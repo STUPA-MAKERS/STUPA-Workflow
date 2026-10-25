@@ -1,7 +1,7 @@
 {
   "name": "antragsplattform-frontend",
   "version": "0.0.0",
-  "description": "Antragsplattform SPA — Skelett + Design-System (T-03)",
+  "description": "Antragsplattform SPA — Skelett + Design-System",
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
@@ -12,6 +12,7 @@
     "test:cov": "jest --coverage",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.app.json --noEmit",
+    "typecheck:spec": "tsc -p tsconfig.spec.json --noEmit",
     "e2e": "playwright test",
     "e2e:tsc": "tsc -p e2e/tsconfig.json --noEmit"
   },
@@ -45,6 +46,7 @@
     "@tiptap/extension-table": "^3.31.4",
     "@tiptap/pm": "^3.31.4",
     "@tiptap/starter-kit": "^3.31.4",
+    "elkjs": "^0.12.0",
     "katex": "^0.18.6",
     "rxjs": "~7.8.0",
     "tiptap-markdown": "^0.9.0",

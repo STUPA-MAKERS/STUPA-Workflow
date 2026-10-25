@@ -83,10 +83,10 @@ describe('TodoArchiveSheetComponent', () => {
     expect(cmp.failed()).toBe(true);
   });
 
+  /** The restore is a tonal button with the undo icon before its label. */
   it('opens a card and restores one', async () => {
     const { api, cmp, openCard, restored, toast, detect } = await setup();
     const restoreButton = screen.getByRole('button', { name: '„Bus anfragen“ wiederherstellen' });
-    // A tonal button with the undo icon before its label.
     expect(restoreButton).toHaveClass('btn--tonal');
     expect(restoreButton.querySelector('app-icon')).toHaveAttribute('name', 'undo');
     expect(restoreButton).toHaveTextContent('Wiederherstellen');

@@ -141,13 +141,13 @@ describe('authGuard', () => {
     expect(toastSpy).toHaveBeenCalled();
   });
 
+  /** The route data mirrors the real /meetings route. */
   it('allows a committee member onto allowCommitteeMember routes without the permission', () => {
     const inCommittee: Principal = {
       ...MEMBER,
       permissions: [],
       gremien: [{ id: 'g1', name: 'StuPa', slug: 'stupa' }],
     };
-    // Mirrors the real /meetings route data.
     const data = { gremiumPermission: ['session.manage'], allowCommitteeMember: true };
     expect(run(data, inCommittee)).toBe(true);
   });
@@ -221,10 +221,12 @@ describe('authGuard', () => {
     expect(run(data, anyUser)).toBe(true);
   });
 
+  /**
+   * A reader with `application.read` and no gremium voting right opens a vote at /voting/:id. Every
+   * way back goes to /voting, so the list child must let them in too. The empty-path child inherits
+   * the data of its parent (`emptyOnly`).
+   */
   describe('the vote routes, for a reader of one vote', () => {
-    // A reader with `application.read` and no gremium voting right opens a vote at
-    // /voting/:id. Every way back goes to /voting, so the list child must let them in
-    // too. The empty-path child inherits the data of its parent (`emptyOnly`).
     const shell = routes.find((r) => r.children?.some((c) => c.path === 'voting'));
     const voting = shell!.children!.find((c) => c.path === 'voting')!;
     const child = (path: string) => voting.children!.find((c) => c.path === path)!;

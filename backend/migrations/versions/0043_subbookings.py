@@ -20,6 +20,7 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     op.execute(
         "ALTER TABLE budget_expense ADD COLUMN IF NOT EXISTS parent_expense_id uuid "
         "REFERENCES budget_expense (id) ON DELETE CASCADE"
@@ -31,5 +32,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     op.execute("DROP INDEX IF EXISTS ix_budget_expense_parent_expense_id")
     op.execute("ALTER TABLE budget_expense DROP COLUMN IF EXISTS parent_expense_id")

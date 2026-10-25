@@ -28,10 +28,12 @@ async def gravatar_enabled(db: AsyncSession) -> bool:
 
 
 async def email_by_id(db: AsyncSession, principal_id: UUID) -> str | None:
+    """Return the email of a principal by id."""
     return await db.scalar(select(PrincipalRow.email).where(PrincipalRow.id == principal_id))
 
 
 async def email_by_sub(db: AsyncSession, sub: str) -> str | None:
+    """Return the email of a principal by ``sub``."""
     return await db.scalar(select(PrincipalRow.email).where(PrincipalRow.sub == sub))
 
 

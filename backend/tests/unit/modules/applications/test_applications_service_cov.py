@@ -10,6 +10,10 @@ path.
 The tests monkeypatch the external service dependencies (FormsService, FlowService) and
 the full-text helpers (`dialect_of`, `trigram_rank`). No Postgres, Redis or network
 access is needed.
+
+The comment tests (PATCH and DELETE on one comment) check that the author check runs on
+the server and that the audit log records both operations, because a comment keeps no
+version history.
 """
 
 from __future__ import annotations
@@ -33,6 +37,8 @@ from app.modules.applications.service.service_base import (
     _title_of,
     _whitelist,
 )
+from app.modules.auth.principal import Principal
+from app.modules.forms.models import FormField
 from app.shared.config_schemas import FormFieldDef
 from app.shared.errors import (
     ConflictError,
@@ -46,16 +52,17 @@ NOW = datetime(2026, 6, 16, 12, 0, tzinfo=UTC)
 AUTHOR_ID = UUID("00000000-0000-0000-0000-00000000a001")
 
 
-# generic fakes
 class _Obj:
-    """Attribute container that is lighter than `SimpleNamespace` for the type checker."""
+    """Attribute container that is lighter than `SimpleNamespace` for the type checker.
+
+    ``__getattr__`` runs only for a missing attribute. It makes the object a dynamic ORM row
+    stub, so the strict type check stays quiet without an `Any` cast at each access.
+    """
 
     def __init__(self, **kw: Any) -> None:
         self.__dict__.update(kw)
 
-    # Dynamic ORM row stub. Every attribute read and write is allowed.
-    # This keeps the strict type check quiet without an `Any` cast at each access.
-    def __getattr__(self, name: str) -> Any:  # only for a missing attribute
+    def __getattr__(self, name: str) -> Any:
         raise AttributeError(name)
 
     def __setattr__(self, name: str, value: Any) -> None:
@@ -130,11 +137,14 @@ class _Session:
         return self.scalar_results.pop(0) if self.scalar_results else None
 
     def add(self, obj: Any) -> None:
+        """Record the object and fill ``at``.
+
+        ``at`` has a DB server_default, so a fresh ORM object holds None. The service serializes
+        it right after commit() without a refresh, so the fake sets it here.
+        """
         self.added.append(obj)
         if getattr(obj, "id", None) is None:
             obj.id = uuid4()
-        # `at` has a DB server_default, so a fresh ORM object holds None. The service
-        # serializes it right after commit() without a refresh, so set it here.
         if hasattr(obj, "at") and getattr(obj, "at", None) is None:
             obj.at = NOW
 
@@ -166,6 +176,7 @@ def _ff(key: str, **over: Any) -> FormFieldDef:
 
 
 def _app(**over: Any) -> _Obj:
+    """Build an application row: no decision, not archived, not captured."""
     base: dict[str, Any] = {
         "id": uuid4(),
         "type_id": uuid4(),
@@ -177,7 +188,6 @@ def _app(**over: Any) -> _Obj:
         "budget_id": None,
         "fiscal_year_id": None,
         "amount": None,
-        # No decision (F1).
         "approved_amount": None,
         "currency": None,
         "data": {"title": "Antrag"},
@@ -186,10 +196,8 @@ def _app(**over: Any) -> _Obj:
         "email_confirmed_at": NOW,
         "created_at": NOW,
         "updated_at": NOW,
-        # Not archived by default, which is the state nearly every test wants.
         "archived_at": None,
         "archived_by": None,
-        # Not captured on behalf of the applicant (#11).
         "captured_by": None,
         "capture_intake": None,
         "received_on": None,
@@ -212,9 +220,8 @@ def _state(**over: Any) -> _Obj:
     return _Obj(**base)
 
 
-# tests for the module-level helpers
 def test_field_from_row_maps_all_columns() -> None:
-    row = _Obj(
+    row = FormField(
         key="cost",
         type="currency",
         label_i18n={"de": "Kosten"},
@@ -236,7 +243,7 @@ def test_field_from_row_maps_all_columns() -> None:
 
 def test_field_from_row_validation_falsy_becomes_none() -> None:
     """A falsy `validation` value such as `{}` becomes `None` through the or shortcut."""
-    row = _Obj(
+    row = FormField(
         key="x", type="text", label_i18n={"de": "x"}, help_i18n=None,
         required=False, validation={}, visible_if=None, compute=None,
         options=None, is_pii=False, is_promoted=False, promote_target=None,
@@ -287,13 +294,16 @@ async def test_get_app_missing_404() -> None:
 
 
 async def test_get_with_pii_owner_and_applicant() -> None:
+    """Read with PII as the owner.
+
+    The execute queue holds the stateSince rows (none, so the creation time), the applicant
+    row and the state colors. The version count defaults to 0.
+    """
     state = _state()
     app = _app(created_by="user-1", current_state_id=state.id)
     applicant = _Obj(email="a@b.de", name="Alice", anonymized_at=None)
     session = _Session(
         get_results=[app, state],
-        # _to_out: the stateSince query (no event, so created_at), the applicant
-        # query, then _resolve_state_colors (cached).
         execute_results=[[], [applicant], [("draft", "#zzz")]],
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
@@ -302,13 +312,17 @@ async def test_get_with_pii_owner_and_applicant() -> None:
     assert out.can_edit is True
     assert out.applicant is not None
     assert out.applicant.email == "a@b.de"
-    assert out.version == 0  # scalar() default None → 0
-    assert out.state_since == app.created_at  # no status event → creation time
+    assert out.version == 0
+    assert out.state_since == app.created_at
 
 
 async def test_get_carries_the_capture_block() -> None:
-    # #11: a captured application names the capturing person, or the Gremium in the
-    # applicant view.
+    """Name the capturing person, or the Gremium in the applicant view.
+
+    The execute queue holds stateSince, the state colors and the `refs_by_sub` row of the
+    capturing person (sub, id, name, email, no merge target). The scalar queue ends with the
+    Gremium name of the applicant view.
+    """
     state = _state()
     app = _app(
         created_by="anna",
@@ -320,8 +334,6 @@ async def test_get_carries_the_capture_block() -> None:
     clerk_id = uuid4()
     session = _Session(
         get_results=[app, state],
-        # stateSince, state colours, then the name of the capturing person.
-        # A row of `refs_by_sub`: sub, id, name, email, then the merge target (none).
         execute_results=[
             [],
             [("draft", "#zzz")],
@@ -341,7 +353,6 @@ async def test_get_carries_the_capture_block() -> None:
     session = _Session(
         get_results=[app, state],
         execute_results=[[], [("draft", "#zzz")]],
-        # The Gremium name of the applicant view.
         scalar_results=[None, "StuPa"],
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
@@ -352,6 +363,7 @@ async def test_get_carries_the_capture_block() -> None:
 
 
 async def test_get_without_pii_and_can_manage() -> None:
+    """Read without PII; a manager may edit."""
     state = _state()
     app = _app(created_by="someone-else", current_state_id=state.id)
     session = _Session(
@@ -364,17 +376,17 @@ async def test_get_without_pii_and_can_manage() -> None:
         app.id, include_pii=False, requester_sub="other", requester_can_manage=True
     )
     assert out.is_owner is False
-    assert out.can_edit is True  # manage
+    assert out.can_edit is True
     assert out.applicant is None
     assert out.version == 3
 
 
 async def test_get_include_pii_but_no_applicant_row() -> None:
+    """Read with PII when the applicant row is missing."""
     state = _state()
     app = _app(current_state_id=state.id)
     session = _Session(
         get_results=[app, state],
-        # stateSince, empty applicant result, then colors
         execute_results=[[], [], [("draft", "#zzz")]],
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
@@ -391,11 +403,11 @@ async def test_get_state_none_when_no_current_state() -> None:
 
 
 async def test_resolve_state_colors_caches_result() -> None:
+    """Drop None colors, and serve the second call from the cache without a query."""
     session = _Session(execute_results=[[("approved", "#0f0"), ("draft", None)]])
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     first = await svc._resolve_state_colors()
-    assert first == {"approved": "#0f0"}  # None values dropped
-    # The second call hits the cache, so no further execute runs.
+    assert first == {"approved": "#0f0"}
     second = await svc._resolve_state_colors()
     assert second is first
     assert len(session.statements) == 1
@@ -407,13 +419,13 @@ async def test_state_out_resolved_none() -> None:
 
 
 def _payload(**over: Any) -> SimpleNamespace:
+    """Build a create payload without draft uploads."""
     base: dict[str, Any] = {
         "type_id": uuid4(),
         "data": {"title": "Mein Antrag", "cost": "10"},
         "applicant_email": "a@b.de",
         "applicant_name": "Alice",
         "lang": "de",
-        # Z4: no draft uploads unless a test sets them.
         "attachment_ids": [],
         "draft_token": None,
     }
@@ -441,33 +453,26 @@ class _FakeForms:
 
 
 class _FakeFlow:
-    scheduled: list[tuple[Any, Any]] = []
-    # The `start_confirmed` calls as (application id, dispatcher).
+    """Record the `start_confirmed` calls as (application id, dispatcher)."""
+
     started: list[tuple[Any, Any]] = []
     available: list[Any] = []
-    # The gremien where the principal holds the gremium permission `vote.cast`
-    # (`gremium_ids_for` in `list_tasks`).
-    cast_gids: set[Any] = set()
 
     def __init__(self, session: object, dispatcher: object = None) -> None:
         self.session = session
         self.dispatcher = dispatcher
 
-    async def schedule_state_deadline(self, app: Any, state: Any) -> None:
-        _FakeFlow.scheduled.append((app, state))
-
     async def start_confirmed(self, application_id: Any) -> None:
         _FakeFlow.started.append((application_id, self.dispatcher))
 
     async def available_transitions(
-        self, _app_id: Any, _principal: Any, *, deadline_passed: Any = None
+        self, _app_id: Any, _principal: Any
     ) -> list[Any]:
         return _FakeFlow.available
 
 
 @pytest.fixture(autouse=True)
 def _reset_flow() -> None:
-    _FakeFlow.scheduled = []
     _FakeFlow.started = []
     _FakeFlow.available = []
     _FakeForms.effective = None
@@ -483,12 +488,6 @@ def _patch_forms(monkeypatch: pytest.MonkeyPatch) -> type[_FakeForms]:
 @pytest.fixture
 def _patch_flow(monkeypatch: pytest.MonkeyPatch) -> type[_FakeFlow]:
     monkeypatch.setattr("app.modules.flow.service.FlowService", _FakeFlow)
-    _FakeFlow.cast_gids = set()
-
-    async def _gremium_ids_for(_session: Any, _principal: Any, perm: str) -> set[Any]:
-        return set(_FakeFlow.cast_gids) if perm == "vote.cast" else set()
-
-    monkeypatch.setattr("app.modules.admin.gremium_roles.gremium_ids_for", _gremium_ids_for)
     return _FakeFlow
 
 
@@ -500,23 +499,24 @@ async def test_create_unknown_type_404() -> None:
 
 
 async def test_create_no_active_flow_404(_patch_forms: type[_FakeForms]) -> None:
+    """Answer 404 when no flow is active."""
     app_type = _Obj(id=uuid4(), has_budget=False, gremium_id=uuid4())
-    session = _Session(get_results=[app_type], execute_results=[[]])  # no active flow
+    session = _Session(get_results=[app_type], execute_results=[[]])
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     with pytest.raises(NotFoundError, match="no active global flow"):
         await svc.create(_payload())  # type: ignore[arg-type]
 
 
 async def test_create_validation_error_422(_patch_forms: type[_FakeForms]) -> None:
+    """Answer 422 when the required field `title` is missing."""
     app_type = _Obj(id=uuid4(), has_budget=False, gremium_id=uuid4())
     fv_id = uuid4()
-    # The required field 'title' is missing from the payload data, so 422 follows.
     _FakeForms.effective = _effective(
         [_ff("title", required=True)], fv_id
     )
     session = _Session(
         get_results=[app_type],
-        execute_results=[[fv_id]],  # _resolve_flow_version_id
+        execute_results=[[fv_id]],
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     with pytest.raises(ValidationProblem):
@@ -526,12 +526,13 @@ async def test_create_validation_error_422(_patch_forms: type[_FakeForms]) -> No
 async def test_create_no_initial_state_404(
     _patch_forms: type[_FakeForms],
 ) -> None:
+    """Answer 404 when the flow has no initial state."""
     app_type = _Obj(id=uuid4(), has_budget=False, gremium_id=uuid4())
     fv_id = uuid4()
     _FakeForms.effective = _effective([_ff("title", required=True)], fv_id)
     session = _Session(
         get_results=[app_type],
-        execute_results=[[fv_id], []],  # flow found, but no initial state
+        execute_results=[[fv_id], []],
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     with pytest.raises(NotFoundError, match="initial state"):
@@ -541,6 +542,11 @@ async def test_create_no_initial_state_404(
 async def test_create_anonymous_ok(
     _patch_forms: type[_FakeForms], _patch_flow: type[_FakeFlow]
 ) -> None:
+    """Create a guest application: unknown keys go, no creator, unconfirmed.
+
+    A guest application rests in the flow until the magic-link verify, so the create starts
+    nothing.
+    """
     app_type = _Obj(id=uuid4(), has_budget=True, gremium_id=uuid4())
     fv_id = uuid4()
     initial = _state(is_initial=True)
@@ -562,21 +568,19 @@ async def test_create_anonymous_ok(
     assert email == "a@b.de"
     assert app.amount == Decimal("12.50")
     assert app.currency == "EUR"
-    assert "junk" not in app.data  # whitelist
-    assert app.created_by is None  # anonymous
-    assert app.email_confirmed_at is None  # a guest stays unconfirmed
+    assert "junk" not in app.data
+    assert app.created_by is None
+    assert app.email_confirmed_at is None
     assert session.committed == 1
     kinds = {type(o).__name__ for o in session.added}
     assert {"Application", "Applicant", "SubmissionVersion", "StatusEvent"} <= kinds
-    # O14: a guest application rests in the flow until the magic-link verify. The
-    # create schedules no deadline and starts nothing.
-    assert _FakeFlow.scheduled == []
     assert _FakeFlow.started == []
 
 
 async def test_create_logged_in_actor_confirms_immediately(
     _patch_forms: type[_FakeForms], _patch_flow: type[_FakeFlow]
 ) -> None:
+    """Confirm a logged-in application and start its flow with the route dispatcher."""
     app_type = _Obj(id=uuid4(), has_budget=False, gremium_id=uuid4())
     fv_id = uuid4()
     initial = _state(is_initial=True)
@@ -594,7 +598,6 @@ async def test_create_logged_in_actor_confirms_immediately(
     )
     assert app.created_by == "principal-sub-1"
     assert app.email_confirmed_at is not None
-    # A confirmed application starts its flow at once, with the route dispatcher.
     assert _FakeFlow.started == [(app.id, dispatcher)]
 
 
@@ -633,16 +636,19 @@ async def test_patch_locked_state_409(monkeypatch: pytest.MonkeyPatch) -> None:
 async def test_patch_locked_state_bypass_succeeds(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Patch a locked state with the bypass.
+
+    The scalar queue holds the current version of the patch and the version of `_to_out`.
+    """
     app = _app(data={"title": "old"})
     locked = _state(edit_allowed=False)
     app_type = _Obj(id=app.type_id, has_budget=False)
     _patch_pinned(monkeypatch, [_ff("title", required=True)])
     session = _Session(
         get_results=[app, locked, app_type],
-        execute_results=[[("draft", "#z")]],  # _resolve_state_colors in _to_out
-        scalar_results=[2, None],  # _current_version (patch) then _to_out version
+        execute_results=[[("draft", "#z")]],
+        scalar_results=[2, None],
     )
-    # _to_out needs a state get → also re-get current state
     session.get_results.append(locked)
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     out = await svc.patch(
@@ -654,6 +660,7 @@ async def test_patch_locked_state_bypass_succeeds(
 
 
 async def test_patch_validation_error_422(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Answer 422 when the patch lacks the title."""
     app = _app(data={"title": "x"})
     state = _state(edit_allowed=True)
     app_type = _Obj(id=app.type_id, has_budget=False)
@@ -661,18 +668,21 @@ async def test_patch_validation_error_422(monkeypatch: pytest.MonkeyPatch) -> No
     session = _Session(get_results=[app, state, app_type])
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     with pytest.raises(ValidationProblem):
-        await svc.patch(app.id, {"other": "v"}, changed_by="u")  # title is missing
+        await svc.patch(app.id, {"other": "v"}, changed_by="u")
     assert session.committed == 0
 
 
 async def test_patch_adds_system_title_field_when_absent(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Without a 'title' entry in `_pinned_fields` the system title field goes first."""
+    """Without a 'title' entry in `_pinned_fields` the system title field goes first.
+
+    The title is NOT dropped.
+    """
     app = _app(data={"title": "old", "note": "a"})
     state = _state(edit_allowed=True)
     app_type = _Obj(id=app.type_id, has_budget=False)
-    _patch_pinned(monkeypatch, [_ff("note")])  # no title field
+    _patch_pinned(monkeypatch, [_ff("note")])
     session = _Session(
         get_results=[app, state, app_type, state],
         execute_results=[[("draft", "#z")]],
@@ -680,7 +690,7 @@ async def test_patch_adds_system_title_field_when_absent(
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     out = await svc.patch(app.id, {"title": "new", "note": "b"}, changed_by="u")
-    assert out.data == {"title": "new", "note": "b"}  # title is NOT dropped
+    assert out.data == {"title": "new", "note": "b"}
 
 
 async def test_patch_empty_diff_stores_none(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -703,12 +713,15 @@ async def test_patch_empty_diff_stores_none(monkeypatch: pytest.MonkeyPatch) -> 
 async def test_patch_app_type_missing_uses_false_context(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A missing `app_type` makes the has_budget context fall back to False."""
+    """A missing `app_type` makes the has_budget context fall back to False.
+
+    The third `get` is the application type, and it gives None.
+    """
     app = _app(data={"title": "x"})
     state = _state(edit_allowed=True)
     _patch_pinned(monkeypatch, [_ff("title", required=True)])
     session = _Session(
-        get_results=[app, state, None, state],  # the third get is app_type and gives None
+        get_results=[app, state, None, state],
         execute_results=[[("draft", "#z")]],
         scalar_results=[0, None],
     )
@@ -721,7 +734,7 @@ async def test_patch_app_type_missing_uses_false_context(
 async def test_patch_refuses_an_amount_below_the_approved_amount(
     monkeypatch: pytest.MonkeyPatch, cost: str | None
 ) -> None:
-    """F1: after a decision the requested amount stays at or above the approved one."""
+    """After a decision the requested amount stays at or above the approved one."""
     app = _app(
         data={"title": "x", "cost": "1000"},
         amount=Decimal("1000"),
@@ -787,18 +800,18 @@ async def test_patch_concurrent_integrity_error_409(
 
 
 async def test_delete_removes_and_commits() -> None:
+    """Write the APPLICATION_DELETE audit entry, then delete and commit.
+
+    The audit record runs an advisory lock and a prev-hash select. The fake gives an empty
+    result to both, so the entry is the genesis entry. The entry is added and flushed before
+    the delete, in the same transaction.
+    """
     app = _app()
-    # Before the row goes away, delete() writes an APPLICATION_DELETE audit entry.
-    # It calls scalar() for the version count and then audit_record. That
-    # runs two execute() calls, one advisory lock and one prev-hash select through
-    # scalar_one_or_none, then add(entry) and flush(). Both execute() calls get an empty
-    # _Result from the fake, so prev_hash stays None (genesis). That is enough here.
     session = _Session(get_results=[app], scalar_results=[0])
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     await svc.delete(app.id, actor="admin")
     assert app in session.deleted
     assert session.committed == 1
-    # The audit entry is added and flushed before the delete, in the same transaction.
     assert any(type(o).__name__ == "AuditEntry" for o in session.added)
     assert session.flushed == 1
 
@@ -822,6 +835,11 @@ async def test_archive_stamps_the_time_and_the_actor_and_audits() -> None:
 
 
 async def test_unarchive_clears_both_columns_and_audits() -> None:
+    """Clear `archived_at` and `archived_by`, and audit the change.
+
+    The old actor must go too, because it would claim that the person archived an active
+    application.
+    """
     app = _app(archived_at=NOW, archived_by="someone")
     session = _Session(get_results=[app])
     svc = ApplicationsService(session)  # type: ignore[arg-type]
@@ -829,8 +847,6 @@ async def test_unarchive_clears_both_columns_and_audits() -> None:
     await svc.set_archived(app.id, archived=False, actor="admin")
 
     assert app.archived_at is None
-    # Cleared too: leaving the old actor on an active application would claim it was
-    # archived by them when it is not archived at all.
     assert app.archived_by is None
     assert any(type(o).__name__ == "AuditEntry" for o in session.added)
 
@@ -872,17 +888,22 @@ async def test_archive_missing_404_writes_nothing() -> None:
 
 
 async def test_delete_missing_404() -> None:
+    """Answer 404 first: no audit entry, no delete and no commit."""
     session = _Session(get_results=[None])
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     with pytest.raises(NotFoundError):
         await svc.delete(uuid4(), actor="admin")
-    # A missing application gives 404 first: no audit entry, no delete and no commit.
     assert session.added == []
     assert session.deleted == []
     assert session.committed == 0
 
 
 async def test_timeline_resolves_actor_names_and_states() -> None:
+    """Resolve the actor names and the transition labels.
+
+    An event without an actor keeps None, and the creation or a revert has no transition
+    label.
+    """
     app = _app()
     to_state = _state(key="approved")
     ev1 = _Obj(
@@ -896,23 +917,26 @@ async def test_timeline_resolves_actor_names_and_states() -> None:
     session = _Session(
         get_results=[app, to_state, to_state],
         execute_results=[
-            # timeline events with the label of the fired transition (A3)
             [(ev1, {"de": "Genehmigen"}), (ev2, None)],
-            [sub_ref("sub-1", "Alice", None, AUTHOR_ID)],  # _author_refs
-            [("approved", "#0f0")],  # _resolve_state_colors (cached after this call)
+            [sub_ref("sub-1", "Alice", None, AUTHOR_ID)],
+            [("approved", "#0f0")],
         ],
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     out = await svc.timeline(app.id)
     assert len(out) == 2
-    assert out[0].actor == "Alice"  # resolved
+    assert out[0].actor == "Alice"
     assert out[0].transition_label == {"de": "Genehmigen"}
-    assert out[1].actor is None  # no actor
-    assert out[1].transition_label is None  # creation or revert
+    assert out[1].actor is None
+    assert out[1].transition_label is None
 
 
 async def test_timeline_links_the_vote_or_names_it_as_deleted() -> None:
-    """A branch event carries its vote; a deleted vote (with its meeting) is named."""
+    """A branch event carries its vote; a deleted vote (with its meeting) is named.
+
+    The applicant cannot open the vote, so the applicant view has no link, but the deleted
+    note stays.
+    """
     app = _app()
     to_state = _state(key="approved")
     vote_id = uuid4()
@@ -935,12 +959,12 @@ async def test_timeline_links_the_vote_or_names_it_as_deleted() -> None:
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     out = await svc.timeline(app.id)
     assert [(e.vote_id, e.vote_deleted) for e in out] == [(vote_id, False), (None, True)]
-    # The applicant cannot open the vote: no link, but the deleted note stays.
     view = await svc.timeline(app.id, applicant_view=True)
     assert [(e.vote_id, e.vote_deleted) for e in view] == [(None, False), (None, True)]
 
 
 async def test_timeline_applicant_view_names_the_gremium() -> None:
+    """Name the Gremium of the application in the applicant view."""
     app = _app(created_by="owner-sub")
     to_state = _state(key="approved")
     member = _Obj(
@@ -965,7 +989,7 @@ async def test_timeline_applicant_view_names_the_gremium() -> None:
             ],
             [("approved", "#0f0")],
         ],
-        scalar_results=["StuPa"],  # name of the Gremium of the application
+        scalar_results=["StuPa"],
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     out = await svc.timeline(app.id, applicant_view=True)
@@ -984,12 +1008,13 @@ async def test_timeline_missing_404() -> None:
 
 
 async def test_versions_resolves_names() -> None:
+    """Resolve an editor without a display name to the email."""
     app = _app()
     v1 = _Obj(version=1, data={"title": "a"}, diff=None, changed_by="sub-1", at=NOW)
     v2 = _Obj(version=2, data={"title": "b"}, diff=None, changed_by=None, at=NOW)
     session = _Session(
         get_results=[app],
-        execute_results=[[sub_ref("sub-1", None, "alice@x.de", AUTHOR_ID)]],  # _author_refs: email
+        execute_results=[[sub_ref("sub-1", None, "alice@x.de", AUTHOR_ID)]],
         scalars_results=[[v1, v2]],
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
@@ -1004,7 +1029,6 @@ async def test_versions_missing_404() -> None:
         await svc.versions(uuid4())
 
 
-# These tests run the real _pinned_fields and _pii_keys_for_type, without a monkeypatch.
 async def test_pinned_fields_returns_the_version_fields() -> None:
     app = _app()
     row = _Obj(
@@ -1037,13 +1061,13 @@ def _patch_search(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 async def test_list_applications_no_filters_default_sort() -> None:
+    """List without filters: stateSince falls back to the creation time."""
     app = _app()
     state = _state()
     session = _Session(
         get_results=[state],
-        # the page rows with stateSince (none: creation time), then the colors
         execute_results=[[(app, None)], [("draft", "#z")]],
-        scalar_results=[1],  # total
+        scalar_results=[1],
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     page = await svc.list_applications(limit=20, offset=0)
@@ -1056,6 +1080,7 @@ async def test_list_applications_no_filters_default_sort() -> None:
 async def test_list_applications_all_filters_postgres_search(
     _patch_search: None,
 ) -> None:
+    """List with every filter and the Postgres search."""
     app = _app(budget_id=uuid4())
     state = _state()
     node_path = "VS-800"
@@ -1063,7 +1088,7 @@ async def test_list_applications_all_filters_postgres_search(
     session = _Session(
         get_results=[state],
         execute_results=[[(app, since)], [("draft", "#z")]],
-        scalar_results=[node_path, 1],  # budget path_key lookup, then total
+        scalar_results=[node_path, 1],
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     page = await svc.list_applications(
@@ -1102,8 +1127,9 @@ async def test_list_applications_sort_state_since() -> None:
 
 
 async def test_list_applications_unknown_budget_yields_empty() -> None:
+    """Give an empty page for an unknown cost center."""
     session = _Session(
-        scalar_results=[None, 0],  # budget path_key None → false() filter, total 0
+        scalar_results=[None, 0],
         scalars_results=[[]],
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
@@ -1144,14 +1170,15 @@ async def test_list_applications_total_none_becomes_zero() -> None:
 
 
 async def test_name_maps_locale_fallbacks() -> None:
+    """Fall back from the wanted locale to `de`, and from None to an empty string."""
     tid1, tid2, tid3 = uuid4(), uuid4(), uuid4()
     gid = uuid4()
     session = _Session(
         execute_results=[
             [
-                (tid1, {"de": "DE", "en": "EN"}),  # locale en wanted
-                (tid2, {"de": "NurDE"}),  # falls back to de
-                (tid3, None),  # None becomes "" through the {} fallback
+                (tid1, {"de": "DE", "en": "EN"}),
+                (tid2, {"de": "NurDE"}),
+                (tid3, None),
             ],
             [(gid, "Gremium A")],
         ]
@@ -1172,22 +1199,15 @@ async def test_name_maps_en_missing_falls_to_de() -> None:
     assert types[tid] == "X"
 
 
-def _principal(**over: Any) -> SimpleNamespace:
-    base: dict[str, Any] = {
-        "sub": "me",
-        "roles": [],
-        "groups": set(),
-        "scope_permissions": None,
-    }
-    base.update(over)
-    ns = SimpleNamespace(**base)
-    perms: set[str] = over.get("_perms", set())
-    roles: list[str] = base["roles"]
-    # Mirror `Principal.has`: the admin role holds every right. The fake used to check
-    # only the explicit set, so a principal with `roles=["admin"]` behaved here unlike
-    # the real one and a test could pass against behaviour production never had.
-    ns.has = lambda p, _perms=perms, _roles=roles: "admin" in _roles or p in _perms  # type: ignore[attr-defined]
-    return ns
+def _principal(
+    *, sub: str = "me", roles: list[str] | None = None, _perms: set[str] | None = None
+) -> Principal:
+    """Build a real principal, so `has` is the production rule.
+
+    The admin role holds every right. A fake `has` could let a test pass against
+    behaviour that production does not have.
+    """
+    return Principal(sub=sub, roles=roles or [], permissions=_perms or set())
 
 
 def _sql(clause: Any) -> str:
@@ -1323,18 +1343,21 @@ class _TaskFlow:
 
 
 async def test_fires_task_transition_member_route() -> None:
+    """Make no task of an optional transition; a non-creator has no applicant route."""
     fires: Any = ApplicationsService._fires_task_transition
     flow = _TaskFlow([_Obj(requires_action=False), _Obj(requires_action=True)], [])
     assert await fires(flow, _app(created_by="x"), _principal(), can_transition=True)
     assert flow.calls == ["member"]
-    # Only optional transitions: no task, and a non-creator has no applicant route.
     flow = _TaskFlow([_Obj(requires_action=False)], [_Obj(requires_action=True)])
     assert not await fires(flow, _app(created_by="x"), _principal(), can_transition=True)
     assert flow.calls == ["member"]
 
 
 async def test_fires_task_transition_applicant_route() -> None:
-    """The creator gets the applicant transitions, with or without the transition right."""
+    """Give the creator the applicant transitions, with or without the transition right.
+
+    An anonymous application has no creator.
+    """
     fires: Any = ApplicationsService._fires_task_transition
     flow = _TaskFlow([_Obj(requires_action=True)], [_Obj(requires_action=True)])
     assert await fires(flow, _app(created_by="me"), _principal(), can_transition=False)
@@ -1342,27 +1365,28 @@ async def test_fires_task_transition_applicant_route() -> None:
     flow = _TaskFlow([], [_Obj(requires_action=False)])
     assert not await fires(flow, _app(created_by="me"), _principal(), can_transition=True)
     assert flow.calls == ["member", "applicant"]
-    # An anonymous application has no creator.
     flow = _TaskFlow([], [_Obj(requires_action=True)])
     assert not await fires(flow, _app(created_by=None), _principal(), can_transition=False)
     assert flow.calls == []
 
 
 async def test_author_names_empty_set_short_circuits() -> None:
+    """Run no query for an empty set."""
     session = _Session()
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     assert await svc._author_refs(set()) == {}
-    assert session.statements == []  # no query runs
+    assert session.statements == []
 
 
 async def test_author_refs_resolve_display_then_email_and_skip_the_rest() -> None:
+    """Resolve the display name, else the email, and never the raw sub of an erased account."""
     id1, id2 = uuid4(), uuid4()
     session = _Session(
         execute_results=[
             [
-                sub_ref("s1", "Display", "e1@x.de", id1),  # display_name
-                sub_ref("s2", None, "e2@x.de", id2),  # email
-                sub_ref("s3", None, None, uuid4()),  # anonymized: missing, never the raw sub
+                sub_ref("s1", "Display", "e1@x.de", id1),
+                sub_ref("s2", None, "e2@x.de", id2),
+                sub_ref("s3", None, None, uuid4()),
             ]
         ]
     )
@@ -1372,17 +1396,17 @@ async def test_author_refs_resolve_display_then_email_and_skip_the_rest() -> Non
 
 
 async def test_add_comment_with_author() -> None:
+    """Resolve the author; the author info carries the id for the avatar."""
     app = _app()
     session = _Session(
         get_results=[app],
-        execute_results=[[sub_ref("sub-1", "Alice", None, AUTHOR_ID)]],  # _author_refs
+        execute_results=[[sub_ref("sub-1", "Alice", None, AUTHOR_ID)]],
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     out = await svc.add_comment(
         app.id, author="sub-1", author_kind="principal", body="hi", visibility="public"
     )
     assert out.author == "Alice"
-    # The author carries the id for the avatar.
     assert out.author_info is not None and out.author_info.principal_id == AUTHOR_ID
     assert out.body == "hi"
     assert session.committed == 1
@@ -1453,6 +1477,11 @@ async def test_list_comments_missing_404() -> None:
 async def test_anonymize_full_with_files_service_commit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Anonymize with a files service and commit.
+
+    The PII key goes from ``data``. The application row is locked before the attachments go,
+    as `add_comment` locks it before it binds files.
+    """
     app = _app(data={"title": "T", "email": "secret@x.de", "note": "n"})
     applicant = _Obj(email="a@b.de", name="Alice", anonymized_at=None)
     v1 = _Obj(
@@ -1465,11 +1494,11 @@ async def test_anonymize_full_with_files_service_commit(
     session = _Session(
         get_results=[app],
         execute_results=[
-            [applicant],  # select applicant
+            [applicant],
         ],
         scalars_results=[
-            ["email"],  # _pii_keys_for_type
-            [v1],  # submission versions
+            ["email"],
+            [v1],
         ],
     )
 
@@ -1485,14 +1514,12 @@ async def test_anonymize_full_with_files_service_commit(
     assert applicant.email is None
     assert applicant.name is None
     assert applicant.anonymized_at is not None
-    assert "email" not in app.data  # the PII key is removed
+    assert "email" not in app.data
     assert "email" not in v1.data
     assert "email" not in v1.diff["added"]
     assert files_calls == [(app.id, "admin")]
     assert session.committed == 1
     assert session.refreshed == 1
-    # The application row is locked before the attachments go, as add_comment locks
-    # it before it binds files.
     assert session.get_kw[0] == {
         "with_for_update": {"key_share": True},
         "populate_existing": True,
@@ -1513,33 +1540,37 @@ async def test_anonymize_no_applicant_no_pii_keys_no_files_no_commit(
 
     The test covers the `applicant is None` branch and the false `if pii_keys` branch.
     It also covers the files else branch with the database delete and the flush branch.
+
+    The type has no ``isPII`` field, so ``data`` stays unchanged.
     """
     app = _app(data={"title": "T"})
-    _patch_pinned_keys(monkeypatch, [_ff("title")])  # no isPII field
+    _patch_pinned_keys(monkeypatch, [_ff("title")])
     session = _Session(
         get_results=[app],
-        execute_results=[[]],  # the applicant select gives nothing
-        scalars_results=[[]],  # _pii_keys_for_type gives nothing
+        execute_results=[[]],
+        scalars_results=[[]],
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     await svc.anonymize(app.id, files=None, commit=False)
     assert session.committed == 0
     assert session.flushed == 1
-    # data stays unchanged because there is no PII key
     assert app.data == {"title": "T"}
 
 
 async def test_anonymize_version_without_diff(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """With PII keys present, a version with `diff=None` skips the diff scrub."""
+    """With PII keys present, a version with `diff=None` skips the diff scrub.
+
+    The pinned form has the PII key `email`, while `_pii_keys_for_type` gives nothing.
+    """
     app = _app(data={"title": "T", "email": "x@y.de"})
     v1 = _Obj(version=1, data={"email": "x@y.de"}, diff=None)
     _patch_pinned_keys(monkeypatch, [_ff("email", isPII=True)])
     session = _Session(
         get_results=[app],
-        execute_results=[[]],  # no applicant
-        scalars_results=[[], [v1]],  # pii_keys_for_type empty, but pinned has email
+        execute_results=[[]],
+        scalars_results=[[], [v1]],
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     await svc.anonymize(app.id, files=None, commit=True)
@@ -1566,9 +1597,6 @@ async def test_current_version_value() -> None:
     assert await svc._current_version(uuid4()) == 5
 
 
-# PATCH/DELETE on one comment. The author check is server-side and the audit log
-# records both operations, because a comment keeps no version history.
-
 
 def _comment(**over: Any) -> Any:
     base: dict[str, Any] = {
@@ -1585,18 +1613,21 @@ def _comment(**over: Any) -> Any:
 
 
 def test_is_comment_author_rules() -> None:
+    """Match a principal on the stored sub, and only with a session sub.
+
+    An applicant comment stores no sub, so the magic-link applicant owns it.
+    """
     from app.modules.applications.service.comments import is_comment_author
 
-    # A principal matches on the stored sub, and only with a session sub.
     assert is_comment_author("s1", "principal", viewer_sub="s1", viewer_is_applicant=False)
     assert not is_comment_author("s1", "principal", viewer_sub="s2", viewer_is_applicant=False)
     assert not is_comment_author("s1", "principal", viewer_sub=None, viewer_is_applicant=True)
-    # An applicant comment stores no sub, so the magic-link applicant owns it.
     assert is_comment_author(None, "applicant", viewer_sub=None, viewer_is_applicant=True)
     assert not is_comment_author(None, "applicant", viewer_sub="s1", viewer_is_applicant=False)
 
 
 async def test_update_comment_by_author() -> None:
+    """Update as the author; the audit payload carries metadata only, never the text."""
     app = _app()
     c = _comment(application_id=app.id)
     session = _Session(
@@ -1618,7 +1649,6 @@ async def test_update_comment_by_author() -> None:
     assert session.committed == 1
     entries = [o for o in session.added if type(o).__name__ == "AuditEntry"]
     assert [e.action for e in entries] == ["comment_update"]
-    # The audit payload carries metadata only, never the comment text.
     assert entries[0].data == {
         "applicationId": str(app.id),
         "authorKind": "principal",
@@ -1627,6 +1657,11 @@ async def test_update_comment_by_author() -> None:
 
 
 async def test_update_comment_by_manager_of_foreign_comment() -> None:
+    """Update a foreign comment as a manager.
+
+    The response is not marked as own. The author sub names no account, so the response
+    carries no name and no sub.
+    """
     app = _app()
     c = _comment(application_id=app.id, author="other")
     session = _Session(get_results=[app], execute_results=[[c], [], [], []])
@@ -1640,8 +1675,6 @@ async def test_update_comment_by_manager_of_foreign_comment() -> None:
         viewer_is_applicant=False,
         can_manage=True,
     )
-    # The manager is not the author, so the response is not marked as own. The
-    # author sub names no account, so the response carries no name and no sub.
     assert out.is_own is False and out.author is None
     assert out.author_info is not None and out.author_info.kind == "deleted"
 
@@ -1748,31 +1781,8 @@ async def test_delete_comment_unknown_404() -> None:
         )
 
 
-async def test_patch_moves_a_relative_changed_deadline(
-    monkeypatch: pytest.MonkeyPatch, _patch_flow: type[_FakeFlow]
-) -> None:
-    """F7: a state whose policy follows edits gets its deadline re-created."""
-    from app.modules.applications.service import edits as edits_mod
-
-    app = _app(data={"title": "old"})
-    state = _state(edit_allowed=True, config={"deadlinePolicyKey": "k"})
-    app_type = _Obj(id=app.type_id, has_budget=False)
-    _patch_pinned(monkeypatch, [_ff("title", required=True)])
-
-    async def _follows(_session: Any, config: Any) -> bool:
-        return config == {"deadlinePolicyKey": "k"}
-
-    monkeypatch.setattr(edits_mod, "state_deadline_follows_edits", _follows)
-    session = _Session(
-        get_results=[app, state, app_type, state],
-        execute_results=[[("draft", "#z")]],
-        scalar_results=[1, None],
-    )
-    await ApplicationsService(session).patch(app.id, {"title": "new"}, changed_by="u")  # type: ignore[arg-type]
-    assert _FakeFlow.scheduled == [(app, state)]
-
-
 async def test_add_comment_checks_and_binds_its_files(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Lock the application before the anonymized check, then bind the files."""
     from app.modules.applications.service import comments as comments_mod
 
     calls: list[tuple[str, dict[str, Any]]] = []
@@ -1801,7 +1811,6 @@ async def test_add_comment_checks_and_binds_its_files(monkeypatch: pytest.Monkey
         pepper="p",
     )
     assert [k for k, _ in calls] == ["check", "bind"]
-    # A comment with files locks the application before the anonymized check.
     assert session.get_kw == [{"with_for_update": {"key_share": True}, "populate_existing": True}]
     assert calls[1][1]["comment_id"] == out.id
     assert calls[1][1]["attachment_ids"] == [draft]
@@ -1839,6 +1848,7 @@ async def test_add_comment_with_files_on_an_anonymized_application_is_422(
 async def test_add_comment_without_files_on_an_anonymized_application_skips_the_check(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Skip the anonymized check and the lock for a comment without files."""
     from app.modules.applications.service import comments as comments_mod
 
     async def _check(_s: object, **_kw: Any) -> None:
@@ -1846,18 +1856,17 @@ async def test_add_comment_without_files_on_an_anonymized_application_skips_the_
 
     monkeypatch.setattr(comments_mod, "check_message_drafts", _check)
     app = _app()
-    # The anonymized marker would refuse files; a comment without files never asks.
     session = _Session(get_results=[app], scalar_results=[datetime.now(UTC)], execute_results=[[]])
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     out = await svc.add_comment(
         app.id, author=None, author_kind="applicant", body="hallo", visibility="public"
     )
     assert out.body == "hallo"
-    # Without files the comment takes no lock on the application.
     assert session.get_kw == [{}]
 
 
 async def test_delete_comment_removes_its_files_first() -> None:
+    """Lock the file rows before the COMMENT_DELETE audit entry."""
     app = _app()
     c = _comment(application_id=app.id)
     session = _Session(get_results=[app], execute_results=[[c], [], []])
@@ -1885,6 +1894,5 @@ async def test_delete_comment_removes_its_files_first() -> None:
         files=_Files(),  # type: ignore[arg-type]
     )
     assert removed == [("comment", [c.id], "sub-1")]
-    # The file rows are locked before the COMMENT_DELETE audit entry.
     assert locked == [("comment", [c.id])]
     assert session.deleted == [c]

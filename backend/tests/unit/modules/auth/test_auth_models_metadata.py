@@ -1,4 +1,4 @@
-"""Metadata introspection of the T-10 tables magic_link and auth_session, without a DB."""
+"""Metadata introspection of the tables magic_link and auth_session, without a DB."""
 
 from __future__ import annotations
 

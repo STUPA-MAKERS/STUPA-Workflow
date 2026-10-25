@@ -31,6 +31,7 @@ _TABLES: tuple[str, ...] = ("comment", "ticket_note")
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     for table in _TABLES:
         op.execute(
             f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS mentions jsonb "
@@ -39,5 +40,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     for table in _TABLES:
         op.execute(f"ALTER TABLE {table} DROP COLUMN IF EXISTS mentions")

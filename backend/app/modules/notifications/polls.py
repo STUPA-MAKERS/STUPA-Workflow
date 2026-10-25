@@ -27,7 +27,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.db import get_sessionmaker
-from app.modules.admin.gremium_roles import _time_valid_clause
+from app.modules.admin.gremium_roles import membership_active_clause
 from app.modules.admin.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.notifications.links import vote_link
@@ -100,7 +100,7 @@ async def eligible_members(
             .join(GremiumRole, GremiumRole.id == GremiumMembership.gremium_role_id)
             .where(
                 GremiumMembership.gremium_id == gremium_id,
-                _time_valid_clause(now),
+                membership_active_clause(now),
                 PrincipalRow.active.is_(True),
                 PrincipalRow.email.is_not(None),
             )
@@ -137,7 +137,9 @@ async def send_poll_mail(
 ) -> bool:
     """Send ``poll_started`` (every eligible member) or ``poll_reminder`` (no answer yet).
 
-    Each member gets an own mail with an own idempotency key (kind, vote, member).
+    Each member gets an own mail with an own idempotency key (kind, vote, member),
+    because a shared To: line would show every member who has not answered yet, which
+    a secret poll must not reveal.
 
     Returns:
         True when at least one mail was enqueued.
@@ -160,8 +162,6 @@ async def send_poll_mail(
     }
     service = NotificationService(session, queue=queue, settings=settings)
     sent = False
-    # One mail per member: a shared To: line would show every recipient who has not
-    # answered yet, which a secret poll must not reveal.
     for sub, email in members:
         if await service.send_kind_mail(
             [email],
@@ -199,6 +199,6 @@ async def notify_poll_started(
             return await send_poll_mail(
                 session, queue=queue, settings=settings, vote=vote, now=now, reminder=False
             )
-    except Exception:  # noqa: BLE001 - a mail must never break the open
+    except Exception:
         logger.exception("poll_started mail failed (vote=%s)", vote_id)
         return False

@@ -53,7 +53,6 @@
   font-weight: var(--fw-semibold);
   color: var(--color-text);
 }
-/* A status title keeps the weight of the line. */
 .hist__title app-status-text {
   font-weight: inherit;
   white-space: normal;
@@ -97,8 +96,6 @@
   color: var(--color-text);
   text-decoration: none;
 }
-/* "Werte anzeigen": a text button on its own line below the change. The whole button
-   is the target, with the chevron. */
 .hist__more {
   display: flex;
   align-items: center;
@@ -147,8 +144,6 @@
     transition: none;
   }
 }
-/* The old and the new value as blocks. A block keeps the lines and the indent of its
-   text and wraps a long word; a wrapped line keeps the indent of its first part. */
 .hist__values {
   display: flex;
   flex-direction: column;
@@ -169,12 +164,9 @@
 }
 .hist__line {
   display: block;
-  /* An empty line is a paragraph break: it keeps the height of a line. */
   min-height: 1lh;
   white-space: pre-wrap;
 }
-/* A struck paragraph is hard to read: the caption "Vorher" marks the old block, so it
-   keeps a plain muted text. */
 .hist__changes del.hist__block {
   color: var(--color-text-muted);
   text-decoration: none;
@@ -188,9 +180,7 @@
 .hist__meta {
   color: var(--color-text-subtle);
 }
-/* On surface 3 the subtle text is below 4.5:1 (WCAG 1.4.3); the muted text passes.
-   A status title of the kind `muted` gets the same fix from the global `.rowgroup--bg3`
-   rule in `styles.scss`. */
+// On surface 3 the subtle text is below 4.5:1 (WCAG 1.4.3); the muted text passes.
 .rowgroup--bg3 .hist__meta {
   color: var(--color-text-muted);
 }

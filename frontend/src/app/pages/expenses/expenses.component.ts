@@ -111,7 +111,7 @@ const SORTS: readonly { field: ExpenseSortField; order: 'asc' | 'desc'; key: str
 ];
 
 /**
- * Bookings (boards Fin-Buchungen and the other Fin-Buchung* boards): a list of bookings
+ * Bookings: a list of bookings
  * or transfers beside a detail sheet, like the applications page.
  *
  * The list: title with export, sort and a menu; the search and the chips (cost centre as
@@ -124,11 +124,12 @@ const SORTS: readonly { field: ExpenseSortField; order: 'asc' | 'desc'; key: str
  * A booking is standalone or bound to an application. A standalone booking needs a cost
  * centre and a fiscal year; a bound booking takes both from the application. This class
  * is a facade over the state modules; its public surface drives the specs.
+ *
+ * Side by side it is a pane page (`styles.scss`): the panes fill the free height and scroll
+ * by themselves.
  */
 @Component({
   selector: 'app-expenses',
-  // A pane page (styles.scss): side by side the panes fill the free height and scroll by
-  // themselves.
   host: { '[class.pane-page]': 'split()' },
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -175,7 +176,7 @@ const SORTS: readonly { field: ExpenseSortField; order: 'asc' | 'desc'; key: str
 export class ExpensesComponent implements OnDestroy {
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
-  // The state modules share this root toast instance. Specs spy on it here.
+  /** The state modules share this root toast instance, so specs spy on it here. */
   private readonly toast = inject(ToastService);
   private readonly api = inject(BudgetTreeApi);
   private readonly apps = inject(ApiClient);
@@ -183,8 +184,10 @@ export class ExpensesComponent implements OnDestroy {
   private readonly router = inject(Router);
   private readonly frame = inject(PageFrameService);
 
-  // The state modules. The template hands them to the forms, which read and set their
-  // signals directly; the methods below are the facade the specs drive.
+  /**
+   * The list state. The template hands the state modules to the forms, which read and set
+   * their signals directly; the methods of this class are the facade the specs drive.
+   */
   protected readonly list = new ExpensesListState();
   protected readonly sub = new ExpenseSubBookingsState(this.list);
   protected readonly transfers = new ExpenseTransfersState(this.list);
@@ -221,10 +224,9 @@ export class ExpensesComponent implements OnDestroy {
   readonly refreshing = this.list.refreshing;
   readonly reloading = this.list.reloading;
 
-  /** The display label of every cost centre: name, path and swatch colour (O19). */
+  /** The display label of every cost centre: name, path and swatch colour. */
   readonly costCentres = computed(() => costCentreIndex(this.budgetTree()));
 
-  // --- the open row ------------------------------------------------------------------
   /** The booking open in the detail (`?id=`). */
   readonly selectedId = signal('');
   /** The transfer open in the detail (`?transfer=`). */
@@ -253,16 +255,16 @@ export class ExpensesComponent implements OnDestroy {
     return this.transferItems().find((t) => t.transferId === id) ?? null;
   });
 
-  // --- linked records of the open booking --------------------------------------------
   /** The invoice of the open booking, from the cache or loaded once. */
   readonly linkedInvoice = signal<Invoice | null>(null);
   /** The application of the open booking, when the reader may read it. */
   readonly linkedApplication = signal<Application | null>(null);
   /** The fiscal-year labels ("2026", "2025/26") by id, loaded per top cost centre. */
   readonly fyLabels = signal<ReadonlyMap<string, string>>(new Map());
+  /** The ids of the closed fiscal years among the loaded ones. Their bookings are frozen. */
+  readonly closedFys = signal<ReadonlySet<string>>(new Set());
   private readonly fyRequested = new Set<string>();
 
-  // --- selection (bulk) ------------------------------------------------------------
   /** The rows show check boxes. */
   readonly selecting = signal(false);
   readonly selected = signal<ReadonlySet<Uuid>>(new Set());
@@ -310,7 +312,6 @@ export class ExpensesComponent implements OnDestroy {
     return null;
   });
 
-  // --- filters ---------------------------------------------------------------------
   /** Phone: filters and pickers open from the bottom; wider: from the start edge. */
   readonly sheetSide = computed(() => (this.phone() ? 'bottom' : 'start'));
 
@@ -332,7 +333,6 @@ export class ExpensesComponent implements OnDestroy {
     { value: 'transfers', label: this.i18n.translate('expenses.tab.transfers') },
   ]);
 
-  // --- header menus ----------------------------------------------------------------
   readonly sortSections = computed<RowMenuSection[]>(() => {
     const current = `${this.sortField()}:${this.sortOrder()}`;
     return [
@@ -381,7 +381,6 @@ export class ExpensesComponent implements OnDestroy {
     }
   }
 
-  // --- forms -----------------------------------------------------------------------
   readonly createOpen = this.dialogs.createOpen;
   readonly editing = this.dialogs.editing;
   readonly confirmDelete = this.dialogs.confirmDelete;
@@ -420,9 +419,11 @@ export class ExpensesComponent implements OnDestroy {
     }
   });
 
-  // Transfers tab. The route also admits `budget.view`, but the server lists, edits
-  // and deletes transfers only for `budget.book` (the create permission). So the tab
-  // shows only when `canManage()` is true.
+  /**
+   * The open tab. The transfers tab shows only when `canManage()` is true, because the
+   * route also admits `budget.view`, but the server lists, edits and deletes transfers only
+   * for `budget.book` (the create permission).
+   */
   readonly tab = signal<ExpensesTab>('bookings');
   readonly transferItems = this.transfers.items;
   readonly transferTotal = this.transfers.total;
@@ -465,7 +466,6 @@ export class ExpensesComponent implements OnDestroy {
         : field === 'createdAt'
           ? e.createdAt
           : (e.paymentDate ?? e.createdAt);
-    // Sorted by amount, the months would interleave: one group without a heading.
     if (field === 'amount') {
       return shown.length ? [{ key: 'all', label: '', items: shown }] : [];
     }
@@ -478,8 +478,15 @@ export class ExpensesComponent implements OnDestroy {
     }),
   );
 
+  /**
+   * The URL is applied first, then data loads exactly once, because a second, unfiltered request
+   * could resolve last and overwrite the filtered list. The query param map is subscribed, because
+   * the palette can send a hit here while the component is active. The filter write-back replaces
+   * the create-link navigation instead of merging, because a merge would carry `new=booking` on and
+   * open the form of a new booking again after its save. The rows are tracked too, because a
+   * refresh can move the open booking out of the filter; it then loads by its id.
+   */
   constructor() {
-    // The shown bookings read their linked records ahead, so a click shows them at once.
     prefetchDetails({
       items: this.items,
       key: (e) => e.id,
@@ -495,26 +502,14 @@ export class ExpensesComponent implements OnDestroy {
       },
       when: () => this.tab() === 'bookings',
     });
-    // Apply the URL first, then load data exactly once. The URL keeps the view shareable,
-    // survives a reload, and is the target of links from the budget page, the invoices
-    // page and the global search. A second, unfiltered request could resolve last and
-    // overwrite the filtered list.
     this.applyQueryParams(this.route.snapshot.queryParamMap);
     this.list.reload();
 
-    // The palette can send us here while we are already here: a hit on another booking
-    // changes only the query string, and the router keeps this component alive. The
-    // stream also emits the current parameters once, which opens the form of a create
-    // link.
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((qp) => {
       if (this.applyQueryParams(qp)) this.list.reload();
       this.adoptCreateLink(qp);
     });
 
-    // Write the filters back, so the URL always states what the list shows. The write
-    // also drops the create link: it runs after `adoptCreateLink` and replaces its
-    // navigation, and a merge would carry `new=booking` on to the next navigation, so the
-    // form of a new booking opened again after its save.
     effect(() => {
       const queryParams = {
         budget: this.budgetId() || null,
@@ -534,17 +529,13 @@ export class ExpensesComponent implements OnDestroy {
       );
     });
 
-    // A new booking opens in the detail; a deleted one leaves it, with its form.
     this.dialogs.onCreated = (created) => this.openBooking(created.id);
-    // A saved booking that is open but not among the rows: keep its detail current.
     this.dialogs.onSaved = (saved) => {
       if (saved.id === this.selectedId() && !this.items().some((e) => e.id === saved.id)) {
         this.fetchedExpense.set(saved);
       }
     };
     this.dialogs.onDeleted = (gone) => {
-      // Close the form only when it shows the deleted booking (or a sub-booking of it).
-      // A sub-booking deleted from the form of its parent keeps that form and its edits.
       const edited = this.dialogs.editing();
       if (edited && (edited.id === gone.id || edited.parentExpenseId === gone.id)) {
         this.dialogs.closeForms();
@@ -556,8 +547,6 @@ export class ExpensesComponent implements OnDestroy {
       if (gone.transferId === this.selectedTransferId()) this.closeDetail();
     };
 
-    // Remove selected ids for rows that no longer exist after a refresh, reload,
-    // or delete.
     effect(() => {
       const ids = new Set(this.items().map((e) => e.id));
       this.selected.update((cur) =>
@@ -565,10 +554,6 @@ export class ExpensesComponent implements OnDestroy {
       );
     });
 
-    // The open booking: load what is not among the rows, its invoice, its application,
-    // its sub-bookings and the label of its fiscal year.
-    // The rows are tracked too: a refresh after an edit or a bulk "Umbuchen" can move the
-    // open booking out of the filter. It then loads by its id.
     effect(() => {
       const id = this.selectedId();
       const loading = this.loading();
@@ -579,12 +564,17 @@ export class ExpensesComponent implements OnDestroy {
       const e = this.selectedExpense();
       untracked(() => this.loadLinked(e));
     });
-    // The fiscal-year label of the open row needs the tree, which can come later.
     effect(() => {
       const id = this.selectedTransfer()?.fromBudgetId ?? this.selectedExpense()?.budgetId;
       const tree = this.budgetTree();
       untracked(() => {
         if (id) this.loadFyLabels(id, tree);
+      });
+    });
+    effect(() => {
+      const tree = this.budgetTree();
+      untracked(() => {
+        if (this.canManage()) for (const top of tree) this.loadFyLabels(top.id, tree);
       });
     });
 
@@ -595,6 +585,10 @@ export class ExpensesComponent implements OnDestroy {
   /**
    * Read the filters, the view and the open row from the URL. Return true if a filter of
    * the list changed (the caller then reloads it).
+   *
+   * Absence clears: each of these is written back into the URL, so a parameter that is gone was
+   * taken away, not merely omitted. A click on another row while a form is open replaces the form,
+   * so the highlighted row and the detail always agree.
    */
   private applyQueryParams(qp: ParamMap): boolean {
     const raw = qp.get('kind');
@@ -602,8 +596,6 @@ export class ExpensesComponent implements OnDestroy {
     const budgetId = qp.get('budget') ?? '';
     const q = qp.get('q') ?? '';
     let changed = false;
-    // Absence clears. Each of these is written back into the URL by the effect in the
-    // constructor, so a parameter that is gone was taken away, not merely omitted.
     if (budgetId !== this.budgetId()) {
       this.budgetId.set(budgetId);
       changed = true;
@@ -624,8 +616,6 @@ export class ExpensesComponent implements OnDestroy {
     } else if (changed && view === 'transfers') {
       this.transfers.reload();
     }
-    // A click on another row while a form is open: the row replaces the form, so the
-    // highlighted row and the detail always agree.
     const id = qp.get('id') ?? '';
     if (id !== this.selectedId()) {
       if (id) this.dialogs.closeForms();
@@ -686,7 +676,12 @@ export class ExpensesComponent implements OnDestroy {
     });
   }
 
-  /** The linked records of the open booking. Each request runs once per booking. */
+  /**
+   * The linked records of the open booking. Each request runs once per booking.
+   *
+   * A budget reader may lack the right to read the application; the card then shows only the title
+   * the booking carries.
+   */
   private loadLinked(e: Expense | null): void {
     const invoiceId = e?.invoiceId ?? null;
     if (this.linkedInvoice()?.id !== invoiceId) this.linkedInvoice.set(null);
@@ -704,8 +699,6 @@ export class ExpensesComponent implements OnDestroy {
     const appId = e?.applicationId ?? null;
     if (this.linkedApplication()?.id !== appId) this.linkedApplication.set(null);
     if (appId && this.linkedApplication()?.id !== appId) {
-      // A budget reader may lack the right to read the application: the card then shows
-      // only the title the booking carries.
       this.apps.getApplication(appId, { quiet: true, detail: true }).subscribe({
         next: (app) => {
           if (this.selectedExpense()?.applicationId === app.id) this.linkedApplication.set(app);
@@ -724,12 +717,21 @@ export class ExpensesComponent implements OnDestroy {
     if (!top || this.fyRequested.has(top.id)) return;
     this.fyRequested.add(top.id);
     this.api.listFiscalYears(top.id).subscribe({
-      next: (fys) =>
+      next: (fys) => {
         this.fyLabels.update((m) => {
           const next = new Map(m);
           for (const f of fys) next.set(f.id, f.display);
           return next;
-        }),
+        });
+        this.closedFys.update((c) => {
+          const next = new Set(c);
+          for (const f of fys) {
+            if (f.closedAt) next.add(f.id);
+            else next.delete(f.id);
+          }
+          return next;
+        });
+      },
       error: () => this.fyRequested.delete(top.id),
     });
   }
@@ -739,7 +741,6 @@ export class ExpensesComponent implements OnDestroy {
     this.frame.fill.set(false);
   }
 
-  // --- formatting ------------------------------------------------------------------
   money(amount: string): string {
     return formatMoney(amount, this.i18n.formatLocale());
   }
@@ -748,9 +749,8 @@ export class ExpensesComponent implements OnDestroy {
     return signedEur(e.kind, e.amount, this.i18n.formatLocale());
   }
 
+  /** Only the date part counts, because a `createdAt` keeps the day the server wrote. */
   day(iso: string | null): string {
-    // Only the date part counts (a `createdAt` keeps the day the server wrote), as in the
-    // month groups.
     return dayMonth(iso?.slice(0, 10), this.i18n.formatLocale());
   }
 
@@ -758,11 +758,19 @@ export class ExpensesComponent implements OnDestroy {
     return costCentreLabel(this.costCentres(), id, pathKey);
   }
 
+  /** The label of a fiscal year ("2026"); a closed year says so. */
   fyLabel(id: string): string | null {
-    return this.fyLabels().get(id) ?? null;
+    const year = this.fyLabels().get(id);
+    if (!year) return null;
+    return this.closedFys().has(id) ? this.i18n.translate('budget.fy.closedLabel', { year }) : year;
   }
 
-  // --- the open row ------------------------------------------------------------------
+  /** Whether the reader may change a booking of this fiscal year: `budget.book`, and
+   *  the year is not closed. */
+  canChange(fyId: string): boolean {
+    return this.canManage() && !this.closedFys().has(fyId);
+  }
+
   /** Open a booking in the detail. The URL keeps it, so the back button closes it. */
   openBooking(id: string): void {
     this.dialogs.closeForms();
@@ -795,7 +803,6 @@ export class ExpensesComponent implements OnDestroy {
     });
   }
 
-  // --- filters ---------------------------------------------------------------------
   setKind(k: string): void {
     this.list.setKind(k === 'expense' || k === 'income' ? k : '');
   }
@@ -863,7 +870,6 @@ export class ExpensesComponent implements OnDestroy {
     this.transfers.loadMore();
   }
 
-  // --- forms -----------------------------------------------------------------------
   openCreate(): void {
     this.dialogs.openCreate();
   }
@@ -929,10 +935,11 @@ export class ExpensesComponent implements OnDestroy {
     this.dialogs.openInvoiceFile(inv);
   }
 
-  /** The row menu of a booking. */
+  /** The row menu of a booking. A booking of a closed fiscal year has no write action. */
   rowMenu(e: Expense): RowMenuSection[] {
     const main: RowMenuItem[] = [];
-    if (this.canManage()) {
+    const canChange = this.canChange(e.fiscalYearId);
+    if (canChange) {
       main.push({ id: 'edit', label: this.i18n.translate('action.edit'), icon: 'edit' });
       main.push({ id: 'sub', label: this.i18n.translate('expenses.sub.add'), icon: 'plus' });
     }
@@ -944,7 +951,7 @@ export class ExpensesComponent implements OnDestroy {
       });
     }
     const sections: RowMenuSection[] = main.length ? [{ items: main }] : [];
-    if (this.canManage()) {
+    if (canChange) {
       sections.push({
         items: [{ id: 'delete', label: this.i18n.translate('action.delete'), icon: 'trash', danger: true }],
       });
@@ -1007,7 +1014,6 @@ export class ExpensesComponent implements OnDestroy {
     return this.i18n.translate('expenses.rowMenu', { description: e.description });
   }
 
-  // --- selection -------------------------------------------------------------------
   startSelecting(): void {
     if (!this.canManage()) return;
     this.selecting.set(true);
@@ -1041,9 +1047,9 @@ export class ExpensesComponent implements OnDestroy {
     this.bulkConfirm.set('delete');
   }
 
+  /** The disabled button is an affordance, not a control, so the cap is checked here too. */
   runBulkDelete(): void {
     const ids = [...this.selected()];
-    // The disabled button is an affordance, not a control: check the cap here too.
     if (!ids.length || this.bulkBusy() || this.bulkDeleteBlocked()) return;
     this.bulkBusy.set(true);
     let done = 0;
@@ -1096,8 +1102,6 @@ export class ExpensesComponent implements OnDestroy {
           const e = byId.get(id);
           const patch: ExpenseUpdate = {};
           if (category) patch.category = category;
-          // Set the cost center only for a standalone booking. A bound booking and a
-          // sub-booking inherit it.
           if (budgetId && e && !e.applicationId && !e.parentExpenseId) {
             patch.budgetId = budgetId as Uuid;
           }
@@ -1119,7 +1123,7 @@ export class ExpensesComponent implements OnDestroy {
     this.bulkReassignOpen.set(false);
     this.bulkBudgetId.set('');
     this.bulkCategory.set('');
-    this.list.refresh(); // Get server truth, e.g. transfer legs. Prune effect fixes the selection.
+    this.list.refresh();
     if (failed) {
       const key = kind === 'delete' ? 'expenses.bulk.deleteError' : 'expenses.bulk.reassignError';
       this.toast.error(this.i18n.translate(key));

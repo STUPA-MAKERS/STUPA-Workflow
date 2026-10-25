@@ -337,7 +337,7 @@ def test_card_routes(env: _Env) -> None:
     assert c.delete(f"/api/todos/cards/{CID}/comments/{XID}").status_code == 204
     files = {"body": "", "attachmentIds": [str(XID)], "draftToken": "tok"}
     assert c.post(f"/api/todos/cards/{CID}/comments", json=files).status_code == 201
-    name, _args, kw = next(call for call in reversed(env.service.calls) if call[0] == "add_comment")
+    _, _args, kw = next(call for call in reversed(env.service.calls) if call[0] == "add_comment")
     assert (kw["attachment_ids"], kw["draft_token"]) == ([XID], "tok")
     assert kw["pepper"]
     assert c.post(f"/api/todos/cards/{CID}/comments", json={"body": " "}).status_code == 422
@@ -367,8 +367,8 @@ def test_the_default_wiring() -> None:
     storage = object()
 
     class _Request:
-        class app:  # noqa: N801
-            class state:  # noqa: N801
+        class app:
+            class state:
                 object_storage = storage
 
     service = get_todo_service(object(), _Request())  # type: ignore[arg-type]
@@ -401,13 +401,16 @@ class _Broker:
 
 
 def test_a_write_pings_its_board_after_the_route(env: _Env) -> None:
+    """Ping the board after the write route.
+
+    The pings are drained, so a read after it sends nothing.
+    """
     broker = _Broker()
     env.app.state.broker = broker
     env.service.ping_on.add("move")
     assert env.client.post(f"/api/todos/cards/{CID}/move", json={"columnId": str(XID)}).is_success
     ping = {"type": "card", "boardId": str(BID), "cardId": str(CID)}
     assert broker.sent == [(f"todo-board:{BID}", ping)]
-    # The pings are drained: a read after it sends nothing.
     assert env.client.get(f"/api/todos/cards/{CID}").is_success
     assert len(broker.sent) == 1
 

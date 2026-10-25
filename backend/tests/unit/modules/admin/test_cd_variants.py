@@ -3,7 +3,7 @@
 The tests cover four areas.
 
 1. The upload policy `sniff_cd_logo`: SVG and PDF pass here, because these bytes
-   only reach the LaTeX renderer. A mismatched magic byte is rejected.
+   only reach the typst renderer. A mismatched magic byte is rejected.
 2. The asset name that typst sees: plain, unique per logo row and with the
    extension of the SNIFFED type.
 3. `CdVariantService`: CRUD, the immutable key, the 409 on a delete while a
@@ -43,7 +43,10 @@ from app.modules.admin.schemas import (
 )
 from app.modules.admin.service import ConfigService
 from app.modules.admin.service.cd_variants import CD_LOGO_PREFIX, CdVariantService
+from app.modules.files import scanner as scanner_mod
+from app.modules.files.scanner import ScanVerdict
 from app.modules.files.storage import StorageError
+from app.settings import Settings, load_settings
 from app.shared.errors import (
     ConflictError,
     NotFoundError,
@@ -61,9 +64,6 @@ SVG = b'<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>'
 SVG_XML = b'<?xml version="1.0"?>\n<!-- a comment -->\n<svg viewBox="0 0 1 1"/>'
 PDF = b"%PDF-1.7\n1 0 obj\n"
 ICO = b"\x00\x00\x01\x00" + b"\x00" * 32
-
-
-# --- fakes ----------------------------------------------------------------
 
 
 class FakeResult:
@@ -192,9 +192,6 @@ def logo_row(**kw: Any) -> CdVariantLogo:
     return row
 
 
-# --- 1. upload policy -----------------------------------------------------
-
-
 @pytest.mark.parametrize(
     ("data", "expected"),
     [
@@ -216,14 +213,19 @@ def test_sniff_accepts_the_whole_allowlist(data: bytes, expected: str) -> None:
     "data",
     [
         b"",
-        b"GIF89a" + b"\x00" * 16,  # a real image type, but not on the list
-        ICO,  # branding accepts ICO, the CD logos do not
+        b"GIF89a" + b"\x00" * 16,
+        ICO,
         b"not an image at all",
-        b"<html><body>hi</body></html>",  # opens with '<' but is no SVG
+        b"<html><body>hi</body></html>",
         b"\x00\x01\x02\x03",
     ],
 )
 def test_sniff_rejects_a_mismatched_magic_byte(data: bytes) -> None:
+    """Reject a mismatched magic byte.
+
+    The rows include ICO, a real image type that branding accepts but the CD logos do
+    not, and a file that opens with '<' but is no SVG.
+    """
     assert sniff_cd_logo(data) is None
 
 
@@ -246,16 +248,18 @@ def test_vendored_names_match_the_template_catalog() -> None:
     }
 
 
-# --- 2. asset names -------------------------------------------------------
-
-
 def test_asset_name_is_plain_unique_and_typed_by_the_sniffed_mime() -> None:
+    """Give a plain, unique asset name typed by the sniffed MIME.
+
+    Two uploads of the same name never collide. The extension follows the sniffed type,
+    not the name.
+    """
     first, second = uuid.uuid4(), uuid.uuid4()
     a = asset_file_name(first, "logo.png", "image/svg+xml")
     b = asset_file_name(second, "logo.png", "image/svg+xml")
-    assert a != b  # two uploads of the same name never collide
+    assert a != b
     assert "/" not in a and "\\" not in a
-    assert a.endswith(".svg")  # the extension follows the sniffed type, not the name
+    assert a.endswith(".svg")
 
 
 @pytest.mark.parametrize(
@@ -265,15 +269,13 @@ def test_asset_name_is_plain_unique_and_typed_by_the_sniffed_mime() -> None:
         ("a b/c d.jpeg", "image/jpeg", "-c_d.jpg"),
         (None, "application/pdf", "-logo.pdf"),
         ("...", "image/webp", "-logo.webp"),
-        ("x.png", "image/gif", "-x.bin"),  # unknown type falls back
+        ("x.png", "image/gif", "-x.bin"),
     ],
 )
 def test_asset_name_sanitizes_the_original_name(name: str | None, mime: str, tail: str) -> None:
+    """Sanitize the original name; an unknown type falls back."""
     logo_id = uuid.uuid4()
     assert asset_file_name(logo_id, name, mime) == f"{logo_id.hex}{tail}"
-
-
-# --- 3. model constraints -------------------------------------------------
 
 
 def _checks(model: type[Any]) -> dict[str, str]:
@@ -298,9 +300,6 @@ def test_logo_table_holds_the_exactly_one_of_constraint() -> None:
 def test_variant_table_holds_the_base_variant_constraint() -> None:
     checks = _checks(CdVariant)
     assert checks["ck_cd_variant_base_variant"] == "base_variant IN ('report','protocol')"
-
-
-# --- 4. service: variants -------------------------------------------------
 
 
 async def test_create_variant_persists_and_audits() -> None:
@@ -389,9 +388,6 @@ async def test_list_variant_options_is_slim() -> None:
     assert [(o.key, o.name) for o in out] == [("stupa", "StuPa")]
 
 
-# --- 5. service: logos ----------------------------------------------------
-
-
 async def test_add_vendored_logo_appends_behind_the_last_position() -> None:
     row = variant_row()
     s, sess = svc([*audit_results()], gets=[row], scalars=[2])
@@ -422,7 +418,7 @@ async def test_add_vendored_logo_unknown_variant_404() -> None:
 
 @pytest.mark.parametrize(("data", "mime"), [(SVG, "image/svg+xml"), (PDF, "application/pdf")])
 async def test_upload_logo_accepts_svg_and_pdf(data: bytes, mime: str) -> None:
-    """These bytes only reach LaTeX, never the browser, so the allowlist keeps them."""
+    """These bytes only reach typst, never the browser, so the allowlist keeps them."""
     row = variant_row()
     storage = FakeStorage()
     s, sess = svc([*audit_results()], gets=[row], storage=storage)
@@ -620,9 +616,6 @@ async def test_reorder_logos_unknown_variant_404() -> None:
         )
 
 
-# --- 6. gremium binding ---------------------------------------------------
-
-
 async def test_create_gremium_rejects_an_unknown_cd_variant() -> None:
     """The id comes from the client, so the server checks it."""
     session = FakeSession([res()])
@@ -689,9 +682,6 @@ async def test_cd_variant_key_without_a_variant_is_none(gremium: Gremium | None)
     assert await cd_variant_key_for_gremium(session, gremium) is None  # type: ignore[arg-type]
 
 
-# --- 7. resolver ----------------------------------------------------------
-
-
 def _resolver_session(
     variant: CdVariant, logos: list[CdVariantLogo]
 ) -> FakeSession:
@@ -716,6 +706,10 @@ async def test_resolve_vendored_only_variant_loads_no_asset() -> None:
 
 
 async def test_resolve_upload_only_variant_returns_names_and_bytes() -> None:
+    """Return the names and bytes of an upload-only variant without a path separator.
+
+    Typst refuses a path separator.
+    """
     variant = variant_row(key="custom", base_variant="report")
     logo = logo_row(
         variant_id=variant.id,
@@ -733,7 +727,7 @@ async def test_resolve_upload_only_variant_returns_names_and_bytes() -> None:
     name = asset_file_name(logo.id, "wappen.svg", "image/svg+xml")
     assert out.title_logos == (name,) and out.footer_logos == ()
     assert out.assets == {name: SVG}
-    assert "/" not in name  # typst refuses a path separator
+    assert "/" not in name
 
 
 async def test_resolve_mixed_variant_keeps_the_slot_order() -> None:
@@ -808,3 +802,33 @@ async def test_resolve_storage_error_is_unavailable() -> None:
         await resolve_cd_variant_by_key(
             _resolver_session(variant, [logo]), Failing(), variant.key  # type: ignore[arg-type]
         )
+
+
+async def test_upload_logo_infected_is_refused_before_the_store(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _Infected:
+        async def scan(self, data: bytes) -> ScanVerdict:
+            return ScanVerdict(clean=False, signature="Eicar-Test-Signature")
+
+    def _build(_settings: Settings) -> _Infected:
+        return _Infected()
+
+    monkeypatch.setattr(scanner_mod, "build_scanner", _build)
+    storage = FakeStorage()
+    s, sess = svc(gets=[variant_row()], storage=storage)
+    with pytest.raises(UnsupportedMediaTypeError, match="Eicar-Test-Signature"):
+        await s.upload_logo(uuid.uuid4(), SVG, slot="title", filename="a.svg", actor="a")
+    assert storage.put_calls == []
+    assert sess.committed == 0
+
+
+async def test_upload_logo_without_scanner_in_production_is_unavailable() -> None:
+    session = FakeSession([], gets=[variant_row()])
+    s = CdVariantService(
+        session,  # type: ignore[arg-type]
+        storage=FakeStorage(),
+        settings=load_settings(environment="production"),
+    )
+    with pytest.raises(ServiceUnavailableError, match="Virus scan"):
+        await s.upload_logo(uuid.uuid4(), SVG, slot="title", filename="a.svg", actor="a")

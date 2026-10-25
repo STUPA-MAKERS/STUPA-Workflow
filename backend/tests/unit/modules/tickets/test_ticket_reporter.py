@@ -68,9 +68,6 @@ def _note(ticket: Ticket, author: uuid.UUID | None, **kw: Any) -> TicketNote:
     )
 
 
-# -- the gate -----------------------------------------------------------------------
-
-
 @pytest.mark.parametrize(
     ("account", "ticket_kw"),
     [
@@ -94,9 +91,6 @@ async def test_an_unknown_ticket_is_404() -> None:
     session = ScriptedSession(scalar=[ME])
     with pytest.raises(NotFoundError):
         await _svc(session).reporter_detail(uuid.uuid4(), REPORTER)
-
-
-# -- list ---------------------------------------------------------------------------
 
 
 async def test_the_list_holds_only_the_own_live_tickets() -> None:
@@ -129,10 +123,12 @@ async def test_the_list_search_without_a_number_matches_text_only() -> None:
     assert "ticket.number =" not in sql
 
 
-# -- detail -------------------------------------------------------------------------
-
-
 async def test_the_detail_shows_public_notes_and_status_changes_only() -> None:
+    """Show the reporter only the public notes and the status changes.
+
+    The detail holds the name only, because neither the e-mail nor the id of a holder of
+    ``ticket.manage`` may reach the reporter.
+    """
     ticket = _ticket()
     staff_note = _note(ticket, STAFF)
     own_note = _note(ticket, ME)
@@ -171,8 +167,6 @@ async def test_the_detail_shows_public_notes_and_status_changes_only() -> None:
     assert out.can_reply is True
     assert out.attachments[0].filename == "a.png"
     first, second, third = out.notes
-    # The name only: neither the e-mail nor the id of a holder of ticket.manage reaches
-    # the reporter.
     assert first.author.principal_id is None
     assert first.author.display_name is None
     assert first.attachments == [shot]
@@ -197,10 +191,12 @@ async def test_the_detail_of_a_blocked_reporter_offers_no_reply() -> None:
     assert out.notes == []
 
 
-# -- messages -----------------------------------------------------------------------
-
-
 async def test_a_message_of_the_reporter_is_public() -> None:
+    """Store a message of the reporter as a public note.
+
+    The ticket is always locked, because the anonymization must not run between the check
+    and the commit.
+    """
     ticket = _ticket()
     session = ScriptedSession(scalar=[ME, None], execute=[[(ME, "Me", "me@x.org")]])
     session.put(ticket)
@@ -214,7 +210,6 @@ async def test_a_message_of_the_reporter_is_public() -> None:
     assert out.from_reporter is True
     assert out.is_own is True
     assert ticket.updated_at != NOW
-    # Always locked: the anonymization must not run between the check and the commit.
     assert session.get_kw[0] == {"with_for_update": True, "populate_existing": True}
 
 
@@ -329,9 +324,6 @@ async def test_the_reporter_cannot_change_a_message_on_another_ticket() -> None:
         await service.reporter_delete_note(ticket.id, note.id, REPORTER)
 
 
-# -- the team side ------------------------------------------------------------------
-
-
 async def test_a_team_note_keeps_its_visibility() -> None:
     ticket = _ticket()
     session = ScriptedSession(scalar=[STAFF], execute=[[(STAFF, "Ada", None)]])
@@ -346,9 +338,6 @@ async def test_a_team_note_keeps_its_visibility() -> None:
     assert out.visibility == "public"
     assert out.from_reporter is False
     assert out.author.display_name == "Ada"
-
-
-# -- files and the tab --------------------------------------------------------------
 
 
 @pytest.mark.parametrize("kind", ["ticket", "ticket_note"])

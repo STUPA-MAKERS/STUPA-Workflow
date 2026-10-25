@@ -37,7 +37,7 @@ function fakeDrafts(files: DraftFile[] = [], pending: PendingUpload[] = []) {
     count: computed(() => usable().length),
     bytes: computed(() => usable().reduce((s, f) => s + f.size, 0)),
     filesOf: (key: string | null) => list().filter((f) => f.fieldKey === key),
-    upload: jest.fn(async (fs: File[]) => {
+    upload: jest.fn(async (fs: File[], _opts?: { fieldKey?: string | null }) => {
       const added = fs.map((f, i) => draft(`n${i}`, { filename: f.name }));
       list.update((l) => [...l, ...added]);
       return { uploaded: added, failed: [{ filename: 'bad.exe', reason: 'apply.files.error.type' }] };
@@ -92,6 +92,7 @@ describe('DraftFilesComponent', () => {
     expect(screen.queryByRole('checkbox')).toBeNull();
   });
 
+  /** The summary belongs to the general block. */
   it('shows only the files of its field and the pending uploads', async () => {
     await setup(
       { fieldKey: 'offer', required: true, error: 'Bitte lade mindestens eine Datei hoch.' },
@@ -107,7 +108,6 @@ describe('DraftFilesComponent', () => {
     expect(screen.getByText(/Wird hochgeladen/)).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent('Bitte lade mindestens eine Datei hoch.');
     expect(screen.getByText('*')).toBeInTheDocument();
-    // The summary is the general block's.
     expect(screen.queryByText(/von 20 Dateien/)).toBeNull();
   });
 

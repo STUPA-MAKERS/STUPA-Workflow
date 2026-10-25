@@ -27,10 +27,10 @@ from app.shared.config_schemas import (
 )
 
 MeetingStatus = Literal["planned", "live", "closed"]
-# #17: admitted guests of a public meeting vote (`vote`) or only follow it (`watch`).
+#: Admitted guests of a public meeting vote (`vote`) or only follow it (`watch`).
 GuestsMode = Literal["vote", "watch"]
-# The title of a meeting. Create and patch use the same rule: the server strips the
-# outer blanks, and the rest must hold at least one character.
+#: The title of a meeting. Create and patch use the same rule: the server strips the
+#: outer blanks, and the rest must hold at least one character.
 MEETING_TITLE_MAX = 200
 MeetingTitle = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=MEETING_TITLE_MAX)
@@ -53,11 +53,11 @@ class MeetingCreate(_CamelModel):
     title: MeetingTitle
     date: _date
     start_time: _time = Field(alias="startTime")
-    # Without an end time the iCal feed assumes a duration of one hour.
+    #: Without an end time the iCal feed assumes a duration of one hour.
     end_time: _time | None = Field(default=None, alias="endTime")
-    # The protokollant must be a member of the Gremium.
+    #: The protokollant must be a member of the Gremium.
     protokollant_id: UUID | None = Field(default=None, alias="protokollantId")
-    # #17: public participation with the QR code, and what the admitted guests do.
+    #: Public participation with the QR code, and what the admitted guests do.
     public_join: bool = Field(default=False, alias="publicJoin")
     guests_mode: GuestsMode = Field(default="vote", alias="guestsMode")
 
@@ -75,27 +75,27 @@ class MeetingPatch(_CamelModel):
     """
 
     active_application_id: UUID | None = Field(default=None, alias="activeApplicationId")
-    # The agenda item the room handles now. ``null`` clears it. Needs
-    # ``canManageVotes``: the protokollant or the session lead.
+    #: The agenda item the room handles now. ``null`` clears it. Needs
+    #: ``canManageVotes``: the protokollant or the session lead.
     current_agenda_item_id: UUID | None = Field(default=None, alias="currentAgendaItemId")
-    # The item that the room leaves on a move to the next item ("Nächster TOP"). The
-    # server sets its done mark in the same transaction. It needs
-    # ``currentAgendaItemId`` in the same patch and the gate of the done mark.
+    #: The item that the room leaves on a move to the next item ("Nächster TOP"). The
+    #: server sets its done mark in the same transaction. It needs
+    #: ``currentAgendaItemId`` in the same patch and the gate of the done mark.
     complete_agenda_item_id: UUID | None = Field(default=None, alias="completeAgendaItemId")
     status: MeetingStatus | None = None
-    # A new title. Needs ``canManage``, like the date and the time. A closed meeting
-    # keeps its title (409), because the sent protocol names the meeting.
+    #: A new title. Needs ``canManage``, like the date and the time. A closed meeting
+    #: keeps its title (409), because the sent protocol names the meeting.
     title: MeetingTitle | None = None
     date: _date | None = None
     start_time: _time | None = Field(default=None, alias="startTime")
     end_time: _time | None = Field(default=None, alias="endTime")
     protokollant_id: UUID | None = Field(default=None, alias="protokollantId")
-    # #17: public participation and the guest mode. Both need ``canManage``. Switching
-    # ``publicJoin`` off voids the open requests and removes the admitted guests.
+    #: Public participation and the guest mode. Both need ``canManage``. Switching
+    #: ``publicJoin`` off voids the open requests and removes the admitted guests.
     public_join: bool | None = Field(default=None, alias="publicJoin")
     guests_mode: GuestsMode | None = Field(default=None, alias="guestsMode")
-    # The lead confirms an early open: ``status: live`` before ``confirmUntil``. The
-    # field alone changes nothing.
+    #: The lead confirms an early open: ``status: live`` before ``confirmUntil``. The
+    #: field alone changes nothing.
     confirm_early: bool = Field(default=False, alias="confirmEarly")
 
     @model_validator(mode="after")
@@ -134,79 +134,77 @@ class MeetingVoteOut(_CamelModel):
     """A vote bound to the meeting (for meeting control)."""
 
     id: UUID
-    # ``None`` marks a generic question on a free-text agenda item, with no
-    # application behind it.
+    #: ``None`` marks a generic question on a free-text agenda item, with no
+    #: application behind it.
     application_id: UUID | None = Field(default=None, alias="applicationId")
-    # The frontend groups the votes by this agenda item.
+    #: The frontend groups the votes by this agenda item.
     agenda_item_id: UUID | None = Field(default=None, alias="agendaItemId")
     question: str | None = None
     options: list[str] = Field(default_factory=list)
-    # ``cancelled``: somebody moved the application out of the vote state by hand,
-    # which aborts the vote.
+    #: ``cancelled``: somebody moved the application out of the vote state by hand,
+    #: which aborts the vote.
     status: Literal["draft", "open", "closed", "cancelled"]
     result: str | None = None
-    # Current tally, option to count, plus the leading option. Both survive a
-    # reload.
+    #: Current tally, option to count, plus the leading option. Both survive a
+    #: reload.
     counts: dict[str, int] | None = None
     leading: str | None = None
-    # Participation progress: voted against present. ``revealed`` tells whether
-    # ``counts`` and ``leading`` are visible. They are visible after the close, or
-    # when every present member voted and the vote is not secret. Otherwise they
-    # stay hidden.
+    #: Participation progress: voted against present. ``revealed`` tells whether
+    #: ``counts`` and ``leading`` are visible. They are visible after the close, or
+    #: when every present member voted and the vote is not secret. Otherwise they
+    #: stay hidden.
     voted: int = 0
     present: int = 0
     revealed: bool = True
-    # Reason for the rejection after the close: ``quorum`` for a missed quorum,
-    # ``majority`` for a missed majority. The value stays ``None`` while the vote is
-    # open and on ``passed`` or ``tie``.
-    failed_reason: Literal["quorum", "majority"] | None = Field(
-        default=None, alias="failedReason"
-    )
-    # The rules of the vote, for the vote card (A5).
+    #: Reason for the rejection after the close: ``quorum`` for a missed quorum,
+    #: ``majority`` for a missed majority. The value stays ``None`` while the vote is
+    #: open and on ``passed`` or ``tie``.
+    failed_reason: Literal["quorum", "majority"] | None = Field(default=None, alias="failedReason")
+    #: The rules of the vote, for the vote card.
     majority_rule: Literal["simple", "absolute", "two_thirds"] = Field(
         default="simple", alias="majorityRule"
     )
     secret: bool = False
     quorum: Quorum | None = None
-    # The real open time (``opens_at``) and the real end time (close or cancel).
+    #: The real open time (``opens_at``) and the real end time (close or cancel).
     opened_at: _datetime | None = Field(default=None, alias="openedAt")
     closed_at: _datetime | None = Field(default=None, alias="closedAt")
-    # The own ballot of the caller. A secret vote gives only ``cast``. None when the
-    # payload has no caller (a broadcast).
+    #: The own ballot of the caller. A secret vote gives only ``cast``. None when the
+    #: payload has no caller (a broadcast).
     my_ballot: MyBallot | None = Field(default=None, alias="myBallot")
-    # True when the caller cast the ballot of a delegator in this vote.
+    #: True when the caller cast the ballot of a delegator in this vote.
     represented_cast: bool = Field(default=False, alias="representedCast")
-    # #17: the admitted guests vote too (no quorum, majority of the cast ballots).
+    #: The admitted guests vote too (no quorum, majority of the cast ballots).
     guests_vote: bool = Field(default=False, alias="guestsVote")
-    # #17: the present members and the admitted guests, live while the vote runs and
-    # fixed at the close. For a vote with guests ``present`` is their sum.
+    #: The present members and the admitted guests, live while the vote runs and
+    #: fixed at the close. For a vote with guests ``present`` is their sum.
     present_members: int | None = Field(default=None, alias="presentMembers")
     present_guests: int | None = Field(default=None, alias="presentGuests")
-    # The decision proposal of an application vote (F1), or None.
+    #: The decision proposal of an application vote, or None.
     proposal: DecisionIn | None = None
-    # F2: an election with its candidates and seats, its stored result once closed,
-    # and for a runoff the parent election and the round.
+    #: An election with its candidates and seats, its stored result once closed,
+    #: and for a runoff the parent election and the round.
     kind: VoteKind = "motion"
     election: ElectionConfig | None = None
     election_result: ElectionResultOut | None = Field(default=None, alias="electionResult")
     parent_vote_id: UUID | None = Field(default=None, alias="parentVoteId")
     round: int = 1
-    # A poll with its mode and options, and its counts once closed or revealed.
+    #: A poll with its mode and options, and its counts once closed or revealed.
     poll: PollConfig | None = None
     poll_result: PollResultOut | None = Field(default=None, alias="pollResult")
 
 
 class CurrentAgendaItemOut(_CamelModel):
-    """The agenda item the room handles now, for the start page and the timeline (A2)."""
+    """The agenda item the room handles now, for the start page and the timeline."""
 
-    # The 1-based number of the item in the agenda order ("TOP 3").
+    #: The 1-based number of the item in the agenda order ("TOP 3").
     position: int
-    # The title of a free-text item, or the title of the application.
+    #: The title of a free-text item, or the title of the application.
     title: str | None = None
 
 
 class KeeperPeriodOut(_CamelModel):
-    """One period of a protocol keeper (Z3, A13).
+    """One period of a protocol keeper.
 
     ``fromAt`` is ``None`` for the planned handover. ``toAt`` is ``None`` while the
     period runs. The positions are the 1-based numbers of the agenda items in the
@@ -228,7 +226,7 @@ HandoverMode = Literal["now", "next_item"]
 
 
 class ProtokollantHandoverBody(_CamelModel):
-    """``POST /meetings/{id}/protokollant-handover`` — hand the minutes over (Z3, O1).
+    """``POST /meetings/{id}/protokollant-handover`` — hand the minutes over.
 
     ``now`` hands over at once. ``next_item`` plans the handover for the next
     forward move of the current agenda item.
@@ -248,18 +246,18 @@ class MeetingOut(_CamelModel):
     date: _date | None = None
     start_time: _time | None = Field(default=None, alias="startTime")
     end_time: _time | None = Field(default=None, alias="endTime")
-    # The real start (Z7). The start sets it once. ``None`` for a meeting that has not
-    # started, or that started before the field existed: a reader then uses the
-    # planned start.
+    #: The real start. The start sets it once. ``None`` for a meeting that has not
+    #: started, or that started before the field existed: a reader then uses the
+    #: planned start.
     started_at: _datetime | None = Field(default=None, alias="startedAt")
-    # The close sets this field. It fills the end line of the protocol title page.
+    #: The close sets this field. It fills the end line of the protocol title page.
     closed_at: _datetime | None = Field(default=None, alias="closedAt")
     status: MeetingStatus
     active_application_id: UUID | None = Field(default=None, alias="activeApplicationId")
-    # The agenda item the room handles now. Followers and the beamer follow it.
+    #: The agenda item the room handles now. Followers and the beamer follow it.
     current_agenda_item_id: UUID | None = Field(default=None, alias="currentAgendaItemId")
-    # A2: number and title of the current agenda item, and the size of the agenda. The
-    # reader of the meeting also reads its agenda, so both carry no new data.
+    #: Number and title of the current agenda item, and the size of the agenda. The
+    #: reader of the meeting also reads its agenda, so both carry no new data.
     current_agenda_item: CurrentAgendaItemOut | None = Field(
         default=None, alias="currentAgendaItem"
     )
@@ -268,38 +266,38 @@ class MeetingOut(_CamelModel):
     created_at: _datetime = Field(alias="createdAt")
     protokollant_id: UUID | None = Field(default=None, alias="protokollantId")
     protokollant_name: str | None = Field(default=None, alias="protokollantName")
-    # The server resolves this flag, because the frontend knows only ``sub`` and not
-    # the internal principal id.
+    #: The server resolves this flag, because the frontend knows only ``sub`` and not
+    #: the internal principal id.
     is_protokollant: bool = Field(default=False, alias="isProtokollant")
-    # Master flag for the frontend: the principal may lead the meeting, which covers
-    # the protocol, the agenda items and the status. It holds for the protokollant
-    # and for a meeting manager. The granular flags follow below.
+    #: Master flag for the frontend: the principal may lead the meeting, which covers
+    #: the protocol, the agenda items and the status. It holds for the protokollant
+    #: and for a meeting manager. The granular flags follow below.
     can_control: bool = Field(default=False, alias="canControl")
     can_manage: bool = Field(default=False, alias="canManage")
     can_write: bool = Field(default=False, alias="canWrite")
     can_manage_votes: bool = Field(default=False, alias="canManageVotes")
     can_vote: bool = Field(default=False, alias="canVote")
-    # The principal may finalize and send the protocol: the write access plus the
-    # gremium permission ``protocol.finalize``.
+    #: The principal may finalize and send the protocol: the write access plus the
+    #: gremium permission ``protocol.finalize``.
     can_finalize: bool = Field(default=False, alias="canFinalize")
     votes: list[MeetingVoteOut] = Field(default_factory=list)
-    # A13: the periods of the protocol keepers in time order (running and ended),
-    # and the planned handover of the next agenda item.
+    #: The periods of the protocol keepers in time order (running and ended),
+    #: and the planned handover of the next agenda item.
     keeper_periods: list[KeeperPeriodOut] = Field(default_factory=list, alias="keeperPeriods")
     planned_handover: KeeperPeriodOut | None = Field(default=None, alias="plannedHandover")
-    # #17: public participation with the QR code. ``joinCode`` goes only to a caller
-    # with ``canManage``, ``pendingGuests`` too (0 for everybody else).
+    #: Public participation with the QR code. ``joinCode`` goes only to a caller
+    #: with ``canManage``, ``pendingGuests`` too (0 for everybody else).
     public_join: bool = Field(default=False, alias="publicJoin")
     guests_mode: GuestsMode = Field(default="vote", alias="guestsMode")
     join_code: str | None = Field(default=None, alias="joinCode")
     admitted_guests: int = Field(default=0, alias="admittedGuests")
     pending_guests: int = Field(default=0, alias="pendingGuests")
-    # #17 ruling: public participation only in a gremium without a quorum. The
-    # settings switch is off and explained when this is false.
+    #: Public participation only in a gremium without a quorum. The
+    #: settings switch is off and explained when this is false.
     public_join_allowed: bool = Field(default=True, alias="publicJoinAllowed")
-    # The open window of a planned meeting with a date (UTC). ``opensAt`` is the
-    # earliest open. Before ``confirmUntil`` the open needs ``confirmEarly``. Both are
-    # ``None`` for a meeting without a date and for a live or closed meeting.
+    #: The open window of a planned meeting with a date (UTC). ``opensAt`` is the
+    #: earliest open. Before ``confirmUntil`` the open needs ``confirmEarly``. Both are
+    #: ``None`` for a meeting without a date and for a live or closed meeting.
     opens_at: _datetime | None = Field(default=None, alias="opensAt")
     confirm_until: _datetime | None = Field(default=None, alias="confirmUntil")
 
@@ -333,10 +331,10 @@ class MeetingGremiumOut(_CamelModel):
 
 
 AttendanceStatus = Literal["present", "excused", "absent"]
-# A member reports only "present" or "excused" for the own record (Z2). Only the
-# meeting lead records "absent", that is absent without an excuse.
+#: A member reports only "present" or "excused" for the own record. Only the
+#: meeting lead records "absent", that is absent without an excuse.
 SelfAttendanceStatus = Literal["present", "excused"]
-# Upper limit for the reason of an excuse. The reason is personal data, so keep it short.
+#: Upper limit for the reason of an excuse. The reason is personal data, so keep it short.
 ATTENDANCE_NOTE_MAX = 500
 
 
@@ -346,19 +344,19 @@ class AttendanceOut(_CamelModel):
     principal_id: UUID = Field(alias="principalId")
     display_name: str | None = Field(default=None, alias="displayName")
     email: str | None = None
-    # ``None`` means not yet recorded: a roster member without an entry.
+    #: ``None`` means not yet recorded: a roster member without an entry.
     status: AttendanceStatus | None = None
     source: Literal["self", "lead"] | None = None
-    # The reason of an excuse (A7). It is personal data: only the member and the
-    # meeting lead (``canWrite``) see it. All other readers get ``None``.
+    #: The reason of an excuse. It is personal data: only the member and the
+    #: meeting lead (``canWrite``) see it. All other readers get ``None``.
     note: str | None = None
-    # True when the requesting principal is this member, which allows self-marking.
+    #: True when the requesting principal is this member, which allows self-marking.
     is_self: bool = Field(default=False, alias="isSelf")
-    # O20: the member holds the gremium permission ``protocol.write`` and can keep
-    # the minutes. The keeper pickers offer only these members.
+    #: The member holds the gremium permission ``protocol.write`` and can keep
+    #: the minutes. The keeper pickers offer only these members.
     can_keep_protocol: bool = Field(default=False, alias="canKeepProtocol")
-    # The member has an own vote now (gremium permission ``vote.cast``). Only such a
-    # member can delegate, so the lead offers "Vertretung eintragen" only for them (O6).
+    #: The member has an own vote now (gremium permission ``vote.cast``). Only such a
+    #: member can delegate, so the lead offers "Vertretung eintragen" only for them.
     can_vote: bool = Field(default=False, alias="canVote")
 
 
@@ -368,8 +366,8 @@ class MeetingMemberOut(_CamelModel):
     principal_id: UUID = Field(alias="principalId")
     display_name: str | None = Field(default=None, alias="displayName")
     email: str | None = None
-    # O20: only a member with the gremium permission ``protocol.write`` can keep the
-    # minutes. Another member gives 422 ``protokollant_needs_protocol_write``.
+    #: Only a member with the gremium permission ``protocol.write`` can keep the
+    #: minutes. Another member gives 422 ``protokollant_needs_protocol_write``.
     can_keep_protocol: bool = Field(default=False, alias="canKeepProtocol")
 
 
@@ -414,7 +412,7 @@ class AttendanceSetBody(_AttendanceNoteBody):
 class AttendanceSelfBody(_AttendanceNoteBody):
     """``PUT …/attendance/me`` — a member reports the own attendance.
 
-    Only ``present`` and ``excused`` are allowed (Z2). ``absent`` gives 422.
+    Only ``present`` and ``excused`` are allowed. ``absent`` gives 422.
     """
 
     status: SelfAttendanceStatus
@@ -430,20 +428,20 @@ class AgendaItemOut(_CamelModel):
 
     id: UUID
     application_id: UUID | None = Field(default=None, alias="applicationId")
-    # The to-do card of an item of kind to-do (the item title is the card title).
+    #: The to-do card of an item of kind to-do (the item title is the card title).
     todo_id: UUID | None = Field(default=None, alias="todoId")
     title: str | None = None
-    # Markdown text of this agenda item.
+    #: Markdown text of this agenda item.
     body: str | None = None
     position: int = 0
-    # The public protocol PDF redacts a non-public agenda item.
+    #: The public protocol PDF redacts a non-public agenda item.
     non_public: bool = Field(default=False, alias="nonPublic")
-    # The time of the done mark ("TOP abhaken"). None for an item that is not done.
+    #: The time of the done mark ("TOP abhaken"). None for an item that is not done.
     done_at: _datetime | None = Field(default=None, alias="doneAt")
-    # Current application status as an i18n label.
+    #: Current application status as an i18n label.
     state_label: dict[str, str] | None = Field(default=None, alias="stateLabel")
-    # The requested amount of the application (F1: the decision proposal of the vote
-    # dialog starts with it). None for a free-text item.
+    #: The requested amount of the application (the decision proposal of the vote
+    #: dialog starts with it). None for a free-text item.
     amount: Decimal | None = None
 
 
@@ -465,7 +463,7 @@ def _same_name(name: str) -> str:
 
 
 class ElectionCandidateIn(_CamelModel):
-    """One candidate of a new election (F2): an account or a name only.
+    """One candidate of a new election: an account or a name only.
 
     An unknown key gives 422: the client sets neither the id nor the erasure marker
     (``erased``) of a candidate.
@@ -489,7 +487,7 @@ class MeetingVoteOpenBody(_CamelModel):
     snippet.
 
     The body has no ``tieBreak``: a meeting vote has no casting vote, and the route
-    always stores ``tieBreak=rejected`` (O18).
+    always stores ``tieBreak=rejected``.
     """
 
     agenda_item_id: UUID = Field(alias="agendaItemId")
@@ -498,40 +496,44 @@ class MeetingVoteOpenBody(_CamelModel):
     majority_rule: Literal["simple", "absolute", "two_thirds"] = Field(
         default="simple", alias="majorityRule"
     )
-    # ``None`` picks the default: off for a motion, on for an election (F2).
+    #: ``None`` picks the default: off for a motion, on for an election.
     secret: bool | None = None
-    # F2 · Personnel elections. ``kind = election`` takes ``seats`` and
-    # ``candidates`` and ignores ``options`` and ``majorityRule``. ``question`` is the
-    # name of the ballot ("Wahlgang") and is required. The server gives each
-    # candidate its id (``c1``, ``c2``, ...) in the given order.
+    #: Personnel elections. ``kind = election`` takes ``seats`` and
+    #: ``candidates`` and ignores ``options`` and ``majorityRule``. ``question`` is the
+    #: name of the ballot ("Wahlgang") and is required. The server gives each
+    #: candidate its id (``c1``, ``c2``, ...) in the given order.
     kind: VoteKind = "motion"
     seats: int = Field(default=1, ge=1, le=ELECTION_MAX_CANDIDATES)
     candidates: list[ElectionCandidateIn] = Field(
         default_factory=list, max_length=ELECTION_MAX_CANDIDATES
     )
-    # The server always derives the quorum denominator from the current roster
-    # through ``vote_eligible_count``. It never comes from the client, so nobody can
-    # manipulate it against the real roster. This field holds an explicit percent
-    # quorum from 0 to 100. ``None`` selects the Gremium default when the Gremium
-    # sets one.
-    quorum_percent: int | None = Field(
-        default=None, alias="quorumPercent", ge=0, le=100
-    )
-    # #17: the admitted guests vote too. ``None`` picks the default: on in a meeting
-    # where guests vote, on a public agenda item; else off. Such a vote has no quorum.
+    #: The server always derives the quorum denominator from the current roster
+    #: through ``vote_eligible_count``. It never comes from the client, so nobody can
+    #: manipulate it against the real roster. This field holds an explicit percent
+    #: quorum from 0 to 100. ``None`` selects the Gremium default when the Gremium
+    #: sets one.
+    quorum_percent: int | None = Field(default=None, alias="quorumPercent", ge=0, le=100)
+    #: The admitted guests vote too. ``None`` picks the default: on in a meeting
+    #: where guests vote, on a public agenda item; else off. Such a vote has no quorum.
     guests_vote: bool | None = Field(default=None, alias="guestsVote")
-    # F1: the decision proposal (approved amount, conditions). Only an application
-    # agenda item takes it (422 `decision_not_allowed` otherwise).
+    #: The decision proposal (approved amount, conditions). Only an application
+    #: agenda item takes it (422 `decision_not_allowed` otherwise).
     proposal: DecisionIn | None = None
-    # A poll (``kind = poll``): the mode and the options as the lead types them. The
-    # server gives the option ids. ``question`` is required, ``options`` and
-    # ``majorityRule`` do not apply, and a poll has no quorum.
+    #: A poll (``kind = poll``): the mode and the options as the lead types them. The
+    #: server gives the option ids. ``question`` is required, ``options`` and
+    #: ``majorityRule`` do not apply, and a poll has no quorum.
     poll: PollIn | None = None
-    # Prepare the question only: the vote stays a draft and does not open.
+    #: Prepare the question only: the vote stays a draft and does not open.
     draft: bool = False
 
     @model_validator(mode="after")
     def _min_options(self) -> MeetingVoteOpenBody:
+        """Check the options, the poll and the election candidates.
+
+        A candidate name without an account must not repeat any other candidate name, else the
+        ballot shows two rows nobody can tell apart. Two accounts may share a display name, because
+        they are different people.
+        """
         if len(self.options) < 2:
             raise ValueError("at least two options are required")
         if (self.kind == "poll") != (self.poll is not None):
@@ -546,9 +548,6 @@ class MeetingVoteOpenBody(_CamelModel):
             people = [c.principal_id for c in self.candidates if c.principal_id is not None]
             if len(set(people)) != len(people):
                 raise ValueError("a person can stand only once")
-            # A name without an account must not repeat any other candidate name,
-            # else the ballot shows two rows nobody can tell apart. Two accounts
-            # may share a display name: they are different people.
             names = [_same_name(c.name) for c in self.candidates]
             for c in self.candidates:
                 if c.principal_id is None and names.count(_same_name(c.name)) > 1:
@@ -582,9 +581,9 @@ class AgendaAddBody(_CamelModel):
         return self
 
 
-# The longest Markdown text of one agenda item that a live draft frame carries
-# (`body_draft`). It is the cap of the protocol Markdown (`ProtocolPatch.markdown`),
-# because the item texts go into that protocol. The REST route sets no cap of its own.
+#: The longest Markdown text of one agenda item that a live draft frame carries
+#: (`body_draft`). It is the cap of the protocol Markdown (`ProtocolPatch.markdown`),
+#: because the item texts go into that protocol. The REST route sets no cap of its own.
 AGENDA_BODY_MAX = 512_000
 
 
@@ -613,9 +612,8 @@ class AgendaReorderBody(_CamelModel):
     item_ids: list[UUID] = Field(alias="itemIds")
 
 
-# Public meeting with a QR code (#17)
 GuestStatus = Literal["pending", "admitted", "rejected", "removed", "left"]
-# A guest name: trimmed, 2 to 80 characters. No check for duplicates (decision #17).
+#: A guest name: trimmed, 2 to 80 characters. No check for duplicates.
 GUEST_NAME_MIN = 2
 GUEST_NAME_MAX = 80
 
@@ -634,9 +632,7 @@ def clean_guest_name(value: str) -> str:
     )
     name = " ".join(visible.split())
     if not GUEST_NAME_MIN <= len(name) <= GUEST_NAME_MAX:
-        raise ValueError(
-            f"displayName must have {GUEST_NAME_MIN} to {GUEST_NAME_MAX} characters"
-        )
+        raise ValueError(f"displayName must have {GUEST_NAME_MIN} to {GUEST_NAME_MAX} characters")
     return name
 
 
@@ -663,8 +659,8 @@ class MeetingGuestOut(_CamelModel):
     id: UUID
     number: int
     display_name: str | None = Field(default=None, alias="displayName")
-    # ``expired`` appears only in a ``guest_updated`` event: the row is gone (a voided
-    # request).
+    #: ``expired`` appears only in a ``guest_updated`` event: the row is gone (a voided
+    #: request).
     status: Literal["pending", "admitted", "rejected", "removed", "left", "expired"]
     requested_at: _datetime = Field(alias="requestedAt")
     decided_at: _datetime | None = Field(default=None, alias="decidedAt")
@@ -690,6 +686,6 @@ class JoinLinkOut(_CamelModel):
 class MeetingDefaultsOut(_CamelModel):
     """``GET /gremien/{id}/meeting-defaults`` — what a new meeting of the gremium allows."""
 
-    # #17 ruling: public participation only without a quorum.
+    #: Public participation only without a quorum.
     public_join_allowed: bool = Field(alias="publicJoinAllowed")
     quorum_percent: int | None = Field(default=None, alias="quorumPercent")

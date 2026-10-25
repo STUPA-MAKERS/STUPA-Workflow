@@ -75,7 +75,7 @@ describe('CalendarSubscribeComponent', () => {
   });
 
   it('forgets "copied" when the clipboard refuses, and when the popover opens again', async () => {
-    const writeText = jest.fn(() => Promise.reject(new Error('denied')));
+    const writeText = jest.fn((): Promise<void> => Promise.reject(new Error('denied')));
     Object.assign(navigator, { clipboard: { writeText } });
     const { openIt, fixture, cmp } = await setup();
     await openIt();
@@ -144,6 +144,7 @@ describe('CalendarSubscribeComponent', () => {
     expect(screen.getByRole('dialog')).toHaveTextContent(URL);
   });
 
+  /** A new opening starts without the old message. */
   it('says when a new URL fails and keeps the old one', async () => {
     const { openIt, fixture, cmp } = await setup({ rotate: () => throwError(() => new Error('nope')) });
     await openIt();
@@ -154,12 +155,12 @@ describe('CalendarSubscribeComponent', () => {
     expect(cmp.busy()).toBe(false);
     expect(cmp.error()).toBe(false);
     expect(screen.getByRole('dialog')).toHaveTextContent(URL);
-    // A new opening starts without the old message.
     cmp.close();
     await openIt();
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
+  /** Closing a closed popover changes nothing. */
   it('closes on Escape and on a press outside, and returns the focus to the anchor', async () => {
     const { openIt, anchor, fixture, cmp } = await setup();
     await openIt();
@@ -179,7 +180,6 @@ describe('CalendarSubscribeComponent', () => {
     fireEvent.pointerDown(screen.getByRole('button', { name: 'Draußen' }));
     fixture.detectChanges();
     expect(screen.queryByRole('dialog')).toBeNull();
-    // Closing a closed popover changes nothing.
     cmp.close();
     expect(cmp.isOpen()).toBe(false);
   });
@@ -211,6 +211,7 @@ describe('CalendarSubscribeComponent', () => {
     jest.restoreAllMocks();
   });
 
+  /** A press anywhere belongs to the sheet, not to the popover. */
   it('shows a bottom sheet on a phone, and closes with it', async () => {
     restore = matchMediaQueries(MEDIA.phone);
     const { fixture, cmp } = await setup();
@@ -219,7 +220,6 @@ describe('CalendarSubscribeComponent', () => {
     fixture.detectChanges();
     const sheet = screen.getByRole('dialog', { name: 'Kalender-Abo' });
     expect(sheet).toHaveTextContent(URL);
-    // A press anywhere is the sheet's business, not the popover's.
     fireEvent.pointerDown(document.body);
     expect(cmp.isOpen()).toBe(true);
     window.dispatchEvent(new Event('resize'));
@@ -229,6 +229,7 @@ describe('CalendarSubscribeComponent', () => {
     fixture.destroy();
   });
 
+  /** Before the popover renders there is nothing to place. The sheet only reports a close. */
   it('opens without an anchor under itself, survives an early resize and a quick second call', async () => {
     const shown: HTMLElement[] = [];
     Object.defineProperty(HTMLElement.prototype, 'showPopover', {
@@ -241,7 +242,6 @@ describe('CalendarSubscribeComponent', () => {
       const { fixture, cmp } = await setup();
       cmp.open();
       cmp.open();
-      // Before the popover rendered there is nothing to place.
       window.dispatchEvent(new Event('resize'));
       fixture.detectChanges();
       await new Promise((r) => setTimeout(r));
@@ -249,7 +249,6 @@ describe('CalendarSubscribeComponent', () => {
       expect(shown[0]).toHaveClass('cs--pop');
       fireEvent.pointerDown(document.body);
       expect(cmp.isOpen()).toBe(false);
-      // The sheet only reports a close.
       cmp.onSheetOpen(true);
       cmp.open();
       fixture.destroy();
@@ -258,6 +257,7 @@ describe('CalendarSubscribeComponent', () => {
     }
   });
 
+  /** When closed, a resize changes nothing. */
   it('swaps the popover and the sheet on a resize across the phone limit while open', async () => {
     let listener: ((e: { matches: boolean }) => void) | null = null;
     const original = window.matchMedia;
@@ -281,7 +281,6 @@ describe('CalendarSubscribeComponent', () => {
     });
     try {
       const { fixture, cmp } = await setup();
-      // Closed: a resize changes nothing.
       listener!({ matches: true });
       fixture.detectChanges();
       listener!({ matches: false });
@@ -328,6 +327,10 @@ describe('CalendarSubscribeComponent', () => {
     }
   });
 
+  /**
+   * After one change detection, with no timer and no further tick, the popover is in the top layer,
+   * hidden until placed, and placed under the end of its anchor.
+   */
   it('is placed under its anchor on the first rendered frame, with no timer', async () => {
     const rect = (x: number, y: number, w: number, h: number) =>
       ({ top: y, bottom: y + h, left: x, right: x + w, width: w, height: h, x, y }) as DOMRect;
@@ -349,8 +352,6 @@ describe('CalendarSubscribeComponent', () => {
     try {
       const { fixture, anchor } = await setup();
       fireEvent.click(anchor);
-      // One change detection, no timer and no further tick: the popover is in the top
-      // layer, hidden until placed, and placed under the end of its anchor.
       fixture.detectChanges();
       const pop = document.querySelector<HTMLElement>('.cs--pop')!;
       expect(atShow).toEqual([{ placed: false, top: '' }]);
@@ -365,6 +366,11 @@ describe('CalendarSubscribeComponent', () => {
     }
   });
 
+  /**
+   * The observer watches the popover, the anchor and each container of the anchor, not the page,
+   * because on a pane page the body never changes size. The calendar grid renders below the toolbar
+   * and moves the anchor. A late callback after the close places nothing.
+   */
   it('places the popover again when the layout changes, and stops on close', async () => {
     const observers: { cb: () => void; targets: Element[]; disconnect: jest.Mock }[] = [];
     const originalRO = (globalThis as { ResizeObserver?: unknown }).ResizeObserver;
@@ -395,20 +401,16 @@ describe('CalendarSubscribeComponent', () => {
       await openIt();
       expect(observers).toHaveLength(1);
       const [ro] = observers;
-      // The popover, the anchor and each container of the anchor, not the page: on a
-      // pane page the body never changes size.
       expect(ro.targets.slice(0, 3)).toEqual([document.querySelector('.cs--pop'), anchor, anchor.parentElement]);
       expect(ro.targets).not.toContain(document.body);
       const top = () => document.querySelector<HTMLElement>('.cs--pop')!.style.top;
       expect(top()).toBe('146px');
-      // The calendar grid renders below the toolbar and moves the anchor.
       anchorTop = 160;
       ro.cb();
       expect(top()).toBe('206px');
       cmp.close();
       fixture.detectChanges();
       expect(ro.disconnect).toHaveBeenCalled();
-      // A late callback after the close places nothing.
       const pop = document.querySelector<HTMLElement>('.cs--pop');
       anchorTop = 300;
       ro.cb();

@@ -43,7 +43,7 @@ type BackupState = { status: 'loading' } | { status: 'ok'; list: BackupList } | 
 type ErasureState = { status: 'loading' } | { status: 'ok'; open: number } | { status: 'error' };
 
 /**
- * "Zustand" at the top of the admin navigation (board Verwaltung): three tiles that each
+ * "Zustand" at the top of the admin navigation: three tiles that each
  * link to their page. The tiles show on the home page and in the column beside every
  * admin page; the tile of the open page is marked.
  *
@@ -105,13 +105,13 @@ export class AdminHealthComponent {
     }
   }
 
+  /** Without a stored check (a fresh installation before the nightly job) it checks live. */
   private loadAudit(): void {
     this.api.latestAuditVerification().subscribe({
       next: (check) => {
         if (check) {
           this.audit.set({ status: 'stored', check });
         } else if (this.auth.can('audit.verify')) {
-          // No stored check yet (a fresh installation before the nightly job): check live.
           this.liveCheck.check().subscribe({
             next: (live) => this.audit.set({ status: 'live', check: live }),
             error: () => this.audit.set({ status: 'error' }),
@@ -169,7 +169,6 @@ export class AdminHealthComponent {
       this.t(`admin.backups.status.${shown.status}` as TranslationKey),
     ];
     if (shown.sizeBytes != null) parts.push(formatBytes(shown.sizeBytes, this.i18n.formatLocale()));
-    // A failed archive after the shown one: the last attempt did not give a backup.
     const failed = newestBackup(state.list.items.filter((b) => b.status === 'failed'));
     const alert =
       failed && failed !== shown && time(failed) > time(shown)

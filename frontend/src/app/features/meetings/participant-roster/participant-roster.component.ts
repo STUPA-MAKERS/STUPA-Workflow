@@ -29,7 +29,7 @@ interface RosterRow {
  * 12 von 19 anwesend" and one row per member with the name and "Anwesend", "Abwesend"
  * or "Offen". The row of the minute-taker says so.
  *
- * A member sees "Anwesend" and "Abwesend" only (Z2): an excuse and an absence look the
+ * A member sees "Anwesend" and "Abwesend" only: an excuse and an absence look the
  * same. The roster never shows a reason; the server gives it only to the member and to
  * the meeting lead.
  */

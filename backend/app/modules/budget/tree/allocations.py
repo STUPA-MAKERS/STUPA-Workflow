@@ -67,6 +67,14 @@ class AllocationOps(BudgetTreeServiceBase):
     ) -> AllocationOut:
         """Set a top-down allocation.
 
+        The method locks BEFORE it reads, validates and writes, to stay race-free. The
+        own row guards the downward constraint against the own children. The parent row
+        serializes all concurrent sibling allocations, so both read the same locked
+        sibling sum and cannot overbook together. Upward, the children sum must stay at
+        or below the parent allocation. Downward, the allocation must not fall below the
+        sum already given to the children. The audit entry keeps the prior value for the
+        revert, ``None`` on the first set.
+
         Raises:
             ValidationProblem: The fiscal year belongs to another top-level
                 budget, the children sum exceeds the parent allocation, or the
@@ -80,16 +88,12 @@ class AllocationOps(BudgetTreeServiceBase):
                 "Fiscal year does not belong to this budget's top-level.",
                 errors=[{"field": "fiscalYearId", "msg": "wrong top-level budget"}],
             )
+        self._refuse_closed(fy)
 
-        # Lock BEFORE read, validate and write to stay race-free. The own row
-        # guards the downward constraint against the own children. The parent row
-        # serializes all concurrent sibling allocations. Both then read the same
-        # already locked sibling sum and cannot overbook together.
         await self._lock_budget(node.id)
         if node.parent_id is not None:
             await self._lock_budget(node.parent_id)
 
-        # Upward constraint: new children sum ≤ parent allocation.
         if node.parent_id is not None:
             siblings = await self._children_alloc_sum(
                 node.parent_id, fiscal_year_id, exclude_id=node.id
@@ -104,7 +108,6 @@ class AllocationOps(BudgetTreeServiceBase):
                     errors=[{"field": "allocated", "msg": "exceeds parent budget"}],
                 )
 
-        # Downward constraint: allocation not below the sum already given to children.
         own_children = await self._children_alloc_sum(node.id, fiscal_year_id)
         if tree_rules.parent_allocation_below_children(payload.allocated, own_children):
             raise ValidationProblem(
@@ -113,8 +116,6 @@ class AllocationOps(BudgetTreeServiceBase):
             )
 
         alloc = await self._allocation(budget_id, fiscal_year_id)
-        # Remember the prior value for the audit-log revert. It is ``None`` on the
-        # first set.
         previous_allocated = (
             str(alloc.allocated)
             if alloc is not None and alloc.allocated is not None

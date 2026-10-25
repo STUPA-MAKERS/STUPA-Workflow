@@ -23,13 +23,16 @@ interface Entry {
 export class HttpCacheService {
   private readonly entries = new Map<string, Entry>();
 
-  /** Read a fresh entry, or `undefined` when it is missing or older than `ttlMs`. */
+  /**
+   * Read a fresh entry, or `undefined` when it is missing or older than `ttlMs`.
+   *
+   * An expired entry is dropped, because it will never be served and keeping it makes `size` lie
+   * about what the cache holds.
+   */
   get(key: string, ttlMs: number, now = Date.now()): unknown | undefined {
     const hit = this.entries.get(key);
     if (!hit) return undefined;
     if (now - hit.at > ttlMs) {
-      // Drop it rather than keep it around: a stale entry that will never be served is
-      // just memory, and leaving it makes `size` lie about what the cache holds.
       this.entries.delete(key);
       return undefined;
     }

@@ -26,9 +26,8 @@ from app.modules.budget.tree_schemas import (
     InvoiceUpdate,
 )
 from app.modules.files.mime import MimeRejected, validate_upload
-from app.modules.files.scanner import ScannerError, build_scanner
+from app.modules.files.scanner import scan_or_raise
 from app.modules.files.storage import StorageError
-from app.search import dialect_of, trigram_rank
 from app.shared.errors import (
     NotFoundError,
     PayloadTooLargeError,
@@ -37,16 +36,23 @@ from app.shared.errors import (
     ValidationProblem,
 )
 from app.shared.filenames import sanitize_display_name, sanitize_storage_name
+from app.shared.search import dialect_of, trigram_rank
 
 logger = logging.getLogger("app.budget")
 
-# An invoice file token is always a server-generated key under this prefix.
-# Reject anything else, so a client cannot point fileObjectKey at a foreign
-# object in the bucket.
 _INVOICE_FILE_PREFIX = "invoices/"
 
 
 def _validate_invoice_file_token(token: str) -> str:
+    """Return the token when it is a server-generated invoice key.
+
+    An invoice file token is always a key under ``invoices/``. Anything else is
+    rejected, so a client cannot point ``fileObjectKey`` at a foreign object in the
+    bucket.
+
+    Raises:
+        ValidationProblem: The token has another prefix or contains ``..``.
+    """
     if not token.startswith(_INVOICE_FILE_PREFIX) or ".." in token:
         raise ValidationProblem("invalid invoice file token")
     return token
@@ -57,7 +63,7 @@ class InvoiceOps(BudgetTreeServiceBase):
 
     The read paths take ``visible_gremium_ids``. ``None`` means the full budget view
     and shows every linked booking. A set limits ``linkedBookings`` to the cost
-    centres that `visible_budget_ids` opens for those Gremien (A6).
+    centres that `visible_budget_ids` opens for those Gremien.
     """
 
     @staticmethod
@@ -98,6 +104,9 @@ class InvoiceOps(BudgetTreeServiceBase):
         The bookings come in booking order. ``visible`` holds the cost centres of a
         gremium-scoped reader (see `_visible_ids`); None is the full view.
 
+        The query excludes a booking without an invoice, so ``invoice_id`` is never None
+        here.
+
         Returns:
             The bookings per invoice id. An invoice without a visible booking is
             absent from the map.
@@ -120,7 +129,6 @@ class InvoiceOps(BudgetTreeServiceBase):
         ).all()
         linked: dict[UUID, list[InvoiceBookingOut]] = {}
         for booking, path_key, budget_name in rows:
-            # The WHERE clause excludes a booking without an invoice.
             linked.setdefault(cast("UUID", booking.invoice_id), []).append(
                 InvoiceBookingOut(
                     id=booking.id,
@@ -189,15 +197,22 @@ class InvoiceOps(BudgetTreeServiceBase):
         that the reader can see. Together with ``status`` it gives the segments of the
         list: "Eingang" is ``open`` without a booking, "Verbucht" is ``open`` with one.
         ``counts`` holds the size of each segment under the other filters.
+
+        ``invoice_id`` selects the exact invoice for a deep link, such as a
+        global-search hit. It stands beside the other filters rather than replacing
+        them, so the list still shows the one row it was asked for and the reset button
+        still clears it. The fuzzy search ranks by trigrams over number, supplier and
+        note (GIN indexes). On a non-Postgres dialect an ILIKE substring fallback runs.
+
+        An invoice without a date falls out of every date range. ``func.date`` parses
+        the ISO string of the frontend datepicker into a real date, because Postgres
+        rejects "date >= varchar". On SQLite the call does nothing, because ISO stays
+        ISO. The segment filters apply after the counts, so a count covers its own
+        segment under every other filter.
         """
         filters = []
-        # The exact invoice for a deep link, such as a global-search hit. It stands
-        # beside the other filters rather than replacing them, so the list still shows
-        # the one row it was asked for and the reset button still clears it.
         if invoice_id is not None:
             filters.append(Invoice.id == invoice_id)
-        # Fuzzy search: a trigram rank over number, supplier and note (GIN
-        # indexes). On a non-Postgres dialect the ILIKE substring fallback runs.
         rank_expr = None
         if q and q.strip():
             where, rank_expr = trigram_rank(
@@ -210,10 +225,6 @@ class InvoiceOps(BudgetTreeServiceBase):
             filters.append(Invoice.gross_amount >= gross_min)
         if gross_max is not None:
             filters.append(Invoice.gross_amount <= gross_max)
-        # Nullable date columns: an invoice without a date falls out of every
-        # range. func.date parses the ISO string from the frontend datepicker
-        # into a real date. Postgres rejects "date >= varchar". On SQLite the
-        # call does nothing, because ISO stays ISO.
         if issue_from:
             filters.append(Invoice.issue_date >= func.date(issue_from))
         if issue_to:
@@ -226,8 +237,6 @@ class InvoiceOps(BudgetTreeServiceBase):
         visible = await self._visible_ids(visible_gremium_ids)
         booked_clause = self._booked_clause(visible)
         counts = await self._segment_counts(filters, booked_clause)
-        # The segment filters come after the counts: a count covers its own segment
-        # under every other filter.
         if status is not None:
             filters.append(Invoice.status == status)
         if booked is not None:
@@ -280,12 +289,24 @@ class InvoiceOps(BudgetTreeServiceBase):
     async def get_invoice(
         self, invoice_id: UUID, *, visible_gremium_ids: set[UUID] | None = None
     ) -> InvoiceOut:
+        """Return one invoice with the bookings that the reader can see.
+
+        Raises:
+            NotFoundError: No invoice has this id.
+        """
         inv = await self.session.get(Invoice, invoice_id)
         if inv is None:
             raise NotFoundError(f"invoice {invoice_id} not found")
         return await self._invoice_with_bookings(inv, visible_gremium_ids)
 
     async def create_invoice(self, payload: InvoiceCreate, *, actor: str) -> InvoiceOut:
+        """Create an invoice and audit it.
+
+        A ``fileToken`` from the ZUGFeRD import takes over the stored original. The
+        token is the MinIO key of the object, and the prefix check keeps foreign objects
+        out. The client sends the file name back, so the name gets the display-name rule
+        again.
+        """
         inv = Invoice(
             number=payload.number,
             issue_date=payload.issue_date,
@@ -299,14 +320,11 @@ class InvoiceOps(BudgetTreeServiceBase):
             actor=actor,
         )
         if payload.file_token is not None:
-            # Take over the file from the ZUGFeRD import. The token is the MinIO
-            # key of the stored object. The prefix check keeps foreign objects out.
             inv.file_object_key = _validate_invoice_file_token(payload.file_token)
-            # The client sends the name back, so it gets the display-name rule again.
             inv.file_name = sanitize_display_name(payload.file_name, default="beleg.pdf")
             inv.file_mime = payload.file_mime
         self.session.add(inv)
-        await self.session.flush()  # generate the id for the audit entry
+        await self.session.flush()
         await self._audit(
             AuditAction.BUDGET_INVOICE_CREATE,
             target_type="invoice",
@@ -339,7 +357,7 @@ class InvoiceOps(BudgetTreeServiceBase):
         if mime != "application/pdf":
             raise UnsupportedMediaTypeError("Invoice import expects a PDF.")
 
-        await self._scan_or_raise(data)
+        await scan_or_raise(data, self.settings)
         storage_key = await self._store_invoice_file(
             data, mime, sanitize_storage_name(display_name)
         )
@@ -365,6 +383,9 @@ class InvoiceOps(BudgetTreeServiceBase):
         The order is deliberate: scan first, then parse, then store. A PDF
         without ZUGFeRD data is the common case. It must leave no orphaned
         object behind.
+
+        The parser runs in a thread, because it is synchronous and binds the CPU, and
+        would otherwise block the event loop.
         """
         max_bytes = self.settings.attachment_max_bytes
         if len(data) > max_bytes:
@@ -379,9 +400,7 @@ class InvoiceOps(BudgetTreeServiceBase):
         if mime != "application/pdf":
             raise UnsupportedMediaTypeError("Invoice import expects a PDF.")
 
-        await self._scan_or_raise(data)
-        # The parser runs synchronously and binds the CPU. Move it to a thread,
-        # so it does not block the event loop.
+        await scan_or_raise(data, self.settings)
         parsed = await asyncio.to_thread(parse_zugferd_pdf, data)
 
         storage_key = await self._store_invoice_file(
@@ -435,28 +454,6 @@ class InvoiceOps(BudgetTreeServiceBase):
             raise ServiceUnavailableError("Could not read invoice file.") from exc
         return data, inv.file_mime or "application/pdf", inv.file_name or "beleg.pdf"
 
-    async def _scan_or_raise(self, data: bytes) -> None:
-        """Scan the data for viruses and raise on a bad verdict.
-
-        Without ClamAV the scan is skipped, which covers development and
-        contract CI. In `production` the method fails closed. The server never
-        stores an unscanned invoice PDF when the scanner is missing. This
-        matches the quarantine of the files module.
-        """
-        scanner = build_scanner(self.settings)
-        if scanner is None:
-            if self.settings.environment == "production":
-                raise ServiceUnavailableError("Virus scan unavailable.")
-            return
-        try:
-            verdict = await scanner.scan(data)
-        except ScannerError as exc:
-            raise ServiceUnavailableError("Virus scan unavailable.") from exc
-        if not verdict.clean:
-            raise UnsupportedMediaTypeError(
-                f"File rejected by virus scan: {verdict.signature or 'unknown'}"
-            )
-
     async def _store_invoice_file(self, data: bytes, mime: str, key_name: str) -> str:
         if self.storage is None:
             raise ServiceUnavailableError("Object storage unavailable.")
@@ -468,6 +465,14 @@ class InvoiceOps(BudgetTreeServiceBase):
         return storage_key
 
     async def update_invoice(self, invoice_id: UUID, payload: InvoiceUpdate) -> InvoiceOut:
+        """Update the fields that the payload sets and audit the change.
+
+        The result shows every linked booking, because the write needs ``budget.book``,
+        which is a full-view permission.
+
+        Raises:
+            NotFoundError: No invoice has this id.
+        """
         inv = await self.session.get(Invoice, invoice_id)
         if inv is None:
             raise NotFoundError(f"invoice {invoice_id} not found")
@@ -497,14 +502,21 @@ class InvoiceOps(BudgetTreeServiceBase):
             data={"fields": sorted(fields)},
         )
         await self.session.commit()
-        # The write needs budget.book, which is a full-view permission.
         return await self._invoice_with_bookings(inv, None)
 
     async def delete_invoice(self, invoice_id: UUID) -> None:
+        """Delete an invoice and remove its stored original.
+
+        A linked booking survives, because the FK sets its ``invoice_id`` to NULL. The
+        original is removed as a best effort: if the object is already gone, the delete
+        still stands.
+
+        Raises:
+            NotFoundError: No invoice has this id.
+        """
         inv = await self.session.get(Invoice, invoice_id)
         if inv is None:
             raise NotFoundError(f"invoice {invoice_id} not found")
-        # A booking survives the delete. The FK sets its invoice_id to NULL.
         storage_key = inv.file_object_key
         await self._audit(
             AuditAction.BUDGET_INVOICE_DELETE,
@@ -515,8 +527,6 @@ class InvoiceOps(BudgetTreeServiceBase):
         await self.session.delete(inv)
         await self.session.commit()
         if storage_key is not None and self.storage is not None:
-            # Remove the original as a best effort. If the object is already
-            # gone, the delete still stands.
             try:
                 await self.storage.remove(storage_key)
             except StorageError:

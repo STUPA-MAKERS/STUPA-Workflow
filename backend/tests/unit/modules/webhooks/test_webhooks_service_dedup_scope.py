@@ -1,4 +1,4 @@
-"""AUD-048: scope the dedup pre-check query to the candidate idempotency keys.
+"""Scope the dedup pre-check query to the candidate idempotency keys.
 
 The query must bind the concrete candidate keys in an `IN` clause. It must not load
 every key ever issued for the event.
@@ -38,16 +38,20 @@ class _CapturingSession(FakeSession):
         self.in_params: list[list[str]] = []
 
     async def scalars(self, stmt: Any) -> FakeResult:
+        """Record the keys of the dedup pre-check query.
+
+        Only the query with the IN clause on idempotency_key counts, and the unrelated
+        webhook-lookup query is ignored. ``in_`` expands to one tuple-valued POSTCOMPILE
+        param.
+        """
         compiled = stmt.compile()
-        # Record only the dedup pre-check query, the one with the IN clause on
-        # idempotency_key. Ignore the unrelated webhook-lookup query.
         if "idempotency_key IN" in str(compiled):
             keys = [
                 v for k, v in compiled.params.items()
                 if k.startswith("idempotency_key")
             ]
             flat: list[str] = []
-            for v in keys:  # in_ expands to one tuple-valued POSTCOMPILE param
+            for v in keys:
                 flat.extend(v if isinstance(v, (list, tuple)) else [v])
             self.in_params.append(flat)
         return await super().scalars(stmt)

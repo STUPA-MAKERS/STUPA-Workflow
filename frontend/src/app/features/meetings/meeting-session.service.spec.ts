@@ -56,7 +56,7 @@ describe('MeetingSessionService', () => {
 
   it('starts only a planned meeting with a minute-taker', () => {
     const { http, session, toasts } = setup();
-    session.startMeeting(); // no meeting
+    session.startMeeting();
     session.meeting.set(M({ status: 'live' }));
     session.startMeeting();
     session.meeting.set(M({ protokollantId: null }));
@@ -65,12 +65,15 @@ describe('MeetingSessionService', () => {
     expect(toasts()).toContain('Bitte zuerst die Protokollführung zuweisen, dann die Sitzung starten.');
   });
 
+  /**
+   * The early open sends no PATCH, and the page reads the meeting again for a fresh window. When
+   * the dialog confirms, the PATCH carries confirmEarly and the question closes.
+   */
   it('refuses an open before the window and asks before an early open', () => {
     const { http, session, toasts } = setup();
     const at = (min: number): string => new Date(Date.now() + min * 60_000).toISOString();
     session.meeting.set(M({ opensAt: at(60), confirmUntil: at(110) }));
     session.startMeeting();
-    // No PATCH; the page reads the meeting again for a fresh window.
     http.expectOne({ method: 'GET', url: '/api/meetings/m-1' }).flush({ id: 'm-1', title: 'x', status: 'planned', opensAt: at(60), votes: [], createdAt: 'x' });
     http.verify();
     expect(toasts()).toContain('Die Sitzung lässt sich noch nicht eröffnen.');
@@ -80,7 +83,6 @@ describe('MeetingSessionService', () => {
     session.startMeeting();
     http.verify();
     expect(session.earlyOpenAsk()).toBe(true);
-    // The dialog confirms: the PATCH carries confirmEarly and the question closes.
     session.startMeeting(true);
     expect(session.earlyOpenAsk()).toBe(false);
     const req = http.expectOne('/api/meetings/m-1');
@@ -89,6 +91,7 @@ describe('MeetingSessionService', () => {
     expect(session.meeting()?.status).toBe('live');
   });
 
+  /** The toast shows the German text, not the English server detail. */
   it('asks when the server still finds the open early, and maps a too-early refusal', () => {
     const { http, session, toasts } = setup();
     session.meeting.set(M());
@@ -104,12 +107,11 @@ describe('MeetingSessionService', () => {
       .flush({ code: 'meeting_too_early', detail: 'too early' }, { status: 409, statusText: 'Conflict' });
     http.expectOne('/api/meetings/m-1').flush({ id: 'm-1', title: 'x', status: 'planned', votes: [], createdAt: 'x' });
     expect(session.earlyOpenAsk()).toBe(false);
-    // The German text, not the English server detail.
     expect(toasts()).toContain('Die Sitzung lässt sich noch nicht eröffnen.');
     expect(toasts().some((t) => t.includes('too early'))).toBe(false);
   });
 
-  it('finalizes only a closed meeting, and the close is no part of it (O13)', () => {
+  it('finalizes only a closed meeting, and the close is no part of it', () => {
     const { http, session } = setup();
     session.meeting.set(M({ status: 'live' }));
     session.protocol.set(PROTOCOL);
@@ -134,13 +136,14 @@ describe('MeetingSessionService', () => {
     req.flush({ ...PROTOCOL, status: 'rendering' });
   });
 
+  /** A second publish while the first one runs is ignored. */
   it('holds a final protocol back and publishes it again', () => {
     const { http, session, toasts } = setup();
-    session.setPublicWithheld(true); // no protocol yet
+    session.setPublicWithheld(true);
     http.verify();
     session.protocol.set({ ...PROTOCOL, status: 'final', isFinal: true, isLocked: true });
     session.setPublicWithheld(true);
-    session.setPublicWithheld(false); // ignored while the first one runs
+    session.setPublicWithheld(false);
     const req = http.expectOne('/api/protocols/p-1');
     expect(req.request.body).toEqual({ publicWithheld: true });
     expect(session.publicationSaving()).toBe(true);
@@ -160,7 +163,8 @@ describe('MeetingSessionService', () => {
     expect(toasts().some((t) => t.startsWith('Aktion fehlgeschlagen.'))).toBe(true);
   });
 
-  it('passes the lead events to the guest list and takes the guest counts (#17)', () => {
+  /** A member receives no code and no requests, so the meeting keeps its values. */
+  it('passes the lead events to the guest list and takes the guest counts', () => {
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
@@ -199,7 +203,6 @@ describe('MeetingSessionService', () => {
     expect(session.meeting()).toEqual(
       expect.objectContaining({ publicJoin: true, guestsMode: 'watch', joinCode: '7KQ4MP', admittedGuests: 3, pendingGuests: 1 }),
     );
-    // A member receives no code and no requests: the meeting keeps its values.
     session['onLive']({ type: 'guest_counts', admittedGuests: 4 });
     expect(session.meeting()).toEqual(
       expect.objectContaining({ publicJoin: true, guestsMode: 'watch', joinCode: '7KQ4MP', admittedGuests: 4, pendingGuests: 1 }),
@@ -208,16 +211,16 @@ describe('MeetingSessionService', () => {
     expect(session.meeting()?.votes[0]).toEqual(expect.objectContaining({ presentMembers: 19, presentGuests: 7 }));
     http.match(() => true).forEach((r) => r.flush([]));
   });
-  it('reloads the meeting quietly for a lot or a runoff, and only the open one (F2)', () => {
+  /** When the user opens another meeting meanwhile, the answer is dropped. */
+  it('reloads the meeting quietly for a lot or a runoff, and only the open one', () => {
     const { http, session } = setup();
-    session.reloadMeeting(); // no meeting
+    session.reloadMeeting();
     http.verify();
     session.meeting.set(M({ status: 'live' }));
     session.reloadMeeting();
     http.expectOne('/api/meetings/m-1').flush({ ...M({ status: 'live', title: 'Neu' }), createdAt: 'x' });
     expect(session.meeting()?.title).toBe('Neu');
     session.reloadMeeting();
-    // The user opened another meeting meanwhile: the answer is dropped.
     session.meeting.set(M({ id: 'm-2', title: 'Andere' }));
     http.expectOne('/api/meetings/m-1').flush({ ...M({ title: 'Alt' }), createdAt: 'x' });
     expect(session.meeting()?.title).toBe('Andere');
@@ -226,7 +229,7 @@ describe('MeetingSessionService', () => {
     expect(session.meeting()?.title).toBe('Andere');
   });
 
-  it('takes the election of an opened vote, its result and the drawn lot from the live channel (F2)', () => {
+  it('takes the election of an opened vote, its result and the drawn lot from the live channel', () => {
     const { session } = setup();
     const election = { seats: 1, candidates: [{ id: 'c1', name: 'Ada', principalId: null }], secret: true };
     session.meeting.set(
@@ -264,6 +267,10 @@ describe('MeetingSessionService', () => {
     session['onLive']({ type: 'vote_lot_drawn', voteId: 'v-2', result: 'elected', electionResult: drawn });
     expect(vote('v-2')).toEqual(expect.objectContaining({ result: 'elected', electionResult: drawn }));
   });
+  /**
+   * Without a move the look at another item stays. When the protokollant moves the room, the own
+   * selection stays.
+   */
   it('moves a viewer to the item of the room, but not the protokollant', () => {
     const { http, session } = setup();
     const agenda = TestBed.inject(MeetingAgendaService);
@@ -272,17 +279,15 @@ describe('MeetingSessionService', () => {
       http.match(() => true).forEach((r) => r.flush(r.request.url.endsWith('/agenda') ? rows : { ...M({ status: 'live' }), createdAt: 'x' }));
     session.meeting.set(M({ status: 'live', currentAgendaItemId: 't-1', isProtokollant: false }));
     agenda.agenda.set(rows);
-    agenda.selectedTopId.set('t-3'); // the viewer looks at another item
+    agenda.selectedTopId.set('t-3');
     session['onLive']({ type: 'meeting_state', status: 'live', activeApplicationId: null, currentAgendaItemId: 't-2' });
     expect(agenda.selectedTopId()).toBe('t-2');
     flushReads();
-    // Without a move the look at another item stays.
     session.meeting.set(M({ status: 'live', currentAgendaItemId: 't-2', isProtokollant: false }));
     agenda.selectedTopId.set('t-3');
     session['onLive']({ type: 'meeting_state', status: 'live', activeApplicationId: null, currentAgendaItemId: 't-2' });
     expect(agenda.selectedTopId()).toBe('t-3');
     flushReads();
-    // The protokollant moved the room: the own selection stays.
     session.meeting.set(M({ status: 'live', currentAgendaItemId: 't-2', isProtokollant: true }));
     agenda.selectedTopId.set('t-1');
     session['onLive']({ type: 'meeting_state', status: 'live', activeApplicationId: null, currentAgendaItemId: 't-3' });
@@ -290,17 +295,19 @@ describe('MeetingSessionService', () => {
     flushReads();
   });
 
+  /**
+   * The vote opens while the read of the meeting runs. The second read is after the event and is
+   * taken.
+   */
   it('does not let a read that predates a vote event undo it', () => {
     const { http, session } = setup();
     const open = { id: 'v-1', status: 'open', agendaItemId: 't-1' } as Meeting['votes'][number];
     session.meeting.set(M({ status: 'live', currentAgendaItemId: 't-1' }));
     session['onLive']({ type: 'meeting_state', status: 'live', activeApplicationId: null, currentAgendaItemId: 't-1' });
-    // The vote opens while the read of the meeting runs.
     session['onLive']({ type: 'vote_opened', voteId: 'v-1', applicationId: null, agendaItemId: 't-1', options: [], closesAt: null });
     http.expectOne('/api/meetings/m-1/agenda').flush([]);
     http.expectOne('/api/meetings/m-1').flush({ ...M({ status: 'live', votes: [] }), createdAt: 'x' });
     expect(session.meeting()?.votes.map((v) => v.id)).toEqual(['v-1']);
-    // The second read is after the event and is taken.
     http.expectOne('/api/meetings/m-1').flush({ ...M({ status: 'live', title: 'Neu', votes: [open] }), createdAt: 'x' });
     expect(session.meeting()?.title).toBe('Neu');
     expect(session.meeting()?.votes).toEqual([expect.objectContaining(open)]);
@@ -339,6 +346,7 @@ describe('MeetingSessionService live body draft', () => {
   beforeEach(() => jest.useFakeTimers());
   afterEach(() => jest.useRealTimers());
 
+  /** After a pause the next change goes out at once. */
   it('sends at most one draft per 300 ms, and the last text always goes out', () => {
     const { session, sent } = live();
     session.sendBodyDraft('t-1', 'a');
@@ -352,7 +360,6 @@ describe('MeetingSessionService live body draft', () => {
     jest.advanceTimersByTime(100);
     expect(sent).toHaveLength(2);
     expect(sent[1]).toEqual({ type: 'body_draft', agendaItemId: 't-1', body: 'abc', seq: first + 1 });
-    // After a pause the next change goes out at once.
     jest.advanceTimersByTime(1000);
     session.sendBodyDraft('t-1', 'abcd');
     expect(sent.map((s) => s.body)).toEqual(['a', 'abc', 'abcd']);
@@ -383,16 +390,18 @@ describe('MeetingSessionService live body draft', () => {
     expect(sent).toEqual([]);
   });
 
+  /**
+   * When nothing waits, a flush sends nothing. A new channel (another meeting) drops a waiting
+   * draft too.
+   */
   it('drops the waiting draft when the page goes away', () => {
     const { session, sent } = live();
     session.sendBodyDraft('t-1', 'a');
     session.sendBodyDraft('t-1', 'ab');
     session.ngOnDestroy();
     jest.advanceTimersByTime(1000);
-    // Nothing waits: a flush sends nothing.
     session['flushDraft']();
     expect(sent.map((s) => s.body)).toEqual(['a']);
-    // A new channel (another meeting) drops a waiting draft too.
     session.sendBodyDraft('t-1', 'b');
     session.sendBodyDraft('t-1', 'bc');
     session['connectLive']('m-1');
@@ -403,6 +412,10 @@ describe('MeetingSessionService live body draft', () => {
   const draft = (seq: number, body: string, agendaItemId = 't-1') =>
     ({ type: 'body_draft', agendaItemId, body, seq }) as const;
 
+  /**
+   * The sequence counts per item. A meeting state reads the agenda again: the read wins, and a new
+   * sequence starts.
+   */
   it('shows the draft to a viewer and drops an older frame', () => {
     const { http, session } = setup();
     const agenda = TestBed.inject(MeetingAgendaService);
@@ -415,10 +428,8 @@ describe('MeetingSessionService live body draft', () => {
     session['onLive'](draft(5, 'gleich'));
     session['onLive'](draft(7, 'neuer'));
     expect(agenda.agenda()[0].body).toBe('neuer');
-    // The sequence counts per item.
     session['onLive'](draft(1, 'B2', 't-2'));
     expect(agenda.agenda()[1].body).toBe('B2');
-    // A meeting state reads the agenda again: the read wins, and a new sequence starts.
     session['onLive']({ type: 'meeting_state', status: 'live', activeApplicationId: null });
     http.expectOne('/api/meetings/m-1/agenda').flush([{ id: 't-1', body: 'gespeichert' }, { id: 't-2', body: 'B' }]);
     expect(agenda.agenda()[0].body).toBe('gespeichert');
@@ -427,13 +438,13 @@ describe('MeetingSessionService live body draft', () => {
     http.match(() => true).forEach((r) => r.flush({ ...M({ status: 'live' }), createdAt: 'x' }));
   });
 
+  /** A writer of a live meeting without a protokollant edits the text itself. */
   it('never applies a draft on the client of the protokollant or in an editable editor', () => {
     const { session } = setup();
     const agenda = TestBed.inject(MeetingAgendaService);
     agenda.agenda.set([{ id: 't-1', body: 'eigen' }] as never);
     session.meeting.set(M({ status: 'live', isProtokollant: true }));
     session['onLive'](draft(1, 'fremd'));
-    // A writer of a live meeting without a protokollant edits the text itself.
     session.meeting.set(M({ status: 'live', protokollantId: null, canWrite: true, isProtokollant: false }));
     session['onLive'](draft(2, 'fremd'));
     expect(agenda.agenda()[0].body).toBe('eigen');

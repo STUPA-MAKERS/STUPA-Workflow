@@ -9,7 +9,6 @@
   border-radius: var(--radius-lg);
   background: var(--leg-bg, var(--color-surface-2));
 }
-/* The container of the amount size below. */
 :host(.tl--fit) {
   container-type: inline-size;
 }
@@ -36,9 +35,7 @@
   margin-top: var(--space-2);
   font-size: var(--fs-xl);
 }
-/* The amount shrinks with the leg, so a 5- or 6-digit amount stays in the card.
-   "−125.000,00 €" has 13 mono characters, about 7.8em: 12cqi fits it. The wrap is
-   the last resort for an amount that is still too wide at the smallest size. */
+// "−125.000,00 €" has 13 mono characters, about 7.8em, so 12cqi fits it.
 :host(.tl--fit) .tl__amount {
   font-size: clamp(var(--fs-sm), 12cqi, var(--fs-xl));
   overflow-wrap: anywhere;

@@ -1,4 +1,4 @@
-"""Integration: the T-10 tables against a real Postgres 16 (security.md §1/§2).
+"""Integration: the auth tables against a real Postgres 16.
 
 The tests check the schema behavior of the migration: magic_link (scope CHECK, bytea
 hash, FK CASCADE) and auth_session (sid UNIQUE, principal FK CASCADE).
@@ -11,7 +11,7 @@ from sqlalchemy import Engine, text
 from sqlalchemy.exc import IntegrityError
 
 
-def _new_application(conn) -> str:  # noqa: ANN001
+def _new_application(conn) -> str:
     type_id = conn.execute(
         text("INSERT INTO application_type (key) VALUES (:k) RETURNING id"),
         {"k": "t-" + str(conn.execute(text("SELECT gen_random_uuid()")).scalar())},
@@ -33,7 +33,7 @@ def _new_application(conn) -> str:  # noqa: ANN001
 
 
 def test_magic_link_scope_check_rejects_bad_scope(engine: Engine) -> None:
-    with pytest.raises(IntegrityError), engine.begin() as conn:  # noqa: PT012
+    with pytest.raises(IntegrityError), engine.begin() as conn:
         app_id = _new_application(conn)
         conn.execute(
             text(
@@ -74,7 +74,7 @@ def test_auth_session_sid_unique_and_cascade(engine: Engine) -> None:
             ),
             {"p": pid},
         )
-    with pytest.raises(IntegrityError), engine.begin() as conn:  # noqa: PT012
+    with pytest.raises(IntegrityError), engine.begin() as conn:
         conn.execute(
             text(
                 "INSERT INTO auth_session (sid, principal_id, expires_at) "

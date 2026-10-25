@@ -1,4 +1,4 @@
-"""Personnel elections (F2): ballot shape, stored result, lot and runoff.
+"""Personnel elections: ballot shape, stored result, lot and runoff.
 
 An election is a ``vote`` row with ``kind = 'election'``. ``vote.config`` holds an
 ``ElectionConfig`` (seats, candidates, secret, quorum, guests). It shares the life
@@ -48,7 +48,7 @@ if TYPE_CHECKING:
 
 ELECTION = "election"
 
-# 409 codes of the lot and the runoff.
+#: 409 codes of the lot and the runoff.
 NOT_AN_ELECTION = "not_an_election"
 NO_LOT_PENDING = "no_lot_pending"
 LOT_ALREADY_DRAWN = "lot_already_drawn"
@@ -145,7 +145,7 @@ def dump_result(result: ElectionResultOut) -> dict[str, Any]:
 
 
 def election_fields(vote: Vote) -> dict[str, Any]:
-    """Return the F2 fields of ``VoteOut`` for a vote row (empty for a motion)."""
+    """Return the election fields of ``VoteOut`` for a vote row (empty for a motion)."""
     if not is_election(vote):
         return {}
     stored = getattr(vote, "election_result", None)
@@ -190,6 +190,7 @@ class ElectionService:
     def __init__(
         self, voting: VotingService, choose: Callable[[Sequence[str]], str] = secrets.choice
     ) -> None:
+        """Bind the service to a voting service and the draw function of the lot."""
         self.voting = voting
         self.session = voting.session
         self._choose = choose
@@ -213,6 +214,9 @@ class ElectionService:
         The server draws with ``secrets.choice``, one seat at a time. The result keeps
         the candidates, the moment and the meeting lead who triggered the draw, and
         the audit log gets ``vote_lot_drawn``. The caller checks the manage right.
+
+        The audit entry holds candidate ids only, so the names stay in the vote, not in
+        the chain.
 
         Raises:
             ConflictError: The vote is no closed election (``not_an_election``), no
@@ -247,7 +251,6 @@ class ElectionService:
             action=AuditAction.VOTE_LOT_DRAWN,
             target_type="vote",
             target_id=str(vote.id),
-            # Candidate ids only: the names stay in the vote, not in the chain.
             data={
                 **self.voting._audit_refs(vote),
                 "among": lot.among,
@@ -275,13 +278,15 @@ class ElectionService:
         lead opens it with ``POST /votes/{id}/open``. The caller checks the manage
         right.
 
+        The method locks the meeting row first and the vote row after it, as the meeting
+        close and delete do. The link to the runoff joins the commit of the insert, so a
+        second call sees it under the row lock and gets 409.
+
         Raises:
             ConflictError: The vote is no closed election (``not_an_election``), no
                 runoff is pending (``no_runoff_pending``), a runoff exists that is
                 not cancelled (``runoff_exists``) or the meeting is not live.
         """
-        # Lock order: the meeting row first, the vote row after it (as the meeting
-        # close and delete do).
         meeting_id = await self.session.scalar(select(Vote.meeting_id).where(Vote.id == vote_id))
         if meeting_id is not None:
             await self.voting._lock_live_meeting(meeting_id)
@@ -316,8 +321,6 @@ class ElectionService:
             parentVoteId=vote.id,
             round=(getattr(vote, "round", 1) or 1) + 1,
         )
-        # The link to the runoff joins the commit of the insert, so a second call
-        # sees it under the row lock and gets 409.
         runoff_id = uuid4()
         vote.election_result = dump_result(
             result.model_copy(update={"runoff": runoff.model_copy(update={"vote_id": runoff_id})})

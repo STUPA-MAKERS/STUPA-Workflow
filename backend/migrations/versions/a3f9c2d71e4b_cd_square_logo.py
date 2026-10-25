@@ -30,6 +30,7 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     op.execute("ALTER TABLE cd_variant_logo DROP CONSTRAINT IF EXISTS ck_cd_variant_logo_slot")
     op.execute(
         "ALTER TABLE cd_variant_logo ADD CONSTRAINT ck_cd_variant_logo_slot "
@@ -42,6 +43,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     op.execute("DELETE FROM cd_variant_logo WHERE slot = 'square'")
     op.execute("DROP INDEX IF EXISTS uq_cd_variant_logo_square")
     op.execute("ALTER TABLE cd_variant_logo DROP CONSTRAINT IF EXISTS ck_cd_variant_logo_slot")

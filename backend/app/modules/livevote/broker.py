@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterator
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from fnmatch import fnmatchcase
 from typing import Protocol
@@ -28,21 +28,29 @@ from typing import Protocol
 class Subscription(Protocol):
     """Async iterator over a channel's incoming message dicts."""
 
-    def __aiter__(self) -> AsyncIterator[dict[str, object]]: ...
+    def __aiter__(self) -> AsyncIterator[dict[str, object]]:
+        """Iterate over the incoming messages."""
+        ...
 
 
 class MeetingBroker(Protocol):
     """Pub/sub abstraction for the `meeting:{id}` channel."""
 
-    async def publish(self, channel: str, message: dict[str, object]) -> None: ...
+    async def publish(self, channel: str, message: dict[str, object]) -> None:
+        """Send a message to every subscriber of the channel."""
+        ...
 
-    def subscribe(self, channel: str) -> AbstractAsyncContextManager[Subscription]: ...
+    def subscribe(self, channel: str) -> AbstractAsyncContextManager[Subscription]:
+        """Subscribe to one channel for the duration of the block."""
+        ...
 
 
 class PatternBroker(MeetingBroker, Protocol):
     """A broker that also subscribes to every channel that matches a glob pattern."""
 
-    def subscribe_pattern(self, pattern: str) -> AbstractAsyncContextManager[Subscription]: ...
+    def subscribe_pattern(self, pattern: str) -> AbstractAsyncContextManager[Subscription]:
+        """Subscribe to every channel that matches a glob pattern for the block."""
+        ...
 
 
 class _Hub:
@@ -101,13 +109,16 @@ class InMemoryBroker:
     """
 
     def __init__(self, hub: _Hub | None = None) -> None:
+        """Use the given hub, or a new one."""
         self._hub = hub or _Hub()
 
     async def publish(self, channel: str, message: dict[str, object]) -> None:
+        """Send a message to every subscriber of the channel."""
         self._hub.fan_out(channel, message)
 
     @asynccontextmanager
-    async def subscribe(self, channel: str) -> AsyncIterator[_QueueSubscription]:
+    async def subscribe(self, channel: str) -> AsyncGenerator[_QueueSubscription]:
+        """Subscribe to one channel for the duration of the block."""
         queue = self._hub.register(channel)
         try:
             yield _QueueSubscription(queue)
@@ -115,7 +126,8 @@ class InMemoryBroker:
             self._hub.unregister(channel, queue)
 
     @asynccontextmanager
-    async def subscribe_pattern(self, pattern: str) -> AsyncIterator[_QueueSubscription]:
+    async def subscribe_pattern(self, pattern: str) -> AsyncGenerator[_QueueSubscription]:
+        """Subscribe to every channel that matches a glob pattern for the block."""
         queue = self._hub.register_pattern(pattern)
         try:
             yield _QueueSubscription(queue)
@@ -125,8 +137,11 @@ class InMemoryBroker:
 
 class _RedisSubscription:
     def __init__(self, pubsub: object, kind: str = "message") -> None:
+        """Store the subscription and its kind.
+
+        `kind` is `message` for SUBSCRIBE and `pmessage` for PSUBSCRIBE.
+        """
         self._pubsub = pubsub
-        # `message` for SUBSCRIBE, `pmessage` for PSUBSCRIBE.
         self._kind = kind
 
     async def __aiter__(self) -> AsyncIterator[dict[str, object]]:
@@ -143,13 +158,16 @@ class RedisBroker:
     """Pub/sub broker on `redis.asyncio` that fans out across app instances."""
 
     def __init__(self, client: object) -> None:
+        """Wrap a `redis.asyncio` client."""
         self._client = client
 
     async def publish(self, channel: str, message: dict[str, object]) -> None:
+        """Publish a message as JSON on the channel."""
         await self._client.publish(channel, json.dumps(message))  # type: ignore[attr-defined]
 
     @asynccontextmanager
-    async def subscribe(self, channel: str) -> AsyncIterator[_RedisSubscription]:
+    async def subscribe(self, channel: str) -> AsyncGenerator[_RedisSubscription]:
+        """Subscribe to one channel for the duration of the block."""
         pubsub = self._client.pubsub()  # type: ignore[attr-defined]
         await pubsub.subscribe(channel)
         try:
@@ -159,7 +177,8 @@ class RedisBroker:
             await pubsub.aclose()
 
     @asynccontextmanager
-    async def subscribe_pattern(self, pattern: str) -> AsyncIterator[_RedisSubscription]:
+    async def subscribe_pattern(self, pattern: str) -> AsyncGenerator[_RedisSubscription]:
+        """Subscribe to every channel that matches a glob pattern for the block."""
         pubsub = self._client.pubsub()  # type: ignore[attr-defined]
         await pubsub.psubscribe(pattern)
         try:

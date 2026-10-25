@@ -34,8 +34,6 @@ import {
   StatusTextComponent,
   StickyBarComponent,
 } from '@stupa-makers/ui-kit';
-// By path, not through the `@shared/ui` barrel, so this lazy chunk takes only the blocks
-// it uses.
 import {
   flowColorKind,
 } from '@shared/status-kind.util';
@@ -88,7 +86,7 @@ interface TaskRow {
 }
 
 /**
- * Tasks (board Arbeit-Aufgaben): the applications that wait for an action of the user,
+ * Tasks: the applications that wait for an action of the user,
  * from GET /applications/tasks, in server order (newest first).
  *
  * The page has the same two panes as the applications page: the task list on the left
@@ -106,7 +104,7 @@ interface TaskRow {
  * the empty state when no task is left.
  *
  * Below the applications the group "To-Dos" lists the open cards assigned to the user
- * over all boards (`GET /todos/mine`, by due date, frames 10 and 15). A card opens as
+ * over all boards (`GET /todos/mine`, by due date). A card opens as
  * `/tasks/todo/:cardId` with the card detail in the right pane. While To-Dos exist, the
  * groups carry headings with their counts and the chips "Anzeigen" and "Fällig" filter
  * them; without To-Dos the page looks as before.
@@ -251,14 +249,12 @@ export class TasksComponent implements OnDestroy {
   );
 
   constructor() {
-    // The shown rows read their detail ahead, so a click shows it at once.
     prefetchDetails({
       items: this.rows,
       key: (r) => r.item.id,
       reads: (r) => applicationReads(r.item.id),
       when: this.showApplications,
     });
-    // The people of a board are read once for all its cards.
     const boards = new Set<Uuid>();
     prefetchDetails({
       items: this.todoRows,
@@ -282,7 +278,6 @@ export class TasksComponent implements OnDestroy {
     this.load();
     this.loadTodos();
 
-    // The open application comes from the child route (`/tasks/:id`).
     this.readSelection();
     this.router.events
       .pipe(
@@ -291,8 +286,6 @@ export class TasksComponent implements OnDestroy {
       )
       .subscribe(() => this.readSelection());
 
-    // The detail pane changed an application: load the list again. A deleted application
-    // leaves the list at once; the detail goes back to `/tasks` itself.
     this.page.changes$.pipe(takeUntilDestroyed()).subscribe((change) => {
       if (change.source === 'list') return;
       if (change.kind === 'deleted') {
@@ -303,8 +296,6 @@ export class TasksComponent implements OnDestroy {
     });
 
     effect(() => this.page.split.set(this.split()));
-    // Side by side the page fills the viewport: the frame drops the footer below it, so
-    // only the panes scroll.
     effect(() => this.frame.fill.set(this.split()));
   }
 
@@ -413,7 +404,6 @@ export class TasksComponent implements OnDestroy {
       },
       error: () => {
         if (seq !== this.fetchSeq) return;
-        // A failed reload keeps the rows; only a failed first load shows the error.
         if (!changedId) {
           this.tasks.set([]);
           this.error.set(true);

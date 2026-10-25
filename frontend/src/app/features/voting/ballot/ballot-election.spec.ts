@@ -48,7 +48,7 @@ async function setup(
 
 const confirmButton = () => screen.getByRole('button', { name: /abgeben/ });
 
-describe('BallotComponent · election (F2)', () => {
+describe('BallotComponent · election', () => {
   it('labels an erased candidate in the language of the viewer', async () => {
     const candidates = CANDIDATES.map((c) =>
       c.id === 'c2' ? { ...c, name: 'Gelöscht', erased: true } : c,
@@ -94,6 +94,10 @@ describe('BallotComponent · election (F2)', () => {
     expect(screen.queryByText(/Zur Wahl steht/)).toBeNull();
   });
 
+  /**
+   * A second pick replaces the first one. The open ballot keeps the pick after the cast: "Danke!
+   * Deine Stimme: Enthaltung".
+   */
   it('one seat: a radio list with a separate abstention row', async () => {
     const { caster, castDone, container } = await setup(1);
     const user = userEvent.setup();
@@ -101,7 +105,6 @@ describe('BallotComponent · election (F2)', () => {
     await user.click(screen.getByRole('radio', { name: 'Ben Ott' }));
     expect(screen.getByRole('radio', { name: 'Ben Ott' })).toHaveAttribute('aria-checked', 'true');
     expect(confirmButton()).toHaveTextContent('Stimme abgeben: Ben Ott');
-    // A second pick replaces the first one.
     await user.click(screen.getByRole('radio', { name: 'Anna Berg' }));
     expect(screen.getByRole('radio', { name: 'Ben Ott' })).toHaveAttribute('aria-checked', 'false');
     await user.click(screen.getByRole('radio', { name: 'Enthaltung' }));
@@ -109,28 +112,27 @@ describe('BallotComponent · election (F2)', () => {
     await user.click(confirmButton());
     expect(caster).toHaveBeenCalledWith([], false);
     expect(castDone).toHaveBeenCalledWith({ choice: [], asDelegation: false });
-    // The open ballot keeps the pick after the cast: "Danke! Deine Stimme: Enthaltung".
     expect(screen.getByText('Danke! Deine Stimme: Enthaltung')).toBeInTheDocument();
     expect(await runAxe(container)).toHaveNoViolations();
   });
 
+  /**
+   * The button counts instead of naming, so it stays whole on a phone; the accessible name keeps
+   * the names. When all votes are given, the further box stays off. With only names every seat has
+   * a vote. A click on a chosen box takes the vote back.
+   */
   it('several seats: check boxes, the counter and a vote count in the label', async () => {
     const { caster } = await setup(2);
     const user = userEvent.setup();
     expect(screen.getByText('0 von 2 Stimmen vergeben')).toBeInTheDocument();
     await user.click(screen.getByRole('checkbox', { name: 'Anna Berg' }));
     expect(screen.getByText('1 von 2 Stimmen vergeben')).toBeInTheDocument();
-    // The button counts instead of naming, so it stays whole on a phone (names and abstentions).
     expect(confirmButton()).toHaveTextContent(/^Stimmen abgeben \(1 Name, 1 Enthaltung\)$/);
-    // The accessible name keeps the names.
     expect(confirmButton()).toHaveAccessibleName('Stimmen abgeben (1 Name, 1 Enthaltung): Anna Berg');
     await user.click(screen.getByRole('checkbox', { name: 'Cem Aydin' }));
-    // All votes given: the further box stays off.
     expect(screen.getByRole('checkbox', { name: 'Ben Ott' })).toBeDisabled();
-    // Only names: every seat has a vote.
     expect(confirmButton()).toHaveTextContent(/^Stimmen abgeben \(2 Namen\)$/);
     expect(confirmButton()).toHaveAccessibleName('Stimmen abgeben (2 Namen): Anna Berg, Cem Aydin');
-    // A click on a chosen box takes the vote back.
     await user.click(screen.getByRole('checkbox', { name: 'Cem Aydin' }));
     expect(screen.getByRole('checkbox', { name: 'Ben Ott' })).toBeEnabled();
     await user.click(screen.getByRole('checkbox', { name: 'Ben Ott' }));
@@ -138,6 +140,7 @@ describe('BallotComponent · election (F2)', () => {
     expect(caster).toHaveBeenCalledWith(['c1', 'c2'], false);
   });
 
+  /** With only abstentions there are no names to add to the accessible name. */
   it('"Ganz enthalten" sends an empty list', async () => {
     const { caster } = await setup(2);
     const user = userEvent.setup();
@@ -145,7 +148,6 @@ describe('BallotComponent · election (F2)', () => {
     await user.click(screen.getByRole('button', { name: 'Ganz enthalten' }));
     expect(screen.getByRole('checkbox', { name: 'Anna Berg' })).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByRole('button', { name: 'Ganz enthalten' })).toHaveAttribute('aria-pressed', 'true');
-    // Only abstentions: no names to add to the accessible name.
     expect(confirmButton()).toHaveTextContent(/^Stimmen abgeben \(2 Enthaltungen\)$/);
     expect(confirmButton()).not.toHaveAttribute('aria-label');
     await user.click(confirmButton());
@@ -208,6 +210,7 @@ describe('BallotComponent · election (F2)', () => {
     expect(cmp.confirmAria()).toBe('');
   });
 
+  /** The 409 locks the row, so a further toggle or abstention changes nothing. */
   it('takes no pick while the row is cast or a cast runs', async () => {
     const { fixture } = await setup(2, {
       caster: () => throwError(() => ({ status: 409, error: { code: 'already_voted' } })),
@@ -215,7 +218,6 @@ describe('BallotComponent · election (F2)', () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole('checkbox', { name: 'Anna Berg' }));
     await user.click(confirmButton());
-    // The 409 locks the row: a further toggle or abstention changes nothing.
     const cmp = fixture.componentInstance as unknown as {
       toggle(row: 'own', id: string): void;
       abstainAll(row: 'own'): void;
@@ -226,6 +228,7 @@ describe('BallotComponent · election (F2)', () => {
     expect(cmp.picked()['own']).toBeNull();
   });
 
+  /** A plain vote has no candidates and one seat. */
   it('takes no further candidate once every seat has a vote; the proxy row abstains on its own', async () => {
     const { fixture } = await setup(2, { own: null, proxyName: 'Jonas Weber' });
     const cmp = fixture.componentInstance as unknown as {
@@ -241,7 +244,6 @@ describe('BallotComponent · election (F2)', () => {
     cmp.abstainAll('proxy');
     expect(cmp.picked()['proxy']).toEqual([]);
     expect(cmp.candidateMode()).toBe(true);
-    // A plain vote has no candidates and one seat.
     fixture.componentRef.setInput('election', null);
     const plain = fixture.componentInstance as unknown as { candidateMode(): boolean; multiSeat(): boolean; seats(): number };
     expect(plain.candidateMode()).toBe(false);

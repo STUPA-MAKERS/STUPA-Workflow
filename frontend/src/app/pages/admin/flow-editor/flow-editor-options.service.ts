@@ -35,8 +35,6 @@ export class FlowEditorOptionsService {
   readonly globalRoleOptions = signal<SelectOption[]>([]);
   /** Configured webhooks for the `webhook` action. */
   readonly webhookOptions = signal<SelectOption[]>([]);
-  /** Named deadline policies a state can reference by key. */
-  readonly deadlinePolicyOptions = signal<SelectOption[]>([]);
   /** Cost-center names (id maps to "name (key)") that resolve `budgetIs` guard values. */
   readonly budgetNameById = signal<ReadonlyMap<string, string>>(new Map());
   /** The cost-center tree (roots with children) for the cost-center pickers of actions. */
@@ -63,16 +61,6 @@ export class FlowEditorOptionsService {
       .subscribe({
         next: (hooks) =>
           this.webhookOptions.set(hooks.map((h) => ({ value: h.id, label: h.name || h.url }))),
-        error: () => undefined,
-      });
-    this.api
-      .listDeadlinePolicies()
-      .pipe(takeUntilDestroyed())
-      .subscribe({
-        next: (policies) =>
-          this.deadlinePolicyOptions.set(
-            policies.map((p) => ({ value: p.key, label: `${p.label['de'] ?? p.key} (${p.key})` })),
-          ),
         error: () => undefined,
       });
     this.budgetApi

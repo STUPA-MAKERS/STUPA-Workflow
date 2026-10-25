@@ -1,4 +1,4 @@
-"""Router tests for forms (T-11): endpoint wiring without a DB.
+"""Router tests for forms: endpoint wiring without a DB.
 
 `dependency_overrides` replaces the DB-backed `FormsService` with a fake. Auth runs
 through `get_current_principal`. The integration suite covers the real DB paths.
@@ -6,6 +6,7 @@ through `get_current_principal`. The integration suite covers the real DB paths.
 
 from __future__ import annotations
 
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -29,7 +30,7 @@ class _FakeService:
     def __init__(self) -> None:
         self.created: tuple[object, FormVersionCreate] | None = None
 
-    async def get_effective_form(self, type_id):  # noqa: ANN001
+    async def get_effective_form(self, type_id):
         if str(type_id).startswith("00000000"):
             raise NotFoundError("application type not found")
         sections = [
@@ -46,7 +47,7 @@ class _FakeService:
             sections=sections,
         )
 
-    async def create_form_version(  # noqa: ANN001, ANN003
+    async def create_form_version(
         self, type_id, payload: FormVersionCreate, _actor="sub", **_kw
     ):
         self.created = (type_id, payload)
@@ -111,7 +112,7 @@ def test_get_effective_form_bad_uuid_422(app_client: TestClient) -> None:
     assert r.status_code == 422
 
 
-def _payload() -> dict:
+def _payload() -> dict[str, Any]:
     return {
         "fields": [
             {"key": "title", "type": "text", "label": {"de": "Titel"}, "required": True}
@@ -169,12 +170,14 @@ def test_create_form_version_rejects_empty_fields(
     assert r.status_code == 422
 
 
-# OpenAPI contract: the spec declares the error statuses for Schemathesis conformance.
 def test_openapi_declares_error_responses(app_client: TestClient) -> None:
+    """Declare the error statuses in the OpenAPI spec for Schemathesis.
+
+    The error hook rewrites a 4xx to problem+json.
+    """
     spec = app_client.get("/openapi.json").json()
     get_form = spec["paths"]["/api/application-types/{type_id}/form"]["get"]
     assert "404" in get_form["responses"]
     post = spec["paths"]["/api/admin/application-types/{type_id}/form-versions"]["post"]
     assert {"400", "401", "403", "404", "422"} <= set(post["responses"])
-    # The T-10 hook rewrites 4xx to problem+json.
     assert "application/problem+json" in get_form["responses"]["404"]["content"]

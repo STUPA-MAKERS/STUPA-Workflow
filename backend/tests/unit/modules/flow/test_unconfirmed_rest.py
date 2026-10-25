@@ -1,4 +1,4 @@
-"""Unit tests: unconfirmed guest applications rest in the flow (F15, F18, O14).
+"""Unit tests: unconfirmed guest applications rest in the flow.
 
 The suite runs without a DB. `FlowService` reads through the result-queue fake. The
 integration suite `test_unconfirmed_guest_rest` covers the same rules on Postgres.
@@ -39,30 +39,30 @@ def _app(*, confirmed: bool, state_id: UUID | None = None) -> SimpleNamespace:
     )
 
 
-# F15: `_load_app` hides an unconfirmed application from the routes.
 async def test_load_app_hides_unconfirmed_from_routes() -> None:
+    """Hide an unconfirmed application from the routes."""
     app = _app(confirmed=False)
     svc = FlowService(fake_session(result(app)))
     with pytest.raises(NotFoundError):
-        await svc._load_app(app.id, allow_unconfirmed=False)  # noqa: SLF001
+        await svc._load_app(app.id, allow_unconfirmed=False)
 
 
 async def test_load_app_keeps_unconfirmed_for_internal_callers() -> None:
     app = _app(confirmed=False)
     svc = FlowService(fake_session(result(app)))
-    assert await svc._load_app(app.id) is app  # noqa: SLF001
+    assert await svc._load_app(app.id) is app
 
 
 async def test_load_app_returns_confirmed_to_routes() -> None:
     app = _app(confirmed=True)
     svc = FlowService(fake_session(result(app)))
-    assert await svc._load_app(app.id, allow_unconfirmed=False) is app  # noqa: SLF001
+    assert await svc._load_app(app.id, allow_unconfirmed=False) is app
 
 
 async def test_load_app_missing_404() -> None:
     svc = FlowService(fake_session(result()))
     with pytest.raises(NotFoundError):
-        await svc._load_app(uuid4(), allow_unconfirmed=False)  # noqa: SLF001
+        await svc._load_app(uuid4(), allow_unconfirmed=False)
 
 
 @pytest.mark.parametrize(
@@ -105,14 +105,10 @@ async def test_route_methods_404_for_unconfirmed(call: str) -> None:
         await calls[call]()
 
 
-# F18/O14: `start_confirmed` starts the flow after the confirmation.
 @pytest.fixture
 def steps(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
-    """Patch the deadline and auto-advance steps and record their calls."""
-    record: dict[str, Any] = {"scheduled": [], "advanced": [], "outcome": None}
-
-    async def _schedule(_self: FlowService, app: object, state: object) -> None:
-        record["scheduled"].append((app, state))
+    """Patch the auto-advance step and record its calls."""
+    record: dict[str, Any] = {"advanced": [], "outcome": None}
 
     async def _advance(
         _self: FlowService, application_id: UUID, principal: Principal
@@ -123,7 +119,6 @@ def steps(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
             raise outcome
         return outcome
 
-    monkeypatch.setattr(FlowService, "schedule_state_deadline", _schedule)
     monkeypatch.setattr(FlowService, "auto_advance", _advance)
     return record
 
@@ -133,16 +128,21 @@ async def test_start_confirmed_without_state_does_nothing(steps: dict[str, Any])
     recorder = _Recorder()
     out = await FlowService(fake_session(result(app)), recorder).start_confirmed(app.id)
     assert out is None
-    assert steps["scheduled"] == [] and steps["advanced"] == []
+    assert steps["advanced"] == []
     assert recorder.batches == []
 
 
-async def test_start_confirmed_schedules_advances_and_announces(
+async def test_start_confirmed_commits_advances_and_announces(
     steps: dict[str, Any],
 ) -> None:
-    state = SimpleNamespace(id=uuid4())
-    app = _app(confirmed=True, state_id=state.id)
-    db = fake_session(result(app), result(state))
+    """Commit, advance and announce the task mail of the initial state.
+
+    The start commits the confirmation first, so the dispatchers see it in their own
+    sessions. No transition fired, so the task mail goes out, keyed on the status event: a
+    second start with the same event gives the same key.
+    """
+    app = _app(confirmed=True, state_id=uuid4())
+    db = fake_session(result(app))
     event_id = uuid4()
     db.scalar_results.append(event_id)
     recorder = _Recorder()
@@ -150,12 +150,10 @@ async def test_start_confirmed_schedules_advances_and_announces(
     out = await FlowService(db, recorder).start_confirmed(app.id)
 
     assert out is None
-    assert steps["scheduled"] == [(app, state)]
+    assert db.committed >= 1
     (advanced_id, actor), = steps["advanced"]
     assert advanced_id == app.id
     assert actor.sub == "system:confirmation"
-    # No transition fired, so the task mail of the initial state goes out, keyed on the
-    # status event. A second start with the same event gives the same key.
     (batch,) = recorder.batches
     (action,) = batch
     assert action.type == "taskNotify"
@@ -164,34 +162,30 @@ async def test_start_confirmed_schedules_advances_and_announces(
     assert action.idempotency_key == f"{app.id}:{event_id}:auto:task"
 
 
-async def test_start_confirmed_missing_state_row_skips_the_deadline(
+async def test_start_confirmed_without_status_event_announces_nothing(
     steps: dict[str, Any],
 ) -> None:
+    """Send nothing without a status event, because the announcement has no key."""
     app = _app(confirmed=True, state_id=uuid4())
-    db = fake_session(result(app), result())  # the state row is gone
+    db = fake_session(result(app))
     recorder = _Recorder()
     await FlowService(db, recorder).start_confirmed(app.id)
-    assert steps["scheduled"] == []
-    # Without the deadline step the start still commits the confirmation, so the
-    # dispatchers see it in their own sessions.
     assert db.committed == 1
     assert len(steps["advanced"]) == 1
-    # No status event: the announcement has no key and sends nothing.
     assert recorder.batches == []
 
 
 async def test_start_confirmed_fired_transition_sends_no_extra_mail(
     steps: dict[str, Any],
 ) -> None:
-    state = SimpleNamespace(id=uuid4())
-    app = _app(confirmed=True, state_id=state.id)
+    app = _app(confirmed=True, state_id=uuid4())
     fired = TransitionResult(
         newStateId=uuid4(), statusEventId=uuid4(), dispatchedActions=["notify"]
     )
     steps["outcome"] = fired
     recorder = _Recorder()
     out = await FlowService(
-        fake_session(result(app), result(state)), recorder
+        fake_session(result(app)), recorder
     ).start_confirmed(app.id)
     assert out is fired
     assert recorder.batches == []
@@ -201,15 +195,14 @@ async def test_start_confirmed_fired_transition_sends_no_extra_mail(
 async def test_start_confirmed_swallows_a_failed_advance(
     steps: dict[str, Any], error: Exception
 ) -> None:
-    state = SimpleNamespace(id=uuid4())
-    app = _app(confirmed=True, state_id=state.id)
+    app = _app(confirmed=True, state_id=uuid4())
     steps["outcome"] = error
     recorder = _Recorder()
     out = await FlowService(
-        fake_session(result(app), result(state)), recorder
+        fake_session(result(app)), recorder
     ).start_confirmed(app.id)
     assert out is None
-    assert steps["scheduled"] == [(app, state)]
+    assert len(steps["advanced"]) == 1
     assert recorder.batches == []
 
 
@@ -217,10 +210,9 @@ async def test_start_confirmed_logs_an_unexpected_advance_error(
     steps: dict[str, Any],
 ) -> None:
     """An unexpected error after the commit rolls back, logs and returns None."""
-    state = SimpleNamespace(id=uuid4())
-    app = _app(confirmed=True, state_id=state.id)
+    app = _app(confirmed=True, state_id=uuid4())
     steps["outcome"] = RuntimeError("budget action failed")
-    db = fake_session(result(app), result(state))
+    db = fake_session(result(app))
     recorder = _Recorder()
     out = await FlowService(db, recorder).start_confirmed(app.id)
     assert out is None
@@ -237,9 +229,8 @@ async def test_start_confirmed_logs_a_failed_announcement(
     steps: dict[str, Any],
 ) -> None:
     """A failed task mail enqueue does not fail the start."""
-    state = SimpleNamespace(id=uuid4())
-    app = _app(confirmed=True, state_id=state.id)
-    db = fake_session(result(app), result(state))
+    app = _app(confirmed=True, state_id=uuid4())
+    db = fake_session(result(app))
     db.scalar_results.append(uuid4())
     out = await FlowService(db, _FailingDispatcher()).start_confirmed(app.id)
     assert out is None

@@ -53,6 +53,7 @@ describe('AttendanceDetailComponent', () => {
     localStorage.clear();
   });
 
+  /** With one month there is no month heading. */
   it('shows the meetings of one month under the cell, with the state and the delegate', async () => {
     const view = await setup();
     restore = view.restore;
@@ -65,12 +66,12 @@ describe('AttendanceDetailComponent', () => {
     expect(dialog).toHaveTextContent('Stimme übertragen');
     expect(dialog).toHaveTextContent('an Kai Meier');
     expect(dialog).toHaveTextContent('29.09.');
-    // One month: no month heading.
     expect(dialog.querySelector('.gad__month')).toBeNull();
     expect(dialog.classList.contains('gad--placed')).toBe(true);
     expect(await runAxe(view.container)).toHaveNoViolations();
   });
 
+  /** A second close does nothing. */
   it('closes on Escape and gives the focus back to the cell', async () => {
     const view = await setup();
     restore = view.restore;
@@ -82,11 +83,11 @@ describe('AttendanceDetailComponent', () => {
     view.fixture.detectChanges();
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(document.activeElement).toBe(view.anchor);
-    // A second close does nothing.
     view.cmp.close();
     expect(view.cmp.isOpen()).toBe(false);
   });
 
+  /** When closed, the listeners do nothing. */
   it('closes on a pointer down outside, not on the cell or inside', async () => {
     const view = await setup();
     restore = view.restore;
@@ -99,7 +100,6 @@ describe('AttendanceDetailComponent', () => {
     fireEvent.pointerDown(view.container.querySelector('.outside') as HTMLElement);
     view.fixture.detectChanges();
     expect(view.cmp.isOpen()).toBe(false);
-    // Closed: the listeners do nothing.
     fireEvent.pointerDown(document.body);
     window.dispatchEvent(new Event('resize'));
     expect(view.cmp.isOpen()).toBe(false);
@@ -143,7 +143,7 @@ describe('AttendanceDetailComponent', () => {
   });
 
   it('reports a failed read and reads again', async () => {
-    const memberAttendanceFn = jest.fn(() => throwError(() => new Error('x')));
+    const memberAttendanceFn = jest.fn((): ReturnType<GremienApiService['memberAttendance']> => throwError(() => new Error('x')));
     const view = await setup({ api: gremienApiMock({ memberAttendance: memberAttendanceFn }) });
     restore = view.restore;
     await view.openWith(ONE);
@@ -157,6 +157,7 @@ describe('AttendanceDetailComponent', () => {
     expect(memberAttendanceFn).toHaveBeenCalledTimes(2);
   });
 
+  /** A second request with the same element stays in the top layer. */
   it('puts the popover into the top layer once', async () => {
     const show = jest.fn(function (this: HTMLElement) {
       this.setAttribute('data-open', '');
@@ -172,7 +173,6 @@ describe('AttendanceDetailComponent', () => {
       restore = view.restore;
       await view.openWith(ONE);
       expect(show).toHaveBeenCalledTimes(1);
-      // A second request with the same element stays in the top layer.
       await view.openWith({ ...ONE, months: ['2026-08'] });
       expect(show).toHaveBeenCalledTimes(1);
     } finally {

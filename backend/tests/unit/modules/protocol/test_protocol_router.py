@@ -1,4 +1,4 @@
-"""Router tests for the protocol endpoints (T-22).
+"""Router tests for the protocol endpoints.
 
 The tests cover the endpoint wiring and the RBAC gate (protocol.write). The service is
 a fake.
@@ -51,8 +51,8 @@ class _FakeService:
         self.calls: list[str] = []
         self.status = status
         self.session = _FakeSession()
-        # The router delegates the per-Gremium authorization to MeetingService, so this
-        # fake is a no-op. test_protocol_service covers the real authz paths.
+        #: The router delegates the per-Gremium authorization to MeetingService, so this
+        #: fake is a no-op. test_protocol_service covers the real authz paths.
         self.authz: list[str] = []
 
     async def authorize_write_meeting(self, meeting_id: UUID, principal: object) -> None:
@@ -157,7 +157,6 @@ def _writer(app: FastAPI, *perms: str) -> None:
     )
 
 
-# RBAC fail-closed.
 def test_create_protocol_requires_auth_401(client: TestClient) -> None:
     assert client.post(f"/api/meetings/{MEETING_ID}/protocol").status_code == 401
 
@@ -167,10 +166,12 @@ def test_create_protocol_authz_delegated_to_service(
 ) -> None:
     """The router gates authentication only.
 
-    It delegates the per-Gremium permission to the service (AUD-016). The call of the
+    It delegates the per-Gremium permission to the service. The call of the
     authz hook proves the delegation.
+
+    The writer is logged in only, without a global permission.
     """
-    _writer(app)  # logged in only, no global permission
+    _writer(app)
     r = client.post(f"/api/meetings/{MEETING_ID}/protocol")
     assert r.status_code == 200
     assert fake_service.authz == [f"write_meeting:{MEETING_ID}"]
@@ -189,7 +190,6 @@ def test_finalize_requires_auth_401(client: TestClient) -> None:
     assert client.post(f"/api/protocols/{PROTOCOL_ID}/finalize").status_code == 401
 
 
-# Happy paths.
 def test_create_or_load_protocol(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
@@ -232,12 +232,14 @@ def test_update_protocol_rejects_empty_body_422(app: FastAPI, client: TestClient
 def test_update_protocol_rejects_oversized_markdown_422(
     app: FastAPI, client: TestClient
 ) -> None:
-    """AUD-060: the API caps the Markdown at 512 kB and answers 422 in any deployment."""
+    """The API caps the Markdown at 512 kB and answers 422 in any deployment.
+
+    A body just under the limit stays valid, and the service answers 200.
+    """
     _writer(app)
     oversized = "x" * (512_000 + 1)
     r = client.patch(f"/api/protocols/{PROTOCOL_ID}", json={"markdown": oversized})
     assert r.status_code == 422
-    # Just under the limit stays valid, and the service answers 200.
     ok = client.patch(f"/api/protocols/{PROTOCOL_ID}", json={"markdown": "x" * 512_000})
     assert ok.status_code == 200
 
@@ -276,7 +278,10 @@ def test_finalize_protocol_sync_fallback_without_pool(
 def test_finalize_protocol_enqueues_with_pool(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
-    """With Redis: return `rendering` and enqueue the `render_protocol` job."""
+    """With Redis: return `rendering` and enqueue the `render_protocol` job.
+
+    The router runs no sync render.
+    """
     _writer(app)
     pool = _FakePool()
     app.state.arq_pool = pool
@@ -284,13 +289,13 @@ def test_finalize_protocol_enqueues_with_pool(
     assert r.status_code == 200
     assert r.json()["status"] == "rendering"
     assert pool.jobs == [("render_protocol", str(PROTOCOL_ID))]
-    assert fake_service.calls == [f"start_finalize:{PROTOCOL_ID}"]  # no sync render
+    assert fake_service.calls == [f"start_finalize:{PROTOCOL_ID}"]
 
 
 def test_finalize_protocol_refused_while_rendering(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
-    """A second finalize during the render gives 409 and does not enqueue again (O2)."""
+    """A second finalize during the render gives 409 and does not enqueue again."""
     _writer(app)
     fake_service.status = "rendering"
     pool = _FakePool()
@@ -302,9 +307,8 @@ def test_finalize_protocol_refused_while_rendering(
     assert fake_service.calls == [f"start_finalize:{PROTOCOL_ID}"]
 
 
-# Service wiring.
 def test_get_protocol_service_wires_state_infra() -> None:
-    """The storage and the mail queue come from the app state (T-20 infra), not a copy."""
+    """The storage and the mail queue come from the app state, not a copy."""
     request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(
         object_storage="STORE", arq_pool=object()
     )))
@@ -319,9 +323,6 @@ def test_mail_queue_none_without_pool() -> None:
     assert _mail_queue(request) is None  # type: ignore[arg-type]
 
 
-# DELETE /protocols/{id}: draft only, gated by the write scope (not protocol.finalize).
-
-
 def test_delete_protocol_requires_auth_401(client: TestClient) -> None:
     assert client.delete(f"/api/protocols/{PROTOCOL_ID}").status_code == 401
 
@@ -329,10 +330,10 @@ def test_delete_protocol_requires_auth_401(client: TestClient) -> None:
 def test_delete_draft_protocol_204(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
+    """The delete gate is the write scope of the PATCH, not the finalize scope."""
     _writer(app)
     r = client.delete(f"/api/protocols/{PROTOCOL_ID}")
     assert r.status_code == 204
-    # The gate is the write scope of the PATCH, not the finalize scope.
     assert fake_service.authz == [f"write:{PROTOCOL_ID}"]
     assert fake_service.calls == [f"delete:{PROTOCOL_ID}:p"]
 
@@ -344,8 +345,10 @@ def test_delete_protocol_without_finalize_permission_still_works(
 
     That permission gates publishing. The same caller can already empty the body
     through the PATCH, so a stricter gate here would protect nothing.
+
+    The writer is authenticated only. The service holds the per-Gremium check.
     """
-    _writer(app)  # authenticated only; the service holds the per-Gremium check
+    _writer(app)
     assert client.delete(f"/api/protocols/{PROTOCOL_ID}").status_code == 204
 
 
@@ -357,7 +360,6 @@ def test_delete_final_protocol_409(app: FastAPI, client: TestClient) -> None:
     assert r.headers["content-type"].startswith("application/problem+json")
 
 
-# Publication on the public protocols page.
 def test_patch_withheld_needs_finalize_right(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
@@ -430,6 +432,7 @@ async def test_schedule_public_backfill_enqueues_with_a_pool() -> None:
 async def test_schedule_public_backfill_runs_inline_without_a_pool(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """An inline backfill error only logs, because the gremium save already succeeded."""
     from app.modules.protocol import router as router_mod
 
     seen: list[UUID] = []
@@ -445,6 +448,5 @@ async def test_schedule_public_backfill_runs_inline_without_a_pool(
     monkeypatch.setattr(router_mod.ProtocolService, "backfill_public", _ok)
     await router_mod.schedule_public_backfill(request, object(), get_settings(), gid)  # type: ignore[arg-type]
     assert seen == [gid]
-    # An error only logs: the gremium save already succeeded.
     monkeypatch.setattr(router_mod.ProtocolService, "backfill_public", _boom)
     await router_mod.schedule_public_backfill(request, object(), get_settings(), gid)  # type: ignore[arg-type]

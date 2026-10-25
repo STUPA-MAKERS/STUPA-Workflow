@@ -14,7 +14,6 @@ import type {
   Branding,
   CdVariant,
   ConfigRevision,
-  DeadlinePolicy,
   FlowGraph,
   FormDraft,
   GuestSettings,
@@ -83,10 +82,13 @@ export const MOCK_PERMISSIONS: string[] = [
   'ticket.manage',
 ];
 
+/**
+ * The persons of the admin mock. The first entries are accounts of an earlier OIDC
+ * provider: these persons log in with a new `sub` and appear twice. The first one can be
+ * merged into Robin Mitglied without a conflict; a merge into Alex Admin shows the
+ * conflicts.
+ */
 export const MOCK_PRINCIPALS: AdminPrincipal[] = [
-  // Keycloak-era accounts: the OIDC provider moved to authentik, so these persons log in
-  // with a new `sub` and appear twice. The first one can be merged into Robin Mitglied
-  // without a conflict; a merge into Alex Admin shows the conflicts.
   {
     id: 'p-old-1',
     sub: 'e03ad7d7-5c1e-4f0a-9a3b-6f2a1d9c8b70',
@@ -302,8 +304,10 @@ export const MOCK_FORM_DRAFTS: Record<string, FormDraft> = {
       de: 'Bitte beschreibe dein Förderprojekt möglichst genau.\n\nAnträge werden im STUPA beraten.',
       en: 'Please describe your funding project as precisely as possible.',
     },
-    // Two steps with one field of each family that has its own options: choice options,
-    // cost positions, a currency range and a computed field.
+    /**
+     * Two steps with one field of each family that has its own options: choice options,
+     * cost positions, a currency range and a computed field.
+     */
     fields: [
       { key: 'section_0', type: 'section', label: { de: 'Vorhaben', en: 'Project' } },
       { key: 'title', type: 'text', label: { de: 'Projekttitel', en: 'Project title' }, required: true },
@@ -362,7 +366,7 @@ export const MOCK_WEBHOOKS: WebhookConfig[] = [
     events: ['protocol_finalized', 'vote_closed', 'budget_booked'],
     active: true,
   },
-  { id: 'wh-3', name: 'Kalender', url: 'https://calendar.example.org/hook', events: ['deadline_approaching'], active: true },
+  { id: 'wh-3', name: 'Kalender', url: 'https://calendar.example.org/hook', events: ['vote_opened'], active: true },
   { id: 'wh-4', name: 'Test-Endpunkt', url: 'https://test.example.org/hook', events: [], active: false },
 ];
 
@@ -372,14 +376,6 @@ export const MOCK_WEBHOOK_STATUS: WebhookDeliveryStatus[] = [
   { webhookId: 'wh-2', lastState: 'dead', reasonClass: 'target_server_error', responseCode: 502, attempts: 5, lastAt: '2026-10-04T18:12:00Z' },
   { webhookId: 'wh-3', lastState: 'pending', reasonClass: 'in_progress', responseCode: null, attempts: 2, lastAt: '2026-10-05T07:45:00Z' },
   { webhookId: 'wh-4', lastState: 'never', reasonClass: 'no_deliveries', responseCode: null, attempts: 0, lastAt: null },
-];
-
-/** Deadline policies of the mock flow: one of each kind. */
-export const MOCK_DEADLINE_POLICIES: DeadlinePolicy[] = [
-  { id: 'dp-1', key: 'nachforderung_14d', label: { de: 'Nachforderung beantworten', en: 'Answer the request' }, kind: 'relative_changed', offsetDays: 14, atTime: '23:59', timezone: 'Europe/Berlin' },
-  { id: 'dp-2', key: 'pruefung_21d', label: { de: 'Prüfung durch den Finanzausschuss', en: 'Review by the finance committee' }, kind: 'relative_submitted', offsetDays: 21 },
-  { id: 'dp-3', key: 'einreichschluss_ws', label: { de: 'Einreichschluss Wintersemester', en: 'Winter term deadline' }, kind: 'absolute', absoluteAt: '2026-10-15T10:00:00Z', atTime: '12:00', timezone: 'Europe/Berlin' },
-  { id: 'dp-4', key: 'stupa_sitzungen', label: { de: 'Sitzungstermine Studierendenparlament', en: 'Student parliament meetings' }, kind: 'recurring', dates: ['2026-09-29', '2026-10-13', '2026-10-27', '2026-11-10'], atTime: '18:00', timezone: 'Europe/Berlin' },
 ];
 
 /** The guest settings of the mock backend (the server defaults). */
@@ -682,13 +678,13 @@ export const MOCK_AUDIT_ENTRIES: AuditEntry[] = [
 /**
  * The global flow of mock mode: a review step, a request for more details that comes
  * back automatically, and a vote of the STUPA with its pass and fail branches. The
- * positions put it on the grid of the board Admin-Flow-Editor.
+ * positions put it on the grid of the flow editor.
  */
 export const MOCK_FLOW: FlowGraph = {
   states: [
     { key: 'entwurf', label: { de: 'Entwurf', en: 'Draft' }, isInitial: true },
     { key: 'eingereicht', label: { de: 'Eingereicht', en: 'Submitted' } },
-    { key: 'pruefung', label: { de: 'In Prüfung', en: 'In review' }, color: '#f18700', config: { deadlinePolicyKey: 'pruefung_21d' } },
+    { key: 'pruefung', label: { de: 'In Prüfung', en: 'In review' }, color: '#f18700' },
     { key: 'nachforderung', label: { de: 'Nachforderung', en: 'More details' }, color: '#f18700' },
     {
       key: 'tagesordnung',
@@ -702,7 +698,7 @@ export const MOCK_FLOW: FlowGraph = {
       label: { de: 'Gremium-Abstimmung', en: 'Committee vote' },
       kind: 'vote',
       editAllowed: false,
-      // The gremium comes from the cost center of the application (flow variant B).
+      /** The gremium comes from the cost center of the application. */
       config: { gremiumSource: 'budget' },
     },
     { key: 'bewilligt', label: { de: 'Bewilligt', en: 'Approved' }, color: '#72a384', isTerminal: true, editAllowed: false },
@@ -829,7 +825,6 @@ export function mockMergePreview(
       return { area, rewritten, combined, removed };
     }),
     conflicts,
-    // Sam Neu lacks two rights of the old account; the demo admin holds them.
     extraPermissions:
       targetId === 'p-3'
         ? [{ key: 'vote.cast', gremium: 'STUPA' }, { key: 'budget.view', gremium: null }]

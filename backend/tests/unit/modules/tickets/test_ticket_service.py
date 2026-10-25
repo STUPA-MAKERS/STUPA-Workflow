@@ -86,9 +86,6 @@ class _Todos:
         return wanted & self.readable
 
 
-# -- helpers ------------------------------------------------------------------------
-
-
 def test_format_number_pads_to_four_digits_and_grows() -> None:
     assert format_number(42) == "T-0042"
     assert format_number(12345) == "T-12345"
@@ -107,9 +104,6 @@ async def test_ticket_managers_with_and_without_groups() -> None:
     session = ScriptedSession(scalars=[[]], execute=[[]])
     assert await ticket_managers(session) == []  # type: ignore[arg-type]
     assert "oidc_groups" not in str(session.statements[-1])
-
-
-# -- create ---------------------------------------------------------------------------
 
 
 async def test_create_with_an_email_reporter() -> None:
@@ -178,9 +172,6 @@ async def test_reporter_address_reads_the_account_email() -> None:
     assert await _svc(session).reporter_address(ticket) == "acc@x"
 
 
-# -- list, counts, assignees -----------------------------------------------------------
-
-
 async def test_list_without_filters_maps_reporters_and_assignees() -> None:
     anon = _ticket(anonymized_at=NOW, reporter_email=None)
     account = _ticket(reporter_principal_id=ME, reporter_email=None, assignee_id=OTHER)
@@ -242,9 +233,6 @@ async def test_assignees_drop_nameless_accounts_and_sort_by_name() -> None:
     )
     people = await _svc(session).assignees()
     assert [p.display_name for p in people] == ["Anna", "zora"]
-
-
-# -- detail -------------------------------------------------------------------------
 
 
 async def test_detail_of_an_unknown_ticket_is_404() -> None:
@@ -381,11 +369,13 @@ async def test_a_route_without_a_target_gives_none(route: object) -> None:
 async def test_the_application_target_needs_a_confirmed_readable_application(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Show the application target only for a confirmed application the viewer reads.
+
+    A missing application and an unconfirmed guest application give no target.
+    """
     app_id = uuid.uuid4()
     route = f"/applications/{app_id}/edit"
-    # Missing application.
     assert await _detail_with_route(route, ScriptedSession()) is None
-    # Unconfirmed guest application.
     session = ScriptedSession()
     session.put(Application(id=app_id, data={}, email_confirmed_at=None))
     assert await _detail_with_route(route, session) is None
@@ -438,9 +428,6 @@ async def test_the_meeting_target_needs_read_access(monkeypatch: pytest.MonkeyPa
     assert (target.kind, target.title) == ("meeting", "StuPa 3")
 
 
-# -- patch ----------------------------------------------------------------------------
-
-
 @pytest.fixture
 def no_detail(monkeypatch: pytest.MonkeyPatch) -> list[uuid.UUID]:
     seen: list[uuid.UUID] = []
@@ -465,6 +452,7 @@ async def test_patch_of_an_unknown_ticket_is_404() -> None:
 async def test_patch_closes_and_reopens_with_the_retention_clock(
     no_detail: list[uuid.UUID],
 ) -> None:
+    """Start the retention clock on close and clear it on reopen; done to rejected keeps it."""
     ticket = _ticket()
     session = ScriptedSession(scalar=[ME, ME, ME])
     session.put(ticket)
@@ -473,7 +461,6 @@ async def test_patch_closes_and_reopens_with_the_retention_clock(
     assert ticket.status == "done"
     first_close = ticket.closed_at
     assert first_close is not None
-    # done -> rejected keeps the clock.
     await service.patch(ticket.id, TicketPatch(status="rejected"), VIEWER)
     assert ticket.closed_at == first_close
     await service.patch(ticket.id, TicketPatch(status="in_progress"), VIEWER)
@@ -534,6 +521,7 @@ async def test_patch_complete_todos_needs_a_closing_status() -> None:
 
 
 async def test_patch_complete_todos_calls_the_hooks(no_detail: list[uuid.UUID]) -> None:
+    """Complete the linked cards through the hooks; without hooks the flag changes no card."""
     ticket = _ticket()
     session = ScriptedSession(scalar=[ME, ME])
     session.put(ticket)
@@ -541,7 +529,6 @@ async def test_patch_complete_todos_calls_the_hooks(no_detail: list[uuid.UUID]) 
     payload = TicketPatch.model_validate({"status": "done", "completeTodos": True})
     await _svc(session, todos=todos).patch(ticket.id, payload, VIEWER)
     assert todos.completed == [ticket.id]
-    # Without hooks the flag changes no card.
     payload = TicketPatch.model_validate({"status": "rejected", "completeTodos": True})
     await _svc(session).patch(ticket.id, payload, VIEWER)
     assert ticket.status == "rejected"
@@ -573,9 +560,6 @@ async def test_patch_assigns_unassigns_and_changes_the_kind(no_detail: list[uuid
     ]
 
 
-# -- notes --------------------------------------------------------------------------
-
-
 def _note_in(**kw: Any) -> NoteCreate:
     return NoteCreate.model_validate({"body": "hallo", **kw})
 
@@ -604,6 +588,10 @@ async def test_add_note_needs_an_account_row() -> None:
 
 
 async def test_add_note_checks_and_binds_its_files(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Check and bind the files of a note.
+
+    With files the ticket row is locked against the retention cron.
+    """
     calls: list[tuple[str, dict[str, Any]]] = []
 
     async def _check(_s: object, **kw: Any) -> str:
@@ -632,7 +620,6 @@ async def test_add_note_checks_and_binds_its_files(monkeypatch: pytest.MonkeyPat
     assert calls[1][1]["ticket_note_id"] == out.id
     assert calls[1][1]["attachment_ids"] == [draft]
     assert session.flushed == 1
-    # With files the ticket row is locked against the retention cron.
     assert session.get_kw[0] == {"with_for_update": True, "populate_existing": True}
 
 
@@ -651,12 +638,12 @@ async def test_add_note_with_files_on_an_anonymized_ticket_is_422() -> None:
 
 
 async def test_add_note_without_files_on_an_anonymized_ticket_passes() -> None:
+    """Accept a note without files on an anonymized ticket, without a lock."""
     ticket = _ticket(anonymized_at=NOW, reporter_email=None)
     session = ScriptedSession(scalar=[ME], execute=[[(ME, "Ada", None)]])
     session.put(ticket)
     out = await _svc(session).add_note(ticket.id, _note_in(), VIEWER, pepper="p")
     assert out.body == "hallo"
-    # Without files nothing is locked.
     assert session.get_kw[0] == {}
 
 
@@ -720,17 +707,17 @@ async def test_a_missing_note_is_404() -> None:
             await _svc(session).edit_note(ticket.id, note_id, "x", VIEWER)
 
 
-# -- anonymization ----------------------------------------------------------------
-
-
 async def test_anonymize_clears_the_reporter_the_context_and_the_files() -> None:
+    """Clear the reporter, the context and the files of a ticket.
+
+    The public notes of the reporter and the created event name the reporter, so both lose
+    the account. An internal note of the same account is team work and keeps it.
+    """
     files = FakeFiles()
     ticket = _ticket(reporter_principal_id=ME, reporter_email=None, context={"url": "u"})
     session = ScriptedSession()
     await _svc(session, files=files).anonymize(ticket, actor="sys")
     assert files.deleted == [(ticket.id, "sys")]
-    # The public notes of the reporter and the created event name the reporter, so
-    # both lose the account. An internal note of the same account is team work.
     notes, clear = session.statements
     sql = str(notes.compile(compile_kwargs={"literal_binds": True}))
     assert sql.startswith("UPDATE ticket_note SET author_id")

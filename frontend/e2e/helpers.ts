@@ -35,6 +35,9 @@ export function uniqueEmail(prefix: string): string {
  * Create an application over the public API (POST /api/applications). The call is
  * unauthenticated and needs no CSRF token. The middleware enforces CSRF only with an
  * auth cookie (middleware.py). ALTCHA is OFF in the e2e stack.
+ * The payload uses `title`, not `titel`, because the server prepends a mandatory system field named
+ * `title` to every effective form (`system_title_field` in forms/validation.py). A payload without
+ * it gets a 422.
  */
 export async function createApplication(
   request: APIRequestContext,
@@ -44,9 +47,6 @@ export async function createApplication(
     data: {
       typeId: opts.typeId,
       applicantEmail: opts.email,
-      // `title`, not `titel`: the server prepends a mandatory system field named
-      // `title` to every effective form (forms/validation.py, `system_title_field`),
-      // so a payload without it answers 422 and no scenario past this point can run.
       data: { title: opts.title },
     },
   });
@@ -69,8 +69,8 @@ export async function requestMagicLink(
 /**
  * Pull the newest magic-link token that mailpit holds for `email`. The helper polls
  * until the mail arrives instead of a fixed `sleep`, because the worker delivers the
- * mail asynchronously. The token sits in the link fragment `#t=<token>` (security.md
- * §1: the token never goes to the server).
+ * mail asynchronously. The token sits in the link fragment `#t=<token>`, so the
+ * token never goes to the server.
  */
 export async function fetchMagicLinkToken(
   request: APIRequestContext,

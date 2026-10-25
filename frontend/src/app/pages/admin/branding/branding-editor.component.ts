@@ -48,7 +48,7 @@ import { SectionHeaderComponent } from '@shared/ui/section-header/section-header
 /** The language of the texts in the editor. */
 type TextLang = ContentLang;
 
-/** The free texts in the order of the board. `applyInfo` takes Markdown. */
+/** The free texts in display order. `applyInfo` takes Markdown. */
 const FREETEXTS = ['welcome', 'loginHint', 'support', 'emailFooter', 'applyInfo'] as const;
 type FreetextKey = (typeof FREETEXTS)[number];
 
@@ -138,7 +138,6 @@ export class BrandingEditorComponent {
 
   constructor() {
     this.loadConfig();
-    // An accent that was not saved leaves with the page.
     inject(DestroyRef).onDestroy(() => this.brand.previewAccent(undefined));
   }
 

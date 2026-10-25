@@ -63,8 +63,8 @@ describe('cd-variants.util', () => {
     await expect(readImageSize('blob:x', fakeImage(true))).rejects.toThrow('image could not be read');
   });
 
+  /** jsdom never loads the source; the call must only not throw. */
   it('builds a real image element by default', () => {
-    // jsdom never loads the source; the call must only not throw.
     void readImageSize('blob:x').catch(() => undefined);
   });
 });

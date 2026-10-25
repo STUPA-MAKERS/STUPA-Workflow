@@ -70,15 +70,19 @@ import {
   SideSheetComponent,
   StatusTextComponent,
   type TabItem,
+  TabPageDirective,
+  TabPagerComponent,
   TabsComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import {
   BudgetTreeApi,
+  FISCAL_YEAR_CLOSED,
   type BudgetTreeNode,
   type FiscalYear,
   flattenBudgetOptions,
 } from '../budget/budget-tree.api';
+import { problemCode } from '@core/api/problem';
 import { CostCentreSelectComponent } from '../budget/cost-centre-select/cost-centre-select.component';
 import { AttachmentsPanelComponent } from './attachments-panel.component';
 import { applicationTitle, transitionLooks } from './applications.util';
@@ -114,8 +118,8 @@ type DetailTab = 'app' | 'history' | 'files';
 const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
 
 /**
- * Application detail: the sheet beside the list (board Anträge), or alone with tabs on a
- * narrow screen (board Schmal-Anträge-Detail).
+ * Application detail: the sheet beside the list, or alone with tabs on a
+ * narrow screen.
  *
  * Header: "<Typ> · Version n", the title, "status · gremium · amount", the firable
  * transitions as buttons, and the actions (share links, edit, archive, and a menu with
@@ -124,7 +128,7 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
  * (status changes and versions by day) and the comments.
  *
  * A transition with `addsToAgenda` opens the agenda dialog, which asks for the meeting.
- * "Bearbeiten" turns the sheet into the edit form (board Anträge-Bearbeiten): the bar
+ * "Bearbeiten" turns the sheet into the edit form: the bar
  * "Antrag bearbeiten · Speichern legt Version n+1 an" with Abbrechen over the fields of
  * the form by section. The floating "Speichern" shows after the first change of a field.
  * A 422 of the server shows on its field.
@@ -137,6 +141,18 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
  * public. The author edits and deletes an own comment; the visibility stays as written.
  *
  * RBAC here only gates the UX. The server decides.
+ *
+ * The share action sits outside the edit right, because `application.share` decides who may read
+ * the record, not who may edit it. An archived application shows a banner, because it looks like an
+ * active one and someone arriving from a link has no other way to know. Every tab page stays in the
+ * DOM, so the attachment count and the scroll of a list survive a tab change. The edit form has no
+ * form element, so Enter in a field does not save the whole application. The comment chat exists
+ * only while its sheet shows (open, or still sliding out), because projected content lives even
+ * where the sheet does not render it, and a hidden chat would mark the thread as seen. The
+ * page provides `ChatDrafts`, so the composer files stay with the page too.
+ *
+ * The component provides the field types of the form (`provideFormly`), so Formly is not
+ * part of the initial bundle.
  */
 @Component({
   selector: 'app-applications-detail',
@@ -167,6 +183,8 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
     DialogComponent,
     IconComponent,
     SelectFieldComponent,
+    TabPageDirective,
+    TabPagerComponent,
     TabsComponent,
     CostCentreSelectComponent,
     AttachmentsPanelComponent,
@@ -180,9 +198,6 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
     TodoLinkedListComponent,
     SideSheetComponent,
   ],
-  // The field types of the form (`provideFormly`) come with the component, so Formly is not
-  // part of the initial bundle.
-  // The chat is content of the comments sheet and stays with the page; so do its files.
   providers: [provideFormly(), ChatDrafts],
   templateUrl: './applications-detail.component.html',
   styleUrl: './applications-detail.component.scss',
@@ -304,7 +319,7 @@ export class ApplicationsDetailComponent {
   /** The transition of the agenda dialog. */
   readonly agendaTransition = signal<Transition | null>(null);
   readonly agendaOpen = signal(false);
-  /** F1: the transition of the decision dialog (into an accepted state). */
+  /** The transition of the decision dialog (into an accepted state). */
   readonly decisionTransition = signal<Transition | null>(null);
   readonly decisionOpen = signal(false);
   readonly canTransition = computed(() => this.auth.can('application.transition'));
@@ -332,16 +347,21 @@ export class ApplicationsDetailComponent {
   protected fiscalLabel(id: string | null | undefined): string {
     return (id && this.fiscalLabels().get(id)) || '';
   }
-  /** Dropdown options: "automatic" plus every fiscal year of the top budget.
-   *  An inactive year carries a mark. */
+  /** Dropdown options: "automatic" plus every open fiscal year of the top budget.
+   *  An inactive year carries a mark. A closed year takes no assignment, so it shows
+   *  only while it is the current year of the application. */
   protected readonly fiscalOptions = computed<SelectOption[]>(() => [
     { value: '', label: this.i18n.translate('applications.budget.fiscalAuto') },
-    ...this.fiscalYears().map((y) => ({
+    ...this.fiscalYears()
+      .filter((y) => !y.closedAt || y.id === this.app()?.fiscalYearId)
+      .map((y) => ({
       value: y.id,
-      label: y.active
-        ? y.display
-        : `${y.display} (${this.i18n.translate('applications.budget.fiscalInactive')})`,
-    })),
+        label: y.closedAt
+          ? this.i18n.translate('budget.fy.closedLabel', { year: y.display })
+          : y.active
+            ? y.display
+            : `${y.display} (${this.i18n.translate('applications.budget.fiscalInactive')})`,
+      })),
   ]);
   /** Find the top budget (root) whose subtree contains the cost centre. */
   private topLevelIdOf(budgetId: string): string | null {
@@ -385,7 +405,7 @@ export class ApplicationsDetailComponent {
     this.budgetDialogOpen.set(true);
   }
 
-  // Inline editing for the creator or a manager, plus delete.
+  /** Inline editing for the creator or a manager. */
   readonly editing = signal(false);
   readonly editFields = signal<FormlyFieldConfig[]>([]);
   readonly savingEdit = signal(false);
@@ -398,8 +418,10 @@ export class ApplicationsDetailComponent {
   readonly confirmErase = signal(false);
   readonly requestingErasure = signal(false);
 
-  // Force status is a privileged override that needs `application.force_status`. The
-  // dialog loads the flow states itself.
+  /**
+   * Force status is a privileged override that needs `application.force_status`. The dialog
+   * loads the flow states itself.
+   */
   readonly canForceStatus = computed(() => this.auth.can('application.force_status'));
   readonly forceDialogOpen = signal(false);
 
@@ -419,6 +441,8 @@ export class ApplicationsDetailComponent {
    *
    * Reversible and destructive of nothing, so unlike the delete and the erasure request
    * it asks for no confirmation: the way back is one click on the same button.
+   *
+   * The archive answer carries no applicant block, so the one already shown stays.
    */
   toggleArchived(): void {
     const current = this.app();
@@ -427,7 +451,6 @@ export class ApplicationsDetailComponent {
     this.archiving.set(true);
     this.api.setApplicationArchived(current.id, next).subscribe({
       next: (updated) => {
-        // The archive answer carries no applicant block: the one already shown stays.
         const keep = !updated.applicant && current.applicant;
         this.app.set(keep ? { ...updated, applicant: current.applicant } : updated);
         this.archiving.set(false);
@@ -542,18 +565,21 @@ export class ApplicationsDetailComponent {
     return field ? resolveI18n(field.label, this.i18n.locale()) : key;
   }
 
-  /** The changed fields of a version as lines of the history. */
+  /**
+   * The changed fields of a version as lines of the history.
+   *
+   * The same summary on both sides says nothing, so the line names the field and the blocks show
+   * it.
+   */
   private versionChanges(version: ApplicationVersion): HistoryChange[] {
     const t = (key: TranslationKey) => this.i18n.translate(key);
     if (!version.diff) {
-      // Metadata view (A11): the keys of the changed fields, no values.
       return (version.changedKeys ?? []).map((key) => ({
         kind: 'warn',
         tag: t('applications.history.diff.changed'),
         label: this.fieldLabel(key),
       }));
     }
-    // The long values below the line; a side the change does not have stays null.
     const detail = (
       key: string,
       sides: { old?: unknown; new?: unknown },
@@ -567,8 +593,6 @@ export class ApplicationsDetailComponent {
         const more = detail(c.key, { old: c.old, new: c.new });
         let old = this.fmt(c.old, c.key);
         let neu = this.fmt(c.new, c.key);
-        // The same summary on both sides ("3 Kostenpositionen · 395,00 €" when an offer
-        // text changed) says nothing: the line names the field, the blocks show it.
         if (more && old === neu) old = neu = null;
         return {
           kind: 'warn' as const,
@@ -605,9 +629,12 @@ export class ApplicationsDetailComponent {
    * "Verlauf": the status changes and the versions, by day (`app-history`).
    *
    * A status change shows the new state in its colour, the transition ("Übergang
-   * „Prüfung beginnen“", A3) and the note. The first status event is the submission and
+   * „Prüfung beginnen“") and the note. The first status event is the submission and
    * carries "Version 1". Every later version shows its changed fields with the old and
    * the new value.
+   *
+   * A vote branch writes the machine note "vote:<result>", which stays hidden because the title and
+   * the vote link already say the result.
    */
   readonly historyEntries = computed<HistoryEntry[]>(() => {
     const t = (key: TranslationKey, params?: Record<string, string | number>) =>
@@ -627,10 +654,7 @@ export class ApplicationsDetailComponent {
       if (e.transitionLabel) {
         lines.push(t('applications.history.transition', { label: e.transitionLabel }));
       }
-      // A vote branch writes the machine note "vote:<result>". The title (the new state)
-      // and the vote link already say the result, so the note stays hidden.
       if (e.note && !e.note.startsWith('vote:')) lines.push(e.note);
-      // F1: the status change carried a decision with deviations.
       if (e.decision) {
         const line = decisionHistoryLine(
           e.decision,
@@ -640,8 +664,6 @@ export class ApplicationsDetailComponent {
         );
         if (line) lines.push(line);
       }
-      // The vote that decided the status: a link, or a note when the meeting delete
-      // took it along (the status stays).
       if (e.voteDeleted) lines.push(t('applications.history.voteDeleted'));
       return {
         at: e.at,
@@ -761,16 +783,15 @@ export class ApplicationsDetailComponent {
     },
   ]);
 
+  /**
+   * It subscribes to `paramMap`, not `snapshot`, because Angular reuses the component on a
+   * detail-to-detail navigation and the constructor does not run again.
+   */
   constructor() {
-    // Use `paramMap`, not `snapshot`. Angular reuses the component on a
-    // detail-to-detail navigation, so the constructor does not run again. A snapshot
-    // would keep the old `id`. The subscription reloads on every `id` change.
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((pm) => {
       this.loadApplication(pm.get('id') ?? '');
     });
-    // A link to the comments opens the sheet, also when only the fragment changes.
     this.route.fragment.pipe(takeUntilDestroyed()).subscribe((f) => this.openFromLink(f));
-    // The linked comment scrolls into view after the thread rendered in the open sheet.
     effect(() => {
       const id = this.linkedComment();
       if (!id || !this.commentsOpen() || this.commentsLoading() || this.loading()) return;
@@ -783,7 +804,6 @@ export class ApplicationsDetailComponent {
         { injector: this.injector },
       );
     });
-    // The "@" list loads with the open comments, not with every application.
     effect(() => {
       if (this.commentsOpen() && !this.loading() && this.app() !== null)
         untracked(() => this.loadMentionables());
@@ -792,7 +812,6 @@ export class ApplicationsDetailComponent {
       next: (types) => this.types.set(types),
       error: () => this.types.set([]),
     });
-    // The list pane changed this application (a row action): show the new state.
     this.page?.changes$.pipe(takeUntilDestroyed()).subscribe((change) => {
       if (change.source === 'list' && change.id === this.id && change.kind === 'updated') {
         this.refresh();
@@ -870,23 +889,23 @@ export class ApplicationsDetailComponent {
     this.loadApplication(this.id);
   }
 
+  /**
+   * The effective form comes from the pinned version of the application, not from the active one,
+   * so the labels and the edit fields match the data that the server validates.
+   */
   private loadApplication(id: Uuid): void {
     this.id = id;
     const seq = ++this.loadSeq;
     this.commentsLoaded = false;
     this.mentionsFor = null;
     this.mentionables.set([]);
-    // The dialogs and the edit belong to the shown application: they close at once.
     this.editing.set(false);
     this.confirmDelete.set(false);
     this.outbox.clear();
     this.filesRefusedHere.set(NO_FILES.has(id));
     this.agendaOpen.set(false);
-    // The comments belong to the shown application too; a link to them opens them again.
     this.commentsOpen.set(false);
     this.openFromLink(this.route.snapshot.fragment);
-    // An application is shown: it stays until the next one arrives (`switching`). With
-    // nothing shown, the page resets now and draws its loading shape.
     if (id && this.app() !== null && !this.notFound() && !this.error()) {
       this.switching.set(true);
     } else {
@@ -898,8 +917,6 @@ export class ApplicationsDetailComponent {
       this.notFound.set(true);
       return;
     }
-    // A read ahead by the list paints at once; a newer answer behind it replaces only the
-    // application, so the open view and its other reads stay.
     let shown = false;
     this.api.getApplication(id, { quiet: true, detail: true }).subscribe({
       next: (app) => {
@@ -914,9 +931,6 @@ export class ApplicationsDetailComponent {
         this.app.set(app);
         this.loading.set(false);
         this.loadAux(true);
-        // Take the effective form from the pinned version of the application, not from
-        // the active one. The labels and the edit fields then match the data that the
-        // server validates.
         this.api.applicationForm(app.id, { detail: true }).subscribe({
           next: (eff) => {
             if (seq !== this.loadSeq) return;
@@ -925,7 +939,6 @@ export class ApplicationsDetailComponent {
             this.formLoading.set(false);
           },
           error: () => {
-            // Without the form the answers show as plain text under "Weitere Angaben".
             if (seq !== this.loadSeq) return;
             this.sections.set([]);
             this.formLoading.set(false);
@@ -981,7 +994,12 @@ export class ApplicationsDetailComponent {
   /** Load the versions, the comments and the available transitions.
    *  An error degrades silently to an empty result. The transitions load only with
    *  the needed permission. The server filters them again. `detail`: the first read of
-   *  an opened application, which takes what the list read ahead. */
+   *  an opened application, which takes what the list read ahead.
+   *
+   * Every reader loads the cost-centre tree (the server scopes it), so the row names the cost
+   * centre also for a reader without `application.manage`; only the "Ändern" button needs that
+   * right.
+   */
   private loadAux(detail = false): void {
     const seq = this.loadSeq;
     this.api.versions(this.id, { detail }).subscribe({
@@ -990,8 +1008,6 @@ export class ApplicationsDetailComponent {
       },
       error: () => {},
     });
-    // Only the first read of an application shows the loading state. A reload after a
-    // transition keeps the thread and the count, so the header does not shift.
     if (!this.commentsLoaded) this.commentsLoading.set(true);
     this.api.comments(this.id, { quiet: true, detail }).subscribe({
       next: (c) => {
@@ -1025,9 +1041,6 @@ export class ApplicationsDetailComponent {
         },
       });
     }
-    // The "Kostenstelle" row and the dialog picker both need the cost-centre tree. Every
-    // reader loads it (the server scopes it), so the row names the cost centre also for a
-    // reader without `application.manage`. Only the "Ändern" button needs that right.
     if (this.canManage()) {
       this.budgetChoice.set(this.app()?.budgetId ?? '');
       this.fiscalChoice.set(this.app()?.fiscalYearId ?? '');
@@ -1036,7 +1049,6 @@ export class ApplicationsDetailComponent {
       next: (tree) => {
         if (seq !== this.loadSeq) return;
         this.budgetTree.set(tree);
-        // The row needs the fiscal years of the current cost centre.
         this.loadFiscalYears(this.app()?.budgetId ?? null);
       },
       error: () => {
@@ -1061,11 +1073,13 @@ export class ApplicationsDetailComponent {
         error: (err: { status?: number }) => {
           this.assigningBudget.set(false);
           const key =
-            err.status === 422
-              ? 'applications.budget.invalid'
-              : err.status === 403
-                ? 'applications.transitions.forbidden'
-                : 'applications.actions.error';
+            problemCode(err) === FISCAL_YEAR_CLOSED
+              ? 'budget.fy.closedError'
+              : err.status === 422
+                ? 'applications.budget.invalid'
+                : err.status === 403
+                  ? 'applications.transitions.forbidden'
+                  : 'applications.actions.error';
           this.toast.error(this.i18n.translate(key));
         },
       });
@@ -1077,7 +1091,7 @@ export class ApplicationsDetailComponent {
   }
 
   /**
-   * F1: the approved amount when it deviates from the requested one, else `''`. The
+   * The approved amount when it deviates from the requested one, else `''`. The
    * header and the cost centre then name it next to the struck requested amount.
    */
   approvedAmount(app: Application): string {
@@ -1086,11 +1100,12 @@ export class ApplicationsDetailComponent {
     return formatMoney(app.approvedAmount, this.i18n.formatLocale(), { currency: app.currency });
   }
 
+  /**
+   * A reader without the PII right gets `data` without the isPII fields, and the server names them
+   * in `hiddenKeys`. The form leaves them out, because the server keeps their stored values anyway;
+   * a key that is only missing from `data` was never answered, so that field stays editable.
+   */
   startEdit(app: Application): void {
-    // A reader without the PII right gets `data` without the isPII fields (O21), and
-    // the server names them in `hiddenKeys`. The form leaves them out, because the
-    // server keeps their stored values anyway. A key that is only missing from `data`
-    // was never answered, so that field stays editable.
     this.editFields.set(
       toFormlySections(this.sections(), this.i18n.locale(), this.formContext(), {
         omitKeys: app.hiddenKeys ?? [],
@@ -1109,7 +1124,7 @@ export class ApplicationsDetailComponent {
   /**
    * Save the edit as a new version (PATCH). An invalid form shows its errors and sends
    * nothing. A 422 of the server shows on the fields it names (for example a cost
-   * position without an offer, D12); a 409 means the state no longer allows an edit.
+   * position without an offer); a 409 means the state no longer allows an edit.
    */
   saveEdit(): void {
     if (this.savingEdit()) return;
@@ -1228,7 +1243,6 @@ export class ApplicationsDetailComponent {
       at: comment.at,
       editedAt: comment.editedAt,
       own: comment.isOwn,
-      // The server lets the author and a holder of `application.manage` change a comment.
       canEdit: comment.isOwn || this.canManage(),
       visibility: comment.visibility,
       attachments: toChatAttachments(this.apiBase, comment.attachments),
@@ -1254,8 +1268,8 @@ export class ApplicationsDetailComponent {
     });
   }
 
+  /** Without `application.manage` the composer has no toggle, so the comment is public. */
   protected sendComment(req: ChatSend): void {
-    // Without `application.manage` the composer has no toggle, so the comment is public.
     const comment: ChatSend = { ...req };
     if (!this.canManage()) delete comment.visibility;
     this.outbox.send(comment);
@@ -1305,13 +1319,11 @@ export class ApplicationsDetailComponent {
    *  refreshes. */
   fire(t: Transition): void {
     if (this.firing() !== null) return;
-    // A transition onto the agenda needs the meeting: the dialog asks for it and fires.
     if (t.addsToAgenda) {
       this.agendaTransition.set(t);
       this.agendaOpen.set(true);
       return;
     }
-    // F1: a transition into an accepted state can approve with deviations.
     if (t.allowsDecision) {
       this.decisionTransition.set(t);
       this.decisionOpen.set(true);

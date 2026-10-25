@@ -34,7 +34,7 @@ OUT = object()
 def _svc(session: ScriptedSession, **kw: Any) -> TodoService:
     return TodoService(
         session,  # type: ignore[arg-type]
-        access=kw.pop("access", FakeAccess(**kw)),  # type: ignore[arg-type]
+        access=kw.pop("access", FakeAccess(**kw)),
         links=FakeLinks(),  # type: ignore[arg-type]
         files=FakeFiles(),  # type: ignore[arg-type]
     )
@@ -50,9 +50,6 @@ def _stub(service: TodoService) -> list[Any]:
 
     service._board_out = _out  # type: ignore[method-assign]
     return calls
-
-
-# -- list -------------------------------------------------------------------------
 
 
 async def test_list_boards_needs_the_scope() -> None:
@@ -95,9 +92,6 @@ async def test_list_boards_without_an_account_or_boards(monkeypatch: pytest.Monk
     assert await _svc(session, me=None, scope=ReadScope()).list_boards(USER) == []
 
 
-# -- board read ---------------------------------------------------------------------
-
-
 async def test_board_404_when_unknown_or_unreadable() -> None:
     with pytest.raises(NotFoundError):
         await _svc(ScriptedSession()).board(uuid.uuid4(), USER)
@@ -109,6 +103,10 @@ async def test_board_404_when_unknown_or_unreadable() -> None:
 
 
 async def test_board_out_orders_counts_and_builds_tiles() -> None:
+    """Order the columns, count the cards and build the tiles.
+
+    An unknown person shows as deleted.
+    """
     b = board()
     first, done = column(b.id, "Offen", 0), column(b.id, "Erledigt", 1, is_done=True)
     lab = label(b.id)
@@ -130,7 +128,7 @@ async def test_board_out_orders_counts_and_builds_tiles() -> None:
     assert tile.label_ids == [lab.id]
     assert tile.checklist.done == 1 and tile.checklist.total == 3
     assert out.cards[0].comment_count == 4
-    assert tile.assignees[0].principal_id is None  # unknown person: deleted
+    assert tile.assignees[0].principal_id is None
 
 
 async def test_board_out_of_an_empty_board() -> None:
@@ -139,9 +137,6 @@ async def test_board_out_of_an_empty_board() -> None:
     session.put(b)
     out = await _svc(session).board(b.id, USER)
     assert out.cards == [] and out.archived_count == 0
-
-
-# -- board writes -------------------------------------------------------------------
 
 
 async def test_patch_board_needs_configure() -> None:
@@ -182,9 +177,6 @@ async def test_members_and_archive() -> None:
     assert empty.total == 0 and empty.items == []
 
 
-# -- columns ------------------------------------------------------------------------
-
-
 async def test_add_column_appends() -> None:
     b = board()
     session = ScriptedSession(scalars=[[column(b.id, position=4)], []])
@@ -210,14 +202,18 @@ async def test_patch_column_unknown_or_foreign() -> None:
 
 
 async def test_patch_column_renames_and_moves_the_done_flag() -> None:
+    """Rename a column and move the done flag.
+
+    The fakes feed the columns, the old done column, the new one (archived cards too), then
+    the linked tickets of the one card that becomes done. Making the done column done again
+    moves nothing.
+    """
     b = board()
     first, done = column(b.id, "Offen"), column(b.id, "Erledigt", 1, is_done=True)
     old_done = card(b, done, completed_at=svc_mod._now())
     new_done = card(b, first)
     kept = card(b, first, completed_at=svc_mod._now())
     ticket = uuid.uuid4()
-    # Columns, the old done column, the new one (archived cards too), then the
-    # linked tickets of the one card that becomes done.
     session = ScriptedSession(scalars=[[first, done], [old_done], [new_done, kept], [ticket]])
     session.put(b, first, done)
     service = _svc(session)
@@ -234,25 +230,26 @@ async def test_patch_column_renames_and_moves_the_done_flag() -> None:
     assert event.payload["cardId"] == str(new_done.id)
     assert "archived_at" not in str(session.statements[-1])
     assert "FOR UPDATE" in str(session.statements[0])
-    # The done column again: nothing moves.
     await service.patch_column(b.id, first.id, ColumnPatch.model_validate({"isDone": True}), USER)
     await service.patch_column(b.id, first.id, ColumnPatch(name=" "), USER)
     assert first.name == "Fertig" and session.flushed == 1
 
 
 async def test_patch_column_does_not_tell_tickets_of_archived_cards() -> None:
+    """Write ``todo_done`` only for the live card.
+
+    The archived card takes the column state, so a restore matches it.
+    """
     b = board()
     waiting, done = column(b.id, "Wartet"), column(b.id, "Erledigt", 1, is_done=True)
     archived = card(b, waiting, archived_at=svc_mod._now())
     live = card(b, waiting)
     ticket = uuid.uuid4()
-    # Columns, the old done column, the new one; only the live card reads its tickets.
     session = ScriptedSession(scalars=[[waiting, done], [], [archived, live], [ticket]])
     session.put(b, waiting, done)
     service = _svc(session)
     _stub(service)
     await service.patch_column(b.id, waiting.id, ColumnPatch.model_validate({"isDone": True}), USER)
-    # The archived card takes the column state, so a restore matches it.
     assert archived.completed_at is not None and live.completed_at is not None
     (event,) = [o for o in session.added if isinstance(o, TicketEvent)]
     assert event.payload["cardId"] == str(live.id)
@@ -296,6 +293,11 @@ async def test_delete_column_rules() -> None:
 
 
 async def test_delete_column_moves_the_cards_and_renumbers() -> None:
+    """Move the cards and renumber the columns.
+
+    Each card gets a moved event; only the card that becomes done tells its ticket. An empty
+    column can go into a column without cards that is not done.
+    """
     b = board()
     first = column(b.id, "Offen", 0)
     col = column(b.id, "Wartet", 1)
@@ -312,7 +314,6 @@ async def test_delete_column_moves_the_cards_and_renumbers() -> None:
     assert all(m.column_id == done.id for m in moving)
     assert present.rank < moving[0].rank < moving[1].rank
     assert moving[0].completed_at is not None and moving[1].completed_at == stamp
-    # Each card gets a moved event; only the card that becomes done tells its ticket.
     moved = [o for o in session.added if isinstance(o, TodoEvent)]
     assert [(e.card_id, e.kind, e.actor_id) for e in moved] == [(m.id, "moved", ME) for m in moving]
     assert moved[0].payload == {
@@ -325,7 +326,6 @@ async def test_delete_column_moves_the_cards_and_renumbers() -> None:
     assert (told.ticket_id, told.payload["cardId"]) == (ticket, str(moving[0].id))
     assert session.deleted == [col]
     assert (first.position, done.position) == (0, 1)
-    # An empty column into a column without cards and not done.
     empty = column(b.id, "Leer", 3)
     session.put(empty)
     session.scalars_q[:] = [[], [first, done]]
@@ -360,9 +360,6 @@ async def test_delete_column_into_an_open_column() -> None:
     await service.delete_column(b.id, col.id, USER, move_to=target.id)
     assert moving.column_id == target.id and moving.completed_at is None
     assert moving.rank == "i"
-
-
-# -- labels -------------------------------------------------------------------------
 
 
 async def test_add_label() -> None:

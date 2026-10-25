@@ -1,4 +1,4 @@
-"""Personnel elections (F2): vote kind, runoff link, election result.
+"""Personnel elections: vote kind, runoff link, election result.
 
 The upgrade adds to the table `vote`:
 
@@ -35,10 +35,11 @@ down_revision: str | None = "5a67ac7644ed"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
+#: The constraint is named as the naming convention of the metadata names it, so a fresh install
+#: gets the same name.
 _UPGRADE: tuple[str, ...] = (
     "ALTER TABLE vote ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'motion'",
     "ALTER TABLE vote ADD COLUMN IF NOT EXISTS parent_vote_id uuid",
-    # Named like the metadata naming convention (a fresh install gets the same name).
     """
     DO $$
     BEGIN
@@ -63,8 +64,9 @@ _UPGRADE: tuple[str, ...] = (
     ),
 )
 
+#: The election rows go first, because the narrower CHECK and the dropped columns cannot hold
+#: them.
 _DOWNGRADE: tuple[str, ...] = (
-    # The narrower CHECK and the dropped columns cannot hold an election.
     "DELETE FROM protocol_vote_ref WHERE vote_id IN (SELECT id FROM vote WHERE kind = 'election')",
     "UPDATE status_event SET vote_id = NULL "
     "WHERE vote_id IN (SELECT id FROM vote WHERE kind = 'election')",
@@ -83,10 +85,12 @@ _DOWNGRADE: tuple[str, ...] = (
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     for stmt in _UPGRADE:
         op.execute(stmt)
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     for stmt in _DOWNGRADE:
         op.execute(stmt)

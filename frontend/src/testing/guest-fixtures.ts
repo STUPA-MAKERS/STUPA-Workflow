@@ -1,4 +1,4 @@
-/** Test data of the public meeting specs (#17): a join request, a link, a guest view. */
+/** Test data of the public meeting specs: a join request, a link, a guest view. */
 import type { GuestMe, GuestVote, JoinLink, MeetingGuest } from '../app/core/api/models';
 
 export function guestRow(over: Partial<MeetingGuest> = {}): MeetingGuest {

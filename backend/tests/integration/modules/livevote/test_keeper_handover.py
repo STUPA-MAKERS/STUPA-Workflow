@@ -1,4 +1,4 @@
-"""Z3, O1, O20, A13: the periods of the protocol keeper through the real API.
+"""The periods of the protocol keeper through the real API.
 
 * The start opens the first period, the close ends it.
 * A handover `now` ends the running period and opens the next one. The rights that
@@ -7,7 +7,7 @@
 * A handover `next_item` waits for the next forward move of the current agenda item.
   A new plan replaces the old one, the last agenda item has no next item, and a
   DELETE discards the plan.
-* The new keeper needs `protocol.write` in the gremium (O20, 422). The start of a
+* The new keeper needs `protocol.write` in the gremium (422). The start of a
   planned period checks this again and drops the plan when the check fails.
 * Each handover writes `protokollant_handover` and sends `meeting_state`.
 """
@@ -139,6 +139,12 @@ async def test_start_opens_and_close_ends_the_first_period(
 async def test_handover_now_moves_the_keeper_rights(
     maker: async_sessionmaker[AsyncSession], api: FastAPI, states: list[MeetingOut]
 ) -> None:
+    """Move the keeper rights with a handover now.
+
+    Anna gets no period before the next move.
+
+    Anna keeps the write access through `protocol.write`, while the room control moves.
+    """
     s = await seed(maker, status="live", items=2)
     anna_sub, anna = await _member(maker, s.gremium_id, "Anna", ["protocol.write"])
     bert_sub, bert = await _member(maker, s.gremium_id, "Bert", ["protocol.write"])
@@ -157,15 +163,15 @@ async def test_handover_now_moves_the_keeper_rights(
         after_bert = client.get(url).json()
     body = resp.json()
     assert body["protokollantId"] == str(bert)
-    assert [p["name"] for p in body["keeperPeriods"]] == ["Bert"]  # no period for Anna yet
-    # Anna keeps the write access through protocol.write, the room control moves.
+    assert [p["name"] for p in body["keeperPeriods"]] == ["Bert"]
     assert (after_anna["canWrite"], after_anna["canManageVotes"]) == (True, False)
     assert after_anna["isProtokollant"] is False
     assert (after_bert["canWrite"], after_bert["canManageVotes"]) == (True, True)
     assert after_bert["isProtokollant"] is True
     assert states and states[-1].protokollant_id == bert
     entries = [
-        e for e in await audit_actions(maker, target_id=s.meeting_id)
+        e
+        for e in await audit_actions(maker, target_id=s.meeting_id)
         if e.action == "protokollant_handover"
     ]
     assert len(entries) == 1
@@ -203,6 +209,12 @@ async def test_handover_now_ends_the_running_period(
 async def test_next_item_starts_on_a_forward_move(
     maker: async_sessionmaker[AsyncSession], api: FastAPI, states: list[MeetingOut]
 ) -> None:
+    """Start a planned handover on a forward move.
+
+    Only the protokollant moves the current agenda item. A move back keeps the plan. The
+    ended period stops at the item before the move. The handover is not a planning change of
+    the meeting.
+    """
     s = await seed(maker, status="planned", items=3)
     anna_sub, anna = await _member(maker, s.gremium_id, "Anna", ["protocol.write"])
     _, bert = await _member(maker, s.gremium_id, "Bert", ["protocol.write"])
@@ -218,11 +230,9 @@ async def test_next_item_starts_on_a_forward_move(
         assert planned.json()["protokollantId"] == str(anna)
         assert planned.json()["plannedHandover"]["principalId"] == str(bert)
         assert planned.json()["plannedHandover"]["fromAt"] is None
-        # Only the protokollant moves the current agenda item.
         refused = client.patch(url, json={"currentAgendaItemId": str(s.item_ids[0])})
         assert refused.status_code == 403
         _as(api, anna_sub)
-        # A move back keeps the plan.
         back = client.patch(url, json={"currentAgendaItemId": str(s.item_ids[0])})
         assert back.json()["plannedHandover"] is not None
         assert back.json()["protokollantId"] == str(anna)
@@ -233,13 +243,12 @@ async def test_next_item_starts_on_a_forward_move(
     assert body["plannedHandover"] is None
     periods = body["keeperPeriods"]
     assert [p["name"] for p in periods] == ["Anna", "Bert"]
-    assert periods[0]["toPosition"] == 1  # the item before the move
+    assert periods[0]["toPosition"] == 1
     assert periods[1]["fromPosition"] == 3
     assert states[-1].protokollant_id == bert
     entries = await audit_actions(maker, target_id=s.meeting_id)
     modes = [e.data["mode"] for e in entries if e.action == "protokollant_handover"]
     assert modes == ["next_item", "activate"]
-    # The handover is not a planning change of the meeting.
     updates = [e.data["changes"] for e in entries if e.action == "meeting_update"]
     assert all("protokollantId" not in c for c in updates)
 
@@ -248,7 +257,11 @@ async def test_next_item_starts_on_a_forward_move(
 async def test_planned_keeper_is_checked_again_on_the_move(
     maker: async_sessionmaker[AsyncSession], api: FastAPI, loss: str
 ) -> None:
-    """O20: the start of a planned period checks the new keeper again."""
+    """The start of a planned period checks the new keeper again.
+
+    The seed gives Anna no running period, so no period exists. The planned period of Bert
+    is deleted and does not start.
+    """
     s = await seed(maker, status="live", items=2)
     anna_sub, anna = await _member(maker, s.gremium_id, "Anna", ["protocol.write"])
     _, bert = await _member(maker, s.gremium_id, "Bert", ["protocol.write"])
@@ -279,8 +292,6 @@ async def test_planned_keeper_is_checked_again_on_the_move(
     body = moved.json()
     assert body["protokollantId"] == str(anna)
     assert body["plannedHandover"] is None
-    # The seed gives Anna no running period, so no period exists. The planned
-    # period of Bert is deleted and does not start.
     assert body["keeperPeriods"] == []
     assert await _periods(maker, s.meeting_id) == []
     entries = await audit_actions(maker, target_id=s.meeting_id)
@@ -357,7 +368,7 @@ async def test_handover_only_while_live(
 
 
 async def test_target_rules(maker: async_sessionmaker[AsyncSession], api: FastAPI) -> None:
-    """O20: the new keeper is an active member with protocol.write."""
+    """The new keeper is an active member with protocol.write."""
     s = await seed(maker, status="live", items=1)
     _, anna = await _member(maker, s.gremium_id, "Anna", ["protocol.write"])
     _, voter = await _member(maker, s.gremium_id, "Vera", ["vote.cast"])
@@ -427,14 +438,16 @@ async def test_patch_protokollant_while_live_is_a_handover(
 async def test_assign_needs_protocol_write_but_an_old_keeper_can_start(
     maker: async_sessionmaker[AsyncSession], api: FastAPI
 ) -> None:
-    """O20 validates a new assignment only."""
+    """The `protocol.write` check validates a new assignment only.
+
+    The settings dialog sends the unchanged value with each save.
+    """
     s = await seed(maker, status="planned", items=1)
     _, vera = await _member(maker, s.gremium_id, "Vera", ["vote.cast"])
     url = f"/api/meetings/{s.meeting_id}"
     with TestClient(api) as client:
         refused = client.patch(url, json={"protokollantId": str(vera)})
         await _set_keeper(maker, s.meeting_id, vera)
-        # The settings dialog sends the unchanged value with each save.
         unchanged = client.patch(url, json={"protokollantId": str(vera), "date": "2026-06-21"})
         started = client.patch(url, json={"status": "live"})
     assert refused.status_code == 422, refused.text
@@ -447,6 +460,11 @@ async def test_assign_needs_protocol_write_but_an_old_keeper_can_start(
 async def test_members_and_roster_mark_the_possible_keepers(
     maker: async_sessionmaker[AsyncSession], api: FastAPI
 ) -> None:
+    """Mark the possible keepers in the member list and the roster.
+
+    The roster also marks the members with an own vote, because only they can be substituted
+    by the lead.
+    """
     s = await seed(maker, status="live", items=0)
     _, anna = await _member(maker, s.gremium_id, "Anna", ["protocol.write"])
     _, vera = await _member(maker, s.gremium_id, "Vera", ["vote.cast"])
@@ -457,8 +475,6 @@ async def test_members_and_roster_mark_the_possible_keepers(
         assert resp.status_code == 200, resp.text
         flags: dict[str, Any] = {r["principalId"]: r["canKeepProtocol"] for r in resp.json()}
         assert flags == {str(anna): True, str(vera): False}
-    # The roster also marks the members with an own vote: only they can be
-    # substituted by the lead (O6).
     votes: dict[str, Any] = {r["principalId"]: r["canVote"] for r in roster.json()}
     assert votes == {str(anna): False, str(vera): True}
 

@@ -9,9 +9,6 @@
   min-width: 0;
   min-height: 0;
 }
-/* Without `fill` the board is as tall as its cards: the scroll areas and the phone pager
-   take the height of their content instead of a share of the free height, which a board
-   of natural height does not have. */
 :host(.bv-host--natural) .bv__scroll,
 :host(.bv-host--natural) .bv__pager {
   flex: 0 0 auto;
@@ -20,7 +17,6 @@
   overflow-y: visible;
 }
 
-/* The columns side by side; the board scrolls sideways, each column down. */
 .bv {
   display: grid;
   flex: 1 1 auto;
@@ -41,14 +37,9 @@
   border-radius: var(--radius-xl);
   background: var(--color-surface-2);
 }
-/* The dark column is surface 1, so its tiles (surface 3) stand out as the white tiles do
-   on the grey column of the light theme. */
 :host-context([data-theme='dark']) .bv__col {
   background: var(--color-surface-1);
 }
-/* The cards scroll between the column head and the column foot. The scroll area takes
-   the free height of the column, so the foot ("+ To-Do", the quick field, the done
-   links) sits at the bottom edge of the column. */
 .bv__scroll {
   display: flex;
   flex: 1 1 0;
@@ -58,10 +49,7 @@
   overflow-y: auto;
   overscroll-behavior: contain;
 }
-/* The cards of a column and of a phone page fade at an end only while more cards lie past
-   it (`appScrollFade="y"`). */
-.bv__scroll,
-.bv__page {
+.bv__scroll {
   @include fade.fade-y(var(--space-5));
 }
 .bv__head {
@@ -99,7 +87,6 @@
   font-size: 0.75rem;
   font-weight: var(--fw-medium);
 }
-/* The name and the count start the head; the done tag and the menu end it. */
 .bv__doneTag,
 .bv__menu {
   margin-inline-start: auto;
@@ -108,8 +95,6 @@
   margin-inline-start: 0;
 }
 
-/* The drop list fills the scroll area, so an empty column is a drop target down to its
-   foot. */
 .bv__cards {
   display: flex;
   flex: 1 0 auto;
@@ -123,16 +108,14 @@
 .bv__item:focus-visible {
   outline: none;
 }
-/* The tile in the hand: opaque, lifted with a shadow and tilted a little. */
 .bv__preview {
   @include dp.popover-reset;
   @include dp.lift(2deg);
   opacity: 1;
   @include dp.smooth-edge;
 }
-/* An accent edge marks the tile in the hand, drawn on the tile itself so it follows
-   its corners. It is an inset shadow, not an outline: the shadow is painted as a
-   rounded shape with smoothed edges also when it is tilted. */
+// An inset shadow, not an outline, because the shadow is painted as a rounded shape with smooth
+// edges also when the tile is tilted.
 .bv__preview app-todo-card-tile {
   box-shadow: inset 0 0 0 2px var(--color-accent);
 }
@@ -222,7 +205,6 @@
   padding: var(--space-3);
   border: 2px solid var(--color-accent);
   border-radius: var(--radius-lg);
-  /* The fill of a tile (todo-card-tile): the new card sits among the cards. */
   background: var(--color-surface-1);
 }
 :host-context([data-theme='dark']) .bv__quick {
@@ -243,19 +225,15 @@
   justify-content: flex-end;
 }
 
-/* ------------------------------------------------------------------ phone */
-/* The board fills the free height down to the bottom bar (the page is a pane page on a
-   phone too). The pager scrolls sideways, one page per column; each page scrolls down by
-   itself, so a vertical swipe moves the cards and a horizontal one the column.
-   `--bv-gutter` is the side padding of the page (`.page-shell`), which the tab bar and the
-   pager run over. */
+// `--bv-gutter` is the side padding of the page (`.page-shell`), which the tab bar and the pager
+// run over.
 .bv--phone {
   --bv-gutter: var(--layout-gutter);
   position: relative;
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: 0;
   min-height: 0;
   overflow: visible;
 }
@@ -264,44 +242,13 @@
     --bv-gutter: var(--space-4);
   }
 }
-/* The tab bar runs over the page gutter to the screen edges too, so a long tab scrolls
-   out at the edge; its line stays inside the gutter. The tabs draw no mark of their own
-   (also not on hover): the ink below moves with the swipe. */
-.bv__tabBar {
-  position: relative;
-  flex: none;
-  min-width: 0;
-  margin-inline: calc(-1 * var(--bv-gutter));
+// The last card scrolls clear of the floating "+ To-Do" (56px, --space-4 above the bar).
+.bv__tabPager {
+  --tab-pager-bleed: var(--bv-gutter);
+  --tab-pager-page-top: var(--space-3);
+  --tab-pager-page-bottom: calc(56px + 2 * var(--space-4));
 }
-.bv__tabBar::after {
-  content: '';
-  position: absolute;
-  right: var(--bv-gutter);
-  bottom: 0;
-  left: var(--bv-gutter);
-  height: var(--border-width);
-  background: var(--color-border);
-  pointer-events: none;
-}
-.bv__tabBar ::ng-deep .tabs {
-  padding-inline: var(--bv-gutter);
-  border-bottom-color: transparent;
-}
-.bv__tabBar ::ng-deep .tabs .tabs__tab.tabs__tab--on {
-  box-shadow: none;
-}
-.bv__ink {
-  position: absolute;
-  bottom: var(--border-width);
-  left: 0;
-  width: 0;
-  z-index: 1;
-  height: 3px;
-  background: var(--color-accent);
-  pointer-events: none;
-}
-/* The pager runs over the page gutter to the screen edges, so a card that moves away
-   leaves at the edge of the screen; each page gives the gutter back inside. */
+// The pager of `todo-board-skeleton` in the geometry of the tab pager.
 .bv__pager {
   display: grid;
   flex: 1 1 0;
@@ -323,9 +270,7 @@
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  /* The page reaches down to the bottom bar; its last card scrolls clear of the floating
-     "+ To-Do" (56px, --space-4 above the bar). */
-  padding-inline: var(--bv-gutter);
+  padding: var(--space-3) var(--bv-gutter) 0;
   padding-bottom: calc(56px + 2 * var(--space-4));
   overflow-y: auto;
   overscroll-behavior-y: contain;
@@ -338,8 +283,7 @@
   flex-direction: column;
   gap: var(--space-2);
 }
-/* An empty column: "Keine Karten" in the middle of the page. */
-.bv__page--empty .bv__phoneCards {
+.bv__phoneCards--empty {
   align-items: center;
   justify-content: center;
 }

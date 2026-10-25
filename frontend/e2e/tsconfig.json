@@ -1,5 +1,5 @@
-/* TypeScript-Config für die Playwright-E2E (T-40). Isoliert vom Angular-Build
- * (tsconfig.app.json deckt nur src/** ab); validiert via `npm run e2e:tsc`. */
+/* TypeScript config for the Playwright E2E tests, apart from the Angular build, because
+ * tsconfig.app.json covers only src/**. `npm run e2e:tsc` checks it. */
 {
   "extends": "../tsconfig.json",
   "compilerOptions": {

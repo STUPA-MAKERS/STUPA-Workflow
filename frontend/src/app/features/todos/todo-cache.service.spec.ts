@@ -35,11 +35,11 @@ function setup(cardsRead: (ids: string[]) => Observable<TodoCardDetail[]> = (ids
 }
 
 describe('TodoCacheService', () => {
+  /** The page reads the shown board itself. The cards come in one request. */
   it('reads every other board, its people, the rows and the cards ahead once', () => {
     const { cache, api, boards } = setup();
     cache.prefetch(['b-1', 'b-2'], 'b-2');
     cache.prefetch(['b-1', 'b-2'], 'b-2');
-    // The page reads the shown board itself.
     expect(api.pollBoard.mock.calls).toEqual([['b-1', null]]);
     expect(api.members.mock.calls).toEqual([['b-1']]);
     expect(api.pollAllBoards).toHaveBeenCalledWith(null);
@@ -48,13 +48,16 @@ describe('TodoCacheService', () => {
     expect(cache.board('b-2')).toBeNull();
     expect(cache.members('b-1')).toEqual(MEMBERS);
     expect(cache.rows('all')).toEqual({ boards: [], etag: 'W/"a"' });
-    // The cards come in one request.
     expect(api.cards.mock.calls).toEqual([[['k-1', 'k-2']]]);
     expect(cache.card('k-1')?.id).toBe('k-1');
   });
 
+  /**
+   * The cards of the shown board come first, then the first board, and nothing else yet. A failed
+   * read goes on with the next.
+   */
   it('waits for the page, then runs two reads at once, the shown board first', () => {
-    const reads: Subject<unknown>[] = [];
+    const reads: Pick<Subject<unknown>, 'next' | 'error' | 'complete'>[] = [];
     const { cache, api } = setup((ids) => {
       const s = new Subject<TodoCardDetail[]>();
       reads.push(s);
@@ -69,7 +72,6 @@ describe('TodoCacheService', () => {
     cache.readCards([tile({ id: 'soon' })], true);
     expect(api.cards).not.toHaveBeenCalled();
     cache.prefetch(['b-1', 'b-2'], null);
-    // The cards of the shown board, then the first board; nothing else yet.
     expect(api.cards.mock.calls).toEqual([[['soon']]]);
     expect(api.pollBoard.mock.calls).toEqual([['b-1', null]]);
     expect(api.members).not.toHaveBeenCalled();
@@ -77,7 +79,6 @@ describe('TodoCacheService', () => {
     reads[0].complete();
     expect(cache.card('soon')?.id).toBe('soon');
     expect(api.members.mock.calls).toEqual([['b-1']]);
-    // A failed read goes on with the next.
     reads[1].error(new Error('x'));
     expect(api.pollBoard.mock.calls).toEqual([
       ['b-1', null],
@@ -86,6 +87,7 @@ describe('TodoCacheService', () => {
     expect(cache.board('b-1')).toBeNull();
   });
 
+  /** A read that failed leaves its cards out; a later call reads them again. */
   it('reads at most CARD_BATCH cards per request and never a held card or one in flight', () => {
     const reads: Subject<TodoCardDetail[]>[] = [];
     const { cache, api } = setup(() => {
@@ -103,7 +105,6 @@ describe('TodoCacheService', () => {
     reads[0].next([detail({ id: 'c-0' }), detail({ id: 'c-1' })]);
     reads[0].complete();
     expect(cache.card('c-1')?.id).toBe('c-1');
-    // A read that failed leaves its cards out; a later call reads them again.
     reads[1].error(new Error('x'));
     expect(cache.card(`c-${CARD_BATCH}`)).toBeNull();
     cache.readCards([tile({ id: `c-${CARD_BATCH}` })]);
@@ -140,6 +141,7 @@ describe('TodoCacheService', () => {
     expect(cache.members('b-1')).toBeNull();
   });
 
+  /** Nothing more of the closed page is read. */
   it('stops the waiting reads when the page closes and starts them again on the next visit', () => {
     const reads: Subject<TodoBoardPoll>[] = [];
     const { cache, api } = setup();
@@ -153,7 +155,6 @@ describe('TodoCacheService', () => {
     expect(api.pollBoard).toHaveBeenCalledTimes(1);
     cache.leave();
     reads[0].complete();
-    // Nothing more of the closed page.
     expect(api.pollBoard).toHaveBeenCalledTimes(1);
     expect(api.members).toHaveBeenCalledTimes(1);
     cache.prefetch(['b-1', 'b-2'], null);

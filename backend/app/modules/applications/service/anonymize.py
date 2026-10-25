@@ -43,7 +43,7 @@ class AnonymizeOps(ApplicationsServiceBase):
 
         The method sets ``email`` and ``name`` to NULL and writes
         ``anonymized_at``. It also blanks every ``data`` field marked ``isPII`` and the
-        free-text intake note of a capture (``capture_intake``, #11).
+        free-text intake note of a capture (``capture_intake``).
         It removes the magic links and the attachments, the files of every comment
         (internal and public) included (GDPR Art. 17).
 
@@ -55,6 +55,24 @@ class AnonymizeOps(ApplicationsServiceBase):
         The application row is locked first, the lock that ``add_comment`` takes
         before it binds files. A comment with files therefore commits before the
         attachments are selected, or it sees the anonymization and refuses the files.
+
+        The method also blanks:
+
+        - the intake note of a capture, because it can name a person ("per Mail von Frau
+          X"). The capture date and the capturing member stay;
+        - the ``isPII`` keys of EVERY form version of the type, because a field marked as
+          PII only after the submission is unknown to the pinned version, where ``is_pii``
+          stays false, and its plaintext would survive the erasure;
+        - every ``submission_version`` row and its diff, else the version list and the
+          timeline leak the old snapshot;
+        - the body of every applicant comment, because free text may hold personal data.
+          Staff still reads the comments through the timeline and the comments API.
+
+        It deletes every magic link, because a link is a direct access path to the PII and can
+        live without an expiry; a delete is stronger than an expiry. It revokes the active
+        applicant sessions, so no open magic-link token may read or write. It removes the
+        attachments, because a receipt or a file name may hold PII. At the end it reloads the
+        row, because the UPDATE expires the onupdate columns and a lazy load would do IO.
         """
         app = await self._get_app(application_id, lock=True)
         applicant = (
@@ -66,22 +84,13 @@ class AnonymizeOps(ApplicationsServiceBase):
             applicant.email = None
             applicant.name = None
             applicant.anonymized_at = datetime.now(UTC)
-        # The free-text intake note of a capture (#11) can name a person ("per Mail von
-        # Frau X"), so it goes too. The capture date and the capturing member stay.
         app.capture_intake = None
 
         fields = await self._pinned_fields(app)
         pii_keys = {f.key for f in fields if f.is_pii}
-        # A field marked as PII only after the submission is unknown to the pinned
-        # version of the form, where ``is_pii`` stays false. Union the ``isPII``
-        # keys over every form version of the type. Otherwise the plaintext
-        # survives the erasure, against GDPR Art. 17.
         pii_keys |= await self._pii_keys_for_type(app.type_id)
         if pii_keys:
             app.data = {k: v for k, v in app.data.items() if k not in pii_keys}
-            # The PII also sits in every stored version and in its diff. Scrub
-            # every ``submission_version`` row. Otherwise the version list and
-            # the timeline leak the old plaintext snapshot.
             versions = (
                 await self.session.scalars(
                     select(SubmissionVersion).where(
@@ -94,9 +103,6 @@ class AnonymizeOps(ApplicationsServiceBase):
                 if v.diff is not None:
                     v.diff = _scrub_diff(v.diff, pii_keys)
 
-        # A comment written by the applicant carries free text that may hold
-        # personal data, so scrub the body. Staff still reads the comments through
-        # the timeline and the comments API.
         await self.session.execute(
             update(Comment)
             .where(
@@ -105,21 +111,12 @@ class AnonymizeOps(ApplicationsServiceBase):
             )
             .values(body="[anonymisiert]")
         )
-        # A magic link is a direct access path to the PII through the mail. A link
-        # can live without an expiry, so delete them all (Z1). Deleting is stronger
-        # than expiring them, and the retention would purge them anyway.
         await self.session.execute(
             delete(MagicLink).where(MagicLink.application_id == application_id)
         )
-        # Revoke the active applicant sessions. After the anonymization no open
-        # magic-link token may read or write.
         await auth_sessions.revoke_applicant_sessions(
             self.session, application_id, now=datetime.now(UTC)
         )
-        # An attachment may hold PII in the receipt or in the file name. This covers
-        # the files of the application and the files of all its comments. With a
-        # FilesService the code removes the database row and the storage object.
-        # Without it the code removes the database rows only.
         if files is not None:
             await files.delete_for_application(application_id, actor=actor)
         else:
@@ -136,7 +133,6 @@ class AnonymizeOps(ApplicationsServiceBase):
             )
         if commit:
             await self.session.commit()
-            # The UPDATE expires the onupdate columns. Reload them to avoid lazy IO.
             await self.session.refresh(app)
         else:
             await self.session.flush()

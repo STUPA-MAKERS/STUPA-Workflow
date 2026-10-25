@@ -20,6 +20,10 @@ function vote(overrides: Partial<MeetingVote> = {}): MeetingVote {
     counts: { yes: 12, no: 3, abstain: 1 },
     leading: 'yes',
     closesAt: null,
+    voted: 16,
+    present: 16,
+    revealed: true,
+    failedReason: null,
     ...overrides,
   };
 }
@@ -33,8 +37,8 @@ describe('escapeHtml', () => {
 });
 
 describe('voteSnippet', () => {
+  /** The backend `build_vote_snippet` writes the identical block. */
   it('renders the protocol vote callout with the title and one tally line', () => {
-    // The backend's `build_vote_snippet` writes the identical block.
     expect(voteSnippet(vote())).toBe(
       '> [!abstimmung] **Förderung Ersti-Wochenende**\n> yes: 12, no: 3, abstain: 1',
     );
@@ -50,7 +54,7 @@ describe('voteSnippet', () => {
     expect(snip.startsWith('> [!abstimmung] **Soll X gefördert werden?**')).toBe(true);
   });
 
-  it('names the round in the head of a runoff (F2)', () => {
+  it('names the round in the head of a runoff', () => {
     const election = vote({ kind: 'election', question: 'Vorsitz', counts: null } as Partial<MeetingVote>);
     expect(voteSnippetHead(election)).toBe('> [!abstimmung] **Vorsitz**');
     expect(voteSnippetHead({ ...election, round: 2 } as MeetingVote)).toBe(
@@ -119,13 +123,15 @@ describe('renderMarkdown', () => {
     expect(bad).not.toContain('href');
   });
 
-  it('rejects a link whose URL contains a double-quote (no attribute break-out, AUD-064)', () => {
+  /**
+   * A URL that carries a quote must never become an href attribute. The Markdown link stays text;
+   * the autolink stops before the escaped quote, and no raw double-quote leaks into the rendered
+   * HTML.
+   */
+  it('rejects a link whose URL contains a double-quote (no attribute break-out)', () => {
     const out = renderMarkdown('[x](https://e"x=)');
-    // A URL that carries a quote must never become an href attribute. The Markdown link
-    // stays text; the autolink stops before the escaped quote.
     expect(out).toContain('[x](');
     expect(out).not.toMatch(/href="[^"]*&quot;/);
-    // … and no raw double-quote may leak into the rendered HTML.
     expect(out).not.toContain('"x=');
     expect(out).toContain('&quot;');
   });

@@ -34,7 +34,7 @@ export type DockPanel = 'none' | 'attendance' | 'protokollant';
  *
  * Live: the step through the agenda ("TOP 3 von 8"), the own ballot of the open vote, or
  * the way back to the item that runs now; the attendance, the minute-taker ("Protokoll:
- * Lara Leitung", the handover for the lead and the minute-taker, Z3) and the word count of
+ * Lara Leitung", the handover for the lead and the minute-taker) and the word count of
  * the open item.
  *
  * Closed: "Geschlossen um 21:12 · 8 TOPs", every minute-taker of the meeting (locked: a
@@ -45,6 +45,10 @@ export type DockPanel = 'none' | 'attendance' | 'protokollant';
  * sits on the viewport above the navigation bar. A pick in a live meeting
  * goes to the handover dialog of the page. The attendance chip opens the attendance sheet
  * of the page.
+ *
+ * On a phone the dock is a fixed layer above the page and holds the bottom sheet. While
+ * the sheet is open, the layer moves up to the dialog level, because otherwise the
+ * navigation bar covers the sheet and its scrim.
  */
 @Component({
   selector: 'app-session-dock',
@@ -62,9 +66,6 @@ export type DockPanel = 'none' | 'attendance' | 'protokollant';
   styleUrl: './session-dock.component.scss',
   host: {
     '(document:keydown.escape)': 'closePanel()',
-    // On a phone the dock is a fixed layer above the page. The bottom sheet lives in it,
-    // so the layer moves up to the dialog level while the sheet is open; else the
-    // navigation bar covers the sheet and its scrim.
     '[style.z-index]': "phone() && shownPanel() === 'protokollant' ? 'var(--z-dialog)' : null",
   },
 })
@@ -100,7 +101,7 @@ export class SessionDockComponent {
   private readonly guests = inject(MeetingGuestsService, { optional: true });
 
   /**
-   * The guests of a public meeting (#17): "Anwesend 19 + 7 Gäste" on the chip and the
+   * The guests of a public meeting: "Anwesend 19 + 7 Gäste" on the chip and the
    * number of open requests as a badge (the lead only), or `null` without the public
    * participation.
    */

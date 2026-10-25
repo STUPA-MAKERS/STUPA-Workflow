@@ -1,4 +1,4 @@
-"""Integration (real Postgres): FE10c, the segments of the invoice list.
+"""Integration (real Postgres): the segments of the invoice list.
 
 The invoice list has four segments: all, "Eingang" (open, no booking), "Verbucht"
 (open, with a booking) and "Bezahlt" (paid). ``booked`` filters on a linked booking,
@@ -42,20 +42,25 @@ async def session(migrated: tuple[str, str], engine: Engine) -> AsyncIterator[As
 
 
 async def test_segments_and_counts(session: AsyncSession) -> None:
+    """The segment counts ignore the segment filter itself but follow the other filters.
+
+    Two top cost centres exist, and the gremium sees the first one only. The invoices
+    use a day that no other test uses, so the date filter isolates them. For a
+    gremium-scoped reader the booking on the hidden cost centre does not count. A reader
+    without any visible cost centre sees no booking at all.
+    """
     svc = BudgetTreeService(session)
     suffix = uuid.uuid4().hex[:6]
     gremium = Gremium(name="Kulturreferat", slug=f"g-{suffix}")
     session.add(gremium)
     await session.commit()
 
-    # Two top cost centres: the gremium sees the first one only.
     seen = await svc.create_node(BudgetNodeCreate(key=f"S{suffix}", name="Kultur"))
     await svc.update_node(seen.id, BudgetNodeUpdate(viewGremiumId=gremium.id))
     hidden = await svc.create_node(BudgetNodeCreate(key=f"H{suffix}", name="Sport"))
     fy_seen = await svc.create_fiscal_year(seen.id, FiscalYearCreate(year=2026))
     fy_hidden = await svc.create_fiscal_year(hidden.id, FiscalYearCreate(year=2026))
 
-    # A day that no other test uses, so the date filter isolates these invoices.
     day = date(random.randint(2200, 2900), 1, 1)
 
     async def invoice(number: str, gross: str) -> uuid.UUID:
@@ -100,20 +105,17 @@ async def test_segments_and_counts(session: AsyncSession) -> None:
     assert await ids(booked=False) == {inbox, paid}
     assert await ids(status="paid") == {paid}
 
-    # The counts ignore the segment filter itself, so every segment keeps its number.
     narrowed = await svc.list_invoices_paged(
         issue_from=day.isoformat(), issue_to=day.isoformat(), status="open", booked=True
     )
     assert narrowed.total == 2
     assert narrowed.counts == full.counts
 
-    # Another filter narrows the counts too.
     big = await svc.list_invoices_paged(
         issue_from=day.isoformat(), issue_to=day.isoformat(), gross_min=Decimal("25.00")
     )
     assert big.counts.model_dump() == {"all": 2, "inbox": 0, "booked": 1, "paid": 1}
 
-    # A gremium-scoped reader: the booking on the hidden cost centre does not count.
     scoped = await svc.list_invoices_paged(
         issue_from=day.isoformat(), issue_to=day.isoformat(),
         visible_gremium_ids={gremium.id},
@@ -125,7 +127,6 @@ async def test_segments_and_counts(session: AsyncSession) -> None:
     )
     assert {i.id for i in scoped_inbox.items} == {inbox, booked_hidden}
 
-    # A reader without any visible cost centre sees no booking at all.
     blind = await svc.list_invoices_paged(
         issue_from=day.isoformat(), issue_to=day.isoformat(), visible_gremium_ids=set()
     )

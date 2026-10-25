@@ -1,4 +1,4 @@
-"""Notification service tests (T-18): template CRUD, the notify action and magic link.
+"""Notification service tests: template CRUD, the notify action and magic link.
 
 `FakeSession` answers the database queries and `FakeQueue` takes the send calls, so the
 tests need no SMTP and no Redis.
@@ -43,7 +43,7 @@ def _template(key: str = "status_update") -> MailTemplate:
 
 
 async def test_create_template_ok() -> None:
-    session = FakeSession(scalars=[[]])  # _get_template_by_key finds no collision
+    session = FakeSession(scalars=[[]])
     out = await _service(session).create_template(
         MailTemplateCreate(
             key="welcome",
@@ -65,18 +65,20 @@ async def test_create_template_duplicate_conflict() -> None:
 
 
 async def test_list_templates() -> None:
-    # The merge keeps the full builtin catalog plus the rows outside the catalog.
+    """Merge the full builtin catalog with the rows outside the catalog.
+
+    A builtin default has no database id and the source 'builtin'; the committee notify
+    default is editable too. An override outside the catalog goes to the end with the source
+    'override'.
+    """
     ta, tb = _template("a"), _template("b")
     ta.id, tb.id = uuid.uuid4(), uuid.uuid4()
     session = FakeSession(scalars=[[ta, tb]])
     out = await _service(session).list_templates()
     by_key = {t.key: t for t in out}
-    # Builtin defaults come without a database id and with source='builtin'.
     assert by_key["status_update"].source == "builtin"
     assert by_key["status_update"].id is None
-    # The committee-facing notify default (bug #2) is editable via the merge too.
     assert by_key["status_update_team"].source == "builtin"
-    # Existing overrides outside the catalog go to the end with source='override'.
     assert by_key["a"].source == "override" and by_key["b"].source == "override"
     assert out[-2].key == "a" and out[-1].key == "b"
 
@@ -139,7 +141,7 @@ async def test_preview_template_not_found() -> None:
 
 
 async def test_handle_notify_action_inline_mode() -> None:
-    # First scalars call: the preference filter (#4-2, no opt-out). Then the template.
+    """Send with an inline template; the scalars feed the preference filter, then the lookup."""
     session = FakeSession(scalars=[[], [_template()]])
     queue = FakeQueue()
     svc = _service(session, queue)
@@ -155,7 +157,7 @@ async def test_handle_notify_action_inline_mode() -> None:
 
 
 async def test_handle_notify_action_inline_missing_template_falls_back() -> None:
-    # An unknown template falls back to a variable-free builtin, not to a silent drop.
+    """Fall back to a variable-free builtin for an unknown template instead of a silent drop."""
     session = FakeSession(scalars=[[], []])
     queue = FakeQueue()
     svc = _service(session, queue)
@@ -185,12 +187,11 @@ async def test_handle_notify_action_no_recipients_skips() -> None:
 async def test_handle_notify_action_derives_real_kind_from_catalogue(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """AUD-043: the opt-out filter and the footer use the catalog kind.
+    """Use the catalog kind for the opt-out filter and the footer.
 
-    They do not use a substring heuristic. A `comment_team` template has the catalog
-    kind `comment`, so the filter must treat it as `comment`. The old
-    `'deadline' in key else 'status_update'` test always gave `status_update`, so a
-    comment opt-out had no effect.
+    They do not use a substring heuristic. A ``comment_team`` template has the catalog kind
+    ``comment``, so a comment opt-out applies to it, and the footer names the comment
+    reason.
     """
     import app.modules.notifications.service as svc_mod
 
@@ -212,9 +213,7 @@ async def test_handle_notify_action_derives_real_kind_from_catalogue(
         context={"status": "Y"},
     )
     assert count == 1
-    # Opt-out filter keyed by the real kind, not the old `status_update`.
     assert captured["kind"] == "comment"
-    # Footer reason text matches the comment kind, not status_update.
     assert "neuen Kommentar" in queue.messages[0].html
 
 
@@ -232,7 +231,7 @@ async def test_handle_notify_action_unknown_key_defaults_to_status_update(
 
     monkeypatch.setattr(svc_mod, "filter_recipients_by_preference", _spy)
 
-    session = FakeSession(scalars=[[]])  # no DB template → builtin fallback
+    session = FakeSession(scalars=[[]])
     queue = FakeQueue()
     svc = _service(session, queue)
     svc.resolver = FakeResolver(["a@x.de"])  # type: ignore[assignment]
@@ -244,12 +243,15 @@ async def test_handle_notify_action_unknown_key_defaults_to_status_update(
 
 
 async def test_notify_without_template_key_splits_applicant_and_team() -> None:
-    """Bug #2: without a templateKey the send splits by recipient kind.
+    """Without a templateKey the send splits by recipient kind.
 
     The applicant gets `status_update`. Every other recipient kind gets the
     Gremium-facing `status_update_team` wording.
+
+    Each send reads the preference filter, then the template (builtin). The applicant spec
+    resolves apart from the rest, and the template key is part of the idempotency parts, so
+    the keys differ.
     """
-    # Per send: scalars #1 = preference filter, #2 = template lookup (builtin).
     session = FakeSession(scalars=[[], [], [], []])
     queue = FakeQueue()
     svc = _service(session, queue)
@@ -270,9 +272,7 @@ async def test_notify_without_template_key_splits_applicant_and_team() -> None:
     assert applicant_msg.subject == "Aktualisierung zu Ihrem Antrag"
     assert team_msg.subject == "Statuswechsel: Antrag „T“"
     assert "Aktion oder Abstimmung" in team_msg.text
-    # Template key is part of the idempotency parts → distinct keys.
     assert applicant_msg.idempotency_key != team_msg.idempotency_key
-    # Partitioning: applicant spec resolved separately from the rest.
     assert resolver.calls[0][0] == [{"kind": "applicant"}]
     assert resolver.calls[1][0] == [
         {"kind": "gremium", "ref": "g1"},
@@ -376,7 +376,7 @@ async def test_notify_split_sends_filter_preferences_as_status_update(
 
     monkeypatch.setattr(svc_mod, "filter_recipients_by_preference", _spy)
 
-    session = FakeSession(scalars=[[], []])  # template lookups only (filter spied)
+    session = FakeSession(scalars=[[], []])
     queue = FakeQueue()
     svc = _service(session, queue)
     svc.resolver = FakeResolver(["a@x.de"])  # type: ignore[assignment]
@@ -403,7 +403,7 @@ async def test_send_magic_link_uses_db_template() -> None:
 
 
 async def test_send_magic_link_builtin_fallback() -> None:
-    session = FakeSession(scalars=[[]])  # no magic_link template
+    session = FakeSession(scalars=[[]])
     queue = FakeQueue()
     await _service(session, queue).send_magic_link(email="a@x.de", link="https://l/#t=2")
     assert "https://l/#t=2" in queue.messages[0].text
@@ -433,7 +433,7 @@ async def test_send_magic_link_uses_the_application_language() -> None:
 
 
 async def test_send_magic_link_falls_back_to_default_language() -> None:
-    # A template without the asked language keeps the default language.
+    """Keep the default language when the template lacks the asked one."""
     tpl = MailTemplate(
         key="magic_link",
         subject_i18n={"de": "Ihr Zugangslink"},
@@ -450,7 +450,7 @@ async def test_send_magic_link_falls_back_to_default_language() -> None:
 
 
 async def test_send_magic_link_builtin_fallback_in_english() -> None:
-    session = FakeSession(scalars=[[]])  # no magic_link template
+    session = FakeSession(scalars=[[]])
     queue = FakeQueue()
     await _service(session, queue).send_magic_link(
         email="a@x.de", link="https://l/#t=3", lang="en"
@@ -470,7 +470,7 @@ async def test_resolve_application_lang_takes_the_application_language() -> None
 
 
 async def test_resolve_application_lang_takes_the_gremium_default() -> None:
-    # The application holds no language, so the gremium default applies.
+    """Take the gremium default when the application holds no language."""
     session = FakeSession(executes=[[(None, uuid.uuid4())]], scalar=["en"])
     lang = await resolve_application_lang(
         session,  # type: ignore[arg-type]
@@ -481,7 +481,7 @@ async def test_resolve_application_lang_takes_the_gremium_default() -> None:
 
 
 async def test_resolve_application_lang_falls_back_to_the_settings_default() -> None:
-    # Neither the application nor its gremium holds a language.
+    """Take the settings default when neither the application nor its gremium holds one."""
     session = FakeSession(executes=[[(None, uuid.uuid4())]], scalar=[None])
     lang = await resolve_application_lang(
         session,  # type: ignore[arg-type]
@@ -502,7 +502,7 @@ async def test_resolve_application_lang_without_gremium() -> None:
 
 
 async def test_resolve_application_lang_without_application() -> None:
-    # No id at all, and an id that matches no row, both keep the default.
+    """Keep the default without an id and for an id that matches no row."""
     session = FakeSession(executes=[[]])
     assert (
         await resolve_application_lang(
@@ -523,8 +523,8 @@ async def test_resolve_application_lang_without_application() -> None:
 
 
 async def test_enqueue_without_queue_drops(caplog: pytest.LogCaptureFixture) -> None:
+    """Log and drop the magic-link mail without an error when the queue is None."""
     session = FakeSession(scalars=[[]])
-    # With queue=None, send_magic_link logs and drops the mail without an error.
     await _service(session, None).send_magic_link(email="a@x.de", link="https://l")
 
 

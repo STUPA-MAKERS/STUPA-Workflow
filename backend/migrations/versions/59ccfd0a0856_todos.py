@@ -265,7 +265,7 @@ _GRANTS: tuple[str, ...] = (
     ),
 )
 
-# The four default columns of a new board, as rows of (name, position, is_done).
+#: The four default columns of a new board, as rows of (name, position, is_done).
 _COLUMNS_SQL = (
     "INSERT INTO todo_column (board_id, name, position, is_done) "
     "SELECT b.id, c.name, c.position, c.is_done FROM {boards} b "
@@ -312,10 +312,12 @@ _DOWNGRADE: tuple[str, ...] = (
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     for stmt in (*_TABLES, *_LINK_INDEXES, *_AGENDA, *_GRANTS, *_BOARDS):
         op.execute(stmt)
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     for stmt in _DOWNGRADE:
         op.execute(stmt)

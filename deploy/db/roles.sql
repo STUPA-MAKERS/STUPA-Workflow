@@ -1,4 +1,4 @@
--- deploy/db/roles.sql — Least-Privilege-DB-Rollen (security.md §4/§10, deployment.md §3).
+-- deploy/db/roles.sql — Least-Privilege-DB-Rollen.
 --
 -- EINMALIG als Superuser (postgres) bei der Provisionierung ausführen. Zweistufig:
 --   1) Schritte 1–4 VOR `alembic upgrade head` (die Rollen müssen existieren, bevor
@@ -44,8 +44,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE migrator IN SCHEMA public
   GRANT USAGE, SELECT ON SEQUENCES TO app;
 
 -- 5) NACH den Migrationen: Audit-Least-Privilege. Der Runtime-User darf `audit_entry`
---    nur INSERT/SELECT — NIE UPDATE/DELETE/TRUNCATE (Hash-Kette unveränderlich,
---    security.md §4). Der DB-Trigger (Migration 0006) erzwingt Append-only zusätzlich
+--    nur INSERT/SELECT — NIE UPDATE/DELETE/TRUNCATE (Hash-Kette unveränderlich). Der DB-Trigger (Migration 0006) erzwingt Append-only zusätzlich
 --    rollenunabhängig; dieser Entzug ist die Least-Privilege-Schicht darüber.
 DO $$ BEGIN
   IF EXISTS (

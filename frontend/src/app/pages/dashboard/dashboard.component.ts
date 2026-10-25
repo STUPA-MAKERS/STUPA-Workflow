@@ -47,10 +47,10 @@ import {
   type StatusKind,
   StatusTextComponent,
   type TabItem,
+  TabPageDirective,
+  TabPagerComponent,
   TabsComponent,
 } from '@stupa-makers/ui-kit';
-// By path, not through the `@shared/ui` barrel, so this lazy chunk takes only the blocks
-// it uses.
 import { FabComponent } from '@shared/ui/fab/fab.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { flowColorKind } from '@shared/status-kind.util';
@@ -129,6 +129,9 @@ type Loaded<T> = T | null | undefined;
  *
  * No request shows the global loading overlay: each block shows its own skeleton, empty
  * or error state.
+ *
+ * It imports the shared blocks by path, not through the `@shared/ui` barrel, so this lazy
+ * chunk takes only the blocks it uses.
  */
 @Component({
   selector: 'app-dashboard',
@@ -140,6 +143,8 @@ type Loaded<T> = T | null | undefined;
     RouterLink,
     IconComponent,
     TranslatePipe,
+    TabPageDirective,
+    TabPagerComponent,
     TabsComponent,
     DataTableComponent,
     CellDirective,
@@ -185,8 +190,6 @@ export class DashboardComponent {
   /** The account sheet of the compact phone head. */
   readonly accountOpen = signal(false);
 
-  // ---------------------------------------------------------------- data
-
   /** The "load again" trigger of each request that `load` made, by its signal. */
   private readonly reloads = new Map<() => unknown, () => void>();
   private readonly tasks = this.load(this.api.listTasks());
@@ -208,21 +211,17 @@ export class DashboardComponent {
     { initialValue: [] as ApplicationType[] },
   );
 
+  /** There is no raw id as a fallback, because the types load late or can fail. */
   private readonly typeName = computed(() => {
     const names = new Map(this.types().map((t) => [t.id, t.name]));
-    // No raw id as a fallback: the types load late or can fail.
     return (id: Uuid): string => names.get(id) ?? '';
   });
 
   /** The active application types, for the card "Antrag stellen" of a new user. */
   readonly applyTypes = computed(() => this.types().filter((t) => t.active));
 
-  // ---------------------------------------------------------------- head
-
   /** The first word of the display name: "Willkommen, Mara". */
   readonly firstName = computed(() => this.auth.displayName().trim().split(/\s+/)[0]);
-
-  // ---------------------------------------------------------------- tabs
 
   /** The open tab, from `?tab=`. An unknown value opens the first tab. */
   readonly tab = toSignal(
@@ -264,18 +263,41 @@ export class DashboardComponent {
   }
 
   /** `true` while the request of the open tab has not answered. */
-  readonly tabLoading = computed(() => this.source() === undefined);
+  readonly tabLoading = computed(() => this.loadingOf(this.tab()));
   /** `true` when the request of the open tab failed. */
-  readonly tabError = computed(() => this.source() === null);
+  readonly tabError = computed(() => this.errorOf(this.tab()));
 
-  private readonly source = computed<Loaded<unknown>>(() => {
-    switch (this.tab()) {
-      case 'mine':
-        return this.mine();
-      default:
-        return this.tasks();
-    }
-  });
+  /**
+   * The state of one tab. On a phone each tab has its own page beside the others, so a
+   * swipe shows the next tab with its rows before it is the open tab.
+   */
+  loadingOf(tab: string): boolean {
+    return this.sourceOf(tab) === undefined;
+  }
+
+  errorOf(tab: string): boolean {
+    return this.sourceOf(tab) === null;
+  }
+
+  rowsOf(tab: string): WorkRow[] {
+    return tab === 'mine' ? this.mineRows() : this.taskRows();
+  }
+
+  /** The rows of the tab are empty (and loaded). */
+  emptyOf(tab: string): boolean {
+    return !this.loadingOf(tab) && !this.errorOf(tab) && this.rowsOf(tab).length === 0;
+  }
+
+  /** "Alle … öffnen" of the tab. */
+  allLinkOf(tab: string): { key: TranslationKey; link: string; query: Record<string, string> | null } {
+    return tab === 'mine'
+      ? { key: 'dashboard.all.mine', link: '/applications', query: { mine: 'true' } }
+      : { key: 'dashboard.all.tasks', link: '/tasks', query: null };
+  }
+
+  private sourceOf(tab: string): Loaded<unknown> {
+    return tab === 'mine' ? this.mine() : this.tasks();
+  }
 
   private readonly rowCap = computed(() => (this.phone() ? PHONE_ROWS : ROWS));
 
@@ -294,26 +316,11 @@ export class DashboardComponent {
   );
 
   /** The rows of the open tab are empty (and loaded). */
-  readonly tabEmpty = computed(() => {
-    if (this.tabLoading() || this.tabError()) return false;
-    switch (this.tab()) {
-      case 'mine':
-        return this.mineRows().length === 0;
-      default:
-        return this.taskRows().length === 0;
-    }
-  });
+  readonly tabEmpty = computed(() => this.emptyOf(this.tab()));
 
   /** No own application yet: the empty tab gets the card "Antrag stellen" beside it. */
   readonly newUser = computed(() => this.mine()?.total === 0);
 
-  /** "Alle … öffnen" of the open tab. */
-  readonly allLink = computed<{ key: TranslationKey; link: string; query: Record<string, string> | null }>(
-    () =>
-      this.tab() === 'mine'
-        ? { key: 'dashboard.all.mine', link: '/applications', query: { mine: 'true' } }
-        : { key: 'dashboard.all.tasks', link: '/tasks', query: null },
-  );
 
   /** The columns of "Offene Aufgaben" and "Meine Anträge". */
   readonly workColumns = computed<ColumnDef[]>(() => [
@@ -356,8 +363,6 @@ export class DashboardComponent {
     if (cast) return 'cast';
     return canCast ? 'pending' : null;
   }
-
-  // ---------------------------------------------------------------- today
 
   /** "Di, 29.09.2026". */
 
@@ -439,8 +444,6 @@ export class DashboardComponent {
     return [day, shortTime(m.startTime)].filter((s) => !!s).join(', ');
   }
 
-  // ---------------------------------------------------------------- format
-
   /** How long a task waits, in calendar days: "heute", "1 Tag", "5 Tage". */
   private waited(at: IsoDateTime): string {
     const days = calendarDaysSince(at, new Date(Date.now()));
@@ -462,8 +465,7 @@ export class DashboardComponent {
 
 
   /** Send the request of the open tab again after it failed. */
-  retryTab(): void {
-    const tab = this.tab();
+  retryTab(tab: string = this.tab()): void {
     const source = tab === 'mine' ? this.mine : this.tasks;
     this.reloads.get(source)?.();
   }
@@ -489,8 +491,6 @@ export class DashboardComponent {
     this.reloads.set(value, () => again.next());
     return value;
   }
-
-  // ---------------------------------------------------------------- phone
 
   openAccount(): void {
     this.accountOpen.set(true);

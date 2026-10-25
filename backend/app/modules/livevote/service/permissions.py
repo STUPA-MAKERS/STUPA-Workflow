@@ -13,13 +13,9 @@ from uuid import UUID
 
 from sqlalchemy import select
 
-from app.modules.admin.gremium_roles import (
-    admin_bypass,
-    gremium_ids_for,
-    gremium_ids_with_permission,
-    gremium_member_ids,
-)
+from app.modules.admin.gremium_roles import gremium_ids_with_permission, gremium_member_ids
 from app.modules.auth.models import Principal as PrincipalRow
+from app.modules.auth.policy import admin_bypass, has_gremium_permission
 from app.modules.auth.principal import Principal
 from app.modules.delegations.models import MeetingDelegation
 from app.modules.delegations.pool import substitute_gremien_for_sub
@@ -27,6 +23,7 @@ from app.modules.livevote.keepers import keeper_summaries
 from app.modules.livevote.models import Meeting
 from app.modules.livevote.schemas import MeetingOut, MeetingVoteOut
 from app.modules.livevote.service.service_base import MeetingServiceBase
+from app.modules.voting.service import manages_votes_in_gremium
 from app.shared.errors import ForbiddenError
 
 
@@ -39,9 +36,7 @@ class PermissionOps(MeetingServiceBase):
         The scope cap applies: a token without `session.manage` in its scope cannot
         manage, not even an admin token.
         """
-        if admin_bypass(principal, "session.manage"):
-            return True
-        return gremium_id in await gremium_ids_for(self.session, principal, "session.manage")
+        return await has_gremium_permission(self.session, principal, "session.manage", gremium_id)
 
     async def meeting_gremium_id(self, meeting_id: UUID) -> UUID:
         """Return the gremium of a meeting.
@@ -73,8 +68,8 @@ class PermissionOps(MeetingServiceBase):
             meeting, principal
         ):
             return True
-        return meeting.gremium_id in await gremium_ids_for(
-            self.session, principal, "protocol.write"
+        return await has_gremium_permission(
+            self.session, principal, "protocol.write", meeting.gremium_id
         )
 
     async def can_write_meeting(self, meeting_id: UUID, principal: Principal) -> bool:
@@ -101,7 +96,7 @@ class PermissionOps(MeetingServiceBase):
 
         This is the gate of the agenda-item text (`set_agenda_body`): `can_write`, and
         in a live meeting with a protokollant only the protokollant. The protocol state
-        (O22) is a separate check of the agenda service.
+        is a separate check of the agenda service.
         """
         if not await self.can_write(meeting, principal):
             return False
@@ -132,14 +127,16 @@ class PermissionOps(MeetingServiceBase):
             raise ForbiddenError("only the protokollant may open or close a vote")
 
     async def can_manage_votes(self, meeting: Meeting, principal: Principal) -> bool:
-        """Check who opens and closes votes: manager, protokollant, or `vote.manage`.
+        """Check who manages the votes of a meeting: manager, gremium rule, protokollant.
 
-        The admin role bypasses the gremium check. That keeps this rule equal to
-        the `admin_bypass(principal, "vote.manage")` gate of
-        `VotingService.can_manage_group` and to the batched flags of the meeting
-        list. The protokollant path, the gremium role, and the admin bypass are
-        scope-capped: through them, a token without `vote.manage` in its scope cannot
-        manage votes.
+        The meeting rule adds the session lead (`can_manage`) and the protokollant to
+        the gremium rule of vote management (`voting.service.manages_votes_in_gremium`:
+        the admin role or a gremium role with `vote.manage` or `session.manage`).
+        `VotingService.can_manage_group` asks this method for a meeting-bound vote, so
+        the enforced right equals the advertised `canManageVotes` flag. The batched
+        flags of the meeting list (`ListingOps`) compute the same union. The
+        protokollant path, the gremium role, and the admin bypass are scope-capped:
+        through them, a token without `vote.manage` in its scope cannot manage votes.
 
         The manager path needs only `session.manage`. The meeting lead includes
         vote management and the agenda-item change, so a `meetings:write` token
@@ -147,14 +144,10 @@ class PermissionOps(MeetingServiceBase):
         """
         if await self.can_manage(meeting.gremium_id, principal):
             return True
-        if admin_bypass(principal, "vote.manage"):
+        if await manages_votes_in_gremium(self.session, meeting.gremium_id, principal):
             return True
-        if principal.scope_allows("vote.manage") and await self._is_protokollant(
+        return principal.scope_allows("vote.manage") and await self._is_protokollant(
             meeting, principal
-        ):
-            return True
-        return meeting.gremium_id in await gremium_ids_for(
-            self.session, principal, "vote.manage"
         )
 
     async def can_finalize(self, meeting: Meeting, principal: Principal) -> bool:
@@ -166,10 +159,8 @@ class PermissionOps(MeetingServiceBase):
         """
         if not await self.can_write(meeting, principal):
             return False
-        if admin_bypass(principal, "protocol.finalize"):
-            return True
-        return meeting.gremium_id in await gremium_ids_for(
-            self.session, principal, "protocol.finalize"
+        return await has_gremium_permission(
+            self.session, principal, "protocol.finalize", meeting.gremium_id
         )
 
     async def can_vote(self, meeting: Meeting, principal: Principal) -> bool:
@@ -266,9 +257,7 @@ class PermissionOps(MeetingServiceBase):
             return
         raise ForbiddenError("not allowed to view this meeting")
 
-    async def meeting_read_scope(
-        self, principal: Principal
-    ) -> tuple[set[UUID] | None, set[UUID]]:
+    async def meeting_read_scope(self, principal: Principal) -> tuple[set[UUID] | None, set[UUID]]:
         """Return the read scope of `assert_can_read` as two id sets.
 
         The first set holds the gremien whose meetings the principal can read. `None`
@@ -293,12 +282,13 @@ class PermissionOps(MeetingServiceBase):
         `meeting.view_all` permission is global, read-only, and purely additive. The
         server gates management, write access, and voting separately.
 
+        Both checks apply the OAuth scope cap. `Principal.has` grants the admin role every
+        in-scope right. A read of `principal.roles` here would return `None`, that is every
+        gremium, for a token scoped to far less.
+
         Returns:
             The visible gremium ids, or `None` for all gremien.
         """
-        # Both checks apply the OAuth scope cap. `Principal.has` grants the admin role
-        # every in-scope right. Reading `principal.roles` here would return `None` —
-        # every gremium — for a token scoped to far less.
         if principal.has("meeting.view_all") or admin_bypass(principal, "session.manage"):
             return None
         member = await gremium_member_ids(self.session, principal.sub)

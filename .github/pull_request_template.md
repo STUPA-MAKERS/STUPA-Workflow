@@ -3,12 +3,12 @@ Definition of Done — go through the list BEFORE the review. The list checks th
 error classes that come back again and again in our reviews. Each box stands for a
 mistake that already cost us at least once. Tick a point that does not apply to this
 pull request as `[x] n/a — <short reason>`. Do not delete the point. The reason for
-each point is in docs/CONTRIBUTING.md / CONTRIBUTING.md → "Definition of Done".
+each point is in the conventions skill (.claude/skills/conventions/SKILL.md).
 -->
 
 ## What and Why
 
-<!-- Short: what changes, which issue or task (T-/#), and why this way. -->
+<!-- Short: what changes and why this way. -->
 
 Closes #
 

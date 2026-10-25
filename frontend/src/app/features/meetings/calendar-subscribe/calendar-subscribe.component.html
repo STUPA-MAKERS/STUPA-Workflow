@@ -9,7 +9,6 @@
     <app-skeleton variant="lines" [count]="2" [label]="'common.loading' | t" />
   } @else if (url(); as feedUrl) {
     <span class="cs__label" id="{{ headingId }}-url">{{ 'account.calendar.urlLabel' | t }}</span>
-    <!-- Never cut: the URL wraps and stays fully selectable. -->
     <code class="cs__url" [attr.aria-labelledby]="headingId + '-url'">{{ feedUrl }}</code>
     @if (confirming()) {
       <div class="cs__confirm" role="group" [attr.aria-label]="'account.calendar.rotate' | t">

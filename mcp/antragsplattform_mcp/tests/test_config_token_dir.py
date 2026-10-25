@@ -1,4 +1,4 @@
-"""Tests for the token-cache directory permission hardening (AUD-024).
+"""Tests for the token-cache directory permission hardening.
 
 `Config.token_path` must enforce mode 0o700 on the cache root. It must do so even when
 the directory already exists with wider permissions. A `mkdir(mode=...)` alone applies
@@ -29,7 +29,7 @@ def test_token_path_creates_dir_0700(monkeypatch, tmp_path: Path) -> None:
 
 def test_token_path_tightens_preexisting_loose_dir(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    # Pre-create the cache root with world-listable perms (the AUD-024 scenario).
+    # Pre-create the cache root with world-listable perms.
     root = tmp_path / "antragsplattform-mcp"
     root.mkdir(parents=True)
     os.chmod(root, 0o755)

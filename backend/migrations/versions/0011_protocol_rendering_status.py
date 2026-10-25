@@ -1,4 +1,4 @@
-"""Protocol: the `rendering` status (async protocol render, T-22 follow-up).
+"""Protocol: the `rendering` status (async protocol render).
 
 `finalize` no longer blocks the request. The protocol moves to `rendering`. An
 arq worker then renders the PDF, sends the mail and sets `final`. After a
@@ -27,9 +27,9 @@ _UPGRADE: tuple[str, ...] = (
     ),
 )
 
+#: A render in progress goes back to draft, because the row would break the restored, narrower
+#: constraint.
 _DOWNGRADE: tuple[str, ...] = (
-    # Reset a render in progress to draft. Otherwise the row breaks the
-    # restored, narrower constraint.
     "UPDATE protocol SET status = 'draft' WHERE status = 'rendering'",
     "ALTER TABLE protocol DROP CONSTRAINT IF EXISTS protocol_status",
     (
@@ -40,10 +40,12 @@ _DOWNGRADE: tuple[str, ...] = (
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     for stmt in _UPGRADE:
         op.execute(stmt)
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     for stmt in _DOWNGRADE:
         op.execute(stmt)

@@ -29,17 +29,14 @@
   gap: 6px;
 }
 
-/* The select-all box sits on the same x as the row boxes below it: the rows have an
-   inline-start padding of --space-4, and the bar has the same. The 44px touch target
-   (see below) reaches back into that padding. */
-/* Every checkbox of the panel has a 44px touch target around its 18px box. The
-   negative margins keep the box where it was and the row at its height. */
+// The select-all box sits on the same x as the row boxes: the rows and the bar both have an
+// inline-start padding of --space-4.
+// A 44px touch target around the 18px box. The negative margins keep the box where it was and
+// the row at its height.
 .att__row app-checkbox ::ng-deep label {
   min-height: 2.75rem;
   margin-block: calc((1.125rem - 2.75rem) / 2);
 }
-/* A row box has no text of its own (the file name names it), so its label is the box
-   and its target only, centred on the box. */
 .att__row app-checkbox {
   flex: none;
 }

@@ -126,7 +126,7 @@ export const APPS_SHOWN = 5;
  *
  * The pane holds the fiscal year, the overview (sunburst), a search and the tree. Each
  * tree node shows its allocation and a bar of its utilisation, in its own colour or the
- * colour it inherits (O19). The sheet shows the path, the six figures (Zuteilung,
+ * colour it inherits. The sheet shows the path, the six figures (Zuteilung,
  * Beantragt, Gebunden, Ausgegeben, Einnahmen, Verfügbar; N28), the distribution over the
  * sub cost centres, the utilisation per sub cost centre and the applications on it.
  *
@@ -137,10 +137,17 @@ export const APPS_SHOWN = 5;
  * phone from the bottom. The query params hold the
  * selection, so the view is shareable as a link. A reader with a
  * gremium scope (`viewGremiumId`) gets only the subtrees of the server response.
+ *
+ * The page never shows the empty state while it loads, because "there are no cost centres" is false
+ * during every load. The content is not a `<main>`, because the shell already wraps the routed page
+ * in one. Each bar has the colour of its cost centre, so a shared legend cannot match it; the bar
+ * is only 6px high, so the whole row carries the tooltip.
+ *
+ * It is a pane page (`styles.scss`): the panes fill the free height and scroll by
+ * themselves.
  */
 @Component({
   selector: 'app-budget-dashboard',
-  // A pane page (styles.scss): the panes fill the free height and scroll by themselves.
   host: { '[class.pane-page]': 'wide()' },
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -221,8 +228,6 @@ export class BudgetDashboardComponent {
     'available',
   ];
 
-  // ---------------------------------------------------------------- tree
-
   /** Tree without the hidden cost centres. `hiddenInBudget` removes the node and its
    *  subtree from the budget tab. This changes the display only: the values still count
    *  in the parent rollups. */
@@ -271,10 +276,10 @@ export class BudgetDashboardComponent {
     return out;
   });
 
-  /** Own or inherited colour of every visible node, `null` when it has none (O19). */
+  /** Own or inherited colour of every visible node, `null` when it has none. */
   private readonly setColors = computed(() => resolveNodeColors(this.visibleTree()));
   /** Display colour of every visible node. The tree, the bars and the charts all use it,
-   *  so a cost centre has one colour on the page (gaps D6). */
+   *  so a cost centre has one colour on the page. */
   readonly colors = computed(() => nodeColors(this.visibleTree()));
 
   private readonly selectedKs = computed(() => this.nodeById().get(this.selectedKsId()) ?? null);
@@ -289,7 +294,9 @@ export class BudgetDashboardComponent {
   readonly yearOptions = computed(() =>
     this.years().map((fy) => ({
       value: fy.id,
-      label: this.i18n.translate('budget.dash.yearShort', { year: fy.display }),
+      label: this.i18n.translate(fy.closedAt ? 'budget.dash.yearShortClosed' : 'budget.dash.yearShort', {
+        year: fy.display,
+      }),
     })),
   );
   readonly selectedYear = computed<FiscalYear | null>(
@@ -340,8 +347,6 @@ export class BudgetDashboardComponent {
       n.name.toLowerCase().includes(q) ||
       n.key.toLowerCase().includes(q) ||
       n.pathKey.toLowerCase().includes(q);
-    // With a search: a node shows when it or a node below it matches, and every node on
-    // the way to a match is open.
     const hits = new Set<string>();
     const mark = (n: BudgetTreeNode): boolean => {
       let any = matches(n);
@@ -396,8 +401,6 @@ export class BudgetDashboardComponent {
     if (add.every((x) => this.expanded().has(x))) return;
     this.expanded.update((s) => new Set([...s, ...add]));
   }
-
-  // ---------------------------------------------------------------- sheet
 
   /** The six figures of the selected cost centre. */
   readonly figures = computed<Figures>(() => {
@@ -497,8 +500,6 @@ export class BudgetDashboardComponent {
     });
   }
 
-  // ---------------------------------------------------------------- applications
-
   /** The applications of the selected cost centre and its subtree; `null` while loading. */
   readonly apps = signal<BudgetApplication[] | null>(null);
   readonly appsError = signal(false);
@@ -530,8 +531,6 @@ export class BudgetDashboardComponent {
   private resolveLabel(map: Record<string, string>): string {
     return map[this.i18n.locale()] || map['de'] || map['en'] || Object.values(map)[0] || '';
   }
-
-  // ---------------------------------------------------------------- overview (sunburst)
 
   readonly overviewOpen = signal(false);
   readonly overviewMetric = signal<SunburstMetric>('allocated');
@@ -569,8 +568,6 @@ export class BudgetDashboardComponent {
     this.selectKs(id);
   }
 
-  // ---------------------------------------------------------------- selection + URL
-
   /**
    * The query params to resolve the selection from.
    *
@@ -584,6 +581,11 @@ export class BudgetDashboardComponent {
   /** Outstanding fiscal-year requests. See `resolveSelection` and `emptyReason`. */
   private readonly pendingFiscalYears = signal(0);
 
+  /**
+   * The query param map is subscribed, because the router keeps this component alive for a
+   * query-string-only change; otherwise the URL named one cost centre and the page went on showing
+   * another.
+   */
   constructor() {
     this.appsKey
       .pipe(
@@ -602,9 +604,6 @@ export class BudgetDashboardComponent {
 
     this.load();
 
-    // The palette can send us here while we are already here. The router keeps this
-    // component alive for a query-string-only change, so without this the URL named one
-    // cost centre and the page went on showing another.
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((qp) => {
       this.urlParams = qp;
       this.applyUrlSelection();
@@ -620,6 +619,10 @@ export class BudgetDashboardComponent {
     return formatMoney(value, this.i18n.formatLocale(), { currency, whole: true });
   }
 
+  /**
+   * The fiscal years of every root load in parallel, so one failure does not stop the others. The
+   * counter tells "this root has no years" from "its years have not arrived yet".
+   */
   protected load(): void {
     this.loading.set(true);
     this.error.set(false);
@@ -627,11 +630,7 @@ export class BudgetDashboardComponent {
       next: (tree) => {
         this.tree.set(tree);
         this.loading.set(false);
-        // Forest roots. They can be sub cost centres. A hidden root is not selectable.
         const tops = tree.filter((n) => !n.hiddenInBudget);
-        // The fiscal years of every root load in parallel; one failure does not stop the
-        // others. The counter tells "this root has no years" from "its years have not
-        // arrived yet".
         this.pendingFiscalYears.set(tops.length);
         for (const top of tops) {
           this.api.listFiscalYears(top.id as Uuid).subscribe({
@@ -656,12 +655,12 @@ export class BudgetDashboardComponent {
   }
 
   /** Restore the first selection from the query params. Else take the first root and
-   *  its first fiscal year. */
+   *  its newest fiscal year. */
   private restored = false;
   private restoreOrDefault(tops: BudgetTreeNode[]): void {
     if (this.restored || !tops.length) return;
     const next = this.resolveSelection(tops);
-    if (next === null) return; // not loaded yet, try again later
+    if (next === null) return;
     this.restored = true;
     this.setSelection(next.budgetId, next.ksId, next.fyId);
   }
@@ -678,7 +677,7 @@ export class BudgetDashboardComponent {
   private applyUrlSelection(): void {
     const tops = this.tree().filter((n) => !n.hiddenInBudget);
     const next = this.resolveSelection(tops);
-    if (next === null) return; // nothing loaded yet; the restore will pick it up
+    if (next === null) return;
     if (
       next.budgetId === this.selectedBudgetId() &&
       next.ksId === this.selectedKsId() &&
@@ -695,35 +694,34 @@ export class BudgetDashboardComponent {
    *
    * One resolver for both entry points, so a deep link cannot mean one thing on arrival
    * and another when it is followed later.
+   *
+   * A search hit is `?ks=…` alone, so the root comes from the cost centre itself when the URL does
+   * not name one. A URL that names a root whose years have not landed yet waits rather than settle
+   * for the first ready root, because the choice is latched.
    */
   private resolveSelection(
     tops: BudgetTreeNode[],
   ): { budgetId: string; ksId: string; fyId: string } | null {
     if (!tops.length) return null;
     const withFy = tops.filter((t) => (this.fiscalYearsByBudget()[t.id]?.length ?? 0) > 0);
-    if (!withFy.length) return null; // no fiscal year loaded yet, try again later
+    if (!withFy.length) return null;
     const qp = this.urlParams;
     const selectable = (id: string | null): boolean =>
       !!id && !!this.nodeById().get(id) && (this.fiscalYearsByBudget()[id]?.length ?? 0) > 0;
 
     const ks = qp.get('ks');
     const qpBudget = qp.get('budget');
-    // A search hit is `?ks=…` alone, so the root comes from the cost centre itself when
-    // the URL does not name one.
     const derived = ks && this.nodeById().get(ks) ? this.rootOf(ks) : null;
     const wanted = selectable(qpBudget) ? qpBudget : selectable(derived) ? derived : null;
-    // A URL that names a root whose years have not landed yet must WAIT rather than
-    // settle for the first root that happens to be ready: the choice is latched.
     if (wanted === null && (ks || qpBudget) && this.pendingFiscalYears() > 0) return null;
     const budgetId = wanted ?? withFy[0].id;
 
-    // Both ways to `budgetId` above require at least one year, so `fys[0]` exists.
     const fys = this.fiscalYearsByBudget()[budgetId];
     const fy = qp.get('fy');
     return {
       budgetId,
       ksId: ks && this.nodeById().get(ks) ? ks : budgetId,
-      fyId: fy && fys.some((f) => f.id === fy) ? fy : fys[0].id,
+      fyId: fy && fys.some((f) => f.id === fy) ? fy : newestFyId(fys),
     };
   }
 
@@ -775,12 +773,12 @@ export class BudgetDashboardComponent {
   }
 
   /** Select a cost centre. A node under another root switches the root and keeps the
-   *  start year where that root has it. */
+   *  start year where that root has it, else takes its newest year. */
   selectKs(id: string): void {
     const root = this.rootOf(id) ?? id;
     if (root !== this.selectedBudgetId()) {
       const fys = this.fiscalYearsByBudget()[root] ?? [];
-      const fy = this.fyIdFor(root) || (fys[0]?.id ?? '');
+      const fy = this.fyIdFor(root) || newestFyId(fys);
       this.setSelection(root, id, fy);
     } else {
       this.setSelection(root, id, this.selectedFyId());
@@ -863,4 +861,11 @@ function toFigures(a: BudgetAllocationView): Figures {
 export function utilisation(f: Figures): number | null {
   const total = f.available + f.committed;
   return total > 0 ? Math.round((f.committed / total) * 100) : null;
+}
+
+/** The id of the newest fiscal year (the highest start year), or `''` without one. */
+function newestFyId(fys: readonly FiscalYear[]): string {
+  let newest: FiscalYear | null = null;
+  for (const f of fys) if (!newest || f.year > newest.year) newest = f;
+  return newest?.id ?? '';
 }

@@ -24,7 +24,7 @@ The server enforces these invariants:
   `delegation_lead_minutes` of the gremium config. A pool delegation runs until
   the meeting start. The meeting must still be `planned`, else 422. A revocation
   runs until the meeting start.
-* Lead entry (O6). During a live meeting the meeting lead (`can_manage`) enters
+* Lead entry. During a live meeting the meeting lead (`can_manage`) enters
   a substitution for a missing member (`delegatorId`). The delegate must be a
   pool substitute of that member: a personal entry for the member or a
   gremium-wide entry. The lead can also revoke a
@@ -40,15 +40,16 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from sqlalchemy import or_, select, text
+from sqlalchemy import ColumnElement, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
-from app.modules.admin.gremium_roles import admin_bypass, gremium_ids_for, gremium_member_ids
+from app.modules.admin.gremium_roles import gremium_member_ids
 from app.modules.admin.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth.models import Principal as PrincipalRow
+from app.modules.auth.policy import has_gremium_permission, holds_gremium_permission
 from app.modules.auth.principal import Principal
 from app.modules.delegations.models import (
     DelegationSubstitute,
@@ -78,19 +79,20 @@ from app.shared.errors import (
     ValidationProblem,
 )
 
-# Permission that grants the view and the management of foreign delegations.
+#: Permission that grants the view and the management of foreign delegations.
 _ADMIN_PERM = "admin.delegations"
-# Gremium-role permission that may manage the substitute pool. The same
-# permission makes the meeting lead (`can_manage`), who enters a substitution
-# during a live meeting (O6).
+#: Gremium-role permission that may manage the substitute pool. The same
+#: permission makes the meeting lead (`can_manage`), who enters a substitution
+#: during a live meeting.
 _POOL_MANAGE_PERM = "session.manage"
-# Attendance states in which a member counts as missing (O6). No record counts
-# as missing too.
+#: Attendance states in which a member counts as missing. No record counts
+#: as missing too.
 _MISSING_STATES = frozenset({"excused", "absent"})
-# Advisory-lock base key. It serializes the create per meeting, so a concurrent
-# insert cannot race the read-then-insert check of the no-chains rule. The lock
-# takes this key and a derivation of the meeting id as two int4 arguments.
-_CREATE_LOCK_KEY = 0x4445_4C45  # "DELE"
+#: Advisory-lock base key. It serializes the create per meeting, so a concurrent
+#: insert cannot race the read-then-insert check of the no-chains rule. The lock
+#: takes this key and a derivation of the meeting id as two int4 arguments. The
+#: value spells "DELE" in ASCII.
+_CREATE_LOCK_KEY = 0x4445_4C45
 
 
 def _escape_like(needle: str) -> str:
@@ -160,7 +162,7 @@ async def voting_delegation_check(
     sub: str,
     meeting_id: UUID | None,
     eligible_group: str,
-    now: datetime,  # noqa: ARG001 - signature consistency; delegations are session-bound
+    now: datetime,
 ) -> tuple[bool, str | None]:
     """Give the two-sided vote verdict for `sub`.
 
@@ -175,6 +177,9 @@ async def voting_delegation_check(
       The caller may then cast one delegated ballot next to the own ballot. That
       ballot runs under `delegator_sub`, so it is a transfer and not a duplicate.
       The caller can therefore vote even as an external user.
+
+    `now` keeps the signature equal to the other checks. A delegation is bound to a meeting, not to
+    a time.
 
     Returns:
         The blocked flag and the `sub` of the delegator. The second value is None
@@ -221,6 +226,7 @@ class DelegationService:
     """Delegation service bound to an `AsyncSession` and a `Settings` object."""
 
     def __init__(self, session: AsyncSession, settings: Settings) -> None:
+        """Bind the service to a session and the settings."""
         self.session = session
         self.settings = settings
 
@@ -252,7 +258,7 @@ class DelegationService:
 
         `lock` takes the meeting row FOR UPDATE and reads the current values again.
         The attendance writers hold a share lock on the same row, so a lead entry
-        and an attendance change run one after the other (O23).
+        and an attendance change run one after the other.
 
         Raises:
             NotFoundError: No meeting has this id (404).
@@ -311,7 +317,7 @@ class DelegationService:
             return
         if gremium_id in await substitute_gremien_for_sub(self.session, actor.sub):
             return
-        if gremium_id in await gremium_ids_for(self.session, actor, _POOL_MANAGE_PERM):
+        if await holds_gremium_permission(self.session, actor, _POOL_MANAGE_PERM, gremium_id):
             return
         raise ForbiddenError("Not allowed to view this gremium's delegation roster.")
 
@@ -321,9 +327,7 @@ class DelegationService:
         This is the same rule as `PermissionOps.can_manage` of the meeting module.
         The scope cap applies to both paths.
         """
-        if admin_bypass(actor, _POOL_MANAGE_PERM):
-            return True
-        return gremium_id in await gremium_ids_for(self.session, actor, _POOL_MANAGE_PERM)
+        return await has_gremium_permission(self.session, actor, _POOL_MANAGE_PERM, gremium_id)
 
     def _revocable(
         self, meeting: Meeting, now: datetime, *, lead: bool = False, own: bool = True
@@ -331,7 +335,7 @@ class DelegationService:
         """Tell if the viewer can revoke a delegation of this meeting.
 
         The delegator can revoke while the meeting is planned and has not started.
-        The meeting lead (`lead`) can also revoke while the meeting is live (O6).
+        The meeting lead (`lead`) can also revoke while the meeting is live.
         `own` is False for a row that the viewer sees only as the meeting lead.
         The lead cannot revoke such a row before the start, so it is not revocable.
         """
@@ -365,6 +369,9 @@ class DelegationService:
 
         `lead_gremien` holds the gremien that the viewer leads. `admin` tells that
         the viewer may revoke every row.
+
+        A fresh row gets `created_at` from the database default only on the next select, so the view
+        uses the creation time until then.
         """
         lead_gremien = lead_gremien or set()
         ids: set[UUID] = set()
@@ -386,8 +393,6 @@ class DelegationService:
                 delegate_name=names.get(d.delegate_principal_id),
                 delegate_voting=d.delegate_voting,
                 via_pool=d.via_pool,
-                # For a fresh row the database default fills `created_at` only on
-                # the next select. Use the creation time until then.
                 created_at=d.created_at or now,
                 revocable=self._revocable(
                     meeting,
@@ -400,7 +405,9 @@ class DelegationService:
             for d, meeting, gremium in rows
         ]
 
-    async def _joined(self, *where) -> list[tuple[MeetingDelegation, Meeting, Gremium]]:  # noqa: ANN002
+    async def _joined(
+        self, *where: ColumnElement[bool]
+    ) -> list[tuple[MeetingDelegation, Meeting, Gremium]]:
         rows = (
             await self.session.execute(
                 select(MeetingDelegation, Meeting, Gremium)
@@ -417,7 +424,7 @@ class DelegationService:
 
         Without `delegatorId` the caller delegates for themselves while the meeting
         is planned. With `delegatorId` the meeting lead enters a substitution for a
-        missing member while the meeting is live (O6). See `_create_by_lead`.
+        missing member while the meeting is live. See `_create_by_lead`.
 
         Raises:
             ForbiddenError: The gremium gate blocks the delegation, the recipient
@@ -499,7 +506,7 @@ class DelegationService:
     async def _create_by_lead(
         self, payload: DelegationCreate, delegator_id: UUID, actor: Principal
     ) -> DelegationOut:
-        """Enter a substitution for a missing member during a live meeting (O6).
+        """Enter a substitution for a missing member during a live meeting.
 
         The meeting lead (`can_manage`) names the missing member A (`delegatorId`)
         and a substitute B from the pool of the gremium for A: a personal entry
@@ -509,6 +516,11 @@ class DelegationService:
         record, or the record is `excused` or `absent`. The lead cannot name
         themselves as B. The row stores the lead as `created_by` and
         `via_pool = true`.
+
+        Lock the meeting row before the status and attendance reads. The attendance writers hold a
+        share lock on this row and then look for a delegation. Thus a `present` report of A and this
+        entry for A cannot both commit. The missing member does not consent to this entry, so the
+        lead must not give the vote to themselves.
 
         Raises:
             ForbiddenError: The caller is not the meeting lead, the gremium does not
@@ -528,10 +540,6 @@ class DelegationService:
             raise ForbiddenError(
                 "Only the meeting lead may enter a substitution for another member."
             )
-        # Lock the meeting row before the status and attendance reads. The
-        # attendance writers hold a share lock on this row and then look for a
-        # delegation. Thus a `present` report of A and this entry for A cannot
-        # both commit (O23).
         meeting = await self._meeting(payload.meeting_id, lock=True)
         if not gremium.allow_vote_delegation:
             raise ForbiddenError("Delegation is not enabled for this gremium.")
@@ -553,8 +561,6 @@ class DelegationService:
                 errors=[{"field": "delegateId", "msg": "must differ from delegator"}],
             )
         if delegate.sub == actor.sub:
-            # The missing member does not consent to this entry. Thus the lead
-            # must not give the vote to themselves.
             raise ForbiddenError("The meeting lead cannot name themselves as the substitute.")
         if not await _independently_eligible(self.session, delegator.id, gremium.id, now):
             raise ForbiddenError(
@@ -599,16 +605,16 @@ class DelegationService:
     ) -> MeetingDelegation:
         """Check the chain rules, then store the delegation and write the audit entry.
 
+        No chains: per meeting a principal is either delegator or recipient. A transaction-scoped
+        advisory lock serializes the insert per meeting, because without it a concurrent insert of A
+        to B and B to C could race the read-then-insert check. The second int4 argument of the lock
+        is a stable 32-bit derivation of the meeting id.
+
         Raises:
             ConflictError: The delegator already delegated for this meeting, or the
                 recipient already carries a delegated vote (409).
             ValidationProblem: The delegation would build a chain (422).
         """
-        # No chains: per meeting a principal is either delegator or recipient. A
-        # transaction-scoped advisory lock serializes the insert per meeting.
-        # Without the lock, a concurrent insert of A to B and B to C could race the
-        # read-then-insert check. The second int4 argument is a stable 32-bit
-        # derivation of the meeting id.
         meeting_lock_arg = int.from_bytes(meeting.id.bytes[:4], "big") - 0x8000_0000
         await self.session.execute(
             text("SELECT pg_advisory_xact_lock(:k1, :k2)").bindparams(
@@ -682,7 +688,7 @@ class DelegationService:
 
         A holder of `admin.delegations` sees every delegation. With `meeting_id`,
         the meeting lead (`can_manage`) sees every delegation of that meeting, so
-        the lead can revoke one during the live meeting (O6).
+        the lead can revoke one during the live meeting.
         """
         now = datetime.now(UTC)
         me = await self._principal_row(sub=actor.sub)
@@ -717,7 +723,7 @@ class DelegationService:
 
         The delegator may revoke until the meeting starts, and only while the
         meeting is `planned`. The meeting lead (`can_manage`) may revoke while the
-        meeting is `live` (O6), for example when the substituted member arrives.
+        meeting is `live`, for example when the substituted member arrives.
         A ballot that the delegate already cast stays. An admin may revoke at any
         time.
 
@@ -733,9 +739,7 @@ class DelegationService:
         by_lead = False
         if not actor.has(_ADMIN_PERM):
             meeting = await self._meeting(row.meeting_id)
-            by_lead = meeting.status == "live" and await self._can_manage(
-                meeting.gremium_id, actor
-            )
+            by_lead = meeting.status == "live" and await self._can_manage(meeting.gremium_id, actor)
             if not by_lead:
                 me = await self._principal_row(sub=actor.sub)
                 if me is None or row.delegator_principal_id != me.id:
@@ -768,6 +772,8 @@ class DelegationService:
 
         The roster and the recipient names are PII and must not leak to outsiders.
 
+        Check the view rights before the roster and the personal data are built.
+
         Raises:
             NotFoundError: The meeting does not exist (404).
             ForbiddenError: The actor is not a member, a pool substitute or a
@@ -776,7 +782,6 @@ class DelegationService:
         now = datetime.now(UTC)
         meeting = await self._meeting(meeting_id)
         gremium = await self._gremium(meeting.gremium_id)
-        # Check the view rights before the code builds the roster and the PII.
         await self._assert_can_view_gremium(gremium.id, actor)
         me = await self._principal_row(sub=actor.sub)
 
@@ -854,8 +859,11 @@ class DelegationService:
         With `delegation_allow_external` the search also covers the whole platform
         by name and email. The returned names are PII. Only an authorized caller
         may read them. With `delegator_id` the meeting lead gets the pool
-        substitutes of that member for the lead entry (O6), see
+        substitutes of that member for the lead entry, see
         `_lead_recipients`.
+
+        Check the view rights before the recipient names are resolved. Escape the LIKE
+        metacharacters, so a `%` or `_` from the user is no wildcard.
 
         Raises:
             NotFoundError: The meeting does not exist (404).
@@ -866,7 +874,6 @@ class DelegationService:
         now = datetime.now(UTC)
         meeting = await self._meeting(meeting_id)
         gremium = await self._gremium(meeting.gremium_id)
-        # Check the view rights before the code resolves the recipient names.
         await self._assert_can_view_gremium(gremium.id, actor)
         if delegator_id is not None:
             return await self._lead_recipients(gremium.id, delegator_id, q, actor, now)
@@ -889,8 +896,6 @@ class DelegationService:
             if not needle or needle in (names.get(pid) or "").lower()
         ]
         if gremium.delegation_allow_external and needle:
-            # Escape the LIKE metacharacters, so a `%` or `_` from the user is no
-            # wildcard.
             pattern = f"%{_escape_like(needle)}%"
             rows = (
                 await self.session.execute(
@@ -922,7 +927,7 @@ class DelegationService:
     async def _lead_recipients(
         self, gremium_id: UUID, delegator_id: UUID, q: str, actor: Principal, now: datetime
     ) -> list[RecipientOut]:
-        """List the pool substitutes of a member for the lead entry (O6).
+        """List the pool substitutes of a member for the lead entry.
 
         The list has the personal entries for the member and the gremium-wide
         entries, the same set that `_create_by_lead` accepts. The lead and the
@@ -1008,8 +1013,7 @@ class DelegationService:
     async def _require_pool_manage(self, gremium_id: UUID, actor: Principal) -> None:
         if actor.has(_ADMIN_PERM):
             return
-        allowed = await gremium_ids_for(self.session, actor, _POOL_MANAGE_PERM)
-        if gremium_id not in allowed:
+        if not await holds_gremium_permission(self.session, actor, _POOL_MANAGE_PERM, gremium_id):
             raise ForbiddenError(
                 "Managing the substitute pool requires admin.delegations "
                 "or the gremium's session.manage permission."

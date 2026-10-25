@@ -13,9 +13,9 @@ from app.settings import load_settings
 from tests.unit.modules.todos.fakes import ME, OTHER, ScriptedSession, board, card, column
 
 SETTINGS = load_settings()
-# 08:00 in Berlin (CEST): the reminder window is open.
+#: 08:00 in Berlin (CEST): the reminder window is open.
 MORNING = datetime(2026, 10, 1, 6, 0, tzinfo=UTC)
-# 06:30 in Berlin: too early.
+#: 06:30 in Berlin: too early.
 EARLY = datetime(2026, 10, 1, 4, 30, tzinfo=UTC)
 
 
@@ -77,6 +77,10 @@ async def test_due_waits_for_the_morning() -> None:
 
 
 async def test_due_reminds_once_and_skips_a_failing_card(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Remind once and skip a failing card.
+
+    The members are read once per board, not per card.
+    """
     b = board()
     col = column(b.id)
     ok, quiet, broken = card(b, col), card(b, col), card(b, col)
@@ -94,7 +98,6 @@ async def test_due_reminds_once_and_skips_a_failing_card(monkeypatch: pytest.Mon
         execute=[[(ok, b), (quiet, b), (broken, b)]], scalars=[[ME, OTHER], [], [ME]]
     )
     assert await wt.process_todo_due(_ctx(session), now=MORNING) == 1
-    # One member read per board, not per card.
     assert asked == [b.id]
     tomorrow = date(2026, 10, 2)
     assert [c[2] for c in calls] == [tomorrow] * 3

@@ -1,4 +1,4 @@
-"""Test that GET /api/health returns 200 under the /api base path (see api.md)."""
+"""Test that GET /api/health returns 200 under the /api base path."""
 
 from fastapi.testclient import TestClient
 

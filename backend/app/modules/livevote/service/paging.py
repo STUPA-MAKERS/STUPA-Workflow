@@ -6,22 +6,21 @@ import base64
 from datetime import date as _date
 from datetime import datetime as _datetime
 from datetime import time as _time
-from typing import Any
 from uuid import UUID
 
-from sqlalchemy import DateTime, cast, func
+from sqlalchemy import ColumnElement, DateTime, cast, func
 
 from app.modules.livevote.models import Meeting
 from app.shared.errors import BadRequestError
 
-# Timeline sort and boundary key: the scheduled moment of the meeting. A missing
-# time means midnight. A missing date (an openly planned meeting) sorts the meeting
-# to the far future.
+#: Timeline sort and boundary key: the scheduled moment of the meeting. A missing
+#: time means midnight. A missing date (an openly planned meeting) sorts the meeting
+#: to the far future.
 _MIDNIGHT = _time(0, 0)
 _UNDATED_FALLBACK = _date(9999, 12, 31)
 
 
-def _sort_ts_expr() -> Any:
+def _sort_ts_expr() -> ColumnElement[_datetime]:
     """SQL expression ``date + start_time`` as ``timestamp`` (keyset key)."""
     return cast(
         func.coalesce(Meeting.date, _UNDATED_FALLBACK)

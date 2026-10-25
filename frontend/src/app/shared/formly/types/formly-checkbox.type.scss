@@ -1,4 +1,3 @@
-// A consent checkbox of the form engine with the box of the ui-kit (`app-checkbox`).
 @use 'check' as c;
 @use 'field' as f;
 
@@ -9,7 +8,6 @@
 }
 .check__row {
   display: inline-flex;
-  // The box centred on the label line, as in `app-checkbox`.
   align-items: center;
   gap: var(--space-3);
   padding-inline: var(--space-1);
@@ -31,7 +29,6 @@
 .check__hint,
 .check__error {
   @include f.message;
-  // Below the label, not below the box.
   & {
     padding-inline: calc(var(--space-1) + 18px + var(--space-3)) 0;
   }

@@ -41,9 +41,9 @@ async function setup(inputs: Record<string, unknown> = {}) {
 }
 
 describe('TransferDetailComponent', () => {
+  /** The title opens the sheet on the line of the actions; no line stands above it. */
   it('shows the pair, both bookings, the data and who booked it', async () => {
     await setup();
-    // The title opens the sheet on the line of the actions; no line stands above it.
     expect(document.querySelector('app-sheet-bar .sheet-bar__title [appSheetBarTitle]')).not.toBeNull();
     expect(document.querySelector('.sheet-bar__kicker')).toBeNull();
     expect(screen.getByRole('heading', { name: 'Zuschuss Hallensanierung' })).toBeInTheDocument();

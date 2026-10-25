@@ -5,7 +5,7 @@ description: STUPA-Workflow house rules, Definition-of-Done, test/coverage gates
 
 # Project conventions — house rules & Definition of Done
 
-The non-negotiables. Source of truth: `CONTRIBUTING.md`, `.github/pull_request_template.md`,
+The non-negotiables. Source of truth: this skill, `.github/pull_request_template.md`,
 `backend/migrations/README.md`. Each rule encodes a bug that already cost the team once.
 
 ## Workflow
@@ -24,10 +24,18 @@ The non-negotiables. Source of truth: `CONTRIBUTING.md`, `.github/pull_request_t
   handlers and the OpenAPI rewrite). Never return a bare string or the default `detail` of FastAPI.
 - **RBAC enforced server-side** — check the permission in the backend, not just in FE gating. Roles and
   owner come from the session, never the request body. Object-owner ≠ caller is the most common leak.
-  See `[[admin-domain-rules]]`.
+  See `[[admin-domain-rules]]`. Where each check goes: global permission → route gate
+  (`require_principal("perm")`); gremium permission → `app/modules/auth/policy.py`; object rule →
+  bare gate plus an entry in `OBJECT_CHECK_ROUTES` (`backend/tests/unit/test_route_gates.py`).
+  Details in `be-auth`.
 - **Strictly typed inputs** — Enums/`Literal` instead of free strings. Validate query/body/path via
   Pydantic/`Annotated`. No open `str` status fields. Python ≥3.13, fully annotated, no bare `Any`
   (basedpyright runs in `standard` mode).
+- **Docstrings, not comments** — every public module, class and function in `app/`, `worker/`,
+  `scripts/` and `migrations/` has a brief Google-style docstring (ruff `D`, google convention).
+  Tests may omit them, but the ones they have follow the same format. A `#` comment in a code body
+  is the rare exception for a trick the code cannot show. A reason goes into the docstring, with
+  its "because" kept. Never refer to old tasks, issues or spec sections; state the rule itself.
 - **No `eval`** — flow/form guards run through a whitelist dispatch table (`app/shared/guards.py`,
   `app/shared/jsonlogic.py`), never `eval`.
 
@@ -59,12 +67,12 @@ The non-negotiables. Source of truth: `CONTRIBUTING.md`, `.github/pull_request_t
 - Local (BE): `ruff check .` + `basedpyright` (0 errors) + `pytest`. Local (FE): `npm run lint`,
   `npm run typecheck`, `npm test`. CI order: `Lint → Typecheck → BE-Unit → BE-Integration →
   Contract (Schemathesis) → FE-Unit → E2E (Playwright) → Coverage-Gate → Image-Build + Smoke`.
-  The `mcp` job (ruff check + pytest of `mcp/`, D2) and the `typst` job run beside them.
+  The `mcp` job (ruff check + pytest of `mcp/`) and the `typst` job run beside them.
 
 ## Alembic migrations
 
 - New revision = **hash id** (`cd backend && alembic revision -m "..."`), NOT the old `000N` prefix and
-  **no `--rev-id`**. The `0001…0017` chain stays as-is. Only new revisions get hash ids.
+  **no `--rev-id`**. The `0001…0048` chain stays as-is. Only new revisions get hash ids.
 - `alembic heads` MUST show exactly one head. `alembic upgrade head` MUST be green. Single-head is the
   one intended merge-conflict point.
 - Revision ids MUST be ≤ 32 chars (`alembic_version varchar(32)`). A longer id passes `alembic heads`
@@ -85,7 +93,7 @@ The non-negotiables. Source of truth: `CONTRIBUTING.md`, `.github/pull_request_t
 `errors.py` problem+json · `guards.py` guard evaluator (no eval) · `jsonlogic.py` JsonLogic for
 form visibleIf/compute · `config_schemas.py` camelCase base · `permissions.py` permission catalog ·
 `paging.py` pagination · `ratelimit.py` rate limiting · `altcha.py`/`antiabuse.py` captcha ·
-`i18n.py` locale · `xlsx.py` spreadsheet export · `filenames.py` upload display/storage names and
+`i18n.py` locale · `search.py` trigram/ILIKE fuzzy search of the list services · `xlsx.py` spreadsheet export · `ssrf.py` SSRF guard of the outgoing requests (webhooks, Gravatar; 100 % branch gate) · `filenames.py` upload display/storage names and
 `Content-Disposition` (see `be-files`).
 
 **Related:** every `be-*` skill, `frontend`, `deploy`.

@@ -1,4 +1,4 @@
-"""Wire schemas of the public guest routes of a meeting (#17).
+"""Wire schemas of the public guest routes of a meeting.
 
 A guest has no account. These models carry only what a guest may see: the head of
 the meeting, the own state and, once admitted, the participant view of the public
@@ -38,7 +38,7 @@ class GuestJoinBody(_CamelModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     display_name: str = Field(alias="displayName", max_length=400)
-    # The ALTCHA solution (base64 JSON). The dependency checks it before the route.
+    #: The ALTCHA solution (base64 JSON). The dependency checks it before the route.
     altcha: AltchaSolutionStr | None = None
 
     @model_validator(mode="after")
@@ -52,9 +52,9 @@ class GuestBallotBody(_CamelModel):
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    # A motion takes one option; an election with several candidates the list of the
-    # chosen candidate ids (F2, at most 50 ids); a poll the chosen option ids, or one
-    # answer per date (at most 20).
+    #: A motion takes one option; an election with several candidates the list of the
+    #: chosen candidate ids (at most 50 ids); a poll the chosen option ids, or one
+    #: answer per date (at most 20).
     choice: (
         Annotated[str, Field(max_length=100)]
         | Annotated[list[Annotated[str, Field(max_length=100)]], Field(max_length=50)]
@@ -95,13 +95,15 @@ class GuestAgendaItem(_CamelModel):
     title: str | None = None
     kind: Literal["application", "freetext"]
     non_public: bool = Field(alias="nonPublic")
-    # The protocol excerpt (draft) of a public item. Always None for a non-public one.
+    #: The protocol excerpt (draft) of a public item. Always None for a non-public one.
     body: str | None = None
-    # The done mark of a public item ("TOP abhaken"). Always False for a non-public one.
+    #: The done mark of a public item ("TOP abhaken"). Always False for a non-public one.
     done: bool = False
 
 
 class GuestTally(_CamelModel):
+    """The tally of a vote, as a guest sees it."""
+
     counts: dict[str, int]
     voted: int
     present: int
@@ -130,11 +132,11 @@ class GuestVote(_CamelModel):
     tally: GuestTally
     my_ballot: MyBallot = Field(alias="myBallot")
     can_cast: bool = Field(default=False, alias="canCast")
-    # F2: an election with its candidates and, once closed, its result.
+    #: An election with its candidates and, once closed, its result.
     kind: VoteKind = "motion"
     election: ElectionConfig | None = None
     election_result: ElectionResultOut | None = Field(default=None, alias="electionResult")
-    # A poll with its mode and options, and its counts once closed or revealed.
+    #: A poll with its mode and options, and its counts once closed or revealed.
     poll: PollConfig | None = None
     poll_result: PollResultOut | None = Field(default=None, alias="pollResult")
 
@@ -156,7 +158,7 @@ class GuestMe(_CamelModel):
     number: int
     display_name: str | None = Field(default=None, alias="displayName")
     status: GuestStatus
-    # Seconds until a rejected or removed guest may ask again, else None.
+    #: Seconds until a rejected or removed guest may ask again, else None.
     retry_after: int | None = Field(default=None, alias="retryAfter")
     meeting: PublicMeetingHead
     view: GuestView | None = None

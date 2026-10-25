@@ -25,6 +25,19 @@ other case is a tie (blocking minority).
 rejected (fail-closed), whatever the majority rule says.
 
 Integer arithmetic avoids float rounding. The percent quorum uses Decimal for exactness.
+
+Elections: an election ballot holds the ids of the chosen candidates as a JSON list
+(``[]`` is a full abstention). Every seat that the ballot leaves free is one abstention
+vote: a ballot with 1 of 3 votes gives 2 abstentions. The single-candidate ballot is
+``yes``/``no``/``abstain``, as for a motion. The results are ``elected`` (the seats are
+decided), ``tie`` (a tie at the seat boundary that the lot decides) and ``rejected``
+(quorum missed, or nobody elected). ``runoff`` stays readable for the elections that
+went to a runoff for a tie at the boundary of several seats.
+
+Polls: a single or multi poll ballot holds the chosen option ids as a JSON list (``[]``
+is an abstention), as an election ballot does. A date poll ballot holds a JSON object
+with one answer per option id: ``yes``, ``maybe`` or ``no``. A poll only counts: no
+quorum, no majority, no tie break.
 """
 
 from __future__ import annotations
@@ -100,13 +113,15 @@ def _quorum_met(quorum: Quorum | None, participation: int, eligible: int) -> boo
 
     A quorum of None is always met. A percent quorum fails when no voter is eligible
     (fail-closed).
+
+    The percent check ``participation / eligible * 100 >= value`` runs as
+    ``participation * 100 >= value * eligible``, so it needs no division.
     """
     if quorum is None:
         return True
     value = Decimal(str(quorum.value))
     if quorum.type == "count":
         return Decimal(participation) >= value
-    # percent: participation/eligible * 100 >= value  ->  participation*100 >= value*eligible
     if eligible <= 0:
         return False
     return Decimal(participation) * Decimal(100) >= value * Decimal(eligible)
@@ -148,14 +163,16 @@ def _resolve_tie(tie_break: str) -> VoteResult:
 
 
 def result(config: VoteConfig, counts: Mapping[str, int], eligible: int) -> Outcome:
-    """Apply the quorum and the majority rule to get the outcome."""
+    """Apply the quorum and the majority rule to get the outcome.
+
+    The quorum turnout counts every cast vote. Abstentions drop out only when
+    ``abstainCountsQuorum`` is false.
+    """
     yes = counts.get(YES, 0)
     no = counts.get(NO, 0)
     abstain = counts.get(ABSTAIN, 0)
     cast = sum(counts.values())
 
-    # Turnout for the quorum counts every cast vote. Abstentions drop out only when
-    # `abstainCountsQuorum` is false.
     participation = cast if config.abstain_counts_quorum else cast - abstain
     quorum_met = _quorum_met(config.quorum, participation, eligible)
     lead = leading(counts)
@@ -167,18 +184,6 @@ def result(config: VoteConfig, counts: Mapping[str, int], eligible: int) -> Outc
     final: VoteResult = _resolve_tie(config.tie_break) if raw == "tie" else raw
     return Outcome(result=final, quorum_met=True, leading=lead)
 
-
-# ---------------------------------------------------------------- F2: elections
-#
-# An election ballot holds the ids of the chosen candidates as a JSON list (``[]`` =
-# full abstention). Every seat that the ballot leaves free is one abstention vote: a
-# ballot with 1 of 3 votes gives 2 abstentions. The single-candidate ballot is
-# ``yes``/``no``/``abstain``, as for a motion.
-#
-# Result values: ``elected`` (the seats are decided), ``tie`` (a tie at the seat
-# boundary that the lot decides), ``rejected`` (quorum missed, or nobody elected).
-# ``runoff`` stays readable for the elections that were closed while a tie at the
-# boundary of several seats went to a runoff.
 
 ElectionResult = Literal["elected", "runoff", "tie", "rejected"]
 
@@ -207,15 +212,15 @@ class ElectionOutcome:
 
     result: ElectionResult
     quorum_met: bool
-    # Votes per candidate id. The single-candidate ballot counts ``yes``/``no`` here.
+    #: Votes per candidate id. The single-candidate ballot counts ``yes``/``no`` here.
     counts: dict[str, int]
-    # Abstention votes (free seats on the ballots, or ``abstain``).
+    #: Abstention votes (free seats on the ballots, or ``abstain``).
     abstentions: int
-    # Cast ballots (turnout).
+    #: Cast ballots (turnout).
     ballots: int
     elected: tuple[str, ...] = ()
-    # The tie at the seat boundary: the tied candidates and the open seats. With
-    # ``result == 'runoff'`` a runoff decides, with ``result == 'tie'`` the lot.
+    #: The tie at the seat boundary: the tied candidates and the open seats. With
+    #: ``result == 'runoff'`` a runoff decides, with ``result == 'tie'`` the lot.
     tied: tuple[str, ...] = ()
     open_seats: int = 0
     yes: int | None = None
@@ -262,6 +267,9 @@ def tally_election(
     ``seats`` win, unless a tie crosses the seat boundary: then the candidates above
     the boundary are elected and the lot decides among the tied ones, also with
     several seats (no runoff). A missed quorum elects nobody.
+
+    The sort is stable, so candidates with equal votes keep the order of the candidate
+    list.
     """
     raw = list(choices)
     if config.yes_no:
@@ -284,7 +292,6 @@ def tally_election(
     base = {"counts": counts, "abstentions": abstentions, "ballots": ballots}
     if not quorum_met:
         return ElectionOutcome(result="rejected", quorum_met=False, **base)
-    # Stable sort: equal votes keep the order of the candidate list.
     ranked = sorted((cid for cid in known if counts[cid] > 0), key=lambda c: -counts[c])
     if len(ranked) <= config.seats:
         result: ElectionResult = "elected" if ranked else "rejected"
@@ -323,14 +330,6 @@ def draw_lot(
     return drawn
 
 
-# ------------------------------------------------------------------- polls
-#
-# A poll ballot of a single or a multi poll holds the chosen option ids as a JSON list
-# (``[]`` = abstention), as an election ballot does. A date poll ballot holds a JSON
-# object with one answer per option id: ``yes``, ``maybe`` or ``no``. A poll only
-# counts: no quorum, no majority, no tie break.
-
-
 def encode_poll_answers(answers: Mapping[str, str]) -> str:
     """Return the stored form of a date poll ballot (a JSON object, sorted keys)."""
     return json.dumps(dict(answers), separators=(",", ":"), sort_keys=True)
@@ -353,18 +352,18 @@ def decode_poll_answers(raw: str | None) -> dict[str, str] | None:
 class PollOutcome:
     """Derived result of a poll tally, with no I/O."""
 
-    # Votes per option id. A date poll counts the Ja answers here.
+    #: Votes per option id. A date poll counts the Ja answers here.
     counts: dict[str, int]
-    # A date poll: the Vielleicht answers per option id. None for the other modes.
+    #: A date poll: the Vielleicht answers per option id. None for the other modes.
     maybe: dict[str, int] | None
-    # Ballots without an option (single and multi only).
+    #: Ballots without an option (single and multi only).
     abstentions: int
-    # Cast ballots (turnout).
+    #: Cast ballots (turnout).
     ballots: int
-    # The option ids, highest first. Equal options keep the order of the creator.
+    #: The option ids, highest first. Equal options keep the order of the creator.
     order: tuple[str, ...]
-    # The options with the most votes ("meiste Stimmen", "bester Termin"): every tied
-    # option, none while no option has a vote.
+    #: The options with the most votes ("meiste Stimmen", "bester Termin"): every tied
+    #: option, none while no option has a vote.
     top: tuple[str, ...]
 
     def display_counts(self) -> dict[str, int]:

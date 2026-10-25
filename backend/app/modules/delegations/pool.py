@@ -4,7 +4,7 @@ The pool is the table `delegation_substitute` of a gremium. It holds personal
 entries (for one member) and gremium-wide entries (for every member).
 
 Every path that reads the pool uses the helpers of this module: the delegation
-create (`via_pool`), the lead entry during a live meeting (O6), the recipient
+create (`via_pool`), the lead entry during a live meeting, the recipient
 list, the meeting context, the roster guard, the meeting visibility and
 `/auth/me` (`inSubstitutePool`). Do not query the pool table directly in another
 place.

@@ -208,6 +208,7 @@ async def _seed(session: AsyncSession) -> _World:
 
 
 async def test_the_mentionable_persons_are_the_internal_readers(session: AsyncSession) -> None:
+    """Offer the internal readers; a creator without a member right reads as the applicant."""
     w = await _seed(session)
     people = await mentionable_people(session, w.app)
     assert [p.display_name for p in people] == [
@@ -221,7 +222,6 @@ async def test_the_mentionable_persons_are_the_internal_readers(session: AsyncSe
     assert {p.principal_id for p in people} == {
         w.ids[k] for k in ("read_all", "creator", "meet", "reader", "vote", "view")
     }
-    # The creator without a member right reads as the applicant: no mention.
     plain = {p.principal_id for p in await mentionable_people(session, w.plain_app)}
     assert plain == {w.ids["reader"], w.ids["read_all"]}
 
@@ -273,6 +273,10 @@ async def _edit(
 
 
 async def test_the_comment_checks_stores_and_hides_the_mentions(session: AsyncSession) -> None:
+    """Check, store and hide the mentions.
+
+    The applicant reads a public body, so a public comment names no member.
+    """
     w = await _seed(session)
     svc = ApplicationsService(session)
     with pytest.raises(ValidationProblem) as err:
@@ -298,7 +302,6 @@ async def test_the_comment_checks_stores_and_hides_the_mentions(session: AsyncSe
 
     member_view = await svc.list_comments(w.app, include_internal=True)
     assert [m.display_name for m in member_view[0].mentions] == ["Mona Meet", "Vera Vote"]
-    # The applicant reads a public body, so a public comment names no member.
     with pytest.raises(ValidationProblem) as err:
         await _add(svc, w, [w.ids["vote"]], visibility="public")
     assert err.value.code == "mention_not_member"
@@ -351,6 +354,7 @@ class _Queue:
 
 
 async def test_the_mention_mail_reaches_the_new_mentions_only(session: AsyncSession) -> None:
+    """Mail the new mentions only: not a dropped mention, not the author, not an opt-out."""
     w = await _seed(session)
     comment = Comment(
         application_id=w.app,
@@ -367,10 +371,9 @@ async def test_the_mention_mail_reaches_the_new_mentions_only(session: AsyncSess
     settings = load_settings()
     sent = await send_comment_mentions(
         session,
-        queue=queue,  # type: ignore[arg-type]
+        queue=queue,
         settings=settings,
         comment_id=comment.id,
-        # "other" is no longer mentioned, the author is the actor, "meet" opted out.
         recipients=[w.ids[k] for k in ("vote", "meet", "reader", "other")],
         actor_sub=w.subs["reader"],
     )
@@ -388,7 +391,7 @@ async def test_the_mention_mail_reaches_the_new_mentions_only(session: AsyncSess
     assert (
         await send_comment_mentions(
             session,
-            queue=queue,  # type: ignore[arg-type]
+            queue=queue,
             settings=settings,
             comment_id=uuid.uuid4(),
             recipients=[w.ids["vote"]],
@@ -414,7 +417,7 @@ async def test_the_ticket_mention_mail_links_the_note(session: AsyncSession) -> 
     queue = _Queue()
     sent = await send_ticket_mentions(
         session,
-        queue=queue,  # type: ignore[arg-type]
+        queue=queue,
         settings=load_settings(),
         note_id=note.id,
         recipients=[w.ids["vote"], w.ids["reader"]],
@@ -429,10 +432,10 @@ async def test_the_ticket_mention_mail_links_the_note(session: AsyncSession) -> 
 
 
 async def test_the_mention_mails_skip_what_they_cannot_send(session: AsyncSession) -> None:
+    """Skip the mails that cannot go; an edited applicant comment names the applicant."""
     w = await _seed(session)
     settings = load_settings()
     queue = _Queue()
-    # An applicant comment that a manager edited: the bubble names the applicant.
     comment = Comment(
         application_id=w.app,
         author=None,
@@ -459,7 +462,7 @@ async def test_the_mention_mails_skip_what_they_cannot_send(session: AsyncSessio
     assert (
         await send_comment_mentions(
             session,
-            queue=queue,  # type: ignore[arg-type]
+            queue=queue,
             settings=settings,
             comment_id=comment.id,
             recipients=[w.ids["vote"]],
@@ -477,7 +480,7 @@ async def test_the_mention_mails_skip_what_they_cannot_send(session: AsyncSessio
         assert (
             await send_ticket_mentions(
                 session,
-                queue=queue,  # type: ignore[arg-type]
+                queue=queue,
                 settings=settings,
                 note_id=note_id,
                 recipients=ids,
@@ -487,7 +490,7 @@ async def test_the_mention_mails_skip_what_they_cannot_send(session: AsyncSessio
     assert (
         await send_comment_mentions(
             session,
-            queue=queue,  # type: ignore[arg-type]
+            queue=queue,
             settings=settings,
             comment_id=comment.id,
             recipients=[w.ids["other"]],
@@ -515,6 +518,7 @@ async def test_a_guest_application_and_a_lost_creator_add_no_creator(
 async def test_an_edit_keeps_a_mention_of_a_person_who_lost_the_access(
     session: AsyncSession,
 ) -> None:
+    """Keep an old mention on edit; only a new mention must be mentionable now."""
     w = await _seed(session)
     svc = ApplicationsService(session)
     old = Comment(
@@ -531,6 +535,5 @@ async def test_an_edit_keeps_a_mention_of_a_person_who_lost_the_access(
     kept = await _edit(svc, w, old.id, [w.ids["other"], w.ids["vote"]])
     assert [m.principal_id for m in kept.mentions] == [w.ids["other"], w.ids["vote"]]
     assert list(svc.added_mentions) == [w.ids["vote"]]
-    # Only a new mention must be mentionable now.
     with pytest.raises(ValidationProblem):
         await _edit(svc, w, old.id, [w.ids["other"], w.ids["plain"]])

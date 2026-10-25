@@ -1,4 +1,4 @@
-"""Tests for the flow router wiring (T-14) — fail-closed auth and problem+json.
+"""Tests for the flow router wiring — fail-closed auth and problem+json.
 
 `dependency_overrides` replaces the service. The integration suite covers the DB paths.
 """
@@ -29,16 +29,16 @@ from app.shared.errors import ForbiddenError
 
 class _FakeService:
     def __init__(self) -> None:
+        """Record the `allow_unconfirmed` value of each call; every route passes False."""
         self.fired: dict[str, object] | None = None
-        # The `allow_unconfirmed` value of each call. Every route passes False (F15).
         self.allow_unconfirmed: list[bool] = []
 
-    async def available_transitions(  # noqa: ANN201
+    async def available_transitions(
         self,
-        application_id,  # noqa: ANN001
-        principal,  # noqa: ANN001
+        application_id,
+        principal,
         *,
-        allow_unconfirmed=True,  # noqa: ANN001
+        allow_unconfirmed=True,
     ):
         self.allow_unconfirmed.append(allow_unconfirmed)
         return [
@@ -50,17 +50,17 @@ class _FakeService:
             )
         ]
 
-    async def fire(  # noqa: ANN201
+    async def fire(
         self,
-        application_id,  # noqa: ANN001
-        transition_id,  # noqa: ANN001
-        principal,  # noqa: ANN001
+        application_id,
+        transition_id,
+        principal,
         *,
-        note=None,  # noqa: ANN001
-        meeting_id=None,  # noqa: ANN001
-        non_public=False,  # noqa: ANN001
-        allow_unconfirmed=True,  # noqa: ANN001
-        decision=None,  # noqa: ANN001
+        note=None,
+        meeting_id=None,
+        non_public=False,
+        allow_unconfirmed=True,
+        decision=None,
     ):
         self.allow_unconfirmed.append(allow_unconfirmed)
         self.fired = {
@@ -76,11 +76,11 @@ class _FakeService:
             newStateId=uuid4(), statusEventId=uuid4(), dispatchedActions=["notify"]
         )
 
-    async def available_applicant_transitions(  # noqa: ANN201
+    async def available_applicant_transitions(
         self,
-        application_id,  # noqa: ANN001
+        application_id,
         *,
-        allow_unconfirmed=True,  # noqa: ANN001
+        allow_unconfirmed=True,
     ):
         self.allow_unconfirmed.append(allow_unconfirmed)
         return [
@@ -89,13 +89,13 @@ class _FakeService:
             )
         ]
 
-    async def fire_as_applicant(  # noqa: ANN201
+    async def fire_as_applicant(
         self,
-        application_id,  # noqa: ANN001
-        transition_id,  # noqa: ANN001
+        application_id,
+        transition_id,
         *,
-        note=None,  # noqa: ANN001
-        allow_unconfirmed=True,  # noqa: ANN001
+        note=None,
+        allow_unconfirmed=True,
     ):
         self.allow_unconfirmed.append(allow_unconfirmed)
         self.fired = {
@@ -108,18 +108,18 @@ class _FakeService:
         )
 
 
-    async def list_states(self, application_id, *, allow_unconfirmed=True):  # noqa: ANN001, ANN201
+    async def list_states(self, application_id, *, allow_unconfirmed=True):
         self.allow_unconfirmed.append(allow_unconfirmed)
         return []
 
-    async def force_status(  # noqa: ANN201
+    async def force_status(
         self,
-        application_id,  # noqa: ANN001
-        target_state_id,  # noqa: ANN001
-        principal,  # noqa: ANN001
+        application_id,
+        target_state_id,
+        principal,
         *,
-        note,  # noqa: ANN001
-        allow_unconfirmed=True,  # noqa: ANN001
+        note,
+        allow_unconfirmed=True,
     ):
         self.allow_unconfirmed.append(allow_unconfirmed)
         return TransitionResult(
@@ -142,7 +142,7 @@ class _ReadGate:
         self.checked: list[object] = []
         self.deny = False
 
-    async def __call__(self, _db, application_id, principal, applicant):  # noqa: ANN001, ANN204
+    async def __call__(self, _db, application_id, principal, applicant):
         assert principal is not None
         assert applicant is None
         self.checked.append(application_id)
@@ -181,7 +181,8 @@ def test_list_transitions_requires_auth_401(client: TestClient) -> None:
 
 
 def test_list_transitions_missing_perm_403(app: FastAPI, client: TestClient) -> None:
-    _as_principal(app, "application.read")  # not .manage
+    """Answer 403 for a principal with read but not the transition permission."""
+    _as_principal(app, "application.read")
     r = client.get(f"/api/applications/{uuid4()}/transitions")
     assert r.status_code == 403
     assert r.headers["content-type"] == "application/problem+json"
@@ -190,11 +191,11 @@ def test_list_transitions_missing_perm_403(app: FastAPI, client: TestClient) -> 
 def test_list_transitions_ok(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
+    """List the transitions and hide an unconfirmed guest application."""
     _as_principal(app, "application.transition")
     r = client.get(f"/api/applications/{uuid4()}/transitions")
     assert r.status_code == 200
     assert len(r.json()) == 1
-    # F15: the route hides an unconfirmed guest application.
     assert fake_service.allow_unconfirmed == [False]
 
 
@@ -259,7 +260,7 @@ def test_fire_without_meeting_defaults(
 def test_fire_passes_the_decision(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
-    """F1: the route hands the decision of the body to the engine."""
+    """The route hands the decision of the body to the engine."""
     _as_principal(app, "application.transition")
     r = client.post(
         f"/api/applications/{uuid4()}/transition",
@@ -276,7 +277,7 @@ def test_fire_passes_the_decision(
 
 
 def test_fire_refuses_a_bad_decision_422(app: FastAPI, client: TestClient) -> None:
-    """F1: an empty condition or an unknown key is a 422 before the engine runs."""
+    """An empty condition or an unknown key is a 422 before the engine runs."""
     _as_principal(app, "application.transition")
     for decision in ({"conditions": ["  "]}, {"approvedAmount": "1", "extra": 1}):
         r = client.post(
@@ -294,10 +295,10 @@ def test_fire_rejects_bad_body_422(app: FastAPI, client: TestClient) -> None:
     assert r.status_code == 422
 
 
-# Applicant transitions: access through a magic link.
 def test_list_applicant_transitions_ok(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
+    """List the applicant transitions through a magic link."""
     app_id = uuid4()
     app.dependency_overrides[require_app_applicant] = lambda: SimpleNamespace(
         application_id=app_id
@@ -329,7 +330,7 @@ def test_fire_applicant_transition_ok(
 def test_fire_applicant_transition_refuses_a_decision(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
-    """F1: the applicant never sets a decision (422 `decision_not_allowed`)."""
+    """The applicant never sets a decision (422 `decision_not_allowed`)."""
     app_id = uuid4()
     app.dependency_overrides[require_app_applicant] = lambda: SimpleNamespace(
         application_id=app_id
@@ -346,7 +347,7 @@ def test_fire_applicant_transition_refuses_a_decision(
 def test_force_routes_hide_unconfirmed(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
-    """F15: the force-status picker and the force call pass `allow_unconfirmed=False`."""
+    """The force-status picker and the force call pass `allow_unconfirmed=False`."""
     _as_principal(app, "application.force_status")
     app_id = uuid4()
     assert client.get(f"/api/applications/{app_id}/flow-states").status_code == 200

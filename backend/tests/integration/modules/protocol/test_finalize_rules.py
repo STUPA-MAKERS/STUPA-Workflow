@@ -1,4 +1,4 @@
-"""F8, O13, O2, F12: the protocol is finalized once, after the close, with an audit.
+"""The protocol is finalized once, after the close, with an audit.
 
 * A live meeting gives 409 `meeting_not_closed`, and the protocol stays a draft.
 * A closed meeting finalizes. The start writes `protocol_finalize`.
@@ -28,6 +28,10 @@ pytestmark = pytest.mark.integration
 async def test_finalize_only_after_the_close_and_only_once(
     maker: async_sessionmaker[AsyncSession], api: FastAPI
 ) -> None:
+    """A protocol finalizes only after the close of the meeting and only once.
+
+    Without Redis the request renders synchronously. Without storage no PDF exists.
+    """
     s = await seed(maker, status="live", items=1, protocol="draft")
     assert s.protocol_id is not None
     url = f"/api/protocols/{s.protocol_id}/finalize"
@@ -42,7 +46,6 @@ async def test_finalize_only_after_the_close_and_only_once(
         assert closed.status_code == 200, closed.text
         done = client.post(url)
         again = client.post(url)
-    # Without Redis the request renders synchronously; without storage no PDF exists.
     assert done.status_code == 200, done.text
     assert done.json()["status"] == "final"
     assert again.status_code == 409, again.text

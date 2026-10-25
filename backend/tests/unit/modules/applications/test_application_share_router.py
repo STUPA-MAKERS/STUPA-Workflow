@@ -41,14 +41,14 @@ class _Rows:
     def __init__(self, rows: list[object]) -> None:
         self._rows = rows
 
-    def __iter__(self):  # noqa: ANN204
+    def __iter__(self):
         return iter(self._rows)
 
     def all(self) -> list[object]:
         return self._rows
 
     def first(self) -> object | None:
-        # The site-config lookup for the branding name reads one row this way.
+        """Return the first row; the branding-name lookup reads one row this way."""
         return self._rows[0] if self._rows else None
 
 
@@ -69,10 +69,13 @@ class _FakeSession:
         objects: dict[type, object] | None = None,
         fields: list[object] | None = None,
     ) -> None:
+        """Seed the store.
+
+        `create` looks the application up before it mints anything. Pass `objects={Application:
+        None}` to test the route for an id that is not there.
+        """
         self.share = share
         self.objects = objects or {}
-        # `create` looks the application up before it mints anything. Pass
-        # `objects={Application: None}` to test the route for an id that is not there.
         self.objects.setdefault(Application, _App())
         self.fields = fields or []
         self.added: list[Any] = []
@@ -90,13 +93,14 @@ class _FakeSession:
         Three callers read through this: the listing reads shares, the public page reads
         form fields, and the branding name reads the site config. Answering the same rows
         to all three fed form fields to whichever asked first.
+
+        With no active site config the page falls back to the default name.
         """
         entity = stmt.column_descriptions[0]["entity"]
         if entity is FormField:
             return _Rows(self.fields)
         if entity is ApplicationShare:
             return _Rows([r for r in (self.share,) if r])
-        # No active site config: the page falls back to the default name.
         return _Rows([])
 
     async def get(self, model: type, _pk: object) -> object | None:
@@ -106,8 +110,7 @@ class _FakeSession:
         self.added.append(obj)
 
     async def flush(self) -> None:
-        # Stand in for the server defaults: `id` is `gen_random_uuid()` and `created_at`
-        # is `now()`, so a real INSERT is what fills them in.
+        """Fill `id` and `created_at`, which the server defaults fill on a real INSERT."""
         for obj in self.added:
             if getattr(obj, "id", None) is None:
                 obj.id = uuid.uuid4()
@@ -161,9 +164,6 @@ def _as_applicant(app: FastAPI, application_id: uuid.UUID) -> None:
     )
 
 
-# -- creating -----------------------------------------------------------------
-
-
 def test_reading_an_application_does_not_let_you_publish_it(
     app: FastAPI, client: TestClient
 ) -> None:
@@ -213,7 +213,6 @@ def test_creating_returns_the_token_once_in_a_full_url(
 
     row = next(o for o in session.added if isinstance(o, ApplicationShare))
     assert row.token_hash == tokens.hash_token(token, PEPPER)
-    # The plaintext is nowhere on the stored row.
     assert token.encode() not in bytes(row.token_hash)
     assert session.committed
 
@@ -253,9 +252,6 @@ def test_a_lifetime_beyond_the_bound_is_refused_rather_than_clamped(
     assert r.status_code == 422
 
 
-# -- listing and revoking -----------------------------------------------------
-
-
 def test_listing_never_hands_back_a_token(app: FastAPI, client: TestClient) -> None:
     """The server holds a hash. Even if it could reconstruct one, it would not."""
     app_id = uuid.uuid4()
@@ -269,7 +265,10 @@ def test_listing_never_hands_back_a_token(app: FastAPI, client: TestClient) -> N
 
 
 def test_listing_needs_the_share_permission(app: FastAPI, client: TestClient) -> None:
-    # Who published this, and is the link still live, is part of the same decision.
+    """Need the share permission to list the links.
+
+    Who published a link and whether it is live belong to the same decision.
+    """
     _as_principal(app, "application.read")
     assert client.get(f"/api/applications/{uuid.uuid4()}/shares").status_code == 403
 
@@ -298,9 +297,6 @@ def test_revoking_stamps_the_row_and_audits(app: FastAPI, client: TestClient) ->
     assert r.json()["revokedAt"] is not None
     assert any(getattr(o, "action", None) == "application_share_revoke" for o in fake.added)
     assert fake.committed
-
-
-# -- the public page ----------------------------------------------------------
 
 
 class _App:
@@ -370,12 +366,12 @@ def _public_client_as(
     return TestClient(application, follow_redirects=False), row
 
 
-# -- the signed-in short cut --------------------------------------------------
-
-
 def test_a_member_who_may_read_it_is_sent_to_the_real_application() -> None:
-    """The reduced view exists for people who have no account. Someone who is signed in
-    and may open the record should land on it, not on a copy of it with less on it."""
+    """The reduced view exists for people who have no account.
+
+    Someone who is signed in and may open the record should land on it, not on a copy of it
+    with less on it.
+    """
     client, row = _public_client_as(_live_share(), "application.read")
     r = client.get("/s/" + "x" * 32)
 
@@ -390,8 +386,10 @@ def test_read_all_is_enough_on_its_own() -> None:
 
 
 def test_a_signed_in_user_who_may_not_read_it_still_gets_the_page() -> None:
-    """Redirecting them would trade a page they can read for a 403. The reduced view is
-    the better answer, and it is what the link promised."""
+    """Redirecting them would trade a page they can read for a 403.
+
+    The reduced view is the better answer, and it is what the link promised.
+    """
     client, _ = _public_client_as(_live_share(), "budget.view")
     r = client.get("/s/" + "x" * 32)
 
@@ -400,15 +398,21 @@ def test_a_signed_in_user_who_may_not_read_it_still_gets_the_page() -> None:
 
 
 def test_a_dead_link_is_a_404_even_for_a_member() -> None:
-    """The token is resolved BEFORE anyone is redirected. Otherwise a signed-in reader
-    could tell a revoked link from a made-up one by whether it bounced."""
+    """The token is resolved BEFORE anyone is redirected.
+
+    Otherwise a signed-in reader could tell a revoked link from a made-up one by whether it
+    bounced.
+    """
     client, _ = _public_client_as(None, "application.read")
     assert client.get("/s/" + "x" * 32).status_code == 404
 
 
 def test_the_redirect_is_never_cached_and_never_shared() -> None:
-    """It depends on a cookie. A cache that kept it would send the next reader — who may
-    hold only the link — to a page they cannot open."""
+    """It depends on a cookie.
+
+    A cache that kept it would send the next reader — who may hold only the link — to a page
+    they cannot open.
+    """
     client, _ = _public_client_as(_live_share(), "application.read")
     r = client.get("/s/" + "x" * 32)
 
@@ -418,15 +422,20 @@ def test_the_redirect_is_never_cached_and_never_shared() -> None:
 
 
 def test_the_page_itself_also_varies_on_the_cookie() -> None:
-    """Same URL, two answers. Without this a shared cache could hand the HTML to a member
-    or the redirect to a stranger."""
+    """Same URL, two answers.
+
+    Without this a shared cache could hand the HTML to a member or the redirect to a
+    stranger.
+    """
     r = _public_client(_live_share()).get("/s/" + "x" * 32)
     assert r.headers["vary"] == "Cookie"
 
 
 def test_a_preview_bot_still_gets_the_html() -> None:
-    """A bot carries no session, so it takes the anonymous path and the OpenGraph tags
-    survive. This is the whole reason the route renders HTML at all."""
+    """A bot carries no session, so it takes the anonymous path and the OpenGraph tags survive.
+
+    This is the whole reason the route renders HTML at all.
+    """
     r = _public_client(_live_share()).get("/s/" + "x" * 32)
     assert r.status_code == 200
     assert 'property="og:title"' in r.text
@@ -441,8 +450,10 @@ def test_the_public_page_needs_no_login() -> None:
 
 
 def test_the_preview_carries_the_branding_name_not_the_api_title() -> None:
-    """`settings.app_name` is the FastAPI title and reads "Antragsplattform API". The
-    og:title lands permanently on a chat server, so it takes the configured name."""
+    """`settings.app_name` is the FastAPI title and reads "Antragsplattform API".
+
+    The og:title lands permanently on a chat server, so it takes the configured name.
+    """
     r = _public_client(_live_share()).get("/s/" + "x" * 32)
     assert "Antragsplattform API" not in r.text
     assert "STUPA Antragsplattform" in r.text
@@ -455,8 +466,11 @@ def test_the_public_page_drops_pii_fields() -> None:
 
 
 def test_the_public_page_carries_its_own_policy() -> None:
-    """Without one the API-wide `default-src 'none'` applies and the page arrives as raw
-    unstyled markup."""
+    """Send the own CSP of the page.
+
+    Without it the API-wide `default-src 'none'` applies and the page arrives as raw
+    unstyled markup.
+    """
     r = _public_client(_live_share()).get("/s/" + "x" * 32)
     csp = r.headers["content-security-policy"]
     assert csp.startswith("default-src 'none'")
@@ -493,15 +507,16 @@ def test_a_dead_link_answers_exactly_like_an_unknown_one(over: dict[str, object]
 
 @pytest.mark.parametrize("token", ["short", "has spaces", "a/../b", "x" * 200])
 def test_a_token_that_is_not_token_shaped_never_reaches_the_database(token: str) -> None:
-    """A rejected shape costs no round trip, so a scanner cannot use this as a query
-    generator."""
+    """A rejected shape costs no round trip, so a scanner cannot use this as a query generator."""
     r = _public_client(None).get(f"/s/{token}")
     assert r.status_code in (404, 422)
 
 
 def test_a_link_whose_application_is_already_gone_is_a_404() -> None:
-    """The row cascades with the application, so this is a race rather than a state —
-    and it answers exactly like an unknown token, giving away nothing about what was
-    there a moment ago."""
+    """Answer 404 for a link whose application is gone.
+
+    The row cascades with the application, so this is a race rather than a state. It answers
+    exactly like an unknown token and gives away nothing about what was there.
+    """
     r = _public_client(_live_share(), missing_application=True).get("/s/" + "x" * 32)
     assert r.status_code == 404

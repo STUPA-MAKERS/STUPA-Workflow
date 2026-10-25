@@ -52,6 +52,7 @@ function makeApi(over: Partial<Record<string, jest.Mock>> = {}) {
   };
 }
 
+/** NgModel writes its value after a microtask. */
 async function setup(
   opts: { api?: ReturnType<typeof makeApi>; perms?: string[]; pools?: string[] } = {},
 ) {
@@ -91,7 +92,6 @@ async function setup(
       },
     ],
   });
-  // NgModel writes its value after a microtask.
   await view.fixture.whenStable();
   view.fixture.detectChanges();
   return { ...view, api, delegations };
@@ -117,16 +117,18 @@ describe('GremiumMembersComponent', () => {
     );
   });
 
+  /**
+   * The order is board, manager, own roles, member; a member without a name or e-mail says so. A
+   * role without a German name falls back to its key, and an unknown role is a dash. A member row
+   * has no control.
+   */
   it('lists the members read-only, sorted by role and then by name', async () => {
     await setup();
-    // Board, manager, own roles, member; a member without a name or e-mail says so.
     expect(names()).toEqual(['Mara', 'Jonas', 'p-4@x.de', 'Anna', 'Zoe', '(ohne Namen)']);
     const list = screen.getByRole('list', { name: 'Mitglieder' });
     expect(within(list).getAllByText('Mitglied')).toHaveLength(2);
-    // The role without a German name falls back to its key; an unknown role is a dash.
     expect(within(list).getByText('Protokoll')).toBeInTheDocument();
     expect(within(list).getAllByText('—')).toHaveLength(2);
-    // Read-only: no control on a member row.
     expect(within(list).queryAllByRole('button')).toHaveLength(0);
   });
 
@@ -152,13 +154,13 @@ describe('GremiumMembersComponent', () => {
     expect(delegations.substitutes).not.toHaveBeenCalled();
   });
 
+  /** The page passes its members, so the pool loads none itself. */
   it('shows the pool with admin.delegations or with session.manage in the gremium', async () => {
     const { delegations: delegations0, api: api0 } = await setup({
       perms: ['admin.gremien', 'admin.delegations'],
     });
     expect(screen.getByRole('heading', { name: 'Stellvertretungen' })).toBeInTheDocument();
     expect(delegations0.substitutes).toHaveBeenCalledWith('g-1');
-    // The page passes its members: the pool loads none itself.
     expect(api0.listGremiumMemberships).toHaveBeenCalledTimes(1);
   });
 

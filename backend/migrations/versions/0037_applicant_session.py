@@ -1,4 +1,4 @@
-"""applicant_session: server-side magic-link sessions (security.md §1).
+"""applicant_session: server-side magic-link sessions.
 
 The migration makes the applicant magic-link token **stateful**, like ``auth_session``.
 The browser holds only a signed, opaque ``sid``. The server keeps ``application_id`` and
@@ -42,10 +42,12 @@ _DOWNGRADE: tuple[str, ...] = ("DROP TABLE IF EXISTS applicant_session",)
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     for stmt in _UPGRADE:
         op.execute(stmt)
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     for stmt in _DOWNGRADE:
         op.execute(stmt)

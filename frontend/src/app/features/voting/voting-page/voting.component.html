@@ -12,8 +12,6 @@
         [meta]="!loading() && !error() && openCount() > 0 ? ('voting.list.openCount' | t: { n: openCount() }) : null"
       />
 
-      <!-- The search and the chips never scroll away: one pane at a time they stick to the
-           top of the viewport; side by side only the rows below them scroll. -->
       <app-sticky-bar class="ld-pane__filters">
         <app-search-pill
           [placeholder]="'voting.list.search' | t"
@@ -25,7 +23,6 @@
         <div
           class="vl__chips"
           role="group"
-          appScrollFade="x"
           [attr.aria-label]="'voting.list.filter.group' | t"
         >
           <app-filter-select
@@ -79,8 +76,6 @@
         @if (error()) {
           <app-note class="vl__loadError" kind="error" icon="alert" role="alert" retryable (retry)="reload()">{{ 'voting.list.error' | t }}</app-note>
         } @else if (loading()) {
-          <!-- The shape of the loaded list (a month heading, rows in the geometry of
-               `app-list-item`), shown after 300ms. -->
           <div class="vl__skel skel-in">
             <h2 class="sec vl__month" aria-hidden="true">
               <span class="skel-text skel-text--accent vl__skelMonth"></span>
@@ -98,7 +93,6 @@
               <app-button variant="text" size="sm" (click)="reset()">{{ 'voting.list.filter.reset' | t }}</app-button>
             </app-empty-state>
           } @else if (split()) {
-            <!-- Side by side the detail pane carries the text; the list keeps its ghost rows. -->
             <app-empty-state rows="3" [heading]="'voting.list.empty' | t" />
           } @else {
             <app-empty-state
@@ -178,7 +172,6 @@
   </app-list-detail>
 </div>
 
-<!-- The dialog exists only while it is open: it reads the Gremien when it starts. -->
 @if (pollDialog()) {
   <app-new-poll-dialog
     [open]="true"

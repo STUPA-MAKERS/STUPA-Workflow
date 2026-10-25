@@ -49,10 +49,15 @@ def test_round_trip_of_an_image_and_of_a_miss() -> None:
 
 
 def test_broken_entries_count_as_not_cached() -> None:
-    assert decode_entry(b"x") is None  # unknown marker
-    assert decode_entry(b"1image/png") is None  # no separator
-    assert decode_entry(b"1image/png\n<svg/>") is None  # not an image
-    assert decode_entry(b"1image/gif\n" + PNG) is None  # MIME does not match the bytes
+    """Treat broken entries as not cached.
+
+    The rows have an unknown marker, no separator, bytes that are not an image, and a
+    MIME that does not match the bytes.
+    """
+    assert decode_entry(b"x") is None
+    assert decode_entry(b"1image/png") is None
+    assert decode_entry(b"1image/png\n<svg/>") is None
+    assert decode_entry(b"1image/gif\n" + PNG) is None
 
 
 async def test_put_then_get_with_ttl() -> None:
@@ -68,6 +73,7 @@ async def test_put_then_get_with_ttl() -> None:
 
 
 async def test_unreachable_redis_fails_open() -> None:
+    """Fail open without an exception when Redis is unreachable."""
     cache = RedisAvatarCache(_BrokenRedis())
     assert await cache.get(DIGEST, 64) is None
-    await cache.put(DIGEST, 64, None, ttl_seconds=30)  # no exception
+    await cache.put(DIGEST, 64, None, ttl_seconds=30)

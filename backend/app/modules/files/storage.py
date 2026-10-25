@@ -1,4 +1,4 @@
-"""Object storage abstraction over MinIO/S3, plus signed URLs.
+"""Object storage abstraction over MinIO/S3.
 
 The service knows only the ``ObjectStorage`` protocol, never the concrete client.
 ``MinioStorage`` wraps the synchronous ``minio`` client. It hands every blocking call to
@@ -6,8 +6,7 @@ a thread pool with ``asyncio.to_thread``, so the event loop never blocks. Nothin
 reaches the bucket directly.
 
 There is deliberately no presigned-URL method. MinIO runs on the internal Docker network
-and publishes no port, so a presigned S3 URL binds a host the browser cannot resolve. The
-platform shipped that bug twice, in the PDF download and in the backup download. Every
+and publishes no port, so a presigned S3 URL binds a host the browser cannot resolve. Every
 download therefore streams from the server over a gated route, the way
 ``/api/attachments/{id}/download`` does. Do not add presigning back for a browser caller.
 
@@ -28,8 +27,8 @@ from app.settings import Settings
 if TYPE_CHECKING:
     from minio import Minio
 
-# Default chunk size of the streamed download. The reader never holds the whole object
-# in memory.
+#: Default chunk size of the streamed download. The reader never holds the whole object
+#: in memory.
 STREAM_CHUNK_BYTES = 64 * 1024
 
 
@@ -38,17 +37,25 @@ class StorageError(RuntimeError):
 
 
 class ObjectStorage(Protocol):
-    """Storage interface that the service uses: put, get, remove and signed URL."""
+    """Storage interface that the service uses: put, get, stream and remove."""
 
-    async def put(self, key: str, data: bytes, content_type: str) -> None: ...
+    async def put(self, key: str, data: bytes, content_type: str) -> None:
+        """Store the bytes under ``key``."""
+        ...
 
-    async def get(self, key: str) -> bytes: ...
+    async def get(self, key: str) -> bytes:
+        """Return the bytes of the object."""
+        ...
 
     async def get_stream(
         self, key: str, *, chunk_size: int = STREAM_CHUNK_BYTES
-    ) -> AsyncIterator[bytes]: ...
+    ) -> AsyncIterator[bytes]:
+        """Return the object as a stream of chunks."""
+        ...
 
-    async def remove(self, key: str) -> None: ...
+    async def remove(self, key: str) -> None:
+        """Remove the object."""
+        ...
 
 
 class BulkObjectStorage(ObjectStorage, Protocol):
@@ -59,11 +66,17 @@ class BulkObjectStorage(ObjectStorage, Protocol):
     storage doubles to grow one, for a capability their subject never calls.
     """
 
-    async def list_keys(self) -> list[str]: ...
+    async def list_keys(self) -> list[str]:
+        """Return every key in the bucket."""
+        ...
 
-    async def put_file(self, key: str, path: str, content_type: str) -> None: ...
+    async def put_file(self, key: str, path: str, content_type: str) -> None:
+        """Store a local file under ``key``."""
+        ...
 
-    async def get_file(self, key: str, path: str) -> None: ...
+    async def get_file(self, key: str, path: str) -> None:
+        """Write the object to a local file."""
+        ...
 
 
 @dataclass(slots=True)
@@ -81,6 +94,11 @@ class MinioStorage:
             self.client.make_bucket(self.bucket)
 
     async def put(self, key: str, data: bytes, content_type: str) -> None:
+        """Store the bytes under ``key``.
+
+        Raises:
+            StorageError: The put failed. Every client error maps to this one type.
+        """
         def _put() -> None:
             self._ensure_bucket()
             self.client.put_object(
@@ -93,10 +111,15 @@ class MinioStorage:
 
         try:
             await asyncio.to_thread(_put)
-        except Exception as exc:  # noqa: BLE001 - map to a uniform StorageError
+        except Exception as exc:
             raise StorageError(f"put failed: {type(exc).__name__}") from exc
 
     async def get(self, key: str) -> bytes:
+        """Return the bytes of the object.
+
+        Raises:
+            StorageError: The read failed.
+        """
         def _get() -> bytes:
             response = self.client.get_object(self.bucket, key)
             try:
@@ -107,7 +130,7 @@ class MinioStorage:
 
         try:
             return await asyncio.to_thread(_get)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise StorageError(f"get failed: {type(exc).__name__}") from exc
 
     async def get_stream(
@@ -118,14 +141,15 @@ class MinioStorage:
         A thread pool reads the synchronous connection, so the event loop never blocks.
         The ``finally`` block always closes and releases the connection, also on a client
         abort (``GeneratorExit``) and on a read error.
+
+        The connection opens eagerly, so a transient storage error at connect surfaces as a
+        ``StorageError`` BEFORE the response starts, that is 503, not mid-stream.
         """
-        # Open the connection eagerly. A transient storage error at connect then surfaces
-        # as a StorageError BEFORE the response starts, that is 503, not mid-stream.
         try:
             response = await asyncio.to_thread(
                 self.client.get_object, self.bucket, key
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise StorageError(f"get_stream failed: {type(exc).__name__}") from exc
 
         async def _iter() -> AsyncIterator[bytes]:
@@ -142,9 +166,14 @@ class MinioStorage:
         return _iter()
 
     async def remove(self, key: str) -> None:
+        """Remove the object.
+
+        Raises:
+            StorageError: The remove failed.
+        """
         try:
             await asyncio.to_thread(self.client.remove_object, self.bucket, key)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise StorageError(f"remove failed: {type(exc).__name__}") from exc
 
     async def list_keys(self) -> list[str]:
@@ -167,7 +196,7 @@ class MinioStorage:
 
         try:
             return await asyncio.to_thread(_list)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise StorageError(f"list failed: {type(exc).__name__}") from exc
 
     async def put_file(self, key: str, path: str, content_type: str) -> None:
@@ -179,14 +208,14 @@ class MinioStorage:
 
         try:
             await asyncio.to_thread(_put)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise StorageError(f"put_file failed: {type(exc).__name__}") from exc
 
     async def get_file(self, key: str, path: str) -> None:
         """Download straight to a file on disk, the read counterpart of `put_file`."""
         try:
             await asyncio.to_thread(self.client.fget_object, self.bucket, key, path)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise StorageError(f"get_file failed: {type(exc).__name__}") from exc
 
 

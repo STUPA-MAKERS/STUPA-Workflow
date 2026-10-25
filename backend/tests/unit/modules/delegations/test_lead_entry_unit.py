@@ -1,4 +1,4 @@
-"""Unit tests for the lead entry during a live meeting (O6).
+"""Unit tests for the lead entry during a live meeting.
 
 The fake session answers each `execute`, `get` and `scalar` from a queue. The
 conftest of this package replaces the pool helpers in the service with helpers
@@ -69,9 +69,6 @@ def _person(sub: str) -> SimpleNamespace:
     return SimpleNamespace(id=uuid4(), sub=sub)
 
 
-# ---------------------------------------------------------------- O6 lead entry
-
-
 def _lead_payload(a: Any, b: Any, *, voting: bool = True) -> DelegationCreate:
     return DelegationCreate(
         meetingId=MEETING_ID, delegateId=b.id, delegatorId=a.id, delegateVoting=voting
@@ -99,23 +96,29 @@ class _LockSpySession(FakeSession):
 
 
 async def test_lead_entry_for_missing_member() -> None:
+    """Let the lead enter a substitution for a missing member.
+
+    The fake session returns, in order: the `vote.cast` right of A, B in the pool for A, the
+    advisory lock, no existing delegation, the audit lock, the audit predecessor and the
+    names. The lead may revoke the row while the meeting is live.
+    """
     a, b = _person("a"), _person("b")
     db = _lead_db(
         result(a),
         result(b),
-        result(["vote.cast"]),  # A may vote
-        result(b.id),  # B is in the pool for A
-        result(),  # advisory lock
-        result(),  # existing delegations
-        result(),  # audit lock
-        result(),  # audit prev
-        result((a.id, "A", None), (b.id, "B", None)),  # names
+        result(["vote.cast"]),
+        result(b.id),
+        result(),
+        result(),
+        result(),
+        result(),
+        result((a.id, "A", None), (b.id, "B", None)),
     )
     db.scalar_results = ["absent"]
     out = await _svc(db).create(_lead_payload(a, b), _actor())
     assert (out.delegator_id, out.delegate_id, out.via_pool) == (a.id, b.id, True)
     assert out.delegate_voting is True
-    assert out.revocable is True  # the lead revokes while live
+    assert out.revocable is True
     assert out.direction is None
     entry = next(x for x in db.added if type(x).__name__ == "AuditEntry")
     assert entry.data["byLead"] is True
@@ -142,7 +145,8 @@ async def test_lead_entry_without_attendance_record() -> None:
 
 
 async def test_lead_entry_needs_the_lead() -> None:
-    db = fake_session(result())  # no session.manage
+    """Refuse the lead entry to a caller without `session.manage`."""
+    db = fake_session(result())
     db.get_results = [_meeting(), _gremium()]
     with pytest.raises(ForbiddenError, match="meeting lead"):
         await _svc(db).create(_lead_payload(_person("a"), _person("b")), _actor())
@@ -197,7 +201,7 @@ async def test_lead_entry_refuses_the_lead_as_substitute() -> None:
 
 
 async def test_lead_entry_locks_the_meeting_row() -> None:
-    """The lead entry reads the meeting FOR UPDATE before the attendance read (O23)."""
+    """The lead entry reads the meeting FOR UPDATE before the attendance read."""
     a, b = _person("a"), _person("b")
     db = _LockSpySession(
         _lead_roles(),
@@ -246,6 +250,7 @@ async def test_lead_entry_needs_a_pool_substitute() -> None:
 
 
 async def test_lead_entry_refuses_a_second_delegation_409() -> None:
+    """Refuse a second delegation of A with 409."""
     a, b = _person("a"), _person("b")
     db = _lead_db(
         result(a),
@@ -253,7 +258,7 @@ async def test_lead_entry_refuses_a_second_delegation_409() -> None:
         result(["vote.cast"]),
         result(b.id),
         result(),
-        result((a.id, uuid4(), False)),  # A already delegated
+        result((a.id, uuid4(), False)),
     )
     with pytest.raises(ConflictError, match="already delegated"):
         await _svc(db).create(_lead_payload(a, b), _actor())
@@ -262,7 +267,7 @@ async def test_lead_entry_refuses_a_second_delegation_409() -> None:
 async def test_lead_entry_reads_the_pool_of_the_member(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """O6: the lead entry asks the pool helper for the missing member."""
+    """The lead entry asks the pool helper for the missing member."""
     a, b = _person("a"), _person("b")
     seen: list[dict[str, Any]] = []
 
@@ -287,14 +292,17 @@ def _lead_view_db(*tail: Any) -> FakeSession:
 
 
 async def test_lead_recipients_list_the_pool_of_the_member() -> None:
-    """O6: the lead gets the pool substitutes of A, without A and without the lead."""
+    """The lead gets the pool substitutes of A, without A and without the lead.
+
+    The fake session returns, in order: the lead, the pool for A, the members and the names.
+    """
     lead, a = _person("lead"), _person("a")
     bert, carla = uuid4(), uuid4()
     db = _lead_view_db(
-        result(lead),  # the lead
-        result(bert, carla, lead.id, a.id),  # pool for A
-        result(carla),  # members
-        result((bert, "Bert", None), (carla, None, "carla@x.de")),  # names
+        result(lead),
+        result(bert, carla, lead.id, a.id),
+        result(carla),
+        result((bert, "Bert", None), (carla, None, "carla@x.de")),
     )
     out = await _svc(db).recipients(MEETING_ID, "", _actor(), a.id)
     assert [(r.principal_id, r.via_pool, r.is_member) for r in out] == [
@@ -304,10 +312,14 @@ async def test_lead_recipients_list_the_pool_of_the_member() -> None:
 
 
 async def test_lead_recipients_filter_by_the_needle() -> None:
+    """Filter the lead recipients by the needle.
+
+    The lead has no principal row.
+    """
     a = _person("a")
     bert, carla = uuid4(), uuid4()
     db = _lead_view_db(
-        result(),  # no principal row for the lead
+        result(),
         result(bert, carla),
         result(),
         result((bert, "Bert", None), (carla, "Carla", None)),
@@ -325,10 +337,12 @@ async def test_lead_recipients_need_the_lead() -> None:
         await _svc(db).recipients(MEETING_ID, "", _actor("m"), uuid4())
 
 
-# ---------------------------------------------------------------- list and revoke
-
-
 async def test_list_for_the_lead_shows_the_whole_meeting() -> None:
+    """Show the lead every delegation of the meeting.
+
+    The fake session returns, in order: the caller, the `can_manage` roles, every delegation
+    of the meeting and the names.
+    """
     me = _person("lead")
     other = SimpleNamespace(
         id=uuid4(),
@@ -341,10 +355,10 @@ async def test_list_for_the_lead_shows_the_whole_meeting() -> None:
         created_at=datetime.now(UTC),
     )
     db = fake_session(
-        result(me),  # me
-        _lead_roles(),  # can_manage
-        result((other, _meeting(), _gremium())),  # every delegation of the meeting
-        result(),  # names
+        result(me),
+        _lead_roles(),
+        result((other, _meeting(), _gremium())),
+        result(),
     )
     db.get_results = [_meeting()]
     out = await _svc(db).list(_actor(), MEETING_ID)
@@ -431,9 +445,6 @@ async def test_revoke_unknown_principal_403() -> None:
     db.get_results = [row, _meeting("planned")]
     with pytest.raises(ForbiddenError):
         await _svc(db).revoke(row.id, _actor())
-
-
-# ---------------------------------------------------------------- router
 
 
 class _CreateService:

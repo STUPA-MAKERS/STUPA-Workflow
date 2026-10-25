@@ -14,8 +14,6 @@ import type {
   Uuid,
 } from '@core/api/models';
 
-// Flow graph
-
 /** State kind in the global flow: only normal + vote. */
 export type StateKind = 'normal' | 'vote';
 
@@ -31,11 +29,6 @@ export interface StateConfig {
    * the application enters the state (`decisionGremiumId` of the node or an ancestor).
    */
   gremiumSource?: GremiumSource;
-  /**
-   * Key of a named deadline policy: on entering the state the server creates a
-   * deadline that the state's `deadlinePassed` transition fires.
-   */
-  deadlinePolicyKey?: string;
 }
 
 export interface StateDef {
@@ -99,15 +92,15 @@ export interface FlowGraph {
   layout?: FlowLayout | null;
 }
 
-// Guards — mirror of the backend whitelist in shared/guards.py
-
-/** Comparison operators of the `compare` guard (type-dependent at runtime). */
+/**
+ * Comparison operators of the `compare` guard (type-dependent at runtime). The guard types
+ * mirror the backend whitelist in `shared/guards.py`.
+ */
 export type CompareOp = '==' | '!=' | '<' | '<=' | '>' | '>=' | 'in';
 export const COMPARE_OPS: readonly CompareOp[] = ['==', '!=', '<', '<=', '>', '>=', 'in'] as const;
 
 /** Condition operators (on automatic + manual transitions). */
 export type GuardConditionOp =
-  | 'deadlinePassed'
   | 'applicantRoleIs'
   | 'applicantCommitteeIs'
   | 'applicationTypeIs'
@@ -126,7 +119,6 @@ export type GuardCombinator = 'and' | 'or' | 'not';
 export type Guard = Record<string, unknown>;
 
 export const GUARD_CONDITION_OPERATORS: readonly GuardConditionOp[] = [
-  'deadlinePassed',
   'applicantRoleIs',
   'applicantCommitteeIs',
   'applicationTypeIs',
@@ -182,7 +174,6 @@ export const ASSIGN_BUDGET_ACTIONS: readonly ActionType[] = [
 
 /** Bool-valued guard operators. Mirrors `_BOOL_VALUE_OPERATORS` of the backend. */
 export const GUARD_BOOL_OPERATORS: readonly GuardLeafOperator[] = [
-  'deadlinePassed',
   'budgetFitsApplication',
   'budgetHasDecisionGremium',
   'actorIsApplicant',
@@ -220,8 +211,7 @@ export interface ActionDef {
   [param: string]: unknown;
 }
 
-// Organization / RBAC — mirror of admin/models.py
-
+/** A gremium. The organization and RBAC types mirror `admin/models.py`. */
 export interface Gremium {
   id: Uuid;
   name: string;
@@ -279,11 +269,11 @@ export interface GremiumUpdateBody {
   protocolsPublic?: boolean;
 }
 
-// Corporate-design variants — mirror of `admin/cd_logos.py` and the CD schemas.
-// A variant only controls the logos of a rendered document. It carries no color
-// and no font.
-
-/** Document shape a variant builds on. */
+/**
+ * Document shape a corporate-design variant builds on. The variant types mirror
+ * `admin/cd_logos.py` and the CD schemas. A variant only controls the logos of a rendered
+ * document. It carries no color and no font.
+ */
 export type CdBaseVariant = 'report' | 'protocol';
 export const CD_BASE_VARIANTS: readonly CdBaseVariant[] = ['report', 'protocol'] as const;
 
@@ -475,14 +465,14 @@ export interface AdminPrincipal {
   mergedIntoName?: string | null;
   mergedAt?: string | null;
   /**
-   * Revoke rights (F3): the person still has something that "Rechte entziehen" can take
+   * Revoke rights: the person still has something that "Rechte entziehen" can take
    * away (an OIDC group, a membership, a role, a pool entry or a delegation).
    */
   hasAccess?: boolean;
 }
 
 /**
- * The filters of `GET /admin/principals` (F3). `lastLoginBefore` (ISO date) keeps the
+ * The filters of `GET /admin/principals`. `lastLoginBefore` (ISO date) keeps the
  * people whose last login is before that day; `includeNever` adds the people who never
  * logged in (alone: only those); `hasGroups` keeps the people with or without OIDC groups.
  */
@@ -752,8 +742,6 @@ export interface FormOverviewItem {
   version: number;
 }
 
-// Notification and webhook config
-
 export type EventName =
   | 'application_created'
   | 'application_updated'
@@ -765,9 +753,7 @@ export type EventName =
   | 'comment_added'
   | 'budget_reserved'
   | 'budget_booked'
-  | 'protocol_finalized'
-  | 'deadline_approaching'
-  | 'deadline_passed';
+  | 'protocol_finalized';
 
 export const EVENT_NAMES: readonly EventName[] = [
   'application_created',
@@ -781,16 +767,9 @@ export const EVENT_NAMES: readonly EventName[] = [
   'budget_reserved',
   'budget_booked',
   'protocol_finalized',
-  'deadline_approaching',
-  'deadline_passed',
 ] as const;
 
 export type RecipientKind = 'group' | 'role' | 'applicant';
-
-export interface Recipient {
-  kind: RecipientKind;
-  ref?: string | null;
-}
 
 export interface WebhookConfig {
   id: Uuid;
@@ -835,7 +814,7 @@ export interface GremiumRole {
 }
 
 /**
- * The fixed catalogue of gremium permissions (O7), in display order. It mirrors
+ * The fixed catalogue of gremium permissions, in display order. It mirrors
  * `GREMIUM_PERMISSIONS` in `backend/app/modules/admin/gremium_roles.py`. The catalogue
  * is not configurable, so this list is the source of the role matrix and the role
  * dialog.
@@ -867,31 +846,6 @@ export function sortGremiumRoles(roles: readonly GremiumRole[], label: (r: Gremi
     return i < 0 ? FORCED_GREMIUM_ROLE_KEYS.length : i;
   };
   return [...roles].sort((a, b) => rank(a) - rank(b) || label(a).localeCompare(label(b)));
-}
-
-/** Kind of a named deadline policy. */
-export type DeadlineKind =
-  | 'absolute'
-  | 'relative_submitted'
-  | 'relative_changed'
-  | 'recurring';
-
-/** Named deadline policy (registry, referenced by the flow via `key`). */
-export interface DeadlinePolicy {
-  id: Uuid;
-  key: string;
-  label: I18nMap;
-  kind: DeadlineKind;
-  /** Only for `absolute`: a fixed date (editable per semester), ISO string. */
-  absoluteAt?: string | null;
-  /** Only for the relative variants: offset in days. */
-  offsetDays?: number | null;
-  /** Optional wall-clock anchor `"HH:MM"` (local time in `timezone`, DST-correct). */
-  atTime?: string | null;
-  /** IANA timezone for `atTime` (e.g. `Europe/Berlin`). */
-  timezone?: string | null;
-  /** Only for `recurring`: ordered list of `YYYY-MM-DD` dates (rolling window). */
-  dates?: string[] | null;
 }
 
 /**
@@ -1113,7 +1067,7 @@ export interface NotificationSettings {
 }
 
 /**
- * Settings for applications without an account (Z1, P admin.deadlines):
+ * Settings for applications without an account (P admin.deadlines):
  * `GET/PUT /admin/guest-settings`.
  */
 export interface GuestSettings {
@@ -1188,8 +1142,6 @@ export interface PrivacySettings {
   defaultRetentionMonths: number;
 }
 
-// Backups (P backup.manage)
-
 /** Why the archive exists. `preRestore` is the safety copy a restore takes first. */
 export type BackupKind = 'manual' | 'scheduled' | 'pre_restore' | 'imported';
 
@@ -1233,8 +1185,6 @@ export interface BackupList {
 
 /** The literal a restore has to carry. It is a machine token, never translated. */
 export const BACKUP_RESTORE_CONFIRMATION = 'RESTORE';
-
-// Branding / site-config
 
 export type LogoSlot = 'wordmark' | 'imagemark' | 'favicon';
 

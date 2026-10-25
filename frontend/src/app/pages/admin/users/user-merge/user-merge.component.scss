@@ -25,7 +25,6 @@
 .um__hits {
   --li-hover: var(--color-selected);
 }
-/* The row clips the hover surface of its list item to the corners of the row group. */
 .um__hits > li {
   overflow: hidden;
 }
@@ -49,7 +48,6 @@
   font-weight: var(--fw-regular);
   color: var(--color-text-muted);
 }
-/* An e-mail address wraps; it is never cut. */
 .um__mail {
   font-size: var(--fs-sm);
   color: var(--color-text-muted);
@@ -71,7 +69,6 @@
   color: var(--color-text-muted);
 }
 
-/* From the old account into the account that stays. */
 .um__pair {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
@@ -155,7 +152,6 @@
   overflow-wrap: anywhere;
 }
 
-/* The extra rights: mono keys that wrap, never cut. */
 .um__rights {
   display: flex;
   flex-wrap: wrap;

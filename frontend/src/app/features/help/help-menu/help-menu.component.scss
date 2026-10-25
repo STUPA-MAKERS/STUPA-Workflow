@@ -4,9 +4,7 @@
   display: block;
 }
 
-/* ------------------------------------------------------------------ rail trigger */
-/* The same entry as the areas of the rail (nav-rail.component.scss): a pill behind the
-   icon, the label below. The open menu fills the pill like an active entry. */
+// The same entry as the areas of nav-rail.component.scss.
 .hm__rail {
   display: flex;
   flex-direction: column;
@@ -67,8 +65,6 @@
   }
 }
 
-/* ------------------------------------------------------------------ header trigger */
-/* A quiet text button with the icon, beside the language chip of the public header. */
 .hm__head {
   display: inline-flex;
   flex: none;
@@ -98,8 +94,6 @@
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
-/* On a phone the trigger is the icon alone, so the sign-in button of the public header
-   stays inside the screen. The label stays for screen readers. */
 @include bp.phone {
   .hm__head {
     justify-content: center;
@@ -116,13 +110,12 @@
   }
 }
 
-/* ------------------------------------------------------------------ panel */
 .hm {
   display: flex;
   flex-direction: column;
   color: var(--color-text);
 }
-/* Fixed, so the scrolling rail does not clip it. */
+// Fixed, so the scrolling rail does not clip it.
 .hm--popover {
   position: fixed;
   z-index: var(--z-dropdown);
@@ -189,7 +182,6 @@
   gap: 2px;
   min-width: 0;
 }
-/* A URL is never cut: it wraps anywhere. */
 .hm__url {
   color: var(--color-text-muted);
   font-size: var(--fs-small);
@@ -197,7 +189,6 @@
   overflow-wrap: anywhere;
 }
 
-/* In the "Mehr" sheet: the sheet is the surface, the rows sit on it. */
 .hm--sheet {
   padding-bottom: var(--space-2);
   border-bottom: var(--border-width) solid var(--color-border);

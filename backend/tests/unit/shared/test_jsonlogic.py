@@ -1,4 +1,6 @@
-"""Pure evaluator for the JsonLogic subset (data-model §5.1). Branch coverage 100 %."""
+"""Pure evaluator for the JsonLogic subset. Branch coverage 100 %."""
+
+from typing import Any
 
 import pytest
 
@@ -56,7 +58,7 @@ def test_var_non_string_path_raises() -> None:
         ({">": [1, 2]}, False),
     ],
 )
-def test_comparison_operators(expr: dict, expected: bool) -> None:
+def test_comparison_operators(expr: dict[str, Any], expected: bool) -> None:
     assert eval_jsonlogic(expr) is expected
 
 
@@ -119,7 +121,7 @@ def test_multi_key_operation_raises() -> None:
         {"in": ["x"]},
     ],
 )
-def test_arity_errors(expr: dict) -> None:
+def test_arity_errors(expr: dict[str, Any]) -> None:
     with pytest.raises(JsonLogicError):
         eval_jsonlogic(expr)
 
@@ -137,8 +139,9 @@ def test_non_number_arithmetic_raises() -> None:
 
 
 def test_validate_jsonlogic_ok_and_unknown() -> None:
+    """Accept a literal and valid rules; reject an unknown operator and a rule with two keys."""
     validate_jsonlogic({"and": [{"==": [{"var": "x"}, 1]}, {"in": ["a", {"var": "list"}]}]})
-    validate_jsonlogic(5)  # literal ok
+    validate_jsonlogic(5)
     with pytest.raises(JsonLogicError, match="unknown operator"):
         validate_jsonlogic({"system": ["rm"]})
     with pytest.raises(JsonLogicError):

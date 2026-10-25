@@ -31,7 +31,6 @@ from dataclasses import dataclass
 from sqlalchemy import ColumnElement, String, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.gremium_roles import gremium_view_scope
 from app.modules.admin.models import Gremium
 from app.modules.applications.access import (
     READ_ALL_PERMISSION,
@@ -40,6 +39,7 @@ from app.modules.applications.access import (
 )
 from app.modules.applications.models import Application
 from app.modules.applications.service.service_base import _title_of
+from app.modules.auth.policy import gremium_view_scope
 from app.modules.auth.principal import Principal
 from app.modules.budget.access import has_budget_read
 from app.modules.budget.tree_models import Budget, BudgetExpense, Invoice
@@ -53,8 +53,8 @@ from app.modules.todos.models import LINK_KINDS, TodoBoard, TodoCard, TodoColumn
 from app.modules.todos.schemas import TodoLinkDetail, TodoLinkTarget
 from app.modules.voting.listing import read_scope as vote_read_scope
 from app.modules.voting.models import Vote
-from app.search import dialect_of, escape_like, trigram_rank
 from app.shared.errors import ForbiddenError
+from app.shared.search import dialect_of, escape_like, trigram_rank
 
 #: The most hits of one kind in the link picker.
 PER_KIND = 5
@@ -98,12 +98,11 @@ class LinkResolver:
     """Resolve and search link targets for one principal."""
 
     def __init__(self, session: AsyncSession, access: BoardAccess) -> None:
+        """Bind the resolver to a session and the board access check."""
         self.session = session
         self.access = access
         self._meeting_scope: tuple[set[uuid.UUID] | None, set[uuid.UUID]] | None = None
         self._gremium_scope: tuple[set[uuid.UUID] | None] | None = None
-
-    # -- rights -----------------------------------------------------------------
 
     async def _meetings_scope(
         self, principal: Principal
@@ -135,8 +134,6 @@ class LinkResolver:
         except ForbiddenError:
             return False
         return True
-
-    # -- resolve ----------------------------------------------------------------
 
     async def resolve(
         self, refs: Iterable[LinkRef], principal: Principal
@@ -375,6 +372,11 @@ class LinkResolver:
     async def _expenses(
         self, ids: set[uuid.UUID], principal: Principal
     ) -> dict[uuid.UUID, Resolved]:
+        """Resolve expense links; a sub-booking links to its parent.
+
+        The list shows a sub-booking under its parent only, so the deep link selects the
+        parent.
+        """
         if not has_budget_read(principal):
             return {}
         rows = (
@@ -386,8 +388,6 @@ class LinkResolver:
         ).all()
         out: dict[uuid.UUID, Resolved] = {}
         for exp, path_key in rows:
-            # The list shows a sub-booking under its parent only, so the deep link
-            # selects the parent.
             row_id = exp.parent_expense_id or exp.id
             out[exp.id] = Resolved(
                 accessible=True,
@@ -440,8 +440,6 @@ class LinkResolver:
                     ),
                 )
         return out
-
-    # -- search -----------------------------------------------------------------
 
     async def search(
         self,

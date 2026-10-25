@@ -5,7 +5,6 @@
   display: contents;
 }
 
-/* The content of the sheet: the counts and the search stay, the rows scroll. */
 .as {
   display: flex;
   flex: 1 1 auto;
@@ -55,7 +54,6 @@
   overflow-y: auto;
   padding: 0 var(--space-1) var(--space-2);
 }
-/* An end fades only while more content lies past it (`appScrollFade` sets the classes). */
 .as__scroll {
   @include fade.fade-y(var(--as-fade));
 }
@@ -67,8 +65,6 @@
   list-style: none;
 }
 
-/* A member: avatar, name and sub line, then the control and the row menu. The right
-   inset is the same as the left inset, so the status at the end does not touch the edge. */
 .as__row {
   display: flex;
   flex-wrap: wrap;
@@ -131,8 +127,6 @@
   gap: var(--space-1);
   margin-inline-start: auto;
 }
-/* The control: one pill, the options side by side, the chosen one filled. The options
-   have equal widths: each column is as wide as the widest label. */
 .as__seg {
   display: grid;
   grid-auto-columns: 1fr;
@@ -182,7 +176,6 @@
   width: var(--control-height);
 }
 
-/* O23: the server refused "present" while a delegation of the member is active. */
 .as__conflict {
   display: flex;
   flex: 1 1 100%;
@@ -220,8 +213,6 @@
   padding-top: 14px;
 }
 
-/* A phone: the control takes its own line below the name. A read-only status stays at
-   the end of the name line. */
 @include bp.phone {
   .as__ctl--seg {
     flex: 1 1 100%;
@@ -234,7 +225,6 @@
   .as__opt {
     padding: 0 4px;
   }
-  /* The control spans the row; the gap that aligns the controls beside a row menu goes. */
   .as__menuGap {
     display: none;
   }

@@ -23,7 +23,7 @@ from sqlalchemy.exc import IntegrityError
 pytestmark = pytest.mark.integration
 
 
-def _variant_id(conn, key: str) -> str:  # noqa: ANN001
+def _variant_id(conn, key: str) -> str:
     return conn.execute(
         text("SELECT id FROM cd_variant WHERE key = :k"), {"k": key}
     ).scalar_one()
@@ -74,7 +74,7 @@ def test_seeded_gremien_point_at_their_variant(engine: Engine) -> None:
 
 
 def test_logo_with_both_sources_is_rejected(engine: Engine) -> None:
-    with pytest.raises(IntegrityError), engine.begin() as conn:  # noqa: PT012
+    with pytest.raises(IntegrityError), engine.begin() as conn:
         vid = _variant_id(conn, "stupa")
         conn.execute(
             text(
@@ -86,7 +86,7 @@ def test_logo_with_both_sources_is_rejected(engine: Engine) -> None:
 
 
 def test_logo_without_any_source_is_rejected(engine: Engine) -> None:
-    with pytest.raises(IntegrityError), engine.begin() as conn:  # noqa: PT012
+    with pytest.raises(IntegrityError), engine.begin() as conn:
         vid = _variant_id(conn, "stupa")
         conn.execute(
             text("INSERT INTO cd_variant_logo (variant_id, slot) VALUES (:v, 'title')"),
@@ -95,7 +95,7 @@ def test_logo_without_any_source_is_rejected(engine: Engine) -> None:
 
 
 def test_logo_with_an_unknown_slot_is_rejected(engine: Engine) -> None:
-    with pytest.raises(IntegrityError), engine.begin() as conn:  # noqa: PT012
+    with pytest.raises(IntegrityError), engine.begin() as conn:
         vid = _variant_id(conn, "stupa")
         conn.execute(
             text(
@@ -174,7 +174,7 @@ def test_old_free_text_column_is_gone(engine: Engine) -> None:
     assert exists is False
 
 
-def _insert_square(conn, vid: str, key: str) -> None:  # noqa: ANN001
+def _insert_square(conn, vid: str, key: str) -> None:
     conn.execute(
         text(
             "INSERT INTO cd_variant_logo (variant_id, slot, object_key, file_name, mime, size) "
@@ -226,6 +226,11 @@ def test_upgrade_from_an_installed_database(engine: Engine) -> None:
     metadata and `0002_seed` writes the five rows, so the raw DDL of the revision
     is a no-op there. An installed database has neither. This test rebuilds that
     state — free-text column back, tables gone — and then runs `_UPGRADE`.
+
+    An installed database carries the old free text on every Gremium. Both slots of every
+    variant survive, which a per-logo guard would not do: it would keep the title row
+    only. The rebuild leaves the tables at revision ec167d091656, so the test re-applies
+    the square slot of a3f9c2d71e4b, and the tests that run later see the head schema.
     """
     import importlib.util
     from pathlib import Path
@@ -242,15 +247,14 @@ def test_upgrade_from_an_installed_database(engine: Engine) -> None:
     spec.loader.exec_module(mod)
 
     with engine.begin() as conn:
-        for stmt in mod._DOWNGRADE:  # noqa: SLF001
+        for stmt in mod._DOWNGRADE:
             conn.execute(text(stmt))
         conn.execute(text("DROP TABLE cd_variant_logo"))
         conn.execute(text("DROP TABLE cd_variant"))
-        # An installed database carries the old free text on every Gremium.
         conn.execute(text("UPDATE gremium SET cd_variant = slug"))
 
     with engine.begin() as conn:
-        for stmt in mod._UPGRADE:  # noqa: SLF001
+        for stmt in mod._UPGRADE:
             conn.execute(text(stmt))
 
     with engine.connect() as conn:
@@ -272,8 +276,6 @@ def test_upgrade_from_an_installed_database(engine: Engine) -> None:
                 "WHERE table_name = 'gremium' AND column_name = 'cd_variant')"
             )
         ).scalar_one()
-    # Both slots of every variant survive. A per-logo guard would have kept the
-    # title row only.
     assert [tuple(r) for r in logos] == [
         ("asta", "footer", "ASTA"),
         ("asta", "title", "ASTA"),
@@ -289,8 +291,6 @@ def test_upgrade_from_an_installed_database(engine: Engine) -> None:
     assert ("asta", "asta") in [tuple(r) for r in backfilled]
     assert old_column is False
 
-    # The rebuild left the tables at revision ec167d091656. Re-apply the square
-    # slot of a3f9c2d71e4b, so the tests that run later see the head schema.
     with engine.begin() as conn:
         conn.execute(
             text("ALTER TABLE cd_variant_logo DROP CONSTRAINT IF EXISTS ck_cd_variant_logo_slot")

@@ -60,7 +60,7 @@ export interface AgendaTodoOption {
 }
 
 /**
- * "TOP hinzufügen" (frame 6): put an application or a to-do on the agenda, or add a
+ * "TOP hinzufügen": put an application or a to-do on the agenda, or add a
  * free-text item.
  *
  * The application list is `GET …/agenda/assignable`: the applications of the meeting
@@ -205,7 +205,6 @@ export class AgendaItemDialogComponent {
   }
 
   private reset(): void {
-    // Most new items are free text; an application item is one tap away.
     this.kind.set('freetext');
     this.query.set('');
     this.pick.set(null);
@@ -349,7 +348,6 @@ export class AgendaItemDialogComponent {
       },
       error: (err: unknown) => {
         this.saving.set(false);
-        // A closed meeting answers 409 `meeting_closed`. Show the server reason.
         const detail = problemDetail(err);
         const base = this.i18n.translate('meetings.toast.actionFailed');
         this.toast.error(detail ? `${base}: ${detail}` : base);

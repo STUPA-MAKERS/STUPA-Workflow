@@ -6,7 +6,7 @@ result. The file stays quarantined and nobody can download it until ``scanned`` 
 On a finding the worker deletes the object, sets ``storage_key`` to NULL and writes the
 signature into ``scan_result``.
 
-A row is either bound or a draft (Z4). A bound row has exactly one of five owners:
+A row is either bound or a draft. A bound row has exactly one of five owners:
 ``application_id``, ``ticket_id`` (the attachment of a ticket report), or one chat
 message: ``ticket_note_id``, ``todo_comment_id`` or ``comment_id`` (an application
 comment). A draft row
@@ -43,10 +43,10 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, UUIDPkMixin
 
-# The database enforces this bound with CHECK(size <= 10485760).
+#: The database enforces this bound with CHECK(size <= 10485760).
 MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 
-# The storage-key prefix of a draft upload (Z4). The key stays the same after the bind.
+#: The storage-key prefix of a draft upload. The key stays the same after the bind.
 DRAFT_KEY_PREFIX = "drafts/"
 
 
@@ -58,6 +58,10 @@ class Attachment(UUIDPkMixin, Base):
     ``ticket_id``, ``ticket_note_id``, ``todo_comment_id`` and ``comment_id`` cascade the
     same way. A soft delete of a message does not cascade; the service removes the
     files of the message then (``delete_for_messages``).
+
+    Two CHECKs hold the owner rule: exactly one owner (an application, a ticket, a message
+    or a draft token), and a draft has both draft columns while a bound row has neither. A
+    partial index on the drafts serves the hourly purge and the token lookup.
 
     Attributes:
         field_key: Optional link to a form field.
@@ -105,13 +109,11 @@ class Attachment(UUIDPkMixin, Base):
         CheckConstraint(
             f"size <= {MAX_ATTACHMENT_BYTES}", name="attachment_size_limit"
         ),
-        # Exactly one owner: an application, a ticket, a message or a draft token.
         CheckConstraint(
             "num_nonnulls(application_id, ticket_id, ticket_note_id, todo_comment_id, "
             "comment_id, draft_token_hash) = 1",
             name="draft_xor_application",
         ),
-        # A draft has both draft columns, a bound row has neither.
         CheckConstraint(
             "(draft_token_hash IS NULL) = (draft_expires_at IS NULL)",
             name="draft_columns_paired",
@@ -121,7 +123,6 @@ class Attachment(UUIDPkMixin, Base):
         Index("ix_attachment_ticket_note_id", "ticket_note_id"),
         Index("ix_attachment_todo_comment_id", "todo_comment_id"),
         Index("ix_attachment_comment_id", "comment_id"),
-        # The hourly purge and the token lookup read the drafts only.
         Index(
             "ix_attachment_draft_expires_at",
             "draft_expires_at",
@@ -135,13 +136,13 @@ class Attachment(UUIDPkMixin, Base):
     )
 
 
-# The filter of every application-scoped query. A draft has no application, so this
-# excludes it explicitly, also where an id lookup would not.
+#: The filter of every application-scoped query. A draft has no application, so this
+#: excludes it explicitly, also where an id lookup would not.
 BOUND = Attachment.application_id.is_not(None)
 
 
 class AttachmentDraftToken(Base):
-    """The lifetime of one draft token of the wizard (Z4).
+    """The lifetime of one draft token of the wizard.
 
     The token lives on its own, independent of its draft rows. It stays valid until
     ``expires_at``, also when the owner deletes the last draft. Each upload with the

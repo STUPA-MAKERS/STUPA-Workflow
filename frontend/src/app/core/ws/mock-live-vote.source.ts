@@ -17,6 +17,12 @@ export class MockLiveVoteSource implements LiveVoteSource {
   /** Interval between the simulated incoming ballots, in milliseconds. */
   tickMs = 2500;
 
+  /**
+   * Simulated ballots trickle in until all eligible voters have voted. The timer then stops, so no
+   * perpetual macrotask keeps the zone awake; otherwise Angular never stabilizes and screenshots
+   * hang. A dev hook for screenshots and manual checks can push any frame into the channel. Mock
+   * mode only, so it never reaches a real backend.
+   */
   connectMeeting(_meetingId: string, beamer = false): MeetingChannel {
     const subject = new Subject<ServerMessage>();
 
@@ -55,8 +61,6 @@ export class MockLiveVoteSource implements LiveVoteSource {
       tally.quorumMet = cast * 2 >= tally.eligible;
     };
 
-    // Like the server: the turnout is always visible, the counts only once every present
-    // member voted.
     const emitTally = (): void => {
       const cast = Object.values(tally.counts).reduce((a, b) => a + b, 0);
       const revealed = cast >= tally.eligible;
@@ -73,15 +77,12 @@ export class MockLiveVoteSource implements LiveVoteSource {
     const bump = (choice: string): void => {
       if (!vote.options.includes(choice)) return;
       const cast = Object.values(tally.counts).reduce((a, b) => a + b, 0);
-      if (cast >= tally.eligible) return; // do not go above the eligible voter count
+      if (cast >= tally.eligible) return;
       tally.counts[choice] = (tally.counts[choice] ?? 0) + 1;
       recompute();
       emitTally();
     };
 
-    // Simulate ballots that trickle in until all eligible voters have voted. The timer
-    // then stops, so no perpetual macrotask keeps the zone awake. If not, Angular never
-    // stabilizes and screenshots or SSR hang.
     const rotation = vote.options;
     let i = 0;
     const timer = setInterval(() => {
@@ -93,8 +94,6 @@ export class MockLiveVoteSource implements LiveVoteSource {
       bump(rotation[i++ % rotation.length]);
     }, this.tickMs);
 
-    // Dev hook for screenshots and manual checks: push any frame into the channel, for
-    // example a `vote_closed`. Mock mode only, so it never reaches a real backend.
     (globalThis as { __stupaMockLive?: { push(msg: ServerMessage): void } }).__stupaMockLive = {
       push: (msg) => subject.next(msg),
     };
@@ -107,8 +106,6 @@ export class MockLiveVoteSource implements LiveVoteSource {
           subject.next({ ...vote, replay: true });
           emitTally();
         } else if (msg.type === 'cast' && !beamer) {
-          // An election ballot (F2) is a list; the mock counts its first pick. A date
-          // poll ballot (an object) counts as an abstention.
           const choice =
             typeof msg.choice === 'string'
               ? msg.choice

@@ -3,13 +3,11 @@
 :host {
   display: block;
   min-width: 0;
-  /* The legend moves below the ring when the chart itself is narrow, whatever the
-     viewport: the pie sits in a column of the sheet. */
   container-type: inline-size;
 }
 
-/* The ring keeps 12px of its box free for the lifted slice, so a 16px gap puts the
-   legend about 36px from the ring, as on the Budget board. */
+// The ring keeps 12px of its box free for the lifted slice, so a 16px gap puts the legend
+// about 36px from the ring.
 .pie {
   display: flex;
   align-items: center;
@@ -29,7 +27,6 @@
   height: 100%;
   overflow: visible;
 }
-/* A thin edge in the sheet colour keeps the slices apart. */
 .pie__slice {
   stroke: var(--color-surface-1);
   stroke-width: 2.5;
@@ -38,7 +35,6 @@
     transform var(--motion-fast) var(--ease-standard),
     opacity var(--motion-fast) var(--ease-standard);
 }
-/* No amount: one ring in a neutral surface colour, like a skeleton. */
 .pie__ring {
   fill: var(--color-surface-3);
 }
@@ -62,12 +58,12 @@
   pointer-events: none;
 }
 .pie__cap {
-  font-size: 0.78125rem; // 12.5px
+  font-size: 0.78125rem;
   line-height: 1.125rem;
   color: var(--color-text-muted);
 }
 .pie__total {
-  font-size: 1.0625rem; // 17px
+  font-size: 1.0625rem;
   line-height: 1.5rem;
   font-weight: var(--fw-medium);
   color: var(--color-text);
@@ -135,7 +131,6 @@
   min-width: 0;
   padding: 0 var(--space-2);
 }
-/* One neutral line per legend entry, like a skeleton. No shimmer: nothing loads. */
 .pie__skel {
   display: block;
   height: 10px;
@@ -155,7 +150,6 @@
   }
 }
 
-/* A narrow column: the legend goes below the ring. */
 @container (max-width: 400px) {
   .pie {
     flex-direction: column;

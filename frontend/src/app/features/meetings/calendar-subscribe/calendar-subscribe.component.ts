@@ -105,19 +105,20 @@ export class CalendarSubscribeComponent {
   private observer: ResizeObserver | null = null;
   private readonly copyButton = viewChild(CopyButtonComponent);
 
+  /**
+   * A press on the anchor toggles the popover by itself, so a close here would open it again. After
+   * each render that changes the open state, the mode or the element, the new element goes into the
+   * top layer and is placed before the browser paints it.
+   */
   constructor() {
     watchAnchoredPopover({
       isOpen: () => this.isOpen() && !this.phone(),
-      // A press on the anchor toggles by itself; closing here would reopen it.
       inside: () => [this.pop()?.nativeElement, this.anchor],
       close: () => this.close(false),
       follow: () => this.place(),
     });
     inject(DestroyRef).onDestroy(() => this.unobserve());
 
-    // After each render that changes the open state, the mode (a resize across the phone
-    // limit renders the other element) or the element itself: put the new element into
-    // the top layer, and place the popover before the browser paints it.
     afterRenderEffect(() => {
       const open = this.isOpen();
       const phone = this.phone();

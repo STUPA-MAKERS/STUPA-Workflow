@@ -1,4 +1,4 @@
-"""Z7 and A2: the start sets ``started_at`` once, and MeetingOut carries the agenda.
+"""The start sets ``started_at`` once, and MeetingOut carries the agenda.
 
 The tests run on a real Postgres. The detail, the list and the timeline all carry
 ``startedAt``, ``agendaItemCount`` and ``currentAgendaItem``.
@@ -29,13 +29,16 @@ pytestmark = pytest.mark.integration
 async def test_start_sets_started_at_once(
     maker: async_sessionmaker[AsyncSession], api: FastAPI
 ) -> None:
+    """Set `started_at` once on the start.
+
+    A repeated start is a no-op: the stamp stays, and no second entry is written.
+    """
     s = await seed(maker, status="planned")
     with TestClient(api) as client:
         started = client.patch(f"/api/meetings/{s.meeting_id}", json={"status": "live"})
         assert started.status_code == 200, started.text
         first = started.json()["startedAt"]
         assert first is not None
-        # A repeated start is a no-op: the stamp stays, and no second entry is written.
         again = client.patch(f"/api/meetings/{s.meeting_id}", json={"status": "live"})
         assert again.status_code == 200, again.text
         assert again.json()["startedAt"] == first
@@ -50,6 +53,10 @@ async def test_start_sets_started_at_once(
 async def test_meeting_out_carries_the_agenda_summary(
     maker: async_sessionmaker[AsyncSession], api: FastAPI
 ) -> None:
+    """Carry the agenda summary in the meeting view.
+
+    Only the protokollant moves the current agenda item.
+    """
     s = await seed(maker, status="live", items=3)
     tag = uuid.uuid4().hex[:8]
     async with maker() as session:
@@ -88,7 +95,6 @@ async def test_meeting_out_carries_the_agenda_summary(
         assert detail["agendaItemCount"] == 4
         assert detail["currentAgendaItem"] == {"position": 2, "title": "TOP 2"}
 
-        # Only the protokollant moves the current agenda item.
         api.dependency_overrides[get_current_principal] = lambda: Principal(sub=keeper_sub)
         moved = client.patch(
             f"/api/meetings/{s.meeting_id}", json={"currentAgendaItemId": str(app_item.id)}
@@ -109,7 +115,10 @@ async def test_meeting_out_carries_the_agenda_summary(
 async def test_list_and_timeline_carry_the_agenda_count(
     maker: async_sessionmaker[AsyncSession], api: FastAPI
 ) -> None:
-    """The overview shows "n TOPs" on each row: every list shape counts the agenda."""
+    """The overview shows "n TOPs" on each row: every list shape counts the agenda.
+
+    The planned meeting of 20.06.2026 lies in the past of the test run.
+    """
     live = await seed(maker, status="live", items=2)
     planned = await seed(maker, status="planned", items=0)
     with TestClient(api) as client:
@@ -118,7 +127,6 @@ async def test_list_and_timeline_carry_the_agenda_count(
             params={"direction": "upcoming", "gremiumId": str(live.gremium_id)},
         ).json()["items"]
         assert [(m["id"], m["agendaItemCount"]) for m in upcoming] == [(str(live.meeting_id), 2)]
-        # The planned meeting of 20.06.2026 lies in the past of the test run.
         past = client.get(
             "/api/meetings/timeline",
             params={"direction": "past", "gremiumId": str(planned.gremium_id)},

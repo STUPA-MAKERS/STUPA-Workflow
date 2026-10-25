@@ -1,6 +1,7 @@
-"""Config schemas, flow-graph validation and JSON-Schema export (data-model §5)."""
+"""Config schemas, flow-graph validation and JSON-Schema export."""
 
 from decimal import Decimal
+from typing import Any
 
 import pytest
 from pydantic import ValidationError
@@ -73,16 +74,15 @@ def test_form_field_select_requires_options() -> None:
 
 
 def test_form_field_dynamic_selects_need_no_options() -> None:
-    # The server injects the options of gremium_select and budget_select. Unlike select
-    # and multiselect, these types need NO options in the form.
+    """Accept the dynamic selects without options, because the server injects them."""
     for t in ("gremium_select", "budget_select"):
-        f = FormFieldDef(key="ziel", type=t, label={"de": "Ziel"})  # type: ignore[arg-type]
+        f = FormFieldDef(key="ziel", type=t, label={"de": "Ziel"})
         assert f.options is None
 
 
 def test_form_field_typed_inputs_valid() -> None:
     for t in ("email", "iban", "daterange"):
-        f = FormFieldDef(key="f", type=t, label={"de": "x"})  # type: ignore[arg-type]
+        f = FormFieldDef(key="f", type=t, label={"de": "x"})
         assert f.type == t
 
 
@@ -112,7 +112,7 @@ def test_form_field_rejects_extra_keys() -> None:
         )
 
 
-def _valid_graph_dict() -> dict:
+def _valid_graph_dict() -> dict[str, Any]:
     return {
         "states": [
             {"key": "draft", "label": {"de": "Entwurf"}, "color": "#4a90d9", "isInitial": True},
@@ -137,7 +137,7 @@ def _valid_graph_dict() -> dict:
 
 def test_valid_flow_graph_passes() -> None:
     graph = FlowGraph.model_validate(_valid_graph_dict())
-    validate_flow_graph(graph)  # no raise
+    validate_flow_graph(graph)
 
 
 def test_flow_graph_from_alias_parsed() -> None:
@@ -145,8 +145,7 @@ def test_flow_graph_from_alias_parsed() -> None:
     assert graph.transitions[0].from_ == "draft"
 
 
-# Issue #28: validation of vote, approval and decision states.
-def _vote_graph_dict() -> dict:
+def _vote_graph_dict() -> dict[str, Any]:
     return {
         "states": [
             {"key": "draft", "label": {"de": "Entwurf"}, "color": "#4a90d9", "isInitial": True},
@@ -164,7 +163,7 @@ def _vote_graph_dict() -> dict:
 
 
 def test_vote_state_valid_passes() -> None:
-    validate_flow_graph(FlowGraph.model_validate(_vote_graph_dict()))  # no raise
+    validate_flow_graph(FlowGraph.model_validate(_vote_graph_dict()))
 
 
 def test_vote_state_requires_gremium() -> None:
@@ -198,11 +197,11 @@ def test_vote_state_allows_manual_exit() -> None:
     """A manual exit stays allowed, for example "cancel the vote"."""
     g = _vote_graph_dict()
     g["transitions"].append({"from": "voting", "to": "failed"})
-    validate_flow_graph(FlowGraph.model_validate(g))  # no raise
+    validate_flow_graph(FlowGraph.model_validate(g))
 
 
 def test_actor_gate_rejected_on_automatic_transition() -> None:
-    # roleIs and isInCommittee are actor gates. They fit manual transitions only.
+    """Reject the actor gates roleIs and isInCommittee on an automatic transition."""
     g = _valid_graph_dict()
     g["transitions"][0]["automatic"] = True
     g["transitions"][0]["guard"] = {"roleIs": "applicant"}
@@ -211,11 +210,11 @@ def test_actor_gate_rejected_on_automatic_transition() -> None:
 
 
 def test_add_to_next_session_requires_vote_target() -> None:
-    # The action is allowed only on a transition INTO a vote state.
+    """Reject ``addToNextSession`` on a transition that does not lead into a vote state."""
     g = _vote_graph_dict()
     g["transitions"][1]["actions"] = [
         {"type": "addToNextSession", "gremiumId": "g-1"}
-    ]  # voting -> passed (not a vote state)
+    ]
     with pytest.raises(FlowValidationError, match="vote state"):
         validate_flow_graph(FlowGraph.model_validate(g))
 
@@ -224,12 +223,12 @@ def test_add_to_next_session_into_vote_ok() -> None:
     g = _vote_graph_dict()
     g["transitions"][0]["actions"] = [
         {"type": "addToNextSession", "gremiumId": "g-1"}
-    ]  # draft -> voting (a vote state)
-    validate_flow_graph(FlowGraph.model_validate(g))  # no raise
+    ]
+    validate_flow_graph(FlowGraph.model_validate(g))
 
 
 def test_flow_self_loop_rejected() -> None:
-    # A self-loop defeats the optimistic locking of the engine and fires twice.
+    """Reject a self-loop, because it defeats the optimistic locking and fires twice."""
     g = _valid_graph_dict()
     g["transitions"].append({"from": "review", "to": "review"})
     with pytest.raises(FlowValidationError, match="self-loop"):
@@ -237,8 +236,10 @@ def test_flow_self_loop_rejected() -> None:
 
 
 def test_flow_automatic_two_state_cycle_rejected() -> None:
-    # #auto-cycle: two normal states, each with one automatic transition to the other,
-    # pass the reachability check but ping-pong forever.
+    """Reject two states that ping-pong over automatic transitions.
+
+    They pass the reachability check but would advance forever.
+    """
     g = _valid_graph_dict()
     g["transitions"].append({"from": "review", "to": "approved", "automatic": True})
     g["transitions"].append({"from": "approved", "to": "review", "automatic": True})
@@ -247,7 +248,7 @@ def test_flow_automatic_two_state_cycle_rejected() -> None:
 
 
 def test_flow_automatic_longer_cycle_rejected() -> None:
-    # A cycle over three states inside the automatic subgraph.
+    """Reject a cycle over three states inside the automatic subgraph."""
     g = {
         "states": [
             {"key": "a", "label": {"de": "A"}, "isInitial": True},
@@ -265,22 +266,22 @@ def test_flow_automatic_longer_cycle_rejected() -> None:
 
 
 def test_flow_manual_cycle_allowed() -> None:
-    # A cycle of MANUAL transitions is allowed, because it cannot ping-pong on its own.
+    """Allow a cycle of manual transitions, because it cannot ping-pong on its own."""
     g = _valid_graph_dict()
     g["transitions"].append({"from": "approved", "to": "review"})
-    validate_flow_graph(FlowGraph.model_validate(g))  # no raise
+    validate_flow_graph(FlowGraph.model_validate(g))
 
 
 def test_flow_mixed_cycle_with_one_manual_edge_allowed() -> None:
-    # The cron can ping-pong only when EVERY edge of the cycle is automatic.
+    """Allow a cycle with one manual edge, because the cron loops only over automatic edges."""
     g = _valid_graph_dict()
     g["transitions"].append({"from": "review", "to": "approved", "automatic": True})
-    g["transitions"].append({"from": "approved", "to": "review"})  # manual
-    validate_flow_graph(FlowGraph.model_validate(g))  # no raise
+    g["transitions"].append({"from": "approved", "to": "review"})
+    validate_flow_graph(FlowGraph.model_validate(g))
 
 
 def test_branch_on_non_vote_state_rejected() -> None:
-    # Only the vote result fires a branch transition. On a normal state it is a dead edge.
+    """Reject a branch transition on a normal state, where it is a dead edge."""
     g = _vote_graph_dict()
     g["transitions"].append({"from": "passed", "to": "failed", "branch": "pass"})
     with pytest.raises(FlowValidationError, match="branch"):
@@ -337,7 +338,7 @@ def test_flow_unknown_guard_operator() -> None:
 
 def test_flow_unreachable_state() -> None:
     g = _valid_graph_dict()
-    g["transitions"] = [g["transitions"][0]]  # approved no longer reachable
+    g["transitions"] = [g["transitions"][0]]
     graph = FlowGraph.model_validate(g)
     with pytest.raises(FlowValidationError, match="unreachable"):
         validate_flow_graph(graph)
@@ -358,7 +359,7 @@ def test_flow_no_states() -> None:
 
 
 def test_flow_diamond_reconverges_ok() -> None:
-    # Two paths lead into the same state, so the BFS visits it twice (revisit).
+    """Accept two paths into the same state, which the BFS visits twice."""
     g = {
         "states": [
             {"key": "draft", "label": {"de": "E"}, "isInitial": True},
@@ -373,7 +374,7 @@ def test_flow_diamond_reconverges_ok() -> None:
             {"from": "b", "to": "done"},
         ],
     }
-    validate_flow_graph(FlowGraph.model_validate(g))  # no raise
+    validate_flow_graph(FlowGraph.model_validate(g))
 
 
 def test_form_field_explicit_none_jsonlogic_ok() -> None:
@@ -466,16 +467,14 @@ def test_export_json_schemas_keys_and_deterministic() -> None:
         "WebhookConfig", "ComparisonOffers", "Branding",
     }
     assert export_json_schemas() == schemas
-    # The schema carries the camelCase aliases.
     assert "isPromoted" in schemas["FormFieldDef"]["properties"]
 
 
-# Flow variant B: a vote state takes its Gremium from the cost center.
 def test_vote_state_gremium_source_budget_ok() -> None:
     g = _vote_graph_dict()
     g["states"][1]["config"] = {"gremiumSource": "budget"}
     g["transitions"][0]["actions"] = [{"type": "addToNextSession"}]
-    validate_flow_graph(FlowGraph.model_validate(g))  # no raise
+    validate_flow_graph(FlowGraph.model_validate(g))
 
 
 @pytest.mark.parametrize(
@@ -487,7 +486,7 @@ def test_vote_state_gremium_source_budget_ok() -> None:
         ({"gremiumId": 5}, "requires config.gremiumId"),
     ],
 )
-def test_vote_state_gremium_exactly_one(config: dict, match: str) -> None:
+def test_vote_state_gremium_exactly_one(config: dict[str, Any], match: str) -> None:
     g = _vote_graph_dict()
     g["states"][1]["config"] = config
     with pytest.raises(FlowValidationError, match=match):
@@ -513,13 +512,16 @@ def test_initial_vote_state_cannot_use_the_budget() -> None:
         {"type": "assignBudgetFromMap", "field": "f", "map": {"a": "b-1"}},
     ],
 )
-def test_assign_budget_into_a_budget_vote_state_rejected(action: dict) -> None:
+def test_assign_budget_into_a_budget_vote_state_rejected(action: dict[str, Any]) -> None:
+    """Reject a cost-center action into a budget vote state, but not into a fixed-Gremium one.
+
+    Into a vote state with a fixed Gremium the action stays valid.
+    """
     g = _vote_graph_dict()
     g["states"][1]["config"] = {"gremiumSource": "budget"}
     g["transitions"][0]["actions"] = [action]
     with pytest.raises(FlowValidationError, match="earlier transition"):
         validate_flow_graph(FlowGraph.model_validate(g))
-    # Into a vote state with a fixed Gremium the action stays valid.
     g["states"][1]["config"] = {"gremiumId": "g-1"}
     validate_flow_graph(FlowGraph.model_validate(g))
 
@@ -533,10 +535,11 @@ def test_add_to_next_session_with_gremium_into_a_budget_vote_state_rejected() ->
 
 
 def test_vote_gremium_recipient_only_into_a_vote_state() -> None:
+    """Allow ``voteGremium`` into a vote state only, because the snapshot is gone after it."""
     notify = {"type": "notify", "recipients": [{"kind": "voteGremium"}]}
     g = _vote_graph_dict()
-    g["transitions"][0]["actions"] = [notify]  # draft -> voting: fine
+    g["transitions"][0]["actions"] = [notify]
     validate_flow_graph(FlowGraph.model_validate(g))
-    g["transitions"][1]["actions"] = [notify]  # voting -> passed: the snapshot is gone
+    g["transitions"][1]["actions"] = [notify]
     with pytest.raises(FlowValidationError, match="voteGremium"):
         validate_flow_graph(FlowGraph.model_validate(g))

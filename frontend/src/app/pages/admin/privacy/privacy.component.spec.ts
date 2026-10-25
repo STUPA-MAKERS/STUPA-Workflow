@@ -94,14 +94,16 @@ async function setup(api = makeApi(), url = '/') {
 describe('PrivacyComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
+  /**
+   * The executed row has no email any more, so it reads "anonymisiert". The retention input shows
+   * the loaded default.
+   */
   it('loads the erasure queue and retention default on init', async () => {
     const { api } = await setup();
     expect(api.listErasures).toHaveBeenCalled();
     expect(api.getPrivacySettings).toHaveBeenCalled();
     expect(screen.getByText('a@x')).toBeInTheDocument();
-    // The executed row has no email any more: it reads "anonymisiert".
     expect(screen.getByText('anonymisiert')).toBeInTheDocument();
-    // The retention input shows the loaded default.
     expect(screen.getByDisplayValue('24')).toBeInTheDocument();
   });
 
@@ -112,13 +114,13 @@ describe('PrivacyComponent', () => {
     expect(screen.queryByText('anonymisiert')).toBeNull();
   });
 
+  /** The status is coloured text: an open request waits (warn). */
   it('translates status and subject labels and renders the localized columns', async () => {
     const { fixture } = await setup();
     const cmp = fixture.componentInstance as unknown as {
       subjectLabel: (s: string) => string;
       columns: () => { key: string }[];
     };
-    // The status is coloured text: an open request waits (warn).
     const open = screen.getByText('Offen');
     expect(open.closest('app-status-text')).toHaveClass('st--warn');
     expect(cmp.subjectLabel('applicant')).toBeTruthy();
@@ -131,6 +133,7 @@ describe('PrivacyComponent', () => {
     ]);
   });
 
+  /** The queue loads once on init and once after the execute. */
   it('executes an open erasure after confirmation and reloads', async () => {
     const api = makeApi();
     const { toast } = await setup(api);
@@ -140,7 +143,6 @@ describe('PrivacyComponent', () => {
     await userEvent.click(confirm[confirm.length - 1]);
     expect(api.executeErasure).toHaveBeenCalledWith('er-1');
     expect(toast.success).toHaveBeenCalled();
-    // The queue loads once on init and once after the execute.
     expect(api.listErasures).toHaveBeenCalledTimes(2);
   });
 
@@ -151,6 +153,7 @@ describe('PrivacyComponent', () => {
     expect(api.executeErasure).not.toHaveBeenCalled();
   });
 
+  /** A failure does not reload the queue, so only the init call counts. */
   it('toasts an error when execute fails', async () => {
     const api = makeApi({ executeErasure: jest.fn(() => throwError(() => new Error('boom'))) });
     const { toast, fixture } = await setup(api);
@@ -161,7 +164,6 @@ describe('PrivacyComponent', () => {
     cmp.askExecute(OPEN);
     cmp.doExecute();
     expect(toast.error).toHaveBeenCalled();
-    // A failure does not reload the queue, so only the init call counts.
     expect(api.listErasures).toHaveBeenCalledTimes(1);
   });
 
@@ -218,6 +220,7 @@ describe('PrivacyComponent', () => {
     expect(api.downloadAuskunft).not.toHaveBeenCalled();
   });
 
+  /** The URL is revoked only after the click has started the download. */
   it('downloads the Auskunft XLSX and triggers a browser download', async () => {
     const createObjectURL = jest.fn(() => 'blob:url');
     const revokeObjectURL = jest.fn();
@@ -236,7 +239,6 @@ describe('PrivacyComponent', () => {
     expect(api.downloadAuskunft).toHaveBeenCalledWith('user@x');
     expect(createObjectURL).toHaveBeenCalled();
     expect(clickSpy).toHaveBeenCalled();
-    // The URL is revoked only after the click has started the download.
     expect(revokeObjectURL).not.toHaveBeenCalled();
     await waitFor(() => expect(revokeObjectURL).toHaveBeenCalledWith('blob:url'));
     expect(toast.success).toHaveBeenCalled();
@@ -266,7 +268,11 @@ describe('PrivacyComponent', () => {
     expect(screen.getByRole('button', { name: 'Konto löschen' })).toBeDisabled();
   });
 
-  it('picks the person by name or e-mail, never by a raw id (D1)', async () => {
+  /**
+   * A merged account is a locked reference and is not offered; a nameless one reads "Ohne Namen".
+   * The confirmation names the person, not an id.
+   */
+  it('picks the person by name or e-mail, never by a raw id', async () => {
     jest.useFakeTimers({ advanceTimers: true });
     const { api, fixture } = await setup();
     expect(screen.queryByLabelText(/UUID/)).toBeNull();
@@ -274,7 +280,6 @@ describe('PrivacyComponent', () => {
     jest.advanceTimersByTime(300);
     fixture.detectChanges();
     expect(api.listPrincipals).toHaveBeenCalledWith('an');
-    // A merged account is a locked reference and is not offered; a nameless one reads "Ohne Namen".
     const hits = screen.getByRole('list', { name: 'Gefundene Konten' });
     expect(hits.querySelectorAll('button')).toHaveLength(2);
     expect(screen.getByText('Ohne Namen')).toBeInTheDocument();
@@ -283,13 +288,12 @@ describe('PrivacyComponent', () => {
     expect(screen.queryByRole('list', { name: 'Gefundene Konten' })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Konto löschen' }));
     fixture.detectChanges();
-    // The confirmation names the person, not an id.
     expect(screen.getAllByText('Anna Alt').length).toBeGreaterThan(1);
     expect(screen.queryByText('p-7')).toBeNull();
     jest.useRealTimers();
   });
 
-  it('shows the sub as a tooltip only for a nameless person (D7)', async () => {
+  it('shows the sub as a tooltip only for a nameless person', async () => {
     const { fixture } = await setup();
     const cmp = fixture.componentInstance as unknown as { pickPerson: (p: AdminPrincipal) => void };
     cmp.pickPerson(ANNA);
@@ -456,18 +460,18 @@ describe('PrivacyComponent', () => {
     expect(toast.error).toHaveBeenCalled();
   });
 
+  /** The done row renders nothing in its actions cell, so the card leaves the label out. */
   it('names the request in each row button and leaves a closed row without actions', async () => {
     const { container } = await setup();
     expect(screen.getByRole('button', { name: 'Aktionen: a@x' })).toBeInTheDocument();
-    // The done row renders nothing in its actions cell, so the card leaves the label out.
     const cells = [...container.querySelectorAll('td[data-label="Aktionen"]')];
     expect(cells).toHaveLength(2);
     expect(cells[1].children).toHaveLength(0);
     expect(container.querySelector('.dt--rowgroup')).not.toBeNull();
   });
 
+  /** This covers the rendered template and the openReject path that opens the dialog. */
   it('wires the reject action button click through the queue row', async () => {
-    // This covers the rendered template and the openReject path that opens the dialog.
     const { container } = await setup();
     await userEvent.click(screen.getByRole('button', { name: /^Aktionen: / }));
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Ablehnen' }));

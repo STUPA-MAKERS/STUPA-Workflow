@@ -145,6 +145,7 @@ async def test_code_is_single_use(session: AsyncSession) -> None:
 
 
 async def test_refresh_rotates_and_revokes_old(session: AsyncSession) -> None:
+    """Rotate the refresh token and revoke the old access token."""
     pid = await _principal(session)
     code = await _mint_code(session, pid)
     now = datetime.now(UTC)
@@ -167,7 +168,6 @@ async def test_refresh_rotates_and_revokes_old(session: AsyncSession) -> None:
         refresh_ttl=_REFRESH_TTL,
     )
     assert second.access_token != first.access_token
-    # The rotation revokes the old access token.
     assert await oauth_service.resolve_access_token(
         session, token=first.access_token, now=now
     ) is None
@@ -203,8 +203,12 @@ async def test_expired_access_token_not_resolved(session: AsyncSession) -> None:
 
 
 async def test_never_expiring_token_resolves_far_future(session: AsyncSession) -> None:
+    """Resolve a token that never expires far in the future.
+
+    The token stays valid years later. Only a revocation ends it.
+    """
     pid = await _principal(session)
-    code = await _mint_code(session, pid, access_ttl_seconds=None)  # never expires
+    code = await _mint_code(session, pid, access_ttl_seconds=None)
     now = datetime.now(UTC)
     issued = await oauth_service.exchange_code(
         session,
@@ -217,7 +221,6 @@ async def test_never_expiring_token_resolves_far_future(session: AsyncSession) -
         refresh_ttl=_REFRESH_TTL,
     )
     assert issued.expires_in is None
-    # The token stays valid years later. Only a revocation ends it.
     far = now + timedelta(days=3650)
     resolved = await oauth_service.resolve_access_token(
         session, token=issued.access_token, now=far

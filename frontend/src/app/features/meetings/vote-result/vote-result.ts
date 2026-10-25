@@ -17,7 +17,7 @@ import { clock } from '@shared/date-format';
  * tally line). The editor shows it as a card; this module gives the card what the text
  * does not hold: the caption "Beschluss · 18:52 · Einfache Mehrheit" (`closedAt`, the
  * majority rule), the result under the rule of the vote and the labels in the language of
- * the page. A tie is a rejection (O18), so the result is "Angenommen" or "Abgelehnt".
+ * the page. A tie is a rejection, so the result is "Angenommen" or "Abgelehnt".
  */
 export function voteResultInfo(vote: MeetingVote, t: Translate, locale: string): VoteCalloutInfo {
   if (vote.kind === 'election') return electionResultInfo(vote, t, locale);
@@ -45,7 +45,7 @@ export function voteResultInfo(vote: MeetingVote, t: Translate, locale: string):
   };
 }
 
-/** The card of a personnel election (F2): "Wahl · 2 Posten · 18:52" and "Gewählt". */
+/** The card of a personnel election: "Wahl · 2 Posten · 18:52" and "Gewählt". */
 function electionResultInfo(vote: MeetingVote, t: Translate, locale: string): VoteCalloutInfo {
   const parts = [electionCaption(vote.election ?? null, vote.round, t)];
   const time = clock(vote.closedAt, toFormatLocale(locale));
@@ -101,6 +101,10 @@ export function normalizeQuestion(text: string): string {
  * The resolver of the editor: find the closed vote of a card by its question. The
  * question of the snippet is the question of the vote, else its title, with the round
  * of a runoff (see `voteSnippetQuestion`). A card of another meeting or a deleted vote stays plain.
+ *
+ * A runoff names its round in the head, so the two rounds of an election keep apart. Two votes can
+ * share a question, so a poll or election card names its kind in its first line and the vote of
+ * that kind wins.
  */
 export function voteResultResolver(
   votes: readonly MeetingVote[],
@@ -111,15 +115,11 @@ export function voteResultResolver(
   for (const v of votes) {
     if (v.status !== 'closed') continue;
     if (v.kind !== 'election' && v.kind !== 'poll' && !(v.question?.trim() || v.title?.trim())) continue;
-    // A runoff names its round in the head, so the two rounds of an election
-    // keep apart (see `voteSnippetQuestion`).
     const key = normalizeQuestion(voteSnippetQuestion(v));
     byQuestion.set(key, [...(byQuestion.get(key) ?? []), v]);
   }
   return (question, lines) => {
     const found = byQuestion.get(normalizeQuestion(question)) ?? [];
-    // Two votes can share a question. A poll or election card names its kind in its
-    // first line, so the vote of that kind wins; otherwise the last vote wins.
     const kind = lines?.[0]?.trim();
     const last = [...found].reverse();
     const vote = last.find((v) => kind != null && kindLine(v) === kind) ?? last[0];

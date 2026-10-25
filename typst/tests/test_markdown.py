@@ -19,11 +19,11 @@ def conv(md: str, meta: Meta | None = None) -> list[Node]:
 def texts(nodes: object) -> str:
     """Flatten the text of an inline or block tree."""
     if isinstance(nodes, list):
-        return "".join(texts(n) for n in nodes)  # pyright: ignore[reportUnknownVariableType]
+        return "".join(texts(n) for n in nodes)
     if isinstance(nodes, dict):
         if nodes.get("t") in ("text", "sym", "code", "time"):
             return str(nodes["v"])
-        return "".join(texts(v) for k, v in nodes.items() if k in ("c", "items", "lines"))  # pyright: ignore[reportUnknownVariableType, reportUnknownArgumentType]
+        return "".join(texts(v) for k, v in nodes.items() if k in ("c", "items", "lines"))
     return ""
 
 
@@ -62,7 +62,7 @@ def test_callouts(marker: str, kind: str, label: str | None) -> None:
     assert box["kind"] == kind
     first = box["c"][0]  # pyright: ignore[reportIndexIssue]
     if label:
-        assert first["c"][0] == {"t": "strong", "c": [{"t": "text", "v": label}]}  # pyright: ignore[reportIndexIssue]
+        assert first["c"][0] == {"t": "strong", "c": [{"t": "text", "v": label}]}
     assert "Kopf weiter" in texts(first)
 
 

@@ -122,8 +122,8 @@ class TicketNote(UUIDPkMixin, Base):
     author_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("principal.id"), nullable=True)
     body: Mapped[str] = mapped_column(Text)
     visibility: Mapped[str] = mapped_column(Text, default="internal", server_default="internal")
-    # The principal ids (as strings) of the holders of ``ticket.manage`` that the note
-    # mentions. Only a team note mentions; the reporter never sees the list.
+    #: Principal ids (strings) of the mentioned holders of ``ticket.manage``. Only a team
+    #: note mentions; the reporter never sees the list.
     mentions: Mapped[list[str]] = mapped_column(
         JSONB, default=list, server_default=text("'[]'::jsonb")
     )

@@ -1,10 +1,10 @@
-"""F16: the OAuth scope caps the gremium permissions and the admin bypass.
+"""The OAuth scope caps the gremium permissions and the admin bypass.
 
 A gremium role grants `session.manage`, `protocol.write`, `vote.manage` and
 `protocol.finalize` per gremium. These keys never enter `principal.permissions`, so
-`Principal.has` cannot cap them. Before the fix a token with only the `read` scope could
-still manage a meeting, write the minutes and run the votes of its owner's gremien.
-The minute-taker path had the same gap.
+`Principal.has` cannot cap them. Without an explicit cap, a token with only the `read`
+scope could still manage a meeting, write the minutes and run the votes of its
+owner's gremien. The minute-taker path needs the same cap.
 
 These tests pin the cap on every path: the gremium lookup, the minute-taker path, the
 admin bypass and the batched flags of the meeting list.
@@ -20,8 +20,8 @@ from uuid import UUID, uuid4
 import pytest
 
 from app.modules.admin import gremium_roles as gremium_roles_mod
-from app.modules.admin.gremium_roles import admin_bypass, gremium_ids_for
 from app.modules.auth import oauth
+from app.modules.auth.policy import admin_bypass, held_gremium_ids
 from app.modules.auth.principal import Principal
 from app.modules.livevote.models import Meeting
 from app.modules.livevote.service import MeetingService
@@ -85,17 +85,17 @@ def test_admin_bypass_respects_the_scope() -> None:
     assert admin_bypass(Principal(sub="m"), "session.manage") is False
 
 
-async def test_gremium_ids_for_caps_by_scope(chair: None) -> None:
+async def test_held_gremium_ids_caps_by_scope(chair: None) -> None:
     db = fake_session()
-    assert await gremium_ids_for(db, Principal(sub="c"), "session.manage") == {GID}
-    assert await gremium_ids_for(db, _scoped("read"), "session.manage") == set()
-    assert await gremium_ids_for(db, _scoped("meetings:write"), "session.manage") == {GID}
-    assert await gremium_ids_for(db, _scoped("meetings:write"), "vote.manage") == set()
-    assert await gremium_ids_for(db, _scoped("votes:write"), "vote.manage") == {GID}
+    assert await held_gremium_ids(db, Principal(sub="c"), "session.manage") == {GID}
+    assert await held_gremium_ids(db, _scoped("read"), "session.manage") == set()
+    assert await held_gremium_ids(db, _scoped("meetings:write"), "session.manage") == {GID}
+    assert await held_gremium_ids(db, _scoped("meetings:write"), "vote.manage") == set()
+    assert await held_gremium_ids(db, _scoped("votes:write"), "vote.manage") == {GID}
 
 
 async def test_read_token_of_a_chair_cannot_run_the_meeting(chair: None) -> None:
-    svc = MeetingService(fake_session())  # type: ignore[arg-type]
+    svc = MeetingService(fake_session())
     token = _scoped("read")
     meeting = _meeting()
     assert await svc.can_manage(GID, token) is False
@@ -105,8 +105,11 @@ async def test_read_token_of_a_chair_cannot_run_the_meeting(chair: None) -> None
 
 
 async def test_read_token_of_the_minute_taker_cannot_write(nobody: None) -> None:
-    # The scope check runs before the minute-taker lookup, so no query is queued.
-    svc = MeetingService(fake_session())  # type: ignore[arg-type]
+    """Refuse a write with the read token of the minute taker.
+
+    The scope check runs before the minute-taker lookup, so no query is queued.
+    """
+    svc = MeetingService(fake_session())
     token = _scoped("read", sub="protokoll")
     meeting = _meeting(protokollant_id=PID)
     assert await svc.can_write(meeting, token) is False
@@ -114,20 +117,23 @@ async def test_read_token_of_the_minute_taker_cannot_write(nobody: None) -> None
 
 
 async def test_minute_taker_session_still_writes(nobody: None) -> None:
-    svc = MeetingService(fake_session(result(PID), result(PID)))  # type: ignore[arg-type]
+    svc = MeetingService(fake_session(result(PID), result(PID)))
     meeting = _meeting(protokollant_id=PID)
     assert await svc.can_write(meeting, Principal(sub="protokoll")) is True
     assert await svc.can_manage_votes(meeting, Principal(sub="protokoll")) is True
 
 
 async def test_meetings_write_token_of_a_chair_manages(chair: None) -> None:
-    svc = MeetingService(fake_session())  # type: ignore[arg-type]
+    """Let the meetings:write token of a chair manage.
+
+    `vote.manage` needs `votes:write`, but the manager path still grants it.
+    """
+    svc = MeetingService(fake_session())
     token = _scoped("meetings:write")
     meeting = _meeting()
     assert await svc.can_manage(GID, token) is True
     assert await svc.can_write(meeting, token) is True
     assert await svc.can_finalize(meeting, token) is True
-    # `vote.manage` needs `votes:write`; the manager path still grants it.
     assert await svc.can_manage_votes(meeting, token) is True
 
 
@@ -136,7 +142,7 @@ async def test_finalize_needs_the_gremium_key(monkeypatch: pytest.MonkeyPatch) -
         return {GID} if perm == "protocol.write" else set()
 
     monkeypatch.setattr(gremium_roles_mod, "gremium_ids_with_permission", _write_only)
-    svc = MeetingService(fake_session())  # type: ignore[arg-type]
+    svc = MeetingService(fake_session())
     meeting = _meeting()
     assert await svc.can_write(meeting, Principal(sub="w")) is True
     assert await svc.can_finalize(meeting, Principal(sub="w")) is False
@@ -147,23 +153,26 @@ async def test_finalize_needs_the_write_access(monkeypatch: pytest.MonkeyPatch) 
         return {GID} if perm == "protocol.finalize" else set()
 
     monkeypatch.setattr(gremium_roles_mod, "gremium_ids_with_permission", _finalize_only)
-    svc = MeetingService(fake_session())  # type: ignore[arg-type]
+    svc = MeetingService(fake_session())
     assert await svc.can_finalize(_meeting(), Principal(sub="f")) is False
 
 
 async def test_admin_read_token_sees_all_but_cannot_manage(nobody: None) -> None:
-    svc = MeetingService(fake_session())  # type: ignore[arg-type]
+    """Let an admin read token see all gremien without management rights.
+
+    `read` holds `meeting.view_all`, so the admin keeps the cross-gremium view.
+    """
+    svc = MeetingService(fake_session())
     token = _scoped("read", roles=["admin"])
     meeting = _meeting()
     assert await svc.can_manage(GID, token) is False
     assert await svc.can_write(meeting, token) is False
     assert await svc.can_finalize(meeting, token) is False
-    # `read` holds `meeting.view_all`, so the admin keeps the cross-gremium view.
     assert await svc._visible_gremium_ids(token) is None
 
 
 async def test_admin_session_manages_and_finalizes(nobody: None) -> None:
-    svc = MeetingService(fake_session())  # type: ignore[arg-type]
+    svc = MeetingService(fake_session())
     admin = Principal(sub="a", roles=["admin"])
     meeting = _meeting()
     assert await svc.can_manage(GID, admin) is True
@@ -180,12 +189,14 @@ def _row() -> Meeting:
 
 
 async def test_listing_flags_follow_the_scope_cap(chair: None) -> None:
-    """The batched list flags apply the same cap as the detail flags."""
+    """The batched list flags apply the same cap as the detail flags.
+
+    The queue holds the protocol rows, gremium names, protocol names, principal id and
+    votes. The gremium lookups are patched, and `vote.cast` is empty for a scoped token.
+    """
     m = _row()
-    # proto rows, gremium names, prot names, principal id, votes. The gremium
-    # lookups are patched, `vote.cast` is empty for a scoped token.
     db = fake_session(result(), result(), result(), result(PID), result())
-    out = await MeetingService(db)._decorate([m], _scoped("read", sub="protokoll"))  # type: ignore[arg-type]
+    out = await MeetingService(db)._decorate([m], _scoped("read", sub="protokoll"))
     flags = out[0]
     assert flags.is_protokollant is True
     assert (flags.can_manage, flags.can_write, flags.can_manage_votes) == (False, False, False)
@@ -195,7 +206,7 @@ async def test_listing_flags_follow_the_scope_cap(chair: None) -> None:
 async def test_listing_flags_of_a_chair_session(chair: None) -> None:
     m = _row()
     db = fake_session(result(), result(), result(), result(uuid4()), result())
-    out = await MeetingService(db)._decorate([m], Principal(sub="chair"))  # type: ignore[arg-type]
+    out = await MeetingService(db)._decorate([m], Principal(sub="chair"))
     flags = out[0]
     assert (flags.can_manage, flags.can_write, flags.can_manage_votes) == (True, True, True)
     assert flags.can_finalize is True
@@ -204,7 +215,7 @@ async def test_listing_flags_of_a_chair_session(chair: None) -> None:
 async def test_listing_flags_of_an_admin_session(nobody: None) -> None:
     m = _row()
     db = fake_session(result(), result(), result(), result(PID), result())
-    out = await MeetingService(db)._decorate([m], Principal(sub="a", roles=["admin"]))  # type: ignore[arg-type]
+    out = await MeetingService(db)._decorate([m], Principal(sub="a", roles=["admin"]))
     flags = out[0]
     assert flags.is_protokollant is True
     assert (flags.can_manage, flags.can_write, flags.can_finalize) == (True, True, True)
@@ -217,9 +228,7 @@ def _flags(out: Any) -> tuple[bool, bool, bool, bool]:
 @pytest.mark.parametrize(
     ("scopes", "expected"),
     [
-        # `votes:write` lets the admin bypass for `vote.manage` through, and nothing more.
         (("read", "votes:write"), (False, False, True, False)),
-        # `meetings:write` carries the meeting lead, which includes the votes.
         (("read", "meetings:write"), (True, True, True, True)),
         (("read",), (False, False, False, False)),
     ],
@@ -231,13 +240,14 @@ async def test_list_and_detail_flags_agree_for_a_scoped_admin(
 
     An admin token without a gremium membership: the router gates the vote routes on
     the detail `canManageVotes`, so a list flag that differs offers an action that the
-    API refuses.
+    API refuses. `votes:write` lets the admin bypass for `vote.manage` through, and
+    nothing more. `meetings:write` carries the meeting lead, which includes the votes.
     """
     token = _scoped(*scopes, sub="a", roles=["admin"])
     m = _row()
     m.protokollant_id = None
-    listed = await MeetingService(fake_session())._decorate([m], token)  # type: ignore[arg-type]
-    detail = await MeetingService(fake_session())._emit(m, token)  # type: ignore[arg-type]
+    listed = await MeetingService(fake_session())._decorate([m], token)
+    detail = await MeetingService(fake_session())._emit(m, token)
     assert _flags(listed[0]) == _flags(detail) == expected
 
 
@@ -247,7 +257,5 @@ async def test_admin_votes_token_passes_the_voting_gate_too(nobody: None) -> Non
 
     token = _scoped("read", "votes:write", sub="a", roles=["admin"])
     meeting = _meeting()
-    assert await MeetingService(fake_session()).can_manage_votes(meeting, token) is True  # type: ignore[arg-type]
-    await VotingService(fake_session()).assert_can_manage_group(  # type: ignore[arg-type]
-        str(GID), meeting.id, token
-    )
+    assert await MeetingService(fake_session()).can_manage_votes(meeting, token) is True
+    await VotingService(fake_session()).assert_can_manage_group(str(GID), meeting.id, token)

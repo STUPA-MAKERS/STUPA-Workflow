@@ -19,10 +19,12 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     op.execute("ALTER TABLE account ADD COLUMN IF NOT EXISTS fints_last_balance numeric(14, 2)")
     op.execute("ALTER TABLE account ADD COLUMN IF NOT EXISTS fints_balance_at timestamptz")
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     op.execute("ALTER TABLE account DROP COLUMN IF EXISTS fints_balance_at")
     op.execute("ALTER TABLE account DROP COLUMN IF EXISTS fints_last_balance")

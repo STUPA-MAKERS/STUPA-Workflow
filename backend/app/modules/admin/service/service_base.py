@@ -9,7 +9,7 @@ a gremium delete removes.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from app.modules.audit.service import record as audit_record
 
@@ -30,6 +30,7 @@ class ConfigServiceBase:
     """Admin config operations bound to one ``AsyncSession`` — shared base."""
 
     def __init__(self, session: AsyncSession, *, storage: ObjectStorage | None = None) -> None:
+        """Bind the service to a session and the optional object storage."""
         self.session = session
         self.storage = storage
 
@@ -39,7 +40,7 @@ class ConfigServiceBase:
         action: AuditAction,
         target_type: str,
         target_id: UUID,
-        data: dict | None = None,
+        data: dict[str, Any] | None = None,
     ) -> None:
         await audit_record(
             self.session,

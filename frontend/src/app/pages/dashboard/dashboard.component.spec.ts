@@ -132,7 +132,7 @@ function delegation(direction: string | null, extra: Record<string, unknown> = {
   };
 }
 
-type Body = unknown | 'error' | 'pending';
+type Body = Parameters<TestRequest['flush']>[0] | 'error' | 'pending';
 
 interface SetupOpts {
   tasks?: Body;
@@ -359,11 +359,11 @@ describe('DashboardComponent', () => {
       expect(cmp(fixture).tabs().map((t: { count: number | null }) => t.count)).toEqual([null, null]);
     });
 
+    /** The user has own applications, so there is no card "Antrag stellen". */
     it('shows the empty state of each tab', async () => {
       const { fixture } = await setup(MEMBER, { tasks: [] });
       expect(screen.getByText('Nichts zu tun')).toBeInTheDocument();
       expect(cmp(fixture).tabEmpty()).toBe(true);
-      // The user has own applications: no card "Antrag stellen".
       expect(screen.queryByRole('heading', { name: 'Antrag stellen' })).not.toBeInTheDocument();
     });
 
@@ -382,6 +382,10 @@ describe('DashboardComponent', () => {
       expect(screen.getByText('Noch keine Anträge')).toBeInTheDocument();
     });
 
+    /**
+     * A row without a type name (the types failed) and without a title reads "Ohne Titel". Without
+     * `stateSince` the waiting time counts from the last change.
+     */
     it('builds the rows from what the list item holds', async () => {
       const { fixture } = await setup(MEMBER, {
         types: 'error',
@@ -402,10 +406,8 @@ describe('DashboardComponent', () => {
         },
       });
       const rows = cmp(fixture).taskRows();
-      // No type name (the types failed) and no title: "Ohne Titel".
       expect(rows[0].title).toBe(cmp(fixture).i18n.translate('applications.list.untitled'));
       expect(rows[0].statusLabel).toBe('');
-      // Without `stateSince` the waiting time counts from the last change.
       expect(rows[0].since).toBe('9 Tage');
       expect(rows[1].since).toBe('—');
       expect(rows[1].sinceTitle).toBeNull();
@@ -428,6 +430,9 @@ describe('DashboardComponent', () => {
   });
 
   describe('Heute', () => {
+    /**
+     * On the wide layout "Antrag stellen" stands at the foot of the work list, outside the sheet.
+     */
     it('shows the live meeting with progress, keeper, own vote state and "Live beitreten"', async () => {
       const started = new Date(2026, 8, 29, 18, 4).toISOString();
       const { fixture, http } = await setup(MEMBER, {
@@ -449,7 +454,6 @@ describe('DashboardComponent', () => {
         },
       });
       expect(fixture.nativeElement.classList).toContain('pane-page');
-      // Wide: "Antrag stellen" stands at the foot of the work list, outside the sheet.
       const fab = (fixture.nativeElement as HTMLElement).querySelector('app-fab');
       expect(fab?.closest('.dash__work')).not.toBeNull();
       expect(fab?.closest('.dash__today')).toBeNull();
@@ -497,8 +501,8 @@ describe('DashboardComponent', () => {
       expect(c.sub).toBe('');
     });
 
+    /** 2 October 2026 is a Friday. A row of other persons (no direction) gives no note. */
     it('lists the next meetings with the delegation note, weekday and time', async () => {
-      // 2 October 2026 is a Friday.
       const { fixture } = await setup(TREASURER, {
         timeline: {
           items: [
@@ -516,7 +520,6 @@ describe('DashboardComponent', () => {
       expect(rows).toHaveLength(3);
       expect(rows[0].note).toBe('Du vertrittst Konrad Pfeiffer');
       expect(rows[0].when).toBe('Fr, 17:30');
-      // A row of other persons (no direction) gives no note.
       expect(rows[1].note).toBeNull();
       expect(rows[2].when).toBe('');
       expect(screen.getByText('Du vertrittst Konrad Pfeiffer')).toBeInTheDocument();

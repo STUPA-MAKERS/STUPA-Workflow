@@ -1,4 +1,4 @@
-"""Z2, O15, O23, A7 and F12: the attendance rules through the real API.
+"""The attendance rules through the real API.
 
 * A member reports the own attendance as present or excused only (422 for absent).
 * The record of the meeting lead wins: the member gets 409 until the lead resets it.
@@ -66,6 +66,10 @@ def _row(roster: list[dict[str, object]], principal_id: uuid.UUID) -> dict[str, 
 async def test_member_reports_present_or_excused_only(
     maker: async_sessionmaker[AsyncSession], api: FastAPI, status: str
 ) -> None:
+    """Let a member report only present or excused.
+
+    The own report is not audited.
+    """
     s = await seed(maker, status=status, items=0)
     sub, pid = await _member(maker, s.gremium_id, "Anna")
     _as(api, sub)
@@ -85,7 +89,6 @@ async def test_member_reports_present_or_excused_only(
         "Krank",
         True,
     )
-    # The own report is not audited.
     assert await audit_actions(maker, target_id=s.meeting_id) == []
 
 
@@ -136,7 +139,10 @@ async def test_member_cannot_set_or_reset_others(
 async def test_present_refused_while_delegation_is_active(
     maker: async_sessionmaker[AsyncSession], api: FastAPI
 ) -> None:
-    """O23: the lead first revokes the delegation, then sets the member present."""
+    """The lead first revokes the delegation, then sets the member present.
+
+    Only the delegator is blocked, not the delegate.
+    """
     s = await seed(maker, status="live", items=0)
     _, delegator = await _member(maker, s.gremium_id, "Anna")
     _, delegate = await _member(maker, s.gremium_id, "Bert")
@@ -161,14 +167,13 @@ async def test_present_refused_while_delegation_is_active(
     assert present.status_code == 409, present.text
     assert present.json()["code"] == "delegation_active"
     assert excused.status_code == 200, excused.text
-    # Only the delegator is blocked, not the delegate.
     assert delegate_present.status_code == 200, delegate_present.text
 
 
 async def test_own_present_refused_while_delegation_is_active(
     maker: async_sessionmaker[AsyncSession], api: FastAPI
 ) -> None:
-    """O23 also holds for the own report. The delegator can still report an excuse."""
+    """The delegation rule holds for the own report. The delegator can still report an excuse."""
     s = await seed(maker, status="live", items=0)
     sub, delegator = await _member(maker, s.gremium_id, "Anna")
     _, delegate = await _member(maker, s.gremium_id, "Bert")
@@ -219,6 +224,11 @@ async def test_note_only_for_the_member_and_the_lead(
 async def test_lead_changes_are_audited_without_the_note(
     maker: async_sessionmaker[AsyncSession], api: FastAPI
 ) -> None:
+    """Audit the changes of the lead without the note.
+
+    Without a note the excuse keeps its reason. A second reset finds no record, so it makes
+    no change and writes no audit entry.
+    """
     s = await seed(maker, status="live", items=0)
     _, pid = await _member(maker, s.gremium_id, "Anna")
     url = f"/api/meetings/{s.meeting_id}/attendance/{pid}"
@@ -226,12 +236,10 @@ async def test_lead_changes_are_audited_without_the_note(
         first = client.put(url, json={"status": "excused", "note": "Zahnarzt"})
         assert first.status_code == 200, first.text
         assert _row(first.json(), pid)["note"] == "Zahnarzt"
-        # Without a note the excuse keeps its reason.
         kept = client.put(url, json={"status": "excused"})
         assert _row(kept.json(), pid)["note"] == "Zahnarzt"
         assert client.put(url, json={"status": "absent"}).status_code == 200
         assert client.delete(url).status_code == 200
-        # A second reset finds no record: no change and no audit entry.
         assert client.delete(url).status_code == 200
     entries = await audit_actions(maker, target_id=s.meeting_id)
     assert [e.action for e in entries] == [

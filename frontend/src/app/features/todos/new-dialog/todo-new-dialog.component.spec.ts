@@ -53,6 +53,7 @@ async function setup(opts: Opts = {}) {
 describe('TodoNewDialogComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
+  /** Only boards that take cards show, and people get a fallback name. */
   it('starts on the given board and column with the given title and links', async () => {
     const links: NewTodoLink[] = [{ kind: 'agenda_item', targetId: 't-1', label: 'TOP 5 · Haushalt' }];
     const { cmp, open, api } = await setup({
@@ -65,7 +66,6 @@ describe('TodoNewDialogComponent', () => {
     expect(cmp.column()).toBe('c-2');
     expect(cmp.title()).toBe('Bus');
     expect(screen.getByText('TOP 5 · Haushalt')).toBeInTheDocument();
-    // Only boards that take cards, people with a fallback name.
     expect(cmp.boardOptions().map((o) => o.value)).toEqual(['b-0', 'b-1', 'b-2', 'b-3']);
     expect(cmp.memberOptions().map((o) => o.label)).toEqual(['Niemand', 'Selin Yıldız', 'Jonas Weber', 'Gelöschte Person']);
     expect(cmp.columnOptions().map((o) => o.label)).toEqual(['Offen', 'In Arbeit', 'Wartet', 'Erledigt']);
@@ -138,21 +138,21 @@ describe('TodoNewDialogComponent', () => {
     expect(cmp.members()).toEqual(MEMBERS);
   });
 
+  /** The button opens and closes the picker. */
   it('adds a picked target, takes a linked one off and removes a chip', async () => {
     const { cmp, open, fixture } = await setup();
     open();
-    cmp.pickLink({ kind: 'ticket', targetId: 't-7', title: 'Login', detail: null });
+    cmp.pickLink({ kind: 'ticket', targetId: 't-7', title: 'Login', detail: {} });
     fixture.detectChanges();
     expect(screen.getByText('Ticket · Login')).toBeInTheDocument();
     expect(cmp.linkedKeys().has('ticket:t-7')).toBe(true);
-    cmp.pickLink({ kind: 'ticket', targetId: 't-7', title: 'Login', detail: null });
+    cmp.pickLink({ kind: 'ticket', targetId: 't-7', title: 'Login', detail: {} });
     expect(cmp.links()).toEqual([]);
-    cmp.pickLink({ kind: 'todo', targetId: 'k-9', title: 'Andere', detail: null });
+    cmp.pickLink({ kind: 'todo', targetId: 'k-9', title: 'Andere', detail: {} });
     fixture.detectChanges();
     fireEvent.click(screen.getByRole('button', { name: 'Verknüpfung mit To-Do · Andere entfernen' }));
     expect(cmp.links()).toEqual([]);
     expect(cmp.icon('ticket')).toBe(LINK_ICON.ticket);
-    // The button opens and closes the picker.
     fireEvent.click(screen.getByRole('button', { name: /Verknüpfen/ }));
     expect(cmp.pickerOpen()).toBe(true);
   });
@@ -311,6 +311,7 @@ describe('TodoNewDialogComponent from a ticket', () => {
 
   afterEach(() => localStorage.clear());
 
+  /** Read-only boards are no choice. */
   it('starts from the ticket, the team board and its first column, without a description', async () => {
     const { c, api } = await ticketSetup();
     expect(screen.getByRole('dialog', { name: 'To-Do aus Ticket anlegen' })).toBeInTheDocument();
@@ -318,7 +319,6 @@ describe('TodoNewDialogComponent from a ticket', () => {
     expect(c.selectedBoard()).toBe('tb');
     expect(api.board).toHaveBeenCalledWith('tb');
     expect(c.column()).toBe('tb-c1');
-    // Read-only boards are no choice.
     expect(c.boardOptions().map((o) => o.value)).toEqual(['gb', 'pb', 'tb']);
     expect(c.columnOptions().map((o) => o.label)).toEqual(['Offen', 'In Arbeit']);
     expect(c.memberOptions().map((o) => o.label)).toEqual(['Niemand', 'Mara Keller', 'Gelöschte Person']);

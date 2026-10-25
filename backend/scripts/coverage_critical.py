@@ -1,4 +1,4 @@
-"""Separate coverage gate for the critical modules (testing.md §1).
+"""Separate coverage gate for the critical modules.
 
 `auth`, `voting`, `flow`, `budget`, `webhooks` and `audit` must reach 100 % branch
 coverage. This gate is stricter than the overall gate. The overall gate uses
@@ -6,9 +6,8 @@ coverage. This gate is stricter than the overall gate. The overall gate uses
 
 The script reads `coverage.xml` and the module list from `[tool.coverage_critical]` in
 `pyproject.toml`. Run `coverage xml` first to write the report. A module whose path has
-no class in the report counts as absent, and the script skips it. The gate therefore
-stays green until a follow-up task adds the module. After that the gate applies again on
-its own.
+no class in the report counts as absent, and the script skips it, so the gate stays green
+for that module. When the module has classes in the report, the gate applies again.
 
 CLI: `python -m scripts.coverage_critical [coverage.xml] [pyproject.toml]`
 Exit 0 = pass or nothing to check. Exit 1 = a module is below the minimum.
@@ -26,6 +25,7 @@ class ClassCoverage:
     """Branch coverage of one source file, as read from coverage.xml."""
 
     def __init__(self, filename: str, branch_rate: float) -> None:
+        """Store the file name and its branch rate."""
         self.filename = filename
         self.branch_rate = branch_rate
 
@@ -40,8 +40,11 @@ def load_config(pyproject: Path) -> tuple[list[str], float]:
 
 
 def parse_classes(coverage_xml: Path) -> list[ClassCoverage]:
-    """Read every <class> entry of coverage.xml with its file name and branch rate."""
-    root = ElementTree.parse(coverage_xml).getroot()  # noqa: S314 — our own artifact
+    """Read every <class> entry of coverage.xml with its file name and branch rate.
+
+    The file is our own coverage artifact, so the plain ElementTree parser is safe here.
+    """
+    root = ElementTree.parse(coverage_xml).getroot()
     result: list[ClassCoverage] = []
     for cls in root.iter("class"):
         filename = cls.get("filename", "")
@@ -60,13 +63,15 @@ def check(classes: list[ClassCoverage], modules: list[str], min_rate: float) -> 
     Returns:
         One message for each file with a branch rate below `min_rate`. An empty list
         means the gate passes.
+
+    A module without any entry in the report does not exist yet, so its gate stays inactive.
     """
     failures: list[str] = []
     for module in modules:
         prefix = _normalize(module)
         matched = [c for c in classes if c.filename.startswith(prefix)]
         if not matched:
-            continue  # The module does not exist yet. The gate stays inactive.
+            continue
         for cls in matched:
             if cls.branch_rate < min_rate:
                 pct = cls.branch_rate * 100
@@ -78,6 +83,11 @@ def check(classes: list[ClassCoverage], modules: list[str], min_rate: float) -> 
 
 
 def main(argv: list[str]) -> int:
+    """Run the branch gate of the critical modules; return the exit code.
+
+    Args:
+        argv: Optional path of coverage.xml, then optional path of pyproject.toml.
+    """
     xml_path = Path(argv[0]) if argv else Path("coverage.xml")
     pyproject = Path(argv[1]) if len(argv) > 1 else Path("pyproject.toml")
 

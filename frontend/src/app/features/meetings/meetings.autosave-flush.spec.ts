@@ -12,10 +12,10 @@ import type { MeetingOutWire, ProtocolOutWire } from '@core/api/models';
 import { WsService } from '@core/ws/ws.service';
 import { MeetingsComponent } from './meetings.component';
 
-// Focus suite: the user switches the TOP selected in the editor. A pending
-// debounced autosave of the text of the previous TOP must NOT get lost.
-// The component must send it to the server at once.
-
+/**
+ * When the user switches the TOP selected in the editor, a pending debounced autosave of the text
+ * of the previous TOP must not get lost. The component must send it to the server at once.
+ */
 const MEETING: MeetingOutWire = {
   id: 'm-1',
   title: 'StuPa-Sitzung',
@@ -146,7 +146,12 @@ async function loaded() {
   return { ...view, http, cmp };
 }
 
-describe('MeetingsComponent — AUD-012 autosave flush on TOP switch', () => {
+describe('MeetingsComponent — autosave flush on TOP switch', () => {
+  /**
+   * The test types in TOP t-1 and does not wait for the debounce. The component keeps the text
+   * locally (optimistic), so it stays in the UI. A switch to t-2 within the debounce window must
+   * save t-1. No trailing timer is left, because it would cause a duplicate or delayed save.
+   */
   it('flushes the pending TOP body save before switching TOPs (no silent loss)', async () => {
     jest.useFakeTimers();
     try {
@@ -156,13 +161,10 @@ describe('MeetingsComponent — AUD-012 autosave flush on TOP switch', () => {
         AGENDA_ITEM({ id: 't-2', position: 1 }),
       ] as never);
 
-      // Type in TOP t-1, but do NOT wait until the debounce ends.
       cmp.onTopBodyChange('t-1', 'Wichtiges Protokoll');
       expect(cmp.saveState()).toBe('idle');
-      // The component keeps the text locally (optimistic) so it stays in the UI.
       expect(cmp.agenda().find((a) => a.id === 't-1')?.body).toBe('Wichtiges Protokoll');
 
-      // Switch to t-2 within the debounce window → MUST save t-1.
       cmp.selectTop('t-2');
       const req = http.expectOne('/api/meetings/m-1/agenda/t-1');
       expect(req.request.method).toBe('PATCH');
@@ -170,7 +172,6 @@ describe('MeetingsComponent — AUD-012 autosave flush on TOP switch', () => {
       req.flush([AGENDA_ITEM({ body: 'Wichtiges Protokoll' })]);
       expect(cmp.selectedTopId()).toBe('t-2');
 
-      // No trailing timer is left. Otherwise a duplicate or delayed save follows.
       jest.advanceTimersByTime(5000);
       http.verify();
     } finally {
@@ -178,7 +179,8 @@ describe('MeetingsComponent — AUD-012 autosave flush on TOP switch', () => {
     }
   });
 
-  it('sends the handover only after the pending TOP body is saved (Z3)', async () => {
+  /** The write right can move with the handover, so the POST waits for the save. */
+  it('sends the handover only after the pending TOP body is saved', async () => {
     jest.useFakeTimers();
     try {
       const { cmp, http } = await loaded();
@@ -189,7 +191,6 @@ describe('MeetingsComponent — AUD-012 autosave flush on TOP switch', () => {
       cmp.handOver(cmp.meeting()!, 'now');
       const save = http.expectOne('/api/meetings/m-1/agenda/t-1');
       expect(save.request.body).toEqual({ body: 'Letzter Satz' });
-      // The write right can move with the handover, so the POST waits for the save.
       http.expectNone('/api/meetings/m-1/protokollant-handover');
       save.flush([AGENDA_ITEM({ body: 'Letzter Satz' })]);
       const handover = http.expectOne('/api/meetings/m-1/protokollant-handover');

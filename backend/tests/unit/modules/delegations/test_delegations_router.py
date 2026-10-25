@@ -27,7 +27,7 @@ from app.shared.errors import ForbiddenError, NotFoundError, ValidationProblem
 NOW = datetime(2026, 6, 6, 12, 0, tzinfo=UTC)
 
 
-def _out(**over) -> DelegationOut:  # noqa: ANN003
+def _out(**over) -> DelegationOut:
     base = dict(
         id=uuid4(),
         meeting_id=uuid4(),
@@ -50,24 +50,24 @@ def _out(**over) -> DelegationOut:  # noqa: ANN003
 
 
 class _FakeService:
-    async def list(self, actor, meeting_id=None):  # noqa: ANN001
+    async def list(self, actor, meeting_id=None):
         return [_out()]
 
-    async def create(self, payload, actor):  # noqa: ANN001
+    async def create(self, payload, actor):
         return _out(
             meeting_id=payload.meeting_id,
             delegate_id=payload.delegate_id,
             delegate_voting=payload.delegate_voting,
         )
 
-    async def revoke(self, delegation_id, actor):  # noqa: ANN001
+    async def revoke(self, delegation_id, actor):
         if str(delegation_id).startswith("00000000"):
             raise NotFoundError("nope")
         if str(delegation_id).startswith("11111111"):
             raise ForbiddenError("not yours")
         return None
 
-    async def meeting_context(self, meeting_id, actor):  # noqa: ANN001
+    async def meeting_context(self, meeting_id, actor):
         return MeetingDelegationContext(
             meeting_id=meeting_id,
             gremium_id=uuid4(),
@@ -90,11 +90,11 @@ class _FakeService:
             ],
         )
 
-    async def recipients(self, meeting_id, q, actor, delegator_id=None):  # noqa: ANN001
+    async def recipients(self, meeting_id, q, actor, delegator_id=None):
         self.recipients_delegator = delegator_id
         return []
 
-    async def vote_status(self, vote_id, actor):  # noqa: ANN001
+    async def vote_status(self, vote_id, actor):
         return VoteDelegationStatus(
             blocked=True,
             delegated_to_name="Other",
@@ -102,7 +102,7 @@ class _FakeService:
             delegated_by_name=None,
         )
 
-    async def substitutes_list(self, gremium_id, actor):  # noqa: ANN001
+    async def substitutes_list(self, gremium_id, actor):
         return [
             SubstituteOut(
                 id=uuid4(),
@@ -114,7 +114,7 @@ class _FakeService:
             )
         ]
 
-    async def substitute_create(self, payload, actor):  # noqa: ANN001
+    async def substitute_create(self, payload, actor):
         return SubstituteOut(
             id=uuid4(),
             gremium_id=payload.gremium_id,
@@ -124,12 +124,12 @@ class _FakeService:
             substitute_name="Sub",
         )
 
-    async def substitute_delete(self, substitute_id, actor):  # noqa: ANN001
+    async def substitute_delete(self, substitute_id, actor):
         return None
 
 
 class _RaisingService(_FakeService):
-    async def create(self, payload, actor):  # noqa: ANN001
+    async def create(self, payload, actor):
         raise ValidationProblem(
             "disabled", errors=[{"field": "delegateVoting", "msg": "disabled"}]
         )
@@ -244,7 +244,7 @@ def test_recipients_requires_session_401() -> None:
 
 
 def test_recipients_passes_the_delegator_id() -> None:
-    """O6: the lead asks for the pool substitutes of one member."""
+    """The lead asks for the pool substitutes of one member."""
     service = _FakeService()
     a = uuid4()
     client = _client(_MEMBER, service)

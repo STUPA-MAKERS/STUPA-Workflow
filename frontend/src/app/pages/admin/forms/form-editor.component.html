@@ -53,8 +53,6 @@
               @for (field of group.fields; track $index; let qi = $index) {
                 @if (qi > 0) { <hr class="fe__divider" aria-hidden="true" /> }
                 <div class="fe__pv-field">
-                  <!-- An info text shows its text once: a bold label only over a help
-                       text of its own (the rule of the wizard). -->
                   @if (field.type !== 'markdown' || infoHelp(field)) {
                     <label class="fe__pv-label">
                       {{ resolved(field.label) || ('admin.forms.untitledQuestion' | t) }}
@@ -94,7 +92,6 @@
           }
         </article>
       } @else {
-        <!-- The outline: every group with its questions. -->
         <nav class="fe__outline" appScrollFade="y" [attr.aria-label]="'admin.form.outline' | t">
           @for (group of groups(); track $index; let gi = $index) {
             <section
@@ -171,7 +168,6 @@
           </app-button>
         </nav>
 
-        <!-- The cards of the shown group. -->
         <div class="fe__main" appScrollFade="y">
           @if (duplicates().length > 0) {
             <p class="fe__alert" role="alert">{{ 'admin.form.dupKeys' | t: { keys: duplicates().join(', ') } }}</p>
@@ -215,8 +211,6 @@
                 (focusin)="focusCard(pos)"
                 (click)="focusCard(pos)"
               >
-                <!-- The actions of the head stop their click here: a click that reaches the
-                     card would select the old place again after a move. -->
                 <div class="fe__cardHead">
                   <h3 class="cap fe__cardTitle ell">{{ resolved(field.label) || ('admin.forms.untitledQuestion' | t) }}</h3>
                   <app-move-buttons (click)="$event.stopPropagation()" (move)="moveQuestion(pos, $event)" />
@@ -384,7 +378,6 @@
         </div>
       }
 
-      <!-- The form settings and the versions. -->
       <aside class="fe__side" appScrollFade="y">
         <section class="fe__card fe__meta" [attr.aria-label]="'admin.form.formCard' | t">
           <h2 class="cap fe__cap">{{ 'admin.form.formCard' | t }}</h2>
@@ -439,8 +432,6 @@
   }
 </section>
 
-<!-- The menu of the question types. It sits outside the scrolling columns, so their
-     edges and fades do not cut it; it opens at its button, above it near the bottom. -->
 @if (typeMenuGroup() !== null && !phone()) {
   @let gi = typeMenuGroup() ?? 0;
   <div
@@ -460,7 +451,6 @@
   </div>
 }
 
-<!-- Phone: the question types open in a bottom sheet. -->
 @if (phone()) {
   <app-side-sheet
     side="bottom"

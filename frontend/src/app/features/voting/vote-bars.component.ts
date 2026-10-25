@@ -15,15 +15,15 @@ interface BarRow {
   tone: SegTone;
 }
 
-/** Ja in the accent, Nein in the error colour, Enthaltung grey (board Beamer). */
+/** Ja in the accent, Nein in the error colour, Enthaltung grey. */
 const TONES: Record<string, SegTone> = { yes: 'filled', no: 'error', abstain: 'muted' };
 
 /**
  * The result of a vote: one row per option with the count, the share of the cast
  * ballots and a bar, and above them the result as status text.
  *
- * "Angenommen" takes the accent, "Abgelehnt" the error colour. A tie is a rejection
- * (O18): the server has no tie break, so `tie` shows as "Abgelehnt". A missed quorum
+ * "Angenommen" takes the accent, "Abgelehnt" the error colour. A tie is a rejection:
+ * the server has no tie break, so `tie` shows as "Abgelehnt". A missed quorum
  * adds "Quorum nicht erreicht".
  *
  * The vote page, the live page and the beamer share this component. It shows
@@ -71,7 +71,7 @@ export class VoteBarsComponent {
     });
   });
 
-  /** The status line. Every result that is not `passed` is a rejection (O18). */
+  /** The status line. Every result that is not `passed` is a rejection. */
   protected readonly status = computed<StatusView | null>(() => {
     const result = this.result();
     if (!result) return null;

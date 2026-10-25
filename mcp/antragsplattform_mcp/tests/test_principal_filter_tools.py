@@ -1,4 +1,4 @@
-"""Tests for the filters of `list_principals` and the missing revoke tool (F3).
+"""Tests for the filters of `list_principals` and the missing revoke tool.
 
 `list_principals` sends the user-list filters in camelCase; a None filter stays off
 the wire. "Rechte entziehen" (`/admin/principals/{id}/revoke`) is a web-only action:

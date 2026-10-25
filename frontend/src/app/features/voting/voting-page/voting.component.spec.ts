@@ -172,6 +172,7 @@ describe('VotingComponent', () => {
       expect(screen.getByText('1 offen')).toBeInTheDocument();
     });
 
+    /** An empty question falls back, and there is no ballot state without a voting right. */
     it('names the meeting without a number, else the gremium; a cast ballot reads "Abgestimmt"', async () => {
       await start('/voting', {
         pages: [
@@ -184,12 +185,12 @@ describe('VotingComponent', () => {
       });
       expect(screen.getByText('Sitzung ohne TOP')).toBeInTheDocument();
       expect(screen.getByText('Abgestimmt')).toBeInTheDocument();
-      // An empty question falls back; no ballot state without a voting right.
       expect(screen.getByRole('link', { name: 'Beschlussfrage' })).toBeInTheDocument();
       expect(screen.getAllByText('Stimme offen')).toHaveLength(1);
       expect(screen.getByText('bis 07.10.2026')).toBeInTheDocument();
     });
 
+    /** A tie is a rejection. */
     it('groups the open votes, the drafts and the ended votes by month', async () => {
       await start('/voting', {
         manager: true,
@@ -212,14 +213,13 @@ describe('VotingComponent', () => {
       expect(groups).toEqual(['Offen', 'Entwürfe', 'September 2026', 'August 2026']);
       expect(screen.getByText('Entwurf')).toBeInTheDocument();
       expect(screen.getByText('Angenommen')).toBeInTheDocument();
-      // A tie is a rejection (O18).
       expect(screen.getByText('Abgelehnt')).toBeInTheDocument();
       expect(screen.getByText('Abgebrochen')).toBeInTheDocument();
       expect(screen.getByText('12.09.2026')).toBeInTheDocument();
       expect(screen.getByText('20.09.2026')).toBeInTheDocument();
     });
 
-    it('shows the result of a closed election, not a rejection (F2)', async () => {
+    it('shows the result of a closed election, not a rejection', async () => {
       await start('/voting', {
         pages: [page([item('e1', { status: 'closed', kind: 'election', result: 'elected' })])],
       });
@@ -241,6 +241,10 @@ describe('VotingComponent', () => {
   });
 
   describe('polls', () => {
+    /**
+     * The poll is no decision, so its empty result reads no "Abgelehnt". The end is in the line
+     * below the title, so the time is the start.
+     */
     it('reads "Umfrage offen" and "Umfrage beendet"; a Gremium poll names its Gremium and its end', async () => {
       await start('/voting', {
         pages: [
@@ -266,10 +270,8 @@ describe('VotingComponent', () => {
       });
       expect(screen.getByText('Umfrage offen')).toBeInTheDocument();
       expect(screen.getByText('Umfrage beendet')).toBeInTheDocument();
-      // The poll is no decision: no "Abgelehnt" for its empty result.
       expect(screen.queryByText('Abgelehnt')).not.toBeInTheDocument();
       expect(screen.getByText(/^STUPA · bis Fr, 30\.10\., \d\d:00$/)).toBeInTheDocument();
-      // The end is in the line below the title, so the time is the start.
       expect(screen.getByText('seit 09:05')).toBeInTheDocument();
       expect(screen.getByText('TOP 2 · 34. Sitzung')).toBeInTheDocument();
       expect(screen.getByText('Stimme offen')).toBeInTheDocument();
@@ -411,6 +413,7 @@ describe('VotingComponent', () => {
   });
 
   describe('filters', () => {
+    /** A gremium that the person is not in shows its id until a row names it. */
     it('reads the filters from the URL and sends them', async () => {
       const { listVotes, cmp } = await start('/voting?status=ended&gremium=g2&q=Haushalt');
       expect(listVotes).toHaveBeenCalledWith({
@@ -421,7 +424,6 @@ describe('VotingComponent', () => {
         offset: 0,
       });
       expect(cmp.activeFilterCount()).toBe(3);
-      // A gremium that the person is not in shows its id until a row names it.
       expect(cmp.gremiumChipLabel()).toBe('g2');
     });
 
@@ -431,6 +433,7 @@ describe('VotingComponent', () => {
       expect(listVotes).toHaveBeenCalledWith(expect.objectContaining({ status: undefined }));
     });
 
+    /** An emptied field shows the whole list at once. */
     it('searches by itself after a short pause', async () => {
       jest.useFakeTimers({ doNotFake: ['Date'] });
       try {
@@ -441,7 +444,6 @@ describe('VotingComponent', () => {
         jest.advanceTimersByTime(LIVE_SEARCH_DEBOUNCE_MS);
         expect(navigate).toHaveBeenCalledTimes(1);
         expect(navigate).toHaveBeenCalledWith([], expect.objectContaining({ queryParams: { q: 'Haushalt' } }));
-        // An emptied field shows the whole list at once.
         cmp.search.set('  ');
         expect(navigate).toHaveBeenLastCalledWith([], expect.objectContaining({ queryParams: { q: null } }));
       } finally {
@@ -509,11 +511,11 @@ describe('VotingComponent', () => {
       expect(listVotes).toHaveBeenCalledWith(expect.objectContaining({ status: undefined }));
     });
 
+    /** A member has no draft option, so the chip shows the raw value. */
     it('labels the status chip by its value', async () => {
       const { cmp } = await start('/voting?status=open');
       expect(cmp.statusChipLabel()).toBe('Offen');
       cmp.statusFilter.set('draft');
-      // A member has no draft option: the chip shows the raw value.
       expect(cmp.statusChipLabel()).toBe('draft');
       cmp.statusFilter.set('');
       expect(cmp.statusChipLabel()).toBe('Status');
@@ -648,6 +650,7 @@ describe('VotingComponent', () => {
       expect(live.open).not.toHaveBeenCalled();
     });
 
+    /** The same state again (a replay of the same vote) is no event. */
     it('reloads on a vote that opens, closes or is cancelled, once per burst', async () => {
       jest.useFakeTimers({ doNotFake: ['Date'] });
       try {
@@ -661,7 +664,6 @@ describe('VotingComponent', () => {
         jest.advanceTimersByTime(VOTE_LIVE_DEBOUNCE);
         expect(listVotes).toHaveBeenCalledTimes(1);
         listVotes.mockClear();
-        // The same state again (a replay of the same vote) is no event.
         s.result.set({ type: 'vote_closed', voteId: 'v7', result: 'passed', counts: {} });
         harness.detectChanges();
         jest.advanceTimersByTime(VOTE_LIVE_DEBOUNCE);
@@ -773,11 +775,14 @@ describe('VotingComponent', () => {
       });
     });
 
+    /**
+     * The first row is closed, so the first load opens nothing by itself. The list still loads
+     * again; only the detail stays. A reconnect replays the same vote, which is no event at all.
+     */
     it('does not open the vote that a connect replays, but a vote that opens after it', async () => {
       const restore = matchMediaQueries(MEDIA.wide);
       jest.useFakeTimers({ doNotFake: ['Date'] });
       try {
-        // The first row is closed, so the first load opens nothing by itself.
         const { sessions, harness, router, listVotes } = await start('/voting', {
           live: [{ id: 'm1', status: 'live' }],
           pages: [page([item('c1', { status: 'closed', result: 'passed' })])],
@@ -788,10 +793,8 @@ describe('VotingComponent', () => {
         s.openVote.set(opened('v7', true));
         harness.detectChanges();
         jest.advanceTimersByTime(VOTE_LIVE_DEBOUNCE);
-        // The list still loads again; only the detail stays.
         expect(listVotes).toHaveBeenCalledTimes(1);
         expect(navigate).not.toHaveBeenCalled();
-        // A reconnect replays the same vote: no event at all.
         s.openVote.set(opened('v7', true));
         harness.detectChanges();
         jest.advanceTimersByTime(VOTE_LIVE_DEBOUNCE);
@@ -809,11 +812,13 @@ describe('VotingComponent', () => {
       }
     });
 
+    /**
+     * The setup is the one-pane layout, the ended votes only, and a live meeting with an open vote
+     * that the filter hides. A vote that opens now still opens, with the filters kept.
+     */
     it('keeps a filtered list when a connect replays a vote that the filter hides', async () => {
       jest.useFakeTimers({ doNotFake: ['Date'] });
       try {
-        // One pane at a time, the ended votes only, and a live meeting with an open vote
-        // that the filter hides.
         for (const url of ['/voting?status=ended', '/voting?gremium=g2', '/voting?q=Mensa']) {
           TestBed.resetTestingModule();
           const { sessions, harness, router } = await start(url, {
@@ -826,7 +831,6 @@ describe('VotingComponent', () => {
           harness.detectChanges();
           jest.advanceTimersByTime(VOTE_LIVE_DEBOUNCE);
           expect(navigate).not.toHaveBeenCalled();
-          // A vote that opens now still opens, with the filters kept.
           s.openVote.set(opened('v8'));
           harness.detectChanges();
           jest.advanceTimersByTime(VOTE_LIVE_DEBOUNCE);
@@ -908,6 +912,7 @@ describe('VotingComponent', () => {
     expect(cmp.items().map((i) => i.id)).toEqual(['v1']);
   });
 
+  /** Without child routes the filters navigate relative to the page itself. */
   it('reads the next page of the timeline to find the live meetings', async () => {
     const listMeetingsTimeline = jest
       .fn()
@@ -916,7 +921,6 @@ describe('VotingComponent', () => {
     const live = { open: jest.fn(() => fakeSession()) };
     TestBed.configureTestingModule({
       providers: [
-        // No child routes: the filters navigate relative to the page itself.
         provideRouter([{ path: 'voting', component: VotingComponent }]),
         { provide: ApiClient, useValue: { listVotes: () => of(page([])), listMeetingsTimeline } },
         {

@@ -60,14 +60,18 @@ class FakeSession:
     """Stub for `AsyncSession` where `execute` returns the results in order."""
 
     def __init__(self, results: Iterable[FakeResult] = ()) -> None:
+        """Set up the result queues.
+
+        ``session.get(Model, id)`` in the delegation service has its own queue,
+        independent of the ``execute`` order; the default ``None`` means not found. The
+        statements are recorded, so a test can check one, for example the vote
+        cancellation UPDATE.
+        """
         self._results = list(results)
         self.scalar_results: list[Any] = []
-        # Separate queue for `session.get(Model, id)` in the delegation service. It is
-        # independent of the `execute` order. The default `None` means not found.
         self.get_results: list[Any] = []
         self.added: list[Any] = []
         self.deleted: list[Any] = []
-        # Recorded so a test can check a statement, for example the vote cancellation UPDATE.
         self.statements: list[Any] = []
         self.flushed = 0
         self.committed = 0
@@ -92,7 +96,7 @@ class FakeSession:
         return None
 
     async def scalar(self, _stmt: Any) -> Any:
-        """Stand-in for `session.scalar`, used for example by `_deadline_passed`.
+        """Stand-in for `session.scalar`, used for example by the task mail.
 
         This method reads its own queue and defaults to `None`. The `execute` order of
         the tests stays unchanged.
@@ -122,8 +126,8 @@ class FakeSession:
     async def refresh(self, _obj: Any) -> None:
         """Stand-in for `session.refresh` that does nothing.
 
-        After the commit the service reloads the application. It then materializes the
-        deadline of the new state.
+        A service can reload an object after a commit. The fake keeps the object as it
+        is.
         """
 
 

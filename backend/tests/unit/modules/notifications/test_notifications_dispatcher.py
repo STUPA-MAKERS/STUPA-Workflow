@@ -1,9 +1,9 @@
-"""Tests of the `notify` flow action dispatcher (T-18) with a fake service."""
+"""Tests of the `notify` flow action dispatcher with a fake service."""
 
 from __future__ import annotations
 
 import uuid
-from typing import cast
+from typing import Any, cast
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -28,7 +28,7 @@ def _sessionmaker(session: FakeSession) -> async_sessionmaker[AsyncSession]:
     return cast("async_sessionmaker[AsyncSession]", lambda: _CM())
 
 
-def _action(action_type: str, params: dict | None = None) -> DispatchedAction:
+def _action(action_type: str, params: dict[str, Any] | None = None) -> DispatchedAction:
     app_id = uuid.uuid4()
     return DispatchedAction(
         type=action_type,
@@ -41,13 +41,14 @@ def _action(action_type: str, params: dict | None = None) -> DispatchedAction:
 
 
 async def test_dispatch_notify_calls_service(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Call the service; an applicant with an account and the team both open the application."""
     captured: dict[str, object] = {}
 
     class FakeService:
-        def __init__(self, session, *, queue, settings) -> None:  # noqa: ANN001
+        def __init__(self, session, *, queue, settings) -> None:
             captured["session"] = session
 
-        async def handle_notify_action(self, action, **kw):  # noqa: ANN001, ANN003
+        async def handle_notify_action(self, action, **kw):
             captured["action"] = action
             captured["kw"] = kw
             return 1
@@ -68,7 +69,6 @@ async def test_dispatch_notify_calls_service(monkeypatch: pytest.MonkeyPatch) ->
     assert kw["lang"] == "en"  # type: ignore[index]
     assert kw["context"]["applicationId"] == str(action.application_id)  # type: ignore[index]
     assert kw["context"]["applicationTitle"] == "Beamer"  # type: ignore[index]
-    # An applicant with an account and the team both open the application.
     url = f"{SETTINGS.public_base_url.rstrip('/')}/applications/{action.application_id}"
     assert kw["applicant_link"].url == url  # type: ignore[index]
     assert kw["team_link"].url == url  # type: ignore[index]
@@ -81,10 +81,10 @@ async def test_dispatch_notify_links_a_guest_to_the_applicant_page(
     captured: dict[str, object] = {}
 
     class FakeService:
-        def __init__(self, *a, **k) -> None:  # noqa: ANN002, ANN003
+        def __init__(self, *a, **k) -> None:
             pass
 
-        async def handle_notify_action(self, action, **kw):  # noqa: ANN001, ANN003
+        async def handle_notify_action(self, action, **kw):
             captured["kw"] = kw
             return 1
 
@@ -103,27 +103,27 @@ async def test_dispatch_skips_non_notify(monkeypatch: pytest.MonkeyPatch) -> Non
     called: list[bool] = []
 
     class FakeService:
-        def __init__(self, *a, **k) -> None:  # noqa: ANN002, ANN003
+        def __init__(self, *a, **k) -> None:
             called.append(True)
 
-        async def handle_notify_action(self, *a, **k):  # noqa: ANN002, ANN003
+        async def handle_notify_action(self, *a, **k):
             called.append(True)
             return 1
 
     monkeypatch.setattr(mod, "NotificationService", FakeService)
     disp = NotificationActionDispatcher(_sessionmaker(FakeSession()), None, SETTINGS)
     await disp.dispatch([_action("webhook"), _action("budgetReserve")])
-    assert called == []  # the dispatcher never built or called the service
+    assert called == []
 
 
 async def test_dispatch_notify_merges_context(monkeypatch: pytest.MonkeyPatch) -> None:
     captured: dict[str, object] = {}
 
     class FakeService:
-        def __init__(self, *a, **k) -> None:  # noqa: ANN002, ANN003
+        def __init__(self, *a, **k) -> None:
             pass
 
-        async def handle_notify_action(self, action, **kw):  # noqa: ANN001, ANN003
+        async def handle_notify_action(self, action, **kw):
             captured["kw"] = kw
             return 1
 
@@ -140,23 +140,23 @@ async def test_dispatch_notify_merges_context(monkeypatch: pytest.MonkeyPatch) -
 async def test_dispatch_task_notify_sends_kind_mail(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """`taskNotify` (#4-3) resolves the recipients at send time and uses send_kind_mail."""
+    """`taskNotify` resolves the recipients at send time and uses send_kind_mail."""
     captured: dict[str, object] = {}
 
     class FakeService:
-        def __init__(self, session, *, queue, settings) -> None:  # noqa: ANN001
+        def __init__(self, session, *, queue, settings) -> None:
             pass
 
-        async def send_kind_mail(self, recipients, **kw):  # noqa: ANN001, ANN003
+        async def send_kind_mail(self, recipients, **kw):
             captured["recipients"] = recipients
             captured["kw"] = kw
             return True
 
-    async def fake_actionable(session, *, application_id, state):  # noqa: ANN001
+    async def fake_actionable(session, *, application_id, state):
         captured["application_id"] = application_id
         return ["team@x.de"]
 
-    async def fake_state_actionable(session, state):  # noqa: ANN001
+    async def fake_state_actionable(session, state):
         return True
 
     import app.modules.notifications.recipients as recipients_mod
@@ -168,7 +168,7 @@ async def test_dispatch_task_notify_sends_kind_mail(
     monkeypatch.setattr(recipients_mod, "state_actionable", fake_state_actionable)
     session = FakeSession(
         executes=[[({"title": "Beamer"}, uuid.uuid4(), True)]],
-        scalar=[None],  # the state lookup needs no hit
+        scalar=[None],
     )
     disp = NotificationActionDispatcher(_sessionmaker(session), None, SETTINGS)
     action = _action("taskNotify")
@@ -185,18 +185,18 @@ async def test_dispatch_task_notify_sends_kind_mail(
 async def test_dispatch_task_notify_skips_non_actionable_state(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """#9: the new state has no actionable transition, so no task mail goes out."""
+    """The new state has no actionable transition, so no task mail goes out."""
     captured: dict[str, object] = {}
 
     class FakeService:
-        def __init__(self, session, *, queue, settings) -> None:  # noqa: ANN001
+        def __init__(self, session, *, queue, settings) -> None:
             pass
 
-        async def send_kind_mail(self, recipients, **kw):  # noqa: ANN001, ANN003
+        async def send_kind_mail(self, recipients, **kw):
             captured["recipients"] = recipients
             return True
 
-    async def fake_state_actionable(session, state):  # noqa: ANN001
+    async def fake_state_actionable(session, state):
         return False
 
     import app.modules.notifications.recipients as recipients_mod
@@ -210,10 +210,7 @@ async def test_dispatch_task_notify_skips_non_actionable_state(
     disp = NotificationActionDispatcher(_sessionmaker(session), None, SETTINGS)
     await disp.dispatch([_action("taskNotify")])
 
-    assert "recipients" not in captured  # the dispatcher skipped the send
-
-
-# --- #19: the applicant mail follows the language of the application ---------
+    assert "recipients" not in captured
 
 
 class _CapturingService:
@@ -221,10 +218,10 @@ class _CapturingService:
 
     captured: dict[str, object] = {}
 
-    def __init__(self, session, *, queue, settings) -> None:  # noqa: ANN001
+    def __init__(self, session, *, queue, settings) -> None:
         pass
 
-    async def handle_notify_action(self, action, **kw):  # noqa: ANN001, ANN003
+    async def handle_notify_action(self, action, **kw):
         type(self).captured.update(kw)
         return 1
 
@@ -236,35 +233,38 @@ def _capture(monkeypatch: pytest.MonkeyPatch) -> dict[str, object]:
     return _CapturingService.captured
 
 
-def _applicant_notify(params: dict) -> DispatchedAction:
+def _applicant_notify(params: dict[str, Any]) -> DispatchedAction:
     return _action("notify", params)
 
 
 async def test_applicant_only_notify_uses_the_application_language(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """#19: an English application gets an English mail, with the status label.
+    """An English application gets an English mail, with the status label.
 
     The test drives the real `NotificationService`, so the assertion covers the
     rendered subject and body, not only the language argument.
+
+    The fakes feed the application row, its language (en), the state label, and no opt-out
+    or template override.
     """
     from app.modules.notifications.service import NotificationService
     from tests._support.notifications_fakes import FakeQueue, FakeResolver
 
     class _Service(NotificationService):
-        def __init__(self, session, *, queue, settings) -> None:  # noqa: ANN001
+        def __init__(self, session, *, queue, settings) -> None:
             super().__init__(session, queue=queue, settings=settings)
-            self.resolver = FakeResolver(["applicant@example.org"])  # type: ignore[assignment]
+            self.resolver = FakeResolver(["applicant@example.org"])
 
     monkeypatch.setattr(mod, "NotificationService", _Service)
     state_id = uuid.uuid4()
     session = FakeSession(
         executes=[
-            [(uuid.uuid4(), state_id, {"title": "Beamer"}, True, "sub-1")],  # the application row
-            [("en", None)],  # resolve_application_lang: application.lang is en
+            [(uuid.uuid4(), state_id, {"title": "Beamer"}, True, "sub-1")],
+            [("en", None)],
         ],
-        scalar=[{"de": "Genehmigt", "en": "Approved"}],  # the state label
-        scalars=[[], []],  # nobody opted out, and no template override in the DB
+        scalar=[{"de": "Genehmigt", "en": "Approved"}],
+        scalars=[[], []],
     )
     queue = FakeQueue()
     disp = NotificationActionDispatcher(_sessionmaker(session), queue, SETTINGS)
@@ -293,10 +293,10 @@ async def test_applicant_only_notify_without_a_state_label(
     captured = _capture(monkeypatch)
     session = FakeSession(
         executes=[
-            [(uuid.uuid4(), uuid.uuid4(), None, True, "sub-1")],  # application row with a state
-            [("en", None)],  # resolve_application_lang
+            [(uuid.uuid4(), uuid.uuid4(), None, True, "sub-1")],
+            [("en", None)],
         ],
-        scalar=[None],  # the state carries no label
+        scalar=[None],
     )
     disp = NotificationActionDispatcher(_sessionmaker(session), None, SETTINGS)
     await disp.dispatch([_applicant_notify({"recipients": [{"kind": "applicant"}]})])
@@ -374,9 +374,6 @@ async def test_notify_with_non_dict_recipients_keeps_the_default_language(
     assert captured["lang"] is None
 
 
-# --- O14: an unconfirmed guest application gets no flow mail -------------------
-
-
 @pytest.mark.parametrize(
     ("action_type", "row"),
     [
@@ -390,14 +387,14 @@ async def test_unconfirmed_application_gets_no_flow_mail(
     sent: list[str] = []
 
     class FakeService:
-        def __init__(self, *a, **k) -> None:  # noqa: ANN002, ANN003
+        def __init__(self, *a, **k) -> None:
             pass
 
-        async def handle_notify_action(self, *a, **k) -> int:  # noqa: ANN002, ANN003
+        async def handle_notify_action(self, *a, **k) -> int:
             sent.append("notify")
             return 1
 
-        async def send_kind_mail(self, *a, **k) -> bool:  # noqa: ANN002, ANN003
+        async def send_kind_mail(self, *a, **k) -> bool:
             sent.append("task")
             return True
 
@@ -415,10 +412,10 @@ async def test_notify_for_a_missing_application_still_runs(
     sent: list[object] = []
 
     class FakeService:
-        def __init__(self, *a, **k) -> None:  # noqa: ANN002, ANN003
+        def __init__(self, *a, **k) -> None:
             pass
 
-        async def handle_notify_action(self, action, **kw) -> int:  # noqa: ANN001, ANN003
+        async def handle_notify_action(self, action, **kw) -> int:
             sent.append(kw["application_type_id"])
             return 1
 

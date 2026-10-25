@@ -61,7 +61,6 @@ import {
   type GremiumMembershipMappingBody,
   type GremiumRoleMapping,
   type GremiumRoleMappingBody,
-  type DeadlinePolicy,
   type ErasureRequest,
   type ErasureStatus,
   type PrivacySettings,
@@ -97,7 +96,6 @@ import {
   MOCK_BACKUPS,
   MOCK_BRANDING,
   MOCK_CD_VARIANTS,
-  MOCK_DEADLINE_POLICIES,
   MOCK_ERASURES,
   MOCK_FLOW,
   MOCK_FORM_DRAFTS,
@@ -144,17 +142,21 @@ interface ApplicationTypeOutWire {
   activeFormVersion?: number | null;
 }
 
+/**
+ * The API calls of the admin area. In mock mode an in-memory store answers them. One store
+ * per service instance is enough for the UI and the tests.
+ */
 @Injectable({ providedIn: 'root' })
 export class AdminApiService {
   private readonly http = inject(HttpClient);
   private readonly base = inject(API_BASE_URL);
   private readonly mock = inject(USE_MOCK_API);
-  // The public `/application-types` route resolves its i18n name server-side, so the
-  // active UI locale must travel with the request.
+  /**
+   * The public `/application-types` route resolves its i18n name server-side, so the active
+   * UI locale must travel with the request.
+   */
   private readonly i18n = inject(I18nService);
 
-  // In-memory store for mock mode only. One store per service instance is enough for
-  // the UI and the tests.
   private readonly store = {
     gremien: structuredCopy(MOCK_GREMIEN),
     appTypes: structuredCopy(MOCK_APP_TYPES),
@@ -165,7 +167,6 @@ export class AdminApiService {
     membershipMappings: structuredCopy(MOCK_GREMIUM_MEMBERSHIP_MAPPINGS),
     roleMappings: structuredCopy(MOCK_GREMIUM_ROLE_MAPPINGS),
     mailRecipients: structuredCopy(MOCK_GREMIUM_MAIL_RECIPIENTS),
-    deadlinePolicies: structuredCopy(MOCK_DEADLINE_POLICIES) as DeadlinePolicy[],
     guestSettings: structuredCopy(MOCK_GUEST_SETTINGS) as GuestSettings,
     meetingSettings: structuredCopy(MOCK_MEETING_SETTINGS) as MeetingSettings,
     loginSettings: structuredCopy(MOCK_LOGIN_SETTINGS) as LoginSettings,
@@ -180,7 +181,7 @@ export class AdminApiService {
     webhooks: structuredCopy(MOCK_WEBHOOKS),
     roles: structuredCopy(MOCK_ROLES),
     principals: structuredCopy([...MOCK_PRINCIPALS, MOCK_REVOKE_PRINCIPAL]),
-    // "Rechte entziehen" (F3): the Gremien cleared per person, the pool and delegations.
+    /** "Rechte entziehen": the Gremien cleared per person, the pool and delegations. */
     revoked: {} as Record<Uuid, Uuid[]>,
     revokeExtras: mockRevokeExtras(),
     oauthGrants: structuredCopy(MOCK_OAUTH_GRANTS),
@@ -198,7 +199,6 @@ export class AdminApiService {
   /** `quiet` = the gremien page shows its own loading indicator (no overlay). */
   listGremien(opts: { quiet?: boolean } = {}): Observable<Gremium[]> {
     if (this.mock) {
-      // The admin list counts the members and the roles of each gremium.
       return of(
         structuredCopy(this.store.gremien).map((g) => ({
           ...g,
@@ -230,7 +230,6 @@ export class AdminApiService {
     if (this.mock) {
       const created: Gremium = { id: `g-${this.store.gremien.length + 1}`, allowVoteDelegation: false, ...body };
       this.store.gremien.push(created);
-      // The server creates the forced roles together with the gremium.
       this.store.gremiumRoles = [
         ...this.store.gremiumRoles,
         ...MOCK_GREMIUM_ROLES.filter((r) => r.gremiumId === MOCK_GREMIUM_STUPA_ID && r.forced).map((r) => ({
@@ -290,11 +289,12 @@ export class AdminApiService {
     );
   }
 
-  // Corporate-design variants. Every `/admin/cd-variants` route needs
-  // P `admin.cd_variants`. The page shows its own loading indicator, so the
-  // list GET opts out of the global overlay.
-
-  /** GET /admin/cd-variants — the variants with their title and footer logos. */
+  /**
+   * GET /admin/cd-variants — the variants with their title and footer logos.
+   *
+   * Every `/admin/cd-variants` route needs P `admin.cd_variants`. The page shows its own
+   * loading indicator, so this GET opts out of the global overlay.
+   */
   listCdVariants(): Observable<CdVariant[]> {
     if (this.mock) return of(structuredCopy(this.store.cdVariants));
     return this.http.get<CdVariant[]>(`${this.base}/admin/cd-variants`, {
@@ -368,12 +368,14 @@ export class AdminApiService {
     return this.http.get<Role[]>(`${this.base}/admin/roles`);
   }
 
-  // OIDC group mappings. There are three separate kinds: group → global role,
-  // group → gremium membership and group → gremium role. All need
-  // P(`admin.group_mappings`). The backend answers 409 for a duplicate, 404 for an
-  // unknown role or gremium, and 422 for a group name with the reserved `vote:` prefix.
-
-  /** OIDC group → global role. */
+  /**
+   * OIDC group → global role.
+   *
+   * There are three separate kinds of group mapping: group → global role, group → gremium
+   * membership and group → gremium role. All need P(`admin.group_mappings`). The backend
+   * answers 409 for a duplicate, 404 for an unknown role or gremium, and 422 for a group
+   * name with the reserved `vote:` prefix.
+   */
   listGroupMappings(): Observable<GroupMapping[]> {
     if (this.mock) return of(structuredCopy(this.store.groupMappings));
     return this.http.get<GroupMapping[]>(`${this.base}/admin/group-mappings`);
@@ -486,7 +488,6 @@ export class AdminApiService {
   /** Delete an override → restore the builtin default. */
   resetMailTemplate(key: string): Observable<MailTemplate> {
     if (this.mock) {
-      // The seed stands in for the builtin catalogue.
       const builtin = MOCK_MAIL_TEMPLATES.find((t) => t.key === key) ?? MOCK_MAIL_TEMPLATES[0];
       const reset: MailTemplate = { ...structuredCopy(builtin), id: null, source: 'builtin' };
       this.store.mailTemplates = this.store.mailTemplates.map((t) => (t.key === key ? reset : t));
@@ -499,7 +500,6 @@ export class AdminApiService {
   /** Preview from the editor draft (no id). */
   previewMailPayload(body: MailPreviewPayload): Observable<MailPreview> {
     if (this.mock) {
-      // The mock fills `{{ name }}` from the context; the server renders Jinja2.
       const fill = (text: string | undefined): string =>
         (text ?? '').replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k: string) => String(body.context[k] ?? ''));
       const html = fill(body.bodyHtmlI18n[body.lang]);
@@ -532,12 +532,14 @@ export class AdminApiService {
       .pipe(map((page) => page.items.map((t) => ({ id: t.id, name: t.name }))));
   }
 
-  /** Overview of active forms: name/gremium/status/version. */
+  /**
+   * Overview of active forms: name/gremium/status/version.
+   *
+   * `/admin/application-types` returns `ApplicationTypeOut`, not the FE view, so the rows are
+   * mapped instead of cast; after a raw cast the table shows an empty name and `status.undefined`.
+   */
   listForms(): Observable<FormOverviewItem[]> {
     if (this.mock) return of(structuredCopy(MOCK_FORMS));
-    // `/admin/application-types` returns `ApplicationTypeOut` (nameI18n,
-    // activeFormVersionId …), not the FE view. Map the rows instead of a raw cast.
-    // After a raw cast the table shows an empty name and `status.undefined`.
     return this.http
       .get<ApplicationTypeOutWire[]>(`${this.base}/admin/application-types`)
       .pipe(
@@ -666,7 +668,7 @@ export class AdminApiService {
 
   /**
    * List/search users (OIDC principals) — GET /admin/principals?q=. `filters` adds the
-   * user-list filters of F3 (`lastLoginBefore`, `includeNever`, `hasGroups`).
+   * user-list filters (`lastLoginBefore`, `includeNever`, `hasGroups`).
    */
   listPrincipals(query?: string, filters?: PrincipalFilters): Observable<AdminPrincipal[]> {
     if (this.mock) {
@@ -734,12 +736,12 @@ export class AdminApiService {
     return this.http.post<RevokeResult>(`${this.base}/admin/principals/${principalId}/revoke`, body);
   }
 
-  // OAuth grants of ANY principal. Both routes need P(`admin.users`). The
-  // self-service twins under `/oauth/grants` reach the caller's own grants only, so a
-  // leaked agent token of somebody else can be killed here and nowhere else.
-
   /**
    * GET /admin/oauth-grants — live (not revoked) grants, newest first.
+   *
+   * The grants of ANY principal. Both routes need P(`admin.users`). The self-service twins
+   * under `/oauth/grants` reach the caller's own grants only, so a leaked agent token of
+   * somebody else can be killed here and nowhere else.
    *
    * `principalId` narrows the list to one owner. The list drives its own status line,
    * so it opts out of the global loading overlay.
@@ -881,7 +883,6 @@ export class AdminApiService {
   ): Observable<{ id: Uuid }> {
     if (this.mock) {
       const id = `formver-${fields.length}`;
-      // Update draft + type in the store so a reload shows the saved state.
       this.store.formDrafts[typeId] = {
         applicationTypeId: typeId,
         formVersionId: id,
@@ -1006,41 +1007,9 @@ export class AdminApiService {
     return this.http.delete<void>(`${this.base}/admin/gremium-roles/${id}`);
   }
 
-  listDeadlinePolicies(): Observable<DeadlinePolicy[]> {
-    if (this.mock) return of(structuredCopy(this.store.deadlinePolicies));
-    return this.http.get<DeadlinePolicy[]>(`${this.base}/admin/deadline-policies`);
-  }
-
-  createDeadlinePolicy(body: Omit<DeadlinePolicy, 'id'>): Observable<DeadlinePolicy> {
-    if (this.mock) {
-      const row = { id: `dp-${this.store.deadlinePolicies.length + 1}`, ...body };
-      this.store.deadlinePolicies = [...this.store.deadlinePolicies, row];
-      return of(structuredCopy(row));
-    }
-    return this.http.post<DeadlinePolicy>(`${this.base}/admin/deadline-policies`, body);
-  }
-
-  updateDeadlinePolicy(id: Uuid, body: Partial<Omit<DeadlinePolicy, 'id' | 'key'>>): Observable<DeadlinePolicy> {
-    if (this.mock) {
-      const row = this.store.deadlinePolicies.find((r) => r.id === id);
-      if (row) Object.assign(row, body);
-      return of(structuredCopy(row ?? ({ id, key: '', label: {}, kind: 'absolute' } as DeadlinePolicy)));
-    }
-    return this.http.patch<DeadlinePolicy>(`${this.base}/admin/deadline-policies/${id}`, body);
-  }
-
-  deleteDeadlinePolicy(id: Uuid): Observable<void> {
-    if (this.mock) {
-      this.store.deadlinePolicies = this.store.deadlinePolicies.filter((r) => r.id !== id);
-      return of(void 0);
-    }
-    return this.http.delete<void>(`${this.base}/admin/deadline-policies/${id}`);
-  }
-
   /** Memberships of one gremium (read-only). The OIDC group sync writes them. */
   listGremiumMemberships(gremiumId: Uuid): Observable<GremiumMembership[]> {
     if (this.mock) {
-      // The server joins the name and the e-mail of each member.
       const byId = new Map(this.store.principals.map((p) => [p.id, p]));
       return of(
         structuredCopy(MOCK_GREMIUM_MEMBERSHIPS.filter((m) => m.gremiumId === gremiumId)).map((m) => ({
@@ -1053,8 +1022,10 @@ export class AdminApiService {
     return this.http.get<GremiumMembership[]>(`${this.base}/admin/gremien/${gremiumId}/memberships`);
   }
 
-  // Every audit-log endpoint below needs P(audit.read).
-  /** Keyset-paged audit log. `before` is the cursor (id). Filter by action, actor or time. */
+  /**
+   * Keyset-paged audit log. `before` is the cursor (id). Filter by action, actor or time.
+   * Every audit-log endpoint needs P(audit.read).
+   */
   listAuditLog(
     opts: {
       limit?: number;
@@ -1190,7 +1161,6 @@ export class AdminApiService {
   /** Field diff of a snapshot against its predecessor (wire → array form). */
   getConfigRevisionDiff(id: Uuid): Observable<ConfigRevisionDiff> {
     if (this.mock) {
-      // The mock flow change of the audit log (revision `rev-12`) has a small diff.
       const diff: ConfigRevisionDiff['diff'] =
         id === 'rev-12'
           ? {
@@ -1226,7 +1196,7 @@ export class AdminApiService {
     );
   }
 
-  // Every notification-config endpoint below needs P(admin.notifications).
+  /** The notification config. Every notification-config endpoint needs P(admin.notifications). */
   getNotificationSettings(): Observable<NotificationSettings> {
     if (this.mock) {
       return of({ taskReminderEnabled: true, taskReminderAfterDays: 5, taskReminderRepeatDays: 7 });
@@ -1253,8 +1223,10 @@ export class AdminApiService {
     );
   }
 
-  // Guest applications (Z1). Both routes need P(admin.deadlines).
-  /** GET /admin/guest-settings — the confirm window and the link lifetime. */
+  /**
+   * GET /admin/guest-settings — the confirm window and the link lifetime of guest
+   * applications. The GET and the PUT need P(admin.deadlines).
+   */
   getGuestSettings(): Observable<GuestSettings> {
     if (this.mock) return of(structuredCopy(this.store.guestSettings));
     return this.http.get<GuestSettings>(`${this.base}/admin/guest-settings`, {
@@ -1271,8 +1243,10 @@ export class AdminApiService {
     return this.http.put<GuestSettings>(`${this.base}/admin/guest-settings`, body);
   }
 
-  // The open window of meetings. Both routes need P(admin.deadlines).
-  /** GET /admin/meeting-settings — the earliest open and the end of the early window. */
+  /**
+   * GET /admin/meeting-settings — the earliest open and the end of the early window of
+   * meetings. The GET and the PUT need P(admin.deadlines).
+   */
   getMeetingSettings(): Observable<MeetingSettings> {
     if (this.mock) return of(structuredCopy(this.store.meetingSettings));
     return this.http.get<MeetingSettings>(`${this.base}/admin/meeting-settings`, {
@@ -1291,8 +1265,10 @@ export class AdminApiService {
     return this.http.put<MeetingSettings>(`${this.base}/admin/meeting-settings`, body);
   }
 
-  // SSO login lifetimes. Both routes need P(admin.users).
-  /** GET /admin/login-settings — the session lifetimes of a browser tab and of the installed app. */
+  /**
+   * GET /admin/login-settings — the session lifetimes of a browser tab and of the installed app.
+   * The GET and the PUT need P(admin.users).
+   */
   getLoginSettings(): Observable<LoginSettings> {
     if (this.mock) return of(structuredCopy(this.store.loginSettings));
     return this.http.get<LoginSettings>(`${this.base}/admin/login-settings`, {
@@ -1313,8 +1289,10 @@ export class AdminApiService {
     return this.http.put<LoginSettings>(`${this.base}/admin/login-settings`, body);
   }
 
-  // "Hilfe & Tickets". Both routes need P(admin.site).
-  /** GET /admin/help-tickets — the handbook link and the ticket settings. */
+  /**
+   * GET /admin/help-tickets — the handbook link and the ticket settings ("Hilfe & Tickets").
+   * The GET and the PUT need P(admin.site).
+   */
   getHelpTickets(): Observable<HelpTicketsSettings> {
     if (this.mock) return of(structuredCopy(this.store.helpTickets));
     return this.http.get<HelpTicketsSettings>(`${this.base}/admin/help-tickets`, {
@@ -1331,8 +1309,10 @@ export class AdminApiService {
     return this.http.put<HelpTicketsSettings>(`${this.base}/admin/help-tickets`, body);
   }
 
-  // Every DSGVO/privacy endpoint below needs P(privacy.manage).
-  /** `quiet` = the caller shows its own loading state (no overlay). */
+  /**
+   * The DSGVO erasure requests. `quiet` = the caller shows its own loading state (no
+   * overlay). Every DSGVO/privacy endpoint needs P(privacy.manage).
+   */
   listErasures(
     status?: ErasureStatus,
     opts: { quiet?: boolean } = {},
@@ -1396,12 +1376,12 @@ export class AdminApiService {
     return this.http.put<PrivacySettings>(`${this.base}/admin/privacy/settings`, settings);
   }
 
-  // Backups (P backup.manage). The archive itself never passes through the browser
-  // except as a signed download; these calls move metadata only.
-
   /**
    * GET /admin/backups — the catalogue plus what this installation can do.
    * `quiet` = the caller shows its own loading state (no overlay).
+   *
+   * The backup calls need P backup.manage. The archive itself never passes through the
+   * browser except as a signed download; these calls move metadata only.
    */
   listBackups(opts: { quiet?: boolean } = {}): Observable<BackupList> {
     if (this.mock) {
@@ -1417,14 +1397,17 @@ export class AdminApiService {
     });
   }
 
-  /** GET /admin/backups/{id} — one row. The page polls this while a job runs. */
+  /**
+   * GET /admin/backups/{id} — one row. The page polls this while a job runs.
+   *
+   * The poll runs on a timer, so it must not raise the global loading overlay.
+   */
   getBackup(id: Uuid): Observable<Backup> {
     if (this.mock) {
       const row = this.store.backups.find((b) => b.id === id);
       return of(structuredCopy(row ?? ({ id } as Backup)));
     }
     return this.http.get<Backup>(`${this.base}/admin/backups/${id}`, {
-      // The poll runs on a timer, so it must not raise the global loading overlay.
       context: skipLoading(),
     });
   }

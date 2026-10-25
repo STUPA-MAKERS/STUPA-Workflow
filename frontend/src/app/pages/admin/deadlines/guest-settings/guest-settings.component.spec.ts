@@ -15,6 +15,7 @@ function makeApi(initial: GuestSettings = { confirmTtlHours: 12, linkTtlDays: nu
   };
 }
 
+/** ngModel writes the stored values into the fields after a tick. */
 async function setup(opts: { api?: ReturnType<typeof makeApi> | Record<string, jest.Mock>; perms?: string[] } = {}) {
   const api = opts.api ?? makeApi();
   const perms = new Set(opts.perms ?? ['admin.deadlines']);
@@ -26,7 +27,6 @@ async function setup(opts: { api?: ReturnType<typeof makeApi> | Record<string, j
       { provide: ToastService, useValue: toast },
     ],
   });
-  // ngModel writes the stored values into the fields after a tick.
   await view.fixture.whenStable();
   view.fixture.detectChanges();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -39,6 +39,10 @@ const hoursField = (): HTMLInputElement => screen.getByLabelText('Unbestätigte 
 describe('GuestSettingsComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
+  /**
+   * The section has no button of its own: the deadlines page shows "Speichern" while a section has
+   * changes.
+   */
   it('shows the stored values: the hours and "Unbegrenzt" for a link without expiry', async () => {
     const { api, c } = await setup();
     expect(api.getGuestSettings).toHaveBeenCalledTimes(1);
@@ -47,12 +51,11 @@ describe('GuestSettingsComponent', () => {
     const select = screen.getByLabelText('Gültigkeit des persönlichen Links');
     expect(select).toHaveTextContent('Unbegrenzt');
     expect(screen.queryByLabelText('Gültig für')).not.toBeInTheDocument();
-    // Nothing changed yet. The section has no button of its own: the deadlines page
-    // shows "Speichern" while a section has changes.
     expect(c.dirty()).toBe(false);
     expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
   });
 
+  /** The saved values are the new baseline. */
   it('saves new hours and keeps "Unbegrenzt" as null', async () => {
     const { api, toast, c } = await setup();
     await userEvent.clear(hoursField());
@@ -61,7 +64,6 @@ describe('GuestSettingsComponent', () => {
     c.save();
     expect(api.putGuestSettings).toHaveBeenCalledWith({ confirmTtlHours: 48, linkTtlDays: null });
     expect(toast.success).toHaveBeenCalled();
-    // The saved values are the new baseline.
     expect(c.dirty()).toBe(false);
   });
 
@@ -79,12 +81,15 @@ describe('GuestSettingsComponent', () => {
     expect(api.putGuestSettings).not.toHaveBeenCalled();
   });
 
+  /**
+   * The field starts with 30 days, so a switch alone is a valid change. "Unbegrenzt" sends null
+   * again; a typed day count stays in the draft.
+   */
   it('limits the link to a number of days, and back to "Unbegrenzt"', async () => {
     const { api, c } = await setup();
     const select = screen.getByLabelText('Gültigkeit des persönlichen Links');
     await pickOption(select, 'Begrenzt');
     const days = screen.getByLabelText('Gültig für') as HTMLInputElement;
-    // The field starts with 30 days, so a switch alone is a valid change.
     await waitFor(() => expect(days.value).toBe('30'));
     await userEvent.clear(days);
     await userEvent.type(days, '3651');
@@ -95,7 +100,6 @@ describe('GuestSettingsComponent', () => {
     c.save();
     expect(api.putGuestSettings).toHaveBeenLastCalledWith({ confirmTtlHours: 12, linkTtlDays: 90 });
 
-    // "Unbegrenzt" sends null again; a typed day count stays in the draft.
     c.setMode('unlimited');
     c.setMode('days');
     expect(c.draft().days).toBe('90');

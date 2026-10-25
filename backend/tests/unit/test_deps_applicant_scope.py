@@ -1,4 +1,4 @@
-"""An applicant session has no fixed scope (O4, F5).
+"""An applicant session has no fixed scope.
 
 `get_current_applicant` gives every valid session the scope `edit`, also an old
 `view` session from before that change. Each action checks the current state.
@@ -14,8 +14,7 @@ import pytest
 from app import deps
 from app.settings import load_settings
 
-# The function reads neither the request nor the session itself: the patched
-# helpers take them.
+#: A placeholder request and session. The function does not read them; the patched helpers do.
 _ANY: Any = SimpleNamespace()
 
 

@@ -24,11 +24,12 @@ from tests.integration.modules.livevote.conftest import audit_actions, seed
 pytestmark = pytest.mark.integration
 
 
-async def _starts_in(
-    maker: async_sessionmaker[AsyncSession], minutes: int
-) -> str:
+async def _starts_in(maker: async_sessionmaker[AsyncSession], minutes: int) -> str:
+    """Plan the meeting to start in `minutes` real minutes.
+
+    The time is computed in UTC and then made local, so it is correct across a DST switch.
+    """
     s = await seed(maker, status="planned")
-    # Real minutes in UTC, then local: correct across a DST switch.
     local = (datetime.now(UTC) + timedelta(minutes=minutes)).astimezone(ZoneInfo("Europe/Berlin"))
     async with maker() as session:
         meeting = await session.get(Meeting, s.meeting_id)

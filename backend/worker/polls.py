@@ -53,6 +53,8 @@ async def process_poll_reminders(ctx: dict[str, Any], now: datetime | None = Non
 
     Returns:
         The number of polls with an enqueued reminder.
+
+    One bad poll is logged and does not stop the run.
     """
     moment = now or datetime.now(UTC)
     settings: Settings = ctx.get("settings") or load_settings()
@@ -89,7 +91,7 @@ async def process_poll_reminders(ctx: dict[str, Any], now: datetime | None = Non
                     reminder=True,
                 ):
                     sent += 1
-            except Exception:  # noqa: BLE001 - one bad poll must not stop the run
+            except Exception:
                 logger.exception("poll_reminder mail failed for %s", vote.id)
                 continue
             vote.reminded_at = moment

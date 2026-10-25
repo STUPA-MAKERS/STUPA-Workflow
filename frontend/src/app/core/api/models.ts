@@ -49,7 +49,7 @@ export interface PublicSiteConfig {
    * `guest_application_settings.link_ttl_days`). `null`: the link does not expire.
    */
   linkTtlDays?: number | null;
-  /** Upload limits of the wizard (Z4): one file, and all draft files of a draft token. */
+  /** Upload limits of the wizard: one file, and all draft files of a draft token. */
   attachmentLimits?: AttachmentLimits | null;
   branding?: {
     /** Configured app name (language neutral). Empty falls back to i18n or the default. */
@@ -154,7 +154,7 @@ export interface Page<T> {
 
 export interface ApplicationListQuery {
   /**
-   * Flow state UUIDs. The request repeats `state` once per value (A4), and the list keeps
+   * Flow state UUIDs. The request repeats `state` once per value, and the list keeps
    * the applications in any of these states.
    */
   state?: readonly string[];
@@ -221,23 +221,23 @@ export interface ApplicationOutWire {
   canEdit?: boolean;
   isOwner?: boolean;
   archivedAt?: IsoDateTime | null;
-  /** Time of the last status change (A9). */
+  /** Time of the last status change. */
   stateSince?: IsoDateTime | null;
   /**
-   * The `isPII` field keys that the server removed from `data` for this reader (O21).
+   * The `isPII` field keys that the server removed from `data` for this reader.
    * Empty for a reader with the PII right.
    */
   hiddenKeys?: string[];
-  /** Set when a person captured the application on behalf of the applicant (#11). */
+  /** Set when a person captured the application on behalf of the applicant. */
   capture?: ApplicationCapture | null;
-  /** F1: the amount that the cost center binds. `null` means as requested. */
+  /** The amount that the cost center binds. `null` means as requested. */
   approvedAmount?: string | null;
-  /** F1: the valid decision, or `null` before one. */
+  /** The valid decision, or `null` before one. */
   decision?: ApplicationDecision | null;
 }
 
 /**
- * `DecisionIn`. A decision proposal (F1, approval with deviations): the approved amount
+ * `DecisionIn`. A decision proposal (approval with deviations): the approved amount
  * and the conditions. The body of a vote (`proposal`) and of a transition (`decision`).
  */
 export interface DecisionProposal {
@@ -248,7 +248,7 @@ export interface DecisionProposal {
 }
 
 /**
- * `DecisionOut`. The valid decision of an application (F1), or `null` before one. The
+ * `DecisionOut`. The valid decision of an application, or `null` before one. The
  * applicant view names the Gremium only: `voteId`, `meetingTitle` and `agendaPosition`
  * are `null` there.
  */
@@ -265,7 +265,7 @@ export interface ApplicationDecision {
   agendaPosition: number | null;
 }
 
-/** `TimelineDecisionOut`. The decision that a status change carried (F1). */
+/** `TimelineDecisionOut`. The decision that a status change carried. */
 export interface TimelineDecision {
   requestedAmount: string | null;
   approvedAmount: string | null;
@@ -274,7 +274,7 @@ export interface TimelineDecision {
 }
 
 /**
- * `CaptureOut`. How an application captured on behalf of the applicant came in (#11).
+ * `CaptureOut`. How an application captured on behalf of the applicant came in.
  * `capturedBy` follows the actor rules of the timeline: the applicant view names the
  * Gremium instead of the member.
  */
@@ -295,7 +295,7 @@ export interface ApplicantCandidate {
 }
 
 /**
- * `OnBehalfCreate`. The body of `POST /applications/on-behalf` (#11). The applicant is
+ * `OnBehalfCreate`. The body of `POST /applications/on-behalf`. The applicant is
  * EITHER an account (`applicantPrincipalId`) OR a guest (`applicantName` and
  * `applicantEmail`).
  */
@@ -321,13 +321,13 @@ export interface ApplicationListItemWire {
   state?: StateOutWire | null;
   gremiumId?: Uuid | null;
   amount?: string | null;
-  /** F1: the approved amount. `null` means as requested. */
+  /** The approved amount. `null` means as requested. */
   approvedAmount?: string | null;
   currency?: string | null;
   createdAt: IsoDateTime;
   updatedAt: IsoDateTime;
   archivedAt?: IsoDateTime | null;
-  /** Time of the last status change (A9). */
+  /** Time of the last status change. */
   stateSince?: IsoDateTime | null;
 }
 
@@ -339,7 +339,7 @@ export interface ApplicationCreatedWire {
 /** Attendance status of a member in a meeting. `absent` means absent without an excuse. */
 export type AttendanceStatus = 'present' | 'excused' | 'absent';
 
-/** The statuses a member reports for the own record (Z2). Only the lead records `absent`. */
+/** The statuses a member reports for the own record. Only the lead records `absent`. */
 export type SelfAttendanceStatus = 'present' | 'excused';
 
 /** A current gremium member. This is a protokollant candidate for a new meeting. */
@@ -347,7 +347,7 @@ export interface MeetingMember {
   principalId: Uuid;
   displayName: string | null;
   email: string | null;
-  /** O20: the member holds `protocol.write` in the gremium and can keep the minutes. */
+  /** The member holds `protocol.write` in the gremium and can keep the minutes. */
   canKeepProtocol?: boolean;
 }
 
@@ -358,7 +358,7 @@ export interface Attendance {
   email: string | null;
   /** `null` = not recorded yet ("open"). */
   status: AttendanceStatus | null;
-  /** Who set the record. A `lead` record wins: the member cannot change it (O15). */
+  /** Who set the record. A `lead` record wins: the member cannot change it. */
   source: 'self' | 'lead' | null;
   /**
    * The reason of an excuse. The server sends it only to the member and to the
@@ -367,11 +367,11 @@ export interface Attendance {
   note: string | null;
   /** True if this row is the requesting user. It enables self-marking. */
   isSelf: boolean;
-  /** O20: the member holds `protocol.write` in the gremium and can keep the minutes. */
+  /** The member holds `protocol.write` in the gremium and can keep the minutes. */
   canKeepProtocol?: boolean;
   /**
    * The member has an own vote now (gremium permission `vote.cast`). Only such a member
-   * can be substituted (O6). An older server leaves the flag out.
+   * can be substituted. An older server leaves the flag out.
    */
   canVote?: boolean;
 }
@@ -392,7 +392,7 @@ export interface AgendaItem {
   /** The done mark ("TOP abhaken"): the time of the tick, or `null`. Set by hand only. */
   doneAt?: string | null;
   stateLabel?: I18nMap | null;
-  /** F1: the requested amount of the application, for the decision proposal. */
+  /** The requested amount of the application, for the decision proposal. */
   amount?: string | null;
 }
 
@@ -415,9 +415,9 @@ export interface AltchaChallenge {
 /**
  * `ActorOut`. The resolved actor of a timeline event, a version or a comment.
  * - `principal`: a member; `displayName` is the name (or the email).
- * - `applicant`: the applicant through the magic link; no name (PII, O21).
+ * - `applicant`: the applicant through the magic link; no name (PII).
  * - `system`: an automatic action; `key` names the source (`deadlines`, `flow`, `auto`, …).
- * - `gremium`: the applicant view names the Gremium for a member (A12/O16).
+ * - `gremium`: the applicant view names the Gremium for a member.
  * - `deleted`: an unknown or anonymized account; no name, no id.
  */
 export type ActorKind = 'principal' | 'applicant' | 'system' | 'gremium' | 'deleted';
@@ -435,9 +435,9 @@ export interface TimelineEventOutWire {
   fromStateId?: Uuid | null;
   toStateId: Uuid;
   toState?: StateOutWire | null;
-  /** Label of the fired transition (A3). Null for the creation and for a revert. */
+  /** Label of the fired transition. Null for the creation and for a revert. */
   transitionLabel?: I18nMap | null;
-  /** In the applicant view, the Gremium for every action of a member (A12). */
+  /** In the applicant view, the Gremium for every action of a member. */
   actor?: string | null;
   /** The resolved actor. The UI renders this and never the raw `actor`. */
   actorInfo?: ActorInfo | null;
@@ -447,7 +447,7 @@ export interface TimelineEventOutWire {
   voteId?: Uuid | null;
   /** A vote close fired the event, and the vote went with its meeting. */
   voteDeleted?: boolean;
-  /** F1: the decision that this status change carried. */
+  /** The decision that this status change carried. */
   decision?: TimelineDecision | null;
 }
 
@@ -494,12 +494,12 @@ export interface TransitionOutWire {
   label: I18nMap;
   /** Optional color for the decision button. */
   color?: string | null;
-  /** The transition carries an `addToNextSession` action into a vote state (A1), so a
+  /** The transition carries an `addToNextSession` action into a vote state, so a
    *  fire takes a `meetingId`. */
   addsToAgenda?: boolean;
-  /** The gremium whose planned meetings the agenda dialog offers (A1). */
+  /** The gremium whose planned meetings the agenda dialog offers. */
   agendaGremiumId?: Uuid | null;
-  /** F1: the target is an accepted state of the cost center, so a fire takes a decision. */
+  /** The target is an accepted state of the cost center, so a fire takes a decision. */
   allowsDecision?: boolean;
 }
 
@@ -525,9 +525,9 @@ export interface DataDiffWire {
 /**
  * `VersionOut`. One submission version and its diff.
  *
- * The applicant view gets the metadata only (A11): `data` and `diff` are null, and
+ * The applicant view gets the metadata only: `data` and `diff` are null, and
  * `changedKeys` lists the changed fields. A reader without the PII right gets no
- * `isPII` field in `data`, `diff` and `changedKeys` (O21).
+ * `isPII` field in `data`, `diff` and `changedKeys`.
  */
 export interface VersionOutWire {
   version: number;
@@ -557,7 +557,7 @@ export interface AttachmentOutWire {
 }
 
 /**
- * `DraftAttachmentOut` (files/schemas.py): 201 of `POST /apply/attachments` (Z4). The
+ * `DraftAttachmentOut` (files/schemas.py): 201 of `POST /apply/attachments`. The
  * attachment fields stay snake_case like `AttachmentOut`; the token fields are camelCase.
  */
 export interface DraftAttachmentOutWire extends AttachmentOutWire {
@@ -579,15 +579,17 @@ export interface SignedUrlOutWire {
 export interface ApplicationCreateBody {
   typeId: Uuid;
   data: Record<string, unknown>;
-  // Optional. For a logged-in user the backend takes the identity from the account.
-  // For an anonymous submission the server requires these fields.
+  /**
+   * Optional. For a logged-in user the backend takes the identity from the account. For an
+   * anonymous submission the server requires this field and `applicantName`.
+   */
   applicantEmail?: string | null;
   applicantName?: string | null;
   lang: Lang;
   altcha?: string | null;
-  /** Draft uploads of the wizard to bind (Z4). Needs `draftToken`. */
+  /** Draft uploads of the wizard to bind. Needs `draftToken`. */
   attachmentIds?: Uuid[];
-  /** The token of the draft uploads (Z4). */
+  /** The token of the draft uploads. */
   draftToken?: string | null;
 }
 
@@ -604,14 +606,14 @@ export interface TransitionRequestBody {
   transitionId: Uuid;
   note?: string | null;
   /**
-   * The meeting whose agenda gets the application (A1). Only for a transition with
+   * The meeting whose agenda gets the application. Only for a transition with
    * `addsToAgenda`; the meeting must be planned and belong to `agendaGremiumId`, else
    * the server answers 422 `agenda_meeting_invalid`.
    */
   meetingId?: Uuid | null;
   /** The new agenda item is not public (NÖ). Only with `meetingId`. */
   nonPublic?: boolean;
-  /** F1: the decision. Only for a transition with `allowsDecision`, else 422. */
+  /** The decision. Only for a transition with `allowsDecision`, else 422. */
   decision?: DecisionProposal | null;
 }
 
@@ -629,8 +631,6 @@ export interface TransitionResult {
   statusEventId: Uuid;
   dispatchedActions: string[];
 }
-
-// View models. Frontend friendly, i18n already resolved. Built by `mappers.ts`.
 
 /** Application status with the label resolved for the current `lang`. */
 export interface ApplicationState {
@@ -680,19 +680,19 @@ export interface Application {
    * left the working list. `be-privacy` owns the DSGVO erasure people confuse this with.
    */
   archivedAt: IsoDateTime | null;
-  /** Time of the last status change (A9), for "since" on the status page. */
+  /** Time of the last status change, for "since" on the status page. */
   stateSince?: IsoDateTime | null;
   /**
-   * The `isPII` field keys that the server removed from `data` (O21). The edit form
+   * The `isPII` field keys that the server removed from `data`. The edit form
    * leaves out these fields. A key that is only missing from `data` was never
    * answered, and the field stays editable.
    */
   hiddenKeys?: string[];
-  /** Set when a person captured the application on behalf of the applicant (#11). */
+  /** Set when a person captured the application on behalf of the applicant. */
   capture?: ApplicationCapture | null;
-  /** F1: the amount that the cost center binds. `null` means as requested. */
+  /** The amount that the cost center binds. `null` means as requested. */
   approvedAmount?: string | null;
-  /** F1: the valid decision, or `null` before one. */
+  /** The valid decision, or `null` before one. */
   decision?: ApplicationDecision | null;
 }
 
@@ -725,14 +725,14 @@ export interface ApplicationListItem {
   state: ApplicationState | null;
   gremiumId: Uuid | null;
   amount: string | null;
-  /** F1: the approved amount. `null` means as requested. */
+  /** The approved amount. `null` means as requested. */
   approvedAmount?: string | null;
   currency: string | null;
   createdAt: IsoDateTime;
   updatedAt: IsoDateTime;
   /** Set when the row is archived, so a combined list can mark it. */
   archivedAt: IsoDateTime | null;
-  /** Time of the last status change (A9), for "waiting since". */
+  /** Time of the last status change, for "waiting since". */
   stateSince?: IsoDateTime | null;
 }
 
@@ -746,7 +746,7 @@ export interface TimelineEntry {
   toStateId: Uuid;
   toState: ApplicationState | null;
   label: string;
-  /** Label of the fired transition (A3), resolved to the locale. */
+  /** Label of the fired transition, resolved to the locale. */
   transitionLabel?: string | null;
   actor: string | null;
   actorInfo?: ActorInfo | null;
@@ -756,7 +756,7 @@ export interface TimelineEntry {
   voteId: Uuid | null;
   /** The vote that fired the event was deleted with its meeting. */
   voteDeleted: boolean;
-  /** F1: the decision that this status change carried. */
+  /** The decision that this status change carried. */
   decision?: TimelineDecision | null;
 }
 
@@ -801,7 +801,7 @@ export interface Transition {
   color: string | null;
   /**
    * The transition puts the application on the agenda of a meeting and leads into a
-   * vote state (A1), so the server takes a chosen meeting. The detail and the row menu
+   * vote state, so the server takes a chosen meeting. The detail and the row menu
    * open the agenda dialog for it, which asks for the meeting. A transition whose
    * action leads into a normal state is `false` here and fires as a plain transition;
    * the server action then picks the next planned meeting.
@@ -810,7 +810,7 @@ export interface Transition {
   /** The gremium whose planned meetings the agenda dialog offers, or null. */
   agendaGremiumId: Uuid | null;
   /**
-   * F1: the target is an accepted state of the cost center. The detail and the row
+   * The target is an accepted state of the cost center. The detail and the row
    * menu then open the decision dialog, which can approve with deviations.
    */
   allowsDecision?: boolean;
@@ -839,7 +839,7 @@ export interface ApplicationVersion {
   version: number;
   data: Record<string, unknown>;
   diff: DataDiff | null;
-  /** Keys of the changed fields. The applicant view gets only these (A11). */
+  /** Keys of the changed fields. The applicant view gets only these. */
   changedKeys?: string[];
   changedBy: string | null;
   changedByInfo?: ActorInfo | null;
@@ -895,19 +895,22 @@ export interface SignedUrl {
 export interface NewApplication {
   typeId: Uuid;
   data: Record<string, unknown>;
-  // Null for a logged-in user. The backend takes the identity and the altcha itself.
+  /**
+   * Null for a logged-in user, like `applicantName`. The backend takes the identity and the
+   * altcha itself.
+   */
   applicantEmail?: string | null;
   applicantName?: string | null;
   lang: Lang;
   altcha?: string | null;
-  /** Draft uploads of the wizard to bind (Z4). */
+  /** Draft uploads of the wizard to bind. */
   attachmentIds?: Uuid[];
   /** The token of the draft uploads; required with `attachmentIds`. */
   draftToken?: string | null;
 }
 
 /**
- * A draft upload of the wizard (Z4), frontend view: the attachment plus the field it
+ * A draft upload of the wizard, frontend view: the attachment plus the field it
  * belongs to (`null` = the general block "Anhänge").
  */
 export interface DraftAttachment extends Attachment {
@@ -921,8 +924,15 @@ export interface DraftUpload {
   draftExpiresAt: IsoDateTime;
 }
 
-// Form definition. A mirror of the backend `FormFieldDef`.
-
+/**
+ * The type of a form field, a mirror of the backend `FormFieldDef`.
+ *
+ * - `gremium_select` and `budget_select` are dynamic pickers. The server injects the
+ *   options: Gremien or the budget tree.
+ * - `email` and `iban` are typed inputs with built-in validation.
+ * - `daterange` is a date range `{from, to}`.
+ * - `funding` is the requested funding, separate from the cost total of the positions.
+ */
 export type FieldType =
   | 'text'
   | 'textarea'
@@ -931,13 +941,10 @@ export type FieldType =
   | 'date'
   | 'select'
   | 'multiselect'
-  // Dynamic pickers. The server injects the options: Gremien or the budget tree.
   | 'gremium_select'
   | 'budget_select'
-  // Typed inputs with built-in validation.
   | 'email'
   | 'iban'
-  // Date range {from, to}.
   | 'daterange'
   | 'checkbox'
   | 'file'
@@ -945,7 +952,6 @@ export type FieldType =
   | 'markdown'
   | 'computed'
   | 'positions'
-  // Requested funding, separate from the cost total of the positions.
   | 'funding'
   | 'section';
 
@@ -1018,11 +1024,11 @@ export interface MagicLinkVerifyResult {
 export type MajorityRule = 'simple' | 'absolute' | 'two_thirds';
 /** `draft`: planned, not open yet. `cancelled`: the application left the vote state by hand, so the vote stopped. */
 export type VoteStatus = 'draft' | 'open' | 'closed' | 'cancelled';
-/** A motion gives `passed`, `rejected` or `tie`. A personnel election (F2) gives
+/** A motion gives `passed`, `rejected` or `tie`. A personnel election gives
  *  `elected`, `runoff` (a runoff decides the open seats), `tie` (the lot decides) or
  *  `rejected` (quorum missed, or nobody elected). */
 export type VoteResult = 'passed' | 'rejected' | 'tie' | 'elected' | 'runoff';
-/** `motion`: a decision (Ja/Nein/Enthaltung). `election`: a personnel election (F2).
+/** `motion`: a decision (Ja/Nein/Enthaltung). `election`: a personnel election.
  *  `poll`: a poll ("Umfrage") that only counts the answers. */
 export type VoteKind = 'motion' | 'election' | 'poll';
 
@@ -1097,7 +1103,7 @@ export interface ElectionCandidate {
 }
 
 /**
- * The config of a personnel election (`ElectionConfig`, F2). Each voter gives up to
+ * The config of a personnel election (`ElectionConfig`). Each voter gives up to
  * `seats` votes, at most one per candidate. One candidate for one seat gives a
  * Ja/Nein/Enthaltung ballot.
  */
@@ -1141,7 +1147,7 @@ export interface ElectionResult {
   lot?: ElectionLot | null;
 }
 
-/** The election fields of a vote (F2) and the poll fields. A motion has
+/** The election fields of a vote and the poll fields. A motion has
  *  `kind: 'motion'` and no others. */
 export interface ElectionFields {
   kind?: VoteKind;
@@ -1167,7 +1173,7 @@ export interface Quorum {
  * Vote configuration (`VoteConfig`). The backend `_CamelModel` sends the fields in
  * camelCase. The defaults mirror the Pydantic defaults: `abstainCountsQuorum` is
  * true, `secret` is false. The frontend never sets a tie break: a tie is a
- * rejection (O18).
+ * rejection.
  */
 export interface VoteConfig {
   options: string[];
@@ -1187,7 +1193,7 @@ export interface VoteConfig {
 export interface MyBallot {
   cast: boolean;
   choice: string | null;
-  /** The chosen candidate ids of an open election ballot (F2), or the chosen option
+  /** The chosen candidate ids of an open election ballot, or the chosen option
    *  ids of an open single or multi poll. */
   choices?: string[] | null;
   /** The answers of an open date poll ballot. */
@@ -1351,8 +1357,6 @@ export interface VoteClosed {
   branchFired: boolean;
 }
 
-// Meetings and protocol. The wire form is camelCase (`_CamelModel`).
-
 /** Meeting status. The backend enum is `planned|live|closed`. */
 export type MeetingStatus = 'planned' | 'live' | 'closed';
 /** `draft`: planned, not open yet. `cancelled`: the application left the vote state by hand, so the vote stopped. */
@@ -1398,13 +1402,13 @@ export interface MeetingVoteOutWire extends ElectionFields {
   /** Present members and admitted guests (live while open, fixed at the close). */
   presentMembers?: number | null;
   presentGuests?: number | null;
-  /** F1: the decision proposal of an application vote. */
+  /** The decision proposal of an application vote. */
   proposal?: DecisionProposal | null;
 }
 
 /** `MeetingOut`. Meeting state and votes. GET /meetings/{id}. */
 /**
- * `KeeperPeriodOut`. One period of a protocol keeper (Z3, A13). `fromAt` is `null`
+ * `KeeperPeriodOut`. One period of a protocol keeper. `fromAt` is `null`
  * for the planned handover, `toAt` is `null` while the period runs. The positions
  * are 1-based numbers in the current agenda order, `null` without an item.
  */
@@ -1559,8 +1563,6 @@ export interface CalendarFeed {
   url: string | null;
 }
 
-// View models for meetings and protocol.
-
 /** Vote summary, frontend view. It normalizes the `null` defaults. */
 export interface MeetingVote extends ElectionFields {
   id: Uuid;
@@ -1588,7 +1590,7 @@ export interface MeetingVote extends ElectionFields {
   /** The own ballot of the caller. A secret vote gives only `cast`. `null` when the
    *  server sent none (for example a broadcast). */
   myBallot?: MyBallot | null;
-  /** The rules of the vote, for the vote card (A5). A vote that a WS event added
+  /** The rules of the vote, for the vote card. A vote that a WS event added
    *  before the next GET has none of them. */
   majorityRule?: MajorityRule;
   secret?: boolean;
@@ -1656,7 +1658,7 @@ export interface Meeting {
   /** Finalize and send the protocol: write access plus the gremium permission
    *  `protocol.finalize`. */
   canFinalize: boolean;
-  /** The periods of the protocol keepers, running and ended, in time order (Z3). */
+  /** The periods of the protocol keepers, running and ended, in time order. */
   keeperPeriods: KeeperPeriod[];
   /** The handover planned for the next agenda item, or `null`. */
   plannedHandover: KeeperPeriod | null;
@@ -1712,17 +1714,19 @@ export interface Protocol {
   gremiumProtocolsPublic?: boolean;
 }
 
-// Notification preferences. The account popout offers them as self service.
-
-/** Toggle for a notification kind (`GET/PUT /notifications/preferences`). */
+/**
+ * Toggle for a notification kind (`GET/PUT /notifications/preferences`). The account popout
+ * offers it as self service.
+ */
 export interface NotificationPreference {
   kind: string;
   enabled: boolean;
 }
 
-// OAuth grants and MCP setup. The account popout offers them as self service.
-
-/** An active OAuth grant of the logged-in user. It is an agent or MCP token. */
+/**
+ * An active OAuth grant of the logged-in user. It is an agent or MCP token. The account popout
+ * offers the grants as self service.
+ */
 export interface OAuthGrant {
   id: string;
   clientId: string;
@@ -1798,8 +1802,6 @@ export interface SearchResults {
   /** Sources that errored. The search degrades rather than returning nothing. */
   failed: string[];
 }
-
-// Public meeting with QR code (#17).
 
 /** Admitted guests vote (`vote`) or only follow the meeting (`watch`). */
 export type GuestsMode = 'vote' | 'watch';

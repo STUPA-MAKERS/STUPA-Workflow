@@ -61,7 +61,7 @@ function pathOf(url: string): string {
  * - `false`: the page needs the full width at every size (the flow editor, the form
  *   editor), so the frame leaves out the navigation column.
  * - anything else: the navigation column shows on a wide viewport. A wide page (the cost
- *   centres) scrolls inside its sheet instead of dropping the navigation (D6).
+ *   centres) scrolls inside its sheet instead of dropping the navigation.
  */
 type AdminNavMode = 'always' | 'never';
 
@@ -94,7 +94,7 @@ function paneRoute(root: ActivatedRouteSnapshot): boolean {
 const sheetScroll = new Map<number, number>();
 
 /**
- * The frame of the admin area (board Verwaltung): the admin navigation beside every
+ * The frame of the admin area: the admin navigation beside every
  * admin page. The account area (`/account/*`) uses the same frame in its own mode, see
  * "Account mode" below.
  *
@@ -113,14 +113,15 @@ const sheetScroll = new Map<number, number>();
  *   stays in view; the page sits on a sheet with round corners that scrolls inside
  *   itself, so the corners clip its content in every scroll position. The breadcrumbs
  *   then leave out "Verwaltung", because the navigation shows it.
- * - Narrower: an admin page fills the width below the bar of a one-view page
- *   (`app-list-detail-bar`), the same bar as above the detail of a list/detail page: the
- *   back arrow to the parent page (`data.parent`, else the home page), the title in small
- *   type once the big title has scrolled under the bar, and the actions of the page
- *   header. The page header then has no breadcrumbs.
+ * - Narrower: an admin page fills the width. Its page header keeps the breadcrumbs.
+ * - Phone (`MEDIA.phone`, the bottom bar replaces the rail): an admin page sits below the
+ *   bar of a one-view page (`app-list-detail-bar`), the same bar as above the detail of a
+ *   list/detail page: the back arrow to the parent page (`data.parent`, else the home
+ *   page), the title in small type once the big title has scrolled under the bar, and the
+ *   actions of the page header. The page header then has no breadcrumbs.
  * - A route with `data: { adminNav: false }` (the flow editor, the form editor) fills
  *   the width at every size, the same as the narrow mode. Every other admin page,
- *   the cost centres too, keeps the navigation at every wide size (D6).
+ *   the cost centres too, keeps the navigation at every wide size.
  * - A full-width route with `data: { adminPane: true }` (the two editors) is a pane
  *   page from wide on: the frame fills the window and the page gets the free height,
  *   so its columns scroll inside themselves.
@@ -132,8 +133,11 @@ const sheetScroll = new Map<number, number>();
  * Account mode (route data `frame: 'account'`, see `FRAME_MODES`): the navigation
  * "Konto" lists the account pages (`ACCOUNT_PAGES`), without the search and without the
  * tiles. Wide, `/account` shows an empty sheet beside the navigation. Below wide,
- * `/account` shows the navigation alone, and an account page has the same bar as an
- * admin page.
+ * `/account` shows the navigation alone, and on a phone an account page has the same bar
+ * as an admin page.
+ *
+ * The tiles hide during a search through a class and are not destroyed, so a cleared search does
+ * not load them again.
  */
 @Component({
   selector: 'app-admin-frame',
@@ -227,8 +231,14 @@ export class AdminFrameComponent {
    */
   readonly navOnly = computed(() => this.home() && !this.split());
 
-  /** Below wide a page shows the bar of a one-view page, with the way back. */
-  readonly showBar = computed(() => !this.home() && !this.showNav());
+  /** The viewport is a phone: the bottom bar replaces the rail of the shell. */
+  readonly phone = mediaQuery(MEDIA.phone);
+
+  /**
+   * Only on a phone a page shows the bar of a one-view page, with the way back: there the
+   * rail of the shell is the bottom bar. Wider, the page header keeps its breadcrumbs.
+   */
+  readonly showBar = computed(() => !this.home() && !this.showNav() && this.phone());
 
 
   /**
@@ -291,8 +301,6 @@ export class AdminFrameComponent {
         this.navMode.set(navMode(this.router.routerState.snapshot.root));
         this.paneRoute.set(paneRoute(this.router.routerState.snapshot.root));
         this.parentPath.set(parentOf(this.router.routerState.snapshot.root));
-        // A swipe back that led to another page in the frame: the sheet goes back to its
-        // place with the new page.
         this.swipe()?.done();
         const top = this.restoreId === null ? 0 : (sheetScroll.get(this.restoreId) ?? 0);
         afterNextRender(
@@ -307,12 +315,9 @@ export class AdminFrameComponent {
     afterNextRender(() => this.revealActive());
     effect(() => this.nav.active.set(this.showBar()));
 
-    // Beside the navigation the frame is a pane page: it fills the window, without the
-    // bottom padding of a page that scrolls.
     effect(() => this.pageFrame.fill.set(this.split() || this.fullPane()));
     inject(DestroyRef).onDestroy(() => this.pageFrame.fill.set(false));
 
-    // The navigation shows "Verwaltung" beside the page, so the breadcrumbs leave it out.
     effect(() =>
       this.pageFrame.crumbRoot.set(this.split() ? this.mode().home.replace(/^\//, '') : null),
     );

@@ -1,4 +1,4 @@
-"""Unit tests for the flow action dispatch (T-14, flows §9.3 step 4)."""
+"""Unit tests for the flow action dispatch."""
 
 from __future__ import annotations
 
@@ -19,10 +19,14 @@ from app.modules.flow.dispatch import (
 
 
 def test_build_skips_set_edit_lock_and_strips_type() -> None:
+    """Skip the inline `setEditLock` action and strip the type.
+
+    The idempotency key holds the original index (notify=0), not the filtered index.
+    """
     app_id, transition_id, event_id = uuid4(), uuid4(), uuid4()
     actions = [
         {"type": "notify", "group": "gremium", "template": "submitted"},
-        {"type": "setEditLock", "locked": True},  # inline action, never dispatched
+        {"type": "setEditLock", "locked": True},
         {"type": "webhook", "url": "https://example.org/hook"},
     ]
     dispatched = build_dispatched_actions(
@@ -34,7 +38,6 @@ def test_build_skips_set_edit_lock_and_strips_type() -> None:
     assert [a.type for a in dispatched] == ["notify", "webhook"]
     notify = dispatched[0]
     assert notify.params == {"group": "gremium", "template": "submitted"}
-    # The idempotency key holds the original index (notify=0), not the filtered index.
     assert notify.idempotency_key == f"{app_id}:{event_id}:0:notify"
     assert dispatched[1].idempotency_key == f"{app_id}:{event_id}:2:webhook"
 
@@ -73,8 +76,9 @@ class _SpyLogger:
 async def test_null_dispatcher_logs_each_action(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Log each action; the dispatcher meets the runtime-checkable protocol."""
     dispatcher = NullActionDispatcher()
-    assert isinstance(dispatcher, ActionDispatcher)  # runtime_checkable Protocol
+    assert isinstance(dispatcher, ActionDispatcher)
     spy = _SpyLogger()
     monkeypatch.setattr(dispatch_mod, "logger", spy)
     action = DispatchedAction(
@@ -96,8 +100,8 @@ async def test_null_dispatcher_empty_is_noop(monkeypatch: pytest.MonkeyPatch) ->
     assert spy.messages == []
 
 
-# Implicit auto mails per status change (#4-3).
 def test_implicit_adds_applicant_notify_and_task() -> None:
+    """Add the implicit applicant mail and task mail of a status change."""
     app_id, t_id, e_id = uuid4(), uuid4(), uuid4()
     implicit = build_implicit_notifications(
         [{"type": "webhook", "url": "https://x"}],
@@ -123,8 +127,6 @@ def test_implicit_skips_applicant_when_explicitly_notified() -> None:
     assert [a.type for a in implicit] == ["taskNotify"]
 
 
-# -- the chain ----------------------------------------------------------------
-
 
 def _action() -> DispatchedAction:
     return DispatchedAction(
@@ -148,8 +150,11 @@ class _Recording:
 
 
 async def test_the_chain_calls_every_dispatcher_in_order() -> None:
-    """Order matters: each one ignores the types it does not handle, so a later
-    dispatcher must still see the actions an earlier one already looked at."""
+    """Call every dispatcher in order.
+
+    Each one ignores the types it does not handle, so a later dispatcher must still see the
+    actions that an earlier one already looked at.
+    """
     log: list[str] = []
     chain = ChainActionDispatcher([_Recording("a", log), _Recording("b", log)])
 

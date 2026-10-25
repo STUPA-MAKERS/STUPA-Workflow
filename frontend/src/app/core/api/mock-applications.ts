@@ -31,13 +31,13 @@ import type {
  * state changes when a transition fires, and archive and delete act on the rows, so the
  * row menu and the detail header can be tried out.
  *
- * The detail (FE4b) gets a form with three sections (Vorhaben, Kosten, Kontakt), cost
+ * The detail gets a form with three sections (Vorhaben, Kosten, Kontakt), cost
  * positions with offers (one without comparison offers), a history of status changes
  * and versions, and an edit that makes a new version. A position without any offer
  * gives the 422 of the server. Three planned meetings of the Gremium serve the agenda
  * dialog; a fire with `meetingId` checks that the meeting is one of them.
  *
- * "Antrag erfassen" (#11): the row "Flyer für die Hochschulgruppen-Messe" was captured
+ * "Antrag erfassen": the row "Flyer für die Hochschulgruppen-Messe" was captured
  * on behalf of the applicant (per PDF). The search knows three accounts, and a capture
  * adds a new row in "Eingereicht" on top.
  */
@@ -61,7 +61,10 @@ const STATES = {
 
 type StateKey = keyof typeof STATES;
 
-/** The manual transitions out of each state, as the flow of the demo defines them. */
+/**
+ * The manual transitions out of each state, as the flow of the demo defines them. A
+ * transition into an accepted state takes a decision (approval with deviations).
+ */
 const FLOW: Record<
   StateKey,
   { id: string; to: StateKey; de: string; en: string; color?: string; agenda?: boolean; decision?: boolean }[]
@@ -73,7 +76,6 @@ const FLOW: Record<
   review: [
     { id: '77777777-7777-7777-7777-777777777783', to: 'agenda', de: 'Auf Tagesordnung setzen', en: 'Put on the agenda', color: '#72a384', agenda: true },
     { id: '77777777-7777-7777-7777-777777777784', to: 'submitted', de: 'Nachforderung stellen', en: 'Ask for more', color: '#e8a33d' },
-    // F1: a transition into an accepted state takes a decision (approval with deviations).
     { id: '77777777-7777-7777-7777-777777777786', to: 'approved', de: 'Bewilligen', en: 'Approve', color: '#3f8f5a', decision: true },
     { id: '77777777-7777-7777-7777-777777777785', to: 'rejected', de: 'Ablehnen', en: 'Reject', color: '#c0392b' },
   ],
@@ -96,9 +98,9 @@ interface DemoApp {
   versions?: VersionOutWire[];
   /** Status changes fired in this session. */
   events?: TimelineEventOutWire[];
-  /** Captured on behalf of the applicant (#11). */
+  /** Captured on behalf of the applicant. */
   capture?: ApplicationCapture;
-  /** F1: the decision (approval with deviations). `approved` null means as requested. */
+  /** The decision (approval with deviations). `approved` null means as requested. */
   decision?: { approved: number | null; conditions: string[]; at: string; viaVote?: boolean };
 }
 
@@ -190,7 +192,7 @@ function detail(d: DemoApp): ApplicationOutWire {
   };
 }
 
-/** F1: the decision of a demo row, as the server sends it. */
+/** The decision of a demo row, as the server sends it. */
 function decisionOf(d: DemoApp): ApplicationDecision | null {
   const dec = d.decision;
   if (!dec) return null;
@@ -209,7 +211,7 @@ function decisionOf(d: DemoApp): ApplicationDecision | null {
   };
 }
 
-/** F1: the decision of a status change, for the timeline. */
+/** The decision of a status change, for the timeline. */
 function timelineDecision(d: DemoApp): TimelineDecision | null {
   const full = decisionOf(d);
   if (!full) return null;
@@ -406,7 +408,7 @@ export function mockApplicationsWrite(method: string, p: string, body: unknown):
   return undefined;
 }
 
-/** #11: the accounts that the capture search knows. */
+/** The accounts that the capture search knows. */
 const ACCOUNTS: ApplicantCandidate[] = [
   { id: 'p1000000-0000-0000-0000-000000000001', displayName: 'Anna Antrag', email: 'anna.antrag@example.org' },
   { id: 'p1000000-0000-0000-0000-000000000002', displayName: 'Anton Albers', email: 'anton.albers@example.org' },
@@ -468,15 +470,16 @@ function problem422(errors: { field: string; msg: string }[]): ProblemDetail {
   };
 }
 
-// --------------------------------------------------------------------- the form
-
 const OPTIONS_CATEGORY = [
   { value: 'event', label: { de: 'Veranstaltung', en: 'Event' } },
   { value: 'firstyear', label: { de: 'Erstsemester', en: 'First year' } },
   { value: 'culture', label: { de: 'Kultur', en: 'Culture' } },
 ];
 
-/** The form of the demo applications: three sections, as on the boards. */
+/**
+ * The form of the demo applications: three sections. The room question
+ * sits mid-section, so a hidden room shows whether the next field moves up into its cell.
+ */
 const DEMO_FORM: EffectiveForm = {
   applicationTypeId: TYPE_FUND,
   formVersionId: 'f0000000-0000-0000-0000-0000000000f1',
@@ -490,8 +493,6 @@ const DEMO_FORM: EffectiveForm = {
         { key: 'description', type: 'textarea', label: { de: 'Beschreibung', en: 'Description' }, required: true },
         { key: 'event_date', type: 'date', label: { de: 'Veranstaltungsdatum', en: 'Event date' } },
         { key: 'participants', type: 'number', label: { de: 'Erwartete Teilnehmende', en: 'Expected participants' } },
-        // The room question sits mid-section, so a hidden room shows whether the next
-        // field moves up into its cell.
         { key: 'needs_room', type: 'checkbox', label: { de: 'Raum der Hochschule nötig', en: 'Needs a university room' } },
         {
           key: 'room',
@@ -556,7 +557,6 @@ function positionsFor(amount: number): Record<string, unknown>[] {
       label: 'Verpflegung',
       offers: [
         { label: 'Mensa-Catering', value: b, preferred: true },
-        // A supplier named by the URL of its offer: the view links it and wraps it.
         { label: 'https://www.baeckerei-am-campus.example/catering/angebote/sommerfest-2026',
           value: Math.round(b * 109) / 100, preferred: false },
       ],
@@ -606,8 +606,6 @@ function versionsOf(d: DemoApp): VersionOutWire[] {
       version: 2,
       data: answers(d),
       diff: { added: {}, removed: {}, changed: { participants: { old: 100, new: 120 } } },
-      // Every other demo: the edit came from an account that no longer exists. The
-      // server sends no name and no sub; the UI shows "Ehemaliges Konto".
       ...(d.n % 2
         ? { changedBy: null, changedByInfo: { kind: 'deleted' as const } }
         : { changedBy: 'applicant', changedByInfo: { kind: 'applicant' as const } }),
@@ -676,7 +674,7 @@ function diffOf(
   return diff;
 }
 
-/** The server's rule for a position without comparison offers: still one offer (D12). */
+/** The server's rule for a position without comparison offers: still one offer. */
 function positionErrors(raw: unknown): { field: string; msg: string }[] {
   if (!Array.isArray(raw)) return [];
   return raw.flatMap((p: { noOffers?: boolean; offers?: unknown[] }, i) =>
@@ -685,8 +683,6 @@ function positionErrors(raw: unknown): { field: string; msg: string }[] {
       : [],
   );
 }
-
-// --------------------------------------------------------------------- meetings
 
 /** A local `YYYY-MM-DD`, `days` away from today. */
 function dayFromToday(days: number): string {

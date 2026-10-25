@@ -89,6 +89,10 @@ describe('tickets.util', () => {
       ).toBe('Mara Keller hat das Ticket als Duplikat von T-0012 geschlossen');
     });
 
+    /**
+     * When the system assigns, the text is never "übernommen". A deleted person can be on both
+     * sides.
+     */
     it('writes the assignee changes', () => {
       expect(eventText(ev({ kind: 'assignee', payload: { to: null } }), '', t)).toBe(
         'Mara Keller hat die Zuweisung entfernt',
@@ -100,11 +104,9 @@ describe('tickets.util', () => {
       expect(eventText(ev({ kind: 'assignee', payload: { to: JONAS } }), '', t)).toBe(
         'Mara Keller hat das Ticket Jonas Albrecht zugewiesen',
       );
-      // The system assigns: never "übernommen".
       expect(eventText(ev({ kind: 'assignee', actor: null, payload: { to: MARA } }), '', t)).toBe(
         'STUPA hat das Ticket Mara Keller zugewiesen',
       );
-      // A deleted person on both sides.
       const gone = { principalId: null, displayName: null };
       expect(eventText(ev({ kind: 'assignee', actor: gone, payload: { to: gone } }), '', t)).toBe(
         'Gelöschte Person hat das Ticket Gelöschte Person zugewiesen',

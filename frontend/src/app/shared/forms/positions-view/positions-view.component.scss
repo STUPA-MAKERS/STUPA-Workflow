@@ -10,7 +10,6 @@
   min-width: 0;
 }
 
-/* The first row names the block, as a field label does. */
 .pv__head {
   padding: 10px var(--space-4) 6px;
 }
@@ -27,7 +26,6 @@
   min-width: 0;
 }
 
-/* The collapsed row is one button over the full width and height of the row. */
 .pv__toggle {
   display: flex;
   align-items: center;
@@ -80,7 +78,6 @@
   gap: 2px;
   min-width: 0;
 }
-/* Names, suppliers and offer texts (often URLs) are never cut: they wrap. */
 .pv__name {
   min-width: 0;
   font-size: var(--fs-md);
@@ -113,7 +110,6 @@
   font-size: var(--fs-md);
 }
 
-/* Open: the offers below the row, set in by the chevron column. */
 .pv__body {
   display: flex;
   flex-direction: column;

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import (
     BigInteger,
@@ -110,31 +111,33 @@ class CdVariantLogo(UUIDPkMixin, CreatedAtMixin, Base):
 
 
 class Gremium(UUIDPkMixin, CreatedAtMixin, Base):
+    """A gremium: the body that holds members, meetings and votes."""
+
     __tablename__ = "gremium"
 
     name: Mapped[str] = mapped_column(Text)
     slug: Mapped[str] = mapped_column(Text, unique=True)
-    # Corporate design of the rendered documents. NULL = no variant, so the
-    # render path falls back to the renderer default. The FK is RESTRICT: a variant
-    # that a gremium still references cannot be deleted (the service answers 409).
+    #: Corporate design of the rendered documents. NULL = no variant, so the
+    #: render path falls back to the renderer default. The FK is RESTRICT: a variant
+    #: that a gremium still references cannot be deleted (the service answers 409).
     cd_variant_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("cd_variant.id", ondelete="RESTRICT"), nullable=True
     )
     default_lang: Mapped[str] = mapped_column(Text, server_default="de")
-    # Vote delegation allowed in this gremium (per gremium, not per assignment).
+    #: Vote delegation allowed in this gremium (per gremium, not per assignment).
     allow_vote_delegation: Mapped[bool] = mapped_column(Boolean, server_default="false")
-    # Lead time in minutes before the meeting start. A non-pool delegation must
-    # be set up before this lead time. 0 = until the meeting start.
+    #: Lead time in minutes before the meeting start. A non-pool delegation must
+    #: be set up before this lead time. 0 = until the meeting start.
     delegation_lead_minutes: Mapped[int] = mapped_column(Integer, server_default="0")
-    # Allow delegation to users outside gremium & substitute pool.
+    #: Allow delegation to users outside gremium & substitute pool.
     delegation_allow_external: Mapped[bool] = mapped_column(
         Boolean, server_default="false"
     )
-    # Default quorum for the votes of this gremium. It is the percentage of
-    # eligible voters that must take part, from 0 to 100. NULL = no default.
+    #: Default quorum for the votes of this gremium. It is the percentage of
+    #: eligible voters that must take part, from 0 to 100. NULL = no default.
     quorum_percent: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    # The final protocols of this gremium appear without login on the public
-    # protocols page, as the public version only. Off by default.
+    #: The final protocols of this gremium appear without login on the public
+    #: protocols page, as the public version only. Off by default.
     protocols_public: Mapped[bool] = mapped_column(Boolean, server_default="false")
 
 
@@ -152,10 +155,10 @@ class GremiumRole(UUIDPkMixin, Base):
         ForeignKey("gremium.id", ondelete="CASCADE")
     )
     key: Mapped[str] = mapped_column(Text)
-    name_i18n: Mapped[dict] = mapped_column(JSONB, server_default="{}")
-    # Granular meeting-domain permissions of this role, as a list of keys:
-    # session.manage, vote.manage, vote.cast, protocol.write, protocol.finalize.
-    permissions: Mapped[list] = mapped_column(JSONB, server_default="[]")
+    name_i18n: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
+    #: Granular meeting-domain permissions of this role, as a list of keys:
+    #: session.manage, vote.manage, vote.cast, protocol.write, protocol.finalize.
+    permissions: Mapped[list[str]] = mapped_column(JSONB, server_default="[]")
 
     __table_args__ = (
         UniqueConstraint("gremium_id", "key", name="uq_gremium_role_gremium_key"),
@@ -171,6 +174,12 @@ class GremiumMembership(UUIDPkMixin, Base):
     gremium) pair exactly one role is active. The sync leaves ``valid_from`` and
     ``valid_until`` NULL (open). The readers still filter on them, and the
     EXCLUDE constraint below keeps the one-row invariant.
+
+    The EXCLUDE constraint backs the overlap invariant in the database: a
+    (principal, gremium) pair must not have overlapping terms. A NULL bound means
+    minus or plus infinity, and the range is half-open ``[from, until)``, so
+    adjacent memberships are allowed. It closes the TOCTOU gap of the Python check
+    on parallel inserts and needs the btree_gist extension.
     """
 
     __tablename__ = "gremium_membership"
@@ -194,11 +203,6 @@ class GremiumMembership(UUIDPkMixin, Base):
     __table_args__ = (
         Index("ix_gremium_membership_principal", "principal_id"),
         Index("ix_gremium_membership_gremium", "gremium_id"),
-        # Database backing of the overlap invariant. A (principal, gremium) pair
-        # must not have overlapping term intervals. A NULL bound means minus or
-        # plus infinity. The range is half-open [from, until), so adjacent
-        # memberships are allowed. The constraint closes the TOCTOU gap of the
-        # pure Python check on parallel inserts. It needs the btree_gist extension.
         ExcludeConstraint(
             ("principal_id", "="),
             ("gremium_id", "="),
@@ -288,11 +292,11 @@ class ApplicationType(UUIDPkMixin, CreatedAtMixin, Base):
         ForeignKey("gremium.id", ondelete="CASCADE"), nullable=True
     )
     key: Mapped[str] = mapped_column(Text, unique=True)
-    name_i18n: Mapped[dict] = mapped_column(JSONB, server_default="{}")
+    name_i18n: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
     has_budget: Mapped[bool] = mapped_column(Boolean, server_default="false")
-    comparison_offers: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    # GDPR retention in months until the anonymization. NULL = the global default
-    # ``privacy_settings.default_retention_months``.
+    comparison_offers: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    #: GDPR retention in months until the anonymization. NULL = the global default
+    #: ``privacy_settings.default_retention_months``.
     retention_months: Mapped[int | None] = mapped_column(Integer, nullable=True)
     active_form_version_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("form_version.id", ondelete="SET NULL", use_alter=True),
@@ -333,7 +337,7 @@ class WebhookDelivery(UUIDPkMixin, Base):
         ForeignKey("webhook.id", ondelete="CASCADE")
     )
     event: Mapped[str] = mapped_column(Text)
-    payload: Mapped[dict] = mapped_column(JSONB, server_default="{}")
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
     status: Mapped[str] = mapped_column(Text, server_default="pending")
     attempts: Mapped[int] = mapped_column(Integer, server_default="0")
     idempotency_key: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -374,7 +378,7 @@ class SiteConfigVersion(UUIDPkMixin, CreatedAtMixin, Base):
     version: Mapped[int] = mapped_column(Integer)
     active: Mapped[bool] = mapped_column(Boolean, server_default="false")
     created_by: Mapped[str | None] = mapped_column(Text, nullable=True)
-    branding: Mapped[dict] = mapped_column(JSONB, server_default="{}")
+    branding: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
 
     __table_args__ = (
         UniqueConstraint("version", name="uq_site_config_version_version"),

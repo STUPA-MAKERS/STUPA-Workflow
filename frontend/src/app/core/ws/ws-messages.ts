@@ -37,7 +37,7 @@ export interface VoteOpenedMsg {
    * vote was already open, it did not open now. Older servers do not send it.
    */
   replay?: boolean;
-  /** A personnel election (F2) carries its candidates and its round. */
+  /** A personnel election carries its candidates and its round. */
   kind?: VoteKind;
   election?: ElectionConfig | null;
   round?: number;
@@ -72,12 +72,12 @@ export interface VoteClosedMsg {
   /** Rejection reason: `quorum` for a missed quorum, `majority` for a missed majority. */
   failedReason?: 'quorum' | 'majority' | null;
   kind?: VoteKind;
-  /** The result of a personnel election (F2). */
+  /** The result of a personnel election. */
   electionResult?: ElectionResult | null;
   /** The counts of a poll. */
   pollResult?: PollResult | null;
 }
-/** The lot of a tied election was drawn (F2): the room and the beamer show it. */
+/** The lot of a tied election was drawn: the room and the beamer show it. */
 export interface VoteLotDrawnMsg {
   type: 'vote_lot_drawn';
   voteId: string;
@@ -162,8 +162,6 @@ export type ClientMessage =
     }
   | { type: 'subscribe' }
   | BodyDraftMsg;
-
-// ------------------------------------------------------------------ to-do boards (`/api/ws/todos`)
 
 /**
  * A change ping of a board. It names what changed, never the content: the page reads the

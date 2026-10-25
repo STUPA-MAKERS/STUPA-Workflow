@@ -2,7 +2,8 @@
 
 The service renders a meeting protocol to PDF. It takes the protocol Markdown
 that the backend builds (with a YAML frontmatter) and gives back a PDF in the
-HSRT design. The PDF looks the same as the output of the former pytex service.
+HSRT design. The layout matches the pytex (LaTeX) HSRT report, which is the
+reference for every measurement in the template.
 
 > **Internal only.** The service has no host port. In compose it sits on
 > `typst_net`, which has no egress. Do not publish port 8099.
@@ -80,7 +81,7 @@ uv venv && uv pip install -e '.[dev]'
 .venv/bin/pytest             # the integration tests need typst and pdftotext
 ```
 
-The integration tests compare anchor positions with the pytex output. If you
+The integration tests compare anchor positions with the pytex reference output. If you
 change the layout, keep these positions or update the test with a reason.
 
 ## Licenses of the vendored files

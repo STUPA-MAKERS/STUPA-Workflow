@@ -1,8 +1,8 @@
-"""O24: a meeting vote is deletable only while the meeting is planned or live.
+"""A meeting vote is deletable only while the meeting is planned or live.
 
 Every delete writes ``vote_delete``. After the close the vote is part of the record and
 the route answers 409 ``meeting_closed``. An open or closed vote is part of the record
-too (409 ``vote_not_deletable``), so its agenda item stays (O25).
+too (409 ``vote_not_deletable``), so its agenda item stays.
 """
 
 from __future__ import annotations
@@ -59,7 +59,7 @@ async def test_delete_meeting_vote_after_close_is_refused(
 async def test_delete_open_or_closed_meeting_vote_is_refused(
     maker: async_sessionmaker[AsyncSession], api: FastAPI, vote: str
 ) -> None:
-    """Two deletes do not get around O25: the vote stays, so the agenda item stays."""
+    """Two deletes do not get around the delete rule: the vote stays, so the agenda item stays."""
     s = await seed(maker, status="live", votes=(vote,))
     vote_id = s.vote_ids[vote]
     with TestClient(api) as client:

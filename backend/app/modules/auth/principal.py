@@ -22,18 +22,20 @@ class Principal:
     roles: list[str] = field(default_factory=list)
     permissions: set[str] = field(default_factory=set)
     groups: set[str] = field(default_factory=set)
-    # OAuth scope cap for MCP. `None` marks an unscoped session cookie with the full
-    # range. A set makes only these permissions reachable. The cap also applies to an
-    # admin, so a scoped token cannot bypass it through the admin role.
+    #: OAuth scope cap for MCP. `None` marks an unscoped session cookie with the full
+    #: range. A set makes only these permissions reachable. The cap also applies to an
+    #: admin, so a scoped token cannot bypass it through the admin role.
     scope_permissions: frozenset[str] | None = None
 
     def has(self, perm: str) -> bool:
-        # Check the scope cap first. A permission outside the token scope stays
-        # unreachable, whatever the role or the admin bypass says.
+        """Tell whether the principal holds ``perm``.
+
+        The scope cap comes first: a permission outside the token scope stays
+        unreachable, whatever the role or the admin bypass says. An admin then holds
+        every in-scope right. This is the single RBAC chokepoint.
+        """
         if self.scope_permissions is not None and perm not in self.scope_permissions:
             return False
-        # An admin holds every in-scope right, whatever the explicitly assigned
-        # permissions are. This is the single RBAC chokepoint.
         return "admin" in self.roles or perm in self.permissions
 
     @property
@@ -41,7 +43,7 @@ class Principal:
         """Tell if the principal holds the global `admin` role.
 
         This flag does not apply the scope cap. Use `scope_allows` together with it,
-        or use `app.modules.admin.gremium_roles.admin_bypass`.
+        or use `app.modules.auth.policy.admin_bypass`.
         """
         return "admin" in self.roles
 
@@ -56,6 +58,7 @@ class Principal:
         return self.scope_permissions is None or perm in self.scope_permissions
 
     def in_group(self, group: str) -> bool:
+        """Tell whether the principal is in the OIDC group ``group``."""
         return group in self.groups
 
 

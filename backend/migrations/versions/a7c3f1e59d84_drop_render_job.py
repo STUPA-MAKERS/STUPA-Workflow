@@ -22,6 +22,7 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     op.execute("DROP TABLE IF EXISTS render_job")
 
 

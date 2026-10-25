@@ -40,14 +40,13 @@ from app.modules.auth.models import (
     RolePermission,
 )
 from app.modules.budget.decision import effective_decision_gremium
-from app.modules.deadlines.service import flow_deadline_passed
 from app.modules.flow.context import build_base_context, with_actor
 from app.modules.flow.models import State, Transition
 from app.shared.guards import GuardContext, GuardError, eval_guard
 
-# The admin role bypasses every permission check. It must match ``Principal.has``
-# ("admin" in roles). Recipient resolution runs set-based in SQL and not through
-# ``has``, so this key stays one constant.
+#: Admin role key; it bypasses every permission check. It must match ``Principal.has``,
+#: and the recipient resolution runs set-based in SQL, not through ``has``, so the key
+#: stays one constant.
 ADMIN_ROLE_KEY = "admin"
 
 
@@ -112,7 +111,7 @@ def principal_rows_with_permission_stmt(
     now: datetime,
     *,
     gremium_id: uuid.UUID | None = None,
-) -> Select[uuid.UUID, str, str | None, list | None]:
+) -> Select[uuid.UUID, str, str | None, list[str] | None]:
     """Select the identity rows of the permission holders.
 
     The WHERE clauses match the mail statement. The projection
@@ -189,7 +188,6 @@ async def _candidates_with_transition_permission(
     for pid, role_key, assignment_gremium in assignment_rows:
         roles_by_pid[pid].add(role_key)
         if assignment_gremium is not None:
-            # A gremium scope counts as a group key. This matches resolve_principal.
             groups_by_pid[pid].add(str(assignment_gremium))
 
     all_groups: set[str] = set().union(*groups_by_pid.values())
@@ -285,7 +283,10 @@ class RecipientResolver:
         application_id: uuid.UUID | None = None,
         now: datetime | None = None,
     ) -> list[str]:
-        """Resolve all specs into a sorted address list without duplicates."""
+        """Resolve all specs into a sorted address list without duplicates.
+
+        An unknown or incomplete spec is ignored, so the rule stays valid.
+        """
         now = now or datetime.now(UTC)
         out: set[str] = set()
         for spec in specs:
@@ -320,7 +321,6 @@ class RecipientResolver:
                     out.update(await self._emails_for_gremium(str(gid), now))
             elif kind == "permission" and ref:
                 out.update(await self._emails_for_permission(str(ref), now))
-            # Ignore an unknown or incomplete spec. The rule stays valid.
         return sorted(e for e in out if e)
 
     async def _emails_for_group(self, group: str) -> list[str]:
@@ -388,7 +388,7 @@ class RecipientResolver:
         return [e for e in rows if e]
 
     async def _applicant_email(self, application_id: uuid.UUID) -> str | None:
-        # An anonymized application has no PII mail any more. Do not address it.
+        """Return the applicant mail; an anonymized application has none any more."""
         return await self.session.scalar(
             select(Applicant.email).where(
                 Applicant.application_id == application_id,
@@ -411,7 +411,8 @@ async def actionable_principal_emails(
     A transition fires only when its guard passes. This mirrors the task-list semantics
     of ``list_tasks`` and ``available_transitions``. The seed holds admins like every
     other holder of the transition permission. An admin gets mail only when a guard
-    fires for them too.
+    fires for them too. The transitions are the manual non-branch ones that count as an
+    open task, as in ``FlowService._outgoing`` and ``list_tasks``.
     """
     if state is not None and state.kind == "vote":
         return await RecipientResolver(session).resolve(
@@ -423,8 +424,6 @@ async def actionable_principal_emails(
     )
     if app is None or app.current_state_id is None:
         return []
-    # Mirror FlowService._outgoing and the list_tasks predicate: manual,
-    # non-branch transitions that count as an open task.
     transitions = list(
         (
             await session.scalars(
@@ -443,10 +442,7 @@ async def actionable_principal_emails(
     if not transitions:
         return []
 
-    deadline_passed = await flow_deadline_passed(session, application_id)
-    base_ctx = await build_base_context(
-        session, app, manual=True, deadline_passed=deadline_passed
-    )
+    base_ctx = await build_base_context(session, app, manual=True)
     candidates = await _candidates_with_transition_permission(
         session, datetime.now(UTC), gremium_id=app.gremium_id
     )

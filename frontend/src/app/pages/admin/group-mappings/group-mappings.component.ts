@@ -127,8 +127,6 @@ export class GroupMappingsComponent {
   /** The link to the gremium roles page needs its own permission. */
   protected readonly canManageGremiumRoles = computed(() => this.auth.can('admin.gremium_roles'));
 
-  // --- data --------------------------------------------------------------------
-
   private readonly globalMappings = signal<GroupMapping[]>([]);
   private readonly membershipMappings = signal<GremiumMembershipMapping[]>([]);
   private readonly roleMappings = signal<GremiumRoleMapping[]>([]);
@@ -146,8 +144,6 @@ export class GroupMappingsComponent {
     membership: true,
     role: true,
   });
-
-  // --- dialog state ------------------------------------------------------------
 
   /** The open add/edit dialog, or null. */
   readonly dialog = signal<MappingKind | null>(null);
@@ -178,8 +174,6 @@ export class GroupMappingsComponent {
     if (kind === 'membership') return !!this.gremiumId();
     return !!this.gremiumRoleId();
   });
-
-  // --- rows --------------------------------------------------------------------
 
   private readonly gremienById = computed(
     () => new Map(this.gremien().map((g) => [g.id, g.name])),
@@ -237,8 +231,6 @@ export class GroupMappingsComponent {
     },
   ]);
 
-  // --- dialog options ----------------------------------------------------------
-
   readonly roleOptions = computed<SelectOption[]>(() =>
     this.roles().map((r) => ({ value: r.id, label: this.roleName(r) })),
   );
@@ -267,8 +259,6 @@ export class GroupMappingsComponent {
     this.refresh('membership');
     this.refresh('role');
   }
-
-  // --- loading -----------------------------------------------------------------
 
   private refresh(kind: MappingKind): void {
     const done = (): void => this.loading.update((l) => ({ ...l, [kind]: false }));
@@ -317,8 +307,6 @@ export class GroupMappingsComponent {
     this.gremiumRoles.update((m) => new Map(m).set(gremiumId, roles));
   }
 
-  // --- labels ------------------------------------------------------------------
-
   private unknown(): string {
     return this.i18n.translate('admin.groupMappings.unknown');
   }
@@ -357,8 +345,6 @@ export class GroupMappingsComponent {
     const c = this.confirm();
     return c ? this.key(c.kind, 'deleteBody') : 'admin.groupMappings.title';
   });
-
-  // --- dialog ------------------------------------------------------------------
 
   openAdd(kind: MappingKind): void {
     this.editId.set(null);
@@ -437,7 +423,6 @@ export class GroupMappingsComponent {
         this.dialog.set(null);
         this.refresh(kind);
       },
-      // The dialog stays open, so the admin can correct the input.
       error: (err: { status?: number }) => {
         this.saving.set(false);
         this.toast.error(this.i18n.translate(this.errorKey(err?.status)));
@@ -451,8 +436,6 @@ export class GroupMappingsComponent {
     if (status === 404) return 'admin.groupMappings.notFound';
     return 'admin.groupMappings.failed';
   }
-
-  // --- delete ------------------------------------------------------------------
 
   askDelete(kind: MappingKind, id: string): void {
     this.confirm.set({ kind, id });

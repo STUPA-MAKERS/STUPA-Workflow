@@ -5,8 +5,10 @@ import { firstValueFrom } from 'rxjs';
 import { USE_MOCK_API } from './api.config';
 import { lazyMockApiInterceptor } from './mock-api.lazy';
 
-// `isDevMode` is a non-configurable named export of @angular/core (see
-// mock-api.prod-gate.spec.ts): the test mocks the module and keeps every other export.
+/**
+ * `isDevMode` is a non-configurable named export of @angular/core (see mock-api.prod-gate.spec.ts),
+ * so the test mocks the module and keeps every other export.
+ */
 const isDevModeMock = jest.fn<boolean, []>();
 jest.mock('@angular/core', () => {
   const actual = jest.requireActual('@angular/core');
@@ -54,11 +56,11 @@ describe('lazyMockApiInterceptor', () => {
     http.verify();
   });
 
+  /** The demo type of the mock answers, not a backend. */
   it('loads the mock and lets it answer an API request', async () => {
     isDevModeMock.mockReturnValue(true);
     const { http, client } = setup(true);
     const types = await firstValueFrom(client.get<{ items: { id: string }[] }>('/api/application-types'));
-    // The demo type of the mock answers, not a backend.
     expect(types.items[0].id).toBe('11111111-1111-1111-1111-111111111111');
     http.expectNone('/api/application-types');
     http.verify();

@@ -42,8 +42,11 @@ class _FakeService:
         self, *, revisions: list[ConfigRevision] | None = None, get: Any = None,
         diff: dict[str, Any] | None = None,
     ) -> None:
-        # The list handler passes `session` to AuditService.resolve_actor_names. With
-        # `created_by=None` that call short-circuits and reads no DB.
+        """Store the canned results.
+
+        The list handler passes `session` to AuditService.resolve_actor_names. With
+        `created_by=None` that call short-circuits and reads no DB.
+        """
         from tests._support.auth_fakes import fake_session
 
         self.session = fake_session()
@@ -113,8 +116,8 @@ def test_restore_404_when_revision_missing() -> None:
 
 
 def test_restore_403_without_entity_permission() -> None:
+    """Refuse the restore to a principal with audit.read but without flow.configure."""
     rev = _rev(entity_type="flow", created_by=None)
-    # The principal holds audit.read but not flow.configure, so the restore is refused.
     client = _client(_principal("audit.read"), _FakeService(get=rev))
     r = client.post(f"/api/admin/config-revisions/{rev.id}/restore")
     assert r.status_code == 403
@@ -145,8 +148,12 @@ def test_audit_revert_requires_audit_revert_permission() -> None:
 
 
 def test_audit_revert_delegates_to_revert_service(monkeypatch: pytest.MonkeyPatch) -> None:
-    # #AUD-018: the router passes the principal as the third argument. The RevertService
-    # then re-asserts the granular permission of the original operation.
+    """Delegate the audit revert to the RevertService.
+
+    The principal holds audit.revert for the router gate and the granular
+    flow.configure. The router passes the principal as the third argument, so the
+    RevertService can re-assert the granular permission of the original operation.
+    """
     seen: list[Principal | None] = []
 
     class _FakeRevert:
@@ -160,7 +167,6 @@ def test_audit_revert_delegates_to_revert_service(monkeypatch: pytest.MonkeyPatc
 
     monkeypatch.setattr("app.modules.audit.router.RevertService", _FakeRevert)
     app = create_app()
-    # Happy path: audit.revert for the router gate plus the granular flow.configure (AUD-018).
     app.dependency_overrides[get_current_principal] = lambda: _principal(
         "audit.revert", "flow.configure"
     )
@@ -170,6 +176,5 @@ def test_audit_revert_delegates_to_revert_service(monkeypatch: pytest.MonkeyPatc
     body = r.json()
     assert body["revertedAuditId"] == 7
     assert body["entityType"] == "flow"
-    # The router delegates to the RevertService and passes the principal for the re-assertion.
     assert seen and seen[0] is not None
     assert seen[0].has("flow.configure")

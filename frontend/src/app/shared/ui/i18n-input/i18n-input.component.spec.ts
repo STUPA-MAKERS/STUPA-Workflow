@@ -31,12 +31,15 @@ describe('I18nInputComponent', () => {
     expect(enChange).toHaveBeenLastCalledWith('x');
   });
 
+  /**
+   * The kit field names itself by its visible label; the accessible name is for a field without
+   * one.
+   */
   it('takes the labels and the placeholders of the page', async () => {
     await render(
       `<app-i18n-input deLabel="DE" enLabel="EN" deAriaLabel="Text deutsch" enAriaLabel="Text englisch" dePlaceholder="Frage" />`,
       { imports: [I18nInputComponent] },
     );
-    // The kit field names itself by its visible label; the accessible name is for a field without one.
     expect(screen.getByRole('textbox', { name: 'DE' })).toHaveAttribute('placeholder', 'Frage');
     expect(screen.getByRole('textbox', { name: 'EN' })).not.toHaveAttribute('placeholder');
   });

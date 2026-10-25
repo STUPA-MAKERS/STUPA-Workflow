@@ -142,9 +142,11 @@ class FakeSession:
         self.committed += 1
 
 
-# Every audit write consumes two ``execute`` results: the ``pg_advisory_xact_lock``
-# and the ``prev_hash`` select.
 def audit_results() -> list[FakeResult]:
+    """Return the two ``execute`` results that every audit write consumes.
+
+    They are the ``pg_advisory_xact_lock`` and the ``prev_hash`` select.
+    """
     return [res(), res()]
 
 
@@ -158,9 +160,11 @@ def svc(
     return ConfigService(session), session  # type: ignore[arg-type]
 
 
-# The row doubles below carry no DB default, so each factory lists every column.
 class Row:
-    """Generic attribute container for ORM row doubles."""
+    """Generic attribute container for ORM row doubles.
+
+    The row doubles below carry no DB default, so each factory lists every column.
+    """
 
     def __init__(self, **kw: Any) -> None:
         for k, v in kw.items():
@@ -283,10 +287,9 @@ def test_mappers_roundtrip() -> None:
 
 
 def test_principal_out_active_none_defaults_true() -> None:
-    # An active value of None means the default True (#legacy-row without a column value).
+    """An active value of None means the default True. An explicit False stays False."""
     out = _principal_out(principal_row(active=None), [])
     assert out.active is True
-    # An explicit False stays False.
     out2 = _principal_out(principal_row(active=False), [])
     assert out2.active is False
 
@@ -298,16 +301,18 @@ async def test_list_gremien() -> None:
 
 
 async def test_list_gremien_admin_counts() -> None:
+    """Count only current memberships of active principals.
+
+    Queue: the gremien, then the member counts, then the role counts. B has no member.
+    """
     a = gremium_row(name="A")
     b = gremium_row(name="B")
-    # Queue: the gremien, then the member counts, then the role counts. B has no member.
     s, session = svc([res(a, b), res((a.id, 3)), res((a.id, 4), (b.id, 3))])
     out = await s.list_gremien_admin()
     assert [(g.name, g.member_count, g.role_count) for g in out] == [
         ("A", 3, 4),
         ("B", 0, 3),
     ]
-    # The member count keeps current memberships of active principals only.
     member_sql = str(session.statements[1])
     assert "valid_until" in member_sql
     assert "valid_from" in member_sql
@@ -316,8 +321,11 @@ async def test_list_gremien_admin_counts() -> None:
 
 
 async def test_create_gremium_ok() -> None:
-    # Queue: _gremium_by_slug finds no row so the slug is free, ensure_forced_roles finds
-    # no role, then the two audit results.
+    """Create a gremium with a free slug.
+
+    Queue: ``_gremium_by_slug`` finds no row, ``ensure_forced_roles`` finds no role, then
+    the two audit results.
+    """
     s, sess = svc(
         [res(), res(), *audit_results()]
     )
@@ -335,8 +343,8 @@ async def test_create_gremium_slug_conflict() -> None:
 
 
 async def test_update_gremium_all_fields() -> None:
+    """Queue: the row from get, a free slug from _gremium_by_slug, then two audit results."""
     row = gremium_row(slug="old")
-    # Queue: the row from get, a free slug from _gremium_by_slug, then two audit results.
     s, _ = svc([res(), *audit_results()], gets=[row])
     out = await s.update_gremium(
         row.id,
@@ -357,9 +365,9 @@ async def test_update_gremium_all_fields() -> None:
 
 
 async def test_update_gremium_quorum_set_to_null() -> None:
+    """An explicit quorumPercent of None lands in model_fields_set, so the service sets None."""
     row = gremium_row(quorum_percent=50)
     s, _ = svc([*audit_results()], gets=[row])
-    # An explicit quorumPercent of None lands in model_fields_set, so the service sets None.
     out = await s.update_gremium(
         row.id, GremiumUpdate.model_validate({"quorumPercent": None}), "admin"
     )
@@ -374,7 +382,7 @@ async def test_update_gremium_noop_keeps_values() -> None:
 
 
 async def test_update_gremium_same_slug_no_conflict_check() -> None:
-    # The slug equals row.slug, so the service runs NO _gremium_by_slug query.
+    """The slug equals row.slug, so the service runs NO _gremium_by_slug query."""
     row = gremium_row(slug="keep")
     s, _ = svc([*audit_results()], gets=[row])
     out = await s.update_gremium(row.id, GremiumUpdate(slug="keep"), "admin")
@@ -403,16 +411,18 @@ def todo_locks(*comment_ids: Any) -> list[FakeResult]:
 
 
 async def test_delete_gremium_ok() -> None:
+    """Lock the to-do board, then its cards, before the meetings.
+
+    That is the order of every to-do write. Queue: the locked Gremium, the to-do locks,
+    no meeting (the locking select), no vote, the audit.
+    """
     row = gremium_row()
-    # The locked Gremium, the to-do locks, then no meeting (the locking select), no
-    # vote, the audit.
     s, sess = svc([*todo_locks(), res(), res(), *audit_results()], scalars=[row])
     await s.delete_gremium(row.id, _ADMIN)
     assert row in sess.deleted
     assert sess.committed == 1
     lock = str(sess.statements[0])
     assert "FROM gremium" in lock and "FOR UPDATE" in lock
-    # The board, then its cards, before the meetings: the order of every to-do write.
     board, cards, comments = (str(sess.statements[i]) for i in (3, 4, 5))
     assert "FROM todo_board" in board and "FOR UPDATE" in board
     assert "FROM todo_card" in cards and "FOR UPDATE" in cards
@@ -423,7 +433,10 @@ async def test_delete_gremium_ok() -> None:
 async def test_delete_gremium_removes_the_files_of_the_to_do_comments(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The comment file rows go before the cascade, their objects after the commit."""
+    """The comment file rows go before the cascade, their objects after the commit.
+
+    The Gremium row is still there when the rows go.
+    """
     from app.modules.files.service import FilesService
 
     row = gremium_row()
@@ -447,7 +460,6 @@ async def test_delete_gremium_removes_the_files_of_the_to_do_comments(
     )
     s = ConfigService(session, storage=storage)  # type: ignore[arg-type]
     await s.delete_gremium(row.id, _ADMIN)
-    # The Gremium row is still there when the rows go; the objects go after the commit.
     assert seen == [
         ("drop", storage, "todo_comment", [c1, c2], "admin", []),
         ("remove", storage, ["k1", "k2"], 1),
@@ -544,7 +556,10 @@ def _vote_row(meeting_id: Any) -> Any:
 async def test_delete_gremium_locks_and_checks_everything_before_the_first_write(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Locks and refusals come first; then the meeting deletes. A vote without a meeting stays."""
+    """Locks and refusals come first; then the meeting deletes. A vote without a meeting stays.
+
+    The Gremium row first, then the meetings of the Gremium in id order.
+    """
     row = gremium_row()
     m1, m2 = _meeting_row(final=True), _meeting_row()
     v1, v2, loose = _vote_row(m1.id), _vote_row(m2.id), _vote_row(None)
@@ -569,7 +584,6 @@ async def test_delete_gremium_locks_and_checks_everything_before_the_first_write
         ),
     ]
     assert all(loose.id not in call[1] for call in spy.calls if call[0] == "votes")
-    # The Gremium row first, then the meetings of the Gremium in id order.
     lock = str(sess.statements[6])
     assert "FOR UPDATE" in lock and "meeting.gremium_id" in lock
     assert "ORDER BY meeting.id" in lock
@@ -606,9 +620,11 @@ async def test_delete_gremium_not_found() -> None:
 
 
 async def test_get_gremium_mail_recipients_union_dedup() -> None:
+    """Queue: get returns the Gremium, then the recipient lists.
+
+    One row is ``None``, which covers the ``recipients or []`` branch. One address appears twice.
+    """
     gid = uuid.uuid4()
-    # Queue: get returns the Gremium, then the recipient lists. One row is ``None``, which
-    # covers the ``recipients or []`` branch. One address appears twice.
     s, _ = svc(
         [res(["a@x.de", "b@x.de"], ["b@x.de"], None)],
         gets=[gremium_row(id=gid)],
@@ -624,25 +640,27 @@ async def test_get_gremium_mail_recipients_not_found() -> None:
 
 
 async def test_set_gremium_mail_recipients_with_addresses() -> None:
+    """Queue: the Gremium from get, the delete execute, then the two audit results.
+
+    The service adds one MailList row next to the audit row.
+    """
     gid = uuid.uuid4()
-    # Queue: the Gremium from get, the delete execute, then the two audit results.
     s, sess = svc([res(), *audit_results()], gets=[gremium_row(id=gid)])
     out = await s.set_gremium_mail_recipients(
         gid, GremiumMailRecipients(recipients=["a@x.de"]), "admin"
     )
     assert out.recipients == ["a@x.de"]
-    # The service adds one MailList row next to the audit row.
     assert sum(type(o).__name__ == "MailList" for o in sess.added) == 1
 
 
 async def test_set_gremium_mail_recipients_empty_adds_nothing() -> None:
+    """No MailList row, only the audit row."""
     gid = uuid.uuid4()
     s, sess = svc([res(), *audit_results()], gets=[gremium_row(id=gid)])
     out = await s.set_gremium_mail_recipients(
         gid, GremiumMailRecipients(recipients=[]), "admin"
     )
     assert out.recipients == []
-    # No MailList row, only the audit row.
     assert sum(type(o).__name__ == "MailList" for o in sess.added) == 0
 
 
@@ -674,7 +692,7 @@ async def test_update_application_type_returns_active_version() -> None:
 
 
 async def test_create_application_type_with_comparison_offers() -> None:
-    # Queue: the existing-type select returns None, then the two audit results.
+    """Queue: the existing-type select returns None, then the two audit results."""
     s, sess = svc([res(), *audit_results()])
     out = await s.create_application_type(
         ApplicationTypeCreate(
@@ -759,8 +777,8 @@ async def test_update_application_type_not_found() -> None:
 
 
 async def test_delete_application_type_ok() -> None:
+    """Queue: the type row from get, in_use None from scalar, then two audit results."""
     row = type_row()
-    # Queue: the type row from get, in_use None from scalar, then two audit results.
     s, sess = svc([*audit_results()], scalars=[None], gets=[row])
     await s.delete_application_type(row.id, "admin")
     assert row in sess.deleted
@@ -832,6 +850,7 @@ async def test_get_active_global_flow_none() -> None:
 
 
 async def test_get_active_global_flow_returns_graph() -> None:
+    """Queue: the version, the states, then the transitions."""
     version = _flow_version_row(editor_layout={"x": 1})
     s_init = _flow_state_row("draft", is_initial=True)
     s_done = _flow_state_row("done", is_terminal=True, color="#0f0")
@@ -841,7 +860,6 @@ async def test_get_active_global_flow_returns_graph() -> None:
         label_i18n={"de": "fertig"},
         actions=[{"type": "notify"}],
     )
-    # Queue: the version, the states, then the transitions.
     s, _ = svc(
         [res(s_init, s_done), res(trans)],
         scalars=[version],
@@ -855,10 +873,10 @@ async def test_get_active_global_flow_returns_graph() -> None:
 
 
 async def test_get_active_global_flow_empty_label_and_layout() -> None:
+    """An empty label_i18n and actions None give label None and an empty actions list."""
     version = _flow_version_row(editor_layout={})
     s_init = _flow_state_row("draft", is_initial=True)
     s_done = _flow_state_row("done")
-    # An empty label_i18n and actions None give label None and an empty actions list.
     trans = _flow_transition_row(s_init.id, s_done.id, label_i18n="", actions=None)
     s, _ = svc([res(s_init, s_done), res(trans)], scalars=[version])
     graph = await s.get_active_global_flow()
@@ -884,16 +902,19 @@ def _two_state_graph() -> FlowGraph:
 
 
 async def test_create_global_flow_version_fresh_no_existing_version() -> None:
-    """With no FlowVersion yet the service creates the version, the states and the graph."""
+    """With no FlowVersion yet the service creates the version, the states and the graph.
+
+    The ``execute`` order:
+
+    1. the ``app_keys`` select gives no applications;
+    2. the FlowVersion select gives None, so the service creates one;
+    3. the FlowVersion update deactivates the others;
+    4. the State select gives none, because the flow is fresh;
+    5. the Transition id select gives none;
+    6. the Application update where ``current_state_id`` is None;
+    7. and 8. the audit.
+    """
     graph = _two_state_graph()
-    # execute order:
-    #  1 app_keys select.all() -> no applications
-    #  2 select FlowVersion .scalar_one_or_none() -> None, so the service creates one
-    #  3 update FlowVersion (deactivate the others)
-    #  4 select existing State .scalars().all() -> none, because the flow is fresh
-    #  5 select Transition.id .scalars().all() -> none
-    #  6 update Application where current_state_id is None
-    #  7,8 audit
     s, sess = svc(
         [res(), res(), res(), res(), res(), res(), *audit_results()]
     )
@@ -918,19 +939,21 @@ async def test_create_global_flow_version_new_version_remaps_apps() -> None:
     ``legacy``. ``max_version`` (scalar) is 3, so the new version is 4. Every other
     execute call falls back to the empty default result: deactivate, the per-application
     update, the None update and the config_revision record. ``head`` (scalar) is None.
+
+    Fresh states without reuse of an old version, plus the transition.
+
+    Append-only: the service deletes nothing, so the earlier version survives.
     """
     graph = _two_state_graph()
     app_id = uuid.uuid4()
-    s, sess = svc([res((app_id, "legacy", {}))], scalars=[3])
+    s, sess = svc([res((app_id, "legacy"))], scalars=[3])
     out = await s.create_global_flow_version(FlowVersionCreate(graph=graph), "admin")
     assert out.version == 4
     assert out.active is True
     added_types = [type(o).__name__ for o in sess.added]
     assert added_types.count("FlowVersion") == 1
-    # Fresh states without reuse of an old version, plus the transition.
     assert added_types.count("State") == 2
     assert added_types.count("Transition") == 1
-    # Append-only: the service deletes nothing, so the earlier version survives.
     assert sess.deleted == []
     assert sess.committed == 1
 
@@ -939,9 +962,11 @@ async def test_create_global_flow_version_no_apps_bumps_version() -> None:
     """Without running applications the new version is ``max+1``.
 
     The bulk update for ``current_state_id IS NULL`` runs and the service deletes nothing.
+
+    No applications, max 5, so the new version is 6.
     """
     graph = _two_state_graph()
-    s, sess = svc([res()], scalars=[5])  # no applications, max 5, so the new version is 6
+    s, sess = svc([res()], scalars=[5])
     out = await s.create_global_flow_version(FlowVersionCreate(graph=graph), "admin")
     assert out.version == 6
     assert out.active is True
@@ -969,7 +994,7 @@ async def test_create_global_flow_version_transition_explicit_order() -> None:
 
 
 async def test_create_global_flow_version_invalid_graph_422() -> None:
-    # Without an initial state the service raises ValidationProblem before any DB access.
+    """Without an initial state the service raises ValidationProblem before any DB access."""
     graph = FlowGraph.model_validate(
         {"states": [{"key": "a", "label": {"de": "A"}}], "transitions": []}
     )
@@ -980,11 +1005,11 @@ async def test_create_global_flow_version_invalid_graph_422() -> None:
 
 
 async def test_list_roles_groups_permissions() -> None:
+    """Queue: the roles, then the permissions."""
     r1 = role_row(key="a")
     r2 = role_row(key="b")
     perm = Row(role_id=r1.id, permission="x.read")
     perm2 = Row(role_id=r1.id, permission="x.write")
-    # Queue: the roles, then the permissions.
     s, _ = svc([res(r1, r2), res(perm, perm2)])
     out = await s.list_roles()
     by_key = {o.key: o for o in out}
@@ -993,7 +1018,10 @@ async def test_list_roles_groups_permissions() -> None:
 
 
 async def test_create_role_ok() -> None:
-    # Queue: the existing-role select returns None, then the two audit results.
+    """Queue: the existing-role select returns None, then the two audit results.
+
+    One RolePermission row, because the service drops the duplicate.
+    """
     s, sess = svc([res(), *audit_results()])
     out = await s.create_role(
         RoleCreate(
@@ -1005,7 +1033,6 @@ async def test_create_role_ok() -> None:
     )
     assert out.key == "neu"
     assert out.permissions == ["application.read"]
-    # One RolePermission row, because the service drops the duplicate.
     assert sum(type(o).__name__ == "RolePermission" for o in sess.added) == 1
 
 
@@ -1016,8 +1043,8 @@ async def test_create_role_conflict() -> None:
 
 
 async def test_update_role_label_and_permissions() -> None:
+    """Queue: the role, the permission delete, two audit results, the permissions after."""
     role = role_row()
-    # Queue: the role, the permission delete, two audit results, the permissions after.
     s, _ = svc(
         [res(), *audit_results(), res("application.read", "application.archive")],
         gets=[role],
@@ -1035,7 +1062,7 @@ async def test_update_role_label_and_permissions() -> None:
 
 
 async def test_update_role_permissions_only_label_none() -> None:
-    # A None label skips the branch 572->574. The payload sets the permissions.
+    """A None label leaves the label unchanged. The payload sets the permissions."""
     role = role_row(name_i18n={"de": "Alt"})
     s, _ = svc(
         [res(), *audit_results(), res("application.archive")],
@@ -1044,13 +1071,16 @@ async def test_update_role_permissions_only_label_none() -> None:
     out = await s.update_role(
         role.id, RoleUpdate(permissions=["application.archive"]), "admin"
     )
-    assert role.name_i18n == {"de": "Alt"}  # unchanged
+    assert role.name_i18n == {"de": "Alt"}
     assert out.permissions == ["application.archive"]
 
 
 async def test_update_role_no_permissions_change() -> None:
+    """A None permissions field skips the delete.
+
+    Queue: two audit results, then no row.
+    """
     role = role_row()
-    # A None permissions field skips the delete. Queue: two audit results, then no row.
     s, _ = svc([*audit_results(), res()], gets=[role])
     out = await s.update_role(role.id, RoleUpdate(label={"de": "Nur Label"}), "admin")
     assert out.label == {"de": "Nur Label"}
@@ -1091,10 +1121,10 @@ async def test_list_role_assignments() -> None:
 
 
 async def test_search_principals_with_query_and_assignments() -> None:
+    """Queue: the principals, then the assignments."""
     p1 = principal_row(sub="alice")
     p2 = principal_row(sub="bob")
     a1 = assignment_row(principal_id=p1.id)
-    # Queue: the principals, then the assignments.
     s, _ = svc([res(p1, p2), res(a1)])
     out = await s.search_principals("ali")
     by_sub = {o.sub: o for o in out}
@@ -1104,16 +1134,18 @@ async def test_search_principals_with_query_and_assignments() -> None:
 
 
 async def test_search_principals_no_query_no_results() -> None:
-    # A None query adds no where clause. Without a principal the service skips the
-    # assignments query.
+    """A None query adds no where clause.
+
+    Without a principal the service skips the assignments query.
+    """
     s, _ = svc([res()])
     out = await s.search_principals(None)
     assert out == []
 
 
 async def test_set_principal_active_activate() -> None:
+    """Queue: the principal, the two audit results, then the assignments."""
     principal = principal_row(active=False, sub="x")
-    # Queue: the principal, the two audit results, then the assignments.
     s, _ = svc([*audit_results(), res()], gets=[principal])
     out = await s.set_principal_active(principal.id, True, "admin")
     assert out.active is True
@@ -1121,8 +1153,8 @@ async def test_set_principal_active_activate() -> None:
 
 
 async def test_set_principal_active_deactivate_other() -> None:
+    """Queue: the session delete, the audit results, the assignments."""
     principal = principal_row(active=True, sub="someone")
-    # Queue: the session delete, the audit results, the assignments.
     s, _ = svc([res(), *audit_results(), res(assignment_row(principal_id=principal.id))],
                gets=[principal])
     out = await s.set_principal_active(principal.id, False, "admin")
@@ -1147,10 +1179,13 @@ async def test_set_principal_active_merged_cannot_be_activated() -> None:
 
 
 async def test_set_principal_active_merged_names_the_target() -> None:
+    """Name the target account of a merged principal.
+
+    Queue: the session delete, the audit results, the assignments, then the merge-aware
+    name lookup.
+    """
     target = uuid.uuid4()
     principal = principal_row(active=True, sub="old", merged_into=target)
-    # Queue: the session delete, the audit results, the assignments, then the
-    # merge-aware name lookup.
     s, _ = svc(
         [res(), *audit_results(), res(), res(sub_ref("new", "Neu", None, target))], gets=[principal]
     )
@@ -1180,8 +1215,8 @@ async def test_list_group_mappings() -> None:
 
 
 async def test_create_group_mapping_ok() -> None:
+    """Queue: the role, then the two audit results."""
     role = role_row()
-    # Queue: the role, then the two audit results.
     s, sess = svc([*audit_results()], gets=[role])
     out = await s.create_group_mapping(
         GroupMappingCreate(oidcGroup="grp", roleId=role.id), "admin"
@@ -1199,9 +1234,9 @@ async def test_create_group_mapping_role_not_found() -> None:
 
 
 async def test_update_group_mapping_all_fields() -> None:
+    """Queue: the mapping row, the role for the existence check, then two audit results."""
     row = mapping_row()
     new_role = role_row()
-    # Queue: the mapping row, the role for the existence check, then two audit results.
     s, _ = svc([*audit_results()], gets=[row, new_role])
     out = await s.update_group_mapping(
         row.id, GroupMappingUpdate(oidcGroup="neu", roleId=new_role.id), "admin"
@@ -1255,6 +1290,7 @@ async def test_list_webhooks() -> None:
 
 
 async def test_create_webhook_ok() -> None:
+    """The server generates the secret with 32 bytes."""
     s, sess = svc([*audit_results()])
     out = await s.create_webhook(
         WebhookCreate(
@@ -1264,7 +1300,6 @@ async def test_create_webhook_ok() -> None:
     )
     assert out.name == "hook"
     assert out.events == ["status_changed"]
-    # The server generates the secret with 32 bytes.
     wh = sess.added[0]
     assert isinstance(wh.secret, bytes)
     assert len(wh.secret) == 32
@@ -1317,9 +1352,11 @@ async def test_delete_webhook_not_found() -> None:
         await s.delete_webhook(uuid.uuid4(), "admin")
 
 
-# AUD-062: the advisory SSRF check of the webhook URL at CRUD time.
 def test_webhook_url_advisory_blocks_internal_ip_literal() -> None:
-    # The link-local metadata IP is not global, so this is a 400 and no silent dead-letter.
+    """Block the link-local metadata IP at CRUD time.
+
+    The IP is not global, so the advisory SSRF check gives 400 and no silent dead-letter.
+    """
     with pytest.raises(BadRequestError):
         ConfigService._assert_webhook_url_advisory("http://169.254.169.254/")
 
@@ -1335,17 +1372,17 @@ def test_webhook_url_advisory_blocks_bad_scheme() -> None:
 
 
 def test_webhook_url_advisory_allows_global_ip_literal() -> None:
-    # A global IP literal passes without a block and without DNS.
+    """A global IP literal passes without a block and without DNS."""
     ConfigService._assert_webhook_url_advisory("https://1.1.1.1/hook")
 
 
 def test_webhook_url_advisory_dns_failure_is_non_blocking() -> None:
-    # The host does not resolve (.example is reserved), so the check stays best-effort.
+    """The host does not resolve (.example is reserved), so the check stays best-effort."""
     ConfigService._assert_webhook_url_advisory("https://x.example/h")
 
 
-# AUD-062 (second half): the delivery-status diagnostic read.
 def delivery_row(**kw: Any) -> Any:
+    """Build a webhook delivery row for the delivery-status diagnostic read."""
     base = {
         "id": uuid.uuid4(),
         "webhook_id": uuid.uuid4(),
@@ -1359,15 +1396,18 @@ def delivery_row(**kw: Any) -> Any:
 
 
 def test_reason_class_buckets() -> None:
-    # ok maps to delivered. pending maps to in_progress.
+    """Map each delivery state and HTTP code to its coarse bucket.
+
+    ``ok`` maps to delivered and ``pending`` to in_progress. ``dead`` without an HTTP
+    code (an SSRF block or a transport or DNS error) maps to unreachable_or_blocked and
+    never names the blocked IP. ``failed`` with a running retry and without a code is a
+    transient transport error. 4xx means that the target rejects the call, 5xx a
+    target server error.
+    """
     assert _delivery_reason_class("ok", 200) == "delivered"
     assert _delivery_reason_class("pending", None) == "in_progress"
-    # dead without an HTTP code (an SSRF block or a transport or DNS error) maps to
-    # unreachable_or_blocked and never names the blocked IP.
     assert _delivery_reason_class("dead", None) == "unreachable_or_blocked"
-    # failed with a running retry and without a code is a transient transport error.
     assert _delivery_reason_class("failed", None) == "transient_transport_error"
-    # 4xx means the target rejects the call. 5xx means a target server error.
     assert _delivery_reason_class("dead", 404) == "rejected_by_target"
     assert _delivery_reason_class("dead", 503) == "target_server_error"
 
@@ -1382,14 +1422,17 @@ def test_delivery_status_out_never_when_no_delivery() -> None:
 
 
 def test_delivery_status_out_dead_no_ip_leak() -> None:
-    # A mistyped or internal webhook ends as dead without an HTTP code. The view names
-    # ONLY the coarse class, never a resolved IP and never a host.
+    """A mistyped or internal webhook ends as dead without an HTTP code.
+
+    The view names ONLY the coarse class, never a resolved IP and never a host.
+
+    The diagnostic DTO carries no IP, host or body field.
+    """
     row = delivery_row(status="dead", response_code=None, attempts=5)
     out = _delivery_status_out(row.webhook_id, row)
     assert out.last_state == "dead"
     assert out.reason_class == "unreachable_or_blocked"
     assert out.attempts == 5
-    # The diagnostic DTO carries no IP, host or body field.
     dumped = out.model_dump()
     assert "ip" not in dumped
     assert "host" not in dumped
@@ -1407,10 +1450,14 @@ def test_delivery_status_out_sent_maps_ok() -> None:
 
 
 async def test_list_webhook_delivery_status_per_hook() -> None:
+    """The webhook list comes from the scalars queue (_results).
+
+    Each hook gets one latest delivery from the scalar queue (_scalars), in the same order.
+
+    A hook without a delivery maps to never.
+    """
     hook_a = webhook_row(name="a")
     hook_b = webhook_row(name="b")
-    # The webhook list comes from the scalars queue (_results). Each hook gets one latest
-    # delivery from the scalar queue (_scalars), in the same order.
     latest_a = delivery_row(webhook_id=hook_a.id, status="dead", response_code=None)
     s, _ = svc(
         [res(hook_a, hook_b)],
@@ -1421,13 +1468,12 @@ async def test_list_webhook_delivery_status_per_hook() -> None:
     assert out[0].webhook_id == hook_a.id
     assert out[0].last_state == "dead"
     assert out[0].reason_class == "unreachable_or_blocked"
-    # A hook without a delivery maps to never.
     assert out[1].webhook_id == hook_b.id
     assert out[1].last_state == "never"
 
 
-# AUD-053: the role permission whitelist validation.
 def test_role_create_rejects_unknown_permission() -> None:
+    """Refuse a permission key that is not on the whitelist."""
     with pytest.raises(ValueError, match="unknown permission"):
         RoleCreate(key="r", permissions=["application.read", "bogus.key"])
 
@@ -1452,6 +1498,7 @@ def test_role_update_none_permissions_ok() -> None:
 async def test_update_gremium_protocols_public_audits_old_and_new(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """The same value again changes nothing and names no field."""
     from app.modules.admin.service import service_base
 
     entries: list[dict[str, Any]] = []
@@ -1465,7 +1512,6 @@ async def test_update_gremium_protocols_public_audits_old_and_new(
     out = await s.update_gremium(row.id, GremiumUpdate(protocolsPublic=True), "admin")
     assert out.protocols_public is True
     assert entries[-1]["data"] == {"field": "protocolsPublic", "old": False, "new": True}
-    # The same value again changes nothing and names no field.
     s, _ = svc([], gets=[row])
     await s.update_gremium(row.id, GremiumUpdate(protocolsPublic=True), "admin")
     assert entries[-1]["data"] == {}

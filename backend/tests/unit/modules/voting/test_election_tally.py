@@ -1,4 +1,4 @@
-"""F2 · Personnel elections: the pure election tally, the ballot codec and the lot.
+"""Personnel elections: the pure election tally, the ballot codec and the lot.
 
 No database and no clock: every branch of `tally_election`, `draw_lot`, the ballot
 codec and the `ElectionConfig` rules runs here.
@@ -34,9 +34,6 @@ def _ballots(*picks: Sequence[str]) -> list[str]:
     return [encode_election_choice(p) for p in picks]
 
 
-# ---------------------------------------------------------------- codec
-
-
 def test_encode_sorts_and_compacts() -> None:
     assert encode_election_choice(["c2", "c1"]) == '["c1","c2"]'
     assert encode_election_choice([]) == "[]"
@@ -55,9 +52,6 @@ def test_encode_sorts_and_compacts() -> None:
 )
 def test_decode(raw: str | None, expected: list[str] | None) -> None:
     assert decode_election_choice(raw) == expected
-
-
-# ---------------------------------------------------------------- config
 
 
 def test_config_defaults_secret_and_projection() -> None:
@@ -110,9 +104,6 @@ def test_config_strips_names() -> None:
     assert config.candidates[0].name == "Anna"
 
 
-# ---------------------------------------------------------------- single candidate
-
-
 def test_yes_no_elected_when_yes_beats_no() -> None:
     out = tally_election(["yes", "yes", "no", "abstain"], _config(n=1), 10)
     assert out.result == "elected"
@@ -133,9 +124,6 @@ def test_yes_no_quorum_without_abstentions() -> None:
     assert out.quorum_met is False
     assert out.result == "rejected"
     assert out.elected == ()
-
-
-# ---------------------------------------------------------------- several candidates
 
 
 def test_single_seat_clear_winner() -> None:
@@ -173,16 +161,16 @@ def test_runoff_round_tie_goes_to_the_lot() -> None:
 
 
 def test_multi_seat_without_boundary_tie() -> None:
+    """3 ballots for 2 seats give 6 votes, all given."""
     ballots = _ballots(["c1", "c2"], ["c1", "c2"], ["c1", "c3"])
     out = tally_election(ballots, _config(seats=2, n=3), 10)
     assert out.result == "elected"
     assert out.elected == ("c1", "c2")
-    # 3 ballots * 2 seats = 6 votes, all given.
     assert out.abstentions == 0
 
 
 def test_fewer_candidates_with_votes_than_seats() -> None:
-    # A candidate needs at least one vote. The free seat stays empty.
+    """A candidate needs at least one vote, so a free seat stays empty."""
     out = tally_election(_ballots(["c1"], ["c1"]), _config(seats=2, n=3), 10)
     assert out.result == "elected"
     assert out.elected == ("c1",)
@@ -197,12 +185,14 @@ def test_nobody_elected_when_all_abstain() -> None:
 
 
 def test_invalid_entries_do_not_count() -> None:
-    # A repeated id, an unknown id, a vote beyond the seats and a garbled row.
+    """A repeated id, an unknown id, a vote beyond the seats and a garbled row do not count.
+
+    The abstentions are 1 + 0 + 2 + 2 free seats.
+    """
     ballots = ['["c1","c1","x"]', '["c1","c2","c3"]', "garbled", None]
     out = tally_election(ballots, _config(seats=2, n=3), 10)
     assert out.counts == {"c1": 2, "c2": 1, "c3": 0}
     assert out.ballots == 4
-    # 1 + 0 + 2 + 2 free seats.
     assert out.abstentions == 5
 
 
@@ -219,9 +209,6 @@ def test_quorum_without_full_abstentions() -> None:
     config = _config(quorum={"type": "count", "value": 2}, abstainCountsQuorum=False)
     assert tally_election(_ballots(["c1"], []), config, 10).quorum_met is False
     assert tally_election(_ballots(["c1"], ["c2"]), config, 10).quorum_met is True
-
-
-# ---------------------------------------------------------------- lot
 
 
 def test_draw_lot_takes_distinct_candidates() -> None:

@@ -28,16 +28,18 @@ import { SectionHeaderComponent } from '@shared/ui/section-header/section-header
 import { localToday } from '@shared/date-format';
 
 /**
- * The admin overview of the delegations (`/admin/delegations`, board Admin-Vertretung).
+ * The admin overview of the delegations (`/admin/delegations`).
  *
- * "Aktive Vertretungen": the delegations of the meetings from today on (or without a
- * date), newest meeting last, each with meeting, date, from → to, the tags "Stimmrecht"
- * and "Pool", and "Widerrufen" in the ⋮ menu (danger, with a confirmation). An admin may revoke at any
- * time. The delegations of past meetings stay behind "Frühere Vertretungen".
+ * "Aktive Vertretungen": the delegations of the meetings from today on (or without a date), newest
+ * meeting last, each with meeting, date, from → to, the tags "Stimmrecht" and "Pool", and
+ * "Widerrufen" in the ⋮ menu (danger, with a confirmation). An admin may revoke at any time. The
+ * delegations of past meetings stay behind "Frühere Vertretungen".
  *
  * "Stellvertretungen": the substitute pool of one gremium (`app-substitute-pool`); the
  * gremium chip picks the gremium. A member creates the own delegation on the meeting
  * page; the gremium must allow it.
+ *
+ * The disclosure is a native button, because it needs aria-expanded on the button itself.
  */
 @Component({
   selector: 'app-delegations',
@@ -120,7 +122,6 @@ export class DelegationsComponent {
   constructor() {
     this.reload();
     this.admin.listGremienOptions().subscribe({
-      // The server order; the first gremium opens.
       next: (list) => {
         this.gremien.set(list);
         if (!this.gremiumId() && list.length) this.gremiumId.set(list[0].id);

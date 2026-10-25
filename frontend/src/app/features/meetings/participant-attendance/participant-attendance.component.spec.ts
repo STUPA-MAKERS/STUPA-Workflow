@@ -34,7 +34,8 @@ async function setup(
 }
 
 describe('ParticipantAttendanceComponent', () => {
-  it('reports "Anwesend" as present and "Abwesend" as an excuse (Z2)', async () => {
+  /** The status is never "absent", because a member cannot set an unexcused absence. */
+  it('reports "Anwesend" as present and "Abwesend" as an excuse', async () => {
     const { change } = await setup(me());
     expect(screen.getByRole('heading', { name: 'Deine Anwesenheit' })).toBeInTheDocument();
     const group = screen.getByRole('radiogroup', { name: 'Deine Anwesenheit' });
@@ -43,14 +44,13 @@ describe('ParticipantAttendanceComponent', () => {
     expect(change).toHaveBeenLastCalledWith({ status: 'present' });
     await userEvent.click(screen.getByRole('radio', { name: 'Abwesend' }));
     expect(change).toHaveBeenLastCalledWith({ status: 'excused' });
-    // Never "absent": a member cannot set an unexcused absence.
     expect(change.mock.calls.every(([c]) => c.status !== 'absent')).toBe(true);
   });
 
+  /** The kit control ignores a click on the chosen option, and the component guards too. */
   it('sends nothing for the status the member already has, or while a change saves', async () => {
     const { change, fixture } = await setup(me({ status: 'present', source: 'self' }));
     expect(screen.getByRole('radio', { name: 'Anwesend' })).toHaveAttribute('aria-checked', 'true');
-    // The kit control ignores a click on the chosen option; the component guards too.
     (fixture.componentInstance as unknown as { pick(v: string | null): void }).pick('present');
     (fixture.componentInstance as unknown as { pick(v: string | null): void }).pick(null);
     expect(change).not.toHaveBeenCalled();
@@ -60,18 +60,17 @@ describe('ParticipantAttendanceComponent', () => {
     expect(change).not.toHaveBeenCalled();
   });
 
+  /** A field left unchanged sends nothing, and while a change saves the field sends nothing. */
   it('asks for an optional reason of an absence and sends a changed reason', async () => {
     const { change, fixture } = await setup(me({ status: 'excused', source: 'self', note: 'Prüfung' }));
     const field = screen.getByLabelText('Grund (optional)');
     await waitFor(() => expect(field).toHaveValue('Prüfung'));
-    // Leaving the field unchanged sends nothing.
     await userEvent.click(field);
     await userEvent.tab();
     expect(change).not.toHaveBeenCalled();
     await userEvent.clear(field);
     await userEvent.type(field, ' Klausur {Enter}');
     expect(change).toHaveBeenCalledWith({ status: 'excused', note: 'Klausur' });
-    // While a change saves, the field sends nothing.
     change.mockReset();
     fixture.componentRef.setInput('saving', true);
     fixture.detectChanges();
@@ -79,18 +78,20 @@ describe('ParticipantAttendanceComponent', () => {
     expect(change).not.toHaveBeenCalled();
   });
 
+  /**
+   * The roster arrives again over the live channel as a new object with the same reason. A changed
+   * reason from the server replaces the draft.
+   */
   it('keeps the typed reason when a live update brings the same record again', async () => {
     const { fixture } = await setup(me({ status: 'excused', source: 'self', note: 'Prüfung' }));
     const field = screen.getByLabelText('Grund (optional)');
     await waitFor(() => expect(field).toHaveValue('Prüfung'));
     await userEvent.clear(field);
     await userEvent.type(field, 'Klausur');
-    // The roster arrives again over the live channel: a new object, the same reason.
     fixture.componentRef.setInput('member', me({ status: 'excused', source: 'self', note: 'Prüfung' }));
     fixture.detectChanges();
     await fixture.whenStable();
     expect(field).toHaveValue('Klausur');
-    // A changed reason from the server replaces the draft.
     fixture.componentRef.setInput('member', me({ status: 'excused', source: 'self', note: 'Urlaub' }));
     fixture.detectChanges();
     await waitFor(() => expect(field).toHaveValue('Urlaub'));
@@ -104,7 +105,7 @@ describe('ParticipantAttendanceComponent', () => {
     expect(change).toHaveBeenCalledWith({ status: 'excused', note: null });
   });
 
-  it('shows the record of the lead as text, which the member cannot change (O15)', async () => {
+  it('shows the record of the lead as text, which the member cannot change', async () => {
     await setup(me({ status: 'excused', source: 'lead', note: 'Urlaub' }));
     expect(screen.queryByRole('radiogroup')).toBeNull();
     expect(screen.getByText('Abwesend')).toBeInTheDocument();
@@ -122,7 +123,7 @@ describe('ParticipantAttendanceComponent', () => {
     expect(screen.getByText('Offen')).toBeInTheDocument();
   });
 
-  it('turns "Anwesend" off while the member hands the meeting over (O23)', async () => {
+  it('turns "Anwesend" off while the member hands the meeting over', async () => {
     const { change } = await setup(me({ status: 'excused', source: 'self' }), { delegated: true });
     expect(screen.getByRole('radio', { name: 'Anwesend' })).toBeDisabled();
     expect(screen.getByText(/Widerrufe die Vertretung, um dich anwesend zu melden/)).toBeInTheDocument();

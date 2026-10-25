@@ -1,4 +1,4 @@
-"""One error contract for the whole API (api.md §2).
+"""One error contract for the whole API.
 
 A problem JSON body carries type, title, status, code, detail, errors and traceId.
 The status-to-code map covers 400, 401, 403, 404, 409, 410, 413, 422, 429 and 500.
@@ -14,7 +14,7 @@ from app.main import create_app
 from app.middleware import RequestContextMiddleware
 from app.shared.errors import STATUS_CODE_MAP, ProblemDetail, register_exception_handlers
 
-# (path suffix, expected status, expected code)
+#: The path suffix, the expected status and the expected code.
 CASES = [
     ("bad-request", 400, "bad_request"),
     ("unauthorized", 401, "unauthorized"),
@@ -70,8 +70,7 @@ def test_unknown_route_yields_problem_json(client: TestClient) -> None:
     _assert_problem_shape(resp.json(), 404, "not_found")
 
 
-# An unparsable request body gives ONE documented 422 across the whole app. FastAPI
-# alone answers a per-endpoint, undocumented 400 for a broken multipart body (T-13).
+#: A broken multipart body. FastAPI alone answers it with an undocumented 400.
 _MALFORMED_MULTIPART = b"--ff\r\nFalse--ff--\r\n"
 _MULTIPART_HEADERS = {"content-type": "multipart/form-data; boundary=xxx"}
 
@@ -131,8 +130,12 @@ def test_other_400_with_dict_detail_stays_400() -> None:
 
 
 def test_malformed_json_body_is_422() -> None:
-    # A JSON decode error already runs through RequestValidationError and gives 422.
-    # This test holds both body-parse paths to the SAME status.
+    """Answer 422 for a malformed JSON body.
+
+    A JSON decode error already runs through RequestValidationError and gives 422. This test
+    holds both body-parse paths to the same status, so an unparsable body gives one
+    documented 422 across the whole app.
+    """
     resp = create_app_client().post(
         "/api/auth/magic-link", content=b"not json{", headers={"content-type": "application/json"}
     )
@@ -154,8 +157,11 @@ def test_attachments_route_documents_422_problem_json() -> None:
 
 
 def test_all_body_endpoints_document_422() -> None:
-    # Global guarantee: every endpoint that takes a body documents 422. Without it an
-    # unparsable body returns an undocumented status and be-contract turns red.
+    """Document 422 on every endpoint that takes a body.
+
+    Without it, an unparsable body returns an undocumented status and the contract check
+    fails.
+    """
     schema = create_app().openapi()
     missing: list[str] = []
     for path, ops in schema["paths"].items():

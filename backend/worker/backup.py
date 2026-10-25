@@ -78,6 +78,8 @@ async def create_backup(ctx: dict[str, Any], backup_id: str) -> str:
 
     Returns:
         One of ``done``, ``failed`` or ``gone``.
+
+    A row that is already ``done`` returns at once, so the task is idempotent.
     """
     async with _sessionmaker(ctx)() as session:
         service = _service(ctx, session)
@@ -86,7 +88,7 @@ async def create_backup(ctx: dict[str, Any], backup_id: str) -> str:
             logger.info("backup row %s gone — skipped", backup_id)
             return "gone"
         if row.status == "done":
-            return "done"  # idempotent: the archive already exists
+            return "done"
         await service.mark_running(row)
         await session.commit()
 
@@ -124,12 +126,14 @@ async def run_retention(ctx: dict[str, Any]) -> int:
 
     Returns:
         The number of archives removed.
+
+    A failure is logged and never fails the backup.
     """
     async with _sessionmaker(ctx)() as session:
         service = _service(ctx, session)
         try:
             doomed = await service.prune()
-        except Exception:  # noqa: BLE001 — retention must never fail a backup
+        except Exception:
             logger.exception("backup retention failed")
             return 0
         if doomed:
@@ -174,10 +178,20 @@ async def restore_backup(ctx: dict[str, Any], backup_id: str, actor: str | None)
     what proves what the platform looked like beforehand.
 
     After that entry, the task verifies the restored chain and stores the result with
-    ``trigger = restore`` (Z6). A failed check does not fail the restore.
+    ``trigger = restore``. A failed check does not fail the restore.
 
     Returns:
         One of ``done``, ``failed`` or ``gone``.
+
+    The task reads what the restore needs and then LETS THE SESSION GO, because ``pg_restore
+    --clean`` drops every table, and an open session holds a lock on the rows it read, so
+    the drop would wait on the own transaction and the restore would hang forever. It takes
+    the catalogue along, because the archive predates the safety copy, and the restore would
+    otherwise erase the row that points at it and hide the one archive that makes this
+    undoable. It then disposes the engine pool, because the closed session's connection
+    still counts as a client, and the restore needs the database to itself. Afterwards a new
+    session writes the catalogue back, because the old one talks to a database that no
+    longer exists in its form.
     """
     settings = _settings(ctx)
     if not settings.backup_restore_enabled:
@@ -189,10 +203,6 @@ async def restore_backup(ctx: dict[str, Any], backup_id: str, actor: str | None)
         logger.error("restore aborted: the safety backup failed")
         return "failed"
 
-    # Read what the restore needs, then LET THE SESSION GO. `pg_restore --clean` drops
-    # every table, and a session still open here holds a lock on the very rows it just
-    # read, so the drop waits on this task's own transaction and the restore hangs for
-    # ever. Nothing may hold a connection to the database while the restore runs.
     async with _sessionmaker(ctx)() as session:
         service = _service(ctx, session)
         row = await service.get(UUID(backup_id))
@@ -200,17 +210,12 @@ async def restore_backup(ctx: dict[str, Any], backup_id: str, actor: str | None)
             logger.info("restore target %s gone — skipped", backup_id)
             return "gone"
         storage_key = row.storage_key
-        # Take the catalogue with us. The archive predates the safety copy, so the
-        # restore would otherwise erase the row that points at it and leave the one
-        # archive that makes this undoable invisible to the admin page.
         catalogue = await service.snapshot_catalogue()
 
     archives = ctx.get("backup_archives")
     if archives is None:
         return "failed"
 
-    # The session is closed, but its connection is still in the engine pool and still
-    # counts as a client. Dispose the pool so the restore has the database to itself.
     await _dispose_engine(ctx)
 
     service = _service(ctx, None)
@@ -222,8 +227,6 @@ async def restore_backup(ctx: dict[str, Any], backup_id: str, actor: str | None)
         logger.error("restore %s failed: %s", backup_id, exc)
         return "failed"
 
-    # A new session: the one above talks to a database that no longer exists in the
-    # form it was opened against.
     async with _sessionmaker(ctx)() as session:
         reseeded = await _service(ctx, session).reseed_catalogue(catalogue)
         logger.info("restore %s put %d catalogue rows back", backup_id, reseeded)

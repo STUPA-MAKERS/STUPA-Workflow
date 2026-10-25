@@ -8,18 +8,23 @@ import { toFormatLocale } from '@core/i18n/i18n.service';
 import { formatMoney } from '@shared/format-money';
 import { normalizePositions, positionsTotal } from './positions';
 
-/** HTML `type` for the `input` variant (text/number/currency/date/file). */
+/**
+ * HTML `type` for the `input` variant (text/number/currency/date/file).
+ *
+ * `currency` takes its own branch in `FormlyInputType` (`app-currency-input` with the €
+ * format). `funding` is an amount in euro like `currency`, checked against the cost total.
+ * `file` is an attachment reference in a text field. `iban` is free text, because the
+ * backend checks the format (mod-97).
+ */
 const INPUT_HTML_TYPE: Partial<Record<FieldType, string>> = {
   text: 'text',
   number: 'number',
-  // 'currency' takes its own branch in FormlyInputType (app-currency-input with € format).
   currency: 'currency',
   date: 'date',
-  file: 'text', // file upload (attachment reference). The full upload lands later.
-  // 'funding' is an amount in euro like 'currency', checked against the cost total.
+  file: 'text',
   funding: 'currency',
   email: 'email',
-  iban: 'text', // the backend checks the format (mod-97), so this is a free text field.
+  iban: 'text',
 };
 
 /** Form field type → registered Formly type (`@shared/formly/formly.providers`). */
@@ -33,8 +38,10 @@ const FORMLY_TYPE: Record<FieldType, string> = {
   textarea: 'textarea',
   select: 'select',
   multiselect: 'multicheckbox',
-  // Dynamic pickers render as a normal select. The server supplies the options in the
-  // effective form, so nobody maintains them by hand.
+  /**
+   * Dynamic pickers render as a normal select. The server supplies the options in the
+   * effective form, so nobody maintains them by hand.
+   */
   gremium_select: 'select',
   budget_select: 'select',
   email: 'input',
@@ -45,8 +52,10 @@ const FORMLY_TYPE: Record<FieldType, string> = {
   computed: 'display',
   table: 'display',
   positions: 'positions',
-  // Section markers are structural. `toFormlyFields` handles them apart from this map,
-  // so this entry never applies. The backend strips them from the effective form.
+  /**
+   * Section markers are structural. `toFormlyFields` handles them apart from this map, so
+   * this entry never applies. The backend strips them from the effective form.
+   */
   section: 'display',
 };
 
@@ -66,8 +75,6 @@ export function toFormlyFields(
   lang: Lang | string,
   extraContext: Record<string, unknown> = {},
 ): FormlyFieldConfig[] {
-  // Render section and group markers as headings instead of discarding them. Question
-  // groups then also appear grouped in the inline editor.
   const costKeys = positionsKeys(fields);
   return fields.map((f) =>
     f.type === 'section'
@@ -88,13 +95,13 @@ const FULL_WIDTH_TYPES: ReadonlySet<FieldType> = new Set<FieldType>([
 
 /** Options of `toFormlySections`. */
 export interface FormlySectionOptions {
-  /** Keys the form leaves out, for example the PII fields the server held back (O21). */
+  /** Keys the form leaves out, for example the PII fields the server held back. */
   omitKeys?: readonly string[];
 }
 
 /**
  * Translate the sections of an effective form into one Formly group for the edit
- * form of the detail (board Anträge-Bearbeiten).
+ * form of the detail.
  *
  * The `title` field comes first over the full width. Each section then starts with its
  * heading; short fields take half a row (class `fe-half`), long ones the full row
@@ -124,8 +131,6 @@ export function toFormlySections(
     });
     for (const f of fields) {
       const mapped = mapField(f, lang, extraContext, costKeys);
-      // The edit form shows several choices as a dropdown (board Anträge-Bearbeiten), not
-      // as the checkbox list of the wizard.
       if (f.type === 'multiselect') mapped.type = 'multiselect';
       group.push({ ...mapped, className: FULL_WIDTH_TYPES.has(f.type) ? 'fe-full' : 'fe-half' });
     }
@@ -137,7 +142,6 @@ export function toFormlySections(
 function sectionHeading(f: FormFieldDef, lang: Lang | string): FormlyFieldConfig {
   const label = resolveI18n(f.label, lang);
   const props: Record<string, unknown> = { heading: true, label };
-  // A help text that only repeats the heading would show the same words twice.
   const help = ownHelp(f, label, lang);
   if (help) props['description'] = help;
   return { type: 'display', props };
@@ -172,6 +176,8 @@ function totalText(key: TranslationKey, lang: Lang | string, total: number): str
 /**
  * The requested funding: the hint shows the cost total, and a value above the total is
  * an error with its own text. The server checks the same rule (`_check_funding_total`).
+ *
+ * The cap is checked again when any answer changes, because the cost positions are other controls.
  */
 function applyFunding(
   config: FormlyFieldConfig,
@@ -189,7 +195,6 @@ function applyFunding(
     ...config.validators,
     fundingMax: { expression: (_control: unknown, field: FormlyFieldConfig) => !over(field) },
   };
-  // The cost positions are other controls: re-check the cap when any answer changes.
   config.hooks = {
     onInit: (field) =>
       field.form?.valueChanges.pipe(
@@ -214,7 +219,6 @@ function mapField(
   costKeys: readonly string[] = [],
 ): FormlyFieldConfig {
   const label = resolveI18n(f.label, lang);
-  // An info text whose help repeats its label counts as an info text without help.
   const help = f.type === 'markdown' ? ownHelp(f, label, lang) : f.help ? resolveI18n(f.help, lang) : undefined;
   const isDisplay = f.type === 'markdown' || f.type === 'computed' || f.type === 'table';
 
@@ -238,13 +242,10 @@ function mapField(
 
   if (f.type === 'markdown') {
     props['text'] = help ?? label;
-    // An info text without help has its text in the label. Show it once, not as a
-    // bold label over the same text.
     if (!help) delete props['label'];
   }
   if (f.type === 'computed') props['computed'] = true;
   if (f.type === 'table') {
-    // The UI catalogue, not a fixed German text: an English page shows English.
     props['text'] = CATALOG[lang as Locale]?.['forms.table.pending'] ?? de['forms.table.pending'];
   }
   if (f.type === 'positions') {

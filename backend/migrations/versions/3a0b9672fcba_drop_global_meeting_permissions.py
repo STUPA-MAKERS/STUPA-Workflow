@@ -5,15 +5,15 @@ The meeting domain is scoped per gremium. The gremium permissions `session.manag
 it. The global keys that overlapped with them go:
 
 - `meeting.manage`: the gremium permission `session.manage` replaces it.
-- `protocol.finalize`: it becomes a gremium permission (decision O7). Finalizing
-  needs the write access AND the gremium key (decision O2).
-- `application.create`: no code checked it (bug F11). The public form creates an
+- `protocol.finalize`: it becomes a gremium permission. Finalizing
+  needs the write access AND the gremium key.
+- `application.create`: no code checked it. The public form creates an
   application without a permission.
 
 The upgrade:
 
 1. adds `protocol.finalize` to the forced gremium roles `vorstand` and `manager` of
-   every gremium (O7). A custom gremium role does not get it.
+   every gremium. A custom gremium role does not get it.
 2. logs a warning with the global roles that held one of the keys, and with the
    number of principals who lose a meeting right. That is a non-admin principal who
    held the right through a global role and has no gremium role with
@@ -52,7 +52,7 @@ logger = logging.getLogger("alembic.runtime.migration")
 _DROPPED: tuple[str, ...] = ("meeting.manage", "protocol.finalize", "application.create")
 _DROPPED_SQL = ", ".join(f"'{p}'" for p in _DROPPED)
 
-# The seed grants of 0002 and 0017 per seeded global role, for the downgrade.
+#: The seed grants of 0002 and 0017 per seeded global role, for the downgrade.
 _SEED_GRANTS: dict[str, tuple[str, ...]] = {
     "admin": ("application.create", "meeting.manage", "protocol.finalize"),
     "manager": ("application.create", "meeting.manage", "protocol.finalize"),
@@ -74,10 +74,13 @@ _ROLES_WITH_DROPPED = (
 )
 
 
-# A principal holds a global role through an active role_assignment or through an
-# OIDC group that a group_mapping links to the role. See `rbac.resolve_principal`.
-# `role_cond` filters the `role_permission` row `rp` of that role.
 def _holds_role(role_cond: str) -> str:
+    """Return the SQL condition that a principal holds the global role of ``rp``.
+
+    A principal holds a global role through an active role_assignment or through an OIDC
+    group that a group_mapping links to the role (see ``rbac.resolve_principal``).
+    ``role_cond`` filters the ``role_permission`` row ``rp`` of that role.
+    """
     return f"""
     (EXISTS (
         SELECT 1 FROM role_assignment ra
@@ -127,12 +130,14 @@ def _report() -> None:
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     op.execute(_GRANT_FINALIZE)
     _report()
     op.execute(f"DELETE FROM role_permission WHERE permission IN ({_DROPPED_SQL})")
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     for role_key, perms in _SEED_GRANTS.items():
         for perm in perms:
             op.execute(

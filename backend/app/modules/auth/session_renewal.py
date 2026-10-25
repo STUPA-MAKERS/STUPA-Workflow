@@ -54,9 +54,9 @@ from app.shared.errors import ForbiddenError
 
 logger = logging.getLogger(__name__)
 
-# After an unreachable IdP, the process skips the IdP for this time.
+#: After an unreachable IdP, the process skips the IdP for this time.
 _IDP_BACKOFF_SECONDS = 60.0
-# Monotonic time until which the IdP counts as unreachable in this process.
+#: Monotonic time until which the IdP counts as unreachable in this process.
 _idp_retry_after = 0.0
 
 
@@ -76,8 +76,11 @@ def _too_old(row: AuthSession, now: datetime) -> bool:
 
 
 def _due(row: AuthSession, now: datetime, settings: Settings) -> bool:
-    # A row without a check time counts as due: the column is NOT NULL, so only a row
-    # that was never stored lacks it, and an unknown age must not skip the check.
+    """Tell whether the IdP check of the session is due.
+
+    A row without a check time counts as due. The column is NOT NULL, so only a row
+    that was never stored lacks it, and an unknown age must not skip the check.
+    """
     last = row.revalidated_at
     return last is None or now - last >= timedelta(hours=settings.session_revalidate_hours)
 
@@ -105,14 +108,20 @@ async def renew_principal_session(
 ) -> bool:
     """Check the session at the IdP when the check is due.
 
+    The IdP backoff is one per process. A request that does not get the row lock
+    goes on while another request renews the session, and fails when the row is gone
+    (logout in another tab, deactivation). ``revalidated_at`` moves only after the
+    principal update, so a failure there leaves the check due. ``upsert_principal``
+    is imported in the body, because ``service`` pulls in the flow engine, which
+    imports ``app.deps``, which imports this module.
+
     Returns:
         `True` when the session stays valid, `False` when the function ended it.
     """
-    global _idp_retry_after  # noqa: PLW0603 - one backoff per process
+    global _idp_retry_after
     if not _due(session, now, settings):
         return True
     if _monotonic() < _idp_retry_after and _within_grace(session, now, settings):
-        # The IdP failed a moment ago. Skip the call and keep the session for now.
         return True
     locked = (
         await db.execute(
@@ -123,15 +132,11 @@ async def renew_principal_session(
         )
     ).scalar_one_or_none()
     if locked is None:
-        # Either another request holds the lock and renews the session now, or the
-        # row is gone (logout in another tab, deactivation). Only the first case may
-        # go on.
         still_there = (
             await db.execute(select(AuthSession.id).where(AuthSession.id == session.id))
         ).scalar_one_or_none()
         return still_there is not None
     if not _due(locked, now, settings):
-        # Another request renewed it between our read and the lock.
         await db.commit()
         return True
     if _too_old(locked, now):
@@ -158,14 +163,9 @@ async def renew_principal_session(
         return True
     except OidcError:
         return await _end(db, locked, "idp refused the refresh grant")
-    # Keep the new tokens before anything else can fail: a rotating IdP has used up
-    # the old refresh token. `revalidated_at` moves only after the principal update,
-    # so a failure below leaves the check due.
     locked.refresh_token = token_set.get("refresh_token") or locked.refresh_token
     locked.id_token = token_set["id_token"]
     await db.commit()
-    # Imported here: `service` pulls in the flow engine, and the flow engine imports
-    # `app.deps`, which imports this module. A top-level import closes that cycle.
     from app.modules.auth.service import upsert_principal
 
     try:

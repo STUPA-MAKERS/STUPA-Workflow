@@ -22,6 +22,7 @@ class ApplicationTypesService:
     """DB-backed application-type queries bound to an `AsyncSession`."""
 
     def __init__(self, session: AsyncSession) -> None:
+        """Bind the service to a database session."""
         self.session = session
 
     async def list_types(

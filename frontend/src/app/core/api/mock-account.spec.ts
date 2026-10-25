@@ -7,9 +7,10 @@ import { mockAccount } from './mock-account';
 import { mockApiInterceptor } from './mock-api.interceptor';
 import type { ConsentRequest, McpSetup, NotificationPreference, OAuthGrant } from './models';
 
-describe('mockAccount (FE13 demo data)', () => {
+describe('mockAccount (demo data)', () => {
   afterEach(() => localStorage.removeItem('mockNoMcp'));
 
+  /** A body without preferences keeps every switch. */
   it('serves the switches of the server catalogue and stores a PUT', () => {
     const before = mockAccount('GET', '/api/notifications/preferences', null)!.body as NotificationPreference[];
     expect(before.map((p) => p.kind)).toEqual([
@@ -20,14 +21,12 @@ describe('mockAccount (FE13 demo data)', () => {
       'meeting',
       'delegation',
       'protocol',
-      'deadline',
       'privacy',
     ]);
     const saved = mockAccount('PUT', '/api/notifications/preferences', {
       preferences: [{ kind: 'protocol', enabled: true }],
     })!.body as NotificationPreference[];
     expect(saved.find((p) => p.kind === 'protocol')?.enabled).toBe(true);
-    // A body without preferences keeps every switch.
     expect(mockAccount('PUT', '/api/notifications/preferences', null)!.body).toEqual(saved);
   });
 
@@ -103,7 +102,7 @@ describe('mockApiInterceptor: account routes', () => {
 
   it('loads the demo data lazily and answers the account pages', async () => {
     const prefs = await firstValueFrom(http.get<NotificationPreference[]>('/api/notifications/preferences'));
-    expect(prefs.length).toBe(9);
+    expect(prefs.length).toBe(8);
     const setup = await firstValueFrom(http.get<McpSetup>('/api/mcp/config'));
     expect(setup.clientId).toBe('antragsplattform-mcp');
   });

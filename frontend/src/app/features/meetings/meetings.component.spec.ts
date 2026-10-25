@@ -14,7 +14,7 @@ import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
 import type { Meeting, MeetingOutWire, ProtocolOutWire } from '@core/api/models';
 import { WsService, type MeetingChannel } from '@core/ws/ws.service';
-import type { ServerMessage } from '@core/ws/ws-messages';
+import type { MeetingStateMsg, ServerMessage } from '@core/ws/ws-messages';
 import { AGENDA } from '../../../testing/meeting-fixtures';
 import { MeetingAgendaService } from './meeting-agenda.service';
 import { MeetingSessionService } from './meeting-session.service';
@@ -25,7 +25,7 @@ const MEETING: MeetingOutWire = {
   id: 'm-1',
   title: 'StuPa-Sitzung',
   status: 'live',
-  // Date and time are required. Without them the settings dialog does not save.
+  /** Date and time are required, because without them the settings dialog does not save. */
   date: '2026-06-12',
   startTime: '17:00',
   endTime: null,
@@ -91,6 +91,14 @@ const MEETING_MODEL: Meeting = {
   canFinalize: true,
   keeperPeriods: [],
   plannedHandover: null,
+  publicJoin: false,
+  guestsMode: 'vote',
+  joinCode: null,
+  admittedGuests: 0,
+  pendingGuests: 0,
+  publicJoinAllowed: true,
+  opensAt: null,
+  confirmUntil: null,
   votes: [
     {
       id: 'v-1', applicationId: 'app-1', agendaItemId: null, title: 'Antrag A',
@@ -160,6 +168,10 @@ function routerStub(navigate: jest.Mock = jest.fn(() => Promise.resolve(true))) 
   };
 }
 
+/**
+ * The Gremium dropdown loads `/gremien` at start, only for a meeting manager. The overview route
+ * loads the timeline: one cursor page each for past and upcoming.
+ */
 async function setup(
   opts: {
     perms?: string[];
@@ -196,9 +208,7 @@ async function setup(
     ],
   });
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
-  // The Gremium dropdown loads `/gremien` at start, only for a meeting manager.
   http.match((r) => r.url.endsWith('/gremien')).forEach((req) => req.flush(opts.gremien ?? []));
-  // The overview route loads the timeline: one cursor page each for past and upcoming.
   const isPast = (m: MeetingOutWire) => m.status === 'closed';
   if (!opts.skipTimelineFlush) {
     http
@@ -245,20 +255,20 @@ function flushDelegationContext(http: HttpTestingController): void {
 }
 
 describe('MeetingsComponent', () => {
+  /** The list and its header do not show, so the page header titles the notice. */
   it('shows a forbidden notice without the required permissions', async () => {
     await setup({ perms: [], id: null });
     expect(screen.getByRole('alert')).toHaveTextContent(/Keine Berechtigung/i);
-    // The list (and its header) does not show, so the page header titles the notice.
     expect(screen.getByRole('heading', { level: 1, name: 'Sitzungen' })).toBeInTheDocument();
   });
 
+  /** The delegation card loads its context only after rendering, so the test flushes again. */
   it('loads the meeting and renders session control with votes', async () => {
     const { http } = await setup();
     flushLoad(http);
     expect(await screen.findByText('Sitzungssteuerung')).toBeInTheDocument();
     expect(screen.getByText('Antrag A')).toBeInTheDocument();
     expect(screen.getByText('Antrag B')).toBeInTheDocument();
-    // The delegation card loads its context only after rendering, so flush again.
     flushDelegationContext(http);
     http.verify();
   });
@@ -272,9 +282,9 @@ describe('MeetingsComponent', () => {
     expect(screen.queryByRole('button', { name: /Abstimmung abbrechen/i })).toBeNull();
   });
 
+  /** Only the protokollant opens and closes a vote. */
   it('opens a planned vote via the API', async () => {
     const { http } = await setup();
-    // Only the protokollant opens and closes a vote.
     flushLoad(http, { ...MEETING, isProtokollant: true });
     const openBtn = await screen.findByRole('button', { name: /Abstimmung öffnen/i });
     await userEvent.click(openBtn);
@@ -283,9 +293,9 @@ describe('MeetingsComponent', () => {
     req.flush(OPENED_V2);
   });
 
+  /** Only the protokollant opens and closes a vote. */
   it('closes an open vote via the API', async () => {
     const { http } = await setup();
-    // Only the protokollant opens and closes a vote.
     flushLoad(http, { ...MEETING, isProtokollant: true });
     const closeBtn = await screen.findByRole('button', { name: /Abstimmung schließen/i });
     await userEvent.click(closeBtn);
@@ -303,7 +313,6 @@ describe('MeetingsComponent', () => {
   it('sets the active application via PATCH', async () => {
     const { http } = await setup();
     flushLoad(http);
-    // "Set active" on the second (not-yet-active) vote.
     const buttons = await screen.findAllByRole('button', { name: /Aktiv setzen/i });
     await userEvent.click(buttons[buttons.length - 1]);
     const req = http.expectOne('/api/meetings/m-1');
@@ -312,7 +321,12 @@ describe('MeetingsComponent', () => {
     req.flush({ ...MEETING, activeApplicationId: 'app-2' });
   });
 
-  it('closes without a finalize, then finalizes as a step of its own (O13)', async () => {
+  /**
+   * Closing is final, so the toolbar button opens the confirmation dialog. The close never
+   * finalizes; the finalize is the next step on the closed meeting. A top-level `#` has no "TOP n:"
+   * prefix, because the renderer numbers the TOPs itself.
+   */
+  it('closes without a finalize, then finalizes as a step of its own', async () => {
     const { http } = await setup();
     const idle: MeetingOutWire = { ...MEETING, votes: [] };
     http.expectOne('/api/meetings/m-1').flush(idle);
@@ -323,7 +337,6 @@ describe('MeetingsComponent', () => {
     ]);
     flushDelegationContext(http);
 
-    // Closing is final: the toolbar button opens the confirmation dialog.
     const bar = await screen.findByRole('toolbar', { name: 'Sitzungssteuerung' });
     await userEvent.click(within(bar).getByRole('button', { name: 'Sitzung schließen' }));
     const confirm = await screen.findByRole('dialog', { name: 'Sitzung schließen?' });
@@ -333,18 +346,15 @@ describe('MeetingsComponent', () => {
     expect(closeReq.request.method).toBe('PATCH');
     expect(closeReq.request.body).toEqual({ status: 'closed' });
     closeReq.flush({ ...idle, status: 'closed' });
-    // The close never finalizes.
     http.expectNone('/api/protocols/p-1');
     http.expectNone('/api/protocols/p-1/finalize');
     await waitFor(() =>
       expect(screen.queryByRole('dialog', { name: 'Sitzung schließen?' })).toBeNull(),
     );
 
-    // The finalize is the next step on the closed meeting.
     await userEvent.click(await screen.findByRole('button', { name: 'Finalisieren & versenden' }));
     const saveReq = http.expectOne('/api/protocols/p-1');
     expect(saveReq.request.method).toBe('PATCH');
-    // Top-level `#` without a "TOP n:" prefix, because the renderer numbers the TOPs itself.
     expect(saveReq.request.body.markdown).toContain('# Begrüßung');
     saveReq.flush(PROTOCOL);
     const finReq = http.expectOne('/api/protocols/p-1/finalize');
@@ -354,9 +364,11 @@ describe('MeetingsComponent', () => {
     expect(await screen.findByText('Final')).toBeInTheDocument();
   });
 
+  /**
+   * With non-public TOPs the backend returns both URLs, and the protocol bar of the closed meeting
+   * carries them.
+   */
   it('offers separate internal + public PDF links when a redacted variant exists', async () => {
-    // Non-public TOPs ⇒ the backend returns both URLs. The protocol bar of the closed
-    // meeting carries them.
     const { http } = await setup();
     http.expectOne('/api/meetings/m-1').flush({ ...MEETING, status: 'closed' });
     http.expectOne('/api/meetings/m-1/protocol').flush({
@@ -375,8 +387,10 @@ describe('MeetingsComponent', () => {
     expect(pub).toHaveAttribute('href', '/api/protocols/p-1/pdf/public');
   });
 
+  /**
+   * Without non-public TOPs there is only one PDF (publicPdfUrl null) for internal and public use.
+   */
   it('offers a single generic PDF link when nothing is redacted', async () => {
-    // No non-public TOPs ⇒ only one PDF (publicPdfUrl null) for internal and public use.
     const { http } = await setup();
     http.expectOne('/api/meetings/m-1').flush({ ...MEETING, status: 'closed' });
     http.expectOne('/api/meetings/m-1/protocol').flush({
@@ -395,10 +409,14 @@ describe('MeetingsComponent', () => {
     expect(screen.queryByRole('link', { name: 'PDF öffentlich' })).toBeNull();
   });
 
+  /**
+   * A finalized protocol locks the editor, so the non-public checkbox is gone and the badge takes
+   * over. Below the wide layout the agenda is a sheet from the start edge. The locked protocol
+   * leaves no row menu.
+   */
   it('marks non-public TOPs with a NÖ badge once the meeting is closed and finalized', async () => {
     const { http, container } = await setup();
     http.expectOne('/api/meetings/m-1').flush({ ...MEETING, status: 'closed' });
-    // Finalized ⇒ editor locked ⇒ the non-public checkbox is gone. The badge takes over.
     http.expectOne('/api/meetings/m-1/protocol').flush({ ...PROTOCOL, status: 'final' });
     http.expectOne('/api/meetings/m-1/attendance').flush([]);
     http.expectOne('/api/meetings/m-1/agenda').flush([
@@ -407,15 +425,13 @@ describe('MeetingsComponent', () => {
     ]);
     flushDelegationContext(http);
 
-    // Below the wide layout the agenda is a sheet from the start edge.
     await userEvent.click(await screen.findByTitle('Tagesordnung öffnen'));
     const agendaSheet = await screen.findByRole('dialog', { name: 'Tagesordnung' });
     await within(agendaSheet).findByText('Vertraulich');
     const noe = Array.from(agendaSheet.querySelectorAll('app-badge')).filter(
       (b) => b.textContent?.trim() === 'NÖ',
     );
-    expect(noe).toHaveLength(1); // only the non-public TOP, not the public one
-    // The locked protocol leaves no row menu.
+    expect(noe).toHaveLength(1);
     expect(within(agendaSheet).queryByRole('button', { name: /Aktionen für/ })).toBeNull();
     void container;
   });
@@ -436,7 +452,7 @@ describe('MeetingsComponent', () => {
 
   it('tags the non-public TOP while the meeting is still live', async () => {
     const { http, container } = await setup();
-    http.expectOne('/api/meetings/m-1').flush(MEETING); // status 'live'
+    http.expectOne('/api/meetings/m-1').flush(MEETING);
     http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
     http.expectOne('/api/meetings/m-1/attendance').flush([]);
     http.expectOne('/api/meetings/m-1/agenda').flush([
@@ -496,7 +512,7 @@ describe('MeetingsComponent', () => {
     flushDelegationContext(http);
   };
 
-  it('lets every writer edit the draft of a closed meeting, not only the last keeper (O22)', async () => {
+  it('lets every writer edit the draft of a closed meeting, not only the last keeper', async () => {
     const { http, fixture } = await setup();
     flushClosed(http, 'draft');
     fixture.detectChanges();
@@ -505,19 +521,22 @@ describe('MeetingsComponent', () => {
     expect(screen.getByRole('button', { name: 'Ins Protokoll übernehmen' })).toBeInTheDocument();
   });
 
+  /** The right stays; the lock of the protocol takes the editor away. */
   it('keeps the final protocol of a closed meeting locked for every writer', async () => {
     const { http, fixture } = await setup();
     flushClosed(http, 'final');
     await screen.findByText('Final');
-    // The right stays; the lock of the protocol takes the editor away.
     expect((fixture.componentInstance as Cmp).canEditProtocol()).toBe(true);
     expect(screen.queryByRole('toolbar', { name: 'Format' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Ins Protokoll übernehmen' })).toBeNull();
   });
 
+  /**
+   * The meeting is closed and the protocol is back to draft, which means that the render failed.
+   * The finalize action first saves the assembled markdown, then posts to /finalize.
+   */
   it('retries a failed finalize via the toolbar repeat button', async () => {
     const { http } = await setup();
-    // The meeting is closed and the protocol is back to draft ⇒ the render failed.
     http.expectOne('/api/meetings/m-1').flush({ ...MEETING, status: 'closed' });
     http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
     http.expectOne('/api/meetings/m-1/attendance').flush([]);
@@ -526,7 +545,6 @@ describe('MeetingsComponent', () => {
     await userEvent.click(
       await screen.findByRole('button', { name: 'Finalisieren & versenden' }),
     );
-    // The finalize action first saves the assembled markdown, then posts to /finalize.
     http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
     const finReq = http.expectOne('/api/protocols/p-1/finalize');
     expect(finReq.request.method).toBe('POST');
@@ -534,6 +552,7 @@ describe('MeetingsComponent', () => {
     expect(await screen.findByText('Final')).toBeInTheDocument();
   });
 
+  /** "Abbrechen" closes without a finalize. */
   it('asks before it finalizes the protocol of a public gremium, and can hold it back', async () => {
     const { http } = await setup();
     http.expectOne('/api/meetings/m-1').flush({ ...MEETING, status: 'closed' });
@@ -547,7 +566,6 @@ describe('MeetingsComponent', () => {
     http.expectNone('/api/protocols/p-1/finalize');
     const dialog = await screen.findByRole('dialog', { name: 'Protokoll finalisieren?' });
     expect(dialog).toHaveTextContent('Dieses Protokoll wird öffentlich. Keine Namen Dritter im Freitext.');
-    // "Abbrechen" closes without a finalize.
     await userEvent.click(within(dialog).getAllByRole('button', { name: 'Abbrechen' })[0]);
     http.expectNone('/api/protocols/p-1');
 
@@ -577,13 +595,13 @@ describe('MeetingsComponent', () => {
     expect(screen.getByText('99')).toBeInTheDocument();
   });
 
+  /** The header shows the status, and the dock shows it until the read gives the close time. */
   it('reflects a live meeting_state status change', async () => {
     const { http, ws, fixture } = await setup();
     flushLoad(http);
     await screen.findByText('Sitzungssteuerung');
     ws.subject.next({ type: 'meeting_state', activeApplicationId: 'app-2', status: 'closed' });
     fixture.detectChanges();
-    // The header status, and the dock until the read gives the close time.
     expect(screen.getByText('Geschlossen', { selector: 'app-status-text' })).toBeInTheDocument();
   });
 
@@ -598,9 +616,10 @@ describe('MeetingsComponent', () => {
     http.expectOne('/api/meetings/m-1').flush({ title: 'fail' }, { status: 500, statusText: 'Server Error' });
   });
 
+  /**
+   * The protocol is created only at meeting start, so there is no manual "create protocol" button.
+   */
   it('offers no on-demand protocol button — the protocol is created on start', async () => {
-    // The protocol is created only at meeting start. A manual "create protocol"
-    // button no longer exists.
     const { http } = await setup();
     http.expectOne('/api/meetings/m-1').flush({ ...MEETING, protocolId: null });
     http.expectOne('/api/meetings/m-1/attendance').flush([]);
@@ -611,6 +630,11 @@ describe('MeetingsComponent', () => {
     expect(screen.queryByRole('button', { name: 'Protokoll anlegen' })).not.toBeInTheDocument();
   });
 
+  /**
+   * openSettings reloads the roster (minute-taker options). The test matches the exact label,
+   * because the start button carries an aria-label "Protokollant zuweisen …" that makes a
+   * /Protokollant/ regex ambiguous. The dock names the minute-taker after saving.
+   */
   it('persists the selected protokollant via PATCH and marks the row in the roster', async () => {
     const { http } = await setup();
     http.expectOne('/api/meetings/m-1').flush(MEETING);
@@ -622,12 +646,9 @@ describe('MeetingsComponent', () => {
     flushDelegationContext(http);
     await userEvent.click(await screen.findByRole('button', { name: 'Sitzungsmenü' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Sitzung bearbeiten' }));
-    // openSettings reloads the roster (minute-taker options).
     http.expectOne('/api/meetings/m-1/attendance').flush([
       { principalId: 'pr-1', displayName: 'Max P', email: 'm@x.de', status: null, source: null, isSelf: false, canKeepProtocol: true },
     ]);
-    // Match the exact label. The start button carries an aria-label
-    // "Protokollant zuweisen …", which makes a /Protokollant/ regex ambiguous.
     const select = await screen.findByLabelText('Protokollführung');
     await pickOption(select, 'Max P');
     await userEvent.click(screen.getByRole('button', { name: /Speichern/i }));
@@ -635,13 +656,14 @@ describe('MeetingsComponent', () => {
     expect(req.request.method).toBe('PATCH');
     expect(req.request.body.protokollantId).toBe('pr-1');
     req.flush({ ...MEETING, protokollantId: 'pr-1', protokollantName: 'Max P' });
-    // The dock names the minute-taker after saving.
     expect(await screen.findByText('Protokoll: Max P')).toBeInTheDocument();
   });
 
+  /**
+   * The meeting has an assigned minute-taker, and it is someone else. The logged-in user is not the
+   * minute-taker, so the page shows the live/voting view, not the manager view.
+   */
   it('gives non-protokollants the live read/vote view once a protokollant is assigned', async () => {
-    // The meeting has an assigned minute-taker, and it is someone else. The
-    // logged-in user is NOT the minute-taker ⇒ live/voting view, not the manager view.
     const assigned: MeetingOutWire = {
       ...MEETING,
       canControl: false,
@@ -661,9 +683,11 @@ describe('MeetingsComponent', () => {
     expect(screen.queryByText('Sitzungssteuerung')).not.toBeInTheDocument();
   });
 
+  /**
+   * The follow view is the view of a plain member. It must not depend on an assigned minute-taker:
+   * no write and no manage right is enough.
+   */
   it('keeps the follow view for a member without rights and without a minute-taker', async () => {
-    // The follow view is the view of a plain member. It must not depend on a
-    // minute-taker being assigned: no write and no manage right is enough.
     const member: MeetingOutWire = {
       ...MEETING,
       canControl: false,
@@ -706,45 +730,49 @@ describe('MeetingsComponent', () => {
       return view;
     }
 
+    /**
+     * The minute-taker is reassigned in the settings dialog, and that dialog opens from this
+     * toolbar. If the toolbar is hidden from everybody else, the meeting is stranded when the
+     * minute-taker drops out. The start sits in the header and in the checklist while the meeting
+     * is planned. Settings and delete are in the session menu. The participant view must not take
+     * the page over.
+     */
     it('keeps the control toolbar for a manager who is not the minute-taker', async () => {
-      // The operational bite: the minute-taker is reassigned in the settings
-      // dialog, and that dialog opens from this toolbar. Hiding the toolbar from
-      // everybody else strands the meeting when the minute-taker drops out.
       await loadOtherProtokollant();
 
       expect(await screen.findByRole('toolbar', { name: 'Sitzungssteuerung' })).toBeInTheDocument();
-      // The start sits in the header and in the checklist while the meeting is planned.
       const starts = screen.getAllByRole('button', { name: 'Sitzung eröffnen' });
       expect(starts).toHaveLength(2);
       starts.forEach((b) => expect(b).toBeEnabled());
-      // Settings and delete are in the session menu.
       await userEvent.click(screen.getByRole('button', { name: 'Sitzungsmenü' }));
       expect(await screen.findByRole('menuitem', { name: 'Sitzung bearbeiten' })).toBeInTheDocument();
       expect(screen.getByRole('menuitem', { name: 'Sitzung löschen' })).toBeInTheDocument();
-      // The participant view must not take the page over.
       expect(screen.queryByRole('complementary', { name: 'Teilnahme' })).not.toBeInTheDocument();
     });
 
+    /**
+     * A vote needs a started meeting, so the page offers it while live only. An open vote on any
+     * item blocks a new one, so this meeting has none. Below the wide layout the agenda opens as a
+     * sheet.
+     */
     it('keeps the agenda editor and vote creation for a manager who is not the minute-taker', async () => {
-      // A vote needs a started meeting, so the page offers it while live only. An open
-      // vote on any item blocks a new one, so this meeting has none.
       await loadOtherProtokollant({ status: 'live', votes: [] });
 
       expect(await screen.findByRole('button', { name: 'Beschlussfrage hinzufügen' })).toBeInTheDocument();
-      // Below the wide layout the agenda opens as a sheet.
       await userEvent.click(screen.getByTitle('Tagesordnung öffnen'));
       expect(await screen.findByRole('button', { name: 'TOP hinzufügen' })).toBeInTheDocument();
     });
 
+    /**
+     * Two people must not type into one protocol, so the editor is disabled, but the page is not
+     * hidden. The page says who holds the pen, so the greyed editor is clear.
+     */
     it('shows the protocol pane read-only to a manager who is not the minute-taker', async () => {
-      // Two people must not type into one protocol. That is what the exclusivity
-      // was written for, so the editor is disabled — not the whole page hidden.
       const { container, fixture } = await loadOtherProtokollant({ status: 'live' });
 
       expect(await screen.findByText('Entwurf')).toBeInTheDocument();
       await renderDeferred(fixture);
       expect(container.querySelector('.mde__host--disabled')).toBeTruthy();
-      // Say who holds the pen, so the greyed editor is not a mystery.
       expect(screen.getByText(/Other P führt das Protokoll/)).toBeInTheDocument();
     });
 
@@ -762,9 +790,11 @@ describe('MeetingsComponent', () => {
   });
 });
 
-// Instance-driven tests: call the public methods directly and check signals and
-// HTTP. They reach the branches that the DOM alone does not trigger: error paths,
-// search debounce, drag and drop, WS messages and helpers.
+/**
+ * These tests call the public methods directly and check signals and HTTP. They reach the branches
+ * that the DOM alone does not trigger: error paths, search debounce, drag and drop, WS messages and
+ * helpers.
+ */
 type Cmp = MeetingsComponent;
 
 const AGENDA_ITEM = (over: Record<string, unknown> = {}) => ({
@@ -786,7 +816,7 @@ function services(fixture: { debugElement: { injector: { get<T>(t: new (...a: ne
 }
 
 /** Set up a loaded detail meeting and return the instance. */
-/** Members who can take the minutes over (O20). */
+/** Members who can take the minutes over. */
 const PR9 = { principalId: 'pr-9', displayName: 'Neu', email: null, status: 'present' as const, source: 'self' as const, note: null, isSelf: false, canKeepProtocol: true };
 const PR2 = { ...PR9, principalId: 'pr-2', displayName: 'B' };
 
@@ -830,6 +860,7 @@ describe('MeetingsComponent — methods', () => {
       expect(screen.queryByRole('dialog', { name: 'TOP hinzufügen' })).toBeNull();
     });
 
+    /** Another vote of the meeting is open, so the dialog only prepares the question. */
     it('opens a vote for an agenda item and takes the new vote into the page', async () => {
       const { cmp, http, fixture } = await loaded();
       expect(cmp.voteTopNumber()).toBe(0);
@@ -837,7 +868,6 @@ describe('MeetingsComponent — methods', () => {
       cmp.openVoteDialog(AGENDA_ITEM({ id: 't-2', title: 'Bericht' }) as never);
       fixture.detectChanges();
       expect(cmp.voteTopNumber()).toBe(2);
-      // Another vote of the meeting is open, so the dialog only prepares the question.
       const dialog = screen.getByRole('dialog', { name: 'Abstimmung vorbereiten' });
       expect(dialog).toHaveAccessibleDescription('TOP 2 · Bericht');
       expect(within(dialog).queryByRole('button', { name: 'Abstimmung öffnen' })).toBeNull();
@@ -897,7 +927,7 @@ describe('MeetingsComponent — methods', () => {
 
     it('labels vote options, falling back to the raw key when unknown', async () => {
       const { cmp } = await loaded();
-      expect(cmp.voteOptionLabel('yes')).not.toBe('yes'); // translated
+      expect(cmp.voteOptionLabel('yes')).not.toBe('yes');
       expect(cmp.voteOptionLabel('weird-option')).toBe('weird-option');
     });
 
@@ -917,6 +947,7 @@ describe('MeetingsComponent — methods', () => {
       expect(none).toEqual([]);
     });
 
+    /** Without options and counts the list is empty. */
     it('computes vote options for a vote, falling back to count keys', async () => {
       const { cmp } = await loaded();
       const withOpts = cmp.voteOptionsFor({
@@ -931,7 +962,6 @@ describe('MeetingsComponent — methods', () => {
         closesAt: null, voted: 0, present: 0, revealed: true, failedReason: null,
       });
       expect(fromCounts).toEqual(['a', 'b']);
-      // Neither options nor counts → empty list (covers the ?? {} fallback).
       const empty = cmp.voteOptionsFor({
         id: 'v', applicationId: null, agendaItemId: null, title: null, question: null,
         options: [], status: 'open', result: null, counts: null, leading: null,
@@ -951,13 +981,15 @@ describe('MeetingsComponent — methods', () => {
       }
     });
 
+    /**
+     * The MEETING votes have no agendaItemId, so all of them are loose. A vote bound to a TOP
+     * matches votesForTop, and looseVotes shrinks.
+     */
     it('groups votes by TOP and collects loose votes', async () => {
       const { cmp, fixture } = await loaded();
       const { session } = services(fixture);
-      expect(session.votesForTop('app-1')).toEqual([]); // votesForTop matches agendaItemId
-      // The MEETING votes have no agendaItemId, so all of them are "loose".
+      expect(session.votesForTop('app-1')).toEqual([]);
       expect(cmp.looseVotes().length).toBe(2);
-      // Bind a vote to a TOP → votesForTop matches, looseVotes shrinks.
       cmp.meeting.set({
         ...cmp.meeting()!,
         votes: [
@@ -981,13 +1013,13 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.selectedIndex()).toBe(1);
     });
 
+    /** A second call before the timer fires resets the timer. */
     it('debounce-saves a TOP body and reflects the save state', async () => {
       jest.useFakeTimers();
       try {
         const { cmp, http, fixture } = await loaded();
         cmp.onTopBodyChange('t-1', 'Neuer Text');
         expect(cmp.saveState()).toBe('idle');
-        // A second call before it fires resets the timer (covers the clearTimeout branch).
         cmp.onTopBodyChange('t-1', 'Neuer Text 2');
         jest.advanceTimersByTime(1000);
         expect(cmp.saveState()).toBe('saving');
@@ -1035,7 +1067,7 @@ describe('MeetingsComponent — methods', () => {
     it('does nothing on body change without a loaded meeting', async () => {
       const { fixture } = await setup({ id: null });
       const cmp = fixture.componentInstance as Cmp;
-      cmp.onTopBodyChange('t-1', 'X'); // meeting() === null → early return
+      cmp.onTopBodyChange('t-1', 'X');
       expect(cmp.saveState()).toBe('idle');
     });
 
@@ -1052,7 +1084,7 @@ describe('MeetingsComponent — methods', () => {
     it('ignores removeFromAgenda while saving and handles its error', async () => {
       const { cmp, http } = await loaded();
       cmp.savingAgenda.set(true);
-      cmp.removeFromAgenda('t-1'); // savingAgenda → return
+      cmp.removeFromAgenda('t-1');
       cmp.savingAgenda.set(false);
       cmp.removeFromAgenda('t-1');
       http.expectOne('/api/meetings/m-1/agenda/t-1').flush(null, { status: 500, statusText: 'e' });
@@ -1139,11 +1171,11 @@ describe('MeetingsComponent — methods', () => {
       const { cmp, http } = await loaded();
       cmp.startRename(AGENDA_ITEM({ title: 'Alt' }) as never);
       cmp.renameDraft.set('   ');
-      cmp.renameTop(AGENDA_ITEM({ title: 'Alt' }) as never); // empty → cancel
+      cmp.renameTop(AGENDA_ITEM({ title: 'Alt' }) as never);
       expect(cmp.renamingTopId()).toBeNull();
       cmp.startRename(AGENDA_ITEM({ title: 'Alt' }) as never);
       cmp.renameDraft.set('Alt');
-      cmp.renameTop(AGENDA_ITEM({ title: 'Alt' }) as never); // unchanged → cancel
+      cmp.renameTop(AGENDA_ITEM({ title: 'Alt' }) as never);
       expect(cmp.renamingTopId()).toBeNull();
       http.verify();
     });
@@ -1166,7 +1198,7 @@ describe('MeetingsComponent — methods', () => {
         AGENDA_ITEM({ id: 't-2', position: 1 }),
         AGENDA_ITEM({ id: 't-3', position: 2 }),
       ] as never);
-      cmp.moveTop(0, 2); // t-1 to the end
+      cmp.moveTop(0, 2);
       expect(cmp.agenda().map((a) => a.id)).toEqual(['t-2', 't-3', 't-1']);
       const req = http.expectOne('/api/meetings/m-1/agenda/order');
       expect(req.request.method).toBe('PUT');
@@ -1183,6 +1215,7 @@ describe('MeetingsComponent — methods', () => {
       http.expectOne('/api/meetings/m-1/agenda').flush([AGENDA_ITEM()]);
     });
 
+    /** Out of range, onto itself or without a meeting there is nothing to save. */
     it('moves a TOP up and down from the row menu', async () => {
       const { cmp, http } = await loaded();
       cmp.agenda.set([
@@ -1193,7 +1226,6 @@ describe('MeetingsComponent — methods', () => {
       const req = http.expectOne('/api/meetings/m-1/agenda/order');
       expect(req.request.body).toEqual({ itemIds: ['t-2', 't-1'] });
       req.flush([AGENDA_ITEM({ id: 't-2' }), AGENDA_ITEM({ id: 't-1', position: 1 })]);
-      // Out of range, onto itself or without a meeting: nothing to save.
       cmp.moveTop(1, 2);
       cmp.moveTop(0, -1);
       cmp.moveTop(1, 1);
@@ -1225,7 +1257,7 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.savingAttendance()).toBe(false);
     });
 
-    it('never sends absent, another row or a lead record as a member (Z2, O15)', async () => {
+    it('never sends absent, another row or a lead record as a member', async () => {
       const { cmp, http } = await asMember();
       cmp.setAttendance(SELF as never, 'absent');
       cmp.setAttendance(OTHER as never, 'present');
@@ -1248,7 +1280,7 @@ describe('MeetingsComponent — methods', () => {
     it('saves a changed reason with the same status', async () => {
       const { cmp, http } = await loaded();
       const excused = { ...OTHER, status: 'excused', note: 'Alt' };
-      cmp.setAttendance(excused as never, 'excused', 'Alt'); // unchanged → return
+      cmp.setAttendance(excused as never, 'excused', 'Alt');
       http.verify();
       cmp.setAttendance(excused as never, 'excused', 'Neu');
       const req = http.expectOne('/api/meetings/m-1/attendance/pr-2');
@@ -1258,7 +1290,7 @@ describe('MeetingsComponent — methods', () => {
 
     it('skips when the status is unchanged or already saving', async () => {
       const { cmp, http } = await loaded();
-      cmp.setAttendance({ ...OTHER, status: 'present' } as never, 'present'); // unchanged → return
+      cmp.setAttendance({ ...OTHER, status: 'present' } as never, 'present');
       cmp.savingAttendance.set(true);
       cmp.setAttendance(OTHER as never, 'present');
       cmp.resetAttendance(OTHER as never);
@@ -1280,23 +1312,25 @@ describe('MeetingsComponent — methods', () => {
       expect(spy).toHaveBeenLastCalledWith('Aktion fehlgeschlagen.');
     });
 
-    it('marks the row of an active delegation (O23) and reloads the roster', async () => {
+    /**
+     * The attendance sheet marks the row and offers the revoke, with no toast. A later save of the
+     * row clears the mark. A revoke of the delegation in the attendance sheet clears it too, only
+     * for that member.
+     */
+    it('marks the row of an active delegation and reloads the roster', async () => {
       const { cmp, http, fixture } = await loaded();
       const spy = jest.spyOn(fixture.debugElement.injector.get(ToastService), 'error');
       cmp.setAttendance(OTHER as never, 'present');
       http
         .expectOne('/api/meetings/m-1/attendance/pr-2')
         .flush({ code: 'delegation_active' }, { status: 409, statusText: 'Conflict' });
-      // The attendance sheet marks the row and offers the revoke; no toast.
       expect(cmp.attendanceConflict()).toBe('pr-2');
       expect(spy).not.toHaveBeenCalled();
       http.expectOne('/api/meetings/m-1/attendance').flush([OTHER]);
       expect(cmp.attendance()).toEqual([OTHER]);
-      // A later save of the row clears the mark.
       cmp.setAttendance(OTHER as never, 'excused');
       http.expectOne('/api/meetings/m-1/attendance/pr-2').flush([{ ...OTHER, status: 'excused' }]);
       expect(cmp.attendanceConflict()).toBeNull();
-      // A revoke of the delegation in the attendance sheet clears it too, only for that member.
       cmp.setAttendance(OTHER as never, 'present');
       http
         .expectOne('/api/meetings/m-1/attendance/pr-2')
@@ -1308,7 +1342,7 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.attendanceConflict()).toBeNull();
     });
 
-    it('explains the own delegation (O23) to a member and reloads the roster', async () => {
+    it('explains the own delegation to a member and reloads the roster', async () => {
       const { cmp, http, fixture } = await asMember();
       const spy = jest.spyOn(fixture.debugElement.injector.get(ToastService), 'error');
       cmp.setAttendance(SELF as never, 'present');
@@ -1319,7 +1353,7 @@ describe('MeetingsComponent — methods', () => {
       http.expectOne('/api/meetings/m-1/attendance').flush([]);
     });
 
-    it('explains a record that the lead set (O15) and reloads the roster', async () => {
+    it('explains a record that the lead set and reloads the roster', async () => {
       const { cmp, http, fixture } = await asMember();
       const spy = jest.spyOn(fixture.debugElement.injector.get(ToastService), 'error');
       cmp.setAttendance(SELF as never, 'present');
@@ -1349,6 +1383,7 @@ describe('MeetingsComponent — methods', () => {
   });
 
   describe('session control', () => {
+    /** With canWrite and a protocolId the page reloads through refreshProtocol. */
     it('starts the session (status live) when a protokollant is set', async () => {
       const { cmp, http } = await loaded();
       cmp.meeting.set({ ...cmp.meeting()!, status: 'planned', protokollantId: 'pr-9' });
@@ -1356,7 +1391,6 @@ describe('MeetingsComponent — methods', () => {
       const req = http.expectOne('/api/meetings/m-1');
       expect(req.request.body).toEqual({ status: 'live' });
       req.flush({ ...MEETING, status: 'live', protocolId: 'p-1' });
-      // canWrite + protocolId → reload via refreshProtocol.
       http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
     });
 
@@ -1381,7 +1415,7 @@ describe('MeetingsComponent — methods', () => {
       const { cmp, http } = await loaded();
       cmp.meeting.set({ ...cmp.meeting()!, status: 'planned', protokollantId: null });
       cmp.startMeeting();
-      http.verify(); // no PATCH
+      http.verify();
     });
 
     it('reports an error on a failed status change and reloads the meeting', async () => {
@@ -1415,7 +1449,7 @@ describe('MeetingsComponent — methods', () => {
       const { cmp, http } = await loaded();
       cmp.setActive('app-7');
       http.expectOne('/api/meetings/m-1').flush(null, { status: 500, statusText: 'e' });
-      expect(cmp.meeting()?.activeApplicationId).toBe('app-1'); // unchanged
+      expect(cmp.meeting()?.activeApplicationId).toBe('app-1');
     });
 
     it('does nothing on setActive without a meeting', async () => {
@@ -1484,13 +1518,13 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.meeting()?.votes.find((v) => v.id === 'v-1')?.status).toBe('cancelled');
     });
 
+    /** voteActionFailed reloads the meeting. */
     it('shows the server detail and reloads the meeting on a vote action error', async () => {
       const { cmp, http } = await loaded();
       cmp.openVote('v-2');
       http
         .expectOne('/api/meetings/m-1/votes/v-2/open')
         .flush({ detail: 'Antrag nicht im vote-State' }, { status: 409, statusText: 'Conflict' });
-      // voteActionFailed reloads the meeting.
       http.expectOne('/api/meetings/m-1').flush({ ...MEETING, status: 'live' });
     });
 
@@ -1508,14 +1542,15 @@ describe('MeetingsComponent — methods', () => {
       http.expectOne('/api/meetings/m-1').flush(null, { status: 500, statusText: 'e' });
     });
 
+    /**
+     * A free-text TOP always allows another vote. An application TOP without a vote allows one, and
+     * an application TOP with a bound vote is locked.
+     */
     it('decides whether a TOP may get another vote', async () => {
       const { cmp, fixture } = await loaded();
       const { session } = services(fixture);
-      // A free-text TOP always allows another vote.
       expect(session.canAddVote(AGENDA_ITEM({ applicationId: null }) as never)).toBe(true);
-      // An application TOP without a vote (votesForTop matches agendaItemId) allows one.
       expect(session.canAddVote(AGENDA_ITEM({ id: 't-x', applicationId: 'app-1' }) as never)).toBe(true);
-      // An application TOP with a bound vote is locked.
       cmp.meeting.set({
         ...cmp.meeting()!,
         votes: [{ ...cmp.meeting()!.votes[0], agendaItemId: 't-x' }],
@@ -1535,7 +1570,7 @@ describe('MeetingsComponent — methods', () => {
     it('ignores a second cast while one is in flight', async () => {
       const { cmp, http } = await loaded();
       cmp.casting.set('v-1');
-      cmp.cast('v-1', 'yes'); // casting → return
+      cmp.cast('v-1', 'yes');
       http.verify();
     });
 
@@ -1557,10 +1592,11 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.meeting()?.votes.length).toBe(0);
     });
 
+    /** The refusal reloads the meeting, which may have closed in another tab. */
     it('ignores deleteVote without a meeting or while deleting, and handles errors', async () => {
       const { cmp, http } = await loaded();
       cmp.deletingVote.set('v-1');
-      cmp.deleteVote('v-1'); // deletingVote → return
+      cmp.deleteVote('v-1');
       cmp.deletingVote.set(null);
       cmp.deleteVote('v-1');
       http
@@ -1570,32 +1606,33 @@ describe('MeetingsComponent — methods', () => {
           { status: 409, statusText: 'Conflict' },
         );
       expect(cmp.deletingVote()).toBeNull();
-      // The refusal reloads the meeting, which may have closed in another tab.
       http.expectOne('/api/meetings/m-1').flush({ ...MEETING, status: 'closed' });
       expect(cmp.meeting()!.status).toBe('closed');
     });
   });
 
   describe('finalize', () => {
+    /**
+     * The finalize returns rendering, so the poll loop starts, and watchRendering polls again after
+     * 4 s.
+     */
     it('assembles markdown with application refs + bodies and finalizes (async path)', async () => {
       const { cmp, http } = await loaded();
       cmp.agenda.set([
         AGENDA_ITEM({ id: 't-1', applicationId: 'app-1', title: 'Antrag', body: 'Text' }),
         AGENDA_ITEM({ id: 't-2', applicationId: null, title: '', body: '' }),
       ] as never);
-      cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' }); // F8: finalize after the close
+      cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' });
       cmp.finalize();
       const saveReq = http.expectOne('/api/protocols/p-1');
       expect(saveReq.request.body.markdown).toContain('# Antrag');
       expect(saveReq.request.body.markdown).toContain(':::antrag{#app-1}');
-      expect(saveReq.request.body.markdown).toContain('Tagesordnungspunkt'); // empty title fallback
+      expect(saveReq.request.body.markdown).toContain('Tagesordnungspunkt');
       saveReq.flush(PROTOCOL);
-      // Async path: finalize returns rendering, so the poll loop starts.
       jest.useFakeTimers();
       try {
         http.expectOne('/api/protocols/p-1/finalize').flush({ ...PROTOCOL, status: 'rendering', isFinal: false, isLocked: true });
         expect(cmp.finalizing()).toBe(false);
-        // watchRendering polls again after 4s.
         jest.advanceTimersByTime(4000);
         http.expectOne('/api/meetings/m-1/protocol').flush({ ...PROTOCOL, status: 'final', isFinal: true, isLocked: true });
       } finally {
@@ -1605,7 +1642,7 @@ describe('MeetingsComponent — methods', () => {
 
     it('reports a save error before finalize', async () => {
       const { cmp, http } = await loaded();
-      cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' }); // F8: finalize after the close
+      cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' });
       cmp.finalize();
       http.expectOne('/api/protocols/p-1').flush(null, { status: 500, statusText: 'e' });
       expect(cmp.finalizing()).toBe(false);
@@ -1613,18 +1650,18 @@ describe('MeetingsComponent — methods', () => {
 
     it('reports a finalize error with the server detail', async () => {
       const { cmp, http } = await loaded();
-      cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' }); // F8: finalize after the close
+      cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' });
       cmp.finalize();
       http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
       http
         .expectOne('/api/protocols/p-1/finalize')
-        .flush({ detail: 'LaTeX-Fehler' }, { status: 400, statusText: 'Bad Request' });
+        .flush({ detail: 'Render-Fehler' }, { status: 400, statusText: 'Bad Request' });
       expect(cmp.finalizing()).toBe(false);
     });
 
     it('reports a finalize error without a detail', async () => {
       const { cmp, http } = await loaded();
-      cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' }); // F8: finalize after the close
+      cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' });
       cmp.finalize();
       http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
       http.expectOne('/api/protocols/p-1/finalize').flush(null, { status: 500, statusText: 'e' });
@@ -1634,16 +1671,18 @@ describe('MeetingsComponent — methods', () => {
     it('ignores finalize without a protocol / when locked / for a live meeting', async () => {
       const { cmp, http } = await loaded();
       cmp.protocol.set(null);
-      cmp.finalize(); // no protocol → return
+      cmp.finalize();
       cmp.protocol.set({ ...PROTOCOL, isFinal: false, isLocked: true } as never);
-      cmp.finalize(); // isLocked → return
+      cmp.finalize();
       cmp.protocol.set({ ...PROTOCOL, isFinal: false, isLocked: false } as never);
-      cmp.finalize(); // F8: the meeting is still live → return
+      cmp.finalize();
       http.verify();
     });
 
-    // The server renders the PDF from the item texts it holds, and refuses a body save
-    // after the finalize. Text typed within the autosave delay must reach it first.
+    /**
+     * The server renders the PDF from the item texts it holds, and refuses a body save after the
+     * finalize. Text typed within the autosave delay must reach it first.
+     */
     it('saves the text of the last TOP before it finalizes', async () => {
       const { cmp, http } = await loaded();
       cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' });
@@ -1693,12 +1732,14 @@ describe('MeetingsComponent — methods', () => {
   });
 
   describe('settings dialog', () => {
+    /**
+     * The PATCH names only the protokollant; the date and the time stay with the settings dialog.
+     */
     it('names the protokollant from the session page in one PATCH', async () => {
       const { cmp, http } = await loaded();
       cmp.setProtokollant(cmp.meeting()!, 'pr-9');
       const req = http.expectOne('/api/meetings/m-1');
       expect(req.request.method).toBe('PATCH');
-      // Only the protokollant: the date and the time stay with the settings dialog.
       expect(req.request.body).toEqual({ protokollantId: 'pr-9' });
       req.flush({ ...MEETING, protokollantId: 'pr-9', protokollantName: 'Neu' });
       expect(cmp.meeting()!.protokollantId).toBe('pr-9');
@@ -1712,7 +1753,7 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.meeting()!.protokollantId).toBe(before);
     });
 
-    it('hands the minutes over now and plans the next-item handover (Z3)', async () => {
+    it('hands the minutes over now and plans the next-item handover', async () => {
       const { cmp, http, fixture } = await loaded();
       const toast = fixture.debugElement.injector.get(ToastService);
       const success = jest.spyOn(toast, 'success');
@@ -1744,8 +1785,12 @@ describe('MeetingsComponent — methods', () => {
       expect(success).toHaveBeenLastCalledWith('Übergabe mit dem nächsten TOP geplant.');
     });
 
-    it('reads the meeting again on meeting_state, so a handover reaches the new keeper (Z3)', async () => {
-      // Viewer B: a member with protocol.write in the gremium, not the keeper yet.
+    /**
+     * Viewer B is a member with protocol.write in the gremium, not the keeper yet. A hands the
+     * minutes over to B, and the event carries no rights. After the read B can write, so the editor
+     * loads the protocol.
+     */
+    it('reads the meeting again on meeting_state, so a handover reaches the new keeper', async () => {
       const { http, ws, fixture } = await setup({ perms: ['protocol.write'] });
       const cmp = fixture.componentInstance as Cmp;
       http.expectOne('/api/meetings/m-1').flush({
@@ -1761,10 +1806,9 @@ describe('MeetingsComponent — methods', () => {
       http.expectOne('/api/meetings/m-1/attendance').flush([]);
       http.expectOne('/api/meetings/m-1/agenda').flush([]);
       flushDelegationContext(http);
-      http.expectNone('/api/meetings/m-1/protocol'); // no write right yet
+      http.expectNone('/api/meetings/m-1/protocol');
       expect(cmp.canWrite()).toBe(false);
 
-      // A hands the minutes over to B. The event carries no rights.
       ws.subject.next({ type: 'meeting_state', activeApplicationId: 'app-1', status: 'live' });
       http.expectOne('/api/meetings/m-1/agenda').flush([]);
       const plan = {
@@ -1793,7 +1837,6 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.meeting()!.isProtokollant).toBe(true);
       expect(cmp.meeting()!.protokollantName).toBe('B');
       expect(cmp.meeting()!.plannedHandover?.principalId).toBe('pr-c');
-      // B can write now, so the editor loads the protocol.
       http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
       expect(cmp.protocol()?.id).toBe('p-1');
     });
@@ -1827,7 +1870,11 @@ describe('MeetingsComponent — methods', () => {
       expect(error.mock.lastCall?.[0]).toBe('Aktion fehlgeschlagen.');
     });
 
-    it('keeps the handover dialog open on a pick of "with the next TOP" and sends it (Z3, O1)', async () => {
+    /**
+     * The native change event of the radio bubbles to the host of the dialog. It must not reach an
+     * output binding there and close the dialog.
+     */
+    it('keeps the handover dialog open on a pick of "with the next TOP" and sends it', async () => {
       const { cmp, http, fixture } = await loaded();
       services(fixture).agenda.agenda.set(AGENDA);
       cmp.attendance.set([PR9]);
@@ -1835,8 +1882,6 @@ describe('MeetingsComponent — methods', () => {
       fixture.detectChanges();
       const dialog = await screen.findByRole('dialog', { name: 'Protokollführung übergeben' });
       const next = within(dialog).getByRole('radio', { name: /Ab nächstem TOP/ });
-      // The native change event of the radio bubbles to the host of the dialog. It must
-      // not reach an output binding there and close the dialog.
       await userEvent.click(next);
       fixture.detectChanges();
       expect(screen.getByRole('dialog', { name: 'Protokollführung übergeben' })).toBe(dialog);
@@ -1847,6 +1892,7 @@ describe('MeetingsComponent — methods', () => {
       expect(req.request.body).toEqual({ principalId: 'pr-9', mode: 'next_item' });
     });
 
+    /** The dialog is gone, and the picker of the dock (a popover of the same name) is open. */
     it('goes back from the handover dialog to the picker of the dock', async () => {
       const { cmp, fixture } = await loaded();
       cmp.attendance.set([PR9]);
@@ -1855,7 +1901,6 @@ describe('MeetingsComponent — methods', () => {
       const dialog = await screen.findByRole('dialog', { name: 'Protokollführung übergeben' });
       expect(within(dialog).getByText('Kopf des Protokolls')).toBeInTheDocument();
       await userEvent.click(within(dialog).getByRole('button', { name: 'Ändern' }));
-      // The dialog is gone; the picker of the dock (a popover of the same name) is open.
       expect(screen.queryByText('Kopf des Protokolls')).toBeNull();
       expect(screen.getByText('Protokollführung übergeben an')).toBeInTheDocument();
     });
@@ -1880,6 +1925,10 @@ describe('MeetingsComponent — methods', () => {
   });
 
   describe('overview gating + filters', () => {
+    /**
+     * Standard auth has gremien=[], so there is no overview. A signal override is costly, so this
+     * test checks the computed logic through the flags.
+     */
     it('shows the overview for a plain committee member without manage rights', async () => {
       const { fixture } = await setup({
         id: null,
@@ -1887,8 +1936,6 @@ describe('MeetingsComponent — methods', () => {
         meetings: [],
       });
       const cmp = fixture.componentInstance as Cmp;
-      // Standard auth has gremien=[], so there is no overview. A signal override
-      // would be costly. This test checks the computed logic through the flags.
       expect(cmp.showForbidden()).toBe(true);
       expect(cmp.showOverview()).toBe(false);
     });
@@ -1900,9 +1947,8 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.showForbidden()).toBe(false);
     });
 
+    /** The page and loadList() share one predicate, so the overview of this reader is not empty. */
     it('loads and renders the timeline for a meeting.view_all reader without a gremium', async () => {
-      // The page and loadList() share one predicate. Before, loadList() returned early
-      // for this reader and the visible overview stayed empty.
       const { http } = await setup({ id: null, perms: ['meeting.view_all'], skipTimelineFlush: true });
       const reqs = http.match((r) => r.url.endsWith('/meetings/timeline') && r.method === 'GET');
       expect(reqs.map((r) => r.request.params.get('direction')).sort()).toEqual(['past', 'upcoming']);
@@ -1934,11 +1980,11 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.isProtokollant()).toBe(false);
     });
 
+    /** canManage falls back to canManageAny, which is true for an admin. */
     it('uses the global/false fallbacks for per-meeting flags without a meeting', async () => {
       const { fixture } = await setup({ id: null });
       const cmp = fixture.componentInstance as Cmp;
       expect(cmp.meeting()).toBeNull();
-      // canManage falls back to canManageAny (true, since admin).
       expect(cmp.canManage()).toBe(true);
       expect(cmp.canWrite()).toBe(false);
       expect(cmp.canManageVotes()).toBe(false);
@@ -1946,14 +1992,16 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.isProtokollant()).toBe(false);
     });
 
+    /**
+     * A named protokollant leaves the rights of everybody else untouched. No write and no manage
+     * right gives the follow view, with or without a protokollant.
+     */
     it('marks a user as follower on the server rights alone, not on the protokollant', async () => {
       const { cmp } = await loaded();
-      // A named protokollant leaves the rights of everybody else untouched.
       cmp.meeting.set({ ...cmp.meeting()!, protokollantId: 'someone', isProtokollant: false });
       expect(cmp.isFollower()).toBe(false);
       cmp.meeting.set({ ...cmp.meeting()!, protokollantId: 'someone', isProtokollant: true });
       expect(cmp.isFollower()).toBe(false);
-      // No write and no manage right ⇒ follow view, with or without a protokollant.
       cmp.meeting.set({ ...cmp.meeting()!, protokollantId: null, canWrite: false, canManage: false });
       expect(cmp.isFollower()).toBe(true);
       cmp.meeting.set({ ...cmp.meeting()!, protokollantId: 'someone', canWrite: false, canManage: false });
@@ -1962,6 +2010,7 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.isFollower()).toBe(false);
     });
 
+    /** A reader still may not type into the minutes. */
     it('gives a meeting.view_all reader the full view read-only, never the follow view', async () => {
       const { cmp } = await loaded({ perms: ['meeting.view_all'] });
       cmp.meeting.set({
@@ -1971,13 +2020,12 @@ describe('MeetingsComponent — methods', () => {
         protokollantId: 'someone',
       });
       expect(cmp.isFollower()).toBe(false);
-      // A reader still may not type into the minutes.
       expect(cmp.canEditProtocol()).toBe(false);
     });
 
+    /** Before a protokollant is named, everyone with canWrite may take the minutes. */
     it('grants the protocol edit only to the protokollant once one is named', async () => {
       const { cmp } = await loaded();
-      // No protokollant yet: everyone with canWrite may take the minutes.
       expect(cmp.canEditProtocol()).toBe(true);
       cmp.meeting.set({ ...cmp.meeting()!, protokollantId: 'someone', isProtokollant: false });
       expect(cmp.canEditProtocol()).toBe(false);
@@ -2004,43 +2052,53 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.agenda()).toEqual([]);
     });
 
+    /** The meeting_state broadcast triggers loadAgenda again. */
     it('keeps a still-valid selected TOP after an agenda reload', async () => {
       const { cmp, http, ws } = await loaded();
       cmp.selectedTopId.set('t-1');
-      // meeting_state broadcast re-triggers loadAgenda.
       ws.subject.next({ type: 'meeting_state', activeApplicationId: null, status: 'live' });
       http.expectOne('/api/meetings/m-1/agenda').flush([
         { id: 't-1', applicationId: null, title: 'A', body: '', position: 0 },
         { id: 't-2', applicationId: null, title: 'B', body: '', position: 1 },
       ]);
       http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
-      expect(cmp.selectedTopId()).toBe('t-1'); // unchanged, still valid
+      expect(cmp.selectedTopId()).toBe('t-1');
     });
   });
 
   describe('protocol rendering lifecycle', () => {
+    /** A meeting_state with a non-final protocol leads to GET /protocol and applyProtocolUpdate. */
     it('toasts a failure when a rendering protocol rolls back to draft', async () => {
       const { cmp, ws, http } = await loaded();
-      cmp.protocol.set({ ...PROTOCOL, status: 'rendering', isFinal: false, isLocked: true });
-      // meeting_state with a non-final protocol → GET /protocol → applyProtocolUpdate.
+      cmp.protocol.set({
+        ...PROTOCOL,
+        pdfUrl: null,
+        publicPdfUrl: null,
+        sentAt: null,
+        status: 'rendering',
+        isFinal: false,
+        isLocked: true,
+      });
       ws.subject.next({ type: 'meeting_state', activeApplicationId: null, status: 'live' });
       http.expectOne('/api/meetings/m-1/agenda').flush([]);
       http.expectOne('/api/meetings/m-1/protocol').flush({ ...PROTOCOL, status: 'draft', isFinal: false, isLocked: false });
       expect(cmp.protocol()?.status).toBe('draft');
     });
 
+    /**
+     * The first poll after 4 s fails, so watchRendering reschedules it, and the second attempt
+     * comes after another 4 s.
+     */
     it('re-watches when a rendering poll fails', async () => {
       jest.useFakeTimers();
       try {
         const { cmp, http } = await loaded();
-        cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' }); // F8: finalize after the close
+        cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' });
         cmp.finalize();
         http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
         http.expectOne('/api/protocols/p-1/finalize').flush({ ...PROTOCOL, status: 'rendering', isFinal: false, isLocked: true });
-        // The first poll after 4s fails, so watchRendering is rescheduled.
         jest.advanceTimersByTime(4000);
         http.expectOne('/api/meetings/m-1/protocol').flush(null, { status: 500, statusText: 'e' });
-        // Second poll attempt after another 4s.
         jest.advanceTimersByTime(4000);
         http.expectOne('/api/meetings/m-1/protocol').flush({ ...PROTOCOL, status: 'final', isFinal: true, isLocked: true });
         expect(cmp.protocol()?.isFinal).toBe(true);
@@ -2068,7 +2126,7 @@ describe('MeetingsComponent — methods', () => {
 
     it('patches an existing vote on a live vote_opened', async () => {
       const { cmp, ws } = await loaded();
-      ws.subject.next({ type: 'vote_opened', voteId: 'v-2', closesAt: 'soon' });
+      ws.subject.next({ type: 'vote_opened', voteId: 'v-2', options: [], closesAt: 'soon' });
       expect(cmp.meeting()?.votes.find((v) => v.id === 'v-2')?.status).toBe('open');
     });
 
@@ -2116,10 +2174,10 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.viewers()).toEqual(['Alice', 'Bob']);
     });
 
+    /** The event leads to loadAgenda, the assignable list and the protocol GET. */
     it('refreshes protocol on a meeting_state when writable and not final', async () => {
       const { cmp, ws, http } = await loaded();
       ws.subject.next({ type: 'meeting_state', activeApplicationId: 'app-2', status: 'live' });
-      // loadAgenda + assignable + protocol GET.
       http.expectOne('/api/meetings/m-1/agenda').flush([]);
       http.expectOne('/api/meetings/m-1/protocol').flush({ ...PROTOCOL, status: 'final', isFinal: true, isLocked: true });
       expect(cmp.protocol()?.isFinal).toBe(true);
@@ -2128,7 +2186,8 @@ describe('MeetingsComponent — methods', () => {
     it('keeps the prior status when the meeting_state status is absent', async () => {
       const { cmp, ws, http } = await loaded();
       const before = cmp.meeting()?.status;
-      ws.subject.next({ type: 'meeting_state', activeApplicationId: 'app-2' });
+      const noStatus: Omit<MeetingStateMsg, 'status'> = { type: 'meeting_state', activeApplicationId: 'app-2' };
+      ws.subject.next(noStatus as MeetingStateMsg);
       http.expectOne('/api/meetings/m-1/agenda').flush([]);
       http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
       expect(cmp.meeting()?.status).toBe(before);
@@ -2168,9 +2227,9 @@ describe('MeetingsComponent — methods', () => {
       http.expectNone('/api/meetings/m-1');
     });
 
+    /** The session lead manages votes, but only the protokollant moves the room. */
     it('keeps "now" local for the session lead, before the opening, after the close and without a meeting', async () => {
       const { cmp, http } = await loaded();
-      // The session lead manages votes, but only the protokollant moves the room.
       cmp.meeting.set({ ...MEETING_MODEL, canManageVotes: true, isProtokollant: false });
       cmp.jumpTo('t-2');
       expect(cmp.selectedTopId()).toBe('t-2');
@@ -2183,6 +2242,7 @@ describe('MeetingsComponent — methods', () => {
       http.expectNone('/api/meetings/m-1');
     });
 
+    /** The tick is on the agenda, so the page reads it again. */
     it('ticks the item that the room leaves with "Nächster TOP", in the same request', async () => {
       const { cmp, http } = await loaded();
       cmp.meeting.set({ ...MEETING_MODEL, isProtokollant: true, currentAgendaItemId: 't-1' });
@@ -2193,7 +2253,6 @@ describe('MeetingsComponent — methods', () => {
       expect(req.request.method).toBe('PATCH');
       expect(req.request.body).toEqual({ currentAgendaItemId: 't-2', completeAgendaItemId: 't-1' });
       req.flush({ ...MEETING, currentAgendaItemId: 't-2' });
-      // The tick is on the agenda: the page reads it again.
       http
         .expectOne((r) => r.method === 'GET' && r.url === '/api/meetings/m-1/agenda')
         .flush([AGENDA_ITEM({ doneAt: '2026-10-15T16:30:00Z' }), AGENDA_ITEM({ id: 't-2', position: 1 })]);
@@ -2218,54 +2277,59 @@ describe('MeetingsComponent — methods', () => {
       const { cmp, ws } = await loaded();
       ws.subject.next({ type: 'pong' } as unknown as ServerMessage);
       cmp.meeting.set(null);
-      ws.subject.next({ type: 'viewers', viewers: ['X'] }); // m null → early return
+      ws.subject.next({ type: 'viewers', viewers: ['X'] });
       expect(cmp.viewers()).toEqual([]);
     });
   });
 
-  // Remaining branches for branch coverage: fallbacks, guards, empty maps, a
-  // missing meeting instance, stale search, timeline height and mock mode.
+  /**
+   * These tests reach the remaining branches: fallbacks, guards, empty maps, a missing meeting
+   * instance, a stale search, the timeline height and mock mode.
+   */
   describe('branch coverage', () => {
     it('returns empty vote lists when no meeting is loaded', async () => {
       const { fixture } = await setup({ id: null });
       const cmp = fixture.componentInstance as Cmp;
       expect(cmp.meeting()).toBeNull();
-      expect(services(fixture).session.votesForTop('t-1')).toEqual([]); // meeting()?.votes ?? []
-      expect(cmp.looseVotes()).toEqual([]); // meeting()?.votes ?? []
+      expect(services(fixture).session.votesForTop('t-1')).toEqual([]);
+      expect(cmp.looseVotes()).toEqual([]);
     });
 
+    /**
+     * A rendering protocol makes watchRendering schedule a poll, and an autosave waits. ngOnDestroy
+     * runs the autosave at once and stops the poll, so no timers fire after it.
+     */
     it('saves the pending text and stops the render poll on destroy', async () => {
       jest.useFakeTimers();
       try {
         const { cmp, fixture, http } = await loaded();
-        // renderPollTimer: protocol rendering → watchRendering schedules a poll.
-        cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' }); // F8: finalize after the close
+        cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' });
         cmp.finalize();
         http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
         http.expectOne('/api/protocols/p-1/finalize').flush({ ...PROTOCOL, status: 'rendering', isFinal: false, isLocked: true });
-        // bodyTimer: an autosave that has not fired yet.
         cmp.onTopBodyChange('t-1', 'X');
-        fixture.destroy(); // ngOnDestroy → the autosave runs at once, the poll stops
+        fixture.destroy();
         const save = http.expectOne('/api/meetings/m-1/agenda/t-1');
         expect(save.request.body).toEqual({ body: 'X' });
         save.flush([AGENDA_ITEM({ body: 'X' })]);
-        jest.advanceTimersByTime(8000); // no timers fire anymore → no requests
+        jest.advanceTimersByTime(8000);
         http.verify();
       } finally {
         jest.useRealTimers();
       }
     });
 
+    /** The `if (!m) return` guard of the session service stops any request. */
     it('does nothing in refreshProtocol when no meeting is loaded', async () => {
       const { fixture } = await setup({ id: null });
       const cmp = fixture.componentInstance as Cmp;
       expect(cmp.meeting()).toBeNull();
-      // The `if (!m) return` guard of the session service stops any request.
       const http = fixture.debugElement.injector.get(HttpTestingController);
       services(fixture).session.refreshProtocol();
       http.verify();
     });
 
+    /** In mock mode connectLive returns early because useMock is set, so no WS channel opens. */
     it('skips the live channel in mock mode (no WebSocket handshake)', async () => {
       const ws = new FakeWs();
       const view = await render(MeetingsComponent, {
@@ -2280,32 +2344,31 @@ describe('MeetingsComponent — methods', () => {
         ],
       });
       const http = view.fixture.debugElement.injector.get(HttpTestingController);
-      // Mock mode: connectLive returns early because useMock is set. No WS channel opens.
       http.expectOne('/api/meetings/m-1').flush(MEETING);
       http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
       http.expectOne('/api/meetings/m-1/attendance').flush([]);
       http.expectOne('/api/meetings/m-1/agenda').flush([]);
       flushDelegationContext(http);
-      expect(ws.closed).toBe(false); // connectMeeting was never called
+      expect(ws.closed).toBe(false);
     });
 
+    /**
+     * The finalize turns the protocol to rendering, so watchRendering schedules the
+     * renderPollTimer. A meeting_state broadcast arrives before the 4 s poll fires and calls
+     * watchRendering again while the old timer still runs, which takes the clearTimeout branch. The
+     * rescheduled poll then finds the protocol final.
+     */
     it('re-watches a still-rendering protocol, clearing the prior poll timer', async () => {
       jest.useFakeTimers();
       try {
         const { cmp, ws, http } = await loaded();
-        // Finalize turns the protocol to rendering, so watchRendering schedules
-        // the renderPollTimer.
-        cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' }); // F8: finalize after the close
+        cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' });
         cmp.finalize();
         http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
         http.expectOne('/api/protocols/p-1/finalize').flush({ ...PROTOCOL, status: 'rendering', isFinal: false, isLocked: true });
-        // A meeting_state broadcast arrives before the 4s poll fires → getProtocol →
-        // applyProtocolUpdate → watchRendering AGAIN while the old timer still runs
-        // → the clearTimeout branch for renderPollTimer.
         ws.subject.next({ type: 'meeting_state', activeApplicationId: null, status: 'live' });
         http.expectOne('/api/meetings/m-1/agenda').flush([]);
         http.expectOne('/api/meetings/m-1/protocol').flush({ ...PROTOCOL, status: 'rendering', isFinal: false, isLocked: true });
-        // Now the (rescheduled) poll fires → final.
         jest.advanceTimersByTime(4000);
         http.expectOne('/api/meetings/m-1/protocol').flush({ ...PROTOCOL, status: 'final', isFinal: true, isLocked: true });
         expect(cmp.protocol()?.isFinal).toBe(true);
@@ -2314,18 +2377,18 @@ describe('MeetingsComponent — methods', () => {
       }
     });
 
+    /** The meeting is gone before the poll timer fires, so the poll callback returns. */
     it('stops a rendering poll when the meeting vanished before it fired', async () => {
       jest.useFakeTimers();
       try {
         const { cmp, http } = await loaded();
-        cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' }); // F8: finalize after the close
+        cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' });
         cmp.finalize();
         http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
         http.expectOne('/api/protocols/p-1/finalize').flush({ ...PROTOCOL, status: 'rendering', isFinal: false, isLocked: true });
-        // The meeting is gone before the poll timer fires, so the poll callback returns.
         cmp.meeting.set(null);
         jest.advanceTimersByTime(4000);
-        http.verify(); // no GET /protocol
+        http.verify();
       } finally {
         jest.useRealTimers();
       }
@@ -2335,14 +2398,15 @@ describe('MeetingsComponent — methods', () => {
       const { cmp } = await loaded();
       cmp.startRename(AGENDA_ITEM({ applicationId: null, title: null }) as never);
       expect(cmp.renamingTopId()).toBe('t-1');
-      expect(cmp.renameDraft()).toBe(''); // item.title ?? ''
+      expect(cmp.renameDraft()).toBe('');
     });
 
+    /**
+     * The test sets renamingTopId to the application TOP id by hand, because startRename rejects
+     * it. renameTop then takes the item.applicationId branch, cancels and sends no request.
+     */
     it('cancels a rename when the item turns out to be application-bound', async () => {
       const { cmp, http } = await loaded();
-      // Set renamingTopId manually to the app TOP id, because startRename rejects it.
-      // renameTop then takes the item.applicationId branch of the OR chain. It cancels
-      // and sends no request.
       cmp.renamingTopId.set('t-app');
       cmp.renameDraft.set('Neu');
       cmp.renameTop(AGENDA_ITEM({ id: 't-app', applicationId: 'app-1', title: 'X' }) as never);
@@ -2350,10 +2414,12 @@ describe('MeetingsComponent — methods', () => {
       http.verify();
     });
 
+    /**
+     * With item.title === null, `item.title ?? ''` gives '', which differs from 'Neu', so the
+     * rename saves.
+     */
     it('saves a renamed freetext TOP whose previous title was null (?? fallback)', async () => {
       const { cmp, http } = await loaded();
-      // With item.title === null the OR chain reaches `title === (item.title ?? '')`.
-      // It evaluates `item.title ?? ''` on the null branch → '' ≠ 'Neu' → save.
       cmp.startRename(AGENDA_ITEM({ id: 't-1', applicationId: null, title: null }) as never);
       cmp.renameDraft.set('Neu');
       cmp.renameTop(AGENDA_ITEM({ id: 't-1', applicationId: null, title: null }) as never);
@@ -2363,12 +2429,14 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.savingAgenda()).toBe(false);
     });
 
+    /**
+     * A vote_opened without applicationId, agendaItemId, question or options takes the `?? null`
+     * and `?? []` fallbacks. The wire message stays minimal on purpose, because the optional fields
+     * are absent at runtime. That is why the test casts with `as unknown as ServerMessage`, because
+     * VoteOpenedMsg requires `options`.
+     */
     it('adds a live-opened vote with all optional fields defaulted', async () => {
       const { cmp, ws, fixture } = await loaded();
-      // vote_opened WITHOUT applicationId, agendaItemId, question or options starts
-      // the `?? null` and `?? []` fallbacks. The wire message stays minimal on purpose,
-      // because the optional fields are absent at runtime. That is why the test casts
-      // with `as unknown as ServerMessage`. VoteOpenedMsg otherwise requires `options`.
       ws.subject.next({ type: 'vote_opened', voteId: 'v-min', closesAt: null } as unknown as ServerMessage);
       fixture.detectChanges();
       const v = cmp.meeting()?.votes.find((x) => x.id === 'v-min');
@@ -2379,10 +2447,12 @@ describe('MeetingsComponent — methods', () => {
       expect(v?.options).toEqual([]);
     });
 
+    /**
+     * The answer of the open carries the meeting. If the page left the meeting by then, the answer
+     * changes no state.
+     */
     it('ignores an opened vote once the meeting has been cleared', async () => {
       const { cmp, http } = await loaded();
-      // The answer of the open carries the meeting. If the page left the meeting by
-      // then, the answer changes no state.
       cmp.openVote('v-2');
       cmp.meeting.set(null);
       http.expectOne('/api/meetings/m-1/votes/v-2/open').flush(OPENED_V2);

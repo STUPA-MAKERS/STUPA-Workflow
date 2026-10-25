@@ -24,6 +24,9 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
+#: The TAN session gets the principal that starts it. The existing sessions are deleted
+#: first, because they are short lived and worthless after the deploy, and old rows
+#: have no useful default for the NOT NULL column.
 _UPGRADE: tuple[str, ...] = (
     """
     CREATE TABLE IF NOT EXISTS account_fints_credential (
@@ -43,9 +46,6 @@ _UPGRADE: tuple[str, ...] = (
     "ON account_fints_credential (account_id)",
     "CREATE INDEX IF NOT EXISTS ix_account_fints_credential_principal_id "
     "ON account_fints_credential (principal_id)",
-    # Bind the TAN session to the principal that starts it. Existing sessions are short
-    # lived and worthless after the deploy. Delete them first, then add the NOT NULL
-    # column. Old rows have no useful default.
     "DELETE FROM bank_sync_session",
     "ALTER TABLE bank_sync_session ADD COLUMN IF NOT EXISTS principal_id uuid "
     "NOT NULL REFERENCES principal (id) ON DELETE CASCADE",
@@ -56,8 +56,8 @@ _UPGRADE: tuple[str, ...] = (
     "ALTER TABLE account DROP COLUMN IF EXISTS fints_login",
 )
 
+#: The account columns come back empty, because the upgrade removed the data for good.
 _DOWNGRADE: tuple[str, ...] = (
-    # The account columns come back empty. The upgrade removed the data for good.
     "ALTER TABLE account ADD COLUMN IF NOT EXISTS fints_login text",
     "ALTER TABLE account ADD COLUMN IF NOT EXISTS fints_pin_encrypted text",
     "ALTER TABLE account ADD COLUMN IF NOT EXISTS fints_tan_mechanism text",
@@ -70,10 +70,12 @@ _DOWNGRADE: tuple[str, ...] = (
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     for stmt in _UPGRADE:
         op.execute(stmt)
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     for stmt in _DOWNGRADE:
         op.execute(stmt)

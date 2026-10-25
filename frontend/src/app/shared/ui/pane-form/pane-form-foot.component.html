@@ -1,5 +1,4 @@
 @if (deletable()) {
-  <!-- A phone sheet has no room for three labelled buttons: delete is an icon. -->
   <app-button variant="danger" [iconOnly]="compact()" [ariaLabel]="'action.delete' | t" (click)="removed.emit()">
     <span class="pff__btn"
       ><app-icon name="trash" />@if (!compact()) { {{ 'action.delete' | t }} }</span

@@ -4,7 +4,7 @@ A guard decides if a transition can fire. The evaluator is declarative and works
 whitelist. It never calls `eval`.
 
 The catalog splits into conditions and actor gates. Conditions apply to automatic and
-manual transitions: `deadlinePassed`, `applicantRoleIs`, `applicantCommitteeIs`,
+manual transitions: `applicantRoleIs`, `applicantCommitteeIs`,
 `applicationTypeIs` (the application type key), `attachmentPresent` (one attachment or
 more), `budgetIs`, `budgetFitsApplication`, `budgetHasDecisionGremium` (the cost center
 has an effective deciding Gremium), `hasField`. `compare` adds a typed
@@ -34,7 +34,6 @@ from typing import Any
 
 GUARD_CONDITION_OPERATORS: frozenset[str] = frozenset(
     {
-        "deadlinePassed",
         "applicantRoleIs",
         "applicantCommitteeIs",
         "applicationTypeIs",
@@ -46,10 +45,9 @@ GUARD_CONDITION_OPERATORS: frozenset[str] = frozenset(
         "budgetHasDecisionGremium",
     }
 )
-# Actor gates apply to manual transitions only. `actorIsApplicant` is true when the
-# actor that triggers the transition is the applicant.
-# `isInVoteGremium` is true when the actor is a member of the Gremium that decides the
-# current vote (`application.vote_gremium_id`).
+#: Actor gates; they apply to manual transitions only. ``actorIsApplicant`` holds when
+#: the acting principal is the applicant, ``isInVoteGremium`` when the actor is a member
+#: of the Gremium that decides the current vote (``application.vote_gremium_id``).
 GUARD_ACTOR_OPERATORS: frozenset[str] = frozenset(
     {"roleIs", "isInCommittee", "actorIsApplicant", "isInVoteGremium"}
 )
@@ -57,19 +55,15 @@ GUARD_LEAF_OPERATORS: frozenset[str] = GUARD_CONDITION_OPERATORS | GUARD_ACTOR_O
 GUARD_COMBINATORS: frozenset[str] = frozenset({"and", "or", "not"})
 GUARD_OPERATORS: frozenset[str] = GUARD_LEAF_OPERATORS | GUARD_COMBINATORS
 
-# Comparison operators of the `compare` guard, per value type.
+#: Comparison operators of the ``compare`` guard for a number (the other types follow).
 _NUMERIC_OPS: frozenset[str] = frozenset({"==", "!=", "<", "<=", ">", ">="})
 _DATE_OPS: frozenset[str] = _NUMERIC_OPS
 _TEXT_OPS: frozenset[str] = frozenset({"==", "!=", "in"})
 _BOOL_OPS: frozenset[str] = frozenset({"=="})
 
-# Value types of a comparable field. They come from the form-field type.
-COMPARE_TYPES: frozenset[str] = frozenset({"number", "currency", "date", "text", "bool"})
-
-# Leaf operators with a string value, such as a role, Gremium, budget or field key, or
-# with a bool value. The save gate `validate_guard` checks them. A wrong value type such
-# as a list crashes at runtime as unhashable in `in frozenset` instead of failing
-# cleanly.
+#: Leaf operators with a string value (role, Gremium, budget or field key). The save
+#: gate ``validate_guard`` checks the value type of these and of the bool operators,
+#: because a list crashes at runtime as unhashable in ``in frozenset``.
 _STRING_VALUE_OPERATORS: frozenset[str] = frozenset(
     {
         "roleIs",
@@ -83,7 +77,6 @@ _STRING_VALUE_OPERATORS: frozenset[str] = frozenset(
 )
 _BOOL_VALUE_OPERATORS: frozenset[str] = frozenset(
     {
-        "deadlinePassed",
         "budgetFitsApplication",
         "actorIsApplicant",
         "attachmentPresent",
@@ -104,10 +97,10 @@ ACTION_TYPES: frozenset[str] = frozenset(
     }
 )
 
-# `config.gremiumSource` of a vote state that takes its Gremium from the cost center.
+#: ``config.gremiumSource`` of a vote state that takes its Gremium from the cost center.
 GREMIUM_SOURCE_BUDGET = "budget"
 
-# The actions that set the cost center of the application.
+#: Actions that set the cost center of the application.
 ASSIGN_BUDGET_ACTION_TYPES: frozenset[str] = frozenset(
     {
         "assignBudget",
@@ -117,29 +110,29 @@ ASSIGN_BUDGET_ACTION_TYPES: frozenset[str] = frozenset(
     }
 )
 
-# Required string field per action type. `notify` and `assignBudgetFromMap` have a
-# separate check. `assignBudgetFromField` reads the cost center id from the named form
-# field.
+#: Required string field per action type. ``notify`` and ``assignBudgetFromMap`` have a
+#: separate check. ``assignBudgetFromField`` reads the cost center id from the named field.
 _ACTION_REQUIRED_FIELD: dict[str, str] = {
     "webhook": "webhookId",
     "assignBudget": "budgetId",
     "assignBudgetFromField": "field",
 }
 
-# Optional string field per action type. When the key is present, it must hold a
-# non-empty string. `addToNextSession` without `gremiumId` takes the Gremium of the
-# vote. `assignBudgetFromApplicantGremium` without `parentId` searches the whole tree.
+#: Optional string field per action type; when present it is a non-empty string.
+#: ``addToNextSession`` without ``gremiumId`` takes the Gremium of the vote, and
+#: ``assignBudgetFromApplicantGremium`` without ``parentId`` searches the whole tree.
 _ACTION_OPTIONAL_FIELD: dict[str, str] = {
     "addToNextSession": "gremiumId",
     "assignBudgetFromApplicantGremium": "parentId",
 }
 
-# `voteGremium` is the Gremium of the current vote (`application.vote_gremium_id`).
-# `budgetGremium` is the effective deciding Gremium of the cost center.
+#: Recipient kinds of ``notify``. ``voteGremium`` is the Gremium of the current vote
+#: (``application.vote_gremium_id``), ``budgetGremium`` the effective deciding Gremium
+#: of the cost center.
 NOTIFY_RECIPIENT_KINDS: frozenset[str] = frozenset(
     {"gremium", "role", "applicant", "email", "voteGremium", "budgetGremium"}
 )
-# Recipient kinds that take no `ref`.
+#: Recipient kinds that take no ``ref``.
 _NOTIFY_KINDS_WITHOUT_REF: frozenset[str] = frozenset(
     {"applicant", "voteGremium", "budgetGremium"}
 )
@@ -183,7 +176,6 @@ class GuardContext:
     """
 
     manual: bool = True
-    deadline_passed: bool = False
     actor_is_applicant: bool = False
     roles: frozenset[str] = frozenset()
     actor_committees: frozenset[str] = frozenset()
@@ -199,7 +191,7 @@ class GuardContext:
     budget_has_decision_gremium: bool = False
 
 
-def _to_decimal(value: Any) -> Decimal | None:
+def _to_decimal(value: object) -> Decimal | None:
     if value is None or isinstance(value, bool):
         return None
     try:
@@ -208,7 +200,7 @@ def _to_decimal(value: Any) -> Decimal | None:
         return None
 
 
-def _to_date(value: Any) -> date | None:
+def _to_date(value: object) -> date | None:
     if isinstance(value, datetime):
         return value.date()
     if isinstance(value, date):
@@ -221,7 +213,7 @@ def _to_date(value: Any) -> date | None:
     return None
 
 
-def _to_bool(value: Any) -> bool:
+def _to_bool(value: object) -> bool:
     if isinstance(value, bool):
         return value
     if isinstance(value, str):
@@ -243,12 +235,16 @@ def ops_for_type(value_type: str) -> frozenset[str]:
     return _TEXT_OPS
 
 
-def _eval_compare(spec: Any, ctx: GuardContext) -> bool:
+def _eval_compare(spec: object, ctx: GuardContext) -> bool:
     """Evaluate the `compare` guard over `{field, op, value}` per type.
 
     The value type comes from `ctx.field_types[field]` and defaults to `text`. A field
     that is missing from `field_values` gives `False`. That fails closed and implies
     `hasField`.
+
+    An operator that the type does not allow also gives False instead of raising. The type
+    comes from the PINNED form version, which can differ from the stored flow through form
+    drift, and raising would make every transition return a 500.
     """
     if not isinstance(spec, dict):
         raise GuardError("compare requires an object {field, op, value}")
@@ -261,9 +257,6 @@ def _eval_compare(spec: Any, ctx: GuardContext) -> bool:
         raise GuardError("compare.op must be a string")
     value_type = ctx.field_types.get(fld, "text")
     if op not in ops_for_type(value_type):
-        # The runtime type comes from the PINNED form version of the application. It can
-        # differ from the globally stored flow through form drift. A missing field gives
-        # `text`. Fail closed instead of raising, or every transition returns a 500.
         return False
     if fld not in ctx.field_values:
         return False
@@ -283,7 +276,6 @@ def _eval_compare(spec: Any, ctx: GuardContext) -> bool:
         return _apply_ordered(op, l_d, r_d)
     if value_type == "bool":
         return _to_bool(left) == _to_bool(operand)
-    # Fall-through for the text and select types.
     left_s = str(left)
     if op == "==":
         return left_s == str(operand)
@@ -294,9 +286,8 @@ def _eval_compare(spec: Any, ctx: GuardContext) -> bool:
     return False
 
 
-# Map an ordered comparison operator to its `operator` function. An unknown operator
-# gives `False` and fails closed. `validate_guard` rejects an unknown operator at save
-# time anyway.
+#: Ordered comparison operators. An unknown operator gives False (fail closed), and
+#: ``validate_guard`` rejects it at save time anyway.
 _ORDERED_OPS: dict[str, Callable[[Any, Any], bool]] = {
     "==": operator.eq,
     "!=": operator.ne,
@@ -307,12 +298,13 @@ _ORDERED_OPS: dict[str, Callable[[Any, Any], bool]] = {
 }
 
 
-def _apply_ordered(op: str, left: Any, right: Any) -> bool:
+def _apply_ordered(op: str, left: Decimal | date, right: Decimal | date) -> bool:
+    """Apply an ordered operator; an unknown operator gives False."""
     fn = _ORDERED_OPS.get(op)
     return fn(left, right) if fn is not None else False
 
 
-def _has_field(value: Any, ctx: GuardContext) -> bool:
+def _has_field(value: object, ctx: GuardContext) -> bool:
     """Evaluate `hasField`: the field is present and not empty.
 
     A value of `None`, an empty string or an empty list counts as missing.
@@ -321,10 +313,9 @@ def _has_field(value: Any, ctx: GuardContext) -> bool:
     return v is not None and v != "" and v != []
 
 
-# Map a leaf operator to a pure predicate `(value, ctx) -> bool`. Actor gates apply only
-# on manual transitions. An automatic transition has empty `roles` and
-# `actor_committees`. `_eval_compare` compares a `compare` value per type.
-_LEAF_EVALUATORS: dict[str, Callable[[Any, GuardContext], bool]] = {
+#: Leaf operator to a pure predicate ``(value, ctx) -> bool``. An automatic transition
+#: has empty ``roles`` and ``actor_committees``, so the actor gates fail there.
+_LEAF_EVALUATORS: dict[str, Callable[[object, GuardContext], bool]] = {
     "roleIs": lambda value, ctx: value in ctx.roles,
     "isInCommittee": lambda value, ctx: str(value) in ctx.actor_committees,
     "actorIsApplicant": lambda value, ctx: ctx.actor_is_applicant == bool(value),
@@ -335,7 +326,6 @@ _LEAF_EVALUATORS: dict[str, Callable[[Any, GuardContext], bool]] = {
     "budgetIs": lambda value, ctx: ctx.budget_id is not None and str(value) == ctx.budget_id,
     "budgetFitsApplication": lambda value, ctx: ctx.budget_fits == bool(value),
     "attachmentPresent": lambda value, ctx: ctx.has_attachment == bool(value),
-    "deadlinePassed": lambda value, ctx: ctx.deadline_passed == bool(value),
     "isInVoteGremium": lambda value, ctx: (
         ctx.vote_gremium_id is not None and ctx.vote_gremium_id in ctx.actor_committees
     )
@@ -347,7 +337,7 @@ _LEAF_EVALUATORS: dict[str, Callable[[Any, GuardContext], bool]] = {
 }
 
 
-def _eval_leaf(op: str, value: Any, ctx: GuardContext) -> bool:
+def _eval_leaf(op: str, value: object, ctx: GuardContext) -> bool:
     evaluator = _LEAF_EVALUATORS.get(op)
     if evaluator is None:
         raise GuardError(f"unknown guard operator: {op!r}")  # pragma: no cover
@@ -382,11 +372,13 @@ def eval_guard(guard: dict[str, Any] | None, ctx: GuardContext) -> bool:
     raise GuardError(f"unknown guard operator: {op!r}")
 
 
-def _children(op: str, value: Any) -> list[dict[str, Any]]:
-    children = value if isinstance(value, list) else [value]
-    for c in children:
+def _children(op: str, value: object) -> list[dict[str, Any]]:
+    raw = value if isinstance(value, list) else [value]
+    children: list[dict[str, Any]] = []
+    for c in raw:
         if not isinstance(c, dict):
             raise GuardError(f"'{op}' children must be guard objects, got {c!r}")
+        children.append(c)
     return children
 
 
@@ -445,7 +437,7 @@ def validate_guard(guard: dict[str, Any] | None, *, allow_actor_ops: bool = True
         _validate_compare(value)
 
 
-def _validate_compare(spec: Any) -> None:
+def _validate_compare(spec: object) -> None:
     """Check the shape of a `compare` guard.
 
     This function checks the structure and that `op` is a known comparison operator.
@@ -531,7 +523,7 @@ def budget_ids_of_action(action: dict[str, Any]) -> list[str]:
     return []
 
 
-def _validate_notify_recipients(recipients: Any) -> None:
+def _validate_notify_recipients(recipients: object) -> None:
     if not isinstance(recipients, list) or not recipients:
         raise GuardError("notify action requires a non-empty 'recipients' list")
     for r in recipients:

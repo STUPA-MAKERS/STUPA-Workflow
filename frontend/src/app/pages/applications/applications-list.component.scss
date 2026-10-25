@@ -6,21 +6,13 @@
 :host {
   @include lp.stack;
 }
-/* One pane at a time the host takes at least the free height of the shell main. Side by
-   side it is a pane page (`.pane-page`), which sets its own flex. */
 :host(:not(.pane-page)) {
   flex: 1 0 auto;
 }
 
-/* Side by side the page does not scroll: the host is a pane page (`.pane-page` in
-   styles.scss) that takes the free height of the main column of the shell, and each pane
-   scrolls inside itself. One pane at a time, the page scrolls. */
 .apps {
   min-width: 0;
 }
-/* One pane at a time the column takes at least the free height of the shell main and
-   passes it down to the pane. A short pane, such as "application not found", then
-   centres in the page instead of sitting at the top. A long pane still grows the page. */
 .apps:not(.apps--split) {
   @include lp.single-column;
 }
@@ -31,16 +23,12 @@
   @include lp.split-column;
 }
 
-/* ------------------------------------------------------------------ list pane */
-/* The column, its header and the search bar are the shared list geometry: `.ld-pane`
-   (styles.scss) and `app-page-header` with `pane`. */
 .apps__chips {
   @include lp.chips;
 }
 .apps__chip {
   max-width: 100%;
 }
-/* "Weitere Filter" at the end of the search pill. The count says how many are set. */
 .apps__tune {
   position: relative;
   display: grid;
@@ -84,10 +72,8 @@
   line-height: 1;
 }
 
-/* ------------------------------------------------------------------ rows */
 .apps__scroll {
   @include lp.scroll(--apps-fade);
-  /* The FAB covers the end of the list: room to scroll the last row above it. */
   padding-bottom: calc(56px + var(--space-6));
 }
 .apps--split .apps__scroll {
@@ -96,7 +82,6 @@
 .apps--split .apps__scroll > * {
   flex: none;
 }
-/* An end fades only while more rows lie past it (`appScrollFade` sets the classes). */
 .apps__scroll {
   @include fade.fade-y(var(--apps-fade));
 }
@@ -133,28 +118,20 @@
   gap: var(--space-1);
   margin-inline-end: calc(-1 * var(--space-2));
 }
-/* With a pointer, the row menu shows on hover, on focus and while it is open, so a calm
-   list reads as titles and amounts. It keeps its place, so nothing shifts. The full-width
-   list shows a chevron in that place while the menu is hidden (board
-   Schmal-Antraege-Liste). Keyboard users reach the menu through :focus-within. Without
-   hover (touch), the menu always shows. */
+// Without hover (touch), the menu always shows.
 @include lp.hover-menu(apps);
 
-/* The loading shape: the heading of a first group, a bar about as wide as
-   "September 2026". */
 .apps__skel .apps__month {
   padding-top: var(--space-2);
 }
 .apps__skelMonth {
   width: 7rem;
 }
-/* The reload bar sits on the lower edge of the sticky search bar. */
 .apps__progress {
   top: auto;
   bottom: 0;
 }
 
-/* The note starts at the edge of the filters and the rows. */
 .apps__loadError {
   margin: var(--space-4) 0;
 }
@@ -171,16 +148,14 @@
   text-align: center;
 }
 
-/* ------------------------------------------------------------------ detail pane */
 .apps__detail {
   @include lp.detail;
 }
-/* "Antrag erfassen" (#11) fills the pane; the routed detail waits behind it. */
 .apps__detail--capture {
   min-height: 0;
 }
-/* The routed component comes from the router, so it carries no content attribute of
-   this component: `::ng-deep` reaches it, and the class keeps the rule local. */
+// The routed component carries no content attribute of this component, so only `::ng-deep`
+// reaches it; the class keeps the rule local.
 .apps__detail--capture > ::ng-deep :not(app-application-capture) {
   display: none;
 }
@@ -191,9 +166,7 @@
   white-space: nowrap;
 }
 
-/* ------------------------------------------------------------------ sheets */
 .apps__moreForm {
-  /* The fields sit on the sheet (surface 2): one step up, so they stand out from it. */
   @include sc.raised-fields($muted-label: false);
   display: flex;
   flex-direction: column;
@@ -223,9 +196,8 @@
 }
 
 @include bp.phone {
-  /* One row of chips that scrolls sideways; an end fades while more chips lie past it. */
   .apps__chips {
-    @include lp.phone-chips(--apps-chip-fade);
+    @include lp.phone-chips;
   }
   .apps__month {
     padding-inline: var(--space-1);

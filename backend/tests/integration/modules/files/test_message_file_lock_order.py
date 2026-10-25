@@ -259,7 +259,7 @@ async def test_a_principal_erasure_and_an_infected_verdict_both_finish(
         await PrincipalService(session).erase(
             owner_id,
             actor="dpo",
-            files=FilesService(session, storage=MemoryStorage()),  # pyright: ignore[reportArgumentType]
+            files=FilesService(session, storage=MemoryStorage()),
         )
 
     await _race(maker, files[1].id, _remove)

@@ -1,6 +1,5 @@
-"""Security hardening (T-41, security.md §3/§8/§10).
+"""Security hardening.
 
-These unit tests cover the T-41 acceptance criteria.
 The CSRF double-submit check applies to every cookie-authenticated write request.
 The default rate limit on a write endpoint answers 429 plus `Retry-After`.
 The app code does NOT parse X-Forwarded-For, which blocks spoofing.
@@ -51,7 +50,6 @@ def _csrf_app(settings: Settings) -> TestClient:
     return TestClient(app)
 
 
-# CSRF double-submit checks, see security.md §10.
 def test_csrf_write_without_auth_cookie_allowed() -> None:
     """A write without an auth cookie has nothing to protect, so it passes (public POST)."""
     s = _settings()
@@ -86,13 +84,49 @@ def test_csrf_write_with_mismatched_token_forbidden() -> None:
     assert resp.status_code == 403
 
 
-def test_csrf_bearer_request_exempt() -> None:
-    """CSRF cannot forge a Bearer-token request, so it stays exempt even with a cookie."""
+def test_csrf_principal_bearer_request_exempt() -> None:
+    """A principal access token authenticates instead of the cookie, so it stays exempt."""
+    s = _settings()
+    client = _csrf_app(s)
+    client.cookies.set(s.session_cookie_name, "sess")
+    resp = client.post("/w", headers={"Authorization": "Bearer apat_abc"})
+    assert resp.status_code == 200
+
+
+def test_csrf_other_bearer_with_auth_cookie_forbidden() -> None:
+    """A bearer that is no principal token leaves the cookie to authenticate: check CSRF."""
     s = _settings()
     client = _csrf_app(s)
     client.cookies.set(s.session_cookie_name, "sess")
     resp = client.post("/w", headers={"Authorization": "Bearer abc"})
+    assert resp.status_code == 403
+    assert resp.json()["code"] == "csrf_failed"
+
+
+def test_csrf_other_bearer_with_auth_cookie_and_token_allowed() -> None:
+    s = _settings()
+    client = _csrf_app(s)
+    client.cookies.set(s.applicant_cookie_name, "app")
+    client.cookies.set(s.csrf_cookie_name, "tok")
+    resp = client.post(
+        "/w", headers={"Authorization": "Bearer abc", s.csrf_header_name: "tok"}
+    )
     assert resp.status_code == 200
+
+
+def test_csrf_applicant_bearer_without_cookie_allowed() -> None:
+    """A magic-link bearer without an auth cookie has nothing to protect."""
+    s = _settings()
+    resp = _csrf_app(s).post("/w", headers={"Authorization": "Bearer some.signed.sid"})
+    assert resp.status_code == 200
+
+
+def test_csrf_non_bearer_authorization_with_cookie_forbidden() -> None:
+    s = _settings()
+    client = _csrf_app(s)
+    client.cookies.set(s.session_cookie_name, "sess")
+    resp = client.post("/w", headers={"Authorization": "Basic apat_abc"})
+    assert resp.status_code == 403
 
 
 def test_csrf_cookie_issued_on_safe_request() -> None:
@@ -116,6 +150,8 @@ def test_csrf_defaults_match_angular_fe_flow() -> None:
     (frontend/.../auth.interceptor.ts) reads the cookie `XSRF-TOKEN` and sends the
     header `X-XSRF-TOKEN`. This test replays the real flow. The cookie plus the
     mirrored header returns 2xx. The cookie without the header returns 403.
+
+    The frontend never writes without a token.
     """
     s = _settings()
     assert s.csrf_cookie_name == "XSRF-TOKEN"
@@ -124,10 +160,9 @@ def test_csrf_defaults_match_angular_fe_flow() -> None:
     client.cookies.set(s.session_cookie_name, "sess")
     client.cookies.set("XSRF-TOKEN", "fe-token")
     assert client.post("/w", headers={"X-XSRF-TOKEN": "fe-token"}).status_code == 200
-    assert client.post("/w").status_code == 403  # the FE never writes without a token
+    assert client.post("/w").status_code == 403
 
 
-# Default rate limit on write endpoints (api.md §7)
 def _wlimit_app(settings: Settings, limiter: InMemoryRateLimiter) -> TestClient:
     app = FastAPI()
     app.add_middleware(
@@ -147,10 +182,11 @@ def _wlimit_app(settings: Settings, limiter: InMemoryRateLimiter) -> TestClient:
 
 
 def test_default_write_limit_blocks_second_with_retry_after() -> None:
+    """Let the first write pass and give 429 with Retry-After for the second."""
     s = _settings(rl_default_write_per_hour=1)
     client = _wlimit_app(s, InMemoryRateLimiter())
-    assert client.post("/w").status_code == 200  # the first write passes
-    resp = client.post("/w")  # the second write gives 429
+    assert client.post("/w").status_code == 200
+    resp = client.post("/w")
     assert resp.status_code == 429
     assert int(resp.headers["retry-after"]) >= 1
     assert resp.json()["code"] == "rate_limited"
@@ -158,9 +194,10 @@ def test_default_write_limit_blocks_second_with_retry_after() -> None:
 
 
 def test_default_write_limit_noop_for_safe_method() -> None:
+    """Never throttle a GET, even over the limit."""
     s = _settings(rl_default_write_per_hour=1)
     client = _wlimit_app(s, InMemoryRateLimiter())
-    for _ in range(5):  # over the limit, but a GET is never throttled
+    for _ in range(5):
         assert client.get("/r").status_code == 200
 
 
@@ -185,7 +222,6 @@ def test_default_write_limit_ignores_an_unsigned_session_cookie() -> None:
     assert client.post("/w").status_code == 429
 
 
-# Proxy trust and X-Forwarded spoofing (security.md §3)
 def test_client_ip_ignores_x_forwarded_for() -> None:
     """`client_ip` parses no X-Forwarded-For, so a spoofed header cannot change the key.
 
@@ -204,7 +240,6 @@ def test_client_ip_ignores_x_forwarded_for() -> None:
     assert client_ip(req) == "1.2.3.4"
 
 
-# The proxy wildcard is forbidden in production (security.md §3)
 def test_wildcard_forwarded_allow_ips_rejected_in_production() -> None:
     with pytest.raises(SettingsError):
         _settings(environment="production", forwarded_allow_ips="*")

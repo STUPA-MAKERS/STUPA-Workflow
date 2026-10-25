@@ -24,18 +24,17 @@ logger = logging.getLogger("app.error")
 
 PROBLEM_CONTENT_TYPE = "application/problem+json"
 
-# These HTTPException(400) details mean that the body parsing failed in a way that is
-# not a JSON decode error, mainly a broken multipart/form-data. FastAPI raises the first
-# one for an unknown parser error. Starlette 1.7 and later wraps a multipart parser
-# error itself and raises the second one. Invalid JSON goes through
-# RequestValidationError to 422. The handler lifts these cases to 422
-# (validation_error). An unparseable body then gives the same documented problem+json
-# status app-wide, instead of an undocumented per-endpoint 400.
+#: HTTPException(400) details of a body that fails to parse but is not invalid JSON,
+#: mainly a broken multipart/form-data. FastAPI raises the first for an unknown parser
+#: error; Starlette 1.7 and later raises the second for a multipart parser error.
+#: Invalid JSON goes through RequestValidationError to 422. The handler lifts these
+#: cases to 422 too, so an unparseable body gives the same documented status app-wide
+#: instead of an undocumented per-endpoint 400.
 _BODY_PARSE_ERROR_DETAILS: frozenset[str] = frozenset(
     {"There was an error parsing the body", "Invalid multipart data."}
 )
 
-# Status -> stable error code.
+#: HTTP status to stable error code.
 STATUS_CODE_MAP: dict[int, str] = {
     400: "bad_request",
     401: "unauthorized",
@@ -51,7 +50,7 @@ STATUS_CODE_MAP: dict[int, str] = {
     503: "service_unavailable",
 }
 
-# Status -> human-readable title (default when AppError sets none).
+#: HTTP status to the default title when an AppError sets none.
 STATUS_TITLE_MAP: dict[int, str] = {
     400: "Bad Request",
     401: "Unauthorized",
@@ -69,11 +68,13 @@ STATUS_TITLE_MAP: dict[int, str] = {
 
 
 class FieldError(BaseModel):
+    """Validation error of one field in a problem response."""
     field: str
     msg: str
 
 
 class ProblemDetail(BaseModel):
+    """Error body of every 4xx and 5xx response (RFC 9457 problem+json)."""
     type: str
     title: str
     status: int
@@ -84,10 +85,12 @@ class ProblemDetail(BaseModel):
 
 
 def code_for(status: int) -> str:
+    """Return the stable error code of an HTTP status."""
     return STATUS_CODE_MAP.get(status, "error")
 
 
 def title_for(status: int) -> str:
+    """Return the default title of an HTTP status."""
     return STATUS_TITLE_MAP.get(status, "Error")
 
 
@@ -105,6 +108,15 @@ class AppError(Exception):
         errors: Sequence[FieldError | dict[str, str]] | None = None,
         headers: dict[str, str] | None = None,
     ) -> None:
+        """Build the error.
+
+        Args:
+            detail: Human-readable detail.
+            code: Stable error code; defaults to the code of the status.
+            title: Title; defaults to the title of the status.
+            errors: Field errors, as models or as ``{field, msg}`` dicts.
+            headers: Extra response headers, for example ``Retry-After`` on a 429.
+        """
         self.status = type(self).status
         self.code = code or code_for(self.status)
         self.title = title or title_for(self.status)
@@ -114,11 +126,11 @@ class AppError(Exception):
             if errors is not None
             else None
         )
-        # Extra response headers, for example ``Retry-After`` on a 429.
         self.headers: dict[str, str] | None = headers
         super().__init__(self.detail or self.title)
 
     def to_problem(self, trace_id: str | None) -> ProblemDetail:
+        """Return the problem body of this error."""
         return ProblemDetail(
             type=f"app://error/{self.code}",
             title=self.title,
@@ -131,30 +143,37 @@ class AppError(Exception):
 
 
 class BadRequestError(AppError):
+    """400 - malformed request."""
     status = 400
 
 
 class UnauthorizedError(AppError):
+    """401 - no valid login."""
     status = 401
 
 
 class ForbiddenError(AppError):
+    """403 - the caller lacks the right."""
     status = 403
 
 
 class NotFoundError(AppError):
+    """404 - unknown or not readable resource."""
     status = 404
 
 
 class ConflictError(AppError):
+    """409 - conflict with the current state."""
     status = 409
 
 
 class GoneError(AppError):
+    """410 - the resource no longer exists."""
     status = 410
 
 
 class PayloadTooLargeError(AppError):
+    """413 - the body exceeds its cap."""
     status = 413
 
 
@@ -171,6 +190,8 @@ class ValidationProblem(AppError):
 
 
 class RateLimitedError(AppError):
+    """429 - rate limit hit; ``retry_after`` sets the ``Retry-After`` header."""
+
     status = 429
 
     def __init__(
@@ -181,6 +202,7 @@ class RateLimitedError(AppError):
         code: str | None = None,
         title: str | None = None,
     ) -> None:
+        """Build the error; a ``retry_after`` in seconds sets the ``Retry-After`` header."""
         headers = (
             {"Retry-After": str(max(0, retry_after))} if retry_after is not None else None
         )
@@ -246,9 +268,11 @@ async def _validation_handler(
 async def _http_exception_handler(
     request: Request, exc: StarletteHTTPException
 ) -> JSONResponse:
-    # Unify the body-parse errors (broken multipart and similar) onto 422, instead of
-    # the endpoint-specific, undocumented 400 of FastAPI. See
-    # ``_BODY_PARSE_ERROR_DETAILS``.
+    """Map an HTTPException onto problem+json.
+
+    A body-parse error (see ``_BODY_PARSE_ERROR_DETAILS``) becomes 422 instead of the
+    endpoint-specific, undocumented 400 of FastAPI.
+    """
     if (
         exc.status_code == 400
         and isinstance(exc.detail, str)
@@ -272,12 +296,17 @@ async def _http_exception_handler(
     return _problem_response(problem)
 
 
-# All public routes without login (same prefix as `app.middleware`).
+#: Prefix of every public route without login (the same as in ``app.middleware``).
 PUBLIC_API_PREFIX = "/api/public/"
 
 
 async def _unhandled_handler(request: Request, exc: Exception) -> JSONResponse:
-    # Log the full detail internally. Leak nothing outward: no path, no stack trace.
+    """Log an unhandled exception and answer a bare 500.
+
+    The log holds the full detail; the answer leaks nothing (no path, no stack trace).
+    The handler of ``Exception`` runs outside the middleware stack, so the security
+    middleware never sees this answer, and a public route sets its noindex here.
+    """
     logger.exception("Unhandled exception", exc_info=exc)
     problem = ProblemDetail(
         type="app://error/internal_error",
@@ -287,8 +316,6 @@ async def _unhandled_handler(request: Request, exc: Exception) -> JSONResponse:
         detail="An internal error occurred.",
         traceId=_trace_id(request),
     )
-    # The handler of `Exception` runs outside the middleware stack, so the security
-    # middleware never sees this answer. A public route keeps its noindex here.
     extra = (
         {"X-Robots-Tag": "noindex"}
         if request.url.path.startswith(PUBLIC_API_PREFIX)
@@ -328,6 +355,12 @@ def use_problem_json_contract(app: FastAPI) -> None:
     emit ``application/problem+json`` (RFC 9457-ish). This function rewrites every 4xx
     and 5xx response to ``application/problem+json`` with ``ProblemDetail``. The contract
     then stays consistent.
+
+    An endpoint with ``x-error-contract: oauth`` documents its own responses (the RFC
+    6749 token error uses OAuth JSON) and stays as it is. Every body-accepting endpoint
+    gets a 422, because it can return one on an unparseable or invalid body, and FastAPI
+    documents 422 only when validatable fields exist, so a multipart or File endpoint
+    misses it and the contract would fail on an undocumented status.
     """
     generate = app.openapi
 
@@ -347,17 +380,9 @@ def use_problem_json_contract(app: FastAPI) -> None:
             for operation in operations.values():
                 if not isinstance(operation, dict):
                     continue
-                # Opt-out: an endpoint with its own error contract documents its own
-                # responses. An example is the RFC 6749 OAuth token error, which uses
-                # OAuth JSON instead of problem+json. This function does NOT rewrite it.
                 if operation.get("x-error-contract") == "oauth":
                     continue
                 responses = operation.setdefault("responses", {})
-                # Any body-accepting endpoint can return 422 on an unparseable or
-                # invalid body (RequestValidationError or the unified body-parse error).
-                # FastAPI documents 422 only when validatable fields exist, so a
-                # multipart or File endpoint misses it. Add it globally so the contract
-                # does not fail on an undocumented status.
                 if "requestBody" in operation and isinstance(responses, dict):
                     responses.setdefault(
                         "422", {"description": "Validation Error"}
@@ -368,4 +393,4 @@ def use_problem_json_contract(app: FastAPI) -> None:
         app.openapi_schema = schema
         return schema
 
-    app.openapi = custom_openapi  # type: ignore[method-assign]
+    app.openapi = custom_openapi

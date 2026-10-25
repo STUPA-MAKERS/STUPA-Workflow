@@ -1,4 +1,4 @@
-"""F2 · Erasure of a principal from the candidate lists, against a real Postgres.
+"""Erasure of a principal from the candidate lists, against a real Postgres.
 
 ``PrincipalService.erase`` replaces the name of each candidacy of the principal who was
 not elected with ``Gelöscht``, in ``vote.config`` (JSONB) and in the election callouts
@@ -44,8 +44,11 @@ OLD_NAME = "Max Alt"
 async def maker(
     migrated: tuple[str, str], engine: Engine
 ) -> AsyncIterator[async_sessionmaker[AsyncSession]]:
-    # ``engine`` truncates meeting, vote, ballot, protocol and the audit chain;
-    # the helper truncates the principals.
+    """Return a session maker on clean tables.
+
+    ``engine`` truncates meeting, vote, ballot, protocol and the audit chain, and the
+    helper truncates the principals.
+    """
     clear_privacy_tables(engine)
     eng = create_async_engine(migrated[1])
     yield async_sessionmaker(eng, expire_on_commit=False)
@@ -90,6 +93,12 @@ def _yes_no(yes: int, no: int, *, elected: bool) -> dict[str, Any]:
 async def test_erase_replaces_only_the_names_of_lost_candidacies(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
+    """Replace only the names of lost candidacies.
+
+    Both callouts of the person open with the same head line, and the won callout
+    follows the lost one without a blank line. The stored results and the ballots stay,
+    so the tally does not change.
+    """
     tag = uuid.uuid4().hex[:8]
     async with maker() as session:
         person = Principal(sub=f"kc-{tag}", email=f"max-{tag}@x.de", display_name=NAME)
@@ -162,9 +171,7 @@ async def test_erase_replaces_only_the_names_of_lost_candidacies(
         lost_callout = _callout(single, lost_result)
         won_callout = _callout(single, won_result)
         merged_callout = _callout(merged_config, merged_result)
-        # Both callouts of the person open with the same head line.
         assert lost_callout.split("\n")[0] == won_callout.split("\n")[0]
-        # The won callout follows the lost one without a blank line.
         markdown = f"# Sitzung\n\n{lost_callout}\n{won_callout}\n\nEnde\n"
         protocol = Protocol(meeting_id=meeting.id, gremium_id=gremium.id, markdown=markdown)
         item.body = f"Wahl:\n\n{merged_callout}\n"
@@ -186,7 +193,6 @@ async def test_erase_replaces_only_the_names_of_lost_candidacies(
         assert won_row.config["candidates"][0]["name"] == NAME
         names = {c["id"]: c["name"] for c in merged_row.config["candidates"]}
         assert names == {"c1": ERASED_CANDIDATE_NAME, "c2": "Erika"}
-        # The stored results and the ballots stay: the tally does not change.
         assert lost_row.election_result == lost_result
         assert won_row.election_result == won_result
         assert merged_row.election_result == merged_result

@@ -1,12 +1,5 @@
-import {
-  applicationTitle,
-  formatBytes,
-  formatDateRangeValue,
-  formatFieldValue,
-  formatIsoDate,
-  isRejection,
-  transitionLooks,
-} from './applications.util';
+import { formatDateRangeValue, formatFieldValue, formatIsoDate } from '@shared/forms/answer-format';
+import { applicationTitle, formatBytes, isRejection, transitionLooks } from './applications.util';
 import type { Transition } from '@core/api/models';
 
 describe('applicationTitle', () => {
@@ -46,15 +39,17 @@ describe('formatFieldValue', () => {
 });
 
 describe('formatIsoDate', () => {
+  /** The English locale is en-GB, not en-US, so 1 July reads as 01/07/2026, never as 07/01/2026. */
   it('formats an ISO day in the active locale', () => {
     expect(formatIsoDate('2026-07-01', 'de')).toBe('01.07.2026');
-    // en-GB, not en-US: 1 July reads as 01/07/2026, never as 07/01/2026.
     expect(formatIsoDate('2026-07-01', 'en')).toBe('01/07/2026');
   });
 
+  /**
+   * A date-only answer carries no zone. Read and printed in UTC it stays the day the applicant
+   * entered, in every timezone.
+   */
   it('keeps the entered day west of UTC', () => {
-    // A date-only answer carries no zone. Read and printed in UTC it stays the
-    // day the applicant entered, in every timezone.
     expect(formatIsoDate('2026-01-01', 'de')).toBe('01.01.2026');
     expect(formatIsoDate('2026-07-01T00:00:00Z', 'de')).toBe('01.07.2026');
   });
@@ -112,12 +107,13 @@ describe('formatBytes', () => {
     expect(formatBytes(1048576, 'de')).toBe('1,0 MB');
   });
 
+  /**
+   * 1 GiB is 1024^3, so the unit index walks KB to MB to GB. 1 TiB is 1024^4, so the loop walks to
+   * the last unit. Above TB the unit stays at TB, because of the `unit < units.length - 1` guard.
+   */
   it('climbs through GB and TB units (loop body)', () => {
-    // 1 GiB is 1024^3, so the unit index walks KB to MB to GB.
     expect(formatBytes(1024 ** 3, 'de')).toBe('1,0 GB');
-    // 1 TiB is 1024^4, so the loop walks to the last unit.
     expect(formatBytes(1024 ** 4, 'de')).toBe('1,0 TB');
-    // Above TB the unit stays at TB, because of the `unit < units.length - 1` guard.
     expect(formatBytes(1024 ** 5, 'de')).toBe('1.024,0 TB');
   });
 

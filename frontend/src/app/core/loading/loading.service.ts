@@ -32,8 +32,10 @@ export class LoadingService {
   /** True when the app must show the loading bar. */
   readonly visible = this._visible.asReadonly();
 
-  // The timer and the clock are overridable hooks. Tests can then run deterministically
-  // without jest fake timers or zone.js interaction.
+  /**
+   * The clock, an overridable hook like `setTimer` and `clearTimer`, so tests run
+   * deterministically without jest fake timers or zone.js interaction.
+   */
   protected now(): number {
     return Date.now();
   }

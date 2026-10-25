@@ -84,13 +84,15 @@ export class WsService {
     };
   }
 
+  /**
+   * An outbound buffer holds frames sent before the handshake ends (`CONNECTING`), because a socket
+   * drops them; it flushes them in order on `open`. A frame in CLOSING or CLOSED is dropped; a
+   * reconnect opens a new channel.
+   */
   private open(path: string): MeetingChannel {
     const ws = new WebSocket(this.url(path));
     const subject = new Subject<ServerMessage>();
 
-    // Outbound buffer. A socket drops a frame that goes out before the handshake ends
-    // (`CONNECTING`), for example the initial `subscribe` of LiveVoteSession. The buffer
-    // holds such a frame and flushes it in order on `open`.
     const outbox: string[] = [];
     const flush = (): void => {
       while (outbox.length > 0) ws.send(outbox.shift() as string);
@@ -120,7 +122,6 @@ export class WsService {
         } else if (ws.readyState === WebSocket.CONNECTING) {
           outbox.push(data);
         }
-        // CLOSING or CLOSED: drop the frame. A reconnect opens a new channel.
       },
       close: () => ws.close(),
     };

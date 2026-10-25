@@ -1,5 +1,3 @@
-// The filled field of the ui-kit: a grey box with the label inside it. The `multiselect`
-// type uses it for its trigger; the `select` type renders the app's `app-select`.
 @use 'field' as f;
 
 .field {
@@ -25,10 +23,10 @@
 .field__req {
   color: var(--color-danger);
 }
+// The plain declarations come after the nested states of the mixin, so they stay in one block.
 .field__control {
   @include f.control;
   @include f.control-labelled;
-  // After the mixin's nested states, so the plain declarations stay in one block.
   & {
     appearance: none;
     -webkit-appearance: none;

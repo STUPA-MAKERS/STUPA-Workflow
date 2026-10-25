@@ -9,8 +9,7 @@ override wins when it exists, otherwise the builtin default applies. The editor 
 real send therefore never drift apart. Nothing copies a seed into the DB.
 
 The module imports the builtins from the sender modules. Only ``task_reminder`` (the
-worker sends it) and ``deadline_approaching`` (it otherwise falls back to
-``status_update``) live here as the single source.
+worker sends it) and ``status_update_team`` live here as the single source.
 """
 
 from __future__ import annotations
@@ -30,8 +29,8 @@ from app.modules.notifications import (
 )
 from app.modules.notifications import service as _svc
 
-# task_reminder: the worker (``worker/task_reminders.py``) sends it. The worker imports
-# these constants from here. The app never imports the worker.
+#: Subject of ``task_reminder``. The worker (``worker/task_reminders.py``) sends it and
+#: imports these constants from here, because the app never imports the worker.
 TASK_REMINDER_SUBJECT: dict[str, str] = {
     "de": "Erinnerung: offene Aufgabe"
     "{% if applicationTitle %} — „{{ applicationTitle }}“{% endif %}",
@@ -47,23 +46,8 @@ TASK_REMINDER_BODY: dict[str, str] = {
     "waiting for action for {{ daysOpen }} days"
     "{% if status %} (status: {{ status }}){% endif %}.\n",
 }
-# deadline_approaching: ``handle_notify_action`` uses this as the builtin
-# fallback when no DB override exists.
-DEADLINE_APPROACHING_SUBJECT: dict[str, str] = {
-    "de": "Frist-Erinnerung{% if applicationTitle %} — „{{ applicationTitle }}“{% endif %}",
-    "en": 'Deadline reminder{% if applicationTitle %} — "{{ applicationTitle }}"{% endif %}',
-}
-DEADLINE_APPROACHING_BODY: dict[str, str] = {
-    "de": "Hallo,\n\neine Frist"
-    "{% if applicationTitle %} zum Antrag „{{ applicationTitle }}“{% endif %} "
-    "läuft bald ab{% if dueAt %} (fällig: {{ dueAt }}){% endif %}.\n",
-    "en": "Hello,\n\na deadline"
-    '{% if applicationTitle %} for the application "{{ applicationTitle }}"{% endif %} '
-    "is approaching{% if dueAt %} (due: {{ dueAt }}){% endif %}.\n",
-}
-# status_update_team: the team-facing default for a flow `notify` action without an
-# explicit templateKey and with non-applicant recipients. The applicant default
-# (`status_update`) reads "Your application" and is wrong for the team.
+#: Subject of ``status_update_team``, the team default of a ``notify`` action without
+#: ``templateKey``, because ``status_update`` reads "Your application".
 STATUS_UPDATE_TEAM_SUBJECT: dict[str, str] = {
     "de": "Statuswechsel: Antrag{% if applicationTitle %} „{{ applicationTitle }}“{% endif %}",
     "en": 'Status change: application{% if applicationTitle %} "{{ applicationTitle }}"{% endif %}',
@@ -93,13 +77,14 @@ class MailTemplateSpec:
     placeholders: dict[str, str]
 
 
-# The order of this tuple is the display order in the editor.
+#: Mail kinds in the display order of the editor. ``status_update`` shares the builtin of
+#: the notification service.
 TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
     MailTemplateSpec(
         "status_update",
         "status_update",
-        _svc._BUILTIN_NOTIFY_SUBJECT,  # noqa: SLF001 — shared builtin
-        _svc._BUILTIN_NOTIFY_BODY,  # noqa: SLF001
+        _svc._BUILTIN_NOTIFY_SUBJECT,
+        _svc._BUILTIN_NOTIFY_BODY,
         {
             "link": "Link zum Antrag (ohne den Platzhalter hängt die Mail ihn an)",
             "applicationTitle": "Titel des Antrags",
@@ -130,8 +115,8 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
     MailTemplateSpec(
         "task_new",
         "task",
-        action_dispatcher._BUILTIN_TASK_SUBJECT,  # noqa: SLF001
-        action_dispatcher._BUILTIN_TASK_BODY,  # noqa: SLF001
+        action_dispatcher._BUILTIN_TASK_SUBJECT,
+        action_dispatcher._BUILTIN_TASK_BODY,
         {
             "link": "Link zur Aufgabe (ohne den Platzhalter hängt die Mail ihn an)",
             "applicationTitle": "Titel des Antrags",
@@ -153,23 +138,10 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
         },
     ),
     MailTemplateSpec(
-        "deadline_approaching",
-        "deadline",
-        DEADLINE_APPROACHING_SUBJECT,
-        DEADLINE_APPROACHING_BODY,
-        {
-            "link": "Link zum Antrag (ohne den Platzhalter hängt die Mail ihn an)",
-            "applicationTitle": "Titel des Antrags",
-            "dueAt": "Fälligkeitszeitpunkt",
-            "kind": "Art der Frist",
-            "deadlineId": "ID der Frist",
-        },
-    ),
-    MailTemplateSpec(
         "comment_applicant",
         "comment",
-        comments._BUILTIN_APPLICANT_SUBJECT,  # noqa: SLF001
-        comments._BUILTIN_APPLICANT_BODY,  # noqa: SLF001
+        comments._BUILTIN_APPLICANT_SUBJECT,
+        comments._BUILTIN_APPLICANT_BODY,
         {
             "link": "Link zum Antrag (ohne den Platzhalter hängt die Mail ihn an)",
             "applicationTitle": "Titel des Antrags",
@@ -183,8 +155,8 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
     MailTemplateSpec(
         "comment_team",
         "comment",
-        comments._BUILTIN_TEAM_SUBJECT,  # noqa: SLF001
-        comments._BUILTIN_TEAM_BODY,  # noqa: SLF001
+        comments._BUILTIN_TEAM_SUBJECT,
+        comments._BUILTIN_TEAM_BODY,
         {
             "link": "Link zum Antrag (ohne den Platzhalter hängt die Mail ihn an)",
             "applicationTitle": "Titel des Antrags",
@@ -205,8 +177,8 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
     MailTemplateSpec(
         "meeting_created",
         "meeting",
-        auto._BUILTIN_MEETING_SUBJECT,  # noqa: SLF001
-        auto._BUILTIN_MEETING_BODY,  # noqa: SLF001
+        auto._BUILTIN_MEETING_SUBJECT,
+        auto._BUILTIN_MEETING_BODY,
         {
             "link": "Link zur Sitzung (ohne den Platzhalter hängt die Mail ihn an)",
             "meetingTitle": "Titel der Sitzung",
@@ -219,8 +191,8 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
     MailTemplateSpec(
         "delegation_granted",
         "delegation",
-        auto._BUILTIN_DELEGATION_GRANTED_SUBJECT,  # noqa: SLF001
-        auto._BUILTIN_DELEGATION_GRANTED_BODY,  # noqa: SLF001
+        auto._BUILTIN_DELEGATION_GRANTED_SUBJECT,
+        auto._BUILTIN_DELEGATION_GRANTED_BODY,
         {
             "link": "Link zur Sitzung (ohne den Platzhalter hängt die Mail ihn an)",
             "meetingTitle": "Titel der Sitzung",
@@ -230,8 +202,8 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
     MailTemplateSpec(
         "delegation_revoked",
         "delegation",
-        auto._BUILTIN_DELEGATION_REVOKED_SUBJECT,  # noqa: SLF001
-        auto._BUILTIN_DELEGATION_REVOKED_BODY,  # noqa: SLF001
+        auto._BUILTIN_DELEGATION_REVOKED_SUBJECT,
+        auto._BUILTIN_DELEGATION_REVOKED_BODY,
         {
             "link": "Link zur Sitzung (ohne den Platzhalter hängt die Mail ihn an)",
             "meetingTitle": "Titel der Sitzung",
@@ -241,8 +213,8 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
     MailTemplateSpec(
         "magic_link",
         "magic_link",
-        _svc._BUILTIN_MAGIC_LINK_SUBJECT,  # noqa: SLF001
-        _svc._BUILTIN_MAGIC_LINK_BODY,  # noqa: SLF001
+        _svc._BUILTIN_MAGIC_LINK_SUBJECT,
+        _svc._BUILTIN_MAGIC_LINK_BODY,
         {"link": "Anmelde-Link"},
     ),
     MailTemplateSpec(

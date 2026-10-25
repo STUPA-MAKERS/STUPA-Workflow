@@ -42,13 +42,13 @@ import { problemDetail } from '@core/api/problem';
  * member voted on an open vote, or after the close. The card then shows them.
  *
  * The vote manager closes or cancels (danger) an open vote, opens a planned one and
- * deletes a planned or cancelled one while the meeting is planned or live (O24). Only one
+ * deletes a planned or cancelled one while the meeting is planned or live. Only one
  * vote of the meeting is open at a time, so "Abstimmung öffnen" waits for it. A voter
- * who did not vote yet gets the options; a ballot never changes once it is cast (O11).
+ * who did not vote yet gets the options; a ballot never changes once it is cast.
  * A closed vote offers to put its result into the text of the item ("Ins Protokoll
  * übernehmen"), and says "Im Protokoll" once the text holds it.
  *
- * A personnel election (F2) shows the election ballot (candidates, abstention) and,
+ * A personnel election shows the election ballot (candidates, abstention) and,
  * once closed, the bars per candidate with the runoff and lot actions of the manager.
  *
  * A poll ("Umfrage") shows the poll ballot and, once revealed or closed, the counts per
@@ -108,10 +108,10 @@ export class VoteCardComponent {
   readonly remove = output<Uuid>();
   readonly cast = output<{ voteId: Uuid; choice: string }>();
   readonly insertResult = output<MeetingVote>();
-  /** The lot was drawn, or the runoff opened (F2): the page reads the meeting again. */
+  /** The lot was drawn, or the runoff opened: the page reads the meeting again. */
   readonly electionChanged = output<Vote>();
 
-  /** The personnel election of the vote (F2), or `null` for a motion. */
+  /** The personnel election of the vote, or `null` for a motion. */
   protected readonly election = computed(() => electionOf(this.vote()));
   /** The poll of the vote, or `null`. */
   protected readonly poll = computed(() => pollOf(this.vote()));
@@ -148,7 +148,7 @@ export class VoteCardComponent {
     if (this.poll() && (status === 'open' || status === 'closed')) return this.status().key;
     return `meetings.vote.card.${status}` as TranslationKey;
   });
-  /** The result of a closed vote. A tie is a rejection (O18). */
+  /** The result of a closed vote. A tie is a rejection. */
   protected readonly result = computed<StatusView | null>(() => {
     const v = this.vote();
     if (v.status !== 'closed' || this.poll()) return null;
@@ -160,7 +160,7 @@ export class VoteCardComponent {
     voteMetaLine(this.vote(), (key, params) => this.i18n.translate(key, params), this.i18n.locale()),
   );
 
-  /** A vote with guests (#17): "19 Mitglieder + 7 Gäste anwesend", else `null`. */
+  /** A vote with guests: "19 Mitglieder + 7 Gäste anwesend", else `null`. */
   protected readonly composition = computed(() => {
     const v = this.vote();
     if (!v.guestsVote) return null;
@@ -198,7 +198,7 @@ export class VoteCardComponent {
     () => this.myChoice() !== null || this.vote().myBallot?.cast === true,
   );
 
-  /** Plan, cancel and delete: only while the meeting is planned or live (O24). */
+  /** Plan, cancel and delete: only while the meeting is planned or live. */
   protected readonly canEdit = computed(
     () => this.canManage() && !this.locked() && this.meetingStatus() !== 'closed',
   );

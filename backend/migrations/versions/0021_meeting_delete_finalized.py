@@ -1,4 +1,4 @@
-"""Meeting: `closed_at` (#14) and the `meeting.delete_finalized` permission (#16).
+"""Meeting: `closed_at` and the `meeting.delete_finalized` permission.
 
 * `meeting.closed_at` — the platform sets it when the meeting goes to `closed`.
   It fills the "end" row on the title page of the protocol.
@@ -38,10 +38,12 @@ _DOWNGRADE: tuple[str, ...] = (
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     for stmt in _UPGRADE:
         op.execute(stmt)
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     for stmt in _DOWNGRADE:
         op.execute(stmt)

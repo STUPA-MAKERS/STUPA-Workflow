@@ -1,4 +1,4 @@
-"""F2 · Personnel elections in the voting service, without a database.
+"""Personnel elections in the voting service, without a database.
 
 A result-queue fake drives every new branch: the election ballot on the member, the
 secret and the guest path, the tally read, the close without a flow branch, the lot,
@@ -78,12 +78,11 @@ def _audits(db: Any) -> list[Any]:
     return [a for a in db.added if type(a).__name__ == "AuditEntry"]
 
 
-def _stored(choices: list[str | None], config: dict[str, Any], *, round_: int = 1) -> dict:
+def _stored(
+    choices: list[str | None], config: dict[str, Any], *, round_: int = 1
+) -> dict[str, Any]:
     outcome = tally_election(choices, ElectionConfig.model_validate(config), 10, round_=round_)
     return result_of(outcome).model_dump(mode="json", by_alias=True)
-
-
-# ---------------------------------------------------------------- cast
 
 
 async def test_cast_open_election_stores_the_sorted_list() -> None:
@@ -140,9 +139,6 @@ async def test_cast_guest_election() -> None:
     out = await VotingService(db).cast_guest(vote.id, uuid4(), ["c3"], now=NOW)
     assert out.status == "cast"
     assert db.statements[-1].compile().params["choice"] == '["c3"]'
-
-
-# ---------------------------------------------------------------- read
 
 
 async def test_get_open_election_counts_ballots_and_candidates() -> None:
@@ -203,10 +199,8 @@ async def test_own_ballots_of_the_vote_list_decode_an_election() -> None:
     assert out[motion.id].choice == "yes"
 
 
-# ---------------------------------------------------------------- create
-
-
 async def test_create_internal_election_writes_kind_and_json_config() -> None:
+    """An election is secret by default: the tally stays hidden until the close."""
     principal = uuid4()
     config = ElectionConfig.model_validate(
         {
@@ -225,12 +219,8 @@ async def test_create_internal_election_writes_kind_and_json_config() -> None:
     assert vote.round == 1
     assert vote.config["candidates"][0]["principalId"] == str(principal)
     assert out.kind == "election"
-    # An election is secret by default: the tally stays hidden until the close.
     assert out.secret is True
     assert out.tally.counts == {}
-
-
-# ---------------------------------------------------------------- close
 
 
 @pytest.mark.usefixtures("_patch_flow")
@@ -304,9 +294,10 @@ async def test_close_election_after_the_window_rejects_without_quorum() -> None:
 
 
 async def test_close_meeting_election_fixes_the_attendance() -> None:
+    """The close of a meeting election stores 4 present members and 2 admitted guests."""
     vote = _evote(meeting_id=uuid4())
     db = fake_session(result(vote), result('["c1"]'))
-    db.scalar_results = [4, 2]  # present members, admitted guests
+    db.scalar_results = [4, 2]
     out = await VotingService(db).close(vote.id, _voter(), now=NOW)
     assert out.tally.present_members == 4
     assert out.tally.present_guests == 2
@@ -314,22 +305,24 @@ async def test_close_meeting_election_fixes_the_attendance() -> None:
 
 
 async def test_close_meeting_election_with_guests_counts_them_as_eligible() -> None:
+    """The admitted guests of a meeting election with guests count as eligible.
+
+    The fake session serves the admitted guest, no guest ballots and no guest markers.
+    The scalar is the number of present members.
+    """
     vote = _evote(meeting_id=uuid4(), config=_econfig(guestsVote=True))
     guest = uuid4()
     db = fake_session(
         result(vote),
         result('["c1"]'),
-        result(guest),  # admitted guests
-        result(),  # guest ballots
-        result(),  # guest markers
+        result(guest),
+        result(),
+        result(),
     )
-    db.scalar_results = [3]  # present members
+    db.scalar_results = [3]
     out = await VotingService(db).close(vote.id, _voter(), now=NOW)
     assert out.tally.eligible == 4
     assert vote.eligible_count == 4
-
-
-# ---------------------------------------------------------------- lot
 
 
 def _first(pool: Any) -> str:
@@ -350,14 +343,18 @@ def _tied_vote(**over: Any) -> SimpleNamespace:
 
 
 async def test_draw_lot_elects_the_drawn_candidate() -> None:
+    """The lot elects the drawn candidate.
+
+    The fake session serves the audit hook and the reloaded ballots.
+    """
     vote = _tied_vote()
     db = fake_session(
         result(vote),
         result(),
-        result(),  # the audit hook
+        result(),
         result(vote),
         result(),
-        result('["c1"]', '["c2"]'),  # the reload
+        result('["c1"]', '["c2"]'),
     )
     lead = Principal(sub="lead", display_name="Mara Keller")
     out = await ElectionService(VotingService(db), _first).draw_lot(vote.id, lead, now=NOW)
@@ -409,9 +406,6 @@ async def test_draw_lot_twice_409() -> None:
             vote.id, _voter(), now=NOW
         )
     assert err.value.code == "lot_already_drawn"
-
-
-# ---------------------------------------------------------------- runoff
 
 
 def _legacy_runoff(stored: dict[str, Any]) -> dict[str, Any]:
@@ -475,10 +469,14 @@ async def test_create_runoff_without_a_pending_runoff_409() -> None:
 
 @pytest.mark.parametrize("status", ["draft", "open", "closed"])
 async def test_create_runoff_twice_409(status: str) -> None:
+    """A second runoff gives 409 while the first is not cancelled.
+
+    The scalars are the meeting id and the status of the runoff.
+    """
     parent = _runoff_parent(meeting_id=None)
     parent.election_result["runoff"]["voteId"] = str(uuid4())
     db = fake_session(result(parent))
-    db.scalar_results = [None, status]  # the meeting id, the status of the runoff
+    db.scalar_results = [None, status]
     with pytest.raises(ConflictError) as err:
         await ElectionService(VotingService(db)).create_runoff(parent.id)
     assert err.value.code == "runoff_exists"
@@ -561,9 +559,6 @@ async def test_create_runoff_needs_a_live_meeting() -> None:
     with pytest.raises(ConflictError) as err:
         await ElectionService(VotingService(db)).create_runoff(parent.id)
     assert err.value.code == "meeting_closed"
-
-
-# ---------------------------------------------------------------- routes
 
 
 _TALLY = TallyOut(counts={}, eligible=0, quorumMet=True)
@@ -668,4 +663,3 @@ def test_ballot_body_takes_a_list(routes: tuple[FastAPI, _Pub]) -> None:
     assert BallotIn.model_validate({"choice": ["c1"]}).choice == ["c1"]
     with pytest.raises(ValueError):
         BallotIn.model_validate({"choice": ""})
-

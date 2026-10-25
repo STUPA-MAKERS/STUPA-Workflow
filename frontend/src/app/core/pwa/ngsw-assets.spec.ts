@@ -25,8 +25,8 @@ interface NgswConfig {
 /** Paths that nginx answers from the API, not from the build output. */
 const SERVER_GENERATED = ['/manifest.webmanifest'];
 
+/** The project root is four levels up from src/app/core/pwa. */
 function config(): NgswConfig {
-  // Four levels up from src/app/core/pwa to the project root.
   const path = join(__dirname, '..', '..', '..', '..', 'ngsw-config.json');
   return JSON.parse(readFileSync(path, 'utf8')) as NgswConfig;
 }

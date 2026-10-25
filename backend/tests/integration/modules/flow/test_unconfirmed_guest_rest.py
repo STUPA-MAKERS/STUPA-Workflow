@@ -1,15 +1,14 @@
-"""F15, F18, O14: an unconfirmed guest application rests in the flow (real Postgres).
+"""An unconfirmed guest application rests in the flow (real Postgres).
 
 A guest submission starts with `email_confirmed_at IS NULL`. Until the magic-link
 verify confirms it:
 
-* the flow routes answer 404 (F15),
-* the create schedules no deadline, the cron fires no deadline action, sends no
-  reminder and fires no automatic transition (F18),
-* the notify dispatcher sends no flow mail (O14).
+* the flow routes answer 404,
+* the create starts nothing and the cron fires no automatic transition,
+* the notify dispatcher sends no flow mail.
 
-The first verify starts the flow one time: it schedules the deadline of the current
-state, runs `auto_advance` and sends the task mail of the state. A second verify
+The first verify starts the flow one time: it runs `auto_advance` and sends the task
+mail of the state. A second verify
 starts nothing.
 """
 
@@ -18,7 +17,7 @@ from __future__ import annotations
 import re
 import uuid
 from collections.abc import AsyncIterator, Iterator, Sequence
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -38,8 +37,6 @@ from app.modules.applications.schemas import ApplicationCreate
 from app.modules.applications.service import ApplicationsService
 from app.modules.auth import service as auth_service
 from app.modules.auth.principal import Principal
-from app.modules.deadlines.models import Deadline, DeadlinePolicy
-from app.modules.deadlines.service import DeadlineService
 from app.modules.flow.dispatch import DispatchedAction
 from app.modules.flow.models import FlowVersion, State, Transition
 from app.modules.forms.schemas import FormVersionCreate
@@ -103,10 +100,9 @@ def settings(migrated: tuple[str, str]) -> Settings:
 async def _seed(
     maker: async_sessionmaker[AsyncSession], *, automatic: bool
 ) -> _Seed:
-    """Create a type, a deadline policy and a flow `eingang` -> `pruefung`.
+    """Create a type and a flow `eingang` -> `pruefung`.
 
-    The initial state `eingang` carries a `relative_submitted` policy of 3 days. The
-    one transition is automatic when `automatic` is true, else manual.
+    The one transition is automatic when `automatic` is true, else manual.
     """
     tag = uuid.uuid4().hex[:8]
     async with maker() as session:
@@ -116,11 +112,7 @@ async def _seed(
         app_type = ApplicationType(
             gremium_id=gremium.id, key=f"t-{tag}", name_i18n={}, has_budget=False
         )
-        policy = DeadlinePolicy(
-            key=f"frist-{tag}", label={"de": "Frist"}, kind="relative_submitted",
-            offset_days=3,
-        )
-        session.add_all([app_type, policy])
+        session.add(app_type)
         await session.commit()
         await FormsService(session).create_form_version(
             app_type.id,
@@ -137,7 +129,7 @@ async def _seed(
         states = {
             "eingang": State(flow_version_id=flow.id, key="eingang",
                              label_i18n={"de": "Eingang"}, edit_allowed=True,
-                             is_initial=True, config={"deadlinePolicyKey": policy.key}),
+                             is_initial=True),
             "pruefung": State(flow_version_id=flow.id, key="pruefung",
                               label_i18n={"de": "Prüfung"}, edit_allowed=False),
         }
@@ -203,19 +195,6 @@ async def _verify(
         await session.commit()
 
 
-async def _deadlines(
-    maker: async_sessionmaker[AsyncSession], app_id: uuid.UUID
-) -> list[Deadline]:
-    async with maker() as session:
-        return list(
-            (
-                await session.scalars(
-                    select(Deadline).where(Deadline.application_id == app_id)
-                )
-            ).all()
-        )
-
-
 async def _app(maker: async_sessionmaker[AsyncSession], app_id: uuid.UUID) -> Application:
     async with maker() as session:
         app = await session.get(Application, app_id)
@@ -223,13 +202,14 @@ async def _app(maker: async_sessionmaker[AsyncSession], app_id: uuid.UUID) -> Ap
         return app
 
 
-# F15: the flow routes hide an unconfirmed application.
 @pytest.fixture
 def api(
     migrated: tuple[str, str], settings: Settings, monkeypatch: pytest.MonkeyPatch
 ) -> Iterator[FastAPI]:
-    # The TestClient runs the app on its own event loop. It gets its own engine
-    # without a pool, so no connection crosses the loops.
+    """Serve the app on its own event loop with its own engine without a pool.
+
+    No connection crosses the loops.
+    """
     maker = async_sessionmaker(
         create_async_engine(migrated[1], poolclass=NullPool), expire_on_commit=False
     )
@@ -254,6 +234,7 @@ def api(
 async def test_flow_routes_answer_404_until_the_verify(
     maker: async_sessionmaker[AsyncSession], settings: Settings, api: FastAPI
 ) -> None:
+    """Answer 404 on the flow routes until the verify; nothing moves."""
     seed = await _seed(maker, automatic=False)
     app_id = await _guest_create(maker, seed, _Recorder())
     base = f"/api/applications/{app_id}"
@@ -271,7 +252,6 @@ async def test_flow_routes_answer_404_until_the_verify(
         )
         assert force.status_code == 404, force.text
 
-    # Nothing moved.
     assert (await _app(maker, app_id)).current_state_id == seed.states["eingang"].id
 
     await _verify(maker, settings, await _magic_token(maker, settings, app_id), _Recorder())
@@ -283,30 +263,15 @@ async def test_flow_routes_answer_404_until_the_verify(
         assert client.get(f"{base}/flow-states").status_code == 200
 
 
-# F18 and O14: no deadline, no automatic transition and no mail before the verify.
 async def test_unconfirmed_application_rests_in_the_cron(
     maker: async_sessionmaker[AsyncSession], settings: Settings
 ) -> None:
+    """Fire no automatic transition and send no mail before the verify."""
     seed = await _seed(maker, automatic=True)
     recorder = _Recorder()
     app_id = await _guest_create(maker, seed, recorder)
 
-    # The create schedules no deadline and starts nothing.
-    assert await _deadlines(maker, app_id) == []
     assert recorder.actions == []
-
-    # A deadline row from before this fix is due and has an action. The scans skip it.
-    past = datetime.now(UTC) - timedelta(hours=1)
-    async with maker() as session:
-        legacy = await DeadlineService(session).create(
-            kind="flow_deadline", due_at=past, application_id=app_id,
-            action_on_pass={"transitionId": str(seed.transition_id)},
-        )
-    async with maker() as session:
-        svc = DeadlineService(session)
-        now = datetime.now(UTC)
-        assert legacy.id not in await svc.due_action_deadline_ids(now)
-        assert legacy.id not in await svc.due_reminder_ids(now, timedelta(days=1))
 
     ctx: dict[str, Any] = {
         "settings": settings,
@@ -320,14 +285,12 @@ async def test_unconfirmed_application_rests_in_the_cron(
     assert app.current_state_id == seed.states["eingang"].id
     assert recorder.actions == []
     assert ctx["mail_queue"].messages == []
-    (row,) = await _deadlines(maker, app_id)
-    assert row.reminded_at is None
-    assert row.action_on_pass is not None  # not consumed
 
 
 async def test_notify_dispatcher_holds_back_flow_mails(
     maker: async_sessionmaker[AsyncSession], settings: Settings
 ) -> None:
+    """Hold back the flow mails until the email is confirmed."""
     seed = await _seed(maker, automatic=False)
     app_id = await _guest_create(maker, seed, _Recorder())
     queue = _ListQueue()
@@ -348,7 +311,6 @@ async def test_notify_dispatcher_holds_back_flow_mails(
     await dispatcher.dispatch([action])
     assert queue.messages == []
 
-    # The same action goes out once the email is confirmed.
     async with maker() as session:
         app = await session.get(Application, app_id)
         assert app is not None
@@ -358,10 +320,13 @@ async def test_notify_dispatcher_holds_back_flow_mails(
     assert [m.to for m in queue.messages] == [("gast@example.org",)]
 
 
-# Item 3 of the plan: the verify starts the flow, one time.
-async def test_verify_schedules_the_deadline_and_announces_once(
+async def test_verify_announces_once(
     maker: async_sessionmaker[AsyncSession], settings: Settings
 ) -> None:
+    """Start the flow at the first verify only.
+
+    The edit link is not single-use, so a second click comes, and it starts nothing.
+    """
     seed = await _seed(maker, automatic=False)
     app_id = await _guest_create(maker, seed, _Recorder())
     token = await _magic_token(maker, settings, app_id)
@@ -372,24 +337,19 @@ async def test_verify_schedules_the_deadline_and_announces_once(
     app = await _app(maker, app_id)
     assert app.email_confirmed_at is not None
     assert app.current_state_id == seed.states["eingang"].id
-    (deadline,) = await _deadlines(maker, app_id)
-    assert deadline.kind == "flow_deadline"
-    assert deadline.due_at == app.created_at + timedelta(days=3)
     (action,) = recorder.actions
     assert action.type == "taskNotify"
     assert action.transition_id is None
 
-    # The edit link is not single-use. A second click starts nothing again.
     second = _Recorder()
     await _verify(maker, settings, token, second)
     assert second.actions == []
-    (again,) = await _deadlines(maker, app_id)
-    assert again.id == deadline.id
 
 
 async def test_verify_runs_the_automatic_transition(
     maker: async_sessionmaker[AsyncSession], settings: Settings
 ) -> None:
+    """Run the automatic transition; its own mails replace the task mail of `eingang`."""
     seed = await _seed(maker, automatic=True)
     app_id = await _guest_create(maker, seed, _Recorder())
 
@@ -407,11 +367,8 @@ async def test_verify_runs_the_automatic_transition(
             )
         ).all()
     assert [e.actor for e in events] == ["applicant", "system:confirmation"]
-    # The fired transition sends its own mails. No extra task mail of `eingang`.
     assert {a.type for a in recorder.actions} == {"notify", "taskNotify"}
     assert all(a.status_event_id == events[-1].id for a in recorder.actions)
-    # `pruefung` has no deadline policy, so the start leaves no deadline behind.
-    assert await _deadlines(maker, app_id) == []
 
 
 async def test_logged_in_create_starts_the_flow_at_once(
@@ -424,6 +381,4 @@ async def test_logged_in_create_starts_the_flow_at_once(
             _payload(seed.type_id), actor="member-1", dispatcher=recorder
         )
     assert app.email_confirmed_at is not None
-    (deadline,) = await _deadlines(maker, app.id)
-    assert deadline.kind == "flow_deadline"
     assert [a.type for a in recorder.actions] == ["taskNotify"]

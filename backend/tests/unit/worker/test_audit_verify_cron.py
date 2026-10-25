@@ -1,4 +1,4 @@
-"""Worker tasks of the stored audit-chain check (Z6/O8).
+"""Worker tasks of the stored audit-chain check.
 
 The tests replace `AuditService.verify_and_store` and drive the tasks with a fake
 sessionmaker. They pin down the cron schedule at 04:30, the trigger of each path,
@@ -133,14 +133,17 @@ async def test_restore_check_carries_trigger_and_actor(calls: _Calls) -> None:
 
 
 async def test_restore_check_failure_only_logs(monkeypatch: pytest.MonkeyPatch) -> None:
-    """An old archive without the table must not turn a finished restore into a failure."""
+    """An old archive without the table must not turn a finished restore into a failure.
+
+    The test records the logger call itself, because caplog misses the record when another
+    test stops the logger propagation.
+    """
 
     async def _boom(_self: object, **_kw: object) -> AuditVerification:
         raise RuntimeError('relation "audit_verification" does not exist')
 
     logged: list[str] = []
     monkeypatch.setattr(audit_verify.AuditService, "verify_and_store", _boom)
-    # caplog misses the record when another test stops the logger propagation.
     monkeypatch.setattr(
         audit_verify.logger, "exception", lambda msg, *a: logged.append(msg % a)
     )

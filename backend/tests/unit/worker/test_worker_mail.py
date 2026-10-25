@@ -1,6 +1,8 @@
-"""Worker task `send_mail` (T-18): send, retry, permanent failure and sender choice."""
+"""Worker task `send_mail`: send, retry, permanent failure and sender choice."""
 
 from __future__ import annotations
+
+from typing import Any
 
 import pytest
 from arq import Retry
@@ -14,7 +16,7 @@ _PAYLOAD = MailMessage(
 ).to_payload()
 
 
-def _ctx(sender: object, *, job_try: int = 1, max_tries: int = 5) -> dict:
+def _ctx(sender: object, *, job_try: int = 1, max_tries: int = 5) -> dict[str, Any]:
     settings = load_settings(mail_max_tries=max_tries, mail_retry_backoff_seconds=10)
     return {"settings": settings, "mail_sender": sender, "job_try": job_try}
 
@@ -54,7 +56,7 @@ def test_build_sender_smtp_with_host() -> None:
 
 
 async def test_on_startup_populates_ctx() -> None:
-    ctx: dict = {}
+    ctx: dict[str, Any] = {}
     await on_startup(ctx)
     assert "settings" in ctx and "mail_sender" in ctx
 

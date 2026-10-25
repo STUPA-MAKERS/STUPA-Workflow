@@ -188,15 +188,17 @@ async function openMenu(detectChanges: () => void) {
 describe('ApplicationsDetailComponent — header', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
+  /**
+   * The title opens the sheet on the line of the actions; no line stands above it. Intl puts a
+   * non-breaking space before the currency sign. The dots are CSS: every part draws one before it,
+   * and the line clips the one at each line start.
+   */
   it('shows the title and status · type · amount, with no line above the title and no gremium', async () => {
     await setup();
-    // The title opens the sheet on the line of the actions; no line stands above it.
     expect(document.querySelector('app-sheet-bar .sheet-bar__title [appSheetBarTitle]')).not.toBeNull();
     expect(document.querySelector('.sheet-bar__kicker')).toBeNull();
     expect(screen.getByRole('heading', { level: 2, name: 'Zuschuss Kennenlernwochenende' })).toBeInTheDocument();
     const line = document.querySelector('.ad__line') as HTMLElement;
-    // Intl puts a non-breaking space before the currency sign. The dots are CSS: every
-    // part draws one before it, and the line clips the one at each line start.
     expect(line).toHaveClass('ad__seps');
     const parts = [...line.querySelectorAll('.ad__part')].map((el) => el.textContent?.replace(/\s+/g, ''));
     expect(parts).toEqual(['Eingereicht', 'Förderantrag', '1.250,00€']);
@@ -217,21 +219,21 @@ describe('ApplicationsDetailComponent — header', () => {
     expect(line.textContent?.replace(/\s+/g, '')).toBe('1.250,00€');
   });
 
+  /** The versions show newest first. */
   it('lists the versions in the history with their authors', async () => {
     await setup();
     const history = document.querySelector('#ad-history app-history') as HTMLElement;
     expect(history).not.toBeNull();
     const titles = [...history.querySelectorAll('.hist__title')].map((el) => el.textContent?.trim());
-    // Newest first.
     expect(titles).toEqual(['Version 2', 'Version 1']);
     const metas = [...history.querySelectorAll('.hist__meta')].map((el) => el.textContent ?? '');
     expect(metas[0]).toContain('Antragsteller:in');
     expect(metas[1]).toContain('Lea');
   });
 
+  /** The title opens the sheet on the line of the actions; no line stands above it. */
   it('leaves out an unknown type and a missing amount', async () => {
     const { http } = await setup({ app: { gremiumId: null, amount: null, typeId: 'other' } });
-    // The title opens the sheet on the line of the actions; no line stands above it.
     expect(document.querySelector('app-sheet-bar .sheet-bar__title [appSheetBarTitle]')).not.toBeNull();
     expect(document.querySelector('.sheet-bar__kicker')).toBeNull();
     expect(document.querySelector('.ad__line')!.textContent?.trim()).toBe('Eingereicht');
@@ -368,6 +370,7 @@ describe('ApplicationsDetailComponent — header', () => {
       expect(cmp.menuSections()).toEqual([]);
     });
 
+    /** The edit form needs structuredClone, which jsdom lacks. */
     it('takes the header actions into the menu on a phone', async () => {
       const { cmp, http, detectChanges } = await setup({ phone: true });
       expect(screen.queryByRole('button', { name: 'Öffentliche Links' })).not.toBeInTheDocument();
@@ -378,7 +381,6 @@ describe('ApplicationsDetailComponent — header', () => {
       cmp.onMenu({ id: 'archive', label: '' });
       http.expectOne((r) => r.url.endsWith('/archive')).flush(appWire({ archivedAt: 'x' }));
       expect(cmp.menuSections()[0].items[2].label).toBe('Aus Archiv holen');
-      // The edit form needs structuredClone, which jsdom lacks.
       const g = globalThis as unknown as { structuredClone?: unknown };
       const saved = g.structuredClone;
       g.structuredClone = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
@@ -389,11 +391,11 @@ describe('ApplicationsDetailComponent — header', () => {
   });
 
   describe('tabs (one pane at a time)', () => {
+    /** The comments are a header action that opens a sheet, not a tab. */
     it('shows the sections in tabs with their counts', async () => {
       const { detectChanges } = await setup({ split: false });
       const tabs = screen.getAllByRole('tab').map((t) => t.getAttribute('aria-label') ?? t.textContent?.trim());
       expect(tabs).toEqual(['Antrag', 'Verlauf 2', 'Anhänge 0']);
-      // The comments are a header action that opens a sheet, not a tab.
       expect(screen.getByRole('button', { name: 'Kommentare, 0' })).toBeInTheDocument();
       expect(screen.getByRole('tabpanel', { name: 'Antrag' })).toBeVisible();
       await userEvent.click(screen.getByRole('tab', { name: 'Verlauf 2' }));
@@ -402,12 +404,16 @@ describe('ApplicationsDetailComponent — header', () => {
       expect(screen.queryByRole('tabpanel', { name: 'Antrag' })).not.toBeInTheDocument();
     });
 
+    /**
+     * The edit form needs structuredClone, which jsdom lacks. The sheet holds only the edit bar and
+     * the form, with no tabs and no header actions. "Speichern" is the floating button, and it
+     * shows only after a change.
+     */
     it('replaces the tabs with the edit form, also from another tab', async () => {
       const { cmp, detectChanges } = await setup({ split: false });
       await userEvent.click(screen.getByRole('tab', { name: 'Anhänge 0' }));
       detectChanges();
       expect(cmp.tab()).toBe('files');
-      // The edit form needs structuredClone, which jsdom lacks.
       const g = globalThis as unknown as { structuredClone?: unknown };
       const saved = g.structuredClone;
       g.structuredClone = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
@@ -418,12 +424,10 @@ describe('ApplicationsDetailComponent — header', () => {
       }
       detectChanges();
       expect(cmp.editing()).toBe(true);
-      // The sheet holds only the edit bar and the form: no tabs, no header actions.
       expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
       expect(screen.queryByRole('heading', { level: 2 })).not.toBeInTheDocument();
       const bar = document.querySelector('.ad__editBar') as HTMLElement;
       expect(bar.textContent).toContain('Antrag bearbeiten');
-      // "Speichern" is the floating button, and it shows only after a change.
       expect(screen.queryByRole('button', { name: 'Speichern' })).not.toBeInTheDocument();
       await userEvent.click(within(bar).getByRole('button', { name: 'Abbrechen' }));
       detectChanges();
@@ -492,6 +496,11 @@ describe('ApplicationsDetailComponent — header', () => {
     ];
     const YEARS_URL = (r: { url: string }) => r.url === '/api/budgets/b1/fiscal-years';
 
+    /**
+     * Another cost centre of the same top budget sets the year choice back to automatic. The
+     * original cost centre brings its year back. No cost centre, or one outside the tree, has no
+     * years to choose.
+     */
     it('names the cost centre with its fiscal year and changes both in the dialog', async () => {
       const { http, cmp, detectChanges } = await setup({ app: { budgetId: 'b2', fiscalYearId: 'fy1' }, tree: TREE });
       http.expectOne(YEARS_URL).flush(YEARS);
@@ -509,20 +518,34 @@ describe('ApplicationsDetailComponent — header', () => {
       };
       expect(c.fiscalOptions().map((o) => o.label)).toEqual(['Automatisch (aktives HHJ)', '2026', '2025 (inaktiv)']);
 
-      // Another cost centre of the same top budget: the year choice goes back to automatic.
       c.onBudgetPicked('b1');
       expect(c.fiscalChoice()).toBe('');
       http.expectOne(YEARS_URL).flush({}, { status: 500, statusText: 'x' });
       expect(c.fiscalYears()).toEqual([]);
-      // The original cost centre again: its year comes back.
       c.onBudgetPicked('b2');
       expect(c.fiscalChoice()).toBe('fy1');
       http.expectOne(YEARS_URL).flush(YEARS);
-      // No cost centre, or one outside the tree: no years to choose.
       c.onBudgetPicked('');
       c.onBudgetPicked('gone');
       expect(c.fiscalYears()).toEqual([]);
       http.verify();
+    });
+
+    it('offers a closed year only while it is the year of the application', async () => {
+      const closed = { ...YEARS[1], id: 'fyc', year: 2024, display: '2024', closedAt: '2026-03-01T00:00:00Z' };
+      const c = (await setup({ app: { budgetId: 'b2', fiscalYearId: 'fy1' }, tree: TREE })).cmp as unknown as {
+        fiscalOptions: () => { value: string; label: string }[];
+        fiscalYears: { set: (v: unknown[]) => void };
+        app: { update: (f: (a: Record<string, unknown>) => Record<string, unknown>) => void };
+      };
+      c.fiscalYears.set([YEARS[0], closed]);
+      expect(c.fiscalOptions().map((o) => o.label)).toEqual(['Automatisch (aktives HHJ)', '2026']);
+      c.app.update((a) => ({ ...a, fiscalYearId: 'fyc' }));
+      expect(c.fiscalOptions().map((o) => o.label)).toEqual([
+        'Automatisch (aktives HHJ)',
+        '2026',
+        '2024 · abgeschlossen',
+      ]);
     });
 
     it('names a cost centre without a year and offers "Zuordnen" without one', async () => {

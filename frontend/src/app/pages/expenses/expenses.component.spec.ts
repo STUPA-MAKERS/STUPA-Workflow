@@ -1,6 +1,6 @@
 import { BehaviorSubject, of } from 'rxjs';
 import { provideHttpClient } from '@angular/common/http';
-import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting, type TestRequest } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { render, screen, within } from '@testing-library/angular';
@@ -63,6 +63,8 @@ const EXPENSE: Expense = {
   category: 'Werbung',
   invoiceId: null,
   invoiceNumber: null,
+  parentExpenseId: null,
+  childCount: 0,
   createdAt: '2026-05-30T09:00:00Z',
 };
 
@@ -98,6 +100,11 @@ function fakeAuth(perms: string[]): Partial<AuthService> {
   return { can: (p: string) => set.has(p), canAny: (...p: string[]) => p.some((x) => set.has(x)) };
 }
 
+/**
+ * The constructor loads the cost center tree, the invoices and the first page of bookings.
+ * `listInvoices` reads a page, so the answer must be a paged shape and not an array. Otherwise
+ * `page.items` is undefined and the `invoiceOptions` computed throws.
+ */
 async function setup(opts: { perms?: string[]; page?: ExpensePage; tree?: BudgetTreeNode[] } = {}) {
   const view = await render(ExpensesComponent, {
     providers: [
@@ -109,11 +116,7 @@ async function setup(opts: { perms?: string[]; page?: ExpensePage; tree?: Budget
     ],
   });
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
-  // The constructor loads the cost center tree, the invoices and the first page of
-  // bookings.
   http.match((r) => r.url.endsWith('/budgets')).forEach((req) => req.flush(opts.tree ?? []));
-  // `listInvoices` reads a page, so the answer must be a paged shape and not an array.
-  // Otherwise `page.items` is undefined and the `invoiceOptions` computed throws.
   http
     .match((r) => r.url.endsWith('/invoices') && r.method === 'GET')
     .forEach((req) => req.flush({ items: [], total: 0, limit: 200, offset: 0 }));
@@ -123,9 +126,10 @@ async function setup(opts: { perms?: string[]; page?: ExpensePage; tree?: Budget
   return { ...view, http };
 }
 
-// Direct component tests for the methods and branches, without DOM rendering. Every
-// method runs through the HttpTestingController, and the test checks the signal state.
-
+/**
+ * The direct component tests cover the methods and branches without DOM rendering. Every method
+ * runs through the HttpTestingController, and the test checks the signal state.
+ */
 const ROOT_TREE: BudgetTreeNode[] = [
   {
     id: 'top-1',
@@ -270,9 +274,11 @@ function flushList(http: HttpTestingController, body: ExpensePage): void {
 
 describe('ExpensesComponent (unit)', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+  /**
+   * Some tests reset the TestBed. After that no HttpTestingController provider exists, so the
+   * verify call does not run.
+   */
   afterEach(() => {
-    // Some tests reset the TestBed. After that no HttpTestingController provider
-    // exists, so the verify call does not run.
     try {
       TestBed.inject(HttpTestingController).verify();
     } catch {
@@ -281,6 +287,7 @@ describe('ExpensesComponent (unit)', () => {
     jest.useRealTimers();
   });
 
+  /** Intl separates with a narrow no-break space, so the test normalizes to plain whitespace. */
   it('loads tree and invoices on construction (success)', () => {
     const { cmp } = build({
       tree: ROOT_TREE,
@@ -295,7 +302,6 @@ describe('ExpensesComponent (unit)', () => {
     expect(lst(cmp).costCentreOptions().length).toBe(2);
     const label = dlg(cmp).invoiceOptions()[0];
     expect(label.value).toBe('inv-1');
-    // Intl separates with a narrow no-break space, so normalize to plain whitespace.
     expect(label.label.replace(/\s/g, ' ')).toBe('RE-2026-1 · Acme GmbH · 119,00 €');
   });
 
@@ -323,9 +329,9 @@ describe('ExpensesComponent (unit)', () => {
     expect(no.cmp.canExport()).toBe(false);
   });
 
+  /** The de locale comes from localStorage. */
   it('money() formats EUR for de and en locales', () => {
     const { cmp } = build();
-    // the de locale comes from localStorage
     expect(cmp.money('120').replace(/\s/g, ' ')).toMatch(/120,00/);
     localStorage.setItem('ap.locale', 'en');
     TestBed.resetTestingModule();
@@ -345,6 +351,7 @@ describe('ExpensesComponent (unit)', () => {
     expect(cmp.activeFilterCount()).toBe(3);
   });
 
+  /** Only the amount remains, because number and supplier are filtered out. */
   it('invoiceLabel falls back gracefully for sparse invoices', () => {
     const sparse: Invoice = {
       ...INVOICE,
@@ -354,19 +361,19 @@ describe('ExpensesComponent (unit)', () => {
       grossAmount: '5.00',
     };
     const { cmp } = build({ invoices: [sparse] });
-    // Only the amount remains (number/supplier filtered out).
     expect(dlg(cmp).invoiceOptions()[0].label).toMatch(/5,00\s?€/);
     expect(dlg(cmp).invoiceOptions()[0].label).not.toContain('·');
   });
 
+  /**
+   * The create dropdown and an edit without a selection show only open invoices. The linked,
+   * already paid invoice stays visible in the edit dropdown.
+   */
   it('lists only open invoices; edit keeps a linked paid invoice visible', () => {
     const paid: Invoice = { ...INVOICE, id: 'inv-paid', number: 'RE-PAID', status: 'paid' };
     const { cmp } = build({ invoices: [INVOICE, paid] });
-    // Create dropdown: only open invoices (paid ones hidden).
     expect(dlg(cmp).invoiceOptions().map((o) => o.value)).toEqual(['inv-1']);
-    // Edit without a selection: also only open ones.
     expect(dlg(cmp).editInvoiceOptions().map((o) => o.value)).toEqual(['inv-1']);
-    // The linked (already paid) invoice stays visible in the edit dropdown.
     dlg(cmp).editInvoiceId.set('inv-paid');
     expect(dlg(cmp).editInvoiceOptions().map((o) => o.value)).toEqual(['inv-paid', 'inv-1']);
   });
@@ -413,7 +420,7 @@ describe('ExpensesComponent (unit)', () => {
     cmp.createdFrom.set('2026-01-01');
     cmp.createdTo.set('2026-12-31');
     cmp.budgetId.set('b-1');
-    cmp.setKind('expense'); // triggers reload
+    cmp.setKind('expense');
     const req = http.expectOne((r) => r.url.endsWith('/expenses') && r.method === 'GET');
     const p = req.request.params;
     expect(p.get('budget')).toBe('b-1');
@@ -433,7 +440,7 @@ describe('ExpensesComponent (unit)', () => {
     cmp.q.set('   ');
     cmp.amountMin.set('   ');
     cmp.amountMax.set('');
-    cmp.setKind(''); // reload with every filter empty
+    cmp.setKind('');
     const req = http.expectOne((r) => r.url.endsWith('/expenses') && r.method === 'GET');
     const p = req.request.params;
     expect(p.has('q')).toBe(false);
@@ -478,9 +485,9 @@ describe('ExpensesComponent (unit)', () => {
     flushList(http, page([]));
   });
 
+  /** The default sort is paymentDate desc, so the same column flips to asc. */
   it('onSort toggles direction on same field and resets to desc on new field', () => {
     const { cmp, http } = build();
-    // the default sort is paymentDate desc, so the same column flips to asc
     cmp.onSort('paymentDate');
     expect(cmp.sortField()).toBe('paymentDate');
     expect(cmp.sortOrder()).toBe('asc');
@@ -507,9 +514,9 @@ describe('ExpensesComponent (unit)', () => {
     expect(cmp.loadingMore()).toBe(false);
   });
 
+  /** total === items.length gives hasMore false. */
   it('loadMore is a no-op while loading, loadingMore or when no more pages', () => {
     const { cmp, http } = build({ expenses: page([EXPENSE], 1) });
-    // total === items.length → hasMore false
     expect(cmp.hasMore()).toBe(false);
     cmp.loadMore();
     http.expectNone((r) => r.url.endsWith('/expenses') && r.method === 'GET');
@@ -524,6 +531,10 @@ describe('ExpensesComponent (unit)', () => {
     cmp.loading.set(false);
   });
 
+  /**
+   * The fiscal-year load resolves child-1 to its top node top-1. Exactly one active fiscal year is
+   * preselected.
+   */
   it('openCreate resets the dialog and loads fiscal years when a budget is preselected', () => {
     const { cmp, http } = build({ tree: ROOT_TREE });
     cmp.budgetId.set('child-1');
@@ -531,11 +542,9 @@ describe('ExpensesComponent (unit)', () => {
     expect(cmp.createOpen()).toBe(true);
     expect(dlg(cmp).newKind()).toBe('expense');
     expect(dlg(cmp).newBudgetId()).toBe('child-1');
-    // the fiscal-year load resolves child-1 to its top node top-1
     const req = http.expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years'));
     req.flush([FY_ACTIVE]);
     expect(dlg(cmp).fiscalYearOptions()).toEqual([{ value: 'fy-active', label: '2026' }]);
-    // exactly one active fiscal year → preselected
     expect(dlg(cmp).newFiscalYearId()).toBe('fy-active');
   });
 
@@ -548,6 +557,7 @@ describe('ExpensesComponent (unit)', () => {
     http.expectNone((r) => r.url.includes('/fiscal-years'));
   });
 
+  /** Two active years give no preselection. */
   it('onPickBudget loads fiscal years; multiple active years are not auto-selected', () => {
     const { cmp, http } = build({ tree: ROOT_TREE });
     dlg(cmp).onPickBudget('child-1');
@@ -557,7 +567,6 @@ describe('ExpensesComponent (unit)', () => {
       .expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years'))
       .flush([FY_ACTIVE, secondActive, FY_OLD]);
     expect(dlg(cmp).fiscalYearOptions().length).toBe(3);
-    // two active → no preselection
     expect(dlg(cmp).newFiscalYearId()).toBe('');
   });
 
@@ -582,34 +591,38 @@ describe('ExpensesComponent (unit)', () => {
     expect(dlg(cmp).fiscalYearOptions()).toEqual([]);
   });
 
+  /** The top-node lookup returns null, so no request runs and the options stay empty. */
   it('loadFiscalYears is skipped when the budget id is not in the tree', () => {
     const { cmp, http } = build({ tree: ROOT_TREE });
     dlg(cmp).onPickBudget('unknown-id');
-    // the top-node lookup returns null, so no request runs and the options stay empty
     http.expectNone((r) => r.url.includes('/fiscal-years'));
     expect(dlg(cmp).fiscalYearOptions()).toEqual([]);
   });
 
+  /**
+   * The amount must be present and above 0. A standalone booking needs budget and fiscal year. A
+   * linked booking needs only an application, which carries cost center and year.
+   */
   it('canSubmitCreate enforces description, amount and (for standalone) budget+fy', () => {
     const { cmp } = build();
     expect(cmp.canSubmitCreate()).toBe(false);
     dlg(cmp).newDescription.set('Kaffee');
-    expect(cmp.canSubmitCreate()).toBe(false); // amount missing
+    expect(cmp.canSubmitCreate()).toBe(false);
     dlg(cmp).newAmount.set('0');
-    expect(cmp.canSubmitCreate()).toBe(false); // amount must be > 0
+    expect(cmp.canSubmitCreate()).toBe(false);
     dlg(cmp).newAmount.set('12');
-    expect(cmp.canSubmitCreate()).toBe(false); // standalone needs budget+fy
+    expect(cmp.canSubmitCreate()).toBe(false);
     dlg(cmp).newBudgetId.set('b-1');
-    expect(cmp.canSubmitCreate()).toBe(false); // fy missing
+    expect(cmp.canSubmitCreate()).toBe(false);
     dlg(cmp).newFiscalYearId.set('fy-1');
     expect(cmp.canSubmitCreate()).toBe(true);
-    // a linked booking needs only an application, which carries cost center and year
     dlg(cmp).newBudgetId.set('');
     dlg(cmp).newFiscalYearId.set('');
     dlg(cmp).newApplicationId.set('app-9');
     expect(cmp.canSubmitCreate()).toBe(true);
   });
 
+  /** The reload fires another list request. */
   it('create posts a standalone booking, toasts and reloads', () => {
     const { cmp, http } = build();
     dlg(cmp).newDescription.set('  Kaffee  ');
@@ -639,7 +652,6 @@ describe('ExpensesComponent (unit)', () => {
     req.flush({ ...EXPENSE, id: 'e-new' });
     expect(cmp.saving()).toBe(false);
     expect(cmp.createOpen()).toBe(false);
-    // reload fires another list request
     flushList(http, page([]));
   });
 
@@ -669,9 +681,8 @@ describe('ExpensesComponent (unit)', () => {
 
   it('create is a no-op when invalid or already saving', () => {
     const { cmp, http } = build();
-    cmp.create(new Event('submit')); // invalid → no request
+    cmp.create(new Event('submit'));
     http.expectNone((r) => r.url.endsWith('/expenses') && r.method === 'POST');
-    // valid but saving
     dlg(cmp).newDescription.set('x');
     dlg(cmp).newAmount.set('1');
     dlg(cmp).newApplicationId.set('app-1');
@@ -680,6 +691,7 @@ describe('ExpensesComponent (unit)', () => {
     http.expectNone((r) => r.url.endsWith('/expenses') && r.method === 'POST');
   });
 
+  /** Without a detail the toast shows a generic fallback. */
   it('create surfaces the problem+json detail on error, else a generic message', () => {
     const { cmp, http } = build();
     const toastSpy = jest.spyOn(
@@ -696,7 +708,6 @@ describe('ExpensesComponent (unit)', () => {
     expect(cmp.saving()).toBe(false);
     expect(toastSpy).toHaveBeenCalledWith('Budget überschritten');
 
-    // generic fallback without a detail
     cmp.create(new Event('submit'));
     http
       .expectOne((r) => r.url.endsWith('/expenses') && r.method === 'POST')
@@ -716,11 +727,11 @@ describe('ExpensesComponent (unit)', () => {
     expect(dlg(cmp).appCandidates()).toEqual([]);
   });
 
+  /** appQuery holds the raw value, and only the request param is trimmed. */
   it('onAppSearch queries applications and maps candidates (a nameless one reads "Ohne Titel", never its id)', () => {
     const { cmp, http } = build();
     dlg(cmp).onAppSearch('  flyer ');
     dlg(cmp).appSearch.flush();
-    // appQuery holds the raw value. Only the request param is trimmed.
     expect(dlg(cmp).appQuery()).toBe('  flyer ');
     const req = http.expectOne((r) => r.url.endsWith('/applications'));
     expect(req.request.params.get('q')).toBe('flyer');
@@ -787,9 +798,8 @@ describe('ExpensesComponent (unit)', () => {
     expect(dlg(cmp).newCorrespondent()).toBe('');
   });
 
+  /** The backend can send null for grossAmount, which hits the empty-string fallback. */
   it('onPickInvoice handles sparse invoices (null gross, missing fields)', () => {
-    // A null grossAmount at runtime hits the empty-string fallback. The backend can
-    // send null for this field.
     const sparse = {
       ...INVOICE,
       id: 'inv-3',
@@ -830,11 +840,14 @@ describe('ExpensesComponent (unit)', () => {
     expect(dlg(cmp).editAmount()).toBe('');
   });
 
+  /**
+   * Invoices without a date sort after the dated one. A linked invoice that the list does not hold
+   * adds no option.
+   */
   it('onPickEditInvoice keeps the fields an invoice without data cannot fill', () => {
     const bare = { ...INVOICE, id: 'inv-5', supplier: null, number: null, issueDate: null } as unknown as Invoice;
     const undated = { ...INVOICE, id: 'inv-6', issueDate: null } as unknown as Invoice;
     const { cmp } = build({ invoices: [bare, undated, INVOICE] });
-    // Invoices without a date sort after the dated one.
     expect(dlg(cmp).invoiceOptions()[0].value).toBe('inv-1');
     dlg(cmp).editCorrespondent.set('Alt');
     dlg(cmp).editReferenceNumber.set('R-1');
@@ -843,7 +856,6 @@ describe('ExpensesComponent (unit)', () => {
     expect(dlg(cmp).editCorrespondent()).toBe('Alt');
     expect(dlg(cmp).editReferenceNumber()).toBe('R-1');
     expect(dlg(cmp).editInvoiceDate()).toBe('2026-01-01');
-    // A linked invoice that the list does not hold adds no option.
     dlg(cmp).editInvoiceId.set('inv-gone');
     expect(dlg(cmp).editInvoiceOptions().map((o) => o.value)).not.toContain('inv-gone');
   });
@@ -947,7 +959,7 @@ describe('ExpensesComponent (unit)', () => {
 
   it('saveEdit is a no-op without an editing target or while saving', () => {
     const { cmp, http } = build();
-    cmp.saveEdit(new Event('submit')); // editing null
+    cmp.saveEdit(new Event('submit'));
     http.expectNone((r) => r.method === 'PATCH');
     cmp.editing.set(EXPENSE);
     cmp.saving.set(true);
@@ -997,7 +1009,7 @@ describe('ExpensesComponent (unit)', () => {
 
   it('doDelete is a no-op without a target or while saving', () => {
     const { cmp, http } = build();
-    cmp.doDelete(); // no confirmDelete
+    cmp.doDelete();
     http.expectNone((r) => r.method === 'DELETE');
     cmp.confirmDelete.set(EXPENSE);
     cmp.saving.set(true);
@@ -1020,8 +1032,10 @@ describe('ExpensesComponent (unit)', () => {
     expect(toastSpy).toHaveBeenCalledWith('Aktion fehlgeschlagen.');
   });
 
+  /**
+   * jsdom has no URL.createObjectURL and no URL.revokeObjectURL, so the test defines them first.
+   */
   it('onExport downloads the xlsx and clears the exporting flag', () => {
-    // jsdom has no URL.createObjectURL and no URL.revokeObjectURL, so define them first.
     (URL as unknown as { createObjectURL?: unknown }).createObjectURL = () => 'blob:mock';
     (URL as unknown as { revokeObjectURL?: unknown }).revokeObjectURL = () => undefined;
     const createObjSpy = jest.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock');
@@ -1116,12 +1130,14 @@ describe('ExpensesComponent (unit)', () => {
     http.expectNone((r) => r.url.includes('/fiscal-years'));
   });
 
+  /**
+   * An unknown budget has no top node, so no request runs. A known budget with an error resets the
+   * options.
+   */
   it('loadTransferFy is skipped for an unknown budget and resets on error', () => {
     const { cmp, http } = build({ tree: ROOT_TREE });
-    // an unknown budget has no top node, so no request runs
     dlg(cmp).onTransferFrom('ghost');
     http.expectNone((r) => r.url.includes('/fiscal-years'));
-    // known but error → options reset
     dlg(cmp).transferFyOptions.set([{ value: 'x', label: 'X' }]);
     dlg(cmp).onTransferFrom('child-1');
     http
@@ -1142,7 +1158,7 @@ describe('ExpensesComponent (unit)', () => {
     const { cmp } = build();
     expect(cmp.canSubmitTransfer()).toBe(false);
     cmp.tFromId.set('a');
-    cmp.tToId.set('a'); // same → invalid
+    cmp.tToId.set('a');
     cmp.tFiscalYearId.set('fy-1');
     cmp.tAmount.set('10');
     cmp.tDescription.set('Umbuchung');
@@ -1181,7 +1197,7 @@ describe('ExpensesComponent (unit)', () => {
 
   it('createTransfer is a no-op when invalid or already saving', () => {
     const { cmp, http } = build();
-    cmp.createTransfer(new Event('submit')); // invalid
+    cmp.createTransfer(new Event('submit'));
     http.expectNone((r) => r.url.endsWith('/budget-transfers'));
     cmp.tFromId.set('a');
     cmp.tToId.set('b');
@@ -1213,10 +1229,11 @@ describe('ExpensesComponent (unit)', () => {
   });
 });
 
-// Sub-bookings, the description expand and the invoice detail dialog.
-
 /** Parent booking with children. Its amount is the sum of the children and read-only
- *  on the server. */
+ *  on the server.
+ *
+ * Tests for sub-bookings, the description expand and the invoice detail dialog.
+ */
 const PARENT: Expense = { ...EXPENSE, id: 'parent-1', parentExpenseId: null, childCount: 2 };
 const SUB: Expense = {
   ...EXPENSE,
@@ -1286,6 +1303,7 @@ describe('ExpensesComponent (sub-bookings)', () => {
     expect(subs(cmp).canSubmitSub()).toBe(true);
   });
 
+  /** The reload covers the child list and the parent amount, which is the sum of the children. */
   it('createSub posts the sub-booking, expands the parent, reloads and toasts', () => {
     const { cmp, http } = build({ expenses: page([PARENT], 1) });
     const { success } = toastSpies(cmp);
@@ -1308,7 +1326,6 @@ describe('ExpensesComponent (sub-bookings)', () => {
     expect(cmp.saving()).toBe(false);
     expect(cmp.subParent()).toBeNull();
     expect(success).toHaveBeenCalledWith('Unterbuchung hinzugefügt.');
-    // reload the child list and the parent amount, which is the sum of the children
     http
       .expectOne(
         (r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'GET',
@@ -1317,12 +1334,12 @@ describe('ExpensesComponent (sub-bookings)', () => {
     flushList(http, page([PARENT], 1));
   });
 
+  /** A call without an event takes the optional-chaining branch and skips preventDefault. */
   it('createSub nulls blank payment date and correspondent', () => {
     const { cmp, http } = build({ expenses: page([PARENT], 1) });
     cmp.openCreateSub(PARENT);
     subs(cmp).subAmount.set('5');
     subs(cmp).subDescription.set('Teil');
-    // a call without an event takes the optional-chaining branch and skips preventDefault
     subs(cmp).createSub();
     const req = http.expectOne(
       (r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'POST',
@@ -1346,9 +1363,9 @@ describe('ExpensesComponent (sub-bookings)', () => {
     const { cmp, http } = build();
     subs(cmp).subAmount.set('10');
     subs(cmp).subDescription.set('Teil');
-    subs(cmp).createSub(new Event('submit')); // no parent dialog open
+    subs(cmp).createSub(new Event('submit'));
     http.expectNone((r) => r.url.includes('/sub-bookings'));
-    cmp.openCreateSub(PARENT); // dialog open but fields reset → invalid
+    cmp.openCreateSub(PARENT);
     subs(cmp).createSub(new Event('submit'));
     http.expectNone((r) => r.url.includes('/sub-bookings'));
     subs(cmp).subAmount.set('10');
@@ -1358,6 +1375,7 @@ describe('ExpensesComponent (sub-bookings)', () => {
     http.expectNone((r) => r.url.includes('/sub-bookings'));
   });
 
+  /** The dialog stays open for correction. */
   it('createSub toasts a generic failure on error', () => {
     const { cmp, http } = build();
     const { error } = toastSpies(cmp);
@@ -1371,11 +1389,11 @@ describe('ExpensesComponent (sub-bookings)', () => {
       )
       .error(new ProgressEvent('err'));
     expect(cmp.saving()).toBe(false);
-    // dialog stays open for correction.
     expect(cmp.subParent()).toBe(PARENT);
     expect(error).toHaveBeenCalledWith('Aktion fehlgeschlagen.');
   });
 
+  /** parentExpenseId is set, so the parent panel and the list reload for the amount. */
   it('saveEdit on a sub-booking refreshes the parent panel and the list', () => {
     const { cmp, http } = build({ expenses: page([PARENT], 1) });
     cmp.openEdit(SUB);
@@ -1385,7 +1403,6 @@ describe('ExpensesComponent (sub-bookings)', () => {
       .expectOne((r) => r.url.endsWith('/budget-expenses/sub-1') && r.method === 'PATCH')
       .flush({ ...SUB, description: 'Teil neu' });
     expect(cmp.editing()).toBeNull();
-    // parentExpenseId is set, so the parent panel and the list reload for the amount
     http
       .expectOne(
         (r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'GET',
@@ -1395,22 +1412,26 @@ describe('ExpensesComponent (sub-bookings)', () => {
     expect(subs(cmp).subOf('parent-1')[0].description).toBe('Teil neu');
   });
 
+  /**
+   * A changed standalone cost centre is sent. The amount did not change and stays read-only on the
+   * server, so it is not sent. The row keeps childCount from the known row, because a single
+   * response omits it.
+   */
   it('saveEdit sends budgetId only for a changed standalone cost centre and preserves childCount', () => {
     const { cmp, http } = build({ expenses: page([PARENT], 1) });
     cmp.openEdit(PARENT);
-    dlg(cmp).editBudgetId.set('b-2'); // standalone + changed → gets sent
+    dlg(cmp).editBudgetId.set('b-2');
     cmp.saveEdit(new Event('submit'));
     const req = http.expectOne(
       (r) => r.url.endsWith('/budget-expenses/parent-1') && r.method === 'PATCH',
     );
     expect(req.request.body).toMatchObject({ budgetId: 'b-2' });
-    // the amount did not change and stays read-only on the server, so it is not sent
     expect((req.request.body as Record<string, unknown>)['amount']).toBeUndefined();
     req.flush({ ...PARENT, budgetId: 'b-2', childCount: undefined as unknown as number });
-    // keep childCount from the known row, because a single response omits it
     expect(cmp.items().find((x) => x.id === 'parent-1')?.childCount).toBe(2);
   });
 
+  /** The parent row stays in the list, so the panel and the list reload instead. */
   it('doDelete on a sub-booking refreshes the parent panel and the list', () => {
     const { cmp, http } = build({ expenses: page([PARENT], 1) });
     cmp.askDelete(SUB);
@@ -1419,7 +1440,6 @@ describe('ExpensesComponent (sub-bookings)', () => {
       .expectOne((r) => r.url.endsWith('/budget-expenses/sub-1') && r.method === 'DELETE')
       .flush(null);
     expect(cmp.confirmDelete()).toBeNull();
-    // the parent row stays in the list. Reload the panel and the list instead.
     http
       .expectOne(
         (r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'GET',
@@ -1429,6 +1449,10 @@ describe('ExpensesComponent (sub-bookings)', () => {
     expect(cmp.items().map((x) => x.id)).toEqual(['parent-1']);
   });
 
+  /**
+   * The form of the parent stays, with the unsaved edit. The list reloads, and the parent loads
+   * alone for its new amount.
+   */
   it('keeps the parent form open when a sub-booking of it is deleted', () => {
     const { cmp, http } = build({ expenses: page([PARENT], 1) });
     cmp.openEdit(PARENT);
@@ -1438,7 +1462,6 @@ describe('ExpensesComponent (sub-bookings)', () => {
     http
       .expectOne((r) => r.url.endsWith('/budget-expenses/sub-1') && r.method === 'DELETE')
       .flush(null);
-    // The form of the parent stays, with the unsaved edit.
     expect(cmp.formMode()).toBe('edit');
     expect(cmp.editing()?.id).toBe('parent-1');
     expect(dlg(cmp).editDescription()).toBe('Neu, noch nicht gespeichert');
@@ -1447,7 +1470,6 @@ describe('ExpensesComponent (sub-bookings)', () => {
         (r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'GET',
       )
       .flush([]);
-    // The list reloads, and the parent loads alone for its new amount.
     http
       .expectOne((r) => r.url.endsWith('/expenses') && r.method === 'GET' && !r.params.has('id'))
       .flush(page([{ ...PARENT, amount: '30.00', childCount: 1 }], 1));
@@ -1488,6 +1510,7 @@ describe('ExpensesComponent (invoice detail)', () => {
     }
   });
 
+  /** A null fileName falls back to 'beleg.pdf'. */
   it('openInvoiceFile streams the file blob and downloads it (fileName fallback)', () => {
     (URL as unknown as { createObjectURL?: unknown }).createObjectURL = () => 'blob:mock';
     (URL as unknown as { revokeObjectURL?: unknown }).revokeObjectURL = () => undefined;
@@ -1497,7 +1520,6 @@ describe('ExpensesComponent (invoice detail)', () => {
       .spyOn(HTMLAnchorElement.prototype, 'click')
       .mockImplementation(() => undefined);
     const { cmp, http } = build();
-    // a null fileName falls back to 'beleg.pdf'
     dlg(cmp).openInvoiceFile({ ...INVOICE, fileName: null });
     http
       .expectOne((r) => r.url.endsWith('/invoices/inv-1/file') && r.method === 'GET')
@@ -1520,13 +1542,18 @@ describe('ExpensesComponent (invoice detail)', () => {
   });
 });
 
-// IntersectionObserver branch: the observer calls loadMore when the sentinel becomes
-// visible. The test shims the observer and fires the callback by hand.
+/**
+ * The observer calls loadMore when the sentinel becomes visible. The test shims the observer and
+ * fires the callback by hand.
+ */
 describe('ExpensesComponent (infinite scroll)', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
+  /**
+   * A visible sentinel makes loadMore fetch the second page; a hidden one runs no further request.
+   */
   it('observes the sentinel and loads more when it intersects', async () => {
-    let trigger: ((entries: { isIntersecting: boolean }[]) => void) | null = null;
+    let trigger = null as ((entries: { isIntersecting: boolean }[]) => void) | null;
     const disconnect = jest.fn();
     const observe = jest.fn();
     class IOStub {
@@ -1558,18 +1585,17 @@ describe('ExpensesComponent (infinite scroll)', () => {
     view.detectChanges();
 
     expect(observe).toHaveBeenCalled();
-    // the sentinel becomes visible, so loadMore fetches the second page
     trigger?.([{ isIntersecting: true }]);
     http
       .match((r) => r.url.endsWith('/expenses') && r.method === 'GET')
       .forEach((req) => req.flush(page([{ ...EXPENSE, id: 'e-2' }], 3, 1)));
-    // the sentinel is not visible, so no further request runs
     trigger?.([{ isIntersecting: false }]);
     http.expectNone((r) => r.url.endsWith('/expenses') && r.method === 'GET');
 
     delete (globalThis as unknown as { IntersectionObserver?: unknown }).IntersectionObserver;
     http.verify();
   });
+  /** The list scrolls inside its own box there, so the box is the root. */
   it('watches the sentinel inside the list box on the wide layout', async () => {
     setViewport(WIDE);
     const roots: (Element | Document | null | undefined)[] = [];
@@ -1583,18 +1609,18 @@ describe('ExpensesComponent (infinite scroll)', () => {
     (globalThis as unknown as { IntersectionObserver: unknown }).IntersectionObserver = IOStub;
     const { container, fixture } = await setup({ page: page([EXPENSE], 3) });
     fixture.detectChanges();
-    // The list scrolls inside its own box there, so the box is the root.
     expect(roots.at(-1)).toBe(container.querySelector('.exp__scroll'));
     delete (globalThis as unknown as { IntersectionObserver?: unknown }).IntersectionObserver;
   });
 });
 
-// Bulk actions, cross-links and URL sync. The facade adds these members
-// on top of the state modules. They are the selection, the bulk delete, the bulk export
-// and reassign, ksLink, and the query-param adoption and mirror effects.
-
 /** Stub URL.createObjectURL, URL.revokeObjectURL and the anchor click for blob
- *  downloads. */
+ *  downloads.
+ *
+ * Bulk actions, cross-links and URL sync are members that the facade adds on top of the state
+ * modules: the selection, the bulk delete, the bulk export and reassign, ksLink, and the
+ * query-param adoption and mirror effects.
+ */
 function stubDownload(): {
   create: jest.SpyInstance;
   click: jest.SpyInstance;
@@ -1654,7 +1680,7 @@ describe('ExpensesComponent (batch/bulk)', () => {
 
   it('askBulkDelete only opens the confirmation with a selection under the cap', () => {
     const { cmp } = build({ expenses: page([EXPENSE], 1) });
-    cmp.askBulkDelete(); // nothing selected → no-op
+    cmp.askBulkDelete();
     expect(cmp.bulkConfirm()).toBeNull();
     cmp.toggleSelect('e-1', true);
     cmp.askBulkDelete();
@@ -1663,14 +1689,18 @@ describe('ExpensesComponent (batch/bulk)', () => {
 
   it('runBulkDelete and runBulkExport are no-ops while busy or without a selection', () => {
     const { cmp } = build({ expenses: page([EXPENSE], 1) });
-    cmp.runBulkDelete(); // nothing selected
+    cmp.runBulkDelete();
     cmp.runBulkExport();
     cmp.toggleSelect('e-1', true);
     cmp.bulkBusy.set(true);
-    cmp.runBulkDelete(); // busy → no DELETE
-    cmp.runBulkExport(); // busy → no export
+    cmp.runBulkDelete();
+    cmp.runBulkExport();
   });
 
+  /**
+   * The bulk epilogue refreshes the list with one GET /expenses for the window, and the prune
+   * effect empties the stale selection.
+   */
   it('runBulkDelete removes the selected rows, refreshes and toasts', () => {
     const e2 = { ...EXPENSE, id: 'e-2' };
     const e3 = { ...EXPENSE, id: 'e-3' };
@@ -1686,12 +1716,10 @@ describe('ExpensesComponent (batch/bulk)', () => {
     http
       .expectOne((r) => r.url.endsWith('/budget-expenses/e-2') && r.method === 'DELETE')
       .flush(null);
-    // the bulk epilogue refreshes the list with one GET /expenses for the window
     flushList(http, page([], 0));
     expect(cmp.bulkConfirm()).toBeNull();
     expect(cmp.bulkBusy()).toBe(false);
     expect(success).toHaveBeenCalledWith('2 Buchung(en) gelöscht.');
-    // the prune effect empties the stale selection
     TestBed.tick();
     expect(cmp.selectedCount()).toBe(0);
   });
@@ -1752,7 +1780,7 @@ describe('ExpensesComponent (batch/bulk)', () => {
     const { cmp } = build({ expenses: page([EXPENSE], 1) });
     cmp.bulkBudgetId.set('stale');
     cmp.bulkCategory.set('stale');
-    cmp.openBulkReassign(); // nothing selected → no-op
+    cmp.openBulkReassign();
     expect(cmp.bulkReassignOpen()).toBe(false);
     cmp.toggleSelect('e-1', true);
     cmp.openBulkReassign();
@@ -1761,6 +1789,10 @@ describe('ExpensesComponent (batch/bulk)', () => {
     expect(cmp.bulkCategory()).toBe('');
   });
 
+  /**
+   * A standalone booking takes budgetId and category. A bound booking takes only the category,
+   * because the application sets the cost center.
+   */
   it('runBulkReassign patches the cost centre for standalone rows only and refreshes', () => {
     const bound = { ...EXPENSE, id: 'e-bound', applicationId: 'app-1' };
     const { cmp, http } = build({ expenses: page([EXPENSE, bound], 2) });
@@ -1771,13 +1803,11 @@ describe('ExpensesComponent (batch/bulk)', () => {
     cmp.bulkBudgetId.set('b-9');
     cmp.bulkCategory.set('  Reise  ');
     cmp.runBulkReassign();
-    // a standalone booking takes budgetId and category
     const r1 = http.expectOne(
       (r) => r.url.endsWith('/budget-expenses/e-1') && r.method === 'PATCH',
     );
     expect(r1.request.body).toEqual({ category: 'Reise', budgetId: 'b-9' });
     r1.flush({ ...EXPENSE });
-    // a bound booking takes only the category, because the application sets the cost center
     const r2 = http.expectOne(
       (r) => r.url.endsWith('/budget-expenses/e-bound') && r.method === 'PATCH',
     );
@@ -1793,7 +1823,7 @@ describe('ExpensesComponent (batch/bulk)', () => {
     const { cmp, http } = build({ expenses: page([EXPENSE], 1) });
     cmp.toggleSelect('e-1', true);
     cmp.openBulkReassign();
-    cmp.bulkBudgetId.set('b-7'); // no category → the category branch stays false
+    cmp.bulkBudgetId.set('b-7');
     cmp.runBulkReassign();
     const req = http.expectOne(
       (r) => r.url.endsWith('/budget-expenses/e-1') && r.method === 'PATCH',
@@ -1806,12 +1836,12 @@ describe('ExpensesComponent (batch/bulk)', () => {
 
   it('runBulkReassign is a no-op without a selection, while busy or when nothing to submit', () => {
     const { cmp, http } = build({ expenses: page([EXPENSE], 1) });
-    cmp.runBulkReassign(); // empty selection
+    cmp.runBulkReassign();
     cmp.toggleSelect('e-1', true);
-    cmp.runBulkReassign(); // canSubmitReassign false (no budget/category)
+    cmp.runBulkReassign();
     cmp.bulkBudgetId.set('b-2');
     cmp.bulkBusy.set(true);
-    cmp.runBulkReassign(); // busy
+    cmp.runBulkReassign();
     http.expectNone((r) => r.method === 'PATCH');
   });
 
@@ -1834,9 +1864,9 @@ describe('ExpensesComponent (batch/bulk)', () => {
     const e2 = { ...EXPENSE, id: 'e-2' };
     const { cmp } = build({ expenses: page([EXPENSE, e2], 2) });
     cmp.selected.set(new Set(['e-1', 'e-2']));
-    TestBed.tick(); // all still present → selection kept
+    TestBed.tick();
     expect([...cmp.selected()].sort()).toEqual(['e-1', 'e-2']);
-    cmp.items.set([EXPENSE]); // e-2 vanished
+    cmp.items.set([EXPENSE]);
     TestBed.tick();
     expect([...cmp.selected()]).toEqual(['e-1']);
   });
@@ -1845,7 +1875,7 @@ describe('ExpensesComponent (batch/bulk)', () => {
     const { cmp } = build();
     const router = TestBed.inject(Router);
     const nav = jest.spyOn(router, 'navigate').mockResolvedValue(true);
-    TestBed.tick(); // initial run: everything empty → nulls
+    TestBed.tick();
     expect(nav).toHaveBeenLastCalledWith(
       [],
       expect.objectContaining({
@@ -1879,9 +1909,9 @@ describe('ExpensesComponent (batch/bulk)', () => {
     const { cmp } = build({ expenses: page([EXPENSE, e2], 2) });
     cmp.toggleSelectAll(true);
     expect(cmp.bulkDeleteBlocked()).toBe(true);
-    cmp.askBulkDelete(); // blocked → dialog stays closed
+    cmp.askBulkDelete();
     expect(cmp.bulkConfirm()).toBeNull();
-    cmp.toggleSelect('e-2', false); // partial selection → delete allowed again
+    cmp.toggleSelect('e-2', false);
     expect(cmp.bulkDeleteBlocked()).toBe(false);
     cmp.askBulkDelete();
     expect(cmp.bulkConfirm()).toBe('delete');
@@ -1908,6 +1938,10 @@ describe('ExpensesComponent (batch/bulk)', () => {
   });
 });
 
+/**
+ * The component adopts the URL filters first and then loads exactly one time, because a double
+ * reload races and can show the unfiltered list.
+ */
 describe('ExpensesComponent (query-param adoption)', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
   afterEach(() => {
@@ -1938,8 +1972,6 @@ describe('ExpensesComponent (query-param adoption)', () => {
     http
       .expectOne((r) => r.url.endsWith('/invoices') && r.method === 'GET')
       .flush({ items: [], total: 0, limit: 200, offset: 0 });
-    // Exactly ONE reload. The component adopts the URL filters first and then loads
-    // one time. The old double reload raced and could show the unfiltered list.
     const reqs = http.match((r) => r.url.endsWith('/expenses') && r.method === 'GET');
     expect(reqs.length).toBe(1);
     reqs.forEach((req) => req.flush(page([])));
@@ -1962,14 +1994,17 @@ describe('ExpensesComponent (query-param adoption)', () => {
       ['kind', 'weird'],
       ['budget', 'b-2'],
     ]);
-    expect(cmp.kind()).toBe(''); // invalid value not applied
+    expect(cmp.kind()).toBe('');
     expect(cmp.budgetId()).toBe('b-2');
   });
 
+  /**
+   * The id opens a row; it does not narrow the list. The fiscal-year labels need the tree, which is
+   * empty here, so there is no request.
+   */
   it('opens the booking of ?id= and loads it when it is not among the rows', () => {
     const { cmp, http } = buildWithQuery([['id', 'e-42']]);
     expect(cmp.selectedId()).toBe('e-42');
-    // The id opens a row; it does not narrow the list.
     expect(cmp.activeFilterCount()).toBe(0);
     TestBed.tick();
     const one = http.expectOne(
@@ -1981,7 +2016,6 @@ describe('ExpensesComponent (query-param adoption)', () => {
     expect(cmp.detailView()).toBe('booking');
     expect(cmp.detailOpen()).toBe(true);
     TestBed.tick();
-    // The fiscal-year labels need the tree, which is empty here: no request.
     http.expectNone((r) => r.url.includes('/fiscal-years'));
   });
 
@@ -2004,17 +2038,19 @@ describe('ExpensesComponent (query-param adoption)', () => {
     expect(cmp.selectedMissing()).toBe(true);
   });
 
+  /**
+   * The row is among the loaded rows, so there is no request by id. A bulk "Umbuchen" moves the
+   * booking out of the cost-centre filter. The detail keeps the row as the list showed it until the
+   * booking loads by its id.
+   */
   it('keeps the open booking when a refresh drops it from the filtered list', () => {
     const { cmp, http } = buildWithQuery([['id', 'e-1']]);
     lst(cmp).items.set([EXPENSE]);
     TestBed.tick();
-    // The row is among the loaded rows: no request by id.
     http.expectNone((r) => r.url.endsWith('/expenses') && r.params.get('id') === 'e-1');
-    // A bulk "Umbuchen" moved the booking out of the cost-centre filter.
     lst(cmp).refresh();
     flushList(http, page([]));
     TestBed.tick();
-    // The detail keeps the row as the list showed it until the booking loads by its id.
     expect(cmp.detailView()).toBe('booking');
     expect(cmp.selectedExpense()?.budgetId).toBe('b-1');
     http
@@ -2039,6 +2075,11 @@ describe('ExpensesComponent (query-param adoption)', () => {
     expect(cmp.selectedExpense()?.description).toBe('Neu');
   });
 
+  /**
+   * The late answer of the first booking changes nothing. An empty answer marks the open booking as
+   * missing. A late error of a booking that is no longer open changes nothing either. A booking
+   * that is already loaded loads no second time.
+   */
   it('drops the answer for a booking that is no longer open', () => {
     const { cmp, http } = buildWithQuery([['id', 'e-42']]);
     TestBed.tick();
@@ -2046,13 +2087,10 @@ describe('ExpensesComponent (query-param adoption)', () => {
     cmp.selectedId.set('e-43');
     TestBed.tick();
     const second = http.expectOne((r) => r.url.endsWith('/expenses') && r.params.get('id') === 'e-43');
-    // The late answer of the first booking changes nothing.
     first.flush(page([{ ...EXPENSE, id: 'e-42' }]));
     expect(cmp.selectedMissing()).toBe(false);
-    // An empty answer marks the open booking as missing.
     second.flush(page([]));
     expect(cmp.selectedMissing()).toBe(true);
-    // A late error of a booking that is no longer open changes nothing either.
     cmp.selectedId.set('e-44');
     TestBed.tick();
     const third = http.expectOne((r) => r.url.endsWith('/expenses') && r.params.get('id') === 'e-44');
@@ -2064,7 +2102,6 @@ describe('ExpensesComponent (query-param adoption)', () => {
     http.expectOne((r) => r.url.endsWith('/expenses') && r.params.get('id') === 'e-45').flush(
       page([{ ...EXPENSE, id: 'e-45' }]),
     );
-    // A booking that is already loaded loads no second time.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (cmp as any).ensureSelected('e-45', false, []);
     http.expectNone((r) => r.url.endsWith('/expenses') && r.params.get('id') === 'e-45');
@@ -2095,6 +2132,7 @@ describe('ExpensesComponent (query-param adoption)', () => {
     expect(cmp.linkedApplication()).toBeNull();
   });
 
+  /** A form on the open row stays while the URL keeps that row. */
   it('closes an open form when the URL opens another booking or transfer', () => {
     const { cmp } = buildWithQuery([]);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -2103,7 +2141,6 @@ describe('ExpensesComponent (query-param adoption)', () => {
     expect(cmp.formMode()).toBe('edit');
     adopt({ id: 'e-2' });
     expect(cmp.formMode()).toBeNull();
-    // A form on the open row stays while the URL keeps that row.
     cmp.openEdit(EXPENSE);
     adopt({ id: 'e-2' });
     expect(cmp.formMode()).toBe('edit');
@@ -2111,13 +2148,13 @@ describe('ExpensesComponent (query-param adoption)', () => {
     expect(cmp.formMode()).toBeNull();
   });
 
+  /** A later refresh of the capped list does not hold the paid invoice. */
   it('keeps a preselected invoice when the invoice list arrives after it', () => {
     const { cmp, http } = buildWithQuery([]);
     dlg(cmp).openCreate({ invoiceId: 'inv-paid' });
     http
       .expectOne((r) => r.url.endsWith('/invoices/inv-paid'))
       .flush({ ...INVOICE, id: 'inv-paid', number: 'RE-OLD', status: 'paid' });
-    // A later refresh of the capped list does not hold the paid invoice.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (dlg(cmp) as any).loadInvoices();
     http
@@ -2127,10 +2164,15 @@ describe('ExpensesComponent (query-param adoption)', () => {
     expect(dlg(cmp).invoiceOptions().map((o) => o.value)).toEqual(['inv-paid', 'inv-1']);
   });
 
+  /**
+   * On the same route with a new query string the router keeps this component. A snapshot read once
+   * would leave the list on the booking the reader came from, and the write-back effect would put
+   * that id straight back into the URL. Another booking opens and leaves the list as it is; another
+   * filter reloads the list. A parameter that goes away clears its filter, because each of them is
+   * written back into the URL, so absence means that the reader took it away. The look-up of the
+   * earlier booking is still open, so the test answers it.
+   */
   it('re-filters when the palette sends it here while it is already here', () => {
-    // Same route, new query string: the router keeps this component. Reading the
-    // snapshot once would leave the list showing the booking the reader came from, and
-    // the write-back effect would put that id straight back into the URL.
     const params = new BehaviorSubject(convertToParamMap({ id: 'e-42' }));
     TestBed.configureTestingModule({
       providers: [
@@ -2153,12 +2195,10 @@ describe('ExpensesComponent (query-param adoption)', () => {
       .flush({ items: [], total: 0, limit: 200, offset: 0 });
     http.expectOne((r) => r.url.endsWith('/expenses') && r.method === 'GET').flush(page([]));
 
-    // Another booking opens: the list stays as it is.
     params.next(convertToParamMap({ id: 'e-9' }));
     expect(cmp.selectedId()).toBe('e-9');
     http.expectNone((r) => r.url.endsWith('/expenses') && !r.params.has('id'));
 
-    // Another filter reloads the list.
     params.next(convertToParamMap({ id: 'e-9', budget: 'b-2' }));
     const again = http.expectOne(
       (r) => r.url.endsWith('/expenses') && r.method === 'GET' && !r.params.has('id'),
@@ -2166,8 +2206,6 @@ describe('ExpensesComponent (query-param adoption)', () => {
     expect(again.request.params.get('budget')).toBe('b-2');
     again.flush(page([]));
 
-    // A parameter that goes away clears its filter. Each of them is written back into
-    // the URL, so absence means the reader took it away.
     params.next(convertToParamMap({}));
     expect(cmp.selectedId()).toBe('');
     expect(cmp.budgetId()).toBe('');
@@ -2176,12 +2214,15 @@ describe('ExpensesComponent (query-param adoption)', () => {
     );
     expect(cleared.request.params.has('budget')).toBe(false);
     cleared.flush(page([]));
-    // The look-up of the booking from before is still open; answer it.
     http.match((r) => r.params.get('id') === 'e-42').forEach((r) => r.flush(page([])));
   });
 });
 
-// The window reload that ExpensesListState runs after a mutation, tested in isolation.
+/**
+ * Tests for the window reload that ExpensesListState runs after a mutation, in isolation. The state
+ * does not load on its own; the component fires the first reload after it adopts the URL filters,
+ * and the test does the same.
+ */
 describe('ExpensesListState.refresh', () => {
   afterEach(() => {
     try {
@@ -2202,31 +2243,32 @@ describe('ExpensesListState.refresh', () => {
     const http = TestBed.inject(HttpTestingController);
     const state = TestBed.runInInjectionContext(() => new ExpensesListState());
     http.expectOne((r) => r.url.endsWith('/budgets')).flush([]);
-    // The state no longer loads on its own. The component fires the
-    // first reload after it adopts the URL filters. Mirror that here.
     state.reload();
     http.expectOne((r) => r.url.endsWith('/expenses') && r.method === 'GET').flush(page([]));
     return { state, http };
   }
 
+  /**
+   * The filtered request B resolves first, then the stale request A arrives, and A must not
+   * overwrite the list.
+   */
   it('a reload discards the stale response of an older filter state', () => {
     const { state, http } = buildState();
-    state.reload(); // request A (old filter state)
+    state.reload();
     state.kind.set('income');
-    state.reload(); // request B (new filter state)
+    state.reload();
     const [reqA, reqB] = http.match((r) => r.url.endsWith('/expenses') && r.method === 'GET');
-    // The filtered request B resolves first, then the stale request A arrives. Request
-    // A must NOT overwrite the list.
     reqB.flush(page([EXPENSE], 1));
     reqA.flush(page([{ ...EXPENSE, id: 'stale' }, EXPENSE], 2));
     expect(state.items()).toEqual([EXPENSE]);
     expect(state.total()).toBe(1);
   });
 
+  /** A filter change while the refresh is in flight makes its response stale. */
   it('a stale refresh response is dropped after an intervening reload', () => {
     const { state, http } = buildState();
-    state.refresh(); // in flight …
-    state.reload(); // … filter changes meanwhile
+    state.refresh();
+    state.reload();
     const [refreshReq, reloadReq] = http.match(
       (r) => r.url.endsWith('/expenses') && r.method === 'GET',
     );
@@ -2236,10 +2278,11 @@ describe('ExpensesListState.refresh', () => {
     expect(state.items()).toEqual([EXPENSE]);
   });
 
+  /** refreshing() is already true, so the second call returns early with no request. */
   it('early-returns a concurrent refresh and clears the flag on success', () => {
     const { state, http } = buildState();
     state.refresh();
-    state.refresh(); // refreshing() already true → early return, no second request
+    state.refresh();
     const reqs = http.match((r) => r.url.endsWith('/expenses') && r.method === 'GET');
     expect(reqs.length).toBe(1);
     reqs[0].flush(page([EXPENSE], 1));
@@ -2256,26 +2299,28 @@ describe('ExpensesListState.refresh', () => {
     expect(state.refreshing()).toBe(false);
   });
 
+  /**
+   * Request A (old filter state) fails after request B (new filter state) started. Its error
+   * handler must return early on the epoch mismatch, because otherwise it clears `loading` while B
+   * is still in flight. The test settles B, so no request stays outstanding.
+   */
   it('a stale fetch ERROR leaves the loading flags of the newer request alone', () => {
     const { state, http } = buildState();
-    state.reload(); // request A, the old filter state
+    state.reload();
     state.kind.set('income');
-    state.reload(); // request B, the new filter state, so A is stale from here on
+    state.reload();
     const [reqA, reqB] = http.match((r) => r.url.endsWith('/expenses') && r.method === 'GET');
-    // A fails late. Its error handler must return early on the epoch mismatch.
-    // Otherwise it clears `loading` while B is still in flight.
     reqA.error(new ProgressEvent('err'));
     expect(state.loading()).toBe(true);
-    // Settle B so the test ends with no outstanding request.
     reqB.flush(page([]));
     expect(state.loading()).toBe(false);
   });
 
+  /** A second call while one is in flight returns early and fires no request. */
   it('clears the exporting flag when the xlsx export fails', () => {
     const { state, http } = buildState();
     state.onExport();
     expect(state.exporting()).toBe(true);
-    // A second call while one is in flight returns early and fires no request.
     state.onExport();
     const reqs = http.match((r) => r.url.endsWith('/expenses/export.xlsx'));
     expect(reqs.length).toBe(1);
@@ -2285,8 +2330,6 @@ describe('ExpensesListState.refresh', () => {
     expect(toast).toHaveBeenCalledWith('Der Export ist fehlgeschlagen.');
   });
 });
-
-// --- transfers tab ---------------------------------------------------------
 
 const TRANSFER = {
   transferId: 'tr-1',
@@ -2315,7 +2358,7 @@ function transferPage(items: unknown[] = [TRANSFER], total = items.length) {
 /** Open the transfers tab and answer the first page. */
 async function openTransfers(
   ctx: Awaited<ReturnType<typeof setup>>,
-  body: unknown = transferPage(),
+  body: Parameters<TestRequest['flush']>[0] = transferPage(),
 ) {
   await userEvent.click(await screen.findByRole('radio', { name: 'Überträge' }));
   ctx.http.expectOne((r) => r.url.endsWith('/budget-transfers') && r.method === 'GET').flush(body);
@@ -2369,6 +2412,7 @@ describe('ExpensesComponent — transfers tab', () => {
     ctx.http.verify();
   });
 
+  /** The two legs are rows in the bookings list, so it refreshes too. */
   it('patches a transfer without the cost-centre pair', async () => {
     const ctx = await setup();
     await openTransfers(ctx);
@@ -2389,7 +2433,6 @@ describe('ExpensesComponent — transfers tab', () => {
       paymentDate: '2026-05-28',
     });
     patch.flush({ ...TRANSFER, amount: '75.00', description: 'Korrigiert' });
-    // The two legs are rows in the bookings list, so it refreshes too.
     ctx.http
       .match((r) => r.url.endsWith('/expenses') && r.method === 'GET')
       .forEach((r) => r.flush(page([])));
@@ -2400,6 +2443,7 @@ describe('ExpensesComponent — transfers tab', () => {
     ctx.http.verify();
   });
 
+  /** The reload brings the server truth back on screen. */
   it('explains the 409 on a changed cost-centre pair and reloads', async () => {
     const ctx = await setup();
     await openTransfers(ctx);
@@ -2417,7 +2461,6 @@ describe('ExpensesComponent — transfers tab', () => {
       },
       { status: 409, statusText: 'Conflict' },
     );
-    // The reload gets the server truth back on screen.
     ctx.http
       .expectOne((r) => r.url.endsWith('/budget-transfers') && r.method === 'GET')
       .flush(transferPage());
@@ -2436,6 +2479,21 @@ describe('ExpensesComponent — transfers tab', () => {
       .expectOne('/api/budget-transfers/tr-1')
       .flush({ title: 'e' }, { status: 500, statusText: 'Server Error' });
     expect(c.transferSaving()).toBe(false);
+    ctx.http.verify();
+  });
+
+  it('names a closed fiscal year on a refused patch instead of the pair', async () => {
+    const ctx = await setup();
+    await openTransfers(ctx);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = ctx.fixture.componentInstance as any;
+    const { error } = toastSpies(c);
+    c.openTransferEdit(TRANSFER);
+    c.saveTransferEdit(new Event('submit'));
+    ctx.http
+      .expectOne('/api/budget-transfers/tr-1')
+      .flush({ status: 409, code: 'fiscal_year_closed' }, { status: 409, statusText: 'Conflict' });
+    expect(error).toHaveBeenCalledWith('Das Haushaltsjahr ist abgeschlossen.');
     ctx.http.verify();
   });
 
@@ -2472,6 +2530,7 @@ describe('ExpensesComponent — transfers tab', () => {
     ctx.http.verify();
   });
 
+  /** Without a further page the call returns early and fires no request. */
   it('loads a second page and stops when the list is complete', async () => {
     const ctx = await setup();
     await openTransfers(ctx, transferPage([TRANSFER], 2));
@@ -2483,7 +2542,6 @@ describe('ExpensesComponent — transfers tab', () => {
       .expectOne((r) => r.url.endsWith('/budget-transfers') && r.method === 'GET')
       .flush({ items: [{ ...TRANSFER, transferId: 'tr-2' }], total: 2, limit: 20, offset: 1 });
     expect(c.transferItems().length).toBe(2);
-    // No further page: the call returns early and fires no request.
     c.loadMoreTransfers();
     ctx.http.verify();
   });
@@ -2581,9 +2639,11 @@ describe('ExpensesComponent (filters, generically)', () => {
     }
   });
 
+  /**
+   * A filter that is in the reset list and not in the request list stays invisible until the list
+   * stops answering, so the test checks every filter: eight filters plus sort and order.
+   */
   it('sends every declared filter that has a value', async () => {
-    // The reset list and the request list were spelled out separately; a filter in one
-    // and not the other is invisible until the list stops answering.
     const { fixture } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const state = (fixture.componentInstance as any).list;
@@ -2591,12 +2651,9 @@ describe('ExpensesComponent (filters, generically)', () => {
 
     const params = state.filterParams();
     const values = Object.values(params).filter((v) => v !== undefined);
-    // Eight filters plus sort and order.
     expect(values.length).toBe(state.filterSignals.length + 2);
   });
 });
-
-// --- list/detail (FE10c) ---------------------------------------------------
 
 /** A tree with figures for the fiscal year `fy-1`, so the detail shows its numbers. */
 const FIG_TREE: BudgetTreeNode[] = [
@@ -2634,6 +2691,10 @@ describe('ExpensesComponent (list/detail)', () => {
     }
   });
 
+  /**
+   * A row is a link that opens the booking beside the list. Side by side with nothing open, the
+   * detail says so.
+   */
   it('lists the bookings by month with kind, cost centre, date and the signed amount', async () => {
     setViewport(WIDE);
     const income = { ...EXPENSE, id: 'e-2', kind: 'income' as const, description: 'Pfand', paymentDate: '2026-04-02' };
@@ -2644,13 +2705,15 @@ describe('ExpensesComponent (list/detail)', () => {
     expect(screen.getByText(/−120,00/)).toBeInTheDocument();
     expect(screen.getByText(/\+120,00/)).toBeInTheDocument();
     expect(screen.getByText('28.05.')).toBeInTheDocument();
-    // A row is a link that opens the booking beside the list.
     const link = screen.getByRole('link', { name: /Druckkosten Flyer/ });
     expect(link.getAttribute('href')).toContain('id=e-1');
-    // Side by side, nothing open: the detail says so.
     expect(screen.getByText('Keine Buchung geöffnet')).toBeInTheDocument();
   });
 
+  /**
+   * Sorted by invoice date or by the record date, the months follow that date. The checked sort
+   * order shows in the menu.
+   */
   it('shows one group without a heading while it sorts by amount', () => {
     const { cmp, http } = build({ expenses: page([EXPENSE]) });
     cmp.onHeaderMenu({ id: 'amount:asc', label: '' });
@@ -2658,24 +2721,22 @@ describe('ExpensesComponent (list/detail)', () => {
     expect(cmp.sortField()).toBe('amount');
     expect(cmp.sortOrder()).toBe('asc');
     expect(cmp.groups()).toEqual([{ key: 'all', label: '', items: [EXPENSE] }]);
-    // Sorted by invoice date or by the record date, the months follow that date.
     cmp.onHeaderMenu({ id: 'invoiceDate:desc', label: '' });
     flushList(http, page([EXPENSE]));
     expect(cmp.groups()[0].label).toBe('Mai 2026');
     cmp.onHeaderMenu({ id: 'createdAt:desc', label: '' });
     flushList(http, page([{ ...EXPENSE, paymentDate: null }]));
     expect(cmp.groups()[0].key).toBe('2026-05');
-    // The checked sort order shows in the menu.
     const checked = cmp.sortSections()[0].items.filter((i) => i.checked).map((i) => i.id);
     expect(checked).toEqual(['createdAt:desc']);
   });
 
+  /** An empty list leaves a neutral sheet beside it. */
   it('shows the empty list with a reset only while a filter is set', async () => {
     setViewport(WIDE);
     const { fixture } = await setup();
     expect(await screen.findByText('Keine Buchungen gefunden.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Filter zurücksetzen' })).toBeNull();
-    // An empty list leaves a neutral sheet beside it.
     expect(fixture.nativeElement.querySelector('app-detail-none .dn__ghost')).not.toBeNull();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
@@ -2719,6 +2780,7 @@ describe('ExpensesComponent (list/detail)', () => {
     expect(cmp.activeFilterCount()).toBe(3);
   });
 
+  /** The debounced search of the bookings fires later, so the test answers it. */
   it('filters the transfers with the same chips while they show', () => {
     const { cmp, http } = build();
     cmp.setTab('transfers');
@@ -2737,7 +2799,6 @@ describe('ExpensesComponent (list/detail)', () => {
     cmp.resetFilters();
     flushList(http, page([]));
     http.expectOne((r) => r.url.endsWith('/budget-transfers')).flush(transferPage([]));
-    // The debounced search of the bookings fires later; answer it.
     jest.useFakeTimers();
     jest.useRealTimers();
     http.match((r) => r.url.endsWith('/expenses')).forEach((r) => r.flush(page([])));
@@ -2759,6 +2820,7 @@ describe('ExpensesComponent (list/detail)', () => {
     expect(reader.cmp.headerMenu()).toEqual([]);
   });
 
+  /** An unknown item does nothing. */
   it('runs the items of the header menu', () => {
     const { cmp, http } = build();
     cmp.onHeaderMenu({ id: 'transfer', label: '' });
@@ -2769,10 +2831,10 @@ describe('ExpensesComponent (list/detail)', () => {
     expect(cmp.selecting()).toBe(true);
     cmp.onHeaderMenu({ id: 'export', label: '' });
     http.expectOne((r) => r.url.endsWith('/expenses/export.xlsx')).error(new ProgressEvent('err'));
-    // An unknown item does nothing.
     cmp.onHeaderMenu({ id: 'other', label: '' });
   });
 
+  /** "Zur Liste" with a form open closes the form. */
   it('names each form for the sheet of a phone', () => {
     const { cmp } = build({ expenses: page([EXPENSE]) });
     expect(cmp.formTitle()).toBe('');
@@ -2787,7 +2849,6 @@ describe('ExpensesComponent (list/detail)', () => {
     expect(cmp.formTitle()).toBe('Übertrag bearbeiten');
     expect(cmp.detailView()).toBe('form');
     expect(cmp.detailOpen()).toBe(true);
-    // "Zur Liste" with a form open closes the form.
     cmp.closeDetail();
     expect(cmp.formMode()).toBeNull();
   });
@@ -2831,6 +2892,7 @@ describe('ExpensesComponent (list/detail)', () => {
     nav.mockRestore();
   });
 
+  /** A sub-booking leaves the open parent alone, and another transfer leaves the open one alone. */
   it('closes the detail of a deleted booking and of a deleted transfer', () => {
     const { cmp, http } = build({ expenses: page([EXPENSE]) });
     const router = TestBed.inject(Router);
@@ -2843,7 +2905,6 @@ describe('ExpensesComponent (list/detail)', () => {
     expect(cmp.editing()).toBeNull();
     expect(nav).toHaveBeenLastCalledWith([], expect.objectContaining({ queryParams: { id: null, transfer: null } }));
     nav.mockClear();
-    // A sub-booking leaves the open parent alone.
     cmp.askDelete({ ...EXPENSE, id: 'sub-9', parentExpenseId: 'e-1' });
     cmp.doDelete();
     http.expectOne((r) => r.url.endsWith('/budget-expenses/sub-9')).flush(null);
@@ -2859,7 +2920,6 @@ describe('ExpensesComponent (list/detail)', () => {
     flushList(http, page([EXPENSE]));
     expect(cmp.editingTransfer()).toBeNull();
     expect(nav).toHaveBeenLastCalledWith([], expect.objectContaining({ queryParams: { id: null, transfer: null } }));
-    // Another transfer leaves the open one alone.
     nav.mockClear();
     cmp.askDeleteTransfer({ ...TRANSFER, transferId: 'tr-2' });
     cmp.doDeleteTransfer();
@@ -2869,6 +2929,7 @@ describe('ExpensesComponent (list/detail)', () => {
     nav.mockRestore();
   });
 
+  /** The year labels load once per top cost centre. */
   it('loads the invoice, the application, the sub-bookings and the year of the open booking', () => {
     const parent = { ...EXPENSE, budgetId: 'child-1', invoiceId: 'inv-9', applicationId: 'app-1', childCount: 2 };
     const { cmp, http } = build({ tree: ROOT_TREE, expenses: page([parent]) });
@@ -2891,7 +2952,6 @@ describe('ExpensesComponent (list/detail)', () => {
     expect(cmp.linkedApplication()?.id).toBe('app-1');
     expect(cmp.fyLabel('fy-1')).toBe('2026');
     expect(cmp.fyLabel('fy-x')).toBeNull();
-    // The year labels load once per top cost centre.
     cmp.selectedId.set('');
     TestBed.tick();
     cmp.selectedId.set('e-1');
@@ -2899,6 +2959,7 @@ describe('ExpensesComponent (list/detail)', () => {
     http.expectNone((r) => r.url.includes('/fiscal-years'));
   });
 
+  /** An uncached invoice that fails to load leaves the card without its data. */
   it('takes a cached invoice and keeps going when a linked record fails', () => {
     const linked = { ...EXPENSE, invoiceId: 'inv-1', applicationId: 'app-x' };
     const { cmp, http } = build({ tree: ROOT_TREE, invoices: [INVOICE], expenses: page([linked]) });
@@ -2907,7 +2968,6 @@ describe('ExpensesComponent (list/detail)', () => {
     expect(cmp.linkedInvoice()).toEqual(INVOICE);
     http.expectOne((r) => r.url.endsWith('/applications/app-x')).flush(null, { status: 403, statusText: 'x' });
     expect(cmp.linkedApplication()).toBeNull();
-    // An uncached invoice that fails to load leaves the card without its data.
     TestBed.resetTestingModule();
     const other = build({ expenses: page([{ ...EXPENSE, invoiceId: 'inv-gone' }]) });
     other.cmp.selectedId.set('e-1');
@@ -2928,6 +2988,7 @@ describe('ExpensesComponent (list/detail)', () => {
     http.expectOne((r) => r.url.endsWith('/fiscal-years')).flush([]);
   });
 
+  /** The invoice is not in the cache, so it loads and then fills the form. */
   it('opens the form of a new booking from the invoices page and cleans the URL', () => {
     TestBed.configureTestingModule({
       providers: [
@@ -2952,7 +3013,6 @@ describe('ExpensesComponent (list/detail)', () => {
     });
     flushList(http, page([]));
     expect(cmp.createOpen()).toBe(true);
-    // The invoice is not in the cache: it loads, then fills the form.
     http.expectOne((r) => r.url.endsWith('/invoices/inv-1')).flush(INVOICE);
     expect(dlg(cmp).newInvoiceId()).toBe('inv-1');
     expect(dlg(cmp).newCorrespondent()).toBe('Acme GmbH');
@@ -2982,6 +3042,7 @@ describe('ExpensesComponent (list/detail)', () => {
     expect(cmp.createOpen()).toBe(false);
   });
 
+  /** A transfer that is not loaded leaves the detail empty. */
   it('opens the transfers from ?view=transfers with the open transfer', () => {
     TestBed.configureTestingModule({
       providers: [
@@ -3006,12 +3067,12 @@ describe('ExpensesComponent (list/detail)', () => {
     expect(cmp.transferGroups()[0].label).toBe('Mai 2026');
     TestBed.tick();
     http.expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years')).flush([]);
-    // A transfer that is not loaded leaves the detail empty.
     cmp.selectedTransferId.set('tr-9');
     expect(cmp.selectedTransfer()).toBeNull();
     expect(cmp.detailView()).toBe('none');
   });
 
+  /** A row without an invoice gets no invoice item. */
   it('builds the row menus from the rights and runs them', () => {
     const { cmp, http } = build({ expenses: page([EXPENSE]) });
     const withInvoice = { ...EXPENSE, invoiceId: 'inv-1' };
@@ -3025,7 +3086,7 @@ describe('ExpensesComponent (list/detail)', () => {
     const nav = jest.spyOn(router, 'navigate').mockResolvedValue(true);
     cmp.onRowMenu({ id: 'invoice', label: '' }, withInvoice);
     expect(nav).toHaveBeenCalledWith(['/invoices'], { queryParams: { id: 'inv-1' } });
-    cmp.onRowMenu({ id: 'invoice', label: '' }, EXPENSE); // no invoice: nothing
+    cmp.onRowMenu({ id: 'invoice', label: '' }, EXPENSE);
     cmp.onRowMenu({ id: 'edit', label: '' }, EXPENSE);
     expect(cmp.editing()).toBe(EXPENSE);
     cmp.onRowMenu({ id: 'sub', label: '' }, EXPENSE);
@@ -3050,10 +3111,14 @@ describe('ExpensesComponent (list/detail)', () => {
     expect(reader.cmp.rowMenu(withInvoice).flatMap((s) => s.items.map((i) => i.id))).toEqual(['invoice']);
   });
 
+  /**
+   * Outside the selection mode the link opens the row. A view change ends the selection. A reader
+   * cannot select.
+   */
   it('selects rows in the selection mode and leaves it again', () => {
     const e2 = { ...EXPENSE, id: 'e-2' };
     const { cmp } = build({ expenses: page([EXPENSE, e2]) });
-    cmp.onRowActivate(EXPENSE); // not selecting: the link opens the row
+    cmp.onRowActivate(EXPENSE);
     expect(cmp.selectedCount()).toBe(0);
     cmp.startSelecting();
     cmp.onRowActivate(EXPENSE);
@@ -3064,18 +3129,17 @@ describe('ExpensesComponent (list/detail)', () => {
     cmp.toggleSelect('e-2', true);
     cmp.openBulkReassign();
     expect(cmp.bulkReassignOpen()).toBe(true);
-    // A view change ends the selection.
     cmp.setTab('bookings');
     expect(cmp.selecting()).toBe(false);
     expect(cmp.selectedCount()).toBe(0);
     expect(cmp.bulkReassignOpen()).toBe(false);
-    // A reader cannot select.
     TestBed.resetTestingModule();
     const reader = build({ perms: ['budget.view'] });
     reader.cmp.startSelecting();
     expect(reader.cmp.selecting()).toBe(false);
   });
 
+  /** The select-all box of the bar selects every row. */
   it('shows the bulk panel beside the list and the bulk bar one pane at a time', async () => {
     setViewport(WIDE);
     const e2 = { ...EXPENSE, id: 'e-2', description: 'Plakate' };
@@ -3094,7 +3158,6 @@ describe('ExpensesComponent (list/detail)', () => {
     fixture.detectChanges();
     expect(c.detailView()).toBe('bulk');
     expect(screen.getByRole('heading', { name: '1 Buchungen ausgewählt' })).toBeInTheDocument();
-    // The select-all box of the bar selects every row.
     const all = screen.getByRole('checkbox', { name: /^Alle wählen/ });
     await userEvent.click(all);
     expect(c.selectedCount()).toBe(2);
@@ -3119,6 +3182,7 @@ describe('ExpensesComponent (list/detail)', () => {
     expect(screen.getByRole('button', { name: 'Auswahl exportieren' })).toBeInTheDocument();
   });
 
+  /** The list pane keeps its name while the title row is the bar. */
   it('turns the title row into the bar of the bulk actions on a phone', async () => {
     setViewport(PHONE);
     const { fixture } = await setup({ page: page([EXPENSE]) });
@@ -3129,12 +3193,12 @@ describe('ExpensesComponent (list/detail)', () => {
     fixture.detectChanges();
     const bar = screen.getByRole('toolbar', { name: 'Auswahl' });
     expect(within(bar).getByRole('status')).toHaveTextContent('1 ausgewählt');
-    // The list pane keeps its name while the title row is the bar.
     expect(screen.getByRole('region', { name: 'Buchungen' })).toBeInTheDocument();
     await userEvent.click(within(bar).getByRole('button', { name: 'Löschen' }));
     expect(c.bulkConfirm()).toBe('delete');
   });
 
+  /** The form replaces the detail. */
   it('shows the open booking, the open transfer and a missing booking in the detail', async () => {
     setViewport(WIDE);
     const { fixture, http } = await setup({ page: page([{ ...EXPENSE, budgetId: 'b-1', fiscalYearId: 'fy-1' }]), tree: FIG_TREE });
@@ -3147,7 +3211,6 @@ describe('ExpensesComponent (list/detail)', () => {
     expect(screen.getByRole('heading', { name: 'Druckkosten Flyer' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Buchung bearbeiten' }));
     expect(c.editing()?.id).toBe('e-1');
-    // The form replaces the detail.
     expect(screen.getByRole('heading', { name: 'Buchung bearbeiten' })).toBeInTheDocument();
     c.closeDetail();
 
@@ -3246,5 +3309,92 @@ describe('ExpensesComponent (row swipe)', () => {
     expect(reader.swipeLeft()).toBeNull();
     reader.selectWith(EXPENSE);
     expect(reader.selecting()).toBe(false);
+  });
+});
+
+describe('ExpensesComponent (closed fiscal year)', () => {
+  beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+
+  const CLOSED: FiscalYear = { ...FY_OLD, id: 'fy-closed', active: true, closedAt: '2026-03-01T00:00:00Z' };
+  const closedText = 'Das Haushaltsjahr ist abgeschlossen.';
+
+  /** The closed year is active too, but only the open one counts for the preselection. */
+  it('offers no closed year for a booking or a transfer', () => {
+    const { cmp, http } = build({ tree: ROOT_TREE });
+    dlg(cmp).onPickBudget('child-1');
+    http.expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years')).flush([FY_ACTIVE, CLOSED]);
+    expect(dlg(cmp).fiscalYearOptions()).toEqual([{ value: 'fy-active', label: '2026' }]);
+    expect(dlg(cmp).newFiscalYearId()).toBe('fy-active');
+    dlg(cmp).onTransferFrom('child-1');
+    http.expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years')).flush([FY_ACTIVE, CLOSED]);
+    expect(dlg(cmp).transferFyOptions()).toEqual([{ value: 'fy-active', label: '2026' }]);
+    expect(dlg(cmp).tFiscalYearId()).toBe('fy-active');
+  });
+
+  /** A frozen booking has no write action in its row menu. */
+  it('marks a closed year and freezes its bookings in the detail', () => {
+    const booking = { ...EXPENSE, budgetId: 'child-1', fiscalYearId: 'fy-closed' };
+    const { cmp, http } = build({ tree: ROOT_TREE, expenses: page([booking]) });
+    cmp.selectedId.set('e-1');
+    TestBed.tick();
+    http.expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years')).flush([FY_ACTIVE, CLOSED]);
+    http.match(() => true);
+    expect(cmp.fyLabel('fy-closed')).toBe('2025 · abgeschlossen');
+    expect(cmp.fyLabel('fy-active')).toBe('2026');
+    expect(cmp.canChange('fy-closed')).toBe(false);
+    expect(cmp.canChange('fy-active')).toBe(cmp.canManage());
+    const ids = cmp.rowMenu(booking).flatMap((sec) => sec.items.map((i) => i.id));
+    expect(ids).not.toContain('edit');
+    expect(ids).not.toContain('delete');
+  });
+
+  it('a reopened year drops out of the closed set on the next load', () => {
+    const { cmp } = build({ tree: ROOT_TREE });
+    cmp.closedFys.set(new Set(['fy-active']));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = cmp as any;
+    c.fyRequested.clear();
+    c.loadFyLabels('child-1');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (TestBed.inject(HttpTestingController) as any)
+      .expectOne((r: { url: string }) => r.url.endsWith('/budgets/top-1/fiscal-years'))
+      .flush([FY_ACTIVE]);
+    expect(cmp.closedFys().has('fy-active')).toBe(false);
+  });
+
+  it('names the closed year when the server refuses a booking change', () => {
+    const { cmp, http } = build();
+    const { error } = toastSpies(cmp);
+    dlg(cmp).newDescription.set('x');
+    dlg(cmp).newAmount.set('1');
+    dlg(cmp).newApplicationId.set('app-1');
+    cmp.create(new Event('submit'));
+    http
+      .expectOne((r) => r.url.endsWith('/expenses') && r.method === 'POST')
+      .flush({ status: 409, code: 'fiscal_year_closed' }, { status: 409, statusText: 'Conflict' });
+    expect(error).toHaveBeenLastCalledWith(closedText);
+
+    cmp.openEdit(EXPENSE);
+    cmp.saveEdit(new Event('submit'));
+    http
+      .expectOne((r) => r.url.endsWith('/budget-expenses/e-1') && r.method === 'PATCH')
+      .flush({ status: 409, code: 'fiscal_year_closed' }, { status: 409, statusText: 'Conflict' });
+    expect(error).toHaveBeenLastCalledWith(closedText);
+
+    cmp.confirmDelete.set(EXPENSE);
+    cmp.doDelete();
+    http
+      .expectOne((r) => r.url.endsWith('/budget-expenses/e-1') && r.method === 'DELETE')
+      .flush({ status: 409, code: 'fiscal_year_closed' }, { status: 409, statusText: 'Conflict' });
+    expect(error).toHaveBeenLastCalledWith(closedText);
+
+    cmp.openCreateSub(PARENT);
+    subs(cmp).subAmount.set('10');
+    subs(cmp).subDescription.set('Teil');
+    subs(cmp).createSub(new Event('submit'));
+    http
+      .expectOne((r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings'))
+      .flush({ status: 409, code: 'fiscal_year_closed' }, { status: 409, statusText: 'Conflict' });
+    expect(error).toHaveBeenLastCalledWith(closedText);
   });
 });

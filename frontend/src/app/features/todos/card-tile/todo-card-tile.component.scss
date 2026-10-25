@@ -1,7 +1,4 @@
 @use 'press';
-/* A tile a step above its column: white on the grey column in the light theme, surface 3
-   on the surface 1 column in the dark theme. `--stack-ring` gives the avatar rings the
-   colour of the tile. */
 :host {
   --tile-bg: var(--color-surface-1);
   --tile-hover: var(--color-surface-3);
@@ -28,13 +25,11 @@
     --tile-bg: var(--tile-hover);
   }
 }
-/* The press of the kit (`_press.scss`) on the tile: a tint of the text colour, and a little
-   smaller until the finger lets go or the long press lifts the card. */
+// The press of the kit (`_press.scss`) on the tile.
 :host(:active) {
   background-image: linear-gradient(var(--press-tint), var(--press-tint));
   @include press.press-scale(row);
 }
-/* A tile with a long press (`appLongPress`): no text callout and no selection on touch. */
 :host(.long-press) {
   -webkit-touch-callout: none;
   user-select: none;
@@ -69,7 +64,6 @@
   margin-top: 2px;
   color: var(--color-accent-text);
 }
-/* The title is the button; its pseudo element stretches over the whole tile. */
 .tt__open {
   min-width: 0;
   padding: 0;
@@ -120,7 +114,6 @@
   font-size: 0.8125rem;
   color: var(--color-text-muted);
 }
-/* The column of the card in a list of the phone: the muted tag of the board rows. */
 .tt__col {
   flex: none;
   max-width: 10rem;
@@ -146,7 +139,6 @@
   display: inline-flex;
   margin-inline-start: auto;
 }
-/* The people of a tile are 24px circles, a little larger than the shared extra small size. */
 .tt__people ::ng-deep .av--xs {
   width: 1.5rem;
   height: 1.5rem;

@@ -1,4 +1,4 @@
-"""Shared fixtures of the delegation integration tests (O6).
+"""Shared fixtures of the delegation integration tests.
 
 ``maker`` gives a session factory. ``api`` gives the real app
 wiring with the vote transfer switched on. ``act`` changes the calling principal.
@@ -50,6 +50,9 @@ def make_api(migrated: tuple[str, str], monkeypatch: pytest.MonkeyPatch) -> Fast
 
     The request session has no pool, so no connection crosses the event loops of
     the TestClient.
+
+    The test stack has no Redis. The broadcasts go to an in-memory broker, and the vote
+    tally of a cast goes nowhere.
     """
     settings = load_settings(
         database_url=migrated[1],
@@ -70,8 +73,6 @@ def make_api(migrated: tuple[str, str], monkeypatch: pytest.MonkeyPatch) -> Fast
     application = create_app(settings)
     application.dependency_overrides[get_settings] = lambda: settings
     application.dependency_overrides[get_session] = _request_session
-    # The test stack has no Redis. The broadcasts go to an in-memory broker, and
-    # the vote tally of a cast goes nowhere.
     broker = InMemoryBroker()
     application.dependency_overrides[get_broker_rest] = lambda: broker
     application.dependency_overrides[get_meeting_publisher] = NullPublisher

@@ -92,6 +92,10 @@ async def test_a_null_retention_turns_the_job_off(
 async def test_due_tickets_are_anonymized_one_by_one(
     months: dict[str, int | None], audits: list[dict[str, Any]]
 ) -> None:
+    """Anonymize the due tickets one by one.
+
+    The row lock serializes the run with a note that binds files.
+    """
     due, gone, done_already, broken = (
         _ticket(),
         uuid.uuid4(),
@@ -117,7 +121,6 @@ async def test_due_tickets_are_anonymized_one_by_one(
     assert due.reporter_email is None
     assert due.context == {}
     assert work.committed == 1
-    # The row lock serializes the run with a note that binds files.
     assert work.get_kw == [{"with_for_update": True}]
     assert [(a["action"], a["target_id"]) for a in audits[:1]] == [("anonymization", str(due.id))]
     sql = str(lookup.statements[0])

@@ -1,7 +1,7 @@
 """Pure domain logic of the budget tree. The tests cover every branch (critical, 100 %).
 
-The constraints come from CR #76/#78: path composition, fiscal year disjointness (R7.1f),
-top-down allocation (R7.1b) and roll-up of the bound sum (R7.1c).
+The constraints: path composition, fiscal year disjointness, top-down allocation and
+roll-up of the bound sum.
 """
 
 from __future__ import annotations
@@ -14,11 +14,11 @@ from app.modules.budget import tree_rules as r
 
 
 def test_is_valid_key() -> None:
+    """A key is alphanumeric without the separator and at most ``_KEY_MAX`` long."""
     assert r.is_valid_key("VS")
     assert r.is_valid_key("800")
-    assert not r.is_valid_key("VS-800")  # the separator is not allowed
+    assert not r.is_valid_key("VS-800")
     assert not r.is_valid_key("")
-    # Length limit: exactly _KEY_MAX is valid, one more is rejected.
     assert r.is_valid_key("A" * r._KEY_MAX)
     assert not r.is_valid_key("A" * (r._KEY_MAX + 1))
 
@@ -29,22 +29,14 @@ def test_compose_path_key() -> None:
 
 
 def test_descendant_paths() -> None:
+    """A descendant path starts with the parent path plus the separator, not a bare prefix."""
     assert r.is_descendant_path("VS", "VS-800")
     assert r.is_descendant_path("VS-800", "VS-800-04")
-    assert not r.is_descendant_path("VS", "VST")  # the separator stops a false prefix match
+    assert not r.is_descendant_path("VS", "VST")
     assert not r.is_descendant_path("VS", "VS")
     assert r.is_self_or_descendant_path("VS", "VS")
     assert r.is_self_or_descendant_path("VS", "VS-800")
     assert not r.is_self_or_descendant_path("VS", "WS")
-
-
-def test_intervals_overlap() -> None:
-    d = date
-    assert r.intervals_overlap(d(2026, 1, 1), d(2026, 6, 1), d(2026, 5, 1), d(2026, 12, 1))
-    # b lies fully after a, so there is no overlap and the second AND branch is false
-    assert not r.intervals_overlap(d(2026, 1, 1), d(2026, 6, 1), d(2026, 7, 1), d(2026, 12, 1))
-    # b lies fully before a, so there is no overlap and the first AND branch is false
-    assert not r.intervals_overlap(d(2026, 7, 1), d(2026, 12, 1), d(2026, 1, 1), d(2026, 6, 1))
 
 
 def test_as_amount() -> None:
@@ -53,12 +45,13 @@ def test_as_amount() -> None:
 
 
 def test_children_allocation_exceeds_parent() -> None:
+    """Siblings of 600 plus 500 exceed 1000, plus 400 stay at the cap.
+
+    Without a parent budget every positive child allocation breaks the rule.
+    """
     parent = Decimal("1000")
-    # 600 (siblings) + 500 = 1100 > 1000 → exceeds
     assert r.children_allocation_exceeds_parent(parent, Decimal("600"), Decimal("500"))
-    # 600 + 400 = 1000 ≤ 1000 → ok
     assert not r.children_allocation_exceeds_parent(parent, Decimal("600"), Decimal("400"))
-    # without a parent budget every positive child allocation breaks the rule
     assert r.children_allocation_exceeds_parent(None, Decimal("0"), Decimal("1"))
 
 
@@ -80,16 +73,20 @@ def test_pick_fiscal_year() -> None:
 
 
 def test_rollup_committed() -> None:
+    """The committed use rolls up from leaf to root, with None counted as 0.
+
+    A separate subtree keeps its own value.
+    """
     nodes = [("top", "VS"), ("mid", "VS-800"), ("leaf", "VS-800-04"), ("other", "WS")]
     leaves = [("VS-800-04", Decimal("100")), ("VS-800-04", None), ("WS", Decimal("5"))]
     out = r.rollup_committed(nodes, leaves)
-    assert out["leaf"] == Decimal("100")  # own use, with None counted as 0
-    assert out["mid"] == Decimal("100")   # roll-up from the child
-    assert out["top"] == Decimal("100")   # roll-up up to the root
-    assert out["other"] == Decimal("5")   # separate subtree
+    assert out["leaf"] == Decimal("100")
+    assert out["mid"] == Decimal("100")
+    assert out["top"] == Decimal("100")
+    assert out["other"] == Decimal("5")
 
 
-def _node(  # noqa: ANN001
+def _node(
     nid, parent, gremium, key, path, name="N", currency="EUR", active=True,
     color=None, accepted=(), denied=(), fiscal_start_month=1, fiscal_start_day=1,
     hidden_in_budget=False, view_gremium_id=None, decision_gremium_id=None,
@@ -102,13 +99,18 @@ def _node(  # noqa: ANN001
 
 
 def test_build_forest_tree_and_rollup() -> None:
+    """The forest rolls the use up to the root and computes the available amount.
+
+    A node without allocation and use has only views with committed 0, which the filter
+    drops.
+    """
     g = uuid.uuid4()
     fy = uuid.uuid4()
     nodes = [
         _node("top", None, g, "VS", "VS"),
         _node("mid", "top", None, "800", "VS-800"),
         _node("leaf", "mid", None, "04", "VS-800-04"),
-        _node("empty", "top", None, "900", "VS-900"),  # no allocation and no use
+        _node("empty", "top", None, "900", "VS-900"),
     ]
     allocations = [("top", fy, Decimal("1000")), ("mid", fy, Decimal("400"))]
     committed = [(fy, "VS-800-04", Decimal("250"))]
@@ -118,13 +120,12 @@ def test_build_forest_tree_and_rollup() -> None:
     assert top["id"] == "top"
     top_view = top["by_fiscal_year"][0]
     assert top_view["allocated"] == Decimal("1000")
-    assert top_view["committed"] == Decimal("250")     # roll-up up to the root
+    assert top_view["committed"] == Decimal("250")
     assert top_view["available"] == Decimal("750")
     children = {c["id"]: c for c in top["children"]}
     mid = children["mid"]
     assert mid["by_fiscal_year"][0]["committed"] == Decimal("250")
-    assert mid["by_fiscal_year"][0]["available"] == Decimal("150")  # 400-250
-    # 'empty' has no allocation and no use, so the filter drops the views with committed 0
+    assert mid["by_fiscal_year"][0]["available"] == Decimal("150")
     assert children["empty"]["by_fiscal_year"] == []
     leaf = mid["children"][0]
     assert leaf["by_fiscal_year"][0]["committed"] == Decimal("250")
@@ -147,11 +148,12 @@ def test_fiscal_year_bounds() -> None:
 
 
 def test_is_valid_fiscal_start() -> None:
-    # Day 1 to 28 is valid in every month.
+    """Day 1 to 28 is valid in every month, a later day can be missing in a month.
+
+    A month outside 1 to 12 is invalid as well.
+    """
     assert r.is_valid_fiscal_start(1, 1)
     assert r.is_valid_fiscal_start(12, 28)
-    # Day 29 and later can be missing in a month, so the code rejects it. A month outside
-    # 1 to 12 is invalid as well.
     assert not r.is_valid_fiscal_start(2, 30)
     assert not r.is_valid_fiscal_start(4, 31)
     assert not r.is_valid_fiscal_start(0, 1)
@@ -160,8 +162,7 @@ def test_is_valid_fiscal_start() -> None:
 
 
 def test_fiscal_year_bounds_rejects_impossible_stichtag() -> None:
-    # An impossible cut-off date such as 30.02. or 31.04. raises ValueError instead of a
-    # 500 at INSERT time.
+    """An impossible cut-off such as 30.02. raises ValueError instead of a 500 at INSERT time."""
     import pytest
 
     with pytest.raises(ValueError, match="invalid fiscal start"):
@@ -171,12 +172,11 @@ def test_fiscal_year_bounds_rejects_impossible_stichtag() -> None:
 
 
 def test_fiscal_year_display() -> None:
-    # A cut-off date of 01.01. gives a plain year. Any other date gives YYYY/YY with the
-    # short next year.
+    """A cut-off of 01.01. gives a plain year, any other date YYYY/YY with the short next year."""
     assert r.fiscal_year_display(2026, 1, 1) == "2026"
     assert r.fiscal_year_display(2026, 7, 1) == "2026/27"
     assert r.fiscal_year_display(2099, 4, 1) == "2099/00"
-    assert r.fiscal_year_display(2026, 1, 2) == "2026/27"  # a day other than 1 is not plain
+    assert r.fiscal_year_display(2026, 1, 2) == "2026/27"
 
 
 def test_build_forest_carries_stichtag() -> None:
@@ -186,7 +186,7 @@ def test_build_forest_carries_stichtag() -> None:
 
 
 def test_build_forest_committed_only_node() -> None:
-    # A node with use but without an allocation gets a view with allocated 0.
+    """A node with use but without an allocation gets a view with allocated 0."""
     fy = uuid.uuid4()
     nodes = [_node("leaf", None, uuid.uuid4(), "L", "L")]
     forest = r.build_forest(nodes, [], [(fy, "L", Decimal("30"))])
@@ -196,7 +196,6 @@ def test_build_forest_committed_only_node() -> None:
     assert view["available"] == Decimal("-30")
 
 
-# Gremium scope
 def test_scope_forest_picks_assigned_subtrees_as_roots() -> None:
     g = uuid.uuid4()
     nodes = [
@@ -212,6 +211,7 @@ def test_scope_forest_picks_assigned_subtrees_as_roots() -> None:
 
 
 def test_scope_forest_outer_assignment_wins_and_empty_scope() -> None:
+    """The outer assigned subtree wins without a duplicate, and an empty scope gives no root."""
     g = uuid.uuid4()
     nodes = [
         _node("top", None, None, "VS", "VS", view_gremium_id=g),
@@ -219,29 +219,31 @@ def test_scope_forest_outer_assignment_wins_and_empty_scope() -> None:
     ]
     forest = r.build_forest(nodes, [], [])
     scoped = r.scope_forest(forest, {g})
-    assert [n["id"] for n in scoped] == ["top"]  # the outer subtree wins, with no duplicate
+    assert [n["id"] for n in scoped] == ["top"]
     assert r.scope_forest(forest, set()) == []
     assert r.scope_forest(forest, {uuid.uuid4()}) == []
 
 
 def test_fiscal_year_delete_blocker_reports_first_reason() -> None:
+    """Bookings win over the other two, so the message names the strongest reason."""
     assert r.fiscal_year_delete_blocker(False, False, False) is None
     assert r.fiscal_year_delete_blocker(True, False, False) == "bookings"
     assert r.fiscal_year_delete_blocker(False, True, False) == "allocations"
     assert r.fiscal_year_delete_blocker(False, False, True) == "applications"
-    # Bookings win over the other two, so the message names the strongest reason.
     assert r.fiscal_year_delete_blocker(True, True, True) == "bookings"
     assert r.fiscal_year_delete_blocker(False, True, True) == "allocations"
 
 
 def test_transfer_pair_changed() -> None:
+    """A different source or target is a different transfer.
+
+    Omitting both ends or repeating the pair changes nothing.
+    """
     a, b = uuid.uuid4(), uuid.uuid4()
-    # Omitting both ends changes nothing, and repeating the pair changes nothing.
     assert not r.transfer_pair_changed(a, b, None, None)
     assert not r.transfer_pair_changed(a, b, a, b)
     assert not r.transfer_pair_changed(a, b, a, None)
     assert not r.transfer_pair_changed(a, b, None, b)
-    # A different source or a different target is a different transfer.
     assert r.transfer_pair_changed(a, b, b, None)
     assert r.transfer_pair_changed(a, b, None, a)
     assert r.transfer_pair_changed(a, b, b, a)

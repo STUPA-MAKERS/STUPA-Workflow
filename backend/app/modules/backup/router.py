@@ -57,8 +57,8 @@ from app.shared.filenames import content_disposition
 
 router = APIRouter(prefix="/admin/backups", tags=["backup"])
 
-# The literal a client must send to restore. It is not translated: it is a machine
-# confirmation token, and the UI types it for the operator after its own dialog.
+#: The literal a client must send to restore. It is not translated: it is a machine
+#: confirmation token, and the UI types it for the operator after its own dialog.
 RESTORE_CONFIRMATION = "RESTORE"
 
 _UPLOAD_CHUNK = 1024 * 1024
@@ -155,12 +155,12 @@ async def create_backup(
 ) -> BackupJobOut:
     """Create a catalogue row and enqueue the archive build.
 
-    Answers 202. The worker does the dump, so the row starts ``pending``.
+    Answers 202. The worker does the dump, so the row starts ``pending``. The enqueue
+    runs after the commit, so the worker always finds the row.
     """
     _require_enabled(service)
     row = await service.create_row(kind="manual", actor=admin.sub, note=body.note)
     await session.commit()
-    # Enqueue after the commit, so the worker always finds the row.
     queue = backup_queue_from_pool(getattr(request.app.state, "arq_pool", None))
     if queue is not None:
         await queue.enqueue_create(row.id)
@@ -203,7 +203,8 @@ async def export_backup(
     this route, the same pattern the attachment download uses.
 
     The bytes stay age-encrypted on the way out: what leaves the platform is ciphertext,
-    and the audit entry records that it left at all.
+    and the audit entry records that it left at all. The entry is committed BEFORE
+    the stream starts, because a response that has begun cannot be rolled back.
     """
     _require_enabled(service)
     row = await _load(service, backup_id)
@@ -214,8 +215,6 @@ async def export_backup(
     except BackupError as exc:
         raise ServiceUnavailableError(str(exc)) from exc
 
-    # Audited and committed BEFORE the stream starts. A response that has begun cannot be
-    # rolled back, so the record of the export must not depend on it finishing.
     await audit_record(
         session,
         actor=admin.sub,

@@ -27,7 +27,7 @@ function valueOf(label: string): string | null {
 }
 
 describe('AnswerViewComponent', () => {
-  // One row per field type: the value as the reader sees it (O19).
+  /** There is one row per field type: the value as the reader sees it. */
   it.each<[string, FormFieldDef, unknown, string]>([
     ['text', { key: 'f', type: 'text', label: { de: 'Feld' } }, 'Hallo', 'Hallo'],
     ['email', { key: 'f', type: 'email', label: { de: 'Feld' } }, 'a@b.de', 'a@b.de'],
@@ -52,6 +52,10 @@ describe('AnswerViewComponent', () => {
     expect(valueOf('Feld')?.replace(/\u00a0/g, ' ')).toBe(expected);
   });
 
+  /**
+   * The long text is a row of its own between the two grids, rendered as Markdown. Amounts and
+   * IBANs use the mono face, other values not.
+   */
   it('puts short fields side by side and a long text over the full width as Markdown', async () => {
     const { container } = await view(
       one([
@@ -67,10 +71,8 @@ describe('AnswerViewComponent', () => {
     expect(grids).toHaveLength(2);
     expect(grids[0].querySelectorAll('app-field-row')).toHaveLength(2);
     expect(grids[1].querySelectorAll('app-field-row')).toHaveLength(1);
-    // The long text is a row of its own between the two grids, rendered as Markdown.
     const md = group.querySelector(':scope > app-field-row app-markdown-view') as HTMLElement;
     expect(md.querySelector('strong')?.textContent).toBe('fetter');
-    // Amounts and IBANs use the mono face, other values not.
     expect(screen.getByText('A').closest('app-field-row')?.querySelector('.fld__value')).not.toHaveClass('mono');
   });
 
@@ -122,7 +124,7 @@ describe('AnswerViewComponent', () => {
     expect(valueOf('Sichtbar')).toBe('ja');
   });
 
-  it('shows nothing for a PII field the server left out (O21)', async () => {
+  it('shows nothing for a PII field the server left out', async () => {
     await view(
       one([
         { key: 'name', type: 'text', label: { de: 'Name' } },
@@ -134,6 +136,10 @@ describe('AnswerViewComponent', () => {
     expect(valueOf('Name')).toBe('Lea');
   });
 
+  /**
+   * A stored value wins over the rule. A rule that fails, or no rule, gives no value, so the field
+   * does not show.
+   */
   it('says "berechnet" for a computed field and computes a missing value', async () => {
     await view(
       one([
@@ -147,9 +153,7 @@ describe('AnswerViewComponent', () => {
       { fee: 3, n: 100, stored: 7 },
     );
     expect(valueOf('Einnahmen · berechnet')).toBe('300');
-    // A stored value wins over the rule.
     expect(valueOf('Gespeichert · berechnet')).toBe('7');
-    // A rule that fails, or no rule, gives no value: the field does not show.
     expect(screen.queryByText(/Kaputt/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Ohne Regel/)).not.toBeInTheDocument();
   });

@@ -10,7 +10,7 @@ import type {
  *
  * One top budget with two fiscal years. Three sub cost centres carry their own colour,
  * one sub cost centre inherits it, and the rest have none, so the page shows every
- * colour case (O19). The rollups are consistent: a parent sums its children plus what it
+ * colour case. The rollups are consistent: a parent sums its children plus what it
  * keeps for itself.
  */
 
@@ -62,7 +62,7 @@ const SPEC: Spec = {
       id: 'b1000000-0000-0000-0000-000000000010',
       key: '100',
       name: 'Referate',
-      // AStA decides on the Referate; Fachschaften below are decided by the STUPA.
+      /** The AStA decides on the Referate; the STUPA decides on the Fachschaften below. */
       decision: 'g-asta',
       cur: [40000, 6000, 15000, 0, 2400],
       children: [
@@ -91,7 +91,7 @@ const SPEC: Spec = {
               key: '231',
               name: 'Werkstatt',
               cur: [4000, 1000, 1200, 600, 0],
-              // A deep path, so the breadcrumb of the budget page has to make room.
+              /** A deep path, so the breadcrumb of the budget page has to make room. */
               children: [
                 {
                   id: 'b1000000-0000-0000-0000-000000000025',
@@ -130,14 +130,12 @@ function build(spec: Spec, parent: BudgetTreeNode | null): BudgetTreeNode {
     hiddenInBudget: false,
     viewGremiumId: null,
     decisionGremiumId: spec.decision ?? null,
-    // The own value, else the effective value of the parent (as the API serves it).
     effectiveDecisionGremiumId: spec.decision ?? parent?.effectiveDecisionGremiumId ?? null,
     decisionGremiumSourceId: spec.decision ? spec.id : (parent?.decisionGremiumSourceId ?? null),
     fiscalStartMonth: 1,
     fiscalStartDay: 1,
     byFiscalYear: [
       alloc(FY_CURRENT, allocated, bound, expended, income, requested),
-      // The previous year: the same allocation, all spent.
       alloc(FY_PREVIOUS, allocated, 0, allocated * 0.9),
     ],
     children: [],
@@ -148,10 +146,10 @@ function build(spec: Spec, parent: BudgetTreeNode | null): BudgetTreeNode {
 
 export const MOCK_BUDGET_TREE: BudgetTreeNode[] = [build(SPEC, null)];
 
+/** The fiscal years. The closed year 2024 is the one the admin cost-centre page marks "inaktiv". */
 const MOCK_FISCAL_YEARS: FiscalYear[] = [
   { id: FY_CURRENT, budgetId: ROOT, year: 2026, display: '2026', startDate: '2026-01-01', endDate: '2026-12-31', active: true },
   { id: FY_PREVIOUS, budgetId: ROOT, year: 2025, display: '2025', startDate: '2025-01-01', endDate: '2025-12-31', active: true },
-  // A closed year: the admin cost-centre page marks it "inaktiv".
   { id: 'f1000000-0000-0000-0000-000000000003', budgetId: ROOT, year: 2024, display: '2024', startDate: '2024-01-01', endDate: '2024-12-31', active: false },
 ];
 

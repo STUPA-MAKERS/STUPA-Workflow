@@ -6,6 +6,8 @@ also gets 403. Every error is declared as `ProblemDetail` (problem+json contract
 
 An unconfirmed guest application rests in the flow until the magic link confirms it.
 Every route here passes `allow_unconfirmed=False` and answers 404 for it.
+
+A 400 means a malformed JSON body. The FastAPI parser raises it before validation.
 """
 
 from __future__ import annotations
@@ -39,12 +41,12 @@ router = APIRouter(tags=["flow"])
 
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 
-# Fire manual transitions. This permission is separate from full application management.
-# The per-transition actor gates in the guard refine it.
+#: Fire manual transitions. This permission is separate from full application management.
+#: The per-transition actor gates in the guard refine it.
 MANAGE_PERMISSION = "application.transition"
 
-# Force an application directly into any state. This bypasses guards and transitions.
-# It stays separate from application.transition on purpose: it is an audited override.
+#: Force an application into any state, past guards and transitions. It is separate from
+#: `application.transition` because it is an audited override.
 FORCE_PERMISSION = "application.force_status"
 
 
@@ -65,10 +67,13 @@ def get_action_dispatcher() -> ActionDispatcher:
 def get_flow_service(
     session: DbSession,
     dispatcher: Annotated[ActionDispatcher, Depends(get_action_dispatcher)],
-    # A transition that leaves a vote state cancels its votes. The publisher sends
-    # `vote_cancelled` to the live clients of the meeting.
     publisher: Annotated[MeetingPublisher, Depends(get_meeting_publisher)],
 ) -> FlowService:
+    """Build the flow service of a request.
+
+    A transition that leaves a vote state cancels its votes. The publisher sends
+    `vote_cancelled` to the live clients of the meeting.
+    """
     return FlowService(session, dispatcher, publisher)
 
 
@@ -126,7 +131,6 @@ async def list_transitions(
 @router.post(
     "/applications/{application_id}/transition",
     response_model=TransitionResult,
-    # 400 means a malformed JSON body. The FastAPI parser raises it before validation.
     responses=_errors(400, 401, 403, 404, 409, 422),
 )
 async def fire_transition(
@@ -171,7 +175,6 @@ async def list_flow_states(
 @router.post(
     "/applications/{application_id}/force-status",
     response_model=TransitionResult,
-    # 400 means a malformed JSON body. The FastAPI parser raises it before validation.
     responses=_errors(400, 401, 403, 404, 409, 422),
 )
 async def force_status(
@@ -232,8 +235,8 @@ async def fire_applicant_transition(
     The caller is the magic-link holder or the logged-in creator. The creator does
     not need `application.manage`. A principal who is not the creator gets 403, also
     with `application.manage` or `application.edit_any`. A transition that
-    `actorIsApplicant` does not open gives 403. The applicant never sets a decision
-    (F1): a `decision` gives 422 `decision_not_allowed`.
+    `actorIsApplicant` does not open gives 403. The applicant never sets a decision:
+    a `decision` gives 422 `decision_not_allowed`.
     """
     if payload.decision is not None:
         raise not_allowed_problem("The applicant cannot set a decision.")

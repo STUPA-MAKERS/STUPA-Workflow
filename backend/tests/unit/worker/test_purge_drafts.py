@@ -1,4 +1,4 @@
-"""Unit tests of the hourly draft purge (Z4) without a database.
+"""Unit tests of the hourly draft purge without a database.
 
 The integration test `tests/integration/worker/test_purge_drafts.py` runs the SQL.
 These tests cover the loop, the storage fallbacks and the error paths.
@@ -19,7 +19,7 @@ from app.settings import load_settings
 
 NOW = datetime(2026, 10, 1, 12, 0, tzinfo=UTC)
 
-# The real token purge. The fixture below replaces it for the loop tests.
+#: The real token purge. A fixture replaces it for the loop tests.
 _PURGE_TOKENS = wfd._purge_tokens
 TOKEN_RUNS: list[datetime] = []
 
@@ -28,7 +28,7 @@ TOKEN_RUNS: list[datetime] = []
 def _no_token_purge(monkeypatch: pytest.MonkeyPatch) -> None:
     TOKEN_RUNS.clear()
 
-    async def _tokens(_maker: Any, now: datetime) -> int:  # noqa: ANN401
+    async def _tokens(_maker: Any, now: datetime) -> int:
         TOKEN_RUNS.append(now)
         return 1
 
@@ -49,7 +49,7 @@ class _Storage:
 def _batches(monkeypatch: pytest.MonkeyPatch, batches: list[tuple[int, list[str]]]) -> None:
     queue = list(batches)
 
-    async def _batch(_maker: Any, now: datetime) -> tuple[int, list[str]]:  # noqa: ANN401
+    async def _batch(_maker: Any, now: datetime) -> tuple[int, list[str]]:
         assert now == NOW
         return queue.pop(0)
 
@@ -57,13 +57,13 @@ def _batches(monkeypatch: pytest.MonkeyPatch, batches: list[tuple[int, list[str]
 
 
 async def test_purge_loops_until_a_short_batch(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Purge in a loop until a batch is short; the token purge runs once, after the drafts."""
     monkeypatch.setattr(wfd, "PURGE_BATCH", 2)
     _batches(monkeypatch, [(2, ["a", "b"]), (2, ["c"]), (1, ["d"])])
     storage = _Storage()
     ctx = {"files_sessionmaker": object(), "object_storage": storage}
     assert await wfd.purge_draft_attachments(ctx, now=NOW) == 5
     assert storage.removed == ["a", "b", "c", "d"]
-    # The token purge runs once, after the drafts.
     assert TOKEN_RUNS == [NOW]
 
 
@@ -77,7 +77,7 @@ async def test_purge_uses_the_current_time_by_default(
 ) -> None:
     seen: list[datetime] = []
 
-    async def _batch(_maker: Any, now: datetime) -> tuple[int, list[str]]:  # noqa: ANN401
+    async def _batch(_maker: Any, now: datetime) -> tuple[int, list[str]]:
         seen.append(now)
         return 0, []
 
@@ -89,10 +89,13 @@ async def test_purge_uses_the_current_time_by_default(
 async def test_remove_objects_tolerates_errors_and_missing_storage(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Tolerate storage errors and a missing storage.
+
+    Without keys there is nothing to do, not even a storage lookup. With no storage in the
+    context and none configured, the objects stay, with a warning.
+    """
     await wfd._remove_objects({"object_storage": _Storage(fail=True)}, ["a"])
-    # No keys: nothing to do, not even a storage lookup.
     await wfd._remove_objects({}, [])
-    # No storage in the context and none configured: the objects stay, with a warning.
     monkeypatch.setattr(wfd, "build_object_storage", lambda _settings: None)
     await wfd._remove_objects({"settings": load_settings()}, ["a"])
 
@@ -109,7 +112,7 @@ def test_storage_and_sessionmaker_fallbacks(monkeypatch: pytest.MonkeyPatch) -> 
 
 
 class _Rows:
-    def __init__(self, rows: list[Any]) -> None:  # noqa: ANN401
+    def __init__(self, rows: list[Any]) -> None:
         self._rows = rows
 
     def all(self) -> list[Any]:
@@ -117,7 +120,7 @@ class _Rows:
 
 
 class _Session:
-    def __init__(self, rows: list[Any]) -> None:  # noqa: ANN401
+    def __init__(self, rows: list[Any]) -> None:
         self.rows = rows
         self.statements: list[str] = []
         self.committed = 0
@@ -128,7 +131,7 @@ class _Session:
     async def __aexit__(self, *_exc: object) -> bool:
         return False
 
-    async def execute(self, stmt: Any) -> _Rows:  # noqa: ANN401
+    async def execute(self, stmt: Any) -> _Rows:
         self.statements.append(str(stmt))
         return _Rows(self.rows if len(self.statements) == 1 else [])
 

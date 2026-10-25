@@ -45,8 +45,8 @@ _BUILTIN_MEETING_BODY = {
     "{% if meetingTime %}, {{ meetingTime }}{% endif %}\n",
 }
 
-# Session-bound delegations: the substitute gets the mail. The context names
-# the meeting, the Gremium and the delegating member.
+#: Builtin subject of a meeting-bound delegation mail to the substitute. The context
+#: names the meeting, the Gremium and the delegating member.
 _BUILTIN_DELEGATION_GRANTED_SUBJECT = {
     "de": "Vertretung erhalten: {{ meetingTitle }}",
     "en": "Proxy received: {{ meetingTitle }}",
@@ -100,7 +100,7 @@ async def meeting_delegation_mail_info(
     """Collect the mail data of a meeting delegation (best effort).
 
     The mail goes to the delegate. ``to_delegator`` sends it to the delegator
-    instead: the access revoke (F3) takes the rights of a delegate, and the delegator
+    instead: the access revoke takes the rights of a delegate, and the delegator
     then loses the representation.
     """
     from app.modules.admin.models import Gremium
@@ -140,7 +140,7 @@ async def meeting_delegation_mail_info(
                 .where(MeetingDelegation.id == delegation_id)
             )
         ).first()
-    except Exception:  # noqa: BLE001 — mail info is best effort
+    except Exception:
         logger.exception("delegation mail info failed (delegation=%s)", delegation_id)
         return None
     if row is None:
@@ -164,9 +164,10 @@ class AutoMailer:
     async def meeting_created(
         self, settings: Settings, meeting_id: uuid.UUID, pool: object
     ) -> None:
+        """Mail a new meeting to the members of its Gremium; log a failure."""
         try:
             await self._meeting_created(settings, meeting_id, pool)
-        except Exception:  # noqa: BLE001 — mail must never break the request
+        except Exception:
             logger.exception("meeting mail failed (meeting=%s)", meeting_id)
 
     async def delegation_changed(
@@ -177,9 +178,10 @@ class AutoMailer:
         granted: bool,
         pool: object,
     ) -> None:
+        """Mail a granted or revoked delegation; log a failure."""
         try:
             await self._delegation_changed(settings, info, granted=granted, pool=pool)
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.exception("delegation mail failed")
 
     async def _meeting_created(

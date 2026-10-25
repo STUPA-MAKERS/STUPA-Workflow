@@ -1,4 +1,4 @@
-"""O12: a meeting with an open vote does not close, and the close cancels the drafts.
+"""A meeting with an open vote does not close, and the close cancels the drafts.
 
 The tests run on a real Postgres through the REST route ``PATCH /meetings/{id}``.
 """
@@ -67,7 +67,7 @@ async def test_close_cancels_draft_votes_in_one_transaction(
 async def test_invalid_status_transition(
     maker: async_sessionmaker[AsyncSession], api: FastAPI, current: str, target: str
 ) -> None:
-    """F9 and O13: the status runs only planned, live, closed."""
+    """The status runs only planned, live, closed."""
     s = await seed(maker, status=current)
     with TestClient(api) as client:
         resp = client.patch(f"/api/meetings/{s.meeting_id}", json={"status": target})

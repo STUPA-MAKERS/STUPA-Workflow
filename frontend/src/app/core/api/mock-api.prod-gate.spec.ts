@@ -11,9 +11,10 @@ import {
 import { USE_MOCK_API } from './api.config';
 import { mockApiInterceptor } from './mock-api.interceptor';
 
-// `isDevMode` is a non-configurable named export of @angular/core, so
-// `jest.spyOn` cannot replace it. The test mocks the module and keeps every
-// other export. Only `isDevMode` changes per test.
+/**
+ * `isDevMode` is a non-configurable named export of @angular/core, so `jest.spyOn` cannot replace
+ * it. The test mocks the module and keeps every other export. Only `isDevMode` changes per test.
+ */
 const isDevModeMock = jest.fn<boolean, []>();
 jest.mock('@angular/core', () => {
   const actual = jest.requireActual('@angular/core');
@@ -48,25 +49,27 @@ describe('mockApiInterceptor — production gate', () => {
     };
   }
 
+  /**
+   * In a prod build the mock stays off. The request reaches the real backend instead of invented
+   * mock data.
+   */
   it('passes /api/ requests through to the real backend when not in dev mode (mock enabled)', () => {
     isDevModeMock.mockReturnValue(false);
     const { http, client } = setup(true);
 
     client.get('/api/application-types').subscribe();
 
-    // Prod build: the mock stays off. The request reaches the real backend
-    // instead of invented mock data.
     http.expectOne('/api/application-types').flush({ items: [], total: 0, limit: 20, offset: 0 });
     http.verify();
   });
 
+  /** In a dev or demo build the mock still takes effect and answers with no backend. */
   it('still short-circuits in dev mode when the mock is enabled', () => {
     isDevModeMock.mockReturnValue(true);
     const { http, client } = setup(true);
 
     client.get('/api/application-types').subscribe();
 
-    // Dev or demo build: the mock still takes effect and answers with no backend.
     http.expectNone('/api/application-types');
     http.verify();
   });

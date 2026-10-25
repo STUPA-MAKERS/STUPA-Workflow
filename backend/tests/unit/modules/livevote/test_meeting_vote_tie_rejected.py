@@ -1,4 +1,4 @@
-"""O18: a meeting vote has no casting vote, so a tie is ``rejected``.
+"""A meeting vote has no casting vote, so a tie is ``rejected``.
 
 The meeting-vote route stores ``tieBreak=rejected`` itself. ``MeetingVoteOpenBody`` has
 no ``tieBreak``, so a client value has no effect. An application vote outside a
@@ -65,12 +65,15 @@ def test_open_body_has_no_tie_break() -> None:
 def test_meeting_vote_stores_tie_break_rejected(
     client: TestClient, fakes: dict[str, Any], application: bool
 ) -> None:
+    """Store `tieBreak=rejected` for a meeting vote.
+
+    A client `tieBreak` is not part of the body and has no effect.
+    """
     if application:
         fakes["agenda"].item_row = SimpleNamespace(id=uuid4(), application_id=uuid4())
     fakes["meeting"]._meeting_out = _meeting_out(status="live", can_manage_votes=True)
     r = client.post(
         f"/api/meetings/{uuid4()}/votes",
-        # A client tieBreak is not part of the body and has no effect.
         json={"agendaItemId": str(uuid4()), "tieBreak": "passed"},
     )
     assert r.status_code == 200

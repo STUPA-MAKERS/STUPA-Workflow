@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import (
     DateTime,
@@ -28,22 +29,24 @@ from app.db import Base
 
 
 class ConfigRevision(Base):
+    """One immutable snapshot of a config entity, linked to its predecessor."""
+
     __tablename__ = "config_revision"
 
     id: Mapped[uuid.UUID] = mapped_column(
         primary_key=True, server_default=func.gen_random_uuid()
     )
-    # 'form' | 'flow' | 'site_config'.
+    #: 'form' | 'flow' | 'site_config'.
     entity_type: Mapped[str] = mapped_column(Text)
-    # UUID string (form: application_type_id) or 'global' (flow/site_config).
+    #: UUID string (form: application_type_id) or 'global' (flow/site_config).
     entity_id: Mapped[str] = mapped_column(Text)
     version: Mapped[int] = mapped_column(Integer)
-    snapshot: Mapped[dict] = mapped_column(JSONB, server_default="{}")
-    # Predecessor snapshot of the same entity (NULL = first state).
+    snapshot: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
+    #: Predecessor snapshot of the same entity (NULL = first state).
     prev_revision_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("config_revision.id", ondelete="RESTRICT"), nullable=True
     )
-    # OIDC ``sub`` of the actor that caused the change (no PII).
+    #: OIDC ``sub`` of the actor that caused the change (no PII).
     created_by: Mapped[str | None] = mapped_column(Text, nullable=True)
     at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

@@ -19,11 +19,15 @@ def test_join_and_leave_track_names() -> None:
 
 
 def test_same_user_two_tabs_stays_until_last_leaves() -> None:
+    """Keep a user with two tabs until the last tab leaves.
+
+    The list holds one entry per user, and the second tab keeps the user in it.
+    """
     p = MeetingPresence()
     c1, _ = p.join(MID, "sub-a", "Alice")
     c2, names = p.join(MID, "sub-a", "Alice")
-    assert names == ["Alice"]  # one entry per user
-    assert p.leave(MID, c1) == ["Alice"]  # the second tab keeps her in the list
+    assert names == ["Alice"]
+    assert p.leave(MID, c1) == ["Alice"]
     assert p.leave(MID, c2) == []
 
 

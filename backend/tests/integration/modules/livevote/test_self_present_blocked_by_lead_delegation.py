@@ -1,4 +1,4 @@
-"""O6 with O23: a substitution of the lead blocks the own `present` report.
+"""A substitution of the lead blocks the own `present` report.
 
 The meeting lead enters a substitution for a missing member during a live
 meeting. While it exists, the member gets 409 `delegation_active` for an own
@@ -42,6 +42,10 @@ def api(migrated: tuple[str, str], monkeypatch: pytest.MonkeyPatch) -> Iterator[
 async def test_own_present_waits_for_the_revoke(
     maker: async_sessionmaker[AsyncSession], api: FastAPI, before: str | None
 ) -> None:
+    """Let the own present report wait for the revoke.
+
+    Only `present` is blocked; an excuse stays possible.
+    """
     gid = await gremium(maker)
     lead, _ = await member(maker, gid, "Lead", ("session.manage", "vote.cast"))
     anna, a = await member(maker, gid, "Anna")
@@ -69,7 +73,6 @@ async def test_own_present_waits_for_the_revoke(
         present = client.put(me, json={"status": "present"})
     assert blocked.status_code == 409, blocked.text
     assert blocked.json()["code"] == "delegation_active"
-    # Only `present` is blocked; an excuse stays possible.
     assert excused.status_code == 200, excused.text
     assert lead_set.status_code == 409, lead_set.text
     assert revoked.status_code == 204, revoked.text

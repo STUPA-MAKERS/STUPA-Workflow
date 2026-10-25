@@ -20,9 +20,9 @@ from app.modules.budget.tree_models import (
 )
 from app.modules.budget.tree_rules import _SEP
 from app.modules.budget.tree_schemas import ExpenseCreate, ExpenseOut, ExpenseUpdate
-from app.search import dialect_of, trigram_rank
 from app.shared.errors import NotFoundError, ValidationProblem
 from app.shared.paging import Page
+from app.shared.search import dialect_of, trigram_rank
 
 
 class ExpenseOps(BudgetTreeServiceBase):
@@ -35,13 +35,14 @@ class ExpenseOps(BudgetTreeServiceBase):
         holds a name matches no principal and stays out of the map. The frontend
         then falls back to `actor`.
 
+        A merged account shows the name of the account it was merged into.
+
         Returns:
             The display name per `sub`. The name falls back to the email, then
             to the `sub` itself.
         """
         from app.modules.auth.identity import refs_by_sub
 
-        # A merged account shows the name of the account it was merged into.
         refs = await refs_by_sub(self.session, subs)
         return {sub: (ref.name or sub) for sub, ref in refs.items()}
 
@@ -105,6 +106,9 @@ class ExpenseOps(BudgetTreeServiceBase):
         A booking with `applicationId` set inherits the cost center and the
         fiscal year from the application. A standalone booking needs `budgetId`.
         The service then resolves the fiscal year itself.
+
+        With ``commit=False`` the caller bundles the booking and its follow-up mutations
+        in one transaction.
         """
         app_title: str | None = None
         if payload.application_id is not None:
@@ -118,6 +122,7 @@ class ExpenseOps(BudgetTreeServiceBase):
                 )
             node = await self._get_node(app.budget_id)
             fy_id = app.fiscal_year_id
+            await self._require_open_fiscal_year(fy_id)
             app_title = _title_of(app.data)
         else:
             if payload.budget_id is None:
@@ -161,8 +166,6 @@ class ExpenseOps(BudgetTreeServiceBase):
         )
         if payload.invoice_id is not None:
             await self._require_invoice(payload.invoice_id)
-        # With commit=False the caller bundles the booking and its follow-up
-        # mutations in one transaction.
         if commit:
             await self.session.commit()
         names = await self._actor_names({expense.actor} if expense.actor else set())
@@ -195,14 +198,29 @@ class ExpenseOps(BudgetTreeServiceBase):
         the extra metadata. The fiscal year and the application binding stay
         fixed. The service writes only the fields that the payload
         sets. An explicit `null` clears an optional field.
+
+        A parent amount is never set directly while children exist, because it equals
+        the sum of the children. The children are counted only when the payload sets an
+        amount, to save one query. A child cannot move to another cost center alone,
+        because it inherits the cost center from its parent.
+
+        A move to another cost center needs an existing target (else 404). The fiscal
+        year stays fixed and the currency follows the new cost center. ``budgetId`` is a
+        required FK, so null does nothing. The kept fiscal year must belong to the
+        top-level budget of the target, as in ``book_expense`` and ``move_fiscal_year``
+        (422 on a mismatch), because otherwise the moved booking points at a foreign
+        fiscal year: an orphan year, or a phantom row with allocated=0 and a negative
+        available sum.
+
+        The audit entry holds the prior and the new values of the patched fields. The
+        revert uses the new values to detect a later edit and answers 409 instead of
+        overwriting the changes of another user.
         """
         expense = await self.session.get(BudgetExpense, expense_id)
         if expense is None:
             raise NotFoundError(f"budget expense {expense_id} not found")
+        await self._require_open_fiscal_year(expense.fiscal_year_id)
         fields = payload.model_fields_set
-        # Sub-booking invariant: never set the parent amount directly while
-        # children exist. It equals the sum of the children. Count the children
-        # only when the payload sets an amount, to save one query.
         child_n = 0
         if "amount" in fields and payload.amount is not None:
             child_n = (await self._child_counts([expense_id])).get(expense_id, 0)
@@ -212,27 +230,17 @@ class ExpenseOps(BudgetTreeServiceBase):
                     code="subbooking_parent_amount_readonly",
                 )
         if expense.parent_expense_id is not None and "budget_id" in fields:
-            # A child inherits the cost center from its parent. It cannot move alone.
             raise ValidationProblem(
                 "A sub-booking inherits its cost-centre from its parent.",
                 code="subbooking_inherited_field",
             )
-        # Capture the prior values of the patched fields for audit-log revert.
         before: dict[str, object] = {f: _json_safe(getattr(expense, f)) for f in fields}
         if "amount" in fields and payload.amount is not None:
             expense.amount = payload.amount
         if "description" in fields and payload.description is not None:
             expense.description = payload.description
         if "budget_id" in fields and payload.budget_id is not None:
-            # Re-book to another cost center. The target must exist, else 404.
-            # The fiscal year stays fixed. The currency follows the new cost
-            # center. budgetId is a required FK, so null does nothing.
             target = await self._get_node(payload.budget_id)
-            # The kept fiscal year must belong to the top-level budget of the
-            # target. Otherwise the moved booking points at a foreign fiscal
-            # year: an orphan year, or a phantom row with allocated=0 and a
-            # negative available sum. This mirrors book_expense and
-            # move_fiscal_year: 422 on a top-level mismatch.
             await self._resolve_fiscal_year(target, expense.fiscal_year_id)
             expense.budget_id = target.id
             expense.currency = target.currency
@@ -254,8 +262,6 @@ class ExpenseOps(BudgetTreeServiceBase):
             expense.invoice_id = payload.invoice_id
             if payload.invoice_id is not None:
                 await self._require_invoice(payload.invoice_id)
-        # Capture the new values too. Revert uses them to detect a later edit
-        # and answers 409 instead of overwriting the changes of another user.
         after: dict[str, object] = {f: _json_safe(getattr(expense, f)) for f in fields}
         await self._audit(
             AuditAction.BUDGET_EXPENSE_UPDATE,
@@ -319,12 +325,24 @@ class ExpenseOps(BudgetTreeServiceBase):
         """List bookings, that is expenses and income, filtered and paginated.
 
         `budget_id` restricts the result to this cost center and its subtree.
+
+        Only top-level bookings are rows. A sub-booking appears when the user expands
+        its parent, so it is no row of its own and no link candidate. ``expense_id`` is
+        the deep link to one exact booking.
+
+        The fuzzy search ranks by trigrams over the free-text fields of the booking plus
+        the joined texts of application and invoice. Its where clause goes into the
+        shared filter list, so the count query and the row query stay identical. The
+        count query therefore carries the same joins as the row query, because otherwise
+        the where clause over the foreign tables does not resolve, or it cross-joins.
+        Without ``q`` the count query adds no join. With a search the most relevant hit
+        comes first, and the normal ordering is a deterministic tiebreak.
+
+        The sort column comes from a whitelist, and the default is newest first. Empty
+        values of the nullable date columns go last in both directions.
         """
-        # List only top-level bookings. A sub-booking appears when the user
-        # expands its parent. It is no row of its own and no link candidate.
         filters: list[ColumnElement[bool]] = [BudgetExpense.parent_expense_id.is_(None)]
         if expense_id is not None:
-            # Deep link to one exact booking.
             filters.append(BudgetExpense.id == expense_id)
         if budget_id is not None:
             node = await self._get_node(budget_id)
@@ -341,10 +359,6 @@ class ExpenseOps(BudgetTreeServiceBase):
             filters.append(BudgetExpense.kind == kind)
         if application_id is not None:
             filters.append(BudgetExpense.application_id == application_id)
-        # Fuzzy search: a trigram rank over the free-text fields of the booking
-        # plus the joined texts of application and invoice. rank_expr
-        # orders the hits. The where clause goes into the shared filters list,
-        # so the count query and the row query stay identical.
         rank_expr = None
         if q and q.strip():
             where, rank_expr = trigram_rank(
@@ -371,7 +385,6 @@ class ExpenseOps(BudgetTreeServiceBase):
         if created_to:
             filters.append(func.date(BudgetExpense.created_at) <= created_to)
 
-        # Sort column (whitelist) and direction. The default is newest first.
         sort_map = {
             "amount": BudgetExpense.amount,
             "invoiceDate": BudgetExpense.invoice_date,
@@ -379,22 +392,14 @@ class ExpenseOps(BudgetTreeServiceBase):
         }
         sort_col = sort_map.get(sort or "", BudgetExpense.created_at)
         direction = sort_col.asc() if order == "asc" else sort_col.desc()
-        # Nullable date columns: empty values go last regardless of direction.
         ordering = direction.nulls_last() if sort in ("invoiceDate", "paymentDate") else direction
 
-        # The search reads joined texts from application and invoice. The count
-        # query must carry the same joins as the row query. Otherwise the where
-        # clause over the foreign tables does not resolve, or it cross-joins.
-        # Without q the count query stays lean and adds no join.
         count_stmt = select(func.count()).select_from(BudgetExpense)
         if rank_expr is not None:
             count_stmt = count_stmt.outerjoin(
                 Application, Application.id == BudgetExpense.application_id
             ).outerjoin(Invoice, Invoice.id == BudgetExpense.invoice_id)
         total = await self.session.scalar(count_stmt.where(*filters))
-        # With an active search the most relevant hit comes first. The normal
-        # ordering then acts as a deterministic tiebreak. Without a search
-        # nothing changes.
         order_by = (
             (rank_expr.desc(), ordering, BudgetExpense.created_at.desc())
             if rank_expr is not None
@@ -455,6 +460,7 @@ class ExpenseOps(BudgetTreeServiceBase):
         ).scalar_one_or_none()
         if expense is None:
             raise NotFoundError(f"budget expense {expense_id} not found")
+        await self._require_open_fiscal_year(expense.fiscal_year_id)
         await self._audit(
             AuditAction.BUDGET_EXPENSE_DELETE,
             target_type="budget_expense",

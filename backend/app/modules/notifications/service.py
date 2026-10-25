@@ -55,8 +55,8 @@ logger = logging.getLogger("app.notifications")
 
 MAGIC_LINK_TEMPLATE_KEY = "magic_link"
 
-# The sender uses this builtin fallback when the DB has no `magic_link` template.
-# The body states no lifetime: by default a link has no expiry (link_ttl_days NULL).
+#: Builtin magic-link subject, used when the DB has no ``magic_link`` template. The
+#: body states no lifetime, because by default a link has no expiry.
 _BUILTIN_MAGIC_LINK_SUBJECT = {
     "de": "Ihr Zugangslink zur Antragsplattform",
     "en": "Your access link for the application platform",
@@ -70,20 +70,18 @@ _BUILTIN_MAGIC_LINK_BODY = {
     "ignore this email.\n",
 }
 
-# Default template for a ``notify`` action without an explicit ``templateKey``.
-# When the template is absent, the variable-free builtin fallback applies. That
-# fallback is safe under StrictUndefined.
+#: Template of a ``notify`` action without ``templateKey``. When it is absent, the
+#: variable-free builtin applies, which is safe under StrictUndefined.
 DEFAULT_NOTIFY_TEMPLATE_KEY = "status_update"
-# Team-facing default for the non-applicant recipients of a `notify` action without an
-# explicit templateKey. Applicants keep `status_update`.
+#: Team-facing default for the non-applicant recipients of such an action.
 TEAM_NOTIFY_TEMPLATE_KEY = "status_update_team"
 _BUILTIN_NOTIFY_SUBJECT = {
     "de": "Aktualisierung zu Ihrem Antrag",
     "en": "Update on your application",
 }
-# F1: the block that shows an approval with deviations. The dispatcher sets
-# `amountDeviates` and `conditions` for a flow mail. The `is defined` tests keep
-# the block safe under StrictUndefined for a caller without these keys.
+#: Block that shows an approval with deviations. The dispatcher sets
+#: ``amountDeviates`` and ``conditions`` for a flow mail; the ``is defined`` tests keep
+#: the block safe under StrictUndefined for a caller without these keys.
 DECISION_BLOCK = {
     "de": "{% if (amountDeviates is defined and amountDeviates)"
     " or (conditions is defined and conditions) %}"
@@ -102,8 +100,7 @@ DECISION_BLOCK = {
     "{% for condition in conditions %}\n- {{ condition }}{% endfor %}{% endif %}"
     "{% endif %}",
 }
-# The body names the application title and the new status when the dispatcher
-# supplies them.
+#: Builtin notify body. It names the title and the new status when they are supplied.
 _BUILTIN_NOTIFY_BODY = {
     "de": "Hallo,\n\nes gibt eine Aktualisierung zu Ihrem Antrag"
     "{% if applicationTitle %} „{{ applicationTitle }}“{% endif %}."
@@ -128,12 +125,20 @@ class NotificationService:
         queue: MailQueue | None = None,
         settings: Settings | None = None,
     ) -> None:
+        """Bind the service to a session, an optional mail queue and the settings."""
         self.session = session
         self.queue = queue
         self.settings = settings or get_settings()
         self.resolver = RecipientResolver(session)
 
     async def create_template(self, payload: MailTemplateCreate) -> MailTemplateOut:
+        """Create a mail template.
+
+        Raises:
+            ConflictError: The key exists, or a concurrent insert of the same key won
+                between the read and the commit (HTTP 409, so the client retries
+                instead of seeing 500).
+        """
         existing = await self._get_template_by_key(payload.key)
         if existing is not None:
             raise ConflictError(f"mail template {payload.key!r} already exists")
@@ -148,9 +153,6 @@ class NotificationService:
         try:
             await self.session.commit()
         except IntegrityError as exc:
-            # A concurrent insert of the same key (UNIQUE mail_template.key) won
-            # between the read and the commit. Return 409 and not 500. The client
-            # retries.
             await self.session.rollback()
             raise ConflictError(
                 f"mail template {payload.key!r} already exists", code="conflict"
@@ -203,6 +205,8 @@ class NotificationService:
         Raises:
             ValidationProblem: The key has no catalogue entry and no existing row
                 (HTTP 422).
+
+        A concurrent insert of the same key gives 409, not 500, so the client retries.
         """
         from app.modules.notifications.templates_catalogue import CATALOGUE_BY_KEY
 
@@ -230,9 +234,6 @@ class NotificationService:
         try:
             await self.session.commit()
         except IntegrityError as exc:
-            # A concurrent insert of the same key (UNIQUE mail_template.key) won
-            # between the read and the commit. Return 409 and not 500. The client
-            # retries.
             await self.session.rollback()
             if inserting:
                 raise ConflictError(
@@ -266,6 +267,11 @@ class NotificationService:
     async def update_template(
         self, template_id: uuid.UUID, payload: MailTemplateUpdate
     ) -> MailTemplateOut:
+        """Update the given fields of a mail template.
+
+        Raises:
+            NotFoundError: The template is unknown (HTTP 404).
+        """
         tpl = await self.session.get(MailTemplate, template_id)
         if tpl is None:
             raise NotFoundError(f"mail template {template_id} not found")
@@ -283,6 +289,12 @@ class NotificationService:
     async def preview_template(
         self, template_id: uuid.UUID, req: MailPreviewRequest
     ) -> MailPreviewOut:
+        """Render a mail template with a sample context.
+
+        Raises:
+            NotFoundError: The template is unknown (HTTP 404).
+            ValidationProblem: The template does not render with the context (HTTP 422).
+        """
         tpl = await self.session.get(MailTemplate, template_id)
         if tpl is None:
             raise NotFoundError(f"mail template {template_id} not found")
@@ -455,14 +467,15 @@ class NotificationService:
 
         Returns:
             True when the method enqueued a mail.
+
+        The context defaults ``link`` to an empty string, so a template that uses ``{{
+        link }}`` stays safe under StrictUndefined.
         """
         recipients = await filter_recipients_by_preference(
             self.session, recipients, kind
         )
         if not recipients:
             return False
-        # A template may use `{{ link }}`. The empty default keeps a mail without a
-        # link safe under StrictUndefined.
         context = {"link": link.url if link is not None else "", **context}
         tpl = await self._get_template_by_key(template_key)
         if tpl is not None:
@@ -484,7 +497,7 @@ class NotificationService:
                 lang=lang or self.settings.mail_default_lang,
                 default_lang=self.settings.mail_default_lang,
             )
-        except TemplateRenderError as exc:  # defensive: builtins cover their own vars
+        except TemplateRenderError as exc:
             logger.warning("builtin template %r render failed: %s", template_key, exc)
             return False
         return await self._enqueue(
@@ -513,11 +526,15 @@ class NotificationService:
 
         Returns:
             The number of enqueued sends.
+
+        The title and the status default to empty strings, because not every caller
+        (legacy flows) supplies them and StrictUndefined would fail the send. Without
+        ``templateKey`` (the flow editor often stores only the recipients), applicants
+        get the applicant default and every other recipient kind the team wording. The
+        audience or the template key is part of the idempotency parts, so the two sends
+        get distinct keys.
         """
         specs = _as_specs(action.get("recipients", []))
-        # The builtin and status templates reference the title and the status. Not
-        # every caller (deadline worker, legacy flows) supplies them. Default to empty
-        # strings so StrictUndefined does not fail the send.
         context = dict(context or {})
         context.setdefault("applicationTitle", "")
         context.setdefault("status", "")
@@ -535,9 +552,6 @@ class NotificationService:
                 link=applicant_link if applicant_specs else team_link,
             )
         if template_key:
-            # One explicit template for both audiences: one mail per audience, each
-            # with its own link. The audience is part of the idempotency parts, so the
-            # two mails get distinct keys.
             count = 0
             for audience, partition, link in (
                 ("applicant", applicant_specs, applicant_link),
@@ -554,10 +568,6 @@ class NotificationService:
                     audience=audience,
                 )
             return count
-        # No explicit templateKey. The flow editor often stores the action with
-        # recipients only. Applicants get the applicant-facing default and every other
-        # recipient kind gets the team-facing wording. The template key is part of the
-        # idempotency parts, so the two sends get distinct keys.
         count = 0
         for partition_key, partition, link in (
             (DEFAULT_NOTIFY_TEMPLATE_KEY, applicant_specs, applicant_link),
@@ -588,10 +598,14 @@ class NotificationService:
         link: MailLink | None = None,
         audience: str | None = None,
     ) -> int:
-        """Resolve, filter and enqueue one `notify` send for ``template_key``."""
-        # Derive the real notification kind from the catalogue. It drives both the
-        # opt-out filter and the footer reason. A key that is unknown or DB-only falls
-        # back to `status_update`.
+        """Resolve, filter and enqueue one `notify` send for ``template_key``.
+
+        The notification kind comes from the catalog, because it drives the opt-out
+        filter and the footer reason; an unknown or DB-only key falls back to
+        ``status_update``. Without a DB template a catalog key (for example
+        ``status_update_team``) uses its own builtin, every other key the
+        ``status_update`` builtin.
+        """
         from app.modules.notifications.templates_catalogue import CATALOGUE_BY_KEY
 
         spec = CATALOGUE_BY_KEY.get(template_key)
@@ -621,9 +635,6 @@ class NotificationService:
                 link=link,
             )
             return int(ok)
-        # The DB holds no template, so use the builtin fallback. A catalogue key (for
-        # example ``deadline_approaching``) uses its own default. Every other key uses
-        # status_update.
         rendered = render_mail(
             subject_i18n=spec.subject_i18n if spec else _BUILTIN_NOTIFY_SUBJECT,
             body_i18n=spec.body_i18n if spec else _BUILTIN_NOTIFY_BODY,

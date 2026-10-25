@@ -48,8 +48,7 @@ export interface PoolMember {
 const SEARCH_LIMIT = 8;
 
 /**
- * The substitute pool of one gremium: the single entries (boards Admin-Vertretung and
- * Admin-Gremium-Mitglieder, "Einzelne Einträge").
+ * The substitute pool of one gremium: the single entries ("Einzelne Einträge").
  *
  * A delegation to a pool substitute has no lead time and stays possible until the
  * meeting starts, also for a person who is not a member. An entry represents every
@@ -101,7 +100,6 @@ export class SubstitutePoolComponent {
   /** The ids of the entries with a delete in flight. */
   protected readonly removing = signal<ReadonlySet<string>>(new Set());
 
-  // --- add dialog -------------------------------------------------------------
   /** The ⋮ menu of a pool entry: remove is its only action. */
   protected readonly rowMenu = computed<readonly RowMenuSection[]>(() => [
     { items: [{ id: 'remove', label: this.i18n.translate('admin.substitutes.remove'), icon: 'trash', danger: true }] },
@@ -177,7 +175,6 @@ export class SubstitutePoolComponent {
           next: (rows) => {
             const seen = new Set<string>();
             const list: PoolMember[] = [];
-            // A deactivated or expired member represents nobody.
             for (const m of rows) {
               if (!isActiveMembership(m) || seen.has(m.principalId)) continue;
               seen.add(m.principalId);
@@ -204,8 +201,6 @@ export class SubstitutePoolComponent {
     return s.memberName || this.memberList().find((m) => m.id === s.memberId)?.name || '—';
   }
 
-  // --- add ----------------------------------------------------------------------
-
   protected openAdd(): void {
     this.search.sync('');
     this.selected.set(null);
@@ -220,14 +215,13 @@ export class SubstitutePoolComponent {
     this.search.set(q);
   }
 
-  /** Without a name and an e-mail: "Ohne Namen" (D7), never the `sub`. */
+  /** Without a name and an e-mail: "Ohne Namen", never the `sub`. */
   protected label(p: AdminPrincipal): string {
     return personLabel(p, this.i18n);
   }
 
   protected pick(p: AdminPrincipal): void {
     this.selected.set(p);
-    // The name goes into the field without a new search.
     this.search.sync(this.label(p));
     this.candidates.set([]);
   }

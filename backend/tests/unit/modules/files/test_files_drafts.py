@@ -1,4 +1,4 @@
-"""Unit tests for the draft uploads of the wizard (Z4) without a database.
+"""Unit tests for the draft uploads of the wizard without a database.
 
 A scripted session fake answers the queries of `DraftAttachments`, `check_drafts` and
 `bind_drafts`. The integration tests `test_draft_upload` and
@@ -45,14 +45,14 @@ NOW = datetime(2026, 10, 1, 12, 0, tzinfo=UTC)
 
 
 class _Result:
-    def __init__(self, row: Any = None, rows: list[Any] | None = None) -> None:  # noqa: ANN401
+    def __init__(self, row: Any = None, rows: list[Any] | None = None) -> None:
         self._row = row
         self._rows = rows or []
 
-    def one(self) -> Any:  # noqa: ANN401
+    def one(self) -> Any:
         return self._row
 
-    def first(self) -> Any:  # noqa: ANN401
+    def first(self) -> Any:
         return self._row
 
     def all(self) -> list[Any]:
@@ -79,7 +79,7 @@ class _Session:
         self.deleted: list[Any] = []
         self.committed = 0
 
-    async def execute(self, stmt: Any, params: Any = None) -> _Result:  # noqa: ANN401
+    async def execute(self, stmt: Any, params: Any = None) -> _Result:
         sql = str(stmt)
         self.statements.append(sql)
         if "count(" in sql:
@@ -88,21 +88,21 @@ class _Session:
             return _Result(row=self._removed.pop(0) if self._removed else None)
         return _Result()
 
-    async def scalar(self, stmt: Any) -> Any:  # noqa: ANN401
+    async def scalar(self, stmt: Any) -> Any:
         self.statements.append(str(stmt))
         return self._scalar.pop(0) if self._scalar else None
 
-    async def scalars(self, stmt: Any) -> _Result:  # noqa: ANN401
+    async def scalars(self, stmt: Any) -> _Result:
         self.statements.append(str(stmt))
         return _Result(rows=self._scalars.pop(0) if self._scalars else [])
 
-    def add(self, obj: Any) -> None:  # noqa: ANN401
+    def add(self, obj: Any) -> None:
         self.added.append(obj)
 
     async def flush(self) -> None:
         return None
 
-    async def delete(self, obj: Any) -> None:  # noqa: ANN401
+    async def delete(self, obj: Any) -> None:
         self.deleted.append(obj)
 
     async def commit(self) -> None:
@@ -116,7 +116,7 @@ AUDITS: list[dict[str, Any]] = []
 def _patches(monkeypatch: pytest.MonkeyPatch) -> None:
     AUDITS.clear()
 
-    async def _record(session: object, **kw: Any) -> None:  # noqa: ANN401
+    async def _record(session: object, **kw: Any) -> None:
         AUDITS.append(kw)
 
     monkeypatch.setattr(drafts_mod, "audit_record", _record)
@@ -138,6 +138,11 @@ def _drafts(
 
 
 async def test_first_upload_issues_a_token() -> None:
+    """Issue a token on the first upload.
+
+    The new token needs no validity check, but the advisory lock and the quota run. The
+    upload stores the token on its own and moves its end.
+    """
     session = _Session()
     storage, queue = FakeStorage(), FakeScanQueue()
     out = await _drafts(session, storage=storage, queue=queue).upload(
@@ -153,10 +158,8 @@ async def test_first_upload_issues_a_token() -> None:
     assert storage.put_calls == [row.storage_key]
     assert queue.enqueued == [out.id]
     assert session.committed == 1
-    # The new token needs no validity check, but the advisory lock and the quota run.
     assert any("pg_advisory_xact_lock" in s for s in session.statements)
     assert not any("FROM attachment_draft_token" in s for s in session.statements)
-    # The upload stores the token on its own and moves its end.
     (upsert,) = [s for s in session.statements if "INSERT INTO attachment_draft_token" in s]
     assert "ON CONFLICT (token_hash) DO UPDATE" in upsert
     assert AUDITS[0]["action"] == "attachment_upload"
@@ -196,15 +199,15 @@ async def test_quota_gives_413(quota: tuple[int, int], message: str) -> None:
 
 
 async def test_token_is_valid_reads_the_token_table() -> None:
+    """Read the token table, not the drafts, so a token without drafts is valid."""
     session = _Session(scalar=[b"hash"])
     assert await _drafts(session).token_is_valid("t") is True
-    # The check reads the token table, not the drafts: a token without drafts is valid.
     assert "FROM attachment_draft_token" in session.statements[0]
     assert "FROM attachment " not in session.statements[0]
     assert await _drafts(_Session(scalar=[None])).token_is_valid("t", now=NOW) is False
 
 
-def _draft_row(**over: Any) -> Attachment:  # noqa: ANN401
+def _draft_row(**over: Any) -> Attachment:
     base: dict[str, Any] = {
         "id": uuid.uuid4(),
         "application_id": None,
@@ -226,11 +229,14 @@ def _removed(key: str | None = "drafts/x/d.pdf") -> SimpleNamespace:
 
 
 async def test_delete_removes_row_object_and_audits() -> None:
+    """Delete the row and the object, and audit the delete.
+
+    One DELETE carries every condition, so a parallel bind cannot slip in between.
+    """
     session = _Session(removed=[_removed()])
     storage = FakeStorage()
     att_id = uuid.uuid4()
     await _drafts(session, storage=storage).delete(att_id, token="t", actor="applicant")
-    # One DELETE carries every condition, so a parallel bind cannot slip in between.
     (stmt,) = [s for s in session.statements if s.startswith("DELETE FROM attachment")]
     assert "application_id IS NULL" in stmt
     assert "draft_token_hash" in stmt

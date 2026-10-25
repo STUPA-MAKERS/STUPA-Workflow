@@ -53,6 +53,8 @@ export interface DetailPrefetch<T> {
  * comes back after its answer may have gone stale. The answers go into the HTTP cache
  * (`detailContext()`); the detail finds them there and reads again behind them. A failed
  * read is silent: the detail reads on its own when it opens and shows its own error.
+ *
+ * A cached read can end inside `subscribe`, before its subscription is returned.
  */
 export function prefetchDetails<T>(spec: DetailPrefetch<T>): void {
   if (!inject(DETAIL_PREFETCH)) return;
@@ -65,7 +67,6 @@ export function prefetchDetails<T>(spec: DetailPrefetch<T>): void {
   const pump = (): void => {
     while (!stopped && running.size < READS_AT_ONCE && queue.length) {
       const read = (queue.shift() as () => Observable<unknown>)();
-      // A cached read can end inside `subscribe`, before its subscription is returned.
       const slot: { sub?: Subscription; done?: boolean } = {};
       slot.sub = quietly(() =>
         read

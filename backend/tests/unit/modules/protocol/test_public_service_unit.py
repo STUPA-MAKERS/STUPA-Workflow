@@ -76,6 +76,7 @@ def _view(question: str, status: str = "closed") -> SimpleNamespace:
 
 
 async def test_assemble_collects_public_tops(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A vote already in the text as a snippet still shows its result in the list."""
     pub_item = SimpleNamespace(id=uuid4(), title="Haushalt", body="Text", non_public=False)
     np_item = SimpleNamespace(id=uuid4(), title="Personal", body="Geheim", non_public=True)
     empty_item = SimpleNamespace(id=uuid4(), title=None, body="  ", non_public=False)
@@ -101,7 +102,6 @@ async def test_assemble_collects_public_tops(monkeypatch: pytest.MonkeyPatch) ->
     assert "Geheim" not in md
     assert [t.number for t in tops] == [1, 2, 3]
     assert tops[0].title == "Haushalt"
-    # A vote already in the text as a snippet still shows its result in the list.
     assert [d.question for d in tops[0].decisions] == ["Annehmen?", "Schon im Text?"]
     assert [d.in_text for d in tops[0].decisions] == [False, True]
     assert md.count("Schon im Text?") == 1
@@ -139,6 +139,10 @@ async def test_assemble_titles_application_items_by_their_application(
 async def test_finalize_public_gremium_renders_public_version(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """A public gremium gets the public version, and the mail keeps the internal PDF.
+
+    The mail keeps the internal PDF, because the protocol has no non-public TOP.
+    """
     proto = _protocol(status="rendering")
     gremium = SimpleNamespace(id=GID, protocols_public=True)
     session = FakeSession(store={GID: gremium}, results=[result(proto)])
@@ -175,7 +179,6 @@ async def test_finalize_public_gremium_renders_public_version(
     assert proto.public_content["tops"][0]["title"] == "A"
     assert proto.public_search_text == "A\nx"
     assert proto.public_pdf_size == len(b"%PDF-public")
-    # Without a non-public TOP the mail keeps the internal PDF, as before.
     assert mailed == [b"%PDF-internal"]
     assert isinstance(svc.storage, FakeStorage)
     assert {k for k, _n, _ct in svc.storage.puts} == {
@@ -243,13 +246,15 @@ async def test_start_finalize_sets_and_audits_the_withhold_option(
 async def test_start_finalize_without_option_keeps_a_withheld_draft(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A draft held back earlier stays held back on a plain finalize (no option)."""
+    """A draft held back earlier stays held back on a plain finalize (no option).
+
+    The same value again writes no publication entry either.
+    """
     entries = _finalize_fakes(monkeypatch)
     proto = await _start(True, None)
     assert proto.public_withheld is True
     assert [e["action"] for e in entries] == [AuditAction.PROTOCOL_FINALIZE]
     assert entries[0]["data"]["publicWithheld"] is True
-    # The same value again writes no publication entry either.
     entries.clear()
     proto = await _start(True, True)
     assert [e["action"] for e in entries] == [AuditAction.PROTOCOL_FINALIZE]
@@ -283,6 +288,7 @@ async def test_gremien_missing_public_lists_the_gremien() -> None:
 
 
 async def test_backfill_counts_each_outcome(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Only a permanent failure counts up, and a transient one retries later."""
     ids = [uuid4(), uuid4(), uuid4()]
     session = FakeSession(results=[result(*ids)])
     rolled: list[int] = []
@@ -313,16 +319,19 @@ async def test_backfill_counts_each_outcome(monkeypatch: pytest.MonkeyPatch) -> 
     res = await svc.backfill_public(GID)
     assert (res.done, res.transient, res.failed) == (1, 1, 1)
     assert len(rolled) == 2
-    # Only the permanent failure counts; a transient one retries later.
     assert counted == [ids[2]]
 
 
 async def test_count_render_failure_warns_once_at_the_limit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """The failure count warns once at the limit, and a missing protocol is a no-op.
+
+    The test spies on the logger instead of using caplog, because other suites
+    reconfigure the log handlers.
+    """
     from app.modules.protocol.service import PUBLIC_RENDER_MAX_FAILURES
 
-    # A spy on the logger, not caplog: other suites reconfigure the log handlers.
     warnings: list[object] = []
     monkeypatch.setattr(
         protocol_service_mod.logger, "warning", lambda *a, **_kw: warnings.append(a)
@@ -338,7 +347,6 @@ async def test_count_render_failure_warns_once_at_the_limit(
     assert len(warnings) == 1
     assert proto.public_render_failures == PUBLIC_RENDER_MAX_FAILURES + 1
     assert session.committed == 3
-    # A missing protocol is a no-op.
     await _service(FakeSession())._count_render_failure(uuid4())
 
 
@@ -458,4 +466,3 @@ async def test_to_out_reads_the_gremium_flag() -> None:
     assert out.gremium_protocols_public is True
     out = await _service(FakeSession())._to_out(proto)
     assert out.gremium_protocols_public is False
-

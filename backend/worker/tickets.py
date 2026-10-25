@@ -78,6 +78,9 @@ async def anonymize_tickets(ctx: dict[str, Any], now: datetime | None = None) ->
 
     Returns:
         The number of anonymized tickets.
+
+    The row lock serializes the run with a note that binds files (``TicketService.add_note``
+    locks the row too). One bad row is logged and does not stop the run.
     """
     moment = now or datetime.now(UTC)
     maker = _sessionmaker(ctx)
@@ -86,8 +89,6 @@ async def anonymize_tickets(ctx: dict[str, Any], now: datetime | None = None) ->
     for ticket_id in await _due(maker):
         try:
             async with maker() as session:
-                # The lock serializes the run with a note that binds files
-                # (``TicketService.add_note`` locks the row too).
                 ticket = await session.get(Ticket, ticket_id, with_for_update=True)
                 if ticket is None or ticket.anonymized_at is not None:
                     continue
@@ -103,7 +104,7 @@ async def anonymize_tickets(ctx: dict[str, Any], now: datetime | None = None) ->
                 )
                 await session.commit()
                 done += 1
-        except Exception:  # noqa: BLE001 - one bad row must not stop the run
+        except Exception:
             logger.exception("ticket anonymization failed for %s", ticket_id)
     if done:
         logger.info("anonymized %d ticket(s)", done)

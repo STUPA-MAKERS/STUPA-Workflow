@@ -50,12 +50,12 @@ if TYPE_CHECKING:
 
 POLL = "poll"
 
-# 409 codes of the edit.
+#: 409 codes of the edit.
 NOT_A_POLL = "not_a_poll"
 POLL_HAS_ANSWERS = "poll_has_answers"
 POLL_NOT_EDITABLE = "poll_not_editable"
 
-# The end of a poll of a Gremium lies at least this far ahead (create, edit and open).
+#: The end of a poll of a Gremium lies at least this far ahead (create, edit and open).
 MIN_RUNTIME = timedelta(hours=1)
 
 _DATE_ANSWERS = frozenset({"yes", "maybe", "no"})
@@ -191,20 +191,19 @@ class PollService:
     """The poll of a Gremium and the edit of a poll, on a ``VotingService`` session."""
 
     def __init__(self, voting: VotingService) -> None:
+        """Bind the service to a voting service and its session."""
         self.voting = voting
         self.session = voting.session
 
     async def can_create(self, gremium_id: UUID, principal: Principal) -> bool:
         """Tell whether the principal creates a poll in this Gremium.
 
-        The admin role (``admin_bypass`` with ``vote.manage``) or the gremium
-        permission ``vote.manage`` (scope-capped through ``gremium_ids_for``).
+        The admin role or the gremium permission ``vote.manage``, both scope-capped
+        (``policy.has_gremium_permission``).
         """
-        from app.modules.admin.gremium_roles import admin_bypass, gremium_ids_for
+        from app.modules.auth.policy import has_gremium_permission
 
-        if admin_bypass(principal, "vote.manage"):
-            return True
-        return gremium_id in await gremium_ids_for(self.session, principal, "vote.manage")
+        return await has_gremium_permission(self.session, principal, "vote.manage", gremium_id)
 
     async def create(self, payload: PollCreate, principal: Principal, *, now: datetime) -> VoteOut:
         """Create the poll of a Gremium, as a draft or open at once.

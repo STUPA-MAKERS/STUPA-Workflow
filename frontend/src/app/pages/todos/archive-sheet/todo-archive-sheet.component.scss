@@ -2,14 +2,11 @@
   display: contents;
 }
 .as {
-  /* The sheet has the surface-2 background of the search field. The field takes the
-     next surface, so that its edge shows. */
   --sp-bg: var(--color-surface-3);
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
   box-sizing: border-box;
-  /* The whole body of the sheet. */
   min-height: 100%;
   padding-bottom: var(--space-4);
 }
@@ -29,8 +26,6 @@
   border-radius: var(--radius-md);
   background: var(--color-surface-3);
 }
-/* The row has the surface-3 fill of a tonal button. The restore button takes the next
-   surface, and its hover a step further, so that it shows on the row. */
 .as__row {
   --as-restore: var(--color-surface-4);
   --as-restore-hover: color-mix(in srgb, var(--color-text) 8%, var(--color-surface-4));
@@ -66,7 +61,6 @@
   font-size: var(--fs-small);
 }
 
-/* The loading rows: the day line and the size of the small tonal button. */
 .as__skelSub {
   width: 6rem;
 }

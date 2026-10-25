@@ -1,4 +1,4 @@
-"""TDD: RBAC resolution (security.md §2)."""
+"""TDD: RBAC resolution."""
 
 from __future__ import annotations
 
@@ -13,29 +13,33 @@ NOW = datetime(2026, 6, 5, 12, 0, tzinfo=UTC)
 
 
 def test_assignment_valid_window() -> None:
+    """Check the validity window: not yet valid, valid and expired."""
     assert rbac._assignment_valid(None, None, NOW) is True
     assert rbac._assignment_valid(NOW - timedelta(days=1), NOW + timedelta(days=1), NOW)
-    assert rbac._assignment_valid(NOW + timedelta(days=1), None, NOW) is False  # not yet
-    assert rbac._assignment_valid(None, NOW - timedelta(days=1), NOW) is False  # expired
+    assert rbac._assignment_valid(NOW + timedelta(days=1), None, NOW) is False
+    assert rbac._assignment_valid(None, NOW - timedelta(days=1), NOW) is False
 
 
 def test_assignment_valid_naive_db_values_do_not_crash() -> None:
-    """Regression: naive `valid_from` and `valid_until` values from the database.
+    """Accept naive `valid_from` and `valid_until` values from the database.
 
-    A naive timestamp carries no time zone. Before the fix, the comparison against the
-    aware `now` raised a `TypeError` about offset-naive and offset-aware datetimes. The
-    error broke the whole principal resolution. REST answered 500 and the WebSocket
-    handshake answered 403.
+    A naive timestamp carries no time zone. A comparison against the aware `now` raises a
+    `TypeError` about offset-naive and offset-aware datetimes. That error would break the
+    whole principal resolution: REST answers 500 and the WebSocket handshake answers 403.
+    The rows are a naive expired window and a naive window that is not valid yet.
     """
     naive_from = (NOW - timedelta(days=1)).replace(tzinfo=None)
     naive_until = (NOW + timedelta(days=1)).replace(tzinfo=None)
     assert rbac._assignment_valid(naive_from, naive_until, NOW) is True
-    assert rbac._assignment_valid(None, naive_from, NOW) is False  # naive, expired
-    assert rbac._assignment_valid(naive_until, None, NOW) is False  # naive, not yet
+    assert rbac._assignment_valid(None, naive_from, NOW) is False
+    assert rbac._assignment_valid(naive_until, None, NOW) is False
 
 
 async def test_resolve_principal_with_naive_validity_window() -> None:
-    """The full resolver path survives a naive validity window (WebSocket and REST auth)."""
+    """Resolve a principal with a naive validity window and no group mappings.
+
+    The full resolver path for WebSocket and REST auth must survive it.
+    """
     row = PrincipalRow(sub="u4", email=None, display_name=None, oidc_groups=None)
     naive_valid = RoleAssignment(
         role_id="r1",
@@ -45,7 +49,7 @@ async def test_resolve_principal_with_naive_validity_window() -> None:
     )
     db = fake_session(
         result(naive_valid),
-        result(),  # no group mappings
+        result(),
         result("vote.cast"),
         result("member"),
     )
@@ -55,8 +59,9 @@ async def test_resolve_principal_with_naive_validity_window() -> None:
 
 
 async def test_resolve_principal_no_roles() -> None:
+    """Resolve a principal without assignments to no roles."""
     row = PrincipalRow(sub="u1", email="e@x.de", display_name="N", oidc_groups=None)
-    db = fake_session(result())  # no assignments
+    db = fake_session(result())
     p = await rbac.resolve_principal(db, row, NOW)
     assert p.sub == "u1"
     assert p.email == "e@x.de"
@@ -66,6 +71,10 @@ async def test_resolve_principal_no_roles() -> None:
 
 
 async def test_resolve_principal_full_path() -> None:
+    """Put the OIDC group and the Gremium scope of the assignment in groups.
+
+    A global group mapping has no Gremium scope.
+    """
     row = PrincipalRow(sub="u2", email=None, display_name=None, oidc_groups=["grpA"])
     row.id = "pid"  # type: ignore[assignment]
     valid = RoleAssignment(role_id="r1", gremium_id="gid1", valid_from=None, valid_until=None)
@@ -83,12 +92,11 @@ async def test_resolve_principal_full_path() -> None:
     p = await rbac.resolve_principal(db, row, NOW)
     assert p.permissions == {"application.read", "vote.cast"}
     assert set(p.roles) == {"member", "manager"}
-    # The OIDC group and the Gremium scope of the assignment land in groups. A global
-    # group mapping has no Gremium scope.
     assert p.groups == {"grpA", "gid1"}
 
 
 async def test_resolve_principal_assignment_without_gremium() -> None:
+    """Resolve an assignment without Gremium scope and without OIDC groups."""
     row = PrincipalRow(sub="u3", email=None, display_name=None, oidc_groups=None)
     valid = RoleAssignment(role_id="r1", gremium_id=None, valid_from=None, valid_until=None)
     db = fake_session(
@@ -98,4 +106,4 @@ async def test_resolve_principal_assignment_without_gremium() -> None:
     )
     p = await rbac.resolve_principal(db, row, NOW)
     assert p.permissions == {"application.read"}
-    assert p.groups == set()  # no Gremium scope and no OIDC groups
+    assert p.groups == set()

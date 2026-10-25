@@ -94,6 +94,7 @@ def _id_url(pid: uuid.UUID | None = None, size: int | None = None) -> str:
 
 
 def test_image_of_a_principal() -> None:
+    """Serve the image of a principal; 40 px rounds up to the 64 px bucket."""
     fetcher = _Fetcher(FetchResult("found", IMAGE))
     db = fake_session(result(EMAIL), result({"gravatarEnabled": True}))
     resp = _client(db, fetcher=fetcher).get(_id_url(size=40))
@@ -104,7 +105,6 @@ def test_image_of_a_principal() -> None:
     assert resp.headers["etag"] == IMAGE.etag
     assert resp.headers["x-content-type-options"] == "nosniff"
     assert "vary" not in resp.headers
-    # 40 px rounds up to the 64 px bucket.
     assert fetcher.calls == [(DIGEST, 64)]
 
 
@@ -113,7 +113,7 @@ def test_response_leaks_neither_the_email_nor_its_hash() -> None:
     resp = _client(db).get(_id_url())
     blob = (str(dict(resp.headers)) + resp.content.decode("latin-1")).lower()
     assert DIGEST not in blob
-    assert hashlib.md5(EMAIL.lower().encode()).hexdigest() not in blob  # noqa: S324
+    assert hashlib.md5(EMAIL.lower().encode()).hexdigest() not in blob
     assert EMAIL.lower() not in blob
 
 
@@ -204,6 +204,7 @@ def test_bad_id_is_422() -> None:
 
 
 def test_rate_limit_per_principal() -> None:
+    """Limit the rate per principal; another principal has its own budget."""
     limiter = InMemoryRateLimiter()
     db = fake_session(*[result(EMAIL) if i % 2 == 0 else result() for i in range(8)])
     client = _client(db, limiter=limiter)
@@ -212,7 +213,6 @@ def test_rate_limit_per_principal() -> None:
     blocked = client.get(_id_url())
     assert blocked.headers["retry-after"]
     assert blocked.json()["code"] == "rate_limited"
-    # Another principal has its own budget.
     other = _client(
         fake_session(result(EMAIL), result()),
         Principal(sub="u2"),

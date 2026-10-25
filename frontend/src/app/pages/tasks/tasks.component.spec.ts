@@ -132,13 +132,13 @@ describe('TasksComponent', () => {
   });
   afterEach(() => jest.restoreAllMocks());
 
+  /** The status is coloured text, not a badge: a yellow flow colour reads as "warn". */
   it('fills a row: title, status as text, type, amount and waiting time', async () => {
     const since = new Date(Date.now() - 4 * DAY - 3_600_000).toISOString();
     await start('/tasks', [[task('a1', { stateSince: since })]]);
     const link = screen.getByRole('link', { name: 'Mein Antrag' });
     expect(link).toHaveAttribute('href', '/tasks/a1');
     expect(screen.getByText('Förderantrag')).toBeInTheDocument();
-    // The status is coloured text, not a badge: a yellow flow colour reads as "warn".
     expect(screen.getByText('In Prüfung').closest('app-status-text')).toHaveClass('st--warn');
     expect(screen.getByText('1.250,00 €')).toHaveClass('mono');
     const waiting = screen.getByText('seit 4 Tagen');
@@ -167,13 +167,15 @@ describe('TasksComponent', () => {
     expect(pageService.listPath()).toEqual(['/tasks']);
   });
 
+  /**
+   * An application sheet keeps its own height; only a to-do sheet is bounded. In the one-pane
+   * layout of the test the list is hidden while the detail is open.
+   */
   it('opens a deep link /tasks/:id in the detail pane and marks the row', async () => {
     const { cmp } = await start('/tasks/a2', [THREE]);
     expect(cmp.selectedId()).toBe('a2');
     expect(screen.getByText('detail')).toBeInTheDocument();
-    // An application sheet keeps its own height; only a to-do sheet is bounded.
     expect(document.querySelector('.tasks__detail--todo')).toBeNull();
-    // One pane at a time in the test: the list is hidden while the detail is open.
     const link = (name: string) => screen.getByRole('link', { name, hidden: true });
     expect(link('Zweiter')).toHaveAttribute('aria-current', 'true');
     expect(link('Erster')).not.toHaveAttribute('aria-current');
@@ -236,13 +238,13 @@ describe('TasksComponent', () => {
     expect(router.url).toBe('/tasks/zz');
   });
 
+  /** Only the rows of the list pane count, not a link of the detail or the frame. */
   it('removes a deleted task from the list without a request', async () => {
     const { pageService, settle, listTasks } = await start('/tasks/a1', [THREE]);
     pageService.notify({ id: 'a1', kind: 'deleted', source: 'detail' });
     await settle();
     expect(listTasks).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('link', { name: 'Erster', hidden: true })).not.toBeInTheDocument();
-    // Only the rows of the list pane count, not a link of the detail or the frame.
     const list = document.querySelector<HTMLElement>('.tasks__scroll')!;
     expect(
       within(list).getAllByRole('link', { hidden: true }).map((a) => a.textContent?.trim()),
@@ -263,9 +265,9 @@ describe('TasksComponent', () => {
     expect(router.url).toBe('/tasks');
   });
 
+  /** The list pane (one pane at a time in the test) and the none pane both say it. */
   it('shows the empty state when there are no tasks', async () => {
     await start('/tasks', [[]]);
-    // The list pane (one pane at a time in the test) and the none pane both say it.
     expect(screen.getAllByText('Keine offenen Aufgaben.').length).toBeGreaterThan(0);
     expect(document.querySelector('app-empty-state')).not.toBeNull();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
@@ -276,6 +278,7 @@ describe('TasksComponent', () => {
     expect(screen.getByText('Keine Aufgabe geöffnet')).toBeInTheDocument();
   });
 
+  /** "Erneut versuchen" sends the request again. */
   it('shows an error, not an empty list, when the request fails', async () => {
     const { cmp, listTasks, harness } = await start('/tasks', [[]], { tasksError: true });
     expect(cmp.tasks()).toEqual([]);
@@ -283,7 +286,6 @@ describe('TasksComponent', () => {
     expect(cmp.error()).toBe(true);
     expect(screen.getByRole('alert')).toHaveTextContent('Aufgaben konnten nicht geladen werden.');
     expect(screen.queryByText('Keine offenen Aufgaben.')).not.toBeInTheDocument();
-    // "Erneut versuchen" sends the request again.
     const calls = listTasks.mock.calls.length;
     screen.getByRole('button', { name: 'Erneut versuchen' }).click();
     harness.detectChanges();
@@ -312,10 +314,10 @@ describe('TasksComponent', () => {
     );
   });
 
+  /** A clock a little ahead of the server is still today, not a negative age. */
   it('says "seit heute", "seit 1 Tag" and a dash for a missing or invalid time', async () => {
     const { cmp: c } = await start('/tasks', [[]]);
     expect(c.waitingSince(new Date().toISOString())).toBe('seit heute');
-    // A clock a little ahead of the server is still today, not a negative age.
     expect(c.waitingSince(new Date(Date.now() + 60_000).toISOString())).toBe('seit heute');
     expect(c.waitingSince(new Date(Date.now() - DAY - 60_000).toISOString())).toBe(
       'seit 1 Tag',
@@ -326,19 +328,20 @@ describe('TasksComponent', () => {
     expect(c.sinceTitle('kein Datum')).toBeNull();
   });
 
+  /**
+   * Now is 4 Oct, 09:00. Yesterday late in the evening is one day, not "today". Two days ago in the
+   * evening is two days, not one. Earlier the same day is today.
+   */
   it('counts local calendar days, not blocks of 24 hours', async () => {
     const { cmp: c } = await start('/tasks', [[]]);
-    // Now is 4 Oct, 09:00. Yesterday late in the evening is one day, not "today".
     expect(c.waitingSince(new Date(2026, 9, 3, 23, 0).toISOString())).toBe('seit 1 Tag');
-    // Two days ago in the evening is two days, not one.
     expect(c.waitingSince(new Date(2026, 9, 2, 20, 0).toISOString())).toBe('seit 2 Tagen');
-    // Earlier the same day is today.
     expect(c.waitingSince(new Date(2026, 9, 4, 0, 5).toISOString())).toBe('seit heute');
   });
 
+  /** In a zone with DST, 25 or 23 hours lie between these local midnights. */
   it('counts a day across a DST change as one day', async () => {
     const { cmp: c } = await start('/tasks', [[]]);
-    // In a zone with DST, 25 or 23 hours lie between these local midnights.
     jest.spyOn(Date, 'now').mockReturnValue(new Date(2026, 9, 26, 0, 30).getTime());
     expect(c.waitingSince(new Date(2026, 9, 25, 0, 30).toISOString())).toBe('seit 1 Tag');
     jest.spyOn(Date, 'now').mockReturnValue(new Date(2026, 2, 30, 0, 30).getTime());
@@ -355,12 +358,12 @@ describe('TasksComponent', () => {
     expect(c.waitingSince(new Date().toISOString())).toBe('since today');
   });
 
+  /** Without a currency the amount is in euro. Intl puts a no-break space before the sign. */
   it('formats a missing, odd or foreign-currency amount', async () => {
     const { cmp: c } = await start('/tasks', [[]]);
     expect(c.money(task('x', { amount: null }))).toBeNull();
     expect(c.money(task('x', { amount: '' }))).toBeNull();
     expect(c.money(task('x', { amount: 'abc' }))).toBe('abc');
-    // Without a currency the amount is in euro. Intl puts a no-break space before the sign.
     expect(c.money(task('x', { amount: '10', currency: null }))).toBe('10,00 €');
   });
 
@@ -400,10 +403,10 @@ describe('TasksComponent', () => {
       expect(screen.getByText('Keine Aufgabe passt zur Suche.')).toBeInTheDocument();
     });
 
+    /** THREE spans September and August; beside the To-Dos they form one row group. */
     it('puts the applications of all months in one list without month headings', async () => {
       const { harness } = await start('/tasks', [THREE], { todos: TODOS });
       const container = harness.fixture.nativeElement as HTMLElement;
-      // THREE spans September and August; beside the To-Dos they form one row group.
       const lists = container.querySelectorAll('.tasks__group:not([aria-labelledby]) .tasks__rows');
       expect(lists).toHaveLength(1);
       expect(within(lists[0] as HTMLElement).getAllByRole('link').map((l) => l.textContent)).toEqual([
@@ -464,13 +467,13 @@ describe('TasksComponent', () => {
       expect(screen.getByText('Keine Aufgabe geöffnet')).toBeInTheDocument();
     });
 
+    /** The pane bounds a to-do sheet, so its thread fills the pane height. */
     it('opens a To-Do in the right pane and marks its row', async () => {
       const { cmp } = await start('/tasks/todo/k-2', [THREE], { todos: TODOS });
       expect(cmp.selectedTodo()).toBe('k-2');
       expect(cmp.selectedId()).toBeNull();
       expect(cmp.detailOpen()).toBe(true);
       expect(screen.getByText('detail')).toBeInTheDocument();
-      // The pane bounds a to-do sheet, so its thread fills the pane height.
       expect(document.querySelector('.tasks__detail--todo')).not.toBeNull();
     });
 

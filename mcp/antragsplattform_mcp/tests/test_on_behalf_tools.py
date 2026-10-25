@@ -1,4 +1,4 @@
-"""Tests for the capture tools (#11): `create_application_on_behalf` and its search.
+"""Tests for the capture tools: `create_application_on_behalf` and its search.
 
 The tools send camelCase keys and leave out the arguments that the agent did not
 give, so the server applies its defaults (for example `receivedOn` = today).

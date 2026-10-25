@@ -1,10 +1,13 @@
 """Unit tests for the guard-context split (`build_base_context` and `with_actor`).
 
-The actor-free base context and the pure actor overlay come from `build_context`
-(#task-recipients). This suite covers every branch of the two extracted functions
+The actor-free base context and the pure actor overlay come from `build_context`.
+This suite covers every branch of the two extracted functions
 and the recomposed `build_context` semantics. The DB helpers (`committee_ids_for_sub`,
 `_field_types` and `_budget_fits`) keep their own branch coverage in
-`test_deadlines_flow_cov`.
+`test_flow_context_cov`.
+
+The direct imports of the helpers keep the real bodies for the coverage tests, because
+the autouse monkeypatch replaces the module attributes.
 """
 
 from __future__ import annotations
@@ -18,9 +21,6 @@ import pytest
 
 from app.modules.auth.principal import Principal
 from app.modules.flow import context as flow_context
-
-# Original helper bindings. The autouse monkeypatch replaces the module attributes, so
-# these direct imports keep the real bodies for the coverage tests below.
 from app.modules.flow.context import (
     _application_type_key,
     _has_attachment,
@@ -80,8 +80,12 @@ def _pure_helpers(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_with_actor_overlays_on_manual_context() -> None:
+    """Overlay the actor on a manual context.
+
+    The overlay is pure: it replaces a frozen object and leaves the base context intact.
+    """
     base = GuardContext(
-        manual=True, deadline_passed=True, applicant_roles=frozenset({"member"})
+        manual=True, budget_fits=True, applicant_roles=frozenset({"member"})
     )
     ctx = with_actor(
         base,
@@ -92,9 +96,8 @@ def test_with_actor_overlays_on_manual_context() -> None:
     assert ctx.roles == frozenset({"chair"})
     assert ctx.actor_committees == frozenset({"g-1"})
     assert ctx.actor_is_applicant is True
-    assert ctx.deadline_passed is True
+    assert ctx.budget_fits is True
     assert ctx.applicant_roles == frozenset({"member"})
-    # The overlay is pure. It replaces a frozen object and leaves the base context intact.
     assert base.roles == frozenset()
     assert base.actor_is_applicant is False
 
@@ -130,7 +133,6 @@ async def test_base_context_collects_actor_free_facts() -> None:
     )
     ctx = await build_base_context(fake_session(), cast("Any", app), manual=True)
     assert ctx.manual is True
-    assert ctx.deadline_passed is False
     assert ctx.roles == frozenset()
     assert ctx.actor_committees == frozenset()
     assert ctx.actor_is_applicant is False
@@ -176,10 +178,9 @@ async def test_base_context_applicant_roles_not_list() -> None:
 
 async def test_base_context_flags_propagate() -> None:
     ctx = await build_base_context(
-        fake_session(), cast("Any", _app()), manual=False, deadline_passed=True
+        fake_session(), cast("Any", _app()), manual=False
     )
     assert ctx.manual is False
-    assert ctx.deadline_passed is True
 
 
 async def test_build_context_manual_creator_is_applicant() -> None:
@@ -211,6 +212,7 @@ async def test_build_context_created_by_none_not_applicant() -> None:
 
 
 async def test_build_context_automatic_strips_actor_signals() -> None:
+    """Strip only the actor signals; the applicant facts of the base survive."""
     app = _app(created_by="actor-1")
     ctx = await build_context(
         fake_session(), cast("Any", app), _principal(), manual=False, as_applicant=True
@@ -219,5 +221,4 @@ async def test_build_context_automatic_strips_actor_signals() -> None:
     assert ctx.roles == frozenset()
     assert ctx.actor_committees == frozenset()
     assert ctx.actor_is_applicant is False
-    # The strip removes the actor signals only. The applicant facts of the base survive.
     assert ctx.applicant_committees == frozenset({"g-actor-1"})

@@ -120,15 +120,19 @@ async def maker(
     await eng.dispose()
 
 
-# The rows of a test that the `engine` fixture does not clear: the principals with their
-# tokens, preferences and roles, the budget, the bookings, the backups and the site config
-# versions. Without the cleanup they leak into the later tests of the session (a list of
-# all invoices or of all OAuth grants then counts them).
+#: The rows of a test that the `engine` fixture does not clear: the principals with their
+#: tokens, preferences and roles, the budget, the bookings, the backups and the site config
+#: versions. Without the cleanup they leak into the later tests of the session (a list of
+#: all invoices or of all OAuth grants then counts them).
 _CREATED: list[tuple[list[uuid.UUID], list[str], uuid.UUID | None]] = []
 
 
 @pytest.fixture(autouse=True)
 def _cleanup(engine: Engine) -> Iterator[None]:
+    """Delete the rows in ``_CREATED`` and the roles of ``_plain_actor``.
+
+    The permissions of those roles go by CASCADE.
+    """
     yield
     with engine.begin() as conn:
         for ids, subs, budget_id in _CREATED:
@@ -160,7 +164,6 @@ def _cleanup(engine: Engine) -> Iterator[None]:
                     "DELETE FROM budget WHERE id = :b",
                 ):
                     conn.execute(text(stmt), {"b": budget_id})
-        # The roles of `_plain_actor` (their permissions go by CASCADE).
         conn.execute(text("DELETE FROM role WHERE key LIKE 'merger\\_%'"))
     _CREATED.clear()
 
@@ -261,12 +264,25 @@ async def _vote(
 
 
 async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
-    """Give the old principal one row in every area that references a principal."""
+    """Give the old principal one row in every area that references a principal.
+
+    The old account is the creator of an application, fires a transition, writes a
+    version and a comment, and decides by a manual transition. In meetings it is the
+    minute-taker with a keeper period, writes the protocol, attends, ticks an agenda item
+    and decides on a guest. A third person delegates to it in meeting A, and it delegates
+    its seat in meeting B. It casts an open ballot and a secret vote (marker and
+    anonymous choice), sits in the substitute pool, books, invoices and closes a fiscal
+    year. It reports, works on, notes and blocks in a ticket and is blocked itself. Its
+    personal to-do board holds a card that it created, holds, comments on (with a mention
+    of itself), changes and links to the ticket. It also has config, roles, privacy
+    requests, backups and stored audit checks. Its own assignment goes; the one it
+    granted to a third person is rewritten to the new account. Its one audit entry must
+    stay as it is.
+    """
     seed = await seed_read_world(maker)
     old, new, other = await _people(maker, seed)
     tag = _tag()
 
-    # Applications: creator, a transition, a version and a comment of the old account.
     app_id = await create_app(maker, seed, actor=old.sub, title="Antrag Alt")
     await fire(
         maker,
@@ -298,10 +314,8 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
         await session.merge(
             LoginSettings(id=1, web_session_days=90, pwa_session_days=180, updated_by=old.sub)
         )
-        # F1: the old account decided on the application by a manual transition.
         session.add(ApplicationDecision(application_id=app_id, decided_by=old.sub))
 
-        # Meetings, the minute-taker, a keeper period, the protocol, attendance.
         meeting = await _meeting(session, seed.gremium_id, f"Sitzung A {tag}")
         meeting.created_by = old.sub
         meeting.protokollant_id = old.id
@@ -311,7 +325,6 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
                 ProtocolKeeperPeriod(
                     meeting_id=meeting.id, principal_id=old.id, handed_over_by=old.sub
                 ),
-                # The old account ticked an agenda item as done.
                 MeetingAgendaItem(
                     meeting_id=meeting.id,
                     title="TOP 1",
@@ -319,7 +332,6 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
                     done_at=datetime.now(UTC),
                     done_by=old.sub,
                 ),
-                # #17: the old account decided on a join request of a guest.
                 MeetingGuest(
                     meeting_id=meeting.id,
                     seq=1,
@@ -332,7 +344,6 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
                 MeetingAttendance(
                     meeting_id=meeting.id, principal_id=old.id, status="present", source="self"
                 ),
-                # A third person delegated to the old account in meeting A.
                 MeetingDelegation(
                     meeting_id=meeting.id,
                     gremium_id=seed.gremium_id,
@@ -340,7 +351,6 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
                     delegate_principal_id=old.id,
                     created_by=other.sub,
                 ),
-                # The old account delegated its seat to a third person in meeting B.
                 MeetingDelegation(
                     meeting_id=second.id,
                     gremium_id=seed.gremium_id,
@@ -352,7 +362,6 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
             ]
         )
 
-        # Votes: an open ballot and a secret vote (marker + anonymous choice).
         open_vote = await _vote(session, seed.gremium_id, "Offene Frage")
         secret_vote = await _vote(session, seed.gremium_id, "Geheime Frage", secret=True)
         session.add_all(
@@ -364,7 +373,6 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
             ]
         )
 
-        # Substitute pool.
         session.add(
             DelegationSubstitute(
                 gremium_id=seed.gremium_id,
@@ -374,12 +382,16 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
             )
         )
 
-        # Budget: a booking and an invoice.
         budget = Budget(parent_id=None, key=f"M{tag}", path_key=f"M{tag}", name="Merge")
         session.add(budget)
         await session.flush()
         year = FiscalYear(
-            budget_id=budget.id, year=2025, start_date=date(2025, 1, 1), end_date=date(2025, 12, 31)
+            budget_id=budget.id,
+            year=2025,
+            start_date=date(2025, 1, 1),
+            end_date=date(2025, 12, 31),
+            closed_at=datetime.now(UTC),
+            closed_by=old.sub,
         )
         session.add(year)
         await session.flush()
@@ -396,8 +408,6 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
             ]
         )
 
-        # Tickets: the old account reported the ticket, works on it, wrote a note and
-        # an event, blocked a sender and is blocked itself.
         ticket = Ticket(
             kind="bug",
             title="Fehler",
@@ -418,9 +428,6 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
             ]
         )
 
-        # To-dos: the personal board of the old account with one card that the old
-        # account created, holds, commented on (with a mention of itself), changed and
-        # linked to the ticket.
         board = TodoBoard(name="Meine To-Dos", kind="personal", owner_id=old.id)
         session.add(board)
         await session.flush()
@@ -445,7 +452,6 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
             ]
         )
 
-        # Config, roles, privacy, backups, stored audit checks.
         role = await _role(session, "member")
         admin_id = await _admin_actor(session)
         session.add_all(
@@ -457,8 +463,6 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
                     entity_type="flow", entity_id=f"merge-{tag}", version=1, created_by=old.sub
                 ),
                 FormVersion(application_type_id=seed.type_id, version=99, created_by=old.id),
-                # The own assignment of the old account goes; the one it granted to a
-                # third person keeps its marks, rewritten to the new account.
                 RoleAssignment(principal_id=old.id, role_id=role.id, granted_by="bootstrap"),
                 RoleAssignment(
                     principal_id=other.id,
@@ -516,7 +520,6 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
                 principal_id=old.id, gremium_id=seed.gremium_id, gremium_role_id=member_role.id
             )
         )
-        # One audit entry of the old account. The merge must leave it as it is.
         await AuditService(session).record(
             actor=old.sub, action="login", target_type="principal", target_id=str(old.id)
         )
@@ -559,6 +562,17 @@ ID_REFS = [c for _, c in merge_mod.ID_COLUMNS]
 
 
 async def test_merge_rewrites_every_area(maker: async_sessionmaker[AsyncSession]) -> None:
+    """Rewrite every sub and id column of the old account to the new one.
+
+    Before the merge every column has a row of the old account, and the preview writes
+    nothing. The tickets count reporter, assignee, note, event, the blocking person and
+    the blocked account; the to-dos count card, comment, event, link, assignee, mention
+    and personal board. Rights never move, so the role assignments of the old account are
+    gone. The erasure request stays on the old account, because it is the proof. The old
+    row keeps its name for the admin list. The audit log keeps the old rows and gets one
+    merge entry. The config revisions are append-only too: they keep the old sub, and the
+    version sidebar resolves it to the new name.
+    """
     w = await _seed(maker)
 
     async with maker() as session:
@@ -568,13 +582,11 @@ async def test_merge_rewrites_every_area(maker: async_sessionmaker[AsyncSession]
     assert preview.source.display_name == OLD_NAME
     assert preview.target.display_name == NEW_NAME
     before = _areas(preview)
-    # Every sub column and every id column has a row of the old account.
     async with maker() as session:
         for column in SUB_REFS:
             assert await _count(session, column, w.old_sub) >= 1, str(column)
         for column in ID_REFS:
             assert await _count(session, column, w.old_id) >= 1, str(column)
-        # The preview wrote nothing.
         old = await session.get(PrincipalRow, w.old_id)
         assert old is not None and old.merged_into is None
 
@@ -589,9 +601,7 @@ async def test_merge_rewrites_every_area(maker: async_sessionmaker[AsyncSession]
     assert after["sessions"] == {"rewritten": 0, "combined": 0, "removed": 3}
     assert after["memberships"]["removed"] == 1
     assert after["calendar"]["removed"] == 1
-    # Reporter, assignee, note, event, the blocking person and the blocked account.
     assert after["tickets"] == {"rewritten": 6, "combined": 0, "removed": 0}
-    # Card, comment, event, link, assignee, the mention and the personal board.
     assert after["todos"] == {"rewritten": 7, "combined": 0, "removed": 0}
 
     async with maker() as session:
@@ -610,22 +620,18 @@ async def test_merge_rewrites_every_area(maker: async_sessionmaker[AsyncSession]
             assert await _count(session, column, w.old_id) == 0, str(column)
         assert await _count(session, NotificationPreference.principal_id, w.new_id) == 1
         assert await _count(session, TicketSenderBlock.principal_id, w.new_id) == 1
-        # Rights never move: the role assignments of the old account are gone.
         assert await _count(session, RoleAssignment.principal_id, w.new_id) == 0
         assert await _count(session, RoleAssignment.principal_id, w.old_id) == 0
         assert await _count(session, MeetingAttendance.principal_id, w.new_id) == 1
         assert await _count(session, DelegationSubstitute.substitute_principal_id, w.new_id) == 1
-        # The erasure request stays on the old account: it is the proof.
         old = await session.get(PrincipalRow, w.old_id)
         assert old is not None
         assert old.merged_into == w.new_id
         assert old.merged_at is not None
         assert old.active is False
         assert old.calendar_token is None
-        # The old row keeps its name for the admin list.
         assert old.display_name == OLD_NAME
 
-        # The audit log keeps the old rows and gets one merge entry.
         entries = (await session.scalars(select(AuditEntry).order_by(AuditEntry.id))).all()
         assert any(e.actor == w.old_sub and e.action == "login" for e in entries)
         merge_entry = [e for e in entries if e.action == "principal_merge"]
@@ -637,14 +643,16 @@ async def test_merge_rewrites_every_area(maker: async_sessionmaker[AsyncSession]
         assert merge_entry[0].data["counts"]["votes"] == {"rewritten": 2}
         verification = await AuditService(session).verify_chain()
         assert verification.valid is True
-        # The config revisions are append-only too: they keep the old sub, and the
-        # version sidebar resolves it to the new name.
         assert await _count(session, ConfigRevision.created_by, w.old_sub) == 1
         names = await AuditService(session).resolve_actor_names([w.old_sub])
         assert names == {w.old_sub: NEW_NAME}
 
 
 async def test_secret_ballot_stays_anonymous(maker: async_sessionmaker[AsyncSession]) -> None:
+    """Move only the identity half of a secret vote (who voted).
+
+    The choice half has no identity and does not change at all.
+    """
     w = await _seed(maker)
     async with maker() as session:
         before = (
@@ -665,20 +673,25 @@ async def test_secret_ballot_stays_anonymous(maker: async_sessionmaker[AsyncSess
                 select(VotedMarker.voter_sub).where(VotedMarker.vote_id == w.secret_vote_id)
             )
         ).all()
-    # The choice half has no identity and did not change at all.
     assert [dict(r) for r in after] == [dict(r) for r in before]
     assert all("sub" not in k and "principal" not in k for k in after[0])
-    # Only the identity half (who voted) moved to the new account.
     assert marker == [w.new_sub]
 
 
 async def test_duplicates_are_combined(maker: async_sessionmaker[AsyncSession]) -> None:
+    """Combine the duplicate rows; the rows of the new account win.
+
+    A pool entry in which the old account substitutes for the new one means nothing after
+    the merge. A gremium-wide entry of the old account moves. The old account is also a
+    member whom a third person substitutes. The assignment of the old account goes, the
+    one of the new account stays. Three pool entries combine: the self entry, the same
+    substitute for ``other`` and the member entry for ``other``.
+    """
     w = await _seed(maker)
     async with maker() as session:
         role = (await session.scalars(select(Role).where(Role.key == "member"))).one()
         session.add_all(
             [
-                # The new account has the same rows: they win.
                 NotificationPreference(principal_id=w.new_id, kind="comment", enabled=True),
                 RoleAssignment(principal_id=w.new_id, role_id=role.id),
                 MeetingAttendance(
@@ -689,19 +702,16 @@ async def test_duplicates_are_combined(maker: async_sessionmaker[AsyncSession]) 
                     member_principal_id=w.other_id,
                     substitute_principal_id=w.new_id,
                 ),
-                # The old account substitutes for the new one: that means nothing later.
                 DelegationSubstitute(
                     gremium_id=w.gremium_id,
                     member_principal_id=w.new_id,
                     substitute_principal_id=w.old_id,
                 ),
-                # A gremium-wide entry of the old account moves.
                 DelegationSubstitute(
                     gremium_id=w.gremium_id,
                     member_principal_id=None,
                     substitute_principal_id=w.old_id,
                 ),
-                # The old account is a member whom a third person substitutes.
                 DelegationSubstitute(
                     gremium_id=w.gremium_id,
                     member_principal_id=w.old_id,
@@ -723,11 +733,9 @@ async def test_duplicates_are_combined(maker: async_sessionmaker[AsyncSession]) 
         result = await PrincipalMergeService(session).merge(w.old_id, w.new_id, actor=ADMIN_SUB)
     counts = _areas(result)
     assert counts["notifications"] == {"rewritten": 0, "combined": 1, "removed": 0}
-    # The assignment of the old account goes; the one of the new account stays.
     assert counts["roles"]["removed"] == 1
     assert counts["roles"]["combined"] == 0
     assert counts["attendance"] == {"rewritten": 0, "combined": 1, "removed": 0}
-    # Self entry + the same substitute for `other` + the member entry for `other`.
     assert counts["substitutes"]["combined"] == 3
     assert counts["substitutes"]["rewritten"] >= 1
     assert _areas(preview)["substitutes"]["combined"] == 3
@@ -764,9 +772,12 @@ async def test_duplicates_are_combined(maker: async_sessionmaker[AsyncSession]) 
 async def test_legacy_self_absent_attendance_becomes_a_lead_entry(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
+    """Move an older self report ``absent`` as a lead entry.
+
+    The test writes the row with raw SQL, because the NOT VALID check refuses it today.
+    """
     w = await _seed(maker)
     async with maker() as session:
-        # Write a row from before Z2: the NOT VALID check refuses it today.
         await session.execute(
             text(
                 "ALTER TABLE meeting_attendance "
@@ -811,6 +822,11 @@ async def _add(maker: async_sessionmaker[AsyncSession], *rows: object) -> None:
 async def _conflict_world(
     maker: async_sessionmaker[AsyncSession], kind: str
 ) -> tuple[World, str | None]:
+    """Seed the world plus the rows of one conflict kind.
+
+    For ``delegation_chain`` a third person delegates to the new account in meeting B,
+    where the old account is a delegator.
+    """
     w = await _seed(maker)
     meeting_title: str | None = None
     async with maker() as session:
@@ -858,8 +874,6 @@ async def _conflict_world(
             assert meeting is not None
             return w, meeting.title
     if kind == "delegation_chain":
-        # The third person delegated to the new account in meeting B, where the old
-        # account is a delegator.
         async with maker() as session:
             third = PrincipalRow(sub=f"third-{_tag()}", display_name="Dritte")
             session.add(third)
@@ -920,6 +934,7 @@ _CONFLICTS = {
 async def test_each_conflict_blocks_the_merge(
     maker: async_sessionmaker[AsyncSession], case: str
 ) -> None:
+    """Refuse the merge on each conflict kind and change nothing."""
     w, label = await _conflict_world(maker, case)
     kind = _CONFLICTS[case]
     async with maker() as session:
@@ -934,7 +949,6 @@ async def test_each_conflict_blocks_the_merge(
     assert exc.value.errors is not None
     assert [(e.field, e.msg) for e in exc.value.errors] == [(kind, label or "")]
 
-    # Nothing changed.
     async with maker() as session:
         old = await session.get(PrincipalRow, w.old_id)
         assert old is not None and old.merged_into is None and old.active is True
@@ -1021,13 +1035,13 @@ async def test_preconditions(maker: async_sessionmaker[AsyncSession]) -> None:
 async def test_earlier_merges_move_on_to_the_new_target(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
+    """An even older account merged into the old account now points to the new one."""
     w = await _seed(maker)
     async with maker() as session:
         older = PrincipalRow(sub=f"older-{_tag()}", display_name="Ganz Alt")
         session.add(older)
         await session.commit()
         older_id = older.id
-    # An even older account was merged into the old account before.
     async with maker() as session:
         await PrincipalMergeService(session).merge(older_id, w.old_id, actor=ADMIN_SUB)
     async with maker() as session:
@@ -1040,6 +1054,7 @@ async def test_earlier_merges_move_on_to_the_new_target(
 
 
 async def test_old_sub_cannot_log_in(maker: async_sessionmaker[AsyncSession]) -> None:
+    """Refuse a login with the old sub and change nothing."""
     w = await _seed(maker)
     async with maker() as session:
         await PrincipalMergeService(session).merge(w.old_id, w.new_id, actor=ADMIN_SUB)
@@ -1053,7 +1068,6 @@ async def test_old_sub_cannot_log_in(maker: async_sessionmaker[AsyncSession]) ->
     async with maker() as session:
         old = await session.get(PrincipalRow, w.old_id)
         assert old is not None
-        # The refused login changed nothing.
         assert old.display_name == OLD_NAME
         assert old.oidc_groups == []
         assert old.last_login is None
@@ -1081,6 +1095,13 @@ async def test_routes_and_display_follow_the_merge(
     maker: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """The routes and the displays follow the merge.
+
+    The user list marks the old account, which cannot be activated again. Rows that still
+    hold the old sub (the audit log, and here a comment written with the old sub after
+    the merge) show the new name. In the audit log the actor follows the merge, and the
+    target names the old account itself.
+    """
     w = await _seed(maker)
     api = _api(migrated, monkeypatch, _MERGE_ADMIN)
     with TestClient(api) as client:
@@ -1107,7 +1128,6 @@ async def test_routes_and_display_follow_the_merge(
         assert again.json()["code"] == "principal_already_merged"
         assert again.headers["content-type"].startswith("application/problem+json")
 
-        # The user list marks the old account.
         users = client.get("/api/admin/principals", params={"q": OLD_NAME}).json()
         old_row = next(u for u in users if u["id"] == str(w.old_id))
         assert old_row["mergedIntoId"] == str(w.new_id)
@@ -1115,13 +1135,10 @@ async def test_routes_and_display_follow_the_merge(
         assert old_row["mergedAt"]
         assert old_row["active"] is False
 
-        # A merged account cannot be activated again.
         react = client.patch(f"/api/admin/principals/{w.old_id}", json={"active": True})
         assert react.status_code == 409
         assert react.json()["code"] == "principal_merged"
 
-    # Rows that still hold the old sub (the audit log, and here a comment written
-    # with the old sub after the merge) show the new name.
     async with maker() as session:
         session.add(
             Comment(
@@ -1159,7 +1176,6 @@ async def test_routes_and_display_follow_the_merge(
         login = next(e for e in audit if e["action"] == "login")
         assert login["actor"] == w.old_sub
         assert login["actorName"] == NEW_NAME
-        # The actor follows the merge; the target names the old account itself.
         assert login["targetLabel"] == OLD_NAME
         merge_row = next(e for e in audit if e["action"] == "principal_merge")
         assert merge_row["actor"] == ADMIN_SUB
@@ -1236,6 +1252,10 @@ async def test_merge_conflict_is_problem_json(
 async def test_merged_principal_gets_no_membership_and_no_bootstrap_admin(
     migrated: tuple[str, str], maker: async_sessionmaker[AsyncSession]
 ) -> None:
+    """A merged principal gets no gremium membership and no bootstrap admin.
+
+    The test deletes its mapping, because the mapping table is not cleared between tests.
+    """
     from app.modules.admin.membership_sync import sync_all_memberships
     from app.modules.admin.models import GremiumMembershipMapping
     from app.modules.auth.bootstrap import ensure_bootstrap_admins
@@ -1263,14 +1283,10 @@ async def test_merged_principal_gets_no_membership_and_no_bootstrap_admin(
         await session.commit()
         assert granted == 0
         assert await _count(session, GremiumMembership.principal_id, w.old_id) == 0
-        # The mapping table is not cleared between tests.
         await session.execute(
             text("DELETE FROM gremium_membership_mapping WHERE oidc_group = :g"), {"g": group}
         )
         await session.commit()
-
-
-# -- Security review: rights, erasure, inactive target, Art. 15 ------------------------
 
 
 async def _plain_actor(maker: async_sessionmaker[AsyncSession], perms: set[str]) -> str:
@@ -1299,16 +1315,18 @@ async def _give_old_admin(maker: async_sessionmaker[AsyncSession], w: World) -> 
 async def test_extra_rights_of_the_source_block_a_merge_by_a_weaker_actor(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
-    """D1: a holder of the merge right cannot take over the admin role of another account."""
+    """A holder of the merge right cannot take over the admin role of another account.
+
+    Without the admin role the extra right is the gremium right of the old membership.
+    With the admin role the old account holds every right, and one entry says so.
+    """
     w = await _seed(maker)
     actor = await _plain_actor(maker, {"admin.users", "admin.users.merge"})
-    # Without the admin role: the gremium right of the membership of the old account.
     async with maker() as session:
         preview = await PrincipalMergeService(session).preview(w.old_id, w.new_id, actor=actor)
     assert preview.can_merge is False
     assert preview.actor_holds_extra is False
     assert ("vote.cast", "StuPa") in {(p.key, p.gremium) for p in preview.extra_permissions}
-    # With the admin role the old account holds every right: one entry says so.
     await _give_old_admin(maker, w)
     async with maker() as session:
         preview = await PrincipalMergeService(session).preview(w.old_id, w.new_id, actor=actor)
@@ -1328,7 +1346,7 @@ async def test_extra_rights_of_the_source_block_a_merge_by_a_weaker_actor(
 async def test_an_admin_actor_may_merge_extra_rights_but_no_role_moves(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
-    """D1: the admin may merge; the role assignments of the source never move."""
+    """The admin may merge; the role assignments of the source never move."""
     w = await _seed(maker)
     await _give_old_admin(maker, w)
     async with maker() as session:
@@ -1348,7 +1366,10 @@ async def test_an_admin_actor_may_merge_extra_rights_but_no_role_moves(
 async def test_the_own_old_account_merges_when_the_target_holds_its_rights(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
-    """The main use case: an admin merges their own old account into their account."""
+    """The main use case: an admin merges their own old account into their account.
+
+    The new account itself is the actor and holds no merge-relevant extra right.
+    """
     w = await _seed(maker)
     async with maker() as session:
         member = (
@@ -1371,7 +1392,6 @@ async def test_the_own_old_account_merges_when_the_target_holds_its_rights(
         assert new is not None
         await session.commit()
         new_sub = new.sub
-    # The new account itself is the actor and holds no merge-relevant extra right.
     async with maker() as session:
         preview = await PrincipalMergeService(session).preview(
             w.old_id, w.new_id, actor=new_sub
@@ -1387,7 +1407,7 @@ async def test_the_own_old_account_merges_when_the_target_holds_its_rights(
 async def test_an_erased_account_cannot_be_merged(
     maker: async_sessionmaker[AsyncSession], mark: str, side: str
 ) -> None:
-    """D2: an executed erasure request or the erasure audit entry blocks the merge."""
+    """An executed erasure request or the erasure audit entry blocks the merge."""
     w = await _seed(maker)
     pid = w.old_id if side == "source" else w.new_id
     async with maker() as session:
@@ -1433,7 +1453,7 @@ async def test_a_deactivated_target_is_refused(maker: async_sessionmaker[AsyncSe
 async def test_auskunft_names_the_live_account_of_a_shared_address(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
-    """D3: an old account that keeps the address never hides the live account."""
+    """An old account that keeps the address never hides the live account."""
     from app.modules.privacy.service import AuskunftService
 
     w = await _seed(maker)

@@ -6,7 +6,8 @@ chunks, comments; an ICC profile stays, so the colors stay right), scales the lo
 side down to ``MAX_SIDE`` (``MAX_ANIMATION_SIDE`` for an animation) and encodes the
 pixels again in the input format. A
 polyglot file or a payload in a metadata block therefore does not survive the
-upload, and the images skip the ClamAV scan of the attachments.
+upload. The ClamAV scan of the client bytes runs before this decode, in
+``MediaService.upload``.
 
 The guards against a decompression bomb: libmagic must sniff one of the four types,
 Pillow must read the same format, the pixel count of one frame must stay under
@@ -50,7 +51,7 @@ MAX_ICC_BYTES: Final[int] = 256 * 1024
 #: The quality of a lossy JPEG or WEBP encode.
 QUALITY: Final[int] = 85
 
-# Sniffed type -> the Pillow format name that must match it.
+#: Sniffed type -> the Pillow format name that must match it.
 _FORMATS: Final[dict[str, str]] = {
     "image/png": "PNG",
     "image/jpeg": "JPEG",
@@ -89,7 +90,11 @@ def _icc(img: Image) -> bytes | None:
 
 
 def _still(img: Image, mime: str) -> Image:
-    """Return the oriented, scaled pixels of a single-frame image, without metadata."""
+    """Return the oriented, scaled pixels of a single-frame image, without metadata.
+
+    A palette image scales with NEAREST only, so it converts to RGBA to keep the quality.
+    The transparency of a palette or RGB image stays. Every other info block goes.
+    """
     from PIL import Image as PILImage
     from PIL import ImageOps
 
@@ -102,10 +107,8 @@ def _still(img: Image, mime: str) -> Image:
     size = _target_size(out.width, out.height)
     if size != out.size:
         if out.mode in ("1", "P"):
-            # A palette image scales with NEAREST only; RGBA keeps the quality.
             out = out.convert("RGBA")
         out = out.resize(size, PILImage.Resampling.LANCZOS)
-    # Keep the transparency of a palette or RGB image, drop every other block.
     out.info = {k: v for k, v in out.info.items() if k == "transparency"}
     return out
 
@@ -115,6 +118,10 @@ def _frames(img: Image) -> tuple[list[Image], list[int]]:
 
     Each frame is converted and scaled before the next one decodes, so only one frame
     is in memory at full size.
+
+    A later GIF frame can reach past the canvas. Pillow then grows the image at the seek,
+    before the frame decodes, so the check of the first frame does not see it. The function
+    therefore checks every frame before it decodes.
 
     Raises:
         ImageRejected: A frame is not the size of the canvas. Every frame then has
@@ -128,9 +135,6 @@ def _frames(img: Image) -> tuple[list[Image], list[int]]:
     canvas = (img.width, img.height)
     size = _target_size(img.width, img.height, MAX_ANIMATION_SIDE)
     for frame in ImageSequence.Iterator(img):
-        # A later GIF frame can reach past the canvas. Pillow then grows the image at
-        # the seek, before the frame decodes, so the check of the first frame does not
-        # see it. Check every frame before it decodes.
         if frame.size != canvas:
             raise ImageRejected("A frame of the animation is larger than its canvas.")
         durations.append(int(frame.info.get("duration") or 100))
@@ -195,6 +199,9 @@ def _encode(img: Image, mime: str) -> CleanImage:
 def clean_image(data: bytes) -> CleanImage:
     """Decode the upload and encode it again without metadata.
 
+    A bomb warning of Pillow is an error here, on top of the own guards. ``formats`` makes
+    Pillow read the sniffed format only, so the two agree.
+
     Returns:
         The encoded image, in the format of the input.
 
@@ -211,9 +218,7 @@ def clean_image(data: bytes) -> CleanImage:
 
     try:
         with warnings.catch_warnings():
-            # A bomb warning of Pillow is an error here, on top of our own guards.
             warnings.simplefilter("error", PILImage.DecompressionBombWarning)
-            # `formats` makes Pillow read the sniffed format only, so the two agree.
             with PILImage.open(io.BytesIO(data), formats=[_FORMATS[mime]]) as img:
                 return _encode(img, mime)
     except ImageRejected:

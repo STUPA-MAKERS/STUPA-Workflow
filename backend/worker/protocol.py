@@ -74,6 +74,9 @@ async def _broadcast_meeting_state(ctx: dict[str, Any], protocol_id: UUID) -> No
 
     The call is best effort. A broadcast error must not fail a render or a rollback that
     already completed.
+
+    The status is a text column; the service constrains it to the allowed literals, so the
+    cast is safe.
     """
     redis = ctx.get("redis")
     if redis is None:
@@ -91,12 +94,11 @@ async def _broadcast_meeting_state(ctx: dict[str, Any], protocol_id: UUID) -> No
         return
     event = MeetingStateEvent(
         activeApplicationId=meeting.active_application_id,
-        # Text column. The service constrains the values to the allowed literals.
         status=cast("Any", meeting.status),
     )
     try:
         await RedisBroker(redis).publish(meeting_channel(meeting.id), event.dump())
-    except Exception as exc:  # noqa: BLE001 - broadcast is not render-critical
+    except Exception as exc:
         logger.warning(
             "meeting_state broadcast failed (protocol=%s): %s", protocol_id, exc
         )
@@ -111,6 +113,8 @@ async def render_protocol(ctx: dict[str, Any], protocol_id: str) -> str:
     Returns:
         `"final"` after the send, `"dead"` after the last failed try, or `"failed"` after
         a permanent error.
+
+    Any other error is permanent (for example a malformed formula).
     """
     settings: Settings = ctx["settings"]
     pid = UUID(protocol_id)
@@ -139,7 +143,7 @@ async def render_protocol(ctx: dict[str, Any], protocol_id: str) -> str:
         await _revert_to_draft(ctx, pid)
         await _broadcast_meeting_state(ctx, pid)
         return "dead"
-    except Exception as exc:  # noqa: BLE001 - permanent (e.g. a malformed formula)
+    except Exception as exc:
         logger.error(
             "protocol render failed permanently (protocol=%s): %s", protocol_id, exc
         )
@@ -208,7 +212,7 @@ async def heal_public_protocols(ctx: dict[str, Any]) -> str:
                 result = await _service(ctx, session).backfill_public(
                     gremium_id, retry_failed=False
                 )
-        except Exception:  # noqa: BLE001 - one gremium must not stop the others
+        except Exception:
             logger.exception("public heal failed (gremium=%s)", gremium_id)
             failed += 1
             continue

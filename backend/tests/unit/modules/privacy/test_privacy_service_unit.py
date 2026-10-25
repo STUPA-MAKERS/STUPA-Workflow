@@ -61,6 +61,10 @@ def _erasure(**over: object) -> ErasureRequest:
 
 
 async def test_principal_erase_clears_pii_and_deactivates() -> None:
+    """Clear the PII and deactivate the principal.
+
+    The sub stays as a pseudonym for the audit chain and the IdP link.
+    """
     principal = _principal()
     db = fake_session(gets=[principal])
     result_principal = await PrincipalService(db).erase(principal.id, actor="admin")
@@ -70,7 +74,6 @@ async def test_principal_erase_clears_pii_and_deactivates() -> None:
     assert principal.calendar_token is None
     assert principal.oidc_groups is None
     assert principal.active is False
-    # The sub stays as a pseudonym for the audit chain and the IdP link.
     assert principal.sub == "kc-123"
     assert db.committed == 1
     assert any(getattr(o, "action", None) == "principal_erased" for o in db.added)
@@ -116,11 +119,12 @@ async def test_principal_erase_commit_false_flushes_only() -> None:
 
 
 async def test_settings_get_returns_existing_row() -> None:
+    """Return the existing settings row without the seed fallback."""
     row = PrivacySettings(id=1, default_retention_months=36)
     db = fake_session(gets=[row])
     got = await PrivacySettingsService(db).get()
     assert got is row
-    assert db.added == []  # the seed fallback did not fire
+    assert db.added == []
 
 
 async def test_settings_get_seeds_when_missing() -> None:
@@ -154,7 +158,8 @@ async def test_create_principal_requires_principal_id() -> None:
 
 
 async def test_create_applicant_unknown_application_raises_not_found() -> None:
-    db = fake_session(gets=[None])  # the application does not exist
+    """Raise NotFound when the application does not exist."""
+    db = fake_session(gets=[None])
     with pytest.raises(NotFoundError):
         await ErasureRequestService(db).create(
             subject_type="applicant", application_id=uuid4()
@@ -162,10 +167,14 @@ async def test_create_applicant_unknown_application_raises_not_found() -> None:
 
 
 async def test_create_applicant_backfills_email_from_applicant() -> None:
+    """Fill a missing email from the applicant.
+
+    The execute calls are the existence check and the lookup of applicant.email.
+    """
     app_id = uuid4()
     db = fake_session(
-        gets=[Application(id=app_id)],  # existence check
-        scalar=["found@example.org"],  # Applicant.email lookup
+        gets=[Application(id=app_id)],
+        scalar=["found@example.org"],
     )
     request = await ErasureRequestService(db).create(
         subject_type="applicant", application_id=app_id
@@ -190,6 +199,7 @@ async def test_create_principal_records_requested_by() -> None:
 
 
 async def test_create_applicant_keeps_explicit_email() -> None:
+    """Keep an explicit email and run no backfill lookup."""
     app_id = uuid4()
     db = fake_session(gets=[Application(id=app_id)])
     request = await ErasureRequestService(db).create(
@@ -197,7 +207,6 @@ async def test_create_applicant_keeps_explicit_email() -> None:
         application_id=app_id,
         email="explicit@example.org",
     )
-    # The explicit email stays. The service runs no backfill lookup.
     assert request.email == "explicit@example.org"
 
 
@@ -222,10 +231,13 @@ async def test_get_returns_row() -> None:
 
 
 async def test_execute_applicant_dispatches_anonymize(monkeypatch) -> None:
+    """Dispatch the anonymization to the right application atomically.
+
+    The call has files None and commit False, which proves the dispatch path.
+    """
     calls: list[tuple[UUID, str, object, bool]] = []
 
-    async def fake_anonymize(_self, application_id, *, files, actor, commit):  # type: ignore[no-untyped-def]
-        # Here files is None and commit is False, which proves the dispatch path.
+    async def fake_anonymize(_self, application_id, *, files, actor, commit):
         calls.append((application_id, actor, files, commit))
 
     monkeypatch.setattr(
@@ -237,18 +249,19 @@ async def test_execute_applicant_dispatches_anonymize(monkeypatch) -> None:
     assert out.status == "executed"
     assert out.handled_by == "admin"
     assert out.handled_at is not None
-    # The service dispatches the anonymization to the right application atomically
-    # (commit=False).
     assert calls == [(request.application_id, "admin", None, False)]
     assert db.committed == 1
 
 
 async def test_execute_principal_dispatches_erase() -> None:
+    """Dispatch a principal request to the erase.
+
+    The gets run in this order: _require_open, then PrincipalService.erase.
+    """
     principal = _principal()
     request = _erasure(
         subject_type="principal", application_id=None, principal_id=principal.id
     )
-    # First the get of _require_open, then the get of PrincipalService.erase.
     db = fake_session(gets=[request, principal])
     out = await ErasureRequestService(db).execute(request.id, actor="dpo")
     assert out.status == "executed"
@@ -271,7 +284,10 @@ async def test_execute_already_handled_raises_conflict() -> None:
 
 
 async def test_execute_no_resolvable_subject_raises_conflict() -> None:
-    # An applicant row without application_id is a DB inconsistency: no subject resolves.
+    """Raise Conflict when no subject resolves.
+
+    An applicant row without application_id is a DB inconsistency.
+    """
     request = _erasure(subject_type="applicant", application_id=None)
     db = fake_session(gets=[request])
     with pytest.raises(ConflictError) as exc:
@@ -305,7 +321,8 @@ async def test_reject_already_handled_raises_conflict() -> None:
 
 
 async def test_auskunft_empty_when_no_applicant_or_principal() -> None:
-    db = fake_session(scalars=[result()], scalar=[None])  # no applicants, no principal
+    """Return an empty export when no applicant and no principal exist."""
+    db = fake_session(scalars=[result()], scalar=[None])
     data = await AuskunftService(db).collect("nobody@example.org")
     assert data["email"] == "nobody@example.org"
     assert data["applications"] == []
@@ -314,6 +331,10 @@ async def test_auskunft_empty_when_no_applicant_or_principal() -> None:
 
 
 async def test_auskunft_collects_applications_versions_principal() -> None:
+    """Collect the applications, versions and the principal.
+
+    The last two execute calls read the type names and the state labels.
+    """
     app_id = uuid4()
     type_id = uuid4()
     state_id = "s-1"
@@ -332,8 +353,8 @@ async def test_auskunft_collects_applications_versions_principal() -> None:
             result(version),
         ],
         execute=[
-            result((type_id, {"de": "Typ"})),  # type_names
-            result((state_id, {"de": "Eingereicht"})),  # state_labels
+            result((type_id, {"de": "Typ"})),
+            result((state_id, {"de": "Eingereicht"})),
         ],
         scalar=[principal],
     )
@@ -350,10 +371,14 @@ async def test_auskunft_collects_applications_versions_principal() -> None:
 
 
 async def test_auskunft_i18n_falls_back_and_handles_missing_state() -> None:
+    """Fall back to 'en' for i18n and handle a missing state.
+
+    current_state_id is None, so the service skips the state_labels query. The
+    application has no versions. A type name with only 'en' falls back to 'en'.
+    """
     app_id = uuid4()
     type_id = uuid4()
     applicant = Applicant(application_id=app_id, email="y@example.org", name="Y")
-    # current_state_id is None, so the service skips the state_labels query.
     application = Application(
         id=app_id, type_id=type_id, current_state_id=None, created_at=_AT, data={}
     )
@@ -361,21 +386,25 @@ async def test_auskunft_i18n_falls_back_and_handles_missing_state() -> None:
         scalars=[
             result(applicant),
             result(application),
-            result(),  # no versions
+            result(),
         ],
-        execute=[result((type_id, {"en": "Type"}))],  # EN only, so de falls back to en
+        execute=[result((type_id, {"en": "Type"}))],
         scalar=[None],
     )
     data = await AuskunftService(db).collect("y@example.org", locale="de")
-    assert data["applications"][0]["typeName"] == "Type"  # de is missing, so en wins
-    assert data["applications"][0]["status"] == ""  # no state
+    assert data["applications"][0]["typeName"] == "Type"
+    assert data["applications"][0]["status"] == ""
     assert data["versions"] == []
 
 
 async def test_principal_erase_erases_the_candidacies_in_the_same_transaction(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """F2: the erasure replaces the candidate names (elections and protocol text)."""
+    """Erase the candidacies in the same transaction.
+
+    The erasure replaces the candidate names in elections and protocol text. The caller,
+    the erasure queue, commits, so the erase does not commit.
+    """
     from app.modules.privacy import service as privacy_service
 
     principal = _principal()
@@ -394,5 +423,4 @@ async def test_principal_erase_erases_the_candidacies_in_the_same_transaction(
     monkeypatch.setattr(privacy_service, "erase_candidate_names", fake_names)
     await PrincipalService(db).erase(principal.id, actor="admin", commit=False)
     assert calls == [("candidacies", db, principal.id), ("names", db, marker)]
-    # The caller (the erasure queue) commits: no commit of its own.
     assert db.committed == 0

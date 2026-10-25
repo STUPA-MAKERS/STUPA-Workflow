@@ -74,6 +74,8 @@ import {
   SkeletonComponent,
   StatusTextComponent,
   type TabItem,
+  TabPageDirective,
+  TabPagerComponent,
   TabsComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
@@ -159,7 +161,7 @@ export function fromMine(m: MyTicketDetail, reporter: TicketReporter): TicketDet
 }
 
 /**
- * The detail of a ticket (frames 18, 19, 30–32, 35, 36) in the geometry of the
+ * The detail of a ticket in the geometry of the
  * application detail: a header with the state, the kind and the assignee and the main
  * actions ("Erledigt", "Ablehnen"), then side by side the thread "Verlauf" (`app-chat`:
  * the report, the internal notes and the events) and "Details" (reporter, assignee, kind,
@@ -169,15 +171,17 @@ export function fromMine(m: MyTicketDetail, reporter: TicketReporter): TicketDet
  * first) when an account reported the ticket, because only an account reads a public
  * note. A note takes up to 5 files (not on an anonymized ticket).
  *
- * Without `ticket.manage` the page is the view of the reporter on an own ticket
- * (`/tickets/mine`): the report, the public notes and the status changes, the own
- * messages, the kind and the report time. No actions, no menu, no assignee, no to-dos,
- * no technical context. A block of the sender hides the composer. Closing a ticket with open to-dos asks "Offene
- * To-Dos mit erledigen?" (default yes). The ⋮ menu blocks or unblocks the sender (frame
- * 19) at once, with a toast (contract 12.8: no question); the own report offers no
- * block. While a file of the report or
- * a note is in the scan, the chat asks for the thread again (`refreshThread`), and only
- * the scan states of that read change the page.
+ * Without `ticket.manage` the page is the view of the reporter on an own ticket (`/tickets/mine`):
+ * the report, the public notes and the status changes, the own messages, the kind and the report
+ * time. No actions, no menu, no assignee, no to-dos, no technical context. A block of the sender
+ * hides the composer. Closing a ticket with open to-dos asks "Offene To-Dos mit erledigen?"
+ * (default yes). The ⋮ menu blocks or unblocks the sender at once, with a toast and no question;
+ * the own report offers no block. While a file of the report or a note is in the scan, the chat
+ * asks for the thread again (`refreshThread`), and only the scan states of that read change the
+ * page.
+ *
+ * The two layouts re-create the chat. The page provides `ChatDrafts`, so the composer files
+ * stay with the page.
  */
 @Component({
   selector: 'app-ticket-detail',
@@ -205,11 +209,12 @@ export function fromMine(m: MyTicketDetail, reporter: TicketReporter): TicketDet
     SheetBarTitleDirective,
     SkeletonComponent,
     StatusTextComponent,
+    TabPageDirective,
+    TabPagerComponent,
     TabsComponent,
     TodoNewDialogComponent,
     TodoLinkedListComponent,
   ],
-  // The two layouts re-create the chat; the composer files stay with the page.
   providers: [ChatDrafts],
   templateUrl: './ticket-detail.component.html',
   styleUrl: './ticket-detail.component.scss',
@@ -250,7 +255,7 @@ export class TicketDetailComponent {
   readonly saving = signal<'status' | 'assignee' | 'kind' | null>(null);
   readonly tab = signal<DetailTab>('log');
 
-  /** The done question (frame 35): the state to set, and whether the to-dos go along. */
+  /** The done question: the state to set, and whether the to-dos go along. */
   readonly closing = signal<'done' | 'rejected' | null>(null);
   readonly completeTodos = signal(true);
   /** The ticket a rejection marks as the original, when the question came from the duplicate pick. */
@@ -318,11 +323,9 @@ export class TicketDetailComponent {
         items: [{ id: 'reset', label: this.t('tickets.detail.resetNew'), icon: 'history' }],
       });
     }
-    // The closing action and the block stand apart from the status change, behind a rule.
     const apart: RowMenuItem[] = [];
     if (isOpen(t.status))
       apart.push({ id: 'duplicate', label: this.t('tickets.detail.duplicate'), icon: 'copy' });
-    // An anonymized ticket has no sender any more, and nobody blocks themselves.
     if (!t.anonymizedAt && !this.ownReport(t.reporter)) {
       apart.push(
         t.senderBlocked
@@ -331,7 +334,6 @@ export class TicketDetailComponent {
       );
     }
     if (apart.length) sections.push({ items: apart });
-    // A new ticket can be a duplicate, any other can go back to "Neu": never empty.
     return sections;
   });
 
@@ -398,7 +400,6 @@ export class TicketDetailComponent {
       authorLabel: this.manager ? this.reporter() : null,
       body: t.body,
       at: t.createdAt,
-      // The reporter reads the own report on the right, without an edit.
       own: !this.manager,
       canEdit: false,
       visibility: this.visibilityOptions().length ? 'public' : null,
@@ -463,7 +464,6 @@ export class TicketDetailComponent {
   });
 
   constructor() {
-    // The route is `tickets/:id`, so the id is always there.
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((pm) => this.load(pm.get('id')!));
     if (!this.manager) return;
     this.api.assignees().subscribe({
@@ -471,8 +471,6 @@ export class TicketDetailComponent {
       error: () => this.assignees.set([]),
     });
   }
-
-  // --- loading ------------------------------------------------------------
 
   /** Load the ticket again after a failed load. */
   retry(): void {
@@ -482,7 +480,6 @@ export class TicketDetailComponent {
 
   private load(id: Uuid): void {
     const seq = ++this.seq;
-    // A newly opened ticket takes what the list read ahead; a reload reads fresh.
     const opened = id !== this.id;
     if (opened) {
       this.id = id;
@@ -593,8 +590,6 @@ export class TicketDetailComponent {
       },
     });
   }
-
-  // --- header -------------------------------------------------------------
 
   selectTab(id: string | null): void {
     if (id === 'log' || id === 'details') this.tab.set(id);
@@ -764,8 +759,6 @@ export class TicketDetailComponent {
     return 'tickets.detail.error.save';
   }
 
-  // --- notes --------------------------------------------------------------
-
   sendNote(req: ChatSend): void {
     this.outbox.send(req);
   }
@@ -803,8 +796,6 @@ export class TicketDetailComponent {
     });
   }
 
-  // --- to-dos -------------------------------------------------------------
-
   onTodoCreated(): void {
     this.loadTodos();
     this.load(this.id);
@@ -813,8 +804,6 @@ export class TicketDetailComponent {
   statusOf(status: TicketStatus): string {
     return this.t(STATUS_LABEL[status]);
   }
-
-  // --- formatting ---------------------------------------------------------
 
   /** "14.10., 21:14". */
   private when(at: string): string {

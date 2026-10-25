@@ -91,7 +91,7 @@ const STEP_LABEL: Record<StepKey, TranslationKey> = {
 };
 
 /**
- * Public application wizard (board Antrag-stellen).
+ * Public application wizard.
  *
  * Layout: at the start a column with the title, the purpose, the vertical stepper (done
  * steps take a click back) and the autosave note; beside it the sheet "Schritt n von N ·
@@ -103,7 +103,7 @@ const STEP_LABEL: Record<StepKey, TranslationKey> = {
  * 1. Antragsart: the active types; the configured info text below.
  * 2. Angaben: every section of the effective form in one grid (`toFormlySections`),
  *    without the PII fields. A `file` field uploads its files as drafts; the block
- *    "Anhänge" below takes any other file (Z4, `DraftAttachmentsService`).
+ *    "Anhänge" below takes any other file (`DraftAttachmentsService`).
  * 3. Kontakt: e-mail and name of a guest, plus the PII fields of the form (for example
  *    the IBAN). A signed-in user sees the account instead; without PII fields the step
  *    drops out.
@@ -123,6 +123,11 @@ const STEP_LABEL: Record<StepKey, TranslationKey> = {
  * A type switch keeps the general files ("Anhänge") but deletes the files of the file
  * fields that the new form does not have: the server would bind them with a field
  * reference that the new form does not know.
+ *
+ * Every form step stays in the page, so the submit checks all fields.
+ *
+ * The component provides the field types of the form (`provideFormly`), so Formly is not
+ * part of the initial bundle.
  */
 @Component({
   selector: 'app-apply-wizard',
@@ -147,8 +152,6 @@ const STEP_LABEL: Record<StepKey, TranslationKey> = {
     ListDetailNavDirective,
     TranslatePipe,
   ],
-  // The field types of the form (`provideFormly`) come with the component, so Formly is not
-  // part of the initial bundle.
   providers: [DraftAttachmentsService, provideFormly()],
   templateUrl: './apply-wizard.component.html',
   styleUrl: './apply-wizard.component.scss',
@@ -273,7 +276,6 @@ export class ApplyWizardComponent {
 
   /** The steps of the stepper: label and the second line. */
   readonly steps = computed<Step[]>(() => {
-    // Read the locale so the labels follow a language switch.
     this.i18n.locale();
     return this.stepKeys().map((key) => ({
       label: this.i18n.translate(STEP_LABEL[key]),
@@ -314,7 +316,6 @@ export class ApplyWizardComponent {
   });
 
   readonly canSubmit = computed(() => {
-    // Read the model, so the value follows each answer.
     this.modelSignal();
     return (
       (this.loggedIn() || !this.altchaRequired() || this.altchaSolution() !== null) &&
@@ -329,15 +330,11 @@ export class ApplyWizardComponent {
   private autosaveTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
-    // Load the (cached) session, so a signed-in user gets the account as contact. /apply
-    // is public.
     this.auth.ensureLoaded().subscribe();
     this.api.applicationTypes().subscribe({
       next: (t) => {
         const active = t.filter((x) => x.active);
         this.types.set(active);
-        // A link that names a type (`/apply?type=…`, the start page) picks it. Else pick
-        // up the type of the last autosave on this device.
         const wanted = [
           this.route.snapshot.queryParamMap.get('type'),
           readStorage(DRAFT_LAST_TYPE),
@@ -350,7 +347,6 @@ export class ApplyWizardComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => this.touchModel());
 
-    // Autosave: a change of the answers or the step writes after a short pause.
     effect(() => {
       this.modelSignal();
       this.activeIndex();
@@ -411,7 +407,6 @@ export class ApplyWizardComponent {
     const details = toFormlySections(eff.sections, lang, ctx, {
       omitKeys: contact.map((f) => f.key),
     });
-    // A `file` field takes its files as drafts of this wizard (Z4).
     const files = this.fileKeys();
     for (const field of details[0]?.fieldGroup ?? []) {
       if (typeof field.key === 'string' && files.has(field.key)) {
@@ -516,6 +511,10 @@ export class ApplyWizardComponent {
     this.altchaRequired.set(false);
   }
 
+  /**
+   * A signed-in applicant sends no identity and no ALTCHA solution, because the backend derives
+   * them from the account. A solution is good for one request, so the next submit needs a new one.
+   */
   submit(): void {
     if (!this.canSubmit() || this.submitting()) return;
     const typeId = this.typeId();
@@ -526,7 +525,6 @@ export class ApplyWizardComponent {
     const payload: NewApplication = {
       typeId,
       data: this.submitData(),
-      // Logged in: the backend derives identity/Altcha from the account.
       applicantEmail: this.loggedIn() ? null : this.contactForm.controls.email.value,
       applicantName: this.loggedIn() ? null : this.contactForm.controls.name.value || null,
       lang: this.i18n.locale(),
@@ -549,7 +547,6 @@ export class ApplyWizardComponent {
       },
       error: (err: { status?: number; error?: ProblemDetail | null }) => {
         this.submitting.set(false);
-        // A solution is good for one request: the next submit needs a new one.
         this.altchaSolution.set(null);
         this.altchaRound.update((n) => n + 1);
         if (err.status === 422) this.onInvalid(err.error ?? null);
@@ -623,8 +620,6 @@ export class ApplyWizardComponent {
     await this.drafts.discard();
   }
 
-  // --- autosave ------------------------------------------------------------------
-
   private draftKey(): string | null {
     const id = this.typeId();
     return id ? `${DRAFT_PREFIX}${id}` : null;
@@ -683,6 +678,7 @@ export class ApplyWizardComponent {
     }
   }
 
+  /** The restore never goes past an empty contact step, because the contact is not stored. */
   private restoreDraft(id: Uuid): void {
     const raw = readStorage(`${DRAFT_PREFIX}${id}`);
     if (!raw) return;
@@ -690,7 +686,7 @@ export class ApplyWizardComponent {
     try {
       draft = JSON.parse(raw) as Partial<StoredAnswers>;
     } catch {
-      return; // a broken entry: ignore it
+      return;
     }
     if (draft.model && typeof draft.model === 'object') {
       const skip = new Set([...this.piiDefs().map((f) => f.key), ...this.fileKeys()]);
@@ -700,8 +696,6 @@ export class ApplyWizardComponent {
       this.touchModel();
       this.saved.set(true);
     }
-    // Go back to the stored step, but never past an empty contact step: the contact
-    // is not stored.
     const keys = this.stepKeys();
     let target = draft.step ? keys.indexOf(draft.step) : -1;
     if (target < 0) return;
@@ -727,8 +721,6 @@ export class ApplyWizardComponent {
       /* storage blocked: nothing to clear */
     }
   }
-
-  // --- helpers -------------------------------------------------------------------
 
   /** The second line of a step in the stepper. */
   private stepHint(key: StepKey): string {

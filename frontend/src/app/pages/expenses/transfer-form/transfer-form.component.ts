@@ -40,7 +40,7 @@ interface LegFree {
 }
 
 /**
- * The transfer form (boards "Übertrag buchen", "Übertrag · Handy"): move an amount from
+ * The transfer form: move an amount from
  * one cost centre to another in one fiscal year ("Übertrag"), or correct a transfer. It
  * replaces the detail sheet.
  *

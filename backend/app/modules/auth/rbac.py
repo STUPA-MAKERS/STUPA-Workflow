@@ -10,6 +10,7 @@ turns into the namespaced `vote:` key.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,9 +20,9 @@ from app.modules.auth.models import GroupMapping, Role, RoleAssignment, RolePerm
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 
-# The internal namespace of the voting eligibility. It belongs to this resolver alone.
-# `resolve_principal` drops every incoming OIDC group claim that uses it, so a key in
-# this namespace always proves an active `vote.cast` membership.
+#: The internal namespace of the voting eligibility. It belongs to this resolver alone.
+#: `resolve_principal` drops every incoming OIDC group claim that uses it, so a key in
+#: this namespace always proves an active `vote.cast` membership.
 VOTE_GROUP_PREFIX = "vote:"
 
 
@@ -66,18 +67,27 @@ def _assignment_valid(
 
 
 async def resolve_principal(db: AsyncSession, row: PrincipalRow, now: datetime) -> Principal:
-    """Resolve a `principal` row into a full `Principal` with roles, permissions, groups."""
-    # The `vote:` namespace is reserved for the membership loop below. An IdP can emit
-    # any group name, including one that copies the internal key, and the cast gate
-    # reads that key as proof of an active `vote.cast` membership. The resolver
-    # therefore drops such a claim at the door. A `group_mapping` on a reserved name
-    # stays without effect for the same reason.
+    """Resolve a `principal` row into a full `Principal` with roles, permissions, groups.
+
+    The ``vote:`` namespace is reserved for the membership step. An IdP can emit any
+    group name, including one that copies the internal key, and the cast gate reads
+    that key as proof of an active ``vote.cast`` membership. The resolver therefore
+    drops such a claim at the door, and a ``group_mapping`` on a reserved name stays
+    without effect.
+
+    An active Gremium role with ``vote.cast`` is the only source of the voting
+    eligibility: ``vote.cast`` is no global permission, and a vote names a gremium
+    UUID as its eligible group. The cast gate checks the namespaced key
+    ``vote:<gremium_id>`` from ``vote_group_key``, never the bare UUID, so a matching
+    OIDC group claim cannot satisfy it. A user who only follows a meeting goes
+    through ``MeetingService.is_member``, a separate query.
+    """
     groups: set[str] = {
         g
         for g in (str(raw) for raw in (row.oidc_groups or []))
         if not g.startswith(VOTE_GROUP_PREFIX)
     }
-    role_ids: set = set()
+    role_ids: set[UUID] = set()
 
     assignments = (
         await db.execute(
@@ -117,13 +127,6 @@ async def resolve_principal(db: AsyncSession, row: PrincipalRow, now: datetime) 
             ).scalars().all()
         )
 
-    # An active Gremium role with `vote.cast` grants the voting eligibility. It is the
-    # only source: `vote.cast` is no global permission, and a vote names a gremium UUID
-    # as its eligible group. The cast gate checks the namespaced key `vote:<gremium_id>`
-    # from `vote_group_key`. It never checks the bare UUID string, so a matching OIDC
-    # group claim cannot satisfy the eligibility.
-    # A user who only follows a meeting goes through `MeetingService.is_member`, which is
-    # a separate query.
     membership_rows = (
         await db.execute(
             select(GremiumMembership.gremium_id, GremiumRole.permissions)

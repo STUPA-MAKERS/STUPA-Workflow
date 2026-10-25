@@ -28,7 +28,7 @@ from app.modules.files.models import Attachment
 from app.modules.forms.models import FormField
 from app.shared.guards import GuardContext
 
-# Form field type to `compare` value type (guards.COMPARE_TYPES).
+#: Form field type to `compare` value type: number, currency, date, text or bool.
 _FIELD_TYPE_MAP: dict[str, str] = {
     "number": "number",
     "currency": "currency",
@@ -68,7 +68,7 @@ async def committee_ids_for_sub(session: AsyncSession, sub: str | None) -> froze
 async def _budget_fits(session: AsyncSession, app: Application) -> bool:
     """Return True when the committed amount fits the free remainder of the cost center.
 
-    The committed amount is the approved amount of the decision (F1: a vote proposal
+    The committed amount is the approved amount of the decision (a vote proposal
     or the decision of a manual transition sets it before the guard runs), else the
     requested amount. The available amount is the node allocation minus expenses plus
     income for the fiscal year. This is the same direction as
@@ -111,7 +111,9 @@ async def _has_attachment(session: AsyncSession, app: Application) -> bool:
     required. Only a file that ClamAV scanned and found clean counts. A file that
     still waits for the scan stays in quarantine and does not count. `storage_key IS
     NULL` marks an attachment that a ClamAV hit removed. Such an attachment does not
-    count either. A draft of the wizard (Z4) has no application and never counts.
+    count either. A draft of the wizard has no application and never counts.
+
+    The clean check compares with `SCAN_RESULT_CLEAN` of the files service.
     """
     return bool(
         await session.scalar(
@@ -121,7 +123,6 @@ async def _has_attachment(session: AsyncSession, app: Application) -> bool:
                     Attachment.application_id == app.id,
                     Attachment.storage_key.is_not(None),
                     Attachment.scanned.is_(True),
-                    # `SCAN_RESULT_CLEAN` of the files service.
                     Attachment.scan_result == "clean",
                 )
             )
@@ -160,12 +161,11 @@ async def build_base_context(
     app: Application,
     *,
     manual: bool,
-    deadline_passed: bool = False,
 ) -> GuardContext:
     """Build the actor-free part of the guard context from the database and the application.
 
     The context holds every fact that comes from the application alone: applicant,
-    budget, fields and deadline. The actor fields keep their empty defaults. Overlay
+    budget and fields. The actor fields keep their empty defaults. Overlay
     them per actor with `with_actor`.
     """
     raw_roles = app.data.get("_applicantRoles") if isinstance(app.data, dict) else None
@@ -179,7 +179,6 @@ async def build_base_context(
 
     return GuardContext(
         manual=manual,
-        deadline_passed=deadline_passed,
         applicant_roles=applicant_roles,
         applicant_committees=applicant_committees,
         budget_id=str(app.budget_id) if app.budget_id is not None else None,
@@ -230,7 +229,6 @@ async def build_context(
     principal: Principal,
     *,
     manual: bool,
-    deadline_passed: bool = False,
     as_applicant: bool = False,
 ) -> GuardContext:
     """Build the full `GuardContext` from the database and the principal.
@@ -238,9 +236,7 @@ async def build_context(
     `as_applicant=True` marks the magic-link holder as the applicant actor whatever
     `created_by` says. The link holder is the applicant for exactly this application.
     """
-    base = await build_base_context(
-        session, app, manual=manual, deadline_passed=deadline_passed
-    )
+    base = await build_base_context(session, app, manual=manual)
     actor_committees = (
         await committee_ids_for_sub(session, principal.sub) if manual else frozenset()
     )

@@ -1,4 +1,4 @@
-"""F2 · Erasure of a principal from the candidate lists of the elections.
+"""Erasure of a principal from the candidate lists of the elections.
 
 A candidate who was not elected (or whose election is not decided) gets the name
 ``Gelöscht``; an elected candidate keeps the name. The ballots, the candidate ids and
@@ -86,6 +86,7 @@ def _sql(stmt: Any) -> str:
 
 
 async def test_query_selects_the_elections_of_the_principal_by_containment() -> None:
+    """The query selects the elections by containment. An empty first pass runs no second pass."""
     _, db = await _erase()
     assert "principal.merged_into =" in _sql(db.statements[0])
     sql = _sql(db.statements[1])
@@ -93,7 +94,6 @@ async def test_query_selects_the_elections_of_the_principal_by_containment() -> 
     assert sql.count("vote.config @>") == 1
     assert "NOT IN" not in sql
     assert "FOR UPDATE" in sql
-    # The first pass found nothing, so no second pass runs.
     assert len(db.statements) == 2
 
 
@@ -106,6 +106,12 @@ async def test_elected_candidate_keeps_the_name() -> None:
 
 
 async def test_not_elected_candidate_gets_the_placeholder() -> None:
+    """A candidate who was not elected gets the placeholder name and the marker.
+
+    The id, the account link and the result stay, so the tally does not change. The
+    marker tells the UI to show its own label, and the other candidates carry none. The
+    old config comes back unchanged, for the protocol rewrite.
+    """
     vote = _election(elected=["c8"])
     result_before = copy.deepcopy(vote.election_result)
     old = vote.config
@@ -113,16 +119,13 @@ async def test_not_elected_candidate_gets_the_placeholder() -> None:
     assert [c.vote for c in changed] == [vote]
     assert changed[0].old_config is old
     assert _names(vote) == {"c1": ERASED_CANDIDATE_NAME, "c8": "Ben", "c9": "Cem"}
-    # The id, the account link and the result stay: the tally does not change.
     mine = vote.config["candidates"][0]
     assert mine["id"] == "c1"
     assert mine["principalId"] == str(PID)
     assert vote.election_result == result_before
     assert vote.config["seats"] == 1
-    # The marker tells the UI to show its own label; the others carry none.
     assert mine["erased"] is True
     assert [c.get("erased") for c in vote.config["candidates"][1:]] == [None, None]
-    # The old config stays as it was, for the protocol rewrite.
     assert old["candidates"][0]["name"] == "Anna Erased"
     assert "erased" not in old["candidates"][0]
 
@@ -198,7 +201,7 @@ async def test_loss_in_the_runoff_replaces_the_name_in_every_round() -> None:
 
 
 async def test_runoff_whose_parent_is_gone_stands_alone() -> None:
-    # The parent row is deleted (or not found), so the runoff is its own election.
+    """A runoff whose parent row is deleted or not found is its own election."""
     child = _election(status="open", parent=uuid4(), round_=2)
     changed, _ = await _erase(child)
     assert [c.vote for c in changed] == [child]
@@ -239,7 +242,7 @@ async def test_no_election_changes_nothing() -> None:
 
 
 async def test_name_only_candidate_with_the_same_name_stays() -> None:
-    # A candidate without an account link never matches, even with the same name.
+    """A candidate without an account link never matches, even with the same name."""
     vote = _election(
         elected=["c8"],
         candidates=[
@@ -260,8 +263,11 @@ async def test_second_erasure_finds_nothing_to_change() -> None:
 
 
 async def test_placeholder_name_without_the_marker_gets_the_marker() -> None:
-    # The marker decides, not the name: a stored placeholder without the marker
-    # (or a person really named so) gets the marker; the name stays the placeholder.
+    """The marker decides, not the name.
+
+    A stored placeholder without the marker, or a person really named so, gets the
+    marker, and the name stays the placeholder.
+    """
     vote = _election(
         elected=["c8"],
         candidates=[
@@ -280,17 +286,18 @@ async def test_placeholder_name_without_the_marker_gets_the_marker() -> None:
 
 
 async def test_erased_config_validates_and_carries_the_marker() -> None:
+    """The beamer form drops the account links and keeps the marker."""
     vote = _election(elected=["c8"])
     await _erase(vote)
     config = ElectionConfig.model_validate(vote.config)
     assert [c.erased for c in config.candidates] == [True, False, False]
-    # The beamer form drops the account links and keeps the marker.
     dumped = config.public().model_dump(mode="json", by_alias=True)
     assert [c["erased"] for c in dumped["candidates"]] == [True, False, False]
     assert [c["principalId"] for c in dumped["candidates"]] == [None, None, None]
 
 
 async def test_multiple_elections_each_decide_on_their_own() -> None:
+    """The candidate id differs per election, and the account link decides."""
     won = _election(elected=["c1"])
     lost = _election(elected=["c8"])
     open_ = _election(status="open")
@@ -300,11 +307,8 @@ async def test_multiple_elections_each_decide_on_their_own() -> None:
     assert _names(won)["c1"] == "Anna Erased"
     assert _names(lost)["c1"] == ERASED_CANDIDATE_NAME
     assert _names(open_)["c1"] == ERASED_CANDIDATE_NAME
-    # The candidate id of the principal differs per election; the account link decides.
     assert _names(other_id)["c4"] == "Anna Erased"
 
-
-# --- merged accounts -------------------------------------------------------------------
 
 MERGED = uuid4()
 
@@ -317,14 +321,17 @@ def _merged_candidates(*, mine: str = "c1") -> list[dict[str, Any]]:
 
 
 async def test_candidacy_of_a_merged_account_gets_the_placeholder() -> None:
-    # The merge leaves ``principalId`` of the old account in the candidate list.
+    """The candidacy of a merged account gets the placeholder.
+
+    The merge leaves ``principalId`` of the old account in the candidate list. The query
+    holds one containment clause per account id, joined with OR.
+    """
     lost = _election(elected=["c8"], candidates=_merged_candidates())
     db = _Session([lost], merged=(MERGED,))
     changed = await erase_candidacies(db, PID)  # pyright: ignore[reportArgumentType]
     assert [c.vote for c in changed] == [lost]
     assert _names(lost) == {"c1": ERASED_CANDIDATE_NAME, "c8": "Ben"}
     assert lost.config["candidates"][0]["principalId"] == str(MERGED)
-    # One containment clause per account id, joined with OR.
     sql = _sql(db.statements[1])
     assert sql.count("vote.config @>") == 2
     assert " OR " in sql
@@ -340,7 +347,7 @@ async def test_win_of_a_merged_account_keeps_the_name() -> None:
 
 
 async def test_both_accounts_in_one_election_change_together() -> None:
-    # The old and the new account both stand in one election; neither won.
+    """The old and the new account both stand in one election, and neither won."""
     vote = _election(
         elected=["c8"],
         candidates=[
@@ -371,13 +378,14 @@ async def test_win_of_one_account_keeps_both_names_in_the_election() -> None:
     assert await erase_candidacies(db, PID) == []  # pyright: ignore[reportArgumentType]
 
 
-# --- a runoff that a parallel transaction inserted ------------------------------------
-
-
 async def test_runoff_found_in_a_later_pass_joins_the_decision() -> None:
-    # The first select waited for the parent lock of a parallel ``create_runoff``; its
-    # snapshot misses the new runoff, which the second pass finds. A win there keeps
-    # the name in the parent too.
+    """A runoff that only a later pass finds joins the decision.
+
+    The first select waited for the parent lock of a parallel ``create_runoff``, so its
+    snapshot misses the new runoff, which the second pass finds. A win there keeps the
+    name in the parent too. The second pass leaves out the rows it holds, and the third
+    finds nothing.
+    """
     parent = _election(
         result={
             "counts": {"c1": 2, "c8": 2},
@@ -390,7 +398,6 @@ async def test_runoff_found_in_a_later_pass_joins_the_decision() -> None:
     changed = await erase_candidacies(db, PID)  # pyright: ignore[reportArgumentType]
     assert changed == []
     assert _names(parent)["c1"] == "Anna Erased"
-    # The second pass leaves out the rows it holds; the third finds nothing.
     assert len(db.statements) == 4
     second = db.statements[2]
     assert "NOT IN" in _sql(second)
@@ -413,9 +420,9 @@ async def test_draft_runoff_found_in_a_later_pass_gets_the_placeholder() -> None
 
 
 async def test_passes_stop_at_the_bound() -> None:
+    """One principal select and ``_MAX_PASSES`` election selects run, no more."""
     rounds = [[_election(status="open")] for _ in range(_MAX_PASSES + 2)]
     db = _Session(*rounds)
     changed = await erase_candidacies(db, PID)  # pyright: ignore[reportArgumentType]
-    # One principal select and ``_MAX_PASSES`` election selects, no more.
     assert len(db.statements) == 1 + _MAX_PASSES
     assert len(changed) == _MAX_PASSES

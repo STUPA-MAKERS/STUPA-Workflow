@@ -65,6 +65,12 @@ async def _draft(
 async def test_a_comment_binds_its_files_and_the_board_gates_the_download(
     api: Api, maker: async_sessionmaker[AsyncSession], settings: Settings
 ) -> None:
+    """Bind the files to a comment and let the board gate the download.
+
+    The lifespan sets the storage of the services, and the test replaces it. For someone who
+    is not a member of the gremium, the file does not exist. Signed out, the download gives
+    401. A comment marked deleted hides its remaining files.
+    """
     member, member_id = await add_person(maker, "Max")
     stranger, _ = await add_person(maker, "Sam")
     gremium_id, board_id = await add_gremium(maker)
@@ -75,7 +81,6 @@ async def test_a_comment_binds_its_files_and_the_board_gates_the_download(
     second = await _draft(maker, settings, storage, "tok", "b.pdf")
     api.login(member)
     with TestClient(api.app) as client:
-        # The lifespan sets the storage of the services; the test replaces it.
         api.app.state.object_storage = storage
         card = _ok(
             client.post("/api/todos/cards", json={"boardId": str(board_id), "title": "A"}), 201
@@ -112,7 +117,6 @@ async def test_a_comment_binds_its_files_and_the_board_gates_the_download(
         assert foreign.status_code == 422
         assert foreign.json()["code"] == "draft_attachments_missing"
 
-        # Not a member of the gremium: the file does not exist. Signed out: 401.
         api.login(stranger)
         assert client.get(f"/api/attachments/{first}/download").status_code == 404
         assert client.get(f"/api/attachments/{first}").status_code == 404
@@ -125,7 +129,6 @@ async def test_a_comment_binds_its_files_and_the_board_gates_the_download(
     assert f"drafts/{first}/a.pdf" not in storage.blobs
     async with maker() as session:
         assert await session.get(Attachment, first) is None
-        # A comment marked deleted hides its remaining files.
         await session.execute(
             update(TodoComment)
             .where(TodoComment.id == uuid.UUID(other["id"]))
@@ -139,6 +142,10 @@ async def test_a_comment_binds_its_files_and_the_board_gates_the_download(
 async def test_the_erasure_of_a_personal_board_removes_the_comment_files(
     api: Api, maker: async_sessionmaker[AsyncSession], settings: Settings
 ) -> None:
+    """Remove the comment files when a personal board is erased.
+
+    The objects stay until the commit, so a rollback keeps every file whole.
+    """
     me, me_id = await add_person(maker, "Ada")
     storage = MemoryStorage()
     draft = await _draft(maker, settings, storage, "tok", "privat.pdf")
@@ -156,16 +163,15 @@ async def test_the_erasure_of_a_personal_board_removes_the_comment_files(
             201,
         )
     async with maker() as session:
-        files = FilesService(session, storage=storage, settings=settings)  # pyright: ignore[reportArgumentType]
+        files = FilesService(session, storage=storage, settings=settings)
         await erase_todos(session, me_id, files=files, actor="dpo")
-        # The objects stay until the commit, so a rollback keeps every file whole.
         assert storage.blobs != {}
         await session.rollback()
     async with maker() as session:
         row = await session.get(Attachment, draft)
         assert row is not None and row.storage_key in storage.blobs
     async with maker() as session:
-        files = FilesService(session, storage=storage, settings=settings)  # pyright: ignore[reportArgumentType]
+        files = FilesService(session, storage=storage, settings=settings)
         keys = await erase_todos(session, me_id, files=files, actor="dpo")
         await session.commit()
         await files.remove_objects(keys)

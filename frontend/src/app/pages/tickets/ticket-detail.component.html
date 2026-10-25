@@ -1,8 +1,4 @@
 @if (loading()) {
-  <!-- The loaded sheet with bars in place of the text: the same head, the fields column
-       beside the chat column (one view: the tabs over the chat), so nothing moves when
-       the ticket arrives. Fixed headings and labels are real text; the bars show after
-       300ms (`skel-in`). -->
   <article class="td" [class.td--split]="split()" aria-busy="true">
     <header class="sheet-head td__head" aria-hidden="true">
       <app-sheet-bar [bleed]="split()">
@@ -55,8 +51,6 @@
     <app-note class="td__loadError" kind="error" icon="alert" role="alert" retryable (retry)="retry()">{{ 'tickets.detail.error.load' | t }}</app-note>
   </div>
 } @else if (ticket(); as ticket) {
-  <!-- The ticket fades in where its skeleton was (the load-stable geometry keeps it in
-       place), so the swap is not a cut. -->
   <article class="td" animate.enter="motion-fade-in" [class.td--split]="split()" aria-labelledby="td-title">
     <header class="sheet-head td__head">
       <app-sheet-bar [bleed]="split()">
@@ -136,38 +130,31 @@
         </div>
       </div>
     } @else {
-      <app-tabs
-        #tabBar
+      <app-tab-pager
         class="td__tabs"
         idPrefix="td"
         [ariaLabel]="ticket.title"
         [tabs]="tabs()"
         [active]="tab()"
+        [paged]="phone()"
+        [fill]="phone()"
         (activeChange)="selectTab($event)"
-      />
-      <section
-        class="td__panel td__panel--log"
-        role="tabpanel"
-        [id]="tabBar.panelId('log')"
-        [attr.aria-labelledby]="tabBar.tabId('log')"
-        [hidden]="tab() !== 'log'"
       >
-        <ng-container *ngTemplateOutlet="log" />
-      </section>
-      <section
-        class="td__panel td__panel--details"
-        role="tabpanel"
-        [id]="tabBar.panelId('details')"
-        [attr.aria-labelledby]="tabBar.tabId('details')"
-        [hidden]="tab() !== 'details'"
-      >
-        <ng-container *ngTemplateOutlet="details; context: { $implicit: ticket }" />
-      </section>
+        <ng-template appTabPage="log">
+          <section class="td__panel td__panel--log">
+            <ng-container *ngTemplateOutlet="log" />
+          </section>
+        </ng-template>
+        <ng-template appTabPage="details">
+          <section class="td__panel td__panel--details">
+            <ng-container *ngTemplateOutlet="details; context: { $implicit: ticket }" />
+          </section>
+        </ng-template>
+      </app-tab-pager>
     }
   </article>
 }
 
-<!-- "Verlauf": the report, the notes and the events. -->
 <ng-template #log>
   <section class="td__sec" [attr.aria-labelledby]="split() ? 'td-log' : null">
     @if (split()) {
@@ -193,12 +180,9 @@
   </section>
 </ng-template>
 
-<!-- "Details": reporter, assignee, kind, the to-dos and the technical context. -->
 <ng-template #details let-ticket>
   <section class="td__sec" aria-labelledby="td-details">
     <h3 id="td-details" class="sec td__secTitle" [class.sr-only]="!split()">{{ 'tickets.detail.details' | t }}</h3>
-    <!-- Side by side the fields pair up; in one column the e-mail follows the reporter.
-         The reporter reads the report time and the kind only. -->
     <app-field-group>
       @if (!manager) {
         <div class="td__pair">
@@ -310,8 +294,6 @@
   }
 </ng-template>
 
-<!-- The details while the ticket loads: the labels are real, the values are bars, in
-     the order and the pairs of the loaded fields. -->
 <ng-template #skelRow let-label="label" let-width="width">
   <app-field-row [label]="label | t"><span class="skel-text skel-in" [style.width]="width"></span></app-field-row>
 </ng-template>
@@ -349,7 +331,6 @@
   }
 </ng-template>
 
-<!-- Frame 35: "Ticket erledigen?" with the open to-dos. -->
 <app-dialog
   [open]="closing() !== null"
   [title]="(closing() === 'rejected' ? 'tickets.close.rejectTitle' : 'tickets.close.doneTitle') | t"
@@ -376,7 +357,6 @@
   </app-button>
 </app-dialog>
 
-<!-- "Als Duplikat schließen …": pick the ticket this one repeats. -->
 <app-dialog
   [open]="duplicateOpen()"
   [title]="'tickets.duplicate.title' | t"

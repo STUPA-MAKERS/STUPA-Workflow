@@ -95,6 +95,11 @@ def _sent(conn: LiveVoteConnection) -> list[dict[str, object]]:
 
 @pytest.mark.asyncio
 async def test_draft_of_the_protokollant_is_published() -> None:
+    """Publish a draft of the protokollant.
+
+    The check reads the current protokollant of the live meeting, with an active account,
+    and then the agenda item of this meeting. The cycle ends its read.
+    """
     conn, session, broker = _conn(1, 1)
     frame = _frame()
     await conn._handle_body_draft(frame)
@@ -110,8 +115,6 @@ async def test_draft_of_the_protokollant_is_published() -> None:
             },
         )
     ]
-    # The check reads the current protokollant of the live meeting, with an active
-    # account, and then the agenda item of this meeting. The cycle ends its read.
     keeper, item = session.statements
     assert "meeting.status" in keeper and "meeting.protokollant_id" in keeper
     assert "principal.sub" in keeper and "principal.merged_into IS NULL" in keeper
@@ -122,7 +125,11 @@ async def test_draft_of_the_protokollant_is_published() -> None:
 
 @pytest.mark.asyncio
 async def test_draft_of_another_member_gets_not_protokollant() -> None:
-    # Also the old protokollant after a handover: the row names the new keeper now.
+    """Answer `not_protokollant` to a draft of another member.
+
+    This also holds for the old protokollant after a handover, because the row names the new
+    keeper.
+    """
     conn, session, broker = _conn(0)
     await conn._handle_body_draft(_frame())
     assert _sent(conn) == [{"type": "error", "code": "not_protokollant"}]
@@ -133,7 +140,10 @@ async def test_draft_of_another_member_gets_not_protokollant() -> None:
 
 @pytest.mark.asyncio
 async def test_handover_takes_effect_on_the_next_frame() -> None:
-    # The first frame finds the sender as keeper, the second after the handover not.
+    """Apply a handover on the next frame.
+
+    The first frame finds the sender as keeper, the second one after the handover does not.
+    """
     conn, _session, broker = _conn(1, 1, 0)
     await conn._handle_body_draft(_frame(seq=1))
     await conn._handle_body_draft(_frame(seq=2))
@@ -143,11 +153,14 @@ async def test_handover_takes_effect_on_the_next_frame() -> None:
 
 @pytest.mark.asyncio
 async def test_scoped_token_without_protocol_write_gets_not_protokollant() -> None:
+    """Answer `not_protokollant` to a scoped token without `protocol.write`.
+
+    The scope cap refuses before any read.
+    """
     principal = Principal(sub="keeper", scope_permissions=frozenset({"meeting.view_all"}))
     conn, session, broker = _conn(principal=principal)
     await conn._handle_body_draft(_frame())
     assert _sent(conn) == [{"type": "error", "code": "not_protokollant"}]
-    # The scope cap refuses before any read.
     assert session.statements == []
     assert broker.published == []
 
@@ -172,8 +185,11 @@ async def test_draft_over_the_size_limit_gets_too_large() -> None:
 
 @pytest.mark.asyncio
 async def test_draft_size_counts_utf8_bytes_not_characters() -> None:
-    """A multi-byte text under the limit in characters but over it in bytes is refused."""
-    body = "€" * (AGENDA_BODY_MAX // 3 + 1)  # 3 bytes each
+    """A multi-byte text under the limit in characters but over it in bytes is refused.
+
+    The euro sign takes 3 bytes.
+    """
+    body = "€" * (AGENDA_BODY_MAX // 3 + 1)
     assert len(body) <= AGENDA_BODY_MAX
     conn, session, broker = _conn()
     await conn._handle_body_draft(_frame(body=body))
@@ -246,8 +262,11 @@ def test_draft_cap_opens_a_new_window_after_one_second() -> None:
 
 @pytest.mark.asyncio
 async def test_receive_routes_drafts_past_the_general_throttle() -> None:
+    """Route the drafts past the general throttle.
+
+    The general bucket is empty, so a cast or a subscribe would get `rate_limited`.
+    """
     conn, _session, _broker = _conn()
-    # The general bucket is empty: a cast or subscribe would get `rate_limited`.
     conn._tokens = 0.0
     conn._last_refill = time.monotonic()
     frames: list[object] = [_frame(), {"type": "subscribe"}]
@@ -265,7 +284,7 @@ async def test_receive_routes_drafts_past_the_general_throttle() -> None:
         handled.append(raw)
 
     conn.ws.receive_json = _receive_json  # type: ignore[attr-defined]
-    conn._handle_body_draft = _draft  # type: ignore[method-assign]
+    conn._handle_body_draft = _draft
     with pytest.raises(_Stop):
         await conn._receive()
     assert [h["type"] for h in handled] == ["body_draft"]

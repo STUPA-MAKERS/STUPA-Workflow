@@ -60,21 +60,13 @@ logger = logging.getLogger("app.auth")
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
-_TX_MAX_AGE = 600  # OIDC transaction: 10-minute window authorize -> callback.
+#: OIDC transaction: 10-minute window from authorize to callback.
+_TX_MAX_AGE = 600
 
 
 def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
     """Document problem+json for the given error status codes."""
     return {code: _PROBLEM for code in codes}
-
-
-def _cookie_kwargs(settings: SettingsDep) -> dict[str, object]:
-    return {
-        "httponly": True,
-        "secure": settings.cookie_secure,
-        "samesite": "lax",
-        "path": "/",
-    }
 
 
 @router.get(
@@ -125,7 +117,7 @@ async def login(
             sessions.safe_return_to(return_to),
         ),
         max_age=_TX_MAX_AGE,
-        **_cookie_kwargs(settings),  # type: ignore[arg-type]
+        **sessions.cookie_kwargs(settings),  # type: ignore[arg-type]
     )
     return response
 
@@ -146,6 +138,13 @@ async def callback(
 
     The state match and the nonce in the id_token protect against CSRF and replay. An
     IdP that cannot be reached gives 503. A rejected code or token gives 400.
+
+    A login with the ``sub`` of a merged account redirects to the start page, which
+    says what happened, instead of a raw 403; nothing is committed and the OIDC
+    transaction ends. Otherwise the route commits the principal and the session row,
+    because ``get_session`` never commits. With an OAuth login in flight
+    (``ap_oauth_tx``) it redirects to the code-mint step, else to the page where the
+    login started. Both targets are same-origin, so there is no open redirect.
     """
     if not settings.oidc_enabled:
         raise NotFoundError("OIDC is not configured.")
@@ -173,21 +172,13 @@ async def callback(
     except ForbiddenError as exc:
         if exc.code != "account_merged":
             raise
-        # A login with the sub of a merged (old) account: the browser lands on the
-        # start page, which says what happened, instead of a raw 403. Nothing is
-        # committed, and the OIDC transaction ends.
         await db.rollback()
         dest = settings.public_base_url.rstrip("/") + "/?loginError=account_merged"
         refused = RedirectResponse(dest, status_code=status.HTTP_303_SEE_OTHER)
         refused.delete_cookie(settings.oidc_tx_cookie_name, path="/")
         return refused
-    # Persist the principal and the auth_session row. `get_session` never commits.
-    # Without this commit the request close rolls both rows back.
     await db.commit()
 
-    # If an OAuth AS login is in flight (MCP, ap_oauth_tx set), go to the code-mint
-    # step instead of the app home. Else go back to the page where the login started.
-    # Both targets stay same-origin, so no open redirect.
     dest = settings.public_base_url
     if tx.get("return_to"):
         dest = settings.public_base_url.rstrip("/") + tx["return_to"]
@@ -199,7 +190,7 @@ async def callback(
         settings.session_cookie_name,
         cookie,
         max_age=days * 24 * 3600,
-        **_cookie_kwargs(settings),  # type: ignore[arg-type]
+        **sessions.cookie_kwargs(settings),  # type: ignore[arg-type]
     )
     response.delete_cookie(settings.oidc_tx_cookie_name, path="/")
     return response
@@ -276,7 +267,7 @@ async def _renew_session_cookie(
         settings.session_cookie_name,
         sessions.sign_principal_sid(settings.session_secret, row.sid),
         max_age=max(int((row.expires_at - now).total_seconds()), 0),
-        **_cookie_kwargs(settings),  # type: ignore[arg-type]
+        **sessions.cookie_kwargs(settings),  # type: ignore[arg-type]
     )
 
 
@@ -353,9 +344,9 @@ async def _session_manage_gremien(db: DbSession, principal: Principal) -> list[U
     source as `MeetingService.can_manage`. The frontend gate for "create meeting"
     and the server decision therefore stay congruent.
     """
-    from app.modules.admin.gremium_roles import gremium_ids_for
+    from app.modules.auth.policy import held_gremium_ids
 
-    return sorted(await gremium_ids_for(db, principal, "session.manage"), key=str)
+    return sorted(await held_gremium_ids(db, principal, "session.manage"), key=str)
 
 
 async def _gremium_permissions(
@@ -448,7 +439,6 @@ async def _deliver_magic_link(
         Depends(rate_limit_magic_link),
         Depends(verify_altcha),
     ],
-    # 400 = ALTCHA missing or invalid, 413 = body too large, 429 = rate limit.
     responses=_errors(400, 413, 429),
 )
 async def request_magic_link(
@@ -460,7 +450,8 @@ async def request_magic_link(
     """Request a magic link.
 
     The route always answers 202 with a constant body. It never tells the caller if the
-    address exists. The DB work runs in the background to keep the response time
+    address exists. 400 means that ALTCHA is missing or invalid, 413 that the body is
+    too large, 429 the rate limit. The DB work runs in the background to keep the response time
     constant.
     """
     pool = getattr(request.app.state, "arq_pool", None)
@@ -492,8 +483,8 @@ async def verify_magic_link(
     The server sets the session only as an HttpOnly cookie. It never returns the token
     in the body, so JavaScript cannot read it.
 
-    The first verify of a guest application starts its flow (deadline, automatic
-    transitions, task mail) through the flow action dispatcher.
+    The first verify of a guest application starts its flow (automatic transitions,
+    task mail) through the flow action dispatcher.
     """
     app_id, scope, token = await service.verify_magic_link(
         db, settings, token=body.token, dispatcher=dispatcher
@@ -503,6 +494,6 @@ async def verify_magic_link(
         settings.applicant_cookie_name,
         token,
         max_age=settings.applicant_session_ttl_hours * 3600,
-        **_cookie_kwargs(settings),  # type: ignore[arg-type]
+        **sessions.cookie_kwargs(settings),  # type: ignore[arg-type]
     )
     return MagicLinkVerifyOut(application_id=UUID(app_id), scope=scope)

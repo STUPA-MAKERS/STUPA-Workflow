@@ -2,7 +2,7 @@
 @use 'scroll-fade' as fade;
 @use '../../shared/ui/list-pane' as lp;
 
-/* The same two panes as the applications and the voting page. */
+// The same two panes as applications-list.component.scss and voting.component.scss.
 
 :host {
   @include lp.stack;
@@ -24,7 +24,6 @@
   @include lp.split-column;
 }
 
-/* ------------------------------------------------------------------ list pane */
 .tk:not(.tk--split) .tk__pane {
   flex: 1 0 auto;
 }
@@ -35,7 +34,6 @@
   max-width: 100%;
 }
 
-/* ------------------------------------------------------------------ rows */
 .tk__scroll {
   @include lp.scroll(--tk-fade);
 }
@@ -70,18 +68,15 @@
   @include lp.stack;
 }
 
-/* The kind as an icon on a small tile: a thing, never initials. */
 .tk__kind {
   display: grid;
   place-items: center;
   width: 40px;
   height: 40px;
   border-radius: var(--radius-md);
-  /* A neutral tile that shows on the row and on the selected row alike. */
   background: color-mix(in srgb, var(--color-text) 8%, transparent);
   color: var(--color-text-muted);
 }
-/* A bug has the icon in the danger colour, an idea in the success colour. */
 .tk__kind[data-kind='bug'] {
   color: var(--color-danger);
 }
@@ -124,7 +119,6 @@
   border-radius: var(--radius-sm);
 }
 
-/* The note starts at the edge of the filters and the rows. */
 .tk__loadError {
   margin: var(--space-4) 0;
 }
@@ -132,7 +126,6 @@
   @include lp.more;
 }
 
-/* ------------------------------------------------------------------ detail pane */
 .tk__detail {
   @include lp.detail;
 }
@@ -142,10 +135,7 @@
 
 @include bp.phone {
   .tk__chips {
-    @include lp.phone-chips(--tk-chip-fade, $fade-ends: false);
-  }
-  .tk__chips {
-    @include fade.fade-x(var(--tk-chip-fade), $both: false);
+    @include lp.phone-chips;
   }
   .tk__groupTitle {
     padding-inline: var(--space-1);
@@ -155,13 +145,12 @@
   }
 }
 
-/* The kind icon in front is a narrow box, so the slots of a row sit closer and the title keeps its width. */
 .tk__row,
 .tk__skelRows {
   --li-gap: var(--space-3);
 }
-/* One view at a time a row ends with a chevron after the person: the gap and the 17px
-   icon, of which `app-row-chevron` pulls 8px into the row padding. */
+// A row ends with a chevron: the gap and the 17px icon, of which `app-row-chevron` pulls 8px
+// into the row padding.
 .tk:not(.tk--split) .tk__skelRows {
   --sk-trail-end: 17px;
 }

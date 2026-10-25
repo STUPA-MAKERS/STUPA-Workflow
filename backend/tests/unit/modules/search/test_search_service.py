@@ -149,14 +149,15 @@ def test_every_kind_has_a_url_that_names_the_record() -> None:
     `/admin/users`: picking one of five people out of the palette opened the whole user
     list, and the reader searched a second time. One table rather than a URL built at
     each source, so a kind added later cannot quietly repeat that.
+
+    Filled in, the URL has to differ from the plain page, because a template that ignores
+    its id would still pass the ``{id}`` check if the id sat in a comment.
     """
     kinds = set(get_args(SearchKind))
     assert set(HIT_URL) == kinds
 
     for kind, template in HIT_URL.items():
         assert "{id}" in template, kind
-        # Filled in, the URL has to differ from the plain page: a template that ignores
-        # its id would still pass the check above if the id sat in a comment.
         assert template.format(id="X") != template.format(id="Y"), kind
 
 
@@ -247,7 +248,7 @@ async def test_a_nameless_record_reads_as_untitled_not_as_its_id(
     ("lang", "expected"), [("de", "Gremium"), ("en", "Committee"), ("fr", "Gremium")]
 )
 async def test_a_gremium_hit_names_its_kind_not_its_slug(lang: str, expected: str) -> None:
-    """D10: the subtitle of a Gremium hit is the kind only. The slug is an internal key."""
+    """The subtitle of a Gremium hit is the kind only. The slug is an internal key."""
     from types import SimpleNamespace
 
     gid = uuid.uuid4()
@@ -274,7 +275,7 @@ async def test_a_gremium_hit_names_its_kind_not_its_slug(lang: str, expected: st
 async def test_a_nameless_person_reads_no_name_not_its_sub(
     monkeypatch: pytest.MonkeyPatch, lang: str, expected: str
 ) -> None:
-    """D7: an account without a name and an e-mail never shows its `sub` as the title."""
+    """An account without a name and an e-mail never shows its `sub` as the title."""
     from types import SimpleNamespace
 
     from app.modules.admin.service.service import ConfigService

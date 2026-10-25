@@ -37,7 +37,7 @@ function sameTexts(a: Record<string, string>, b: Record<string, string>): boolea
 }
 
 /**
- * Mail-template editor at `/admin/mail-templates` (board Admin-Mail-Vorlagen). Needs the
+ * Mail-template editor at `/admin/mail-templates`. Needs the
  * `admin.notifications` permission.
  *
  * The page shows the template list on the left ("angepasst" marks an override; on a
@@ -78,7 +78,7 @@ export class MailTemplatesComponent {
   readonly phone = mediaQuery(MEDIA.phone);
   private readonly templates_ = signal<MailTemplate[]>([]);
   readonly templates = this.templates_.asReadonly();
-  // Select by key, not by ID. A builtin template has no database ID.
+  /** The selected template, by key and not by ID, because a builtin template has no database ID. */
   readonly selectedKey = signal<string | null>(null);
   readonly draft = signal<MailTemplate | null>(null);
   /** The list has not arrived yet. */
@@ -97,7 +97,7 @@ export class MailTemplatesComponent {
   });
 
   /**
-   * Localize a template key: `deadline_approaching` becomes "Deadline reminder".
+   * Localize a template key: `task_reminder` becomes "Task reminder".
    *
    * An unknown key returns the raw key.
    */
@@ -141,12 +141,12 @@ export class MailTemplatesComponent {
     });
   }
 
+  /** The i18n maps are copied, so an edit does not mutate the original template. */
   select(key: string): void {
     const tpl = this.templates_().find((t) => t.key === key);
     if (!tpl) return;
     this.selectedKey.set(key);
     this.preview.set(null);
-    // Copy the i18n maps so that an edit does not mutate the original template.
     this.draft.set({
       ...tpl,
       subjectI18n: { ...tpl.subjectI18n },
@@ -166,7 +166,6 @@ export class MailTemplatesComponent {
     const d = this.draft();
     if (!d || this.saving()) return;
     this.saving.set(true);
-    // Upsert by key. The server creates an override, also for a builtin default.
     this.api
       .upsertMailTemplate({
         key: d.key,
@@ -213,10 +212,8 @@ export class MailTemplatesComponent {
     const d = this.draft();
     if (!d || this.previewing()) return;
     this.previewing.set(true);
-    // No real values exist at preview time. Use the placeholder description as the sample value.
     const context: Record<string, unknown> = {};
     for (const [key, desc] of Object.entries(d.placeholders)) context[key] = desc || key;
-    // Render the draft without an ID. This works for builtin templates and for overrides.
     this.api
       .previewMailPayload({
         subjectI18n: d.subjectI18n,

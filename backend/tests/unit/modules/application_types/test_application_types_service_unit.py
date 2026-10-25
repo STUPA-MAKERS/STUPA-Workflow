@@ -52,7 +52,8 @@ def _row(**over: object) -> SimpleNamespace:
     return SimpleNamespace(**base)
 
 
-def _run(coro):  # noqa: ANN001, ANN202 — test helper
+def _run(coro):
+    """Run a coroutine to completion."""
     return asyncio.run(coro)
 
 
@@ -87,11 +88,12 @@ def test_list_name_falls_back_to_key_when_i18n_empty() -> None:
 
 
 def test_list_admin_includes_extra_fields_and_inactive() -> None:
+    """List the admin fields and an inactive type without an active form version."""
     row = _row(active_form_version_id=None)
     svc = ApplicationTypesService(_FakeSession([row], total=1))  # type: ignore[arg-type]
     page = _run(svc.list_types(lang="de", limit=50, offset=0, include_inactive=True, admin=True))
     item = page.items[0]
-    assert item.active is False  # no active form version
+    assert item.active is False
     assert item.active_form_version_id is None
     assert item.key == "finanz"
     assert item.gremium_id == row.gremium_id

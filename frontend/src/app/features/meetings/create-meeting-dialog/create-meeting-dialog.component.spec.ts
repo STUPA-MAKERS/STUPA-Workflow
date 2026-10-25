@@ -79,7 +79,11 @@ describe('CreateMeetingDialogComponent', () => {
     expect(within(dialog).getByRole('button', { name: 'Weiter' })).toBeDisabled();
   });
 
-  it('goes to step 2 with a prefilled title and lists only members who can keep the minutes (O20)', async () => {
+  /**
+   * Tom has no protocol.write. A member without a name shows the e-mail; without both, "Ohne
+   * Namen".
+   */
+  it('goes to step 2 with a prefilled title and lists only members who can keep the minutes', async () => {
     const { http, cmp, fixture } = await setup();
     flushGremien(http, fixture);
     await pickOption(screen.getByLabelText(/Gremium/), 'Studierendenparlament');
@@ -93,8 +97,6 @@ describe('CreateMeetingDialogComponent', () => {
     expect(cmp.title()).toBe('Sitzung des Studierendenparlament am 10. November 2026');
     const keeper = screen.getByLabelText('Protokollführung');
     const names = await optionLabels(keeper);
-    // Tom has no protocol.write. A member without a name shows the e-mail; without both,
-    // "Ohne Namen".
     expect(names).toEqual(['— niemand —', 'Mara Keller', 'lea@x.de', 'Ohne Namen']);
   });
 
@@ -127,6 +129,7 @@ describe('CreateMeetingDialogComponent', () => {
     expect(toasts()).toContain('Sitzung angelegt.');
   });
 
+  /** The first submit goes to step 2, and a second submit while the first runs is ignored. */
   it('sends no end and no minute-taker when none is set, and reports a failed create', async () => {
     const { http, cmp, closed, toasts, fixture } = await setup();
     flushGremien(http, fixture);
@@ -134,10 +137,10 @@ describe('CreateMeetingDialogComponent', () => {
     http.expectOne('/api/gremien/g-2/meeting-members').flush([]);
     cmp.date.set('2026-11-10');
     cmp.time.set('18:00');
-    cmp.submit(); // step 1: the submit goes to step 2
+    cmp.submit();
     expect(cmp.step()).toBe(2);
     cmp.submit();
-    cmp.submit(); // a second submit while the first runs is ignored
+    cmp.submit();
     const req = http.expectOne('/api/meetings');
     expect(req.request.body.endTime).toBeNull();
     expect(req.request.body.protokollantId).toBeNull();
@@ -150,7 +153,7 @@ describe('CreateMeetingDialogComponent', () => {
   it('keeps step 1 when the end is before the start, or when a field is missing', async () => {
     const { http, cmp, toasts, fixture } = await setup();
     flushGremien(http, fixture);
-    cmp.next(); // nothing set
+    cmp.next();
     expect(cmp.step()).toBe(1);
     cmp.onGremiumChange('g-1');
     http.expectOne('/api/gremien/g-1/meeting-members').flush([]);
@@ -193,10 +196,10 @@ describe('CreateMeetingDialogComponent', () => {
     expect(cmp.title()).toBe('Sitzung des Studierendenparlament am 17. November 2026');
   });
 
+  /** A required field has no row for its placeholder. */
   it('offers a non-admin only the Gremien with session.manage', async () => {
     const { http, fixture } = await setup({ admin: false, managed: ['g-2'] });
     flushGremien(http, fixture);
-    // A required field has no row for its placeholder.
     expect(await optionLabels(screen.getByLabelText(/Gremium/))).toEqual(['Finanzausschuss']);
   });
 
@@ -270,10 +273,13 @@ describe('CreateMeetingDialogComponent', () => {
     expect(await runAxe(document.body)).toHaveNoViolations();
   });
 
+  /**
+   * The test clicks the footer button, because the round close button of the dialog has the same
+   * name.
+   */
   it('closes on cancel without a request', async () => {
     const { http, closed, fixture } = await setup();
     flushGremien(http, fixture);
-    // The footer button; the round close button of the dialog has the same name.
     expect(screen.getByRole('button', { name: 'Schließen' })).toBeInTheDocument();
     const footerCancel = screen.getByRole('button', { name: 'Abbrechen' });
     await userEvent.click(footerCancel);
@@ -293,7 +299,7 @@ describe('CreateMeetingDialogComponent', () => {
     expect(cmp.title()).toBe('Studierendenparlament meeting on 10 November 2026');
   });
 
-  describe('public participation (#17)', () => {
+  describe('public participation', () => {
     it('locks the switch for a gremium with a quorum and sends it for one without', async () => {
       localStorage.setItem('ap.locale', 'de');
       const { http, cmp, fixture } = await setup();

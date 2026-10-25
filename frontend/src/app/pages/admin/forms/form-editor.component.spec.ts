@@ -64,19 +64,20 @@ async function setup(
   return { ...view, c, api, createFormVersion, updateApplicationType, setFormActive, toast };
 }
 
-// The suite renders the whole form builder (outline, question cards, ui-kit fields)
-// in jsdom. One test takes 1–3 s alone, and more than the default 5 s while the full
-// run keeps every core busy, so local gates timed out at random (CI passed). The same
-// budget as the other heavy meeting suites.
+/**
+ * The suite renders the whole form builder (outline, question cards, ui-kit fields) in jsdom. One
+ * test takes 1–3 s alone, and more than the default 5 s while the full run keeps every core busy,
+ * so the suite uses the same budget as the other heavy meeting suites.
+ */
 jest.setTimeout(15_000);
 
 describe('FormEditorComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
+  /** The ui-kit input writes its value once the model settles. */
   it('loads the draft title and questions', async () => {
     await setup(draft([{ key: 'title', type: 'text', label: { de: 'Titel', en: '' }, required: true }]));
     expect(screen.getByRole('heading', { name: 'Förderantrag' })).toBeInTheDocument();
-    // The ui-kit input writes its value once the model settles.
     expect(await screen.findByDisplayValue('Titel')).toBeInTheDocument();
   });
 
@@ -131,17 +132,19 @@ describe('FormEditorComponent', () => {
     expect(c.groups()[0].titleDe).toBe('Schritt 2');
   });
 
+  /**
+   * With nothing changed the page shows no "Speichern", but the save itself still works. A
+   * markerless single group serializes back to exactly the original flat fields.
+   */
   it('saves a normalized form version with the description', async () => {
     const { c, createFormVersion } = await setup(
       draft([{ key: 'title', type: 'text', label: { de: 'Titel', en: '' } }], { de: 'Hallo', en: '' }),
     );
-    // Nothing changed: the page shows no "Speichern"; the save itself still works.
     expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
     c.save();
     expect(createFormVersion).toHaveBeenCalledTimes(1);
     const [typeId, fields, description] = createFormVersion.mock.calls[0];
     expect(typeId).toBe('f1');
-    // Markerless single group → serializes back to exactly the original flat fields.
     expect(fields).toEqual([{ key: 'title', type: 'text', label: { de: 'Titel', en: '' } }]);
     expect(description).toEqual({ de: 'Hallo', en: '' });
   });
@@ -177,7 +180,8 @@ describe('FormEditorComponent', () => {
     expect(c.errorsFor(0, 0)).not.toContain('label (de) is required');
   });
 
-  it('toggles "Mit Budget" and persists it on the type (#24/budget)', async () => {
+  /** The saved state is the new baseline, so "Speichern" goes away. */
+  it('toggles "Mit Budget" and persists it on the type (budget)', async () => {
     const { fixture, updateApplicationType } = await setup(
       draft([{ key: 'title', type: 'text', label: { de: 'Titel', en: '' } }]),
     );
@@ -191,7 +195,6 @@ describe('FormEditorComponent', () => {
     expect(updateApplicationType.mock.calls[0][1]).toEqual(
       expect.objectContaining({ hasBudget: true }),
     );
-    // The saved state is the new baseline: "Speichern" goes away.
     fixture.detectChanges();
     expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
     c.hasBudget.set(false);
@@ -254,11 +257,11 @@ describe('FormEditorComponent — load branches', () => {
     expect(c.typeId()).toBe('');
   });
 
+  /** Without a matching type the title stays the loaded-draft default (empty). */
   it('ignores a missing type (no matching id) and leaves defaults', async () => {
     const { c } = await setup(draft([{ key: 'title', type: 'text', label: { de: 'T', en: '' } }]), {
       type: null,
     });
-    // No matching type -> title stays the loaded-draft default (empty), not patched.
     expect(c.title()).toEqual({ de: '', en: '' });
     expect(c.hasBudget()).toBe(false);
   });
@@ -398,7 +401,7 @@ describe('FormEditorComponent — title/description/label helpers', () => {
 describe('FormEditorComponent — group & question mutations', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
-  // jsdom in jest has no structuredClone. The component relies on the browser global.
+  /** jsdom in jest has no structuredClone, and the component relies on the browser global. */
   const g = globalThis as unknown as { structuredClone?: <T>(v: T) => T };
   const savedClone = g.structuredClone;
   beforeAll(() => {
@@ -425,16 +428,19 @@ describe('FormEditorComponent — group & question mutations', () => {
     expect(c.groups()).toHaveLength(1);
   });
 
+  /**
+   * Out-of-bounds targets are no-ops. The test calls the private reorderGroup with equal indices to
+   * cover the guard.
+   */
   it('reorder is a no-op at the edges and when from===to', async () => {
     const { c } = await base();
     c.addGroup();
     c.setGroupTitle(0, 'de', 'First');
-    c.moveGroup(0, -1); // to=-1 -> out of bounds
+    c.moveGroup(0, -1);
     expect(c.groups()).toHaveLength(2);
     expect(c.groups()[0].titleDe).toBe('First');
-    c.moveGroup(1, 1); // to=2 -> out of bounds
+    c.moveGroup(1, 1);
     expect(c.groups()).toHaveLength(2);
-    // Call the private reorderGroup with equal indices to cover the guard.
     c.reorderGroup(0, 0);
     expect(c.groups()[0].titleDe).toBe('First');
   });
@@ -446,12 +452,12 @@ describe('FormEditorComponent — group & question mutations', () => {
     expect(c.groups()[0].fields[0].key).toBe('q2');
   });
 
+  /** An empty key stays empty. */
   it('duplicates a question, suffixing _copy (and handling an empty key)', async () => {
     const { c } = await base();
     c.duplicateQuestion({ gi: 0, qi: 0 });
     expect(c.groups()[0].fields).toHaveLength(3);
     expect(c.groups()[0].fields[1].key).toBe('q1_copy');
-    // empty key -> stays empty
     c.groups()[0].fields[0].key = '';
     c.touch();
     c.duplicateQuestion({ gi: 0, qi: 0 });
@@ -470,25 +476,28 @@ describe('FormEditorComponent — group & question mutations', () => {
     expect(c.groups()[0].fields).toHaveLength(2);
   });
 
+  /**
+   * The last question of group 0 goes forward into group 1, and back again onto the end of group 0.
+   */
   it('passes a boundary question into the next/previous group', async () => {
     const { c } = await base();
-    c.addGroup(); // group 1
-    // push last question of group 0 forward into group 1
+    c.addGroup();
     c.moveQuestion({ gi: 0, qi: 1 }, 1);
     expect(c.groups()[0].fields).toHaveLength(1);
     expect(c.groups()[1].fields[0].key).toBe('q2');
-    // pull it back into group 0 (dir -1 -> push onto the end of the previous group)
     c.moveQuestion({ gi: 1, qi: 0 }, -1);
     expect(c.groups()[1].fields).toHaveLength(0);
     expect(c.groups()[0].fields.map((f: FormFieldDef) => f.key)).toEqual(['q1', 'q2']);
   });
 
+  /**
+   * The first question with direction -1 and the last question with direction +1 have no neighbour
+   * group.
+   */
   it('moveQuestion at a boundary with no neighbour group does nothing', async () => {
     const { c } = await base();
-    // first question, dir -1 -> ngi=-1 -> out of bounds
     c.moveQuestion({ gi: 0, qi: 0 }, -1);
     expect(c.groups()[0].fields.map((f: FormFieldDef) => f.key)).toEqual(['q1', 'q2']);
-    // last question, dir +1 -> ngi beyond list
     c.moveQuestion({ gi: 0, qi: 1 }, 1);
     expect(c.groups()[0].fields.map((f: FormFieldDef) => f.key)).toEqual(['q1', 'q2']);
   });
@@ -623,10 +632,8 @@ describe('FormEditorComponent — drag reorder', () => {
     const { c } = await setup(draft([{ key: 'q', type: 'text', label: { de: 'A', en: '' } }]));
     c.addGroup();
     c.setGroupTitle(1, 'de', 'Second');
-    // no active drag
     c.onDrop(0);
     expect(c.groups()[1].titleDe).toBe('Second');
-    // drop onto same group
     c.onDragStart(1);
     c.onDrop(1);
     expect(c.groups()[1].titleDe).toBe('Second');
@@ -650,13 +657,13 @@ describe('FormEditorComponent — validation setters & JsonLogic', () => {
     expect(c.groups()[0].fields[0].validation).toEqual({ pattern: '^a+$' });
   });
 
+  /** Allowed is the default, so the key is removed instead of storing true. */
   it('setAllowNoOffers stores only the false value and clears on allow', async () => {
     const { c } = await setup(
       draft([{ key: 'q', type: 'positions', label: { de: 'A', en: '' } }]),
     );
     c.setAllowNoOffers({ gi: 0, qi: 0 }, false);
     expect(c.groups()[0].fields[0].validation).toEqual({ allowNoOffers: false });
-    // Allowed is the default → the key is removed instead of storing true.
     c.setAllowNoOffers({ gi: 0, qi: 0 }, true);
     expect(c.groups()[0].fields[0].validation).toEqual({});
   });
@@ -675,12 +682,12 @@ describe('FormEditorComponent — validation setters & JsonLogic', () => {
     expect(c.logicRaw(0, 0, 'compute')).toBe('{ not json');
   });
 
+  /** The field key is dropped (trimmed empty), but the raw text is kept verbatim. */
   it('removes the logic key when cleared to empty', async () => {
     const { c } = await setup(
       draft([{ key: 'q', type: 'text', label: { de: 'A', en: '' }, visibleIf: { var: 'x' } }]),
     );
     c.onLogicInput({ gi: 0, qi: 0 }, 'visibleIf', '   ');
-    // The field key is dropped (trimmed empty) but the raw text is preserved verbatim.
     expect(c.groups()[0].fields[0].visibleIf).toBeUndefined();
     expect(c.logicRaw(0, 0, 'visibleIf')).toBe('   ');
   });
@@ -772,6 +779,7 @@ describe('FormEditorComponent — nullish/branch edges', () => {
     expect(c.title()).toEqual({ de: '', en: '' });
   });
 
+  /** setFormActive returns a draft without `active`, which counts as false. */
   it('treats a returned draft without an active flag as inactive on toggle', async () => {
     const { c } = await setup(
       {
@@ -780,7 +788,6 @@ describe('FormEditorComponent — nullish/branch edges', () => {
         active: false,
         fields: [{ key: 't', type: 'text', label: { de: 'T', en: '' } }],
       },
-      // setFormActive returns a draft missing `active` -> `?? false`.
       { api: { setFormActive: jest.fn(() => of({ applicationTypeId: 'f1', formVersionId: 'fv1', fields: [] })) } },
     );
     c.toggleActive();
@@ -813,10 +820,12 @@ describe('FormEditorComponent — nullish/branch edges', () => {
   });
 });
 
-describe('FormEditorComponent — layout of the redesign (FE12b)', () => {
+describe('FormEditorComponent — layout of the redesign', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
-  // jsdom in jest has no structuredClone. The duplicate action relies on the browser global.
+  /**
+   * jsdom in jest has no structuredClone, and the duplicate action relies on the browser global.
+   */
   const g = globalThis as unknown as { structuredClone?: <T>(v: T) => T };
   const savedClone = g.structuredClone;
   beforeAll(() => {
@@ -836,6 +845,7 @@ describe('FormEditorComponent — layout of the redesign (FE12b)', () => {
     { key: 'summe', type: 'computed', label: { de: 'Summe', en: '' }, compute: { var: 'eintritt' } },
   ];
 
+  /** Every type becomes a question of the group whose menu is open. */
   it('offers every question type in the type menu (the section marker is no question)', async () => {
     const { c } = await setup(draft(TWO_GROUPS));
     await userEvent.click(screen.getAllByRole('button', { name: 'Frage hinzufügen' })[1]);
@@ -845,7 +855,6 @@ describe('FormEditorComponent — layout of the redesign (FE12b)', () => {
       expect(items).toContain(c.typeLabel(type));
     }
     expect(items).not.toContain('Abschnitt (neuer Schritt)');
-    // Every type becomes a question of the group whose menu is open.
     await userEvent.click(screen.getByRole('menuitem', { name: 'Kostenpositionen' }));
     expect(c.groups()[1].fields.at(-1).type).toBe('positions');
     expect(c.typeMenuGroup()).toBeNull();
@@ -870,6 +879,7 @@ describe('FormEditorComponent — layout of the redesign (FE12b)', () => {
     expect(container.querySelector('.fe__card--sel')?.getAttribute('data-q')).toBe('0:0');
   });
 
+  /** A click into a card selects its question without moving the page. */
   it('a click in the outline selects a question and shows its group; a click on a group heading shows the group', async () => {
     const { c, fixture, container } = await setup(draft(TWO_GROUPS));
     await userEvent.click(screen.getByRole('button', { name: /^Summe/ }));
@@ -881,14 +891,16 @@ describe('FormEditorComponent — layout of the redesign (FE12b)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Abschnitt 1 · Vorhaben' }));
     expect(c.groupIndex()).toBe(0);
     expect(c.selected()).toBeNull();
-    // A click into a card selects its question without moving the page.
     c.focusCard({ gi: 0, qi: 1 });
     expect(c.selected()).toEqual({ gi: 0, qi: 1 });
   });
 
+  /**
+   * The choice question of group 1 has its options with value, DE and EN. The expression of a
+   * computed field shows without the advanced options.
+   */
   it('shows the options of each type: choice options, cost positions and the computed expression', async () => {
     const { c, fixture } = await setup(draft(TWO_GROUPS));
-    // Group 1: the choice question has its options with value, DE and EN.
     expect(screen.getByText('Auswahloptionen')).toBeInTheDocument();
     expect(await screen.findByDisplayValue('Kultur')).toBeInTheDocument();
     c.selectGroup(1);
@@ -897,7 +909,6 @@ describe('FormEditorComponent — layout of the redesign (FE12b)', () => {
     expect(screen.getByLabelText('Min. Vergleichsangebote')).toBeInTheDocument();
     expect(screen.getByLabelText('Min. Positionen')).toBeInTheDocument();
     expect(screen.getByText('Verzicht auf Vergleichsangebote erlauben')).toBeInTheDocument();
-    // The expression of a computed field shows without the advanced options.
     await waitFor(() =>
       expect(screen.getByLabelText('Berechnung (JsonLogic)')).toHaveValue('{"var":"eintritt"}'),
     );
@@ -919,10 +930,10 @@ describe('FormEditorComponent — layout of the redesign (FE12b)', () => {
     expect(screen.getByLabelText('Sichtbar wenn (JsonLogic)')).toHaveAttribute('placeholder', 'leer: immer sichtbar');
   });
 
+  /** The ui-kit checkbox takes its value once the model settles. */
   it('the required box sets the flag of the question', async () => {
     const { c } = await setup(draft(TWO_GROUPS));
     const boxes = screen.getAllByRole('checkbox', { name: 'Pflichtfeld' });
-    // The ui-kit checkbox takes its value once the model settles.
     await waitFor(() => expect(boxes[0]).toBeChecked());
     await userEvent.click(boxes[1]);
     expect(c.groups()[0].fields[1].required).toBe(true);
@@ -930,13 +941,13 @@ describe('FormEditorComponent — layout of the redesign (FE12b)', () => {
     expect(c.groups()[0].fields[0].required).toBe(false);
   });
 
+  /** A move and its way back leave the form as it was. */
   it('save creates a form version with every group and question', async () => {
     const { c, fixture, createFormVersion } = await setup(draft(TWO_GROUPS));
     expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
     c.moveQuestion({ gi: 0, qi: 0 }, 1);
     c.moveQuestion({ gi: 0, qi: 1 }, -1);
     fixture.detectChanges();
-    // A move and its way back leave the form as it was.
     expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
     c.setGroupTitle(0, 'de', 'Neu');
     fixture.detectChanges();
@@ -946,11 +957,15 @@ describe('FormEditorComponent — layout of the redesign (FE12b)', () => {
     expect(fields.map((f) => f.key)).toEqual(['section_1', 'title', 'cat', 'section_2', 'kosten', 'eintritt', 'summe']);
   });
 
+  /**
+   * At the edge the question moves into the next group, and the selection goes with it. Removing a
+   * question above the selection keeps the selection on the same question. A move of another
+   * question leaves the selection alone.
+   */
   it('the selection follows a question that moves, is duplicated, added or removed', async () => {
     const { c } = await setup(draft(TWO_GROUPS));
     c.moveQuestion({ gi: 0, qi: 0 }, 1);
     expect(c.selected()).toEqual({ gi: 0, qi: 1 });
-    // At the edge the question moves into the next group, and the selection with it.
     c.moveQuestion({ gi: 0, qi: 1 }, 1);
     expect(c.selected()).toEqual({ gi: 1, qi: 0 });
     expect(c.groupIndex()).toBe(1);
@@ -960,32 +975,32 @@ describe('FormEditorComponent — layout of the redesign (FE12b)', () => {
     expect(c.selected()).toEqual({ gi: 0, qi: 2 });
     c.addQuestion(1, 'email');
     expect(c.selected()).toEqual({ gi: 1, qi: 3 });
-    // Removing a question above the selection keeps it on the same question.
     c.removeQuestion({ gi: 1, qi: 0 });
     expect(c.selected()).toEqual({ gi: 1, qi: 2 });
     c.removeQuestion({ gi: 1, qi: 2 });
     expect(c.selected()).toBeNull();
-    // A move of another question leaves the selection alone.
     c.selectQuestion({ gi: 0, qi: 0 }, false);
     c.moveQuestion({ gi: 1, qi: 0 }, 1);
     expect(c.selected()).toEqual({ gi: 0, qi: 0 });
   });
 
+  /**
+   * "Titel" (selected) is dropped on "Eintritt" in group 2. A drop on a group appends a dragged
+   * question, and the selection stays on its question. A drop without a drag, or on the same row,
+   * changes nothing.
+   */
   it('moves a question by drag and drop in the outline, also into another group', async () => {
     const { c } = await setup(draft(TWO_GROUPS));
     const ev = () =>
       ({ preventDefault: jest.fn(), stopPropagation: jest.fn(), dataTransfer: { setData: jest.fn() } }) as unknown as DragEvent;
-    // Drop "Titel" (selected) on "Eintritt" in group 2.
     c.onQuestionDragStart(ev(), { gi: 0, qi: 0 });
     c.onQuestionDrop(ev(), { gi: 1, qi: 1 });
     expect(c.groups()[1].fields.map((f: FormFieldDef) => f.key)).toEqual(['kosten', 'title', 'eintritt', 'summe']);
     expect(c.selected()).toEqual({ gi: 1, qi: 1 });
-    // A drop on a group appends a dragged question; the selection stays on its question.
     c.onQuestionDragStart(ev(), { gi: 0, qi: 0 });
     c.onDrop(1);
     expect(c.groups()[1].fields.at(-1).key).toBe('cat');
     expect(c.selected()).toEqual({ gi: 1, qi: 1 });
-    // A drop without a drag, or on the same row, changes nothing.
     const before = JSON.stringify(c.groups());
     c.onQuestionDrop(ev(), { gi: 1, qi: 0 });
     c.onQuestionDragStart(ev(), { gi: 1, qi: 0 });
@@ -1033,6 +1048,10 @@ describe('FormEditorComponent — layout of the redesign (FE12b)', () => {
     expect(screen.getByText('Aktiv', { selector: 'app-status-text' })).toBeInTheDocument();
   });
 
+  /**
+   * A press inside the menu keeps it; a press elsewhere closes it. A scroll closes an open menu
+   * too.
+   */
   it('opens the type menu below its button, or above it near the bottom, and closes it on a press outside', async () => {
     const { c } = await setup(draft(TWO_GROUPS));
     const button = (top: number) =>
@@ -1045,14 +1064,12 @@ describe('FormEditorComponent — layout of the redesign (FE12b)', () => {
     c.toggleTypeMenu(1, button(window.innerHeight - 40));
     expect(c.menuPos().top).toBeNull();
     expect(c.menuPos().bottom).toBe(44);
-    // A press inside the menu keeps it; a press elsewhere closes it.
     const inside = document.createElement('div');
     inside.className = 'fe__menu';
     c.onDocumentPointerDown({ target: inside } as unknown as PointerEvent);
     expect(c.typeMenuGroup()).toBe(1);
     c.onDocumentPointerDown({ target: document.body } as unknown as PointerEvent);
     expect(c.typeMenuGroup()).toBeNull();
-    // A scroll closes an open menu too.
     c.toggleTypeMenu(0, button(100));
     window.dispatchEvent(new Event('scroll'));
     expect(c.typeMenuGroup()).toBeNull();
@@ -1067,6 +1084,7 @@ describe('FormEditorComponent — layout of the redesign (FE12b)', () => {
     expect(c.typeMenuGroup()).toBe(0);
   });
 
+  /** Tab leaves the menu the same way: it closes, and the button has the focus. */
   it('the type menu works with the keyboard: the focus goes in, arrows move, Escape closes and refocuses', async () => {
     const { fixture } = await setup(draft(TWO_GROUPS));
     const add = screen.getAllByRole('button', { name: 'Frage hinzufügen' })[0];
@@ -1088,7 +1106,6 @@ describe('FormEditorComponent — layout of the redesign (FE12b)', () => {
     fixture.detectChanges();
     expect(screen.queryByRole('menu')).toBeNull();
     expect(document.activeElement).toBe(add);
-    // Tab leaves the menu the same way: it closes, and the button has the focus.
     await userEvent.keyboard('{Enter}');
     fixture.detectChanges();
     await waitFor(() => expect(screen.getByRole('menu').contains(document.activeElement)).toBe(true));
@@ -1098,23 +1115,25 @@ describe('FormEditorComponent — layout of the redesign (FE12b)', () => {
     expect(document.activeElement).toBe(add);
   });
 
+  /**
+   * "Kategorie" is the last question of group 1, and "Nach unten" hands it to group 2. Within a
+   * group the selection goes with the question, not to the neighbour. Duplicate selects the copy;
+   * delete clears the selection.
+   */
   it('the move buttons of a card: the moved question keeps the selection, also into the next group', async () => {
     const { c, fixture } = await setup(draft(TWO_GROUPS));
     c.selectQuestion({ gi: 0, qi: 1 }, false);
     fixture.detectChanges();
-    // "Kategorie" is the last question of group 1; "Nach unten" hands it to group 2.
     const card = document.querySelector<HTMLElement>('[data-q="0:1"]')!;
     await userEvent.click(within(card).getByRole('button', { name: 'Nach unten' }));
     expect(c.groupIndex()).toBe(1);
     expect(c.selected()).toEqual({ gi: 1, qi: 0 });
     expect(c.groups()[1].fields[0].key).toBe('cat');
-    // Within a group: the selection goes with the question, not to the neighbour.
     fixture.detectChanges();
     const first = document.querySelector<HTMLElement>('[data-q="1:0"]')!;
     await userEvent.click(within(first).getByRole('button', { name: 'Nach unten' }));
     expect(c.selected()).toEqual({ gi: 1, qi: 1 });
     expect(c.groups()[1].fields[1].key).toBe('cat');
-    // Duplicate selects the copy; delete clears the selection.
     fixture.detectChanges();
     const moved = document.querySelector<HTMLElement>('[data-q="1:1"]')!;
     await userEvent.click(within(moved).getByRole('button', { name: 'Duplizieren' }));
@@ -1125,21 +1144,23 @@ describe('FormEditorComponent — layout of the redesign (FE12b)', () => {
     expect(c.selected()).toBeNull();
   });
 
+  /**
+   * "Titel" is dragged into group 2, before "Eintritt". "Kategorie" then holds the old place and
+   * shows its own state. An arrow move, a duplicate, a delete and a group move re-key the state the
+   * same way.
+   */
   it('the raw JsonLogic text and the open advanced options move with their question', async () => {
     const { c } = await setup(draft(TWO_GROUPS));
     const ev = () =>
       ({ preventDefault: jest.fn(), stopPropagation: jest.fn(), dataTransfer: { setData: jest.fn() } }) as unknown as DragEvent;
     c.toggleExpanded({ gi: 0, qi: 0 });
     c.onLogicInput({ gi: 0, qi: 0 }, 'visibleIf', '{"==": [');
-    // Drag "Titel" into group 2, before "Eintritt".
     c.onQuestionDragStart(ev(), { gi: 0, qi: 0 });
     c.onQuestionDrop(ev(), { gi: 1, qi: 1 });
     expect(c.logicRaw(1, 1, 'visibleIf')).toBe('{"==": [');
     expect(c.isExpanded({ gi: 1, qi: 1 })).toBe(true);
-    // "Kategorie" now holds the old place and shows its own state.
     expect(c.logicRaw(0, 0, 'visibleIf')).toBe('');
     expect(c.isExpanded({ gi: 0, qi: 0 })).toBe(false);
-    // An arrow move, a duplicate, a delete and a group move re-key the state the same way.
     c.moveQuestion({ gi: 1, qi: 1 }, -1);
     expect(c.logicRaw(1, 0, 'visibleIf')).toBe('{"==": [');
     c.duplicateQuestion({ gi: 1, qi: 0 });

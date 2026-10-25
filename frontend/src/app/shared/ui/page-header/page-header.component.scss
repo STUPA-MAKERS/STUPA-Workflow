@@ -7,28 +7,18 @@
   margin-bottom: var(--space-5);
 }
 
-/* The parent already spaces its children, so the header must not add to it. Without
-   this the gap and the margin stack and the title floats far above its content. */
+// The parent already spaces its children; without this the gap and the margin stack.
 :host(.ph--flush) {
   margin-bottom: 0;
 }
 
-/* The header shares the content box exactly, so the two always share a left edge. A
-   `wide` route drops the max-width on `.main` for two sidebars; a header that kept the
-   normal container width would sit indented from the table it titles, which is the
-   misalignment a reader sees.
-
-   That holds only while the content really starts at the gutter. A RAIL page does not:
-   its main column is capped and centred between two margins, so a full-width header
-   drifts left of the table as the viewport grows. `rail` gives those pages the cap
-   back, which puts the header on the same column as the content it titles. */
+// A rail page caps and centres its main column, so `rail` gives the header the same cap and it
+// stays on the column of its content.
 :host(.ph--rail) {
   max-width: var(--layout-max-width);
   margin-inline: auto;
 }
 
-/* D9: the actions sit on the title row, not on the centre of the text block. A long
-   subtitle therefore never moves them: they have the same y on every page. */
 .ph__bar {
   --ph-title-lh: var(--lh-d2);
   display: flex;
@@ -38,15 +28,11 @@
   gap: var(--space-4);
 }
 
-/* The text takes the free width and wraps inside it, so a long subtitle does not push
-   the actions onto a line of their own. On a narrow screen the basis no longer fits
-   beside the actions, and they wrap below the text. */
 .ph__text {
   flex: 1 1 20rem;
   min-width: 0;
 }
 
-/* The page title of the design system (d2): 28/36, semibold, a little tighter. */
 .ph__title {
   margin: 0;
   font-size: var(--fs-d2);
@@ -55,8 +41,6 @@
   letter-spacing: var(--tracking-tight);
 }
 
-/* The title and its meta text share one baseline. The meta text wraps under the title
-   only when the line has no space for both. */
 .ph__heading {
   display: flex;
   align-items: baseline;
@@ -66,8 +50,6 @@
   min-width: 0;
 }
 
-/* A short fact about the page, such as "8 offen". It is part of the title block, not a
-   control, so it does not go into the actions slot. */
 .ph__meta {
   font-size: var(--fs-sm);
   color: var(--color-text-muted);
@@ -75,7 +57,6 @@
   white-space: nowrap;
 }
 
-/* The lead line. Give it only when it says something the title does not. */
 .ph__subtitle {
   margin: var(--space-1) 0 0;
   font-size: var(--fs-body);
@@ -93,10 +74,7 @@
   }
 }
 
-/* A phone: a header whose only action is a ⋮ menu keeps the menu on the title row, at
-   its end. The title wraps beside it; the menu never takes a line of its own. The menu
-   is projected content, so the match goes through ::ng-deep. It finds the menu as the
-   only child of the slot, or as the only child of the one wrapper a page puts there. */
+// The menu is projected content, so the match goes through ::ng-deep.
 @include bp.phone {
   :host ::ng-deep .ph__bar:has(> .ph__actions > app-row-menu:only-child),
   :host ::ng-deep .ph__bar:has(> .ph__actions > :only-child > app-row-menu:only-child) {
@@ -108,15 +86,13 @@
   }
 }
 
-/* The slot stays in the flow only when a page fills it. An empty slot would
-   otherwise take the gap and push the title off center. */
+// An empty slot would take the gap and push the title off centre.
 .ph__actions:empty {
   display: none;
 }
 
-/* The first row of actions is centred on the title line. The row is one control high
-   (40 px) and its centre moves onto the centre of the title line (36 px, on a phone
-   28 px), so a small button and a normal one both sit on that line. */
+// The row is one control high (40px); its centre moves onto the centre of the title line (36px,
+// on a phone 28px).
 .ph__actions {
   display: flex;
   align-items: center;
@@ -124,24 +100,11 @@
   flex-wrap: wrap;
   min-height: var(--control-height);
   margin-top: calc((var(--ph-title-lh) - var(--control-height)) / 2);
-  /* Chrome, not content: a long press on an action selects no label and opens no callout. */
   @include press.chrome-text;
 }
 
-/* ------------------------------------------------------------------ pane
-
-   The header of a list column (`pane`): the applications, the tasks, the votes, the
-   meetings, the bookings, the invoices, the budget tree and the Verwaltung navigation.
-   This block is the ONLY place that sets its geometry, so the title starts at the same
-   x and y, with the same size, on every such page, and the actions end on the edge of
-   the column. A page does not style its list header itself (see
-   list-geometry.contract.spec.ts).
-
-   - One line at the height of a control: the title at the start, the actions at the end.
-     Nothing wraps; the title shrinks first.
-   - The title is inset from the column edge like the rows below it. `--ph-inset` changes
-     the inset only where the column is no column (the Verwaltung home page in one column).
-   - The title keeps the d2 size on a phone too: the list is the page there. */
+// The only place that sets the geometry of a list column header; list-geometry.contract.spec.ts
+// checks that no page styles it itself.
 :host(.ph--pane) {
   flex: none;
   margin-bottom: 0;
@@ -156,8 +119,6 @@
 :host(.ph--pane) .ph__text {
   flex: 1 1 0;
 }
-/* A control in the `heading` slot (the "Liste | Kalender" switch) sits on the centre
-   line of the title, as the actions do. */
 :host(.ph--pane) .ph__heading {
   flex-wrap: nowrap;
   align-items: center;

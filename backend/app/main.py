@@ -3,12 +3,18 @@
 `create_app()` wires settings, logging, middleware (trace id + security headers,
 CORS off), the problem+json error contract, and all module routers under `/api`.
 The uvicorn entrypoint runs with `--proxy-headers`.
+
+The routers join ``api_router`` once at import time, so repeated ``create_app()`` calls in the
+tests do not register them twice. The OAuth admin router is the admin view over the grants of
+every principal (kill switch for a leaked agent token). OAuth discovery is mirrored under /api:
+the RFC location is the root, but /api always stays reachable through the edge proxy and gives
+MCP clients a fallback. The module-level ``app`` serves uvicorn (``app.main:app``).
 """
 
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, FastAPI
@@ -40,7 +46,6 @@ from app.modules.backup.router import router as backup_router
 from app.modules.budget.tree_router import router as budget_tree_router
 from app.modules.calendar.router import router as calendar_router
 from app.modules.config_revision.router import router as config_revision_router
-from app.modules.deadlines.router import router as deadline_policies_router
 from app.modules.delegations.router import router as delegations_router
 from app.modules.files.router import router as files_router
 from app.modules.files.storage import build_object_storage
@@ -84,15 +89,10 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-# This module includes the routers once at import time. Repeated `create_app()`
-# calls in the tests then do not register them twice.
 api_router.include_router(auth_router)
 api_router.include_router(oauth_router)
-# Admin view over the grants of every principal (kill switch for a leaked agent token).
 api_router.include_router(oauth_admin_router)
 api_router.include_router(mcp_router)
-# Mirror OAuth discovery under /api. The RFC location is the root, but /api always
-# stays reachable through the edge proxy and gives MCP clients a fallback.
 api_router.include_router(oauth_well_known_router)
 api_router.include_router(forms_router)
 api_router.include_router(application_types_router)
@@ -116,7 +116,6 @@ api_router.include_router(public_media_router)
 api_router.include_router(audit_router)
 api_router.include_router(config_revision_router)
 api_router.include_router(admin_router)
-api_router.include_router(deadline_policies_router)
 api_router.include_router(delegations_router)
 api_router.include_router(privacy_router)
 api_router.include_router(backup_router)
@@ -145,25 +144,26 @@ async def _bootstrap_admins_on_startup(settings: Settings) -> None:  # pragma: n
         async with sessionmaker() as db:
             await ensure_bootstrap_admins(db, settings)
             await db.commit()
-    except Exception:  # noqa: BLE001 — startup must never fail on bootstrap
+    except Exception:
         logging.getLogger("app.auth.bootstrap").warning(
             "bootstrap admin startup sweep skipped (db unavailable?)", exc_info=True
         )
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
+    """Open and close the shared clients of the app.
+
+    The arq pool (mail and scan jobs) and the object storage are best effort: without Redis
+    or MinIO they are None, and uploads answer 503. The Redis client of the live vote
+    connects lazily on the first PUBLISH or SUBSCRIBE, so creating it is cheap.
+    """
     settings = get_settings()
-    # Open the arq pool best effort for mail and scan jobs. Without Redis it is None.
     app.state.arq_pool = await create_mail_pool(settings.redis_url)
-    # Build the object storage best effort. Without MinIO it is None and uploads 503.
     app.state.object_storage = build_object_storage(settings)
-    # The Redis client connects lazily on the first PUBLISH or SUBSCRIBE, so this
-    # call is cheap.
     import redis.asyncio as aioredis
 
     livevote_redis = aioredis.from_url(settings.redis_url)
-    app.state._livevote_redis = livevote_redis
     app.state.broker = RedisBroker(livevote_redis)
     app.state.locker = RedisLocker(livevote_redis)
     app.state.meeting_publisher = BrokerPublisher(app.state.broker)
@@ -200,6 +200,20 @@ def _flow_action_dispatcher(conn: HTTPConnection) -> ActionDispatcher:
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
+    """Build the FastAPI app with its middleware, handlers and routers.
+
+    CORS stays unregistered on purpose: no cross-origin access. The last middleware added
+    becomes the outermost one. SecurityHeaders is outermost, so its headers also reach the
+    CSRF and 429 responses; then come the trace id, CSRF, and innermost the default write
+    rate limit. All of them are BaseHTTPMiddleware, so a WebSocket scope passes through
+    untouched.
+
+    OAuth discovery (RFC 8414/9728) sits at the root, per well-known convention. The public
+    share pages ``/s/<token>`` sit at the root and NOT under /api, because Matrix, WhatsApp
+    and Signal build a link preview by fetching the URL server-side and reading the
+    OpenGraph tags. The answer must be HTML from a path nginx proxies ahead of the SPA
+    fallback; under /api it would work but read as an internal URL in a chat.
+    """
     settings = settings or get_settings()
     configure_logging(settings.log_level)
 
@@ -209,11 +223,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
     )
 
-    # CORS stays unregistered on purpose: no cross-origin access. The last middleware
-    # added becomes the outermost one. SecurityHeaders is outermost, so its headers
-    # also reach the CSRF and 429 responses. Next come the trace id, then CSRF, and
-    # innermost the default write rate limit. All of them are BaseHTTPMiddleware, so
-    # a WebSocket scope passes through untouched.
     app.add_middleware(DefaultWriteRateLimitMiddleware, settings=settings)
     app.add_middleware(CsrfMiddleware, settings=settings)
     app.add_middleware(RequestContextMiddleware)
@@ -224,16 +233,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.dependency_overrides[get_action_dispatcher] = _flow_action_dispatcher
 
     app.include_router(api_router)
-    # OAuth discovery (RFC 8414/9728) at the root, per well-known convention.
     app.include_router(oauth_well_known_router)
-    # Public share pages at `/s/<token>`, at the root and NOT under /api. Matrix, WhatsApp
-    # and Signal build a link preview by fetching the URL server-side and reading the
-    # OpenGraph tags, so the response has to be HTML from a path nginx proxies ahead of
-    # the SPA fallback. Under /api it would work but read as an internal URL in a chat.
     app.include_router(share_page_router)
     use_problem_json_contract(app)
     return app
 
 
-# Module-level app for uvicorn (`app.main:app`).
 app = create_app()

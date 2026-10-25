@@ -1,4 +1,4 @@
-"""Integration: the create binds the draft uploads of the wizard (Z4, real Postgres).
+"""Integration: the create binds the draft uploads of the wizard (real Postgres).
 
 `POST /applications` takes `attachmentIds` and `draftToken`. The create checks that
 the token owns each listed draft and that no draft is expired or infected. A pending
@@ -96,18 +96,19 @@ async def _draft(
 ) -> tuple[uuid.UUID, str]:
     """Upload one draft through the service and return its id and the token."""
     async with maker() as session:
-        files = FilesService(session, storage=_storage(), settings=settings)  # pyright: ignore[reportArgumentType]
+        files = FilesService(session, storage=_storage(), settings=settings)
         out = await DraftAttachments(files).upload(
             token=token, filename="angebot.pdf", data=_PDF, by="applicant"
         )
     return out.id, out.draftToken
 
 
-def _storage() -> Any:  # noqa: ANN401 - a duck-typed ObjectStorage
+def _storage() -> Any:
+    """Return a duck-typed ObjectStorage."""
     return _MemoryStorage()
 
 
-def _payload(seed: GuestSeed, **extra: Any) -> ApplicationCreate:  # noqa: ANN401
+def _payload(seed: GuestSeed, **extra: Any) -> ApplicationCreate:
     data: dict[str, Any] = {"title": "Mit Anhang"}
     data.update(extra.pop("data", {}))
     return ApplicationCreate.model_validate(
@@ -139,6 +140,10 @@ async def _count_apps(maker: async_sessionmaker[AsyncSession]) -> int:
 async def test_create_binds_the_listed_drafts(
     maker: async_sessionmaker[AsyncSession], settings: Settings
 ) -> None:
+    """Bind the listed drafts and keep their storage keys.
+
+    A draft that the submit does not list stays a draft until the purge.
+    """
     seed = await _seed(maker)
     first, token = await _draft(maker, settings)
     second, _ = await _draft(maker, settings, token)
@@ -166,9 +171,7 @@ async def test_create_binds_the_listed_drafts(
             assert rows[aid].application_id == app_id
             assert rows[aid].draft_token_hash is None
             assert rows[aid].draft_expires_at is None
-            # The storage key stays the same after the bind.
             assert rows[aid].storage_key == keys[aid]
-        # A draft that the submit does not list stays a draft until the purge.
         assert rows[unlisted].application_id is None
         assert rows[unlisted].draft_token_hash is not None
         entry = await session.scalar(
@@ -290,7 +293,7 @@ async def test_http_submit_binds_drafts_and_names_missing_ids(
         object_storage: ObjectStorage = storage  # pyright: ignore[reportAssignmentType]
         return FilesService(session, storage=object_storage, settings=request_settings)
 
-    async def _sender(_settings: Settings, to: str, app_id: uuid.UUID, _pool: Any) -> None:  # noqa: ANN401
+    async def _sender(_settings: Settings, to: str, app_id: uuid.UUID, _pool: Any) -> None:
         return None
 
     api.dependency_overrides[get_files_service] = _files

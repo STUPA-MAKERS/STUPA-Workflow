@@ -1,4 +1,4 @@
-"""Negative check for the critical coverage gate (acceptance criterion T-04).
+"""Negative check for the critical coverage gate.
 
 The gate lives in `scripts.coverage_critical`. It blocks with exit code 1 when a
 critical module has a branch rate below 100 percent. It passes at 100 percent. It also
@@ -48,6 +48,7 @@ def test_absent_module_does_not_block(tmp_path: Path) -> None:
 
 
 def test_main_exit_codes(tmp_path: Path) -> None:
+    """Check the exit codes of the gate; without a critical module the gate passes."""
     pyproject = tmp_path / "pyproject.toml"
     pyproject.write_text(
         '[tool.coverage_critical]\nmodules = ["app/modules/auth"]\nmin_branch_rate = 1.0\n',
@@ -59,7 +60,7 @@ def test_main_exit_codes(tmp_path: Path) -> None:
 
     assert main([str(bad), str(pyproject)]) == 1
     assert main([str(good), str(pyproject)]) == 0
-    assert main([str(empty), str(pyproject)]) == 0  # No critical module, so the gate passes.
+    assert main([str(empty), str(pyproject)]) == 0
 
 
 def test_main_missing_xml_fails(tmp_path: Path) -> None:

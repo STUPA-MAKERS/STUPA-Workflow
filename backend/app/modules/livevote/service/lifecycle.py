@@ -1,11 +1,11 @@
 """Meeting lifecycle: create, patch (planned to live to closed), broadcast, delete.
 
-The status runs only forward: ``planned`` to ``live`` to ``closed`` (F9, O13). A
+The status runs only forward: ``planned`` to ``live`` to ``closed``. A
 repeat of the current status is a no-op. Every other change gives 409
 ``invalid_status_transition``. A meeting that does not take place is deleted, not
 closed.
 
-The lifecycle also drives the periods of the protocol keeper (Z3, see
+The lifecycle also drives the periods of the protocol keeper (see
 ``handover``): the start opens the first period, a forward move of the current
 agenda item starts a planned handover, a new protokollant of a live meeting is a
 handover ``now``, and the close ends the running period.
@@ -41,13 +41,11 @@ from app.shared.errors import (
 
 logger = logging.getLogger(__name__)
 
-# The only status changes of a meeting (F9, O13). A repeat of the current status is a
-# no-op and not in this set.
-_TRANSITIONS: frozenset[tuple[str, str]] = frozenset(
-    {("planned", "live"), ("live", "closed")}
-)
+#: The only status changes of a meeting. A repeat of the current status is a
+#: no-op and not in this set.
+_TRANSITIONS: frozenset[tuple[str, str]] = frozenset({("planned", "live"), ("live", "closed")})
 
-# The planning fields that MEETING_UPDATE records, as (model attribute, JSON key).
+#: The planning fields that MEETING_UPDATE records, as (model attribute, JSON key).
 _AUDITED_FIELDS: tuple[tuple[str, str], ...] = (
     ("status", "status"),
     ("title", "title"),
@@ -74,6 +72,8 @@ class LifecycleOps(HandoverOps):
         """Create a meeting in status ``planned``.
 
         Only a meeting manager (``session.manage``) may create a meeting.
+
+        A public meeting gets its join link at once, so the link can go into the invitation.
         """
         if not await self.can_manage(payload.gremium_id, principal):
             raise ForbiddenError("not allowed to create meetings for this committee")
@@ -97,7 +97,6 @@ class LifecycleOps(HandoverOps):
         self.session.add(meeting)
         await self.session.flush()
         if payload.public_join:
-            # #17: the join link exists from the start, so it can go into the invitation.
             await GuestService(self.session).ensure_code(meeting)
         await audit_record(
             self.session,
@@ -118,7 +117,7 @@ class LifecycleOps(HandoverOps):
     async def _resolve_protokollant(
         self, gremium_id: UUID, protokollant_id: UUID | None
     ) -> UUID | None:
-        """Validate the protokollant: an active member with ``protocol.write`` (O20).
+        """Validate the protokollant: an active member with ``protocol.write``.
 
         The rule applies to a new assignment only. A protokollant who lost
         ``protocol.write`` after the assignment can still start the meeting.
@@ -142,18 +141,53 @@ class LifecycleOps(HandoverOps):
         The start (``planned`` to ``live``) sets ``started_at`` once. The close (``live``
         to ``closed``) sets ``closed_at`` and cancels the draft votes of the meeting in
         the same transaction, then sends ``vote_cancelled`` after the commit. A status
-        change or a planning change writes ``meeting_update`` (F12).
+        change or a planning change writes ``meeting_update``.
 
         ``completeAgendaItemId`` sets the done mark of the item that the room leaves,
         in the same transaction as the move ("Nächster TOP"). It needs the gate of the
         done mark (``can_mark_done``, 403) and an item of this meeting (404).
 
-        Z3: the start opens the first keeper period, and the close ends the running
+        The start opens the first keeper period, and the close ends the running
         one. A forward move of the current agenda item starts a planned handover. A
         new protokollant of a live meeting is a handover ``now``. Each handover writes
         ``protokollant_handover`` instead of a protokollant change in
         ``meeting_update``. The same protokollant again is a no-op. A new
-        protokollant needs ``protocol.write`` in the gremium (O20, 422).
+        protokollant needs ``protocol.write`` in the gremium (422).
+
+        Public participation and the guest mode are planning values of the lead. A status
+        change locks the meeting row. The open of a vote takes the same lock, so the
+        open-vote check and the close cannot race. A move of the agenda item and a
+        protokollant change can change the keeper periods, so they take the lock too, as the
+        handover route does.
+
+        The current agenda item follows the protokollant and nobody else, so a look of the
+        session lead at another item does not move the beamer and the followers. The lead
+        takes the minutes over first (handover) to move it.
+
+        The status runs only forward. A repeat of the current status is a no-op. ``closed``
+        is terminal, and a meeting that does not take place is deleted, not closed. A closed
+        meeting is frozen, because the protocol refers to its planning data. The open window
+        reads the stored planning before this patch changes it, so a date change in the same
+        patch cannot move the window.
+
+        On the start the router creates the protocol after this commit, and nobody takes
+        minutes or votes before that. ``meeting.status`` changes only after the protokollant
+        check, which keeps the change atomic: no ``live`` without a protokollant, not even
+        in memory on a rejected patch. A meeting needs a protokollant before it goes live,
+        because the protokollant writes the protocol that the start creates.
+
+        The schema checks the order of the start and end time only on create. The service
+        checks it only on a patch that touches a time, so a pure status or protokollant
+        patch never fails on it. The same protokollant again is a no-op, so the settings
+        dialog can send the value with every save; it also skips the ``protocol.write``
+        check of a new assignment. After the finalization the protokollant is part of the
+        signed document, so the assignment is locked. A live meeting always keeps a
+        protokollant.
+
+        The close drops the planned keeper period, cancels the drafts, which can never open,
+        and removes the requests that never got admitted, the guest names and every guest
+        token. The voting service is imported locally, because it imports the flow engine,
+        which reaches back into this module.
 
         Raises:
             ConflictError: The status change is not ``planned`` to ``live`` or ``live``
@@ -163,7 +197,6 @@ class LifecycleOps(HandoverOps):
                 confirmed (``early_open_unconfirmed``), or the meeting is closed and
                 the patch changes its planning.
         """
-        # #17: public participation and the guest mode are planning values of the lead.
         wants_public = payload.public_join is not None or payload.guests_mode is not None
         wants_manage = (
             "title" in payload.model_fields_set
@@ -175,10 +208,6 @@ class LifecycleOps(HandoverOps):
         )
         wants_write = payload.status is not None or payload.active_application_id is not None
         wants_now = "current_agenda_item_id" in payload.model_fields_set
-        # A status change locks the meeting row. The open of a vote takes the same
-        # lock, so the open-vote check below and the close cannot race (O12). A move
-        # of the agenda item and a protokollant change can change the keeper periods
-        # (Z3), so they take the lock too, as the handover route does.
         meeting = await self._get(
             meeting_id,
             for_update=(
@@ -192,9 +221,6 @@ class LifecycleOps(HandoverOps):
             raise ForbiddenError("only a session manager may plan this meeting")
         if wants_write and not await self.can_write(meeting, principal):
             raise ForbiddenError("not allowed to control this meeting")
-        # The current agenda item follows the protokollant and nobody else, so a look
-        # of the session lead at another item does not move the beamer and the
-        # followers. The lead takes the minutes over first (handover) to move it.
         if wants_now and not await self.can_set_current_item(meeting, principal):
             raise ForbiddenError("only the protokollant may set the current agenda item")
         if wants_now and meeting.status == "closed":
@@ -209,16 +235,11 @@ class LifecycleOps(HandoverOps):
                 raise NotFoundError(
                     f"agenda item {payload.current_agenda_item_id} not found in this meeting"
                 )
-        # "Nächster TOP": the item that the room leaves gets its done mark. The caller
-        # needs the gate of the done mark, and the item must belong to this meeting.
         if payload.complete_agenda_item_id is not None and not await self.can_mark_done(
             meeting, principal
         ):
             raise ForbiddenError("not allowed to mark this agenda item as done")
 
-        # The status runs only forward (F9, O13): planned to live, live to closed. A
-        # repeat of the current status is a no-op. ``closed`` is terminal, and a
-        # meeting that does not take place is deleted, not closed.
         status_change = payload.status is not None and payload.status != meeting.status
         if status_change and (meeting.status, payload.status) not in _TRANSITIONS:
             raise ConflictError(
@@ -227,45 +248,30 @@ class LifecycleOps(HandoverOps):
                 code="invalid_status_transition",
             )
         closing = status_change and payload.status == "closed"
-        # O12: a meeting with an open vote does not close. The lead closes or cancels
-        # the vote first.
         if closing and await self.open_vote(meeting.id) is not None:
             raise ConflictError(
                 "a vote of this meeting is still open — close or cancel it first",
                 code="open_vote",
             )
 
-        # A closed meeting is frozen: title, date, time and protokollant stay
-        # immutable, because the protocol refers to this planning data.
         if meeting.status == "closed" and wants_manage:
             raise ConflictError("the session is closed — its settings can no longer be changed")
 
         before = _snapshot(meeting)
         now = datetime.now(UTC)
         if status_change and payload.status == "live":
-            # The open window: at the earliest ``open_lead_minutes`` before the planned
-            # start, and an early open needs ``confirmEarly``. The window reads the
-            # stored planning, before this patch changes it, so a date change in the
-            # same patch cannot move the window.
             window = (await self._open_windows([meeting]))[meeting.id]
             check_open(window, now=now, confirmed=payload.confirm_early)
         guest_events = (
             await self._apply_public(meeting, payload, principal, now) if wants_public else None
         )
-        # planned to live: the router creates the protocol at meeting start, after this
-        # commit, and nobody takes minutes or votes before that. ``meeting.status`` is
-        # set only AFTER the protokollant check, which keeps the change atomic: no
-        # ``live`` without a protokollant, not even in memory on a rejected patch.
         going_live = status_change and payload.status == "live"
-        # A handover writes its own audit entry (``protokollant_handover``), so the
-        # ``meeting_update`` entry leaves the protokollant out then.
         handed_over = False
         if payload.active_application_id is not None:
             meeting.active_application_id = payload.active_application_id
         if wants_now:
             old_item = meeting.current_agenda_item_id
             meeting.current_agenda_item_id = payload.current_agenda_item_id
-            # Z3: a forward move starts the planned handover in this transaction.
             if meeting.status == "live" and await self.activate_planned(
                 meeting, old_item, payload.current_agenda_item_id, principal.sub, now
             ):
@@ -286,9 +292,6 @@ class LifecycleOps(HandoverOps):
             meeting.start_time = payload.start_time
         if "end_time" in payload.model_fields_set:
             meeting.end_time = payload.end_time
-        # The end time must be after the start time. The schema checks this only on
-        # create. The service checks it only on a patch that touches a time, so a
-        # pure status or protokollant patch never fails here.
         if (
             ("start_time" in payload.model_fields_set or "end_time" in payload.model_fields_set)
             and meeting.start_time is not None
@@ -296,19 +299,13 @@ class LifecycleOps(HandoverOps):
             and meeting.end_time <= meeting.start_time
         ):
             raise BadRequestError("endTime must be after startTime")
-        # The same protokollant again is a no-op, so the settings dialog can send the
-        # value with every save. It skips the O20 check of a new assignment too.
         if (
             "protokollant_id" in payload.model_fields_set
             and payload.protokollant_id != meeting.protokollant_id
         ):
-            # After the finalization the protokollant is part of the signed
-            # document, so the assignment is locked.
             if await self._protocol_final(meeting.id):
                 raise ConflictError("protocol is finalized — the protokollant can no longer change")
             if meeting.status == "live":
-                # Z3: a new protokollant of a live meeting is a handover ``now``. A
-                # live meeting always keeps a protokollant.
                 if payload.protokollant_id is None:
                     raise ConflictError(
                         "a live meeting needs a protokollant — hand the minutes over instead"
@@ -328,33 +325,21 @@ class LifecycleOps(HandoverOps):
                 meeting.protokollant_id = await self._resolve_protokollant(
                     meeting.gremium_id, payload.protokollant_id
                 )
-        # A meeting needs a protokollant before it goes live. The protokollant
-        # writes the protocol that the start creates.
         if going_live and meeting.protokollant_id is None:
             raise ConflictError("assign a protokollant before starting the meeting")
         cancelled: list[Vote] = []
         if going_live and meeting.started_at is None:
-            # Z7: the real start, set once. The protocol header and the UI read it.
             meeting.started_at = now
         if going_live:
-            # Z3: the first period of the protokollant starts with the meeting.
             await self.open_first_period(meeting, principal.sub, now)
         if closing:
-            # Z3: the close ends the running period and drops the planned one.
             await self.close_periods(meeting, now)
-            # Set the close timestamp once, on the transition to ``closed``. It
-            # fills the "end" line of the protocol title page.
             meeting.closed_at = now
-            # A draft of a closed meeting can never open (O12). Local import: the
-            # voting service imports the flow engine, which reaches back into this
-            # module.
             from app.modules.voting.service import VotingService
 
             cancelled = await VotingService(self.session).cancel_drafts_for_meeting(
                 meeting.id, now=now, actor=principal.sub
             )
-            # #17: the requests that never got admitted go, the guest names and every
-            # guest token too.
             closed_events = await GuestService(self.session).purge_on_close(meeting)
             if guest_events is not None:
                 closed_events.updated[:0] = guest_events.updated
@@ -393,7 +378,7 @@ class LifecycleOps(HandoverOps):
     async def _apply_public(
         self, meeting: Meeting, payload: MeetingPatch, principal: Principal, now: datetime
     ) -> GuestEvents | None:
-        """Apply ``publicJoin`` and ``guestsMode`` of a patch (#17), without a commit.
+        """Apply ``publicJoin`` and ``guestsMode`` of a patch, without a commit.
 
         Switching ``guestsMode`` from ``vote`` to ``watch`` is blocked while a vote with
         guests is open: the guests would lose the ballot in the middle of the vote.
@@ -442,7 +427,7 @@ class LifecycleOps(HandoverOps):
         return events
 
     async def _assert_public_join_allowed(self, gremium_id: UUID) -> None:
-        """Allow public participation only in a gremium without a quorum (#17 ruling).
+        """Allow public participation only in a gremium without a quorum.
 
         A gremium with a quorum (StuPa, AStA) decides by the members only; the feature
         serves the gremien without a quorum (Fachschaften).
@@ -467,7 +452,7 @@ class LifecycleOps(HandoverOps):
         return percent is not None
 
     async def _guest_vote_open(self, meeting_id: UUID) -> bool:
-        """Tell if the meeting has an open vote with guests (#17)."""
+        """Tell if the meeting has an open vote with guests."""
         found = await self.session.scalar(
             select(Vote.id)
             .where(
@@ -497,13 +482,15 @@ class LifecycleOps(HandoverOps):
 
         The method runs after the commit. A broker fault must not fail the committed
         change, so the method only logs it.
+
+        A failed broadcast does not fail the close, because the broadcast is best effort.
         """
         if self.publisher is None:
             return
         for event in events:
             try:
                 await self.publisher.vote_cancelled(event)
-            except Exception:  # noqa: BLE001 - the broadcast is best effort
+            except Exception:
                 logger.warning("vote_cancelled broadcast failed (vote=%s)", event.id)
 
     async def broadcast_state(self, meeting_id: UUID, principal: Principal) -> None:
@@ -519,9 +506,11 @@ class LifecycleOps(HandoverOps):
             await self.publisher.meeting_state(out)
 
     async def _protocol_final(self, meeting_id: UUID) -> bool:
-        """Report whether the protocol of the meeting is final."""
-        # Local import: ``protocol`` depends on ``livevote``. A module-level import
-        # would cycle.
+        """Report whether the protocol of the meeting is final.
+
+        The protocol model is imported locally, because ``protocol`` depends on ``livevote``
+        and a module-level import would cycle.
+        """
         from app.modules.protocol.models import Protocol
 
         status = await self.session.scalar(
@@ -537,14 +526,15 @@ class LifecycleOps(HandoverOps):
         do, and then applies the rules of ``delete_locked``. The service audits
         every delete.
 
+        The row lock serializes the delete with the vote open and the close. Without it, a
+        vote could open between the check and the delete.
+
         Raises:
             ForbiddenError: The caller does not manage the meeting, or the protocol
                 is final and the caller does not hold ``meeting.delete_finalized``
                 (``meeting_finalized``).
             ConflictError: The meeting still has an open vote (``open_vote``).
         """
-        # The lock serializes the delete with the vote open and the close. Without
-        # it, a vote could open between the check below and the delete.
         meeting = await self._get(meeting_id, for_update=True)
         if not await self.can_manage(meeting.gremium_id, principal):
             raise ForbiddenError("not allowed to delete this meeting")
@@ -564,14 +554,15 @@ class LifecycleOps(HandoverOps):
         (``write_delete``). An application that such a vote decided keeps its
         status; its timeline shows the vote as deleted.
 
+        The voting service is imported locally, because it imports the flow engine, which
+        reaches back into this module.
+
         Raises:
             ForbiddenError: The protocol is final and the caller does not hold
                 ``meeting.delete_finalized`` (``meeting_finalized``).
             ConflictError: The meeting still has an open vote (``open_vote``).
         """
         finalized = await self.check_deletable(meeting, principal)
-        # Local import: the voting service imports the flow engine, which reaches
-        # back into this module.
         from app.modules.voting.service import VotingService
 
         deleted_votes = await VotingService(self.session).delete_for_meeting(
@@ -590,6 +581,10 @@ class LifecycleOps(HandoverOps):
         first. The Gremium delete runs this check for all its meetings before its
         first write.
 
+        An open vote of a deleted meeting would stay open without its meeting scope, and the
+        interim counts, the present count and the delegation checks all depend on that
+        scope.
+
         Returns:
             True when the protocol of the meeting is final.
 
@@ -605,9 +600,6 @@ class LifecycleOps(HandoverOps):
                 "the meeting.delete_finalized permission",
                 code="meeting_finalized",
             )
-        # An open vote of a deleted meeting would stay open without its meeting
-        # scope: interim counts, present count and delegation checks all depend on
-        # it.
         if await self.open_vote(meeting.id) is not None:
             raise ConflictError(
                 "a vote of this meeting is still open — close or cancel it first",
@@ -630,6 +622,9 @@ class LifecycleOps(HandoverOps):
         never a choice or a name, and ``reason`` when another delete caused this
         one (``gremium_deleted``). The cascade then removes the protocol, the
         agenda, the attendance, the guests and the delegations.
+
+        The session flushes at once, because a Gremium delete that follows must not cascade
+        over a meeting row that the session still has to delete.
         """
         data: dict[str, Any] = {
             "title": meeting.title,
@@ -649,6 +644,4 @@ class LifecycleOps(HandoverOps):
             data=data,
         )
         await self.session.delete(meeting)
-        # Flush now: a Gremium delete that follows must not cascade over a meeting
-        # row that the session still has to delete.
         await self.session.flush()

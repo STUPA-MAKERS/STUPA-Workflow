@@ -1,4 +1,4 @@
-"""O12 and O25 under concurrency: the meeting row serializes close, open and remove.
+"""Under concurrency, the meeting row serializes close, open and remove.
 
 The meeting close, the vote open and the agenda-item remove all lock the meeting row
 first. The tests hold that lock in one session and start the other operation in a
@@ -8,6 +8,8 @@ must see the new state:
 * A vote open that waits on a close refuses the closed meeting (409 ``meeting_closed``).
 * A close that waits on a vote open sees the open vote (409 ``open_vote``).
 * A remove that waits on a vote open sees the open vote (409 ``agenda_item_has_vote``).
+
+The settle time is long enough for the second session to reach the row lock and block on it.
 """
 
 from __future__ import annotations
@@ -34,7 +36,6 @@ from tests.integration.modules.livevote.conftest import ADMIN_SUB, admin, seed
 
 pytestmark = pytest.mark.integration
 
-# Long enough for the second session to reach the row lock and block on it.
 _SETTLE = 0.5
 
 
@@ -78,12 +79,13 @@ async def test_open_waits_for_a_close_and_refuses_the_closed_meeting(
 async def test_close_waits_for_an_open_and_sees_the_open_vote(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
+    """Make the close wait for an open and see the open vote.
+
+    The open takes the meeting lock first and holds it until its commit.
+    """
     s = await seed(maker, status="live", votes=("draft",), protocol="draft")
     async with maker() as opener, maker() as closer:
-        # The open takes the meeting lock first and holds it until its commit.
-        await opener.scalar(
-            select(Meeting.id).where(Meeting.id == s.meeting_id).with_for_update()
-        )
+        await opener.scalar(select(Meeting.id).where(Meeting.id == s.meeting_id).with_for_update())
         vote = await opener.get(Vote, s.vote_ids["draft"])
         assert vote is not None
         task = _spawn(
@@ -108,9 +110,7 @@ async def test_remove_waits_for_an_open_and_keeps_the_item(
 ) -> None:
     s = await seed(maker, status="live", votes=("draft",))
     async with maker() as opener, maker() as remover:
-        await opener.scalar(
-            select(Meeting.id).where(Meeting.id == s.meeting_id).with_for_update()
-        )
+        await opener.scalar(select(Meeting.id).where(Meeting.id == s.meeting_id).with_for_update())
         vote = await opener.get(Vote, s.vote_ids["draft"])
         assert vote is not None
         task = _spawn(
@@ -133,9 +133,7 @@ async def test_open_refuses_a_planned_meeting(
     s = await seed(maker, status="planned", votes=("draft",))
     async with maker() as session:
         with pytest.raises(ConflictError) as ei:
-            await VotingService(session).open(
-                s.vote_ids["draft"], now=datetime.now(UTC), actor="x"
-            )
+            await VotingService(session).open(s.vote_ids["draft"], now=datetime.now(UTC), actor="x")
     assert ei.value.code == "meeting_not_started"
 
 

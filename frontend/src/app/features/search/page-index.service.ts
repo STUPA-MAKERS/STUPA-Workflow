@@ -39,24 +39,19 @@ export class PageIndexService {
   /**
    * Add the pages of `list` below `prefix`. A route with children is a frame (the admin
    * frame, the applications list): its children are pages too, at the full path.
+   *
+   * A parameterised route (`:id`) is a record view, which the record half of the search already
+   * covers. A `contextual` route is left out, because it only means something after an action
+   * carried the reader there: /status without an id renders "Antrag nicht gefunden".
    */
   private collect(list: Routes, prefix: string, out: PageEntry[]): void {
     for (const route of list) {
       const path = [prefix, route.path ?? ''].filter(Boolean).join('/');
       const data = route.data;
-      // A frame adds its children. The frame gate is the session; each child keeps its
-      // own permission.
       if (route.children) this.collect(route.children, path, out);
-      // A page needs a static path and a title. A parameterised route (`:id`) is a
-      // record view, which the record half of the search already covers.
       if (!path || path.includes(':') || !data?.['title']) continue;
-      // A `contextual` route only means something after an action carried the reader
-      // there. Offering it is offering a dead end: /status without an id renders
-      // "Antrag nicht gefunden", and /apply/confirmation congratulates the reader on a
-      // submission that never happened.
       if (data['contextual'] === true) continue;
       if (!this.allowed(data)) continue;
-      // A frame and its empty-path child name the same page once.
       if (out.some((e) => e.path === `/${path}`)) continue;
       const parent = (data['parent'] as string[] | undefined)?.[0];
       out.push({

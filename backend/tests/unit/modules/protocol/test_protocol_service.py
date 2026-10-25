@@ -1,4 +1,4 @@
-"""Unit tests for ProtocolService (T-22): lifecycle, vote embedding and finalize.
+"""Unit tests for ProtocolService: lifecycle, vote embedding and finalize.
 
 The suite runs without a database, typst, MinIO or Redis. `session.get` reads from a
 store and `execute` reads from an ordered result queue, which gives the branch
@@ -122,10 +122,14 @@ def test_insert_values_without_gremium_has_null_variant() -> None:
 
 
 async def test_get_or_create_new_reselects_after_insert() -> None:
+    """A new protocol is inserted and selected again.
+
+    The execute order is ``_by_meeting`` (empty), the ignored ``pg_insert``, then
+    ``_by_meeting`` with the new row.
+    """
     created = _protocol(markdown="", status="draft")
     session = FakeSession(
         store={MID: _real_meeting(), GID: _real_gremium()},
-        # execute order: _by_meeting is empty, pg_insert is ignored, _by_meeting is new
         results=[result(), result(), result(created)],
     )
     out = await _service(session).get_or_create(MID, author="p1")
@@ -135,11 +139,12 @@ async def test_get_or_create_new_reselects_after_insert() -> None:
 
 
 async def test_get_or_create_returns_existing_idempotent() -> None:
+    """An existing protocol is a pure read, with no insert and no commit."""
     existing = _protocol(markdown="# schon da")
     session = FakeSession(results=[result(existing)])
     out = await _service(session).get_or_create(MID)
     assert out.markdown == "# schon da"
-    assert session.committed == 0  # a pure read, no insert and no commit
+    assert session.committed == 0
 
 
 async def test_get_or_create_concurrent_insert_reselects_winner() -> None:
@@ -175,10 +180,13 @@ async def test_get_or_create_unknown_meeting_404() -> None:
 
 
 async def test_get_or_create_vanished_after_insert_404() -> None:
-    """Defensive: a row that vanishes before the re-select gives 404, not a None deref."""
+    """Defensive: a row that vanishes before the re-select gives 404, not a None deref.
+
+    The fake session serves no existing row, the insert, and an empty re-select.
+    """
     session = FakeSession(
         store={MID: _real_meeting(), GID: _real_gremium()},
-        results=[result(), result(), result()],  # nothing existing, insert, empty re-select
+        results=[result(), result(), result()],
     )
     with pytest.raises(NotFoundError):
         await _service(session).get_or_create(MID)
@@ -198,52 +206,62 @@ async def test_update_markdown_final_conflict() -> None:
 
 
 async def test_update_markdown_unknown_protocol_404() -> None:
-    session = FakeSession(results=[result()])  # _get finds nothing
+    """An unknown protocol gives 404."""
+    session = FakeSession(results=[result()])
     with pytest.raises(NotFoundError):
         await _service(session).update_markdown(PID, "# Neu")
 
 
 async def test_embed_votes_appends_snippet_and_ref() -> None:
+    """An embedded vote appends a snippet and writes the reference.
+
+    The snippet has no "Ergebnis" line, because the tally box carries the result. The
+    fake session serves ``_get``, no existing refs, the inserted ref id,
+    ``VotingService._get_vote`` and the ballots for ``VotingService._aggregate``.
+    """
     proto = _protocol(markdown="# TOP 1")
     session = FakeSession(
         store={VID: _vote()},
         results=[
-            result(proto),  # _get
-            result(),  # existing refs (none)
-            result(uuid4()),  # pg_insert ProtocolVoteRef returns the inserted id
-            result(_vote()),  # VotingService._get_vote
-            result("yes", "yes", "no"),  # VotingService._aggregate
+            result(proto),
+            result(),
+            result(uuid4()),
+            result(_vote()),
+            result("yes", "yes", "no"),
         ],
     )
     out = await _service(session).embed_votes(PID, [VID])
     assert "> [!abstimmung]" in out.markdown
-    assert "Ergebnis" not in out.markdown  # dropped: the tally box carries the result
+    assert "Ergebnis" not in out.markdown
     assert "yes: 2, no: 1" in out.markdown
     assert session.committed == 1
 
 
 async def test_embed_votes_idempotent_skips_referenced() -> None:
+    """A vote that is already referenced leaves the Markdown unchanged."""
     proto = _protocol(markdown="# TOP 1")
-    session = FakeSession(
-        results=[result(proto), result(VID)]  # VID is already referenced (pre-query)
-    )
+    session = FakeSession(results=[result(proto), result(VID)])
     out = await _service(session).embed_votes(PID, [VID])
-    assert out.markdown == "# TOP 1"  # unchanged
+    assert out.markdown == "# TOP 1"
 
 
 async def test_embed_votes_concurrent_ref_skips_snippet() -> None:
-    """A parallel insert wins: ON CONFLICT returns nothing, so no snippet doubles."""
+    """A parallel insert wins: ON CONFLICT returns nothing, so no snippet doubles.
+
+    The insert returns nothing, because a parallel insert won the conflict, so the
+    Markdown stays unchanged.
+    """
     proto = _protocol(markdown="# TOP 1")
     session = FakeSession(
         store={VID: _vote()},
         results=[
-            result(proto),  # _get
-            result(),  # existing refs (none, pre-query)
-            result(),  # pg_insert returns nothing: a parallel insert won the conflict
+            result(proto),
+            result(),
+            result(),
         ],
     )
     out = await _service(session).embed_votes(PID, [VID])
-    assert out.markdown == "# TOP 1"  # unchanged
+    assert out.markdown == "# TOP 1"
 
 
 async def test_embed_votes_unknown_vote_404() -> None:
@@ -259,14 +277,20 @@ async def test_embed_votes_on_final_conflict() -> None:
 
 
 async def test_finalize_renders_stores_and_mails() -> None:
+    """The finalization renders, stores and mails the protocol.
+
+    The fake session serves the empty agenda, the members (the base of the union) and an
+    empty mail list. The PDF travels as an attachment, because a link to the API needs a
+    login and a meeting right, which the recipients do not have. The mail links the
+    meeting page, which holds the protocol, and names no public version for a Gremium
+    that does not publish its protocols.
+    """
     proto = _protocol()
     storage = FakeStorage()
     typst = FakeTypst(pdf=b"%PDF-1.4 ok")
     mail = FakeMailQueue()
     session = FakeSession(
         store={MID: _meeting(), GID: _gremium("stupa")},
-        # The first empty result is the empty agenda. Then come the members, which are
-        # the base of the union, and an empty mail list.
         results=[result(proto), result(), result("a@x.de", "b@x.de"), result()],
     )
     out = await _service(
@@ -281,12 +305,8 @@ async def test_finalize_renders_stores_and_mails() -> None:
     assert out.pdf_url is not None
     assert len(mail.sent) == 1
     assert mail.sent[0].to == ("a@x.de", "b@x.de")
-    # The PDF travels as an attachment. The earlier link needed a
-    # login plus a meeting right and was worthless for the recipients.
     assert [a.filename for a in mail.sent[0].attachments] == ["protokoll.pdf"]
     assert mail.sent[0].attachments[0].content.startswith(b"%PDF")
-    # The mail links the meeting page, which holds the protocol, and names no public
-    # version for a Gremium that does not publish its protocols.
     assert f"Protokoll öffnen: {SETTINGS_BASE}/meetings/{MID}" in mail.sent[0].text
     assert f'href="{SETTINGS_BASE}/meetings/{MID}"' in (mail.sent[0].html or "")
     assert "/protokolle/" not in mail.sent[0].text
@@ -306,7 +326,7 @@ async def test_protocol_mail_links_the_public_version_when_public() -> None:
         store={MID: _meeting(), GID: gremium},
         results=[result("a@x.de"), result()],
     )
-    await _service(session, mail_queue=mail)._send(proto, None)  # noqa: SLF001
+    await _service(session, mail_queue=mail)._send(proto, None)
 
     assert len(mail.sent) == 1
     text = mail.sent[0].text
@@ -324,7 +344,7 @@ async def test_protocol_mail_hides_a_withheld_public_version() -> None:
         store={MID: _meeting(), GID: gremium},
         results=[result("a@x.de"), result()],
     )
-    await _service(session, mail_queue=mail)._send(proto, None)  # noqa: SLF001
+    await _service(session, mail_queue=mail)._send(proto, None)
 
     assert "/protokolle/" not in mail.sent[0].text
 
@@ -348,11 +368,13 @@ async def test_the_design_never_decides_the_document_shape() -> None:
 
 
 async def test_finalize_uploads_and_mails_only_after_commit() -> None:
-    """#pre-commit-side-effects: the storage put and the mail enqueue run after the commit.
+    """The storage put and the mail enqueue run after the commit.
 
     The fakes count the commit and record the put and the enqueue only after it. The
     test checks the committed end state. The PDF is in the storage, the mail is queued
     and the commit ran.
+
+    Exactly one put (single render) and one mail run, both on the post-commit path.
     """
     proto = _protocol()
     storage = FakeStorage()
@@ -366,7 +388,6 @@ async def test_finalize_uploads_and_mails_only_after_commit() -> None:
         session, storage=storage, typst=typst, mail_queue=mail
     ).finalize(PID, now=NOW)
     assert session.committed == 1
-    # Exactly one put (single render) and one mail, both from the post-commit path.
     assert [p[0] for p in storage.puts] == [protocol_storage_key(PID)]
     assert len(mail.sent) == 1
 
@@ -375,6 +396,8 @@ async def test_finalize_storage_error_after_commit_raises_503() -> None:
     """A transient failure of the post-commit storage `put` gives a 503.
 
     The protocol is already committed as `final`, so a retry is an idempotent no-op.
+
+    The commit ran before the storage put.
     """
 
     class _BoomStorage(FakeStorage):
@@ -392,11 +415,12 @@ async def test_finalize_storage_error_after_commit_raises_503() -> None:
         await _service(
             session, storage=_BoomStorage(), typst=FakeTypst()
         ).finalize(PID, now=NOW)
-    assert session.committed == 1  # the commit ran before the storage put
+    assert session.committed == 1
     assert proto.status == "final"
 
 
 async def test_finalize_without_storage_degrades_but_mails() -> None:
+    """Without storage the render is skipped, and the mail goes out without a PDF."""
     proto = _protocol()
     typst = FakeTypst()
     mail = FakeMailQueue()
@@ -410,11 +434,12 @@ async def test_finalize_without_storage_degrades_but_mails() -> None:
     assert out.status == "final"
     assert out.pdf_url is None
     assert proto.pdf_storage_key is None
-    assert typst.calls == []  # render skipped, no storage
-    assert len(mail.sent) == 1 and mail.sent[0].attachments == ()  # no PDF, no storage
+    assert typst.calls == []
+    assert len(mail.sent) == 1 and mail.sent[0].attachments == ()
 
 
 async def test_finalize_idempotent_when_already_final() -> None:
+    """A final protocol comes back with a URL freshly signed from the existing key."""
     proto = _protocol(status="final", pdf_storage_key="pdf/protocol/x.pdf")
     storage = FakeStorage()
     typst = FakeTypst()
@@ -424,11 +449,12 @@ async def test_finalize_idempotent_when_already_final() -> None:
         session, storage=storage, typst=typst, mail_queue=mail
     ).finalize(PID, now=NOW)
     assert out.status == "final"
-    assert out.pdf_url is not None  # freshly signed from the existing key
+    assert out.pdf_url is not None
     assert storage.puts == [] and typst.calls == [] and mail.sent == []
 
 
 async def test_finalize_render_error_raises_503() -> None:
+    """A render error gives 503, and the draft stays."""
     proto = _protocol()
     typst = FakeTypst(error=TypstError("boom", retryable=True))
     session = FakeSession(
@@ -438,15 +464,16 @@ async def test_finalize_render_error_raises_503() -> None:
         await _service(session, storage=FakeStorage(), typst=typst).finalize(
             PID, now=NOW
         )
-    assert proto.status == "draft"  # the draft stays
+    assert proto.status == "draft"
 
 
 async def test_finalize_no_recipients_skips_mail() -> None:
+    """An empty mail list sends no mail."""
     proto = _protocol()
     mail = FakeMailQueue()
     session = FakeSession(
         store={MID: _meeting(), GID: _gremium()},
-        results=[result(proto), result()],  # empty mail list
+        results=[result(proto), result()],
     )
     out = await _service(
         session, storage=FakeStorage(), typst=FakeTypst(), mail_queue=mail
@@ -458,17 +485,20 @@ async def test_finalize_no_recipients_skips_mail() -> None:
 async def test_finalize_members_receive_even_without_maillist() -> None:
     """An empty mail_list still sends to the active Gremium members.
 
-    #protocol-recipients: the members are always the base of the recipient union.
+    The members are always the base of the recipient union.
+
+    The fake session serves ``_get``, no agenda items, two members and an empty mail
+    list.
     """
     proto = _protocol()
     mail = FakeMailQueue()
     session = FakeSession(
         store={MID: _meeting(), GID: _gremium()},
         results=[
-            result(proto),  # _get
-            result(),  # _assemble_from_agenda (no agenda items)
-            result("a@x.de", "b@x.de"),  # members (scalars)
-            result(),  # _recipients: empty mail list
+            result(proto),
+            result(),
+            result("a@x.de", "b@x.de"),
+            result(),
         ],
     )
     out = await _service(
@@ -543,6 +573,7 @@ def _closed_meeting(status: str = "closed") -> SimpleNamespace:
 async def test_start_finalize_marks_rendering_and_audits(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """The start sets ``rendering``, audits, and commits before the enqueue."""
     calls: list[dict[str, Any]] = []
 
     async def _record(_session: Any, **kw: Any) -> None:
@@ -553,7 +584,7 @@ async def test_start_finalize_marks_rendering_and_audits(
     session = FakeSession(store={MID: _closed_meeting()}, results=[result(proto)])
     out = await _service(session).start_finalize(PID, actor="lead")
     assert out.status == "rendering" and proto.status == "rendering"
-    assert session.committed == 1  # the status flip commits before the enqueue
+    assert session.committed == 1
     [entry] = calls
     assert entry["action"].value == "protocol_finalize"
     assert entry["actor"] == "lead"
@@ -567,7 +598,7 @@ async def test_start_finalize_marks_rendering_and_audits(
 
 @pytest.mark.parametrize("status", ["planned", "live"])
 async def test_start_finalize_needs_a_closed_meeting(status: str) -> None:
-    """F8, O13: no finalization while the meeting runs."""
+    """No finalization while the meeting runs."""
     proto = _protocol()
     session = FakeSession(store={MID: _closed_meeting(status)}, results=[result(proto)])
     with pytest.raises(ConflictError) as ei:
@@ -579,13 +610,16 @@ async def test_start_finalize_needs_a_closed_meeting(status: str) -> None:
 
 @pytest.mark.parametrize("status", ["rendering", "final"])
 async def test_start_finalize_only_once(status: str) -> None:
-    """O2: one finalization, also with several keepers."""
+    """One finalization, also with several keepers.
+
+    There is no double enqueue and no write.
+    """
     proto = _protocol(status=status)
     session = FakeSession(store={MID: _closed_meeting()}, results=[result(proto)])
     with pytest.raises(ConflictError) as ei:
         await _service(session).start_finalize(PID, actor="lead")
     assert ei.value.code == "protocol_not_draft"
-    assert session.committed == 0  # no double enqueue and no write
+    assert session.committed == 0
 
 
 async def test_revert_to_draft_resets_rendering() -> None:
@@ -631,19 +665,22 @@ async def test_finalize_from_rendering_completes() -> None:
 
 
 async def test_finalize_recipients_union_members_plus_maillist() -> None:
-    """#protocol-recipients: an extra mail list extends the member list.
+    """An extra mail list extends the member list.
 
     The result is a deduplicated union. The extra list never replaces the members.
+
+    The fake session serves ``_get``, no agenda items, the active members and an extra
+    mail list that repeats a member address.
     """
     proto = _protocol()
     mail = FakeMailQueue()
     session = FakeSession(
         store={MID: _meeting(), GID: _gremium()},
         results=[
-            result(proto),  # _get
-            result(),  # _assemble_from_agenda (no agenda items)
-            result("member@x.de"),  # active members
-            result(["extra@y.de", "member@x.de"]),  # extra mail list, with a duplicate
+            result(proto),
+            result(),
+            result("member@x.de"),
+            result(["extra@y.de", "member@x.de"]),
         ],
     )
     await _service(
@@ -666,9 +703,6 @@ async def test_get_by_meeting_404_without_protocol() -> None:
     session = FakeSession(results=[result()])
     with pytest.raises(NotFoundError):
         await _service(session).get_by_meeting(MID)
-
-
-# delete_protocol: draft only. A finalized protocol is a signed record.
 
 
 async def test_delete_protocol_draft_ok() -> None:

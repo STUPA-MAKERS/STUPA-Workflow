@@ -31,7 +31,7 @@ import { dayMonth } from '@shared/date-format';
 import { formatMoney } from '@shared/format-money';
 
 /**
- * The bulk actions of the selected bookings (board Fin-Buchungen-Auswahl). Side by side
+ * The bulk actions of the selected bookings. Side by side
  * the panel replaces the detail sheet: "n Buchungen ausgewählt", "Umbuchen" (cost centre
  * and category, "unverändert lassen" when empty), the selected rows with their sum, the
  * export and the delete (at most five).
@@ -104,11 +104,6 @@ export class BulkPanelComponent {
     this.rows().filter((r) => !!r.applicationId || !!r.parentExpenseId),
   );
 
-  protected readonly pickedCostCentre = computed(() => {
-    const id = this.budgetId();
-    return id ? costCentreLabel(this.costCentres(), id, null) : null;
-  });
-
   protected readonly canReassign = computed(
     () => !!this.budgetId() || !!this.category().trim(),
   );
@@ -125,9 +120,8 @@ export class BulkPanelComponent {
     return signedEur(e.kind, e.amount, this.i18n.formatLocale());
   }
 
+  /** Only the date part counts, because a `createdAt` keeps the day the server wrote. */
   day(iso: string | null): string {
-    // Only the date part counts (a `createdAt` keeps the day the server wrote), as in the
-    // month groups.
     return dayMonth(iso?.slice(0, 10), this.i18n.formatLocale());
   }
 

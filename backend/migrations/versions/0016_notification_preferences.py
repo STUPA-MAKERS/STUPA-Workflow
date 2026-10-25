@@ -1,4 +1,4 @@
-"""Per-user notification switches (#4-2).
+"""Per-user notification switches.
 
 Every notification kind is active by default. `notification_preference` stores
 the exceptions only. A row with `enabled=false` for a principal and a kind turns
@@ -34,10 +34,12 @@ _DOWNGRADE: tuple[str, ...] = (
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     for stmt in _UPGRADE:
         op.execute(stmt)
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     for stmt in _DOWNGRADE:
         op.execute(stmt)

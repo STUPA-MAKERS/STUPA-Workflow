@@ -4,6 +4,9 @@ These models shape the requests and the responses for application CRUD, the
 timeline, the version history, the list and the comments. The API emits the PII
 in ``ApplicationOut.applicant`` only to an authorized principal or to the
 applicant.
+
+``ApplicationOut`` names ``CaptureOut``, which this module defines later, so the module
+rebuilds the model at the end.
 """
 
 from __future__ import annotations
@@ -41,25 +44,29 @@ class ApplicationCreate(_CamelModel):
     empty ``applicantEmail`` or ``applicantName`` from the account. The router
     enforces the fields that an anonymous submission requires.
 
-    ``attachmentIds`` and ``draftToken`` bind the draft uploads of the wizard
-    (Z4). With them, every reference in a ``file`` field must be one of
+    ``attachmentIds`` and ``draftToken`` bind the draft uploads of the wizard.
+    With them, every reference in a ``file`` field must be one of
     ``attachmentIds``.
+
+    Attributes:
+        applicant_email: Optional in the schema, because the account supplies it for a
+            logged-in user. For an anonymous submission the router enforces it and
+            answers 422.
+        applicant_name: Display name, capped against DoS.
+        altcha: The schema validates the structure and answers 422 for a malformed
+            value. ``require_altcha`` runs the cryptographic verification.
+        attachment_ids: Draft uploads of the wizard. The create binds these drafts of
+            the token in its own transaction. A list without a token answers 422. Both
+            stay optional, because the upload after the create
+            (``POST /applications/{id}/attachments``) still works.
     """
 
     type_id: UUID = Field(alias="typeId")
     data: dict[str, Any]
-    # Optional in the schema, because the account supplies it for a logged-in
-    # user. For an anonymous submission the router enforces it and answers 422.
     applicant_email: EmailStr | None = Field(default=None, alias="applicantEmail")
-    # Anti-DoS cap on the stored free text of the display name.
     applicant_name: str | None = Field(default=None, alias="applicantName", max_length=256)
     lang: Lang = DEFAULT_LANG
-    # The schema validates the structure and answers 422 for a malformed value.
-    # `require_altcha` runs the cryptographic verification.
     altcha: AltchaSolutionStr | None = None
-    # Draft uploads of the wizard (Z4). The create binds these drafts of the token in
-    # its own transaction. A list without a token answers 422. Both stay optional:
-    # the upload after the create (`POST /applications/{id}/attachments`) still works.
     attachment_ids: list[UUID] = Field(
         default_factory=list, alias="attachmentIds", max_length=100
     )
@@ -69,7 +76,7 @@ class ApplicationCreate(_CamelModel):
 
 
 class OnBehalfCreate(_CamelModel):
-    """Capture an application on behalf of an applicant (#11).
+    """Capture an application on behalf of an applicant.
 
     The applicant is EITHER an existing account (``applicantPrincipalId``) OR a guest
     with ``applicantName`` and ``applicantEmail``. The schema rejects a mix and a
@@ -130,12 +137,18 @@ class ApplicationCreated(_CamelModel):
 
 
 class StateOut(_CamelModel):
+    """A flow state as the application shows it.
+
+    Attributes:
+        kind: State kind. The frontend shows approve and reject actions for
+            ``approval``.
+    """
+
     id: UUID
     key: str
     label: I18nMap
     color: str | None = None
     edit_allowed: bool = Field(alias="editAllowed")
-    # State kind. The frontend shows approve and reject actions for ``approval``.
     kind: str = "normal"
 
 
@@ -148,11 +161,36 @@ class ApplicantOut(_CamelModel):
 
 
 class ApplicationOut(_CamelModel):
+    """One application with its current state and the view flags of the requester.
+
+    Attributes:
+        vote_gremium_id: The Gremium that decides the current vote state (snapshot),
+            else null.
+        can_edit: The requester may edit or delete: a manager or the creator.
+        is_owner: The requester is the creator, that is the applicant. This gates the
+            anonymization request (GDPR Art. 17), because only the data subject may
+            ask, never the administration.
+        archived_at: When it was archived, or null. The client shows the badge from
+            it. Archiving is NOT anonymization: the record is complete and readable,
+            it has only left the working list.
+        state_since: Time of the last status change: the newest status event, else the
+            creation time. The status page shows "since" from it.
+        hidden_keys: The ``isPII`` field keys that the server removed from ``data`` for
+            this reader. Empty for a reader with the PII right. The edit form leaves
+            out these fields, because a patch keeps their stored values, and a missing
+            key in ``data`` alone does not tell "removed" from "never answered".
+        capture: Set when a person captured the application on behalf of the
+            applicant.
+        approved_amount: The approved amount of the valid decision, null = as
+            requested.
+        decision: The valid decision (approval with deviations), null before any
+            decision.
+    """
+
     id: UUID
     type_id: UUID = Field(alias="typeId")
     state: StateOut | None = None
     gremium_id: UUID | None = Field(default=None, alias="gremiumId")
-    # The Gremium that decides the current vote state (snapshot), else null.
     vote_gremium_id: UUID | None = Field(default=None, alias="voteGremiumId")
     budget_id: UUID | None = Field(default=None, alias="budgetId")
     fiscal_year_id: UUID | None = Field(default=None, alias="fiscalYearId")
@@ -164,34 +202,18 @@ class ApplicationOut(_CamelModel):
     created_at: datetime = Field(alias="createdAt")
     updated_at: datetime = Field(alias="updatedAt")
     applicant: ApplicantOut | None = None
-    # True when the requester may edit or delete: a manager or the creator.
     can_edit: bool = Field(default=False, alias="canEdit")
-    # True when the requester is the creator, that is the applicant. This gates
-    # the anonymization request (GDPR Art. 17). Only the data subject may ask,
-    # never the administration.
     is_owner: bool = Field(default=False, alias="isOwner")
-    # When it was archived, or null. The client shows the badge from this, so it needs
-    # the timestamp and not just a flag. Archiving is NOT anonymization: this record is
-    # complete and readable, it has only left the working list.
     archived_at: datetime | None = Field(default=None, alias="archivedAt")
-    # Time of the last status change (A9): the newest status event, else the creation
-    # time. The status page shows "since" from it.
     state_since: datetime | None = Field(default=None, alias="stateSince")
-    # The ``isPII`` field keys that the server removed from ``data`` for this reader
-    # (O21). Empty for a reader with the PII right. The edit form leaves out these
-    # fields, because a patch keeps their stored values. A missing key in ``data``
-    # alone does not tell "removed" from "never answered".
     hidden_keys: list[str] = Field(default_factory=list, alias="hiddenKeys")
-    # Set when a person captured the application on behalf of the applicant (#11).
     capture: CaptureOut | None = None
-    # F1: the approved amount of the valid decision, null = as requested.
     approved_amount: Decimal | None = Field(default=None, alias="approvedAmount")
-    # F1: the valid decision (approval with deviations), null before any decision.
     decision: DecisionOut | None = None
 
 
 class DecisionOut(_CamelModel):
-    """The valid decision on an application (F1, approval with deviations).
+    """The valid decision on an application (approval with deviations).
 
     ``approvedAmount`` null means "as requested". The applicant view gets the same
     block without ``voteId``. No view carries vote counts.
@@ -209,7 +231,7 @@ class DecisionOut(_CamelModel):
 
 
 class TimelineDecisionOut(_CamelModel):
-    """The decision that a status event carried (F1), for the history line."""
+    """The decision that a status event carried, for the history line."""
 
     requested_amount: Decimal | None = Field(default=None, alias="requestedAmount")
     approved_amount: Decimal | None = Field(default=None, alias="approvedAmount")
@@ -239,22 +261,24 @@ class ActorOut(_CamelModel):
       the account has no name. ``principalId`` is the id of the account, for the
       avatar (``GET /principals/{id}/avatar``).
     - ``applicant``: the applicant through the magic link. No name, because the
-      name is PII (O21).
+      name is PII.
     - ``system``: an automatic action. ``key`` names the source, for example
       ``deadlines`` for ``system:deadlines``. A plain ``system`` gives the key
       ``auto``.
     - ``gremium``: the applicant view shows the Gremium for each action of a
-      member (A12, O16). ``displayName`` holds the Gremium name, or null when the
+      member. ``displayName`` holds the Gremium name, or null when the
       application has no Gremium.
     - ``deleted``: the stored ``sub`` names no known account, or the account was
       anonymized. No name and no id.
+
+    Attributes:
+        principal_id: Only for ``principal``. The applicant view never holds a member
+            id, because it shows the Gremium instead of the member.
     """
 
     kind: ActorKind
     key: str | None = None
     display_name: str | None = Field(default=None, alias="displayName")
-    # Only for ``principal``. The applicant view never holds a member id, because it
-    # shows the Gremium instead of the member.
     principal_id: UUID | None = Field(default=None, alias="principalId")
 
     def legacy(self, raw: str) -> str | None:
@@ -272,10 +296,10 @@ class ActorOut(_CamelModel):
 
 
 class CaptureOut(_CamelModel):
-    """How an application captured on behalf of the applicant came in (#11).
+    """How an application captured on behalf of the applicant came in.
 
     ``capturedBy`` follows the actor rules of the timeline: the applicant view shows
-    the Gremium instead of the member (A12, O16).
+    the Gremium instead of the member.
     """
 
     captured_by: ActorOut | None = Field(default=None, alias="capturedBy")
@@ -288,30 +312,32 @@ class TimelineEventOut(_CamelModel):
     """One status change of the timeline.
 
     In the applicant view (magic link or creator), ``actor`` names the Gremium of the
-    application for every action that the applicant did not do (A12, O16).
+    application for every action that the applicant did not do.
+
+    Attributes:
+        transition_label: The i18n label of the fired transition. Null for the creation
+            event and for a revert, which fire no transition.
+        actor: The display string of the actor: a name, ``applicant`` or a
+            ``system:*`` key. Never a raw ``sub``. The frontend renders ``actorInfo``.
+        vote_id: The vote whose close fired this event. Null for every other event,
+            for a deleted vote, and in the applicant view (no vote access).
+        vote_deleted: A vote close fired this event (note ``vote:<result>``) and a
+            meeting delete deleted the vote with its meeting. The application keeps
+            the status that the vote decided.
+        decision: The decision that this status change carried (approved amount,
+            number of conditions), else null.
     """
 
     from_state_id: UUID | None = Field(default=None, alias="fromStateId")
     to_state_id: UUID = Field(alias="toStateId")
     to_state: StateOut | None = Field(default=None, alias="toState")
-    # The i18n label of the fired transition (A3). Null for the creation event and
-    # for a revert, which fire no transition.
     transition_label: I18nMap | None = Field(default=None, alias="transitionLabel")
-    # The display string of the actor: a name, ``applicant`` or a ``system:*`` key.
-    # Never a raw ``sub``. The frontend renders ``actorInfo``.
     actor: str | None = None
     actor_info: ActorOut | None = Field(default=None, alias="actorInfo")
     at: datetime
     note: str | None = None
-    # The vote whose close fired this event, for the link to the vote. Null for every
-    # other event, for a deleted vote, and in the applicant view (no vote access).
     vote_id: UUID | None = Field(default=None, alias="voteId")
-    # True when a vote close fired this event (note ``vote:<result>``) and the vote
-    # is gone: a meeting delete deleted it with its meeting. The application keeps the
-    # status that the vote decided.
     vote_deleted: bool = Field(default=False, alias="voteDeleted")
-    # F1: the decision that this status change carried (approved amount, number of
-    # conditions), else null.
     decision: TimelineDecisionOut | None = None
 
 
@@ -319,48 +345,61 @@ class VersionOut(_CamelModel):
     """One submission version.
 
     ``changedKeys`` holds the keys of the added, removed and changed fields. The
-    applicant view gets the metadata only (A11, O17): ``data`` and ``diff`` are null.
+    applicant view gets the metadata only: ``data`` and ``diff`` are null.
     A reader without the PII right gets ``data``, ``diff`` and ``changedKeys``
-    without the ``isPII`` fields (O21).
+    without the ``isPII`` fields.
+
+    Attributes:
+        changed_by: Same rules as ``TimelineEventOut.actor``. The frontend renders
+            ``changedByInfo``.
     """
 
     version: int
     data: dict[str, Any] | None = None
     diff: DataDiff | None = None
     changed_keys: list[str] = Field(default_factory=list, alias="changedKeys")
-    # Same rules as ``TimelineEventOut.actor``; the frontend renders
-    # ``changedByInfo``.
     changed_by: str | None = Field(default=None, alias="changedBy")
     changed_by_info: ActorOut | None = Field(default=None, alias="changedByInfo")
     at: datetime
 
 
 class ApplicationListItem(_CamelModel):
+    """One row of the application list.
+
+    Attributes:
+        title: Title for the list column, from the system title field
+            ``data['title']``.
+        approved_amount: The approved amount of the valid decision, null = as
+            requested.
+    """
+
     id: UUID
     type_id: UUID = Field(alias="typeId")
-    # Title for the list column, from the system title field ``data['title']``.
     title: str | None = None
     state: StateOut | None = None
     gremium_id: UUID | None = Field(default=None, alias="gremiumId")
     amount: Decimal | None = None
-    # F1: the approved amount of the valid decision, null = as requested.
     approved_amount: Decimal | None = Field(default=None, alias="approvedAmount")
     currency: str | None = None
     created_at: datetime = Field(alias="createdAt")
     updated_at: datetime = Field(alias="updatedAt")
     #: Set when the row is archived, so a combined list can mark it.
     archived_at: datetime | None = Field(default=None, alias="archivedAt")
-    #: Time of the last status change (A9), for "waiting since".
+    #: Time of the last status change, for "waiting since".
     state_since: datetime | None = Field(default=None, alias="stateSince")
 
 
 class ShareCreate(_CamelModel):
-    """Ask for a public link. Both fields are optional."""
+    """Ask for a public link. Both fields are optional.
 
-    # Bounded by the service: 1..365 days, defaulting to 30. "Never" is not on offer,
-    # because the point of an expiry is that a forgotten link stops working by itself.
+    Attributes:
+        ttl_days: The service bounds it to 1..365 days, default 30. "Never" is not on
+            offer, because an expiry makes a forgotten link stop working by itself.
+        label: A private note of the creator, for example "an die Fachschaft
+            geschickt". Never shown publicly.
+    """
+
     ttl_days: int | None = Field(default=None, alias="ttlDays", ge=1, le=365)
-    # A note for whoever made it: "an die Fachschaft geschickt". Never shown publicly.
     label: str | None = Field(default=None, max_length=200)
 
 
@@ -386,16 +425,18 @@ class CommentCreate(MessageFilesIn, _CamelModel):
     """A new comment. ``attachmentIds`` and ``draftToken`` bind its files.
 
     The body may be empty only with at least one file.
+
+    Attributes:
+        body: Capped against DoS, so one comment cannot grow without a bound in the
+            database and in the mail render. A longer body answers 422.
+        mentions: The principal ids of the mentioned members (at most 50, duplicates
+            drop). Each one must be in ``GET /applications/{id}/mentionable``, else 422
+            ``mention_not_member``. A caller who does not read the internal comments
+            (the applicant view) may not mention anybody.
     """
 
-    # Anti-DoS cap. It stops one comment from growing without a bound in the
-    # database and in the mail render. A longer body answers 422.
     body: str = Field(max_length=10_000)
     visibility: Literal["internal", "public"] = "public"
-    # The principal ids of the mentioned members (at most 50, duplicates drop). Each
-    # one must be in ``GET /applications/{id}/mentionable``, else 422
-    # ``mention_not_member``. A caller who does not read the internal comments (the
-    # applicant view) may not mention anybody.
     mentions: list[UUID] = Field(default_factory=list, max_length=MAX_MENTIONS)
 
 
@@ -415,6 +456,19 @@ class CommentPatch(_CamelModel):
 
 
 class CommentOut(_CamelModel):
+    """One comment as the viewer sees it.
+
+    Attributes:
+        is_own: The requesting viewer wrote the comment. The frontend aligns the chat
+            bubble by this flag.
+        attachments: The files of the comment, oldest first. They are fixed at the
+            send.
+        mentions: The mentioned members, in the stored order. The applicant view gets
+            an empty list, because the applicant never sees a member name. An erased
+            account shows as the deleted person (``principalId`` and ``displayName``
+            null).
+    """
+
     id: UUID
     author: str | None = None
     author_kind: Literal["principal", "applicant"] = Field(alias="authorKind")
@@ -422,17 +476,9 @@ class CommentOut(_CamelModel):
     body: str
     visibility: Literal["internal", "public"]
     at: datetime
-    # True when the requesting viewer wrote the comment. The frontend aligns the
-    # chat bubble by this flag.
     is_own: bool = Field(default=False, alias="isOwn")
-    # The files of the comment, oldest first. They are fixed at the send.
     attachments: list[MessageAttachmentOut] = Field(default_factory=list)
-    # The mentioned members, in the stored order. The applicant view gets an empty
-    # list, because the applicant never sees a member name (A12, O16). An erased
-    # account shows as the deleted person (``principalId`` and ``displayName`` null).
     mentions: list[PersonRef] = Field(default_factory=list)
 
 
-# ``ApplicationOut`` names ``CaptureOut``, which this module defines later, after
-# ``ActorOut``.
 ApplicationOut.model_rebuild()

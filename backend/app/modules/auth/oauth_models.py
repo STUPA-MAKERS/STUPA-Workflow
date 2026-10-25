@@ -29,9 +29,11 @@ class OAuthAuthorizationCode(UUIDPkMixin, CreatedAtMixin, Base):
     )
     client_id: Mapped[str] = mapped_column(Text)
     redirect_uri: Mapped[str] = mapped_column(Text)
-    code_challenge: Mapped[str] = mapped_column(Text)  # S256, base64url
-    scope: Mapped[str] = mapped_column(Text)  # space-separated scope list
-    # Token lifetime in seconds, chosen in the consent. NULL means the token never expires.
+    #: S256 challenge, base64url.
+    code_challenge: Mapped[str] = mapped_column(Text)
+    #: Space-separated scope list.
+    scope: Mapped[str] = mapped_column(Text)
+    #: Token lifetime in seconds, chosen in the consent. NULL means the token never expires.
     access_ttl_seconds: Mapped[int | None] = mapped_column(nullable=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     used_at: Mapped[datetime | None] = mapped_column(
@@ -53,9 +55,9 @@ class OAuthToken(UUIDPkMixin, CreatedAtMixin, Base):
         LargeBinary, unique=True, nullable=True
     )
     scope: Mapped[str] = mapped_column(Text)
-    # Chosen lifetime in seconds. NULL means never. Kept here for the refresh rotation.
+    #: Chosen lifetime in seconds. NULL means never. Kept here for the refresh rotation.
     access_ttl_seconds: Mapped[int | None] = mapped_column(nullable=True)
-    # NULL means the token never expires.
+    #: NULL means the token never expires.
     access_expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

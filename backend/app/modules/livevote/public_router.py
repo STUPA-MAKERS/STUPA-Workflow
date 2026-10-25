@@ -1,4 +1,4 @@
-"""Public routes of a meeting with a QR code (#17).
+"""Public routes of a meeting with a QR code.
 
 A person without an account reaches these routes from the join page `/j/<code>`. No
 session is involved. The device token sits in the HttpOnly cookie `mg_token`
@@ -58,18 +58,18 @@ from app.shared.errors import NotFoundError, ProblemDetail, RateLimitedError, Un
 
 router = APIRouter(prefix="/public/meetings", tags=["public-meetings"])
 
-# The path of the device cookie: only the public meeting routes see it.
+#: The path of the device cookie: only the public meeting routes see it.
 GUEST_COOKIE_PATH = "/api/public/meetings"
 
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 
-# Close code of a guest socket handshake over the rate limit.
+#: Close code of a guest socket handshake over the rate limit.
 WS_RATE_LIMITED = 4429
 _HOUR = 3600
-# The cookie lasts at least this long; for a meeting in the future until its day ends.
+#: The cookie lasts at least this long; for a meeting in the future until its day ends.
 _MIN_COOKIE_TTL = timedelta(hours=24)
 
-# Cap of the concurrent sockets per guest device (DoS guard, per process).
+#: Cap of the concurrent sockets per guest device (DoS guard, per process).
 _MAX_CONNECTIONS_PER_GUEST = 3
 _guest_connections: dict[UUID, int] = {}
 
@@ -85,6 +85,7 @@ def get_public_guest_service(
     broker: Annotated[MeetingBroker, Depends(get_broker_rest)],
     settings: SettingsDep,
 ) -> GuestService:
+    """Return the guest service with the publisher and the public base URL."""
     return GuestService(session, BrokerPublisher(broker), base_url=settings.public_base_url)
 
 
@@ -92,8 +93,10 @@ def get_public_voting_service(
     session: DbSession,
     dispatcher: Annotated[ActionDispatcher, Depends(get_action_dispatcher)],
 ) -> VotingService:
-    """Voting service with the app flow dispatcher: a guest ballot never closes a vote,
-    but the service keeps one construction path."""
+    """Return the voting service with the app flow dispatcher.
+
+    A guest ballot never closes a vote, but the service keeps one construction path.
+    """
     return VotingService(session, dispatcher)
 
 
@@ -334,11 +337,14 @@ async def guest_socket(
     Close codes: 4401 without a valid token, 4404 for an unknown guest or meeting,
     4403 for a foreign origin or too many connections, 4429 over the handshake limit
     per IP.
+
+    The handshake counts like a read of the guest page, per IP. The route ends the read transaction
+    before the loop, so the socket holds no open transaction. A commit keeps the loaded rows (no
+    expiry), unlike a rollback.
     """
     if not origin_allowed(websocket.headers.get("origin"), settings):
         await websocket.close(code=WS_FORBIDDEN)
         return
-    # The handshake counts like a read of the guest page, per IP.
     limiter = get_rate_limiter(cast(Request, websocket), settings)
     ip = websocket.client.host if websocket.client is not None else "unknown"
     hit = await limiter.hit(
@@ -360,8 +366,6 @@ async def guest_socket(
         await websocket.close(code=WS_NOT_FOUND)
         return
     finally:
-        # End the read transaction, so the socket holds no open transaction. A
-        # commit keeps the loaded rows (no expiry), unlike a rollback.
         await session.commit()
     if guest.status not in ("pending", "admitted"):
         await websocket.accept()

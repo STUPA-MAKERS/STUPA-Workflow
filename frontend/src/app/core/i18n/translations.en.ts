@@ -77,7 +77,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'fab.webhook': 'Create webhook',
   'fab.cdVariant': 'Create variant',
   'fab.form': 'Create form',
-  'fab.deadline': 'Create deadline',
   'account.menu.apiAccess': 'API access',
   'account.menu.notifications': 'Notifications',
   'account.frame.title': 'Account',
@@ -109,7 +108,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'account.notifications.kind.meeting': 'Meetings',
   'account.notifications.kind.delegation': 'Delegations',
   'account.notifications.kind.protocol': 'Protocols',
-  'account.notifications.kind.deadline': 'Deadline reminders',
   'account.notifications.kind.privacy': 'Privacy/erasure requests',
   'search.title': 'Search',
   'search.placeholder': 'Application, meeting, cost centre, page …',
@@ -381,7 +379,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'apply.positions.value': 'Value (€)',
   'apply.positions.preferred': 'Preferred',
   'apply.positions.positionValue': 'Position value',
-  // Review-step summary: counted cost positions.
   'apply.positions.countOne': '1 cost position',
   'apply.positions.countOther': '{count} cost positions',
   'apply.positions.remove': 'Remove',
@@ -435,7 +432,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
     'No email received? Check your spam folder. Keep the link private – it opens your application.',
   'apply.confirm.home': 'Back to start',
 
-  // Signed-in submitter: the backend confirms the address at creation time.
+  /** For a signed-in submitter: the backend confirms the address at creation time. */
   'apply.submitted.heading': 'Application submitted',
   'apply.submitted.badge': 'Submitted',
   'apply.submitted.body':
@@ -1079,7 +1076,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.vote.openBlocked': 'Close or cancel the open vote first.',
   'meetings.vote.close': 'Close vote',
   'meetings.vote.cancel': 'Cancel vote',
-  // F2: personnel elections.
   'meetings.vote.kind.label': 'Kind of vote',
   'meetings.vote.kind.motion': 'Motion',
   'meetings.vote.kind.election': 'Election',
@@ -1551,7 +1547,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'voting.beamer.votesOf': '{cast} of {eligible} votes',
 
   'admin.home.title': 'Administration',
-  'admin.deadlines.dateCountOne': '1 date',
   'budget.tree.expendedTitle': 'Spent {amount}',
   'budget.tree.incomeTitle': 'Income {amount}',
   'admin.webhook.edit': 'Edit the webhook',
@@ -1602,11 +1597,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'budget.tree.deleteBlocked':
     'A cost centre with sub cost centres or allocations cannot be deleted.',
   'budget.tree.fyState': 'Status',
-  'admin.deadlines.edit': 'Edit deadline',
-  'admin.deadlines.keyLocked': 'The key cannot change.',
-  'admin.deadlines.daysValue': '{n} days',
-  'admin.deadlines.dateCount': '{n} dates',
-  'admin.deadlines.noNextDate': 'No date ahead',
   'admin.guest.title': 'Applications without an account',
   'admin.guest.hours': 'Discard unconfirmed applications after',
   'admin.guest.hoursUnit': 'hours',
@@ -1759,8 +1749,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.nav.formsDesc': 'Compose the application fields',
   'admin.nav.flow': 'Flow editor',
   'admin.nav.flowDesc': 'States and transitions',
-  'admin.nav.deadlines': 'Deadlines',
-  'admin.nav.deadlinesDesc': 'Named deadlines for the flow',
+  'admin.nav.deadlines': 'Deadlines & windows',
+  'admin.nav.deadlinesDesc': 'Meeting window and confirmation of guest applications',
   'admin.nav.costCentres': 'Cost centres',
   'admin.nav.costCentresDesc': 'Budgets and cost centres',
   'admin.nav.branding': 'Branding',
@@ -1881,10 +1871,24 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'budget.tree.fyExisting': 'Existing fiscal years',
   'budget.tree.fyActive': 'Active',
   'budget.tree.fyEdit': 'Edit fiscal year',
+  'budget.tree.fyClosed': 'closed',
+  'budget.tree.fyChipClosed': 'FY {year} · closed',
+  'budget.tree.fyClose': 'Close',
+  'budget.tree.fyReopen': 'Reopen',
+  'budget.tree.fyCloseTitle': 'Close fiscal year {year}?',
+  'budget.tree.fyCloseConfirm':
+    'After this, the year takes no bookings, transfers, limits or application assignments until it is reopened.',
+  'budget.tree.fyReopenTitle': 'Reopen fiscal year {year}?',
+  'budget.tree.fyReopenConfirm':
+    'After this, the bookings, transfers, limits and application assignments of the year can change again.',
+  'budget.tree.toast.fyClosed': 'Fiscal year {year} closed.',
+  'budget.tree.toast.fyReopened': 'Fiscal year {year} reopened.',
+  'budget.fy.closedLabel': '{year} · closed',
+  'budget.fy.closedError': 'The fiscal year is closed.',
   'budget.tree.fyDelete': 'Delete fiscal year',
   'budget.tree.fyDeleteTitle': 'Delete fiscal year?',
   'budget.tree.fyDeleteConfirm': 'The fiscal year {year} is deleted. This cannot be undone.',
-  // 409 reasons: the server names exactly one of these causes.
+  /** A 409 reason, like the next keys: the server names exactly one of these causes. */
   'budget.tree.fyBlocked.bookings':
     'This fiscal year still carries bookings. Delete them first, or move them to another year.',
   'budget.tree.fyBlocked.allocations':
@@ -1960,7 +1964,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.form.allowNoOffers': 'Allow opting out of comparison offers',
 
   'admin.flow.title': 'Flow editor',
-  // Flow validation: what the editor rejects in a graph before it is saved.
   'admin.flow.err.noStates': 'The flow has no states.',
   'admin.flow.err.duplicateKeys': 'Duplicate state keys: {keys}',
   'admin.flow.err.invalidKey':
@@ -2014,8 +2017,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.flow.cfgGremiumPh': 'Choose committee…',
   'admin.flow.cfgRole': 'Deciding role',
   'admin.flow.cfgRolePh': 'Choose role…',
-  'admin.flow.cfgDeadline': 'Deadline',
-  'admin.flow.cfgDeadlinePh': 'No deadline',
   'admin.flow.guardPriority': 'Guard priority',
   'admin.flow.guardDefault': 'No guard (catch-all)',
   'admin.flow.branch': 'Outcome branch',
@@ -2029,11 +2030,15 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.flow.guardValue': 'Value',
   'admin.flow.addAction': 'Add action',
   'admin.flow.diagram': 'Diagram',
-  'admin.flow.relayout': 'Re-layout',
+  'admin.flow.bundle': '{n} transitions',
   'admin.flow.undo': 'Undo',
   'admin.flow.redo': 'Redo',
   'admin.flow.zoom': 'Zoom',
   'admin.flow.zoomIn': 'Zoom in',
+  'admin.flow.panLeft': 'Pan left',
+  'admin.flow.panRight': 'Pan right',
+  'admin.flow.panUp': 'Pan up',
+  'admin.flow.panDown': 'Pan down',
   'admin.flow.zoomOut': 'Zoom out',
   'admin.flow.zoomReset': 'Reset view',
   'admin.flow.connectHint': 'Drag to create a transition',
@@ -2055,7 +2060,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.flow.guardOp.permissionIs': 'Actor has permission',
   'admin.flow.guardOp.fieldsComplete': 'Required fields complete',
   'admin.flow.guardOp.voteResult': 'Vote result is',
-  'admin.flow.guardOp.deadlinePassed': 'Deadline passed',
   'admin.flow.guardOp.manual': 'Manual only',
   'admin.flow.guardHint.roleIs': 'Role key, e.g. "referent" or "admin".',
   'admin.flow.guardHint.permissionIs': 'Permission key, e.g. "application.manage".',
@@ -2159,7 +2163,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.flow.actionDesc.budgetBook': 'Books the amount out of the cost centre for good.',
   'admin.flow.actionDesc.openVote': 'Opens a vote for the application in the running meeting.',
   'admin.flow.actionDesc.requeue': 'Puts the application back for re-processing / requeue.',
-  // Flow editor (FE12b): header, toolbar, legend, colours, guard builder, versions.
   'admin.flow.versions': 'Versions',
   'admin.flow.versionsClose': 'Back to editing',
   'admin.flow.versionActive': 'version {n} active',
@@ -2224,7 +2227,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
     '“{name}” is deleted together with its delivery history. This cannot be undone.',
   'admin.webhook.deleted': 'Webhook deleted.',
   'admin.webhook.deleteFailed': 'Delete failed.',
-  // Delivery diagnosis: the server keeps only the newest attempt per webhook.
+  /** The delivery diagnosis: the server keeps only the newest attempt per webhook. */
   'admin.webhook.delivery.title': 'Delivery status',
   'admin.webhook.delivery.state': 'Status',
   'admin.webhook.delivery.reason': 'Reason',
@@ -2342,6 +2345,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.audit.action.budget_assign': 'Application assigned',
   'admin.audit.action.budget_move_fiscal_year': 'Fiscal year moved',
   'admin.audit.action.budget_fiscal_year_delete': 'Fiscal year deleted',
+  'admin.audit.action.budget_fiscal_year_close': 'Fiscal year closed',
+  'admin.audit.action.budget_fiscal_year_reopen': 'Fiscal year reopened',
   'admin.audit.action.application_archive': 'Application archived',
   'admin.audit.action.application_unarchive': 'Application restored from archive',
   'admin.audit.action.application_share': 'Share link created',
@@ -2499,29 +2504,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.notifications.error': 'Settings could not be loaded.',
   'admin.notifications.saveError': 'Saving failed. Please try again.',
 
-  'admin.deadlines.title': 'Deadlines',
-  'admin.deadlines.create': 'Create deadline',
-  'admin.deadlines.empty': 'No deadlines yet.',
-  'admin.deadlines.kind': 'Type',
-  'admin.deadlines.date': 'Date',
-  'admin.deadlines.offsetDays': 'Deadline in days',
-  'admin.deadlines.dates': 'Dates',
-  'admin.deadlines.addDate': 'Add date',
-  'admin.deadlines.removeDate': 'Remove date',
-  'admin.deadlines.atTime': 'Time of day',
-  'admin.deadlines.timezone': 'Timezone',
-  'admin.deadlines.deleteTitle': 'Delete deadline?',
-  'admin.deadlines.deleteConfirm':
-    '“{name}” is deleted. The flow then no longer finds the deadline. This cannot be undone.',
-  'admin.deadlines.col.name': 'Label',
-  'admin.deadlines.col.kind': 'Type',
-  'admin.deadlines.col.value': 'Deadline',
-  'admin.deadlines.kind.absolute': 'Fixed date',
-  'admin.deadlines.kind.relative_submitted': 'Submission + X days',
-  'admin.deadlines.kind.relative_changed': 'Last change + X days',
-  'admin.deadlines.kind.recurring': 'Recurring dates',
+  'admin.deadlines.title': 'Deadlines & windows',
 
-  // Agent tokens (OAuth grants) of every principal — the admin view with a kill switch.
   'admin.oauthGrants.title': 'Agent access',
   'admin.oauthGrants.loading': 'Loading grants…',
   'admin.oauthGrants.error': 'The grants did not load.',
@@ -2547,7 +2531,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.oauthGrants.alreadyGone': 'This grant did not exist any more.',
   'admin.oauthGrants.revokeFailed': 'The grant did not revoke.',
 
-  // Corporate-design variants: the logo sets of the rendered documents.
   'admin.cdVariants.title': 'Document variants',
   'admin.cdVariants.create': 'Create a document variant',
   'admin.cdVariants.edit': 'Edit the document variant',
@@ -2605,7 +2588,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.deleg.revoked': 'Delegation revoked.',
   'admin.deleg.revokeFailed': 'Revocation failed.',
 
-  // Substitute pool, shown in the Gremium member administration.
   'admin.substitutes.title': 'Substitutes',
   'admin.substitutes.add': 'Add substitute',
   'admin.substitutes.search': 'Search person',
@@ -2619,7 +2601,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.substitutes.duplicate': 'This entry already exists.',
   'admin.substitutes.failed': 'Action failed.',
 
-  // Meeting delegation: card on the meeting page plus dialog.
   'delegation.card.title': 'Proxy',
   'delegation.card.deadline': 'Can be set up until {date}.',
   'delegation.card.deadlinePassed':
@@ -2640,7 +2621,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'delegation.toast.revoked': 'Proxy revoked.',
   'delegation.toast.revokeFailed': 'Revocation failed.',
 
-  // Participant view of a meeting and the beamer (FE9).
   'participant.attendance.title': 'Your attendance',
   'participant.attendance.delegated':
     'You have a proxy for this meeting. Revoke the proxy to report as present.',
@@ -2756,7 +2736,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.forms.advanced': 'Advanced options',
   'admin.forms.duplicate': 'Duplicate',
 
-  // Question groups. One group container is one wizard step.
+  /** A question group. One group container is one wizard step. */
   'admin.form.groupStep': 'Section {n}',
   'admin.form.groupTitleDe': 'Group title (DE)',
   'admin.form.groupTitleEn': 'Group title (EN)',
@@ -2767,7 +2747,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.form.moveGroupUp': 'Move group up',
   'admin.form.moveGroupDown': 'Move group down',
   'admin.form.dragGroup': 'Drag group to reorder',
-  // Form editor (FE12b): outline, type menu, settings card.
   'admin.form.outline': 'Questions of the form',
   'admin.form.groupMenu': 'Actions for section {n}',
   'admin.form.typeMenu': 'Choose a question type',
@@ -2797,6 +2776,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'budget.dash.treeBar': '{percent} % used',
   'budget.dash.year': 'Fiscal year',
   'budget.dash.yearShort': 'FY {year}',
+  'budget.dash.yearShortClosed': 'FY {year} · closed',
   'budget.dash.export': 'Export',
   'budget.dash.exportError': 'The export failed.',
   'budget.dash.fig.allocated': 'Allocation',
@@ -3072,7 +3052,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.mailTemplates.key.application_captured': 'Application entered on behalf',
   'admin.mailTemplates.key.status_update': 'Status change',
   'admin.mailTemplates.key.status_update_team': 'Status change (team)',
-  'admin.mailTemplates.key.deadline_approaching': 'Deadline reminder',
   'admin.mailTemplates.key.task_new': 'New task',
   'admin.mailTemplates.key.task_reminder': 'Task reminder',
   'admin.mailTemplates.key.comment_applicant': 'Comment (applicant)',
@@ -3242,7 +3221,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'invoices.toast.paid': 'Invoice marked as paid.',
   'invoices.untitled': 'Invoice without supplier',
   'invoices.detail.noBookings': 'No booking yet.',
-  // Public meeting with QR code (#17).
   'vote.majorityCast.simple': 'Simple majority of the votes cast',
   'vote.majorityCast.absolute': 'Absolute majority of the votes cast',
   'vote.majorityCast.two_thirds': 'Two-thirds majority of the votes cast',
@@ -3497,7 +3475,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
     '{n} of them have no public version yet. The platform makes it now; until then they do not appear.',
   'admin.gremien.publicConfirm.confirm': 'Publish',
   'admin.audit.action.protocol_publication': 'Protocol publication changed',
-  // The tab "Gremien" (/gremien).
   'gremien.title': 'Committees',
   'gremien.filters': 'Filters',
   'gremien.none': 'Choose a committee',
@@ -3829,7 +3806,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.helpTickets.error.blocked': 'The blocked senders could not be loaded.',
   'admin.helpTickets.error.unblock': 'The block could not be lifted.',
 
-  // To-dos (boards, card, list, settings) and the group "To-dos" of tasks.
   'nav.todos': 'Boards',
   'tasks.group.applications': 'Applications',
   'tasks.group.todos': 'To-dos',

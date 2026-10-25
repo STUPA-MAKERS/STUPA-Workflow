@@ -1,4 +1,4 @@
-"""F2 · Erasure of a candidate name from the copies of an election in the protocol text.
+"""Erasure of a candidate name from the copies of an election in the protocol text.
 
 ``embed_votes`` writes the internal election callout into ``protocol.markdown``, and the
 protokollant can insert it into an agenda item body. After the erasure of a candidate
@@ -72,6 +72,7 @@ _CHANGE = (OLD_CALLOUT.split("\n"), NEW_CALLOUT.split("\n"))
 
 
 def test_rewrite_changes_only_the_lines_inside_the_matching_callout() -> None:
+    """The rewrite keeps the plain text before, the quote after and the indent of the callout."""
     text = "\n".join(
         [
             "Intro: Ben: 5 · Anna: 2 · Enthaltungen: 1",
@@ -82,7 +83,6 @@ def test_rewrite_changes_only_the_lines_inside_the_matching_callout() -> None:
         ]
     )
     out = rewrite_callouts(text, [_CHANGE]).split("\n")
-    # The plain text before and the quote after the callout stay; the indent stays.
     assert out[0] == "Intro: Ben: 5 · Anna: 2 · Enthaltungen: 1"
     assert out[2] == "  > [!abstimmung] **Wahl Kasse**"
     assert out[4] == "  " + NEW_VOTES_LINE
@@ -96,7 +96,7 @@ def test_rewrite_without_the_callout_returns_the_text() -> None:
 
 
 def test_edited_or_longer_callout_stays() -> None:
-    # A callout that the protokollant edited (or extended) is no copy of the election.
+    """A callout that the protokollant edited or extended is no copy of the election."""
     edited = OLD_CALLOUT.replace("> Gewählt: Ben", "> Gewählt: Ben (nimmt an)")
     longer = OLD_CALLOUT + "\n> Anmerkung"
     shorter = OLD_CALLOUT.rsplit("\n", 1)[0]
@@ -104,8 +104,8 @@ def test_edited_or_longer_callout_stays() -> None:
         assert rewrite_callouts(text, [_CHANGE]) == text
 
 
-# Two elections of one meeting with the same head line ("**Wahlgang**" when the
-# question is missing): the person lost the first and won the second.
+#: Two elections of one meeting with the same head line ("**Wahlgang**" when the
+#: question is missing): the person lost the first and won the second.
 _LOST = "\n".join(
     [
         "> [!abstimmung] **Wahlgang**",
@@ -137,7 +137,7 @@ def test_two_elections_with_the_same_head_change_only_the_lost_one() -> None:
 
 
 def test_adjacent_callouts_are_separate_blocks() -> None:
-    # No blank line between the callouts: the next marker line ends the first block.
+    """Without a blank line between callouts, the next marker line ends the first block."""
     for text, expected in (
         (f"{_LOST}\n{_WON}", _LOST_CHANGE[1] + _WON.split("\n")),
         (f"{_WON}\n{_LOST}", _WON.split("\n") + _LOST_CHANGE[1]),
@@ -195,8 +195,11 @@ async def test_single_candidate_line_gets_the_placeholder() -> None:
 
 
 async def test_open_election_and_election_without_meeting_query_nothing() -> None:
-    # An open election writes no names into its callout; a vote without a meeting
-    # has no protocol. Neither reads a protocol.
+    """An open election and a vote without a meeting read no protocol.
+
+    An open election writes no names into its callout, and a vote without a meeting has
+    no protocol.
+    """
     db: Any = FakeSession()
     calls: list[Any] = []
 

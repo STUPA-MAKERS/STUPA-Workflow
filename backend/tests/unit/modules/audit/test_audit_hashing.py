@@ -1,4 +1,4 @@
-"""Unit tests for the canonical serialization and the hash chain (T-23, security.md §4)."""
+"""Unit tests for the canonical serialization and the hash chain."""
 
 from __future__ import annotations
 
@@ -35,11 +35,15 @@ def test_canonical_nested_key_order_independent() -> None:
 
 
 def test_canonical_compact_and_sorted() -> None:
+    """Serialize compact and sorted.
+
+    The fields and the data keys are alphabetical, the separators are compact, and action
+    precedes actor.
+    """
     raw = _payload({"b": 1, "a": 2}).decode("utf-8")
-    # The fields are alphabetical, the separators are compact and action precedes actor.
     assert raw.startswith('{"action":"status_change","actor":"admin-1"')
     assert ", " not in raw
-    assert raw.index('"a":2') < raw.index('"b":1')  # data keys are sorted
+    assert raw.index('"a":2') < raw.index('"b":1')
 
 
 def test_canonical_at_is_iso() -> None:
@@ -53,7 +57,7 @@ def _payload_at(at: datetime) -> bytes:
 
 
 def test_canonical_normalizes_non_utc_timezone() -> None:
-    # The same instant in +02:00 gives bytes identical to UTC (time-zone determinism).
+    """Give the same bytes for the same instant in +02:00 and in UTC."""
     berlin = _payload_at(_AT.astimezone(timezone(timedelta(hours=2))))
     assert berlin == _payload_at(_AT)
 

@@ -41,13 +41,13 @@ describe('GuestViewComponent', () => {
     expect(screen.getByText('Du bist zugelassen')).toBeInTheDocument();
   });
 
+  /** An application item says "Antrag"; a free-text item has no subtitle. */
   it('shows the agenda with a non-public item by its title, and the protocol of public items', async () => {
     await setup(guestMe({ view: { ...guestMe().view!, votes: [] } }));
     expect(screen.getByText('Keine offene Abstimmung')).toBeInTheDocument();
     expect(screen.getByText('Jetzt')).toBeInTheDocument();
     expect(screen.getByText('Personal')).toBeInTheDocument();
     expect(screen.getByText('Inhalt nur für Mitglieder')).toBeInTheDocument();
-    // D5: an application item says "Antrag"; a free-text item has no subtitle.
     expect(screen.getByText('Antrag')).toBeInTheDocument();
     expect(screen.queryByText(/^TOP \d/)).toBeNull();
     expect(document.querySelector('.gv__item[aria-current="step"]')?.textContent).toContain('Antrag');
@@ -149,7 +149,7 @@ describe('GuestViewComponent', () => {
     expect(cmp['own']()).toBeNull();
     expect(cmp['voteNote']()).toBeNull();
     expect(cmp['voteWhere']()).toBe('7. Sitzung');
-    cmp['caster']()('yes');
+    cmp['caster']()('yes', false);
     cmp.setTab('other');
     expect(cmp['tab']()).toBe('agenda');
   });

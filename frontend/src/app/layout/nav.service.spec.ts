@@ -70,8 +70,8 @@ describe('NavService', () => {
     expect(keysFor({ ...BASE, permissions: ['backup.manage'] })).toContain('admin');
   });
 
+  /** An entry of the admin navigation must never sit behind a hidden "Verwaltung". */
   it('opens the administration for every page of the admin navigation', () => {
-    // An entry of the admin navigation must never sit behind a hidden "Verwaltung".
     for (const page of ADMIN_PAGES) {
       for (const p of page.permissions) expect(ADMIN_AREA_PERMISSIONS).toContain(p);
     }

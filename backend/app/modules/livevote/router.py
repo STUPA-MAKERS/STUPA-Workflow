@@ -3,6 +3,9 @@
 Auth is fail-closed. REST answers 401 or 403 through ``require_principal``. The
 WebSocket closes with ``4401`` (no session) or ``4403`` (not eligible) after a
 ``not_eligible`` error frame.
+
+The dependency providers below read the broker, the locker and the services from the app
+state. Tests replace them through ``dependency_overrides``.
 """
 
 from __future__ import annotations
@@ -80,15 +83,15 @@ router = APIRouter(tags=["livevote"])
 
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 
-# Single-process fallback for the case where the lifespan does not wire a broker
-# or a locker onto the app state, for example in tests. Production uses Redis.
+#: Single-process fallback for the case where the lifespan does not wire a broker
+#: or a locker onto the app state, for example in tests. Production uses Redis.
 _FALLBACK_BROKER = InMemoryBroker()
 _FALLBACK_LOCKER = InMemoryLocker()
 
-# Cap the concurrent WebSocket connections per meeting and principal as a
-# denial-of-service guard. One user cannot open unbounded sockets. Each socket
-# holds a subscription plus a receive task. The counter is per process. A
-# distributed limit would live at Redis or at the ingress.
+#: Cap the concurrent WebSocket connections per meeting and principal as a
+#: denial-of-service guard. One user cannot open unbounded sockets. Each socket
+#: holds a subscription plus a receive task. The counter is per process. A
+#: distributed limit would live at Redis or at the ingress.
 _MAX_CONNECTIONS_PER_PRINCIPAL = 5
 _connection_counts: dict[tuple[UUID, str], int] = {}
 
@@ -120,16 +123,18 @@ def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
     return {code: _PROBLEM for code in codes}
 
 
-# Tests replace these providers through ``dependency_overrides``.
 def get_broker_rest(request: Request) -> MeetingBroker:
+    """Return the broker of the app, or the process-local fallback."""
     return getattr(request.app.state, "broker", None) or _FALLBACK_BROKER
 
 
 def get_broker_ws(websocket: WebSocket) -> MeetingBroker:
+    """Return the broker of the app for a WebSocket, or the process-local fallback."""
     return getattr(websocket.app.state, "broker", None) or _FALLBACK_BROKER
 
 
 def get_locker_ws(websocket: WebSocket) -> Locker:
+    """Return the locker of the app for a WebSocket, or the process-local fallback."""
     return getattr(websocket.app.state, "locker", None) or _FALLBACK_LOCKER
 
 
@@ -137,6 +142,7 @@ def get_meeting_service(
     session: DbSession,
     broker: Annotated[MeetingBroker, Depends(get_broker_rest)],
 ) -> MeetingService:
+    """Return the meeting service with the broker-backed publisher."""
     return MeetingService(session, BrokerPublisher(broker))
 
 
@@ -149,10 +155,12 @@ def get_meeting_service_ws(
 
 
 def get_attendance_service(session: DbSession) -> AttendanceService:
+    """Return the attendance service of the request."""
     return AttendanceService(session)
 
 
 def get_agenda_service(session: DbSession) -> AgendaService:
+    """Return the agenda service of the request."""
     return AgendaService(session)
 
 
@@ -186,7 +194,7 @@ def get_guest_service(
     broker: Annotated[MeetingBroker, Depends(get_broker_rest)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> GuestService:
-    """Guest service of the public meeting (#17) with the broker and the base URL."""
+    """Guest service of the public meeting with the broker and the base URL."""
     return GuestService(session, BrokerPublisher(broker), base_url=settings.public_base_url)
 
 
@@ -206,7 +214,6 @@ VotingServiceWsDep = Annotated[VotingService, Depends(get_voting_service_ws)]
 WsPrincipalDep = Annotated[Principal | None, Depends(get_ws_principal)]
 
 
-# REST
 @router.post("/meetings", response_model=MeetingOut, responses=_errors(400, 401, 403, 422))
 async def create_meeting(
     payload: MeetingCreate,
@@ -244,7 +251,7 @@ async def list_meeting_members(
 
     The caller must be able to manage the Gremium (``session.manage`` or admin).
     The list fills the protokollant picker in the create dialog before a roster
-    exists. ``canKeepProtocol`` marks the members with ``protocol.write`` (O20): only
+    exists. ``canKeepProtocol`` marks the members with ``protocol.write``: only
     they can be the protokollant.
     """
     if not await service.can_manage(gremium_id, principal):
@@ -260,7 +267,7 @@ async def list_meeting_members(
 async def get_meeting_defaults(
     gremium_id: UUID, service: ServiceDep, principal: ReaderDep
 ) -> MeetingDefaultsOut:
-    """What a new meeting of the gremium allows (#17).
+    """What a new meeting of the gremium allows.
 
     Public participation needs a gremium without a quorum; the create dialog reads it
     before the meeting exists. The caller must manage the gremium (``session.manage``
@@ -349,9 +356,7 @@ async def get_meeting(meeting_id: UUID, service: ServiceDep, principal: ReaderDe
     return await service.get(meeting_id, principal)
 
 
-@router.delete(
-    "/meetings/{meeting_id}", status_code=204, responses=_errors(401, 403, 404, 409)
-)
+@router.delete("/meetings/{meeting_id}", status_code=204, responses=_errors(401, 403, 404, 409))
 async def delete_meeting(meeting_id: UUID, service: ServiceDep, principal: ReaderDep) -> None:
     """Delete a meeting.
 
@@ -376,8 +381,8 @@ async def patch_meeting(
     The service applies RBAC per field. Status and active application need
     ``canWrite`` (protokollant or manager). Date, time and protokollant need
     ``canManage`` (meeting manager). A new protokollant needs ``protocol.write`` in
-    the Gremium (O20: 422). While the meeting is live, a new protokollant is a
-    handover ``now`` (Z3). On the start transition (planned to live) the
+    the Gremium (422). While the meeting is live, a new protokollant is a
+    handover ``now``. On the start transition (planned to live) the
     router creates the protocol, and that step is idempotent. The protocol is
     created only here, never by hand. The service has already checked that a
     protokollant is set, else it answers 409.
@@ -388,16 +393,17 @@ async def patch_meeting(
     (``opensAt``/``confirmUntil`` of the meeting): before ``opensAt`` it answers 409
     ``meeting_too_early``, and before ``confirmUntil`` it needs ``confirmEarly``, else
     409 ``early_open_unconfirmed``.
+
+    The protocol service is imported locally, because ``protocol`` depends on ``livevote``
+    and a module-level import would cycle. The protocol uses the session of the service, so
+    the work stays in one transaction and one commit. The route reads the meeting again, so
+    the response carries the new ``protocolId``.
     """
     updated = await service.patch(meeting_id, payload, principal)
     if payload.status == "live" and updated.status == "live":
-        # Local import: ``protocol`` depends on ``livevote``. A module-level import
-        # would cycle. The protocol uses the session of the service, so the work
-        # stays in one transaction and one commit.
         from app.modules.protocol.service import ProtocolService
 
         await ProtocolService(service.session).get_or_create(meeting_id, author=principal.sub)
-        # Re-read so the response carries the new ``protocolId``.
         return await service.get(meeting_id, principal)
     return updated
 
@@ -413,12 +419,12 @@ async def hand_over_protokollant(
     service: ServiceDep,
     principal: ReaderDep,
 ) -> MeetingOut:
-    """Hand the minutes of a live meeting over to another member (Z3, O1).
+    """Hand the minutes of a live meeting over to another member.
 
     ``mode=now`` hands over at once. ``mode=next_item`` plans the handover for the
     next forward move of the current agenda item and replaces an older plan. The
     session lead (``session.manage``) or the current protokollant may call it. The
-    new protokollant is an active member (403) with ``protocol.write`` (O20: 422
+    new protokollant is an active member (403) with ``protocol.write`` (422
     ``protokollant_needs_protocol_write``). 409 ``meeting_not_live`` outside a live
     meeting, 409 ``already_protokollant`` for the current protokollant, 409
     ``no_next_item`` for ``next_item`` on the last agenda item. Writes
@@ -435,7 +441,7 @@ async def hand_over_protokollant(
 async def cancel_protokollant_handover(
     meeting_id: UUID, service: ServiceDep, principal: ReaderDep
 ) -> MeetingOut:
-    """Discard the planned handover of a live meeting (Z3).
+    """Discard the planned handover of a live meeting.
 
     The same callers as for the handover. 404 ``no_planned_handover`` without a
     planned handover. Writes ``protokollant_handover`` (mode ``cancel``) and sends
@@ -461,8 +467,9 @@ async def list_attendance(
     plus each principal with an attendance record for the meeting. The reason of
     an excuse (`note`) goes only to the member and to the meeting lead
     (`canWrite`).
+
+    Only a principal that may read the meeting sees the names and the emails.
     """
-    # Only a principal that may read the meeting sees the names and the emails.
     await service.assert_can_read(meeting_id, principal)
     can_write = await service.can_write_meeting(meeting_id, principal)
     return await attendance.roster(meeting_id, principal.sub, can_write=can_write)
@@ -480,13 +487,13 @@ async def set_own_attendance(
     service: ServiceDep,
     principal: ReaderDep,
 ) -> list[AttendanceOut]:
-    """Report the attendance of the caller (Gremium members only, Z2).
+    """Report the attendance of the caller (Gremium members only).
 
     The status is `present` or `excused`, else 422. A `note` (the reason) is
     allowed only with `excused`. The meeting must be `planned` or `live`, else
     409. When the meeting lead set the record, the member cannot change it: 409
-    `attendance_set_by_lead` (O15). `present` gives 409 `delegation_active` while
-    the caller has a delegation for this meeting (O23).
+    `attendance_set_by_lead`. `present` gives 409 `delegation_active` while
+    the caller has a delegation for this meeting.
     """
     can_write = await service.can_write_meeting(meeting_id, principal)
     return await attendance.set_self(
@@ -520,9 +527,9 @@ async def set_member_attendance(
 ) -> list[AttendanceOut]:
     """Set the attendance of a member as the meeting lead (`canWrite`).
 
-    The lead's record wins over the own report of the member (O15). `present`
+    The lead's record wins over the own report of the member. `present`
     gives 409 `delegation_active` while the member has a delegation for this
-    meeting (O23). The change writes `attendance_set` without the note.
+    meeting. The change writes `attendance_set` without the note.
     """
     await _require_lead(service, meeting_id, principal)
     return await attendance.set_for(
@@ -597,19 +604,23 @@ async def open_meeting_vote(
     ``eligibleGroup`` is the Gremium of the meeting. The server derives the quorum
     denominator from the roster (members with ``vote.cast``) and never from client
     input. The route broadcasts ``vote_opened``, or ``meeting_state`` for a draft.
+
+    The lead prepares a draft; only the protokollant opens a vote. The admitted guests vote
+    too when the meeting lets them and the item is public; in an election they vote only
+    when the lead switches them on. Such a vote has no quorum: only the majority of the cast
+    ballots counts. An election and a poll never have an application, so they never fire a
+    flow branch. A meeting vote has no casting vote: a tie is ``rejected``, and the body has
+    no ``tieBreak`` to change this. Without an explicit percent, the vote inherits the
+    percent quorum of the Gremium; a vote with guests and a poll have no quorum. The other
+    managers of the meeting see a prepared question at once.
     """
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_manage_votes:
         raise ForbiddenError("not allowed to open a vote in this meeting")
     if not payload.draft:
-        # The lead prepares a draft; only the protokollant opens a vote.
         await service.assert_can_run_votes(meeting_id, principal)
-    # An open vote needs a started meeting. Before ``live`` there is no protocol to
-    # record the result in. A prepared draft only waits for the start.
     assert_vote_window(meeting, draft=payload.draft)
     item = await agenda.item(meeting_id, payload.agenda_item_id)
-    # #17: the admitted guests vote too when the meeting lets them and the item is
-    # public. Such a vote has no quorum: only the majority of the cast ballots counts.
     guests_allowed = meeting.public_join and meeting.guests_mode == "vote"
     if payload.guests_vote and not guests_allowed:
         raise ValidationProblem(
@@ -625,20 +636,17 @@ async def open_meeting_vote(
         )
     election = payload.kind == "election"
     if election and item.application_id is not None:
-        # F2: an election never has an application and never fires a flow branch.
         raise ValidationProblem(
             "An election belongs to a free-text agenda item.",
             code="election_on_application_item",
             errors=[{"field": "kind", "msg": "an application agenda item"}],
         )
     if payload.poll is not None and item.application_id is not None:
-        # A poll only counts: it never decides an application.
         raise ValidationProblem(
             "A poll belongs to a free-text agenda item.",
             code="poll_on_application_item",
             errors=[{"field": "kind", "msg": "an application agenda item"}],
         )
-    # F2: guests vote in an election only when the lead switches them on.
     guests_vote = (
         payload.guests_vote
         if payload.guests_vote is not None
@@ -660,15 +668,10 @@ async def open_meeting_vote(
             "options": payload.options,
             "majorityRule": payload.majority_rule,
             "secret": bool(payload.secret),
-            # A meeting vote has no casting vote (O18): a tie is ``rejected``. The
-            # body has no ``tieBreak``, so the client cannot change this.
             "tieBreak": "rejected",
             "guestsVote": guests_vote,
         }
     )
-    # Gremium quorum default: without an explicit percent, the vote inherits the
-    # percent quorum configured on the Gremium. A vote with guests and a poll have no
-    # quorum.
     quorum_percent = (
         None
         if guests_vote or payload.poll is not None
@@ -708,7 +711,6 @@ async def open_meeting_vote(
         actor=principal.sub,
     )
     if payload.draft:
-        # The other managers of the meeting see the prepared question at once.
         await service.broadcast_state(meeting_id, principal)
         return await service.get(meeting_id, principal)
     opened = await voting.open(vote.id, now=datetime.now(UTC), actor=principal.sub)
@@ -754,8 +756,6 @@ async def open_prepared_meeting_vote(
     return await service.get(meeting_id, principal)
 
 
-
-
 @router.delete(
     "/meetings/{meeting_id}/votes/{vote_id}",
     response_model=MeetingOut,
@@ -771,7 +771,7 @@ async def delete_meeting_vote(
     """Delete a vote and its ballots.
 
     The caller must be the manager, the protokollant, or hold the gremium permission
-    ``vote.manage``. Only a ``planned`` or ``live`` meeting deletes a vote (O24): after
+    ``vote.manage``. Only a ``planned`` or ``live`` meeting deletes a vote: after
     the close the vote is part of the record, and the route answers 409
     ``meeting_closed``. Only a ``draft`` or ``cancelled`` vote can go: an open or
     closed vote gives 409 ``vote_not_deletable``. Every delete writes ``vote_delete``.
@@ -822,6 +822,9 @@ async def add_agenda_item(
     ``todo_wrong_board``); a second item of the same card answers 409
     ``todo_already_on_agenda``. The item takes the card title, and the card gets a
     link to the item.
+
+    A to-do card that gets a link makes the board ping it on the to-do live channel, after
+    the commit.
     """
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_write:
@@ -838,7 +841,6 @@ async def add_agenda_item(
         )
         await todos.link_agenda_item(card, item.id, principal)
         await agenda.session.commit()
-        # The card got a link: the board pings it (to-do live channel, after the commit).
         await publish_pings(todo_broker(request.app.state), todos.pings.drain())
         return await agenda.list(meeting_id)
     return await agenda.add(
@@ -921,13 +923,15 @@ async def set_agenda_body(
 
     The per-item editor calls this route. Only the meeting lead or an admin may
     edit the agenda (``canWrite``). The body needs a planned or live meeting, or a
-    closed meeting whose protocol is still a draft (O22): the minute-taker can write
-    the minutes before the start. A rename needs a planned or live meeting (O25). The
+    closed meeting whose protocol is still a draft: the minute-taker can write
+    the minutes before the start. A rename needs a planned or live meeting. The
     service answers 409 otherwise.
 
     In a live meeting with a protokollant only the protokollant writes the body (403
     ``not_protokollant``). Two writers in one text overwrite each other, and a reader
     with ``canWrite`` (the meeting lead) once saved the stale text of its own view.
+
+    The live followers learn about the changed text through ``meeting_state``.
     """
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_write:
@@ -942,7 +946,6 @@ async def set_agenda_body(
         non_public=payload.non_public,
         actor=principal.sub,
     )
-    # Tell the live followers about the changed agenda-item text.
     await service.broadcast_state(meeting_id, principal)
     return items
 
@@ -998,7 +1001,6 @@ def _assert_live_minutes_writer(meeting: MeetingOut) -> None:
         )
 
 
-# Public meeting with a QR code (#17): the routes of the meeting lead.
 async def _require_manage(service: MeetingService, meeting_id: UUID, principal: Principal) -> None:
     """Allow only the meeting lead with ``session.manage`` in the gremium (or admin)."""
     gremium_id = await service.meeting_gremium_id(meeting_id)
@@ -1014,7 +1016,7 @@ async def _require_manage(service: MeetingService, meeting_id: UUID, principal: 
 async def list_meeting_guests(
     meeting_id: UUID, service: ServiceDep, guests: GuestServiceDep, principal: ReaderDep
 ) -> list[MeetingGuestOut]:
-    """List the join requests and the guests of a public meeting (#17).
+    """List the join requests and the guests of a public meeting.
 
     The open requests come first. Only the meeting lead (``session.manage``) sees the
     names.
@@ -1031,7 +1033,7 @@ async def list_meeting_guests(
 async def admit_all_meeting_guests(
     meeting_id: UUID, service: ServiceDep, guests: GuestServiceDep, principal: ReaderDep
 ) -> list[MeetingGuestOut]:
-    """Admit every waiting guest (#17). Writes ``guest_admit_all`` with the count."""
+    """Admit every waiting guest. Writes ``guest_admit_all`` with the count."""
     await _require_manage(service, meeting_id, principal)
     return await guests.admit_all(meeting_id, actor_sub=principal.sub)
 
@@ -1048,7 +1050,7 @@ async def admit_meeting_guest(
     guests: GuestServiceDep,
     principal: ReaderDep,
 ) -> MeetingGuestOut:
-    """Admit a waiting guest (#17). 409 ``guest_not_pending`` for any other status.
+    """Admit a waiting guest. 409 ``guest_not_pending`` for any other status.
 
     A guest admitted while a vote with guests is open votes in it too.
     """
@@ -1068,7 +1070,7 @@ async def reject_meeting_guest(
     guests: GuestServiceDep,
     principal: ReaderDep,
 ) -> MeetingGuestOut:
-    """Reject a waiting guest (#17). The device may ask again after 3 minutes."""
+    """Reject a waiting guest. The device may ask again after 3 minutes."""
     await _require_manage(service, meeting_id, principal)
     return await guests.reject(meeting_id, guest_id, actor_sub=principal.sub)
 
@@ -1085,7 +1087,7 @@ async def remove_meeting_guest(
     guests: GuestServiceDep,
     principal: ReaderDep,
 ) -> MeetingGuestOut:
-    """Remove an admitted guest (#17). The cast ballots stay counted."""
+    """Remove an admitted guest. The cast ballots stay counted."""
     await _require_manage(service, meeting_id, principal)
     return await guests.remove(meeting_id, guest_id, actor_sub=principal.sub)
 
@@ -1103,11 +1105,9 @@ async def rename_meeting_guest(
     guests: GuestServiceDep,
     principal: ReaderDep,
 ) -> MeetingGuestOut:
-    """Give a guest another name (#17). The audit entry holds the guest id only."""
+    """Give a guest another name. The audit entry holds the guest id only."""
     await _require_manage(service, meeting_id, principal)
-    return await guests.rename(
-        meeting_id, guest_id, payload.display_name, actor_sub=principal.sub
-    )
+    return await guests.rename(meeting_id, guest_id, payload.display_name, actor_sub=principal.sub)
 
 
 @router.get(
@@ -1118,7 +1118,7 @@ async def rename_meeting_guest(
 async def get_meeting_join_link(
     meeting_id: UUID, service: ServiceDep, guests: GuestServiceDep, principal: ReaderDep
 ) -> JoinLinkOut:
-    """Return the join link and its QR code (#17); 409 when the meeting is not public."""
+    """Return the join link and its QR code; 409 when the meeting is not public."""
     await _require_manage(service, meeting_id, principal)
     return await guests.join_link(meeting_id)
 
@@ -1131,7 +1131,7 @@ async def get_meeting_join_link(
 async def rotate_meeting_join_code(
     meeting_id: UUID, service: ServiceDep, guests: GuestServiceDep, principal: ReaderDep
 ) -> JoinLinkOut:
-    """Replace the join code (#17). The old link stops working; open requests are void.
+    """Replace the join code. The old link stops working; open requests are void.
 
     The admitted guests stay. Writes ``meeting_join_code_rotated``.
     """
@@ -1139,7 +1139,6 @@ async def rotate_meeting_join_code(
     return await guests.rotate(meeting_id, actor_sub=principal.sub)
 
 
-# WebSocket
 async def _authorize(
     websocket: WebSocket,
     meeting_id: UUID,
@@ -1150,8 +1149,13 @@ async def _authorize(
 ) -> tuple[Principal, bool] | None:
     """Check the handshake authentication and the RBAC.
 
+    The voter channel admits active Gremium members and the external substitutes that hold a
+    delegation for this meeting. The vote right itself is gated separately through the
+    gremium ``vote.cast`` and the delegation check. The read-only beamer channel needs
+    ``session.manage`` in the Gremium of the meeting, or the admin role.
+
     Returns:
-        The principal and its ``canManage`` flag (#17: the guest events with names
+        The principal and its ``canManage`` flag (the guest events with names
         reach only the meeting lead), or ``None`` when the socket is already closed.
     """
     if principal is None:
@@ -1162,11 +1166,6 @@ async def _authorize(
     except NotFoundError:
         await websocket.close(code=WS_NOT_FOUND)
         return None
-    # Voter channel: active Gremium members and the external substitutes that hold
-    # a delegation for this meeting may read the live stream. The vote right itself
-    # is gated separately through the gremium ``vote.cast`` and the delegation check. The
-    # dedicated read-only beamer channel needs ``session.manage`` in the Gremium of
-    # the meeting (or the admin role).
     eligible = (
         await meetings.can_manage(meeting.gremium_id, principal)
         if beamer
@@ -1191,22 +1190,23 @@ async def _serve(
     *,
     beamer: bool,
 ) -> None:
+    """Authorize the handshake, then run one live connection.
+
+    The handshake reads the session, the principal and the meeting. That transaction ends
+    before the socket opens, because the socket keeps its request session for its whole
+    life, and an open transaction would hold a pool connection.
+
+    The connection cap per meeting and principal applies before the accept, so a flooding
+    client never opens a socket. Above the cap the server sends a ``too_many_connections``
+    frame and closes with 4403, the code that the RBAC rejection also uses.
+    """
     try:
-        authorization = await _authorize(
-            websocket, meeting_id, principal, meetings, beamer=beamer
-        )
+        authorization = await _authorize(websocket, meeting_id, principal, meetings, beamer=beamer)
     finally:
-        # The handshake reads the session, the principal and the meeting. End that
-        # transaction before the socket opens: the socket keeps its request session
-        # for its whole life, and an open transaction would hold a pool connection.
         await voting.session.rollback()
     if authorization is None:
         return
     authorized, can_manage = authorization
-    # Check the connection cap per meeting and principal before the accept, so a
-    # flooding client never opens a socket. Above the cap the server sends a
-    # ``too_many_connections`` frame and closes with 4403, the code that the RBAC
-    # rejection also uses.
     if not _try_acquire_slot(meeting_id, authorized.sub):
         await websocket.accept()
         await websocket.send_json(ErrorEvent(code="too_many_connections").dump())

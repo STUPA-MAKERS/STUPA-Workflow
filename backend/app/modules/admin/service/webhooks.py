@@ -17,10 +17,10 @@ from app.modules.admin.schemas import (
 )
 from app.modules.admin.service.service_base import ConfigServiceBase, _iso
 from app.modules.audit.actions import AuditAction
-from app.modules.webhooks.ssrf import SsrfError, assert_allowed_url
 from app.settings import get_settings
 from app.shared.config_schemas import EventName
 from app.shared.errors import BadRequestError, NotFoundError
+from app.shared.ssrf import SsrfError, assert_allowed_url
 
 
 def _webhook_out(row: Webhook) -> WebhookOut:
@@ -39,15 +39,14 @@ def _delivery_reason_class(status: str, response_code: int | None) -> str:
     The bucket stays coarse on purpose and shows no host or IP detail. A
     ``response_code`` of ``None`` on ``dead`` means an SSRF block at send time
     or a transport error such as DNS, connect or timeout. Both map to
-    ``unreachable_or_blocked``, which hides the blocked IP.
+    ``unreachable_or_blocked``, which hides the blocked IP. ``failed`` without a
+    response still retries and maps to ``transient_transport_error``.
     """
     if status == "ok":
         return "delivered"
     if status == "pending":
         return "in_progress"
     if response_code is None:
-        # No HTTP response points to a transport, DNS or SSRF problem. The status
-        # failed still retries, the status dead does not.
         return "transient_transport_error" if status == "failed" else "unreachable_or_blocked"
     if 400 <= response_code < 500:
         return "rejected_by_target"
@@ -59,19 +58,22 @@ def _delivery_reason_class(status: str, response_code: int | None) -> str:
 def _delivery_status_out(
     webhook_id: UUID, row: WebhookDelivery | None
 ) -> WebhookDeliveryStatusOut:
-    """Reduce the latest delivery to a coarse view without IP or body detail."""
+    """Reduce the latest delivery to a coarse view without IP or body detail.
+
+    The four DB states map to three admin states: ``ok`` is ``sent``, ``dead`` stays
+    ``dead``, and ``pending`` or ``failed`` with a retry in progress is ``pending``.
+    """
     if row is None:
         return WebhookDeliveryStatusOut(
             webhook_id=webhook_id,
             last_state="never",
             reason_class="no_deliveries",
         )
-    # The four DB states pending, ok, failed and dead map to three admin states.
     if row.status == "ok":
         last_state = "sent"
     elif row.status == "dead":
         last_state = "dead"
-    else:  # pending, or failed with a retry in progress
+    else:
         last_state = "pending"
     return WebhookDeliveryStatusOut(
         webhook_id=webhook_id,
@@ -87,6 +89,7 @@ class WebhookOps(ConfigServiceBase):
     """Webhook CRUD and delivery-status diagnostics."""
 
     async def list_webhooks(self) -> list[WebhookOut]:
+        """List the webhooks by name."""
         rows = (
             await self.session.scalars(select(Webhook).order_by(Webhook.name))
         ).all()
@@ -118,7 +121,6 @@ class WebhookOps(ConfigServiceBase):
             assert_allowed_url(url, allowlist=allowlist)
         except SsrfError as exc:
             msg = str(exc)
-            # A transient DNS failure must not block the save. The runtime guard applies.
             if msg.startswith("dns resolution failed"):
                 return
             raise BadRequestError(
@@ -127,6 +129,7 @@ class WebhookOps(ConfigServiceBase):
             ) from exc
 
     async def create_webhook(self, payload: WebhookCreate, actor: str) -> WebhookOut:
+        """Create a webhook after the advisory SSRF check of its URL."""
         self._assert_webhook_url_advisory(payload.url)
         row = Webhook(
             name=payload.name,
@@ -144,6 +147,11 @@ class WebhookOps(ConfigServiceBase):
     async def update_webhook(
         self, webhook_id: UUID, payload: WebhookUpdate, actor: str
     ) -> WebhookOut:
+        """Update a webhook.
+
+        Raises:
+            NotFoundError: No webhook has this id.
+        """
         row = await self.session.get(Webhook, webhook_id)
         if row is None:
             raise NotFoundError(f"webhook {webhook_id} not found")

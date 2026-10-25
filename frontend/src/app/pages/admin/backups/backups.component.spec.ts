@@ -114,9 +114,11 @@ describe('BackupsComponent', () => {
     expect(screen.queryByRole('menuitem', { name: 'Wiederherstellen' })).not.toBeInTheDocument();
   });
 
+  /**
+   * A disabled button with nothing beside it reads as a broken page. An import decrypts the archive
+   * to verify it, so it needs the private key.
+   */
   it('says why the import is dead rather than leaving a greyed-out button', async () => {
-    // The button was disabled with nothing beside it, which reads as a broken page. An
-    // import decrypts the archive to verify it, so it needs the private key.
     const api = makeApi({ listBackups: jest.fn(() => of(list({ restoreEnabled: false }))) });
     await setup(api);
     expect(screen.getByText(/BACKUP_AGE_IDENTITY_FILE/)).toBeInTheDocument();
@@ -141,9 +143,11 @@ describe('BackupsComponent', () => {
     expect(api.createBackup).toHaveBeenCalledWith(null);
   });
 
+  /**
+   * MinIO is internal, so a presigned URL names a host the browser cannot resolve. The bytes come
+   * through the API and are saved as a blob.
+   */
   it('downloads the archive bytes instead of opening a store URL', async () => {
-    // Regression: MinIO is internal, so a presigned URL names a host the browser cannot
-    // resolve. The bytes come through the API and are saved as a blob.
     (URL as unknown as { createObjectURL?: unknown }).createObjectURL = () => 'blob:mock';
     (URL as unknown as { revokeObjectURL?: unknown }).revokeObjectURL = () => undefined;
     const open = jest.spyOn(window, 'open').mockImplementation(() => null);
@@ -154,12 +158,12 @@ describe('BackupsComponent', () => {
     open.mockRestore();
   });
 
+  /** Every label names its archive by date, so the rows differ. */
   it('names the archive in each row menu and draws a pin, not a paperclip', async () => {
     await setup();
     const labels = screen
       .getAllByRole('button', { name: /^Aktionen: / })
       .map((b) => b.getAttribute('aria-label'));
-    // Every label names its archive by date, so the rows differ.
     expect(labels.every((l) => /: \d{2}\.\d{2}\.\d{4}/.test(l ?? ''))).toBe(true);
     await userEvent.click(screen.getAllByRole('button', { name: /^Aktionen: / })[0]);
     await screen.findByRole('menuitem', { name: 'Anheften' });
@@ -174,7 +178,7 @@ describe('BackupsComponent', () => {
     expect(api.updateBackup).toHaveBeenCalledWith('b-1', { pinned: true });
   });
 
-  // A restore replaces the whole platform, so the confirmation is the safety rail.
+  /** A restore replaces the whole platform, so the confirmation is the safety rail. */
   describe('restore', () => {
     it('stays disabled until the confirmation word is typed', async () => {
       await setup();
@@ -209,15 +213,16 @@ describe('BackupsComponent', () => {
       expect(api.deleteBackup).toHaveBeenCalledWith('b-1');
     });
 
+    /** The second row is pinned, so its delete item is disabled. */
     it('refuses a pinned archive in the UI, not only in the API', async () => {
       await setup();
-      // The second row is pinned, so its delete item is disabled.
       await userEvent.click(screen.getAllByRole('button', { name: /^Aktionen: / })[1]);
       const del = await screen.findByRole('menuitem', { name: 'Löschen' });
       expect(del).toHaveAttribute('aria-disabled', 'true');
     });
   });
 
+  /** When the row is done, a second tick must not poll again. */
   it('polls while a job runs and stops when it finishes', async () => {
     jest.useFakeTimers();
     const getBackup = jest.fn(() => of({ ...RUNNING, status: 'done' as const }));
@@ -235,7 +240,6 @@ describe('BackupsComponent', () => {
     jest.advanceTimersByTime(3000);
     expect(getBackup).toHaveBeenCalledWith('b-3');
     expect(toast.success).toHaveBeenCalled();
-    // The row is done now, so a second tick must not poll again.
     getBackup.mockClear();
     jest.advanceTimersByTime(9000);
     expect(getBackup).not.toHaveBeenCalled();

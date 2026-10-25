@@ -19,7 +19,12 @@ streams through them.
 
 The functions do the encoding and the encryption only. They run no subprocess and touch
 no database, so the unit tests cover them directly. `service.py` supplies the dump and
-the objects, and `tasks.py` runs the pg_dump/pg_restore subprocesses.
+the objects and runs the pg_dump/pg_restore subprocesses. `worker/backup.py` calls it.
+
+pyrage is a native extension without stubs, so the type checker cannot see through
+``from .pyrage import *`` in its ``__init__``. The unit tests verify the imported
+names instead. pyrage raises its own exception types, so the parsers catch
+``Exception``.
 """
 
 from __future__ import annotations
@@ -28,14 +33,11 @@ import hashlib
 import io
 import json
 import tarfile
-from collections.abc import Iterable, Iterator
+from collections.abc import Generator, Iterable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import IO
 
-# pyrage is a native extension and ships no stubs, so the type checker cannot see
-# through `from .pyrage import *` in its `__init__`. The names are verified by the
-# unit tests instead.
 from pyrage import (
     decrypt_io,  # pyright: ignore[reportAttributeAccessIssue]
     encrypt_io,  # pyright: ignore[reportAttributeAccessIssue]
@@ -48,8 +50,8 @@ from app.modules.backup.models import (
     ARCHIVE_OBJECT_PREFIX,
 )
 
-# Bump this when the layout changes in a way an older reader cannot handle. `read_manifest`
-# refuses a higher version rather than guessing at the contents.
+#: Bump this when the layout changes in a way an older reader cannot handle. `read_manifest`
+#: refuses a higher version rather than guessing at the contents.
 ARCHIVE_FORMAT_VERSION = 1
 
 _CHUNK = 1024 * 1024
@@ -126,7 +128,7 @@ def recipient_from_str(value: str) -> x25519.Recipient:
     """
     try:
         return x25519.Recipient.from_str(value.strip())
-    except Exception as exc:  # pyrage raises its own RecipientError
+    except Exception as exc:
         raise ArchiveError("backup_age_recipient is not a valid age public key") from exc
 
 
@@ -146,7 +148,7 @@ def identity_from_str(value: str) -> x25519.Identity:
             continue
         try:
             return x25519.Identity.from_str(stripped)
-        except Exception:  # noqa: S112 — a comment line is not a key, try the next
+        except Exception:
             continue
     raise ArchiveError("the age identity file holds no usable private key")
 
@@ -169,12 +171,13 @@ def write_tar(
             reader is consumed once and left to the caller to close.
         manifest: Metadata. `object_count` is overwritten with the real count.
 
+    The manifest goes in last, because only then is the object count known. tar has no
+    index, so a reader scans the members anyway and the order does not matter to it.
+
     Returns:
         The number of objects written.
     """
     count = 0
-    # The manifest goes in last, because only then is the object count known. tar has no
-    # index, so a reader scans the members anyway and the order does not matter to it.
     with tarfile.open(fileobj=target, mode="w") as tar:
         _add_stream(tar, ARCHIVE_DUMP_NAME, dump, _size_of(dump))
         for key, reader in objects:
@@ -248,22 +251,23 @@ def decrypt_stream(source: IO[bytes], target: IO[bytes], identity: x25519.Identi
     source.seek(0)
     try:
         decrypt_io(source, target, [identity])
-    except Exception as exc:  # pyrage raises its own DecryptError
+    except Exception as exc:
         raise ArchiveError("the archive does not decrypt with the configured age identity") from exc
     target.seek(0)
 
 
 @contextmanager
-def open_tar(handle: IO[bytes]) -> Iterator[tarfile.TarFile]:
+def open_tar(handle: IO[bytes]) -> Generator[tarfile.TarFile]:
     """Open a decrypted tar for reading.
+
+    The ``finally`` of this context manager closes the tar, so the SIM115 advice does
+    not apply.
 
     Raises:
         ArchiveError: The bytes are not a readable tar.
     """
     handle.seek(0)
     try:
-        # The close happens in the `finally` below, which is what this contextmanager
-        # exists for, so the SIM115 "use a context manager" advice does not apply.
         tar = tarfile.open(fileobj=handle, mode="r")  # noqa: SIM115
     except tarfile.TarError as exc:
         raise ArchiveError("archive is not a readable tar") from exc

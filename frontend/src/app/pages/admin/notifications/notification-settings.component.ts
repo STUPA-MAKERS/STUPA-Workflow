@@ -17,7 +17,7 @@ import type { LoadState } from '@shared/forms/settings-form';
 import { LoadStateComponent } from '@shared/ui/load-state/load-state.component';
 
 /**
- * Admin notification settings (board Admin-Benachrichtigungen, permission
+ * Admin notification settings (permission
  * `admin.notifications`).
  *
  * The page holds the platform config of the task reminders: on or off, the threshold in

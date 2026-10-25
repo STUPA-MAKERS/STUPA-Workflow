@@ -37,7 +37,7 @@ import {
 } from '@stupa-makers/ui-kit';
 
 /**
- * "Vertretung einrichten" (board Teilnahme-Vertretung): the member picks who represents
+ * "Vertretung einrichten": the member picks who represents
  * them in one meeting.
  *
  * - "Deine Stellvertretung": the substitutes of the member (the pool of the gremium,
@@ -118,7 +118,6 @@ export class DelegationDialogComponent {
   protected readonly canSubmit = computed(() => this.selected() !== '' && !this.busy());
 
   constructor() {
-    // A new opening starts empty.
     effect(() => {
       if (!this.open()) return;
       untracked(() => {
@@ -143,7 +142,6 @@ export class DelegationDialogComponent {
 
   protected search(q: string): void {
     this.query.set(q);
-    // Without external substitutes the list of members is complete: filter it here.
     if (this.context().delegationAllowExternal) this.remote.set(q);
   }
 

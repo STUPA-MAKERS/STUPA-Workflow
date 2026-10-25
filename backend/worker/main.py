@@ -53,29 +53,29 @@ async def ping(ctx: dict[str, object]) -> str:
     return "pong"
 
 
-# Hard per-job deadline for `deliver_webhook`. The task shares the arq worker with mail,
-# scan, render and the crons. A slow or hostile target must not hold a slot for the
-# arq default of 300 s. This bound sits one level below the service cap
-# `webhook_timeout_seconds`.
+#: Hard deadline of ``deliver_webhook``. The task shares the worker with mail, scan,
+#: render and the crons, so a slow or hostile target must not hold a slot for the arq
+#: default of 300 s. It sits one level below ``webhook_timeout_seconds``.
 _WEBHOOK_JOB_TIMEOUT_SECONDS = 30.0
 
-# A backup dumps the whole database and mirrors the attachment bucket, and a restore
-# puts both back. Neither fits the arq default of 300 s on a real dataset. The bound
-# sits one level above the subprocess timeout `backup_subprocess_timeout_seconds`.
+#: Deadline of a backup or restore, which dumps or restores the whole database and the
+#: attachment bucket; neither fits the arq default of 300 s. It sits one level above
+#: ``backup_subprocess_timeout_seconds``.
 _BACKUP_JOB_TIMEOUT_SECONDS = 7200.0
 
-# The nightly audit-chain check reads the whole `audit_entry` table, so its run time
-# grows with the log. With the arq default of 300 s, arq cancels the job on a large
-# log, the transaction rolls back and no `audit_verification` row is stored. The tile
-# then keeps the last stored result. The bound is the same as for a backup, which
-# reads the same table and more.
+#: Deadline of the nightly audit-chain check. It reads the whole ``audit_entry`` table.
+#: With the arq default of 300 s, arq cancels it on a large log, the transaction rolls
+#: back and no ``audit_verification`` row is stored. It equals the backup bound, because
+#: a backup reads the same table and more.
 _AUDIT_VERIFY_JOB_TIMEOUT_SECONDS = 7200.0
 
 
 async def _on_startup(ctx: dict[str, Any]) -> None:
     """Set up the mail, scan, protocol render, webhook and deadline dependencies.
 
-    It also enqueues the one-off conversion of the vendored CD logos.
+    It also enqueues the one-off conversion of the vendored CD logos. That step runs
+    after the protocol start-up, because the conversion job reads the object storage
+    that the protocol start-up builds.
 
     It also builds the flow action dispatcher once. The deadline cron, the automatic
     transitions and the vote auto-close read it from `ctx['flow_dispatcher']`, so a
@@ -87,8 +87,6 @@ async def _on_startup(ctx: dict[str, Any]) -> None:
     await webhook_on_startup(ctx)
     await deadlines_on_startup(ctx)
     await backup_on_startup(ctx)
-    # After the protocol start-up, because the conversion job reads the object
-    # storage that it builds.
     await cd_builtin_on_startup(ctx)
     ctx["flow_dispatcher"] = build_worker_dispatcher(
         ctx.get("redis"), get_sessionmaker(), ctx.get("settings")
@@ -132,6 +130,22 @@ async def _shutdown(ctx: dict[str, Any]) -> None:  # pragma: no cover
 
 
 class WorkerSettings:
+    """arq settings of the worker: the jobs, the crons and the lifecycle hooks.
+
+    The crons: the budget stats at 03:00. GDPR retention at 03:30 anonymizes
+    terminal applications and purges expired sessions and magic links; it does not touch
+    budget data. Ticket retention at 03:45 anonymizes tickets closed longer than
+    ``tickets.retentionMonths`` (reporter, context, attachments). The to-do archive at
+    03:50 archives cards longer than ``archive_after_days`` in the done column. The
+    deadline and vote scan runs every minute; it is idempotent and uses SKIP LOCKED.
+    Task reminders run hourly (thresholds in days); ``task_reminder_log`` prevents
+    duplicate sends. Expired wizard drafts go hourly with their objects. The public
+    protocol heal builds the public versions that a failed or raced backfill left out,
+    so they appear without a new switch of the gremium flag. The backup at 04:00 runs
+    after retention, so the archive holds the anonymized state rather than PII that
+    retention is about to drop. The audit-chain check at 04:30 does not depend on the
+    backup and runs also when backups are off or failed.
+    """
     functions = [
         ping,
         refresh_budget_stats,
@@ -155,30 +169,14 @@ class WorkerSettings:
     ]
     cron_jobs = [
         cron(refresh_budget_stats, hour=3, minute=0),
-        # GDPR retention: anonymize terminal applications once a day and purge expired
-        # sessions and magic links. The job does not touch budget data.
         cron(process_retention, hour=3, minute=30),
-        # Ticket retention: anonymize the tickets closed longer than
-        # `tickets.retentionMonths` ago (reporter, context and attachments).
         cron(anonymize_tickets, hour=3, minute=45),
-        # To-do archive: the cards longer than `archive_after_days` in the done column.
         cron(archive_done_todos, hour=3, minute=50),
-        # Scan deadlines and votes every minute. The scan is idempotent and uses
-        # SKIP LOCKED.
         cron(process_deadlines, second=0),
-        # Task reminders run hourly. The thresholds are in days. The task_reminder_log
-        # table prevents duplicate sends.
         cron(process_task_reminders, minute=10),
-        # Expired draft uploads of the wizard (Z4) go hourly, with their objects.
         cron(purge_draft_attachments, minute=20),
-        # Public protocols: build the public versions that a failed or raced backfill
-        # left out, so they appear without a new switch of the gremium flag.
         cron(heal_public_protocols, minute=40),
-        # Nightly backup. It runs after the retention job, so the archive holds the
-        # already-anonymized state rather than PII that retention is about to drop.
         cron(scheduled_backup, hour=4, minute=0),
-        # Nightly audit-chain check (Z6/O8). It does not depend on the backup and runs
-        # also when backups are off or failed. The result goes to `audit_verification`.
         cron(
             process_audit_verification,
             hour=4,

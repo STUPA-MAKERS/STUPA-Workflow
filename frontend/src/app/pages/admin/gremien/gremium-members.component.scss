@@ -41,7 +41,6 @@
 .gmm__name {
   font-weight: var(--fw-semibold);
 }
-/* An e-mail address wraps; it is never cut. */
 .gmm__mail {
   font-size: var(--fs-sm);
   color: var(--color-text-muted);
@@ -57,7 +56,6 @@
   --button-font-size: var(--fs-sm);
 }
 
-/* A narrow container: the e-mail goes under the name. */
 @container (max-width: 40rem) {
   .gmm__row {
     grid-template-columns: 2rem minmax(0, 1fr) auto;

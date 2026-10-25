@@ -12,9 +12,9 @@
   gap: var(--space-1) var(--space-3);
   margin: 0;
 }
+// `app-status-text` never wraps, and a result such as "Gewählt: Anna, Ben" can be longer
+// than the card.
 .bars__result {
-  /* app-status-text never wraps; a result such as "Gewählt: Anna, Ben" can be longer
-     than the card, so it wraps here. */
   flex: 0 1 auto;
   min-width: 0;
   white-space: normal;
@@ -63,7 +63,6 @@
   color: var(--color-text-subtle);
 }
 
-/* Beamer: large type for the projector (board Beamer). */
 :host(.bars--beamer) {
   gap: var(--space-8);
 

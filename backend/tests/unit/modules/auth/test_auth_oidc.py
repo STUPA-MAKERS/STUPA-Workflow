@@ -1,4 +1,4 @@
-"""TDD: OIDC (security.md §2) — discovery, PKCE, token exchange, id_token verify.
+"""TDD: OIDC — discovery, PKCE, token exchange, id_token verify.
 
 The IdP here is shaped like authentik: the issuer ends in a slash, and the endpoints do
 not sit under the issuer path. A module that builds a URL from the issuer instead of
@@ -72,9 +72,10 @@ def _clear_caches() -> object:
 
 
 def test_pkce_pair_and_state_nonce() -> None:
+    """Make a PKCE pair without padding, plus a state and a nonce."""
     verifier, challenge = oidc.generate_pkce()
     assert verifier and challenge
-    assert "=" not in challenge  # no padding
+    assert "=" not in challenge
     assert oidc.generate_state() != oidc.generate_state()
     assert oidc.generate_nonce() != oidc.generate_nonce()
 
@@ -140,7 +141,7 @@ async def test_exchange_code_unreachable() -> None:
             await oidc.exchange_code(_settings(), code="c", verifier="v")
 
 
-# The id_token verify tests sign with a real RS256 key.
+#: The id_token verify tests sign with a real RS256 key.
 _KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 _KID = "k1"
 
@@ -161,10 +162,11 @@ def _id_token(**claims: object) -> str:
         "exp": now + timedelta(hours=1),
     }
     payload.update(claims)
-    return jwt.encode(payload, _KEY, algorithm="RS256", headers={"kid": _KID})  # type: ignore[arg-type]
+    return jwt.encode(payload, _KEY, algorithm="RS256", headers={"kid": _KID})
 
 
 async def test_verify_id_token_happy() -> None:
+    """Verify a valid ID token; a missing `email_verified` claim counts as unverified."""
     token = _id_token(email="e@x.de", name="N", nonce="nc", groups=["stupa", "asta"])
     with respx.mock:
         _serve_discovery()
@@ -173,18 +175,20 @@ async def test_verify_id_token_happy() -> None:
     assert claims.sub == "user-1"
     assert claims.email == "e@x.de"
     assert claims.groups == ["stupa", "asta"]
-    assert claims.email_verified is False  # the claim is missing, so treat it as unverified
+    assert claims.email_verified is False
 
 
 async def test_verify_id_token_email_verified_claim() -> None:
-    """`email_verified` counts only when it is strictly True (#70 email bootstrap)."""
+    """`email_verified` counts only when it is strictly True (email bootstrap).
+
+    A truthy value that is not True, such as the string "true", does not count.
+    """
     with respx.mock:
         _serve_discovery()
         respx.get(CERTS).mock(return_value=httpx.Response(200, json={"keys": [_jwk()]}))
         verified = await oidc.verify_id_token(
             _settings(), id_token=_id_token(nonce="nc", email_verified=True), nonce="nc"
         )
-        # A truthy value that is not True, such as the string "true", does not count.
         unverified = await oidc.verify_id_token(
             _settings(), id_token=_id_token(nonce="nc", email_verified="true"), nonce="nc"
         )
@@ -193,13 +197,14 @@ async def test_verify_id_token_email_verified_claim() -> None:
 
 
 async def test_verify_id_token_groups_non_list_falls_back() -> None:
+    """Ignore a non-list groups claim; the name falls back to preferred_username."""
     token = _id_token(nonce="nc", groups="not-a-list", preferred_username="pu")
     with respx.mock:
         _serve_discovery()
         respx.get(CERTS).mock(return_value=httpx.Response(200, json={"keys": [_jwk()]}))
         claims = await oidc.verify_id_token(_settings(), id_token=token, nonce="nc")
     assert claims.groups == []
-    assert claims.name == "pu"  # falls back to preferred_username
+    assert claims.name == "pu"
 
 
 async def test_verify_id_token_nonce_mismatch() -> None:
@@ -246,6 +251,7 @@ async def test_verify_id_token_wrong_audience() -> None:
 
 
 async def test_jwks_cached_across_calls() -> None:
+    """Cache the JWKS, so the second verify uses the cache."""
     token = _id_token(nonce="nc")
     with respx.mock:
         _serve_discovery()
@@ -254,10 +260,11 @@ async def test_jwks_cached_across_calls() -> None:
         )
         await oidc.verify_id_token(_settings(), id_token=token, nonce="nc")
         await oidc.verify_id_token(_settings(), id_token=token, nonce="nc")
-        assert route.call_count == 1  # the second verify uses the cache
+        assert route.call_count == 1
 
 
 async def test_jwks_refetched_after_ttl(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Load the JWKS again after the TTL expires."""
     clock = {"t": 1000.0}
     monkeypatch.setattr(oidc, "_monotonic", lambda: clock["t"])
     token = _id_token(nonce="nc")
@@ -269,19 +276,24 @@ async def test_jwks_refetched_after_ttl(monkeypatch: pytest.MonkeyPatch) -> None
         await oidc.verify_id_token(_settings(), id_token=token, nonce="nc")
         clock["t"] = 1000.0 + oidc._JWKS_TTL_SECONDS + 1
         await oidc.verify_id_token(_settings(), id_token=token, nonce="nc")
-        assert route.call_count == 2  # the TTL expired, so the JWKS loads again
+        assert route.call_count == 2
 
 
 async def test_jwks_force_refetch_on_unknown_kid() -> None:
-    token = _id_token(nonce="nc")  # the kid is k1
+    """Force a JWKS reload on an unknown kid.
+
+    The token has kid k1. The cache holds no k1, so the forced reload fetches the set
+    with k1.
+    """
+    token = _id_token(nonce="nc")
     stale = _jwk()
     stale["kid"] = "rotated-away"
     with respx.mock:
         _serve_discovery()
         route = respx.get(CERTS).mock(
             side_effect=[
-                httpx.Response(200, json={"keys": [stale]}),  # cache without k1
-                httpx.Response(200, json={"keys": [_jwk()]}),  # forced reload with k1
+                httpx.Response(200, json={"keys": [stale]}),
+                httpx.Response(200, json={"keys": [_jwk()]}),
             ]
         )
         claims = await oidc.verify_id_token(_settings(), id_token=token, nonce="nc")
@@ -290,8 +302,11 @@ async def test_jwks_force_refetch_on_unknown_kid() -> None:
 
 
 async def test_verify_id_token_rejects_hs256() -> None:
-    # HS256 signature, the algorithm-confusion attack that uses the public key as the HMAC
-    # secret. The token carries no kid, so no JWKS key matches and the verify fails.
+    """Reject an HS256 token.
+
+    HS256 is the algorithm-confusion attack that uses the public key as the HMAC secret.
+    The token carries no kid, so no JWKS key matches and the verify fails.
+    """
     now = datetime.now(UTC)
     payload = {
         "sub": "u", "aud": CLIENT_ID, "iss": ISSUER,
@@ -306,8 +321,11 @@ async def test_verify_id_token_rejects_hs256() -> None:
 
 
 async def test_verify_id_token_rejects_alg_none() -> None:
-    # An unsigned token with alg=none and a matching kid reaches decode. Decode accepts
-    # RS256 only, so it raises InvalidAlgorithm, which the module turns into OidcError.
+    """Reject an unsigned token with alg=none.
+
+    The token has a matching kid, so it reaches decode. Decode accepts RS256 only, so it
+    raises InvalidAlgorithm, which the module turns into OidcError.
+    """
     def _b64(obj: dict[str, object]) -> str:
         return base64.urlsafe_b64encode(json.dumps(obj).encode()).rstrip(b"=").decode()
 
@@ -325,11 +343,11 @@ async def test_verify_id_token_rejects_alg_none() -> None:
             await oidc.verify_id_token(_settings(), id_token=token, nonce="nc")
 
 
-# Discovery (OpenID Connect Discovery 1.0).
-
-
 async def test_discovery_serves_all_four_endpoints() -> None:
-    """Every endpoint the flow calls comes from the discovery document, none from a path."""
+    """Every endpoint the flow calls comes from the discovery document, none from a path.
+
+    One load serves all four, from the cache.
+    """
     token = _id_token(nonce="nc")
     with respx.mock:
         discovery = _serve_discovery()
@@ -345,7 +363,7 @@ async def test_discovery_serves_all_four_endpoints() -> None:
         await oidc.exchange_code(_settings(), code="c", verifier="v")
         await oidc.verify_id_token(_settings(), id_token=token, nonce="nc")
         logout = await oidc.end_session_url(_settings(), id_token=None)
-        assert discovery.call_count == 1  # one load serves all four, from the cache
+        assert discovery.call_count == 1
     assert authorize.startswith(f"{AUTHORIZE}?")
     assert token_route.call_count == 1
     assert certs_route.call_count == 1
@@ -361,11 +379,12 @@ async def test_discovery_url_has_no_double_slash() -> None:
 
 
 async def test_discovery_issuer_mismatch() -> None:
+    """Reject a document with a wrong issuer and do not cache it."""
     with respx.mock:
         _serve_discovery(issuer="https://evil.example/application/o/antrag/")
         with pytest.raises(oidc.OidcUnavailableError, match="issuer mismatch"):
             await oidc.discover(ISSUER)
-    assert oidc._discovery_cache == {}  # a rejected document is not cached
+    assert oidc._discovery_cache == {}
 
 
 async def test_discovery_issuer_compare_is_exact() -> None:
@@ -486,8 +505,8 @@ async def test_verify_id_token_iss_matches_configured_issuer_verbatim() -> None:
     assert ok.sub == "user-1"
 
 
-# Refresh grant of the session renewal.
 async def test_refresh_tokens_ok() -> None:
+    """Run the refresh grant of the session renewal."""
     with respx.mock:
         _serve_discovery()
         route = respx.post(TOKEN).mock(

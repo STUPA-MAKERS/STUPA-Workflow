@@ -1,4 +1,4 @@
-"""OpenAPI error contract (api.md §2).
+"""OpenAPI error contract.
 
 Error responses use the problem+json media type.
 """
@@ -29,17 +29,21 @@ def test_problem_detail_component_registered() -> None:
 
 
 def test_openapi_served_and_cached() -> None:
+    """Serve the OpenAPI schema and cache it.
+
+    The second call uses the cache, because ``app.openapi_schema`` is set.
+    """
     app = create_app()
     client = TestClient(app)
     first = client.get("/openapi.json")
     assert first.status_code == 200
-    # The second call uses the cache because app.openapi_schema is set.
     assert client.get("/openapi.json").json() == first.json()
 
 
 def test_ensure_problem_components_idempotent() -> None:
+    """Add the problem components once; the second run returns early."""
     schema: dict[str, object] = {}
     _ensure_problem_components(schema)
-    _ensure_problem_components(schema)  # The second run returns early.
+    _ensure_problem_components(schema)
     schemas = schema["components"]["schemas"]  # type: ignore[index]
     assert "ProblemDetail" in schemas

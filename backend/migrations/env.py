@@ -36,6 +36,7 @@ def _database_url() -> str:
 
 
 def run_migrations_offline() -> None:
+    """Emit the migration SQL without a database connection."""
     context.configure(
         url=_database_url(),
         target_metadata=target_metadata,
@@ -58,6 +59,7 @@ def _do_run_migrations(connection: Connection) -> None:
 
 
 async def run_migrations_online() -> None:
+    """Run the migrations over an async engine without a pool."""
     config.set_main_option("sqlalchemy.url", _database_url())
     connectable = async_engine_from_config(
         config.get_section(config.config_ini_section, {}),

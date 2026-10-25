@@ -119,7 +119,7 @@ const DUE_TEXT: Record<BoardFilter['due'], TranslationKey> = {
 };
 
 /**
- * "Boards" (`/todos`, `/todos/:boardId`): one board of the person (frames 0–9, 11–14, 34).
+ * "Boards" (`/todos`, `/todos/:boardId`): one board of the person.
  *
  * `/todos` opens the personal board "Meine To-Dos", else the board of the first own Gremium;
  * a board in the URL wins. The header holds "Board | Liste" and, at its end, the board
@@ -157,6 +157,10 @@ const DUE_TEXT: Record<BoardFilter['due'], TranslationKey> = {
  * `board` is the ETag read of the board. The rows below the board and "Alle" take their
  * own pings. While a card is held or a move of the page is in flight, the pings wait.
  * While the socket is up, the poll reads every 120 seconds instead of 30.
+ *
+ * It is a pane page (`styles.scss`) except for the list on a phone: on a phone the board
+ * fills the free height too, so its column pages scroll inside, while the list scrolls as a
+ * page.
  */
 @Component({
   selector: 'app-todos',
@@ -192,8 +196,6 @@ const DUE_TEXT: Record<BoardFilter['due'], TranslationKey> = {
     TodoMoveSheetComponent,
     TodoTransferDialogComponent,
   ],
-  // On a phone the board fills the free height too, so its column pages scroll inside;
-  // the list scrolls as a page.
   host: { '[class.pane-page]': "!phone() || view() === 'board'", class: 'todos-host' },
   templateUrl: './todos.component.html',
   styleUrl: './todos.component.scss',
@@ -355,7 +357,6 @@ export class TodosComponent implements OnDestroy {
     const personal = this.summary()?.kind === 'personal';
     return {
       columns: 4,
-      // A new personal board has no labels, so its chip row has no label chip.
       labels: !personal,
       natural: personal && this.view() === 'board' && this.rowsExpected(),
     };
@@ -415,8 +416,6 @@ export class TodosComponent implements OnDestroy {
   readonly openCount = computed(() => {
     if (this.all()) return this.rowsView()?.openCount() ?? 0;
     const board = this.board();
-    // While the board loads, the list already knows its count, so the search does not
-    // say "0 offene To-Dos".
     if (!board) return this.summary()?.openCount ?? 0;
     const done = this.doneColumns();
     return board.cards.filter((c) => !done.has(c.columnId)).length;
@@ -502,6 +501,12 @@ export class TodosComponent implements OnDestroy {
     return [{ items }];
   });
 
+  /**
+   * The read-ahead of every board and its cards waits until the shown board answered, because it
+   * would otherwise queue in front of the reads the page shows first. The sheet and its transfer
+   * dialog live on the phone only: a wider window closes them and forgets the tile, so they do not
+   * open again on the way back.
+   */
   constructor() {
     this.api.boards().subscribe({
       next: (boards) => {
@@ -517,11 +522,9 @@ export class TodosComponent implements OnDestroy {
       },
     });
 
-    // A card-only link: open the board the card is on now.
     const linked = this.boardId() ? null : this.cardId();
     if (linked) this.openCardBoard(linked);
 
-    // An entry URL with a board and a card: the card may have moved to another board.
     effect(() => {
       const id = this.entryCard();
       if (!id || !this.boardsRead()) return;
@@ -531,17 +534,12 @@ export class TodosComponent implements OnDestroy {
       });
     });
 
-    // A board in the route: read it (and its people) when it changes. "Alle" has no
-    // board: its rows read themselves.
     effect(() => {
       const id = this.boardId();
       if (!id) return;
       untracked(() => (id === ALL_BOARDS ? this.enterAll() : this.loadBoard(id)));
     });
 
-    // Once the shown board (and the rows under it) answered, read every board and its
-    // cards ahead, so a board change and an opened card show at once. Before that the
-    // read-ahead would queue in front of the reads the page shows first.
     effect(() => {
       if (!this.settled()) return;
       untracked(() => {
@@ -553,14 +551,12 @@ export class TodosComponent implements OnDestroy {
       });
     });
 
-    // "Alle": my principal id is the one member of my personal board.
     effect(() => {
       const id = this.all() ? this.personalId() : null;
       if (!id) return;
       untracked(() => this.loadMe(id));
     });
 
-    // Keep the shown board and its people for a return.
     effect(() => {
       const b = this.board();
       if (b) untracked(() => this.cache.putBoard(b, this.etag));
@@ -571,7 +567,6 @@ export class TodosComponent implements OnDestroy {
       if (b && list.length) untracked(() => this.cache.putMembers(b.id, list));
     });
 
-    // The drawer takes the focus once when it opens for a card.
     effect(() => {
       const id = this.cardId();
       const el = this.drawer();
@@ -585,8 +580,6 @@ export class TodosComponent implements OnDestroy {
       }
     });
 
-    // The sheet and its transfer dialog live on the phone only: a wider window closes
-    // them and forgets the tile, so they do not open again on the way back.
     effect(() => {
       if (this.phone()) return;
       untracked(() => {
@@ -596,10 +589,8 @@ export class TodosComponent implements OnDestroy {
       });
     });
 
-    // Side by side the page fills the viewport and only the columns scroll.
     effect(() => this.frame.fill.set(!this.phone()));
 
-    // The pings of the shown board.
     effect((onCleanup) => {
       const id = this.liveBoard();
       if (!id) return;
@@ -611,8 +602,6 @@ export class TodosComponent implements OnDestroy {
       onCleanup(() => sub.unsubscribe());
     });
 
-    // Poll every 30 s while the tab is visible (120 s while the socket is up), and on the
-    // focus of the window.
     interval(BOARD_POLL_MS)
       .pipe(
         filter(() => typeof document === 'undefined' || document.visibilityState !== 'hidden'),
@@ -695,7 +684,6 @@ export class TodosComponent implements OnDestroy {
     this.rowMatches.set(null);
     this.filter.set(NO_FILTER);
     this.search.sync('');
-    // A board read ahead shows at once; the read behind it keeps it on a 304.
     if (held) {
       this.board.set(held.board);
       this.etag = held.etag;
@@ -782,8 +770,6 @@ export class TodosComponent implements OnDestroy {
     });
   }
 
-  // ------------------------------------------------------------------ live
-
   /** A card is held anywhere on the page or a write is in flight: a live change waits. */
   private busy(): boolean {
     return this.hold() || !!this.rowsView()?.dragging();
@@ -816,7 +802,6 @@ export class TodosComponent implements OnDestroy {
     this.api.cardTile(ping.cardId).subscribe({
       next: (tile) => {
         if (seq !== this.loadSeq) return;
-        // The same load: the board answered before its first ping, and only a new load clears it.
         const board = this.board() as TodoBoard;
         if (this.busy() || writes !== this.localWrites) {
           this.liveRetry.next(ping);
@@ -836,11 +821,14 @@ export class TodosComponent implements OnDestroy {
     });
   }
 
-  /** Take a tile off the shown board when it holds it. */
+  /**
+   * Take a tile off the shown board when it holds it.
+   *
+   * A tile read that left before the drop would put the card back, so it counts as a write.
+   */
   private dropTile(cardId: Uuid): void {
     const board = this.board();
     if (!board?.cards.some((c) => c.id === cardId)) return;
-    // A tile read that left before the drop would put the card back: it counts as a write.
     this.wrote();
     this.board.set(removeTile(board, cardId));
   }
@@ -875,6 +863,7 @@ export class TodosComponent implements OnDestroy {
     });
   }
 
+  /** `/todos/mine` lists open cards only, so a card of mine in a done column stays mine. */
   private loadMine(): void {
     if (this.mineLoaded) return;
     this.mineLoaded = true;
@@ -882,7 +871,6 @@ export class TodosComponent implements OnDestroy {
     this.api.mine().subscribe({
       next: (m) => {
         if (seq !== this.mineSeq) return;
-        // `/todos/mine` lists open cards only: a card of mine in a done column stays mine.
         const done = this.doneColumns();
         const prev = this.mine();
         const kept = (this.board()?.cards ?? [])
@@ -910,8 +898,6 @@ export class TodosComponent implements OnDestroy {
     if (this.filter().assignee === 'me') this.loadMine();
   }
 
-  // ------------------------------------------------------------------ header
-
   pickBoard(id: Uuid): void {
     const list = id !== ALL_BOARDS && this.view() === 'list';
     void this.router.navigate(['/todos', id], { queryParams: { view: list ? 'list' : null } });
@@ -937,10 +923,7 @@ export class TodosComponent implements OnDestroy {
     this.newOpen.set(true);
   }
 
-  // ------------------------------------------------------------------ filters
-
   setAssignee(value: string): void {
-    // "Alle" knows the assignees of every card: "Ich" needs no `/todos/mine`.
     if (value === 'me' && !this.all()) this.loadMine();
     this.filter.update((f) => ({ ...f, assignee: value }));
   }
@@ -958,8 +941,6 @@ export class TodosComponent implements OnDestroy {
     this.search.clear();
     this.filter.set(NO_FILTER);
   }
-
-  // ------------------------------------------------------------------ cards
 
   openCard(id: Uuid): void {
     void this.router.navigate([], { relativeTo: this.route, queryParams: { card: id }, queryParamsHandling: 'merge' });
@@ -981,8 +962,11 @@ export class TodosComponent implements OnDestroy {
     }
   }
 
+  /**
+   * The drawer itself holds the focus after the open and is not in `items`, so a Tab from there
+   * wraps like one from an edge.
+   */
   onDrawerKey(event: KeyboardEvent): void {
-    // A dialog or sheet inside the drawer (the delete question of the chat) handles its own keys.
     if ((event.target as Element).closest('[role="dialog"]') !== event.currentTarget) return;
     if (event.key === 'Escape' && !event.defaultPrevented) {
       event.preventDefault();
@@ -990,9 +974,6 @@ export class TodosComponent implements OnDestroy {
       return;
     }
     const root = event.currentTarget as HTMLElement;
-    // Only the shown elements. The drawer itself holds the focus after the open and is not
-    // in `items`: a Tab from there (or from any element outside the list) wraps like one
-    // from an edge.
     const items = focusableIn(
       root,
       'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
@@ -1000,6 +981,7 @@ export class TodosComponent implements OnDestroy {
     trapTab(event, root, { items, outsideWraps: true, focusRootWhenEmpty: false });
   }
 
+  /** The rollback applies only when nothing else changed the board meanwhile. */
   moveCard(event: BoardMove): void {
     const board = this.board();
     if (!board) return;
@@ -1014,7 +996,6 @@ export class TodosComponent implements OnDestroy {
       },
       error: (err: unknown) => {
         this.toast.error(this.i18n.translate(moveErrorText(err, 'todos.error.move')));
-        // Roll back when nothing else changed the board meanwhile, then read it again.
         if (this.board() === optimistic) this.board.set(board);
         this.resync(board.id);
       },
@@ -1078,7 +1059,6 @@ export class TodosComponent implements OnDestroy {
   onCardChanged(card: TodoCardDetail): void {
     this.rowsView()?.cardChanged(card);
     const board = this.board();
-    // A card of another board (a row, or one that left with a transfer) is not on this board.
     if (!board || card.boardId !== board.id) return;
     const held = board.cards.some((c) => c.id === card.id);
     this.wrote();
@@ -1087,7 +1067,6 @@ export class TodosComponent implements OnDestroy {
     } else if (held) {
       this.board.set(placeTile(board, card));
     } else {
-      // A card the board does not hold came back from the archive (the drawer's restore).
       this.board.set({ ...placeTile(board, card), archivedCount: Math.max(0, board.archivedCount - 1) });
     }
     this.refreshMine();
@@ -1109,7 +1088,6 @@ export class TodosComponent implements OnDestroy {
     this.rowsView()?.cardRemoved(id);
     const board = this.board();
     this.wrote();
-    // A card of a row lives on another board: the archive count of this one stays.
     if (board?.cards.some((c) => c.id === id)) {
       this.board.set({ ...removeTile(board, id), archivedCount: board.archivedCount + 1 });
     }
@@ -1122,8 +1100,6 @@ export class TodosComponent implements OnDestroy {
     this.wrote();
     this.board.set({ ...placeTile(board, card), archivedCount: Math.max(0, board.archivedCount - 1) });
   }
-
-  // ------------------------------------------------------------------ sheet
 
   /** A long press on a tile (phone): the "Verschieben" sheet for it. */
   onTileMenu(request: TileMenuRequest): void {
@@ -1216,8 +1192,6 @@ export class TodosComponent implements OnDestroy {
     rows.receive(tile, event.boardId, event.move);
     this.track(this.api.transferCard(tile.id, { boardId: event.boardId, ...event.move })).subscribe({
       next: (card) => {
-        // A card of mine stays in its row (the server makes me its assignee when I am a
-        // member there); one that leaves the rows gets a toast from `accept`.
         this.rowsView()?.accept(card);
         this.refreshBoards();
         this.refreshMine();

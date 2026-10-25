@@ -58,7 +58,6 @@
 
     @if (votingEnabled()) {
       <div class="dd__voting">
-        <!-- The text is the label of the switch: the whole row toggles it. -->
         <label class="dd__votingText" for="lsd-voting">
           <span class="dd__votingLabel">{{ 'delegation.dialog.voting' | t }}</span>
           <span class="dd__note">{{ (voting() ? 'meetings.leadSubstitute.votingOn' : 'meetings.leadSubstitute.votingOff') | t: { name: memberName() } }}</span>

@@ -4,7 +4,6 @@
   display: block;
 }
 
-/* One line on surface 2 across the top of the sheet. */
 .pb {
   display: flex;
   align-items: center;
@@ -48,7 +47,6 @@
 .pb__actions:empty {
   display: none;
 }
-/* The PDF links look like small tonal buttons; they are links, so they stay `<a>`. */
 .pb__pdf {
   display: inline-flex;
   align-items: center;
@@ -73,9 +71,7 @@
   outline-offset: 2px;
 }
 
-/* A phone: the actions take their own line below the text. The icon and the text stay on
-   the first line: a zero basis lets the text wrap its words instead of moving to a line of
-   its own. */
+// A zero basis lets the text wrap its words instead of moving to a line of its own.
 @include bp.phone {
   .pb {
     flex-wrap: wrap;
@@ -84,7 +80,6 @@
   .pb__text {
     flex: 1 1 0;
   }
-  /* A text of two lines: the icon stays with the first line (line height 20px). */
   .pb__icon {
     align-self: flex-start;
     margin-top: 1px;

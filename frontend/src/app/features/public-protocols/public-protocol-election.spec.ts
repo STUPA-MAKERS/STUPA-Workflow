@@ -6,7 +6,7 @@ import { PublicProtocolDetailComponent } from './public-protocol-detail.componen
 import { PublicProtocolsService } from './public-protocols.service';
 import { detailFixture } from './public-protocols.fixtures';
 
-/** The fixture with one election decision on its second item (F2). */
+/** The fixture with one election decision on its second item. */
 function withElection(decision: PublicDecision): PublicProtocolDetail {
   const detail = detailFixture();
   return {
@@ -26,7 +26,7 @@ async function setup(decision: PublicDecision) {
   });
 }
 
-describe('PublicProtocolDetailComponent · election (F2)', () => {
+describe('PublicProtocolDetailComponent · election', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
   afterEach(() => localStorage.clear());
 

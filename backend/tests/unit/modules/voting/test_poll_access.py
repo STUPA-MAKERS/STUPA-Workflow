@@ -14,7 +14,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from app.modules.admin import gremium_roles
+from app.modules.auth import policy
 from app.modules.auth.principal import Principal
 from app.modules.auth.rbac import vote_group_key
 from app.modules.voting.service import VotingService
@@ -40,14 +40,13 @@ def rights(monkeypatch: pytest.MonkeyPatch) -> dict[str, set[UUID]]:
     """Stub the gremium rights per permission."""
     state: dict[str, set[UUID]] = {}
 
-    async def _ids_for(_s: Any, _p: Principal, perm: str) -> set[UUID]:
+    async def _ids_for(_s: Any, _p: Principal, perm: str, _now: object = None) -> set[UUID]:
         return set(state.get(perm, set()))
 
-    monkeypatch.setattr(gremium_roles, "gremium_ids_for", _ids_for)
+    monkeypatch.setattr(policy, "held_gremium_ids", _ids_for)
     return state
 
 
-# ------------------------------------------------------------------ read
 async def test_application_reader_cannot_read_a_gremium_poll(
     rights: dict[str, set[UUID]],
 ) -> None:
@@ -83,17 +82,16 @@ async def test_scope_capped_admin_token_cannot_read_a_gremium_poll(
         await VotingService(fake_session()).assert_can_read(_poll(), capped)  # pyright: ignore[reportArgumentType]
 
 
-# ------------------------------------------------------------------ manage
 async def test_session_manage_alone_does_not_manage_a_gremium_poll(
     rights: dict[str, set[UUID]],
 ) -> None:
+    """session.manage alone does not manage a Gremium poll, but an application vote."""
     rights["session.manage"] = {GID}
     svc = VotingService(fake_session())
     principal = Principal(sub="s")
     assert await svc.can_manage(_poll(), principal) is False  # pyright: ignore[reportArgumentType]
     with pytest.raises(ForbiddenError):
         await svc.assert_can_manage(_poll(), principal)  # pyright: ignore[reportArgumentType]
-    # The same right still manages an application vote of the Gremium.
     assert await svc.can_manage(_poll(kind="motion"), principal) is True  # pyright: ignore[reportArgumentType]
 
 

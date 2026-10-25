@@ -1,4 +1,4 @@
-"""arq cron task: purge the expired draft uploads of the wizard (Z4).
+"""arq cron task: purge the expired draft uploads of the wizard.
 
 `purge_draft_attachments` runs every hour. A draft lives
 `attachment_draft_ttl_days` after the last upload of its token. After that it can no
@@ -35,7 +35,7 @@ from app.settings import load_settings
 
 logger = logging.getLogger("app.files")
 
-# Rows per batch. The task loops until a batch comes back short.
+#: Rows per batch; the task loops until a batch comes back short.
 PURGE_BATCH = 500
 
 

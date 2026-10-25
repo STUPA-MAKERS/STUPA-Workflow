@@ -1,11 +1,10 @@
-/* A bare page (route data `chrome: false`): its own bar, one column, the footer at the
-   bottom. On a wide screen the same column in the middle. */
 :host {
   display: flex;
   flex-direction: column;
   min-height: 100dvh;
   background: var(--color-bg);
 }
+// Reaches under the status bar of an installed iOS app; every inset is 0 in a browser tab.
 .pm__bar {
   position: sticky;
   top: 0;
@@ -13,8 +12,6 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  /* The bar reaches under the status bar of an installed iOS app and keeps its content
-     below it and clear of the notch in landscape. Every inset is 0 in a browser tab. */
   height: calc(64px + var(--app-top-safe-area, 0px));
   padding: var(--app-top-safe-area, 0px) max(6px, var(--app-right-safe-area, 0px)) 0
     max(18px, var(--app-left-safe-area, 0px));
@@ -29,7 +26,7 @@
 .pm__spacer {
   flex: 1 1 auto;
 }
-/* The globe opens the native language picker; the select covers the icon button. */
+// The native select covers the globe button and opens the language picker.
 .pm__footer {
   margin-top: auto;
 }

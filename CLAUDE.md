@@ -17,7 +17,7 @@ worker. Frontend = Angular 20 (strict TS, standalone, separate `.html`/`.scss`, 
 ngx-formly). Postgres 16 (versioned JSONB), Redis, MinIO (S3), ClamAV, typst (internal
 Markdown→PDF), ALTCHA.
 
-Full prose: `README.md`. Workflow & Definition of Done: `CONTRIBUTING.md`.
+Full prose: `README.md`. Workflow & Definition of Done: the `conventions` skill.
 
 ## How to navigate (read in this order)
 
@@ -43,7 +43,6 @@ Backend domain modules (`backend/app/modules/<module>`):
 - **be-forms** — versioned form JSON, definition/answer validation, JsonLogic visibleIf/compute
 - **be-flow** — declarative state machine, guard evaluator (no eval), transition actions
   *(critical)*
-- **be-deadlines** — named deadline policies referenced by the flow
 - **be-voting** — quorum/majority/secret ballot, tally, gremium-scoped reads *(critical)*
 - **be-livevote** — meetings, agenda items, attendance, live vote over WebSocket + beamer stream
 - **be-protocol** — meeting protocol (Markdown→PDF), vote snippets, finalize + mail
@@ -78,7 +77,7 @@ Components:
 - **mcp** — MCP server (`mcp/`): act on the platform through its API as the logged-in user, PKCE
   browser grant
 - **typst** — internal Markdown→PDF render service (`typst/`), data-driven Typst template,
-  calibrated pytex layout, variants
+  layout calibrated to the pytex reference, variants
 - **deploy** — docker-compose production stack (`deploy/`) behind an external Caddy reverse
   proxy (the TLS edge), services, networking
 
@@ -104,4 +103,4 @@ So a wrapper that looks for `AGENTS.md` or `.agents/skills` resolves to the same
   `alembic upgrade head`
 - Stack (`deploy/`): `docker compose config -q` · `docker compose up -d --build`
 
-See `conventions` skill + `CONTRIBUTING.md` for the full gates.
+See the `conventions` skill for the full gates.

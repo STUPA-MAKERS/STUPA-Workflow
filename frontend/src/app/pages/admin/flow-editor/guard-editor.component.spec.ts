@@ -61,14 +61,14 @@ describe('GuardEditorComponent', () => {
       expect(c.valueKind()).toBe('role');
       expect(c.strValue()).toBe('stupa');
 
-      setGuard({ and: [{ roleIs: 'a' }, { deadlinePassed: true }] });
+      setGuard({ and: [{ roleIs: 'a' }, { budgetHasDecisionGremium: true }] });
       expect(c.op()).toBe('and');
       expect(c.kind()).toBe('combinator');
       expect(c.children()).toHaveLength(2);
     });
 
     it('children() is empty for a combinator whose value is not an array', async () => {
-      const { c } = await setup({ guard: { not: { deadlinePassed: true } } as Guard });
+      const { c } = await setup({ guard: { not: { budgetHasDecisionGremium: true } } as Guard });
       expect(c.kind()).toBe('combinator');
       expect(c.children()).toEqual([]);
     });
@@ -76,16 +76,16 @@ describe('GuardEditorComponent', () => {
     it('strValue() blanks object/null values', async () => {
       const { c, setGuard } = await setup({ guard: { compare: { field: 'x', op: '==', value: '' } } });
       expect(c.strValue()).toBe('');
-      setGuard({ deadlinePassed: null } as unknown as Guard);
+      setGuard({ budgetHasDecisionGremium: null } as unknown as Guard);
       expect(c.strValue()).toBe('');
-      setGuard({ deadlinePassed: true });
+      setGuard({ budgetHasDecisionGremium: true });
       expect(c.strValue()).toBe('true');
     });
 
     it('valueKind() resolves every operator family', async () => {
       const { c, setGuard } = await setup({ guard: null });
       const cases: Array<[Guard, string]> = [
-        [{ deadlinePassed: true }, 'none'],
+        [{ budgetHasDecisionGremium: true }, 'none'],
         [{ budgetFitsApplication: true }, 'none'],
         [{ actorIsApplicant: true }, 'none'],
         [{ attachmentPresent: true }, 'none'],
@@ -124,7 +124,7 @@ describe('GuardEditorComponent', () => {
       const { c, setAutomatic } = await setup({ automatic: true });
       const autoOps = c.opOptions().map((o: SelectOption) => o.value);
       expect(autoOps).toContain('and');
-      expect(autoOps).toContain('deadlinePassed');
+      expect(autoOps).toContain('budgetHasDecisionGremium');
       expect(autoOps).not.toContain('roleIs');
       expect(autoOps).not.toContain('isInCommittee');
 
@@ -184,8 +184,8 @@ describe('GuardEditorComponent', () => {
       expect(last()).toEqual({ roleIs: '' });
 
       setGuard(null);
-      c.onOpChange('deadlinePassed');
-      expect(last()).toEqual({ deadlinePassed: true });
+      c.onOpChange('budgetHasDecisionGremium');
+      expect(last()).toEqual({ budgetHasDecisionGremium: true });
 
       c.onOpChange('budgetFitsApplication');
       expect(last()).toEqual({ budgetFitsApplication: true });
@@ -300,15 +300,15 @@ describe('GuardEditorComponent', () => {
     });
   });
 
-  describe('layout (FE12b)', () => {
+  describe('layout', () => {
     it('describes a combinator beside its operator and offers "+ Bedingung" except for NOT', async () => {
-      const { c, setGuard, container } = await setup({ guard: { and: [{ deadlinePassed: true }] } });
+      const { c, setGuard, container } = await setup({ guard: { and: [{ budgetHasDecisionGremium: true }] } });
       expect(c.combinatorText()).toBe('alle Bedingungen erfüllt');
       expect(container.querySelector('.ge__box')).not.toBeNull();
       expect(container.querySelector('.ge__add, app-button')).not.toBeNull();
-      setGuard({ or: [{ deadlinePassed: true }] });
+      setGuard({ or: [{ budgetHasDecisionGremium: true }] });
       expect(c.combinatorText()).toBe('mindestens eine Bedingung erfüllt');
-      setGuard({ not: [{ deadlinePassed: true }] });
+      setGuard({ not: [{ budgetHasDecisionGremium: true }] });
       expect(c.combinatorText()).toBe('die Bedingung ist nicht erfüllt');
       expect(container.textContent).not.toContain('Bedingung entfernen');
       setGuard({ roleIs: 'stupa' });

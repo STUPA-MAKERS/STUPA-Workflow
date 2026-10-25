@@ -72,12 +72,14 @@ async def rotate_my_calendar(
         404: _PROBLEM,
     },
 )
-async def calendar_feed(
-    token: str, db: DbSession, settings: SettingsDep
-) -> Response:
+async def calendar_feed(token: str, db: DbSession, settings: SettingsDep) -> Response:
     """Serve the public iCal feed for a feed token.
 
     An unknown or deactivated token gives a 404.
+
+    `member_meetings` filters on `date IS NOT NULL`, so every meeting here has a date. The cache is
+    short, so a new or changed meeting shows up quickly. A rotated token is a new URL and therefore
+    its own cache key.
     """
     principal = await service.principal_by_calendar_token(db, token)
     if principal is None:
@@ -87,7 +89,6 @@ async def calendar_feed(
         MeetingEvent(
             uid=str(meeting.id),
             title=meeting.title,
-            # member_meetings filters on `date IS NOT NULL`, so the value is set here.
             date=cast(_date, meeting.date),
             start_time=meeting.start_time,
             end_time=meeting.end_time,
@@ -103,8 +104,6 @@ async def calendar_feed(
         media_type=_ICS_MEDIA_TYPE,
         headers={
             "Content-Disposition": 'inline; filename="stupa-sitzungen.ics"',
-            # Short cache: a new or changed meeting shows up quickly. A rotated
-            # token is a new URL and therefore its own cache key.
             "Cache-Control": "private, max-age=300",
         },
     )

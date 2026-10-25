@@ -1,6 +1,5 @@
 @let me_ = me();
 @if (pageVote(); as v) {
-  <!-- The vote on its own page (board Telefon-Abstimmen): the same panel as for members. -->
   <section class="gv__vote" [attr.aria-label]="'voting.cast.heading' | t">
     <div class="gv__voteHead">
       <app-button variant="text" [iconOnly]="true" [ariaLabel]="'guests.vote.back' | t" (click)="openVoteId.set(null)">

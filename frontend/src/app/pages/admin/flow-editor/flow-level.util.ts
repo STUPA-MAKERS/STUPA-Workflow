@@ -35,7 +35,7 @@ export function deepStateKeys(groupById: Map<string, FlowGroup>, groupId: string
   const out: string[] = [];
   const seen = new Set<string>();
   const walk = (id: string): void => {
-    if (seen.has(id)) return; // Cycle guard. A normalized graph never cycles.
+    if (seen.has(id)) return;
     seen.add(id);
     const g = groupById.get(id);
     if (!g) return;

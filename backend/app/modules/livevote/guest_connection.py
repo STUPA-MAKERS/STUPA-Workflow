@@ -1,4 +1,4 @@
-"""WebSocket of a guest of a public meeting (#17).
+"""WebSocket of a guest of a public meeting.
 
 The guest channel listens on the same pub/sub channel `meeting:{id}` as the members,
 but it filters every event:
@@ -43,11 +43,11 @@ from app.modules.voting.service import VotingService
 
 logger = logging.getLogger("app.livevote.guest")
 
-# The vote events that an admitted guest gets for a public agenda item.
+#: The vote events that an admitted guest gets for a public agenda item.
 _VOTE_EVENTS = frozenset(
     {"vote_opened", "vote_tally", "vote_closed", "vote_cancelled", "vote_lot_drawn"}
 )
-# After these states the guest has no business on the channel any more.
+#: After these states the guest has no business on the channel any more.
 _TERMINAL = frozenset({"rejected", "removed", "left", "expired"})
 
 
@@ -67,6 +67,11 @@ class GuestConnection:
         meeting_id: UUID,
         guest: MeetingGuest,
     ) -> None:
+        """Bind the socket to the guest and the meeting.
+
+        `_db` makes one task at a time use the database session. `_public_votes` maps a vote
+        id to True when the vote belongs to a public item of this meeting.
+        """
         self.ws = websocket
         self.session = session
         self.broker = broker
@@ -76,9 +81,7 @@ class GuestConnection:
         self.display_name = guest.display_name
         self.status = guest.status
         self.guests = GuestService(session)
-        # One task at a time uses the database session.
         self._db = asyncio.Lock()
-        # vote id -> True when the vote belongs to a public item of this meeting.
         self._public_votes: dict[UUID, bool] = {}
 
     async def _send(self, payload: dict[str, Any]) -> None:
@@ -152,6 +155,9 @@ class GuestConnection:
     async def handle(self, message: dict[str, Any]) -> None:
         """Filter one channel event for this guest and send what the guest may see.
 
+        An agenda change, for example an item that turns non-public, sends a meeting state.
+        The handler then reads the visibility of the votes again.
+
         Raises:
             _Closed: The guest reached a terminal state, or the meeting closed.
         """
@@ -161,7 +167,7 @@ class GuestConnection:
             if not isinstance(guest, dict) or guest.get("id") != str(self.guest_id):
                 return
             self.status = str(guest.get("status"))
-            self.display_name = guest.get("displayName")  # type: ignore[assignment]
+            self.display_name = guest.get("displayName")
             number = guest.get("number")
             if isinstance(number, int):
                 self.number = number
@@ -173,8 +179,6 @@ class GuestConnection:
                 await self.send_state()
             return
         if kind == "meeting_state":
-            # An agenda change (for example an item that turns non-public) sends a
-            # meeting state: the visibility of the votes is read again.
             self._public_votes.clear()
             status = message.get("status")
             if self.status == "admitted":
@@ -221,7 +225,10 @@ class GuestConnection:
                 await self._send(ErrorEvent(code="unknown_type").dump())
 
     async def run(self) -> None:
-        """Subscribe, send the state, then filter the channel until the end."""
+        """Subscribe, send the state, then filter the channel until the end.
+
+        A failed task ends the connection.
+        """
         async with self.broker.subscribe(meeting_channel(self.meeting_id)) as subscription:
             try:
                 await self.send_state()
@@ -241,7 +248,7 @@ class GuestConnection:
                         await self.ws.close(code=1000)
                     except WebSocketDisconnect:
                         pass
-                    except Exception:  # noqa: BLE001 - a failed task ends the connection
+                    except Exception:
                         logger.warning("guest pump/receive task failed", exc_info=True)
             finally:
                 pump.cancel()

@@ -23,17 +23,14 @@
   gap: var(--space-3);
   padding: var(--space-8) var(--space-4);
 }
-/* The centred state column would shrink the empty state to its text; it spans the box. */
 .cd__none {
   align-self: stretch;
 }
 
-/* ------------------------------------------------------------------ head */
 .cd__head {
   flex: none;
 }
-/* The count of the comments on the activity button of a phone: the small plate of the
-   comments button of an application (`.ad__commentsN`). */
+// The same plate as `.ad__commentsN` of the application detail.
 .cd__activityN {
   display: inline-grid;
   place-items: center;
@@ -88,9 +85,6 @@
 .cd__itemInput:focus-visible {
   outline: 2px solid var(--color-focus-ring);
 }
-/* A part of the line ("Angelegt von …", the day) wraps as a whole: a narrow sheet breaks
-   the line between the parts, and inside a part only when it alone is wider than the
-   line. */
 .cd__seg {
   display: inline-block;
 }
@@ -98,7 +92,6 @@
   margin-top: var(--space-2);
 }
 
-/* ------------------------------------------------------------------ columns */
 .cd__cols {
   display: grid;
   flex: 1 1 auto;
@@ -113,23 +106,17 @@
   min-width: 0;
   min-height: 0;
 }
+// The column clips at its edges, so it reaches 10px past the content edge for the end
+// buttons, the scrollbar and the focus ring.
 .cd__col--details {
   gap: var(--space-4);
   overflow-y: auto;
   overscroll-behavior: contain;
-  /* The column is a scroll container, so it clips what reaches past its edges. It
-     reaches 10px past the content edge on both sides: the end buttons below and the
-     scrollbar have room at the end, and the focus ring of a field (the inline editors
-     of the checklist) has room at both ends. */
   margin-inline: -10px;
   padding-inline: 10px;
-  /* An end fades only while more content lies past it (`appScrollFade` sets the
-     classes), so the description never ends in a hard cut through a line or a row. The
-     scroll padding keeps a field that gets the focus clear of the fade. */
   scroll-padding-block: var(--space-5);
   @include fade.fade-y(var(--space-5));
 }
-/* An icon or text button at the end of a row lines its glyph up with the content edge. */
 .cd__secHead > app-button {
   margin-inline-end: calc(-1 * var(--space-2));
 }
@@ -142,17 +129,10 @@
 .cd__col--chat .cd__chat {
   flex: 1 1 auto;
 }
-/* The sheet in the pane of "Aufgaben" is as tall as the pane, like the card drawer: the columns fill
-   it down to its foot, and the thread fills its column, as in the ticket detail. The log
-   adds only its minimum to the height of the sheet (`--chat-log-basis: 0`), so a long
-   thread scrolls inside the log, and the composer stays at the foot of the pane. The
-   details column scrolls inside itself. */
+// The log adds only its minimum (`--chat-log-basis: 0`), so a long thread scrolls inside it.
 :host(.cd--pane:not(.cd--phone)) .cd__chat {
   --chat-log-basis: 0;
 }
-/* A card without the write right or an archived card has no composer, so the thread is
-   a record: the frame takes the height of its entries, not the height of the column.
-   A long thread scrolls inside the log. */
 .cd__col--readonly .cd__chat,
 :host(.cd--pane:not(.cd--phone)) .cd__col--readonly .cd__chat {
   --chat-log-basis: auto;
@@ -178,10 +158,8 @@
   min-height: 36px;
 }
 
-/* ------------------------------------------------------------------ fields */
 .cd__fields {
   display: grid;
-  /* The values start on one line, a label column of at least 5.25rem. */
   grid-template-columns: minmax(5.25rem, max-content) minmax(0, 1fr);
   gap: var(--space-3) var(--space-5);
   margin: 0;
@@ -227,11 +205,9 @@
   font-size: var(--fs-small);
 }
 
-/* ------------------------------------------------------------------ links */
 .cd__pickerAnchor {
   position: relative;
 }
-/* The picker floats over the head of its section, as wide as the column. */
 .cd__pickerAnchor {
   height: 0;
   margin-bottom: calc(-1 * var(--space-2));
@@ -296,9 +272,7 @@
   color: var(--color-text-muted);
   font-size: var(--fs-small);
 }
-/* A row with a target ends with a chevron. Where a pointer can hover, the remove button
-   takes the place of the chevron on hover and while the row holds the focus; on a touch
-   screen the remove button stays, because there is no hover to reveal it. */
+// A touch screen has no hover, so there the remove button stays.
 .cd__linkChev {
   flex: none;
   color: var(--color-text-muted);
@@ -322,7 +296,6 @@
   }
 }
 
-/* ------------------------------------------------------------------ description */
 .cd__desc {
   line-height: 1.5;
   overflow-wrap: anywhere;
@@ -357,7 +330,6 @@
   margin-inline-end: auto;
 }
 
-/* ------------------------------------------------------------------ checklist */
 .cd__progress {
   display: inline-flex;
   align-items: center;
@@ -368,8 +340,6 @@
 .cd__checkBar {
   width: 64px;
 }
-/* An empty list takes no gap of the section, so "Punkt hinzufügen" sits under the
-   heading at the same distance as the content of the other sections. */
 .cd__items:empty {
   display: none;
 }
@@ -397,7 +367,6 @@
 .cd__item .cd__itemForm {
   flex: 1 1 auto;
 }
-/* A new item: the field takes the full row, and the two buttons end the row below it. */
 .cd__itemForm--add .cd__itemInput {
   flex-basis: 100%;
 }
@@ -474,7 +443,6 @@
   outline: 2px solid var(--color-focus-ring);
 }
 
-/* ------------------------------------------------------------------ phone */
 .cd__panel {
   display: flex;
   flex-direction: column;
@@ -485,18 +453,11 @@
   border-bottom: 0;
   padding-bottom: 0;
 }
-/* The labels take only their own width, so the values get the room: at 360px a person
-   chip with a first and a last name and the "+" fit on one line. */
+// At 360px a person chip with a first and a last name and the "+" fit on one line.
 :host(.cd--phone) .cd__fields {
   grid-template-columns: max-content minmax(0, 1fr);
   column-gap: var(--space-4);
 }
-/* The activity of a phone fills its bottom sheet, as the comments of an application
-   (`.ad__chat`): the sheet passes its height down (`contentScrolls`), the log takes the
-   height of the thread up to the cap of the sheet and then scrolls inside, and the
-   composer stays at the foot of the sheet, not above the bottom navigation, because the
-   sheet lies over the navigation. The sheet is surface 2, so the messages of others take
-   the next step. */
 .cd__chat--sheet {
   flex: 1 1 auto;
   min-height: 0;
@@ -519,9 +480,6 @@
   padding: var(--space-3) 0;
   background: var(--cd-bar-bg);
 }
-/* The fade above the bar: the details fade out as they scroll under it, so a line or a
-   table row never ends in a hard cut at the edge of the bar. At rest it lies over the gap
-   above the bar, in the colour of the bar, so nothing shows. */
 .cd__bar::before {
   content: '';
   position: absolute;
@@ -530,13 +488,11 @@
   background: linear-gradient(to top, var(--cd-bar-bg), transparent);
   pointer-events: none;
 }
-/* In the pane of "Aufgaben" a phone shows the detail on the page, not on a sheet. */
 :host(.cd--pane) .cd__bar {
   --cd-bar-bg: var(--color-bg);
 }
 
-/* ------------------------------------------------------------------ loading */
-/* The places of the icon buttons of the sheet bar (40px). */
+// The places of the 40px icon buttons of the sheet bar.
 .cd__skelIcon {
   display: grid;
   flex: none;
@@ -551,14 +507,12 @@
 .cd__skelTitle {
   width: 68%;
 }
-/* On a phone a title takes two lines. */
 .cd__skelTitle--second {
   width: 40%;
 }
 .cd__skelCreated {
   width: 14rem;
 }
-/* The chips of the fields: the filter chip of the column, people, the date, labels. */
 .cd__skelChip {
   width: 7rem;
   height: 32px;
@@ -585,7 +539,6 @@
 .cd__skelLines {
   margin: 0;
 }
-/* One bar per text line: the bar sits in the middle of a line box of the body text. */
 .cd__skelLines > .skel-text {
   display: block;
   margin-block: 5px 6px;

@@ -20,11 +20,13 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.modules.applications.models import Application, StatusEvent
 from app.modules.flow.models import State
 from app.modules.notifications.links import task_link
 from app.modules.notifications.models import TaskReminderLog
+from app.modules.notifications.provider import MailQueue
 from app.modules.notifications.recipients import (
     actionable_principal_emails,
     state_actionable,
@@ -50,7 +52,7 @@ def _naive_utc(dt: datetime) -> datetime:
     return dt.astimezone(UTC).replace(tzinfo=None) if dt.tzinfo is not None else dt
 
 
-def _sessionmaker(ctx: dict[str, Any]) -> Any:
+def _sessionmaker(ctx: dict[str, Any]) -> async_sessionmaker[AsyncSession]:
     """Return the DB sessionmaker (tests inject one via `ctx['sessionmaker']`)."""
     maker = ctx.get("sessionmaker")
     if maker is not None:
@@ -60,7 +62,7 @@ def _sessionmaker(ctx: dict[str, Any]) -> Any:
     return get_sessionmaker()
 
 
-def _mail_queue(ctx: dict[str, Any]) -> Any:
+def _mail_queue(ctx: dict[str, Any]) -> MailQueue | None:
     from app.modules.notifications.provider import mail_queue_from_pool
 
     return ctx.get("mail_queue") or mail_queue_from_pool(ctx.get("redis"))
@@ -75,6 +77,8 @@ async def process_task_reminders(
 
     Returns:
         The number of reminders sent.
+
+    One failing case is logged and does not break the cycle.
     """
     now = now or datetime.now(UTC)
     settings: Settings = ctx.get("settings") or load_settings()
@@ -107,13 +111,13 @@ async def process_task_reminders(
                     state=state,
                 ):
                     sent += 1
-            except Exception:  # noqa: BLE001 - one case must not break the cycle
+            except Exception:
                 logger.exception("task reminder failed (application=%s)", app_id)
     return sent
 
 
 async def _due_applications(
-    session: Any,
+    session: AsyncSession,
     *,
     now: datetime,
     after: timedelta,
@@ -124,6 +128,8 @@ async def _due_applications(
     An application is due when the applicant confirmed it and the state stay is older
     than `after`. The application must also have no reminder for this stay, or a last
     reminder older than `repeat`. A `repeat` of `None` means one reminder per stay.
+
+    An application already reminded for this stay is sent again only in repeat mode.
     """
     latest_event = (
         select(
@@ -151,7 +157,7 @@ async def _due_applications(
     if not rows:
         return []
 
-    states = {
+    states: dict[uuid.UUID | None, State] = {
         s.id: s
         for s in (
             await session.scalars(
@@ -184,7 +190,6 @@ async def _due_applications(
             .limit(1)
         )
         log = logs.get(app_id)
-        # Already reminded for this stay: send again only in repeat mode.
         if (
             log is not None
             and log.status_event_id == event_id
@@ -196,7 +201,7 @@ async def _due_applications(
 
 
 async def _remind_one(
-    session: Any,
+    session: AsyncSession,
     service: NotificationService,
     settings: Settings,
     *,
@@ -206,6 +211,11 @@ async def _remind_one(
     entered_at: datetime,
     state: State | None,
 ) -> bool:
+    """Send one task reminder and write its log; return whether a mail went out.
+
+    The log is written even without a send, for example when all recipients opted out,
+    because without it every run re-checks the same opted-out set.
+    """
     app_row = (
         await session.execute(
             select(Application.data).where(Application.id == application_id)
@@ -245,9 +255,6 @@ async def _remind_one(
         ),
         link=task_link(settings, application_id),
     )
-    # Write the log even without a send, for example when all recipients opted out.
-    # Without the log every run re-checks the same opted-out set. `sent` counts only
-    # the real mails.
     log = await session.get(TaskReminderLog, application_id)
     if log is None:
         session.add(

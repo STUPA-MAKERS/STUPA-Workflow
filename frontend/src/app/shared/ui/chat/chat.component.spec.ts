@@ -155,13 +155,13 @@ describe('ChatComponent', () => {
     expect(within(log()).getByText('Noch keine Nachrichten.')).toBeInTheDocument();
   });
 
+  /** The composer is there at once. */
   it('draws bubbles, not "no messages", while the thread is on its way', async () => {
     const { log } = await setup({ loading: true });
     expect(within(log()).queryByText('Noch keine Nachrichten.')).toBeNull();
     expect(log().querySelector('app-skeleton')).not.toBeNull();
     expect(log().querySelectorAll('.sk__msg')).toHaveLength(5);
     expect(within(log()).getByRole('status')).toHaveTextContent('Nachrichten werden geladen');
-    // The composer is there at once.
     expect(document.querySelector('textarea.chat__input')).not.toBeNull();
   });
 
@@ -177,6 +177,7 @@ describe('ChatComponent', () => {
     expect(await runAxe(view.container)).toHaveNoViolations();
   });
 
+  /** The group has one name and one avatar, and the own message has neither. */
   it('groups messages, puts own ones right and the time under the last', async () => {
     const { view } = await setup({
       messages: [
@@ -188,7 +189,6 @@ describe('ChatComponent', () => {
     const rows = view.container.querySelectorAll('.chat__row');
     expect(rows).toHaveLength(3);
     expect(rows[2]).toHaveClass('chat__row--own');
-    // One name and one avatar for the group, the own message has neither.
     expect(screen.getAllByText('Jonas Albrecht')).toHaveLength(1);
     expect(view.container.querySelectorAll('app-avatar')).toHaveLength(1);
     expect(rows[0].querySelector('.chat__avSpace')).not.toBeNull();
@@ -229,6 +229,7 @@ describe('ChatComponent', () => {
     expect(rows[2].querySelector('app-avatar, .chat__avSpace, .chat__name')).toBeNull();
   });
 
+  /** A thread that offers both visibilities marks a single one too. */
   it('marks internal and public only where both exist', async () => {
     const { view, set } = await setup({
       messages: [msg('a', today(9), { visibility: 'internal' }), msg('b', today(10), { visibility: 'internal' })],
@@ -238,7 +239,6 @@ describe('ChatComponent', () => {
     expect(view.container.querySelector('.chat__mark--internal')).toHaveTextContent('Intern');
     expect(view.container.querySelector('.chat__mark--public')).toHaveTextContent('Öffentlich');
     expect(view.container.querySelector('.chat__bubble--internal')).not.toBeNull();
-    // A thread that offers both visibilities marks a single one too.
     set('messages', [msg('a', today(9), { visibility: 'internal' })]);
     set('visibilityOptions', ['public', 'internal']);
     expect(view.container.querySelector('.chat__mark--internal')).not.toBeNull();
@@ -252,6 +252,10 @@ describe('ChatComponent', () => {
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
   });
 
+  /**
+   * A clean image shows as a thumbnail, and its link is the inline preview (a click opens the
+   * viewer).
+   */
   it('lists the attachments of a message', async () => {
     await setup({
       messages: [
@@ -267,7 +271,6 @@ describe('ChatComponent', () => {
     expect(screen.getByRole('link', { name: /^angebot\.pdf/ })).toHaveAttribute('href', '/api/attachments/f/download');
     const metas = [...document.querySelectorAll('.chat__fileMeta')].map((m) => m.textContent?.trim());
     expect(metas).toEqual(['PDF · 1 KB', '2 KB']);
-    // A clean image shows as a thumbnail; its link is the inline preview (a click opens the viewer).
     const img = screen.getByRole('img', { name: 'kopf.png' });
     expect(img).toHaveAttribute('src', '/api/attachments/g/download?inline=1');
     const thumb = screen.getByRole('link', { name: 'kopf.png' });
@@ -276,6 +279,11 @@ describe('ChatComponent', () => {
     expect(thumb).toHaveAttribute('rel', 'noopener');
   });
 
+  /**
+   * Another file keeps its link and opens no viewer. A click with a modifier keeps the new tab. The
+   * viewer holds the clean image and the PDF of this message, nothing of another message. The PDF
+   * link opens the viewer at the PDF.
+   */
   it('opens an image or a PDF of a message in the viewer and steps through its previewable files', async () => {
     const { view } = await setup({
       messages: [
@@ -292,9 +300,7 @@ describe('ChatComponent', () => {
         }),
       ],
     });
-    // Another file keeps its link: no viewer.
     expect(fireEvent.click(screen.getByRole('link', { name: /^README/ }))).toBe(true);
-    // A click with a modifier keeps the new tab.
     expect(fireEvent.click(screen.getByRole('link', { name: 'kopf.png' }), { ctrlKey: true })).toBe(true);
     expect(screen.queryByRole('dialog')).toBeNull();
 
@@ -302,7 +308,6 @@ describe('ChatComponent', () => {
     view.fixture.detectChanges();
     const viewer = screen.getByRole('dialog', { name: 'kopf.png' });
     expect(within(viewer).getByRole('img', { name: 'kopf.png' })).toHaveAttribute('src', '/api/attachments/g/download?inline=1');
-    // The clean image and the PDF of this message, nothing of another message.
     expect(viewer.querySelector('.fv__position')).toHaveTextContent('2 von 2');
     expect(within(viewer).getByRole('link', { name: 'Herunterladen' })).toHaveAttribute('href', '/api/attachments/g/download');
 
@@ -318,7 +323,6 @@ describe('ChatComponent', () => {
     view.fixture.detectChanges();
     expect(screen.queryByRole('dialog')).toBeNull();
 
-    // The PDF link opens the viewer at the PDF.
     expect(fireEvent.click(screen.getByRole('link', { name: /^angebot\.pdf/ }))).toBe(false);
     view.fixture.detectChanges();
     expect(screen.getByRole('dialog', { name: 'angebot.pdf' })).toBeInTheDocument();
@@ -364,6 +368,7 @@ describe('ChatComponent', () => {
     );
   });
 
+  /** A pending message offers no edit. */
   it('shows pending, failed and edited states', async () => {
     const { retry, view } = await setup({
       messages: [
@@ -376,7 +381,6 @@ describe('ChatComponent', () => {
     const metas = [...view.container.querySelectorAll('.chat__meta')].map((m) => m.textContent?.replace(/\s+/g, ' ').trim());
     expect(metas).toEqual(['bearbeitet', '09:01·bearbeitet', 'wird gesendet …', 'Nicht gesendet Erneut senden Bearbeiten Verwerfen']);
     expect(view.container.querySelector('.chat__bubble--failed')).not.toBeNull();
-    // A pending message offers no edit.
     expect(screen.queryAllByRole('button', { name: 'Nachricht bearbeiten' })).toHaveLength(0);
     fireEvent.click(screen.getByRole('button', { name: 'Erneut senden' }));
     expect(retry).toHaveBeenCalledWith({ id: 'f' });
@@ -689,6 +693,53 @@ describe('ChatComponent', () => {
       });
     });
 
+    /** Set back to public, the next letters keep it public. */
+    it('makes a public message internal at a typed "@" where public ones do not mention', async () => {
+      const { cmp, input, send, view } = await setup({
+        mentionables: people,
+        publicMentions: false,
+        visibilityOptions: ['public', 'internal'],
+      });
+      expect(cmp.visibility()).toBe('public');
+      type(input(), 'Hallo @');
+      view.fixture.detectChanges();
+      expect(cmp.visibility()).toBe('internal');
+      expect(list()).not.toBeNull();
+      cmp.setVisibility('public');
+      type(input(), 'Hallo @J');
+      view.fixture.detectChanges();
+      expect(cmp.visibility()).toBe('public');
+      expect(list()).toBeNull();
+      cmp.setVisibility('internal');
+      type(input(), 'Hallo @Jonas Weber!');
+      fireEvent.keyDown(input(), { key: 'Enter' });
+      expect(send).toHaveBeenLastCalledWith({
+        body: 'Hallo @Jonas Weber!',
+        visibility: 'internal',
+        mentions: ['p-1'],
+      });
+    });
+
+    it('keeps a public message public at "@" without people to mention', async () => {
+      const { cmp, input } = await setup({
+        publicMentions: false,
+        visibilityOptions: ['public', 'internal'],
+      });
+      type(input(), '@');
+      expect(cmp.visibility()).toBe('public');
+    });
+
+    it('keeps a public message public at "@" without an internal choice', async () => {
+      const { cmp, input } = await setup({
+        mentionables: people,
+        publicMentions: false,
+        visibilityOptions: ['public'],
+      });
+      type(input(), '@');
+      expect(cmp.visibility()).toBe('public');
+    });
+
+    /** The switch back to public closes the open list. */
     it('mentions only in an internal message where the other side reads the public ones', async () => {
       const own = [
         msg('pub', today(9), { own: true, body: 'Alt', visibility: 'public' }),
@@ -707,7 +758,6 @@ describe('ChatComponent', () => {
       type(input(), '@jo');
       view.fixture.detectChanges();
       expect(list()).not.toBeNull();
-      // The switch back to public closes the open list.
       cmp.setVisibility('public');
       view.fixture.detectChanges();
       expect(list()).toBeNull();
@@ -741,6 +791,10 @@ describe('ChatComponent', () => {
       });
     });
 
+    /**
+     * The next message starts without the earlier choice. An edit keeps the person that the message
+     * mentions.
+     */
     it('keeps the chosen person where two people have the same name', async () => {
       const twins: ChatPerson[] = [
         { principalId: 'k-1', displayName: 'Kim' },
@@ -760,11 +814,9 @@ describe('ChatComponent', () => {
       fireEvent.keyDown(input(), { key: 'Enter' });
       fireEvent.keyDown(input(), { key: 'Enter' });
       expect(send).toHaveBeenLastCalledWith({ body: '@Kim', mentions: ['k-2'] });
-      // The next message starts without the earlier choice.
       type(input(), '@Kim ');
       fireEvent.keyDown(input(), { key: 'Enter' });
       expect(send).toHaveBeenLastCalledWith({ body: '@Kim', mentions: ['k-1'] });
-      // An edit keeps the person that the message mentions.
       fireEvent.click(screen.getByRole('button', { name: 'Nachricht bearbeiten' }));
       const box = screen.getByRole('textbox', { name: 'Nachricht bearbeiten' });
       type(box as HTMLTextAreaElement, '@Kim, bitte');
@@ -847,6 +899,7 @@ describe('ChatComponent', () => {
       expect(edit).toHaveBeenCalledWith({ id: 'm', body: 'Neu', restore: expect.any(Function) });
     });
 
+    /** An edit closed while the focus is elsewhere leaves the focus there. */
     it('moves the focus into the edit field and back to the Edit button', async () => {
       const { view } = await setup({ messages: own() });
       const settle = async () => {
@@ -872,7 +925,6 @@ describe('ChatComponent', () => {
       await settle();
       expect(editOf(0)).toHaveFocus();
 
-      // An edit closed while the focus is elsewhere leaves the focus there.
       fireEvent.click(editOf(0));
       await settle();
       const outside = screen.getByRole('textbox', { name: 'Nachricht schreiben …' });
@@ -882,6 +934,9 @@ describe('ChatComponent', () => {
       expect(outside).toHaveFocus();
     });
 
+    /**
+     * While another edit is open, the refused one waits. When the message is gone, nothing opens.
+     */
     it('opens a refused edit again with the new text, not over another edit or a gone message', async () => {
       const { edit, view, set } = await setup({ messages: own() });
       const settle = async () => {
@@ -900,7 +955,6 @@ describe('ChatComponent', () => {
       expect(box()?.value).toBe('Lange neue Fassung');
       expect(box()).toHaveFocus();
 
-      // Another edit is open: the refused one waits.
       fireEvent.keyDown(box() as HTMLTextAreaElement, { key: 'Escape' });
       fireEvent.click(screen.getAllByRole('button', { name: 'Nachricht bearbeiten' })[1]);
       await settle();
@@ -908,7 +962,6 @@ describe('ChatComponent', () => {
       await settle();
       expect(box()?.value).not.toBe('Lange neue Fassung');
 
-      // The message is gone: nothing opens.
       fireEvent.keyDown(box() as HTMLTextAreaElement, { key: 'Escape' });
       set('messages', [own()[1]]);
       first.restore();
@@ -916,6 +969,7 @@ describe('ChatComponent', () => {
       expect(box()).toBeNull();
     });
 
+    /** While nothing is being edited a save does nothing, and a vanished message emits nothing. */
     it('saves with the button, cancels with Abbrechen and needs a text', async () => {
       const { edit, cmp } = await setup({ messages: own() });
       fireEvent.click(screen.getAllByRole('button', { name: 'Nachricht bearbeiten' })[1]);
@@ -930,7 +984,6 @@ describe('ChatComponent', () => {
       fireEvent.click(screen.getAllByRole('button', { name: 'Nachricht bearbeiten' })[1]);
       fireEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
       expect(screen.queryByRole('textbox', { name: 'Nachricht bearbeiten' })).toBeNull();
-      // Nothing is being edited: a save does nothing; a vanished message emits nothing.
       cmp.saveEdit();
       cmp.editingId.set('gone');
       cmp.editDraft.set('x');
@@ -938,6 +991,7 @@ describe('ChatComponent', () => {
       expect(edit).toHaveBeenCalledTimes(1);
     });
 
+    /** While the answer is still out, the message and its button stay. */
     it('keeps the focus in the thread when the deleted message leaves the list', async () => {
       const { set, input, view } = await setup({ messages: own() });
       const trash = screen.getAllByRole('button', { name: 'Nachricht löschen' })[0];
@@ -946,13 +1000,13 @@ describe('ChatComponent', () => {
       view.fixture.detectChanges();
       fireEvent.click(within(screen.getByRole('dialog', { name: 'Nachricht löschen?' })).getByRole('button', { name: 'Löschen' }));
       view.fixture.detectChanges();
-      // The answer is still out: the message and its button stay.
       set('messages', own());
       set('messages', own().filter((m) => m.id !== 'm'));
       await view.fixture.whenStable();
       expect(document.activeElement).toBe(input());
     });
 
+    /** A confirm without a message does nothing. */
     it('deletes after a confirmation', async () => {
       const { del, view } = await setup({ messages: own() });
       fireEvent.click(screen.getAllByRole('button', { name: 'Nachricht löschen' })[0]);
@@ -962,7 +1016,6 @@ describe('ChatComponent', () => {
       fireEvent.click(screen.getAllByRole('button', { name: 'Nachricht löschen' })[0]);
       fireEvent.click(within(screen.getByRole('dialog', { name: 'Nachricht löschen?' })).getByRole('button', { name: 'Löschen' }));
       expect(del).toHaveBeenCalledWith({ id: 'm' });
-      // A confirm without a message does nothing.
       (view.fixture.componentInstance as unknown as { confirmDelete(): void }).confirmDelete();
       expect(del).toHaveBeenCalledTimes(1);
     });
@@ -1011,9 +1064,12 @@ describe('ChatComponent', () => {
       return ctx;
     }
 
+    /**
+     * The clipboard is read after the setup, because user-event puts its own clipboard on the
+     * navigator.
+     */
     it('opens the sheet on a long press and copies the text', async () => {
       const { view } = await longPress();
-      // After the setup: user-event puts its own clipboard on the navigator.
       const writeText = jest.fn().mockResolvedValue(undefined);
       Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
       const sheet = screen.getByRole('dialog', { name: 'Deine Nachricht · 08:21' });
@@ -1036,18 +1092,17 @@ describe('ChatComponent', () => {
       expect(cmp.menuFor()).toBeNull();
     });
 
+    /** Enter is a new line on a phone. A phone has no Edit button, so the focus goes to the log. */
     it('edits and deletes from the sheet', async () => {
       const { view, cmp } = await longPress();
       fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Bearbeiten' }));
       view.fixture.detectChanges();
       expect(screen.getByRole('textbox', { name: 'Nachricht bearbeiten' })).toHaveValue('Prüfe ich');
-      // Enter is a new line on a phone.
       fireEvent.keyDown(screen.getByRole('textbox', { name: 'Nachricht bearbeiten' }), { key: 'Enter' });
       expect(screen.getByRole('textbox', { name: 'Nachricht bearbeiten' })).toBeInTheDocument();
       expect(screen.getByRole('textbox', { name: 'Nachricht bearbeiten' })).toHaveFocus();
       cmp.cancelEdit();
       view.fixture.detectChanges();
-      // A phone has no Edit button: the focus goes to the log.
       expect(screen.getByRole('log')).toHaveFocus();
 
       cmp.openMenu(cmp.messages()[0]);
@@ -1093,17 +1148,21 @@ describe('ChatComponent', () => {
       expect(log()).toBeInTheDocument();
     });
 
+    /**
+     * A separator role would make the text presentational, so the day and the marker reach AT as
+     * text.
+     */
     it('shows "N neue" where the viewer was last', async () => {
       localStorage.setItem('ap.chat.seen.t1', today(9));
       const { view } = await setup({ messages: [msg('a', today(9)), msg('b', today(10)), msg('c', today(10, 1))] });
       const sep = view.container.querySelector('.chat__sep--new');
       expect(sep).toHaveTextContent('2 neue');
-      // A separator role would make the text presentational: the day and the marker reach AT as text.
       expect(screen.queryAllByRole('separator')).toHaveLength(0);
       expect(sep).not.toHaveAttribute('role');
       expect(screen.getByText('Heute').closest('[role]')).toBe(screen.getByRole('log'));
     });
 
+    /** Back at the end by scrolling, the log follows again. */
     it('offers a button for new messages below and follows at the end', async () => {
       const { log, set, view } = await setup({ messages: [msg('a', today(9))] });
       size(log(), 0);
@@ -1119,7 +1178,6 @@ describe('ChatComponent', () => {
       expect(screen.queryByRole('button', { name: /neue Nachricht/ })).toBeNull();
       expect(localStorage.getItem('ap.chat.seen.t1')).toBe(today(11));
 
-      // Back at the end by scrolling: the log follows again.
       size(log(), 0);
       fireEvent.scroll(log());
       size(log(), 800);
@@ -1174,6 +1232,10 @@ describe('ChatComponent', () => {
       expect(document.querySelector('.chat__fileInput')).toBeNull();
     });
 
+    /**
+     * The input is emptied, so the same file can be picked again. A message of files only goes out
+     * with an empty text. The next message starts a new draft.
+     */
     it('uploads picked files as chips and sends them with the message', async () => {
       const { pick, api, send, input, view, cmp } = await setup({ canAttach: true });
       const clip = screen.getByRole('button', { name: 'Datei anhängen' });
@@ -1185,10 +1247,8 @@ describe('ChatComponent', () => {
       expect(api.uploadDraftAttachment.mock.calls[1][1]).toMatchObject({ token: 'tok' });
       const chips = [...view.container.querySelectorAll('.chat__draft')].map((c) => c.textContent?.replace(/\s+/g, ' ').trim());
       expect(chips).toEqual(['angebot.pdf PDF · 1 KB · In Prüfung', 'kopf.png PNG · 1 KB · In Prüfung']);
-      // The input is emptied, so the same file can be picked again.
       expect((view.container.querySelector('.chat__fileInput') as HTMLInputElement).value).toBe('');
 
-      // A message of files only goes out with an empty text.
       fireEvent.keyDown(input(), { key: 'Enter' });
       expect(send).toHaveBeenCalledWith({
         body: '',
@@ -1201,7 +1261,6 @@ describe('ChatComponent', () => {
       });
       view.fixture.detectChanges();
       expect(view.container.querySelectorAll('.chat__draft')).toHaveLength(0);
-      // The next message starts a new draft.
       await pick(pdf());
       expect(api.uploadDraftAttachment.mock.calls[2][1]).toMatchObject({ token: null });
       expect(cmp.files()).toHaveLength(1);
@@ -1368,6 +1427,7 @@ describe('ChatComponent', () => {
       expect(api.uploadDraftAttachment).not.toHaveBeenCalled();
     });
 
+    /** Pasted text stays text. */
     it('takes a pasted image and names one without an extension', async () => {
       const { input, api, cmp, settle } = await setup({ canAttach: true });
       jest.spyOn(cmp, 'now').mockReturnValue(new Date(2026, 9, 15, 10, 45, 0));
@@ -1389,7 +1449,6 @@ describe('ChatComponent', () => {
       expect(names).toEqual(['Bild-20261015-104500.png', 'Bild-20261015-104500.jpg', 'Bild-20261015-104500.bin', 'shot.png']);
       expect((api.uploadDraftAttachment.mock.calls[0][0] as File).type).toBe('image/png');
 
-      // Pasted text stays text.
       expect(paste([]).defaultPrevented).toBe(false);
       const plain = new Event('paste', { bubbles: true, cancelable: true });
       input().dispatchEvent(plain);
@@ -1524,6 +1583,10 @@ describe('ChatComponent', () => {
       expect(api.deleteDraftAttachment).toHaveBeenCalledWith('d2', 'tok');
     });
 
+    /**
+     * A second chat beside it gets drafts of its own, and its files go with it. Another thread
+     * drops them, and so does the page when it goes.
+     */
     it('keeps the files of the page (ChatDrafts) when a layout switch re-creates the chat', async () => {
       @Component({
         standalone: true,
@@ -1580,7 +1643,6 @@ describe('ChatComponent', () => {
       expect(api.deleteDraftAttachment).not.toHaveBeenCalled();
       expect(screen.getByRole('button', { name: 'a.pdf entfernen' })).toBeInTheDocument();
 
-      // A second chat beside it gets drafts of its own, and its files go with it.
       fixture.componentInstance.second.set(true);
       await settle();
       expect(chat('two').files()).toEqual([]);
@@ -1591,7 +1653,6 @@ describe('ChatComponent', () => {
       expect(api.deleteDraftAttachment).toHaveBeenCalledWith('d2', 'tok');
       expect(api.deleteDraftAttachment).toHaveBeenCalledTimes(1);
 
-      // Another thread drops them; so does the page when it goes.
       fixture.componentInstance.key.set('t2');
       await settle();
       expect(api.deleteDraftAttachment).toHaveBeenCalledWith('d1', 'tok');
@@ -1640,6 +1701,11 @@ describe('ChatComponent', () => {
       beforeEach(() => jest.useFakeTimers());
       afterEach(() => jest.useRealTimers());
 
+      /**
+       * The same file still in the scan keeps the back-off where it is until the back-off runs out.
+       * A new file in the scan starts it again. With one file out of the scan and another still in
+       * it, the back-off goes on.
+       */
       it('reads the thread again with a back-off while a sent file is in the scan', async () => {
         const { refresh, set } = await setup({ messages: [scanning('a')] });
         expect(SCAN_BACKOFF.reduce((a, b) => a + b, 0)).toBe(30_000);
@@ -1649,18 +1715,14 @@ describe('ChatComponent', () => {
         expect(refresh).toHaveBeenCalledTimes(1);
         jest.advanceTimersByTime(SCAN_BACKOFF[1]);
         expect(refresh).toHaveBeenCalledTimes(2);
-        // The same file still in the scan keeps the back-off where it is.
         set('messages', [scanning('a', { body: 'neu' })]);
         jest.advanceTimersByTime(SCAN_BACKOFF[2] + SCAN_BACKOFF[3]);
         expect(refresh).toHaveBeenCalledTimes(4);
-        // The back-off has run out.
         jest.advanceTimersByTime(60_000);
         expect(refresh).toHaveBeenCalledTimes(4);
-        // A new file in the scan starts it again.
         set('messages', [scanning('a'), scanning('b')]);
         jest.advanceTimersByTime(SCAN_BACKOFF[0]);
         expect(refresh).toHaveBeenCalledTimes(5);
-        // One file out of the scan, another still in it: the back-off goes on.
         set('messages', [scanning('b')]);
         jest.advanceTimersByTime(SCAN_BACKOFF[1]);
         expect(refresh).toHaveBeenCalledTimes(6);

@@ -1,4 +1,4 @@
-"""Shared fixtures of the meeting lifecycle and agenda integration tests (P5a).
+"""Shared fixtures of the meeting lifecycle and agenda integration tests.
 
 ``maker`` gives a session factory on the migrated test database. ``api`` gives the real
 app wiring with an admin principal and a request session without a pool, so no
@@ -54,6 +54,10 @@ async def maker(
 
 @pytest.fixture
 def api(migrated: tuple[str, str], monkeypatch: pytest.MonkeyPatch) -> Iterator[FastAPI]:
+    """Build the real app on the test database.
+
+    The test stack has no Redis, so the broadcasts go to an in-memory broker.
+    """
     settings = load_settings(
         database_url=migrated[1],
         session_secret="session-secret-meeting-p5a-000",
@@ -72,7 +76,6 @@ def api(migrated: tuple[str, str], monkeypatch: pytest.MonkeyPatch) -> Iterator[
     application = create_app(settings)
     application.dependency_overrides[get_settings] = lambda: settings
     application.dependency_overrides[get_session] = _request_session
-    # The test stack has no Redis. The broadcasts go to an in-memory broker.
     broker = InMemoryBroker()
     application.dependency_overrides[get_broker_rest] = lambda: broker
     application.dependency_overrides[get_current_principal] = lambda: Principal(

@@ -1,10 +1,9 @@
-"""Integration test for the voting service (T-15).
+"""Integration test for the voting service.
 
-The test uses a real Postgres from testcontainers and a real schema. It checks
-data-model section 5.3 and flows section 4.
+The test uses a real Postgres from testcontainers and a real schema.
 
 `UNIQUE(vote,voter)` turns a double vote into a 409 `already_voted`: a ballot never
-changes after the cast (O11). The secret path writes `voted_marker` and
+changes after the cast. The secret path writes `voted_marker` and
 `secret_ballot` without a link to the identity. The percent quorum comes from the
 eligible snapshot. `close` computes the `result` and fires the result branch in the
 same transaction.
@@ -16,6 +15,7 @@ import asyncio
 import uuid
 from collections.abc import AsyncIterator, Sequence
 from datetime import UTC, datetime
+from typing import Any
 
 import pytest
 from sqlalchemy import Engine, func, select
@@ -76,6 +76,11 @@ async def _seed(session: AsyncSession) -> tuple[Application, dict[str, State]]:
     """Create an application type, a form, a flow and an application in `voting`.
 
     The vote result moves the flow from `voting` to `approved`, `rejected` or `review`.
+
+    The vote state has two fixed exits, pass and fail, and the close fires one of them.
+    A passed vote takes pass to approved. A rejected vote or a tie takes fail to
+    rejected, which is fail-closed. The application is confirmed, because an unconfirmed
+    one rests in the flow.
     """
     gremium = Gremium(name="G", slug=f"g-{uuid.uuid4()}")
     session.add(gremium)
@@ -112,9 +117,6 @@ async def _seed(session: AsyncSession) -> tuple[Application, dict[str, State]]:
     }
     session.add_all(list(states.values()))
     await session.flush()
-    # #28: the vote state has two fixed exits, pass and fail. The close fires the branch.
-    # A passed vote takes pass to approved. A rejected vote or a tie takes fail to
-    # rejected, which is fail-closed.
     session.add_all([
         Transition(flow_version_id=flow.id, from_state_id=states["voting"].id,
                    to_state_id=states["approved"].id, label_i18n={},
@@ -135,14 +137,13 @@ async def _seed(session: AsyncSession) -> tuple[Application, dict[str, State]]:
     app_row = await session.get(Application, app.id)
     assert app_row is not None
     app_row.current_state_id = states["voting"].id
-    # A vote needs a confirmed application. An unconfirmed one rests in the flow.
     app_row.email_confirmed_at = datetime.now(UTC)
     await session.commit()
     return app_row, states
 
 
-def _config(**over: object) -> dict:
-    base: dict = {"options": ["yes", "no", "abstain"], "majorityRule": "simple"}
+def _config(**over: object) -> dict[str, Any]:
+    base: dict[str, Any] = {"options": ["yes", "no", "abstain"], "majorityRule": "simple"}
     base.update(over)
     return VoteConfig.model_validate(base).model_dump(by_alias=True)
 
@@ -151,7 +152,7 @@ async def _make_vote(
     session: AsyncSession, app: Application, *, eligible_count: int | None = None,
     **cfg: object,
 ) -> Vote:
-    # A vote names the gremium of the application as its eligible group.
+    """Create a vote for the gremium of the application as its eligible group."""
     vote = Vote(application_id=app.id, eligible_group=str(app.gremium_id),
                 config=_config(**cfg), eligible_count=eligible_count, status="draft")
     session.add(vote)
@@ -165,6 +166,7 @@ def _voter(sub: str, vote: Vote) -> Principal:
 
 
 async def test_double_vote_conflict_409(session: AsyncSession) -> None:
+    """A second ballot gives 409, and the first ballot stays as it was."""
     app, _ = await _seed(session)
     vote = await _make_vote(session, app)
     svc = VotingService(session)
@@ -174,7 +176,6 @@ async def test_double_vote_conflict_409(session: AsyncSession) -> None:
     with pytest.raises(ConflictError) as ei:
         await svc.cast(vote.id, _voter("v1", vote), "no", now=NOW)
     assert ei.value.code == "already_voted"
-    # O11: the first ballot stays as it was.
     rows = (await session.execute(
         select(Ballot.choice).where(Ballot.vote_id == vote.id)
     )).scalars().all()
@@ -182,11 +183,11 @@ async def test_double_vote_conflict_409(session: AsyncSession) -> None:
 
 
 async def test_not_in_group_forbidden(session: AsyncSession) -> None:
+    """A raw OIDC claim and the gremium key of another gremium both miss the roster."""
     app, _ = await _seed(session)
     vote = await _make_vote(session, app)
     svc = VotingService(session)
     await svc.open(vote.id, now=NOW)
-    # A raw OIDC claim, and the gremium key of another gremium, both miss the roster.
     outsider = Principal(
         sub="x", groups={vote.eligible_group, vote_group_key(uuid.uuid4())}
     )
@@ -195,6 +196,12 @@ async def test_not_in_group_forbidden(session: AsyncSession) -> None:
 
 
 async def test_secret_vote_unlinks_choice_from_voter(session: AsyncSession) -> None:
+    """A secret vote keeps who voted apart from what they chose.
+
+    The markers name the voters, the secret ballots hold the choices without an
+    identity, and no identifying ballot exists. The secret path also rejects a double
+    vote with 409.
+    """
     app, _ = await _seed(session)
     vote = await _make_vote(session, app, secret=True)
     svc = VotingService(session)
@@ -202,7 +209,6 @@ async def test_secret_vote_unlinks_choice_from_voter(session: AsyncSession) -> N
 
     await svc.cast(vote.id, _voter("v1", vote), "yes", now=NOW)
     await svc.cast(vote.id, _voter("v2", vote), "no", now=NOW)
-    # The secret path also rejects a double vote with a 409.
     with pytest.raises(ConflictError) as ei:
         await svc.cast(vote.id, _voter("v1", vote), "no", now=NOW)
     assert ei.value.code == "already_voted"
@@ -216,9 +222,9 @@ async def test_secret_vote_unlinks_choice_from_voter(session: AsyncSession) -> N
     ballots = (await session.execute(
         select(func.count()).select_from(Ballot).where(Ballot.vote_id == vote.id)
     )).scalar_one()
-    assert sorted(markers) == ["v1", "v2"]      # who voted
-    assert sorted(secrets) == ["no", "yes"]      # what the voters chose, no identity
-    assert ballots == 0                          # no identifying ballot
+    assert sorted(markers) == ["v1", "v2"]
+    assert sorted(secrets) == ["no", "yes"]
+    assert ballots == 0
 
 
 def test_secret_ballot_has_no_timestamp_column() -> None:
@@ -230,18 +236,21 @@ def test_secret_ballot_has_no_timestamp_column() -> None:
 async def test_percent_quorum_denominator_is_roster_not_voters(
     session: AsyncSession,
 ) -> None:
+    """The percent quorum divides by the roster, not by the voters.
+
+    The roster holds 20 eligible voters, for example the size of the Gremium,
+    independent of who logs in or votes. No principal row exists for these voters. 5
+    votes give 5/20 = 25%, below 50%, so the quorum is missed. A denominator of the
+    voters alone would give 5/5 = 100% and fail open. A missed quorum blocks the close
+    with 409 instead of a silent rejected. The way out is to collect more votes or to
+    cancel the vote.
+    """
     app, _ = await _seed(session)
-    # The roster holds 20 eligible voters, for example the size of the Gremium. That
-    # number does not depend on who logs in or who votes. No principal row exists for
-    # these voters.
     vote = await _make_vote(
         session, app, eligible_count=20, quorum={"type": "percent", "value": 50}
     )
     svc = VotingService(session)
     await svc.open(vote.id, now=NOW)
-    # 5 votes give 5/20 = 25%, which is below 50%. The vote misses the quorum, because
-    # the denominator is the roster and not the voters. The old fail-open denominator
-    # counted the voters alone and gave 5/5 = 100%.
     for i in range(5):
         await svc.cast(vote.id, _voter(f"v{i}", vote), "yes", now=NOW)
 
@@ -249,8 +258,6 @@ async def test_percent_quorum_denominator_is_roster_not_voters(
     assert pre.tally.eligible == 20
     assert pre.tally.quorum_met is False
 
-    # A missed quorum blocks the close. The service raises a 409 instead of a
-    # silent rejected. The way out is to collect more votes or to cancel the vote.
     closer = Principal(sub="mgr")
     with pytest.raises(ConflictError):
         await svc.close(vote.id, closer)
@@ -261,7 +268,7 @@ async def test_percent_quorum_denominator_is_roster_not_voters(
     [
         (["yes", "yes", "no"], "rejected", "passed", "approved"),
         (["no", "no", "yes"], "rejected", "rejected", "rejected"),
-        (["yes", "no"], "tie", "tie", "rejected"),  # tie → fail-closed → rejected
+        (["yes", "no"], "tie", "tie", "rejected"),
     ],
 )
 async def test_close_branches_to_flow(
@@ -331,14 +338,14 @@ async def test_concurrent_cast_same_voter_exactly_one_wins(
     assert count == 1
 
 
-# AUD-027: the lifecycle (create, open, close, cancel) is gremium-scoped, like the
-# scoped read. An admin and a per-Gremium `vote.manage` or `session.manage` holder may
-# act. No global permission grants the right. A cross-tenant call is fail-closed. A
-# per-Gremium holder may not act on a vote of another Gremium.
 async def _gremium_member_with_vote_manage(
     session: AsyncSession, gremium_id: uuid.UUID
 ) -> Principal:
-    """Build a principal that holds `vote.manage` through a Gremium role, not globally."""
+    """Build a principal that holds `vote.manage` through a Gremium role, not globally.
+
+    The principal has no groups and no global permission. The Gremium role alone grants
+    the right.
+    """
     row = PrincipalRow(sub=f"gm-{uuid.uuid4()}", display_name="GM", email="gm@x.de")
     session.add(row)
     await session.flush()
@@ -356,21 +363,22 @@ async def _gremium_member_with_vote_manage(
         )
     )
     await session.commit()
-    # No groups and no global permission. The Gremium role alone grants the right.
     return Principal(sub=row.sub, permissions=set())
 
 
 async def test_assert_can_manage_admin_passes_global_keys_do_not(
     session: AsyncSession,
 ) -> None:
+    """An admin passes for any Gremium.
+
+    A stale global `vote.manage` or `vote.cast` grants nothing.
+    """
     app, _ = await _seed(session)
     vote = await _make_vote(session, app)
     svc = VotingService(session)
     vote_row = await session.get(Vote, vote.id)
     assert vote_row is not None
-    # An admin passes, independent of the Gremium.
     await svc.assert_can_manage(vote_row, Principal(sub="adm", roles=["admin"]))
-    # A stale global `vote.manage` or `vote.cast` grants nothing.
     for perm in ("vote.manage", "vote.cast"):
         with pytest.raises(ForbiddenError):
             await svc.assert_can_manage(
@@ -381,12 +389,12 @@ async def test_assert_can_manage_admin_passes_global_keys_do_not(
 async def test_assert_can_manage_per_gremium_role(session: AsyncSession) -> None:
     """Let a per-Gremium `vote.manage` holder manage a vote of the own Gremium.
 
-    The old router gate accepted a global permission only and locked this holder out.
     The holder still may not manage a vote of another Gremium.
+
+    The `eligible_group` of the vote holds the Gremium UUID as text. The same holder may
+    not manage a vote of another Gremium, so cross-tenant access is fail-closed.
     """
     app, _ = await _seed(session)
-    # Bind the vote to the Gremium of the application. The `eligible_group` field holds
-    # the Gremium UUID as text.
     type_row = await session.get(ApplicationType, app.type_id)
     assert type_row is not None and type_row.gremium_id is not None
     gremium_id = type_row.gremium_id
@@ -404,8 +412,6 @@ async def test_assert_can_manage_per_gremium_role(session: AsyncSession) -> None
     assert vote_row is not None
     await VotingService(session).assert_can_manage(vote_row, holder)
 
-    # The same holder may not manage a vote of another Gremium. Cross-tenant access is
-    # fail-closed.
     other = Gremium(name="Other", slug=f"o-{uuid.uuid4()}")
     session.add(other)
     await session.flush()
@@ -480,7 +486,7 @@ async def test_create_hides_an_unconfirmed_application(session: AsyncSession) ->
 async def test_create_counts_the_roster_and_binds_the_gremium(
     session: AsyncSession,
 ) -> None:
-    """F14 and NEW-1 against the real schema.
+    """The eligible count and the gremium check against the real schema.
 
     The server stores the number of members with `vote.cast` as `eligible_count`. A
     vote of another gremium than the one of the application gives 422.

@@ -44,6 +44,7 @@ function ticket(over: Partial<TicketListItem> = {}): TicketListItem {
   };
 }
 
+/** The anonymous report has only the e-mail, which the cut sub line never shows. */
 const OPEN = [
   ticket(),
   ticket({
@@ -53,7 +54,6 @@ const OPEN = [
     title: 'Protokoll-PDF zeigt im Kopf das falsche Datum',
     status: 'in_progress',
     assignee: MARA,
-    // An anonymous report: only the e-mail, which the cut sub line never shows.
     reporter: { principalId: null, displayName: null, email: 'kassenwart.fachschaft-technik@student.example.org', anonymized: false },
     createdAt: new Date(2026, 9, 14, 21, 14).toISOString(),
   }),
@@ -84,6 +84,7 @@ interface Opts {
   manager?: boolean;
 }
 
+/** The clock of the row ages, and the rows compute again with it. */
 async function start(url = '/tickets', opts: Opts = {}) {
   localStorage.setItem('ap.locale', 'de');
   let answer = opts.answer ?? defaultAnswer;
@@ -116,7 +117,6 @@ async function start(url = '/tickets', opts: Opts = {}) {
   });
   const harness = await RouterTestingHarness.create();
   const cmp = await harness.navigateByUrl(url, TicketsComponent);
-  // The clock of the row ages; the rows compute again with it.
   cmp.now = () => NOW;
   cmp.items.set([...cmp.items()]);
   harness.detectChanges();
@@ -215,6 +215,7 @@ describe('TicketsComponent', () => {
     expect(cmp.closedItems()).toBeNull();
   });
 
+  /** There is no closed group outside the default view. */
   it('filters by state, kind and assignee through the query params', async () => {
     const { harness, cmp, api, router } = await start();
     cmp.setStatus('done');
@@ -222,7 +223,6 @@ describe('TicketsComponent', () => {
     harness.detectChanges();
     expect(router.url).toBe('/tickets?status=done');
     expect(api.list).toHaveBeenLastCalledWith(expect.objectContaining({ status: ['done'] }));
-    // No closed group outside the default view.
     expect(cmp.closedTotal()).toBe(0);
 
     cmp.setKind('bug');
@@ -390,6 +390,7 @@ describe('TicketsComponent', () => {
     expect(cmp.closedTotal()).toBe(2);
   });
 
+  /** A failed reload keeps the rows. */
   it('loads again when the detail changed a ticket, and keeps the shown closed tickets', async () => {
     const { harness, cmp, api, rail, page, setAnswer } = await start();
     cmp.showClosed();
@@ -401,7 +402,6 @@ describe('TicketsComponent', () => {
     expect(api.list).toHaveBeenCalledWith(expect.objectContaining({ status: ['done', 'rejected'], limit: TICKET_PAGE }));
     expect(cmp.closedItems()).toHaveLength(2);
 
-    // A failed reload keeps the rows.
     setAnswer(() => throwError(() => new Error('x')));
     page.notify('t42');
     harness.detectChanges();
@@ -420,6 +420,7 @@ describe('TicketsComponent', () => {
     expect(cmp.selectedId()).toBe('t42');
   });
 
+  /** Leaving the page frees the frame. */
   it('shows the list beside the detail on a wide screen', async () => {
     const restore = matchMediaQueries(MEDIA.wide);
     try {
@@ -430,7 +431,6 @@ describe('TicketsComponent', () => {
       expect(TestBed.inject(PageFrameService).fill()).toBe(true);
       const row = screen.getByRole('link', { name: /Protokoll-PDF/ }).closest('app-list-item')!;
       expect(row.querySelector('app-row-chevron')).toBeNull();
-      // Leaving the page frees the frame.
       harness.fixture.destroy();
       expect(TestBed.inject(PageFrameService).fill()).toBe(false);
     } finally {

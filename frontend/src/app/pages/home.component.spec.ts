@@ -56,15 +56,17 @@ describe('HomeComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
   afterEach(() => localStorage.clear());
 
+  /**
+   * The apply choice is a router link. The login choice is a button, because the OIDC redirect
+   * leaves the SPA and has no route of its own. Nothing else competes with them: the body holds one
+   * link and one button.
+   */
   it('offers exactly two ways in and nothing else without public protocols', async () => {
     const { protocols } = await setup();
     expect(protocols.list).toHaveBeenCalledWith({ limit: 3 });
-    // The apply choice is a router link; the login choice is a button, because the OIDC
-    // redirect leaves the SPA and has no route of its own.
     const apply = screen.getByRole('link', { name: /Antrag stellen/ });
     expect(apply).toHaveAttribute('href', '/apply');
     expect(screen.getByRole('button', { name: /Gremiumsmitglied anmelden/ })).toBeInTheDocument();
-    // Nothing else competes with them: one link and one button in the body.
     expect(screen.getAllByRole('link')).toHaveLength(1);
     expect(screen.getAllByRole('button')).toHaveLength(1);
   });
@@ -125,6 +127,7 @@ describe('HomeComponent', () => {
   });
 
   describe('public protocols', () => {
+    /** Two of the three agenda items are public. The login stays. */
     it('adds the protocol card and the strip of the newest protocols', async () => {
       const page: PublicProtocolPage = {
         items: [summary(), summary({ id: 'p-2', title: '6. Sitzung der Fachschaft' })],
@@ -137,13 +140,11 @@ describe('HomeComponent', () => {
       expect(screen.getByRole('heading', { name: 'Zuletzt veröffentlicht' })).toBeInTheDocument();
       const first = screen.getByRole('link', { name: /34\. Sitzung des Studierendenparlaments/ });
       expect(first).toHaveAttribute('href', '/protokolle/p-1');
-      // Two of the three agenda items are public.
       expect(first).toHaveTextContent('Studierendenparlament · 2 öffentliche TOPs');
       expect(screen.getByRole('link', { name: /Alle 23 Protokolle/ })).toHaveAttribute(
         'href',
         '/protokolle',
       );
-      // The login stays.
       expect(screen.getByRole('button', { name: /Gremiumsmitglied anmelden/ })).toBeInTheDocument();
     });
 

@@ -1,4 +1,4 @@
-"""Test fakes for the protocol unit suite (T-22, without DB, typst, MinIO or Redis).
+"""Test fakes for the protocol unit suite (without DB, typst, MinIO or Redis).
 
 `FakeSession` combines the two access patterns of
 `app.modules.protocol.service.ProtocolService`. It answers `get(model, id)` from a store
@@ -52,13 +52,16 @@ class FakeSession:
         self.committed = 0
 
     async def execute(self, _stmt: Any) -> FakeResult:
-        # The header metadata path reads the attendance. That query
-        # has no entry in the ordered queue. Return an empty result for it, so that it
-        # does not take the result of another query.
+        """Pop the next result of the ordered queue.
+
+        The header metadata path reads the attendance, and that query has no entry in
+        the queue. It gets an empty result, so that it does not take the result of
+        another query. The header also reads the keeper periods. That query returns
+        ``keeper_rows``, which a test sets when it needs them, and never takes a result
+        of the queue.
+        """
         if "meeting_attendance" in str(_stmt).lower():
             return FakeResult()
-        # The header also reads the keeper periods (Z3). A test that needs them sets
-        # `keeper_rows`. The query never takes a result of the ordered queue.
         if "protocol_keeper_period" in str(_stmt).lower():
             return FakeResult(self.keeper_rows)
         return self._results.pop(0) if self._results else FakeResult()
@@ -71,11 +74,11 @@ class FakeSession:
 
         This method uses its own queue and returns `None` by default. It keeps the order
         of the `execute` queue unchanged.
+
+        The render path resolves the corporate design of the protocol, and that query
+        has no entry in the queue either. It gets ``None``, so the render falls back to
+        the variant name and the query does not take the result of another one.
         """
-        # The render path resolves the corporate design of the protocol. That query
-        # has no entry in the queue either. Answer it with `None`, so the render
-        # falls back to the variant name and the query does not eat the result of
-        # another one. Same reason as the attendance case in `execute`.
         if "cd_variant" in str(_stmt).lower():
             return None
         if self.scalar_results:

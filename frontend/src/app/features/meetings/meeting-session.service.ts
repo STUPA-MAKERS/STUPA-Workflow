@@ -57,12 +57,10 @@ export class MeetingSessionService implements OnDestroy {
   private readonly destroyRef = inject(DestroyRef);
   private readonly useMock = inject(USE_MOCK_API);
   private readonly agendaSvc = inject(MeetingAgendaService);
-  /** The join requests and the guests (#17); provided beside this service. */
+  /** The join requests and the guests; provided beside this service. */
   private readonly guests = inject(MeetingGuestsService, { optional: true });
 
   constructor() {
-    // The guest list follows the loaded meeting: it loads for the lead of a public
-    // meeting and clears for everybody else.
     effect(() => {
       const m = this.meeting();
       untracked(() => this.guests?.sync(m));
@@ -79,7 +77,7 @@ export class MeetingSessionService implements OnDestroy {
   readonly viewers = signal<string[]>([]);
   readonly savingAttendance = signal(false);
   /**
-   * O23: the member whose "present" the server refused with 409 `delegation_active`. The
+   * The member whose "present" the server refused with 409 `delegation_active`. The
    * attendance sheet marks the row and offers the revoke of the delegation.
    */
   readonly attendanceConflict = signal<Uuid | null>(null);
@@ -117,7 +115,6 @@ export class MeetingSessionService implements OnDestroy {
   /** The highest draft sequence number seen per agenda item (viewer side). */
   private readonly draftSeen = new Map<Uuid, number>();
 
-  // Permission flags, per meeting where loaded. The backend checks them per Gremium.
   /** The admin manages the meetings of every Gremium. Everybody else manages per
    *  Gremium through `session.manage`, which the server reports as `canManage`. */
   readonly canManageAny = computed(() => this.auth.isAdmin());
@@ -141,7 +138,6 @@ export class MeetingSessionService implements OnDestroy {
   readonly isFollower = computed(() => {
     const m = this.meeting();
     if (!m) return false;
-    // Readers with view_all get the full 3-column view read-only.
     if (this.canViewAll()) return false;
     return !m.canWrite && !m.canManage;
   });
@@ -154,7 +150,7 @@ export class MeetingSessionService implements OnDestroy {
    *
    * Before the start and after the close there is no live keeper to protect. Every
    * writer prepares the text of a planned meeting, and every writer edits the draft of
-   * a closed one (O22): the session lead, the finalizer and an earlier keeper, not only
+   * a closed one: the session lead, the finalizer and an earlier keeper, not only
    * the last one. A final protocol stays locked through `Protocol.isLocked`.
    */
   readonly canEditProtocol = computed(() => {
@@ -194,14 +190,13 @@ export class MeetingSessionService implements OnDestroy {
     });
   }
 
+  /** An existing protocol is read with GET, which keeps the write rate limit intact. */
   private adoptMeeting(m: Meeting): void {
     this.meeting.set(m);
     this.attendanceConflict.set(null);
     this.planDate.set(m.date ?? '');
     this.planTime.set(m.startTime ?? '');
     this.connectLive(m.id);
-    // Read an existing protocol with GET, which keeps the write rate limit
-    // intact. A protocol is only ever created explicitly.
     if (m.protocolId && (this.canWrite() || this.canViewAll())) this.refreshProtocol();
     this.loadAttendance(m.id);
     this.agendaSvc.load(m.id, m.currentAgendaItemId);
@@ -228,7 +223,6 @@ export class MeetingSessionService implements OnDestroy {
     this.api.patchMeeting(m.id, body).subscribe({
       next: (updated) => {
         this.meeting.set(updated);
-        // The tick is on the agenda, not on the meeting: read the agenda again.
         if (completeItemId) this.agendaSvc.load(m.id, updated.currentAgendaItemId);
       },
       error: () => this.toast.error(this.i18n.translate('meetings.toast.actionFailed')),
@@ -240,15 +234,18 @@ export class MeetingSessionService implements OnDestroy {
    * the start. Only a planned meeting starts, and it needs a minute-taker: the page
    * says so at once instead of showing the server 409 after the click.
    *
-   * The open window: before `opensAt` the page refuses at once (the button is off
-   * anyway) and reads the meeting again, because the window may have moved. The
-   * server 409 `meeting_too_early` (the clocks differ) does the same. Before `confirmUntil` the open is early: the first call opens "Sitzung
-   * schon eröffnen?" (`earlyOpenAsk`), and the dialog calls again with
-   * `confirmEarly`. When the server still finds the open early (the clocks differ),
-   * its 409 `early_open_unconfirmed` opens the dialog too.
+   * The open window: before `opensAt` the page refuses at once (the button is off anyway) and reads
+   * the meeting again, because the window may have moved. The server 409 `meeting_too_early` (the
+   * clocks differ) does the same. Before `confirmUntil` the open is early: the first call opens
+   * "Sitzung schon eröffnen?" (`earlyOpenAsk`), and the dialog calls again with `confirmEarly`.
+   * When the server still finds the open early (the clocks differ), its 409
+   * `early_open_unconfirmed` opens the dialog too.
    *
    * The close is a dialog of its own (`CloseMeetingDialogComponent`), and a planned
-   * meeting that does not take place is deleted, not closed (O13).
+   * meeting that does not take place is deleted, not closed.
+   *
+   * The window may have moved (settings, a date change in another tab), so the start reads it
+   * again.
    */
   startMeeting(confirmEarly = false): void {
     const m = this.meeting();
@@ -260,7 +257,6 @@ export class MeetingSessionService implements OnDestroy {
     }
     const phase = openWindowState(m, Date.now());
     if (phase === 'tooEarly') {
-      // The window may have moved (settings, a date change in another tab): read again.
       this.tooEarly();
       return;
     }
@@ -272,7 +268,6 @@ export class MeetingSessionService implements OnDestroy {
     this.api.patchMeeting(m.id, body).subscribe({
       next: (updated) => {
         this.meeting.set(updated);
-        // The backend creates the protocol on start. Fetch it right away.
         if (updated.status === 'live' && updated.protocolId && this.canWrite()) {
           this.refreshProtocol();
         }
@@ -315,7 +310,7 @@ export class MeetingSessionService implements OnDestroy {
     this.reloadMeeting();
   }
 
-  /** Read the meeting again (quiet): the lot of an election or its runoff (F2). */
+  /** Read the meeting again (quiet): the lot of an election or its runoff. */
   reloadMeeting(): void {
     const m = this.meeting();
     if (!m) return;
@@ -371,12 +366,14 @@ export class MeetingSessionService implements OnDestroy {
 
   /** Close a vote. The close always ends the vote. When the pass or fail
    *  transition of the application is blocked (`branchFired: false`), a warning
-   *  tells the manager to move the application by hand. */
+   *  tells the manager to move the application by hand.
+   *
+   * A generic motion has no application and fires no branch on purpose.
+   */
   closeVote(voteId: Uuid): void {
     this.api.closeVote(voteId).subscribe({
       next: (closed) => {
         this.patchVote(voteId, { status: 'closed', closedAt: nowIso() });
-        // A generic motion has no application and fires no branch on purpose.
         if (closed.applicationId && !closed.branchFired) {
           this.toast.show(this.i18n.translate('meetings.toast.voteBranchBlocked'), 'warning', 10000);
         }
@@ -439,8 +436,6 @@ export class MeetingSessionService implements OnDestroy {
       },
       error: (err: unknown) => {
         this.deletingVote.set(null);
-        // A closed meeting keeps its votes (409 `meeting_closed`), and an open or
-        // closed vote stays (409 `vote_not_deletable`). Show the reason.
         this.voteActionFailed(err);
       },
     });
@@ -499,26 +494,25 @@ export class MeetingSessionService implements OnDestroy {
   /**
    * Finalize the protocol. `publicWithheld` keeps the protocol of a public gremium off
    * the public protocol page (the finalize dialog asks for it).
+   *
+   * `isLocked` also covers `rendering`, so there is no second start and no 409 on PATCH. The
+   * protocol is finalized only after the close, as a step of its own. The text typed within the
+   * last autosave delay is sent first, because the server renders the PDF from the item texts it
+   * holds.
    */
   finalize(opts: { publicWithheld?: boolean } = {}): void {
     const proto = this.protocol();
-    // `isLocked` also covers `rendering`: no second start, no 409 on PATCH.
     if (!proto || proto.isLocked || this.finalizing()) return;
-    // F8, O13: the protocol is finalized only after the close (409 otherwise), as a
-    // step of its own. The close never finalizes.
     if (this.meeting()?.status !== 'closed') return;
     const meetingId = this.meeting()?.id;
     if (!meetingId) return;
     this.finalizing.set(true);
-    // The server renders the PDF from the item texts it holds. The text typed within
-    // the last autosave delay reaches it first, or the last TOP stays empty in the PDF.
     this.agendaSvc.persistBody(meetingId).subscribe((held) => {
       if (!held) {
         this.finalizing.set(false);
         this.toast.error(this.i18n.translate('meetings.toast.saveFailed'));
         return;
       }
-      // Then persist the assembled TOP markdown, then finalize/render.
       this.api
         .updateProtocol(proto.id, assembleProtocolMarkdown(this.agendaSvc.agenda()))
         .subscribe({
@@ -570,18 +564,14 @@ export class MeetingSessionService implements OnDestroy {
         this.finalizing.set(false);
         this.protocol.set(updated);
         if (updated.isFinal) {
-          // Sync path (dev without Redis): the protocol is final right away.
           this.toast.success(this.i18n.translate('meetings.toast.finalized'));
         } else {
-          // Async path: the worker renders in the background. The completion
-          // arrives over the WS broadcast or the poll fallback.
           this.toast.success(this.i18n.translate('meetings.toast.renderQueued'));
           this.watchRendering(updated);
         }
       },
       error: (err: unknown) => {
         this.finalizing.set(false);
-        // Render and compile errors (400) carry a concrete reason. Show it.
         const detail = problemDetail(err);
         this.toast.error(
           detail
@@ -602,7 +592,7 @@ export class MeetingSessionService implements OnDestroy {
   /**
    * Change an attendance record. The meeting lead (`canControl`) sets any status of any
    * member through the lead endpoint. A member reports only the own record, only as
-   * present or excused (Z2), and only while the lead did not set it (O15). `note` is
+   * present or excused, and only while the lead did not set it. `note` is
    * the reason of an excuse: leave it out to keep the stored reason.
    */
   setAttendance(member: Attendance, status: AttendanceStatus, note?: string | null): void {
@@ -618,7 +608,7 @@ export class MeetingSessionService implements OnDestroy {
     this.saveAttendance(m.id, member.principalId, req, asLead);
   }
 
-  /** O23: the delegation of the member was revoked, so the refusal no longer applies. */
+  /** The delegation of the member was revoked, so the refusal no longer applies. */
   clearAttendanceConflict(principalId: Uuid): void {
     if (this.attendanceConflict() === principalId) this.attendanceConflict.set(null);
   }
@@ -655,9 +645,9 @@ export class MeetingSessionService implements OnDestroy {
   }
 
   /**
-   * Explain a refused attendance change. O23: a member with a delegation cannot be set or
+   * Explain a refused attendance change. A member with a delegation cannot be set or
    * report present; for the lead the attendance sheet marks the row and offers the
-   * revoke. O15: the lead set the record of the member. Both reload the roster, because
+   * revoke. The lead set the record of the member. Both reload the roster, because
    * it changed in another tab or by the lead.
    */
   private attendanceFailed(
@@ -691,11 +681,12 @@ export class MeetingSessionService implements OnDestroy {
    * `DRAFT_INTERVAL_MS`: a change inside the interval waits, and the last text always
    * goes out at the end of the interval. The autosave stays the only save; the server
    * passes the draft on without a write.
+   *
+   * A wait for another item goes out first, so the last text of each item goes out.
    */
   sendBodyDraft(itemId: Uuid, body: string): void {
     const m = this.meeting();
     if (!m || m.status !== 'live' || !m.isProtokollant || !this.channel) return;
-    // A wait for another item goes out first, so the last text of each item goes out.
     if (this.draftPending && this.draftPending.itemId !== itemId) this.flushDraft();
     this.draftPending = { itemId, body };
     if (this.draftTimer !== null) return;
@@ -745,11 +736,11 @@ export class MeetingSessionService implements OnDestroy {
     this.agendaSvc.applyDraft(msg.agendaItemId, msg.body);
   }
 
+  /** Mock mode has no WS server, so the live channel is skipped. */
   private connectLive(meetingId: Uuid): void {
-    this.viewers.set([]); // drop the state of the previous meeting
+    this.viewers.set([]);
     this.clearDraft();
     this.draftSeen.clear();
-    // Mock mode (FE dev and test harness) has no WS server. Skip the live channel.
     if (this.useMock) return;
     this.channel?.close();
     this.channel = this.ws.connectMeeting(meetingId);
@@ -758,6 +749,11 @@ export class MeetingSessionService implements OnDestroy {
       .subscribe((msg) => this.onLive(msg));
   }
 
+  /**
+   * TOP bodies can change without a vote, so a live event reloads the agenda. The event carries no
+   * rights, so a handover reads the meeting again. Reads after a live event use GET, so broadcast
+   * bursts do not burn the write rate limit.
+   */
   private onLive(msg: ServerMessage): void {
     const m = this.meeting();
     if (!m) return;
@@ -771,23 +767,12 @@ export class MeetingSessionService implements OnDestroy {
           activeApplicationId: msg.activeApplicationId,
           currentAgendaItemId,
         });
-        // TOP bodies can change without a vote. Reload the agenda so live
-        // followers see the current protocol state. The read replaces the live
-        // drafts, and the next keeper (a handover) starts a new draft sequence.
         this.draftSeen.clear();
         this.agendaSvc.load(m.id, currentAgendaItemId);
-        // The room moved on: everybody but the protokollant follows the minutes. A
-        // look at another item lasts until the next move.
         if (currentAgendaItemId && currentAgendaItemId !== m.currentAgendaItemId && !m.isProtokollant) {
           this.agendaSvc.selectTop(m.id, currentAgendaItemId);
         }
-        // The event carries no rights. A handover (or the start of a planned
-        // handover on a TOP move) moves canWrite, canManageVotes and the keeper
-        // data, so read the meeting again.
         this.reloadAfterState(m.id);
-        // The protocol status can change (rendering → final or draft). The worker
-        // broadcasts meeting_state after the background render. Use GET so
-        // broadcast bursts do not burn the write rate limit.
         if (
           (this.canWrite() || this.canViewAll()) &&
           this.protocol() &&
@@ -807,8 +792,6 @@ export class MeetingSessionService implements OnDestroy {
           this.patchVote(msg.voteId, {
             status: 'open',
             closesAt: msg.closesAt,
-            // Another manager opened it: the card shows "seit HH:MM" at once. Keep the
-            // time of an own open, or of a read.
             openedAt: known.openedAt ?? nowIso(),
             secret: msg.secret ?? known.secret,
             ...(msg.kind === 'election'
@@ -817,7 +800,6 @@ export class MeetingSessionService implements OnDestroy {
             ...(msg.kind === 'poll' ? { kind: msg.kind, poll: msg.poll ?? known.poll } : {}),
           });
         } else {
-          // A vote opened live that did not exist at load time (follower).
           this.meeting.set({ ...m, votes: [...m.votes, liveOpenedVote(msg)] });
         }
         break;
@@ -839,7 +821,6 @@ export class MeetingSessionService implements OnDestroy {
         this.guests?.apply(msg.guest);
         break;
       case 'guest_counts':
-        // The public participation changed (switch, mode, code, a decision).
         this.meeting.set({
           ...m,
           publicJoin: msg.publicJoin ?? m.publicJoin,
@@ -890,16 +871,16 @@ export class MeetingSessionService implements OnDestroy {
    * gets the editor and the vote controls, the old keeper loses the controls.
    * When the viewer can write now but has no protocol loaded yet, the method
    * loads it.
+   *
+   * A vote event that arrives while the read runs triggers one more read, because the read may
+   * predate it and would undo it.
    */
   private reloadAfterState(meetingId: Uuid, attempt = 0): void {
     const events = this.voteEvents;
     this.api.getMeeting(meetingId, { quiet: true }).subscribe({
       next: (read) => {
         const current = this.meeting();
-        if (current?.id !== read.id) return; // the user opened another meeting
-        // A vote event came while the read ran: the read may predate it and would undo
-        // it (an opened vote vanished, a closed one opened again). Read once more; a
-        // busy vote keeps the votes of the events after three reads.
+        if (current?.id !== read.id) return;
         let updated = read;
         if (this.voteEvents !== events) {
           if (attempt < 2) {

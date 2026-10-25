@@ -90,10 +90,10 @@ function altOf(file: File): string {
  * access reads the same sheet, and its foot says who keeps the minutes and the state of
  * the protocol.
  *
- * A closed meeting (boards Sitzung-Protokoll-Entwurf, Sitzung-Geschlossen): the protocol
+ * A closed meeting: the protocol
  * bar on top (draft and "Finalisieren & versenden", or final and the PDF links) and the
  * keeper line below the title, "Protokoll: Lara Leitung (TOP 1–3), Uli Übernahme (ab TOP 3,
- * 18:55)". The text stays editable for every writer while the protocol is a draft (O22).
+ * 18:55)". The text stays editable for every writer while the protocol is a draft.
  *
  * A writer of the minutes (`editable`) ticks the open item with "Erledigt" right of the
  * title, a toggle that also removes the tick ("TOP abhaken").
@@ -107,7 +107,7 @@ function altOf(file: File): string {
  * uploads it to the media store and inserts the image (`MediaApiService`).
  *
  * A vote result in the text shows as a card with "Beschluss · 18:52 · Einfache Mehrheit",
- * the counts and the result (a tie is "Abgelehnt", O18), from the votes of this meeting.
+ * the counts and the result (a tie is "Abgelehnt"), from the votes of this meeting.
  */
 @Component({
   selector: 'app-top-sheet',
@@ -159,7 +159,7 @@ export class TopSheetComponent {
   /** The finalize runs. */
   readonly finalizing = input(false);
   /**
-   * The participant view (boards Teilnahme-Live, Schmal-Teilnahme): read only, "Jetzt"
+   * The participant view: read only, "Jetzt"
    * before the item that the room handles, the line "Mara Keller führt das Protokoll"
    * below the title, and the text without a protocol of the viewer.
    */
@@ -216,17 +216,17 @@ export class TopSheetComponent {
     },
   );
 
+  /**
+   * Only a rename end after the start counts, because the agenda names the item only after the
+   * click.
+   */
   constructor() {
-    // The field takes the focus when it opens, with the whole title selected.
     effect(() => {
       const el = this.titleInput()?.nativeElement;
       if (!el) return;
       el.focus();
       el.select();
     });
-    // A rename that ends elsewhere (a save or a cancel in the agenda pane) closes the
-    // field of the heading too. The agenda names the item only after the click, so only
-    // an end after that start counts.
     let started = false;
     effect(() => {
       const id = this.renamingTopId();

@@ -27,7 +27,6 @@
   color: var(--color-text-muted);
 }
 
-/* Three cards in a row, stacked when the sheet gets narrow. */
 .pc__cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
@@ -82,7 +81,6 @@
   align-items: center;
   gap: var(--space-3);
 }
-/* Before the open window: when the open becomes possible, next to the disabled button. */
 .pc__hint {
   font-size: var(--fs-small);
   color: var(--color-text-muted);
@@ -92,8 +90,6 @@
   .pc {
     padding: var(--space-5) var(--space-4);
   }
-  /* Icon and text in one row, the button always on its own row below the text: every
-     card has the same layout, whatever the length of its text. */
   .pc__card {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);

@@ -65,15 +65,17 @@ async function setup(over: Record<string, unknown> = {}) {
 }
 
 describe('VersionHistoryComponent', () => {
+  /**
+   * Exactly one "Aktiv" status text shows, for the head revision. Only an older version offers the
+   * restore, and it names the version.
+   */
   it('lists every revision (newest first) and marks the current one', async () => {
     const { c, api, container } = await setup();
     expect(api.listConfigRevisions).toHaveBeenCalledWith('form', 't1');
     expect(c.revisions().length).toBe(2);
     expect(container.textContent).toContain('Version 2');
     expect(container.textContent).toContain('Version 1');
-    // Exactly one "Aktiv" status text, for the head revision.
     expect(container.querySelectorAll('app-status-text').length).toBe(1);
-    // Only an older version offers the restore, and it names the version.
     expect(screen.getByRole('button', { name: 'Wiederherstellen: Version 1' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Wiederherstellen: Version 2' })).not.toBeInTheDocument();
   });
@@ -93,13 +95,13 @@ describe('VersionHistoryComponent', () => {
     expect(c.diff()).toEqual(DIFF);
   });
 
+  /** A restore reloads the list, so the list call happens a second time. */
   it('restores a prior version on confirm and reloads + toasts', async () => {
     const { c, api, toast } = await setup();
     c.askRestore(REVS[1]);
     c.doRestore();
     expect(api.restoreConfigRevision).toHaveBeenCalledWith('r1');
     expect(toast.success).toHaveBeenCalled();
-    // A restore reloads the list, so the list call happens a second time.
     expect(api.listConfigRevisions).toHaveBeenCalledTimes(2);
   });
 
@@ -146,14 +148,15 @@ describe('VersionHistoryComponent', () => {
     expect(api.restoreConfigRevision).not.toHaveBeenCalled();
   });
 
+  /** With only an older version there is no current one, and a failed read reports nothing. */
   it('reports the number of the current version after each load, or null without one', async () => {
     const answers = [of(REVS), of([REVS[1]]), throwError(() => new Error('x'))];
     let call = 0;
     const { c } = await setup({ listConfigRevisions: jest.fn(() => answers[call++]) });
     const seen: (number | null)[] = [];
     c.current.subscribe((v) => seen.push(v));
-    c.reload(); // only an older version: no current one
-    c.reload(); // a failed read reports nothing
+    c.reload();
+    c.reload();
     expect(seen).toEqual([null]);
     expect(call).toBe(3);
   });

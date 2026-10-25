@@ -40,6 +40,10 @@ updates:
       # Tailwind 4 brings a new CSS-first config model. Plan that migration separately.
       - dependency-name: "tailwindcss"
         update-types: ["version-update:semver-major"]
+      # @ngx-formly/core 10 and later need @angular/forms >= 21, so npm ci fails with
+      # ERESOLVE on Angular 20. Remove this entry during the Angular migration.
+      - dependency-name: "@ngx-formly/core"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: pip
     directory: /backend
@@ -54,7 +58,7 @@ updates:
     open-pull-requests-limit: 5
     # mcp 2.x moved `mcp.server.fastmcp` into the `fastmcp` distribution. The server
     # cannot import it, so pyproject.toml caps mcp below 2.0. Dependabot raised that
-    # cap to <3 once (#144). Remove this entry during the mcp 2.x migration.
+    # cap to <3 once. Remove this entry during the mcp 2.x migration.
     ignore:
       - dependency-name: "mcp"
         update-types: ["version-update:semver-major"]

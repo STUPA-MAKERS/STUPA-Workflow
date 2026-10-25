@@ -15,7 +15,7 @@ Alembic does not run this conversion, because a migration has no object
 storage. The arq worker runs it at each start (`worker.cd_builtin`). A new
 install gets vendored rows from the seed, and the same job converts them.
 
-Phase 2 (a later release) drops the column ``vendored_name``. This module does
+A later release drops the column ``vendored_name``. This module does
 not do that.
 """
 
@@ -43,8 +43,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger("app.admin.cd_builtin")
 
-# Fixed advisory-lock key of the conversion. It is a constant, not user input.
-_LOCK_KEY: Final[int] = 0x43445F4255494C54  # "CD_BUILT"
+#: Fixed advisory-lock key of the conversion (``"CD_BUILT"``). It is a constant, not
+#: user input.
+_LOCK_KEY: Final[int] = 0x43445F4255494C54
 SYSTEM_ACTOR: Final[str] = "system"
 SEED_NAME: Final[str] = "StuPa"
 NEW_NAME: Final[str] = "STUPA"

@@ -1,4 +1,4 @@
-"""arq worker tasks: the stored audit-chain check (Z6/O8).
+"""arq worker tasks: the stored audit-chain check.
 
 `process_audit_verification` is the nightly cron at 04:30. It does not depend on the
 backup: it runs also when backups are off or when the backup failed. `verify_after_restore`
@@ -67,6 +67,6 @@ async def verify_after_restore(
     """
     try:
         return await run_verification(maker, trigger="restore", triggered_by=actor)
-    except Exception:  # noqa: BLE001 - the restore itself is done; only log
+    except Exception:
         logger.exception("audit chain check after the restore failed")
         return None

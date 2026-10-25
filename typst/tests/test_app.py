@@ -95,7 +95,7 @@ def test_multipart_source_as_plain_field(client: TestClient, compiler: CompileRe
 def test_bad_requests_answer_400(
     client: TestClient, compiler: CompileRecorder, kwargs: dict[str, object], needle: str
 ) -> None:
-    resp = client.post("/render", **kwargs)  # pyright: ignore[reportArgumentType]
+    resp = client.post("/render", **kwargs)
     assert resp.status_code == 400
     assert needle in resp.json()["error"]
     assert not compiler.calls

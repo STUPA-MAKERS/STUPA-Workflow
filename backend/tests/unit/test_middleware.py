@@ -1,16 +1,19 @@
-"""Tests for the security-header and trace-id middleware (security.md §10, §3)."""
+"""Tests for the security-header and trace-id middleware."""
 
 from fastapi.testclient import TestClient
 
 
 def test_security_headers_present(client: TestClient) -> None:
+    """Set the security headers.
+
+    The JSON API has a strict CSP: no active content and no framing.
+    """
     resp = client.get("/api/health")
     h = resp.headers
     assert h["x-content-type-options"] == "nosniff"
     assert h["referrer-policy"] == "no-referrer"
     assert h["x-frame-options"] == "DENY"
     assert "permissions-policy" in h
-    # Strict CSP for the JSON API (security.md §10): no active content and no framing.
     assert "default-src 'none'" in h["content-security-policy"]
     assert "frame-ancestors 'none'" in h["content-security-policy"]
 

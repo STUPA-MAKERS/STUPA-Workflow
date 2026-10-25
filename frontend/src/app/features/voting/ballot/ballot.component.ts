@@ -45,7 +45,7 @@ export type BallotRow = 'own' | 'proxy';
 /** The answers of a date poll ballot, one per date. */
 export type DateAnswers = Readonly<Record<string, DateAnswer>>;
 
-/** A pick: one option, the candidate ids of an election ballot (F2; `[]` = full
+/** A pick: one option, the candidate ids of an election ballot (`[]` = full
  *  abstention) or the option ids of a poll, or the answers of a date poll. */
 export type BallotPick = string | readonly string[] | DateAnswers;
 
@@ -86,7 +86,7 @@ const NOT_CAST: MyBallot = { cast: false, choice: null };
 /**
  * The ballot of one vote, in two steps: pick Ja, Nein or Enthaltung, then confirm with
  * "Stimme abgeben: Ja". The fixed line above the button says that the ballot cannot
- * change afterwards (O11). Nothing here offers a change: once the server accepted the
+ * change afterwards. Nothing here offers a change: once the server accepted the
  * ballot, the row locks and says "Danke! Deine Stimme: Ja".
  *
  * - A person who represents a member gets a second row "Als Vertretung für <name>". It
@@ -97,9 +97,9 @@ const NOT_CAST: MyBallot = { cast: false, choice: null };
  * - A 409 `already_voted` (another tab, the meeting page) locks the row as well.
  * - `compact` gives the small ballot of a side column: buttons in one row.
  * - `columns` puts the rows side by side (the strip of a narrow screen).
- * - `layout="phone"` pins the button bar to the bottom of the screen (board
- *   Telefon-Abstimmen) and always names the rows.
- * - `election` (F2) turns the options into the candidates: one seat gives a radio list
+ * - `layout="phone"` pins the button bar to the bottom of the screen and always names
+ *   the rows.
+ * - `election` turns the options into the candidates: one seat gives a radio list
  *   with a separate "Enthaltung" row; several seats give check boxes with the counter
  *   "1 von 2 Stimmen vergeben", the further boxes stay off when all votes are given, and
  *   "Ganz enthalten" picks no candidate. A free vote is an abstention. The button
@@ -150,11 +150,11 @@ export class BallotComponent {
    */
   readonly compact = input(false);
   /**
-   * The ballot of a narrow strip (board Schmal-Teilnahme): the own row and the
+   * The ballot of a narrow strip: the own row and the
    * represented row side by side, the confirm bar in one line below them.
    */
   readonly columns = input(false);
-  /** The personnel election of the vote (F2), or `null` for a motion. */
+  /** The personnel election of the vote, or `null` for a motion. */
   readonly election = input<ElectionConfig | null>(null);
   /** The poll of the vote, or `null`. */
   readonly poll = input<PollConfig | null>(null);
@@ -281,7 +281,7 @@ export class BallotComponent {
 
   /**
    * The confirm bar shows while a row is open. The strip (`columns`) shows it only once
-   * the person picked an option, so the strip stays low (board Schmal-Teilnahme).
+   * the person picked an option, so the strip stays low.
    */
   protected readonly showBar = computed(() => {
     const row = this.target();
@@ -302,7 +302,6 @@ export class BallotComponent {
   protected readonly barHeight = signal(0);
 
   constructor() {
-    // A new vote starts with no pick and no local lock.
     effect(() => {
       this.voteId();
       untracked(() => {
@@ -444,7 +443,6 @@ export class BallotComponent {
       .pipe(take(1), takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
-          // The ballot is in: a short double pulse on a phone with a vibration motor.
           haptic('success');
           this.lock(row, this.secret() ? null : choice);
           this.pending.set(null);

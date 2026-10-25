@@ -2,8 +2,6 @@
 
 @let keeperOpen = shownPanel() === 'protokollant';
 
-<!-- The minute-taker menu: a popover above the dock, a bottom sheet on a phone (UI
-     feedback 2026-10-04). The attendance is a side sheet of the page. -->
 @if (phone()) {
   <app-side-sheet side="bottom" [heading]="panelHeading() | t" [open]="keeperOpen" (openChange)="$event || closePanel()">
     @if (keeperOpen) {
@@ -94,7 +92,6 @@
 
 <ng-template #keeperChip>
   @if (m.status === 'closed') {
-    <!-- A closed meeting changes no keeper: every keeper of the meeting, locked. -->
     <span class="sd__chip sd__chip--static" [title]="closedKeeperTitle()">
       <app-icon name="lock" [size]="16" />
       <span class="sd__chipText">{{ 'meetings.dock.protokollantIs' | t: { name: keepers() || '—' } }}</span>

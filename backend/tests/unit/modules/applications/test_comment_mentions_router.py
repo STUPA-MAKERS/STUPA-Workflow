@@ -77,11 +77,11 @@ def test_the_applicant_may_not_mention(
     fake_service: _FakeService,
     mention_mails: list[tuple[object, ...]],
 ) -> None:
+    """Pass `may_mention=False` for the applicant; the service refuses a non-empty list."""
     app_id = uuid4()
     _as_applicant(app, app_id, "view")
     r = client.post(f"/api/applications/{app_id}/comments", json={"body": "x", "mentions": []})
     assert r.status_code == 201
-    # The service refuses a non-empty list without ``may_mention`` (422).
     assert fake_service.comment_mentions == ([], False)
     assert mention_mails == []
 

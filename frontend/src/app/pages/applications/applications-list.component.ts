@@ -128,7 +128,7 @@ interface ListRow {
   stateLabel: string | null;
   stateKind: StatusKind;
   amount: string | null;
-  /** F1: the approved amount when it deviates; the row then strikes `amount` through. */
+  /** The approved amount when it deviates; the row then strikes `amount` through. */
   approved: string | null;
   /** The swipe of a phone: "Status setzen" to the right, archive to the left. */
   swipeRight: RowSwipeAction | null;
@@ -140,7 +140,7 @@ type FilterSheet = 'more' | null;
 
 /**
  * The applications page: the list pane with search and filters, and the detail of the
- * open application beside it (board Anträge).
+ * open application beside it.
  *
  * The routes `/applications` and `/applications/:id` share this page. The detail is the
  * child route in the outlet of the detail pane, so the list keeps its rows and its scroll
@@ -149,10 +149,15 @@ type FilterSheet = 'more' | null;
  *
  * Every filter and the sort live in the query params, so a filtered list is shareable as
  * a link and the back button works. Opening a row keeps them.
+ *
+ * The export hides while `mine` is set, because the export has no `mine` filter and would export
+ * more rows than the list shows.
+ *
+ * It is a pane page (`styles.scss`): the panes fill the free height and scroll by
+ * themselves.
  */
 @Component({
   selector: 'app-applications-list',
-  // A pane page (styles.scss): the panes fill the free height and scroll by themselves.
   host: { '[class.pane-page]': 'split()' },
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -264,7 +269,7 @@ export class ApplicationsListComponent implements OnDestroy {
   /** The search writes the URL after a pause (about 250 ms, like /expenses). */
   private readonly applySearch = debounced(() => this.navigate({ q: this.searchText().trim() || null }));
   readonly typeId = signal('');
-  /** The chosen flow states. `state` repeats in the URL and in the request (A4). */
+  /** The chosen flow states. `state` repeats in the URL and in the request. */
   readonly states = signal<readonly string[]>([]);
   /**
    * Which rows to show. Archived applications leave the working list by default.
@@ -371,7 +376,7 @@ export class ApplicationsListComponent implements OnDestroy {
     { value: 'all', label: this.i18n.translate('applications.list.filter.archivedAll') },
   ]);
 
-  /** The search placeholder with the number of applications, as on the board. */
+  /** The search placeholder with the number of applications. */
   readonly searchPlaceholder = computed(() => {
     if (this.loading() && this.total() === 0) return this.i18n.translate('applications.list.searchPlain');
     if (this.total() === 1) return this.i18n.translate('applications.list.searchCountOne');
@@ -467,7 +472,6 @@ export class ApplicationsListComponent implements OnDestroy {
     return sections;
   });
 
-  // --- row actions --------------------------------------------------------
   /** The row whose links the share dialog shows. */
   readonly shareFor = signal<Uuid | null>(null);
   readonly shareOpen = signal(false);
@@ -476,7 +480,7 @@ export class ApplicationsListComponent implements OnDestroy {
   readonly forceOpen = signal(false);
   /** The row and the transition of the agenda dialog ("Auf Tagesordnung setzen"). */
   readonly agendaFor = signal<{ item: ApplicationListItem; transition: Transition } | null>(null);
-  /** F1: the row and the transition of the decision dialog. */
+  /** The row and the transition of the decision dialog. */
   readonly decisionFor = signal<{ item: ApplicationListItem; transition: Transition } | null>(null);
   readonly decisionOpen = signal(false);
   readonly agendaOpen = signal(false);
@@ -486,22 +490,21 @@ export class ApplicationsListComponent implements OnDestroy {
   /** A row action in flight (archive, transition). */
   readonly busyRow = signal<Uuid | null>(null);
 
+  /**
+   * The filter and sort values live in the query params; the offset is not in the URL (infinite
+   * scroll).
+   */
   constructor() {
-    // The shown rows read their detail ahead, so a click shows it at once.
     prefetchDetails({ items: this.items, key: (a) => a.id, reads: (a) => applicationReads(a.id) });
     this.api.applicationTypes({ quiet: true }).subscribe({
       next: (types) => this.types.set(types),
       error: () => this.types.set([]),
     });
-    // Cost centres hidden in the budget tab (`hiddenInBudget`) do not appear in the
-    // filter either.
     this.budgetApi.tree().subscribe({
       next: (tree) => this.budgetTree.set(pruneHidden(tree)),
       error: () => this.budgetTree.set([]),
     });
 
-    // The filter and sort values live in the query params. Every change resets the list
-    // and reloads page 0. The offset is not in the URL (infinite scroll).
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((pm) => {
       this.readFilters(pm);
       this.sortField.set(pm.get('sort') === 'amount' ? 'amount' : 'createdAt');
@@ -509,7 +512,6 @@ export class ApplicationsListComponent implements OnDestroy {
       this.reload();
     });
 
-    // The open application comes from the child route (`/applications/:id`).
     this.readSelection();
     this.router.events
       .pipe(
@@ -518,15 +520,11 @@ export class ApplicationsListComponent implements OnDestroy {
       )
       .subscribe(() => this.readSelection());
 
-    // A change in the detail pane (a transition, an edit, an archive, a delete) shows in
-    // the list. The loaded rows and the scroll position stay.
     this.page.changes$.pipe(takeUntilDestroyed()).subscribe((change) => {
       if (change.source !== 'list') this.apply(change.id, change.kind);
     });
 
     effect(() => this.page.split.set(this.split()));
-    // Side by side the page fills the viewport: the frame drops the footer below it, so
-    // only the panes scroll.
     effect(() => this.frame.fill.set(this.split()));
 
   }
@@ -541,7 +539,7 @@ export class ApplicationsListComponent implements OnDestroy {
   }
 
   /** The amount in the currency of the row, or null without an amount. */
-  /** F1: the approved amount as money when it deviates from the requested one, else null. */
+  /** The approved amount as money when it deviates from the requested one, else null. */
   private approvedMoney(item: ApplicationListItem): string | null {
     const approved = item.approvedAmount;
     if (approved === null || approved === undefined || item.amount === null) return null;
@@ -554,14 +552,10 @@ export class ApplicationsListComponent implements OnDestroy {
     return formatMoney(item.amount, this.i18n.formatLocale(), { currency: item.currency }) || item.amount;
   }
 
-  // --- navigation ---------------------------------------------------------
-
   /** Open a row in the detail pane. The filters stay in the URL. */
   open(id: Uuid): void {
     void this.router.navigate(['/applications', id], { queryParamsHandling: 'preserve' });
   }
-
-  // --- capture on behalf (#11) -------------------------------------------------
 
   openCapture(): void {
     this.capturing.set(true);
@@ -592,8 +586,6 @@ export class ApplicationsListComponent implements OnDestroy {
   private readSelection(): void {
     this.selectedId.set(this.route.snapshot.firstChild?.paramMap.get('id') ?? null);
   }
-
-  // --- filters ------------------------------------------------------------
 
   /**
    * The search. After about 250 ms of debounce it writes the `q` query param and
@@ -709,8 +701,6 @@ export class ApplicationsListComponent implements OnDestroy {
     this.fetch('more');
   }
 
-  // --- row actions --------------------------------------------------------
-
   onRowAction(item: ApplicationListItem, action: RowAction): void {
     switch (action.kind) {
       case 'open':
@@ -731,13 +721,11 @@ export class ApplicationsListComponent implements OnDestroy {
         this.toggleArchived(item);
         return;
       case 'transition':
-        // A transition onto the agenda needs the meeting: the dialog asks for it.
         if (action.transition.addsToAgenda) {
           this.agendaFor.set({ item, transition: action.transition });
           this.agendaOpen.set(true);
           return;
         }
-        // F1: a transition into an accepted state can approve with deviations.
         if (action.transition.allowsDecision) {
           this.decisionFor.set({ item, transition: action.transition });
           this.decisionOpen.set(true);
@@ -903,8 +891,6 @@ export class ApplicationsListComponent implements OnDestroy {
     }
   }
 
-  // --- loading ------------------------------------------------------------
-
   private navigate(queryParams: Record<string, string | number | readonly string[] | null>): void {
     void this.router.navigate([], {
       relativeTo: this.route.firstChild ?? this.route,
@@ -932,8 +918,10 @@ export class ApplicationsListComponent implements OnDestroy {
       param: 'archived',
       signal: this.archived as WritableSignal<string>,
       empty: 'false',
-      // Anything that is not one of the two non-default values is the default, so a
-      // hand-edited URL cannot leave the filter in a state no control shows.
+      /**
+       * Anything that is not one of the two non-default values is the default, so a
+       * hand-edited URL cannot leave the filter in a state no control shows.
+       */
       parse: (raw) => (raw === 'true' || raw === 'all' ? raw : 'false'),
     },
   ];
@@ -981,7 +969,6 @@ export class ApplicationsListComponent implements OnDestroy {
    * (`aria-current`) and the scroll position. A failure keeps the current rows.
    */
   protected refresh(): void {
-    // Nothing shown yet: a plain reload, with its placeholder and its error.
     if (this.loading() || this.items().length === 0) {
       this.reload();
       return;
@@ -1015,11 +1002,12 @@ export class ApplicationsListComponent implements OnDestroy {
    * - `initial`: the page replaces the list, and a failure shows the full error.
    * - `refresh`: as `initial`, but a failure keeps the rows and shows no error.
    * - `more`: the page appends, and a failure stays silent.
+   *
+   * A refresh starts at 0 but leaves `nextOffset` alone until its answer arrives, so a failed
+   * refresh does not load the first page a second time on the next scroll.
    */
   private fetch(mode: 'initial' | 'refresh' | 'more', limit = this.limit): void {
     const seq = ++this.fetchSeq;
-    // A refresh starts at 0 but leaves `nextOffset` alone until its answer arrives, so a
-    // failed refresh does not load the first page a second time on the next scroll.
     const offset = mode === 'refresh' ? 0 : this.nextOffset;
     this.api.listApplications(this.buildQuery(offset, limit)).subscribe({
       next: (page) => {

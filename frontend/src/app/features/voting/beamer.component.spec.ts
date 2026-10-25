@@ -170,6 +170,10 @@ describe('BeamerComponent', () => {
     expect(screen.getByRole('heading', { name: 'TOP 1 · Begrüßung' })).toBeInTheDocument();
   });
 
+  /**
+   * The turnout grows with each ballot; the counts stay hidden. A frame of another vote changes
+   * nothing.
+   */
   it('shows the turnout of an open vote and no tally while the counts are hidden', async () => {
     const { push, api, container } = await setup();
     push(OPEN);
@@ -177,12 +181,10 @@ describe('BeamerComponent', () => {
     expect(screen.getByRole('heading', { name: 'Wird der Haushalt beschlossen?' })).toBeInTheDocument();
     expect(container.querySelector('.bm__big')?.textContent?.trim()).toBe('4');
     expect(container.querySelector('.bm__warn')?.textContent?.trim()).toBe('Quorum 12 · noch nicht erreicht');
-    // The turnout grows with each ballot; the counts stay hidden.
     push({ type: 'vote_tally', voteId: 'v1', counts: {}, eligible: 19, cast: 14, present: 19, revealed: false, quorumMet: true, leading: null });
     expect(container.querySelector('.bm__big')?.textContent?.trim()).toBe('14');
     expect(container.querySelector('.bm__warn')).toBeNull();
     expect(container.querySelector('app-vote-bars')).toBeNull();
-    // A frame of another vote changes nothing.
     push({ type: 'vote_tally', voteId: 'other', counts: {}, eligible: 19, cast: 1, present: 19, revealed: false, quorumMet: true, leading: null });
     expect(container.querySelector('.bm__big')?.textContent?.trim()).toBe('4');
   });
@@ -202,6 +204,7 @@ describe('BeamerComponent', () => {
     expect(screen.getByRole('img', { name: 'Ja: 2 Stimmen, 67 %' })).toBeInTheDocument();
   });
 
+  /** The second read still says open because the server is slow, so the frame stands in. */
   it('shows the result of the close frame, then the result of the read', async () => {
     const closed = vote({
       status: 'closed',
@@ -212,7 +215,6 @@ describe('BeamerComponent', () => {
     push(OPEN);
     push({ type: 'vote_closed', voteId: 'v1', result: 'passed', counts: { yes: 15, no: 3, abstain: 2 } });
     expect(api.getVote).toHaveBeenCalledTimes(2);
-    // The second read still says open (the server was slow): the frame stands in.
     expect(container.querySelector('.bm__result')?.textContent).toContain('Angenommen');
     expect(screen.getByText('Einfache Mehrheit · Quorum erreicht · 20 Stimmen')).toBeInTheDocument();
   });
@@ -237,7 +239,7 @@ describe('BeamerComponent', () => {
     expect(screen.getByText('Einfache Mehrheit · Quorum nicht erreicht · 1 Stimme')).toBeInTheDocument();
   });
 
-  it('shows an election: the result of the close frame, then a runoff round from the read (F2)', async () => {
+  it('shows an election: the result of the close frame, then a runoff round from the read', async () => {
     const election = { seats: 1, candidates: [{ id: 'c1', name: 'Anna' }, { id: 'c2', name: 'Ben' }], secret: true };
     const open = vote({ kind: 'election', election, config: { options: ['c1', 'c2', 'abstain'], majorityRule: 'simple' }, secret: true });
     const { push, fixture } = await setup({ votes: [open, open] });
@@ -260,6 +262,9 @@ describe('BeamerComponent', () => {
     expect(runoff.electionResult).toEqual({ counts: {}, abstentions: 0, ballots: 0, elected: [] });
   });
 
+  /**
+   * The room closes v1 and opens v2 at once. The read of v2 comes first, the reads of v1 after it.
+   */
   it('ignores a read that arrives after the read of a newer vote', async () => {
     const { push, api, fixture } = await setup();
     const reads: { id: string; read: Subject<Vote> }[] = [];
@@ -269,12 +274,10 @@ describe('BeamerComponent', () => {
       return read;
     });
     push(OPEN);
-    // The room closes v1 and opens v2 at once.
     push({ type: 'vote_closed', voteId: 'v1', result: 'passed', counts: { yes: 3 } });
     push({ ...OPEN, voteId: 'v2' } as ServerMessage);
     const answer = (id: string, v: Vote) =>
       reads.filter((r) => r.id === id).forEach((r) => r.read.next(v));
-    // The read of v2 comes first, the reads of v1 after it.
     answer('v2', vote({ id: 'v2', question: 'Wird der Nachtrag beschlossen?' }));
     answer('v1', vote({ id: 'v1' }));
     fixture.detectChanges();
@@ -289,6 +292,10 @@ describe('BeamerComponent', () => {
     expect(screen.getByText('Zurzeit keine aktive Abstimmung.')).toBeInTheDocument();
   });
 
+  /**
+   * The question falls back to the placeholder, and the turnout to the sum of the counts. When the
+   * room moves on, the result goes.
+   */
   it('shows the last result of the current item from the meeting read', async () => {
     const row = { id: 'c1', agendaItemId: 'ag-2', status: 'closed' } as MeetingVote;
     const closed = vote({
@@ -299,10 +306,8 @@ describe('BeamerComponent', () => {
     });
     const { container, push } = await setup({ meeting: meeting({ votes: [row] }), votes: [closed] });
     expect(container.querySelector('.bm__result')?.textContent).toContain('Abgelehnt');
-    // The question falls back to the placeholder; the turnout to the sum of the counts.
     expect(screen.getByRole('heading', { level: 1, name: 'Beschlussfrage' })).toBeInTheDocument();
     expect(screen.getByText('Einfache Mehrheit nicht erreicht · Quorum erreicht · 5 Stimmen')).toBeInTheDocument();
-    // The room moves on: the result goes.
     push({ type: 'meeting_state', activeApplicationId: null, currentAgendaItemId: 'ag-1', status: 'live' });
     expect(screen.getByText('Zurzeit keine aktive Abstimmung.')).toBeInTheDocument();
   });
@@ -350,6 +355,7 @@ describe('BeamerComponent', () => {
       expect(router.serializeUrl(navigate.mock.calls[0][0] as never)).toBe('/voting/v1');
     });
 
+    /** A refused exit (no user gesture) is swallowed. */
     it('ends a fullscreen mode when it leaves', async () => {
       const exit = jest.fn(() => Promise.reject(new Error('not allowed')));
       setFullscreen(document.body, exit);
@@ -357,7 +363,6 @@ describe('BeamerComponent', () => {
       jest.spyOn(fixture.debugElement.injector.get(Router), 'navigateByUrl').mockResolvedValue(true);
       fireEvent.keyDown(document, { key: 'Escape' });
       expect(exit).toHaveBeenCalledTimes(1);
-      // A refused exit (no user gesture) is swallowed.
       await Promise.resolve();
       await Promise.resolve();
     });
@@ -414,7 +419,11 @@ describe('BeamerComponent', () => {
     });
   });
 
-  describe('public meeting (#17)', () => {
+  describe('public meeting', () => {
+    /**
+     * A new (rotated) code reads the link again; the same code does not. When switched off, no code
+     * is on the screen.
+     */
     it('shows the join code while idle with the room in numbers, and follows the stream', async () => {
       const { api, push, fixture } = await setup({
         meeting: meeting({ publicJoin: true, admittedGuests: 7, status: 'live' }),
@@ -425,13 +434,11 @@ describe('BeamerComponent', () => {
       fixture.detectChanges();
       expect(screen.getByText('Mit dem Handy scannen')).toBeInTheDocument();
       expect(screen.getByText(/7 Anwesende · 0 Mitglieder \+ 7 Gäste/)).toBeInTheDocument();
-      // A new code (rotated) reads the link again; the same code does not.
       push({ type: 'guest_counts', publicJoin: true, joinCode: LINK.joinCode, admittedGuests: 8 });
       expect(api.getJoinLink).toHaveBeenCalledTimes(1);
       push({ type: 'guest_counts', publicJoin: true, joinCode: '9XH2TR', admittedGuests: 8 });
       expect(api.getJoinLink).toHaveBeenCalledTimes(2);
       expect(screen.getByText(/8 Anwesende/)).toBeInTheDocument();
-      // Off: no code on the screen.
       push({ type: 'guest_counts', publicJoin: false, joinCode: null, admittedGuests: 0 });
       expect(screen.queryByText('Mit dem Handy scannen')).toBeNull();
     });

@@ -29,9 +29,9 @@ if TYPE_CHECKING:
 
     from app.modules.livevote.service.pubsub import BrokerPublisher
 
-# Per meeting: the number of agenda items and the current item (A2).
+#: Per meeting: the number of agenda items and the current item.
 AgendaSummary = tuple[int, CurrentAgendaItemOut | None]
-# Per meeting: the admitted and the pending guests (#17).
+#: Per meeting: the admitted and the pending guests.
 GuestCounts = tuple[int, int]
 
 
@@ -39,6 +39,7 @@ class MeetingServiceBase:
     """Meeting operations bound to one `AsyncSession` and an optional publisher."""
 
     def __init__(self, session: AsyncSession, publisher: BrokerPublisher | None = None) -> None:
+        """Bind the service to a session and an optional publisher."""
         self.session = session
         self.publisher = publisher
 
@@ -62,6 +63,14 @@ class MeetingServiceBase:
         public_join_allowed: bool = True,
         window: OpenWindow | None = None,
     ) -> MeetingOut:
+        """Build the meeting view for one principal.
+
+        `canControl` marks the right to run the meeting: the protocol, the agenda items and
+        the status. The protokollant and the session manager hold it, and the frontend gates
+        the editor on this flag. The guest columns are read with `getattr`, because a read
+        model of an older caller may lack them. The join code and the open requests go to
+        the meeting lead only.
+        """
         periods, planned = keepers if keepers is not None else ([], None)
         return MeetingOut(
             id=meeting.id,
@@ -83,9 +92,6 @@ class MeetingServiceBase:
             protokollantId=meeting.protokollant_id,
             protokollantName=protokollant_name,
             isProtokollant=is_protokollant,
-            # `canControl` marks the right to run the meeting: the protocol, the
-            # agenda items, and the status. The protokollant and the session manager
-            # hold it. The frontend gates the editor on this flag.
             canControl=can_write,
             canManage=can_manage,
             canWrite=can_write,
@@ -95,10 +101,8 @@ class MeetingServiceBase:
             votes=votes or [],
             keeperPeriods=periods,
             plannedHandover=planned,
-            # `getattr`: a read model of an older caller may lack the #17 columns.
             publicJoin=bool(getattr(meeting, "public_join", False)),
             guestsMode=getattr(meeting, "guests_mode", None) or "vote",
-            # The join code and the open requests go to the meeting lead only (#17).
             joinCode=getattr(meeting, "join_code", None) if can_manage else None,
             admittedGuests=guests[0],
             pendingGuests=guests[1] if can_manage else 0,
@@ -119,7 +123,7 @@ class MeetingServiceBase:
         return {m.id: open_window(m, settings, tz_name) for m in meetings}
 
     async def _guest_counts(self, meeting_ids: Sequence[UUID]) -> dict[UUID, GuestCounts]:
-        """Count the admitted and the pending guests of each meeting (#17), batched."""
+        """Count the admitted and the pending guests of each meeting, batched."""
         if not meeting_ids:
             return {}
         rows = (
@@ -139,7 +143,7 @@ class MeetingServiceBase:
         return out
 
     async def _agenda_summaries(self, meetings: Sequence[Meeting]) -> dict[UUID, AgendaSummary]:
-        """Count the agenda items of each meeting and describe its current item (A2).
+        """Count the agenda items of each meeting and describe its current item.
 
         Two batched queries for any number of meetings: the agenda items in agenda
         order, then the titles of the applications behind the current items. The
@@ -174,9 +178,7 @@ class MeetingServiceBase:
                 app_id: title_of(data)
                 for app_id, data in (
                     await self.session.execute(
-                        select(Application.id, Application.data).where(
-                            Application.id.in_(app_ids)
-                        )
+                        select(Application.id, Application.data).where(Application.id.in_(app_ids))
                     )
                 ).all()
             }
@@ -206,7 +208,7 @@ class MeetingServiceBase:
         return (row.display_name or row.email) if row is not None else None
 
     async def _gremium_quorum_set(self, gremium_id: UUID) -> bool:
-        """Tell if the gremium sets a default quorum (#17: then no public participation)."""
+        """Tell if the gremium sets a default quorum (then no public participation)."""
         row = await self.session.get(Gremium, gremium_id)
         return getattr(row, "quorum_percent", None) is not None
 
@@ -221,7 +223,7 @@ class MeetingServiceBase:
 
         ``for_update`` locks the meeting row until the commit and reads the current
         values again. A status change, an agenda change and a vote open all take this
-        lock first, so they run one after the other (O12, O25).
+        lock first, so they run one after the other.
 
         Raises:
             NotFoundError: No meeting has this id.

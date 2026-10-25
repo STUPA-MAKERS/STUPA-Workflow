@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Smoke test (T-01). The script starts the stack and checks that all services become
-# healthy. It counts as the test of this infrastructure task (T-01 AK).
+# Smoke test. The script starts the stack and checks that all services become
+# healthy.
 #
 # Usage: scripts/smoke.sh [up|down]
 set -euo pipefail

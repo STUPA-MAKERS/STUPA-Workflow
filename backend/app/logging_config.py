@@ -8,17 +8,17 @@ from __future__ import annotations
 
 import logging
 
-_CONFIGURED = False
+_configured = False
 
 
 def configure_logging(level: str = "INFO") -> None:
     """Configure the root logger once (idempotent)."""
-    global _CONFIGURED
-    if _CONFIGURED:
+    global _configured
+    if _configured:
         logging.getLogger().setLevel(level.upper())
         return
     logging.basicConfig(
         level=level.upper(),
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
-    _CONFIGURED = True
+    _configured = True

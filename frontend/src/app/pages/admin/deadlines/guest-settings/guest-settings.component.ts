@@ -44,7 +44,7 @@ function draftOf(s: GuestSettings): Draft {
 }
 
 /**
- * "Anträge ohne Konto" on the deadlines page (Z1, board Admin-Fristen).
+ * "Anträge ohne Konto" on the deadlines page.
  *
  * Two settings of `GET/PUT /admin/guest-settings` (permission `admin.deadlines`):
  *
@@ -68,8 +68,6 @@ export class GuestSettingsComponent {
   private readonly api = inject(AdminApiService);
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
-
-  protected readonly maxDays = MAX_LINK_TTL_DAYS;
 
   protected readonly form: SettingsForm<GuestSettings, Draft> = settingsForm<GuestSettings, Draft, Body>({
     allowed: () => this.auth.can('admin.deadlines'),

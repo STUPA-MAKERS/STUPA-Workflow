@@ -88,7 +88,7 @@ describe('HandoverDialogComponent', () => {
     expect(confirm).toHaveBeenCalledWith('next_item');
   });
 
-  it('hands over now, in the current TOP, and previews the head of the protocol (O1, O2)', async () => {
+  it('hands over now, in the current TOP, and previews the head of the protocol', async () => {
     const { on } = await setup();
     const now = within(dialog()).getByRole('radio', { name: /Ab jetzt/ });
     expect(now).toBeChecked();
@@ -121,6 +121,7 @@ describe('HandoverDialogComponent', () => {
     expect(on.confirm).toHaveBeenCalledWith('now');
   });
 
+  /** After the refusal only "now" is left. */
   it('shows the refusals of the server in the body (409, 422)', async () => {
     const { fixture } = await setup({ refusal: 'protokollant_needs_protocol_write' });
     expect(within(dialog()).getByRole('alert')).toHaveTextContent('Diese Person hat im Gremium kein Protokollrecht.');
@@ -131,7 +132,6 @@ describe('HandoverDialogComponent', () => {
     fixture.componentRef.setInput('refusal', 'no_next_item');
     fixture.detectChanges();
     expect(within(dialog()).getByRole('alert')).toHaveTextContent('Der aktuelle TOP ist der letzte.');
-    // Only "now" is left.
     expect(within(dialog()).getByRole('radio', { name: /Ab jetzt/ })).toBeChecked();
     expect(within(dialog()).getByRole('radio', { name: /Ab nächstem TOP/ })).toBeDisabled();
     fixture.componentRef.setInput('refusal', 'meeting_not_live');
@@ -160,9 +160,9 @@ describe('HandoverDialogComponent', () => {
     expect(within(dialog()).getByText(/Mika Mitglied \(ab dem nächsten TOP\)$/)).toBeInTheDocument();
   });
 
+  /** The close button of the dialog and the footer button both cancel. */
   it('closes on cancel and sends nothing while saving or without a target', async () => {
     const { on, fixture } = await setup({ saving: true });
-    // The close button of the dialog and the footer button both cancel.
     const cancels = within(dialog()).getAllByRole('button', { name: 'Abbrechen' });
     await userEvent.click(cancels[cancels.length - 1]);
     expect(on.closed).toHaveBeenCalled();

@@ -1,8 +1,9 @@
 import { provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
-import { NEVER, of, throwError } from 'rxjs';
+import { NEVER, of, throwError, type Observable } from 'rxjs';
 import { AdminApiService } from '../admin-api.service';
+import type { MailPreview, MailPreviewPayload } from '../admin.models';
 import { MEDIA, ToastService } from '@stupa-makers/ui-kit';
 import { matchMediaQueries } from '../../../../testing/meeting-fixtures';
 import { MailTemplatesComponent } from './mail-templates.component';
@@ -22,13 +23,16 @@ function setupApi() {
     listMailTemplates: jest.fn(() => of([TPL])),
     upsertMailTemplate: jest.fn(() => of({ ...TPL, source: 'override' })),
     resetMailTemplate: jest.fn(() => of({ ...TPL, source: 'builtin' })),
-    previewMailPayload: jest.fn(() =>
-      of({ subject: 'Anmeldung', text: 'Hallo Anzeigename', html: null, lang: 'de' }),
+    previewMailPayload: jest.fn(
+      (_body: MailPreviewPayload): Observable<MailPreview> =>
+        of({ subject: 'Anmeldung', text: 'Hallo Anzeigename', html: null, lang: 'de' }),
     ),
   };
 }
 
-async function setup(api = setupApi()) {
+type MailApiMock = Record<keyof ReturnType<typeof setupApi>, jest.Mock>;
+
+async function setup(api: MailApiMock = setupApi()) {
   const toast = { success: jest.fn(), error: jest.fn() };
   const view = await render(MailTemplatesComponent, {
     providers: [
@@ -43,15 +47,17 @@ async function setup(api = setupApi()) {
 describe('MailTemplatesComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
+  /**
+   * ngModel writes the subject into the field after a tick. The placeholder reference lists the
+   * "name" token.
+   */
   it('lists templates and auto-selects the first with its subject', async () => {
     const { view } = await setup();
     const fixture = view.fixture;
     expect(await screen.findByRole('button', { name: /Anmelde-Link/ })).toHaveAttribute('aria-current', 'true');
-    // ngModel writes the subject into the field after a tick.
     await fixture.whenStable();
     fixture.detectChanges();
     expect(screen.getByDisplayValue('Anmeldung')).toBeInTheDocument();
-    // The placeholder reference lists the "name" token.
     expect(screen.getByText(/name/)).toBeInTheDocument();
   });
 
@@ -235,18 +241,22 @@ describe('MailTemplatesComponent', () => {
     expect(arg.lang).toBe('de');
   });
 
+  /** Save upserts the auto-selected first template. The "other" sibling covers the else branch. */
   it('applyUpdate replaces only the matching template and leaves siblings alone', async () => {
     const other = { ...TPL, key: 'other', subjectI18n: { de: 'Andere', en: 'Other' } };
     const api = { ...setupApi(), listMailTemplates: jest.fn(() => of([TPL, other])) };
     const { view } = await setup(api);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = view.fixture.componentInstance as any;
-    // Save upserts the auto-selected first template. The "other" sibling covers the else branch.
     c.save();
     expect(c.templates().find((t: { key: string }) => t.key === 'other')).toEqual(other);
     expect(c.templates().find((t: { key: string }) => t.key === 'magic_link').source).toBe('override');
   });
 
+  /**
+   * magic_link stays selected while the upsert returns 'other'. This covers the branch where the
+   * selected key differs from the updated key.
+   */
   it('does not re-select after updating a non-selected template', async () => {
     const other = { ...TPL, key: 'other' };
     const api = {
@@ -257,8 +267,6 @@ describe('MailTemplatesComponent', () => {
     const { view } = await setup(api);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = view.fixture.componentInstance as any;
-    // magic_link stays selected while the upsert returns 'other'.
-    // This covers the branch where the selected key differs from the updated key.
     expect(c.selectedKey()).toBe('magic_link');
     c.save();
     expect(c.selectedKey()).toBe('magic_link');
@@ -271,6 +279,7 @@ describe('MailTemplatesComponent', () => {
     expect(c.keyLabel('totally_unknown_key')).toBe('totally_unknown_key');
   });
 
+  /** A builtin template has no reset. */
   it('switches the language of the fields and marks an override', async () => {
     const override = { ...TPL, key: 'status_update', source: 'override', bodyHtmlI18n: { de: '<p>Hi</p>' } };
     const api = {
@@ -281,7 +290,6 @@ describe('MailTemplatesComponent', () => {
     const { view } = await setup(api);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = view.fixture.componentInstance as any;
-    // A builtin template has no reset.
     expect(screen.queryByRole('button', { name: 'Auf Standard zurücksetzen' })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /Status-Änderung/ }));
     expect(screen.getAllByText('angepasst')).toHaveLength(2);

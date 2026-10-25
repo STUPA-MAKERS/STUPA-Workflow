@@ -74,10 +74,10 @@ async def _neutralize_close(websocket: WebSocket) -> None:
     absorbs the second close.
     """
 
-    async def _noop(code: int = 1000, reason: str | None = None) -> None:  # noqa: ARG001
+    async def _noop(code: int = 1000, reason: str | None = None) -> None:
         return None
 
-    websocket.close = _noop  # type: ignore[method-assign]
+    websocket.close = _noop
 
 
 async def resolve_ws_principal(
@@ -92,9 +92,11 @@ async def resolve_ws_principal(
     Returns:
         The principal, or `None` when the origin, the cookie or the session is
         invalid.
+
+    The function closes on a foreign origin itself and neutralizes the later close of the
+    router. A long session checks the account at the IdP from time to time; the check can
+    end the session and can change the groups and memberships of the row.
     """
-    # Close here on a foreign origin, then neutralize the later close of the
-    # router.
     origin = websocket.headers.get("origin")
     if not origin_allowed(origin, settings):
         logger.info("ws handshake rejected: disallowed origin %r", origin)
@@ -119,8 +121,6 @@ async def resolve_ws_principal(
     ).scalar_one_or_none()
     if row is None or row.active is False:
         return None
-    # A long session checks the account at the IdP from time to time. The check can
-    # end the session, and it can change the groups and memberships of the row.
     if not await renew_principal_session(db, settings, session=session, principal=row, now=now):
         return None
     if row.active is False:

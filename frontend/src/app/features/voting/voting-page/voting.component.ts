@@ -40,8 +40,6 @@ import {
   StatusTextComponent,
   StickyBarComponent,
 } from '@stupa-makers/ui-kit';
-// By path, not through the `@shared/ui` barrel, so this lazy chunk takes only the blocks
-// it uses.
 import { meetingVoteStatus, type StatusView } from '@shared/status-kind.util';
 import { PageFrameService } from '../../../layout/page-frame.service';
 import { LIVE_MAX_PAGES, LIVE_PAGE_LIMIT } from '../../../layout/rail-status.service';
@@ -110,7 +108,7 @@ export interface VoteGroup {
 }
 
 /**
- * "Abstimmungen" (`/voting`, boards Arbeit-Abstimmungen and Telefon-Abstimmen): the votes
+ * "Abstimmungen" (`/voting`): the votes
  * of the person as a list beside the open vote, like the applications and the tasks.
  *
  * - Left: `GET /votes`, the open votes first ("Offen"), then the drafts ("Entwürfe", only
@@ -128,11 +126,11 @@ export interface VoteGroup {
  *   connect was open before, so it does not open by itself. On the first load side by
  *   side the page opens the first open vote, as the board shows it.
  * - One pane at a time (narrow, phone): the list, then the vote with a way back.
+ * - Side by side it is a pane page (`styles.scss`): the panes fill the free height and
+ *   scroll by themselves.
  */
 @Component({
   selector: 'app-voting',
-  // A pane page (styles.scss): side by side the panes fill the free height and scroll by
-  // themselves.
   host: { '[class.pane-page]': 'split()' },
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -195,7 +193,7 @@ export class VotingComponent implements OnDestroy {
   /** The first open vote opens by itself once, on the first load side by side. */
   private autoOpened = false;
 
-  // Filters, from the query params.
+  /** The search text of the filters, from the query params. */
   readonly q = signal('');
   /**
    * The search field: it searches while the user types (`liveSearch`, debounced, from
@@ -308,8 +306,6 @@ export class VotingComponent implements OnDestroy {
   });
 
   constructor() {
-    // The shown votes read their detail ahead, so a click shows it at once: the vote, the
-    // voting right, the linked to-dos, and once per meeting the meeting and its agenda.
     const meetings = new Set<Uuid>();
     prefetchDetails({
       items: this.items,
@@ -342,7 +338,6 @@ export class VotingComponent implements OnDestroy {
       )
       .subscribe(() => this.readSelection());
 
-    // The detail cast a ballot or deleted the vote: the row follows.
     this.page.changes$.pipe(takeUntilDestroyed()).subscribe((change) => {
       if (change.kind === 'deleted') {
         const before = this.items().length;
@@ -356,8 +351,6 @@ export class VotingComponent implements OnDestroy {
     effect(() => this.page.split.set(this.split()));
     effect(() => this.frame.fill.set(this.split()));
 
-    // The first open vote opens by itself on the first load side by side (the board shows
-    // the vote at once). One pane at a time the list comes first.
     effect(() => {
       const split = this.split();
       const loading = this.loading();
@@ -377,8 +370,6 @@ export class VotingComponent implements OnDestroy {
     if (this.liveTimer) clearTimeout(this.liveTimer);
   }
 
-  // --- navigation ---------------------------------------------------------
-
   /** "Zur Liste" and the back of the phone header: close the vote, keep the filters. */
   closeDetail(): void {
     void this.router.navigate(['/voting'], { queryParamsHandling: 'preserve' });
@@ -394,8 +385,6 @@ export class VotingComponent implements OnDestroy {
   private readSelection(): void {
     this.selectedId.set(this.route.snapshot.firstChild?.paramMap.get('id') ?? null);
   }
-
-  // --- filters ------------------------------------------------------------
 
   setStatus(value: string): void {
     this.navigate({ status: value || null });
@@ -425,8 +414,6 @@ export class VotingComponent implements OnDestroy {
     this.q.set((pm.get('q') ?? '').trim());
     this.search.sync(this.q());
     const status = pm.get('status') ?? '';
-    // Only a manager has the draft chip. A link with `status=draft` shows the default
-    // list to anybody else.
     const known = status in STATUS_QUERY && (status !== 'draft' || this.canManage());
     this.statusFilter.set(known ? (status as VoteStatusFilter) : '');
     this.gremiumId.set(pm.get('gremium') ?? '');
@@ -441,8 +428,6 @@ export class VotingComponent implements OnDestroy {
       queryParamsHandling: 'merge',
     });
   }
-
-  // --- loading ------------------------------------------------------------
 
   /** Load page 0 after a filter change. The rows stay until the new ones arrive. */
   protected reload(): void {
@@ -521,8 +506,6 @@ export class VotingComponent implements OnDestroy {
     if (changed) this.seenGremien.set(next);
   }
 
-  // --- live ---------------------------------------------------------------
-
   private liveTimer: ReturnType<typeof setTimeout> | null = null;
 
   /**
@@ -530,6 +513,9 @@ export class VotingComponent implements OnDestroy {
    * finds them) and the meetings of the open votes in the list. A vote that opens,
    * closes or is cancelled in one of them reloads the list, and a vote that just opened
    * can open in the detail (`openFresh`).
+   *
+   * A channel replays the open vote on each connect and marks it as a replay. The flag comes from
+   * the channel, not from the rows, so a filter that hides the vote does not make it new.
    */
   private followLive(): void {
     const page = (cursor: string | null) =>
@@ -548,8 +534,6 @@ export class VotingComponent implements OnDestroy {
 
     let last: string | null = null;
     effect(() => {
-      // The open vote and the last result of every followed meeting. A change of this
-      // signature is a vote that opened, closed or was cancelled.
       const sessions = [...this.page.sessions()];
       const opened = sessions.map(([, s]) => s.openVote());
       const signature = sessions
@@ -563,11 +547,6 @@ export class VotingComponent implements OnDestroy {
         if (signature === last) return;
         const known = new Set(last.split('|').map((part) => part.split(':')[0]));
         last = signature;
-        // A channel replays the open vote on each connect and marks it as a replay: that
-        // vote was open before, so it did not just open. The flag comes from the channel,
-        // not from the rows, so a filter that hides the vote (status "Beendet", another
-        // gremium, a search) does not make it new. Before the first rows arrive, nothing
-        // is new: the first load opens the first open vote itself.
         const at = this.loading()
           ? -1
           : opened.findIndex((msg) => !!msg && msg.replay !== true && !known.has(msg.voteId));
@@ -593,6 +572,9 @@ export class VotingComponent implements OnDestroy {
    * - The detail shows an ended vote of the same meeting (the vote before): replace it
    *   with the new vote, so the way back still goes to the list.
    * - Any other vote (an open vote, a draft, a vote of another meeting) stays.
+   *
+   * The close of the shown vote and the open of the next can come in one burst, and the detail may
+   * not have read the result yet; the channel already has it.
    */
   private openFresh(fresh: FreshVote): void {
     const selected = this.selectedId();
@@ -605,8 +587,6 @@ export class VotingComponent implements OnDestroy {
     const vote =
       shown?.id === selected ? shown : this.items().find((i) => i.id === selected);
     if (!vote || vote.meetingId !== fresh.meetingId) return;
-    // The close of the shown vote and the open of the next can come in one burst; the
-    // detail may not have read the result yet. The channel already has it.
     const closed = this.page.sessions().get(fresh.meetingId)?.result()?.voteId === selected;
     if (vote.status === 'closed' || vote.status === 'cancelled' || closed) {
       this.openRow(fresh.id, true);
@@ -620,8 +600,6 @@ export class VotingComponent implements OnDestroy {
     }
   }
 
-  // --- rows ---------------------------------------------------------------
-
   private toRow(item: VoteListItem): VoteRow {
     const ended = item.status === 'closed' || item.status === 'cancelled';
     const poll = item.kind === 'poll';
@@ -630,7 +608,6 @@ export class VotingComponent implements OnDestroy {
       (item.status === 'closed' && item.result
         ? closedStatus(item.kind, item.result)
         : this.statusOf(item.status));
-    // The row names its meeting; a vote without one names no gremium either.
     let where: string | null = null;
     if (item.meetingTitle) {
       where =
@@ -641,8 +618,6 @@ export class VotingComponent implements OnDestroy {
               n: item.agendaPosition,
             });
     }
-    // A poll of a Gremium names its Gremium and, until it ends, its end: "STUPA · bis
-    // Fr, 30.10., 12:00".
     if (poll && !item.meetingId && item.gremiumName) {
       const until =
         !ended && item.closesAt ? this.i18n.translate('voting.list.until', { time: this.endOf(item.closesAt) }) : null;
@@ -683,8 +658,6 @@ export class VotingComponent implements OnDestroy {
     let key: TranslationKey | null = null;
     let at: string | null = null;
     if (item.status === 'open') {
-      // A poll of a Gremium names its end in the line below the title: the time is
-      // its start.
       if (item.closesAt && !endInWhere) {
         key = 'voting.list.until';
         at = item.closesAt;

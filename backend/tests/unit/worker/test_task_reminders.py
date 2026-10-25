@@ -76,23 +76,29 @@ async def test_disabled_sends_nothing() -> None:
 
 
 async def test_stale_application_gets_reminder() -> None:
+    """Remind a stale application.
+
+    The fakes feed the due candidates, the application, the states, the logs, the preference
+    filter (no opt-out), the template lookup (no override), the manual transition count and
+    the last status event.
+    """
     app_id, event_id = uuid.uuid4(), uuid.uuid4()
     state = _state()
     entered = NOW - timedelta(days=6)
     session = FakeSession(
         executes=[
-            [(app_id, state.id, entered)],  # due candidates
-            [({"title": "Beamer"},)],  # _remind_one: the application
+            [(app_id, state.id, entered)],
+            [({"title": "Beamer"},)],
         ],
         scalars=[
-            [state],  # states
-            [],  # existing logs
-            [],  # preference filter (#4-2, no opt-outs)
-            [],  # template lookup (no DB override)
+            [state],
+            [],
+            [],
+            [],
         ],
         scalar=[
-            1,  # _state_actionable: manual transitions
-            event_id,  # the last status_event
+            1,
+            event_id,
         ],
     )
     session.add(_config(after_days=5))
@@ -113,6 +119,7 @@ async def test_stale_application_gets_reminder() -> None:
 
 
 async def test_once_mode_skips_already_reminded_stay() -> None:
+    """Send nothing again in once mode for a stay already reminded."""
     app_id, event_id = uuid.uuid4(), uuid.uuid4()
     state = _state()
     log = TaskReminderLog(
@@ -125,13 +132,14 @@ async def test_once_mode_skips_already_reminded_stay() -> None:
         scalars=[[state], [log]],
         scalar=[1, event_id],
     )
-    session.add(_config(repeat_days=0))  # once mode
+    session.add(_config(repeat_days=0))
     queue = FakeQueue()
     assert await process_task_reminders(_ctx(session, queue), now=NOW) == 0
     assert queue.messages == []
 
 
 async def test_repeat_mode_reminds_again_after_interval() -> None:
+    """Remind again after the interval and update the existing log instead of adding a row."""
     app_id, event_id = uuid.uuid4(), uuid.uuid4()
     state = _state()
     log = TaskReminderLog(
@@ -147,15 +155,16 @@ async def test_repeat_mode_reminds_again_after_interval() -> None:
         scalars=[[state], [log], [], []],
         scalar=[1, event_id],
     )
-    session.store[app_id] = log  # `session.get` must find this log
+    session.store[app_id] = log
     session.add(_config(repeat_days=7))
     queue = FakeQueue()
 
     assert await process_task_reminders(_ctx(session, queue), now=NOW) == 1
-    assert log.reminded_at == NOW  # the worker updates the log and adds no second row
+    assert log.reminded_at == NOW
 
 
 async def test_vote_state_counts_as_actionable() -> None:
+    """Count a vote state as actionable without a transition-count scalar."""
     app_id, event_id = uuid.uuid4(), uuid.uuid4()
     state = _state(kind="vote")
     session = FakeSession(
@@ -163,7 +172,6 @@ async def test_vote_state_counts_as_actionable() -> None:
             [(app_id, state.id, NOW - timedelta(days=6))],
             [({},)],
         ],
-        # A vote state needs no transition-count scalar.
         scalars=[[state], [], [], []],
         scalar=[event_id],
     )
@@ -172,7 +180,6 @@ async def test_vote_state_counts_as_actionable() -> None:
     assert await process_task_reminders(_ctx(session, queue), now=NOW) == 1
 
 
-# Admin API
 class _FakeService:
     def __init__(self) -> None:
         self.updated: dict[str, Any] | None = None

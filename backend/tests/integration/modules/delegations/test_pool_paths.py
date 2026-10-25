@@ -39,8 +39,13 @@ pytestmark = pytest.mark.integration
 async def test_pool_substitute_on_all_six_paths(
     maker: async_sessionmaker[AsyncSession], api: FastAPI
 ) -> None:
+    """Give a pool substitute standing on all six paths.
+
+    The long lead time leaves only a pool delegation open. The paths: 1. create without a
+    lead-time deadline, 2. the recipients of the member, 3. the meeting context, 4. the
+    roster guard, 5. the meeting visibility without a membership, 6. `/auth/me`.
+    """
     gid = await gremium(maker)
-    # A lead time of a day: only a pool delegation may still be created.
     async with maker() as session:
         await session.execute(
             update(Gremium).where(Gremium.id == gid).values(delegation_lead_minutes=60 * 24 * 60)
@@ -52,19 +57,14 @@ async def test_pool_substitute_on_all_six_paths(
     mid = await meeting(maker, gid)
 
     with TestClient(api) as client:
-        # 6. /auth/me
         act(api, sam_sub)
         me = client.get("/api/auth/me")
-        # 5. meeting visibility of a pool substitute without a membership
         detail = client.get(f"/api/meetings/{mid}")
         timeline = client.get("/api/meetings")
-        # 4. roster guard
         pool = client.get("/api/delegations/substitutes", params={"gremiumId": str(gid)})
-        # 3. meeting context and 2. recipients of the member
         act(api, mia_sub)
         context = client.get(f"/api/delegations/meetings/{mid}/context")
         recipients = client.get(f"/api/delegations/meetings/{mid}/recipients")
-        # 1. create: no lead-time deadline for a pool substitute
         created = client.post(
             "/api/delegations",
             json={"meetingId": str(mid), "delegateId": str(sam), "delegateVoting": True},
@@ -90,6 +90,10 @@ async def test_pool_substitute_on_all_six_paths(
 async def test_outsider_has_no_pool_standing(
     maker: async_sessionmaker[AsyncSession], api: FastAPI
 ) -> None:
+    """Give an outsider no pool standing.
+
+    The faculty-group routes are gone.
+    """
     gid = await gremium(maker)
     out_sub, _ = await person(maker, "Out")
     mid = await meeting(maker, gid)
@@ -97,18 +101,19 @@ async def test_outsider_has_no_pool_standing(
     with TestClient(api) as client:
         me = client.get("/api/auth/me")
         detail = client.get(f"/api/meetings/{mid}")
-        groups = client.get(
-            "/api/delegations/substitute-groups", params={"gremiumId": str(gid)}
-        )
+        groups = client.get("/api/delegations/substitute-groups", params={"gremiumId": str(gid)})
     assert me.json()["in_substitute_pool"] is False
     assert detail.status_code == 403
-    # The faculty-group routes are gone.
     assert groups.status_code in {404, 405}
 
 
 async def test_personal_and_gremium_wide_entries(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
+    """Resolve the personal and the gremium-wide pool entries.
+
+    Ben has no personal entry, only the gremium-wide entry. A member gives no pool standing.
+    """
     gid = await gremium(maker)
     mia_sub, mia = await member(maker, gid, "Mia")
     _, ben = await member(maker, gid, "Ben")
@@ -121,10 +126,8 @@ async def test_personal_and_gremium_wide_entries(
     await pool_entry(maker, other, foreign, for_member=mia)
     async with maker() as session:
         assert await substitutes_for(session, gid, mia) == {personal, wide}
-        # Ben has no personal entry: only the gremium-wide entry.
         assert await substitutes_for(session, gid, ben) == {wide}
         assert await substitute_gremien_for_sub(session, personal_sub) == {gid}
         assert await substitute_gremien_for_sub(session, foreign_sub) == {other}
         assert await substitute_gremien_for_sub(session, wide_sub) == {gid}
-        # A member gives no pool standing.
         assert await substitute_gremien_for_sub(session, mia_sub) == set()

@@ -30,7 +30,7 @@ import { UserMergeComponent } from './user-merge/user-merge.component';
 import { UserRevokeComponent } from './user-revoke/user-revoke.component';
 import { personLabel } from '@shared/person-label.util';
 
-/** The choices of the chip "Letzte Anmeldung" (F3): older than n days, or never. */
+/** The choices of the chip "Letzte Anmeldung": older than n days, or never. */
 export const LAST_LOGIN_FILTERS = ['', '90', '180', '365', 'never'] as const;
 export type LastLoginFilter = (typeof LAST_LOGIN_FILTERS)[number];
 /** The choices of the chip "Hat SSO-Gruppen". */
@@ -61,7 +61,7 @@ export function principalFilters(
 }
 
 /**
- * Users (board Admin-Benutzer): a search and one row per principal.
+ * Users: a search and one row per principal.
  *
  * A row shows the person, the global roles, the OIDC groups and the last login, and
  * "Deaktivieren" or "Aktivieren". The roles are read-only. They come from the OIDC
@@ -134,9 +134,9 @@ export class UsersComponent {
 
   /** "Mit anderem Konto zusammenführen" needs its own permission (admin only by default). */
   protected readonly canMerge = computed(() => this.auth.can('admin.users.merge'));
-  /** "Konto löschen (DSGVO)" leads to the privacy page and needs its permission (D1). */
+  /** "Konto löschen (DSGVO)" leads to the privacy page and needs its permission. */
   protected readonly canErase = computed(() => this.auth.can('privacy.manage'));
-  /** "Rechte entziehen …" needs its own permission (admin only by default, F3). */
+  /** "Rechte entziehen …" needs its own permission (admin only by default). */
   protected readonly canRevoke = computed(() => this.auth.can('admin.users.revoke_groups'));
   /** A row has a ⋮ menu when at least one of its actions is allowed. */
   /** The old account of the open merge dialog. Null: the dialog is closed. */
@@ -174,23 +174,19 @@ export class UsersComponent {
    */
   protected readonly loading = signal(true);
 
+  /**
+   * Without the permission the mappings request answers 403, and the column then shows the
+   * bootstrap roles only. The query param map is subscribed, not read once, because the palette can
+   * send a global-search hit here while the component is already active and the router keeps it.
+   */
   constructor() {
     this.api.listRoles().subscribe((r) => this.roles.set(r));
-    // The mappings resolve the roles that the groups give. Without the permission the
-    // request answers 403, so the column then shows the bootstrap roles only.
     if (this.canManageMappings()) {
       this.api.listGroupMappings().subscribe({
         next: (m) => this.groupMappings.set(m),
         error: () => this.groupMappings.set([]),
       });
     }
-    // `/admin/users?q=…` is where a global-search hit on a person lands. Without it the
-    // hit opened the unfiltered list and the reader searched the same name twice.
-    //
-    // The subscription and not one read of the snapshot: the palette can send us here
-    // while we are already here, and a hit on another person changes only the query
-    // string. The router keeps this component, so a snapshot read would never run again.
-    // The query param map emits at once, so its first value makes the initial load.
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((qp) => {
       const q = qp.get('q') ?? '';
       if (q === this.search.text() && this.principals().length) return;
@@ -252,12 +248,12 @@ export class UsersComponent {
       .join(', ');
   }
 
-  /** The name of an account. Without a name and an e-mail: "Ohne Namen" (D7), never the `sub`. */
+  /** The name of an account. Without a name and an e-mail: "Ohne Namen", never the `sub`. */
   protected userLabel(p: AdminPrincipal): string {
     return personLabel(p, this.i18n);
   }
 
-  /** The tooltip of the name: the `sub` of a nameless account, for the admin detail (D7). */
+  /** The tooltip of the name: the `sub` of a nameless account, for the admin detail. */
   protected userTitle(p: AdminPrincipal): string {
     return p.displayName || p.email ? this.userLabel(p) : p.sub;
   }
@@ -269,7 +265,6 @@ export class UsersComponent {
 
   /** The row menu of an account that is not merged. */
   protected menuFor(p: AdminPrincipal): RowMenuSection[] {
-    // Activate or deactivate first, the destructive actions after it.
     const state: RowMenuItem =
       p.active === false
         ? { id: 'activate', label: this.i18n.translate('admin.users.activate'), icon: 'power' }
@@ -291,14 +286,12 @@ export class UsersComponent {
         disabledReason: this.isSelf(p) ? this.i18n.translate('admin.users.merge.notSelf') : null,
       });
     }
-    // Only for a person who still has something to take away (the server flag `hasAccess`).
     if (this.canRevoke() && p.hasAccess) {
       items.push({
         id: 'revoke',
         label: this.i18n.translate('admin.users.revoke.action'),
         icon: 'shield',
         danger: true,
-        // The server refuses it too (409 `revoke_own_account`).
         disabledReason: this.isSelf(p) ? this.i18n.translate('admin.users.revoke.notSelf') : null,
       });
     }
@@ -308,7 +301,6 @@ export class UsersComponent {
         label: this.i18n.translate('admin.users.erase.action'),
         icon: 'trash',
         danger: true,
-        // The server refuses it too (409 `erase_self`).
         disabledReason: this.isSelf(p) ? this.i18n.translate('admin.users.erase.notSelf') : null,
       });
     }
@@ -320,7 +312,6 @@ export class UsersComponent {
     if (item.id === 'deactivate') this.setActive(p, false);
     if (item.id === 'merge') this.mergeSource.set(p);
     if (item.id === 'revoke') this.revokeSource.set(p);
-    // The privacy page holds the one erasure path with its confirmation (D1).
     if (item.id === 'erase') void this.router.navigate(['/admin/privacy'], { queryParams: { person: p.sub } });
   }
 

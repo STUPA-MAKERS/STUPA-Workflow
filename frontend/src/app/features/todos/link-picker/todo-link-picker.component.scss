@@ -8,8 +8,6 @@
   gap: var(--space-3);
   min-width: 0;
 }
-/* Desktop: the panel floats over everything, like the search palette, also over a
-   dialog that holds the picker. It sits near the top, because the hits grow downward. */
 .lp__scrim {
   position: fixed;
   inset: 0;
@@ -59,13 +57,11 @@
   gap: var(--space-2);
   padding-inline: var(--space-1);
 }
-/* Compact kind chips: the picker is a dropdown, not a page filter row. */
 .lp__chips .lp__chip {
   height: 28px;
   padding-inline: var(--space-3);
   font-size: 0.8125rem;
 }
-/* The search and the chips stay; the hits scroll and run from edge to edge. */
 .lp--pop .lp__results {
   flex: 1 1 auto;
   min-height: 0;
@@ -76,7 +72,6 @@
 .lp--pop .lp__group {
   margin-inline: var(--space-4);
 }
-/* The hits run from edge to edge; the empty state keeps the inset of the sheet. */
 .lp--pop .lp__empty {
   width: auto;
   margin-inline: var(--space-3);

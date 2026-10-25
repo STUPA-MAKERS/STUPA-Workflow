@@ -1,4 +1,4 @@
-"""Seed helpers for the vote lifecycle tests of P4 (real Postgres).
+"""Seed helpers for the vote lifecycle tests (real Postgres).
 
 `seed_vote_flow` builds one gremium, one application type with an active form and one
 flow: `review` -> `voting` (a vote state) with the exits `pass` -> `approved`,
@@ -48,6 +48,11 @@ async def seed_vote_flow(
     with_fail: bool = True,
     start: str = "voting",
 ) -> VoteFlow:
+    """Seed a gremium, a vote flow and an application in the start state.
+
+    The application carries the vote Gremium snapshot that the flow engine sets on entry
+    into a vote state.
+    """
     tag = uuid.uuid4().hex[:8]
     gremium = Gremium(name="G", slug=f"g-{tag}")
     session.add(gremium)
@@ -110,7 +115,6 @@ async def seed_vote_flow(
     row = await session.get(Application, app.id)
     assert row is not None
     row.current_state_id = states[start].id
-    # The snapshot that the flow engine sets on entry into a vote state.
     row.vote_gremium_id = gremium.id if states[start].kind == "vote" else None
     await session.commit()
     return VoteFlow(

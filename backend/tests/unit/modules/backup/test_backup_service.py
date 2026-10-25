@@ -49,10 +49,10 @@ class _FakeStorage:
     async def get(self, key: str) -> bytes:
         return self.objects[key]
 
-    async def get_stream(self, key: str, *, chunk_size: int = 1024):  # noqa: ANN202
+    async def get_stream(self, key: str, *, chunk_size: int = 1024):
         payload = self.objects[key]
 
-        async def _chunks():  # noqa: ANN202
+        async def _chunks():
             for i in range(0, len(payload), chunk_size):
                 yield payload[i : i + chunk_size]
 
@@ -132,9 +132,9 @@ def _row(**kw: object) -> Backup:
     `id` and `created_at` are server defaults, so a row the service ever sees already
     carries both. The helper fills them in, because the plain constructor does not.
     """
-    row = Backup(**kw)  # type: ignore[arg-type]
+    row = Backup(**kw)
     row.id = uuid4()
-    if row.created_at is None:  # type: ignore[comparison-overlap]
+    if row.created_at is None:
         row.created_at = CREATED_AT
     return row
 
@@ -149,12 +149,9 @@ def _service(
     return BackupService(
         session or _FakeSession(),  # type: ignore[arg-type]
         _settings(**settings_overrides),
-        attachments=attachments,  # type: ignore[arg-type]
-        archives=archives,  # type: ignore[arg-type]
+        attachments=attachments,
+        archives=archives,
     )
-
-
-# ------------------------------------------------------------------------- helpers
 
 
 def test_libpq_dsn_strips_the_asyncpg_driver_prefix() -> None:
@@ -182,9 +179,6 @@ def test_temp_file_removes_the_file_on_the_way_out() -> None:
         handle.write(b"x")
         assert path.exists()
     assert not path.exists()
-
-
-# ----------------------------------------------------------------------- catalogue
 
 
 @pytest.mark.asyncio
@@ -239,9 +233,10 @@ async def test_mark_failed_truncates_the_code_and_never_carries_a_path() -> None
 
 @pytest.mark.asyncio
 async def test_export_streams_the_bytes_rather_than_presigning_a_url() -> None:
-    """Regression: MinIO is internal, so a presigned URL is unreachable from a browser.
+    """Stream the export bytes rather than presign a URL.
 
-    The export therefore reads the object and streams it; nothing hands the client a
+    MinIO is internal, so a presigned URL is unreachable from a browser. The export
+    therefore reads the object and streams it; nothing hands the client a
     URL that points at the object store.
     """
     archives = _FakeStorage({"key": b"cipher-bytes"})
@@ -256,9 +251,6 @@ async def test_export_refuses_a_row_without_an_archive() -> None:
     service = _service(archives=_FakeStorage())
     with pytest.raises(BackupError, match="no stored archive"):
         await service.export_stream(_row(storage_key=None))
-
-
-# ----------------------------------------------------------------------- retention
 
 
 @pytest.mark.asyncio
@@ -300,9 +292,6 @@ async def test_delete_survives_an_object_that_is_already_gone() -> None:
     row = _row(storage_key="missing")
     await service.delete(row)
     assert session.deleted == [row]
-
-
-# --------------------------------------------------------------------------- build
 
 
 @pytest.mark.asyncio
@@ -386,10 +375,7 @@ async def test_schema_revision_is_none_when_alembic_version_is_unreadable() -> N
     session = _FakeSession()
     session.scalar_value = RuntimeError("no such table")
     service = _service(session=session)
-    assert await service._schema_revision() is None  # noqa: SLF001
-
-
-# ------------------------------------------------------------------------- restore
+    assert await service._schema_revision() is None
 
 
 @pytest.mark.asyncio
@@ -437,21 +423,18 @@ async def test_verify_archive_rejects_a_file_that_is_not_an_archive(
 def test_identity_refuses_when_none_is_configured() -> None:
     service = _service(backup_age_identity_file=None)
     with pytest.raises(BackupError, match="no restore is possible"):
-        service._identity()  # noqa: SLF001
+        service._identity()
 
 
 def test_identity_refuses_an_unreadable_key_file() -> None:
     service = _service(backup_age_identity_file="/nonexistent/age.key")
     with pytest.raises(BackupError, match="not readable"):
-        service._identity()  # noqa: SLF001
-
-
-# -------------------------------------------------------------------------- upload
+        service._identity()
 
 
 @pytest.mark.asyncio
 async def test_stream_upload_writes_the_whole_body_and_returns_its_size() -> None:
-    async def _chunks():  # noqa: ANN202
+    async def _chunks():
         yield b"abc"
         yield b"de"
 
@@ -462,7 +445,7 @@ async def test_stream_upload_writes_the_whole_body_and_returns_its_size() -> Non
 
 @pytest.mark.asyncio
 async def test_stream_upload_stops_at_the_cap() -> None:
-    async def _chunks():  # noqa: ANN202
+    async def _chunks():
         yield b"x" * 10
         yield b"x" * 10
 

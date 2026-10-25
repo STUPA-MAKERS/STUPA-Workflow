@@ -46,8 +46,8 @@ function globalBlocks(path = GLOBAL_STYLES): Set<string> {
 describe('global app classes and ui-kit classes', () => {
   const kit = kitBlocks();
 
+  /** This is a sanity check: if the parser breaks, the collision check below passes for nothing. */
   it('finds the kit blocks', () => {
-    // A sanity check: if the parser breaks, the collision check below passes for nothing.
     expect(kit).toContain('seg');
     expect(kit).toContain('btn');
   });
@@ -57,8 +57,8 @@ describe('global app classes and ui-kit classes', () => {
     expect(clashes).toEqual([]);
   });
 
+  /** The row group is a global partial of the kit, which the app loads. */
   it('the row group is not called `.seg`', () => {
-    // The row group is a global partial of the kit, which the app loads.
     expect(globalBlocks(KIT_ROWGROUP)).toContain('rowgroup');
     expect(globalBlocks(KIT_ROWGROUP)).not.toContain('seg');
     expect(globalBlocks()).not.toContain('seg');

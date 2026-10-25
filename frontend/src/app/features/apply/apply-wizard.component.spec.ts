@@ -202,6 +202,7 @@ describe('ApplyWizardComponent', () => {
     jest.restoreAllMocks();
   });
 
+  /** Only active types show, and Next does nothing without a type. */
   it('shows the title and four steps before a type is chosen', async () => {
     const s = await setup();
     expect(screen.getByRole('heading', { level: 1, name: 'Antrag stellen' })).toBeInTheDocument();
@@ -209,13 +210,12 @@ describe('ApplyWizardComponent', () => {
     expect(steps.querySelectorAll('li')).toHaveLength(4);
     expect(screen.getByText('Schritt 1 von 4')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: 'Antragsart wählen' })).toBeInTheDocument();
-    // Only active types.
     expect(screen.getAllByRole('radio')).toHaveLength(1);
-    // Next does nothing without a type.
     s.comp.next();
     expect(s.comp.activeIndex()).toBe(0);
   });
 
+  /** The PII field and its display text belong to "Kontakt", not to "Angaben". */
   it('names the type and the parts of each step once the form is in', async () => {
     const s = await setup();
     await pickType(s);
@@ -229,7 +229,6 @@ describe('ApplyWizardComponent', () => {
     s.fixture.detectChanges();
     expect(screen.getByText('Schritt 2 von 4 · Förderantrag')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: 'Angaben zum Vorhaben' })).toBeInTheDocument();
-    // The PII field and its display text belong to "Kontakt", not to "Angaben".
     const details = s.comp.detailsFields()[0].fieldGroup ?? [];
     expect(details.map((f) => f.key).filter(Boolean)).toEqual(['title', 'needs', 'detail', 'receipt', 'amount']);
     expect(details.find((f) => f.key === 'receipt')?.type).toBe(FormlyDraftFilesType);
@@ -250,6 +249,7 @@ describe('ApplyWizardComponent', () => {
     expect(await screen.findByRole('textbox', { name: /^Details/ })).toBeInTheDocument();
   });
 
+  /** The contact step needs a valid e-mail and the required IBAN. */
   it('blocks an invalid step with the errors and a toast', async () => {
     const s = await setup();
     await pickType(s);
@@ -260,11 +260,9 @@ describe('ApplyWizardComponent', () => {
     await userEvent.type(field(/Titel/), 'Party');
     s.comp.next();
     expect(s.comp.currentStep()).toBe('contact');
-    // The contact step needs a valid e-mail.
     s.comp.next();
     expect(s.comp.currentStep()).toBe('contact');
     await userEvent.type(screen.getByLabelText(/^E-Mail/), 'a@b.de');
-    // ... and the required IBAN.
     s.comp.next();
     expect(s.comp.currentStep()).toBe('contact');
   });
@@ -295,6 +293,10 @@ describe('ApplyWizardComponent', () => {
     expect(s.comp.activeIndex()).toBe(0);
   });
 
+  /**
+   * The model holds the file ids of the field, and one of them is lost before the submit. "Weiter"
+   * has no step after the review.
+   */
   it('reviews the answers, the applicant and the files, and submits with drafts and altcha', async () => {
     const drafts = fakeDrafts([draft('d1'), draft('d2', 'receipt')]);
     const s = await setup({ drafts });
@@ -306,9 +308,7 @@ describe('ApplyWizardComponent', () => {
     expect(screen.getByText('Erika')).toBeInTheDocument();
     const review = document.querySelector('.wz__review') as HTMLElement;
     expect(within(review).getByText('d1.pdf')).toBeInTheDocument();
-    // The model holds the file ids of the field; one of them is lost before the submit.
     s.comp.model['receipt'] = ['d2', 'gone'];
-    // "Weiter" has no step after the review.
     s.comp.next();
     expect(s.comp.currentStep()).toBe('review');
     const submit = screen.getByRole('button', { name: 'Antrag absenden' });
@@ -338,7 +338,7 @@ describe('ApplyWizardComponent', () => {
     sessionStorage.setItem(`${DRAFT_PREFIX}t9`, JSON.stringify({ v: 1, model: { title: 'Alt' } }));
     sessionStorage.setItem('ap.other', 'keep');
     const s = await setup({ form: PLAIN, loggedIn: true });
-    await waitFor(() => expect(s.comp.loggedIn()).toBe(true));
+    await waitFor(() => expect(s.comp['loggedIn']()).toBe(true));
     await pickType(s);
     s.comp.next();
     s.fixture.detectChanges();
@@ -352,6 +352,7 @@ describe('ApplyWizardComponent', () => {
     expect(sessionStorage.getItem('ap.other')).toBe('keep');
   });
 
+  /** After a tab reload the autosave (without the file field) and the draft files are back. */
   it('gives a file field its draft files back after a reload, so a required field passes', async () => {
     const required: EffectiveForm = {
       ...PLAIN,
@@ -366,7 +367,6 @@ describe('ApplyWizardComponent', () => {
         },
       ],
     };
-    // The tab reloaded: the autosave (without the file field) and the draft files are back.
     sessionStorage.setItem(DRAFT_LAST_TYPE, 't1');
     sessionStorage.setItem(`${DRAFT_PREFIX}t1`, JSON.stringify({ v: 1, model: { title: 'X' }, step: 'details' }));
     const lost = { ...draft('d3', 'receipt'), failed: true };
@@ -421,7 +421,7 @@ describe('ApplyWizardComponent', () => {
 
   it('shows the account and the PII fields in the contact step of a signed-in user', async () => {
     const s = await setup({ loggedIn: true });
-    await waitFor(() => expect(s.comp.loggedIn()).toBe(true));
+    await waitFor(() => expect(s.comp['loggedIn']()).toBe(true));
     await pickType(s);
     expect(s.comp.stepKeys()).toHaveLength(4);
     expect(s.comp.steps()[2].hint).toBe('IBAN');
@@ -437,7 +437,7 @@ describe('ApplyWizardComponent', () => {
 
   it('falls back to the display name when the account has no e-mail', async () => {
     const s = await setup({ loggedIn: true });
-    await waitFor(() => expect(s.comp.loggedIn()).toBe(true));
+    await waitFor(() => expect(s.comp['loggedIn']()).toBe(true));
     const auth = s.fixture.debugElement.injector.get(
       (await import('@core/auth/auth.service')).AuthService,
     );
@@ -448,6 +448,7 @@ describe('ApplyWizardComponent', () => {
     expect(s.comp.reviewEmail()).toBe('Userin');
   });
 
+  /** The next submit needs a new solution. */
   it('sends lost files back to the details step', async () => {
     const drafts = fakeDrafts([draft('d1', 'receipt'), draft('d2')]);
     const problem = {
@@ -467,7 +468,6 @@ describe('ApplyWizardComponent', () => {
     expect(s.toast.error).toHaveBeenCalledWith(
       'Einige Dateien sind nicht mehr vorhanden. Bitte lade sie neu hoch.',
     );
-    // A new solution is needed for the next submit.
     expect(s.comp.altchaSolution()).toBeNull();
     expect(s.comp.altchaRound()).toBe(1);
   });
@@ -530,6 +530,7 @@ describe('ApplyWizardComponent', () => {
     expect(s.create).not.toHaveBeenCalled();
   });
 
+  /** Nothing of the draft goes into localStorage; only the language is there. */
   it('autosaves the answers without contact, PII and file fields', async () => {
     const s = await setup();
     await toReview(s);
@@ -543,7 +544,6 @@ describe('ApplyWizardComponent', () => {
     expect(sessionStorage.getItem(DRAFT_LAST_TYPE)).toBe('t1');
     s.fixture.detectChanges();
     expect(screen.getByText('Entwurf in diesem Tab gespeichert')).toBeInTheDocument();
-    // Nothing of the draft goes into localStorage (only the language is there).
     expect(Object.keys(localStorage)).toEqual(['ap.locale']);
   });
 
@@ -624,7 +624,7 @@ describe('ApplyWizardComponent', () => {
       throw new Error('blocked');
     });
     const s = await setup({ form: PLAIN, loggedIn: true });
-    await waitFor(() => expect(s.comp.loggedIn()).toBe(true));
+    await waitFor(() => expect(s.comp['loggedIn']()).toBe(true));
     await pickType(s);
     s.comp.next();
     s.comp.persistDraft();
@@ -642,6 +642,7 @@ describe('ApplyWizardComponent', () => {
     expect(sessionStorage.getItem(DRAFT_LAST_TYPE)).toBeNull();
   });
 
+  /** The autosave effect runs after the discard, and past its pause it stores nothing. */
   it('discards the draft after the confirmation', async () => {
     const drafts = fakeDrafts([draft('d1')]);
     const s = await setup({ drafts });
@@ -658,7 +659,6 @@ describe('ApplyWizardComponent', () => {
     await waitFor(() => expect(drafts.discard).toHaveBeenCalled());
     expect(s.comp.model).toEqual({});
     expect(s.comp.activeIndex()).toBe(0);
-    // The autosave effect runs after the discard: past its pause, it stores nothing.
     s.fixture.detectChanges();
     await new Promise((r) => setTimeout(r, 600));
     expect(sessionStorage.getItem(`${DRAFT_PREFIX}t1`)).toBeNull();
@@ -747,7 +747,7 @@ describe('ApplyWizardComponent', () => {
 
   it('names a single part without a list and a type without a name', async () => {
     const s = await setup({ form: PLAIN, loggedIn: true });
-    await waitFor(() => expect(s.comp.loggedIn()).toBe(true));
+    await waitFor(() => expect(s.comp['loggedIn']()).toBe(true));
     s.comp.selectType('t1');
     expect(s.comp.steps()[1].hint).toBe('Antrag');
     s.comp.types.set([]);

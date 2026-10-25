@@ -38,6 +38,7 @@ def build_sender(settings: Settings) -> MailSender:
 
 
 async def on_startup(ctx: dict[str, Any]) -> None:
+    """Load the settings and build the mail sender into the worker context."""
     settings = load_settings()
     ctx["settings"] = settings
     ctx["mail_sender"] = build_sender(settings)
@@ -51,13 +52,15 @@ async def send_mail(ctx: dict[str, Any], payload: dict[str, object]) -> str:
 
     Returns:
         `"sent"` after delivery, or `"dead"` after the last failed try.
+
+    Any send error counts as transient and is retried.
     """
     settings: Settings = ctx["settings"]
     sender: MailSender = ctx["mail_sender"]
     msg = MailMessage.from_payload(payload)
     try:
         await sender.send(msg)
-    except Exception as exc:  # noqa: BLE001 - transient SMTP error -> retry
+    except Exception as exc:
         job_try = int(ctx.get("job_try", 1))
         if job_try >= settings.mail_max_tries:
             logger.error(

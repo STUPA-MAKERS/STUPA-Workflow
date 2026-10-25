@@ -1,4 +1,4 @@
-"""Public meeting with a QR code (#17) on a real Postgres.
+"""Public meeting with a QR code on a real Postgres.
 
 The tests drive the lead routes, the public guest routes and both WebSockets through
 the real app wiring: the join with its cookie, the decisions of the lead, the guest
@@ -138,7 +138,10 @@ async def seed(
     present: int = 2,
     quorum_percent: int | None = None,
 ) -> Seed:
-    """A live meeting with two public free-text items, one non-public item, members."""
+    """A live meeting with two public free-text items, one non-public item, members.
+
+    The lead also keeps the minutes, because only the protokollant opens and closes votes.
+    """
     tag = uuid.uuid4().hex[:8]
     async with maker() as session:
         gremium = Gremium(name=f"Fachschaft {tag}", slug=f"fs-{tag}", quorum_percent=quorum_percent)
@@ -148,7 +151,6 @@ async def seed(
         if existing is None:
             session.add(lead)
         await session.flush()
-        # The lead also keeps the minutes: only the protokollant opens and closes votes.
         keeper = existing or lead
         meeting = Meeting(
             gremium_id=gremium.id,
@@ -248,12 +250,14 @@ def open_vote(lead: TestClient, s: Seed, item: uuid.UUID, **body: Any) -> dict[s
     )
 
 
-# -- meeting settings ---------------------------------------------------------------
-
-
 async def test_create_and_patch_public_settings(
     maker: async_sessionmaker[AsyncSession], ctx: Ctx
 ) -> None:
+    """Create a public meeting and patch its settings.
+
+    The switch from off to on gives a code, and the change writes its own audit action. A
+    plain member sees neither the code nor the open requests.
+    """
     s = await seed(maker, status="planned", public_join=False)
     with TestClient(ctx.app) as lead:
         resp = lead.post(
@@ -272,7 +276,6 @@ async def test_create_and_patch_public_settings(
         assert body["publicJoin"] is True and body["guestsMode"] == "watch"
         assert len(body["joinCode"]) == 6
         assert set(body["joinCode"]) <= set("ABCDEFGHJKMNPQRSTUVWXYZ23456789")
-        # Off -> on gives a code; the change writes its own audit action.
         resp = lead.patch(f"/api/meetings/{s.meeting_id}", json={"publicJoin": True})
         assert resp.status_code == 200, resp.text
         assert resp.json()["joinCode"]
@@ -280,7 +283,6 @@ async def test_create_and_patch_public_settings(
         assert link["joinUrl"] == f"https://stupa.example/j/{link['joinCode']}"
         assert link["qr"]["size"] == len(link["qr"]["rows"]) >= 21
         assert set("".join(link["qr"]["rows"])) <= {"0", "1"}
-        # A plain member sees neither the code nor the open requests.
         ctx.principal["p"] = Principal(sub="plain", permissions={"meeting.view_all"})
         member_view = lead.get(f"/api/meetings/{s.meeting_id}").json()
         assert member_view["publicJoin"] is True and member_view["joinCode"] is None
@@ -300,12 +302,14 @@ async def test_join_link_of_a_meeting_without_public_join(
         assert lead.post(f"/api/meetings/{s.meeting_id}/join-code/rotate").status_code == 409
 
 
-# -- join, decisions, guest state ------------------------------------------------------
-
-
 async def test_join_admit_and_guest_view_without_non_public_content(
     maker: async_sessionmaker[AsyncSession], ctx: Ctx
 ) -> None:
+    """Join, admit and show the guest view without non-public content.
+
+    A non-public item keeps its title but never its text. A second admit gives 409. The
+    admitted device cannot ask again.
+    """
     s = await seed(maker)
     code = await code_of(maker, s.meeting_id)
     with TestClient(ctx.app) as lead, guest_client(ctx.app) as phone:
@@ -331,7 +335,6 @@ async def test_join_admit_and_guest_view_without_non_public_content(
         assert view["presentMembers"] == 2 and view["admittedGuests"] == 1
         by_id = {a["id"]: a for a in view["agenda"]}
         assert by_id[str(s.public_item)]["body"] == "Text Öffentlich"
-        # A non-public item keeps its title but never its text.
         assert by_id[str(s.np_item)] == {
             "id": str(s.np_item),
             "position": 3,
@@ -341,11 +344,9 @@ async def test_join_admit_and_guest_view_without_non_public_content(
             "body": None,
             "done": False,
         }
-        # A second admit gives 409.
         again = lead.post(f"/api/meetings/{s.meeting_id}/guests/{listed[0]['id']}/admit")
         assert again.status_code == 409 and again.json()["code"] == "guest_not_pending"
         assert lead.get(f"/api/meetings/{s.meeting_id}").json()["admittedGuests"] == 1
-        # The admitted device cannot ask again.
         dup = join(phone, code)
         assert dup.status_code == 409 and dup.json()["code"] == "already_admitted"
     [entry] = [e for e in await audits(maker) if e.action == "guest_admitted"]
@@ -361,6 +362,11 @@ async def test_join_admit_and_guest_view_without_non_public_content(
 async def test_public_routes_reject_bad_tokens_and_codes(
     maker: async_sessionmaker[AsyncSession], ctx: Ctx
 ) -> None:
+    """Reject bad tokens and codes on the public routes.
+
+    The token of meeting A does not open meeting B. A bad code gives the same 404 as an
+    unknown code, so nobody can probe the codes.
+    """
     s = await seed(maker)
     other = await seed(maker)
     code = await code_of(maker, s.meeting_id)
@@ -374,7 +380,6 @@ async def test_public_routes_reject_bad_tokens_and_codes(
         assert forged.status_code == 404 and forged.json()["code"] == "guest_not_found"
         phone.cookies.clear()
         assert join(phone, code).status_code == 200
-        # The token of meeting A does not open meeting B.
         cross = phone.get(f"/api/public/meetings/{other_code}/me")
         assert cross.status_code == 404 and cross.json()["code"] == "guest_not_found"
         bad_name = phone.post(f"/api/public/meetings/join/{code}", json={"displayName": "J"})
@@ -390,13 +395,16 @@ async def test_public_routes_reject_bad_tokens_and_codes(
         await session.commit()
     with guest_client(ctx.app) as phone:
         resp = phone.get(f"/api/public/meetings/{code}")
-        # The same 404 as an unknown code: nobody can probe the codes.
         assert resp.status_code == 404 and resp.json()["code"] == "join_code_unknown"
 
 
 async def test_reject_and_ask_again_after_three_minutes(
     maker: async_sessionmaker[AsyncSession], ctx: Ctx
 ) -> None:
+    """Reject a guest, who may ask again after three minutes.
+
+    The same device keeps the same row, so the new request is the old one again.
+    """
     s = await seed(maker)
     code = await code_of(maker, s.meeting_id)
     with TestClient(ctx.app) as lead, guest_client(ctx.app) as phone:
@@ -419,7 +427,6 @@ async def test_reject_and_ask_again_after_three_minutes(
         later = join(phone, code, "Jana R.")
         assert later.status_code == 200, later.text
         assert later.json()["status"] == "pending"
-        # Same device, same row: the request is the old one again.
         assert later.json()["guestId"] == g["id"]
     [row] = await guests(maker, s.meeting_id)
     assert row.display_name == "Jana R." and row.decided_at is None
@@ -443,6 +450,12 @@ async def test_second_request_of_a_device_replaces_the_first(
 async def test_remove_rename_admit_all_and_leave(
     maker: async_sessionmaker[AsyncSession], ctx: Ctx
 ) -> None:
+    """Remove, rename, admit all and leave.
+
+    The guest can change the name only while waiting. Leaving pseudonymizes at once and
+    clears the cookie. A removed device asks again only after 3 minutes, then as a new
+    request.
+    """
     s = await seed(maker)
     code = await code_of(maker, s.meeting_id)
     with TestClient(ctx.app) as lead, guest_client(ctx.app) as a, guest_client(ctx.app) as b:
@@ -458,14 +471,12 @@ async def test_remove_rename_admit_all_and_leave(
             json={"displayName": "Anna Ahrens"},
         )
         assert renamed.json()["displayName"] == "Anna Ahrens"
-        # The guest can change the name only while waiting.
         late = a.patch(f"/api/public/meetings/{code}/me", json={"displayName": "Nope Nope"})
         assert late.status_code == 409 and late.json()["code"] == "guest_not_pending"
         removed = lead.post(f"/api/meetings/{s.meeting_id}/guests/{anna['id']}/remove")
         assert removed.json()["status"] == "removed"
         again = lead.post(f"/api/meetings/{s.meeting_id}/guests/{anna['id']}/remove")
         assert again.json()["code"] == "guest_not_admitted"
-        # Leaving pseudonymizes at once and clears the cookie.
         left = b.delete(f"/api/public/meetings/{code}/me")
         assert left.status_code == 204
         assert "mg_token=" in left.headers["set-cookie"]
@@ -477,7 +488,6 @@ async def test_remove_rename_admit_all_and_leave(
             json={"displayName": "Bert"},
         )
         assert gone.json()["code"] == "guest_pseudonymized"
-        # A removed device asks again only after 3 minutes, then as a new request.
         assert join(a, code).json()["code"] == "retry_later"
     names = " ".join(str(e.data) for e in await audits(maker))
     assert "Anna" not in names and "Bert" not in names
@@ -485,13 +495,17 @@ async def test_remove_rename_admit_all_and_leave(
     assert {"guest_admit_all", "guest_renamed", "guest_removed"} <= set(actions)
 
 
-# -- votes with guests ------------------------------------------------------------------
-
-
 async def test_guest_votes_without_quorum_and_late_admission(
     maker: async_sessionmaker[AsyncSession], ctx: Ctx
 ) -> None:
-    # A quorum of 100 % of 2 members: a members-only vote without ballots cannot close.
+    """Let guests vote without a quorum, also after a late admission.
+
+    The quorum is 100 % of 2 members, so a members-only vote without ballots cannot close.
+    The vote with guests counts 2 present members and 1 guest. A guest admitted while the
+    vote runs votes too. Without a quorum the vote closes with 2 guest ballots although no
+    member voted. A members-only vote keeps the quorum and refuses the close without
+    ballots.
+    """
     s = await seed(maker, quorum_percent=100)
     code = await code_of(maker, s.meeting_id)
     with TestClient(ctx.app) as lead, guest_client(ctx.app) as a, guest_client(ctx.app) as b:
@@ -500,7 +514,6 @@ async def test_guest_votes_without_quorum_and_late_admission(
         admit_one(lead, s, ga["id"])
         vote = open_vote(lead, s, s.public_item, question="Zuschuss?")
         assert vote["guestsVote"] is True and vote["quorum"] is None
-        # 2 present members + 1 guest.
         assert vote["present"] == 3 and vote["presentGuests"] == 1
         detail = lead.get(f"/api/votes/{vote['id']}").json()
         assert detail["guestsVote"] is True and detail["config"]["guestsVote"] is True
@@ -514,7 +527,6 @@ async def test_guest_votes_without_quorum_and_late_admission(
         assert dup.status_code == 409 and dup.json()["code"] == "already_voted"
         bad = a.post(f"/api/public/meetings/{code}/votes/{vote['id']}/ballot", json={"choice": "x"})
         assert bad.status_code == 422
-        # Admitted while the vote runs: votes too.
         assert join(b, code, "Bert B").status_code == 200
         pending = b.post(
             f"/api/public/meetings/{code}/votes/{vote['id']}/ballot", json={"choice": "no"}
@@ -543,13 +555,11 @@ async def test_guest_votes_without_quorum_and_late_admission(
             "answers": None,
         }
         assert me["view"]["votes"][0]["canCast"] is False
-        # No quorum: the vote closes with 2 guest ballots although no member voted.
         closed = lead.post(f"/api/votes/{vote['id']}/close")
         assert closed.status_code == 200, closed.text
         assert closed.json()["result"] == "passed"
         assert closed.json()["tally"]["presentMembers"] == 2
         assert closed.json()["tally"]["presentGuests"] == 2
-        # A members-only vote keeps the quorum and refuses the close without ballots.
         members_only = open_vote(lead, s, s.secret_item, guestsVote=False)
         assert members_only["guestsVote"] is False and members_only["quorum"] is not None
         refused = lead.post(f"/api/votes/{members_only['id']}/close")
@@ -612,6 +622,12 @@ async def test_secret_guest_ballot_keeps_identity_apart(
 async def test_non_public_item_and_watch_mode(
     maker: async_sessionmaker[AsyncSession], ctx: Ctx
 ) -> None:
+    """Hide a non-public item from the guests and apply the watch mode.
+
+    The guest never sees the vote of a non-public item and cannot vote in it. The switch
+    from vote to watch is blocked while a vote with guests is open. The item of a guest vote
+    cannot become non-public.
+    """
     s = await seed(maker)
     code = await code_of(maker, s.meeting_id)
     with TestClient(ctx.app) as lead, guest_client(ctx.app) as a:
@@ -625,7 +641,6 @@ async def test_non_public_item_and_watch_mode(
         assert refused.status_code == 422 and refused.json()["code"] == "guests_vote_non_public"
         np_vote = open_vote(lead, s, s.np_item)
         assert np_vote["guestsVote"] is False
-        # The guest never sees the vote of a non-public item and cannot vote in it.
         me = a.get(f"/api/public/meetings/{code}/me").json()
         assert me["view"]["votes"] == []
         hidden = a.post(
@@ -634,10 +649,8 @@ async def test_non_public_item_and_watch_mode(
         assert hidden.status_code == 404
         assert lead.post(f"/api/votes/{np_vote['id']}/cancel").status_code == 200
         guest_vote = open_vote(lead, s, s.public_item)
-        # vote -> watch is blocked while a vote with guests is open.
         blocked = lead.patch(f"/api/meetings/{s.meeting_id}", json={"guestsMode": "watch"})
         assert blocked.status_code == 409 and blocked.json()["code"] == "guest_vote_open"
-        # The item of a guest vote cannot become non-public.
         np = lead.patch(
             f"/api/meetings/{s.meeting_id}/agenda/{s.public_item}", json={"nonPublic": True}
         )
@@ -670,6 +683,10 @@ async def test_non_public_item_and_watch_mode(
 async def test_switch_off_voids_requests_and_ends_guests(
     maker: async_sessionmaker[AsyncSession], ctx: Ctx
 ) -> None:
+    """Void the requests and end the guests on the switch-off.
+
+    The cast ballot stays counted.
+    """
     s = await seed(maker)
     code = await code_of(maker, s.meeting_id)
     with TestClient(ctx.app) as lead, guest_client(ctx.app) as a, guest_client(ctx.app) as b:
@@ -688,7 +705,6 @@ async def test_switch_off_voids_requests_and_ends_guests(
         assert off.status_code == 200, off.text
         assert off.json()["admittedGuests"] == 0 and off.json()["pendingGuests"] == 0
         assert a.get(f"/api/public/meetings/{code}/me").json()["code"] == "meeting_not_public"
-        # The cast ballot stays counted.
         assert lead.get(f"/api/votes/{vote['id']}").json()["tally"]["voted"] == 1
     rows = await guests(maker, s.meeting_id)
     assert [(r.display_name, r.status) for r in rows] == [("Anna A", "removed")]
@@ -697,6 +713,10 @@ async def test_switch_off_voids_requests_and_ends_guests(
 async def test_rotate_voids_requests_and_keeps_admitted_guests(
     maker: async_sessionmaker[AsyncSession], ctx: Ctx
 ) -> None:
+    """Void the requests on a rotation and keep the admitted guests.
+
+    The admitted guest keeps working with the old link.
+    """
     s = await seed(maker)
     code = await code_of(maker, s.meeting_id)
     with TestClient(ctx.app) as lead, guest_client(ctx.app) as a, guest_client(ctx.app) as b:
@@ -708,7 +728,6 @@ async def test_rotate_voids_requests_and_keeps_admitted_guests(
         assert link["joinCode"] != code
         assert b.get(f"/api/public/meetings/{code}").json()["code"] == "join_code_unknown"
         assert b.get(f"/api/public/meetings/{code}/me").status_code == 404
-        # The admitted guest keeps working with the old link.
         assert a.get(f"/api/public/meetings/{code}/me").json()["status"] == "admitted"
     rows = await guests(maker, s.meeting_id)
     assert [r.display_name for r in rows] == ["Anna A"]
@@ -720,6 +739,11 @@ async def test_rotate_voids_requests_and_keeps_admitted_guests(
 async def test_close_purges_requests_and_finalize_pseudonymizes(
     maker: async_sessionmaker[AsyncSession], ctx: Ctx
 ) -> None:
+    """Purge the requests on the close and pseudonymize on the finalization.
+
+    The closed meeting refuses a join, and the token no longer works. The close
+    pseudonymizes at the latest; the count stays.
+    """
     s = await seed(maker)
     code = await code_of(maker, s.meeting_id)
     with (
@@ -738,12 +762,10 @@ async def test_close_purges_requests_and_finalize_pseudonymizes(
         assert c.delete(f"/api/public/meetings/{code}/me").status_code == 204
         closed = lead.patch(f"/api/meetings/{s.meeting_id}", json={"status": "closed"})
         assert closed.status_code == 200, closed.text
-        # The closed meeting refuses a join and the token no longer works.
         assert join(b, code).json()["code"] == "join_code_unknown"
         assert b.get(f"/api/public/meetings/{code}").status_code == 404
         assert a.get(f"/api/public/meetings/{code}/me").status_code == 404
     rows = await guests(maker, s.meeting_id)
-    # The close pseudonymizes at the latest (ruling 2026-10-06); the count stays.
     assert [(r.display_name, r.status) for r in rows] == [(None, "admitted")]
     assert rows[0].token_hash is None
     async with maker() as session:
@@ -758,6 +780,10 @@ async def test_close_purges_requests_and_finalize_pseudonymizes(
 async def test_lead_websocket_gets_guest_events_and_members_do_not(
     maker: async_sessionmaker[AsyncSession], ctx: Ctx
 ) -> None:
+    """Send the guest events to the lead socket and not to the members.
+
+    A plain member gets no name event before the counts and no code.
+    """
     s = await seed(maker)
     code = await code_of(maker, s.meeting_id)
     with TestClient(ctx.app) as client, guest_client(ctx.app) as phone:
@@ -773,13 +799,17 @@ async def test_lead_websocket_gets_guest_events_and_members_do_not(
             _drain_until(ws, "viewers")
             assert join(phone, code, "Jana R").status_code == 200
             counts = _drain_until(ws, "guest_counts")
-            # No name event before the counts, and no code for a plain member.
             assert counts["joinCode"] is None and counts["pendingGuests"] == 0
 
 
 async def test_guest_websocket_filters_names_and_non_public_votes(
     maker: async_sessionmaker[AsyncSession], ctx: Ctx
 ) -> None:
+    """Filter the names and the non-public votes on the guest socket.
+
+    Another request reaches the lead, never this guest. The vote of the non-public item
+    never arrives. A missing or unknown token closes the handshake.
+    """
     s = await seed(maker)
     code = await code_of(maker, s.meeting_id)
     with (
@@ -798,7 +828,6 @@ async def test_guest_websocket_filters_names_and_non_public_votes(
                 "number": 1,
                 "reason": None,
             }
-            # Another request reaches the lead, never this guest.
             assert join(other, code, "Bert Other").status_code == 200
             admit_one(lead, s, g["id"])
             seen: list[dict[str, Any]] = []
@@ -807,12 +836,10 @@ async def test_guest_websocket_filters_names_and_non_public_votes(
             np_vote = open_vote(lead, s, s.np_item)
             public_vote = open_vote(lead, s, s.public_item)
             opened = _drain_until(ws, "vote_opened", seen=seen)
-            # The vote of the non-public item never arrives.
             assert opened["voteId"] == public_vote["id"]
             assert all(m.get("voteId") != np_vote["id"] for m in seen)
             assert all("Bert" not in str(m) for m in seen)
             assert all(m["type"] != "viewers" for m in seen)
-        # A missing or unknown token closes the handshake.
         with (
             pytest.raises(WebSocketDisconnect),
             other.websocket_connect("/api/public/meetings/ZZZZZZ/ws") as ws2,
@@ -832,14 +859,16 @@ def _drain_until(
     raise AssertionError(f"no {kind} event")
 
 
-# -- abuse protection -----------------------------------------------------------------
-
-
 async def test_altcha_csrf_and_rate_limits(
     maker: async_sessionmaker[AsyncSession],
     migrated: tuple[str, str],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Check ALTCHA, CSRF and the rate limits.
+
+    With the device cookie a write needs the CSRF header (double submit). The join limit per
+    IP is 2 per hour in this test.
+    """
     s = await seed(maker)
     code = await code_of(maker, s.meeting_id)
     c = _make_app(
@@ -866,7 +895,6 @@ async def test_altcha_csrf_and_rate_limits(
             json={"displayName": "Jo Do", "altcha": solution()},
         )
         assert ok.status_code == 200, ok.text
-        # With the device cookie a write needs the CSRF header (double submit).
         no_header = phone.patch(f"/api/public/meetings/{code}/me", json={"displayName": "Jo Doe"})
         assert no_header.status_code == 403 and no_header.json()["code"] == "csrf_failed"
         token = phone.cookies.get("XSRF-TOKEN")
@@ -877,7 +905,6 @@ async def test_altcha_csrf_and_rate_limits(
             headers={"X-XSRF-TOKEN": token},
         )
         assert with_header.status_code == 200, with_header.text
-        # The join limit per IP (2 per hour in this test).
         limited = phone.post(
             f"/api/public/meetings/join/{code}",
             json={"displayName": "Jo Do", "altcha": solution()},

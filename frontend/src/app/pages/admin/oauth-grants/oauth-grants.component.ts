@@ -23,16 +23,18 @@ import { AdminApiService } from '../admin-api.service';
 import type { AdminPrincipal, OAuthGrantAdmin } from '../admin.models';
 import { personLabel } from '@shared/person-label.util';
 
-/* A token usually carries every scope. Showing all of them wrapped each row over three
-   lines and set the height of the whole table, so the rest are counted instead. */
+/**
+ * The most scope tags per row. A token usually carries every scope, and all of them would
+ * wrap each row over three lines and set the height of the whole table, so the rest are
+ * counted instead.
+ */
 const MAX_VISIBLE_SCOPES = 3;
 
 /** Rows per page. The backend caps `limit` at 200 and defaults to 50. */
 const PAGE_SIZE = 25;
 
 /**
- * Agent access (OAuth grants) of EVERY principal, with a kill switch (boards
- * Admin-Agenten-Tokens, Admin-Agenten-Tokens-Dialog).
+ * Agent access (OAuth grants) of EVERY principal, with a kill switch.
  *
  * `/account/grants` is the self-service twin: it shows the grants of the caller only.
  * A leaked or compromised token of somebody else can therefore be killed here and
@@ -122,17 +124,17 @@ export class AdminOAuthGrantsComponent {
     }),
   );
 
+  /**
+   * Loads the grants and the persons of the owner filter. A failed person load is ignored,
+   * because the owner filter is optional and the list itself still works.
+   */
   constructor() {
     this.load();
     this.api.listPrincipals().subscribe({
       next: (list) => this.principals.set(list),
-      error: () => {
-        /* The owner filter is optional; the list itself still works. */
-      },
+      error: () => {},
     });
   }
-
-  // --- reading -------------------------------------------------------------
 
   load(): void {
     this.loading.set(true);
@@ -145,7 +147,6 @@ export class AdminOAuthGrantsComponent {
       })
       .subscribe({
         next: (page) => {
-          // The last row of the last page went away (a revoke): step back one page.
           if (!page.items.length && this.offset() > 0) {
             this.offset.update((o) => Math.max(0, o - PAGE_SIZE));
             this.load();
@@ -181,8 +182,6 @@ export class AdminOAuthGrantsComponent {
     this.load();
   }
 
-  // --- rendering -----------------------------------------------------------
-
   /** Owner name, else the localized placeholder. NEVER the id. */
   ownerName(grant: OAuthGrantAdmin): string {
     return grant.principalName ?? this.i18n.translate('admin.oauthGrants.unknownOwner');
@@ -215,12 +214,14 @@ export class AdminOAuthGrantsComponent {
     return this.scopes(grant).slice(MAX_VISIBLE_SCOPES);
   }
 
-  // --- revoke --------------------------------------------------------------
-
   askRevoke(grant: OAuthGrantAdmin): void {
     this.confirmRevoke.set(grant);
   }
 
+  /**
+   * A 404 means the grant died between the list and the click. That is the wanted end state, so the
+   * page reports it and refreshes instead of failing.
+   */
   doRevoke(): void {
     const grant = this.confirmRevoke();
     if (!grant || this.revoking()) return;
@@ -228,8 +229,6 @@ export class AdminOAuthGrantsComponent {
     this.api.revokeOAuthGrant(grant.id).subscribe({
       next: () => this.afterRevoke('admin.oauthGrants.revoked'),
       error: (err: unknown) => {
-        // 404 = the grant died between the list and the click. That is the wanted
-        // end state, so the page reports it and refreshes instead of failing.
         if (errorStatus(err) === 404) {
           this.afterRevoke('admin.oauthGrants.alreadyGone');
           return;

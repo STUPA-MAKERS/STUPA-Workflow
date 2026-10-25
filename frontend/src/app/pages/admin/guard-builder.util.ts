@@ -70,6 +70,8 @@ function children(op: string, value: unknown): Guard[] {
  * the correct shape. Automatic transitions pass `allowActorOps=false`. That
  * forbids `roleIs` and `isInCommittee`. An empty or `null` guard sets no gate and
  * passes.
+ *
+ * These operators need a non-empty value, because the server rejects an empty one.
  */
 export function validateGuard(guard: Guard | null | undefined, allowActorOps = true): void {
   if (!guard) return;
@@ -108,7 +110,6 @@ export function validateGuard(guard: Guard | null | undefined, allowActorOps = t
     }
     return;
   }
-  // These operators need a non-empty value. The server rejects an empty one.
   if (
     op === 'roleIs' ||
     op === 'isInCommittee' ||
@@ -157,7 +158,6 @@ export function validateAction(action: ActionDef | null | undefined): void {
   } else if (type === 'notify') {
     validateRecipients(action['recipients']);
   } else if (type === 'addToNextSession') {
-    // The gremium is optional: without it the action takes the gremium of the vote.
     if ('gremiumId' in action && !isNonEmptyString(action['gremiumId'])) {
       throw new GuardError('admin.flow.err.actionGremium');
     }

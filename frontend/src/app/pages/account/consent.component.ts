@@ -17,13 +17,13 @@ import {
 import { scopeDesc, scopeLabel } from './scope-labels';
 
 /**
- * OAuth consent page (board Konto-OAuth-Einwilligung), step two of the MCP login.
+ * OAuth consent page, step two of the MCP login.
  *
- * The page names the client (`clientId`) and lists EVERY scope that the client asks for,
- * with its label and description. A scope the person holds starts ticked. A scope the
- * person does not hold starts unticked and says so: the agent does not get it. A ticked
- * box thus never promises a right the agent does not get. The lifetimes come from the server, "never" included
- * (a token that only a revoke ends), the default one starts chosen.
+ * The page names the client (`clientId`) and lists EVERY scope that the client asks for, with its
+ * label and description. A scope the person holds starts ticked. A scope the person does not hold
+ * starts unticked and says so: the agent does not get it. A ticked box thus never promises a right
+ * the agent does not get. The lifetimes come from the server, "never" included (a token that only a
+ * revoke ends), the default one starts chosen.
  *
  * Without `mcp.use` (`canUseMcp` false) the page shows the error line instead of the
  * choices, and "Erlauben" stays disabled; "Ablehnen" still reports the denial to the
@@ -121,12 +121,12 @@ export class OAuthConsentComponent {
     this.submit(false, []);
   }
 
+  /** It goes back to the local loopback callback of the MCP client; the URL can carry error=…. */
   private submit(approve: boolean, scopes: string[]): void {
     this.submitting.set(true);
     this.error.set(null);
     this.api.submitConsent({ approve, scopes, lifetime: this.lifetime() }).subscribe({
       next: (r) => {
-        // Go back to the local loopback callback of the MCP client. The URL can carry error=…
         this.location.assign(r.redirect);
       },
       error: () => {

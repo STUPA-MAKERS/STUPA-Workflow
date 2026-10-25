@@ -58,6 +58,11 @@ def _personal(client: TestClient) -> str:
 async def test_pings_reach_the_readable_boards_only(
     api: Api, maker: async_sessionmaker[AsyncSession]
 ) -> None:
+    """Send the pings of the readable boards only.
+
+    A write on the unreadable board never reaches this socket, while a write on the readable
+    one does. A read changes nothing and sends nothing, so the next ping is the next write.
+    """
     gid, gboard = await add_gremium(maker, "StuPa")
     _hidden_gid, hidden = await add_gremium(maker, "AStA")
     me, me_id = await add_person(maker, "Mia")
@@ -67,7 +72,6 @@ async def test_pings_reach_the_readable_boards_only(
     with TestClient(api.app) as client, client.websocket_connect("/api/ws/todos") as ws:
         ws.send_json({"type": "subscribe", "boardIds": [board, str(hidden), str(uuid.uuid4())]})
         assert ws.receive_json() == {"type": "subscribed", "boardIds": [board]}
-        # A write on the unreadable board would never reach this socket; the readable one does.
         card = _ok(client.post("/api/todos/cards", json={"boardId": board, "title": "Plakat"}), 201)
         ping = {"type": "card", "boardId": board, "cardId": card["id"]}
         assert ws.receive_json() == ping
@@ -81,7 +85,6 @@ async def test_pings_reach_the_readable_boards_only(
         _ok(client.delete(f"/api/todos/cards/{card['id']}"), 204)
         assert ws.receive_json() == {**ping, "type": "card_removed"}
         assert client.get(f"/api/todos/cards/{card['id']}/tile").status_code == 404
-        # A read changes nothing and sends nothing; the next ping is the next write.
         _ok(client.get(f"/api/todos/boards/{board}"))
         _ok(client.post(f"/api/todos/boards/{board}/columns", json={"name": "Später"}), 201)
         assert ws.receive_json() == {"type": "board", "boardId": board}
@@ -115,6 +118,11 @@ async def test_a_transfer_pings_both_boards(
 async def test_every_subscribe_resolves_the_session_again(
     api: Api, maker: async_sessionmaker[AsyncSession]
 ) -> None:
+    """Resolve the session again at every subscribe.
+
+    When the admin role is gone, the next subscribe no longer keeps the board. When the
+    session is gone, the socket closes with 4401.
+    """
     _gid, gboard = await add_gremium(maker, "StuPa")
     admin, _admin_id = await add_person(maker, "Ada")
     current = _live(api, Principal(sub=admin.sub, roles=["admin"]))
@@ -122,11 +130,9 @@ async def test_every_subscribe_resolves_the_session_again(
     with TestClient(api.app) as client, client.websocket_connect("/api/ws/todos") as ws:
         ws.send_json({"type": "subscribe", "boardIds": [board]})
         assert ws.receive_json() == {"type": "subscribed", "boardIds": [board]}
-        # The admin role is gone: the next subscribe no longer keeps the board.
         current[0] = Principal(sub=admin.sub)
         ws.send_json({"type": "subscribe", "boardIds": [board]})
         assert ws.receive_json() == {"type": "subscribed", "boardIds": []}
-        # The session is gone: the socket closes with 4401.
         current[0] = None
         ws.send_json({"type": "subscribe", "boardIds": [board]})
         with pytest.raises(WebSocketDisconnect) as exc:

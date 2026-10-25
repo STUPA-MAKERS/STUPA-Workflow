@@ -55,11 +55,14 @@ describe('FormlyInputType (rendered branches)', () => {
   });
 
   it('renders the datepicker branch for date fields', async () => {
-    await renderField({
-      key: 'd',
-      type: 'input',
-      props: { label: 'Datum', type: 'date', min: '2020-01-01', max: '2030-12-31', required: true },
-    });
+    const props: Record<string, unknown> = {
+      label: 'Datum',
+      type: 'date',
+      min: '2020-01-01',
+      max: '2030-12-31',
+      required: true,
+    };
+    await renderField({ key: 'd', type: 'input', props });
     expect(document.querySelector('app-datepicker')).toBeTruthy();
     expect(screen.getByLabelText(/Datum/)).toBeInTheDocument();
   });

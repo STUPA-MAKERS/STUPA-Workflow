@@ -1,12 +1,12 @@
 """Integration: the OIDC callback commits the principal and the auth_session row.
 
-The test reproduces the T-10 bug. Without `await db.commit()` in the callback handler,
+Without `await db.commit()` in the callback handler,
 the DB rolls back the fresh principal and the `auth_session` row when the request
 session closes. A later `GET /auth/me` with the session cookie then returns 401 instead
 of 200.
 
 The test needs real Postgres (`gen_random_uuid`, jsonb groups) and an RS256-signed
-id_token (respx, as in T-10), with the endpoints served from a discovery document the
+id_token (respx), with the endpoints served from a discovery document the
 way authentik shapes it. It also needs the real ASGI request cycle through
 `get_session`, which **never** commits by itself. Only this setup shows the missing
 persistence in the router.
@@ -58,7 +58,7 @@ def _jwk() -> dict[str, object]:
 
 def _id_token(nonce: str) -> str:
     now = datetime.now(UTC)
-    return jwt.encode(  # type: ignore[arg-type]
+    return jwt.encode(
         {
             "sub": "user-cb-1",
             "aud": CLIENT_ID,
@@ -80,7 +80,9 @@ async def test_callback_persists_principal_then_me_returns_200(
 ) -> None:
     """The callback creates the principal and the session.
 
-    A `/auth/me` call with the cookie then returns 200, not 401.
+    A `/auth/me` call with the cookie then returns 200. Without the commit in the
+    callback, it returns 401. The test does not use http://testserver, because the
+    client would not send a Secure cookie back there.
     """
     _, async_url = migrated
     settings = load_settings(
@@ -91,7 +93,7 @@ async def test_callback_persists_principal_then_me_returns_200(
         oidc_client_id=CLIENT_ID,
         oidc_client_secret="client-secret-01234",
         oidc_redirect_url="https://antrag.example/api/auth/callback",
-        cookie_secure=False,  # http://testserver would not send a Secure cookie back
+        cookie_secure=False,
     )
     oidc._jwks_cache.clear()
     oidc._discovery_cache.clear()
@@ -124,7 +126,7 @@ async def test_callback_persists_principal_then_me_returns_200(
                 )
             )
             mock.get(CERTS).mock(return_value=httpx.Response(200, json={"keys": [_jwk()]}))
-            mock.route(host="testserver").pass_through()  # pass ASGI requests through
+            mock.route(host="testserver").pass_through()
             async with httpx.AsyncClient(
                 transport=transport,
                 base_url="http://testserver",
@@ -140,7 +142,7 @@ async def test_callback_persists_principal_then_me_returns_200(
     finally:
         await engine.dispose()
 
-    assert me.status_code == 200, me.text  # without the commit in the callback: 401
+    assert me.status_code == 200, me.text
     body = me.json()
     assert body["sub"] == "user-cb-1"
     assert body["email"] == "cb@x.de"

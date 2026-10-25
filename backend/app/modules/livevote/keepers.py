@@ -1,14 +1,14 @@
-"""Read helpers of the protocol keeper (Z3, O20).
+"""Read helpers of the protocol keeper.
 
 The module holds the queries that more than one part of the meeting module needs:
 
 * `member_permissions` gives the gremium-role permissions of each current member.
 * `keeper_principal_ids` gives the members of a gremium who can keep the minutes.
-  O20: the keeper needs the gremium permission `protocol.write`.
+  The keeper needs the gremium permission `protocol.write`.
 * `agenda_positions` gives the 1-based number of each agenda item in the agenda
   order.
 * `keeper_summaries` gives the periods and the planned handover of meetings, as
-  `MeetingOut` shows them (A13).
+  `MeetingOut` shows them.
 """
 
 from __future__ import annotations
@@ -26,13 +26,13 @@ from app.modules.livevote.agenda_service import agenda_order
 from app.modules.livevote.models import MeetingAgendaItem, ProtocolKeeperPeriod
 from app.modules.livevote.schemas import KeeperPeriodOut
 
-# The gremium permission that a protocol keeper needs (O20).
+#: The gremium permission that a protocol keeper needs.
 KEEPER_PERMISSION = "protocol.write"
 
-# The gremium permission that gives a member the own vote (the cast gate of voting).
+#: The gremium permission that gives a member the own vote (the cast gate of voting).
 VOTE_PERMISSION = "vote.cast"
 
-# Per meeting: the running and ended periods in time order, and the planned one.
+#: Per meeting: the running and ended periods in time order, and the planned one.
 KeeperSummary = tuple[list[KeeperPeriodOut], KeeperPeriodOut | None]
 
 
@@ -51,8 +51,7 @@ async def member_permissions(
             .where(
                 GremiumMembership.gremium_id == gremium_id,
                 (GremiumMembership.valid_from.is_(None)) | (GremiumMembership.valid_from <= now),
-                (GremiumMembership.valid_until.is_(None))
-                | (GremiumMembership.valid_until > now),
+                (GremiumMembership.valid_until.is_(None)) | (GremiumMembership.valid_until > now),
             )
         )
     ).all()
@@ -133,7 +132,7 @@ async def principal_names(session: AsyncSession, ids: set[UUID]) -> dict[UUID, s
 async def keeper_summaries(
     session: AsyncSession, meeting_ids: Sequence[UUID]
 ) -> dict[UUID, KeeperSummary]:
-    """Return the periods and the planned handover of each meeting (A13).
+    """Return the periods and the planned handover of each meeting.
 
     Three batched queries at most, for any number of meetings: the periods, the
     names, and the agenda positions when a period refers to an agenda item.
@@ -147,9 +146,7 @@ async def keeper_summaries(
         p.from_agenda_item_id is not None or p.to_agenda_item_id is not None for p in periods
     )
     positions = (
-        await agenda_positions(session, list({p.meeting_id for p in periods}))
-        if referenced
-        else {}
+        await agenda_positions(session, list({p.meeting_id for p in periods})) if referenced else {}
     )
     for p in periods:
         row = KeeperPeriodOut(

@@ -1,3 +1,4 @@
+import { linkify } from '@shared/markdown/linkify';
 import type { ChatMessage } from './chat.models';
 import {
   appendOnce,
@@ -5,7 +6,6 @@ import {
   chatFileUrl,
   dayKey,
   isPending,
-  linkify,
   newCount,
   toChatAttachments,
   withScanStates,
@@ -118,6 +118,7 @@ describe('chat util', () => {
     expect(kinds(items)).toEqual(['day', 'aHT', 'event', 'bHT']);
   });
 
+  /** When nothing is new there is no separator. */
   it('puts "N neue" before the first new message of another person', () => {
     const list = [
       msg('a', '2026-10-12T10:00:00'),
@@ -128,7 +129,6 @@ describe('chat util', () => {
     const items = buildItems(list, [], opts({ markerAt: at('2026-10-12T10:10:00') }));
     expect(kinds(items)).toEqual(['day', 'aHT', 'ownHT', 'new', 'bH', 'cT']);
     expect(items[3]).toEqual({ kind: 'new', key: 'new', count: 2 });
-    // Nothing is new: no separator.
     expect(kinds(buildItems(list, [], opts({ markerAt: at('2026-10-12T11:00:00') })))).not.toContain('new');
   });
 
@@ -197,7 +197,7 @@ describe('withScanStates and appendOnce', () => {
   });
 
   it('takes only the scan states of a read, keeps every message on screen and the same objects without a change', () => {
-    const plain = { id: 'm0', body: 'ohne' };
+    const plain: { id: string; body: string; attachments?: ReturnType<typeof file>[] } = { id: 'm0', body: 'ohne' };
     const same = { id: 'm1', body: 'a', attachments: [file('f1', 'clean')] };
     const scanning = { id: 'm2', body: 'neu', attachments: [file('f2', 'scanning'), file('f3', 'scanning')] };
     const delivered = { id: 'm3', body: 'nach dem Lesen', attachments: [file('f4', 'scanning')] };

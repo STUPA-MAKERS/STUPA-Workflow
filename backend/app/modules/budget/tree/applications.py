@@ -104,22 +104,28 @@ class AssignmentOps(BudgetTreeServiceBase):
         An explicit ``fiscalYearId`` must belong to the top-level budget. Without
         one, the method takes the single open active fiscal year.
 
+        The cost center cannot change during a running vote, because the deciding
+        Gremium of the vote came from this cost center (`application.vote_gremium_id`).
+        A move out of a closed year changes the figures of that year too, so the current
+        year must be open.
+
         Raises:
             ConflictError: `budget_locked_by_vote` (409) while the application sits in
                 a vote state whose Gremium comes from the cost center.
+                `fiscal_year_closed` (409) when the current or the new fiscal
+                year is closed.
             ValidationProblem: The fiscal year is ambiguous or missing. The
                 method fails with a 422 instead of leaving ``fiscal_year_id``
                 NULL. This mirrors the behavior of bookings.
         """
         app = await self._get_application(application_id, for_update=True)
-        # The deciding Gremium of a running vote came from this cost center. A change
-        # now would contradict the snapshot (`application.vote_gremium_id`).
         if await in_budget_vote_state(self.session, app):
             raise ConflictError(
                 "The application is in a vote whose Gremium comes from the cost center. "
                 "Change the cost center after the vote.",
                 code="budget_locked_by_vote",
             )
+        await self._require_open_fiscal_year(app.fiscal_year_id)
         if payload.budget_id is None:
             app.budget_id = None
             app.fiscal_year_id = None
@@ -152,9 +158,13 @@ class AssignmentOps(BudgetTreeServiceBase):
     ) -> AssignBudgetOut:
         """Move an application to another fiscal year of its top-level budget.
 
+        Both years change their figures, so neither may be closed.
+
         Raises:
             ValidationProblem: The application has no budget assignment, or the
                 fiscal year belongs to another top-level budget.
+            ConflictError: `fiscal_year_closed` (409) when the current or the
+                new fiscal year is closed.
         """
         app = await self._get_application(application_id)
         if app.budget_id is None:
@@ -170,6 +180,8 @@ class AssignmentOps(BudgetTreeServiceBase):
                 "Fiscal year does not belong to this application's top-level budget.",
                 errors=[{"field": "fiscalYearId", "msg": "wrong top-level budget"}],
             )
+        await self._require_open_fiscal_year(app.fiscal_year_id)
+        self._refuse_closed(fy)
         app.fiscal_year_id = fy.id
         await self._audit(
             AuditAction.BUDGET_MOVE_FISCAL_YEAR,

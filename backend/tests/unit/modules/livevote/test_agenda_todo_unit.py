@@ -57,7 +57,7 @@ def _service(session: ScriptedSession, status: str = "live") -> tuple[AgendaServ
 
     service._meeting = _meeting  # type: ignore[method-assign]
     service._next_position = _next  # type: ignore[method-assign]
-    service._audit = _audit  # type: ignore[method-assign]
+    service._audit = _audit
     return service, audits
 
 
@@ -87,6 +87,10 @@ async def test_add_todo_in_tx_refuses_a_second_item_and_a_closed_meeting() -> No
 
 
 def test_the_route_adds_a_todo_item(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Add a to-do item through the route.
+
+    A card that got a link makes its board ping it after the commit.
+    """
     calls: list[Any] = []
     session = ScriptedSession()
 
@@ -96,7 +100,7 @@ def test_the_route_adds_a_todo_item(monkeypatch: pytest.MonkeyPatch) -> None:
                 id=MEETING,
                 gremiumId=GREMIUM,
                 title="GV",
-                status="live",  # type: ignore[arg-type]
+                status="live",
                 createdAt=datetime(2026, 6, 8, tzinfo=UTC),
                 canWrite=True,
             )
@@ -147,6 +151,5 @@ def test_the_route_adds_a_todo_item(monkeypatch: pytest.MonkeyPatch) -> None:
     assert calls[1][2] == {"todo_id": CARD, "title": "Plakat", "non_public": True, "actor": "p"}
     assert calls[2][0] == "link"
     assert session.committed == 1
-    # The card got a link: its board pings it after the commit.
     ping = {"type": "card", "boardId": str(BOARD), "cardId": str(CARD)}
     assert broker.sent == [(f"todo-board:{BOARD}", ping)]

@@ -18,7 +18,7 @@ import type {
   TransitionBranch,
   TransitionDef,
 } from '../admin.models';
-import { autoLayout, blankState, layoutEntities } from '../flow-graph.util';
+import { autoLayout, blankState } from '../flow-graph.util';
 import {
   compareSpecOf,
   defaultGuard,
@@ -27,14 +27,6 @@ import {
   recipientNeedsRef,
   recipientsOf,
 } from './flow-guard.util';
-import {
-  buildGroupById,
-  buildParentGroupId,
-  buildStateOwnerId,
-  computeEdgeEnds,
-  deepStateKeys,
-} from './flow-level.util';
-import type { EndRef, Point } from './flow-editor.models';
 
 
 /** Unique state key (`state`, `state2`, …). */
@@ -137,12 +129,10 @@ export function setStateTerminal(g: FlowGraph, key: string, on: boolean): FlowGr
   return patchState(g, key, { isTerminal: on });
 }
 
-/** Change the state kind. This resets the kind-specific config but keeps the deadline policy. */
+/** Change the state kind. This resets the kind-specific config. */
 export function setStateKind(g: FlowGraph, key: string, kind: string): FlowGraph {
   const k = (kind || 'normal') as StateKind;
-  const policy = g.states.find((s) => s.key === key)?.config?.deadlinePolicyKey;
-  const config: StateConfig = policy ? { deadlinePolicyKey: policy } : {};
-  return patchState(g, key, { kind: k === 'normal' ? null : k, config });
+  return patchState(g, key, { kind: k === 'normal' ? null : k, config: {} });
 }
 
 function patchConfig(g: FlowGraph, key: string, patch: Partial<StateConfig>): FlowGraph {
@@ -185,10 +175,6 @@ export function setStateGremiumSource(
   };
 }
 
-export function setStateDeadlinePolicy(g: FlowGraph, key: string, policyKey: string): FlowGraph {
-  return patchConfig(g, key, { deadlinePolicyKey: policyKey || undefined });
-}
-
 
 function patchTransition(
   g: FlowGraph,
@@ -226,7 +212,6 @@ export function setTransitionLabel(
 ): FlowGraph {
   return patchTransition(g, index, (t) => {
     const label = { ...(t.label ?? {}), [lang]: value };
-    // Drop empty languages. No language left means no label.
     const cleaned = Object.fromEntries(Object.entries(label).filter(([, v]) => v));
     return { ...t, label: Object.keys(cleaned).length ? cleaned : null };
   });
@@ -306,7 +291,6 @@ export function setCompare(
     const cur = compareSpecOf(t);
     const op = patch.op ?? cur.op;
     let value: unknown = patch.value ?? cur.value;
-    // The `in` operator expects a list. Split the comma-separated input.
     if (op === 'in' && typeof value === 'string') {
       value = value.split(',').map((s) => s.trim()).filter(Boolean);
     }
@@ -358,6 +342,10 @@ export function removeAction(g: FlowGraph, index: number, ai: number): FlowGraph
   }));
 }
 
+/**
+ * An empty value drops the key, so an optional parameter (`gremiumId` of addToNextSession,
+ * `parentId`) is absent, as the backend expects.
+ */
 export function setActionParam(
   g: FlowGraph,
   index: number,
@@ -365,8 +353,6 @@ export function setActionParam(
   key: string,
   value: string,
 ): FlowGraph {
-  // An empty value drops the key: an optional parameter (`gremiumId` of
-  // addToNextSession, `parentId`) is then absent, as the backend expects.
   return patchTransition(g, index, (t) => ({
     ...t,
     actions: (t.actions ?? []).map((a, k) => {
@@ -444,85 +430,6 @@ export function setRecipientRef(
     list.map((r, i) => (i === ri ? { ...r, ref } : r)),
   );
 }
-
-
-export function setStatePosition(g: FlowGraph, key: string, x: number, y: number): FlowGraph {
-  return {
-    ...g,
-    layout: {
-      ...(g.layout ?? {}),
-      positions: { ...(g.layout?.positions ?? {}), [key]: { x, y } },
-    },
-  };
-}
-
-/** Shift several states at once for a group drag. Clamps to non-negative coordinates. */
-export function moveStatesBy(g: FlowGraph, keys: string[], dx: number, dy: number): FlowGraph {
-  const positions = { ...(g.layout?.positions ?? {}) };
-  for (const k of keys) {
-    const cur = positions[k];
-    if (cur) {
-      positions[k] = {
-        x: Math.max(0, Math.round(cur.x + dx)),
-        y: Math.max(0, Math.round(cur.y + dy)),
-      };
-    }
-  }
-  return { ...g, layout: { ...(g.layout ?? {}), positions } };
-}
-
-/**
- * Auto-arrange the given drill-down level. Each sub-group acts as one node. The
- * function shifts the members of a sub-group as a block.
- */
-export function relayoutLevel(g: FlowGraph, ctx: string | null): FlowGraph {
-  const allGroups = g.layout?.groups ?? [];
-  const byId = buildGroupById(allGroups);
-  const parents = buildParentGroupId(allGroups);
-  const owner = buildStateOwnerId(allGroups);
-  const visible = g.states.filter((s) => (owner.get(s.key) ?? null) === ctx);
-  const childGroups = allGroups.filter((gr) => (parents.get(gr.id) ?? null) === ctx);
-  const ends = computeEdgeEnds(g, ctx, owner, parents);
-  const entId = (r: EndRef): string | null =>
-    r.type === 'state' ? `s:${r.key}` : r.type === 'group' ? `g:${r.id}` : null;
-  const initialKey = g.states.find((s) => s.isInitial)?.key;
-  const entities = [
-    ...visible.map((s) => ({ id: `s:${s.key}`, isInitial: !!s.isInitial })),
-    ...childGroups.map((gr) => ({
-      id: `g:${gr.id}`,
-      isInitial: initialKey ? deepStateKeys(byId, gr.id).includes(initialKey) : false,
-    })),
-  ];
-  const edges: Array<readonly [string, string]> = [];
-  for (const e of ends) {
-    if (!e) continue;
-    const a = entId(e.src);
-    const b = entId(e.dst);
-    if (a && b && a !== b) edges.push([a, b] as const);
-  }
-  const target = layoutEntities(entities, edges);
-  const positions: Record<string, Point> = { ...(g.layout?.positions ?? {}) };
-  for (const s of visible) {
-    const p = target[`s:${s.key}`];
-    if (p) positions[s.key] = p;
-  }
-  // Group as a block: shift the member bbox top-left onto the target position.
-  for (const grp of childGroups) {
-    const p = target[`g:${grp.id}`];
-    if (!p) continue;
-    const deep = deepStateKeys(byId, grp.id);
-    const pts = deep.map((k) => positions[k]).filter((q): q is Point => !!q);
-    if (!pts.length) continue;
-    const dx = p.x - Math.min(...pts.map((q) => q.x));
-    const dy = p.y - Math.min(...pts.map((q) => q.y));
-    for (const k of deep) {
-      const cur = positions[k];
-      if (cur) positions[k] = { x: cur.x + dx, y: cur.y + dy };
-    }
-  }
-  return { ...g, layout: { ...(g.layout ?? {}), positions } };
-}
-
 
 /** First free `grpN` id. */
 export function freshGroupId(groups: readonly FlowGroup[]): { id: string; n: number } {

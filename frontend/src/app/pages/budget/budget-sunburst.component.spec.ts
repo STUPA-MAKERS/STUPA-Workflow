@@ -1,5 +1,5 @@
 import { render } from '@testing-library/angular';
-import { BudgetSunburstComponent } from './budget-sunburst.component';
+import { BudgetSunburstComponent, type SunburstMetric } from './budget-sunburst.component';
 import type { BudgetAllocationView, BudgetTreeNode } from './budget-tree.api';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -50,7 +50,7 @@ async function setup(
   inputs: Partial<{
     root: BudgetTreeNode | null;
     fyId: string;
-    metric: string;
+    metric: SunburstMetric;
     colors: ReadonlyMap<string, string> | null;
   }> = {},
 ) {
@@ -88,16 +88,18 @@ describe('BudgetSunburstComponent', () => {
     expect(c.segments()).toEqual([]);
   });
 
+  /** The lookup asks for FY but the data sits on 'other', so the value is 0. */
   it('metricOf falls back to 0 when the fiscal year is not present', async () => {
     const root = node('root', { fiscalYearId: 'other', allocated: '500' });
     const { c } = await setup({ root, fyId: FY });
-    // The lookup asks for FY but the data sits on 'other', so the value is 0.
     expect(c.total()).toBe(0);
   });
 
+  /**
+   * The parent allocates 100 and the child 120, which is more than the parent. The own share clamps
+   * to 0, so the total is the child value 120.
+   */
   it('subtree adds own remainder plus children sums and clamps negative own to 0', async () => {
-    // Parent alloc 100, child alloc 120 (more than the parent). The own share clamps
-    // to 0, so the total is the child value 120.
     const child = node('c1', { fiscalYearId: FY, allocated: '120' });
     const root = node('root', { fiscalYearId: FY, allocated: '100' }, [child]);
     const { c } = await setup({ root });
@@ -126,6 +128,10 @@ describe('BudgetSunburstComponent', () => {
     expect(segs.map((s: { id: string }) => s.id)).toEqual(['r']);
   });
 
+  /**
+   * The deeper ring is dimmer. The grandchild has no colour of its own, so it inherits the branch
+   * colour of the child.
+   */
   it('lays out deeper rings with decreasing opacity and inherits the parent color', async () => {
     const grandchild = node('gc', { fiscalYearId: FY, allocated: '30' });
     const child = node('ch', { fiscalYearId: FY, allocated: '30' }, [grandchild]);
@@ -136,9 +142,7 @@ describe('BudgetSunburstComponent', () => {
     const gc = segs.find((s: { id: string }) => s.id === 'gc');
     expect(ch.depth).toBe(1);
     expect(gc.depth).toBe(2);
-    // Deeper ring is dimmer.
     expect(gc.opacity).toBeLessThan(ch.opacity);
-    // Grandchild has no own color → inherits the child's branch color.
     expect(gc.color).toBe(ch.color);
   });
 
@@ -192,28 +196,31 @@ describe('BudgetSunburstComponent', () => {
     expect(out).not.toMatch(/,\d\d/);
   });
 
+  /**
+   * The root has exactly one positive child that takes 100 %. childSpan is then 2π, which takes the
+   * full-circle annular branch, and the path closes two sub-paths (outer and inner).
+   */
   it('renders a full-circle annular ring when a single child takes the whole span', async () => {
-    // The root has exactly one positive child that takes 100%. childSpan is then 2π,
-    // which takes the full-circle annular branch.
     const only = node('only', { fiscalYearId: FY, allocated: '100' });
     const root = node('root', { fiscalYearId: FY, allocated: '100' }, [only]);
     const { c, container } = await setup({ root });
     const segs = c.segments();
     expect(segs.length).toBe(1);
-    // Full annular path closes two sub-paths (outer + inner).
     const d = container.querySelector('path.sb__seg')?.getAttribute('d') ?? segs[0].d;
     expect((d.match(/Z/g) ?? []).length).toBe(2);
   });
 
+  /**
+   * A big slice over 50 % of the ring sets the large-arc flag 1 in the outer arc command, and a
+   * small one under 50 % sets 0.
+   */
   it('renders a large-arc segment when a child spans more than half the ring', async () => {
     const big = node('big', { fiscalYearId: FY, allocated: '80' });
     const small = node('small', { fiscalYearId: FY, allocated: '20' });
     const root = node('root', { fiscalYearId: FY, allocated: '100' }, [big, small]);
     const { c } = await setup({ root });
     const segs = c.segments();
-    // big > 50% of the ring → large-arc flag 1 in the outer arc command.
     expect(segs[0].d).toMatch(/A [\d.]+ [\d.]+ 0 1 1/);
-    // small < 50% → large-arc flag 0.
     expect(segs[1].d).toMatch(/A [\d.]+ [\d.]+ 0 0 1/);
   });
 

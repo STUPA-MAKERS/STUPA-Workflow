@@ -77,11 +77,10 @@ def scope(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
         return set(state["manage"].get(perm, set()))
 
     monkeypatch.setattr(MeetingService, "meeting_read_scope", _meeting_scope)
-    monkeypatch.setattr(listing, "gremium_ids_for", _ids_for)
+    monkeypatch.setattr(listing, "held_gremium_ids", _ids_for)
     return state
 
 
-# ------------------------------------------------------------------ read scope
 async def test_scope_reader_of_applications_reads_every_standalone_vote(
     scope: dict[str, Any],
 ) -> None:
@@ -95,9 +94,9 @@ async def test_scope_reader_of_applications_reads_every_standalone_vote(
 async def test_scope_application_reader_does_not_read_gremium_polls(
     scope: dict[str, Any],
 ) -> None:
+    """An application reader reads the standalone application votes, never a Gremium poll."""
     reader = Principal(sub="r", permissions={"application.read"})
     sql = _sql(await listing.read_scope(fake_session(), reader))
-    # The standalone application votes, never a poll of a Gremium.
     assert "vote.kind != %(kind_1)s" in sql
 
 
@@ -138,14 +137,13 @@ async def test_scope_voter_and_manager_keys(scope: dict[str, Any]) -> None:
 
 
 async def test_scope_without_any_key_reads_no_standalone_vote(scope: dict[str, Any]) -> None:
+    """`or_(meeting, false())` folds to the meeting part alone."""
     clause = await listing.read_scope(fake_session(), Principal(sub="x"))
     sql = _sql(clause)
-    # `or_(meeting, false())` folds to the meeting part alone.
     assert "eligible_group IN" not in sql
     assert "vote.meeting_id IS NULL" not in sql
 
 
-# ------------------------------------------------------------------ search
 def test_search_clause_empty_matches_all() -> None:
     assert _sql(listing._search_clause(None)) == "true"
     assert _sql(listing._search_clause(" \x00 ")) == "true"
@@ -158,8 +156,12 @@ def test_search_clause_escapes_wildcards() -> None:
     assert "%50\\%\\_%" in compiled.params.values()
 
 
-# ------------------------------------------------------------------ list
 async def test_list_orders_decorates_and_reads_own_ballots(scope: dict[str, Any]) -> None:
+    """The list orders the votes, adds names and agenda numbers, and reads the own ballots.
+
+    The fake session serves the gremium names, the agenda numbers, the open ballots and
+    the secret markers.
+    """
     meeting_id, item_id = uuid4(), uuid4()
     live = _vote(meeting_id=meeting_id, agenda_item_id=item_id)
     secret = _vote(config=_config(secret=True), status="closed", result="passed")
@@ -170,10 +172,10 @@ async def test_list_orders_decorates_and_reads_own_ballots(scope: dict[str, Any]
             (secret, None, None),
             (legacy, None, None),
         ),
-        result((GID, "Studierendenparlament")),  # gremium names
-        result((item_id, 3), (uuid4(), 1)),  # agenda numbers
-        result((live.id, "yes")),  # open ballots
-        result(secret.id),  # secret markers
+        result((GID, "Studierendenparlament")),
+        result((item_id, 3), (uuid4(), 1)),
+        result((live.id, "yes")),
+        result(secret.id),
     )
     db.scalar_results = [3]
     principal = Principal(sub="v", groups={vote_group_key(GID)})
@@ -201,36 +203,38 @@ async def test_list_orders_decorates_and_reads_own_ballots(scope: dict[str, Any]
 
 
 async def test_list_empty_page_skips_decoration(scope: dict[str, Any]) -> None:
+    """An empty page runs only the row query, with no name, agenda or ballot query.
+
+    The default leaves out the drafts.
+    """
     db = fake_session(result())
     page = await listing.list_votes(db, Principal(sub="x"), limit=5, offset=10)
     assert page.items == []
     assert page.total == 0
     assert page.offset == 10
-    # Only the row query ran: no name, agenda or ballot query for an empty page.
     assert len(db.statements) == 1
-    # The default leaves out the drafts.
     sql = str(db.statements[0].compile(compile_kwargs={"literal_binds": True}))
     assert "vote.status IN ('open', 'closed', 'cancelled')" in sql
 
 
 async def test_list_without_gremium_or_agenda_skips_those_queries(scope: dict[str, Any]) -> None:
+    """Votes without gremium or agenda item read the rows, then only the secret markers."""
     legacy = _vote(eligible_group="free-key", config=_config(secret=True))
     db = fake_session(result((legacy, None, None)), result())
     db.scalar_results = [1]
     page = await listing.list_votes(db, Principal(sub="x"), limit=5, offset=0)
     assert page.items[0].my_ballot.cast is False
-    # Rows, then only the secret markers.
     assert len(db.statements) == 2
 
 
 async def test_list_plain_votes_skip_the_marker_query(scope: dict[str, Any]) -> None:
+    """Plain votes read the rows, the gremium names, then only the open ballots."""
     plain = _vote(status="closed", result="rejected")
     db = fake_session(result((plain, None, None)), result((GID, "StuPa")), result())
     db.scalar_results = [1]
     page = await listing.list_votes(db, Principal(sub="x"), limit=5, offset=0)
     assert page.items[0].my_ballot == MyBallot(cast=False)
     assert page.items[0].gremium_name == "StuPa"
-    # Rows, gremium names, then only the open ballots.
     assert len(db.statements) == 3
 
 
@@ -271,7 +275,6 @@ async def test_meeting_read_scope_all_and_scoped() -> None:
     assert await svc.meeting_read_scope(Principal(sub="m")) == ({GID}, {mid})
 
 
-# ------------------------------------------------------------------ router
 class _ListService:
     def __init__(self) -> None:
         self.kw: dict[str, Any] = {}

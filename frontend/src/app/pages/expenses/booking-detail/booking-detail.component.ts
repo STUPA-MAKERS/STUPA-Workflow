@@ -39,7 +39,7 @@ import { dayMonth } from '@shared/date-format';
 import { formatMoney } from '@shared/format-money';
 
 /**
- * The detail of a booking (boards Fin-Buchungen, Fin-Schmal-Buchung, Fin-Tel-Buchung):
+ * The detail of a booking:
  * "Buchung · HHJ 2026", the description, "Art · Kostenstelle · Betrag" and the sections
  * Zahlung, Details, Unterbuchungen, Verknüpft (application and invoice) and Kostenstelle.
  *
@@ -239,9 +239,8 @@ export class BookingDetailComponent {
     return signedEur(e.kind, e.amount, this.i18n.formatLocale());
   }
 
+  /** Only the date part counts, because a `createdAt` keeps the day the server wrote. */
   day(iso: string | null): string {
-    // Only the date part counts (a `createdAt` keeps the day the server wrote), as in the
-    // month groups.
     return dayMonth(iso?.slice(0, 10), this.i18n.formatLocale());
   }
 

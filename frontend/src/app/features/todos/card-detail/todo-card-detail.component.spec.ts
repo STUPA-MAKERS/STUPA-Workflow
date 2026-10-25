@@ -141,21 +141,24 @@ describe('TodoCardDetailComponent', () => {
     });
   });
 
+  /**
+   * The due line counts from today, so the test pins today to the day the fixture dates are written
+   * for. The title opens the sheet on the line of the actions; no line stands above it. Each part
+   * of the line wraps as a whole; the dot ends the first part. The thread has no heading of its
+   * own; its column carries the name. The checklist shows the open items and keeps the done ones
+   * behind the toggle. The drawer closes with the ×; the pane-only link to the board is absent.
+   */
   it('shows the card side by side: activity, fields, links, description and checklist', async () => {
     const { api, container, closed, cmp, detect } = await setup();
-    // The due line counts from today; pin today to the day the fixture dates were written for.
     cmp.today.set('2026-10-16');
     detect();
     expect(api.card).toHaveBeenCalledWith('k-1', { detail: true });
     expect(api.members).toHaveBeenCalledWith('b-1', { detail: true });
     expect(screen.getByRole('heading', { level: 2, name: 'Raum buchen' })).toBeInTheDocument();
-    // The title opens the sheet on the line of the actions; no line stands above it.
     expect(document.querySelector('app-sheet-bar .sheet-bar__title [appSheetBarTitle]')).not.toBeNull();
     expect(document.querySelector('.sheet-bar__kicker')).toBeNull();
-    // Each part of the line wraps as a whole; the dot ends the first part.
     const created = [...document.querySelectorAll('.cd__created .cd__seg')].map((e) => e.textContent);
     expect(created).toEqual(['Angelegt von Selin Yıldız\u00a0·', expect.stringMatching(/2026$/)]);
-    // The thread has no heading of its own; its column carries the name.
     expect(screen.queryByRole('heading', { name: 'Aktivität' })).toBeNull();
     expect(screen.getByRole('region', { name: 'Aktivität' })).toBeInTheDocument();
     expect(screen.getByText('Raum ist frei')).toBeInTheDocument();
@@ -164,27 +167,27 @@ describe('TodoCardDetailComponent', () => {
     const appLink = screen.getByRole('link', { name: 'Lerncafé' });
     expect(appLink).toHaveAttribute('href', '/applications/a-1');
     expect(screen.getByText('Raum')).toBeInTheDocument();
-    // The checklist shows the open items; the done ones behind the toggle.
     expect(screen.getByRole('checkbox', { name: 'Raum anfragen' })).toHaveAttribute('aria-checked', 'false');
     expect(screen.queryByRole('checkbox', { name: 'Termin klären' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: /1 erledigte Punkte zeigen/ }));
     expect(screen.getByRole('checkbox', { name: 'Termin klären' })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByText('1/2')).toBeInTheDocument();
     expect(container.querySelector('.cd__checkBar .bar__seg--filled')).toHaveStyle({ flexBasis: '50%' });
-    // The drawer closes with the ×; the pane-only link to the board is absent.
     expect(screen.queryByRole('link', { name: /Im Board öffnen/ })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Schließen' }));
     expect(closed).toHaveBeenCalled();
   });
 
+  /**
+   * Beside the list the pane is a sheet, and the bar bleeds into its padding. The link sits in the
+   * bar, so the menu does not repeat it.
+   */
   it('shows the board link in the pane and no close or copy button', async () => {
     const { container, cmp } = await setup({ mode: 'pane', split: true });
     expect(screen.getByRole('link', { name: /Im Board öffnen/ })).toHaveAttribute('href', '/todos/b-1?card=k-1');
     expect(screen.queryByRole('button', { name: 'Schließen' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Link kopieren' })).toBeNull();
-    // Beside the list the pane is a sheet: the bar bleeds into its padding.
     expect(container.querySelector('app-sheet-bar')).toHaveClass('sheet-bar--bleed');
-    // The link sits in the bar, so the menu does not repeat it.
     expect(cmp.menuSections()[0].items[0].id).toBe('rename');
   });
 
@@ -212,10 +215,10 @@ describe('TodoCardDetailComponent', () => {
     expect(readOnly.cmp.menuSections()).toEqual([]);
   });
 
+  /** An archived card of a writable board keeps the edit of an own comment. */
   it('offers no edit of an own comment on a board that the person only reads', async () => {
     const readOnly = await setup({ card: detail({ canWrite: false, comments: [COMMENT] }) });
     expect(readOnly.cmp.messages()[0]).toEqual(expect.objectContaining({ own: true, canEdit: false }));
-    // An archived card of a writable board keeps the edit of an own comment.
     readOnly.cmp.card.set(detail({ archivedAt: '2026-10-12T10:00:00Z', comments: [COMMENT] }));
     expect(readOnly.cmp.messages()[0].canEdit).toBe(true);
   });
@@ -238,6 +241,7 @@ describe('TodoCardDetailComponent', () => {
     expect(cmp.archivedLine()).toBeNull();
   });
 
+  /** A writable card keeps every field and section, so that it can be filled. */
   it('hides the empty fields and sections of an archived card', async () => {
     const empty = detail({
       archivedAt: '2026-10-12T10:00:00Z',
@@ -255,7 +259,6 @@ describe('TodoCardDetailComponent', () => {
     expect(terms()).toEqual(['Spalte', 'Zuständig']);
     expect(sections()).toEqual([]);
     expect(container.querySelector('.cd__col--chat')).toHaveClass('cd__col--readonly');
-    // A writable card keeps every field and section, so that it can be filled.
     cmp.card.set({ ...empty, archivedAt: null });
     detect();
     expect(terms()).toEqual(['Spalte', 'Zuständig', 'Fällig', 'Label']);
@@ -311,6 +314,9 @@ describe('TodoCardDetailComponent', () => {
     expect(cmp.card()?.title).toBe('Raum buchen');
   });
 
+  /**
+   * No context line stands above the title. The title opens the sheet on the line of the actions.
+   */
   it('draws the sheet in its loaded shape while the card loads, with a working close button', async () => {
     const { cmp, api, detect, closed, fixture } = await setup({ board: board() });
     api.card.mockReturnValueOnce(new Subject<TodoCardDetail>());
@@ -318,8 +324,6 @@ describe('TodoCardDetailComponent', () => {
     detect();
     expect(cmp.loading()).toBe(true);
     expect(screen.getByRole('status')).toHaveTextContent('Karte wird geladen');
-    // No context line above the title.
-    // The title opens the sheet on the line of the actions; no line stands above it.
     expect(document.querySelector('app-sheet-bar .sheet-bar__title [appSheetBarTitle]')).not.toBeNull();
     expect(document.querySelector('.sheet-bar__kicker')).toBeNull();
     expect(document.querySelectorAll('.cd__skelIcon')).toHaveLength(2);
@@ -337,11 +341,11 @@ describe('TodoCardDetailComponent', () => {
     expect(document.querySelector('.cd__chat .sk__composer')).toBeNull();
   });
 
+  /** A tile of a row of another board is not held by the board of the page. */
   it('counts no foreign columns while it loads a card of another board', async () => {
     const { cmp, api, detect, fixture } = await setup({ board: board({ id: 'b-0', name: 'Meine To-Dos' }) });
     const late = new Subject<TodoCardDetail>();
     api.card.mockReturnValueOnce(late);
-    // A tile of a row of another board: the board of the page does not hold it.
     fixture.componentRef.setInput('cardId', 'k-9');
     detect();
     expect(cmp.loading()).toBe(true);
@@ -351,6 +355,11 @@ describe('TodoCardDetailComponent', () => {
     expect(cmp.moveColumns().every((col) => col.count === null)).toBe(true);
   });
 
+  /**
+   * The other fields stay as they are, and the text and the count of the comments too. A read from
+   * before a send keeps the comment that the send delivered. A failure changes nothing; an answer
+   * for a card the user left is dropped.
+   */
   it('reads only the comments again when the chat asks, for the scan state of their files', async () => {
     const { cmp, api, fixture, detect, commentsChanged } = await setup();
     const clean = { ...COMMENT, attachments: [{ ...COMMENT.attachments[0], scanState: 'clean' as const }] };
@@ -361,12 +370,10 @@ describe('TodoCardDetailComponent', () => {
     fixture.debugElement.query((d) => d.name === 'app-chat').triggerEventHandler('refresh');
     detect();
     expect(cmp.card()?.comments[0].attachments[0].scanState).toBe('clean');
-    // The other fields stay as they are, the text and the count of the comments too.
     expect(cmp.card()?.title).toBe('Raum buchen');
     expect(cmp.card()?.comments[0].body).toBe('Raum ist frei');
     expect(commentsChanged).toHaveBeenLastCalledWith({ id: 'k-1', commentCount: count });
 
-    // A read from before a send keeps the comment the send delivered.
     const stale = new Subject<TodoCardDetail>();
     api.card.mockReturnValueOnce(stale);
     cmp.refreshComments();
@@ -374,7 +381,6 @@ describe('TodoCardDetailComponent', () => {
     stale.next(detail({ comments: [clean] }));
     expect(cmp.card()?.comments.map((c) => c.id)).toEqual(['cm-1', 'cm-2']);
 
-    // A failure changes nothing; an answer for a card the user left is dropped.
     api.card.mockReturnValueOnce(http(500));
     cmp.refreshComments();
     expect(cmp.error()).toBe(false);
@@ -401,6 +407,7 @@ describe('TodoCardDetailComponent', () => {
     expect(cmp.memberOptions().map((o) => o.label)).toEqual(['Selin Yıldız', 'Jonas Weber', 'Gelöschte Person']);
   });
 
+  /** A card without a done column has nothing to toggle to. */
   it('moves the card by column, done and reopen', async () => {
     const { cmp, api, changed } = await setup();
     cmp.setColumn('c-1');
@@ -416,13 +423,16 @@ describe('TodoCardDetailComponent', () => {
     expect(cmp.isDone()).toBe(true);
     cmp.toggleDone();
     expect(api.moveCard).toHaveBeenLastCalledWith('k-1', { columnId: 'c-1' });
-    // A card without a done column has nothing to toggle to.
     cmp.card.set(detail({ columns: [{ id: 'c-1', name: 'Offen', isDone: false }] }));
     const calls = api.moveCard.mock.calls.length;
     cmp.toggleDone();
     expect(api.moveCard).toHaveBeenCalledTimes(calls);
   });
 
+  /**
+   * For another board the dialog reads the own board of the card; an empty column takes no
+   * neighbour.
+   */
   it('moves to the top of a column with the board of the page or a fresh read', async () => {
     const own = board({
       cards: [tile({ id: 'k-1', columnId: 'c-1' }), tile({ id: 'k-5', columnId: 'c-2' }), tile({ id: 'k-6', columnId: 'c-2' })],
@@ -437,7 +447,6 @@ describe('TodoCardDetailComponent', () => {
     expect(api.moveCard).toHaveBeenLastCalledWith('k-1', { columnId: 'c-2', beforeId: 'k-5' });
     cmp.moveTo({ columnId: 'c-2', position: 'bottom' });
     expect(api.moveCard).toHaveBeenLastCalledWith('k-1', { columnId: 'c-2' });
-    // Another board: read the card's own board; an empty column takes no neighbour.
     fixture.componentRef.setInput('board', board({ id: 'b-x' }));
     cmp.moveTo({ columnId: 'c-3', position: 'top' });
     expect(api.board).toHaveBeenCalledWith('b-1');
@@ -493,12 +502,12 @@ describe('TodoCardDetailComponent', () => {
     expect(cmp.card()?.version).toBe(2);
   });
 
+  /** The image button opens the file dialog of the upload directive. */
   it('edits the description and clears it', async () => {
     const { cmp, api, detect } = await setup({ card: detail({ descriptionMd: null }) });
     fireEvent.click(screen.getByRole('button', { name: 'Beschreibung bearbeiten' }));
     detect();
     expect(cmp.descDraft()).toBe('');
-    // The image button opens the file dialog of the upload directive.
     const click = jest.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => undefined);
     fireEvent.click(screen.getByRole('button', { name: 'Bild einfügen' }));
     expect(click).toHaveBeenCalled();
@@ -584,7 +593,6 @@ describe('TodoCardDetailComponent', () => {
     detect();
     fireEvent.click(screen.getByRole('button', { name: '„Raum anfragen“ löschen' }));
     expect(api.deleteCheckItem).toHaveBeenCalledWith('k-1', 'i-2');
-    // Hide the done items again.
     cmp.showDone.set(true);
     detect();
     fireEvent.click(screen.getByRole('button', { name: /Erledigte Punkte ausblenden/ }));
@@ -656,9 +664,9 @@ describe('TodoCardDetailComponent', () => {
   it('links a picked target and takes a linked one off', async () => {
     const { cmp, api } = await setup();
     expect(cmp.linkedKeys().has('application:a-1')).toBe(true);
-    cmp.pickLink({ kind: 'application', targetId: 'a-1', title: 'Lerncafé', detail: null });
+    cmp.pickLink({ kind: 'application', targetId: 'a-1', title: 'Lerncafé', detail: {} });
     expect(api.removeLink).toHaveBeenCalledWith('k-1', 'li-1');
-    cmp.pickLink({ kind: 'ticket', targetId: 't-1', title: 'Login', detail: null });
+    cmp.pickLink({ kind: 'ticket', targetId: 't-1', title: 'Login', detail: {} });
     expect(api.addLink).toHaveBeenCalledWith('k-1', 'ticket', 't-1');
     fireEvent.click(screen.getByRole('button', { name: 'Verknüpfung mit Lerncafé entfernen' }));
     expect(api.removeLink).toHaveBeenCalledTimes(2);
@@ -679,6 +687,10 @@ describe('TodoCardDetailComponent', () => {
     expect(toast.error).toHaveBeenCalledWith('Die Änderung konnte nicht gespeichert werden.');
   });
 
+  /**
+   * Neither the current board nor, for a card of a gremium board, the personal board is a target.
+   * The page learns of the transfer first, with the board the card left.
+   */
   it('moves the card to another board from the menu', async () => {
     const { cmp, api, toast, changed, detect } = await setup();
     expect(cmp.menuSections()[0].items.map((i) => [i.id, i.icon])).toEqual([
@@ -689,7 +701,6 @@ describe('TodoCardDetailComponent', () => {
     cmp.onMenu({ id: 'transfer', label: '' });
     detect();
     expect(screen.getByRole('dialog', { name: 'In anderes Board verschieben' })).toBeInTheDocument();
-    // Neither the current board nor, for a card of a gremium board, the personal board is a target.
     expect(api.boards).toHaveBeenCalled();
     expect(api.board).toHaveBeenCalledWith('b-2');
     expect(api.board).not.toHaveBeenCalledWith('b-0');
@@ -701,7 +712,6 @@ describe('TodoCardDetailComponent', () => {
     cmp.transfer({ boardId: 'b-2', columnId: 'c-1', boardName: 'Fachschaft Informatik' });
     expect(api.transferCard).toHaveBeenCalledWith('k-1', { boardId: 'b-2', columnId: 'c-1' });
     expect(changed).toHaveBeenLastCalledWith(expect.objectContaining({ boardId: 'b-2' }));
-    // The page learns of the transfer first, with the board the card left.
     expect(transferred).toHaveBeenCalledWith({ card: expect.objectContaining({ boardId: 'b-2' }), fromBoardId: from });
     expect(order).toEqual(['transferred', 'changed']);
     expect(cmp.card()?.boardId).toBe('b-2');
@@ -767,10 +777,10 @@ describe('TodoCardDetailComponent', () => {
     expect(api.card).toHaveBeenCalledTimes(2);
     expect(cmp.busy()).toBe(false);
     api.addLink.mockReturnValueOnce(http(422, 'odd_code'));
-    cmp.pickLink({ kind: 'ticket', targetId: 't-1', title: 'x', detail: null });
+    cmp.pickLink({ kind: 'ticket', targetId: 't-1', title: 'x', detail: {} });
     expect(toast.error).toHaveBeenLastCalledWith('Die Änderung konnte nicht gespeichert werden.');
     api.addLink.mockReturnValueOnce(throwError(() => new Error('net')));
-    cmp.pickLink({ kind: 'ticket', targetId: 't-1', title: 'x', detail: null });
+    cmp.pickLink({ kind: 'ticket', targetId: 't-1', title: 'x', detail: {} });
     expect(toast.error).toHaveBeenLastCalledWith('Die Änderung konnte nicht gespeichert werden.');
     api.moveCard.mockReturnValueOnce(http(404) as never);
     cmp.setColumn('c-2');
@@ -778,6 +788,7 @@ describe('TodoCardDetailComponent', () => {
     expect(cmp.card()).toBeNull();
   });
 
+  /** On the card route itself the card is gone. */
   it('reads the card again on a 404 of a checklist item or a link, and drops it only on a 404 of the card', async () => {
     const { cmp, api, toast } = await setup();
     const item = cmp.items()[0];
@@ -802,7 +813,6 @@ describe('TodoCardDetailComponent', () => {
       expect(cmp.notFound()).toBe(false);
       expect(cmp.card()?.id).toBe('k-1');
     }
-    // The card route itself: the card is gone.
     for (const run of [
       () => {
         api.patchCard.mockReturnValueOnce(http(404));
@@ -824,6 +834,10 @@ describe('TodoCardDetailComponent', () => {
     }
   });
 
+  /**
+   * The writes of k-1 are still out; k-2 starts with its buttons free. A refused edit of a card no
+   * longer shown opens nothing.
+   */
   it('drops the answers of writes on a card that is no longer shown', async () => {
     const { cmp, api, toast, changed, archived, fixture } = await setup();
     const write = new Subject<TodoCardDetail>();
@@ -863,7 +877,6 @@ describe('TodoCardDetailComponent', () => {
     fixture.componentRef.setInput('cardId', 'k-2');
     fixture.detectChanges();
     expect(cmp.card()).toBe(other);
-    // The writes of k-1 are still out; k-2 starts with its buttons free.
     expect(cmp.busy()).toBe(false);
     const moves = api.moveCard.mock.calls.length;
 
@@ -887,7 +900,6 @@ describe('TodoCardDetailComponent', () => {
     expect(toast.error).not.toHaveBeenCalled();
     expect(toast.success).not.toHaveBeenCalled();
     expect(api.moveCard).toHaveBeenCalledTimes(moves);
-    // A refused edit of a card no longer shown opens nothing.
     expect(staleRestore).not.toHaveBeenCalled();
   });
 
@@ -946,7 +958,7 @@ describe('TodoCardDetailComponent', () => {
     cmp.addItem();
     cmp.renameItem({ id: 'i', text: 'x', done: false, position: 0 });
     cmp.deleteItem({ id: 'i', text: 'x', done: false, position: 0 });
-    cmp.pickLink({ kind: 'ticket', targetId: 't', title: 'x', detail: null });
+    cmp.pickLink({ kind: 'ticket', targetId: 't', title: 'x', detail: {} });
     cmp.removeLink(link());
     cmp.archive();
     cmp.restore();
@@ -1059,6 +1071,11 @@ describe('TodoCardDetailComponent', () => {
     expect(files.deleteDraftAttachment).toHaveBeenCalledWith('d1', 'tok');
   });
 
+  /**
+   * The "@" list of the chat holds the members of the board with a name. A comment write gives the
+   * page only the count, never the copy of the card in the drawer. The same answer twice (a mocked
+   * server) joins the thread once.
+   */
   it('posts, retries, edits and deletes comments, with mentions of members', async () => {
     const { cmp, api, toast, changed, commentsChanged } = await setup();
     cmp.sendComment({ body: 'Hallo @Jonas Weber', mentions: ['p-2'] });
@@ -1066,11 +1083,9 @@ describe('TodoCardDetailComponent', () => {
       body: 'Hallo @Jonas Weber',
       mentions: ['p-2'],
     });
-    // The "@" list of the chat: the members of the board with a name.
     expect(cmp.mentionables().map((p) => p.principalId)).toContain('p-2');
     expect(cmp.card()?.comments.map((c) => c.id)).toEqual(['cm-1', 'cm-2']);
     expect(cmp.card()?.commentCount).toBe(1);
-    // A comment write gives the page only the count, never the drawer's copy of the card.
     expect(commentsChanged).toHaveBeenLastCalledWith({ id: 'k-1', commentCount: 1 });
 
     api.addComment.mockReturnValueOnce(throwError(() => new Error('x')));
@@ -1099,7 +1114,6 @@ describe('TodoCardDetailComponent', () => {
     expect(toast.error).toHaveBeenLastCalledWith('Der Kommentar konnte nicht gespeichert werden.');
 
     cmp.deleteComment({ id: 'cm-1' });
-    // The same answer twice (a mocked server) joins the thread once.
     expect(cmp.card()?.comments.map((c) => c.id)).toEqual(['cm-2']);
     cmp.card.set({ ...cmp.card()!, commentCount: 0 });
     cmp.deleteComment({ id: 'cm-2' });
@@ -1133,6 +1147,7 @@ describe('TodoCardDetailComponent', () => {
     expect(cmp.dueRelative()).toBe('');
   });
 
+  /** A phone shows the chat in the activity sheet. */
   it('keeps the composer files when a breakpoint change re-creates the chat', async () => {
     let phone = false;
     const listeners: ((e: MediaQueryListEvent) => void)[] = [];
@@ -1153,13 +1168,12 @@ describe('TodoCardDetailComponent', () => {
     const chat = () => fixture.debugElement.query((d) => d.name === 'app-chat');
     const drafts = chat().injector.get(DraftAttachmentsService);
     const old = chat().componentInstance;
-    const file = { id: 'd1', filename: 'a.png', mime: 'image/png', size: 3, scanned: false, scanState: 'scanning' as const };
+    const file = { id: 'd1', filename: 'a.png', mime: 'image/png', size: 3, scanned: false, scanState: 'scanning' as const, fieldKey: null };
     drafts.files.set([file]);
     phone = true;
     for (const fn of [...listeners]) fn({ matches: true } as MediaQueryListEvent);
     fixture.detectChanges();
     expect(fixture.nativeElement).toHaveClass('cd--phone');
-    // A phone shows the chat in the activity sheet.
     cmp.activityOpen.set(true);
     fixture.detectChanges();
     expect(chat().componentInstance).not.toBe(old);
@@ -1255,6 +1269,7 @@ describe('TodoCardDetailComponent', () => {
   describe('phone', () => {
     beforeEach(() => asPhone(MEDIA.phone));
 
+    /** The way back is the bar of the drawer (`app-list-detail-bar`), not a link here. */
     it('draws the details without tabs while the card loads, and no back link of its own', async () => {
       const { api, detect, fixture } = await setup();
       api.card.mockReturnValueOnce(new Subject<TodoCardDetail>());
@@ -1263,16 +1278,18 @@ describe('TodoCardDetailComponent', () => {
       expect(screen.queryByRole('tablist')).toBeNull();
       expect(document.querySelector('.cd__skelTitle--second')).not.toBeNull();
       expect(document.querySelectorAll('.cd__panel .cd__item').length).toBe(3);
-      // The way back is the bar of the drawer (`app-list-detail-bar`), not a link here.
       expect(screen.queryByRole('button', { name: /Zum Board/ })).toBeNull();
     });
 
+    /**
+     * The chat waits for the sheet, so a closed sheet marks nothing as seen. The fields stay below
+     * the sheet.
+     */
     it('has no tabs: the fields, the bar, and the activity in a sheet from the bottom', async () => {
       const { cmp, detect, fixture } = await setup();
       expect(fixture.nativeElement).toHaveClass('cd--phone');
       expect(screen.queryByRole('tablist')).toBeNull();
       expect(screen.queryByRole('button', { name: 'Link kopieren' })).toBeNull();
-      // The chat waits for the sheet, so a closed sheet marks nothing as seen.
       expect(fixture.nativeElement.querySelector('app-chat')).toBeNull();
       fireEvent.click(screen.getByRole('button', { name: /Verschieben/ }));
       expect(cmp.moveOpen()).toBe(true);
@@ -1290,7 +1307,6 @@ describe('TodoCardDetailComponent', () => {
       expect(cmp.activityOpen()).toBe(true);
       const sheet = screen.getByRole('dialog', { name: 'Aktivität' });
       expect(sheet.querySelector('app-chat')).toHaveClass('cd__chat--sheet');
-      // The fields stay below the sheet.
       expect(screen.getByRole('button', { name: /Verschieben/ })).toBeInTheDocument();
     });
 
@@ -1313,14 +1329,16 @@ describe('TodoCardDetailComponent', () => {
       expect(nav).toHaveBeenCalledWith(['/todos', 'b-1'], { queryParams: { card: 'k-1' } });
     });
 
+    /**
+     * A read-only archived card gets no "Wiederherstellen", only the link. A writable archived card
+     * gets the link, then "Wiederherstellen".
+     */
     it('offers "Im Board öffnen" in the pane without the write right and on an archived card', async () => {
       const { cmp } = await setup({ mode: 'pane', card: detail({ canWrite: false }) });
       const ids = () => cmp.menuSections().map((s) => s.items.map((i) => i.id));
       expect(ids()).toEqual([['openInBoard']]);
-      // Read-only and archived: no "Wiederherstellen", only the link.
       cmp.card.set(detail({ canWrite: false, archivedAt: '2026-10-15T08:00:00Z' }));
       expect(ids()).toEqual([['openInBoard']]);
-      // Writable and archived: the link, then "Wiederherstellen".
       cmp.card.set(detail({ archivedAt: '2026-10-15T08:00:00Z' }));
       expect(ids()).toEqual([['openInBoard'], ['restore']]);
     });

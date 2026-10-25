@@ -42,11 +42,9 @@ from app.shared.errors import (
     ValidationProblem,
 )
 
-# --- closed value sets ----------------------------------------------------
-
-# Logo names that the render service ships (``vendored-logos`` in
-# ``typst/template/protocol.typ``). A
-# vendored entry needs no upload and no object storage.
+#: Logo names that the render service ships (``vendored-logos`` in
+#: ``typst/template/protocol.typ``). A vendored entry needs no upload and no object
+#: storage.
 VendoredLogoName = Literal[
     "HSRT",
     "INF",
@@ -70,21 +68,18 @@ VENDORED_LOGO_NAMES: Final[tuple[VendoredLogoName, ...]] = (
     "Skyline",
 )
 
-# Where a logo appears. ``title`` and ``footer`` go into the rendered document.
-# ``square`` is the 1:1 logo that the app shows for a Gremium in the browser. The
-# render path never reads it.
+#: Where a logo appears. ``title`` and ``footer`` go into the rendered document.
+#: ``square`` is the 1:1 logo that the app shows for a Gremium in the browser. The
+#: render path never reads it.
 LogoSlot = Literal["title", "footer", "square"]
-LOGO_SLOTS: Final[tuple[LogoSlot, ...]] = ("title", "footer", "square")
 
-# The slots that the render path reads.
+#: The slots that the render path reads.
 RenderSlot = Literal["title", "footer"]
 RENDER_SLOTS: Final[tuple[RenderSlot, ...]] = ("title", "footer")
 
-# The document shape that the variant builds on.
+#: The document shape that the variant builds on.
 CdBaseVariant = Literal["report", "protocol"]
-CD_BASE_VARIANTS: Final[tuple[CdBaseVariant, ...]] = ("report", "protocol")
 
-# --- upload policy --------------------------------------------------------
 
 ALLOWED_CD_LOGO_MIME: Final[frozenset[str]] = frozenset(
     {
@@ -95,23 +90,24 @@ ALLOWED_CD_LOGO_MIME: Final[frozenset[str]] = frozenset(
         "application/pdf",
     }
 )
-MAX_CD_LOGO_BYTES: Final[int] = 2 * 1024 * 1024  # 2 MB, same cap as a branding logo
+#: 2 MB, the same cap as a branding logo.
+MAX_CD_LOGO_BYTES: Final[int] = 2 * 1024 * 1024
 
-# The square logo renders in the browser, so it is raster only.
+#: The square logo renders in the browser, so it is raster only.
 ALLOWED_SQUARE_LOGO_MIME: Final[frozenset[str]] = frozenset(
     {"image/png", "image/jpeg", "image/webp"}
 )
-# The smallest edge of a square logo in pixels. A smaller one looks blurred on a
-# high-density screen.
+#: The smallest edge of a square logo in pixels. A smaller one looks blurred on a
+#: high-density screen.
 SQUARE_LOGO_MIN_PX: Final[int] = 256
 SQUARE_LOGO_MAX_PX: Final[int] = 4096
-# The largest difference between width and height, as a fraction of the longer
-# edge, that still counts as square.
+#: The largest difference between width and height, as a fraction of the longer
+#: edge, that still counts as square.
 SQUARE_LOGO_TOLERANCE: Final[float] = 0.01
 
-# Extension per accepted type. The asset name takes the extension from the
-# SNIFFED type, never from the uploaded file name. LaTeX picks its image driver
-# by extension, so a wrong one breaks the render.
+#: Extension per accepted type. The asset name takes the extension from the
+#: SNIFFED type, never from the uploaded file name. Typst picks the image format
+#: by extension, so a wrong one breaks the render.
 _MIME_EXTENSION: Final[dict[str, str]] = {
     "image/png": ".png",
     "image/jpeg": ".jpg",
@@ -120,8 +116,8 @@ _MIME_EXTENSION: Final[dict[str, str]] = {
     "application/pdf": ".pdf",
 }
 
-# Bytes of the head that the SVG sniff reads. An SVG may open with a BOM, an XML
-# declaration, a comment or a DOCTYPE before the root element.
+#: Bytes of the head that the SVG sniff reads. An SVG may open with a BOM, an XML
+#: declaration, a comment or a DOCTYPE before the root element.
 _SVG_HEAD_BYTES: Final[int] = 1024
 _SVG_LEADING = b"\xef\xbb\xbf \t\r\n"
 

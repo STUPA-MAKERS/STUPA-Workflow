@@ -20,6 +20,10 @@ Every image answer is inline, ``nosniff`` and carries ``default-src 'none'; sand
 so a browser that opens the URL directly runs nothing. The stored type is one of four
 raster types; SVG never reaches the store. The security middleware sets its defaults
 with ``setdefault``, so the headers here win.
+
+The upload answers 401 without a principal, 403 for a token without a write scope, 413
+for a body that is too large, 415 for no accepted image, 429 at the rate limit and 503
+when the storage is off.
 """
 
 from __future__ import annotations
@@ -33,7 +37,7 @@ from fastapi.responses import StreamingResponse
 from app.deps import DbSession, SettingsDep, get_current_applicant, get_current_principal
 from app.modules.auth.oauth import SCOPES
 from app.modules.auth.principal import Applicant, Principal
-from app.modules.files.router import _read_capped  # pyright: ignore[reportPrivateUsage]
+from app.modules.files.router import _read_capped
 from app.modules.files.storage import ObjectStorage
 from app.modules.media.schemas import MarkdownImageOut
 from app.modules.media.service import ImageStream, MediaService
@@ -53,8 +57,8 @@ _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 #: The CSP of an image answer: no active content, also when opened directly.
 IMAGE_CSP = "default-src 'none'; sandbox"
 _PRIVATE_CACHE = "private, max-age=31536000, immutable"
-# A public protocol can go private again (hold-back, gremium flag), so a shared cache
-# keeps its images for a short time only.
+#: A public protocol can go private again (hold-back, gremium flag), so a shared cache
+#: keeps its images for a short time only.
 _PUBLIC_CACHE = "public, max-age=300"
 
 #: The OAuth scopes whose texts take images: protocol TOPs, to-do cards and their
@@ -75,7 +79,12 @@ def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
 def get_media_service(session: DbSession, request: Request, settings: SettingsDep) -> MediaService:
     """Wire the service with the optional object storage from the app state."""
     storage: ObjectStorage | None = getattr(request.app.state, "object_storage", None)
-    return MediaService(session, storage=storage, max_bytes=settings.markdown_image_max_bytes)
+    return MediaService(
+        session,
+        storage=storage,
+        max_bytes=settings.markdown_image_max_bytes,
+        settings=settings,
+    )
 
 
 def get_public_protocols(session: DbSession) -> PublicProtocolService:
@@ -103,8 +112,6 @@ def _image_response(image: ImageStream, cache_control: str) -> StreamingResponse
     response_model=MarkdownImageOut,
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(enforce_media_body_cap), Depends(rate_limit_media_images)],
-    # 401 no principal, 403 token without a write scope, 413 too large, 415 no
-    # accepted image, 429 rate limit, 503 storage off.
     responses=_errors(401, 403, 413, 415, 429, 503),
 )
 async def upload_image(

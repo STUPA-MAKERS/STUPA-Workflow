@@ -54,13 +54,16 @@ describe('AdminApiService — mock mode', () => {
     });
   });
 
+  /**
+   * Gremien can be created and edited in the mock store. The gremium dropdown gets stub CD variants
+   * in mock mode. An existing webhook takes the update branch of upsert.
+   */
   it('covers schemas, versions, gremien, roles and rule upsert in mock mode', async () => {
     const s = svc();
     const schemas = await firstValueFrom(s.configSchemas());
     expect(Object.keys(schemas)).toContain('FormFieldDef');
     expect((await firstValueFrom(s.createFormVersion('t', []))).id).toBeTruthy();
     expect((await firstValueFrom(s.listGremien())).length).toBeGreaterThan(0);
-    // #105 — create and edit gremien in the mock store.
     const before = (await firstValueFrom(s.listGremien())).length;
     const newGremium = await firstValueFrom(
       s.createGremium({ name: 'Neu', slug: 'neu', cdVariantId: 'cd-stupa', defaultLang: 'de' }),
@@ -70,10 +73,8 @@ describe('AdminApiService — mock mode', () => {
     const edited = await firstValueFrom(s.updateGremium(newGremium.id, { name: 'Geändert' }));
     expect(edited.name).toBe('Geändert');
     expect((await firstValueFrom(s.listRoles())).length).toBeGreaterThan(0);
-    // The gremium dropdown gets stub CD variants in mock mode.
     expect((await firstValueFrom(s.listCdVariantOptions())).length).toBeGreaterThan(0);
 
-    // An existing webhook takes the update branch of upsert.
     const hooks = await firstValueFrom(s.listWebhooks());
     const wh = await firstValueFrom(s.saveWebhook({ ...hooks[0], name: 'renamed' }));
     expect(wh.name).toBe('renamed');
@@ -188,8 +189,8 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(http.expectOne('/api/admin/roles/r-9').request.method).toBe('PATCH');
   });
 
+  /** The defaults are the documented page size and no owner filter. */
   it('wires the admin OAuth-grant list and the kill switch', () => {
-    // Defaults: the documented page size, no owner filter.
     s.listOAuthGrants().subscribe();
     const all = http.expectOne('/api/admin/oauth-grants?limit=50&offset=0');
     expect(all.request.method).toBe('GET');
@@ -271,7 +272,7 @@ describe('AdminApiService — real mode (contract)', () => {
     http.expectOne('/api/cd-variants').flush([]);
   });
 
-  it('wires OIDC group-mapping CRUD endpoints (#5-4)', () => {
+  it('wires OIDC group-mapping CRUD endpoints', () => {
     s.listGroupMappings().subscribe();
     http.expectOne('/api/admin/group-mappings').flush([]);
 
@@ -285,7 +286,7 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(http.expectOne('/api/admin/group-mappings/gm-9').request.method).toBe('DELETE');
   });
 
-  it('wires mail-template endpoints (list/upsert/reset/preview) (#5-4/#12)', () => {
+  it('wires mail-template endpoints (list/upsert/reset/preview)', () => {
     s.listMailTemplates().subscribe();
     http.expectOne('/api/admin/mail-templates').flush([]);
 
@@ -301,21 +302,24 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(http.expectOne('/api/admin/mail-templates/preview').request.method).toBe('POST');
   });
 
+  /**
+   * The test matches on the path only, because a plain string matcher compares `urlWithParams` and
+   * misses the mandatory `lang`.
+   */
   it('maps /application-types page to id+name options', () => {
     let out: { id: string; name: string }[] | undefined;
     s.listApplicationTypes().subscribe((o) => (out = o));
-    // Match on the path only. A plain string matcher compares `urlWithParams` and
-    // would miss the mandatory `lang`.
     http
       .expectOne((r) => r.url === '/api/application-types')
       .flush({ items: [{ id: 't1', name: 'Foo', extra: 1 }] });
     expect(out).toEqual([{ id: 't1', name: 'Foo' }]);
   });
 
-  // The public `/application-types` resolves the type name SERVER-side from the `lang`
-  // query parameter, which defaults to German. Without the parameter the
-  // application-type picker of the form and flow builders shows German names in an
-  // English admin UI.
+  /**
+   * The public `/application-types` resolves the type name on the server from the `lang` query
+   * parameter, which defaults to German. Without the parameter the application-type picker of the
+   * form and flow builders shows German names in an English admin UI.
+   */
   it('sends the active locale as `lang` on /application-types', () => {
     const i18n = TestBed.inject(I18nService);
 
@@ -332,6 +336,7 @@ describe('AdminApiService — real mode (contract)', () => {
     de.flush({ items: [] });
   });
 
+  /** Missing nameI18n, gremiumId and activeFormVersionId give the defaults plus draft status. */
   it('maps /admin/application-types to FormOverviewItem (active vs draft)', () => {
     let out: { status: string; name: unknown; gremiumId: unknown }[] | undefined;
     s.listForms().subscribe((o) => (out = o as never));
@@ -340,7 +345,6 @@ describe('AdminApiService — real mode (contract)', () => {
       { id: 't2' },
     ]);
     expect(out![0]).toEqual({ id: 't1', name: { de: 'Aktiv' }, gremiumId: 'g1', status: 'active', version: 0 });
-    // Missing nameI18n/gremiumId/activeFormVersionId → defaults plus draft status.
     expect(out![1]).toEqual({ id: 't2', name: {}, gremiumId: null, status: 'draft', version: 0 });
   });
 
@@ -443,6 +447,7 @@ describe('AdminApiService — real mode (contract)', () => {
     req.flush({ id: 'x' });
   });
 
+  /** An empty body sets no keys. */
   it('PATCHes only the supplied application-type fields and DELETEs', () => {
     let done = false;
     s.updateApplicationType('t1', { name: { de: 'N' }, gremiumId: 'g1', hasBudget: false }).subscribe(
@@ -454,7 +459,6 @@ describe('AdminApiService — real mode (contract)', () => {
     req.flush({});
     expect(done).toBe(true);
 
-    // An empty body sets no keys.
     s.updateApplicationType('t1', {}).subscribe();
     expect(http.expectOne('/api/admin/application-types/t1').request.body).toEqual({});
 
@@ -499,6 +503,7 @@ describe('AdminApiService — real mode (contract)', () => {
     });
   });
 
+  /** The helper delegates to updateGremiumRole. */
   it('wires gremium-role CRUD + permission helper', () => {
     s.listGremiumRoles('g1').subscribe();
     http.expectOne('/api/admin/gremien/g1/roles').flush([]);
@@ -509,7 +514,6 @@ describe('AdminApiService — real mode (contract)', () => {
     s.updateGremiumRole('gr-9', { name: { de: 'N2' } }).subscribe();
     expect(http.expectOne('/api/admin/gremium-roles/gr-9').request.method).toBe('PATCH');
 
-    // The helper delegates to updateGremiumRole.
     s.saveGremiumRolePermissions('gr-9', ['vote.cast']).subscribe();
     const pr = http.expectOne('/api/admin/gremium-roles/gr-9');
     expect(pr.request.body).toEqual({ permissions: ['vote.cast'] });
@@ -517,20 +521,6 @@ describe('AdminApiService — real mode (contract)', () => {
 
     s.deleteGremiumRole('gr-9').subscribe();
     expect(http.expectOne('/api/admin/gremium-roles/gr-9').request.method).toBe('DELETE');
-  });
-
-  it('wires deadline-policy CRUD endpoints', () => {
-    s.listDeadlinePolicies().subscribe();
-    http.expectOne('/api/admin/deadline-policies').flush([]);
-
-    s.createDeadlinePolicy({ key: 'k', label: { de: 'L' }, kind: 'absolute' }).subscribe();
-    expect(http.expectOne('/api/admin/deadline-policies').request.method).toBe('POST');
-
-    s.updateDeadlinePolicy('dp-9', { offsetDays: 3 }).subscribe();
-    expect(http.expectOne('/api/admin/deadline-policies/dp-9').request.method).toBe('PATCH');
-
-    s.deleteDeadlinePolicy('dp-9').subscribe();
-    expect(http.expectOne('/api/admin/deadline-policies/dp-9').request.method).toBe('DELETE');
   });
 
   it('wires the gremium membership and the membership/role mapping endpoints', () => {
@@ -567,6 +557,7 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(http.expectOne('/api/admin/gremium-role-mappings/grm-9').request.method).toBe('DELETE');
   });
 
+  /** `before: 0` is a valid cursor (not null), so the request must carry it. */
   it('builds audit-log query params (defaults and all filters)', () => {
     s.listAuditLog().subscribe();
     const def = http.expectOne((r) => r.url === '/api/admin/audit');
@@ -584,7 +575,6 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(all.request.params.get('until')).toBe('u');
     all.flush({ items: [], nextCursor: null, hasMore: false });
 
-    // before: 0 is a valid cursor (!= null). The request must carry it.
     s.listAuditLog({ before: 0 }).subscribe();
     const zero = http.expectOne((r) => r.url === '/api/admin/audit');
     expect(zero.request.params.get('before')).toBe('0');
@@ -617,6 +607,10 @@ describe('AdminApiService — real mode (contract)', () => {
     req.flush({ taskReminderEnabled: false, taskReminderAfterDays: 5, taskReminderRepeatDays: 7 });
   });
 
+  /**
+   * A caller with its own loading state (the health tiles) skips the overlay. An omitted reason
+   * becomes null.
+   */
   it('wires DSGVO/privacy erasure endpoints', () => {
     s.listErasures().subscribe();
     const noFilter = http.expectOne((r) => r.url === '/api/admin/privacy/erasures');
@@ -629,7 +623,6 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(filtered.request.context.get(SKIP_LOADING)).toBe(false);
     filtered.flush([]);
 
-    // A caller with its own loading state (the health tiles) skips the overlay.
     s.listErasures('open', { quiet: true }).subscribe();
     const quiet = http.expectOne((r) => r.url === '/api/admin/privacy/erasures');
     expect(quiet.request.context.get(SKIP_LOADING)).toBe(true);
@@ -643,7 +636,6 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(rej.request.body).toEqual({ reason: 'nope' });
     rej.flush({});
 
-    // An omitted reason becomes null.
     s.rejectErasure('e-1').subscribe();
     expect(http.expectOne('/api/admin/privacy/erasures/e-1/reject').request.body).toEqual({ reason: null });
 
@@ -702,8 +694,10 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(dl.request.responseType).toBe('blob');
     dl.flush(new Blob([]));
   });
-  // Backups. The archive never crosses the API as bytes: a download is a signed URL and
-  // an upload is multipart, so the contract for both is worth pinning down.
+  /**
+   * The archive never crosses the API as bytes in a JSON body: a download is a blob and an upload
+   * is multipart, so the contract for both is pinned down.
+   */
   describe('backups', () => {
     it('lists the catalogue', () => {
       s.listBackups().subscribe();
@@ -742,9 +736,11 @@ describe('AdminApiService — real mode (contract)', () => {
       expect(req.request.body).toEqual({ pinned: true });
     });
 
+    /**
+     * MinIO is internal, so a presigned S3 URL names a host the browser cannot resolve. The client
+     * therefore requests a blob from the API.
+     */
     it('asks for the BYTES, never a presigned store URL', () => {
-      // MinIO is internal, so a presigned S3 URL names a host the browser cannot
-      // resolve. The client therefore requests a blob from the API.
       s.exportBackup('b-1').subscribe();
       const req = http.expectOne('/api/admin/backups/b-1/export');
       expect(req.request.method).toBe('GET');
@@ -792,12 +788,15 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect((await firstValueFrom(s.listApplicationTypesFull())).length).toBeGreaterThan(0);
   });
 
+  /**
+   * The second stub carries no owner name. Every stub has real scope keys and an expiry. Paging
+   * slices the store, and the owner filter narrows the list.
+   */
   it('pages, filters and revokes OAuth grants in the mock store', async () => {
     const s = svc();
     const all = await firstValueFrom(s.listOAuthGrants());
     expect(all.total).toBe(3);
     expect(all.items[0].principalName).toBe('Alex Admin');
-    // The second stub carries no owner name. Every stub has real scope keys and an expiry.
     expect(all.items[1].principalName).toBeNull();
     const known = new Set(['read', 'applications:write', 'votes:write', 'meetings:write', 'budget:write', 'forms:write', 'flows:write', 'admin:write']);
     for (const g of all.items) {
@@ -805,13 +804,11 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
       expect(g.accessExpiresAt).not.toBeNull();
     }
 
-    // Paging slices the store.
     const secondPage = await firstValueFrom(s.listOAuthGrants({ limit: 1, offset: 1 }));
     expect(secondPage.items).toHaveLength(1);
     expect(secondPage.offset).toBe(1);
     expect(secondPage.total).toBe(3);
 
-    // The owner filter narrows the list.
     const mine = await firstValueFrom(s.listOAuthGrants({ principalId: 'p-1' }));
     expect(mine.items.map((g) => g.id)).toEqual(['grant-1']);
 
@@ -830,11 +827,11 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(await firstValueFrom(s.setGremiumMailRecipients('g-x', ['a@b']))).toEqual({ recipients: ['a@b'] });
   });
 
+  /** An unknown id returns store[0] unchanged (not renamed). */
   it('updateGremium falls back to first gremium when id unknown', async () => {
     const s = svc();
     const all = await firstValueFrom(s.listGremien());
     const res = await firstValueFrom(s.updateGremium('does-not-exist', { name: 'Z' }));
-    // An unknown id returns store[0] unchanged (not renamed).
     expect(res.id).toBe(all[0].id);
     expect(res.name).toBe(all[0].name);
   });
@@ -855,19 +852,22 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect((await firstValueFrom(s.listRoles())).some((r) => r.id === created.id)).toBe(false);
   });
 
+  /** An unknown id returns store[0] and does not crash. */
   it('activates/deactivates a principal, falling back when id unknown', async () => {
     const s = svc();
     const all = await firstValueFrom(s.listPrincipals());
     const updated = await firstValueFrom(s.setPrincipalActive(all[0].id, false));
     expect(updated.active).toBe(false);
-    // An unknown id returns store[0] and does not crash.
     const fallback = await firstValueFrom(s.setPrincipalActive('nope', true));
     expect(fallback.id).toBe(all[0].id);
   });
 
+  /**
+   * The Keycloak account of Robin conflicts with Alex Admin. Into Robin Mitglied it merges, and the
+   * list then marks the old account. Unknown accounts give 404.
+   */
   it('previews and merges accounts in mock mode', async () => {
     const s = svc();
-    // The Keycloak account of Robin into Alex Admin conflicts.
     const blocked = await firstValueFrom(s.previewPrincipalMerge('p-old-1', 'p-1'));
     expect(blocked.canMerge).toBe(false);
     expect(blocked.conflicts.map((c) => c.kind)).toContain('ballot_same_vote');
@@ -875,7 +875,6 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(err.status).toBe(409);
     expect(err.error.code).toBe('merge_conflict');
     expect(err.error.errors).toContainEqual({ field: 'erasure_open', msg: '' });
-    // Into Robin Mitglied it merges, and the list then marks the old account.
     const clean = await firstValueFrom(s.previewPrincipalMerge('p-old-1', 'p-2'));
     expect(clean.canMerge).toBe(true);
     expect(clean.areas.find((a) => a.area === 'votes')?.rewritten).toBe(9);
@@ -887,7 +886,6 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(old.mergedIntoId).toBe('p-2');
     expect(old.mergedIntoName).toBe('Robin Mitglied');
     expect(old.active).toBe(false);
-    // Unknown accounts give 404.
     const missing = await firstValueFrom(s.previewPrincipalMerge('nope', 'p-2')).catch((e) => e);
     expect(missing.status).toBe(404);
     const missing2 = await firstValueFrom(s.mergePrincipal('p-2', 'nope')).catch((e) => e);
@@ -907,29 +905,37 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(await firstValueFrom(s.listPrincipals('zzz-no-match'))).toEqual([]);
   });
 
+  /**
+   * A query that does not match sub forces the email/displayName `?? ''` branches. A query that
+   * matches only the sub still returns the principal with null fields.
+   */
   it('search tolerates principals with null email/displayName', async () => {
     const s = svc();
     const store = (s as unknown as { store: { principals: { id: string; sub: string; email: unknown; displayName: unknown; assignments: unknown[] }[] } }).store;
     store.principals.push({ id: 'p-null', sub: 'kc|nulluser', email: null, displayName: null, assignments: [] });
-    // A query that does not match sub forces the email/displayName `?? ''` branches.
     const hits = await firstValueFrom(s.listPrincipals('nomatchwhatsoever'));
     expect(hits).toEqual([]);
-    // A query that matches only the sub still returns the principal with null fields.
     expect((await firstValueFrom(s.listPrincipals('nulluser'))).map((p) => p.id)).toContain('p-null');
   });
 
+  /**
+   * With findIndex < 0 nothing mutates, and the call falls back to the first role without a crash.
+   * No role gains the bogus 'x' permission.
+   */
   it('saveRolePermissions / renameRole no-op safely when role id is unknown', async () => {
     const s = svc();
     const roles = await firstValueFrom(s.listRoles());
-    // findIndex < 0 → no mutation. The call falls back to the first role and does not crash.
     const sp = await firstValueFrom(s.saveRolePermissions('nope', ['x']));
     expect(sp.id).toBe(roles[0].id);
-    // No role gained the bogus 'x' permission. No mutation happened.
     expect((await firstValueFrom(s.listRoles())).some((r) => r.permissions.includes('x'))).toBe(false);
     const rn = await firstValueFrom(s.renameRole('nope', { de: 'X' }));
     expect(rn.id).toBe(roles[0].id);
   });
 
+  /**
+   * createApplicationType without a key falls back to the length index. An update with an empty
+   * body leaves the row untouched, and an unknown id is a no-op.
+   */
   it('CRUDs application types in the mock store', async () => {
     const s = svc();
     const before = (await firstValueFrom(s.listApplicationTypesFull())).length;
@@ -938,7 +944,6 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(created.hasBudget).toBe(false);
     expect((await firstValueFrom(s.listApplicationTypesFull())).length).toBe(before + 1);
 
-    // createApplicationType without a key falls back to the length index.
     const noKey = await firstValueFrom(s.createApplicationType({ key: '', name: { de: 'X' }, gremiumId: 'g1', hasBudget: true }));
     expect(noKey.id).toMatch(/^f-/);
     expect(noKey.gremiumId).toBe('g1');
@@ -950,7 +955,6 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(after.gremiumId).toBe('g-asta');
     expect(after.hasBudget).toBe(true);
 
-    // An update with an empty body leaves the row untouched. An unknown id is a no-op.
     await firstValueFrom(s.updateApplicationType(created.id, {}));
     await firstValueFrom(s.updateApplicationType('ghost', { name: { de: 'X' } }));
 
@@ -966,7 +970,13 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(empty).toEqual({ applicationTypeId: 'unknown-type', fields: [] });
   });
 
-  it('creates a form version, bumps the version, and toggles active (#13/#forms)', async () => {
+  /**
+   * The first version of a new type starts at version 1 with a null description. A second
+   * activation restores activeFormVersionId of the type from the draft. A draft without
+   * formVersionId sets activeFormVersionId to null on activation. setFormActive on a type with no
+   * draft returns a synthesized stub.
+   */
+  it('creates a form version, bumps the version, and toggles active', async () => {
     const s = svc();
     const fields: FormFieldDef[] = [{ key: 'a', type: 'text', label: { de: 'A' } }];
     const v1 = await firstValueFrom(s.createFormVersion('f-foerderung', fields, { de: 'D' }));
@@ -975,7 +985,6 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(draft.active).toBe(true);
     expect(draft.formVersionId).toBe('formver-1');
 
-    // The first version of a brand-new type starts at version 1 with a null description.
     const fresh = await firstValueFrom(s.createFormVersion('brand-new', [], null));
     expect(fresh.id).toBe('formver-0');
     const freshDraft = await firstValueFrom(s.getFormDraft('brand-new'));
@@ -984,20 +993,17 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
 
     const deactivated = await firstValueFrom(s.setFormActive('f-foerderung', false));
     expect(deactivated.active).toBe(false);
-    // A second activation restores activeFormVersionId of the type from the draft.
     const reactivated = await firstValueFrom(s.setFormActive('f-foerderung', true));
     expect(reactivated.active).toBe(true);
     const types = await firstValueFrom(s.listApplicationTypesFull());
     expect(types.find((t) => t.id === 'f-foerderung')!.activeFormVersionId).toBe('formver-1');
 
-    // Activate a draft that has no formVersionId. Then activeFormVersionId becomes null.
     const store = (s as unknown as { store: { formDrafts: Record<string, { applicationTypeId: string; active?: boolean; fields: unknown[] }> } }).store;
     store.formDrafts['f-veranstaltung'] = { applicationTypeId: 'f-veranstaltung', fields: [] };
     const noVer = await firstValueFrom(s.setFormActive('f-veranstaltung', true));
     expect(noVer.active).toBe(true);
     expect((await firstValueFrom(s.listApplicationTypesFull())).find((t) => t.id === 'f-veranstaltung')!.activeFormVersionId).toBeNull();
 
-    // setFormActive on a type with no draft returns a synthesized stub.
     const stub = await firstValueFrom(s.setFormActive('no-draft-type', true));
     expect(stub).toEqual({ applicationTypeId: 'no-draft-type', active: true, fields: [] });
   });
@@ -1011,26 +1017,27 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect((await firstValueFrom(s.getGlobalFlow()))?.states.map((st) => st.key)).toEqual(['s']);
   });
 
+  /**
+   * The seed gives each mock gremium its forced roles. The filter excludes the other gremium. An
+   * unknown id gives a synthesized fallback row that carries the name. An unknown id with no name
+   * in the body takes the `?? {}` branch, so the name becomes {}.
+   */
   it('CRUDs gremium-roles in the mock store', async () => {
     const s = svc();
-    // The seed gives each mock gremium its forced roles.
     expect((await firstValueFrom(s.listGremiumRoles(MOCK_GREMIUM_STUPA_ID))).map((r) => r.key)).toEqual(['vorstand', 'manager', 'member', 'protokoll']);
     expect(await firstValueFrom(s.listGremiumRoles('g-empty'))).toEqual([]);
     const created = await firstValueFrom(s.createGremiumRole('g-empty', { key: 'chair', name: { de: 'Vorsitz' } }));
     expect(created.gremiumId).toBe('g-empty');
     expect((await firstValueFrom(s.listGremiumRoles('g-empty'))).length).toBe(1);
-    // The filter excludes the other gremium.
     expect(await firstValueFrom(s.listGremiumRoles('g-other'))).toEqual([]);
 
     const updated = await firstValueFrom(s.updateGremiumRole(created.id, { name: { de: 'Neu' } }));
     expect(updated.name['de']).toBe('Neu');
     const withPerms = await firstValueFrom(s.saveGremiumRolePermissions(created.id, ['vote.cast']));
     expect(withPerms.permissions).toEqual(['vote.cast']);
-    // An unknown id gives a synthesized fallback row that carries the name.
     const fallback = await firstValueFrom(s.updateGremiumRole('ghost', { name: { de: 'F' } }));
     expect(fallback.id).toBe('ghost');
     expect(fallback.name).toEqual({ de: 'F' });
-    // An unknown id with no name in the body takes the `?? {}` branch. The name becomes {}.
     const fallbackNoName = await firstValueFrom(s.updateGremiumRole('ghost2', { permissions: ['x'] }));
     expect(fallbackNoName.id).toBe('ghost2');
     expect(fallbackNoName.name).toEqual({});
@@ -1039,28 +1046,13 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(await firstValueFrom(s.listGremiumRoles('g-empty'))).toEqual([]);
   });
 
+  /** The store initializes again to an array. Nothing crashes, and the list is empty. */
   it('deleteGremiumRole tolerates a nullish gremiumRoles store (defensive `?? []`)', async () => {
     const s = svc();
     const store = (s as unknown as { store: { gremiumRoles: unknown } }).store;
     store.gremiumRoles = undefined;
     await firstValueFrom(s.deleteGremiumRole('any'));
-    // The store re-initializes to an array. Nothing crashes and the list is empty.
     expect(await firstValueFrom(s.listGremiumRoles(MOCK_GREMIUM_STUPA_ID))).toEqual([]);
-  });
-
-  it('CRUDs deadline policies in the mock store', async () => {
-    const s = svc();
-    const seeded = await firstValueFrom(s.listDeadlinePolicies());
-    expect(seeded.map((p) => p.kind)).toEqual(['relative_changed', 'relative_submitted', 'absolute', 'recurring']);
-    const created = await firstValueFrom(s.createDeadlinePolicy({ key: 'sem', label: { de: 'Semester' }, kind: 'absolute' }));
-    expect(created.id).toBe('dp-5');
-    const updated = await firstValueFrom(s.updateDeadlinePolicy(created.id, { offsetDays: 5 }));
-    expect(updated.offsetDays).toBe(5);
-    // An unknown id gives a synthesized fallback.
-    const fallback = await firstValueFrom(s.updateDeadlinePolicy('ghost', { offsetDays: 1 }));
-    expect(fallback.id).toBe('ghost');
-    await firstValueFrom(s.deleteDeadlinePolicy(created.id));
-    expect(await firstValueFrom(s.listDeadlinePolicies())).toEqual(seeded);
   });
 
   it('keeps the guest settings in the mock store', async () => {
@@ -1116,16 +1108,17 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     });
   });
 
+  /** The server joins the name and the e-mail of each member. */
   it('returns the seeded memberships of one gremium in mock mode', async () => {
     const s = svc();
     const stupa = await firstValueFrom(s.listGremiumMemberships(MOCK_GREMIUM_STUPA_ID));
     expect(stupa.length).toBe(9);
-    // The server joins the name and the e-mail of each member.
     expect(stupa.find((m) => m.principalId === 'p-1')).toMatchObject({ displayName: 'Alex Admin', email: 'alex@stupa.example' });
     expect((await firstValueFrom(s.listGremiumMemberships('g-asta'))).map((m) => m.principalId)).toEqual(['p-4', 'p-7']);
     expect(await firstValueFrom(s.listGremiumMemberships('g-none'))).toEqual([]);
   });
 
+  /** An unknown id is a no-op for a delete. */
   it('CRUDs the global group mappings in the mock store', async () => {
     const s = svc();
     expect((await firstValueFrom(s.listGroupMappings())).length).toBe(2);
@@ -1134,7 +1127,6 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     const updated = await firstValueFrom(s.updateGroupMapping(created.id, { roleId: 'r-admin' }));
     expect(updated.roleId).toBe('r-admin');
     await firstValueFrom(s.deleteGroupMapping(created.id));
-    // An unknown id is a no-op for a delete.
     await firstValueFrom(s.deleteGroupMapping('ghost'));
     expect((await firstValueFrom(s.listGroupMappings())).length).toBe(2);
   });
@@ -1154,6 +1146,7 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect((await firstValueFrom(s.listMembershipMappings())).length).toBe(2);
   });
 
+  /** A change of the group only keeps the gremium. An unknown role gives no gremium. */
   it('CRUDs the role mappings in the mock store and derives the gremium from the role', async () => {
     const s = svc();
     expect((await firstValueFrom(s.listRoleMappings())).length).toBe(4);
@@ -1161,10 +1154,8 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(created.gremiumId).toBe('g-asta');
     const moved = await firstValueFrom(s.updateRoleMapping(created.id, { gremiumRoleId: 'gr-stupa-member' }));
     expect(moved.gremiumId).toBe(MOCK_GREMIUM_STUPA_ID);
-    // A change of the group only keeps the gremium.
     const renamed = await firstValueFrom(s.updateRoleMapping(created.id, { oidcGroup: 'y' }));
     expect(renamed).toMatchObject({ oidcGroup: 'y', gremiumId: MOCK_GREMIUM_STUPA_ID });
-    // An unknown role gives no gremium.
     const orphan = await firstValueFrom(s.createRoleMapping({ oidcGroup: 'z', gremiumRoleId: 'ghost' }));
     expect(orphan.gremiumId).toBe('');
     await firstValueFrom(s.deleteRoleMapping(created.id));
@@ -1172,20 +1163,19 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect((await firstValueFrom(s.listRoleMappings())).length).toBe(4);
   });
 
+  /** The log sorts newest first, with keyset paging on the id, and filters by action and actor. */
   it('pages and filters the mock audit log', async () => {
     const s = svc();
     const all = await firstValueFrom(s.listAuditLog());
     expect(all.items.length).toBeGreaterThan(3);
     expect(all.hasMore).toBe(false);
     expect(all.nextCursor).toBeNull();
-    // Newest first, keyset paging on the id.
     const first = await firstValueFrom(s.listAuditLog({ limit: 2 }));
     expect(first.items).toHaveLength(2);
     expect(first.hasMore).toBe(true);
     expect(first.nextCursor).toBe(first.items[1].id);
     const next = await firstValueFrom(s.listAuditLog({ limit: 2, before: first.nextCursor! }));
     expect(next.items.every((e) => e.id < first.nextCursor!)).toBe(true);
-    // Action and actor filter.
     const byAction = await firstValueFrom(s.listAuditLog({ action: 'role_change' }));
     expect(byAction.items.map((e) => e.action)).toEqual(['role_change']);
     const byActor = await firstValueFrom(s.listAuditLog({ actor: 'kc|kim.kasse' }));
@@ -1206,6 +1196,7 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     });
   });
 
+  /** The manual check is now the newest stored one. */
   it('serves the chain checks and a config diff in mock mode', async () => {
     const s = svc();
     const latest = await firstValueFrom(s.latestAuditVerification());
@@ -1213,7 +1204,6 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(latest?.trigger).toBe('cron');
     const run = await firstValueFrom(s.runAuditVerification());
     expect(run.trigger).toBe('manual');
-    // The manual check is the newest stored one now.
     expect((await firstValueFrom(s.latestAuditVerification()))?.id).toBe(run.id);
     const live = await firstValueFrom(s.verifyAuditChain());
     expect(live.valid).toBe(true);
@@ -1259,12 +1249,15 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     });
   });
 
+  /**
+   * Execute or reject on an unknown id gives a synthesized {id} fallback and no crash. The value
+   * persists in the store.
+   */
   it('manages erasures and privacy settings in the mock store (DSGVO)', async () => {
     const s = svc();
     expect((await firstValueFrom(s.listErasures())).length).toBe(4);
     expect((await firstValueFrom(s.listErasures('open'))).map((r) => r.id)).toEqual(['e-1', 'e-2']);
 
-    // Execute or reject on an unknown id gives a synthesized {id} fallback and no crash.
     const exec = await firstValueFrom(s.executeErasure('e-x'));
     expect(exec.id).toBe('e-x');
     const rej = await firstValueFrom(s.rejectErasure('e-x', 'reason'));
@@ -1278,16 +1271,18 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(settings.defaultRetentionMonths).toBe(24);
     const saved = await firstValueFrom(s.putPrivacySettings({ defaultRetentionMonths: 48 }));
     expect(saved.defaultRetentionMonths).toBe(48);
-    // The value persists in the store.
     expect((await firstValueFrom(s.getPrivacySettings())).defaultRetentionMonths).toBe(48);
 
     const blob = await firstValueFrom(s.downloadAuskunft('a@b.org'));
     expect(blob).toBeInstanceOf(Blob);
   });
 
+  /**
+   * The test seeds the private store directly to reach the status-filter branch. Execute and reject
+   * on existing rows take the mutation branch.
+   */
   it('filters mock erasures by status when the store has rows', async () => {
     const s = svc();
-    // Seed the private store directly to reach the status-filter branch.
     const store = (s as unknown as { store: { erasures: { id: string; status: string }[] } }).store;
     store.erasures.length = 0;
     store.erasures.push(
@@ -1298,7 +1293,6 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     const open = await firstValueFrom(s.listErasures('open'));
     expect(open.map((r) => r.id)).toEqual(['e-open']);
 
-    // Execute and reject on existing rows take the mutation branch.
     await firstValueFrom(s.executeErasure('e-open'));
     expect((await firstValueFrom(s.listErasures('executed'))).map((r) => r.id)).toContain('e-open');
     const rejected = await firstValueFrom(s.rejectErasure('e-done', 'r'));
@@ -1308,6 +1302,7 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(rejectedNull.reason).toBeNull();
   });
 
+  /** An unknown id falls back to a stub instead of throwing. */
   it('serves the backup catalogue from the seeded store', async () => {
     const s = svc();
     const list = await firstValueFrom(s.listBackups());
@@ -1316,7 +1311,6 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
 
     const one = await firstValueFrom(s.getBackup(list.items[0].id));
     expect(one.id).toBe(list.items[0].id);
-    // An unknown id falls back to a stub rather than throwing.
     expect((await firstValueFrom(s.getBackup('nope'))).id).toBe('nope');
 
     const created = await firstValueFrom(s.createBackup('note'));
@@ -1337,6 +1331,10 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(after.items.some((b) => b.id === created.id)).toBe(false);
   });
 
+  /**
+   * An override keeps its id. A key that is not in the store gets no placeholders. An unknown key
+   * falls back to the first seed template.
+   */
   it('edits, resets and previews the mail templates in the mock store', async () => {
     const s = svc();
     const http = TestBed.inject(HttpTestingController);
@@ -1347,19 +1345,16 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     );
     expect(saved).toMatchObject({ key: 'magic_link', source: 'override', id: 'mt-magic_link', subjectI18n: { de: 'Neu' } });
     expect(saved.placeholders).toEqual({ link: expect.any(String) });
-    // An override keeps its id.
     const again = await firstValueFrom(
       s.upsertMailTemplate({ key: 'status_update', subjectI18n: { de: 'S' }, bodyI18n: {}, bodyHtmlI18n: {} }),
     );
     expect(again.id).toBe('mt-1');
-    // A key that is not in the store gets no placeholders.
     const unknown = await firstValueFrom(
       s.upsertMailTemplate({ key: 'ghost', subjectI18n: {}, bodyI18n: {}, bodyHtmlI18n: {} }),
     );
     expect(unknown.placeholders).toEqual({});
     const reset = await firstValueFrom(s.resetMailTemplate('magic_link'));
     expect(reset).toMatchObject({ key: 'magic_link', source: 'builtin', id: null, subjectI18n: { de: 'Dein Link zur Antragsplattform' } });
-    // An unknown key falls back to the first seed template.
     expect((await firstValueFrom(s.resetMailTemplate('ghost'))).source).toBe('builtin');
     const pv = await firstValueFrom(
       s.previewMailPayload({

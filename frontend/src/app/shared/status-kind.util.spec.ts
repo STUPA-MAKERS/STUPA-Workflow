@@ -14,27 +14,28 @@ import {
 
 describe('status kinds', () => {
   describe('flowColorKind', () => {
+    /**
+     * The cases are the colours of the flow presets, the accent of the design system, the signal
+     * colours of the tokens and the edges of the hue ranges.
+     */
     it.each([
-      // The colours of the flow presets.
       ['#4a90d9', 'neutral'], // blue: Entwurf
       ['#e8a33d', 'warn'], // orange: Eingereicht, Prüfung
       ['#9b59b6', 'neutral'], // violet: Abstimmung
       ['#5cb85c', 'accent'], // green: Angenommen
       ['#d9534f', 'error'], // red: Abgelehnt
-      // The accent of the design system and the signal colours of the tokens.
       ['#72a384', 'accent'],
       ['#b3261e', 'error'],
       ['#8a5a00', 'warn'],
       ['#dcb065', 'warn'],
-      // Edges of the hue ranges.
       ['#ff0055', 'error'], // hue 340: a red that leans to violet
       ['#ff5500', 'warn'], // hue 20: the first orange
     ])('maps %s to %s', (hex, kind) => {
       expect(flowColorKind(hex)).toBe(kind);
     });
 
+    /** Hue 70 is neither clearly yellow nor clearly green. */
     it('treats a yellow-green between warn and accent as neutral', () => {
-      // Hue 70: neither clearly yellow nor clearly green.
       expect(flowColorKind('#d4ff00')).toBe('neutral');
     });
 
@@ -61,9 +62,10 @@ describe('status kinds', () => {
       expect(flowColorKind('#12345')).toBe('neutral');
     });
 
+    /** The colour has hue 300. */
     it('reads a hue in the blue sector from the blue channel', () => {
       expect(flowColorKind('#0000ff')).toBe('neutral');
-      expect(flowColorKind('#ff00ff')).toBe('neutral'); // hue 300
+      expect(flowColorKind('#ff00ff')).toBe('neutral');
     });
   });
 
@@ -79,7 +81,7 @@ describe('status kinds', () => {
       });
     });
 
-    it('shows a tie as a rejection, never as "Stimmengleichheit" (O18)', () => {
+    it('shows a tie as a rejection, never as "Stimmengleichheit"', () => {
       const view = voteResultStatus('tie');
       expect(view).toEqual({ kind: 'error', key: 'vote.result.rejected' });
       expect(de[view.key]).toBe('Abgelehnt');

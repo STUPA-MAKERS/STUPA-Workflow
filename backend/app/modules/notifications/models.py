@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import (
     Boolean,
@@ -29,17 +30,22 @@ from app.db import Base, CreatedAtMixin, UUIDPkMixin
 
 
 class MailTemplate(UUIDPkMixin, CreatedAtMixin, Base):
-    """Mail template: i18n subject and body (Jinja2), declared placeholders."""
+    """Mail template: i18n subject and body (Jinja2), declared placeholders.
+
+    Attributes:
+        body_i18n: Body as Jinja2 or Markdown per language.
+        body_html_i18n: Optional HTML body per language.
+        placeholders: Declared placeholders for the docs and the preview, for example
+            ``{"name": "...", "applicationId": "..."}``.
+    """
 
     __tablename__ = "mail_template"
 
     key: Mapped[str] = mapped_column(Text, unique=True)
-    subject_i18n: Mapped[dict] = mapped_column(JSONB, server_default="{}")
-    # Body as Jinja2 or Markdown. The per-language HTML body is optional.
-    body_i18n: Mapped[dict] = mapped_column(JSONB, server_default="{}")
-    body_html_i18n: Mapped[dict] = mapped_column(JSONB, server_default="{}")
-    # Declared placeholders (docs/preview): {"name": "...", "applicationId": "..."}.
-    placeholders: Mapped[dict] = mapped_column(JSONB, server_default="{}")
+    subject_i18n: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
+    body_i18n: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
+    body_html_i18n: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
+    placeholders: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
 
 
 class NotificationPreference(Base):
@@ -84,7 +90,6 @@ class NotificationSettings(Base):
     )
 
     __table_args__ = (
-        # Single-row guarantee: only the row with id 1 can exist.
         CheckConstraint("id = 1", name="notification_settings_singleton"),
         CheckConstraint(
             "task_reminder_after_days >= 1", name="task_reminder_after_days_min"

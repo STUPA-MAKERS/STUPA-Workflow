@@ -24,18 +24,20 @@ _UPGRADE: tuple[str, ...] = (
     "ALTER TABLE oauth_authorization_code ADD COLUMN IF NOT EXISTS access_ttl_seconds integer",
 )
 
+#: access_expires_at stays nullable, because the data can hold NULL after a downgrade.
 _DOWNGRADE: tuple[str, ...] = (
     "ALTER TABLE oauth_authorization_code DROP COLUMN IF EXISTS access_ttl_seconds",
     "ALTER TABLE oauth_token DROP COLUMN IF EXISTS access_ttl_seconds",
-    # access_expires_at stays nullable, because the data can hold NULL after a downgrade.
 )
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     for stmt in _UPGRADE:
         op.execute(stmt)
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     for stmt in _DOWNGRADE:
         op.execute(stmt)

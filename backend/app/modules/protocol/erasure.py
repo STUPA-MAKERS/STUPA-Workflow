@@ -1,4 +1,4 @@
-"""Erasure of a candidate name from the protocol text (F2, DSGVO Art. 17).
+"""Erasure of a candidate name from the protocol text (DSGVO Art. 17).
 
 ``embed_votes`` copies the callout of an election into ``protocol.markdown``, and the
 protokollant can insert the same callout into the body of an agenda item. Both copies
@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Sequence
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
@@ -34,14 +35,14 @@ from app.modules.voting.models import Vote
 from app.modules.voting.schemas import ElectionResultOut
 from app.shared.config_schemas import ElectionConfig
 
-# The lines of the old callout and of the new callout of one election (same length).
+#: The lines of the old callout and of the new callout of one election (same length).
 _Change = tuple[Sequence[str], Sequence[str]]
 
-# The marker that opens a callout (``> [!abstimmung]``, ``> [!note]``, ...).
+#: The marker that opens a callout (``> [!abstimmung]``, ``> [!note]``, ...).
 _OPENER = re.compile(r"^>\s*\[!")
 
 
-def _callout(vote: Vote, config: dict) -> list[str]:
+def _callout(vote: Vote, config: dict[str, Any]) -> list[str]:
     """Build the lines of the internal callout of ``vote`` with ``config``."""
     stored = vote.election_result
     result = ElectionResultOut.model_validate(stored) if stored else None

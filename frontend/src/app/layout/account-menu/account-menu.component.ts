@@ -15,8 +15,6 @@ import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { ThemeService } from '@core/theme/theme.service';
-// By path, not through the `@shared/ui` barrel: the shell is in the initial bundle, and
-// the barrel would pull every shared block a lazy page uses into it.
 import { AvatarComponent, IconComponent, SwitchComponent, TruncatedDirective } from '@stupa-makers/ui-kit';
 import { LanguageSelectComponent } from '../language-select/language-select.component';
 
@@ -83,18 +81,18 @@ export class AccountMenuComponent {
     else this.show();
   }
 
+  /**
+   * The panel renders in this change detection, so its first control gets the focus right after.
+   */
   show(): void {
-    // Only the popover variant has the avatar, and only the avatar calls this.
     const trigger = this.trigger()!.nativeElement;
     const rect = trigger.getBoundingClientRect();
-    // Beside the navigation that holds the avatar, not over it.
     const edge = trigger.closest('nav')?.getBoundingClientRect().right ?? rect.right;
     this.position.set({
       left: edge + GAP,
       bottom: Math.max(GAP, window.innerHeight - rect.bottom),
     });
     this.open.set(true);
-    // The panel renders in this change detection; focus its first control right after.
     setTimeout(() => this.panel()?.nativeElement.querySelector<HTMLElement>('a, button')?.focus());
   }
 

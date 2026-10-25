@@ -84,6 +84,10 @@ describe('AccountMenuComponent', () => {
       expect(screen.queryByRole('region', { name: 'Konto' })).not.toBeInTheDocument();
     });
 
+    /**
+     * The calendar subscription is a popover of the meetings page, not an account page. API access
+     * shows only with mcp.use.
+     */
     it('links the account pages', async () => {
       const { fixture } = await setup();
       await userEvent.click(trigger());
@@ -92,9 +96,7 @@ describe('AccountMenuComponent', () => {
         'href',
         '/account/notifications',
       );
-      // The calendar subscription is a popover of the meetings page, not an account page.
       expect(screen.queryByRole('link', { name: 'Kalender-Abo' })).not.toBeInTheDocument();
-      // API access only with mcp.use.
       expect(screen.queryByRole('link', { name: 'API-Zugang' })).not.toBeInTheDocument();
     });
 

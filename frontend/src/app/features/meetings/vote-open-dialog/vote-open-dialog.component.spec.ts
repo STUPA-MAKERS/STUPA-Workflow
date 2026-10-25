@@ -41,6 +41,7 @@ describe('VoteOpenDialogComponent', () => {
       expect(toasts()).toContain('Abstimmung vorbereitet.');
     });
 
+    /** A direct open is refused while the vote cannot open. */
     it('only prepares in a planned meeting, also on enter', async () => {
       const view = await setup();
       view.fixture.componentRef.setInput('meeting', { ...MEETING, status: 'planned' });
@@ -48,7 +49,6 @@ describe('VoteOpenDialogComponent', () => {
       expect(screen.getByRole('dialog', { name: 'Abstimmung vorbereiten' })).toBeInTheDocument();
       const footer = screen.getByRole('button', { name: 'Vorbereiten' }).closest('.dialog__footer') as HTMLElement;
       expect(within(footer).queryByRole('button', { name: 'Abstimmung öffnen' })).toBeNull();
-      // A direct open is refused while the vote cannot open.
       view.cmp.submit(false);
       view.http.expectNone('/api/meetings/m-1/votes');
       view.cmp.submit();
@@ -78,7 +78,7 @@ describe('VoteOpenDialogComponent', () => {
     expect(screen.getByRole('switch', { name: 'Geheime Abstimmung' })).toHaveAttribute('aria-checked', 'false');
   });
 
-  it('builds no tie break, no ballot change and no eligible count (O11, O18)', async () => {
+  it('builds no tie break, no ballot change and no eligible count', async () => {
     const { http, opened, toasts } = await setup();
     expect(screen.queryByText(/Stimmengleichheit/)).toBeNull();
     expect(screen.queryByText(/änderbar/)).toBeNull();
@@ -108,13 +108,14 @@ describe('VoteOpenDialogComponent', () => {
     expect(toasts()).toContain('Abstimmung geöffnet.');
   });
 
+  /** The dialog sends one request at a time. */
   it('starts a free-text item with its title and sends an empty question as null', async () => {
     const { http, cmp } = await setup(FREE_TOP, 8);
     expect(cmp.question()).toBe('Verschiedenes');
     expect(cmp.subtitle()).toBe('TOP 8 · Verschiedenes');
     cmp.question.set('   ');
     cmp.submit();
-    cmp.submit(); // one request at a time
+    cmp.submit();
     expect(http.expectOne('/api/meetings/m-1/votes').request.body.question).toBeNull();
   });
 
@@ -167,7 +168,7 @@ describe('VoteOpenDialogComponent', () => {
     expect(empty.closed).toHaveBeenCalled();
   });
 
-  describe('guests vote too (#17)', () => {
+  describe('guests vote too', () => {
     const PUBLIC = { ...MEETING, publicJoin: true, guestsMode: 'vote', admittedGuests: 7 } as unknown as Meeting;
 
     async function open(meeting: Meeting, item: AgendaItem = APP_TOP) {
@@ -216,7 +217,7 @@ describe('VoteOpenDialogComponent', () => {
     });
   });
 
-  describe('decision proposal (F1)', () => {
+  describe('decision proposal', () => {
     const PRICED: AgendaItem = { ...APP_TOP, amount: '1250.00' };
     const norm = (s: string) => s.replace(/\u00a0/g, ' ');
 
@@ -247,6 +248,7 @@ describe('VoteOpenDialogComponent', () => {
       expect(cmp.question()).toBe('Eigene Frage?');
     });
 
+    /** The question keeps the last valid proposal, and the error shows at the field. */
     it('sends no proposal without a deviation and blocks a bad amount', async () => {
       const { http, cmp } = await setup(PRICED);
       cmp.setDraft({ enabled: true, amount: '1250.00', conditions: [] });
@@ -256,7 +258,6 @@ describe('VoteOpenDialogComponent', () => {
       const before = cmp.question();
       cmp.setDraft({ enabled: true, amount: '2000', conditions: [] });
       expect(cmp.proposalInvalid()).toBe(true);
-      // The question keeps the last valid proposal; the error shows at the field.
       expect(cmp.question()).toBe(before);
       cmp.submit();
       http.expectNone('/api/meetings/m-1/votes');

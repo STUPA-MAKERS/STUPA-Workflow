@@ -1,4 +1,4 @@
-"""F17, Z3, Z7: the header of the protocol.
+"""The header of the protocol.
 
 * The excused members are their own group. The public variant names only the
   counts.
@@ -83,13 +83,17 @@ async def test_public_header_counts_only() -> None:
 
 
 async def test_header_lists_every_keeper_period() -> None:
+    """The header lists every keeper period with names and agenda positions.
+
+    The planned handover is not part of the minutes.
+    """
     anna, bert = uuid4(), uuid4()
     item1, item2, gone = uuid4(), uuid4(), None
     session = _AttendanceSession(
         [],
         results=[
-            result((anna, "Anna", None), (bert, None, "bert@x.de")),  # names
-            result((MID, item1), (MID, item2)),  # agenda positions
+            result((anna, "Anna", None), (bert, None, "bert@x.de")),
+            result((MID, item1), (MID, item2)),
         ],
     )
     session.keeper_rows = [
@@ -107,7 +111,6 @@ async def test_header_lists_every_keeper_period() -> None:
             from_agenda_item_id=item2,
             to_agenda_item_id=None,
         ),
-        # The planned handover is not part of the minutes.
         SimpleNamespace(
             principal_id=anna,
             from_at=None,
@@ -125,8 +128,11 @@ async def test_header_lists_every_keeper_period() -> None:
 
 
 async def test_header_falls_back_to_the_assigned_protokollant() -> None:
+    """The header falls back to the assigned protokollant.
+
+    The guest count comes first (no guests), then the protokollant.
+    """
     session = _AttendanceSession([])
-    # The guest count of #17 comes first (no guests), then the protokollant.
     session.scalar_results = [0, "Frau Schmidt"]
     header = await _service(session)._header_meta(_meeting(protokollant_id=uuid4()))
     assert header.keepers == []

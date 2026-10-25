@@ -1,4 +1,4 @@
-"""Broker fan-out (T-16, api.md §4): pub/sub over simulated instances.
+"""Broker fan-out: pub/sub over simulated instances.
 
 The in-memory broker with a **shared** hub models several app instances on one Redis.
 A message that instance A publishes must reach every subscriber, also the subscribers
@@ -28,9 +28,10 @@ async def test_inmemory_fanout_across_two_instances() -> None:
     instance_a = InMemoryBroker(hub)
     instance_b = InMemoryBroker(hub)
 
-    async with instance_a.subscribe("meeting:1") as sub_a, instance_b.subscribe(
-        "meeting:1"
-    ) as sub_b:
+    async with (
+        instance_a.subscribe("meeting:1") as sub_a,
+        instance_b.subscribe("meeting:1") as sub_b,
+    ):
         await instance_a.publish("meeting:1", {"type": "vote_tally", "n": 1})
         a = await asyncio.wait_for(_first(sub_a), timeout=1)
         b = await asyncio.wait_for(_first(sub_b), timeout=1)
@@ -48,11 +49,11 @@ async def test_inmemory_isolates_channels() -> None:
 
 @pytest.mark.asyncio
 async def test_unsubscribe_cleans_up_hub() -> None:
+    """Drop the channel from the hub when the context exits, so no subscription leaks."""
     hub = _Hub()
     broker = InMemoryBroker(hub)
     async with broker.subscribe("meeting:1"):
         pass
-    # The hub drops the channel when the context exits, so no subscription leaks.
     assert "meeting:1" not in hub._channels
 
 
@@ -65,8 +66,8 @@ class _FakePubSub:
     async def subscribe(self, channel: str) -> None:
         self.subscribed.append(channel)
 
-    async def listen(self):  # noqa: ANN201
-        # A realistic stream: first a subscribe ack that the broker drops, then messages.
+    async def listen(self):
+        """Yield a realistic stream: a subscribe ack that the broker drops, then the messages."""
         yield {"type": "subscribe", "data": 1}
         for raw in self._messages:
             yield {"type": "message", "data": json.dumps(raw).encode("utf-8")}
@@ -130,7 +131,7 @@ class _FakePatternPubSub(_FakePubSub):
     async def punsubscribe(self, pattern: str) -> None:
         self.unsubscribed.append(pattern)
 
-    async def listen(self):  # noqa: ANN201
+    async def listen(self):
         yield {"type": "psubscribe", "data": 1}
         yield {"type": "message", "data": b"{}"}
         for raw in self._messages:

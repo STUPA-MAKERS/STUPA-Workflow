@@ -1,10 +1,12 @@
 """Media service: store, serve and collect the images of the Markdown texts.
 
-``upload`` takes the bytes of one file. It cleans them (``images.clean_image``: sniff,
-decode, strip the metadata, downscale, encode again), stores the result under
+``upload`` takes the bytes of one file. It scans the bytes of the client with ClamAV
+first (``files.scanner.scan_or_raise``), before Pillow decodes them, because a decoder
+bug is reachable only through the decode. Then it cleans them (``images.clean_image``:
+sniff, decode, strip the metadata, downscale, encode again), stores the result under
 ``media/images/<id>`` in the attachment bucket and inserts the ``markdown_image``
-row. The stored bytes come from Pillow, never from the client, so an image gets no
-ClamAV scan. At most ``CLEAN_CONCURRENCY`` cleans run at the same time in one process.
+row. The stored bytes come from Pillow, never from the client. At most
+``CLEAN_CONCURRENCY`` cleans run at the same time in one process.
 
 ``open`` streams one image. The router applies the read rule before.
 
@@ -27,11 +29,13 @@ from typing import Final
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.files.scanner import scan_or_raise
 from app.modules.files.storage import ObjectStorage, StorageError
 from app.modules.media.images import CleanImage, ImageRejected, clean_image
 from app.modules.media.models import MarkdownImage, image_storage_key
 from app.modules.media.refs import image_ids_in, image_path
 from app.modules.media.schemas import MarkdownImageOut
+from app.settings import Settings, get_settings
 from app.shared.errors import (
     NotFoundError,
     PayloadTooLargeError,
@@ -50,12 +54,11 @@ RENDER_MAX_ASSET_BYTES: Final[int] = 8 * 1024 * 1024
 #: The most image cleans that run at the same time in one process.
 CLEAN_CONCURRENCY: Final[int] = 2
 
-# The clean is CPU and memory work in a thread. The semaphore holds the number of
-# parallel cleans in one process at ``CLEAN_CONCURRENCY``, so parallel uploads cannot
-# take all the CPU or the memory of the API.
+#: Caps the parallel cleans (CPU and memory work in a thread) at ``CLEAN_CONCURRENCY``,
+#: so parallel uploads cannot take all the CPU or the memory of the API.
 _clean_slots: Final[asyncio.Semaphore] = asyncio.Semaphore(CLEAN_CONCURRENCY)
-# A cancelled request releases ``_clean_slots`` while its thread still works. The
-# thread semaphore holds the limit in that case too.
+#: A cancelled request releases ``_clean_slots`` while its thread still works. This
+#: semaphore holds the limit in that case too.
 _clean_threads: Final[threading.BoundedSemaphore] = threading.BoundedSemaphore(
     CLEAN_CONCURRENCY
 )
@@ -66,7 +69,7 @@ def _clean_bounded(data: bytes) -> CleanImage:
     with _clean_threads:
         return clean_image(data)
 
-# Stored type -> the extension of the typst asset name.
+#: Stored type -> the extension of the typst asset name.
 _ASSET_EXT: Final[dict[str, str]] = {
     "image/png": "png",
     "image/jpeg": "jpg",
@@ -98,21 +101,33 @@ class MediaService:
         *,
         storage: ObjectStorage | None,
         max_bytes: int = 10 * 1024 * 1024,
+        settings: Settings | None = None,
     ) -> None:
+        """Bind the service to a session, the storage and the upload limits.
+
+        Without ``storage`` an upload gives 503. ``settings`` None means ``get_settings()``.
+        """
         self.session = session
         self.storage = storage
         self.max_bytes = max_bytes
+        self.settings = settings
 
     async def upload(self, data: bytes) -> MarkdownImageOut:
-        """Clean and store one image.
+        """Scan, clean and store one image.
+
+        Without explicit settings the service reads ``get_settings()``, so the scan
+        never falls back to a skip.
 
         Raises:
-            ServiceUnavailableError: The storage is off or failed (503).
-            UnsupportedMediaTypeError: The file is no accepted image (415).
+            ServiceUnavailableError: The storage is off or failed, or the virus scan
+                is unavailable in production (503).
+            UnsupportedMediaTypeError: The file is no accepted image, or the virus
+                scan found a signature (415).
             PayloadTooLargeError: The encoded image is larger than ``max_bytes`` (413).
         """
         if self.storage is None:
             raise ServiceUnavailableError("Object storage unavailable.")
+        await scan_or_raise(data, self.settings or get_settings())
         try:
             async with _clean_slots:
                 image = await asyncio.to_thread(_clean_bounded, data)

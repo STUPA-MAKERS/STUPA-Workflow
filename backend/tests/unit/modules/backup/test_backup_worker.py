@@ -26,16 +26,19 @@ from app.settings import Settings, load_settings
 from worker import backup as task
 
 BACKUP_ID = uuid4()
-# The real service factory. The autouse fixture below replaces `task._service`, so the
-# reference is taken at import time.
-_REAL_SERVICE = task._service  # noqa: SLF001
+#: The real service factory. The autouse fixture below replaces `task._service`, so the
+#: reference is taken at import time.
+_REAL_SERVICE = task._service
 CREATED_AT = datetime(2026, 9, 1, 22, 5, 0, tzinfo=UTC)
 
 
 def _row(backup_id: UUID = BACKUP_ID, **kw: object) -> Backup:
-    # The model defaults apply at flush, and a double never flushes for real.
+    """Build a row with explicit values.
+
+    The model defaults apply at flush, and a double never flushes for real.
+    """
     defaults: dict[str, object] = {"kind": "manual", "status": "pending", "pinned": False}
-    row = Backup(**{**defaults, **kw})  # type: ignore[arg-type]
+    row = Backup(**{**defaults, **kw})
     row.id = backup_id
     row.created_at = CREATED_AT
     return row
@@ -147,8 +150,9 @@ class _FakeArchives:
         self.fetched: list[str] = []
 
     async def get_file(self, key: str, path: str) -> None:
+        """Return a plain temp path from the task."""
         self.fetched.append(key)
-        with open(path, "wb") as handle:  # noqa: PTH123 — a plain temp path from the task
+        with open(path, "wb") as handle:
             handle.write(b"cipher")
 
 
@@ -201,7 +205,7 @@ def _silence_audit(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
 
 @pytest.fixture(autouse=True)
 def _verify_calls(monkeypatch: pytest.MonkeyPatch) -> list[tuple[object, str | None]]:
-    """Record the chain check after a restore instead of reading a hash chain (Z6)."""
+    """Record the chain check after a restore instead of reading a hash chain."""
     calls: list[tuple[object, str | None]] = []
 
     async def _verify(maker: object, actor: str | None) -> str:
@@ -210,9 +214,6 @@ def _verify_calls(monkeypatch: pytest.MonkeyPatch) -> list[tuple[object, str | N
 
     monkeypatch.setattr(task, "verify_after_restore", _verify)
     return calls
-
-
-# -------------------------------------------------------------------- create_backup
 
 
 @pytest.mark.asyncio
@@ -251,9 +252,6 @@ async def test_create_backup_marks_the_row_failed_and_does_not_retry() -> None:
     assert service.failed_with == "pg_dump failed"
 
 
-# ------------------------------------------------------------------------ retention
-
-
 @pytest.mark.asyncio
 async def test_retention_audits_what_it_removed(
     _silence_audit: list[dict[str, Any]],
@@ -285,9 +283,6 @@ async def test_retention_failure_never_fails_the_backup(
     assert await task.run_retention(_ctx(service)) == 0
 
 
-# ----------------------------------------------------------------- scheduled_backup
-
-
 @pytest.mark.asyncio
 async def test_scheduled_backup_does_nothing_when_backups_are_off() -> None:
     """A stack without an age recipient must not log a failure every night."""
@@ -302,19 +297,17 @@ async def test_scheduled_backup_creates_a_scheduled_row() -> None:
     assert service.created == ["scheduled"]
 
 
-# ------------------------------------------------------------------- restore_backup
-
-
 @pytest.mark.asyncio
 async def test_restore_takes_a_safety_backup_before_it_replaces_anything(
     _silence_audit: list[dict[str, Any]],
 ) -> None:
+    """Take a safety backup before the restore replaces anything, then apply the archive."""
     service = _FakeService(_row(status="done", storage_key="k"))
     archives = _FakeArchives()
     assert await task.restore_backup(_ctx(service, archives=archives), str(BACKUP_ID), "sub")
     assert service.created == ["pre_restore"]
     assert archives.fetched == ["k"]
-    assert service.applied  # the archive was actually applied
+    assert service.applied
     actions = [str(e["action"]) for e in _silence_audit]
     assert actions[-1] == "backup_restore"
 
@@ -333,12 +326,12 @@ async def test_restore_records_the_safety_backup_id_in_the_audit_entry(
 
 @pytest.mark.asyncio
 async def test_restore_releases_the_database_before_it_replaces_it() -> None:
-    """Regression: the restore used to hang for ever on its own lock.
+    """Release the database before the restore replaces it.
 
-    `pg_restore --clean` drops every table, which needs an ACCESS EXCLUSIVE lock. The
-    task used to keep its own session open across that call, so the drop waited on the
-    transaction that had just read the catalogue row, and the restore never returned.
-    Nothing may hold a connection to the database once `apply_archive` starts.
+    `pg_restore --clean` drops every table, which needs an ACCESS EXCLUSIVE lock. If the
+    task keeps its own session open across that call, the drop waits on the transaction
+    that read the catalogue row, and the restore never returns. Nothing may hold a
+    connection to the database once `apply_archive` starts.
     """
     service = _FakeService(_row(status="done", storage_key="k"))
     maker = _Sessionmaker()
@@ -349,12 +342,12 @@ async def test_restore_releases_the_database_before_it_replaces_it() -> None:
 
 @pytest.mark.asyncio
 async def test_restore_puts_the_backup_catalogue_back() -> None:
-    """Regression: the safety archive used to vanish from the list it belongs in.
+    """Put the backup catalogue back after a restore.
 
-    The archive being restored predates the safety copy, so restoring it erased the
-    catalogue row that points at that copy. The object stayed in the bucket, but nothing
-    referenced it and the admin page could not list it — which quietly broke the one
-    promise that makes a restore reversible.
+    The archive being restored predates the safety copy, so restoring it erases the
+    catalogue row that points at that copy. The object would stay in the bucket, but
+    nothing would reference it and the admin page could not list it. That would break
+    the one promise that makes a restore reversible.
     """
     service = _FakeService(_row(status="done", storage_key="k"))
     ctx = _ctx(service, archives=_FakeArchives())
@@ -367,7 +360,7 @@ async def test_restore_puts_the_backup_catalogue_back() -> None:
 async def test_restore_verifies_the_restored_chain(
     _verify_calls: list[tuple[object, str | None]],
 ) -> None:
-    """Z6: a finished restore checks the chain of the restored database, as its actor."""
+    """A finished restore checks the chain of the restored database, as its actor."""
     service = _FakeService(_row(status="done", storage_key="k"))
     maker = _Sessionmaker()
     ctx = _ctx(service, archives=_FakeArchives(), maker=maker)
@@ -413,9 +406,6 @@ async def test_restore_reports_failed_when_the_archive_does_not_apply() -> None:
     assert await task.restore_backup(ctx, str(BACKUP_ID), "sub") == "failed"
 
 
-# ---------------------------------------------------------------------------- queue
-
-
 class _FakePool:
     def __init__(self) -> None:
         self.jobs: list[tuple[str, tuple[object, ...], dict[str, object]]] = []
@@ -439,9 +429,10 @@ async def test_create_enqueue_uses_an_idempotent_job_id() -> None:
 
 @pytest.mark.asyncio
 async def test_create_enqueue_tolerates_a_deduped_job() -> None:
+    """Tolerate a deduplicated job on enqueue without an error."""
     pool = _FakePool()
     pool.result = None
-    await ArqBackupQueue(pool).enqueue_create(BACKUP_ID)  # must not raise
+    await ArqBackupQueue(pool).enqueue_create(BACKUP_ID)
 
 
 @pytest.mark.asyncio
@@ -460,9 +451,6 @@ def test_queue_is_none_without_a_pool() -> None:
     assert backup_queue_from_pool(_FakePool()) is not None  # type: ignore[arg-type]
 
 
-# ------------------------------------------------------------- coverage of the wiring
-
-
 @pytest.mark.asyncio
 async def test_on_startup_puts_the_settings_and_both_storages_in_the_context() -> None:
     ctx: dict[str, Any] = {}
@@ -474,7 +462,7 @@ async def test_on_startup_puts_the_settings_and_both_storages_in_the_context() -
 
 @pytest.mark.asyncio
 async def test_dispose_engine_tolerates_a_sessionmaker_without_an_engine() -> None:
-    await task._dispose_engine({"backup_sessionmaker": object()})  # noqa: SLF001
+    await task._dispose_engine({"backup_sessionmaker": object()})
 
 
 def test_the_service_factory_wires_the_context_storages() -> None:

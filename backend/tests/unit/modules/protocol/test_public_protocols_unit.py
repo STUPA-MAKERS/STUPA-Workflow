@@ -118,9 +118,6 @@ class _Storage:
         return b"%PDF-public"
 
 
-# ---------------------------------------------------------------- helpers
-
-
 @pytest.mark.parametrize(
     ("day", "key"),
     [
@@ -175,9 +172,6 @@ def test_decision_from_vote() -> None:
     assert dec.secret is True
     bare = PublicDecision.from_vote(SimpleNamespace())
     assert bare.counts == {} and bare.result is None and bare.majority_rule == "simple"
-
-
-# ---------------------------------------------------------------- service
 
 
 async def test_list_protocols_maps_rows_and_filters() -> None:
@@ -261,9 +255,6 @@ async def test_get_pdf_paths() -> None:
         await svc.get_pdf(PID)
 
 
-# ---------------------------------------------------------------- router
-
-
 class _FakeService:
     def __init__(self) -> None:
         self.filters: list[PublicFilter] = []
@@ -327,6 +318,10 @@ def test_router_lists_with_filters_and_noindex(
 
 
 def test_router_detail_404_and_pdf(client: tuple[TestClient, _FakeService]) -> None:
+    """The detail route answers 404 and serves the PDF with noindex.
+
+    Other API routes carry no noindex header from this rule.
+    """
     http, _ = client
     missing = http.get(f"/api/public/protocols/{PID}")
     assert missing.status_code == 404
@@ -337,7 +332,6 @@ def test_router_detail_404_and_pdf(client: tuple[TestClient, _FakeService]) -> N
         'attachment; filename="Protokoll_asta_2026-10-05_oeffentlich.pdf"; '
         "filename*=UTF-8''Protokoll_asta_2026-10-05_oeffentlich.pdf"
     )
-    # Other API routes carry no noindex header from this rule.
     assert "X-Robots-Tag" not in http.get("/api/health").headers
 
 

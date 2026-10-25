@@ -53,12 +53,11 @@ const EXCERPT_LENGTH = 160;
 
 /**
  * The participant view of a meeting: the page of a member who neither leads the meeting
- * nor keeps the minutes (boards Teilnahme-Vorher, Teilnahme-Vertretung, Teilnahme-Live,
- * Teilnahme-Telefon, Schmal-Teilnahme).
+ * nor keeps the minutes.
  *
  * - Planned: the agenda (read only), "Die Sitzung beginnt am Di., 13.10.2026 um 18:00"
  *   with "Kalender abonnieren", and beside it "Deine Anwesenheit" (Anwesend or Abwesend,
- *   the reason, O15 lock) and "Vertretung" (the setup with its deadline).
+ *   the reason, the lead lock) and "Vertretung" (the setup with its deadline).
  * - Live: the agenda with "Jetzt", the text of the item that the room handles ("Mara
  *   Keller führt das Protokoll"), the vote card with the two-step ballot (own row and the
  *   row of a represented member) and the delegation. The dock below: the item, the own
@@ -72,7 +71,7 @@ const EXCERPT_LENGTH = 160;
  * The view follows the room: until the member opens another item, the sheet shows the
  * item that the room handles, and the next move of the room ends the look at another
  * item. Below the wide layout the agenda opens as a sheet, the
- * vote card is a strip above the text (board Schmal-Teilnahme) and the delegation sits
+ * vote card is a strip above the text and the delegation sits
  * in the dock. On a phone the page shows the item, the vote card, a protocol excerpt
  * with "Ganzen TOP lesen", then the attendance and the delegation.
  */
@@ -112,7 +111,7 @@ export class MeetingFollowViewComponent {
   readonly savingAttendance = input(false);
 
   readonly back = output<void>();
-  /** An own attendance report (Z2, O15). */
+  /** An own attendance report. */
   readonly attendanceChange = output<{ member: Attendance } & OwnAttendanceChange>();
 
   protected readonly phone = mediaQuery(MEDIA.phone);
@@ -165,7 +164,6 @@ export class MeetingFollowViewComponent {
     const m = this.meeting();
     if (m.status === 'live') return this.nowIndex();
     if (m.status === 'planned' || !this.agenda().length) return -1;
-    // A closed meeting opens on its last item, else on the first one.
     return Math.max(0, this.agenda().findIndex((a) => a.id === m.currentAgendaItemId));
   });
   protected readonly shownTop = computed<AgendaItem | null>(
@@ -226,7 +224,7 @@ export class MeetingFollowViewComponent {
 
   /**
    * A delegation of the meeting to show in the dock of a narrow screen: the own one or
-   * one directed at the member (board Schmal-Teilnahme).
+   * one directed at the member.
    */
   protected readonly dockDelegation = computed(() => {
     const c = this.delegationContext();
@@ -236,7 +234,7 @@ export class MeetingFollowViewComponent {
   /** The own row of the roster, or `null` (an external substitute has none). */
   protected readonly me = computed(() => this.attendance().find((a) => a.isSelf) ?? null);
 
-  /** O23: the member handed this meeting to a substitute. */
+  /** The member handed this meeting to a substitute. */
   protected readonly delegated = computed(() => !!this.delegationContext()?.myDelegation);
 
   /** "Studierendenparlament · Di., 29.09.2026 · seit 18:04". */

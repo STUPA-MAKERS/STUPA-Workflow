@@ -1,4 +1,4 @@
-"""Rate limiting with a sliding window (security.md §8, api.md §7, Issue #24)."""
+"""Rate limiting with a sliding window."""
 
 from __future__ import annotations
 
@@ -27,23 +27,25 @@ async def test_inmemory_blocks_after_limit() -> None:
 
 
 async def test_inmemory_window_slides() -> None:
+    """Let an old hit fall out of the sliding window."""
     clock = {"t": 0.0}
     limiter = InMemoryRateLimiter(now=lambda: clock["t"])
     assert (await limiter.hit("ip", limit=1, window_seconds=10)).allowed
     assert not (await limiter.hit("ip", limit=1, window_seconds=10)).allowed
-    clock["t"] = 11.0  # the old hit fell out of the window
+    clock["t"] = 11.0
     assert (await limiter.hit("ip", limit=1, window_seconds=10)).allowed
 
 
 async def test_inmemory_keys_isolated() -> None:
+    """Keep a separate budget for each key."""
     limiter = InMemoryRateLimiter(now=lambda: 0.0)
     assert (await limiter.hit("a", limit=1, window_seconds=60)).allowed
-    # A different key does not share the budget.
     assert (await limiter.hit("b", limit=1, window_seconds=60)).allowed
 
 
-# The Redis backend runs against an in-memory ZSET fake.
 class _FakePipeline:
+    """Queue the commands of a pipeline for the in-memory ZSET fake."""
+
     def __init__(self, client: _FakeRedis) -> None:
         self._client = client
         self._ops: list[tuple[object, ...]] = []
@@ -69,6 +71,8 @@ class _FakePipeline:
 
 
 class _FakeRedis:
+    """Stand in for Redis with in-memory ZSETs, so the Redis backend runs without a server."""
+
     def __init__(self) -> None:
         self.zsets: dict[str, dict[str, float]] = {}
         self.fail = False
@@ -79,6 +83,7 @@ class _FakeRedis:
         return _FakePipeline(self)
 
     def _apply(self, op: tuple[object, ...]) -> object:
+        """Apply one queued command; any other command (expire) returns True."""
         name = op[0]
         if name == "zrange_rem":
             _, key, lo, hi = op
@@ -93,7 +98,7 @@ class _FakeRedis:
         if name == "zcard":
             _, key = op
             return len(self.zsets.get(key, {}))  # type: ignore[index]
-        return True  # expire
+        return True
 
     async def zrem(self, key: str, member: str) -> int:
         self.zsets.get(key, {}).pop(member, None)

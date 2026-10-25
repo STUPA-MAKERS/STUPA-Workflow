@@ -39,12 +39,11 @@ from app.shared.guards import (
 from app.shared.i18n import I18nMap
 from app.shared.jsonlogic import JsonLogicError, validate_jsonlogic
 
-# Field and state keys: lowercase, snake case.
+#: Pattern of a field or state key: lowercase snake case.
 KEY_PATTERN = r"^[a-z][a-z0-9_]*$"
 
-# Max length of a field-validation pattern (save gate, ReDoS). An admin-authored regex
-# runs synchronously against possibly anonymous input at response time. This bound
-# limits its complexity.
+#: Max length of a field-validation pattern. An admin-authored regex runs synchronously
+#: against possibly anonymous input, so this bound limits its complexity (ReDoS).
 _MAX_PATTERN_LEN = 200
 
 
@@ -67,7 +66,7 @@ def _redos_prone(pattern: str) -> bool:
     except Exception:  # pragma: no cover - CPython internals unavailable
         return False
 
-    def children(op_name: str, av: Any) -> tuple:
+    def children(op_name: str, av: Any) -> tuple[Any, ...]:  # noqa: ANN401
         if op_name in ("MAX_REPEAT", "MIN_REPEAT"):
             return (av[2],)
         if op_name == "SUBPATTERN":
@@ -76,7 +75,7 @@ def _redos_prone(pattern: str) -> bool:
             return tuple(av[1])
         return ()
 
-    def has_unbounded_repeat(toks: Any) -> bool:
+    def has_unbounded_repeat(toks: Any) -> bool:  # noqa: ANN401
         for op, av in toks:
             if op.name in ("MAX_REPEAT", "MIN_REPEAT") and av[1] is maxrepeat:
                 return True
@@ -84,7 +83,7 @@ def _redos_prone(pattern: str) -> bool:
                 return True
         return False
 
-    def walk(toks: Any) -> bool:
+    def walk(toks: Any) -> bool:  # noqa: ANN401
         for op, av in toks:
             if op.name in ("MAX_REPEAT", "MIN_REPEAT"):
                 _min, _max, body = av
@@ -102,6 +101,14 @@ def _redos_prone(pattern: str) -> bool:
         return False
 
 
+#: Field types of a form. ``gremium_select`` and ``budget_select`` are selects whose
+#: options the server injects at render time (``effective_form``); the stored value is
+#: a UUID. ``email`` and ``iban`` validate themselves, ``daterange`` holds ISO dates
+#: ``{from, to}`` with from <= to. ``positions`` is a list of cost positions: each needs
+#: minOffers comparison offers, exactly one offer is preferred and gives the position
+#: value, and the sum is the amount. ``funding`` is the requested amount, at most one per
+#: form, only beside ``positions`` and never above the cost total; when filled it is
+#: the amount. ``section`` only splits a multi-step form and has no value.
 FieldType = Literal[
     "text",
     "textarea",
@@ -110,34 +117,21 @@ FieldType = Literal[
     "date",
     "select",
     "multiselect",
-    # Gremium and cost-center pickers: a `select` whose options the server injects at
-    # render time from the current Gremien or from the budget tree (effective_form).
-    # The form does not hold them. The stored value is a UUID.
     "gremium_select",
     "budget_select",
-    # Typed inputs with built-in validation (instead of a hand-maintained `pattern`).
     "email",
     "iban",
-    # Date range {from, to} — both ISO dates, from <= to.
     "daterange",
     "checkbox",
     "file",
     "table",
     "markdown",
     "computed",
-    # Cost positions: a list of positions. Each position needs at least minOffers
-    # comparison offers. Exactly one offer is the preferred one, and its value is the
-    # position value. The sum of the positions is the amount.
     "positions",
-    # Requested funding: an amount in euro, separate from the cost total. At most one per
-    # form, only beside a `positions` field, and never above the cost total. When the
-    # applicant fills it in, it is the amount; otherwise the cost total is.
     "funding",
-    # Section marker (multi-step forms): carries only a label and splits the following
-    # fields into a new step. No answer value, no validation.
     "section",
 ]
-# Event names — shared by notification and webhook config.
+#: Event names that the notification and the webhook config share.
 EventName = Literal[
     "application_created",
     "application_updated",
@@ -150,8 +144,6 @@ EventName = Literal[
     "budget_reserved",
     "budget_booked",
     "protocol_finalized",
-    "deadline_approaching",
-    "deadline_passed",
 ]
 
 
@@ -165,13 +157,24 @@ class FlowValidationError(Exception):
     """The flow graph violates a structural rule (initial, reachability, ref, op, action)."""
 
 
-# Form definition
 class FieldOption(_CamelModel):
+    """One option of a select field."""
     value: str
     label: I18nMap
 
 
 class FieldValidation(_CamelModel):
+    """Validation constraints of one form field.
+
+    Attributes:
+        min_offers: For ``positions``, the minimum comparison offers per position.
+        max_positions: For ``positions``, the max positions. Without a builder value
+            the engine applies a default cap, so the body cap is not the only bound on
+            validation and on ``positions_total``.
+        allow_no_offers: For ``positions``, allow the per-position opt-out of offers.
+            The opt-out is a checkbox with a mandatory reason, and the position then
+            needs only one offer. Unset means allowed.
+    """
     min: float | None = None
     max: float | None = None
     min_len: int | None = Field(default=None, alias="minLen", ge=0)
@@ -180,17 +183,10 @@ class FieldValidation(_CamelModel):
     file_types: list[str] | None = Field(default=None, alias="fileTypes")
     max_size_mb: float | None = Field(default=None, alias="maxSizeMB", gt=0)
     max_rows: int | None = Field(default=None, alias="maxRows", ge=0)
-    # `positions`: minimum comparison offers per position / minimum positions.
     min_offers: int | None = Field(default=None, alias="minOffers", ge=1)
     min_positions: int | None = Field(default=None, alias="minPositions", ge=1)
-    # `positions`: max positions and max offers per position. Even without a builder
-    # value the engine applies a default cap. The body cap is then not the only bound
-    # on validation and on `positions_total`.
     max_positions: int | None = Field(default=None, alias="maxPositions", ge=1)
     max_offers: int | None = Field(default=None, alias="maxOffers", ge=1)
-    # `positions`: allow the per-position opt-out of comparison offers. The opt-out is a
-    # checkbox with a mandatory reason. The position then needs only one offer. Unset
-    # means allowed.
     allow_no_offers: bool | None = Field(default=None, alias="allowNoOffers")
 
     @field_validator("pattern")
@@ -220,6 +216,7 @@ class FieldValidation(_CamelModel):
 
 
 class FormFieldDef(_CamelModel):
+    """Definition of one form field."""
     key: str = Field(pattern=KEY_PATTERN)
     type: FieldType
     label: I18nMap
@@ -236,6 +233,7 @@ class FormFieldDef(_CamelModel):
     @field_validator("visible_if", "compute")
     @classmethod
     def _check_jsonlogic(cls, v: dict[str, Any] | None) -> dict[str, Any] | None:
+        """Reject a ``visibleIf`` or ``compute`` rule with a non-whitelisted operator."""
         if v is not None:
             try:
                 validate_jsonlogic(v)
@@ -245,6 +243,7 @@ class FormFieldDef(_CamelModel):
 
     @model_validator(mode="after")
     def _check_promote_and_options(self) -> FormFieldDef:
+        """Require the promote target, the select options and the compute rule."""
         if self.is_promoted and not self.promote_target:
             raise ValueError("promoteTarget is required when isPromoted is true")
         if self.type in ("select", "multiselect") and not self.options:
@@ -254,43 +253,50 @@ class FormFieldDef(_CamelModel):
         return self
 
 
-# Flow graph
 StateKind = Literal["normal", "vote"]
 TransitionBranch = Literal["pass", "fail"]
 
 
 class StateDef(_CamelModel):
+    """One state of a flow graph.
+
+    Attributes:
+        is_terminal: Retention and anonymization apply to an application in this state.
+    """
     key: str = Field(pattern=KEY_PATTERN)
     label: I18nMap
     color: str | None = None
     edit_allowed: bool = Field(default=True, alias="editAllowed")
     is_initial: bool = Field(default=False, alias="isInitial")
-    # Terminal state: retention and anonymization apply to a terminal application.
     is_terminal: bool = Field(default=False, alias="isTerminal")
     kind: StateKind = "normal"
     config: dict[str, Any] = Field(default_factory=dict)
 
 
 class TransitionDef(_CamelModel):
+    """One transition of a flow graph.
+
+    Attributes:
+        color: Color of the editor arrow and of the decision button.
+        automatic: The worker fires the transition once the guard holds.
+        branch: Result branch of a vote state (pass or fail).
+        requires_action: The transition counts as an open task of the actor (Tasks
+            tab). False marks a purely optional action.
+    """
     from_: str = Field(alias="from")
     to: str
     label: I18nMap | None = None
-    # Optional color for the editor arrow and for the decision button in the
-    # application.
     color: str | None = None
     guard: dict[str, Any] | None = None
     actions: list[dict[str, Any]] = Field(default_factory=list)
     order: int | None = None
-    # The worker fires an automatic transition once the guard holds.
     automatic: bool = False
-    # Result branch of a vote state: pass or fail.
     branch: TransitionBranch | None = None
-    # Does a firable transition count as an open task for the actor (Tasks tab)?
-    # ``False`` marks a purely optional action.
     requires_action: bool = Field(default=True, alias="requiresAction")
 
 
 class FlowGraph(_CamelModel):
+    """A flow: its states, transitions and editor layout."""
     states: list[StateDef]
     transitions: list[TransitionDef] = Field(default_factory=list)
     layout: dict[str, Any] | None = None
@@ -303,6 +309,18 @@ def validate_flow_graph(graph: FlowGraph) -> None:
     must be unique. Every `from` and `to` reference must name a known state. Every
     state must be reachable from the initial state. A guard may use only whitelisted
     operators. An action must have a known type.
+
+    A self-loop is refused, because the optimistic locking of the engine
+    (``WHERE current_state_id = from_state``) cannot detect a concurrent double firing
+    of a from==to transition, which duplicates events and actions. The actor gates
+    (roleIs, isInCommittee) are allowed only on a manual transition.
+    ``addToNextSession`` may only lead into a ``vote`` state. A vote state with
+    ``gremiumSource: "budget"`` takes its Gremium from the cost center on entry, before
+    the post-commit actions run. So an action of the same transition that sets the cost
+    center comes too late, and an agenda action with a fixed ``gremiumId`` could name
+    another Gremium; both are refused. A ``voteGremium`` recipient is valid only into a
+    vote state, because the engine clears that snapshot on every other target before
+    the mail goes out.
 
     Raises:
         FlowValidationError: The graph violates one of these rules.
@@ -334,27 +352,18 @@ def validate_flow_graph(graph: FlowGraph) -> None:
             raise FlowValidationError(f"transition references unknown from-state: {t.from_!r}")
         if t.to not in key_set:
             raise FlowValidationError(f"transition references unknown to-state: {t.to!r}")
-        # The engine does not support a self-loop. Its optimistic locking
-        # (``WHERE current_state_id = from_state``) cannot detect a concurrent double
-        # firing of a from==to transition, which duplicates events and actions.
         if t.from_ == t.to:
             raise FlowValidationError(
                 f"transition {t.from_!r} -> {t.to!r}: self-loops are not supported"
             )
         try:
-            # Allow the actor gates (roleIs, isInCommittee) only on a manual transition.
             validate_guard(t.guard, allow_actor_ops=not t.automatic)
             for action in t.actions:
                 validate_action(action)
-                # ``addToNextSession`` may only lead into a ``vote`` state.
                 if action.get("type") == "addToNextSession" and kind_by_key.get(t.to) != "vote":
                     raise GuardError(
                         "addToNextSession action is only valid on a transition into a vote state"
                     )
-                # A vote state with `gremiumSource: "budget"` takes its Gremium from the
-                # cost center on entry, before the post-commit actions run. A cost
-                # center that an action of the same transition sets would come too
-                # late, and the vote would run under the old cost center.
                 if (
                     action.get("type") in ASSIGN_BUDGET_ACTION_TYPES
                     and t.to in budget_vote_keys
@@ -364,8 +373,6 @@ def validate_flow_graph(graph: FlowGraph) -> None:
                         "a vote state whose Gremium comes from the cost center; assign "
                         "the cost center on an earlier transition"
                     )
-                # The Gremium of such a state is the one of the cost center. A fixed
-                # `gremiumId` on the agenda action could name another Gremium.
                 if (
                     action.get("type") == "addToNextSession"
                     and "gremiumId" in action
@@ -375,8 +382,6 @@ def validate_flow_graph(graph: FlowGraph) -> None:
                         "addToNextSession must not name a gremiumId on a transition into "
                         "a vote state whose Gremium comes from the cost center"
                     )
-                # `voteGremium` resolves the snapshot of the vote state. The engine
-                # clears it on every other target before the mail goes out.
                 if (
                     action.get("type") == "notify"
                     and kind_by_key.get(t.to) != "vote"
@@ -404,6 +409,11 @@ def _validate_state_kinds(graph: FlowGraph, key_set: set[str]) -> None:
     of ``config.gremiumId`` (a fixed Gremium) or ``config.gremiumSource: "budget"``
     (the deciding Gremium of the cost center). It also needs exactly two outgoing
     transitions, one with branch ``pass`` and one with branch ``fail``.
+
+    A vote state has no automatic non-branch exit, because the worker fires it as soon
+    as its guard holds and the application would be "approved" without any vote. A
+    normal state has no branch transition, because only a vote outcome fires one, so it
+    would be a dead edge.
     """
     outgoing: dict[str, list[TransitionDef]] = {k: [] for k in key_set}
     for t in graph.transitions:
@@ -419,9 +429,6 @@ def _validate_state_kinds(graph: FlowGraph, key_set: set[str]) -> None:
                     f"vote state {s.key!r} needs exactly two outgoing transitions "
                     "with branch 'pass' and 'fail'"
                 )
-            # Only the vote (pass/fail) or a deliberate manual abort may decide a vote
-            # state. The worker fires an automatic non-branch exit as soon as its guard
-            # holds. The application would then be "approved" without any vote.
             for t in outgoing[s.key]:
                 if t.automatic and not t.branch:
                     raise FlowValidationError(
@@ -430,9 +437,6 @@ def _validate_state_kinds(graph: FlowGraph, key_set: set[str]) -> None:
                         "manual exit may leave it"
                     )
         elif branches:
-            # Only the vote outcome fires a branch transition. On a normal state such a
-            # transition is reachable neither manually nor automatically. It is a dead
-            # edge.
             raise FlowValidationError(
                 f"state {s.key!r} (kind={s.kind!r}) must not have branch transitions"
             )
@@ -444,7 +448,8 @@ def _validate_vote_gremium(state: StateDef) -> None:
     Raises:
         FlowValidationError: The state sets both ``gremiumId`` and ``gremiumSource``,
             neither of them, an empty ``gremiumId``, or an unknown ``gremiumSource``.
-            The initial state cannot use ``gremiumSource``.
+            The initial state cannot use ``gremiumSource``, because a new
+            application has no cost center yet.
     """
     has_id = "gremiumId" in state.config
     has_source = "gremiumSource" in state.config
@@ -459,7 +464,6 @@ def _validate_vote_gremium(state: StateDef) -> None:
                 f"vote state {state.key!r}: config.gremiumSource must be "
                 f"{GREMIUM_SOURCE_BUDGET!r}"
             )
-        # A new application has no cost center yet, so no Gremium could resolve.
         if state.is_initial:
             raise FlowValidationError(
                 f"vote state {state.key!r}: the initial state cannot take its Gremium "
@@ -477,6 +481,7 @@ def _validate_vote_gremium(state: StateDef) -> None:
 def _assert_all_reachable(
     initial: str, key_set: set[str], transitions: list[TransitionDef]
 ) -> None:
+    """Raise FlowValidationError when a state is not reachable from the initial one."""
     adjacency: dict[str, list[str]] = {k: [] for k in key_set}
     for t in transitions:
         adjacency[t.from_].append(t.to)
@@ -534,24 +539,30 @@ def _assert_no_automatic_cycle(
             _visit(key, [])
 
 
-# Voting rules
 class Quorum(_CamelModel):
+    """Quorum of a vote: a count or a percentage."""
     type: Literal["count", "percent"]
     value: float = Field(ge=0)
 
 
-# Keys that an old vote row can still hold. VoteConfig.from_stored drops them.
+#: Keys that an old vote row can still hold. ``VoteConfig.from_stored`` drops them.
 _LEGACY_VOTE_KEYS = frozenset({"allowChange", "allow_change"})
 
 
 class VoteConfig(_CamelModel):
     """The rules of one vote, stored as JSONB in ``vote.config``.
 
-    A ballot can never change after the cast (O11), so the config has no
+    A ballot can never change after the cast, so the config has no
     ``allowChange``. Migration ``vote_closed_at`` removes the key from the old rows,
     because ``extra=forbid`` refuses it. The API still refuses the key on create. To
     read a stored row, use ``from_stored``: an old container can write the key during a
     deploy, after the migration ran.
+
+    Attributes:
+        guests_vote: In a public meeting the admitted guests vote too. Such a vote
+            has no quorum; only the majority of the cast ballots counts. Only a
+            meeting vote in a meeting with ``guests_mode = vote`` sets it, never on a
+            non-public agenda item.
     """
 
     options: list[str] = Field(min_length=2)
@@ -560,14 +571,11 @@ class VoteConfig(_CamelModel):
     abstain_counts_quorum: bool = Field(default=True, alias="abstainCountsQuorum")
     secret: bool = False
     tie_break: Literal["passed", "rejected", "tie"] = Field(default="rejected", alias="tieBreak")
-    # Public meeting (#17): the admitted guests vote too. Such a vote has no quorum,
-    # only the majority of the cast ballots counts. Only a meeting vote in a meeting
-    # with ``guests_mode = vote`` sets it, never on a non-public agenda item.
     guests_vote: bool = Field(default=False, alias="guestsVote")
 
     @model_validator(mode="after")
     def _guests_vote_has_no_quorum(self) -> VoteConfig:
-        """A vote with guests has no quorum (#17): only the majority of the cast ballots."""
+        """A vote with guests has no quorum: only the majority of the cast ballots."""
         if self.guests_vote and self.quorum is not None:
             raise ValueError("a vote with guests (guestsVote) has no quorum")
         return self
@@ -575,6 +583,7 @@ class VoteConfig(_CamelModel):
     @field_validator("options")
     @classmethod
     def _unique_options(cls, v: list[str]) -> list[str]:
+        """Refuse duplicate options."""
         if len(set(v)) != len(v):
             raise ValueError("vote options must be unique")
         return v
@@ -585,22 +594,21 @@ class VoteConfig(_CamelModel):
 
         The method drops the legacy ``allowChange`` key (and only that key) before the
         validation. ``extra=forbid`` still refuses every other unknown key. A
-        ``VoteConfig`` instance passes as it is.
+        ``VoteConfig`` instance passes as it is. An election row (with ``seats``) and a
+        poll row (with ``mode``) return their projection on the motion rules, so the
+        readers of secret, guests and options work for every vote kind.
         """
         if isinstance(data, VoteConfig):
             return data
         if "seats" in data:
-            # F2: an election row (``vote.kind = 'election'``). The readers of the motion
-            # rules (secret, guests, options) get the projection of the election.
             return ElectionConfig.model_validate(data).as_vote_config()
         if "mode" in data:
-            # A poll row (``vote.kind = 'poll'``): the same projection as an election.
             return PollConfig.model_validate(data).as_vote_config()
         return cls.model_validate({k: v for k, v in data.items() if k not in _LEGACY_VOTE_KEYS})
 
 
-# F2 · Personnel elections. The answer keys of the single-candidate ballot (Ja/Nein/
-# Enthaltung) and of a full abstention. A candidate id never takes one of them.
+#: Answer keys of the single-candidate ballot (Ja/Nein/Enthaltung) and of a full
+#: abstention. A candidate id never takes one of them.
 ELECTION_RESERVED_IDS = frozenset({"yes", "no", "abstain"})
 ELECTION_MAX_CANDIDATES = 50
 
@@ -632,7 +640,7 @@ class ElectionCandidate(_CamelModel):
 
 
 class ElectionConfig(_CamelModel):
-    """The rules of one election (F2), stored as JSONB in ``vote.config``.
+    """The rules of one election, stored as JSONB in ``vote.config``.
 
     ``vote.kind = 'election'`` marks the row. An election has no majority rule and no
     tie break: the relative majority elects, a tie at the seat boundary goes to a
@@ -687,6 +695,7 @@ class ElectionConfig(_CamelModel):
 
     @property
     def candidate_ids(self) -> list[str]:
+        """Return the candidate ids in ballot order."""
         return [c.id for c in self.candidates]
 
     def as_vote_config(self) -> VoteConfig:
@@ -708,9 +717,8 @@ class ElectionConfig(_CamelModel):
         )
 
 
-# Polls ("Umfrage"). A poll only counts the answers: no quorum, no majority, no lot,
-# no flow branch. ``abstain`` is the key of the abstentions in the counts, so an option
-# id never takes it.
+#: Minimum options of a poll. A poll only counts the answers: no quorum, no majority,
+#: no lot, no flow branch. ``abstain`` keys the abstentions, so no option id takes it.
 POLL_MIN_OPTIONS = 2
 POLL_MAX_OPTIONS = 20
 POLL_LABEL_MAX = 200
@@ -734,6 +742,7 @@ class PollOption(_CamelModel):
     @field_validator("label")
     @classmethod
     def _strip_label(cls, v: str | None) -> str | None:
+        """Strip the label and refuse an empty one."""
         if v is None:
             return None
         stripped = v.strip()
@@ -743,6 +752,7 @@ class PollOption(_CamelModel):
 
     @model_validator(mode="after")
     def _end_after_start(self) -> PollOption:
+        """Require the end of a date option after its start."""
         if self.end is not None and (self.start is None or self.end <= self.start):
             raise ValueError("the end of a date option must come after its start")
         return self
@@ -764,6 +774,7 @@ class PollConfig(_CamelModel):
 
     @model_validator(mode="after")
     def _check(self) -> PollConfig:
+        """Check unique ids, the option form of the mode and ``maxChoices``."""
         ids = self.option_ids
         if len(set(ids)) != len(ids):
             raise ValueError("poll option ids must be unique")
@@ -781,6 +792,7 @@ class PollConfig(_CamelModel):
 
     @property
     def option_ids(self) -> list[str]:
+        """Return the option ids in creator order."""
         return [o.id for o in self.options]
 
     @property
@@ -808,13 +820,14 @@ class PollConfig(_CamelModel):
         )
 
 
-# Notification rule
 class Recipient(_CamelModel):
+    """Recipient of a notification rule: a group, a role or the applicant."""
     kind: Literal["group", "role", "applicant"]
     ref: str | None = None
 
     @model_validator(mode="after")
     def _check_ref(self) -> Recipient:
+        """Require ``ref`` for a group or role and forbid it for the applicant."""
         if self.kind in ("group", "role") and not self.ref:
             raise ValueError(f"recipient kind {self.kind!r} requires 'ref'")
         if self.kind == "applicant" and self.ref is not None:
@@ -823,6 +836,7 @@ class Recipient(_CamelModel):
 
 
 class NotificationRule(_CamelModel):
+    """Rule that sends a mail template to recipients on an event."""
     event: EventName
     filter_type_id: UUID | None = Field(default=None, alias="filterTypeId")
     recipients: list[Recipient] = Field(min_length=1)
@@ -831,6 +845,7 @@ class NotificationRule(_CamelModel):
 
 
 class WebhookConfig(_CamelModel):
+    """Config of one outgoing webhook."""
     name: str
     url: HttpUrl
     events: list[EventName] = Field(min_length=1)
@@ -838,13 +853,13 @@ class WebhookConfig(_CamelModel):
 
 
 class ComparisonOffers(_CamelModel):
+    """Requirement for comparison offers on an application."""
     required: bool = False
     min_count: int = Field(default=2, alias="minCount", ge=0)
     threshold_amount: Decimal | None = Field(default=None, alias="thresholdAmount", ge=0)
     as_: Literal["file", "field", "both"] = Field(default="file", alias="as")
 
 
-# JSON-Schema export for the frontend editors and for client-side validation
 def _exported_models() -> dict[str, type[BaseModel]]:
     """Return the config models to export.
 

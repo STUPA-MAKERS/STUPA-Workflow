@@ -1,8 +1,7 @@
 """Integration fixtures: a real Postgres 16 from testcontainers plus an Alembic upgrade.
 
 The tests skip when no Docker runtime is reachable, for example on a local machine
-without Docker. The CI integration stage (T-04) runs Docker, so the tests run there.
-See data-model §4 and testing.md §5.
+without Docker. The CI integration stage runs Docker, so the tests run there.
 """
 
 from __future__ import annotations
@@ -37,7 +36,13 @@ def _pg_urls() -> Iterator[tuple[str, str]]:
         pytest.skip("testcontainers nicht installiert")
 
     try:
-        container = PostgresContainer("postgres:16-alpine", driver="psycopg")
+        # The test database is thrown away after the run, so it needs no
+        # durability. Each test truncates the data tables twice, and with fsync on
+        # every TRUNCATE waits for the disk, which makes the suite about four times
+        # slower.
+        container = PostgresContainer("postgres:16-alpine", driver="psycopg").with_command(
+            "postgres -c fsync=off -c synchronous_commit=off -c full_page_writes=off"
+        )
         container.start()
     except Exception as exc:  # pragma: no cover - Umgebung ohne Docker
         pytest.skip(f"keine Docker-Runtime: {exc}")
@@ -64,6 +69,22 @@ def migrated(_pg_urls: tuple[str, str]) -> tuple[str, str]:
     return sync_url, async_url
 
 
+@pytest.fixture(autouse=True)
+def _no_mail_pool(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Skip the arq pool in the app lifespan.
+
+    The test stack has no Redis at the configured URL, so each app start waits for
+    the full open timeout (5 s) before the lifespan falls back to no pool, and every
+    test that opens a `TestClient` waits again. The stub gives the same result, no
+    pool, at once.
+    """
+
+    async def _none(_redis_url: str) -> None:
+        return None
+
+    monkeypatch.setattr("app.main.create_mail_pool", _none)
+
+
 @pytest.fixture
 def alembic_cfg(migrated: tuple[str, str]) -> Config:
     return _make_alembic_config(migrated[1])
@@ -84,6 +105,14 @@ def engine(migrated: tuple[str, str]) -> Iterator[Engine]:
         eng.dispose()
 
 
+#: Tables that the ``engine`` fixture truncates after each test. The meeting and vote
+#: tables are listed, because the ``application`` CASCADE does not reach them, and they
+#: would leak between tests (``uq_flow_version_version``, vote or ballot collisions);
+#: their CASCADE clears the children. The single-row settings fall back to the defaults
+#: after the truncate, so a changed setting does not leak. ``attachment_draft_token``,
+#: ``audit_verification`` and ``ticket_sender_block`` have no FK that a CASCADE follows.
+#: ``ticket`` and ``todo_board`` clear their child rows by CASCADE; a test creates the
+#: boards it needs (``ensure_gremium_board``, ``GET /todos/boards``).
 _DATA_TABLES = (
     "applicant",
     "application",
@@ -93,34 +122,18 @@ _DATA_TABLES = (
     "form_field",
     "form_version",
     "application_type",
-    # Meeting, vote and deadline domain (#PII-Re-Add test isolation). The `application`
-    # CASCADE does not reach these tables. Without this list they leak between tests, for
-    # example as `uq_flow_version_version`, vote or ballot collisions. CASCADE also clears
-    # the children: agenda_item, attendance, protocol, ballot and others.
     "meeting",
     "vote",
     "ballot",
     "protocol",
-    "deadline",
-    "deadline_policy",
     "task_reminder_log",
-    # Single-row settings (Z1). After the truncate the code falls back to the
-    # defaults, so a test that changes them does not leak into the next one.
     "guest_application_settings",
     "meeting_settings",
     "login_settings",
-    # Draft tokens of the wizard (Z4). No FK reaches this table, so the `application`
-    # CASCADE does not clear it.
     "attachment_draft_token",
-    # Stored audit-chain checks (Z6). No FK reaches this table either.
     "audit_verification",
-    # Tickets. CASCADE also clears the notes, the events and the ticket attachments.
     "ticket",
-    # Sender blocks. A block of an e-mail address has no FK to a ticket or an account
-    # that a CASCADE follows.
     "ticket_sender_block",
-    # To-do boards. CASCADE also clears the columns, the cards and their rows. A test
-    # creates the boards it needs (`ensure_gremium_board`, `GET /todos/boards`).
     "todo_board",
 )
 
@@ -144,12 +157,14 @@ def clear_privacy_tables(eng: Engine) -> None:
 
 
 def _truncate(eng: Engine) -> None:
+    """Truncate the data tables and the audit log.
+
+    A trigger keeps ``audit_entry`` append-only, also against TRUNCATE. This maintenance
+    transaction is the only place that bypasses it, because ``session_replication_role =
+    replica`` turns off the user triggers; the trigger itself stays. A separate test proves
+    that normal operation rejects the write.
+    """
     with eng.begin() as conn:
-        # A trigger keeps `audit_entry` append-only, also against TRUNCATE (T-23). This
-        # maintenance transaction is the only place that bypasses the protection, because
-        # `session_replication_role = replica` turns off the user triggers. The trigger
-        # itself stays in place. A separate test proves that normal operation rejects the
-        # write.
         conn.execute(text("SET LOCAL session_replication_role = replica"))
         conn.execute(text("TRUNCATE audit_entry RESTART IDENTITY"))
         conn.execute(text("SET LOCAL session_replication_role = origin"))

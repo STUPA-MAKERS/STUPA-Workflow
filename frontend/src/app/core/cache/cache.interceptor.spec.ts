@@ -24,26 +24,27 @@ describe('cacheInterceptor', () => {
   afterEach(() => mock.verify());
 
   describe('listContext', () => {
+    /**
+     * A page switch shows the list at once, and the list corrects itself a moment later, instead of
+     * a loading state for a round trip.
+     */
     it('paints page one from the cache before the request answers', () => {
-      // What a page switch is supposed to feel like: the list is there, and corrects
-      // itself a moment later rather than showing a loading state for a round trip.
       http.get('/api/expenses', { context: listContext(0) }).subscribe();
       mock.expectOne('/api/expenses').flush({ items: ['a'], total: 1, offset: 0 });
 
       const seen: unknown[] = [];
       http.get('/api/expenses', { context: listContext(0) }).subscribe((b) => seen.push(b));
-      // Before the request is answered — the cached page is already delivered.
       expect(seen).toEqual([{ items: ['a'], total: 1, offset: 0 }]);
 
       mock.expectOne('/api/expenses').flush({ items: ['a', 'b'], total: 2, offset: 0 });
       expect(seen).toHaveLength(2);
     });
 
+    /** A read ahead in flight is not joined either. The detail that the list read ahead stays. */
     it('skips the stored page and a read in flight inside freshly(), and stores the answer', () => {
       http.get('/api/expenses', { context: listContext(0) }).subscribe();
       mock.expectOne('/api/expenses').flush({ items: ['a'] });
       cache.set('/api/expenses/e1', { id: 'e1' });
-      // A read ahead in flight is not joined either.
       http.get('/api/invoices', { context: listContext(0) }).subscribe();
 
       const seen: unknown[] = [];
@@ -55,14 +56,15 @@ describe('cacheInterceptor', () => {
       const both = mock.match('/api/invoices');
       expect(both).toHaveLength(2);
       both.forEach((r) => r.flush({ items: [] }));
-      // The detail that the list read ahead stays.
       expect(cache.get('/api/expenses/e1', 60_000)).toEqual({ id: 'e1' });
       expect(cache.get('/api/expenses', 60_000)).toEqual({ items: ['a', 'b'] });
     });
 
+    /**
+     * A cached GET emits twice, and a load-more subscriber appends what it gets. Two emissions
+     * there mean that every row of that page arrives a second time.
+     */
     it('never caches a load-more page, which would append the same rows twice', () => {
-      // A cached GET emits twice, and a load-more subscriber appends what it is given.
-      // Two emissions there means every row of that page arriving a second time.
       http.get('/api/expenses?offset=20', { context: listContext(20) }).subscribe();
       mock.expectOne('/api/expenses?offset=20').flush({ items: ['c'], total: 40, offset: 20 });
       expect(cache.size).toBe(0);
@@ -76,15 +78,15 @@ describe('cacheInterceptor', () => {
       expect(seen).toHaveLength(1);
     });
 
+    /** The list APIs leave `offset` off the first request instead of sending 0. */
     it('treats a missing offset as page one', () => {
-      // The list APIs leave `offset` off the first request rather than sending 0.
       http.get('/api/invoices', { context: listContext(undefined) }).subscribe();
       mock.expectOne('/api/invoices').flush({ items: [], total: 0, offset: 0 });
       expect(cache.size).toBe(1);
     });
 
+    /** A booking that was just created must not be missing from the list that follows it. */
     it('drops the cached page when something is written to the collection', () => {
-      // A booking that was just created cannot be missing from the list that follows it.
       http.get('/api/expenses', { context: listContext(0) }).subscribe();
       mock.expectOne('/api/expenses').flush({ items: ['a'], total: 1, offset: 0 });
       expect(cache.size).toBe(1);
@@ -101,10 +103,11 @@ describe('cacheInterceptor', () => {
     expect(cache.size).toBe(0);
   });
 
+  /**
+   * The page paints from the cache and then corrects itself. A caller that takes only the first
+   * emission keeps the old answer, which is why this is opt-in per call site.
+   */
   it('stores a cached GET and serves it again, then the fresh answer', () => {
-    // The whole point: the page paints from the cache and then corrects itself. A caller
-    // that took only the first emission would keep the old answer, which is exactly why
-    // this is opt-in per call site.
     http.get('/api/budgets', { context: cached() }).subscribe();
     mock.expectOne('/api/budgets').flush(['old']);
 
@@ -116,9 +119,11 @@ describe('cacheInterceptor', () => {
     expect(seen).toEqual([['old'], ['new']]);
   });
 
+  /**
+   * The stream uses `concat`, not `merge`, because the subscriber must have something to paint
+   * before anything else happens, whatever the network does.
+   */
   it('serves the cached value BEFORE the request goes out', () => {
-    // `concat`, not `merge`: the subscriber must have something to paint before anything
-    // else happens, whatever the network does.
     http.get('/api/budgets', { context: cached() }).subscribe();
     mock.expectOne('/api/budgets').flush(['old']);
 
@@ -135,6 +140,7 @@ describe('cacheInterceptor', () => {
     expect(seen).toEqual([['a']]);
   });
 
+  /** A ttl of zero is never served, so there is one emission and it is the fresh one. */
   it('refetches once the entry is past its ttl', () => {
     http.get('/api/budgets', { context: cached(0) }).subscribe();
     mock.expectOne('/api/budgets').flush(['old']);
@@ -142,7 +148,6 @@ describe('cacheInterceptor', () => {
     const seen: unknown[] = [];
     http.get('/api/budgets', { context: cached(0) }).subscribe((b) => seen.push(b));
     mock.expectOne('/api/budgets').flush(['new']);
-    // A ttl of zero can never be served, so there is one emission and it is the fresh one.
     expect(seen).toEqual([['new']]);
   });
 
@@ -171,8 +176,8 @@ describe('cacheInterceptor', () => {
       expect(cache.size).toBe(1);
     });
 
+    /** A cost centre that was just created must not be missing from the list that follows. */
     it('a mutation under the same collection drops it', () => {
-      // A cost centre that was just created cannot be missing from the list that follows.
       http.post('/api/budgets', {}).subscribe();
       expect(cache.size).toBe(0);
       mock.expectOne('/api/budgets').flush({});
@@ -190,9 +195,11 @@ describe('cacheInterceptor', () => {
       mock.expectOne('/api/applications').flush({});
     });
 
+    /**
+     * A request that errors may still have changed something. A stale list after a half-failed
+     * write is worse than one extra fetch.
+     */
     it('invalidates even when the mutation fails', () => {
-      // A request that errors may still have changed something. Serving a stale list
-      // after a half-failed write is worse than one extra fetch.
       http.post('/api/budgets', {}).subscribe({ error: () => undefined });
       expect(cache.size).toBe(0);
       mock.expectOne('/api/budgets').flush(null, { status: 500, statusText: 'x' });

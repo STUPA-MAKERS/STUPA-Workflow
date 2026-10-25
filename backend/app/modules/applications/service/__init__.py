@@ -7,7 +7,7 @@ Layout of the package:
 ``create``
     Creation: effective-form validation, v1, initial state and status event.
 ``on_behalf``
-    Capture on behalf of an applicant (#11) and the applicant search of the dialog.
+    Capture on behalf of an applicant and the applicant search of the dialog.
 ``edits``
     Versioned data edits with a diff, version history and deletion.
 ``reads``

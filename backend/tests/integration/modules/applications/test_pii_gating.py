@@ -1,4 +1,4 @@
-"""O21: the `isPII` fields reach only a reader with the PII right (real Postgres).
+"""The `isPII` fields reach only a reader with the PII right (real Postgres).
 
 The right is `application.read`, `application.read_all` or admin. The applicant
 (magic link) and the logged-in creator read the own data. A member who reads only
@@ -14,6 +14,7 @@ from __future__ import annotations
 import io
 import uuid
 from collections.abc import AsyncIterator
+from typing import Any
 
 import pytest
 from fastapi import FastAPI
@@ -71,13 +72,13 @@ async def _world(
     return seed, app_id
 
 
-def _detail(api: FastAPI, app_id: uuid.UUID) -> dict:
+def _detail(api: FastAPI, app_id: uuid.UUID) -> dict[str, Any]:
     body = get_json(api, f"/api/applications/{app_id}")
     assert isinstance(body, dict)
     return body
 
 
-def _versions(api: FastAPI, app_id: uuid.UUID) -> list:
+def _versions(api: FastAPI, app_id: uuid.UUID) -> list[Any]:
     body = get_json(api, f"/api/applications/{app_id}/versions")
     assert isinstance(body, list)
     return body
@@ -118,16 +119,18 @@ async def test_committee_reader_gets_no_pii(
     maker: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Hide the PII from a Gremium member who reads through the view cost center.
+
+    The client hides exactly the ``hiddenKeys`` fields in the edit form.
+    """
     seed, app_id = await _world(maker)
     api = build_read_api(migrated[1], monkeypatch)
-    # Gremium member without a global permission: reads through the view cost centre.
     as_principal(api, Principal(sub=seed.member_sub, display_name=MEMBER_NAME))
 
     detail = _detail(api, app_id)
     assert "iban" not in detail["data"]
     assert detail["data"]["note"] == "zweite"
     assert detail["applicant"] is None
-    # The client hides exactly these fields in the edit form.
     assert detail["hiddenKeys"] == ["iban"]
 
     versions = _versions(api, app_id)
@@ -181,10 +184,13 @@ async def test_editor_without_read_keeps_the_stored_pii(
     maker: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Keep the stored PII when an editor without read sends the form.
+
+    With `application.manage` but without `application.read` the editor reads no IBAN and
+    sends the form back without it, or with a value it never saw.
+    """
     seed, app_id = await _world(maker)
     api = build_read_api(migrated[1], monkeypatch)
-    # `application.manage` without `application.read`: the editor reads no IBAN and
-    # sends the form back without it, or with a value it never saw.
     as_principal(api, staff(seed))
     with TestClient(api) as client:
         without = client.patch(
@@ -228,7 +234,7 @@ async def test_idempotent_archive_strips_pii_without_read(
     maker: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The no-op path of archive and unarchive applies O21 too."""
+    """The no-op path of archive and unarchive applies the PII strip too."""
     _, app_id = await _world(maker)
     api = build_read_api(migrated[1], monkeypatch)
     as_principal(api, Principal(sub="archivar", permissions={"application.archive"}))
@@ -254,7 +260,7 @@ async def test_search_finds_no_application_by_a_hidden_pii_value(
     maker: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The search is no oracle for a PII value (O21).
+    """The search is no oracle for a PII value.
 
     A Gremium reader without the PII right finds the application by its title, but
     not by its IBAN. The reader with the right and the creator find it by both.
@@ -279,7 +285,10 @@ async def test_creator_without_read_gets_no_internal_comment(
     maker: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The creator without a read permission reads as the applicant (A12)."""
+    """The creator without a read permission reads as the applicant.
+
+    A member with the read permission still reads both.
+    """
     seed, app_id = await _world(maker)
     async with maker() as session:
         for visibility in ("internal", "public"):
@@ -302,7 +311,6 @@ async def test_creator_without_read_gets_no_internal_comment(
         )
     assert resp.status_code == 403, resp.text
 
-    # A member with the read permission still reads both.
     as_principal(api, Principal(sub="reader", permissions={"application.read"}))
     comments = get_json(api, f"/api/applications/{app_id}/comments")
     assert isinstance(comments, list)
@@ -314,10 +322,13 @@ async def test_editor_without_read_is_not_blocked_by_a_missing_required_pii_fiel
     maker: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A required isPII field without a stored value does not stop the blind editor."""
+    """A required isPII field without a stored value does not stop the blind editor.
+
+    The IBAN goes away first, then the field becomes required: old data, new rule. The
+    reader who sees the field still gets the 422.
+    """
     seed = await seed_read_world(maker)
     app_id = await create_app(maker, seed, actor=seed.owner_sub)
-    # The IBAN goes away, then the field becomes required: old data, new rule.
     await patch(maker, app_id, {"title": "Antrag", "note": "ohne"}, changed_by=seed.owner_sub)
     async with maker() as session:
         await session.execute(
@@ -340,7 +351,6 @@ async def test_editor_without_read_is_not_blocked_by_a_missing_required_pii_fiel
         )
     assert blind.status_code == 200, blind.text
 
-    # The reader who sees the field still gets the 422.
     as_principal(
         api, Principal(sub="editor", permissions={"application.read", "application.manage"})
     )
@@ -376,7 +386,10 @@ async def test_xlsx_export_holds_no_pii(
 async def _attachments(
     maker: async_sessionmaker[AsyncSession], app_id: uuid.UUID
 ) -> tuple[uuid.UUID, uuid.UUID, uuid.UUID]:
-    """Three quarantined attachments: by PII field key, by PII answer, and a plain one."""
+    """Three quarantined attachments: by PII field key, by PII answer, and a plain one.
+
+    The answer of an isPII field refers to an attachment, like a file field.
+    """
     async with maker() as session:
         by_key = Attachment(
             application_id=app_id,
@@ -404,7 +417,6 @@ async def _attachments(
         )
         session.add_all([by_key, by_ref, plain])
         await session.flush()
-        # The answer of an isPII field refers to the attachment, like a file field.
         row = await session.get(Application, app_id)
         assert row is not None
         row.data = {**row.data, "iban": str(by_ref.id)}
@@ -429,6 +441,7 @@ async def test_committee_reader_gets_no_pii_attachment(
     maker: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Answer 404 for the hidden files and the quarantine 409 for the plain one."""
     seed, app_id = await _world(maker)
     by_key, by_ref, plain = await _attachments(maker, app_id)
     api = build_read_api(migrated[1], monkeypatch)
@@ -437,7 +450,6 @@ async def test_committee_reader_gets_no_pii_attachment(
     listed = get_json(api, f"/api/applications/{app_id}/attachments")
     assert isinstance(listed, list)
     assert [a["id"] for a in listed] == [str(plain)]
-    # 404 for the hidden files, the quarantine gate (409) for the plain one.
     assert _attachment_codes(api, (by_key, by_ref, plain)) == [
         (404, 404),
         (404, 404),

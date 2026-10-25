@@ -7,6 +7,7 @@ the validation module.
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
 from sqlalchemy import (
     Boolean,
@@ -43,8 +44,8 @@ class FormVersion(UUIDPkMixin, CreatedAtMixin, Base):
     version: Mapped[int] = mapped_column(Integer)
     active: Mapped[bool] = mapped_column(Boolean, server_default="false")
     created_by: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
-    # Multilingual Markdown description of the form.
-    description_i18n: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    #: Multilingual Markdown description of the form.
+    description_i18n: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
     __table_args__ = (
         UniqueConstraint("application_type_id", "version"),
@@ -70,13 +71,13 @@ class FormField(UUIDPkMixin, Base):
     )
     key: Mapped[str] = mapped_column(Text)
     type: Mapped[str] = mapped_column(Text)
-    label_i18n: Mapped[dict] = mapped_column(JSONB, server_default="{}")
-    help_i18n: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    label_i18n: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
+    help_i18n: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     required: Mapped[bool] = mapped_column(Boolean, server_default="false")
-    validation: Mapped[dict] = mapped_column(JSONB, server_default="{}")
-    visible_if: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    compute: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    options: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    validation: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
+    visible_if: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    compute: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    options: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     order: Mapped[int] = mapped_column("order", Integer, server_default="0")
     is_pii: Mapped[bool] = mapped_column(Boolean, server_default="false")
     is_promoted: Mapped[bool] = mapped_column(Boolean, server_default="false")

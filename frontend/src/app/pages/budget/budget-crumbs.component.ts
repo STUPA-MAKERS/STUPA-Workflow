@@ -80,7 +80,6 @@ export function fitCrumbs(m: CrumbMetrics): CrumbFit {
   const current = m.widths[parents];
   const need = (hidden: number, squeeze: CrumbSqueeze): number => {
     let total = squeeze === 'name' ? short(current) : current;
-    // A short key keeps the space before it; only its text shortens.
     total += squeeze === 'none' ? m.key : m.key - m.keyText + short(m.keyText);
     if (hidden > 0) total += m.more + m.sep;
     if (hidden >= parents && parents > 0) total -= m.lead;
@@ -88,7 +87,6 @@ export function fitCrumbs(m: CrumbMetrics): CrumbFit {
     for (const i of visibleParents(parents, hidden)) total += (shortParents ? short(m.widths[i]) : m.widths[i]) + m.sep;
     return total;
   };
-  // The levels between the first one and the direct parent.
   const between = Math.max(0, parents - 2);
   const steps: CrumbFit[] = [
     { hidden: 0, squeeze: 'none' },
@@ -138,6 +136,9 @@ const SEP_ICON = 13;
  * The widths come from a hidden copy of the names. A new path, a new width of the bar or
  * of the copy (`ResizeObserver`, for example when the web font arrives) fits the trail
  * again.
+ *
+ * The names of the hidden copy are drawn from an attribute, so neither a screen reader nor a text
+ * search finds them twice.
  */
 @Component({
   selector: 'app-budget-crumbs',
@@ -176,7 +177,6 @@ export class BudgetCrumbsComponent {
     const items: Item[] = [];
     for (let i = 0; i < parents; i++) {
       if (visible.includes(i)) items.push({ kind: 'node', node: nodes[i], index: i, current: false });
-      // The "…" stands where the first hidden level would be.
       if (hidden > 0 && i === (hidden >= parents ? 0 : 1)) {
         items.push({ kind: 'more', nodes: this.hiddenNodes(nodes, parents, hidden) });
       }
@@ -185,18 +185,19 @@ export class BudgetCrumbsComponent {
     return items;
   });
 
+  /**
+   * The query changes only when the new crumb is drawn, so the crumb of the old path never gets the
+   * focus. The web font arrives after the first fit and changes the size of the hidden copy, so new
+   * widths fit again.
+   */
   constructor() {
-    // A new path: fit it after it is drawn.
     afterRenderEffect(() => {
       const current = this.nodes().at(-1)?.id;
       untracked(() => {
-        // A path that does not end at the picked cost centre ends the pending focus.
         if (this.focusId !== null && current !== this.focusId) this.focusId = null;
         this.refit();
       });
     });
-    // After a pick: the current crumb of the new path takes the focus. The query changes
-    // only when the new crumb is drawn, so the crumb of the old path never gets it.
     afterRenderEffect(() => {
       const el = this.current()?.nativeElement;
       if (el && this.focusId !== null && el.dataset['node'] === this.focusId) {
@@ -204,8 +205,6 @@ export class BudgetCrumbsComponent {
         el.focus();
       }
     });
-    // A new width of the bar, or new widths of the names (the web font arrives after the
-    // first fit, and the hidden copy then changes its size).
     afterNextRender(() => {
       if (typeof ResizeObserver === 'undefined') return;
       const observer = new ResizeObserver(() => this.refit());
@@ -236,7 +235,12 @@ export class BudgetCrumbsComponent {
     return nodes.slice(0, parents).filter((_, i) => !visible.includes(i));
   }
 
-  /** Measures the hidden copy and the bar, and fits the trail. */
+  /**
+   * Measures the hidden copy and the bar, and fits the trail.
+   *
+   * The copy of the key holds the space before it as padding, while the key on screen has it as a
+   * margin, so only the text shortens (`--key-w` is the text width).
+   */
   private refit(): void {
     const nav = this.nav().nativeElement;
     const box = this.measure().nativeElement;
@@ -244,15 +248,11 @@ export class BudgetCrumbsComponent {
     const widths = Array.from(box.querySelectorAll('[data-crumb]'), (el) => Math.ceil(width(el)));
     const style = getComputedStyle(nav);
     const gap = parseFloat(style.columnGap) || 0;
-    // The padding is the room for hover and focus (`--crumb-bleed`), not for the items.
     const padding = (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0);
-    // The copy of the key holds the space before it as padding; the key on screen has it
-    // as a margin. Only the text shortens (`--key-w` is the text width).
     const keyEl = box.querySelector<HTMLElement>('[data-key]');
     const key = Math.ceil(width(keyEl));
     const keyPad = keyEl ? parseFloat(getComputedStyle(keyEl).paddingLeft) || 0 : 0;
     const keyText = Math.max(0, key - keyPad);
-    // The leading "…" moves to the start by the padding of its button.
     const moreEl = box.querySelector<HTMLElement>('[data-more]');
     const lead = moreEl ? parseFloat(getComputedStyle(moreEl).paddingLeft) || 0 : 0;
     this.widths.set(widths);

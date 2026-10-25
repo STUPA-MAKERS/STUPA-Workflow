@@ -1,4 +1,4 @@
-"""Approval with deviations (F1): the decision on an application.
+"""Approval with deviations: the decision on an application.
 
 A decision holds an approved amount (NULL = as requested) and a list of conditions
 (Auflagen). Two paths write it, through the one function `record_decision`:
@@ -36,13 +36,13 @@ from app.modules.audit.service import record as audit_record
 from app.modules.budget.tree_models import Budget
 from app.shared.errors import ValidationProblem
 
-# At most this many conditions, each 1 to MAX_CONDITION_LENGTH characters (trimmed).
+#: At most this many conditions, each 1 to MAX_CONDITION_LENGTH characters (trimmed).
 MAX_CONDITIONS = 20
 MAX_CONDITION_LENGTH = 1000
-# The largest amount of a Numeric(12, 2) column.
+#: The largest amount of a Numeric(12, 2) column.
 MAX_AMOUNT = Decimal("9999999999.99")
 
-# The problem codes of the 422 answers.
+#: The problem codes of the 422 answers.
 CODE_AMOUNT_INVALID = "approved_amount_invalid"
 CODE_AMOUNT_EXCEEDS = "approved_amount_exceeds_requested"
 CODE_NOT_ALLOWED = "decision_not_allowed"
@@ -199,6 +199,8 @@ async def record_decision(
     the amount (`check_approved_amount`) first. `old_approved` is the approved amount
     before this decision, for the audit entry (the flow sets the new amount before the
     guard runs).
+
+    The audit entry holds amounts and counts only, because a condition is free text.
     """
     stamp = now or datetime.now(UTC)
     await _lock_application(session, app)
@@ -228,7 +230,6 @@ async def record_decision(
         action=AuditAction.APPLICATION_DECISION,
         target_type="application",
         target_id=str(app.id),
-        # Amounts and counts only: a condition is free text.
         data={
             "applicationId": str(app.id),
             "decisionId": str(row.id),
@@ -245,7 +246,7 @@ async def record_decision(
 
 @dataclass(frozen=True, slots=True)
 class DecisionSwap:
-    """The decision ids that a status revert changed (F1).
+    """The decision ids that a status revert changed.
 
     `undone_id` lost its validity, `restored_id` got it back (None: no decision before).
     The reversed `status_change` audit entry stores both as `decisionUndoneId` and
@@ -277,11 +278,14 @@ async def _swap(
     status_event_id: UUID | None,
     stamp: datetime,
 ) -> DecisionSwap:
-    """Make `restored` the valid decision instead of `undone` and audit it (no commit)."""
+    """Make `restored` the valid decision instead of `undone` and audit it (no commit).
+
+    The function flushes the supersede first, because the partial unique index allows only
+    one valid row.
+    """
     old_approved = app.approved_amount
     if undone is not None:
         undone.superseded_at = stamp
-        # Flush first: the partial unique index allows only one valid row.
         await session.flush()
     restored_amount: Decimal | None = None
     if restored is not None:

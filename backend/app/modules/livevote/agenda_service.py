@@ -6,7 +6,7 @@ entry into a vote state, is the Gremium of the meeting.
 The agenda keeps an explicit order (`position`). It is the source of the agenda
 items in the protocol.
 
-State rules (F24, O22, O25):
+State rules:
 
 * Add, reorder, rename and remove need a `planned` or `live` meeting. A closed
   meeting gives 409 `meeting_closed`.
@@ -23,7 +23,7 @@ The done mark of an item ("TOP abhaken") follows the minutes window too. A perso
 sets and removes it by hand, and the move to the next item sets it for the item that
 the room leaves.
 
-Every change writes an audit entry (F12): `agenda_item_add`, `agenda_item_update`,
+Every change writes an audit entry: `agenda_item_add`, `agenda_item_update`,
 `agenda_item_remove`, `agenda_reorder`, `agenda_item_done` and
 `agenda_item_reopened`. A body edit of a planned or live meeting
 is the preparation or the running minutes, and its autosave is not audited. A body
@@ -48,7 +48,7 @@ from app.modules.livevote.schemas import AgendaItemOut, AssignableApplicationOut
 from app.modules.protocol.models import Protocol
 from app.shared.errors import ConflictError, NotFoundError
 
-# The meeting states that accept a change of the agenda (O25).
+#: The meeting states that accept a change of the agenda.
 _AGENDA_OPEN = frozenset({"planned", "live"})
 
 
@@ -77,6 +77,7 @@ class AgendaService:
     """Manage the agenda of a meeting: assign, remove and list applications."""
 
     def __init__(self, session: AsyncSession) -> None:
+        """Bind the service to a session."""
         self.session = session
 
     async def _meeting(self, meeting_id: UUID, *, for_update: bool = False) -> Meeting:
@@ -84,7 +85,7 @@ class AgendaService:
 
         ``for_update`` locks the meeting row until the commit and reads the current
         values again. The meeting close and the vote open take the same lock, so an
-        add or a remove cannot race them (O12, O25).
+        add or a remove cannot race them.
 
         Raises:
             NotFoundError: No meeting has this id.
@@ -99,7 +100,7 @@ class AgendaService:
 
     @staticmethod
     def _assert_agenda_open(meeting: Meeting) -> None:
-        """Refuse a change of the agenda structure after the close (O25).
+        """Refuse a change of the agenda structure after the close.
 
         Raises:
             ConflictError: The meeting is closed (``meeting_closed``).
@@ -111,7 +112,7 @@ class AgendaService:
             )
 
     async def _assert_minutes_open(self, meeting: Meeting) -> None:
-        """Refuse a body or ``nonPublic`` edit outside the minutes window (O22).
+        """Refuse a body or ``nonPublic`` edit outside the minutes window.
 
         The window is a ``planned`` or ``live`` meeting, or a closed meeting whose
         protocol is still a draft. A ``planned`` meeting has no protocol yet, but the
@@ -136,7 +137,7 @@ class AgendaService:
         *,
         actor: str | None,
         item: MeetingAgendaItem,
-        **extra: Any,
+        **extra: object,
     ) -> None:
         """Write one agenda audit entry with id references only, never a text."""
         await audit_record(
@@ -152,7 +153,7 @@ class AgendaService:
             },
         )
 
-    async def _state_labels(self, state_ids: set[UUID]) -> dict[UUID, dict]:
+    async def _state_labels(self, state_ids: set[UUID]) -> dict[UUID, dict[str, Any]]:
         """Return the label of each state, for the assignable list."""
         if not state_ids:
             return {}
@@ -180,6 +181,10 @@ class AgendaService:
         return row
 
     async def list(self, meeting_id: UUID) -> list[AgendaItemOut]:
+        """List the agenda items of a meeting in their order.
+
+        A free-text item has no application and carries its own title.
+        """
         await self._meeting(meeting_id)
         rows = (
             await self.session.scalars(
@@ -194,9 +199,7 @@ class AgendaService:
         apps = {
             a.id: a
             for a in (
-                await self.session.scalars(
-                    select(Application).where(Application.id.in_(app_ids))
-                )
+                await self.session.scalars(select(Application).where(Application.id.in_(app_ids)))
             ).all()
         }
         state_ids = {a.current_state_id for a in apps.values() if a.current_state_id}
@@ -204,9 +207,7 @@ class AgendaService:
             {
                 s.id: s
                 for s in (
-                    await self.session.scalars(
-                        select(State).where(State.id.in_(state_ids))
-                    )
+                    await self.session.scalars(select(State).where(State.id.in_(state_ids)))
                 ).all()
             }
             if state_ids
@@ -220,7 +221,6 @@ class AgendaService:
                 if app is not None and app.current_state_id is not None
                 else None
             )
-            # A free-text item has no application and carries its own title.
             title = title_of(app.data) if app is not None else r.title
             out.append(
                 AgendaItemOut(
@@ -254,10 +254,14 @@ class AgendaService:
         title of its application. `non_public` hides the item content in the
         public protocol PDF.
 
-        A rename needs a `planned` or `live` meeting (O25). The body and `non_public`
-        need a `planned` or `live` meeting, or a closed meeting with a draft protocol
-        (O22). A change writes `agenda_item_update` with the
-        changed field names. The body counts only after the close.
+        A rename needs a `planned` or `live` meeting. The body and `non_public`
+        need a `planned` or `live` meeting, or a closed meeting with a draft protocol.
+        A change writes `agenda_item_update` with the changed field names. The body
+        counts only after the close.
+
+        The live minutes autosave every second, so only a correction after the close goes
+        into the audit log. An item that guests saw and voted on cannot become non-public
+        afterwards, or the guest view would have shown non-public content.
 
         Raises:
             NotFoundError: The meeting has no agenda item with this id.
@@ -273,8 +277,6 @@ class AgendaService:
         changed: list[str] = []
         if body is not None and body != row.body:
             row.body = body
-            # The live minutes autosave every second. Only a correction after the
-            # close goes into the audit log.
             if meeting.status == "closed":
                 changed.append("body")
         if renames and title is not None and title.strip() != row.title:
@@ -282,8 +284,6 @@ class AgendaService:
             changed.append("title")
         if non_public is not None and non_public != row.non_public:
             if non_public and await self._has_guest_vote(row.id):
-                # #17: guests saw and voted on this item. It cannot become non-public
-                # afterwards, or the guest view would have shown non-public content.
                 raise ConflictError(
                     "Guests voted on this agenda item; it cannot become non-public.",
                     code="guests_vote_on_item",
@@ -291,9 +291,7 @@ class AgendaService:
             row.non_public = non_public
             changed.append("nonPublic")
         if changed:
-            await self._audit(
-                AuditAction.AGENDA_ITEM_UPDATE, actor=actor, item=row, fields=changed
-            )
+            await self._audit(AuditAction.AGENDA_ITEM_UPDATE, actor=actor, item=row, fields=changed)
         await self.session.flush()
         await self.session.commit()
         return await self.list(meeting_id)
@@ -325,7 +323,7 @@ class AgendaService:
     ) -> None:
         """Set or remove the done mark of an agenda item. It does not commit.
 
-        The mark follows the minutes window (O22): a `planned` or `live` meeting, or a
+        The mark follows the minutes window: a `planned` or `live` meeting, or a
         closed meeting with a draft protocol. A mark that does not change writes
         nothing, so a second tick keeps the time and the person of the first one. A
         change writes `agenda_item_done` or `agenda_item_reopened`. `via` names the
@@ -352,7 +350,7 @@ class AgendaService:
         await self.session.flush()
 
     async def _has_guest_vote(self, item_id: UUID) -> bool:
-        """Tell if the item has an open or closed vote with guests (#17)."""
+        """Tell if the item has an open or closed vote with guests."""
         from app.modules.voting.models import Vote
 
         found = await self.session.scalar(
@@ -376,7 +374,7 @@ class AgendaService:
 
         Raises:
             NotFoundError: The meeting does not exist.
-            ConflictError: The meeting is closed (O25).
+            ConflictError: The meeting is closed.
         """
         meeting = await self._meeting(meeting_id)
         self._assert_agenda_open(meeting)
@@ -384,9 +382,7 @@ class AgendaService:
             r.id: r
             for r in (
                 await self.session.scalars(
-                    select(MeetingAgendaItem).where(
-                        MeetingAgendaItem.meeting_id == meeting_id
-                    )
+                    select(MeetingAgendaItem).where(MeetingAgendaItem.meeting_id == meeting_id)
                 )
             ).all()
         }
@@ -411,6 +407,7 @@ class AgendaService:
         return await self.list(meeting_id)
 
     async def assignable(self, meeting_id: UUID) -> list[AssignableApplicationOut]:
+        """List the applications of the Gremium in a vote state that are not on the agenda."""
         meeting = await self._meeting(meeting_id)
         existing = set(
             (
@@ -505,13 +502,16 @@ class AgendaService:
         own commit, so the state change and the new item stay atomic. A new item
         writes `agenda_item_add`. A missing `actor` marks a system add.
 
+        The read uses `populate_existing`, because the flow engine moved the state with a
+        bulk UPDATE in this transaction. The current state must come from the database.
+
         Returns:
             `True` when the method added an item, `False` when the application
             was already on the agenda.
 
         Raises:
             NotFoundError: The meeting or the application does not exist.
-            ConflictError: The meeting is closed (O25), or the application is not in
+            ConflictError: The meeting is closed, or the application is not in
                 a vote state of the Gremium.
         """
         meeting = await self._meeting(meeting_id, for_update=True)
@@ -531,17 +531,11 @@ class AgendaService:
             )
             return True
 
-        # `populate_existing`: the flow engine moved the state with a bulk UPDATE in
-        # this transaction. Read the current state from the database.
-        app = await self.session.get(
-            Application, application_id, populate_existing=True
-        )
+        app = await self.session.get(Application, application_id, populate_existing=True)
         if app is None:
             raise NotFoundError(f"application {application_id} not found")
         if app.vote_gremium_id is None or app.vote_gremium_id != meeting.gremium_id:
-            raise ConflictError(
-                "application is not in a voting state for this committee"
-            )
+            raise ConflictError("application is not in a voting state for this committee")
         existing = (
             await self.session.execute(
                 select(MeetingAgendaItem.id).where(
@@ -560,9 +554,7 @@ class AgendaService:
         )
         self.session.add(item)
         await self.session.flush()
-        await self._audit(
-            AuditAction.AGENDA_ITEM_ADD, actor=actor, item=item, nonPublic=non_public
-        )
+        await self._audit(AuditAction.AGENDA_ITEM_ADD, actor=actor, item=item, nonPublic=non_public)
         return True
 
     async def add_todo_in_tx(
@@ -625,7 +617,7 @@ class AgendaService:
         actor: str,
         may_delete_votes: bool,
     ) -> list[AgendaItemOut]:
-        """Remove an agenda item (F24, O25).
+        """Remove an agenda item.
 
         The meeting must be `planned` or `live`. An open or closed vote of the item
         blocks the remove. The draft and cancelled votes of the item are deleted
@@ -637,6 +629,9 @@ class AgendaService:
         The method locks the meeting row first. The vote open takes the same lock, so
         no vote can open on the item while the remove runs.
 
+        The voting service is imported locally, because it imports the flow engine, and the
+        flow engine imports this module.
+
         Raises:
             NotFoundError: The meeting does not exist.
             ConflictError: The meeting is closed (``meeting_closed``), or the item has
@@ -644,8 +639,6 @@ class AgendaService:
             ForbiddenError: The item has a draft or cancelled vote and
                 `may_delete_votes` is false.
         """
-        # Local import: the voting service imports the flow engine, and the flow
-        # engine imports this module.
         from app.modules.voting.service import VotingService
 
         meeting = await self._meeting(meeting_id, for_update=True)

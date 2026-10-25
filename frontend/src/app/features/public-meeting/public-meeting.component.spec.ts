@@ -247,12 +247,12 @@ describe('PublicMeetingComponent', () => {
     expect(api.joinPublicMeeting).toHaveBeenCalledWith('7KQ4MP', 'Neuer Name', null);
   });
 
+  /** The language switch is the app list, never a native select. */
   it('has its own bar with the wordmark and the language switch, and the footer', async () => {
     const switchTo = jest.spyOn(LocaleSwitchService.prototype, 'switchTo').mockImplementation(() => {});
     const { container } = await setup(err(401));
     expect(container.querySelector('.pm__logo')).not.toBeNull();
     expect(container.querySelector('app-site-footer')).not.toBeNull();
-    // D8: the app list, never a native select.
     expect(container.querySelector('select')).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Sprache wechseln: DE' }));
     await userEvent.click(screen.getByRole('option', { name: 'English' }));

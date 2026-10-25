@@ -16,8 +16,6 @@
   --sh-inset: 0;
 }
 
-/* The matrix: the role column, one column per right of the catalogue, the actions. All
-   rows use the same columns, so the boxes line up under their header. */
 .rm__table {
   min-width: 0;
 }
@@ -50,9 +48,6 @@
   font-weight: var(--fw-semibold);
   line-height: 1.15rem;
 }
-/* The key in the header is a technical aid. At the full width each key fits on one line
-   (board Verwaltung-Gremium-Dialog); a narrower table wraps it after its dot, never inside
-   a word. */
 .rm__colKey {
   font-size: 0.625rem;
   line-height: 0.9rem;
@@ -78,7 +73,6 @@
 .rm__nameLine app-status-text {
   font-size: var(--fs-sm);
 }
-/* A group keeps its exact spelling from the IdP; a long one wraps and is never cut. */
 .rm__groups {
   font-size: var(--fs-sm);
   color: var(--color-text-muted);
@@ -92,7 +86,6 @@
   min-width: 0;
 }
 
-/* The whole cell is the label of its box, so a click anywhere in the cell toggles it. */
 .rm__chip {
   display: flex;
   align-items: center;
@@ -125,8 +118,7 @@
   display: none;
 }
 
-/* The box of the ui-kit checkbox: 18px with a 2px edge; checked, an accent square with a
-   dark tick. */
+// The box of the ui-kit checkbox: 18px with a 2px edge.
 .rm__box {
   flex: none;
   appearance: none;
@@ -152,7 +144,6 @@
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
-/* A save in flight: the box waits. A read-only matrix keeps the full contrast. */
 .rm__chip:not(.rm__chip--off) .rm__box:disabled {
   opacity: 0.5;
   cursor: progress;
@@ -164,12 +155,9 @@
   gap: var(--space-1);
 }
 
-/* A narrow container: no header; the role and its actions on the first line, the rights
-   as chips with their names below (board Schmal-Verwaltung-Gremien). The matrix is about
-   49rem wide at a 960px viewport and about 54rem at 1440px, so 51rem puts the first in
-   the chip layout and keeps the table for the second. */
+// The matrix is about 49rem wide at a 960px viewport and about 54rem at 1440px, so 51rem puts the
+// first in the chip layout. The header rule is more specific than `.rm__row`, so it stays hidden.
 @container (max-width: 51rem) {
-  /* More specific than `.rm__row` below, so the header stays hidden. */
   .rm__row.rm__row--head {
     display: none;
   }
@@ -177,8 +165,6 @@
     border-top-left-radius: var(--radius-lg);
     border-top-right-radius: var(--radius-lg);
   }
-  /* The chips are as small as on the board, so the five rights fit on one line at the
-     960px board width. */
   .rm__row {
     display: flex;
     flex-wrap: wrap;

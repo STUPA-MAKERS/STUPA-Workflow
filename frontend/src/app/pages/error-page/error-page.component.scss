@@ -1,7 +1,3 @@
-/* Centred in the free space of the page; the text inside stays left-aligned. The shell
-   main is a flex column that fills the height between the bars and the footer, so
-   `flex: 1` takes exactly the free space of any frame and never pushes the footer past
-   the fold. */
 :host {
   display: flex;
   flex: 1 0 auto;
@@ -33,7 +29,6 @@
   flex: none;
   color: var(--color-text-muted);
 }
-/* A section-size heading: the page has nothing else to title. */
 .err__heading {
   margin: 0;
   font-size: var(--fs-h1);
@@ -45,7 +40,6 @@
   color: var(--color-text-muted);
 }
 
-/* The way out, in the look of a filled button. */
 .err__action {
   margin-top: 6px;
 }

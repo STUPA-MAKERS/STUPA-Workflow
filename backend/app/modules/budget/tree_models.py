@@ -12,7 +12,7 @@ persisted, see ``tree_rules.rollup_committed``. The only currency is EUR
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import (
@@ -20,6 +20,7 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     Date,
+    DateTime,
     ForeignKey,
     Index,
     Integer,
@@ -56,37 +57,37 @@ class Budget(UUIDPkMixin, CreatedAtMixin, Base):
     name: Mapped[str] = mapped_column(Text)
     currency: Mapped[str] = mapped_column(CHAR(3), server_default="EUR")
     active: Mapped[bool] = mapped_column(Boolean, server_default="true")
-    # Display color for the pie charts and the tree. NULL selects an auto color.
+    #: Display color for the pie charts and the tree. NULL selects an auto color.
     color: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Top level only: flow-state keys that count as accepted (-> committed) or
-    # as denied (-> excluded). Every other state counts as requested.
-    accepted_state_keys: Mapped[list] = mapped_column(JSONB, server_default="[]")
-    denied_state_keys: Mapped[list] = mapped_column(JSONB, server_default="[]")
-    # Hides the node in the budget tab. Display only: the values still count in
-    # the parent rollups and in the export. A Python default backs up the
-    # server default, so a new instance carries a bool before the flush.
+    #: Top level only: flow-state keys that count as accepted (-> committed) or
+    #: as denied (-> excluded). Every other state counts as requested.
+    accepted_state_keys: Mapped[list[str]] = mapped_column(JSONB, server_default="[]")
+    denied_state_keys: Mapped[list[str]] = mapped_column(JSONB, server_default="[]")
+    #: Hides the node in the budget tab. Display only: the values still count in
+    #: the parent rollups and in the export. A Python default backs up the
+    #: server default, so a new instance carries a bool before the flush.
     hidden_in_budget: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default="false"
     )
-    # Visibility Gremium: its members see this cost center and its subtree as a
-    # root in the budget tab without a global budget.* permission. This is
-    # independent of the top-level ``gremium_id`` classification.
+    #: Visibility Gremium: its members see this cost center and its subtree as a
+    #: root in the budget tab without a global budget.* permission. This is
+    #: independent of the top-level ``gremium_id`` classification.
     view_gremium_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("gremium.id", ondelete="SET NULL"), nullable=True
     )
-    # Deciding Gremium: this Gremium decides on spending from this cost center and its
-    # subtree. A node without an own value inherits the value of the nearest ancestor
-    # (``tree_rules.effective_decision_gremium``). A vote state with
-    # ``gremiumSource: "budget"`` takes the effective value of the assigned cost center.
-    # It is independent of ``gremium_id`` (classification) and ``view_gremium_id``
-    # (visibility).
+    #: Deciding Gremium: this Gremium decides on spending from this cost center and its
+    #: subtree. A node without an own value inherits the value of the nearest ancestor
+    #: (``tree_rules.effective_decision_gremium``). A vote state with
+    #: ``gremiumSource: "budget"`` takes the effective value of the assigned cost center.
+    #: It is independent of ``gremium_id`` (classification) and ``view_gremium_id``
+    #: (visibility).
     decision_gremium_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("gremium.id", ondelete="SET NULL"), nullable=True
     )
-    # Fiscal-year cutoff, the day and the month of the period start. Top level
-    # only. The default is Jan 1. A different cutoff renders a fiscal year as
-    # "YYYY/YY". A fiscal year stores only the year. Start and end derive from
-    # this cutoff.
+    #: Fiscal-year cutoff, the day and the month of the period start. Top level
+    #: only. The default is Jan 1. A different cutoff renders a fiscal year as
+    #: "YYYY/YY". A fiscal year stores only the year. Start and end derive from
+    #: this cutoff.
     fiscal_start_month: Mapped[int] = mapped_column(SmallInteger, server_default="1")
     fiscal_start_day: Mapped[int] = mapped_column(SmallInteger, server_default="1")
 
@@ -114,6 +115,11 @@ class FiscalYear(UUIDPkMixin, CreatedAtMixin, Base):
     (``start = cutoff(year)``, ``end = cutoff(year+1) - 1 day``). Both stay
     persisted for the disjointness check and for filtering. The UI shows
     ``YYYY`` for a Jan-1 cutoff and ``YYYY/YY`` for any other cutoff.
+
+    ``closed_at`` set means the year is closed ("abgeschlossen"). A closed year
+    is frozen: no booking, transfer, allocation or application assignment that
+    touches it can change until a ``budget.structure`` holder reopens it.
+    ``closed_by`` holds the subject of the principal who closed it.
     """
 
     __tablename__ = "fiscal_year"
@@ -125,6 +131,8 @@ class FiscalYear(UUIDPkMixin, CreatedAtMixin, Base):
     start_date: Mapped[date] = mapped_column(Date)
     end_date: Mapped[date] = mapped_column(Date)
     active: Mapped[bool] = mapped_column(Boolean, server_default="true")
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    closed_by: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
         UniqueConstraint("budget_id", "year", name="uq_fiscal_year_budget_year"),
@@ -181,45 +189,45 @@ class BudgetExpense(UUIDPkMixin, CreatedAtMixin, Base):
     fiscal_year_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("fiscal_year.id", ondelete="CASCADE")
     )
-    # Booked against one application: the expense then replaces the binding of
-    # that application pro rata. A standalone booking uses ``None``.
-    # ``SET NULL`` on application delete keeps the booking as a standalone
-    # expense.
+    #: Booked against one application: the expense then replaces the binding of
+    #: that application pro rata. A standalone booking uses ``None``.
+    #: ``SET NULL`` on application delete keeps the booking as a standalone
+    #: expense.
     application_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("application.id", ondelete="SET NULL"), nullable=True
     )
-    # Optional invoice. One invoice can carry N bookings. SET NULL on invoice
-    # delete keeps the booking.
+    #: Optional invoice. One invoice can carry N bookings. SET NULL on invoice
+    #: delete keeps the booking.
     invoice_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("invoice.id", ondelete="SET NULL"), nullable=True
     )
-    # Links the two bookings of a transfer (source expense <-> target income).
+    #: Links the two bookings of a transfer (source expense <-> target income).
     transfer_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
-    # 'expense' | 'income'.
+    #: 'expense' | 'income'.
     kind: Mapped[str] = mapped_column(Text, server_default="expense")
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     currency: Mapped[str] = mapped_column(CHAR(3), server_default="EUR")
     description: Mapped[str] = mapped_column(Text)
     actor: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Business dates for invoice and payment, independent of ``created_at``.
+    #: Business dates for invoice and payment, independent of ``created_at``.
     invoice_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     payment_date: Mapped[date | None] = mapped_column(Date, nullable=True)
-    # Free-text correspondent: from whom for an income, for whom for an expense.
+    #: Free-text correspondent: from whom for an income, for whom for an expense.
     correspondent: Mapped[str | None] = mapped_column(Text, nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Free-text reference of the receipt or of the invoice.
+    #: Free-text reference of the receipt or of the invoice.
     reference_number: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Payment method: ueberweisung | bar | lastschrift | karte | paypal.
+    #: Payment method: ueberweisung | bar | lastschrift | karte | paypal.
     payment_method: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Free-text category or tag. It groups bookings beyond the cost center.
+    #: Free-text category or tag. It groups bookings beyond the cost center.
     category: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Sub-booking: points at the parent booking. A child INHERITS the cost
-    # center, the fiscal year and the kind from the parent. The child stores
-    # copies of these column values, so the rollups and the queries still apply.
-    # A child carries only its own amount, description, dates and receipt.
-    # The parent amount is the sum of its children. The budget rollup counts
-    # parents only (parent_expense_id IS NULL). Children are a pure breakdown.
-    # CASCADE: a delete of the parent deletes its children.
+    #: Sub-booking: points at the parent booking. A child INHERITS the cost
+    #: center, the fiscal year and the kind from the parent. The child stores
+    #: copies of these column values, so the rollups and the queries still apply.
+    #: A child carries only its own amount, description, dates and receipt.
+    #: The parent amount is the sum of its children. The budget rollup counts
+    #: parents only (parent_expense_id IS NULL). Children are a pure breakdown.
+    #: CASCADE: a delete of the parent deletes its children.
     parent_expense_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("budget_expense.id", ondelete="CASCADE"), nullable=True
     )
@@ -257,16 +265,16 @@ class Invoice(UUIDPkMixin, CreatedAtMixin, Base):
     number: Mapped[str | None] = mapped_column(Text, nullable=True)
     issue_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
-    # Free-text supplier or issuer, from the ZUGFeRD SellerTradeParty or manual.
+    #: Free-text supplier or issuer, from the ZUGFeRD SellerTradeParty or manual.
     supplier: Mapped[str | None] = mapped_column(Text, nullable=True)
     net_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     tax_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     gross_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     currency: Mapped[str] = mapped_column(CHAR(3), server_default="EUR")
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # 'open' | 'paid'.
+    #: 'open' | 'paid'.
     status: Mapped[str] = mapped_column(Text, server_default="open")
-    # Original receipt as PDF or XML in the object storage.
+    #: Original receipt as PDF or XML in the object storage.
     file_object_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     file_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     file_mime: Mapped[str | None] = mapped_column(Text, nullable=True)

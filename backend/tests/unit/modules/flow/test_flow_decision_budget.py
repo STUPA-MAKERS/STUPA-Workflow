@@ -1,4 +1,4 @@
-"""The approved amount in the budget guard and the status revert (F1)."""
+"""The approved amount in the budget guard and the status revert."""
 
 from __future__ import annotations
 
@@ -32,8 +32,9 @@ def _app(amount: str, approved: str | None) -> Any:
 
 
 async def test_budget_fits_checks_the_approved_amount() -> None:
+    """Check the approved amount against the available 100."""
     session = fake_session()
-    session.scalar_results = [Decimal("100"), Decimal("0")]  # available = 100
+    session.scalar_results = [Decimal("100"), Decimal("0")]
     assert await _budget_fits(session, _app("150", "100")) is True
 
 

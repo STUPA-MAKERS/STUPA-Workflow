@@ -1,4 +1,4 @@
-"""A4: the `state` filter repeats, on the list and on the XLSX export (real Postgres).
+"""The `state` filter repeats, on the list and on the XLSX export (real Postgres).
 
 `?state=a&state=b` lists the applications in state `a` or `b`. A single value keeps
 working, and without `state` the list is not filtered.

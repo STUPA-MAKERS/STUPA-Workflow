@@ -170,12 +170,15 @@ class TodoColumn(UUIDPkMixin, Base):
 
 
 class TodoCard(UUIDPkMixin, TimestampMixin, Base):
-    """A card. ``rank`` orders it in its column; ``version`` guards content edits."""
+    """A card. ``rank`` orders it in its column; ``version`` guards content edits.
+
+    The column has no cascade, so a column with cards cannot be deleted (409
+    ``column_not_empty``).
+    """
 
     __tablename__ = "todo_card"
 
     board_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("todo_board.id", ondelete="CASCADE"))
-    # No cascade: a column with cards cannot be deleted (409 column_not_empty).
     column_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("todo_column.id"))
     rank: Mapped[str] = mapped_column(Text(collation="C"))
     title: Mapped[str] = mapped_column(Text)

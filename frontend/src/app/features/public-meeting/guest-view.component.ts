@@ -41,14 +41,14 @@ interface AgendaRow {
 }
 
 /**
- * The participant view of an admitted guest (#17, boards Telefon-Teilnahme): the own
+ * The participant view of an admitted guest: the own
  * status ("Du bist zugelassen" or "Du schaust zu"), the item that runs now, the open
  * vote (or "Keine offene Abstimmung"), and the tabs "Tagesordnung" and "Protokoll".
  *
  * A non-public item shows with its title and a lock, never with its text or its votes
  * (the server sends neither). The protocol tab shows the draft texts of the public items
  * as the minute-taker writes them. A vote opens on its own page in the view, with the
- * shared vote panel: the guest votes like a member (one ballot, no change, O11), or
+ * shared vote panel: the guest votes like a member (one ballot, no change), or
  * reads it when the meeting lets guests only watch or the vote is for members only.
  */
 @Component({
@@ -109,10 +109,6 @@ export class GuestViewComponent {
   protected readonly rows = computed<AgendaRow[]>(() =>
     this.ordered().map((item) => {
       const now = item.position === this.currentPos();
-      // D5: the general agenda rule. Only an application item has a subtitle ("Antrag");
-      // a free-text item has none. The badge shows the number and the row colour shows
-      // the current item. A non-public item says why it shows no content, because the
-      // lock icon alone has no text.
       let sub = '';
       if (item.nonPublic) sub = this.i18n.translate('guests.view.membersOnly');
       else if (item.kind === 'application') sub = this.i18n.translate('guests.view.application');
@@ -189,7 +185,6 @@ export class GuestViewComponent {
   });
 
   constructor() {
-    // A vote that the guest can cast opens its page once by itself.
     effect(() => {
       const v = this.focusVote();
       untracked(() => {

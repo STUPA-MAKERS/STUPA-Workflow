@@ -1,4 +1,4 @@
-"""Fuzzy search (#3/#4): the `pg_trgm` extension and GIN trigram indexes.
+"""Fuzzy search: the `pg_trgm` extension and GIN trigram indexes.
 
 The server-side fuzzy search over bookings, applications, invoices and meetings
 uses `pg_trgm` similarity to **filter** and to **rank**. This migration creates
@@ -35,16 +35,17 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
+#: The extension needs CREATE on the database at deploy time; a pre-created one makes
+#: the statement a no-op. ``app_search_text`` joins the meaningful text of the JSONB
+#: (title and text answers) and is IMMUTABLE, so an expression index can use it.
+#: ``jsonb_path_query_array`` pulls every string scalar recursively, and the filter
+#: ``~ '[[:alpha:]]'`` keeps only values with at least one letter, so amounts, dates,
+#: numbers stored as strings (a currency value such as "1234.00"), ids and enum codes
+#: drop out. The indexes cover the free-text fields of the booking search, the account
+#: name it joins, the meeting title of the timeline search, and the Gremium and writer
+#: names that the meeting search joins.
 _UPGRADE: tuple[str, ...] = (
-    # Needs CREATE on the database at deploy time. A pre-created extension makes
-    # this statement a no-op.
     "CREATE EXTENSION IF NOT EXISTS pg_trgm",
-    # Application search text: the MEANINGFUL text of the JSONB (title plus text
-    # answers), concatenated. IMMUTABLE, so an expression index can use it.
-    # `jsonb_path_query_array` pulls every string scalar recursively. The filter
-    # `~ '[[:alpha:]]'` keeps only values that carry at least ONE letter. Amounts,
-    # dates and numbers stored as strings (a currency field such as "1234.00") and
-    # plain ids or enum codes drop out. Only readable text stays.
     (
         "CREATE OR REPLACE FUNCTION app_search_text(data jsonb) RETURNS text AS $$"
         " SELECT coalesce("
@@ -61,7 +62,6 @@ _UPGRADE: tuple[str, ...] = (
         " )"
         " $$ LANGUAGE sql IMMUTABLE"
     ),
-    # The free-text fields of the booking search (#3).
     (
         "CREATE INDEX IF NOT EXISTS ix_trgm_budget_expense_description "
         "ON budget_expense USING gin (description gin_trgm_ops)"
@@ -91,11 +91,8 @@ _UPGRADE: tuple[str, ...] = (
         "ON invoice USING gin (supplier gin_trgm_ops)"
     ),
     ("CREATE INDEX IF NOT EXISTS ix_trgm_invoice_note ON invoice USING gin (note gin_trgm_ops)"),
-    # Account: the booking search joins Account.name.
     ("CREATE INDEX IF NOT EXISTS ix_trgm_account_name ON account USING gin (name gin_trgm_ops)"),
-    # The meeting title, for the timeline search (#4).
     ("CREATE INDEX IF NOT EXISTS ix_trgm_meeting_title ON meeting USING gin (title gin_trgm_ops)"),
-    # The meeting search joins the Gremium name and the protocol writer name.
     ("CREATE INDEX IF NOT EXISTS ix_trgm_gremium_name ON gremium USING gin (name gin_trgm_ops)"),
     (
         "CREATE INDEX IF NOT EXISTS ix_trgm_principal_display_name "
@@ -107,6 +104,7 @@ _UPGRADE: tuple[str, ...] = (
     ),
 )
 
+#: The extension stays, because other objects can use it.
 _DOWNGRADE: tuple[str, ...] = (
     "DROP INDEX IF EXISTS ix_trgm_application_search_text",
     "DROP INDEX IF EXISTS ix_trgm_principal_display_name",
@@ -122,15 +120,16 @@ _DOWNGRADE: tuple[str, ...] = (
     "DROP INDEX IF EXISTS ix_trgm_budget_expense_correspondent",
     "DROP INDEX IF EXISTS ix_trgm_budget_expense_description",
     "DROP FUNCTION IF EXISTS app_search_text(jsonb)",
-    # The extension stays on purpose. Other objects can use it.
 )
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     for stmt in _UPGRADE:
         op.execute(stmt)
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     for stmt in _DOWNGRADE:
         op.execute(stmt)

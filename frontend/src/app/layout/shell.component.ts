@@ -60,9 +60,11 @@ export type ShellFrame = 'rail' | 'public' | 'bare' | 'pending';
   styleUrl: './shell.component.scss',
 })
 export class ShellComponent {
-  // Injected for its side effect: it warms the reference-data cache after sign-in.
-  // Nothing reads it, and that is the point — the pages that need the data find it
-  // in the cache rather than being coupled to a prefetch they did not ask for.
+  /**
+   * Injected for its side effect: it warms the reference-data cache after sign-in. Nothing
+   * reads it, because the pages that need the data find it in the cache and must not
+   * depend on a prefetch they did not ask for.
+   */
   private readonly prefetch = inject(PrefetchService);
 
   readonly auth = inject(AuthService);
@@ -113,14 +115,13 @@ export class ShellComponent {
     return this.auth.isAuthenticated() ? 'rail' : 'public';
   });
 
+  /** The app initializer starts the same request, and `ensureLoaded` shares it. */
   constructor() {
-    // The app initializer starts the same request; `ensureLoaded` shares it.
     this.auth
       .ensureLoaded()
       .pipe(takeUntilDestroyed())
       .subscribe(() => this.sessionKnown.set(true));
 
-    // `wide`, `fab`, `footer` and `chrome` come from the route data. The deepest active route wins.
     this.router.events
       .pipe(
         filter((e) => e instanceof NavigationEnd),

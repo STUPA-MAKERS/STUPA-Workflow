@@ -7,7 +7,7 @@ when a membership ended later or the OIDC sync removed it. A change of the
 attendance needs a membership that is valid now. Each pair of meeting and member
 has exactly one record. The unique constraint drives the upsert.
 
-The rules (Z2, O15, O23, F12):
+The rules:
 
 - A member reports the own attendance (`source='self'`) as `present` or
   `excused` only, while the meeting is `planned` or `live`.
@@ -20,7 +20,7 @@ The rules (Z2, O15, O23, F12):
   with the own report. The delegation must be revoked first. The delegator can
   revoke it only before the meeting start. During the live meeting, the meeting
   lead (`can_manage`) can revoke it, for example a substitution that the lead
-  entered for a missing member (O6). An admin can revoke it at any time.
+  entered for a missing member. An admin can revoke it at any time.
 - `note` is the reason of an excuse and is personal data. Only the member and
   the lead see it. The lead's set and reset write `attendance_set` and
   `attendance_reset` to the audit log, never with the note.
@@ -30,7 +30,6 @@ The rules (Z2, O15, O23, F12):
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
@@ -89,6 +88,10 @@ class AttendanceService:
     """Read the roster of a meeting and change the attendance records."""
 
     def __init__(self, session: AsyncSession, *, tz_name: str | None = None) -> None:
+        """Bind the service to a session.
+
+        `tz_name` overrides the local time zone of the settings.
+        """
         self.session = session
         self._tz_name = tz_name
 
@@ -149,7 +152,7 @@ class AttendanceService:
     async def members(self, gremium_id: UUID) -> list[MeetingMemberOut]:
         """Return the current Gremium members as Protokollant candidates.
 
-        `canKeepProtocol` marks the members with `protocol.write` (O20). Only they
+        `canKeepProtocol` marks the members with `protocol.write`. Only they
         can keep the minutes.
         """
         members = await self._current_members(gremium_id)
@@ -174,9 +177,9 @@ class AttendanceService:
         does not depend on the memberships that are valid now. A member without
         a record gets `status` and `source` as `None`. The `note` goes only to
         the member and to the meeting lead (`can_write`). `canKeepProtocol` marks
-        the members who can keep the minutes now (O20), for the keeper picker and
+        the members who can keep the minutes now, for the keeper picker and
         the handover. `canVote` marks the members with an own vote now (gremium
-        permission `vote.cast`): only they can be substituted (O6). A former member
+        permission `vote.cast`): only they can be substituted. A former member
         with a record has neither flag.
         """
         meeting = await self._meeting(meeting_id)
@@ -226,7 +229,7 @@ class AttendanceService:
         """Load the record of one member with a row lock.
 
         The lock orders a self report and a lead change of the same record, so
-        the O15 check and the write see the same row.
+        the lead-record check and the write see the same row.
         """
         return (
             await self.session.execute(
@@ -305,7 +308,7 @@ class AttendanceService:
         actor: str,
         meeting_id: UUID,
         principal_id: UUID,
-        **extra: Any,
+        **extra: object,
     ) -> None:
         """Write one attendance audit entry, never with the note."""
         await audit_record(
@@ -327,17 +330,17 @@ class AttendanceService:
         replace_note: bool = False,
         can_write: bool = False,
     ) -> list[AttendanceOut]:
-        """Report the own attendance of the requester (Z2).
+        """Report the own attendance of the requester.
 
-        `present` is refused while the member has a delegation for the meeting
-        (O23), as for the lead. Else the member counts as present but stays
+        `present` is refused while the member has a delegation for the meeting,
+        as for the lead. Else the member counts as present but stays
         blocked from the vote.
 
         Raises:
             ForbiddenError: The requester is not a current member of the Gremium.
             ConflictError: The meeting is closed, the meeting lead set the record
-                (O15, code `attendance_set_by_lead`), the status is `present` while
-                a delegation of the member exists (O23, code `delegation_active`),
+                (code `attendance_set_by_lead`), the status is `present` while
+                a delegation of the member exists (code `delegation_active`),
                 or a parallel change wrote the record first (code `conflict`).
         """
         meeting = await self._meeting(meeting_id, for_write=True)
@@ -375,7 +378,7 @@ class AttendanceService:
         also over an `absent` or `excused` record of the lead. The source stays as it
         was, so a lead record stays locked against the self report. A caller who is
         not a current member (an external substitute) has no attendance and gets
-        none, and so does a member with a delegation for the meeting (O23: present
+        none, and so does a member with a delegation for the meeting (present
         and delegated exclude each other). The method does not commit: the ballot
         commits it, and a refused ballot rolls it back. It does not lock the meeting
         row, because the caller holds the vote row and the lock order is meeting row
@@ -415,7 +418,7 @@ class AttendanceService:
         await self._flush_write()
 
     async def _has_delegation(self, meeting_id: UUID, principal_id: UUID) -> bool:
-        """Return True when the member delegated for this meeting (O23)."""
+        """Return True when the member delegated for this meeting."""
         found = (
             await self.session.execute(
                 select(MeetingDelegation.id).where(
@@ -444,7 +447,7 @@ class AttendanceService:
         Raises:
             NotFoundError: The principal is not a current member of the Gremium.
             ConflictError: The meeting is closed, the status is `present` while a
-                delegation of the member exists (O23, code `delegation_active`), or
+                delegation of the member exists (code `delegation_active`), or
                 a parallel change wrote the record first (code `conflict`).
         """
         meeting = await self._meeting(meeting_id, for_write=True)

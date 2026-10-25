@@ -1,4 +1,4 @@
-"""F19: a state change out of a vote state cancels the votes of the application.
+"""A state change out of a vote state cancels the votes of the application.
 
 A transition without a branch and a forced status move the open AND the draft votes to
 `cancelled`, set `closed_at` and write `vote_cancel`. Only the drafts of the state that
@@ -43,7 +43,7 @@ async def session(
     await eng.dispose()
 
 
-async def _status(session: AsyncSession, vote_id) -> tuple[str, datetime | None]:  # noqa: ANN001
+async def _status(session: AsyncSession, vote_id) -> tuple[str, datetime | None]:
     vote = await session.get(Vote, vote_id)
     assert vote is not None
     await session.refresh(vote)
@@ -51,11 +51,11 @@ async def _status(session: AsyncSession, vote_id) -> tuple[str, datetime | None]
 
 
 async def test_manual_exit_cancels_open_and_draft_votes(session: AsyncSession) -> None:
+    """Cancel the open and draft votes; a draft for the entered state stays."""
     flow = await seed_vote_flow(session)
     meeting_id = await add_meeting(session, flow.gremium_id)
     running = await add_vote(session, flow, meeting_id=meeting_id, opens_at=NOW)
     draft = await add_vote(session, flow, status="draft", opens_state="voting")
-    # A draft for the state the application enters stays.
     kept = await add_vote(session, flow, status="draft", opens_state="review")
     closed = await add_vote(session, flow, status="closed")
     publisher = RecordingPublisher()

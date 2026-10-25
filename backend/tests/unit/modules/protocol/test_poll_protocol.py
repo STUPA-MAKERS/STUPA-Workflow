@@ -76,6 +76,7 @@ _RESULT = PollResultOut(
 
 
 def test_snippet_of_a_closed_single_poll() -> None:
+    """The public variant of a closed poll is the same, because a poll never lists names."""
     text = _snippet(_view(_SINGLE, _RESULT), "Beschlussfrage", tz=BERLIN)
     assert text.splitlines() == [
         "> [!abstimmung] **Wohin?**",
@@ -87,7 +88,6 @@ def test_snippet_of_a_closed_single_poll() -> None:
         "> Meiste Stimmen: Ja, Café *Mitte*",
         "> 10 Antworten",
     ]
-    # The public variant is the same: a poll never lists names.
     assert _snippet(_view(_SINGLE, _RESULT), "x", public=True) == text
 
 

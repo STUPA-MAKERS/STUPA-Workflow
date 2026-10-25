@@ -30,7 +30,7 @@ def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
     return {code: _PROBLEM for code in codes}
 
 
-# Kept out of the archive so the download holds no build or cache directory.
+#: Kept out of the archive so the download holds no build or cache directory.
 _EXCLUDE = {"__pycache__", ".venv", "venv", ".mypy_cache", ".pytest_cache", "dist", "build"}
 
 
@@ -66,10 +66,12 @@ def mcp_config(
     settings: SettingsDep,
     _principal: Annotated[Principal, Depends(require_principal("mcp.use"))],
 ) -> dict[str, Any]:
-    """Return a ready-made `mcpServers` entry to paste into the MCP client."""
+    """Return a ready-made `mcpServers` entry to paste into the MCP client.
+
+    The downloaded package bakes in the platform URL, so the entry needs no
+    ``ANTRAGSPLATTFORM_URL``. A scope override in it only narrows the scope.
+    """
     base = settings.public_base_url.rstrip("/")
-    # The downloaded package bakes in this URL, so ANTRAGSPLATTFORM_URL is not needed.
-    # Override the scope here only to narrow it.
     return {
         "mcpServers": {
             "antragsplattform": {
@@ -92,7 +94,13 @@ def mcp_package(
     settings: SettingsDep,
     _principal: Annotated[Principal, Depends(require_principal("mcp.use"))],
 ) -> StreamingResponse:
-    """Stream the `mcp/` source package as `antragsplattform-mcp.tar.gz`."""
+    """Stream the `mcp/` source package as `antragsplattform-mcp.tar.gz`.
+
+    The package gets ``PUBLIC_BASE_URL`` baked in, so it needs no
+    ``ANTRAGSPLATTFORM_URL``. ``json.dumps`` escapes quotes and newlines into the
+    Python string literal, which blocks an injection if the URL ever becomes attacker
+    controlled.
+    """
     pkg = _package_dir(settings)
     if pkg is None:
         raise NotFoundError(
@@ -103,15 +111,11 @@ def mcp_package(
     base = settings.public_base_url.rstrip("/")
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w:gz") as tar:
-
         def _filter(info: tarfile.TarInfo) -> tarfile.TarInfo | None:
             parts = set(Path(info.name).parts)
             return None if parts & _EXCLUDE else info
 
         tar.add(pkg, arcname="antragsplattform-mcp", filter=_filter)
-        # Bake PUBLIC_BASE_URL into the package so ANTRAGSPLATTFORM_URL is not needed.
-        # `json.dumps` escapes quotes and newlines into the Python string literal. This
-        # blocks an interpolation injection if the URL ever becomes attacker controlled.
         baked = (
             '"""Auto-generated at download — pins this package to its source platform."""\n'
             f"BASE_URL = {json.dumps(base)}\n"

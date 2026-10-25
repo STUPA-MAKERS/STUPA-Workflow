@@ -31,8 +31,6 @@
       </app-sheet-bar>
       <app-calendar-subscribe #abo />
 
-      <!-- Every part draws its dot before it; the line clips the dot of the first part on
-           each line, so a dot shows only between two parts, also after a wrap. -->
       <p class="sheet-line gd__line">
         <span class="gd__parts">
           @for (fact of facts(); track fact) {
@@ -62,71 +60,71 @@
       }
     </header>
 
-    <app-tabs
-      #tabBar
-      class="gd__tabs"
-      idPrefix="gd"
-      [ariaLabel]="'gremien.detail.tabs' | t"
-      [tabs]="tabs()"
-      [active]="tab()"
-      (activeChange)="selectTab($event)"
-    />
+    @if (split()) {
+      <app-tabs
+        #tabBar
+        class="gd__tabs"
+        idPrefix="gd"
+        [ariaLabel]="'gremien.detail.tabs' | t"
+        [tabs]="tabs()"
+        [active]="tab()"
+        (activeChange)="selectTab($event)"
+      />
+      <div class="gd__body" [class.gd__body--fill]="tab() === 'anwesenheit'">
+        @for (t of tabs(); track t.id) {
+          <section
+            class="gd__panel"
+            role="tabpanel"
+            [id]="tabBar.panelId(t.id)"
+            [attr.aria-labelledby]="tabBar.tabId(t.id)"
+            [hidden]="tab() !== t.id"
+          >
+            <ng-container *ngTemplateOutlet="page; context: { $implicit: t.id, g }" />
+          </section>
+        }
+      </div>
+    } @else {
+      <app-tab-pager
+        class="gd__tabs gd__pager"
+        idPrefix="gd"
+        [ariaLabel]="'gremien.detail.tabs' | t"
+        [tabs]="tabs()"
+        [active]="tab()"
+        [paged]="phone()"
+        (activeChange)="selectTab($event)"
+      >
+        <ng-template appTabPage let-id>
+          <section class="gd__panel">
+            <ng-container *ngTemplateOutlet="page; context: { $implicit: id, g }" />
+          </section>
+        </ng-template>
+      </app-tab-pager>
+    }
 
-    <div class="gd__body" [class.gd__body--fill]="split() && tab() === 'anwesenheit'">
-      <section
-        class="gd__panel"
-        role="tabpanel"
-        [id]="tabBar.panelId('sitzungen')"
-        [attr.aria-labelledby]="tabBar.tabId('sitzungen')"
-        [hidden]="tab() !== 'sitzungen'"
-      >
-        @if (visited().has('sitzungen')) {
-          <app-gremium-meetings [gremiumId]="g.id" (count)="meetingCount.set($event)" />
+    <ng-template #page let-id let-g="g">
+      @if (visited().has(id)) {
+        @switch (id) {
+          @case ('sitzungen') {
+            <app-gremium-meetings [gremiumId]="g.id" (count)="meetingCount.set($event)" />
+          }
+          @case ('mitglieder') {
+            <app-gremium-members [gremiumId]="g.id" [gremiumName]="g.name" />
+          }
+          @case ('anwesenheit') {
+            <app-gremium-attendance [gremiumId]="g.id" [gremiumName]="g.name" [fill]="split()" />
+          }
+          @case ('beschluesse') {
+            <app-gremium-decisions [gremiumId]="g.id" />
+          }
         }
-      </section>
-      <section
-        class="gd__panel"
-        role="tabpanel"
-        [id]="tabBar.panelId('mitglieder')"
-        [attr.aria-labelledby]="tabBar.tabId('mitglieder')"
-        [hidden]="tab() !== 'mitglieder'"
-      >
-        @if (visited().has('mitglieder')) {
-          <app-gremium-members [gremiumId]="g.id" [gremiumName]="g.name" />
-        }
-      </section>
-      <section
-        class="gd__panel"
-        role="tabpanel"
-        [id]="tabBar.panelId('anwesenheit')"
-        [attr.aria-labelledby]="tabBar.tabId('anwesenheit')"
-        [hidden]="tab() !== 'anwesenheit'"
-      >
-        @if (visited().has('anwesenheit')) {
-          <app-gremium-attendance [gremiumId]="g.id" [gremiumName]="g.name" [fill]="split()" />
-        }
-      </section>
-      <section
-        class="gd__panel"
-        role="tabpanel"
-        [id]="tabBar.panelId('beschluesse')"
-        [attr.aria-labelledby]="tabBar.tabId('beschluesse')"
-        [hidden]="tab() !== 'beschluesse'"
-      >
-        @if (visited().has('beschluesse')) {
-          <app-gremium-decisions [gremiumId]="g.id" />
-        }
-      </section>
-    </div>
+      }
+    </ng-template>
   </article>
 
   @if (canPlan()) {
     <app-create-meeting-dialog [open]="createOpen()" [gremiumId]="g.id" (closed)="createOpen.set(false)" />
   }
 } @else if (store.loading()) {
-  <!-- The containers of the loaded sheet (bar, logo and title, facts line, rows), so the
-       surface is there at once and nothing moves when the Gremium arrives. The bars show
-       after 300ms. -->
   <article class="gd gd--busy" [class.gd--split]="split()" aria-busy="true">
     <header class="gd__head skel-in" aria-hidden="true">
       <app-sheet-bar class="gd__bar" [bleed]="split()">

@@ -11,7 +11,6 @@
   display: none;
 }
 
-/* One row: the board head, then its columns side by side. */
 .br {
   display: flex;
   flex-direction: column;
@@ -105,7 +104,6 @@
   }
 }
 
-/* The columns of the board, as on the board itself; the row scrolls sideways. */
 .br__cols {
   display: grid;
   grid-auto-columns: minmax(17rem, 1fr);
@@ -149,7 +147,6 @@
 }
 .br__doneIcon {
   flex: none;
-  /* The done mark ends the column head, as the done tag on the board. */
   margin-inline-start: auto;
   align-self: center;
   color: var(--color-on-selected);
@@ -189,7 +186,6 @@
     transition: none;
   }
 }
-/* A read-only row: the tiles open, but they do not lift. */
 .br--readonly app-todo-card-tile {
   cursor: pointer;
 }
@@ -210,7 +206,6 @@
   }
 }
 
-/* Phone: each row is one list of its cards at the full width; nothing scrolls sideways. */
 .br__list {
   display: flex;
   flex-direction: column;
@@ -226,8 +221,6 @@
 .br__moreItem {
   display: flex;
 }
-/* A row without a card: one muted line, no frame. */
-/* A board without cards: the shared empty state with one ghost row. */
 .br__empty {
   padding: 0 var(--space-2);
 }

@@ -1,4 +1,7 @@
-"""VotingService: the decision proposal of a vote (F1)."""
+"""VotingService: the decision proposal of a vote.
+
+``_patch_flow`` is a fixture, imported for its side effect.
+"""
 
 from __future__ import annotations
 
@@ -28,7 +31,7 @@ from tests.unit.modules.voting.test_voting_service_unit import (
     _voter,
 )
 
-__all__ = ["_patch_flow"]  # the fixture, imported for its side effect
+__all__ = ["_patch_flow"]
 
 PROPOSAL = {"approvedAmount": "800.00", "conditions": ["Belege nachreichen"]}
 
@@ -77,9 +80,6 @@ def _branch(patch: type[_FakeFlow], monkeypatch: pytest.MonkeyPatch) -> UUID:
 
     monkeypatch.setattr(_FakeFlow, "stage_branch", _stage)
     return event_id
-
-
-# --- create ---------------------------------------------------------------------------
 
 
 async def test_create_stores_the_proposal() -> None:
@@ -157,9 +157,6 @@ async def test_create_internal_without_proposal_and_without_application() -> Non
     db = fake_session()
     out = await VotingService(db).create_internal(None, _internal())
     assert out.proposal is None
-
-
-# --- close ----------------------------------------------------------------------------
 
 
 async def test_close_passed_records_the_proposal_and_links_the_event(

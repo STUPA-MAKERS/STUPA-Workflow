@@ -44,7 +44,9 @@ async def session(
     await eng.dispose()
 
 
-def _graph(vote_config: dict[str, Any], actions: list[dict[str, Any]] | None = None) -> dict:
+def _graph(
+    vote_config: dict[str, Any], actions: list[dict[str, Any]] | None = None
+) -> dict[str, Any]:
     return {
         "states": [
             {"key": "review", "label": {"de": "P"}, "isInitial": True},
@@ -88,6 +90,7 @@ async def _snapshot(session: AsyncSession, app_id: uuid.UUID) -> uuid.UUID | Non
 
 
 async def test_save_refuses_unknown_cost_centers(session: AsyncSession) -> None:
+    """Refuse unknown cost centers on save; known ones raise nothing."""
     g = Gremium(name="G", slug=f"g-{uuid.uuid4().hex[:8]}")
     session.add(g)
     await session.commit()
@@ -110,10 +113,14 @@ async def test_save_refuses_unknown_cost_centers(session: AsyncSession) -> None:
         {"type": "assignBudgetFromMap", "field": "f", "map": {"a": str(top.id)}},
         {"type": "assignBudgetFromApplicantGremium", "parentId": str(top.id)},
     ]})
-    await _save(session, graph)  # no raise
+    await _save(session, graph)
 
 
 async def test_activation_rederives_the_snapshot(session: AsyncSession) -> None:
+    """Derive the snapshot again on activation.
+
+    In v2, `gvote` takes the cost center and `fixed` moves to Gremium A.
+    """
     tag = uuid.uuid4().hex[:8]
     g_a, g_b, g_old = (Gremium(name=n, slug=f"{n}-{tag}") for n in ("a", "b", "old"))
     session.add_all([g_a, g_b, g_old])
@@ -145,7 +152,6 @@ async def test_activation_rederives_the_snapshot(session: AsyncSession) -> None:
     session.add_all([keep, fill, empty, fixed, review])
     await session.commit()
 
-    # v2: `gvote` takes the cost center, `fixed` moves to Gremium A.
     graph = _graph({"gremiumSource": "budget"})
     graph["states"][2]["config"] = {"gremiumId": str(g_a.id)}
     await _save(session, graph)

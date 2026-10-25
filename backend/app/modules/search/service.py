@@ -30,8 +30,8 @@ from app.modules.applications.access import READ_ALL_PERMISSION, READ_PERMISSION
 from app.modules.budget.access import has_budget_read
 from app.modules.budget.tree_models import Budget
 from app.modules.search.schemas import SearchHit, SearchKind, SearchResults
-from app.search import dialect_of, trigram_rank
 from app.shared.i18n import resolve_i18n
+from app.shared.search import dialect_of, trigram_rank
 
 if TYPE_CHECKING:
     from app.modules.auth.principal import Principal
@@ -49,11 +49,11 @@ MIN_QUERY_LENGTH = 2
 #: reader nothing, so a nameless record reads as "untitled" in the reader's language.
 UNTITLED: Mapping[str, str] = {"de": "Ohne Titel", "en": "Untitled"}
 
-#: The subtitle of a Gremium hit (D10): the kind only, in the reader's language. The
+#: The subtitle of a Gremium hit: the kind only, in the reader's language. The
 #: slug is an internal key and tells the reader nothing.
 GREMIUM_SUBTITLE: Mapping[str, str] = {"de": "Gremium", "en": "Committee"}
 
-#: The title of an account without a name and an e-mail (D7). The `sub` is an internal
+#: The title of an account without a name and an e-mail. The `sub` is an internal
 #: key: the user page shows it only in the tooltip.
 UNNAMED: Mapping[str, str] = {"de": "Ohne Namen", "en": "No name"}
 
@@ -64,7 +64,9 @@ UNNAMED: Mapping[str, str] = {"de": "Ohne Namen", "en": "No name"}
 #: reader back into the search they just ran.
 #:
 #: One table rather than an f-string in each source, so a new kind cannot ship a URL
-#: that forgets which record it is about.
+#: that forgets which record it is about. A principal hit links by ``sub``, not by the
+#: row id, because the principal search matches on it. A to-do hit names the card only,
+#: and the page opens the board that the card is on now.
 HIT_URL: Mapping[SearchKind, str] = {
     "application": "/applications/{id}",
     "meeting": "/meetings/{id}",
@@ -72,10 +74,8 @@ HIT_URL: Mapping[SearchKind, str] = {
     "expense": "/expenses?id={id}",
     "budget": "/budget?ks={id}",
     "gremium": "/admin/gremien/{id}/members",
-    # `sub` and not the row id: it is what the principal search matches on.
     "principal": "/admin/users?q={id}",
     "ticket": "/tickets/{id}",
-    # The card only: the page opens the board the card is on now.
     "todo": "/todos?card={id}",
 }
 
@@ -89,7 +89,14 @@ TICKET_STATUS: Mapping[str, Mapping[str, str]] = {
 
 
 class SearchService:
+    """Global search over every source, each behind the gate of its own module.
+
+    Each source asks its own module, and its docstring names the gate it reuses, so a
+    reader can check the claim without following the call.
+    """
+
     def __init__(self, session: AsyncSession) -> None:
+        """Bind the service to a session."""
         self.session = session
 
     async def search(self, q: str, principal: Principal, *, lang: str = "de") -> SearchResults:
@@ -100,6 +107,11 @@ class SearchService:
 
         A hit is one flat line, so an i18n label has to be resolved here rather than left
         for the client the way a list item leaves it. `lang` decides which translation.
+
+        The sources run in sequence, not gathered, because they share one AsyncSession
+        and a session is not safe for concurrent use; each query is small and indexed. A
+        broken source is logged and listed in ``failed``, so it does not empty the
+        palette.
         """
         query = q.strip()
         if len(query) < MIN_QUERY_LENGTH:
@@ -116,15 +128,13 @@ class SearchService:
             "ticket": self._tickets,
             "todo": self._todos,
         }
-        # Sequential, not gathered: they share one AsyncSession, and a session is not
-        # safe for concurrent use. Each query is small and indexed.
         hits: list[SearchHit] = []
         failed: list[str] = []
         truncated = False
         for name, run in sources.items():
             try:
                 found = await run(query, principal, lang)
-            except Exception:  # noqa: BLE001 - one broken source must not empty the palette
+            except Exception:
                 log.exception("search source %s failed", name)
                 failed.append(name)
                 continue
@@ -134,16 +144,14 @@ class SearchService:
             hits.extend(found)
         return SearchResults(hits=hits, truncated=truncated, failed=failed)
 
-    # -- sources ----------------------------------------------------------------
-    #
-    # Each one asks its own module. The comment on a source says which gate it reuses,
-    # so a reader can check the claim without following the call.
-
     async def _applications(self, q: str, principal: Principal, lang: str) -> list[SearchHit]:
         """Reuses `ApplicationsService.list_applications`, gated exactly as its router.
 
         A principal without a global read sees only their own applications plus the
         committee read scope, which the service resolves from the Gremium memberships.
+        Such a principal gets no search over the isPII values of other applications.
+        Archived rows are included, because someone who searches by name looks for one
+        record, and archiving it does not make it stop existing.
         """
         from app.modules.applications.service import ApplicationsService
 
@@ -152,11 +160,7 @@ class SearchService:
             q=q,
             owner_sub=None if can_read else principal.sub,
             committee_sub=None if can_read else principal.sub,
-            # O21: no search over the isPII field values of another application.
             hide_pii_in_search=not can_read,
-            # `None` is both. The list defaults to hiding archived rows, which is right
-            # for a working list and wrong for a search: someone searching by name is
-            # looking for one record, and archiving it does not make it stop existing.
             archived=None,
             limit=PER_KIND + 1,
             offset=0,
@@ -264,10 +268,12 @@ class SearchService:
         ]
 
     async def _gremien(self, q: str, principal: Principal, lang: str) -> list[SearchHit]:
-        """Committees, for a caller who can act on one."""
-        # Gate BEFORE the query. A Gremium row links to the members page, which only an
-        # administrator may open; anyone else would get a label with nowhere to go, and
-        # a gate after the query would pay for a scan nobody is allowed to see.
+        """Search the committees, for a caller who can act on one.
+
+        The gate comes BEFORE the query. A Gremium hit links to the members page, which
+        only an administrator may open, so anyone else would get a label with nowhere to
+        go, and a gate after the query would pay for a scan nobody may see.
+        """
         if not (principal.has("admin.gremien") or principal.has("admin.users")):
             return []
         where, rank = trigram_rank(
@@ -290,8 +296,9 @@ class SearchService:
         ]
 
     async def _principals(self, q: str, principal: Principal, lang: str) -> list[SearchHit]:
-        """People. Reuses `search_principals`, behind the same permission pair that
-        gates `GET /api/admin/principals`.
+        """Search people with `search_principals`.
+
+        The gate is the permission pair of `GET /api/admin/principals`.
         """
         if not (principal.has("admin.users") or principal.has("admin.gremien")):
             return []

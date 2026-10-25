@@ -1,4 +1,4 @@
-"""Unit tests for the ClamAV scanner (T-13). A fake module replaces `clamd`."""
+"""Unit tests for the ClamAV scanner. A fake module replaces `clamd`."""
 
 from __future__ import annotations
 
@@ -8,14 +8,17 @@ from typing import Any
 
 import pytest
 
+from app.modules.files import scanner as scanner_mod
 from app.modules.files.scanner import (
     EICAR_TEST_BYTES,
     ClamdScanner,
     ScannerError,
     ScanVerdict,
     build_scanner,
+    scan_or_raise,
 )
-from app.settings import load_settings
+from app.settings import Settings, load_settings
+from app.shared.errors import ServiceUnavailableError, UnsupportedMediaTypeError
 
 
 class _FakeDaemon:
@@ -69,7 +72,8 @@ async def test_scan_error_wrapped(fake_clamd: dict[str, Any]) -> None:
 
 
 async def test_scan_empty_result_raises(fake_clamd: dict[str, Any]) -> None:
-    fake_clamd["result"] = {}  # no "stream" key, so a protocol error
+    """Raise for a result without a "stream" key, a protocol error."""
+    fake_clamd["result"] = {}
     with pytest.raises(ScannerError):
         await ClamdScanner(host="clamav").scan(b"x")
 
@@ -83,3 +87,52 @@ def test_build_scanner_enabled() -> None:
     scanner = build_scanner(settings)
     assert isinstance(scanner, ClamdScanner)
     assert scanner.host == "clamav"
+
+
+class _StubScanner:
+    def __init__(self, result: ScanVerdict | Exception) -> None:
+        self._result = result
+
+    async def scan(self, data: bytes) -> ScanVerdict:
+        if isinstance(self._result, Exception):
+            raise self._result
+        return self._result
+
+
+def _use_scanner(monkeypatch: pytest.MonkeyPatch, result: ScanVerdict | Exception) -> None:
+    def _build(_settings: Settings) -> _StubScanner:
+        return _StubScanner(result)
+
+    monkeypatch.setattr(scanner_mod, "build_scanner", _build)
+
+
+async def test_scan_or_raise_skips_without_scanner_outside_production() -> None:
+    await scan_or_raise(b"data", load_settings(environment="development"))
+
+
+async def test_scan_or_raise_fails_closed_without_scanner_in_production() -> None:
+    with pytest.raises(ServiceUnavailableError):
+        await scan_or_raise(b"data", load_settings(environment="production"))
+
+
+async def test_scan_or_raise_clean_passes(monkeypatch: pytest.MonkeyPatch) -> None:
+    _use_scanner(monkeypatch, ScanVerdict(clean=True))
+    await scan_or_raise(b"data", load_settings())
+
+
+async def test_scan_or_raise_scanner_error_gives_503(monkeypatch: pytest.MonkeyPatch) -> None:
+    _use_scanner(monkeypatch, ScannerError("down"))
+    with pytest.raises(ServiceUnavailableError):
+        await scan_or_raise(b"data", load_settings())
+
+
+async def test_scan_or_raise_infected_names_signature(monkeypatch: pytest.MonkeyPatch) -> None:
+    _use_scanner(monkeypatch, ScanVerdict(clean=False, signature="Eicar-Test-Signature"))
+    with pytest.raises(UnsupportedMediaTypeError, match="Eicar-Test-Signature"):
+        await scan_or_raise(EICAR_TEST_BYTES, load_settings())
+
+
+async def test_scan_or_raise_infected_without_signature(monkeypatch: pytest.MonkeyPatch) -> None:
+    _use_scanner(monkeypatch, ScanVerdict(clean=False, signature=None))
+    with pytest.raises(UnsupportedMediaTypeError, match="unknown"):
+        await scan_or_raise(b"x", load_settings())

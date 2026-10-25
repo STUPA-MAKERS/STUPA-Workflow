@@ -13,8 +13,6 @@
     [errorText]="'admin.helpTickets.loadError' | t"
   >
     <ng-template #loading>
-      <!-- The loaded form with bars in place of the values: the same sections, the field
-           and the switch rows with their real labels. The bars show after 300ms. -->
       <div class="ht__form" aria-hidden="true">
         <section class="ht__sec">
           <h2 class="section-title ht__secTitle">{{ 'admin.helpTickets.wiki' | t }}</h2>
@@ -127,7 +125,6 @@
           <app-empty-state rows="3" [heading]="'admin.helpTickets.blockedEmpty' | t" />
         }
       } @else {
-        <!-- One row of the list: the sender, the quiet line, "Entsperren". -->
         <ul class="ht__rows ht__skelBlocks skel-in" aria-hidden="true">
           <li class="ht__row ht__row--split">
             <span class="ht__block">

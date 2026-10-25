@@ -7,7 +7,6 @@
   gap: var(--space-4);
   min-width: 0;
 }
-/* Side by side: the matrix takes the free height of the pane and scrolls inside. */
 :host(.gat-host--fill) {
   flex: 1 1 auto;
   min-height: 0;
@@ -21,8 +20,6 @@
   flex: 1 1 auto;
 }
 
-/* ------------------------------------------------------------------ matrix */
-/* The box scrolls in both directions; the head row and the first column stick. */
 .gat__frame {
   min-width: 0;
   max-width: 100%;
@@ -130,7 +127,6 @@ thead .gat__th {
   outline-offset: 2px;
 }
 
-/* The first column sticks while the matrix scrolls sideways. */
 .gat__th--name,
 .gat__who,
 .gat__foot--name {
@@ -168,7 +164,6 @@ thead .gat__th--name {
   font-size: 0.75rem;
 }
 
-/* A cell: "present/held" on a ground from the surface (none) to the accent (all). */
 .gat__cell {
   --gat-s: 0%;
   position: relative;
@@ -212,7 +207,6 @@ button.gat__cell:focus-visible {
   background: repeating-linear-gradient(135deg, var(--color-surface-3) 0 4px, transparent 4px 8px);
 }
 
-/* The marks: a warning badge with the excused meetings, a grey one with "nV". */
 .gat__ex {
   position: absolute;
   top: -6px;
@@ -266,7 +260,6 @@ tfoot .gat__foot--name {
   font-weight: var(--fw-regular);
 }
 
-/* ------------------------------------------------------------------ legend */
 .gat__legend {
   display: flex;
   flex: none;
@@ -297,7 +290,6 @@ tfoot .gat__foot--name {
   background: color-mix(in srgb, var(--color-accent) 45%, var(--color-surface-3));
 }
 
-/* ------------------------------------------------------------------ no meetings */
 .gat__ghost {
   display: flex;
   flex-direction: column;
@@ -324,7 +316,6 @@ tfoot .gat__foot--name {
   background: var(--color-surface-3);
 }
 
-/* ------------------------------------------------------------------ phone cards */
 .gat__phoneHead {
   display: flex;
   gap: 4px;

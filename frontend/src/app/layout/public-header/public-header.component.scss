@@ -4,12 +4,11 @@
   display: block;
 }
 
+// Reaches under the status bar of an installed iOS app; every inset is 0 in a browser tab.
 .pub {
   display: flex;
   align-items: center;
   gap: 12px;
-  /* The bar reaches under the status bar of an installed iOS app and keeps its content
-     below it and clear of the notch in landscape. Every inset is 0 in a browser tab. */
   height: calc(72px + var(--app-top-safe-area, 0px));
   padding: var(--app-top-safe-area, 0px) max(28px, var(--app-right-safe-area, 0px)) 0
     max(28px, var(--app-left-safe-area, 0px));
@@ -37,7 +36,6 @@
   height: 36px;
   width: auto;
 }
-/* On a phone the wordmark is both unreadable and the widest thing in the bar. */
 .pub__mark {
   display: none;
   height: 32px;
@@ -60,8 +58,7 @@
   flex: none;
 }
 
-/* A chip: globe, code, chevron. The native select keeps the keyboard and the
-   platform picker; the icons sit over it and let the clicks through. */
+// The native select keeps the keyboard and the platform picker; the icons let the clicks through.
 .pub__icon {
   display: grid;
   flex: none;
@@ -86,7 +83,6 @@
   outline-offset: 2px;
 }
 
-/* An outlined pill: signing in is offered, not pushed. */
 .pub__login {
   flex: none;
 }

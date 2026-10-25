@@ -1,4 +1,4 @@
-"""Unit tests for the VotingService write and lifecycle authorization (AUD-027).
+"""Unit tests for the VotingService write and lifecycle authorization.
 
 The suite runs without a database. It covers every branch of `_vote_gremium_id`,
 `assert_can_manage_group`, `assert_can_manage` and `assert_can_manage_vote`, because
@@ -18,7 +18,7 @@ import pytest
 
 from app.modules.admin import gremium_roles as gremium_roles_mod
 from app.modules.auth.principal import Principal
-from app.modules.voting.service import VotingService
+from app.modules.voting.service import VotingService, manages_votes_in_gremium
 from app.shared.errors import ForbiddenError
 from tests._support.flow_fakes import fake_session, result
 
@@ -61,7 +61,10 @@ async def test_manage_admin_read_token_denied() -> None:
 
 
 async def test_manage_gremium_session_manage_ok(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The gremium permission `session.manage` alone manages a standalone vote."""
+    """The gremium permission `session.manage` alone manages a standalone vote.
+
+    The lead of another gremium gets 403.
+    """
     gid = uuid4()
 
     async def _fake(
@@ -73,7 +76,6 @@ async def test_manage_gremium_session_manage_ok(monkeypatch: pytest.MonkeyPatch)
     principal = Principal(sub="lead")
     service = VotingService(fake_session())
     await service.assert_can_manage_group(str(gid), None, principal)
-    # The lead of another gremium gets 403.
     with pytest.raises(ForbiddenError):
         await service.assert_can_manage_group(str(uuid4()), None, principal)
 
@@ -93,7 +95,7 @@ async def test_manage_gremium_role_ok(monkeypatch: pytest.MonkeyPatch) -> None:
 async def test_manage_gremium_role_capped_by_scope(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """F16: a token without `vote.manage` in its scope gets nothing from the role."""
+    """A token without `vote.manage` in its scope gets nothing from the role."""
     gid = uuid4()
     _patch_permitted(monkeypatch, {gid})
     principal = Principal(sub="g", scope_permissions=frozenset({"application.read"}))
@@ -126,11 +128,14 @@ async def test_manage_unresolvable_group_denied() -> None:
 async def test_manage_resolves_gremium_via_meeting(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A meeting-bound vote inherits the Gremium of the meeting (`meeting_id` branch)."""
+    """A meeting-bound vote inherits the Gremium of the meeting (`meeting_id` branch).
+
+    The scalar is ``Meeting.gremium_id``.
+    """
     gid = uuid4()
     _patch_permitted(monkeypatch, {gid})
     db = fake_session()
-    db.scalar_results = [gid]  # Meeting.gremium_id
+    db.scalar_results = [gid]
     principal = Principal(sub="g")
     await VotingService(db).assert_can_manage_group("ignored", uuid4(), principal)
 
@@ -138,11 +143,14 @@ async def test_manage_resolves_gremium_via_meeting(
 async def test_manage_meeting_without_gremium_falls_back_to_group(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A `meeting_id` without a resolvable Gremium falls back to the `eligible_group`."""
+    """A `meeting_id` without a resolvable Gremium falls back to the `eligible_group`.
+
+    The meeting lookup returns nothing.
+    """
     gid = uuid4()
     _patch_permitted(monkeypatch, {gid})
     db = fake_session()
-    db.scalar_results = [None]  # the meeting lookup returns nothing
+    db.scalar_results = [None]
     principal = Principal(sub="g")
     await VotingService(db).assert_can_manage_group(str(gid), uuid4(), principal)
 
@@ -164,3 +172,30 @@ async def test_assert_can_manage_vote_loads_then_checks() -> None:
     await VotingService(fake_session(result(vote))).assert_can_manage_vote(
         vote.id, principal
     )
+
+
+async def test_manage_admin_standalone_gremium_vote_ok(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The gremium rule admits the admin role without a gremium role (admin bypass)."""
+    _patch_permitted(monkeypatch, set())
+    principal = Principal(sub="a", roles=["admin"])
+    await VotingService(fake_session()).assert_can_manage_group(
+        str(uuid4()), None, principal
+    )
+
+
+async def test_gremium_rule_admin_token_scope_capped(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`manages_votes_in_gremium` caps the admin bypass and the roles by the scope."""
+    gid = uuid4()
+    _patch_permitted(monkeypatch, set())
+    votes_token = Principal(
+        sub="a", roles=["admin"], scope_permissions=frozenset({"vote.manage"})
+    )
+    read_token = Principal(
+        sub="a", roles=["admin"], scope_permissions=frozenset({"application.read"})
+    )
+    assert await manages_votes_in_gremium(fake_session(), gid, votes_token) is True
+    assert await manages_votes_in_gremium(fake_session(), gid, read_token) is False

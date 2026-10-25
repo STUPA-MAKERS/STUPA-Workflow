@@ -15,13 +15,15 @@ class MagicLinkRequest(BaseModel):
 
     email: EmailStr
     application_id: UUID | None = None
-    # ALTCHA proof-of-work solution. The schema checks only the structure, so a
-    # malformed value gives 422. `require_altcha` runs the cryptographic check.
-    # Without a secret (dev and test) only the structural check remains.
+    #: ALTCHA proof-of-work solution. The schema checks only the structure, so a
+    #: malformed value gives 422. `require_altcha` runs the cryptographic check.
+    #: Without a secret (dev and test) only the structural check remains.
     altcha: AltchaSolutionStr | None = None
 
 
 class MagicLinkVerifyRequest(BaseModel):
+    """Body of the magic-link verify: the token from the URL fragment."""
+
     token: str = Field(min_length=1)
 
 
@@ -55,31 +57,33 @@ class GremiumRef(BaseModel):
 
 
 class MeOut(BaseModel):
+    """The logged-in principal with its roles, permissions and Gremium links."""
+
     sub: str
     email: str | None = None
     display_name: str | None = None
     roles: list[str]
     permissions: list[str]
     groups: list[str]
-    # Gremien the principal is a member of (valid role assignment). This is the base of
-    # the user-facing "my Gremien" view.
+    #: Gremien the principal is a member of (valid role assignment). This is the base of
+    #: the user-facing "my Gremien" view.
     gremien: list[GremiumRef] = []
-    # Gremien the principal MANAGES through a gremium role (`session.manage`). The
-    # frontend uses this to show "create meeting". The OAuth scope caps the list.
+    #: Gremien the principal MANAGES through a gremium role (`session.manage`). The
+    #: frontend uses this to show "create meeting". The OAuth scope caps the list.
     session_manage_gremien: list[UUID] = []
-    # Gremium id to the gremium permissions of the active role of the principal in
-    # that gremium. The OAuth scope caps the lists: a key outside the token scope does
-    # not show. The frontend gates the meeting pages on it. This is UX only; the
-    # server checks every call.
+    #: Gremium id to the gremium permissions of the active role of the principal in
+    #: that gremium. The OAuth scope caps the lists: a key outside the token scope does
+    #: not show. The frontend gates the meeting pages on it. This is UX only; the
+    #: server checks every call.
     gremium_permissions: dict[UUID, list[str]] = {}
-    # True if at least one cost center has a Gremium of the principal as visibility
-    # root. The frontend uses this to show the budget tab without a global `budget.*`
-    # permission.
+    #: True if at least one cost center has a Gremium of the principal as visibility
+    #: root. The frontend uses this to show the budget tab without a global `budget.*`
+    #: permission.
     has_scoped_budget_view: bool = False
-    # True if the principal is in at least one substitute pool. The frontend uses this
-    # to show the meeting timeline to pool substitutes. The live channel still needs a
-    # concrete delegation.
+    #: True if the principal is in at least one substitute pool. The frontend uses this
+    #: to show the meeting timeline to pool substitutes. The live channel still needs a
+    #: concrete delegation.
     in_substitute_pool: bool = False
-    # True if the principal reported at least one ticket that is not anonymized. The
-    # frontend uses this to show the tab "Tickets" without `ticket.manage`.
+    #: True if the principal reported at least one ticket that is not anonymized. The
+    #: frontend uses this to show the tab "Tickets" without `ticket.manage`.
     has_reported_tickets: bool = False

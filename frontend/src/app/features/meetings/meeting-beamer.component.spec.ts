@@ -69,12 +69,12 @@ describe('MeetingBeamerComponent', () => {
     });
   });
 
+  /** The head names the meeting, but not the item a second time. */
   it('shows the item of the room and no vote while idle', async () => {
     await setup({ vote: null });
     expect(screen.getByText('Jetzt')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: 'TOP 3 · Zuschuss' })).toBeInTheDocument();
     expect(screen.getByText('Zurzeit keine aktive Abstimmung.')).toBeInTheDocument();
-    // The head names the meeting, but not the item a second time.
     expect(screen.getByText('34. Sitzung')).toBeInTheDocument();
     expect(screen.getAllByText('TOP 3 · Zuschuss')).toHaveLength(1);
   });
@@ -85,6 +85,7 @@ describe('MeetingBeamerComponent', () => {
     expect(screen.getByText('Zurzeit keine aktive Abstimmung.')).toBeInTheDocument();
   });
 
+  /** The foot shows the status and the rules, and the quorum while it is reached. */
   it('shows the turnout of an open vote in large type and no tally', async () => {
     const { container } = await setup({ vote: vote() });
     expect(screen.getByRole('heading', { level: 1, name: 'Soll der Antrag gefördert werden?' })).toBeInTheDocument();
@@ -93,7 +94,6 @@ describe('MeetingBeamerComponent', () => {
     expect(screen.getByRole('img', { name: '14 von 19 Anwesenden haben abgestimmt' })).toBeInTheDocument();
     expect(screen.getByText('Zwischenstand sichtbar, sobald alle Anwesenden abgestimmt haben.')).toBeInTheDocument();
     expect(container.querySelector('app-vote-bars')).toBeNull();
-    // The foot: the status and the rules, the quorum while it is reached.
     expect(screen.getByText('Offen')).toBeInTheDocument();
     expect(screen.getByText('Einfache Mehrheit · offene Abstimmung · Quorum 12')).toBeInTheDocument();
     expect(container.querySelector('.bm__warn')).toBeNull();
@@ -132,7 +132,7 @@ describe('MeetingBeamerComponent', () => {
     expect(screen.getByText('Einfache Mehrheit · Quorum erreicht · 20 Stimmen')).toBeInTheDocument();
   });
 
-  it('shows a tie as rejected: the simple majority is not reached (O18)', async () => {
+  it('shows a tie as rejected: the simple majority is not reached', async () => {
     const { container } = await setup({
       vote: vote({ status: 'closed', result: 'tie', counts: { yes: 9, no: 9, abstain: 2 }, voted: 20 }),
     });
@@ -172,7 +172,7 @@ describe('MeetingBeamerComponent', () => {
     expect(screen.getByText('Zweidrittelmehrheit nicht erreicht · 9 Stimmen')).toBeInTheDocument();
   });
 
-  describe('public meeting (#17)', () => {
+  describe('public meeting', () => {
     const JOIN = { code: '7KQ4MP', url: 'https://workflow.example/j/7KQ4MP', qr: { size: 1, rows: ['1'] } };
 
     it('shares the idle screen with a large QR card and counts the room, never names', async () => {

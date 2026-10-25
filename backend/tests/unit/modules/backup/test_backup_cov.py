@@ -1,6 +1,6 @@
 """Unit tests for the backup paths that the other files do not reach.
 
-be-backup is a critical module (D11): every branch must run in the pure unit suite. The
+be-backup is a critical module: every branch must run in the pure unit suite. The
 tests here drive the catalogue reads, the restore chain (`apply_archive` → `pg_restore`
 → disconnect) and the rare archive faults with fakes and stubbed subprocesses. Nothing
 here dumps or restores a real database.
@@ -26,8 +26,6 @@ from tests.unit.modules.backup.test_backup_service import (
     _row,
     _settings,
 )
-
-# ------------------------------------------------------------------------ catalogue
 
 
 async def test_list_and_get_read_the_catalogue() -> None:
@@ -99,9 +97,6 @@ async def test_reseed_returns_the_rows_the_insert_wrote(
     assert len(session.executed) == 1
 
 
-# ------------------------------------------------------------------- subprocesses
-
-
 class _Recorder:
     """Stands in for `BackupService._run` and records each command."""
 
@@ -132,13 +127,16 @@ def _service_with_run(
 async def test_pg_dump_writes_the_custom_format_to_the_target(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Write the custom format to the target.
+
+    Sessions with their IdP refresh tokens never enter an archive.
+    """
     run = _Recorder()
-    await _service_with_run(monkeypatch, run)._pg_dump("/tmp/x.dump")  # noqa: SLF001, S108
+    await _service_with_run(monkeypatch, run)._pg_dump("/tmp/x.dump")
     [(argv, what, tolerate)] = run.calls
     assert argv[0] == "pg_dump"
     assert "--format=custom" in argv
     assert "--file=/tmp/x.dump" in argv
-    # Sessions with their IdP refresh tokens never enter an archive.
     assert "--exclude-table-data=auth_session" in argv
     assert "postgresql://u:p@db/antrag" in argv
     assert (what, tolerate) == ("pg_dump", False)
@@ -148,33 +146,34 @@ async def test_pg_restore_disconnects_the_others_first_and_tolerates_warnings(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     run = _Recorder()
-    await _service_with_run(monkeypatch, run)._pg_restore("/tmp/x.dump")  # noqa: SLF001, S108
+    await _service_with_run(monkeypatch, run)._pg_restore("/tmp/x.dump")
     assert [what for _, what, _ in run.calls] == ["psql (disconnect)", "pg_restore"]
     assert all(tolerate for _, _, tolerate in run.calls)
-    assert run.calls[1][0][-1] == "/tmp/x.dump"  # noqa: S108
+    assert run.calls[1][0][-1] == "/tmp/x.dump"
 
 
 async def test_a_failed_disconnect_does_not_stop_the_restore(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Continue the restore when the disconnect fails."""
     run = _Recorder(error=BackupError("psql is not installed in this image"))
     service = _service_with_run(monkeypatch, run)
-    await service._disconnect_everyone_else()  # noqa: SLF001  # must not raise
+    await service._disconnect_everyone_else()
     assert len(run.calls) == 1
 
 
 async def test_a_clean_exit_passes_without_a_warning() -> None:
     service = BackupService(object(), _settings())  # type: ignore[arg-type]
-    await service._run(["true"], what="pg_dump")  # noqa: SLF001
-
-
-# ------------------------------------------------------------------------- restore
+    await service._run(["true"], what="pg_dump")
 
 
 async def test_apply_archive_restores_the_dump_and_mirrors_the_objects(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """The whole restore chain with a real age archive and a stubbed `pg_restore`."""
+    """The whole restore chain with a real age archive and a stubbed `pg_restore`.
+
+    The checksum reads the target back.
+    """
     identity = x25519.Identity.generate()
     key_file = tmp_path / "age.key"
     key_file.write_text(str(identity))
@@ -183,14 +182,14 @@ async def test_apply_archive_restores_the_dump_and_mirrors_the_objects(
     arch.write_tar(plain, io.BytesIO(b"PGDUMP"), [("a.pdf", io.BytesIO(b"pdf"))], manifest)
     plain.seek(0)
     archive_path = tmp_path / "backup.age"
-    with archive_path.open("w+b") as target:  # the checksum reads the target back
+    with archive_path.open("w+b") as target:
         arch.encrypt_stream(plain, target, identity.to_public())
 
     attachments = _FakeStorage({"stale.png": b"old"})
     service = BackupService(
         object(),  # type: ignore[arg-type]  # the restore path needs no session
         _settings(backup_age_identity_file=str(key_file)),
-        attachments=attachments,  # type: ignore[arg-type]
+        attachments=attachments,
     )
     restored: list[bytes] = []
 
@@ -204,9 +203,6 @@ async def test_apply_archive_restores_the_dump_and_mirrors_the_objects(
     assert restored == [b"PGDUMP"]
     assert attachments.objects == {"a.pdf": b"pdf"}
     assert attachments.removed == ["stale.png"]
-
-
-# ------------------------------------------------------------------- archive faults
 
 
 def test_identity_skips_a_line_that_is_not_a_key() -> None:

@@ -133,6 +133,7 @@ describe('CostCentreSelectComponent', () => {
     window.matchMedia = realMatchMedia;
   });
 
+  /** An id that the tree does not hold shows the placeholder. */
   it('shows the placeholder, then the pick with its swatch and path key', async () => {
     const { field, view, host } = await setup();
     expect(field()).toHaveTextContent('Kostenstelle wählen …');
@@ -143,12 +144,16 @@ describe('CostCentreSelectComponent', () => {
     expect(field()).toHaveAccessibleName(/Kostenstelle.*Erstsemesterparty VSM-6-60-120/);
     const swatch = view.container.querySelector<HTMLElement>('.ccs__box .ccs__swatch');
     expect(swatch?.style.background).toBe('rgb(124, 77, 216)');
-    // An id the tree does not hold shows the placeholder.
     host.value.set('gone');
     view.fixture.detectChanges();
     expect(field()).toHaveTextContent('Kostenstelle wählen …');
   });
 
+  /**
+   * The year of the form shows where the cost centre has it, else the year of its budget. A cost
+   * centre without figures shows no amount. QSM has two years and none of the form, so the year
+   * comes from `fiscalYears`.
+   */
   it('lists every cost centre grouped by its top-level budget with the free amount', async () => {
     const { field, tick, user, host } = await setup((h) => h.fy.set('fy-v'));
     await user.click(field());
@@ -163,13 +168,10 @@ describe('CostCentreSelectComponent', () => {
     const erst = screen.getByRole('option', { name: /Erstsemesterparty/ });
     expect(erst).toHaveTextContent('120');
     expect(erst).toHaveTextContent('2.750,00 € frei');
-    // The year of the form where the cost centre has it, else the year of its budget.
     const tut = screen.getByRole('option', { name: /Ersti-Tutorien/ });
     expect(tut).toHaveTextContent(/[−-]120,00 € frei/);
     expect(tut.querySelector('.ccs__free--neg')).not.toBeNull();
-    // A cost centre without figures shows no amount.
     expect(screen.getByRole('option', { name: /^60 Personal$/ })).not.toHaveTextContent('frei');
-    // QSM has two years and none of the form: the year from `fiscalYears`.
     expect(screen.getByRole('option', { name: /QS-Mittel/ })).toHaveTextContent('500,00 € frei');
     await user.click(erst);
     expect(host.picks).toEqual(['erst']);
@@ -187,6 +189,7 @@ describe('CostCentreSelectComponent', () => {
     expect(screen.getByRole('option', { name: /QS-Mittel/ })).not.toHaveTextContent('frei');
   });
 
+  /** The first hit is active, so Enter picks it. */
   it('searches, marks the hit and names the parents of the hits', async () => {
     const { field, tick, user, view } = await setup();
     await user.click(field());
@@ -212,7 +215,6 @@ describe('CostCentreSelectComponent', () => {
       (m) => m.textContent,
     );
     expect(marks).toContain('Erst');
-    // The first hit is active, so Enter picks it.
     expect(search).toHaveAttribute(
       'aria-activedescendant',
       screen.getByRole('option', { name: /Erst ?semesterparty/ }).id,
@@ -223,6 +225,7 @@ describe('CostCentreSelectComponent', () => {
     expect(screen.getByText('Keine Kostenstelle gefunden.')).toBeInTheDocument();
   });
 
+  /** The same pick again reports nothing. */
   it('moves and picks with the keyboard, and closes with Escape', async () => {
     const { field, tick, user, host } = await setup((h) => h.value.set('woche'));
     field().focus();
@@ -255,13 +258,13 @@ describe('CostCentreSelectComponent', () => {
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('listbox')).toBeNull();
     expect(field()).toHaveFocus();
-    // The same pick again reports nothing.
     await user.click(field());
     await tick();
     await user.click(screen.getByRole('option', { name: /QS-Mittel/ }));
     expect(host.picks).toEqual(['qsm']);
   });
 
+  /** Enter on an empty list picks nothing. */
   it('closes on a press outside, on Tab and on a second press of the field', async () => {
     const { field, tick, user } = await setup();
     await user.click(field());
@@ -276,7 +279,6 @@ describe('CostCentreSelectComponent', () => {
     await tick();
     await user.click(field());
     expect(screen.queryByRole('listbox')).toBeNull();
-    // Enter on an empty list picks nothing.
     await user.click(field());
     await tick();
     await user.type(screen.getByRole('combobox'), 'zzz{Enter}');
@@ -313,6 +315,7 @@ describe('CostCentreSelectComponent', () => {
     expect(screen.queryByRole('listbox')).toBeNull();
   });
 
+  /** The layer goes once the sheet has gone, and not before. */
   it('opens the list in the shared bottom sheet on a phone', async () => {
     setPhone(true);
     const { field, tick, user, host } = await setup();
@@ -327,11 +330,14 @@ describe('CostCentreSelectComponent', () => {
     await tick();
     await user.click(within(screen.getByRole('dialog')).getAllByRole('button')[0]);
     expect(screen.queryByRole('dialog')).toBeNull();
-    // The layer goes once the sheet has gone, and not before.
     await tick();
     expect(document.querySelector('.ccs__layer')).toBeNull();
   });
 
+  /**
+   * The list is 400 px tall, above the field, and 520 px wide, pulled left to stay inside the
+   * viewport. A scroll inside the list moves nothing.
+   */
   it('opens above the field when the room below is too small, inside the viewport', async () => {
     const { field, tick, user } = await setup();
     const rect = (top: number, left: number, width: number): DOMRect =>
@@ -354,11 +360,9 @@ describe('CostCentreSelectComponent', () => {
     await user.click(field());
     await tick();
     const menu = document.querySelector<HTMLElement>('.ccs__menu');
-    // 400 px tall, above the field; 520 px wide, pulled left to stay inside the viewport.
     expect(menu?.style.top).toBe('296px');
     expect(menu?.style.width).toBe('520px');
     expect(menu?.style.left).toBe('672px');
-    // A scroll inside the list moves nothing.
     menu?.querySelector('.ccs__search')?.dispatchEvent(new Event('scroll'));
     expect(menu?.style.top).toBe('296px');
     jest.restoreAllMocks();
@@ -401,6 +405,10 @@ describe('CostCentreSelectComponent', () => {
     expect(view.container.querySelector('.ccs__chevron')).toBeNull();
   });
 
+  /**
+   * "Alle" is the first choice and is picked while no cost centre is. A search hides "Alle", and
+   * Enter picks the first hit. The keyboard goes back to "Alle" from the top of the list.
+   */
   it('runs as a filter chip with "Alle" on top, and names an unknown id', async () => {
     @Component({
       standalone: true,
@@ -428,7 +436,6 @@ describe('CostCentreSelectComponent', () => {
     await user.click(chip);
     const list = screen.getByRole('listbox', { name: 'Kostenstelle' });
     const options = within(list).getAllByRole('option');
-    // "Alle" is the first choice and is picked while no cost centre is.
     expect(options[0]).toHaveTextContent('Alle');
     expect(options[0]).toHaveAttribute('aria-selected', 'true');
     expect(options[0].querySelector('.ccs__swatch')).toBeNull();
@@ -436,14 +443,12 @@ describe('CostCentreSelectComponent', () => {
     view.fixture.detectChanges();
     expect(chip).toHaveAccessibleName('Kostenstelle: Erstsemesterparty');
     expect(chip).toHaveClass('on');
-    // A search hides "Alle"; Enter picks the first hit.
     await user.click(chip);
     const search = screen.getByRole('combobox');
     await user.type(search, 'tutor');
     expect(screen.queryByRole('option', { name: 'Alle' })).toBeNull();
     await user.keyboard('{Enter}');
     expect(view.fixture.componentInstance.value()).toBe('tut');
-    // Back to "Alle" from the top of the list.
     await user.click(chip);
     await user.click(screen.getByRole('option', { name: 'Alle' }));
     expect(view.fixture.componentInstance.value()).toBe('');

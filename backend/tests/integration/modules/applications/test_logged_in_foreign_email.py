@@ -1,11 +1,10 @@
-"""F23 and F12: a logged-in submission for another email stays unconfirmed (real Postgres).
+"""A logged-in submission for another email stays unconfirmed (real Postgres).
 
-Before F23 a logged-in person could enter any address, and the application counted
-as confirmed at once. Now only the account email (compared without case) confirms
+Only the account email (compared without case) confirms
 the submission. Any other address gets `email_confirmed_at = NULL` and a magic link,
 and the application rests in the flow like a guest submission (P3b).
 
-Every create writes an `application_create` audit entry without PII (F12).
+Every create writes an `application_create` audit entry without PII.
 """
 
 from __future__ import annotations
@@ -105,6 +104,7 @@ async def test_foreign_email_stays_unconfirmed_until_the_link(
     maker: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Leave a foreign email unconfirmed until its owner confirms it through the link."""
     seed = await seed_guest_flow(maker)
     app_id, sent = _submit(
         migrated, settings, monkeypatch, seed, _MEMBER, "someone-else@example.org"
@@ -122,11 +122,9 @@ async def test_foreign_email_stays_unconfirmed_until_the_link(
         "gremiumId": str(seed.gremium_id),
         "initialStateId": str(seed.open_state_id),
         "emailConfirmed": False,
-        # Z4: the number of bound draft uploads.
         "attachments": 0,
     }
 
-    # The owner of the address confirms it through the link.
     token = await issue_magic_token(maker, settings, app_id, "someone-else@example.org")
     assert await redeem(maker, settings, token) == "edit"
     assert (await _get(maker, app_id)).email_confirmed_at is not None

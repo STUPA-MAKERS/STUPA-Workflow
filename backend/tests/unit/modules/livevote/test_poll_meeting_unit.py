@@ -114,6 +114,11 @@ def _poll_row(**over: Any) -> Any:
 
 
 async def test_votes_for_reads_a_closed_poll() -> None:
+    """Read a closed poll in the meeting votes.
+
+    The fake session returns, in order: the votes, the open and the secret ballots of the
+    motion tally, the poll ballots, the secret poll ballots and the present members.
+    """
     mid = uuid4()
     stored = PollResultOut(counts={"o1": 2, "o2": 1}, ballots=3, order=["o1", "o2"], top=["o1"])
     row = _poll_row(
@@ -121,12 +126,12 @@ async def test_votes_for_reads_a_closed_poll() -> None:
     )
     sess = _QueueSession(
         executes=[
-            res(row),  # votes
-            res(),  # open ballots of the motion tally
-            res(),  # secret ballots of the motion tally
-            res((row.id, '["o1"]'), (row.id, '["o1","o2"]'), (row.id, '["o1"]')),  # poll
-            res(),  # poll: secret ballots
-            res((mid, 3)),  # present members
+            res(row),
+            res(),
+            res(),
+            res((row.id, '["o1"]'), (row.id, '["o1","o2"]'), (row.id, '["o1"]')),
+            res(),
+            res((mid, 3)),
         ]
     )
     [item] = (await MeetingService(sess)._votes_for([mid]))[mid]  # type: ignore[arg-type]
@@ -153,9 +158,6 @@ async def test_votes_for_hides_the_count_of_a_running_poll() -> None:
 async def test_poll_tallies_without_polls() -> None:
     svc = MeetingService(_QueueSession())  # type: ignore[arg-type]
     assert await svc._poll_tallies([]) == {}
-
-
-# ---------------------------------------------------------------- events
 
 
 def _vote_out(**over: Any) -> VoteOut:

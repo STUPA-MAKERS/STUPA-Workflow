@@ -43,6 +43,28 @@ import { AvatarService } from '@shared/ui/avatar/avatar.service';
 import { routes } from './app.routes';
 import { provideServiceWorker } from '@angular/service-worker';
 
+/**
+ * The root providers of the app.
+ *
+ * A long press on a row link opens no link menu of the browser (Android). A back gesture that the
+ * browser animated gets no second view transition. English lives in a lazy chunk, so the app waits
+ * for it and the first paint is not German.
+ *
+ * Interceptor order: loading (outermost, measures the full duration) → cache → auth
+ * (credentials and bearer) → mock response. The cache sits inside the loading interceptor,
+ * because a served-from-cache answer still counts as a completed request for the loading
+ * bar, and the auth layer must run for the revalidation that follows.
+ *
+ * Only the dev or demo build puts the mock interceptor into the chain. In a prod build
+ * `isDevMode()` returns false, so the app never registers it, and no input at runtime can
+ * activate it and spoof a session or data: not the `?mock=1` query flag, not the
+ * `useMockApi` localStorage key, not the `__USE_MOCK_API__` global. The `isDevMode()` guard
+ * inside the interceptor stays as defense in depth. The mock loads on its first request
+ * (`lazyMockApiInterceptor`), so it is not part of the initial bundle.
+ *
+ * The person avatars of the kit load the Gravatar image through the API proxy. The service
+ * worker (`ngsw-config.json`) caches the app shell and the assets, not `/api`.
+ */
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
@@ -56,22 +78,9 @@ export const appConfig: ApplicationConfig = {
         onViewTransitionCreated: onRouteViewTransition,
       }),
     ),
-    // Order: loading (outermost, measures the full duration) → auth (credentials and
-    // bearer) → mock response.
-    //
-    // Security: only the dev or demo build puts the mock interceptor into the chain. In a
-    // prod build `isDevMode()` returns false, so the app never registers it. No input at
-    // runtime can activate it and spoof a session or data. This covers the `?mock=1` query
-    // flag, the `useMockApi` localStorage key and the `__USE_MOCK_API__` global. The
-    // `isDevMode()` guard inside the interceptor stays as defense in depth. The mock
-    // loads on its first request (`lazyMockApiInterceptor`), so it is not part of the
-    // initial bundle.
     provideHttpClient(
       withInterceptors(
         isDevMode()
-          // The cache sits INSIDE the loading interceptor: a served-from-cache answer
-          // still counts as a completed request for the loading bar, and the auth layer
-          // must run for the revalidation that follows.
           ? [loadingInterceptor, cacheInterceptor, authInterceptor, lazyMockApiInterceptor]
           : [loadingInterceptor, cacheInterceptor, authInterceptor],
       ),
@@ -89,24 +98,18 @@ export const appConfig: ApplicationConfig = {
       },
     },
     { provide: UI_KIT_LOADING, useFactory: () => ({ visible: inject(LoadingService).visible }) },
-    // The person avatars of the kit load the Gravatar image through the API proxy.
     { provide: UI_KIT_AVATAR_SOURCE, useExisting: AvatarService },
     provideAppInitializer(() => {
       inject(ThemeService).init();
-      const i18n = inject(I18nService); // the constructor default sets document.lang
-      inject(BrandingService).init(); // site-config app name: tab title, header, home
+      const i18n = inject(I18nService);
+      inject(BrandingService).init();
       inject(AuthService).ensureLoaded().subscribe();
       inject(SwUpdateService).init();
-      // A long press on a row link opens no link menu of the browser (Android).
       guardTouchContextMenu(inject(DOCUMENT));
-      // The installed app does not zoom as a whole page; a browser tab keeps the zoom.
       lockInstalledAppZoom(inject(DOCUMENT), inject(IS_INSTALLED_APP)());
-      // A back gesture that the browser animated gets no second transition from us.
       watchUAVisualTransitions();
-      // EN lives in a lazy chunk. Wait for it, so the first paint is not German.
       return i18n.ready();
     }),
-    // ngsw-config.json caches the app shell and the assets. It does not cache /api.
     provideServiceWorker('ngsw-worker.js', {
       enabled: !isDevMode(),
       registrationStrategy: 'registerWhenStable:30000',

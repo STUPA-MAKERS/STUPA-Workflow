@@ -7,11 +7,13 @@ import type { AdminPrincipal, OAuthGrantAdmin, OAuthGrantQuery } from '../admin.
 import { AdminApiService } from '../admin-api.service';
 import { AdminOAuthGrantsComponent } from './oauth-grants.component';
 
+/**
+ * The last principal has neither a name nor an email, so the option falls back to the placeholder.
+ */
 const PRINCIPALS: AdminPrincipal[] = [
-  { id: 'p-1', sub: 'kc|alex', email: 'alex@x.de', displayName: 'Alex Admin', assignments: [] },
-  { id: 'p-2', sub: 'kc|sam', email: 'sam@x.de', displayName: null, assignments: [] },
-  // Neither a name nor an email: the option falls back to the placeholder.
-  { id: 'p-3', sub: 'kc|ghost', email: null, displayName: null, assignments: [] },
+  { id: 'p-1', sub: 'kc|alex', email: 'alex@x.de', displayName: 'Alex Admin', assignments: [], oidcGroups: [] },
+  { id: 'p-2', sub: 'kc|sam', email: 'sam@x.de', displayName: null, assignments: [], oidcGroups: [] },
+  { id: 'p-3', sub: 'kc|ghost', email: null, displayName: null, assignments: [], oidcGroups: [] },
 ];
 
 /** A named owner with both expiry dates set. */
@@ -76,6 +78,10 @@ async function setup(api = makeApi(), auth = makeAuth()) {
 describe('AdminOAuthGrantsComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
+  /**
+   * Three scopes show and the fourth is counted; the title names them all. The owner email is the
+   * tooltip of the name, because it adds to the name.
+   */
   it('lists the grants with owner, client and scope', async () => {
     const { api, container } = await setup();
     expect(api.listOAuthGrants).toHaveBeenCalledWith({
@@ -86,34 +92,33 @@ describe('AdminOAuthGrantsComponent', () => {
     expect(screen.getByText('Alex Admin')).toBeInTheDocument();
     expect(screen.getByText('antragsplattform-mcp')).toBeInTheDocument();
     expect(screen.getByText('cli-agent')).toBeInTheDocument();
-    // Three scopes show, the fourth is counted; the title names them all.
     expect(screen.getByText('meetings:write')).toBeInTheDocument();
     const tags = [...container.querySelectorAll('code.code-tag')].map((c) => c.textContent);
     expect(tags).not.toContain('applications:write');
     expect(screen.getByText('+1 weitere')).toBeInTheDocument();
-    // The owner email is the tooltip of the name, because it adds to the name.
     expect(screen.getByText('Alex Admin')).toHaveAttribute('title', 'alex@x.de');
     expect(screen.getByText('Person ohne Namen')).toHaveAttribute('title', 'Person ohne Namen');
   });
 
+  /**
+   * No principal id reaches the screen. A name that equals the email adds nothing as a second line.
+   */
   it('shows a placeholder instead of an id when the owner has no name', async () => {
     const { inst } = await setup();
     expect(screen.getByText('Person ohne Namen')).toBeInTheDocument();
-    // The rule is absolute: no principal id reaches the screen.
     expect(screen.queryByText('p-3')).not.toBeInTheDocument();
     expect(inst.ownerName(ANONYMOUS)).toBe('Person ohne Namen');
     expect(inst.ownerEmail(ANONYMOUS)).toBeNull();
     expect(inst.ownerEmail(NAMED)).toBe('alex@x.de');
-    // A name that equals the email adds nothing as a second line.
     expect(inst.ownerEmail({ ...NAMED, principalName: 'alex@x.de' })).toBeNull();
   });
 
+  /** A set expiry shows as a date. */
   it('renders a missing expiry as "Unbegrenzt"', async () => {
     const { container } = await setup();
     const rows = container.querySelectorAll('.og__row');
     expect(rows[1].querySelector('.og__field--access')?.textContent).toContain('Unbegrenzt');
     expect(rows[1].querySelector('.og__field--refresh')?.textContent).toContain('Unbegrenzt');
-    // A set expiry shows as a date.
     expect(rows[0].querySelector('.og__field--access')?.textContent).toContain('01.09.2026');
   });
 
@@ -132,8 +137,7 @@ describe('AdminOAuthGrantsComponent', () => {
     expect(screen.getByText('Alex Admin')).toBeInTheDocument();
   });
 
-  // --- filter ---------------------------------------------------------------
-
+  /** "Alle Personen" clears the filter and reloads without it. */
   it('filters by principal and restarts at page one', async () => {
     const { api, inst } = await setup();
     inst.offset.set(25);
@@ -145,7 +149,6 @@ describe('AdminOAuthGrantsComponent', () => {
       principalId: 'p-1',
     });
     expect(inst.principalChipText()).toBe('Person: Alex Admin');
-    // "Alle Personen" clears the filter and reloads without it.
     inst.setPrincipal('');
     expect(inst.principalChipText()).toBe('Person: Alle Personen');
     expect(api.listOAuthGrants).toHaveBeenLastCalledWith({
@@ -179,8 +182,6 @@ describe('AdminOAuthGrantsComponent', () => {
     expect(screen.getByRole('button', { name: 'Person: Alex Admin' })).toBeInTheDocument();
   });
 
-  // --- paging ---------------------------------------------------------------
-
   it('pages forward and back and reports the range', async () => {
     const first = GRANTS;
     const second = [{ ...NAMED, id: 'grant-3' }];
@@ -210,12 +211,13 @@ describe('AdminOAuthGrantsComponent', () => {
   it('ignores a page step past either end', async () => {
     const { api, inst } = await setup();
     const calls = api.listOAuthGrants.mock.calls.length;
-    inst.prevPage(); // already on page one
-    inst.nextPage(); // the single page holds every row
+    inst.prevPage();
+    inst.nextPage();
     expect(api.listOAuthGrants.mock.calls.length).toBe(calls);
     expect(inst.offset()).toBe(0);
   });
 
+  /** The empty page is not kept: the list goes back to the page before. */
   it('steps back one page when a revoke empties the last page', async () => {
     let lastPageGone = false;
     const second = [{ ...NAMED, id: 'grant-3' }];
@@ -232,7 +234,6 @@ describe('AdminOAuthGrantsComponent', () => {
     lastPageGone = true;
     inst.doRevoke();
     expect(toast.success).toHaveBeenCalledWith('Zugang widerrufen.');
-    // The empty page was not kept: the list went back to the page before.
     expect(inst.offset()).toBe(0);
     expect(api.listOAuthGrants).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 0 }));
     expect(inst.rangeLabel()).toBe('1–2 von 25');
@@ -255,8 +256,7 @@ describe('AdminOAuthGrantsComponent', () => {
     expect(screen.getByText('Keine aktiven Agent-Zugänge.')).toBeInTheDocument();
   });
 
-  // --- revoke ---------------------------------------------------------------
-
+  /** The list refreshes, so a change by a second admin also shows up. */
   it('revokes a grant after the confirmation names owner and client', async () => {
     const { api, inst, toast } = await setup();
     await userEvent.click(screen.getByRole('button', { name: 'Widerrufen: Alex Admin' }));
@@ -272,7 +272,6 @@ describe('AdminOAuthGrantsComponent', () => {
     expect(inst.confirmRevoke()).toBeNull();
     expect(inst.revoking()).toBe(false);
     expect(toast.success).toHaveBeenCalledWith('Zugang widerrufen.');
-    // The list refreshes, so a second admin's change also shows up.
     expect(api.listOAuthGrants.mock.calls.length).toBe(before + 1);
   });
 
@@ -332,13 +331,11 @@ describe('AdminOAuthGrantsComponent', () => {
     expect(api.revokeOAuthGrant).not.toHaveBeenCalled();
   });
 
-  // --- permission gating ----------------------------------------------------
-
+  /** The list itself stays readable. */
   it('hides the revoke column and control without admin.users', async () => {
     const { inst } = await setup(makeApi(), makeAuth(false));
     expect(inst.canRevoke()).toBe(false);
     expect(screen.queryByRole('button', { name: /^Widerrufen/ })).not.toBeInTheDocument();
-    // The list itself stays readable.
     expect(screen.getByText('Alex Admin')).toBeInTheDocument();
   });
 

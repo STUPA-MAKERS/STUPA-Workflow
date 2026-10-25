@@ -1,7 +1,7 @@
-"""Introspect the metadata of the DB core (T-06) without a database.
+"""Introspect the metadata of the DB core without a database.
 
 The tests check the tables, the FK ON DELETE rules, the partial unique indexes and the
-GIN index in `Base.metadata`. They also check the constraints of data-model §1-3. This
+GIN index in `Base.metadata`. They also check the table constraints. This
 metadata is the single source for Alembic.
 """
 
@@ -86,7 +86,7 @@ def test_partial_unique_one_active_form_version() -> None:
 
 
 def test_partial_unique_one_active_flow_version() -> None:
-    # Issue #28 removed the per-type flows. Exactly one global flow stays active.
+    """Keep exactly one global flow active, because there are no per-type flows."""
     idx = _index("flow_version", "uq_flow_version_one_active_global")
     assert idx.unique
     assert "active" in str(idx.dialect_options["postgresql"]["where"])
@@ -126,9 +126,12 @@ def test_role_permission_composite_pk() -> None:
 
 
 def test_versioned_unique_constraints() -> None:
+    """Check the unique constraints of the versioned tables.
+
+    The global flow is unique by ``version`` alone.
+    """
     for table, cols in [
         ("form_version", {"application_type_id", "version"}),
-        # Since issue #28 the global flow is unique by `version` alone.
         ("flow_version", {"version"}),
         ("submission_version", {"application_id", "version"}),
         ("form_field", {"form_version_id", "key"}),
@@ -145,8 +148,10 @@ def test_versioned_unique_constraints() -> None:
 
 
 def test_circular_fk_uses_alter() -> None:
-    # application_type ↔ form_version: circular FK through use_alter.
-    # Since issue #28 flow_version no longer binds to a type.
+    """Break the circular foreign key between application_type and form_version with use_alter.
+
+    flow_version does not bind to a type.
+    """
     circular = [
         c
         for c in _table("application_type").constraints

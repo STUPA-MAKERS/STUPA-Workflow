@@ -64,7 +64,6 @@ export class TodoLinkedListComponent {
       if (this.items() !== null) return;
       untracked(() => this.load(kind, id, false));
     });
-    // A card linked to this target elsewhere on the page: read again, keeping the list shown.
     const seen = this.refresh.last();
     effect(() => {
       const change = this.refresh.last();

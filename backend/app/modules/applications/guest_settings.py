@@ -1,4 +1,4 @@
-"""Settings for applications without an account (Z1).
+"""Settings for applications without an account.
 
 One row (`guest_application_settings`, id=1) holds two values:
 
@@ -47,6 +47,7 @@ class GuestSettingsService:
     """Read and change the guest application settings."""
 
     def __init__(self, session: AsyncSession) -> None:
+        """Bind the service to a database session."""
         self.session = session
 
     async def get(self) -> GuestApplicationSettings:

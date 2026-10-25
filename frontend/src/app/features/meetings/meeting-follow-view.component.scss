@@ -1,17 +1,11 @@
 @use 'breakpoints' as bp;
 @use 'scroll-fade' as fade;
 
-/* The participant view is a pane page like the session page: it takes the free height
-   of the main column of the shell (`flex: 1 1 0`) and pulls the block padding and the
-   gutter of the main region back. Above the phone limit the page does not scroll; the
-   agenda, the sheet and the side column scroll inside themselves. The side column has
-   the radius of its cards, so its corners clip a card that scrolls past an end. */
 :host {
   display: flex;
   flex: 1 1 0;
   flex-direction: column;
   min-height: 0;
-  /* The top inset stays: the header starts below the status bar of an installed app. */
   margin-block: calc(var(--app-top-safe-area, 0px) - var(--main-pad-top, var(--space-8)))
     calc(-1 * var(--main-pad-bottom, var(--space-8)));
   margin-inline: calc(-1 * var(--layout-gutter));
@@ -25,7 +19,6 @@
   margin: 0;
 }
 
-/* ------------------------------------------------------------------ header */
 .fv__head {
   display: flex;
   flex: none;
@@ -35,15 +28,11 @@
   padding: var(--space-3) var(--space-5) var(--space-3) var(--space-3);
 }
 
-/* ------------------------------------------------------------------ body */
-/* Board Schmal-Teilnahme: the vote card as a strip between the header and the body. */
 .fv__strip {
   flex: none;
   margin: 0 var(--space-3) var(--space-3);
 }
 
-/* Every inner scroll area fades an end only while more content lies past it
-   (`appScrollFade` sets the classes). */
 .fv__fade {
   --fv-fade: var(--space-5);
 }
@@ -80,7 +69,6 @@
   display: none;
 }
 
-/* The earlier results of the item, and the votes without an item. */
 .fv__votes {
   display: flex;
   flex-direction: column;
@@ -90,7 +78,6 @@
 .fv__votes .fv__cap {
   padding: 0 var(--space-2);
 }
-/* The text button starts its label at the edge of the content (in a box or not). */
 .fv__roster {
   align-self: flex-start;
   margin-inline-start: calc(-1 * var(--space-3));
@@ -99,14 +86,12 @@
 .fv__phone > .fv__roster {
   margin-inline-start: 0;
 }
-/* The attendance sheet of the dock: the own record, then the roster. */
 .fv__sheetStack {
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
 }
 
-/* Wide: agenda | sheet | side column (340px), each scrolls inside itself. */
 .fv__body--wide {
   display: grid;
   grid-template-columns: 320px minmax(0, 1fr) 340px;
@@ -120,7 +105,7 @@
   overflow-y: auto;
   overscroll-behavior: contain;
 }
-/* The radius of the cards in it: the column is the window they scroll in. */
+// The radius of its cards, so its corners clip a card that scrolls past an end.
 .fv__body--wide .fv__side {
   border-radius: var(--radius-xl);
   scroll-padding-block: var(--space-4);
@@ -130,8 +115,6 @@
   min-height: 0;
 }
 
-/* The start of a planned meeting, in the place of the sheet. Side by side it fills the
-   column like the sheet; one column at a time it takes only its own height. */
 .fv__body:not(.fv__body--wide) .fv__main:has(> .fv__start) {
   flex: none;
 }
@@ -145,7 +128,6 @@
   border-radius: var(--radius-2xl);
   background: var(--color-surface-1);
 }
-/* A closed meeting without items: the empty state spans the card and sits in its middle. */
 .fv__empty {
   align-self: stretch;
   margin-block: auto;
@@ -182,7 +164,6 @@
   outline-offset: 1px;
 }
 
-/* ------------------------------------------------------------------ dock */
 .fv__dock {
   display: flex;
   flex: none;
@@ -239,7 +220,6 @@
 .fv__spacer {
   flex: 1 1 auto;
 }
-/* Board Schmal-Teilnahme: the delegation leads the dock of a narrow screen. */
 .fv__dockDeleg {
   display: block;
   flex: 0 1 auto;
@@ -267,7 +247,7 @@
   background: transparent;
   color: var(--color-text);
   font: inherit;
-  font-size: 0.84375rem; /* 13.5px */
+  font-size: 0.84375rem;
   font-weight: var(--fw-medium);
   white-space: nowrap;
   cursor: pointer;
@@ -282,7 +262,6 @@
   outline-offset: 1px;
 }
 
-/* ------------------------------------------------------------------ phone */
 .fv__phone {
   display: flex;
   flex-direction: column;
@@ -348,15 +327,11 @@
   }
 }
 
-/* The full text on the phone: the item already has its head above, so the card shows
-   only the text. */
 .fv__fullTop ::ng-deep .ts__head,
 .fv__fullTop ::ng-deep .ts__keepers,
 .fv__fullTop ::ng-deep .ts__rule {
   display: none;
 }
-/* The protocol of the item is a box like the attendance below it: caption, text, the
-   button that opens the rest. The full text grows in the same box. */
 .fv__excerpt {
   gap: 10px;
   padding: var(--space-4) 18px;

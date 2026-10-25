@@ -1,4 +1,4 @@
-"""Erasure of a person from the candidate lists of the elections (F2, DSGVO Art. 17).
+"""Erasure of a person from the candidate lists of the elections (DSGVO Art. 17).
 
 An election (``vote.kind = 'election'``) keeps the name of each candidate in
 ``vote.config.candidates``; the ballots and ``election_result`` name the candidates by
@@ -37,13 +37,13 @@ from app.modules.auth.models import Principal
 from app.modules.voting.election import ELECTION
 from app.modules.voting.models import Vote
 
-# The name that replaces the name of an erased candidate who was not elected.
+#: The name that replaces the name of an erased candidate who was not elected.
 ERASED_CANDIDATE_NAME = "Gelöscht"
-# The marker key of an erased candidate in ``vote.config.candidates[]`` (see
-# ``ElectionCandidate.erased``).
+#: The marker key of an erased candidate in ``vote.config.candidates[]`` (see
+#: ``ElectionCandidate.erased``).
 ERASED_KEY = "erased"
 
-# The bound of the passes that look for rounds a parallel runoff added (see below).
+#: The bound of the passes that look for rounds a parallel runoff added.
 _MAX_PASSES = 5
 
 
@@ -78,11 +78,13 @@ def _root_of(vote: Vote, by_id: dict[UUID, Vote]) -> UUID:
     Each runoff carries the candidacy of its parent, so the walk stays inside the
     found rows. A parent that is gone (``parent_vote_id`` is SET NULL on delete) or
     that the found rows do not hold ends the walk.
+
+    A cycle cannot come from the API. The walk stops on one all the same.
     """
     seen = {vote.id}
     while vote.parent_vote_id is not None and vote.parent_vote_id in by_id:
         vote = by_id[vote.parent_vote_id]
-        if vote.id in seen:  # a cycle cannot come from the API; stop all the same
+        if vote.id in seen:
             break
         seen.add(vote.id)
     return vote.id
@@ -139,6 +141,9 @@ async def erase_candidacies(session: AsyncSession, principal_id: UUID) -> list[E
     of the principal does. A candidacy of an account merged into the principal counts
     as a candidacy of the principal.
 
+    The config gets a new dict, because the JSONB column sees a change only on a new
+    value.
+
     Returns:
         The elections whose candidate list changed, each with its config before the
         change, so the caller can update the copies in the protocol text.
@@ -158,12 +163,11 @@ async def erase_candidacies(session: AsyncSession, principal_id: UUID) -> list[E
         mine = [
             candidate
             for candidate in _candidacies(vote, principals)
-            if candidate.get(ERASED_KEY) is not True  # erased before
+            if candidate.get(ERASED_KEY) is not True
         ]
         if not mine or _root_of(vote, by_id) in elected_roots:
             continue
         old_config = vote.config
-        # A new dict: the JSONB column sees the change only on a new value.
         vote.config = {
             **old_config,
             "candidates": [

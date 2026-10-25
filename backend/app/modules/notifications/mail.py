@@ -38,6 +38,7 @@ class MailAttachment:
     content: bytes
 
     def to_payload(self) -> dict[str, object]:
+        """Return the queue form, with the content base64-encoded."""
         return {
             "filename": self.filename,
             "mime": self.mime,
@@ -46,6 +47,7 @@ class MailAttachment:
 
     @classmethod
     def from_payload(cls, payload: dict[str, object]) -> MailAttachment:
+        """Build the attachment from its queue form."""
         return cls(
             filename=str(payload["filename"]),
             mime=str(payload["mime"]),
@@ -55,14 +57,17 @@ class MailAttachment:
 
 @dataclass(frozen=True, slots=True)
 class MailMessage:
-    """A ready-to-send mail (pure value, serializable for the queue)."""
+    """A ready-to-send mail (pure value, serializable for the queue).
+
+    Attributes:
+        from_addr: Optional sender; the sender takes the default from the settings.
+    """
 
     to: tuple[str, ...]
     subject: str
     text: str
     html: str | None = None
     idempotency_key: str = ""
-    # Optional header info. The sender takes the defaults from the settings.
     from_addr: str | None = None
     from_name: str | None = None
     attachments: tuple[MailAttachment, ...] = ()
@@ -97,7 +102,7 @@ class MailMessage:
             from_addr=payload.get("from_addr"),  # type: ignore[arg-type]
             from_name=payload.get("from_name"),  # type: ignore[arg-type]
             attachments=tuple(
-                MailAttachment.from_payload(a)  # type: ignore[arg-type]
+                MailAttachment.from_payload(a)
                 for a in raw_attachments  # type: ignore[union-attr]
             ),
         )
@@ -138,7 +143,9 @@ def build_email_message(msg: MailMessage, settings: Settings) -> EmailMessage:
 class MailSender(Protocol):
     """Send interface (used by the service, injected by the worker)."""
 
-    async def send(self, msg: MailMessage) -> None: ...
+    async def send(self, msg: MailMessage) -> None:
+        """Send one mail."""
+        ...
 
 
 @dataclass(slots=True)
@@ -148,6 +155,7 @@ class CapturingMailSender:
     sent: list[MailMessage] = field(default_factory=list)
 
     async def send(self, msg: MailMessage) -> None:
+        """Collect the mail and log its domains."""
         self.sent.append(msg)
         logger.info(
             "mail captured (domains=%s key=%s)",
@@ -158,15 +166,20 @@ class CapturingMailSender:
 
 @dataclass(slots=True)
 class SmtpMailSender:
-    """Real async SMTP sending (aiosmtplib). The password is never logged."""
+    """Real async SMTP sending (aiosmtplib). The password is never logged.
+
+    The import of aiosmtplib is local, because only the worker sends, and the API
+    import stays lean.
+    """
 
     settings: Settings
 
     async def send(self, msg: MailMessage) -> None:
-        import aiosmtplib  # local import: worker path only, keeps the API import lean
+        """Send the mail over SMTP; a mail without recipients sends nothing."""
+        import aiosmtplib
 
         s = self.settings
-        if not msg.to:  # nothing to send: the resolver returned no recipients
+        if not msg.to:
             return
         email = build_email_message(msg, s)
         logger.info(

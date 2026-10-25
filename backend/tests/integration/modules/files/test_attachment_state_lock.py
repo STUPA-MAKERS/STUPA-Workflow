@@ -1,7 +1,7 @@
 """Integration: a guest can upload in a locked state, but cannot delete (real Postgres).
 
-Every applicant session has the edit scope (O4). Each action checks the current state.
-An upload is allowed in every state, for example a receipt after the decision (Z1).
+Every applicant session has the edit scope. Each action checks the current state.
+An upload is allowed in every state, for example a receipt after the decision.
 A delete is a data change, like a PATCH. In a state with `edit_allowed = false` the
 attachment DELETE route answers 409 for the applicant. In an open state it deletes.
 
@@ -100,6 +100,7 @@ def _client(
     storage: _MemoryStorage,
     sid: str,
 ) -> TestClient:
+    """Build a client with a cookie session and the CSRF double-submit pair for writes."""
     api = build_api(migrated[1], settings, monkeypatch)
 
     def _files(session: DbSession, request_settings: SettingsDep) -> FilesService:
@@ -111,7 +112,6 @@ def _client(
     api.dependency_overrides[get_files_service] = _files
     client = TestClient(api)
     client.cookies.set(settings.applicant_cookie_name, sid)
-    # The session is a cookie, so a write needs the CSRF double-submit pair.
     client.cookies.set(settings.csrf_cookie_name, "csrf-test-token")
     client.headers[settings.csrf_header_name] = "csrf-test-token"
     return client

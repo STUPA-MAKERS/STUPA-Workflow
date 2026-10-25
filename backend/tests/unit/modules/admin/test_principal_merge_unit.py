@@ -182,22 +182,24 @@ def _svc(session: _Session) -> PrincipalMergeService:
 
 
 async def test_preview_counts_every_area() -> None:
+    """Count every area in the preview.
+
+    The fake count also answers the two open erasure requests. Five sub columns count,
+    among them application_decision.decided_by. The notifications have two duplicates of
+    two rows, so nothing is left to rewrite. The preview never locks, writes or commits.
+    """
     session = _Session(_pair(calendar_token="tok"), count=2)
     out = await _svc(session).preview(OLD, NEW, actor="admin")
-    # The fake count also answers the open erasure requests: two of them.
     assert out.can_merge is False
     assert [c.kind for c in out.conflicts] == ["erasure_open", "erasure_open"]
     areas = {a.area: a for a in out.areas}
     assert list(areas) == list(AREAS)
-    # Five sub columns, among them application_decision.decided_by (F1).
     assert areas["applications"].rewritten == 2 * 5
-    # Notifications: two duplicates of two rows, so nothing is left to rewrite.
     assert areas["notifications"].combined == 2
     assert areas["notifications"].rewritten == 0
     assert areas["sessions"].removed == 2 * 3
     assert areas["memberships"].removed == 2
     assert areas["calendar"].removed == 1
-    # The preview never locks, writes or commits.
     assert session.dml == 0
     assert session.committed == 0
     assert "FOR UPDATE" not in str(session.statements[0])
@@ -221,6 +223,7 @@ async def test_preview_lists_conflicts_with_labels() -> None:
 
 
 async def test_merge_applies_audits_and_commits(recorded: list[dict[str, Any]]) -> None:
+    """Apply the merge, audit it and commit; areas without a count stay out of the audit."""
     session = _Session(_pair(), count=0, rowcount=1)
     out = await _svc(session).merge(OLD, NEW, actor="admin")
     assert session.committed == 1
@@ -238,7 +241,6 @@ async def test_merge_applies_audits_and_commits(recorded: list[dict[str, Any]]) 
     assert entry["target_id"] == str(OLD)
     assert entry["data"]["sourceId"] == str(OLD)
     assert entry["data"]["counts"]["votes"] == {"rewritten": 2}
-    # Areas without a count stay out of the audit data.
     assert "calendar" not in entry["data"]["counts"]
 
 
@@ -297,9 +299,6 @@ async def test_preconditions() -> None:
     with pytest.raises(ConflictError) as tgt:
         await _svc(_Session([_Row(OLD, "old"), target])).preview(OLD, NEW, actor="admin")
     assert tgt.value.code == "merge_target_merged"
-
-
-# -- Routes ------------------------------------------------------------------------------
 
 
 def _person(pid: uuid.UUID, name: str) -> MergePrincipalOut:
@@ -383,19 +382,19 @@ def test_merge_body_needs_a_target(api: tuple[FastAPI, _FakeMerge]) -> None:
 
 
 def test_merge_permission_is_in_no_oauth_scope() -> None:
+    """Keep the merge permission out of every OAuth scope, also a future one.
+
+    The permission is forbidden for every token.
+    """
     from app.modules.auth.oauth import SCOPES
     from app.shared.permissions import PERMISSION_CATALOGUE
 
     assert "admin.users.merge" in PERMISSION_CATALOGUE
     assert all("admin.users.merge" not in perms for perms in SCOPES.values())
-    # Also never through a future scope: the permission is forbidden for every token.
     from app.modules.auth.oauth import FORBIDDEN_PERMISSIONS, scope_permissions
 
     assert "admin.users.merge" in FORBIDDEN_PERMISSIONS
     assert "admin.users.merge" not in scope_permissions(list(SCOPES))
-
-
-# -- Erased accounts, inactive target, privileges, retry --------------------------------
 
 
 async def test_merge_into_a_deactivated_target_is_refused() -> None:
@@ -487,17 +486,21 @@ def _rights(by_sub: dict[str | None, set[str]]) -> Any:
 
 @pytest.mark.real_rules
 async def test_privileges_extra_rights_and_actor_cover(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Find the extra rights of the source and check the actor cover.
+
+    An admin target or the same rights give nothing extra, and the actor is not read. A
+    source that is admin and holds a gremium right needs an actor that holds both. An
+    actor with the admin role covers everything, and a global extra right needs no
+    gremium lookup. An actor that holds exactly the extra rights covers them too.
+    """
     gid = uuid4()
     source, target = (_any(r) for r in _pair())
-    # The target is admin: nothing is extra.
     monkeypatch.setattr(PrincipalMergeService, "_effective", _rights({"old": {"*"}, "new": {"*"}}))
     assert await _svc(_GremiumRows([]))._privileges(source, target, "x") == ([], True)
-    # Same rights: nothing is extra, the actor is not read.
     monkeypatch.setattr(
         PrincipalMergeService, "_effective", _rights({"old": {"a"}, "new": {"a", "b"}})
     )
     assert await _svc(_GremiumRows([]))._privileges(source, target, "x") == ([], True)
-    # The source is admin and holds a gremium right; the actor holds neither.
     monkeypatch.setattr(
         PrincipalMergeService,
         "_effective",
@@ -507,8 +510,6 @@ async def test_privileges_extra_rights_and_actor_cover(monkeypatch: pytest.Monke
     extra, covered = await _svc(session)._privileges(source, target, "act")
     assert covered is False
     assert [(p.key, p.gremium) for p in extra] == [("admin", None), ("vote.manage", "StuPa")]
-    # An actor with the admin role covers everything; a global extra right needs no
-    # gremium lookup.
     monkeypatch.setattr(
         PrincipalMergeService,
         "_effective",
@@ -519,7 +520,6 @@ async def test_privileges_extra_rights_and_actor_cover(monkeypatch: pytest.Monke
     )
     assert covered is True
     assert [p.key for p in extra] == ["budget.book"]
-    # An actor that holds exactly the extra rights covers them too.
     monkeypatch.setattr(
         PrincipalMergeService,
         "_effective",
@@ -618,7 +618,11 @@ async def test_another_db_error_is_not_masked(recorded: list[dict[str, Any]]) ->
 
 
 def test_the_merge_moves_the_tickets_of_the_source() -> None:
-    """Reporter, assignee, note author and event actor of a ticket follow the merge."""
+    """Move the tickets of the source.
+
+    The reporter, assignee, note author and event actor of a ticket follow the merge. A
+    block of the source moves to the target, unless the target has one.
+    """
     from typing import get_args
 
     from app.modules.admin.schemas import MergeArea
@@ -633,5 +637,4 @@ def test_the_merge_moves_the_tickets_of_the_source() -> None:
         "TicketEvent.actor_id",
         "TicketSenderBlock.created_by",
     }
-    # A block of the source moves to the target, unless the target has one.
     assert merge_mod.TicketSenderBlock.principal_id in merge_mod.COMBINED_COLUMNS

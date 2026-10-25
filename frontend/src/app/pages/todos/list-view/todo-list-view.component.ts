@@ -36,7 +36,7 @@ interface ListGroup {
 }
 
 /**
- * "Liste" (frame 8): the cards of the board as a table, one group per column, with
+ * "Liste": the cards of the board as a table, one group per column, with
  * Titel, Verknüpft, Label, Fällig and Wer. "Fällig" sorts (up, down, board order). The
  * done group starts folded. The circle before a title moves the card into the done
  * column, or back into the first column.
@@ -84,7 +84,6 @@ export class TodoListViewComponent {
   private sorted(rows: ListRow[]): ListRow[] {
     const dir = this.sort();
     if (dir === 'none') return rows;
-    // Cards without a date go last in both directions.
     return [...rows].sort((a, b) => {
       const x = a.card.dueDate;
       const y = b.card.dueDate;

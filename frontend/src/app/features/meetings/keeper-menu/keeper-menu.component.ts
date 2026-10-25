@@ -30,7 +30,7 @@ interface Candidate {
 }
 
 /**
- * The minute-taker menu of the dock (board Sitzung-Menues-B).
+ * The minute-taker menu of the dock.
  *
  * A live meeting: the planned handover on top ("Uli Übernahme übernimmt ab TOP 4",
  * "Verwerfen"), then "Protokollführung übergeben an" with a member search and the
@@ -38,7 +38,7 @@ interface Candidate {
  * handover takes effect. A planned meeting: "Protokollführung zuweisen"; a pick names the
  * minute-taker at once.
  *
- * O20: only members with the gremium right `protocol.write` ("Protokoll führen") are in
+ * Only members with the gremium right `protocol.write` ("Protokoll führen") are in
  * the list; the server refuses any other with 422.
  */
 @Component({

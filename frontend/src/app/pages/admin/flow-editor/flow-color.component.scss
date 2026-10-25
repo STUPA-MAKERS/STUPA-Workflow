@@ -25,13 +25,11 @@
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 3px;
 }
-/* The chosen swatch: a gap in the colour of the panel, then a ring. */
 .fc__dot--on {
   box-shadow:
     0 0 0 2px var(--color-surface-1),
     0 0 0 4px var(--color-text);
 }
-/* "No colour": an empty circle with a slash. */
 .fc__dot--none {
   background: var(--color-surface-1);
   box-shadow: inset 0 0 0 2px var(--color-border-strong, var(--color-text-subtle));
@@ -49,7 +47,6 @@
     0 0 0 2px var(--color-surface-1),
     0 0 0 4px var(--color-text);
 }
-/* A custom colour: a rainbow ring until one is chosen. */
 .fc__dot--custom {
   background: conic-gradient(#ce1625, #f18700, #e6c619, #72a384, #0075bf, #7a4bc2, #ce1625);
   overflow: hidden;

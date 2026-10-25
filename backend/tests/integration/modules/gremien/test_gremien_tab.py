@@ -105,6 +105,7 @@ def _client(app: FastAPI, principal: Principal) -> TestClient:
 
 
 async def _world(maker: async_sessionmaker[AsyncSession]) -> World:
+    """Seed the gremium world, in which Bob left at the end of May."""
     tag = uuid.uuid4().hex[:8]
     async with maker() as s:
         g = Gremium(name=f"STUPA {tag}", slug=f"stupa-{tag}", quorum_percent=50)
@@ -138,7 +139,6 @@ async def _world(maker: async_sessionmaker[AsyncSession]) -> World:
                 GremiumMembership(
                     principal_id=people["alice"].id, gremium_id=g.id, gremium_role_id=member.id
                 ),
-                # Bob left at the end of May.
                 GremiumMembership(
                     principal_id=people["bob"].id,
                     gremium_id=g.id,
@@ -284,6 +284,7 @@ async def _world(maker: async_sessionmaker[AsyncSession]) -> World:
 async def test_overview_member_and_view_all(
     maker: async_sessionmaker[AsyncSession], app_for: FastAPI
 ) -> None:
+    """List the members for a member and for view-all: me and alice, not bob, who left."""
     w = await _world(maker)
     rows = _client(app_for, w.me).get("/api/gremien/overview").json()
     assert [r["id"] for r in rows] == [str(w.gremium_id)]
@@ -291,7 +292,6 @@ async def test_overview_member_and_view_all(
     assert row["isMember"] is True
     assert row["roleKey"] == "vorstand"
     assert row["roleName"] == {"de": "Vorstand"}
-    # me and alice; bob left.
     assert row["memberCount"] == 2
     assert row["nextMeeting"]["id"] == str(w.ids["m4"])
     assert row["live"] is False
@@ -306,6 +306,10 @@ async def test_overview_member_and_view_all(
 async def test_overview_logo_url_follows_the_square_logo(
     maker: async_sessionmaker[AsyncSession], app_for: FastAPI
 ) -> None:
+    """Follow the square logo in the overview logo URL.
+
+    The test leaves no seeded variant behind, because other suites count them.
+    """
     w = await _world(maker)
     async with maker() as s:
         variant = CdVariant(key=f"v-{uuid.uuid4().hex[:8]}", name="STUPA")
@@ -329,7 +333,6 @@ async def test_overview_logo_url_follows_the_square_logo(
         row = _client(app_for, w.me).get("/api/gremien/overview").json()[0]
         assert row["logoUrl"] == f"/api/gremien/{w.gremium_id}/logo"
     finally:
-        # Other suites count the seeded variants: leave none behind.
         async with maker() as s:
             gremium = await s.get(Gremium, w.gremium_id)
             assert gremium is not None
@@ -369,14 +372,18 @@ async def test_members_and_former(
 
 
 async def test_meetings_counts(maker: async_sessionmaker[AsyncSession], app_for: FastAPI) -> None:
+    """Count the meetings per person.
+
+    The first meeting counts me, sub and bob. The second counts me, alice, bob, who was a
+    member then, and sub, who is recorded.
+    """
     w = await _world(maker)
     rows = _client(app_for, w.me).get(f"/api/gremien/{w.gremium_id}/meetings").json()
     by_id = {r["id"]: r for r in rows}
     assert [r["id"] for r in rows][:2] == [str(w.ids["m5"]), str(w.ids["m4"])]
     m1 = by_id[str(w.ids["m1"])]
     assert m1["agendaItemCount"] == 2
-    assert m1["presentCount"] == 3  # me, sub, bob
-    # me, alice, bob (member then), sub (recorded)
+    assert m1["presentCount"] == 3
     assert m1["memberCount"] == 4
     assert m1["protocolStatus"] == "final"
     assert by_id[str(w.ids["m3"])]["protocolStatus"] == "draft"
@@ -384,6 +391,11 @@ async def test_meetings_counts(maker: async_sessionmaker[AsyncSession], app_for:
 
 
 async def test_attendance_matrix(maker: async_sessionmaker[AsyncSession], app_for: FastAPI) -> None:
+    """Build the attendance matrix.
+
+    The excuse of m1 is a vote transfer, so it counts as delegated only. The pool
+    substitute is no member, so the present record does not count.
+    """
     w = await _world(maker)
     resp = _client(app_for, w.me).get(
         f"/api/gremien/{w.gremium_id}/attendance", params={"from": "2026-05", "to": "2026-07"}
@@ -406,7 +418,6 @@ async def test_attendance_matrix(maker: async_sessionmaker[AsyncSession], app_fo
         "excused": 0,
         "delegated": 0,
     }
-    # The excuse of m1 is a vote transfer, so it counts as delegated only.
     assert may("Alice") == {
         "month": "2026-05",
         "member": True,
@@ -414,7 +425,6 @@ async def test_attendance_matrix(maker: async_sessionmaker[AsyncSession], app_fo
         "excused": 0,
         "delegated": 1,
     }
-    # The pool substitute is no member: the present record does not count.
     assert may("Sub") == {
         "month": "2026-05",
         "member": False,

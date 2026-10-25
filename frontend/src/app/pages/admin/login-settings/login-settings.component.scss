@@ -6,7 +6,6 @@
   container-type: inline-size;
 }
 
-/* Two fields side by side; one column in a narrow sheet. */
 .ls__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

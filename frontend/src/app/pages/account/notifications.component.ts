@@ -9,7 +9,7 @@ import { PageHeaderComponent } from '@shared/ui/page-header/page-header.componen
 import { EmptyStateComponent, NoteComponent, SkeletonComponent, SwitchComponent } from '@stupa-makers/ui-kit';
 
 /**
- * Kinds that the page never shows. No mail goes out for them (F10): "vote" has no sender,
+ * Kinds that the page never shows. No mail goes out for them: "vote" has no sender,
  * and "role_change" has no caller. The server catalogue does not list them any more; the
  * filter keeps an older server from showing a switch that does nothing.
  */
@@ -25,7 +25,7 @@ const TEAM_KINDS: ReadonlyMap<string, string> = new Map([
 ]);
 
 /**
- * Account page "Benachrichtigungen" (board Konto-Benachrichtigungen).
+ * Account page "Benachrichtigungen".
  *
  * One row per kind of the server catalogue: the label, one line that says when the mail
  * goes out, and a switch. Every kind is on by default; a switch is an opt-out. The
@@ -98,6 +98,8 @@ export class AccountNotificationsComponent {
   /**
    * Send the current state. While a PUT runs, only mark the state as dirty; the running
    * PUT then sends it when it ends.
+   *
+   * A switch flipped during the PUT stays on screen and is sent now.
    */
   private save(): void {
     if (this.saving) {
@@ -110,7 +112,6 @@ export class AccountNotificationsComponent {
       next: (saved) => {
         this.saving = false;
         this.confirmed = saved;
-        // A switch flipped during the PUT: keep it on screen and send it now.
         if (this.dirty) this.save();
         else this.prefs.set(saved);
       },

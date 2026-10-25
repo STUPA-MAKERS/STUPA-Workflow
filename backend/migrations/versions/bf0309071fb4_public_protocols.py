@@ -38,6 +38,7 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     op.execute(
         "ALTER TABLE gremium ADD COLUMN IF NOT EXISTS protocols_public "
         "boolean NOT NULL DEFAULT false"
@@ -56,6 +57,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     op.execute("ALTER TABLE protocol DROP COLUMN IF EXISTS public_render_failures")
     op.execute("ALTER TABLE protocol DROP COLUMN IF EXISTS public_pdf_size")
     op.execute("ALTER TABLE protocol DROP COLUMN IF EXISTS public_search_text")

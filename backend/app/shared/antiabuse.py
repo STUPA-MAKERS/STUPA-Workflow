@@ -69,6 +69,7 @@ def _redis_client(request: Request, settings: Settings) -> object:
 
 
 def get_rate_limiter(request: Request, settings: SettingsDep) -> RateLimiter:
+    """Return the app-wide rate limiter, a no-op one when rate limiting is off."""
     state = request.app.state
     limiter = getattr(state, "_rate_limiter", None)
     if limiter is None:
@@ -84,6 +85,7 @@ def get_rate_limiter(request: Request, settings: SettingsDep) -> RateLimiter:
 def get_altcha_verifier(
     request: Request, settings: SettingsDep
 ) -> AltchaVerifier | NullAltchaVerifier:
+    """Return the app-wide ALTCHA verifier, a no-op one without a secret."""
     state = request.app.state
     verifier = getattr(state, "_altcha_verifier", None)
     if verifier is None:
@@ -131,8 +133,8 @@ enforce_auth_payload_limit = body_cap("max_auth_payload_bytes")
 enforce_application_payload_limit = body_cap("max_application_payload_bytes")
 enforce_ticket_payload_limit = body_cap("max_ticket_payload_bytes")
 
-# Room for the multipart frame around the file: boundaries, part headers and the small
-# form fields (field key, flag, ALTCHA solution).
+#: Room for the multipart frame around the file: boundaries, part headers and the small
+#: form fields (field key, flag, ALTCHA solution).
 _MULTIPART_OVERHEAD_BYTES = 64 * 1024
 
 
@@ -190,11 +192,11 @@ def canonical_mail_key(email: str) -> str:
        (``victim+1@host`` becomes ``victim@host``).
 
     The result serves the throttle key only. It does not validate the address. The
-    endpoint does that with ``EmailStr``.
+    endpoint does that with ``EmailStr``, so a value without ``@`` is only casefolded.
     """
     normalized = unicodedata.normalize("NFC", email).strip()
     local, sep, domain = normalized.rpartition("@")
-    if not sep:  # no '@'. The endpoint validation rejects this anyway.
+    if not sep:
         return normalized.casefold()
     local = local.split("+", 1)[0]
     return f"{local.casefold()}@{domain.casefold()}"
@@ -205,10 +207,12 @@ async def _json_field(request: Request, field: str) -> str | None:
 
     Returns:
         The string value. ``None`` when the body or the field is not usable.
+
+    A broken body gives None, and the endpoint validation handles it.
     """
     try:
         body = await request.json()
-    except Exception:  # noqa: BLE001 - broken body -> endpoint validation handles it
+    except Exception:
         return None
     if isinstance(body, dict):
         value = body.get(field)
@@ -261,9 +265,9 @@ async def rate_limit_applications(
     limiter: RateLimiterDep,
     principal: Annotated[Principal | None, Depends(get_current_principal)],
 ) -> None:
-    """``POST /applications``: 10/h/IP."""
+    """``POST /applications``: 10/h/IP; a logged-in OAuth (MCP) caller is not throttled."""
     if _is_oauth_principal(principal):
-        return  # logged-in MCP -> no throttle
+        return
     await _enforce(
         limiter,
         f"applications:ip:{client_ip(request)}",
@@ -320,9 +324,10 @@ async def rate_limit_attachments(
     The key follows the identity. It uses the principal ``sub``, or the bound
     ``application_id`` of the applicant, or the IP when neither exists. The auth
     dependency (401/403) runs separately. This dependency only throttles the frequency.
+    A logged-in OAuth (MCP) caller is not throttled.
     """
     if _is_oauth_principal(principal):
-        return  # logged-in MCP -> no throttle
+        return
     if principal is not None:
         key = f"attachments:principal:{principal.sub}"
     elif applicant is not None:
@@ -366,7 +371,7 @@ async def rate_limit_applicant_search(
     limiter: RateLimiterDep,
     principal: Annotated[Principal | None, Depends(get_current_principal)],
 ) -> None:
-    """``GET /applications/on-behalf/applicants``: a limit per principal per hour (#11).
+    """``GET /applications/on-behalf/applicants``: a limit per principal per hour.
 
     The search discloses the names and e-mails of the accounts, so the limit also
     applies to an OAuth token: an agent must not walk the whole directory. Without a
@@ -386,7 +391,7 @@ async def rate_limit_applicant_search(
 async def rate_limit_public_join(
     request: Request, settings: SettingsDep, limiter: RateLimiterDep
 ) -> None:
-    """``POST /public/meetings/join/{code}`` (#17): a limit per IP and per join code.
+    """``POST /public/meetings/join/{code}``: a limit per IP and per join code.
 
     Many guests share the campus NAT, so the IP limit stays generous; ALTCHA is the
     main guard. The code limit stops a flood of requests on one meeting.
@@ -412,7 +417,7 @@ async def rate_limit_public_join(
 async def rate_limit_public_read(
     request: Request, settings: SettingsDep, limiter: RateLimiterDep
 ) -> None:
-    """The reads of the public meeting routes (#17): a generous limit per IP.
+    """The reads of the public meeting routes: a generous limit per IP.
 
     The limit stops the enumeration of join codes; a guest page reads its state again
     on each live event, and many guests share one IP.
@@ -513,4 +518,5 @@ verify_altcha_unless_authenticated = require_altcha_unless_authenticated()
 
 
 def now_unix() -> int:
+    """Return the current Unix time in seconds."""
     return int(time.time())

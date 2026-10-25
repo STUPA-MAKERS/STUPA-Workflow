@@ -1,4 +1,3 @@
-/* The host of the board view, after the host rule of the list view. */
 :host {
   display: flex;
   flex: 1 1 auto;
@@ -7,8 +6,7 @@
   min-height: 0;
 }
 
-/* The box of `app-todo-card-tile`: its padding, gap, radius and fill. Keep these in step
-   with `todo-card-tile.component.scss`. */
+// The box of `app-todo-card-tile`. Keep it in step with todo-card-tile.component.scss.
 .bsk__tile {
   display: flex;
   flex-direction: column;
@@ -50,7 +48,6 @@
   border-radius: 50%;
 }
 
-/* The place of "+ To-Do" at the foot of the column. */
 .bsk__add {
   margin: 0;
   cursor: default;
@@ -59,10 +56,11 @@
   width: 4.5rem;
 }
 
-/* The tab row of `app-tabs` on a phone. */
 .bsk__tabs {
   display: flex;
   gap: var(--space-5);
+  margin-inline: calc(-1 * var(--bv-gutter));
+  padding-inline: var(--bv-gutter);
   border-bottom: var(--border-width) solid var(--color-border);
 }
 .bsk__tab {
@@ -73,7 +71,6 @@
   font-size: var(--fs-body);
 }
 
-/* The done circle of a list row. */
 .bsk__circle {
   width: 19px;
   height: 19px;
@@ -84,7 +81,6 @@
   font-size: var(--fs-body);
 }
 
-/* The phone list of the rows: the section of `app-todo-board-rows`, its head and its list. */
 .bsk__rows {
   display: flex;
   flex-direction: column;

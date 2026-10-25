@@ -1,10 +1,10 @@
-"""SSRF guard (T-19, security.md §5): the guard blocks every internal or special IP."""
+"""SSRF guard: the guard blocks every internal or special IP."""
 
 from __future__ import annotations
 
 import pytest
 
-from app.modules.webhooks.ssrf import SsrfError, assert_allowed_url, pin_url
+from app.shared.ssrf import SsrfError, assert_allowed_url, pin_url
 
 
 def _resolver(*addrs: str):
@@ -23,22 +23,28 @@ def test_public_dns_ok() -> None:
 @pytest.mark.parametrize(
     "ip",
     [
-        "127.0.0.1",  # loopback
-        "10.0.0.5",  # private
-        "172.16.0.1",  # private
-        "192.168.1.1",  # private
-        "169.254.169.254",  # link-local / cloud metadata
-        "0.0.0.0",  # unspecified
-        "::1",  # ipv6 loopback
-        "fc00::1",  # ipv6 unique-local
-        "fe80::1",  # ipv6 link-local
-        "::ffff:10.0.0.1",  # ipv4-mapped private
-        "64:ff9b::a9fe:a9fe",  # NAT64-wrapped 169.254.169.254 (cloud metadata)
-        "64:ff9b::a00:1",  # NAT64-wrapped 10.0.0.1 (private)
-        "2002:a00:1::",  # 6to4-wrapped 10.0.0.1 (private)
+        "127.0.0.1",
+        "10.0.0.5",
+        "172.16.0.1",
+        "192.168.1.1",
+        "169.254.169.254",
+        "0.0.0.0",
+        "::1",
+        "fc00::1",
+        "fe80::1",
+        "::ffff:10.0.0.1",
+        "64:ff9b::a9fe:a9fe",
+        "64:ff9b::a00:1",
+        "2002:a00:1::",
     ],
 )
 def test_blocks_internal_literals(ip: str) -> None:
+    """Block internal literals.
+
+    The cases: loopback, three private ranges, link-local and cloud metadata, unspecified,
+    the IPv6 loopback, unique-local and link-local, an IPv4-mapped private address,
+    NAT64-wrapped metadata and private addresses, and a 6to4-wrapped private address.
+    """
     with pytest.raises(SsrfError):
         assert_allowed_url(f"http://[{ip}]/h" if ":" in ip else f"http://{ip}/h")
 
@@ -49,7 +55,7 @@ def test_blocks_internal_via_dns() -> None:
 
 
 def test_blocks_when_any_record_internal() -> None:
-    # Round-robin rebinding: one internal record among several blocks the delivery.
+    """Block round-robin rebinding: one internal record among several blocks the delivery."""
     with pytest.raises(SsrfError):
         assert_allowed_url(
             "http://mix.test/h", resolver=_resolver("8.8.8.8", "127.0.0.1")
@@ -83,8 +89,9 @@ def test_allowlist_blocks_unlisted_host() -> None:
 
 
 def test_allowlist_permits_listed_host() -> None:
+    """Permit a listed host, case-insensitively."""
     ips = assert_allowed_url(
-        "https://Good.com/h",  # case-insensitive
+        "https://Good.com/h",
         allowlist=["good.com"],
         resolver=_resolver("1.1.1.1"),
     )

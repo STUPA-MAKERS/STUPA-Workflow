@@ -52,20 +52,22 @@ class OidcEndpoints:
     authorization: str
     token: str
     jwks: str
-    # RP-initiated logout is optional in the spec. Without it there is no IdP logout URL.
+    #: RP-initiated logout is optional in the spec. Without it there is no IdP logout URL.
     end_session: str | None
 
 
 @dataclass(slots=True)
 class OidcClaims:
+    """The verified claims of an ``id_token`` that the platform uses."""
+
     sub: str
     email: str | None
     name: str | None
     groups: list[str] = field(default_factory=list)
-    # `email_verified` is the standard OIDC claim. Only a verified claim may count for the
-    # email bootstrap. Otherwise, on an IdP with self-registration and no mail
-    # verification, any account could get a token with `email` set to a bootstrap-admin
-    # address and become admin on the first login.
+    #: `email_verified` is the standard OIDC claim. Only a verified claim may count for the
+    #: email bootstrap. Otherwise, on an IdP with self-registration and no mail
+    #: verification, any account could get a token with `email` set to a bootstrap-admin
+    #: address and become admin on the first login.
     email_verified: bool = False
 
 
@@ -78,15 +80,17 @@ def generate_pkce() -> tuple[str, str]:
 
 
 def generate_state() -> str:
+    """Generate a random OIDC ``state``."""
     return secrets.token_urlsafe(32)
 
 
 def generate_nonce() -> str:
+    """Generate a random OIDC ``nonce``."""
     return secrets.token_urlsafe(32)
 
 
-# Discovery cache per issuer, as a pair of monotonic expiry time and endpoints. The TTL
-# bounds the load on the IdP and still picks up a changed document without a restart.
+#: Discovery cache per issuer, as a pair of monotonic expiry time and endpoints. The TTL
+#: bounds the load on the IdP and still picks up a changed document without a restart.
 _DISCOVERY_TTL_SECONDS = 3600.0
 _discovery_cache: dict[str, tuple[float, OidcEndpoints]] = {}
 
@@ -107,6 +111,17 @@ def _required(doc: dict[str, object], key: str) -> str:
 
 
 async def _fetch_endpoints(issuer: str) -> OidcEndpoints:
+    """Fetch and check the discovery document of ``issuer``.
+
+    The ``issuer`` in the document must be identical to the issuer the client used
+    (OpenID Connect Discovery 1.0, section 4.3). The compare is exact, like the
+    ``iss`` check of the ``id_token``, so a trailing slash counts: authentik issues
+    with one, Keycloak without.
+
+    Raises:
+        OidcUnavailableError: The document is unreachable, malformed or names
+            another issuer.
+    """
     try:
         async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT) as client:
             resp = await client.get(_discovery_url(issuer))
@@ -120,9 +135,6 @@ async def _fetch_endpoints(issuer: str) -> OidcEndpoints:
     if not isinstance(doc, dict):
         raise OidcUnavailableError("discovery document is not a JSON object")
     fields = cast("dict[str, object]", doc)
-    # OpenID Connect Discovery 1.0 §4.3: the `issuer` in the document must be identical to
-    # the issuer the client used. The compare is exact, like the `iss` check of the
-    # `id_token`, so a trailing slash counts. authentik issues with one, Keycloak without.
     if fields.get("issuer") != issuer:
         raise OidcUnavailableError(
             f"discovery issuer mismatch: {fields.get('issuer')!r} != {issuer!r}"
@@ -205,9 +217,9 @@ async def exchange_code(settings: Settings, *, code: str, verifier: str) -> dict
     return payload
 
 
-# JWKS cache per issuer, as a pair of monotonic expiry time and keys. The TTL bounds the
-# load on the IdP and the DoS amplification. An unknown `kid` forces one reload for a key
-# rotation. A second miss is an error.
+#: JWKS cache per issuer, as a pair of monotonic expiry time and keys. The TTL bounds the
+#: load on the IdP and the DoS amplification. An unknown `kid` forces one reload for a key
+#: rotation. A second miss is an error.
 _JWKS_TTL_SECONDS = 300.0
 _jwks_cache: dict[str, tuple[float, list[dict[str, Any]]]] = {}
 
@@ -236,8 +248,11 @@ def _find_key(keys: list[dict[str, Any]], kid: object) -> dict[str, Any] | None:
     return next((k for k in keys if k.get("kid") == kid), None)
 
 
-async def _signing_key(settings: Settings, id_token: str) -> Any:
-    """Return the TTL-cached JWKS key that matches the `kid` of the `id_token`."""
+async def _signing_key(settings: Settings, id_token: str) -> Any:  # noqa: ANN401
+    """Return the TTL-cached JWKS key that matches the `kid` of the `id_token`.
+
+    A miss forces one reload, because the cache can be stale after a key rotation.
+    """
     try:
         header = jwt.get_unverified_header(id_token)
     except jwt.PyJWTError as exc:
@@ -247,7 +262,6 @@ async def _signing_key(settings: Settings, id_token: str) -> Any:
     keys = await _get_jwks(issuer, force=False)
     jwk = _find_key(keys, kid)
     if jwk is None:
-        # The cache can be stale after a key rotation, so force one reload.
         keys = await _get_jwks(issuer, force=True)
         jwk = _find_key(keys, kid)
     if jwk is None:
@@ -263,7 +277,9 @@ async def refresh_tokens(settings: Settings, *, refresh_token: str) -> dict[str,
 
     Raises:
         OidcUnavailableError: The discovery document or the token endpoint is
-            unreachable, or the token endpoint answers with a server error.
+            unreachable, or the token endpoint answers with a server error. A 200
+            without JSON counts here too, because it is a proxy or maintenance page,
+            not a refusal.
         OidcError: The IdP refuses the grant, or the response carries no `id_token`.
     """
     endpoints = await discover(settings.oidc_issuer or "")
@@ -285,7 +301,6 @@ async def refresh_tokens(settings: Settings, *, refresh_token: str) -> dict[str,
     try:
         payload = resp.json()
     except ValueError as exc:
-        # A 200 that is not JSON is a proxy or maintenance page, not a refusal.
         raise OidcUnavailableError("token endpoint answered without JSON") from exc
     if not isinstance(payload, dict) or "id_token" not in payload:
         raise OidcError("refresh response without id_token")

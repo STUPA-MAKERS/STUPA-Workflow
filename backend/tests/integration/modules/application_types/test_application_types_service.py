@@ -1,6 +1,6 @@
 """Integration (real Postgres, testcontainers): ApplicationTypesService.
 
-The tests run against a real schema (data-model §1). The public list shows only types
+The tests run against a real schema. The public list shows only types
 with an active form version. Paging counts the total correctly. The admin view
 (`include_inactive` and `admin`) returns inactive types plus the extra fields.
 """
@@ -60,6 +60,7 @@ async def _seed_type(
 
 
 async def test_public_lists_only_active_types(session: AsyncSession) -> None:
+    """List only the active types; the public view hides the key."""
     await _seed_type(session, key="aktiv", name={"de": "Aktiv"})
     await _seed_type(session, key="inaktiv", name={"de": "Inaktiv"}, active=False)
     await session.commit()
@@ -68,7 +69,7 @@ async def test_public_lists_only_active_types(session: AsyncSession) -> None:
     page = await svc.list_types(lang="de", limit=50, offset=0)
 
     assert page.total == 1
-    assert [i.key for i in page.items] == [None]  # the public view hides the key
+    assert [i.key for i in page.items] == [None]
     assert [i.name for i in page.items] == ["Aktiv"]
     assert page.items[0].active is True
 
@@ -91,6 +92,7 @@ async def test_admin_lists_inactive_with_extra_fields(session: AsyncSession) -> 
 
 
 async def test_paging_limits_and_counts(session: AsyncSession) -> None:
+    """Limit the page; the total ignores the limit."""
     for n in range(3):
         await _seed_type(session, key=f"t{n}", name={"de": f"Typ {n}"})
     await session.commit()
@@ -98,7 +100,7 @@ async def test_paging_limits_and_counts(session: AsyncSession) -> None:
     svc = ApplicationTypesService(session)
     page = await svc.list_types(lang="de", limit=2, offset=0)
 
-    assert page.total == 3  # the total ignores the limit
+    assert page.total == 3
     assert len(page.items) == 2
     assert page.limit == 2
 

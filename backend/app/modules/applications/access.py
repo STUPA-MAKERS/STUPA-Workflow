@@ -12,8 +12,8 @@ logged-in creator who is no member see ``public`` comments only. A creator is a
 member when the creator reads through the Gremium read scope, or holds
 ``application.manage``, ``application.transition`` or ``application.edit_any``.
 
-`Access.via` records the path that granted the access. The applicant view (A11,
-A12) and the PII rule (O21, `can_read_pii`) read it.
+`Access.via` records the path that granted the access. The applicant view and the PII
+rule (`can_read_pii`) read it.
 """
 
 from __future__ import annotations
@@ -33,32 +33,32 @@ from app.shared.errors import ForbiddenError, UnauthorizedError
 
 READ_PERMISSION = "application.read"
 MANAGE_PERMISSION = "application.manage"
-# Global rights: read any application, or edit an application in any flow state.
-# The edit right also lifts the state edit lock in the service.
+#: Global right to read any application. `EDIT_ANY_PERMISSION` edits an application in
+#: any flow state and also lifts the state edit lock in the service.
 READ_ALL_PERMISSION = "application.read_all"
 EDIT_ANY_PERMISSION = "application.edit_any"
-# Delete an application permanently. This is a separate, destructive right. An admin
-# holds it through the role bypass in `Principal.has`. Any other role holds it only
-# through an explicit grant.
+#: Delete an application permanently. This is a separate, destructive right. An admin
+#: holds it through the role bypass in `Principal.has`. Any other role holds it only
+#: through an explicit grant.
 DELETE_PERMISSION = "application.delete"
-# Move an application out of the working list and back. Reversible, so it is not the
-# delete permission; but it decides what everyone else sees by default, so it is not
-# part of `application.manage` either.
+#: Move an application out of the working list and back. It is reversible, so it is not
+#: the delete permission. It decides what everyone else sees by default, so it is not
+#: part of `application.manage` either.
 ARCHIVE_PERMISSION = "application.archive"
-# Publish a read-only link. Separate from reading, because deciding that a record may
-# be read by anyone holding a URL is a different decision from reading it.
+#: Publish a read-only link. It is separate from reading, because the decision that
+#: anyone with a URL may read a record differs from reading it.
 SHARE_PERMISSION = "application.share"
-# Fire transitions. A creator with this right works on applications as a member.
+#: Fire transitions. A creator with this right works on applications as a member.
 TRANSITION_PERMISSION = "application.transition"
-# The rights that make a creator read the own application as a member and not as the
-# applicant. None of them grants read access alone.
+#: The rights that make a creator read the own application as a member and not as the
+#: applicant. None of them grants read access alone.
 _MEMBER_PERMISSIONS = (MANAGE_PERMISSION, TRANSITION_PERMISSION, EDIT_ANY_PERMISSION)
 #: The public name of the member rights, for the mentionable persons.
 MEMBER_PERMISSIONS = _MEMBER_PERMISSIONS
 
 
-# The path that granted the access: a permission, the magic link of the applicant,
-# the logged-in creator (owner), or the Gremium read scope (committee).
+#: The path that granted the access: a permission, the magic link of the applicant,
+#: the logged-in creator (owner), or the Gremium read scope (committee).
 AccessVia = Literal["permission", "applicant", "owner", "committee"]
 
 
@@ -73,7 +73,7 @@ class Access:
 
     @property
     def _owner_as_applicant(self) -> bool:
-        """Tell whether the creator reads the own application as the applicant (A12).
+        """Tell whether the creator reads the own application as the applicant.
 
         This holds for ``via="owner"`` when the principal holds none of the member
         rights (`_MEMBER_PERMISSIONS`). A creator with such a right works on
@@ -90,7 +90,7 @@ class Access:
 
         Only a principal does, and only as a member: through a permission, the
         Gremium read scope or a member right. The creator who is no member reads as
-        the applicant (A12), so the internal comments of the Gremium stay hidden.
+        the applicant, so the internal comments of the Gremium stay hidden.
         """
         return self.principal is not None and not self._owner_as_applicant
 
@@ -110,13 +110,13 @@ class Access:
 
         This holds for the magic link and for the logged-in creator who is no
         member (see `can_see_internal`). The applicant view shows the Gremium
-        instead of member names (A12, O16) and the version metadata without values
-        (A11, O17).
+        instead of member names and the version metadata without values.
         """
         return self.applicant is not None or self._owner_as_applicant
 
     @property
     def author_kind(self) -> str:
+        """Return the comment author kind: ``principal`` or ``applicant``."""
         return "principal" if self.principal is not None else "applicant"
 
     @property
@@ -184,6 +184,10 @@ async def _committee_can_read(
     view, and a readable application must appear in the list. `committee_gremium_ids`
     returns the Gremien of the same three paths for the mentions, so a change here
     is a change there too.
+
+    The flow engine sets the vote snapshot on entry into a vote state and clears it on exit.
+    Case 1 reuses the canonical ancestor logic of the budget tree instead of a second prefix
+    query.
     """
     from app.modules.admin.gremium_roles import gremium_member_ids
 
@@ -199,20 +203,15 @@ async def _committee_can_read(
         )
     ).first()
     budget_id = row[0] if row is not None else None
-    # Case 2: the snapshot of the deciding Gremium of the current vote state. The
-    # flow engine sets it on entry into a vote state and clears it on exit.
     if row is not None and row[1] is not None and row[1] in gremien:
         return True
 
-    # Case 1 reuses the canonical ancestor logic of the budget tree instead of a
-    # second prefix query.
     if budget_id is not None:
         from app.modules.budget.tree.service import BudgetTreeService
 
         if await BudgetTreeService(db).can_view_node(budget_id, gremien):
             return True
 
-    # Case 3 covers the history: a meeting of a member Gremium voted on it.
     from app.modules.livevote.models import Meeting
     from app.modules.voting.models import Vote
 
@@ -256,10 +255,8 @@ async def committee_gremium_ids(db: AsyncSession, application_id: UUID) -> set[U
     if row is None:
         return out
     budget_id, vote_gremium_id = row
-    # Case 2: the snapshot of the deciding Gremium of the current vote state.
     if vote_gremium_id is not None:
         out.add(vote_gremium_id)
-    # Case 1: the node and its ancestors, through the prefixes of its path key.
     if budget_id is not None:
         path_key = await db.scalar(select(Budget.path_key).where(Budget.id == budget_id))
         if path_key is not None:
@@ -269,7 +266,6 @@ async def committee_gremium_ids(db: AsyncSession, application_id: UUID) -> set[U
                 select(Budget.view_gremium_id).where(Budget.path_key.in_(prefixes))
             )
             out.update(v for v in views if v is not None)
-    # Case 3: the history, every meeting that voted on the application.
     meetings = await db.scalars(
         select(Meeting.gremium_id)
         .join(Vote, Vote.meeting_id == Meeting.id)
@@ -316,7 +312,7 @@ async def resolve_app_read(
     ignores the Gremium and the ownership.
 
     The Gremium read scope comes before the creator. A member who submitted for
-    a student (F23) and who also reads through the Gremium reads as a member
+    a student and who also reads through the Gremium reads as a member
     (``via="committee"``), not as the applicant (``via="owner"``).
 
     `require_app_read` and the attachment routes of the files module use this
@@ -413,7 +409,7 @@ def principal_reads_all(principal: Principal) -> bool:
 
 
 def principal_reads_pii(principal: Principal) -> bool:
-    """Tell whether a principal reads the ``isPII`` fields of every application (O21).
+    """Tell whether a principal reads the ``isPII`` fields of every application.
 
     The rights are ``application.read`` and ``application.read_all``. An admin holds
     both through `Principal.has`, which also applies the OAuth scope cap.
@@ -422,7 +418,7 @@ def principal_reads_pii(principal: Principal) -> bool:
 
 
 async def can_read_pii(db: AsyncSession, access: Access) -> bool:
-    """Tell whether the caller reads the ``isPII`` fields of this application (O21).
+    """Tell whether the caller reads the ``isPII`` fields of this application.
 
     The applicant reads the own data: through the magic link and as the logged-in
     creator. A principal reads them with `principal_reads_pii`. A member who reads
@@ -441,7 +437,7 @@ async def can_read_pii(db: AsyncSession, access: Access) -> bool:
 
 
 async def hidden_pii_keys(db: AsyncSession, access: Access) -> set[str]:
-    """Return the ``isPII`` field keys that the caller may not read (O21).
+    """Return the ``isPII`` field keys that the caller may not read.
 
     The set is empty when `can_read_pii` holds. Otherwise it holds the ``isPII``
     keys of every form version of the application type, like the strip of the

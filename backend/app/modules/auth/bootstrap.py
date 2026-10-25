@@ -117,7 +117,7 @@ async def ensure_member_for_principal(db: AsyncSession, row: PrincipalRow) -> bo
     if role_id is None:
         logger.warning("bootstrap member: role %r missing (migrations applied?)", _MEMBER_ROLE_KEY)
         return False
-    if await _has_admin_assignment(db, row.id, role_id):  # generic query: global + role_id
+    if await _has_admin_assignment(db, row.id, role_id):
         return False
     db.add(_new_assignment(row.id, role_id))
     await db.flush()
@@ -130,7 +130,8 @@ async def ensure_bootstrap_admins(db: AsyncSession, settings: Settings) -> int:
     The sweep matches by `sub` only, because `sub` is the IdP identity that nobody can
     forge. The stored `principal.email` carries no `email_verified` flag, so this code
     cannot check the verification at startup. The email bootstrap happens only at login,
-    with the fresh claim. The function does not commit.
+    with the fresh claim. A merged principal never gets a role again, because it is a
+    locked reference. The function does not commit.
 
     Returns:
         The number of new assignments.
@@ -143,7 +144,6 @@ async def ensure_bootstrap_admins(db: AsyncSession, settings: Settings) -> int:
         logger.warning("bootstrap admin sweep: role %r missing", _ADMIN_ROLE_KEY)
         return 0
     res = await db.execute(
-        # A merged principal is a locked reference. It never gets a role again.
         select(PrincipalRow).where(
             PrincipalRow.sub.in_(subjects), PrincipalRow.merged_into.is_(None)
         )

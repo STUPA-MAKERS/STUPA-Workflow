@@ -1,5 +1,3 @@
-// "Antrag erfassen" (#11) takes the form sheet of the finance pages ("Buchung
-// hinzufügen"): head, scrolling body of sections, foot.
 @use '../../budget/finance-form';
 
 .cap__option {
@@ -36,7 +34,6 @@
   border-radius: 2px;
 }
 
-// The answers span the whole body below the two sections.
 .cap__answers {
   margin-top: var(--space-5);
 }

@@ -23,7 +23,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from app.settings import get_settings
 
-# Deterministic constraint/index names keep migrations stable and reviewable.
+#: Deterministic constraint and index names, which keep migrations stable and reviewable.
 NAMING_CONVENTION = {
     "ix": "ix_%(table_name)s_%(column_0_N_name)s",
     "uq": "uq_%(table_name)s_%(column_0_N_name)s",
@@ -69,6 +69,7 @@ class TimestampMixin(CreatedAtMixin):
 
 @lru_cache
 def get_engine() -> AsyncEngine:
+    """Return the process-wide async engine, created once."""
     settings = get_settings()
     return create_async_engine(
         settings.database_url,
@@ -79,6 +80,7 @@ def get_engine() -> AsyncEngine:
 
 @lru_cache
 def get_sessionmaker() -> async_sessionmaker[AsyncSession]:
+    """Return the process-wide sessionmaker (no expiry on commit, no autoflush)."""
     return async_sessionmaker(
         bind=get_engine(),
         expire_on_commit=False,

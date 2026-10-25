@@ -69,19 +69,19 @@ router = APIRouter(tags=["files"])
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 _CHUNK = 64 * 1024
 
-# Types the browser may render inline in the attachment preview: PDF and raster images
-# from the upload allowlist. HTML, SVG and XML never appear here, so there is no
-# stored-XSS vector. Every other type stays a forced download.
+#: Types the browser may render inline in the attachment preview: PDF and raster images
+#: from the upload allowlist. HTML, SVG and XML never appear here, so there is no
+#: stored-XSS vector. Every other type stays a forced download.
 _INLINE_MIMES = frozenset(
     {"application/pdf", "image/png", "image/jpeg", "image/gif", "image/webp"}
 )
 
-# Headers of an inline preview response. The preview dialog of the SPA shows the file in
-# an iframe of the same origin, so this one response may be framed by 'self' only. The
-# default API set (`X-Frame-Options: DENY`, `frame-ancestors 'none'`) would block the
-# frame. `sandbox` puts the document in a unique origin without scripts. The built-in PDF
-# viewers of Firefox (pdf.js) and Chromium still render with this policy. Every other
-# response keeps the default API set from `SecurityHeadersMiddleware`.
+#: CSP of an inline preview response. The SPA shows the file in an iframe of the same
+#: origin, so this one response may be framed by 'self' only, because the default API set
+#: (`X-Frame-Options: DENY`, `frame-ancestors 'none'`) blocks the frame. `sandbox` puts
+#: the document in a unique origin without scripts. The built-in PDF viewers of Firefox
+#: and Chromium still render with this policy. Every other response keeps the default API
+#: set from `SecurityHeadersMiddleware`.
 PREVIEW_CSP = (
     "default-src 'none'; frame-ancestors 'self'; base-uri 'none'; "
     "form-action 'none'; sandbox"
@@ -114,7 +114,7 @@ ServiceDep = Annotated[FilesService, Depends(get_files_service)]
 
 
 def get_draft_attachments(service: ServiceDep) -> DraftAttachments:
-    """Wire the draft operations (Z4) on top of the files service."""
+    """Wire the draft operations on top of the files service."""
     return DraftAttachments(service)
 
 
@@ -144,7 +144,7 @@ async def _resolve_attachment_read(
 async def _pii_attachment_filter(
     db: AsyncSession, access: Access
 ) -> Callable[[Attachment], bool] | None:
-    """Return a test for the attachments of the ``isPII`` fields (O21).
+    """Return a test for the attachments of the ``isPII`` fields.
 
     The result is ``None`` when the caller reads the ``isPII`` fields (`can_read_pii`).
     Otherwise the test is true for an attachment that belongs to an ``isPII`` field. An
@@ -174,7 +174,7 @@ async def _pii_attachment_filter(
 async def _assert_not_pii_hidden(db: AsyncSession, access: Access, attachment: Attachment) -> None:
     """Answer 404 for an attachment of an ``isPII`` field that the caller may not read.
 
-    A 404 and not a 403, so the route is no existence oracle (O21).
+    A 404 and not a 403, so the route is no existence oracle.
 
     Raises:
         NotFoundError: The attachment belongs to an ``isPII`` field and the caller
@@ -286,8 +286,6 @@ async def _read_capped(file: UploadFile, max_bytes: int) -> bytes:
     response_model=AttachmentOut,
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(enforce_attachment_body_cap), Depends(rate_limit_attachments)],
-    # 401/403 auth, 404 application missing, 413 too large, 415 bad type or sniff,
-    # 429 rate limit, 503 storage off.
     responses=_errors(401, 403, 404, 413, 415, 429, 503),
 )
 async def upload_attachment(
@@ -300,6 +298,10 @@ async def upload_attachment(
     """Upload an attachment.
 
     The attachment stays at ``scanned=false`` until the worker finishes the ClamAV scan.
+
+    The route answers 401 or 403 for auth, 404 for a missing application, 413 for a file
+    that is too large, 415 for a bad type or sniff, 429 at the rate limit and 503 when the
+    storage is off.
     """
     data = await _read_capped(file, service.max_bytes)
     return await service.upload(
@@ -327,7 +329,7 @@ async def list_attachments(
     The frontend uses this route to fill the panel again after a reload. Access is A/P.
 
     A caller without the PII right (`can_read_pii`) does not see the attachments of the
-    ``isPII`` fields (O21).
+    ``isPII`` fields.
 
     An unconfirmed guest submission stays invisible to a principal or a member of the
     Gremium and gives 404. Only the owning magic-link applicant reads it. This mirrors
@@ -357,9 +359,16 @@ async def get_attachment_url(
     A principal or the applicant of the application may call this route. The file
     of a ticket or of a chat message needs the read rule of its owner
     (``_assert_owner_reader``); without it the route gives 404.
+
+    The route fails closed before the database access: without an identity it answers 401,
+    because a difference between 404 and 401 would reveal that the attachment exists. The
+    read check uses the same paths as ``require_app_read`` (read_all, creator and Gremium
+    read), not only the global ``application.read`` permission. A cross-tenant caller is
+    authenticated but has no read access, and gets 404 instead of 403, so an outsider cannot
+    learn that the attachment exists. An unconfirmed guest submission stays invisible to a
+    principal or a Gremium member and gives 404, as in the list and detail gates. Only the
+    owning magic-link applicant reads it.
     """
-    # Fail closed before the database access. Without an identity the route answers 401.
-    # A difference between 404 and 401 would reveal that the attachment exists.
     if principal is None and applicant is None:
         raise UnauthorizedError("Authentication required.")
     owner = await service.owner_of(attachment_id)
@@ -367,11 +376,6 @@ async def get_attachment_url(
         await _assert_owner_reader(db, service, owner, principal, applicant, attachment_id)
         return await service.message_url(attachment_id)
     attachment = await service.get_attachment(attachment_id)
-    # Check read access against the application of the attachment. This uses the same
-    # paths as in require_app_read, that is read_all, creator and Gremium read, not only
-    # the global application.read permission. A cross-tenant caller is authenticated but
-    # has no read access. It gets 404 instead of 403, so an outsider cannot learn that
-    # the attachment exists.
     try:
         access = await _resolve_attachment_read(
             db, application_id_of(attachment), principal, applicant
@@ -379,9 +383,6 @@ async def get_attachment_url(
     except ForbiddenError as exc:
         raise NotFoundError(f"attachment {attachment_id} not found") from exc
     await _assert_not_pii_hidden(db, access, attachment)
-    # An unconfirmed guest submission stays invisible to a principal or a member of the
-    # Gremium and gives 404. Only the owning magic-link applicant reads it. This mirrors
-    # the list and detail gates.
     return await service.signed_url(
         attachment_id, allow_unconfirmed=access.is_owning_applicant
     )
@@ -419,6 +420,13 @@ async def download_attachment(
 
     The file of a ticket or of a chat message needs the read rule of its owner
     (``_assert_owner_reader``), else 404. The same quarantine gates apply.
+
+    An unconfirmed guest submission gives 404 to a principal or a Gremium member, as in the
+    list and detail gates. The quarantine gates (409/410/503) run in the service BEFORE the
+    stream starts. A file outside the inline allowlist stays a forced download with the
+    default API headers, which forbid framing. The security middleware sets its defaults
+    with ``setdefault``, so the preview headers win. ``mime`` is the type that libmagic
+    sniffed at upload, not the claim of the client.
     """
     if principal is None and applicant is None:
         raise UnauthorizedError("Authentication required.")
@@ -435,17 +443,9 @@ async def download_attachment(
         except ForbiddenError as exc:
             raise NotFoundError(f"attachment {attachment_id} not found") from exc
         await _assert_not_pii_hidden(db, access, attachment)
-        # An unconfirmed guest submission stays invisible to a principal or a member
-        # of the Gremium and gives 404. Only the owning magic-link applicant downloads
-        # it. This mirrors the list and detail gates. The quarantine gates
-        # (409/410/503) run in the service BEFORE the stream starts. The
-        # StreamingResponse begins after those gates.
         stream, filename, mime, size = await service.download_stream(
             attachment_id, allow_unconfirmed=access.is_owning_applicant
         )
-    # ``?inline=1`` renders the file in the browser preview dialog. This works only for
-    # the non-scriptable allowlist. Anything else stays a forced download with the
-    # default API headers, which forbid framing.
     preview = inline and mime in _INLINE_MIMES
     kind = "inline" if preview else "attachment"
     headers = {
@@ -454,16 +454,13 @@ async def download_attachment(
         "X-Content-Type-Options": "nosniff",
     }
     if preview:
-        # The security middleware sets its defaults with `setdefault`, so these win.
         headers.update(_PREVIEW_HEADERS)
-    # ``mime`` is the type that libmagic sniffed at upload, not the claim of the client.
     return StreamingResponse(stream, media_type=mime, headers=headers)
 
 
 @router.delete(
     "/attachments/{attachment_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    # 409: an applicant or a creator deletes in a locked state.
     responses=_errors(401, 403, 404, 409),
 )
 async def delete_attachment(
@@ -486,8 +483,10 @@ async def delete_attachment(
     A delete is a data change, not an upload. An applicant and a creator without
     ``application.manage`` can delete only while the current state has
     ``edit_allowed``. In a locked state they get 409, as for a PATCH. They can still
-    upload in every state (Z1, O4). ``application.manage`` and
+    upload in every state. ``application.manage`` and
     ``application.edit_any`` keep the bypass.
+
+    The route answers 409 when an applicant or a creator deletes in a locked state.
     """
     if principal is None and applicant is None:
         raise UnauthorizedError("Authentication required.")
@@ -511,8 +510,8 @@ async def delete_attachment(
     await service.delete(attachment_id, actor=access.actor)
 
 
-# Header of the draft token on ``POST`` and ``DELETE /apply/attachments`` (Z4). A header
-# keeps the token out of the URL and out of the access log.
+#: Header of the draft token on ``POST`` and ``DELETE /apply/attachments``. A header
+#: keeps the token out of the URL and out of the access log.
 DRAFT_TOKEN_HEADER = "X-Draft-Token"
 
 
@@ -521,8 +520,6 @@ DRAFT_TOKEN_HEADER = "X-Draft-Token"
     response_model=DraftAttachmentOut,
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(enforce_attachment_body_cap), Depends(rate_limit_attachments)],
-    # 400 ALTCHA, 413 file or draft too large, 415 bad type or sniff, 422 unknown or
-    # expired token, 429 rate limit, 503 storage off.
     responses=_errors(400, 413, 415, 422, 429, 503),
 )
 async def upload_draft_attachment(
@@ -538,7 +535,7 @@ async def upload_draft_attachment(
         str | None, Header(alias=DRAFT_TOKEN_HEADER, max_length=128)
     ] = None,
 ) -> DraftAttachmentOut:
-    """Upload a file of the wizard before the application exists (Z4).
+    """Upload a file of the wizard before the application exists.
 
     The route is public. The first upload of a draft has no ``X-Draft-Token``
     header. An anonymous caller then sends an ALTCHA solution in the multipart field
@@ -554,6 +551,10 @@ async def upload_draft_attachment(
     Size cap, rate limit and MIME sniff work as on the application upload. The file
     stays quarantined until the scan is clean. ``POST /applications`` binds the
     drafts with ``attachmentIds`` and ``draftToken``.
+
+    The route answers 400 for a failed ALTCHA, 413 for a file or draft that is too large,
+    415 for a bad type or sniff, 422 for an unknown or expired token, 429 at the rate limit
+    and 503 when the storage is off.
     """
     if draft_token is not None:
         if not await drafts.token_is_valid(draft_token):
@@ -578,7 +579,6 @@ async def upload_draft_attachment(
 @router.delete(
     "/apply/attachments/{attachment_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    # 404: the token owns no draft with this id. 422: the header is missing.
     responses=_errors(404, 422),
 )
 async def delete_draft_attachment(
@@ -587,11 +587,14 @@ async def delete_draft_attachment(
     principal: Annotated[Principal | None, Depends(get_current_principal)],
     draft_token: Annotated[str, Header(alias=DRAFT_TOKEN_HEADER, max_length=128)],
 ) -> None:
-    """Remove a draft file of the wizard (Z4).
+    """Remove a draft file of the wizard.
 
     The ``X-Draft-Token`` header must name the token that owns the draft. Any other
     case gives 404, so the route is no existence oracle. A bound attachment is out of
     reach here; ``DELETE /attachments/{id}`` handles it.
+
+    The route answers 404 when the token owns no draft with this id, and 422 when the header
+    is missing.
     """
     await drafts.delete(
         attachment_id,

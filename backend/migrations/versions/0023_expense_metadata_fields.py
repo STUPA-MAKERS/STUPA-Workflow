@@ -1,4 +1,4 @@
-"""Bookings: extra metadata columns (#1-1/#1-2/#3/#4).
+"""Bookings: extra metadata columns.
 
 Add the invoice date, the payment date and the recipient or payer
 (`correspondent`) to `budget_expense`. Add a free `note`, the receipt number
@@ -19,6 +19,7 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
+#: The index on the invoice date serves the default sort of the booking list.
 _UPGRADE: tuple[str, ...] = (
     "ALTER TABLE budget_expense ADD COLUMN IF NOT EXISTS invoice_date date",
     "ALTER TABLE budget_expense ADD COLUMN IF NOT EXISTS payment_date date",
@@ -36,7 +37,6 @@ _UPGRADE: tuple[str, ...] = (
         "CHECK (payment_method IS NULL OR payment_method IN "
         "('ueberweisung', 'bar', 'lastschrift', 'karte'))"
     ),
-    # The booking list sorts by invoice date by default.
     (
         "CREATE INDEX IF NOT EXISTS ix_budget_expense_invoice_date "
         "ON budget_expense (invoice_date)"
@@ -60,10 +60,12 @@ _DOWNGRADE: tuple[str, ...] = (
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     for stmt in _UPGRADE:
         op.execute(stmt)
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     for stmt in _DOWNGRADE:
         op.execute(stmt)

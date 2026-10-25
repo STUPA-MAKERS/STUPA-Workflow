@@ -4,10 +4,12 @@ import * as translations from './translations';
 import { CATALOG } from './translations';
 
 describe('I18nService', () => {
+  /**
+   * jsdom reports en-US by default. The test pins German, so the "no stored choice" path always
+   * resolves to the default that this spec expects.
+   */
   beforeEach(() => {
     localStorage.clear();
-    // jsdom reports en-US by default. Pin German so the "no stored choice" path
-    // always resolves to the default that this spec expects.
     Object.defineProperty(navigator, 'language', { value: 'de-DE', configurable: true });
   });
 
@@ -30,10 +32,12 @@ describe('I18nService', () => {
     expect(document.documentElement.lang).toBe('en');
   });
 
+  /**
+   * The test simulates an incomplete EN catalog. The `en` type is `Partial` on purpose.
+   * `action.login` is a shared, long-lived key, so a rework of the copy of a page does not break
+   * this test.
+   */
   it('falls back to German for keys missing in the active locale', () => {
-    // Simulate an incomplete EN catalog. The `en` type is `Partial` on purpose.
-    // `action.login` is a shared, long-lived key, so this test does not break again the
-    // next time a page reworks its own copy.
     const original = CATALOG.en['action.login'];
     delete CATALOG.en['action.login'];
     try {
@@ -63,15 +67,17 @@ describe('I18nService', () => {
     expect(document.documentElement.lang).toBe('en');
   });
 
+  /**
+   * The key lookup stays on 'de'/'en', because the catalogue has no other keys. Intl gets en-GB, so
+   * English reads DD/MM/YYYY and a 24 h clock.
+   */
   it('maps the UI locale to an Intl locale without moving the translation key locale', () => {
     const i18n = service();
-    // Key lookup stays on 'de'/'en' — the catalogue has no other keys.
     expect(i18n.locale()).toBe('de');
     expect(i18n.formatLocale()).toBe('de-DE');
     i18n.setLocale('en');
     expect(i18n.locale()).toBe('en');
     expect(i18n.translate('action.login')).toBe('Sign in');
-    // Intl gets en-GB, so English reads DD/MM/YYYY and a 24 h clock.
     expect(i18n.formatLocale()).toBe('en-GB');
   });
 

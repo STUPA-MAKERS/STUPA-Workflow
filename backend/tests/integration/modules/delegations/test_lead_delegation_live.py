@@ -1,4 +1,4 @@
-"""O6: the meeting lead enters a substitution for a missing member while live.
+"""The meeting lead enters a substitution for a missing member while live.
 
 * Only the lead (`session.manage` in the gremium) may send `delegatorId`, and
   only while the meeting is live (not planned, not closed).
@@ -11,13 +11,14 @@
 * The row stores the lead as `created_by` and `via_pool = true`.
 * The lead revokes while live. A ballot that the delegate already cast stays.
 * The lead cannot name themselves as the substitute.
-* The entry waits for a parallel attendance change of the member (O23).
+* The entry waits for a parallel attendance change of the member.
 """
 
 from __future__ import annotations
 
 import asyncio
 import uuid
+from typing import Any
 
 import pytest
 from fastapi import FastAPI
@@ -83,7 +84,7 @@ async def _principal_id(maker: async_sessionmaker[AsyncSession], sub: str) -> uu
     return pid
 
 
-def _body(s: _Setup, *, voting: bool = True, delegate: uuid.UUID | None = None) -> dict:
+def _body(s: _Setup, *, voting: bool = True, delegate: uuid.UUID | None = None) -> dict[str, Any]:
     return {
         "meetingId": str(s.meeting_id),
         "delegatorId": str(s.a),
@@ -126,9 +127,7 @@ async def test_lead_enters_a_substitution_for_a_missing_member(
         assert row is not None
         assert (row.created_by, row.via_pool) == (s.lead, True)
         entry = (
-            await session.scalars(
-                select(AuditEntry).where(AuditEntry.target_id == out["id"])
-            )
+            await session.scalars(select(AuditEntry).where(AuditEntry.target_id == out["id"]))
         ).one()
     assert entry.action == "delegation_grant"
     assert entry.actor == s.lead
@@ -139,6 +138,10 @@ async def test_lead_enters_a_substitution_for_a_missing_member(
 async def test_lead_revokes_and_the_cast_ballot_stays(
     maker: async_sessionmaker[AsyncSession], api: FastAPI
 ) -> None:
+    """Let the lead revoke a live delegation; the cast ballot stays.
+
+    The delegator cannot revoke after the start.
+    """
     s = await _setup(maker)
     async with maker() as session:
         vote = Vote(
@@ -159,7 +162,6 @@ async def test_lead_revokes_and_the_cast_ballot_stays(
         cast = client.post(
             f"/api/votes/{vote_id}/ballot", json={"choice": "yes", "asDelegation": True}
         )
-        # The delegator cannot revoke after the start.
         act(api, s.a_sub)
         own = client.delete(f"/api/delegations/{created.json()['id']}")
         act(api, s.lead)
@@ -349,6 +351,11 @@ async def test_a_present_member_needs_no_substitution(
 async def test_lead_cannot_revoke_a_planned_delegation_of_another_member(
     maker: async_sessionmaker[AsyncSession], api: FastAPI
 ) -> None:
+    """Refuse the lead the revoke of a planned delegation of another member.
+
+    The `revocable` flag agrees with the refusal: the lead sees the row but cannot revoke
+    it.
+    """
     s = await _setup(maker, status="planned")
     with TestClient(api) as client:
         act(api, s.a_sub)
@@ -361,17 +368,19 @@ async def test_lead_cannot_revoke_a_planned_delegation_of_another_member(
         listed = client.get("/api/delegations", params={"meetingId": str(s.meeting_id)})
         refused = client.delete(f"/api/delegations/{own.json()['id']}")
     assert refused.status_code == 403, refused.text
-    # The flag agrees with the refusal: the lead sees the row but cannot revoke it.
     assert [(d["id"], d["revocable"]) for d in listed.json()] == [(own.json()["id"], False)]
 
 
 async def test_lead_cannot_name_themselves(
     maker: async_sessionmaker[AsyncSession], api: FastAPI
 ) -> None:
+    """Refuse the lead as the substitute.
+
+    The lead is also a gremium-wide substitute. Still the lead cannot take the vote of A
+    without the consent of A.
+    """
     s = await _setup(maker)
     lead_id = await _principal_id(maker, s.lead)
-    # The lead is also a gremium-wide substitute. Still the lead cannot take the
-    # vote of A without the consent of A.
     await pool_entry(maker, s.gremium_id, lead_id)
     act(api, s.lead)
     with TestClient(api) as client:
@@ -389,7 +398,7 @@ async def test_lead_cannot_name_themselves(
 async def test_lead_entry_waits_for_a_parallel_present_report(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
-    """A holds the share lock of the attendance writer and reports present (O23).
+    """A holds the share lock of the attendance writer and reports present.
 
     The lead entry for A must wait for the lock. After the commit it reads the
     present record and refuses. Without the wait both changes would commit.
@@ -408,9 +417,7 @@ async def test_lead_entry_waits_for_a_parallel_present_report(
         )
         await writer.flush()
         entry = asyncio.create_task(
-            DelegationService(lead_session, service_settings).create(
-                payload, Principal(sub=s.lead)
-            )
+            DelegationService(lead_session, service_settings).create(payload, Principal(sub=s.lead))
         )
         await asyncio.sleep(0.5)
         assert not entry.done()

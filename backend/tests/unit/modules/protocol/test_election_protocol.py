@@ -1,4 +1,4 @@
-"""F2 · Personnel elections in the protocol and on the public protocols page.
+"""Personnel elections in the protocol and on the public protocols page.
 
 The internal snippet names every candidate with the votes; the public snippet and the
 public decision name the elected candidates only and count the others.
@@ -69,10 +69,10 @@ _RESULT = ElectionResultOut(
 
 
 def test_internal_snippet_names_every_candidate() -> None:
+    """The internal snippet names every candidate, sorted by votes."""
     text = _snippet(_view(_RESULT), "Beschlussfrage")
     assert text.splitlines()[0] == "> [!abstimmung] **Wahl der Referate**"
     assert "> Wahl · 2 Posten" in text
-    # Sorted by votes.
     assert "> Ben: 5 · Anna: 3 · Cem: 1 · Enthaltungen: 2" in text
     assert "> Gewählt: Ben, Anna" in text
     assert "weitere" not in text
@@ -241,8 +241,8 @@ async def _assemble_two_rounds(
 async def test_public_protocol_keeps_both_rounds_apart(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Round 1 elected Ben, the runoff elected Anna, and both stay in the public text."""
     md, tops = await _assemble_two_rounds(monkeypatch, (1, 2), public=True)
-    # Round 1 elected Ben, the runoff elected Anna; both stay in the public text.
     assert md.count("> Gewählt: Ben") == 1
     assert md.count("> Gewählt: Anna") == 1
     assert "Cem" not in md

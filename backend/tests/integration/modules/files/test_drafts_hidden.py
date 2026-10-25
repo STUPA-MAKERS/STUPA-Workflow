@@ -1,4 +1,4 @@
-"""Integration: no application-scoped path sees a draft upload (Z4, real Postgres).
+"""Integration: no application-scoped path sees a draft upload (real Postgres).
 
 A draft of the wizard has no `application_id`. The tests prove that each
 application path ignores it, even for an admin and even when the draft is scanned
@@ -125,7 +125,7 @@ async def test_item_routes_answer_404_for_a_draft_even_for_an_admin(
     api = build_api(migrated[1], settings, monkeypatch)
 
     def _files(session: DbSession, request_settings: SettingsDep) -> FilesService:
-        object_storage: ObjectStorage = storage  # pyright: ignore[reportAssignmentType]
+        object_storage: ObjectStorage = storage
         return FilesService(session, storage=object_storage, settings=request_settings)
 
     api.dependency_overrides[get_files_service] = _files
@@ -150,7 +150,7 @@ async def test_service_paths_ignore_a_draft(
     app_id = await _app(maker)
     draft_id = await _clean_draft(maker, settings, storage)
     async with maker() as session:
-        files = FilesService(session, storage=storage, settings=settings)  # pyright: ignore[reportArgumentType]
+        files = FilesService(session, storage=storage, settings=settings)
         assert await files.list_for_application(app_id) == []
         app = await session.get(Application, app_id)
         assert app is not None
@@ -190,7 +190,7 @@ async def test_a_bound_attachment_is_still_visible(
         )
         session.add(bound)
         await session.commit()
-        files = FilesService(session, storage=storage, settings=settings)  # pyright: ignore[reportArgumentType]
+        files = FilesService(session, storage=storage, settings=settings)
         listed = await files.list_for_application(app_id)
         assert [a.id for a in listed] == [bound.id]
         app = await session.get(Application, app_id)
@@ -206,6 +206,7 @@ async def test_a_comment_file_is_no_application_attachment(
     settings: Settings,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Count only the bound attachments in the guard, not the comment file."""
     storage = _MemoryStorage()
     app_id = await _app(maker)
     async with maker() as session:
@@ -225,17 +226,16 @@ async def test_a_comment_file_is_no_application_attachment(
         )
         session.add(row)
         await session.commit()
-        files = FilesService(session, storage=storage, settings=settings)  # pyright: ignore[reportArgumentType]
+        files = FilesService(session, storage=storage, settings=settings)
         assert row.id not in {a.id for a in await files.list_for_application(app_id)}
         app = await session.get(Application, app_id)
         assert app is not None
-        # The guard counts the bound attachments only, not the comment file.
         bound = bool(await files.list_for_application(app_id))
         assert (await build_base_context(session, app, manual=True)).has_attachment is bound
     api = build_api(migrated[1], settings, monkeypatch)
 
     def _files(session: DbSession, request_settings: SettingsDep) -> FilesService:
-        object_storage: ObjectStorage = storage  # pyright: ignore[reportAssignmentType]
+        object_storage: ObjectStorage = storage
         return FilesService(session, storage=object_storage, settings=request_settings)
 
     api.dependency_overrides[get_files_service] = _files

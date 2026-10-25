@@ -1,4 +1,4 @@
-"""Smoke tests for the test infrastructure: factories and freezegun. See testing.md §5."""
+"""Smoke tests for the test infrastructure: factories and freezegun."""
 
 from __future__ import annotations
 
@@ -29,5 +29,8 @@ def test_seed_core_stub_passthrough() -> None:
 
 @freeze_time("2026-06-05T12:00:00Z")
 def test_freezegun_available() -> None:
-    # Deadline, token and vote-window tests depend on frozen time (§5).
+    """Provide freezegun.
+
+    The deadline, token and vote-window tests depend on frozen time.
+    """
     assert dt.datetime.now(tz=dt.UTC).date().isoformat() == "2026-06-05"

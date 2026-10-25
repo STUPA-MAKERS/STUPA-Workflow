@@ -37,7 +37,7 @@ function appWire(): ApplicationOutWire {
     typeId: 't1',
     state: SUBMITTED,
     gremiumId: null,
-    budgetPotId: null,
+    budgetId: null,
     amount: '250.00',
     currency: 'EUR',
     data: { title: 'Förderung Fest', amount: '250.00' },
@@ -79,6 +79,10 @@ function splitPage(): ApplicationsPageService {
   return page;
 }
 
+/**
+ * The real service polls; the page only asks it to refresh. Side by side with the list every
+ * section shows at once, with no tabs.
+ */
 async function setup(
   permissions: string[] = ['application.read', 'application.manage'],
   paramMap$ = new BehaviorSubject(convertToParamMap({ id: 'app-1' })),
@@ -92,7 +96,6 @@ async function setup(
       provideHttpClientTesting(),
       { provide: USE_MOCK_API, useValue: false },
       { provide: AuthService, useValue: fakeAuth(permissions) },
-      // The real service polls; the page only asks it to refresh.
       { provide: RailStatusService, useValue: { refresh: jest.fn() } },
       {
         provide: ActivatedRoute,
@@ -106,7 +109,6 @@ async function setup(
           },
         },
       },
-      // Side by side with the list: every section shows at once, no tabs.
       { provide: ApplicationsPageService, useFactory: splitPage },
     ],
   });
@@ -143,8 +145,6 @@ function flushAttachments(http: HttpTestingController) {
   }
 }
 
-// --- helpers -----------------------------------------------------------------
-
 /** The header action "Kommentare" opens the sheet with the thread. */
 function openComments(detectChanges: () => void) {
   fireEvent.click(screen.getByTestId('ad-comments-open'));
@@ -163,7 +163,10 @@ function flushTypes(http: HttpTestingController) {
   }
 }
 
-/** Load the page with the given comments and answer every request of the load. */
+/**
+ * Load the page with the given comments and answer every request of the load. The open comments
+ * load the "@" list once.
+ */
 async function loaded(
   permissions?: string[],
   comments: CommentOutWire[] = COMMENTS,
@@ -179,7 +182,6 @@ async function loaded(
   ctx.detectChanges();
   flushAttachments(ctx.http);
   openComments(ctx.detectChanges);
-  // The open comments load the "@" list once.
   ctx.http.expectOne(url('/mentionable')).flush(people);
   ctx.detectChanges();
   const input = () => screen.getByRole('textbox', { name: 'Kommentar schreiben …' });
@@ -235,6 +237,7 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
     expect(screen.getByText('Noch keine Nachrichten.')).toBeInTheDocument();
   });
 
+  /** The visibility segment stays with application.manage. */
   it('keeps the thread out of the page and opens it in a sheet from the header action', async () => {
     const { http, detectChanges } = await setup();
     flushTypes(http);
@@ -250,7 +253,6 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
     const sheet = screen.getByRole('dialog', { name: 'Kommentare' });
     expect(sheet).toHaveAttribute('aria-modal', 'true');
     expect(within(sheet).getByText('Bitte Kostenplan ergänzen.')).toBeInTheDocument();
-    // The visibility segment stays with application.manage.
     expect(within(sheet).getByRole('radio', { name: 'Intern' })).toBeInTheDocument();
     fireEvent.keyDown(sheet, { key: 'Escape' });
     detectChanges();
@@ -274,6 +276,7 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
     expect(localStorage.getItem('ap.chat.seen.application.app-1')).not.toBeNull();
   });
 
+  /** While the comments read of the refresh is in flight, the plate and the thread stay. */
   it('keeps the count and the thread while a refresh reads the comments again', async () => {
     const { http, cmp, detectChanges } = await setup();
     flushTypes(http);
@@ -285,12 +288,12 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
     (cmp as unknown as { refresh(): void }).refresh();
     http.expectOne(url('')).flush(appWire());
     detectChanges();
-    // The comments read of the refresh is in flight: the plate and the thread stay.
     expect(http.match(url('/comments'))).toHaveLength(1);
     expect(cmp.commentsLoading()).toBe(false);
     expect(document.querySelector('.ad__commentsN')).toHaveTextContent('1');
   });
 
+  /** A later "#comments" opens the closed sheet again; another fragment does not. */
   it('opens the sheet for a link to the comments and scrolls to the named comment', async () => {
     const fragment$ = new BehaviorSubject<string | null>('comment-c1');
     const scroll = jest.fn();
@@ -309,7 +312,6 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
       expect(cmp.commentsOpen()).toBe(true);
       expect(screen.getByRole('dialog', { name: 'Kommentare' })).toBeInTheDocument();
       expect(scroll).toHaveBeenCalledWith({ block: 'center' });
-      // A later "#comments" opens the closed sheet again; another fragment does not.
       cmp.commentsOpen.set(false);
       fragment$.next('details');
       expect(cmp.commentsOpen()).toBe(false);
@@ -320,12 +322,12 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
     }
   });
 
+  /** A foreign comment offers no edit. */
   it('posts a public comment without application.manage, at once and without a toast', async () => {
     const { http, toast, type, detectChanges } = await loaded(['application.read']);
     const success = jest.spyOn(toast, 'success');
     expect(screen.queryByRole('radiogroup', { name: 'Sichtbarkeit' })).not.toBeInTheDocument();
     expect(screen.getByText('Bitte Kostenplan ergänzen.')).toBeInTheDocument();
-    // A foreign comment offers no edit.
     expect(screen.queryByRole('button', { name: 'Nachricht bearbeiten' })).not.toBeInTheDocument();
 
     type('Frage');
@@ -340,6 +342,7 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
     http.verify();
   });
 
+  /** The applicant reads a public comment, so it lists nobody. */
   it('offers the readers after "@", sends their ids and marks them in the thread', async () => {
     const people = [
       { principalId: 'p-1', displayName: 'Jonas Weber' },
@@ -351,7 +354,6 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
       people,
     );
     const box = input() as HTMLTextAreaElement;
-    // The applicant reads a public comment, so it lists nobody.
     fireEvent.input(box, { target: { value: 'Hallo @sel', selectionStart: 10 } });
     detectChanges();
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
@@ -389,6 +391,7 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
     http.verify();
   });
 
+  /** Closing and opening again reads the list no second time. */
   it('offers no "@" list when the server refuses it', async () => {
     const ctx = await setup(['application.read']);
     flushTypes(ctx.http);
@@ -405,7 +408,6 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
     fireEvent.input(box, { target: { value: '@J', selectionStart: 2 } });
     ctx.detectChanges();
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
-    // Closing and opening again reads the list no second time.
     ctx.cmp.commentsOpen.set(false);
     ctx.detectChanges();
     ctx.cmp.commentsOpen.set(true);
@@ -413,6 +415,7 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
     ctx.http.expectNone(url('/mentionable'));
   });
 
+  /** Both kinds exist, and the internal comment carries its mark. */
   it('posts an internal comment when the toggle says so and keeps the choice', async () => {
     const { http, type, detectChanges } = await loaded();
     const group = screen.getByRole('radiogroup', { name: 'Sichtbarkeit' });
@@ -424,11 +427,11 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
     post.flush({ ...OWN, body: 'Nur für uns' });
     detectChanges();
     expect(within(group).getByRole('radio', { name: 'Intern' })).toHaveAttribute('aria-checked', 'true');
-    // Both kinds exist: the internal comment carries its mark.
     expect(document.querySelector('.chat__mark--internal')).toHaveTextContent('Intern');
     http.verify();
   });
 
+  /** The pending message shows the file, still in the scan, as no link. */
   it('sends a comment with a file only, and shows the files of the comments', async () => {
     const withFile: CommentOutWire = {
       ...COMMENTS[0],
@@ -460,7 +463,6 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
     detectChanges();
     const post = http.expectOne(url('/comments'));
     expect(post.request.body).toEqual({ body: '', visibility: 'public', attachmentIds: ['d1'], draftToken: 'tok' });
-    // The pending message shows the file, still in the scan, as no link.
     expect(screen.getByText('In Prüfung')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'angebot.pdf entfernen' })).not.toBeInTheDocument();
     post.flush({
@@ -489,9 +491,9 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
     http.verify();
   });
 
+  /** A manager may change both comments; the second one is the own. */
   it('patches only the body of an own comment', async () => {
     const { http, detectChanges, cmp } = await loaded(undefined, [COMMENTS[0], OWN]);
-    // A manager may change both comments; the second one is the own.
     fireEvent.click(screen.getAllByRole('button', { name: 'Nachricht bearbeiten' })[1]);
     const box = screen.getByRole('textbox', { name: 'Nachricht bearbeiten' });
     fireEvent.input(box, { target: { value: '  Neuer Text  ' } });
@@ -505,6 +507,7 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
     http.verify();
   });
 
+  /** The chat opens the edit again with the text, so nothing typed is lost. */
   it.each([
     [403, 'Nur die verfassende Person oder eine Antragsverwaltung darf diesen Kommentar ändern.'],
     [404, 'Dieser Kommentar existiert nicht mehr.'],
@@ -518,7 +521,6 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
     expect(restore).not.toHaveBeenCalled();
     http.expectOne(url('/comments/c2')).flush({ title: 'e' }, { status, statusText: 'x' });
     expect(error).toHaveBeenCalledWith(message);
-    // The chat opens the edit again with the text, so nothing typed is lost.
     expect(restore).toHaveBeenCalledTimes(1);
     expect(cmp.comments()[0].body).toBe('Mein Text');
     http.verify();

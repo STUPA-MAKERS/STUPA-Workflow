@@ -64,6 +64,13 @@ async def _draft(
 async def test_the_reporter_reads_and_answers_only_the_public_thread(
     api: Api, maker: async_sessionmaker[AsyncSession], settings: Settings
 ) -> None:
+    """Let the reporter read and answer only the public thread.
+
+    The file of the public note opens, and the file of the internal note does not exist. The
+    team routes stay closed. Another account never sees the ticket or its files. A block
+    keeps the thread readable and stops the messages. The anonymization takes the reporter
+    off the ticket and off its notes.
+    """
     await add_principal(maker, sub=MANAGER.sub, email=MANAGER.email, name="Mia")
     reporter_id = await add_principal(maker, sub=REPORTER.sub, email=REPORTER.email, name="Rex")
     await add_principal(maker, sub=STRANGER.sub, email=STRANGER.email, name="Sam")
@@ -121,10 +128,8 @@ async def test_the_reporter_reads_and_answers_only_the_public_thread(
             ("new", "in_progress")
         ]
         assert "assignee" not in body and "context" not in body
-        # The file of the public note opens, the file of the internal note does not exist.
         assert client.get(f"/api/attachments/{public_file}/download").status_code == 200
         assert client.get(f"/api/attachments/{internal_file}/download").status_code == 404
-        # The team routes stay closed.
         assert client.get(f"/api/tickets/{ticket_id}").status_code == 403
 
         answer = client.post(f"/api/tickets/mine/{ticket_id}/notes", json={"body": "Danke!"})
@@ -152,7 +157,6 @@ async def test_the_reporter_reads_and_answers_only_the_public_thread(
             ("Danke sehr!", True),
         ]
 
-        # Another account never sees the ticket or its files.
         api.login(STRANGER)
         assert client.get("/api/tickets/mine").json()["total"] == 0
         assert client.get(f"/api/tickets/mine/{ticket_id}").status_code == 404
@@ -162,7 +166,6 @@ async def test_the_reporter_reads_and_answers_only_the_public_thread(
         )
         assert client.get(f"/api/attachments/{public_file}/download").status_code == 404
 
-        # A block keeps the thread readable and stops the messages.
         api.login(MANAGER)
         assert client.post(f"/api/tickets/{ticket_id}/block-sender").status_code == 200
         api.login(REPORTER)
@@ -171,11 +174,10 @@ async def test_the_reporter_reads_and_answers_only_the_public_thread(
         assert blocked.status_code == 403
         assert blocked.json()["code"] == "sender_blocked"
 
-    # The anonymization takes the reporter off the ticket and off its notes.
     async with maker() as session:
         ticket = await session.get(Ticket, uuid.UUID(ticket_id))
         assert ticket is not None
-        files = FilesService(session, storage=storage, settings=settings)  # pyright: ignore[reportArgumentType]
+        files = FilesService(session, storage=storage, settings=settings)
         await TicketService(session, files=files).anonymize(ticket, actor="test")
         await session.commit()
         authors = (

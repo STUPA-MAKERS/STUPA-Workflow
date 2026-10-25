@@ -52,19 +52,20 @@ def test_me_with_token_returns_feed_url() -> None:
 
 
 def test_me_requires_authentication() -> None:
-    # No principal override, so the real resolver runs. No cookie gives a 401 and no DB read.
+    """Answer 401 without a cookie: the real resolver runs and reads no database."""
     resp = _client(fake_session()).get("/api/calendar/me")
     assert resp.status_code == 401
 
 
 def test_rotate_generates_feed_url() -> None:
+    """Rotate the token and return the new feed URL."""
     row = SimpleNamespace(calendar_token=None)
     client = _client(fake_session(result(row)), Principal(sub="u1"))
     resp = client.post("/api/calendar/me/rotate")
     assert resp.status_code == 200
     url = resp.json()["url"]
     assert re.fullmatch(r"https://stupa\.example/api/calendar/[\w-]+\.ics", url)
-    assert row.calendar_token is not None  # the token rotated
+    assert row.calendar_token is not None
 
 
 def test_feed_unknown_token_is_404() -> None:
@@ -73,6 +74,7 @@ def test_feed_unknown_token_is_404() -> None:
 
 
 def test_feed_returns_ics_with_meeting() -> None:
+    """Serve the ICS body: 18:00 CEST is 16:00Z, 20:00 CEST is 18:00Z."""
     principal_row = SimpleNamespace(sub="u1")
     gid = uuid.uuid4()
     meeting = SimpleNamespace(
@@ -95,5 +97,5 @@ def test_feed_returns_ics_with_meeting() -> None:
     body = resp.text
     assert "BEGIN:VCALENDAR" in body
     assert "SUMMARY:Vollversammlung" in body
-    assert "DTSTART:20260701T160000Z" in body  # 18:00 CEST → 16:00Z
-    assert "DTEND:20260701T180000Z" in body  # 20:00 CEST → 18:00Z
+    assert "DTSTART:20260701T160000Z" in body
+    assert "DTEND:20260701T180000Z" in body

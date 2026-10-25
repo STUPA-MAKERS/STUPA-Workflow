@@ -1,4 +1,4 @@
-"""Magic links without a fixed scope (Z1, O3, O4, F5).
+"""Magic links without a fixed scope.
 
 A new link always has the scope `edit`, can be used more than once, and gets its
 lifetime from `guest_application_settings.link_ttl_days` (NULL = no expiry). The
@@ -62,7 +62,11 @@ class _RecordingSession(FakeSession):
 async def test_request_writes_an_edit_link_with_the_configured_lifetime(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """`link_ttl_days` sets the expiry. A locked state does not change the scope."""
+    """Write an edit link with the configured lifetime.
+
+    `link_ttl_days` sets the expiry, and a locked state does not change the scope. The
+    request reads no state and expires no other link: only the lookup runs.
+    """
     monkeypatch.setattr(service, "_now", lambda: NOW)
     cfg = GuestApplicationSettings(id=1, confirm_ttl_hours=12, link_ttl_days=30)
     db = _session([result(_app())], gets=[cfg])
@@ -72,7 +76,6 @@ async def test_request_writes_an_edit_link_with_the_configured_lifetime(
     assert link.scope == "edit"
     assert link.single_use is False
     assert link.expires_at == NOW + timedelta(days=30)
-    # The request reads no state and expires no other link (only the lookup runs).
     assert len(db.statements) == 1
 
 
@@ -97,7 +100,7 @@ def _link(settings: Settings, *, expires_at: datetime | None) -> MagicLink:
 
 
 async def test_verify_accepts_a_link_without_expiry(monkeypatch: pytest.MonkeyPatch) -> None:
-    """`expires_at` NULL is valid. Before Z1 the compare raised a TypeError (500)."""
+    """`expires_at` NULL is valid and does not raise a TypeError (500)."""
     monkeypatch.setattr(service, "_now", lambda: NOW)
     settings = _settings()
     db = _session([result(_link(settings, expires_at=None))])
@@ -109,7 +112,7 @@ async def test_verify_accepts_a_link_without_expiry(monkeypatch: pytest.MonkeyPa
 async def test_verify_expires_the_older_links_of_the_application(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The redeem sets `expires_at = now` on the older, still valid links (O4)."""
+    """The redeem sets `expires_at = now` on the older, still valid links."""
     monkeypatch.setattr(service, "_now", lambda: NOW)
     settings = _settings()
     db = _session([result(_link(settings, expires_at=None))])

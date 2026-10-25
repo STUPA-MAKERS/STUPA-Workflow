@@ -5,9 +5,6 @@
   flex-direction: column;
   min-width: 0;
 }
-/* Phone: the pane page ends on the top edge of the bottom bar, not a gutter above it, so
-   the cards scroll right down to the bar. The room at the end (the floating button) is
-   padding inside the scroll areas. */
 @include bp.phone {
   :host(.pane-page) {
     margin-bottom: calc(-1 * var(--main-pad-bottom, 0px));
@@ -23,7 +20,6 @@
   min-height: 0;
 }
 
-/* ------------------------------------------------------------------ bar */
 .td__bar {
   flex: none;
 }
@@ -37,7 +33,6 @@
   flex: 0 1 18.75rem;
   min-width: 12rem;
 }
-/* The board picker and the search start the bar; the filter chips end it. */
 .td__chips {
   --td-chip-fade: var(--space-6);
   display: flex;
@@ -62,7 +57,6 @@
 .td__chips::-webkit-scrollbar {
   display: none;
 }
-/* The strip scrolls sideways: a fade marks only the side where more chips are. */
 .td__chips {
   @include fade.fade-x(var(--td-chip-fade));
 }
@@ -87,7 +81,6 @@
   outline: 2px solid var(--color-focus-ring);
 }
 
-/* The places of the header button and of the filter chips while the board loads. */
 .td__skelIcon {
   display: grid;
   place-items: center;
@@ -111,7 +104,6 @@
   height: 36px;
 }
 
-/* ------------------------------------------------------------------ body */
 .td__body {
   display: flex;
   flex: 1 1 auto;
@@ -119,16 +111,11 @@
   min-width: 0;
   min-height: 0;
 }
-/* The shared top and bottom fade where the body scrolls as a whole (the rows): an end
-   fades only while more content lies past it (`appScrollFade="y"` sets the classes), so
-   the cards do not end at a hard cut under the bar. Elsewhere the body does not scroll
-   (overflow visible), the directive sets no class, and a mask would cut off the list view
-   or a tall state. */
+// Only the rows body scrolls as a whole. Elsewhere the directive sets no class, and a mask would
+// cut off the list view or a tall state.
 .td__body--rows {
   @include fade.fade-y(var(--space-5));
 }
-/* "Meine To-Dos" with rows: the board and the rows below it scroll together, so the
-   board keeps its natural height. */
 .td__body--rows {
   gap: var(--space-4);
   overflow-y: auto;
@@ -139,9 +126,8 @@
 .td__body--rows > app-todo-board-rows {
   flex: none;
 }
-/* The floating "To-Do anlegen" (`app-fab`, 56px high) floats over the board, so
-   the columns keep their full height. Only a body that scrolls as a whole (the rows) gets
-   room at its end, because there the room scrolls away and the last row clears the button. */
+// Only a body that scrolls as a whole gets room for the 56px button at its end, because there
+// the room scrolls away.
 .td__body--rows.td__body--fab {
   padding-bottom: calc(56px + var(--space-6));
 }
@@ -150,7 +136,6 @@
     padding-bottom: calc(56px + 2 * var(--space-4));
   }
 }
-/* A failed body stands in the middle of the free height. */
 .td__state {
   display: flex;
   flex: 1 1 auto;
@@ -161,8 +146,6 @@
   padding: var(--space-8) var(--space-4);
 }
 
-/* ------------------------------------------------------------------ phone */
-/* The board picker starts the bar, the filter chip ends it. */
 .td--phone .td__filter,
 .td__skelChip--filter {
   margin-inline-start: auto;
@@ -173,7 +156,6 @@
   max-width: none;
 }
 
-/* ------------------------------------------------------------------ drawer */
 .td__scrim {
   position: fixed;
   inset: 0;
@@ -201,35 +183,26 @@
 .td__drawer > app-todo-card-detail {
   flex: 1 1 auto;
 }
-/* Phone: the drawer is the page and ends on the bottom bar, which stays visible. */
+// No top padding, because a sticky element sticks below the top padding of its scroll container.
 @include bp.phone {
   .td__scrim,
   .td__drawer {
     bottom: var(--app-bottom-inset, 0px);
   }
   .td__drawer {
-    /* The bar of the card (`app-list-detail-bar`) reaches over the side padding, as it
-       does on a list/detail page. The drawer has no top padding, because the drawer is the
-       scroll container and a sticky element sticks below the top padding of its scroll
-       container: the bar would stop that far below the top edge, and the card would show
-       above it. */
     --main-pad-top: 0px;
     --layout-gutter: var(--space-4);
     width: 100vw;
     padding: 0 var(--space-4);
     border-radius: 0;
-    /* The bottom bar lies over the drawer, as over any page: no shadow falls on it. */
     box-shadow: none;
   }
-  /* The bar takes the colour of the drawer, not of the page (`--color-bg`), so it does not
-     stand out from the card below it. */
   .td__drawer > app-list-detail-bar {
     background: var(--color-surface);
   }
 }
-/* Motion, as `app-side-sheet` from the end: the drawer slides in from the end edge and goes
-   back there, faster on the way out; the scrim fades with it. Reduced motion shortens
-   every animation to nothing (ui-kit base styles). */
+// The motion of `app-side-sheet` from the end. Reduced motion shortens it to nothing (ui-kit base
+// styles).
 .td__scrim--entering {
   animation: td-fade-in var(--motion-base) var(--ease-standard);
 }

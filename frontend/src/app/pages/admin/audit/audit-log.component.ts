@@ -42,8 +42,8 @@ import { expandSet } from '@shared/expand-set';
 const PAGE_SIZE = 50;
 
 /**
- * A UUID target id. Such an id says nothing to a reader, so the row leaves it out
- * (`[[no-uuids-in-ui]]`). A readable id — `global`, `1`, an export file name — stays.
+ * A UUID target id. Such an id says nothing to a reader, so the row leaves it out. A
+ * readable id — `global`, `1`, an export file name — stays.
  */
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -52,6 +52,13 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
  * `backend/app/modules/audit/actions.py`, and a spec compares the two. It fills the action
  * filter. Each action has a label `admin.audit.action.<key>`. Without a label, the view
  * shows the raw action key.
+ *
+ * - `attachment_upload` covers the application upload and the draft upload of the wizard.
+ * - `vote_branch_blocked` marks an application that a person must move.
+ * - A poll has its own create and update actions; open, close and cancel reuse the vote
+ *   actions.
+ * - The guest actions of a public meeting record only the ids of the guests, never their
+ *   names.
  */
 export const AUDIT_ACTIONS = [
   'login',
@@ -73,49 +80,36 @@ export const AUDIT_ACTIONS = [
   'erasure_executed',
   'erasure_rejected',
   'principal_erased',
-  // Account merge: an old principal merged into a new one.
   'principal_merge',
   'principal_access_revoke',
   'retention_anonymize',
   'webhook_config',
-  // attachment_upload (F12) covers the application upload and the draft upload of the
-  // wizard (Z4).
   'attachment_upload',
   'attachment_quarantine',
   'attachment_delete',
-  // Content mutations that leave a trace outside the flow: application data, comments,
-  // protocols, votes. application_create (F12) and guest_application_discard (Z1) mark the
-  // start and the discard of an application.
   'application_create',
-  // #11: an application captured on behalf of an applicant.
   'application_create_on_behalf',
   'guest_application_discard',
   'application_update',
-  // Archive, public share link and delete of an application.
   'application_archive',
   'application_unarchive',
   'application_share',
   'application_share_revoke',
-  // F1: the decision on an application (approval with deviations).
   'application_decision',
   'application_delete',
   'comment_update',
   'comment_delete',
   'protocol_delete',
   'protocol_finalize',
-  // A protocol held back from the public protocol page, or published again.
   'protocol_publication',
   'vote_delete',
-  // Vote lifecycle (F12). vote_branch_blocked marks an application that a person must move.
   'vote_open',
   'vote_close',
   'vote_cancel',
   'vote_branch_blocked',
   'vote_lot_drawn',
-  // Polls: created and changed. Open, close and cancel reuse the vote actions.
   'poll_created',
   'poll_updated',
-  // Meeting and agenda (F12). They mirror the MEETING_* and AGENDA_* values in actions.py.
   'meeting_create',
   'meeting_update',
   'meeting_delete',
@@ -125,11 +119,9 @@ export const AUDIT_ACTIONS = [
   'agenda_reorder',
   'agenda_item_done',
   'agenda_item_reopened',
-  // Attendance set or reset by the meeting lead (F12). They mirror ATTENDANCE_* in actions.py.
   'attendance_set',
   'attendance_reset',
   'protokollant_handover',
-  // Public meeting with QR code (#17): only the ids of the guests, never their names.
   'meeting_public_join_changed',
   'meeting_join_code_rotated',
   'guest_admitted',
@@ -137,7 +129,6 @@ export const AUDIT_ACTIONS = [
   'guest_removed',
   'guest_renamed',
   'guest_admit_all',
-  // Budget and money mutations. They mirror the BUDGET_* values in actions.py.
   'budget_node_create',
   'budget_node_update',
   'budget_node_delete',
@@ -152,7 +143,8 @@ export const AUDIT_ACTIONS = [
   'budget_assign',
   'budget_move_fiscal_year',
   'budget_fiscal_year_delete',
-  // Whole-platform backup and restore. They mirror the BACKUP_* values in actions.py.
+  'budget_fiscal_year_close',
+  'budget_fiscal_year_reopen',
   'backup_create',
   'backup_delete',
   'backup_export',
@@ -175,21 +167,17 @@ const TARGET_ROUTES: Record<string, (id: string) => string[]> = {
   site_config: () => ['/admin/branding'],
   guest_application_settings: () => ['/admin/deadlines'],
   meeting_settings: () => ['/admin/deadlines'],
-  // Each budget target goes to the tab that owns it. Cost centers, allocations and transfers
-  // go to the budget dashboard. Bookings go to the expenses list. Invoices go to the invoice
-  // list.
   budget: () => ['/budget'],
   budget_allocation: () => ['/budget'],
   budget_transfer: () => ['/budget'],
   budget_expense: () => ['/expenses'],
   invoice: () => ['/invoices'],
   fiscal_year: () => ['/budget'],
-  // The config pages of the admin area. A form target carries the id of its type.
   flow: () => ['/admin/flow'],
+  /** A form target carries the id of its type. */
   form: (id) => ['/admin/forms', id],
   cd_variant: () => ['/admin/cd-variants'],
   notification_settings: () => ['/admin/notifications'],
-  // The security and data pages.
   backup: () => ['/admin/backups'],
   erasure_request: () => ['/admin/privacy'],
   oauth_token: () => ['/admin/oauth-grants'],
@@ -225,7 +213,7 @@ type VerifyState =
   | { status: 'error' };
 
 /**
- * The audit log (board Admin-Audit-Log).
+ * The audit log.
  *
  * - The chain check at the top: "Audit-Kette intakt" or "unterbrochen" as coloured text,
  *   when the newest stored check ran, its trigger and the number of entries
@@ -524,6 +512,10 @@ export class AuditLogComponent {
     this.load(true);
   }
 
+  /**
+   * Day boundaries are local: since starts at 00:00 and until ends at 23:59:59, sent as an aware
+   * UTC time.
+   */
   private load(reset: boolean): void {
     if (this.loading()) return;
     this.loading.set(true);
@@ -534,8 +526,6 @@ export class AuditLogComponent {
         before: reset ? undefined : (this.cursor() ?? undefined),
         action: this.action() || undefined,
         actor: this.actor() || undefined,
-        // Day boundaries: since starts at 00:00 and until ends at 23:59:59, in local
-        // time, sent as an aware UTC time.
         since: this.since() ? localDayBound(this.since(), false) : undefined,
         until: this.until() ? localDayBound(this.until(), true) : undefined,
       })

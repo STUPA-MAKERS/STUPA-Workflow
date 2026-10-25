@@ -1,6 +1,6 @@
 """Add `vote.closed_at`, remove `allowChange` from the vote configs, report meeting ties.
 
-`vote.closed_at` is the real moment when a vote ended (close or cancel, Z9 and O10).
+`vote.closed_at` is the real moment when a vote ended (close or cancel).
 It is not `closes_at`, which is the planned end of the cast window.
 
 The upgrade:
@@ -15,9 +15,9 @@ The upgrade:
    time is the close time. All other votes keep NULL: the audit log holds no close
    time for them. The migration logs both counts.
 3. removes the key `allowChange` from `vote.config`. A ballot never changes after the
-   cast (O11), so `VoteConfig` has no such field. `VoteConfig` refuses unknown keys
+   cast, so `VoteConfig` has no such field. `VoteConfig` refuses unknown keys
    (`extra=forbid`), so the old rows must lose the key to stay valid.
-4. reports the closed meeting votes with the result `tie` (O18). From now on a meeting
+4. reports the closed meeting votes with the result `tie`. From now on a meeting
    vote stores `tieBreak=rejected`, so a tie is `rejected`. The migration does not
    change a recorded result.
 
@@ -68,6 +68,7 @@ RETURNING v.id
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     bind = op.get_bind()
     op.execute("ALTER TABLE vote ADD COLUMN IF NOT EXISTS closed_at timestamptz")
 
@@ -103,12 +104,15 @@ def upgrade() -> None:
     for vote_id, meeting_id in ties:
         logger.warning(
             "meeting vote %s (meeting %s) has the result 'tie'; new meeting votes "
-            "count a tie as 'rejected' (O18). The recorded result stays.",
+            "count a tie as 'rejected'. The recorded result stays.",
             vote_id,
             meeting_id,
         )
 
 
 def downgrade() -> None:
-    # `allowChange` is not restored: see the module docstring.
+    """Downgrade the schema to the previous revision.
+
+    ``allowChange`` is not restored (see the module docstring).
+    """
     op.execute("ALTER TABLE vote DROP COLUMN IF EXISTS closed_at")

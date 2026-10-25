@@ -160,6 +160,7 @@ describe('boardRows of "Alle"', () => {
     expect(boardRows([all(cards)], mine, TODAY)[0].count).toBe(3);
   });
 
+  /** An id that the filter does not know matches nothing; without the map the ids compare. */
   it('matches a label filter by the label name on every board', () => {
     const urgent = { id: 'l-1', name: 'Eilig', color: 'red' as const };
     const theirs = { id: 't-l', name: 'eilig', color: 'blue' as const };
@@ -172,7 +173,6 @@ describe('boardRows of "Alle"', () => {
       ['b-1', 1],
       ['b-9', 1],
     ]);
-    // An id the filter does not know matches nothing; without the map the ids compare.
     expect(boardRows([a], { ...NO_FILTER, labels: ['x'] }, TODAY, { filterLabels: new Map() })).toEqual([]);
     expect(boardRows([a, b], f, TODAY).map((r) => r.board.id)).toEqual(['b-1']);
   });
@@ -295,6 +295,7 @@ describe('TodoBoardRowsComponent', () => {
     }
   });
 
+  /** Over a column of another row, that row counts the card. */
   it('moves the column counts with a pointer drag, also over another row', async () => {
     const { cmp } = await setup();
     const [r, other] = cmp.rows();
@@ -308,7 +309,6 @@ describe('TodoBoardRowsComponent', () => {
     cmp.onEnter({ container: { data: doing.id } } as never);
     expect([cmp.count(r, open), cmp.count(r, doing), cmp.count(r, r.columns[2])]).toEqual([1, 1, 0]);
     expect(cmp.count(other, other.columns[0])).toBe(1);
-    // Over a column of another row, that row counts the card.
     cmp.onEnter({ container: { data: other.columns[0].id } } as never);
     expect([cmp.count(r, open), cmp.count(other, other.columns[0])]).toEqual([1, 2]);
     cmp.ptr.set(null);
@@ -361,6 +361,7 @@ describe('TodoBoardRowsComponent', () => {
     expect(phone.cmp.canDrag(phone.cmp.rows()[0])).toBe(false);
   });
 
+  /** Without a drag, Space still opens the card of a read-only row. */
   it('lifts and puts down a card with Space without opening it, as Firefox clicks on keyup', async () => {
     const { cmp, on, api, settle } = await setup();
     firefoxSpace('Raum buchen');
@@ -374,7 +375,6 @@ describe('TodoBoardRowsComponent', () => {
     expect(cmp.kb()).toBeNull();
     expect(api.moveCard).toHaveBeenCalledWith('k-1', { columnId: 'c-2' });
     expect(on.openCard).not.toHaveBeenCalled();
-    // Without a drag, Space still opens the card of a read-only row.
     firefoxSpace('Ticket prüfen');
     expect(on.openCard).toHaveBeenCalledWith('k-9');
   });
@@ -475,6 +475,7 @@ describe('TodoBoardRowsComponent', () => {
     expect(cmp.boards()).toHaveLength(2);
   });
 
+  /** A card that went to another board leaves the row of its old board. */
   it('follows the changes of the card drawer', async () => {
     const { cmp, api } = await setup();
     cmp.commentsChanged({ id: 'k-1', commentCount: 5 });
@@ -488,7 +489,6 @@ describe('TodoBoardRowsComponent', () => {
     expect(cmp.boards()[0].cards.find((c) => c.id === 'k-1')?.columnId).toBe('c-3');
     cmp.cardChanged(detail({ id: 'k-2', boardId: 'b-1', archivedAt: '2026-10-16T10:00:00Z' }));
     expect(cmp.boards()[0].cards.some((c) => c.id === 'k-2')).toBe(false);
-    // A card that went to another board leaves the row of its old board.
     cmp.cardChanged(detail({ id: 'k-1', boardId: 'b-elsewhere' }));
     expect(cmp.boards()[0].cards.some((c) => c.id === 'k-1')).toBe(false);
     expect(api.pollMineBoards).toHaveBeenLastCalledWith(null);
@@ -519,6 +519,7 @@ describe('TodoBoardRowsComponent', () => {
     expect(api.pollAllBoards).toHaveBeenLastCalledWith('W/"a"');
   });
 
+  /** The read-only row is neither source nor target. */
   it('connects the columns of every writable open row and the personal board', async () => {
     const { cmp, fixture, settle } = await setup({ inputs: { extraDrops: ['bv-list-p-1'] } });
     const own = row().columns.map((c) => rowDropId(c.id));
@@ -527,7 +528,6 @@ describe('TodoBoardRowsComponent', () => {
     const lists = fixture.debugElement.queryAll(By.directive(CdkDropList)).map((d) => d.injector.get(CdkDropList));
     const byId = new Map(lists.map((l) => [l.id, l]));
     expect(byId.get(rowDropId('c-1'))?.connectedTo).toEqual([...own, 'bv-list-p-1']);
-    // The read-only row is neither source nor target.
     expect(byId.get(rowDropId('t-1'))?.connectedTo).toEqual([]);
     fireEvent.click(screen.getByRole('button', { name: /Studierendenparlament/ }));
     await settle();
@@ -651,6 +651,7 @@ describe('TodoBoardRowsComponent', () => {
     beforeEach(() => jest.useFakeTimers({ doNotFake: ['queueMicrotask', 'setImmediate', 'nextTick'] }));
     afterEach(() => jest.useRealTimers());
 
+    /** k-1 moved, k-2 is not mine any more, k-3 failed and stays, and k-9 is gone (404). */
     it('takes the pings of its rows and of liveIds: a tile in place, mine only, removed, 404', async () => {
       const { cmp, api, live, settle } = await setup({ cardTile, inputs: { me: 'me', liveIds: ['b-5'] } });
       expect(live.boards()).toEqual(['b-1', 'b-5', 'b-9']);
@@ -663,7 +664,6 @@ describe('TodoBoardRowsComponent', () => {
       live.emit({ type: 'card', boardId: 'x', cardId: 'k-1' });
       await wait(settle);
       expect(api.cardTile.mock.calls.map((c) => c[0])).toEqual(['k-1', 'k-2', 'k-3', 'k-9']);
-      // k-1 moved, k-2 is not mine any more, k-3 failed and stays, k-9 is gone (404).
       expect(cards(cmp).sort()).toEqual(['b-1/k-1/c-2', 'b-1/k-3/c-4']);
       live.emit({ type: 'card_removed', boardId: 'b-1', cardId: 'k-3' });
       await wait(settle);
@@ -834,12 +834,15 @@ describe('TodoBoardRowsComponent', () => {
       expect(list.querySelectorAll('app-todo-card-tile')).toHaveLength(DONE_PREVIEW + 2);
     });
 
+    /**
+     * The page counts the cards of its board, so the matches count only the rows. A row of the same
+     * board as the lead is not shown twice.
+     */
     it('puts the personal board first, with the empty state when it has no card', async () => {
       const { fixture, settle, on, container } = await setup({ phone: true, inputs: { lead: lead() } });
       const heads = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent?.replace(/\s+/g, ' ').trim());
       expect(heads[0]).toMatch(/^Meine To-Dos\s*3/);
       expect(heads).toHaveLength(3);
-      // The page counts the cards of its board: the matches are the rows' only.
       expect(on.matches).toHaveBeenLastCalledWith(4);
       const empty = lead();
       fixture.componentRef.setInput('lead', { ...empty, cards: new Map() });
@@ -847,7 +850,6 @@ describe('TodoBoardRowsComponent', () => {
       const section = container.querySelector('[data-board-id="p-1"]') as HTMLElement;
       expect(within(section).getByText('Keine Karten').closest('app-empty-state')).toHaveClass('br__empty');
       expect(within(section).queryByRole('list')).toBeNull();
-      // A row of the same board as the lead is not shown twice.
       fixture.componentRef.setInput('lead', lead({ id: 'b-1' }));
       await settle();
       expect(container.querySelectorAll('[data-board-id="b-1"]')).toHaveLength(1);
@@ -860,6 +862,7 @@ describe('TodoBoardRowsComponent', () => {
       expect(screen.queryByRole('list', { name: 'Studierendenparlament' })).toBeNull();
     });
 
+    /** The release after the press does not open the card. */
     it('asks for the menu on a long press of a writable tile, not of a read-only one', async () => {
       const { on } = await setup({ phone: true });
       jest.useFakeTimers();
@@ -876,7 +879,6 @@ describe('TodoBoardRowsComponent', () => {
         const req = on.menu.mock.calls[0][0];
         expect(req).toMatchObject({ boardId: 'b-1', boardKind: 'gremium', card: { id: 'k-1' } });
         expect(req.columns.map((c: { name: string }) => c.name)).toEqual(['Offen', 'In Arbeit', 'Wartet', 'Erledigt']);
-        // The release after the press does not open the card.
         expect(on.openCard).not.toHaveBeenCalled();
         press('Ticket prüfen');
         expect(on.menu).toHaveBeenCalledTimes(1);

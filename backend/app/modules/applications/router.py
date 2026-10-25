@@ -95,9 +95,8 @@ router = APIRouter(tags=["applications"])
 
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 
-# Anti-DoS cap for the synchronous XLSX export. The request builds the whole
-# workbook in memory. A larger result set answers 413, and the user must narrow
-# the filter.
+#: Anti-DoS cap for the synchronous XLSX export. The request builds the whole workbook
+#: in memory. A larger result set answers 413, and the user must narrow the filter.
 EXPORT_MAX_ROWS = 10_000
 
 
@@ -106,6 +105,7 @@ def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
 
 
 def get_applications_service(session: DbSession) -> ApplicationsService:
+    """Build the applications service of a request."""
     return ApplicationsService(session)
 
 
@@ -154,16 +154,10 @@ def get_magic_link_sender() -> MagicLinkSender:
     response_model=ApplicationCreated,
     status_code=status.HTTP_201_CREATED,
     dependencies=[
-        # Body cap that answers 413. It bounds Content-Length and reads the body
-        # under a cap, also for a chunked body. The authoritative check on the
-        # serialized field values runs after parsing.
         Depends(enforce_application_payload_limit),
         Depends(rate_limit_applications),
-        # ALTCHA applies to an anonymous submission only. A logged-in user is exempt.
         Depends(verify_altcha_unless_authenticated),
     ],
-    # 400 malformed JSON or invalid ALTCHA, 413 body too large, 422 form or
-    # schema validation, 429 rate limit.
     responses=_errors(400, 404, 413, 422, 429),
 )
 async def create_application(
@@ -187,20 +181,25 @@ async def create_application(
     A logged-in submission with the account email is confirmed at once, and its
     flow starts in this request. An anonymous submission rests in the flow until
     the magic-link verify. So does a logged-in submission for another email
-    address (F23, compared without case): the account does not prove that the
+    address (compared without case): the account does not prove that the
     person owns that address.
 
     ``attachmentIds`` and ``draftToken`` bind the draft uploads of the wizard
-    (``POST /apply/attachments``, Z4) in the same transaction. A missing,
+    (``POST /apply/attachments``) in the same transaction. A missing,
     expired, foreign or infected draft answers 422 and names the ids. A draft
     whose scan is still pending is allowed; it stays quarantined.
+
+    The body cap answers 413. It bounds Content-Length and reads the body under a cap, also
+    for a chunked body. The authoritative check on the serialized field values runs after
+    parsing and does not depend on Content-Length. ALTCHA applies to an anonymous submission
+    only. An explicit identity value wins over the logged-in account. The route answers 400
+    for malformed JSON or an invalid ALTCHA, 413 for a body that is too large, 422 for a
+    failed form or schema validation and 429 at the rate limit.
     """
-    # Authoritative bound on the serialized field values, free of Content-Length.
     if len(json.dumps(payload.data)) > settings.max_application_payload_bytes:
         raise PayloadTooLargeError(
             f"Application data exceeds {settings.max_application_payload_bytes} bytes."
         )
-    # Derive the identity. An explicit value wins over the logged-in account.
     email = (
         str(payload.applicant_email)
         if payload.applicant_email
@@ -233,7 +232,7 @@ async def create_application(
     return ApplicationCreated(applicationId=app.id)
 
 
-#: The permission of the capture on behalf of an applicant (#11).
+#: The permission of the capture on behalf of an applicant.
 CREATE_ON_BEHALF_PERMISSION = "application.create_on_behalf"
 
 OnBehalfCapturer = Annotated[Principal, Depends(require_principal(CREATE_ON_BEHALF_PERMISSION))]
@@ -264,8 +263,6 @@ def get_capture_mail_sender() -> CaptureMailSender:
     "/applications/on-behalf",
     response_model=ApplicationCreated,
     status_code=status.HTTP_201_CREATED,
-    # The body cap applies. The rate limit and ALTCHA do not: the route needs a
-    # session with `application.create_on_behalf`.
     dependencies=[Depends(enforce_application_payload_limit)],
     responses=_errors(401, 403, 404, 413, 422),
 )
@@ -279,7 +276,7 @@ async def create_application_on_behalf(
     send_capture_mail: Annotated[CaptureMailSender, Depends(get_capture_mail_sender)],
     dispatcher: Annotated[ActionDispatcher, Depends(get_action_dispatcher)],
 ) -> ApplicationCreated:
-    """Capture and submit an application on behalf of an applicant (#11).
+    """Capture and submit an application on behalf of an applicant.
 
     The applicant is an account (``applicantPrincipalId``) or a guest
     (``applicantName`` and ``applicantEmail``). The application belongs to the
@@ -294,6 +291,11 @@ async def create_application_on_behalf(
     case) makes the application an account application of that account. After the
     commit the applicant gets the mail ``application_captured``: an account gets the
     normal link, a guest a magic link.
+
+    The body cap applies. The rate limit and ALTCHA do not, because the route needs a
+    session with ``application.create_on_behalf``. When a guest e-mail turned the
+    application into an account application, the owner decides the link of the mail, not the
+    request.
     """
     if len(json.dumps(payload.data)) > settings.max_application_payload_bytes:
         raise PayloadTooLargeError(
@@ -308,8 +310,6 @@ async def create_application_on_behalf(
         draft_pepper=settings.magic_link_secret,
     )
     pool = getattr(request.app.state, "arq_pool", None)
-    # A guest e-mail of an active account became an account application, so the
-    # owner decides the link of the mail, not the request.
     guest = app.created_by is None
     background.add_task(send_capture_mail, settings, email, app.id, guest, pool)
     return ApplicationCreated(applicationId=app.id)
@@ -326,7 +326,7 @@ async def search_on_behalf_applicants(
     _principal: OnBehalfCapturer,
     q: Annotated[str, Query(max_length=200)] = "",
 ) -> list[ApplicantCandidateOut]:
-    """Search the accounts that the capture dialog offers as the applicant (#11).
+    """Search the accounts that the capture dialog offers as the applicant.
 
     The search matches the name and the e-mail of the active accounts. It needs at
     least two characters and returns at most 20 accounts. The route needs
@@ -365,8 +365,6 @@ async def list_applications(
     service: ServiceDep,
     principal: Annotated[Principal, Depends(require_principal())],
     page: Annotated[PageParams, Depends()],
-    # A4: repeat `state` to keep the applications in any of these states. A single
-    # value works as before.
     state_ids: Annotated[list[UUID] | None, Query(alias="state")] = None,
     gremium_id: Annotated[UUID | None, Query(alias="gremium")] = None,
     type_id: Annotated[UUID | None, Query(alias="type")] = None,
@@ -378,11 +376,7 @@ async def list_applications(
     created_to: Annotated[date | None, Query(alias="createdTo")] = None,
     sort: Annotated[Literal["createdAt", "amount", "stateSince"], Query()] = "createdAt",
     order: Annotated[Literal["asc", "desc"], Query()] = "desc",
-    # "My applications" forces the owner filter even for a principal that holds
-    # application.read. Without it, that principal would see every application.
     mine: Annotated[bool, Query()] = False,
-    # Archived applications leave the working list by default, so nobody has to remember
-    # to exclude them. `archived=true` lists only those; `archived=all` lists both.
     archived: Annotated[Literal["false", "true", "all"], Query()] = "false",
 ) -> Page[ApplicationListItem]:
     """List applications with filters, sorting and paging.
@@ -395,14 +389,19 @@ async def list_applications(
     boolean, because "only the archived ones" and "both" are different questions and a
     boolean can only answer one of them.
 
-    ``state`` can repeat (A4): ``?state=a&state=b`` lists the applications in state
-    ``a`` or ``b``. Each item carries ``stateSince`` (A9). ``sort=stateSince`` sorts by
+    ``state`` can repeat: ``?state=a&state=b`` lists the applications in state
+    ``a`` or ``b``. Each item carries ``stateSince``. ``sort=stateSince`` sorts by
     that time, so a list that shows the date of the last status change is in the order
     of that date.
+
+    ``mine=true`` exists because a principal with ``application.read`` otherwise sees every
+    application. The read check goes through ``Principal.has``, the single RBAC chokepoint:
+    it grants every right to the admin role AND applies the OAuth scope cap. A direct read
+    of ``principal.roles`` skips the cap, so a narrowly scoped agent token would read as a
+    full admin. The committee read scope applies to a restricted principal only, and
+    ``mine`` stays owner-only. A reader without the PII right must not find an application
+    by the value of an ``isPII`` field. The own applications stay searchable in full.
     """
-    # `Principal.has` is the single RBAC chokepoint: it grants every right to the admin
-    # role AND applies the OAuth scope cap. Reading `principal.roles` directly would skip
-    # the cap, so a narrowly scoped agent token would read as a full admin.
     can_read = principal_reads_all(principal)
     restricted = not can_read and not mine
     return await service.list_applications(
@@ -419,11 +418,7 @@ async def list_applications(
         sort=sort,
         order=order,
         owner_sub=principal.sub if (mine or not can_read) else None,
-        # The committee read scope applies to a restricted principal only.
-        # "mine" stays owner-only on purpose.
         committee_sub=principal.sub if restricted else None,
-        # O21: a reader without the PII right must not find an application by the
-        # value of an isPII field. The own applications stay searchable in full.
         hide_pii_in_search=not can_read,
         limit=page.limit,
         offset=page.offset,
@@ -437,8 +432,6 @@ async def list_applications(
 async def export_applications_xlsx(
     service: ServiceDep,
     principal: Annotated[Principal, Depends(require_principal("application.export"))],
-    # A4: repeat `state` to keep the applications in any of these states. A single
-    # value works as before.
     state_ids: Annotated[list[UUID] | None, Query(alias="state")] = None,
     gremium_id: Annotated[UUID | None, Query(alias="gremium")] = None,
     type_id: Annotated[UUID | None, Query(alias="type")] = None,
@@ -450,8 +443,6 @@ async def export_applications_xlsx(
     created_to: Annotated[date | None, Query(alias="createdTo")] = None,
     sort: Annotated[Literal["createdAt", "amount", "stateSince"], Query()] = "createdAt",
     order: Annotated[Literal["asc", "desc"], Query()] = "desc",
-    # As in the list: archived applications stay out by default. The export of a list
-    # that shows them must hold them too.
     archived: Annotated[Literal["false", "true", "all"], Query()] = "false",
 ) -> Response:
     """Export the application list as ``.xlsx``.
@@ -459,6 +450,11 @@ async def export_applications_xlsx(
     The filters work as in ``GET /applications``, also the repeated ``state`` and
     ``archived``. The workbook holds no form field values, so it holds no ``isPII``
     field either.
+
+    An exporter without the PII right must not filter on ``isPII`` values. The query asks
+    for one row over the cap, so it detects "more than ``EXPORT_MAX_ROWS``" even when it
+    does not count ``total``. A result set over the cap answers 413 instead of building a
+    huge workbook in the request.
     """
     from app.shared.xlsx import XLSX_MEDIA_TYPE, build_applications_workbook
 
@@ -475,15 +471,10 @@ async def export_applications_xlsx(
         archived={"false": False, "true": True, "all": None}[archived],
         sort=sort,
         order=order,
-        # O21: an exporter without the PII right must not filter on isPII values.
         hide_pii_in_search=not principal_reads_pii(principal),
-        # One row over the cap. This detects "more than EXPORT_MAX_ROWS" even
-        # when the query does not count ``total``.
         limit=EXPORT_MAX_ROWS + 1,
         offset=0,
     )
-    # A result set over the cap answers 413 instead of building a huge workbook
-    # in the request. The check reads ``total`` when counted and the returned rows.
     if page.total > EXPORT_MAX_ROWS or len(page.items) > EXPORT_MAX_ROWS:
         raise PayloadTooLargeError(
             f"Export exceeds {EXPORT_MAX_ROWS} rows; please narrow the filter."
@@ -522,14 +513,15 @@ async def get_application(
     Only a principal gets the applicant block and the internal view. A reader
     without the PII right (``application.read``, ``application.read_all``, admin,
     or the own application) gets ``data`` without the ``isPII`` fields and no
-    applicant block (O21). ``stateSince`` is the time of the last status change.
+    applicant block. ``stateSince`` is the time of the last status change.
+
+    The applicant block goes to a principal with the PII right, also to the logged-in
+    creator. The magic-link applicant gets none.
     """
     principal = access.principal
     pii = await can_read_pii(service.session, access)
     return await service.get(
         access.application_id,
-        # The applicant block goes to a principal with the PII right, also to the
-        # logged-in creator. The magic-link applicant gets none.
         include_pii=principal is not None and pii,
         requester_sub=principal.sub if principal is not None else None,
         requester_can_manage=principal.has("application.manage")
@@ -575,7 +567,7 @@ async def patch_application(
 
     A locked state answers 409, unless the caller holds ``application.edit_any``.
 
-    An editor without the PII right cannot see the ``isPII`` fields (O21). The
+    An editor without the PII right cannot see the ``isPII`` fields. The
     patch keeps their stored values, so a form that was read without them does
     not erase them.
     """
@@ -663,7 +655,7 @@ async def unarchive_application(
 async def _principal_reads_pii(
     service: ApplicationsService, application_id: UUID, principal: Principal
 ) -> bool:
-    """Apply the PII rule (O21) to a route that gates on a permission only."""
+    """Apply the PII rule to a route that gates on a permission only."""
     return await can_read_pii(service.session, Access(application_id, principal, None))
 
 
@@ -700,6 +692,9 @@ async def create_share(
 
     The plaintext token is in the response and nowhere else. It is never stored and cannot
     be recovered; a caller who loses it mints a new link.
+
+    The audit entry holds no token, because an entry with the token would be a second copy
+    of the secret, in a table built to be read.
     """
     service = ShareService(session, pepper=settings.magic_link_secret)
     row, token = await service.create(
@@ -714,8 +709,6 @@ async def create_share(
         action=AuditAction.APPLICATION_SHARE,
         target_type="application",
         target_id=str(application_id),
-        # The token is deliberately absent: an audit entry that carried it would be a
-        # second copy of the secret, in a table built to be read.
         data={"shareId": str(row.id), "expiresAt": row.expires_at.isoformat()},
     )
     await session.commit()
@@ -781,9 +774,9 @@ async def get_timeline(
 ) -> list[TimelineEventOut]:
     """Status timeline of the application.
 
-    Each event carries ``transitionLabel`` (A3). The applicant view (magic link or
+    Each event carries ``transitionLabel``. The applicant view (magic link or
     creator without read permission) shows the Gremium as the actor of every event
-    that the applicant did not do (A12, O16).
+    that the applicant did not do.
     """
     return await service.timeline(
         access.application_id,
@@ -807,16 +800,17 @@ async def get_versions(
     Every identity that reads the application reads its versions:
 
     * The applicant view (magic link, or creator without read permission) gets
-      the metadata only: number, time, changed keys and the editor (A11, O17).
+      the metadata only: number, time, changed keys and the editor.
       The editor is the Gremium for every edit that the applicant did not do.
     * A principal with the PII right gets ``data``, ``diff`` and ``changedKeys``.
     * Any other reader (Gremium read scope) gets them without the ``isPII``
-      fields (O21).
+      fields.
+
+    An unconfirmed guest submission stays invisible to a principal and answers 404, like the
+    list. The magic-link applicant reads it.
     """
     return await service.versions(
         access.application_id,
-        # An unconfirmed guest submission stays invisible to a principal and
-        # answers 404, like the list. The magic-link applicant reads it.
         allow_unconfirmed=access.is_owning_applicant,
         applicant_view=access.is_applicant_view,
         magic_link_view=access.is_owning_applicant,
@@ -942,9 +936,6 @@ async def add_comment(
     request: Request,
     send_comment_mails: Annotated[CommentMailSender, Depends(get_comment_mail_sender)],
     send_mention_mails: Annotated[MentionMailSender, Depends(get_mention_mail_sender)],
-    # ``require_app_read`` on purpose, because the view scope is enough. A
-    # comment is communication, not a data change. An applicant still posts
-    # a public question while the state is locked to view-only.
     access: Annotated[Access, Depends(require_app_read)],
 ) -> CommentOut:
     """Add a comment.
@@ -965,6 +956,11 @@ async def add_comment(
     mention by a caller in the applicant view, gives 422 ``mention_not_member``. Each
     mentioned member except the author gets the mail ``comment_mentioned``, for an
     internal comment too.
+
+    The route depends on ``require_app_read``, because the view scope is enough: a comment
+    is communication, not a data change. An applicant still posts a public question while
+    the state is locked to view-only. The team mail names the author; the applicant mail
+    names the Gremium.
     """
     if payload.visibility == "internal" and not access.can_see_internal:
         raise ForbiddenError("Applicants may only post public comments.")
@@ -1000,7 +996,6 @@ async def add_comment(
         access.author_kind,
         payload.visibility,
         comment_mail_text(payload.body, [a.filename for a in comment.attachments]),
-        # Display name for the team mail. The applicant mail names the Gremium.
         comment.author,
         pool,
     )
@@ -1020,7 +1015,7 @@ async def list_comments(
 
     An applicant sees the ``public`` comments only. So does the logged-in creator
     without a read permission. The applicant view names the Gremium as the author
-    of a member comment (A12, O16).
+    of a member comment.
     """
     return await service.list_comments(
         access.application_id,
@@ -1045,8 +1040,6 @@ async def update_comment(
     background: BackgroundTasks,
     request: Request,
     send_mention_mails: Annotated[MentionMailSender, Depends(get_mention_mail_sender)],
-    # ``require_app_read`` like the create: a comment is communication, not a
-    # data change. The per-comment author check runs in the service.
     access: Annotated[Access, Depends(require_app_read)],
 ) -> CommentOut:
     """Replace the body of a comment.
@@ -1059,6 +1052,9 @@ async def update_comment(
     ``mentions`` null keeps the stored mentions; a list replaces them, with the
     rules of the create. Only a member that the list adds gets the mail
     ``comment_mentioned``, never the editor.
+
+    The route depends on ``require_app_read`` like the create, because a comment is
+    communication, not a data change. The service runs the per-comment author check.
     """
     comment = await service.update_comment(
         access.application_id,
@@ -1129,14 +1125,14 @@ async def request_erasure(
     settings: SettingsDep,
     background: BackgroundTasks,
     request: Request,
-    # GDPR Art. 17: every identity that may read the application may request the
-    # erasure of the PII. This covers the magic-link applicant, the creator and
-    # an authorized principal.
     access: Annotated[Access, Depends(require_app_read)],
 ) -> Response:
     """File an erasure request (GDPR Art. 17) into the ``/admin/privacy`` queue.
 
     The route notifies the privacy officers.
+
+    Every identity that may read the application may request the erasure of the PII: the
+    magic-link applicant, the creator and an authorized principal.
     """
     result = await ErasureRequestService(session).create(
         subject_type="applicant",

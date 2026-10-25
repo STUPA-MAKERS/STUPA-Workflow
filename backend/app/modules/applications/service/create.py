@@ -40,7 +40,7 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True, slots=True)
 class Capture:
-    """A capture on behalf of the applicant (#11).
+    """A capture on behalf of the applicant.
 
     ``owner_sub`` is the ``sub`` of the applicant account, or None for a guest
     applicant. It becomes ``created_by``, so the applicant owns the application as if
@@ -75,34 +75,34 @@ class CreateOps(ApplicationsServiceBase):
 
         1. Load the effective form.
         2. Run ``validate_answers``. A bad answer raises 422 before any DB write.
-           Check and lock the draft uploads of the wizard (Z4, ``_check_drafts``).
+           Check and lock the draft uploads of the wizard (``_check_drafts``).
            A missing, expired, foreign or infected draft raises 422 too.
         3. Write the application, the PII row, version 1, the initial state and
            the status event. Bind the drafts to the application.
         4. Start the flow of a confirmed application
-           (``FlowService.start_confirmed``): the deadline of the initial state,
-           the automatic transitions and the task mail. ``dispatcher`` sends the
+           (``FlowService.start_confirmed``): the automatic transitions and the
+           task mail. ``dispatcher`` sends the
            mails and the other flow actions.
 
         ``actor`` names the audit actor. A public submission passes
         ``"applicant"``. A manual creation by a manager passes the ``sub`` of the
         principal.
 
-        A public submission starts unconfirmed and rests in the flow: no deadline,
-        no automatic transition and no mail. The magic-link verify starts the flow
+        A public submission starts unconfirmed and rests in the flow: no automatic
+        transition and no mail. The magic-link verify starts the flow
         (``auth.service.verify_magic_link``).
 
         ``email_confirmed`` tells whether the applicant email is already confirmed.
         The router sets it to False for a logged-in person who enters an email
-        other than the account email (F23). That application then rests like a
+        other than the account email. That application then rests like a
         guest submission. ``None`` keeps the old rule: only a guest submission
         (``actor == "applicant"``) is unconfirmed.
 
         The create writes an ``application_create`` audit entry in the same
-        transaction (F12). It holds the type, the gremium, the initial state, the
+        transaction. It holds the type, the gremium, the initial state, the
         confirmation flag and the number of bound drafts, never PII.
 
-        ``capture`` marks a capture on behalf of the applicant (#11). The owner
+        ``capture`` marks a capture on behalf of the applicant. The owner
         (``created_by``) is then ``capture.owner_sub`` and not the actor. The actor
         (the capturing person) writes version 1 and the first status event, and the
         create writes a second audit entry ``application_create_on_behalf``.
@@ -111,13 +111,21 @@ class CreateOps(ApplicationsServiceBase):
         (``MAGIC_LINK_SECRET``). The router passes the value of its settings.
         ``None`` reads it from ``get_settings``.
 
+        Details of the steps: exactly one global flow is active, and a missing flow answers 404.
+        Only the known field keys are stored; an unknown key goes. The draft check locks the
+        drafts and runs before the first write, so nothing removes them before the bind. A vote
+        state as the initial state has a fixed Gremium (the validator forbids ``gremiumSource``
+        there), so the vote snapshot starts at once. ``created_by`` holds the logged-in creator,
+        None for an anonymous submission, and for a capture the applicant account (None for a
+        guest), never the capturing person. An unconfirmed submission stays invisible until the
+        magic-link verify, and the worker discards it after ``confirm_ttl_hours``.
+
         Returns:
             The application and the applicant email, for the magic-link mail.
         """
         app_type = await self.session.get(ApplicationType, payload.type_id)
         if app_type is None:
             raise NotFoundError(f"application type {payload.type_id} not found")
-        # Exactly one global flow is active. A missing flow answers 404.
         flow_version_id = await self._resolve_flow_version_id(app_type)
 
         forms = FormsService(self.session)
@@ -135,11 +143,8 @@ class CreateOps(ApplicationsServiceBase):
 
         confirmed = actor != "applicant" if email_confirmed is None else email_confirmed
         initial = await self._initial_state(flow_version_id)
-        # Store the known field keys only. The code discards an unknown key.
         clean = _whitelist(fields, payload.data)
         amount, currency = _amount_currency(fields, clean)
-        # Draft uploads of the wizard (Z4). The check locks the drafts, so nothing
-        # removes them before the bind below. It runs before the first write.
         pepper = await self._check_drafts(payload, fields, clean, draft_pepper)
 
         app = Application(
@@ -147,17 +152,12 @@ class CreateOps(ApplicationsServiceBase):
             form_version_id=effective.form_version_id,
             flow_version_id=flow_version_id,
             current_state_id=initial.id,
-            # A vote state as the initial state has a fixed Gremium (the validator
-            # forbids `gremiumSource` there), so the snapshot starts at once.
             vote_gremium_id=await resolve_vote_gremium(self.session, initial, None),
             gremium_id=app_type.gremium_id,
             amount=amount,
             currency=currency,
             data=clean,
             lang=payload.lang,
-            # A logged-in submission remembers the creator. An anonymous one
-            # stores None. A capture stores the applicant account (or None for a
-            # guest), never the capturing person.
             created_by=(
                 capture.owner_sub
                 if capture is not None
@@ -166,8 +166,6 @@ class CreateOps(ApplicationsServiceBase):
             captured_by=actor if capture is not None else None,
             capture_intake=capture.intake if capture is not None else None,
             received_on=capture.received_on if capture is not None else None,
-            # An unconfirmed submission stays invisible until the magic-link
-            # verify. The worker discards it after `confirm_ttl_hours`.
             email_confirmed_at=datetime.now(UTC) if confirmed else None,
         )
         self.session.add(app)
@@ -241,9 +239,6 @@ class CreateOps(ApplicationsServiceBase):
         await self.session.commit()
 
         if app.email_confirmed_at is not None:
-            # A logged-in submission with the account email is confirmed at once.
-            # Start its flow now. Any other submission waits for the magic-link
-            # verify.
             from app.modules.flow.service import FlowService
 
             await FlowService(self.session, dispatcher).start_confirmed(app.id)
@@ -257,7 +252,7 @@ class CreateOps(ApplicationsServiceBase):
         clean: dict[str, Any],
         draft_pepper: str | None = None,
     ) -> str | None:
-        """Check the draft uploads that the create binds (Z4).
+        """Check the draft uploads that the create binds.
 
         Without ``attachmentIds`` and ``draftToken`` the method does nothing. With
         them, it checks three things and answers 422 for each failure:

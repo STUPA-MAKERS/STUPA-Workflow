@@ -15,8 +15,9 @@ maps `None` to 401 or 410.
 from __future__ import annotations
 
 import secrets
-from typing import Any
+from datetime import datetime
 from urllib.parse import urlsplit
+from uuid import UUID
 
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from sqlalchemy import delete, select, update
@@ -29,6 +30,18 @@ from app.modules.auth.models import (
     ApplicantSession,
     AuthSession,
 )
+from app.settings import Settings
+
+
+def cookie_kwargs(settings: Settings) -> dict[str, object]:
+    """Return the attributes of every auth cookie: HttpOnly, Lax, path `/`, Secure per config."""
+    return {
+        "httponly": True,
+        "secure": settings.cookie_secure,
+        "samesite": "lax",
+        "path": "/",
+    }
+
 
 _APPLICANT_SALT = "applicant-session"
 _OIDC_TX_SALT = "oidc-tx"
@@ -41,7 +54,6 @@ def _serializer(secret: str, salt: str) -> URLSafeTimedSerializer:
     return URLSafeTimedSerializer(secret, salt=salt)
 
 
-# Applicant session: a server-side row with an opaque sid in a signed cookie.
 def _sign_applicant_sid(secret: str, sid: str) -> str:
     return _serializer(secret, _APPLICANT_SALT).dumps(sid)
 
@@ -58,9 +70,9 @@ async def create_applicant_session(
     db: AsyncSession,
     *,
     secret: str,
-    application_id: Any,
+    application_id: UUID,
     scope: str,
-    expires_at: Any,
+    expires_at: datetime,
 ) -> str:
     """Create an `applicant_session` row and return the signed `sid` cookie.
 
@@ -81,7 +93,7 @@ async def create_applicant_session(
 
 
 async def load_applicant_session(
-    db: AsyncSession, *, secret: str, cookie_value: str, now: Any, max_age: int
+    db: AsyncSession, *, secret: str, cookie_value: str, now: datetime, max_age: int
 ) -> ApplicantSession | None:
     """Resolve a cookie to its `applicant_session` row.
 
@@ -123,7 +135,7 @@ async def delete_applicant_session(
 
 
 async def revoke_applicant_sessions(
-    db: AsyncSession, application_id: Any, *, now: Any
+    db: AsyncSession, application_id: UUID, *, now: datetime
 ) -> None:
     """Revoke all active applicant sessions of an application.
 
@@ -140,7 +152,6 @@ async def revoke_applicant_sessions(
     )
 
 
-# OIDC transaction cookie: state, PKCE verifier, nonce and the session client.
 def issue_oidc_tx(
     secret: str,
     state: str,
@@ -149,6 +160,7 @@ def issue_oidc_tx(
     client: str = SESSION_CLIENT_WEB,
     return_to: str | None = None,
 ) -> str:
+    """Sign the OIDC transaction cookie: state, PKCE verifier, nonce and client."""
     data = {"state": state, "verifier": verifier, "nonce": nonce, "client": client}
     if return_to:
         data["return_to"] = return_to
@@ -207,8 +219,8 @@ def load_oidc_tx(secret: str, value: str, max_age: int) -> dict[str, str] | None
     return tx
 
 
-# OAuth AS transaction cookie. It carries the authorize request of an MCP login across
-# the OIDC hop.
+#: OAuth AS transaction cookie. It carries the authorize request of an MCP login across
+#: the OIDC hop.
 _OAUTH_TX_FIELDS = ("client_id", "redirect_uri", "code_challenge", "scope", "state")
 
 
@@ -223,6 +235,7 @@ def issue_oauth_tx(secret: str, data: dict[str, str]) -> str:
 
 
 def load_oauth_tx(secret: str, value: str, max_age: int) -> dict[str, str] | None:
+    """Load the OAuth AS transaction cookie, or return None when it is invalid or expired."""
     try:
         data = _serializer(secret, _OAUTH_TX_SALT).loads(value, max_age=max_age)
     except (BadSignature, SignatureExpired):
@@ -236,10 +249,10 @@ def load_oauth_tx(secret: str, value: str, max_age: int) -> dict[str, str] | Non
     return {k: str(data.get(k, "")) for k in _OAUTH_TX_FIELDS}
 
 
-# Principal session: a server-side row with an opaque sid in a signed cookie.
-# The signature age bound is the longest possible session. The row (`expires_at`) is
-# the real bound, and `GET /auth/me` signs the cookie again on each app start, so an
-# active session never reaches this age.
+#: Principal session: a server-side row with an opaque sid in a signed cookie.
+#: The signature age bound is the longest possible session. The row (`expires_at`) is
+#: the real bound, and `GET /auth/me` signs the cookie again on each app start, so an
+#: active session never reaches this age.
 SESSION_COOKIE_MAX_AGE = MAX_SESSION_DAYS * 24 * 3600
 
 
@@ -268,12 +281,12 @@ async def create_principal_session(
     db: AsyncSession,
     *,
     secret: str,
-    principal_id: Any,
-    expires_at: Any,
+    principal_id: UUID,
+    expires_at: datetime,
     refresh_token: str | None,
     id_token: str | None,
     client: str = SESSION_CLIENT_WEB,
-    now: Any = None,
+    now: datetime | None = None,
 ) -> str:
     """Create an `auth_session` row and return the signed `sid` cookie.
 
@@ -297,7 +310,7 @@ async def create_principal_session(
 
 
 async def load_principal_session(
-    db: AsyncSession, *, secret: str, cookie_value: str, now: Any, max_age: int
+    db: AsyncSession, *, secret: str, cookie_value: str, now: datetime, max_age: int
 ) -> AuthSession | None:
     """Resolve a cookie to its `auth_session` row.
 
@@ -315,7 +328,7 @@ async def load_principal_session(
     return row
 
 
-async def end_principal_sessions(db: AsyncSession, principal_id: Any) -> None:
+async def end_principal_sessions(db: AsyncSession, principal_id: UUID) -> None:
     """Delete every session of a principal. The caller commits.
 
     A session lives for months and renews itself at the IdP. So a deactivation or a

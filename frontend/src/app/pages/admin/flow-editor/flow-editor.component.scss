@@ -1,14 +1,12 @@
-// Flow editor (board Admin-Flow-Editor): the canvas sheet with its toolbar and legend,
-// and the inspector beside it.
 @use 'breakpoints' as bp;
 @use 'scroll-fade' as fade;
+@use 'press';
 
 :host {
   display: flex;
   flex-direction: column;
   min-width: 0;
 }
-/* Wide: the admin frame passes the free height down (route data `adminPane`). */
 :host(.fe-pane) {
   flex: 1 1 0;
   min-height: 0;
@@ -33,9 +31,6 @@
   font-size: var(--fs-sm);
 }
 
-/* ---- Work area ------------------------------------------------------------------- */
-
-/* Below wide: the canvas, then the inspector. */
 .fe__work {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -52,7 +47,6 @@
   }
 }
 
-/* The canvas sheet: a toolbar over the dotted canvas. */
 .fe__sheet {
   display: flex;
   flex-direction: column;
@@ -138,7 +132,6 @@
   padding-left: var(--space-4);
 }
 
-/* The canvas box: a dotted grid; the SVG fills it. Below wide it has a fixed height. */
 .fe__canvas-wrap {
   position: relative;
   flex: 1 1 auto;
@@ -154,8 +147,7 @@
   }
 }
 
-/* While the flow loads, the empty graph stays hidden under the placeholder. The SVG keeps
-   its box, so the canvas measures its real size. */
+// The SVG keeps its box while the flow loads, so the canvas measures its real size.
 .fe__canvas--loading {
   visibility: hidden;
 }
@@ -163,11 +155,11 @@
   position: absolute;
   inset: var(--space-4);
 }
+// touch-action: none stops pen and touch panning from fighting the pan and connect logic.
 .fe__canvas {
   display: block;
   width: 100%;
   height: 100%;
-  /* touch-action: none stops pen and touch panning from fighting the drag logic. */
   touch-action: none;
   user-select: none;
   cursor: grab;
@@ -176,7 +168,104 @@
   cursor: grabbing;
 }
 
-/* The legend at the bottom left of the canvas. */
+// The scroll tongues of the ui-kit data table.
+.fe__tongue {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  cursor: pointer;
+  background: var(--color-surface-3);
+  color: var(--color-text-muted);
+  border: var(--border-width) solid var(--color-border);
+  box-shadow: var(--shadow-elevated);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity var(--motion-base, 200ms) var(--ease-standard, ease),
+    background var(--motion-fast, 120ms) var(--ease-standard, ease),
+    color var(--motion-fast, 120ms) var(--ease-standard, ease),
+    border-color var(--motion-fast, 120ms) var(--ease-standard, ease),
+    scale var(--motion-xs) var(--ease-standard);
+  @include press.press;
+}
+.fe__tongue--on {
+  opacity: 1;
+  pointer-events: auto;
+}
+// The size stays on hover, because a repeat-click target that grows moves its own edge away
+// mid-click.
+.fe__tongue--held {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border-color: var(--color-accent);
+}
+@media (hover: hover) {
+  .fe__tongue:hover {
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+    border-color: var(--color-accent);
+  }
+}
+.fe__tongue:focus-visible {
+  outline: 2px solid var(--color-focus-ring, var(--color-primary));
+  outline-offset: 2px;
+}
+.fe__tongue svg {
+  display: block;
+  width: 13px;
+  height: 13px;
+}
+.fe__tongue[data-side='left'],
+.fe__tongue[data-side='right'] {
+  top: 50%;
+  width: 18px;
+  height: 54px;
+  translate: 0 -50%;
+}
+.fe__tongue[data-side='up'],
+.fe__tongue[data-side='down'] {
+  left: 50%;
+  width: 54px;
+  height: 18px;
+  translate: -50% 0;
+}
+.fe__tongue[data-side='left'] {
+  left: 0;
+  border-left: 0;
+  border-radius: 0 10px 10px 0;
+}
+.fe__tongue[data-side='right'] {
+  right: 0;
+  border-right: 0;
+  border-radius: 10px 0 0 10px;
+}
+.fe__tongue[data-side='right'] svg {
+  rotate: 180deg;
+}
+.fe__tongue[data-side='up'] {
+  top: 0;
+  border-top: 0;
+  border-radius: 0 0 10px 10px;
+}
+.fe__tongue[data-side='up'] svg {
+  rotate: 90deg;
+}
+.fe__tongue[data-side='down'] {
+  bottom: 0;
+  border-bottom: 0;
+  border-radius: 10px 10px 0 0;
+}
+.fe__tongue[data-side='down'] svg {
+  rotate: -90deg;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fe__tongue {
+    transition: none;
+  }
+}
+
 .fe__legend {
   position: absolute;
   left: var(--space-5);
@@ -208,18 +297,32 @@
   border-top: 2px dashed var(--color-text-subtle);
 }
 
-/* ---- Canvas: nodes and edges ----------------------------------------------------- */
-
 .fe__node-g {
-  cursor: grab;
+  cursor: pointer;
 }
 
-/* A state: surface 2, an edge in the state colour (or the outline colour). */
+.fe__node-g,
+.fe__edge-g {
+  transition: opacity var(--motion-fast, 120ms) var(--ease-standard, ease);
+}
+.fe__node-g.fe__dim {
+  opacity: 0.35;
+}
+.fe__edge-g.fe__dim {
+  opacity: 0.12;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fe__node-g,
+  .fe__edge-g {
+    transition: none;
+  }
+}
+
 .fe__node {
   fill: var(--color-surface-2);
   stroke: var(--color-text-subtle);
   stroke-width: 2;
-  cursor: grab;
+  cursor: pointer;
 }
 .fe__node--sel {
   stroke: var(--color-accent);
@@ -228,7 +331,6 @@
   stroke: var(--color-accent);
   stroke-dasharray: 5 3;
 }
-/* The ring around the selected state. */
 .fe__node-halo {
   fill: none;
   stroke: var(--color-accent);
@@ -250,7 +352,6 @@
   user-select: none;
 }
 
-/* "Endzustand" under the label of a terminal state. */
 .fe__node-tag {
   fill: var(--color-text-muted);
   font-size: 11px;
@@ -258,7 +359,6 @@
   user-select: none;
 }
 
-/* The kind above a state ("Abstimmung (Gremium)"), in the accent colour. */
 .fe__node-kind {
   fill: var(--color-accent-text);
   font-size: 11.5px;
@@ -267,7 +367,6 @@
   user-select: none;
 }
 
-/* A connector: a hollow port on the right edge of the state. */
 .fe__connector {
   fill: var(--color-surface-3);
   stroke: var(--color-text-subtle);
@@ -288,13 +387,15 @@
 .fe__dot-label {
   fill: var(--color-text-muted);
   font-size: 10.5px;
+  paint-order: stroke;
+  stroke: var(--color-surface-1);
+  stroke-width: 3px;
+  stroke-linejoin: round;
   pointer-events: none;
   user-select: none;
 }
 
 .fe__edge {
-  // Each transition sets --edge-color inline and overrides the default colour.
-  // The selection rule below still wins through its higher specificity.
   stroke: var(--edge-color, var(--color-text-subtle));
   stroke-width: 1.6;
   fill: none;
@@ -323,12 +424,9 @@
 }
 
 .fe__arrow-head {
-  // The arrow head inherits the stroke of the path that references it.
   fill: context-stroke;
 }
 
-/* An edge label: muted; the selected edge in the accent colour. A halo in the colour
-   of the sheet keeps it readable where it crosses a line. */
 .fe__edge-label {
   fill: var(--color-text-muted);
   font-size: 11.5px;
@@ -346,8 +444,6 @@
 .fe__bolt {
   fill: var(--color-warning);
 }
-
-/* ---- Canvas: groups and proxies -------------------------------------------------- */
 
 .fe__groupbox {
   fill: var(--color-surface-2);
@@ -399,8 +495,6 @@
   font-size: 12px;
   pointer-events: none;
 }
-
-/* ---- Inspector ------------------------------------------------------------------- */
 
 .fe__panel {
   display: flex;
@@ -454,8 +548,6 @@
   font-size: var(--fs-xs);
 }
 
-/* ---- Phone ----------------------------------------------------------------------- */
-
 @include bp.phone {
   .fe__canvas-wrap {
     height: 26rem;
@@ -463,7 +555,6 @@
   .fe__toolbar {
     padding-inline: var(--space-2);
   }
-  /* The zoom starts its own line, at the start like the other tools. */
   .fe__zoom {
     margin-left: 0;
   }

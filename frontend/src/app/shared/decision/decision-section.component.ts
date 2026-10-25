@@ -13,7 +13,7 @@ import {
 } from '@stupa-makers/ui-kit';
 
 /**
- * The section "Beschluss" (F1): the decision on an application.
+ * The section "Beschluss": the decision on an application.
  *
  * It shows the requested amount (struck through when the approved one deviates), the
  * approved amount with the difference, the numbered conditions and where the decision

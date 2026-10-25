@@ -14,7 +14,7 @@ import { parseDay } from '@shared/date-format';
 export const LATEST_COUNT = 3;
 
 /**
- * Public home page (board Oeffentlich-Start, variant A of the public protocols).
+ * Public home page.
  *
  * The body is equal choices: submit an application, read the public protocols, or sign
  * in as a Gremium member. The page cannot tell which kind of visitor it has, so it
@@ -25,6 +25,9 @@ export const LATEST_COUNT = 3;
  *
  * Without a public protocol (or when the list cannot load) the protocol card and the
  * strip stay away, and the page looks as before: two choices.
+ *
+ * The ways in stand side by side and weigh the same, because the page cannot tell which kind of
+ * visitor it has and must not guess with a primary action.
  */
 @Component({
   selector: 'app-home',
@@ -69,7 +72,6 @@ export class HomeComponent {
         this.latest.set(page.items);
         this.protocolTotal.set(page.total);
       },
-      // The landing works without the protocols: the card and the strip stay away.
       error: () => this.protocolTotal.set(0),
     });
   }

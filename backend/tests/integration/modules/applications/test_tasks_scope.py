@@ -74,11 +74,15 @@ _VOTE_CONFIG: dict[str, Any] = {
 
 @dataclass
 class _World:
+    """The seeded world of the probes.
+
+    It holds the principals, the applications, the open votes per application key and every
+    transition of the flow.
+    """
+
     principals: dict[str, Principal] = field(default_factory=dict)
     apps: dict[str, uuid.UUID] = field(default_factory=dict)
-    # The open votes per application key.
     votes: dict[str, list[uuid.UUID]] = field(default_factory=dict)
-    # Every transition of the flow, for the probes.
     transitions: list[Transition] = field(default_factory=list)
 
 
@@ -91,12 +95,15 @@ async def db_engine(migrated: tuple[str, str], engine: Engine) -> AsyncIterator[
 
 @pytest.fixture
 def settings(migrated: tuple[str, str]) -> Settings:
+    """Return test settings without the rate limit.
+
+    The probes send many writes from one client, and the default limit needs Redis.
+    """
     return load_settings(
         database_url=migrated[1],
         session_secret="session-secret-tasks-scope-0000",
         magic_link_secret="magic-link-secret-tasks-scope0",
         cookie_secure=False,
-        # The probes send many writes from one client; the default limit needs Redis.
         rate_limit_enabled=False,
     )
 
@@ -122,7 +129,24 @@ async def _member(
     return row
 
 
-async def _seed(maker: async_sessionmaker[AsyncSession]) -> _World:  # noqa: PLR0915
+async def _seed(maker: async_sessionmaker[AsyncSession]) -> _World:
+    """Seed two Gremien, their principals, a flow and the applications.
+
+    The gremium facts of a principal come from the database through `resolve_principal`; the
+    global permissions are set on the object. voter_a votes in A without a global right.
+    plain_a is a member of A whose role holds no vote.cast. lead_b holds every gremium right
+    in B and the global transition right, but not the global read right. token is an OAuth
+    agent token with `application.transition` but without the read right.
+
+    The flow has, out of the entry state, a transition open to every holder (a task), an
+    optional one (never a task, but it fires), one open to the applicant only, an automatic
+    one (only the worker fires it), and the pass branch of the vote state.
+
+    The applications: a_vote (A votes on A), a_vote_idle (a vote state of A without an open
+    vote), a_in_b (an application of A in a vote of B, which the voter of A can neither read
+    nor cast in), the entry-state applications (readable for the full readers only) and own
+    (the own application of the applicant account). A draft vote opens no ballot.
+    """
     world = _World()
     tag = uuid.uuid4().hex[:8]
     async with maker() as session:
@@ -131,15 +155,9 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> _World:  # noqa: PLR
         session.add_all([g_a, g_b])
         await session.flush()
 
-        # The principals. The gremium facts come from the database through
-        # `resolve_principal`; the global permissions are set on the object.
         rows = {
-            # A voter of Gremium A, no global right.
             "voter_a": await _member(session, f"voter-a-{tag}", g_a, ["vote.cast"], tag),
-            # A member of Gremium A whose role holds no vote.cast.
             "plain_a": await _member(session, f"plain-a-{tag}", g_a, [], tag),
-            # The lead of Gremium B with every gremium right, plus the global
-            # transition right, but without the global read right.
             "lead_b": await _member(
                 session,
                 f"lead-b-{tag}",
@@ -204,16 +222,11 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> _World:  # noqa: PLR
             )
 
         world.transitions = [
-            # Open to every transition holder: a task.
             _t(draft, done, requires_action=True),
-            # Optional: never a task, but the route fires it.
             _t(draft, done, requires_action=False, order=1),
-            # Open to the applicant only: a task of the creator.
             _t(draft, done, requires_action=True, guard={"actorIsApplicant": True}, order=2),
-            # Automatic: the worker fires it, nobody else.
             _t(draft, done, requires_action=True, automatic=True, guard={"hasField": "x"},
                order=3),
-            # The vote outcome: never a manual action.
             _t(vote_a, done, branch="pass"),
             _t(vote_a, draft, branch="fail"),
             _t(vote_b, done, branch="pass"),
@@ -225,6 +238,7 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> _World:  # noqa: PLR
         svc = ApplicationsService(session)
 
         async def _app(app_type: ApplicationType, state: State, creator: str) -> uuid.UUID:
+            """Create an application with the vote snapshot that the flow engine sets on entry."""
             payload = ApplicationCreate.model_validate(
                 {
                     "typeId": str(app_type.id),
@@ -239,7 +253,6 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> _World:  # noqa: PLR
                 .values(
                     current_state_id=state.id,
                     email_confirmed_at=datetime.now(UTC),
-                    # The snapshot that the flow engine sets on entry into a vote state.
                     vote_gremium_id=(
                         uuid.UUID(state.config["gremiumId"]) if state.kind == "vote" else None
                     ),
@@ -249,18 +262,12 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> _World:  # noqa: PLR
             return created.id
 
         world.apps = {
-            # Gremium A votes on an application of Gremium A.
             "a_vote": await _app(type_a, vote_a, "other"),
-            # A vote state of Gremium A without an open vote.
             "a_vote_idle": await _app(type_a, vote_a, "other"),
-            # An application of Gremium A in a vote of Gremium B. The old code showed
-            # it to the voter of A, who can neither read it nor cast in it.
             "a_in_b": await _app(type_a, vote_b, "other"),
             "b_vote": await _app(type_b, vote_b, "other"),
-            # Applications in the entry state, readable for the full readers only.
             "draft_a": await _app(type_a, draft, "other"),
             "draft_b": await _app(type_b, draft, "other"),
-            # The own application of the applicant account.
             "own": await _app(type_b, draft, "owner"),
             "done": await _app(type_a, done, "other"),
         }
@@ -272,7 +279,6 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> _World:  # noqa: PLR
             session.add(vote)
             await session.flush()
             world.votes[key] = [vote.id]
-        # A draft vote does not open a ballot.
         session.add(
             Vote(
                 application_id=world.apps["a_vote_idle"], eligible_group=str(g_a.id),
@@ -297,7 +303,6 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> _World:  # noqa: PLR
             sub=rows["mitglied"].sub, roles=["member"], permissions={"application.read"}
         )
         world.principals["admin"] = Principal(sub=rows["admin"].sub, roles=["admin"])
-        # An OAuth agent token with `application.transition` but without the read right.
         world.principals["token"] = Principal(
             sub=rows["token"].sub,
             permissions={"application.transition"},
@@ -362,25 +367,29 @@ async def _tasks(api: FastAPI, db_engine: AsyncEngine, principal: Principal) -> 
 async def test_tasks_per_principal(
     world: _World, api: FastAPI, db_engine: AsyncEngine
 ) -> None:
-    """Each principal sees exactly the applications that it can read and act on."""
+    """Each principal sees exactly the applications that it can read and act on.
+
+    Expected tasks:
+
+    - voter_a: the ballot in Gremium A only. Not the idle vote state, and not the
+      application of A in the vote of B (no read access, no vote right there).
+    - plain_a: none, because the member reads the vote state of A but lacks vote.cast.
+    - lead_b: the ballots of B. The global transition right gives no task on the
+      entry-state applications, because lead_b cannot read them.
+    - mitglied: none; the member reads everything but has no vote and no transition.
+    - admin: the open transition on every entry-state application. The admin is in no
+      Gremium, so no ballot.
+    - owner: the applicant transition of the own application.
+    - token: none; the agent token reads nothing and never casts.
+    """
     apps = world.apps
     expected = {
-        # The ballot in Gremium A only. Not the idle vote state, and not the application
-        # of Gremium A in the vote of Gremium B (no read access, no vote right there).
         "voter_a": {apps["a_vote"]},
-        # A member without vote.cast reads the vote state of A, but cannot cast.
         "plain_a": set(),
-        # The ballots of Gremium B. The global transition right gives no task on the
-        # entry-state applications, because lead_b cannot read them.
         "lead_b": {apps["a_in_b"], apps["b_vote"]},
-        # The global member reads everything, but has neither a vote nor a transition.
         "mitglied": set(),
-        # The admin fires the open transition on every entry-state application. The
-        # admin is in no Gremium, so no ballot.
         "admin": {apps["draft_a"], apps["draft_b"], apps["own"]},
-        # The applicant account: the applicant transition of the own application.
         "owner": {apps["own"]},
-        # The agent token reads nothing and never casts.
         "token": set(),
     }
     for key, principal in world.principals.items():
@@ -395,6 +404,8 @@ async def _accepted_actions(
     A task transition is a transition with `requiresAction`. The probe tries it on the
     member route and on the applicant route. The automatic and the branch transitions
     are tried too: no route may accept them.
+
+    An optional transition fires, but it is no task by definition.
     """
     app_id = world.apps[key]
     accepted: list[str] = []
@@ -406,7 +417,6 @@ async def _accepted_actions(
         if r.status_code == 200:
             accepted.append(f"ballot:{vote_id}")
     for t in world.transitions:
-        # An optional transition fires, but it is no task by definition.
         if not t.requires_action:
             continue
         for route in ("transition", "applicant-transition"):
@@ -434,7 +444,10 @@ async def test_tasks_agree_with_the_action_routes(
 async def test_transition_routes_refuse_an_unreadable_application(
     world: _World, api: FastAPI, db_engine: AsyncEngine
 ) -> None:
-    """A holder of `application.transition` cannot list or fire on what it cannot read."""
+    """A holder of `application.transition` cannot list or fire on what it cannot read.
+
+    The admin reads the application, so the same call passes.
+    """
     lead_b = world.principals["lead_b"]
     app_id = world.apps["draft_a"]
     r = await _call(api, db_engine, lead_b, "GET", f"/api/applications/{app_id}/transitions")
@@ -445,7 +458,6 @@ async def test_transition_routes_refuse_an_unreadable_application(
         {"transitionId": str(first.id)},
     )
     assert r.status_code == 403
-    # The admin reads it, so the same call passes.
     r = await _call(
         api, db_engine, world.principals["admin"], "GET",
         f"/api/applications/{app_id}/transitions",
@@ -478,14 +490,16 @@ async def test_token_without_read_right_is_refused(
 async def test_applicant_route_refuses_a_non_creator(
     world: _World, api: FastAPI, db_engine: AsyncEngine
 ) -> None:
-    """Only the applicant and the creator fire an applicant transition."""
+    """Only the applicant and the creator fire an applicant transition.
+
+    The list route admits the same callers, so it offers nothing to the admin.
+    """
     applicant_t = world.transitions[2]
     app_id = world.apps["own"]
     url = f"/api/applications/{app_id}/applicant-transition"
     body = {"transitionId": str(applicant_t.id)}
     admin = world.principals["admin"]
     assert (await _call(api, db_engine, admin, "POST", url, body)).status_code == 403
-    # The list route admits the same callers, so it offers nothing to the admin.
     assert (await _call(api, db_engine, admin, "GET", f"{url}s")).status_code == 403
     owner = world.principals["owner"]
     r = await _call(api, db_engine, owner, "GET", f"{url}s")

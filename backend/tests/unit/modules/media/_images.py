@@ -13,7 +13,7 @@ def encode(fmt: str, size: tuple[int, int] = (40, 20), mode: str = "RGB", **kw: 
     """Return one image of ``size`` in the Pillow format ``fmt``."""
     color: object = _COLOR if mode in ("RGB", "RGBA") else 1
     buffer = io.BytesIO()
-    Image.new(mode, size, color).save(buffer, fmt, **kw)  # pyright: ignore[reportArgumentType]
+    Image.new(mode, size, color).save(buffer, fmt, **kw)
     return buffer.getvalue()
 
 

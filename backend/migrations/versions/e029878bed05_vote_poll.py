@@ -40,8 +40,8 @@ _UPGRADE: tuple[str, ...] = (
     ),
 )
 
+#: The poll rows go first, because the narrower CHECK cannot hold a poll.
 _DOWNGRADE: tuple[str, ...] = (
-    # The narrower CHECK cannot hold a poll.
     "DELETE FROM protocol_vote_ref WHERE vote_id IN (SELECT id FROM vote WHERE kind = 'poll')",
     "DELETE FROM vote WHERE kind = 'poll'",
     "ALTER TABLE vote DROP CONSTRAINT IF EXISTS ck_vote_vote_kind",
@@ -52,10 +52,12 @@ _DOWNGRADE: tuple[str, ...] = (
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     for stmt in _UPGRADE:
         op.execute(stmt)
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     for stmt in _DOWNGRADE:
         op.execute(stmt)

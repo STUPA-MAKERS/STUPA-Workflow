@@ -14,7 +14,6 @@
   padding-inline: var(--space-1);
 }
 
-/* An e-mail address and an id wrap; they are never cut. */
 .pv__mail {
   overflow-wrap: anywhere;
 }
@@ -33,7 +32,6 @@
 
 .pv__card {
   @include sc.card;
-  /* The person search of the account erasure sits on surface 2 as well. */
   --sp-bg: var(--color-surface-3);
 }
 .pv__form {
@@ -41,7 +39,6 @@
   flex-direction: column;
   gap: var(--space-3);
 }
-/* The picked account and the hits of the picker (D1). */
 .pv__person {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -67,7 +64,6 @@
   padding: 0;
   list-style: none;
 }
-/* The row clips the hover surface of its list item to the corners of the row group. */
 .pv__hits > li {
   overflow: hidden;
 }
@@ -116,7 +112,6 @@
   font-size: var(--fs-sm);
   font-weight: var(--fw-medium);
 }
-/* The filled field of the ui-kit: no edge; focus draws a 2px accent line inside. */
 .pv__textarea {
   width: 100%;
   padding: var(--space-2) var(--space-3);

@@ -84,6 +84,7 @@ function makeAdmin(over: Partial<Record<string, jest.Mock>> = {}) {
   };
 }
 
+/** NgModel writes its value after a microtask. */
 async function setup(api = makeApi(), admin = makeAdmin()) {
   const toast = { success: jest.fn(), error: jest.fn() };
   const view = await render(DelegationsComponent, {
@@ -95,7 +96,6 @@ async function setup(api = makeApi(), admin = makeAdmin()) {
       { provide: AuthService, useValue: { can: () => true } },
     ],
   });
-  // NgModel writes its value after a microtask.
   await view.fixture.whenStable();
   view.fixture.detectChanges();
   return { ...view, api, admin, toast };
@@ -106,6 +106,7 @@ const activeList = () => screen.getAllByRole('list')[0];
 describe('DelegationsComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
+  /** Without names the row says so; it never shows an id. */
   it('lists the active delegations by meeting date, with the tags and the count', async () => {
     await setup();
     const rows = within(activeList()).getAllByRole('listitem');
@@ -122,7 +123,6 @@ describe('DelegationsComponent', () => {
       'href',
       '/meetings/m-1',
     );
-    // Without names the row says so; it never shows an id.
     expect(within(rows[2]).getAllByText('(ohne Namen)')).toHaveLength(2);
     expect(screen.getByText('3')).toBeInTheDocument();
   });
@@ -211,6 +211,7 @@ describe('DelegationsComponent', () => {
     expect(screen.queryByRole('heading', { name: 'Stellvertretungen' })).toBeNull();
   });
 
+  /** Past meetings sort newest first. */
   it('sorts rows of one date by title and guards the revoke', async () => {
     const same = [
       delegation({ id: 'a', meetingTitle: 'Zeta', meetingDate: '2999-01-01' }),
@@ -224,7 +225,6 @@ describe('DelegationsComponent', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
     expect(c.active().map((d: Delegation) => d.id)).toEqual(['b', 'c', 'a']);
-    // Past meetings: the newest first.
     expect(c.past().map((d: Delegation) => d.id)).toEqual(['p2', 'p1']);
     c.revoke();
     c.confirmRevoke.set(same[0]);

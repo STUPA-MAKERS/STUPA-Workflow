@@ -1,38 +1,22 @@
 @use 'scroll-fade' as fade;
 
-// The shared rules of a list pane page: the list of applications, bookings, invoices,
-// tasks, votes, tickets, meetings and gremien, with the detail beside it or alone.
-//
-// Each mixin is the body of one rule, so a page keeps its own selectors and their order,
-// and a page that differs in one rule keeps that rule as its own. `$fade` is the name of
-// the custom property that holds the fade size, such as `--apps-fade`.
-//
-// Use:
-//   @use '../../shared/ui/list-pane' as lp;
-//   .apps__group { @include lp.stack; }
-//   .apps__scroll { @include lp.scroll(--apps-fade); }
-
-/// A column that does not grow past its pane: the host, a group of rows, the rows.
 @mixin stack {
   display: flex;
   flex-direction: column;
   min-width: 0;
 }
 
-/// One pane at a time: the column takes at least the free height of the shell main.
 @mixin single-column {
   display: flex;
   flex: 1 0 auto;
   flex-direction: column;
 }
 
-/// Side by side: the column takes the free height and each pane scrolls inside itself.
 @mixin split-column {
   flex: 1 1 0;
   min-height: 0;
 }
 
-/// The filter chips under the search; they wrap.
 @mixin chips {
   display: flex;
   flex-wrap: wrap;
@@ -41,7 +25,8 @@
   min-width: 0;
 }
 
-/// The scroll area of the rows, and the size of its fade.
+/// The scroll area of the rows. `$fade` names the custom property of the fade size, such as
+/// `--apps-fade`.
 @mixin scroll($fade) {
   #{$fade}: var(--space-6);
   display: flex;
@@ -49,7 +34,6 @@
   min-width: 0;
 }
 
-/// Side by side only the rows scroll, down to the bottom edge of the pane.
 @mixin split-scroll($fade) {
   flex: 1 1 auto;
   min-height: 0;
@@ -58,19 +42,16 @@
   scroll-padding-block: var(#{$fade});
 }
 
-/// The heading of a group of rows, such as "Oktober 2026".
 @mixin month {
   padding: 18px var(--space-4) 6px;
 }
 
-/// "Mehr laden" under the rows.
 @mixin more {
   display: flex;
   justify-content: center;
   margin-top: var(--space-3);
 }
 
-/// The detail pane.
 @mixin detail {
   display: flex;
   flex: 1 1 auto;
@@ -78,26 +59,21 @@
   min-width: 0;
 }
 
-/// On a phone the chips stay in one row that scrolls sideways, without a scroll bar.
-/// `$fade-ends: false` leaves the fade of the ends to the page.
-@mixin phone-chips($fade, $fade-ends: true) {
-  #{$fade}: var(--space-6);
+@mixin phone-chips {
   flex-wrap: nowrap;
+  margin-inline: calc(-1 * var(--space-4));
+  padding-inline: var(--space-4);
   overflow-x: auto;
+  scroll-padding-inline: var(--space-4);
   scrollbar-width: none;
   &::-webkit-scrollbar {
     display: none;
   }
-  @if $fade-ends {
-    @include fade.fade-x(var(#{$fade}));
-  }
 }
 
-/// The row menu of a list with a pointer: it shows on hover, on focus and while it is
-/// open, so a calm list reads as titles and amounts. It keeps its place, so nothing
-/// shifts. The full-width list shows a chevron in that place while the menu is hidden.
-/// Without hover (touch) the menu always shows. Call it at the top level with the block
-/// name; it styles `.<b>__menuSlot`, `.<b>__chev`, `.<b>__menu` and `.<b>__row`.
+/// The row menu of a list with a pointer. Without hover (touch) the menu always shows. Call it at
+/// the top level with the block name; it styles `.<b>__menuSlot`, `.<b>__chev`, `.<b>__menu`
+/// and `.<b>__row`.
 @mixin hover-menu($b) {
   .#{$b}__menuSlot {
     position: relative;

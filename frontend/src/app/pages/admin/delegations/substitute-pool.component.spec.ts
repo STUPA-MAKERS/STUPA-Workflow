@@ -75,6 +75,7 @@ function makeDelegations(over: Partial<Record<string, jest.Mock>> = {}) {
   };
 }
 
+/** A deactivated member represents nobody, so it is no choice. */
 function makeAdmin(over: Partial<Record<string, jest.Mock>> = {}) {
   return {
     listPrincipals: jest.fn(() => of(clone(PEOPLE))),
@@ -112,7 +113,6 @@ function makeAdmin(over: Partial<Record<string, jest.Mock>> = {}) {
           displayName: null,
           email: null,
         },
-        // A deactivated member represents nobody, so it is no choice.
         {
           id: 'm5',
           principalId: 'p-9',
@@ -128,6 +128,7 @@ function makeAdmin(over: Partial<Record<string, jest.Mock>> = {}) {
   };
 }
 
+/** NgModel writes its value after a microtask. */
 async function setup(
   opts: {
     delegations?: ReturnType<typeof makeDelegations>;
@@ -149,7 +150,6 @@ async function setup(
       ...(opts.members !== undefined ? { members: opts.members } : {}),
     },
   });
-  // NgModel writes its value after a microtask.
   await view.fixture.whenStable();
   view.fixture.detectChanges();
   return { ...view, delegations, admin, toast };
@@ -158,19 +158,21 @@ async function setup(
 describe('SubstitutePoolComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
+  /**
+   * An entry for the whole Gremium reads "Für alle Mitglieder → substitute". There is one heading
+   * only: no "Einzelne Einträge", and no column names over the rows. A missing name falls back to
+   * the member list, then to a placeholder.
+   */
   it('lists the entries as "member → substitute" under one heading', async () => {
     await setup();
     const rows = within(screen.getByRole('list', { name: 'Stellvertretungen' })).getAllByRole(
       'listitem',
     );
-    // An entry for the whole Gremium reads "Für alle Mitglieder → substitute".
     expect(rows[0]).toHaveTextContent(/^Für alle Mitglieder\s*vertreten durch.*Fabi Fachschaft$/);
-    // One heading only: no "Einzelne Einträge", no column names over the rows.
     expect(screen.getAllByRole('heading')).toHaveLength(1);
     expect(screen.queryByText('Einzelne Einträge')).toBeNull();
     expect(document.querySelector('.cap')).toBeNull();
     expect(rows[1]).toHaveTextContent('Robin');
-    // A missing name falls back to the member list, then to a placeholder.
     expect(rows[2]).toHaveTextContent('Toni');
     expect(rows[2]).toHaveTextContent('(ohne Namen)');
   });
@@ -195,6 +197,10 @@ describe('SubstitutePoolComponent', () => {
     expect(toast.error).toHaveBeenCalledWith('Aktion fehlgeschlagen.');
   });
 
+  /**
+   * An inactive person is no choice. A nameless account reads "Ohne Namen", never its sub, and
+   * keeps the subject in the tooltip. The members are the choices of "Vertritt", one per person.
+   */
   it('adds an entry for one member through the person search', async () => {
     const { delegations, admin, toast } = await setup();
     await userEvent.click(screen.getByRole('button', { name: /Stellvertretung hinzufügen/ }));
@@ -203,10 +209,7 @@ describe('SubstitutePoolComponent', () => {
     expect(add).toBeDisabled();
     await userEvent.type(within(dialog).getByRole('searchbox', { name: /Person suchen/ }), 'ki');
     await waitFor(() => expect(admin.listPrincipals).toHaveBeenCalledWith('ki'));
-    // An inactive person is no choice; a person without a name reads "Ohne Namen" and
-    // keeps the subject in the tooltip.
     expect(await within(dialog).findByRole('button', { name: /Kim/ })).toBeInTheDocument();
-    // D7: a nameless account reads "Ohne Namen", never its sub.
     expect(within(dialog).getByRole('button', { name: 'Ohne Namen' })).toBeInTheDocument();
     expect(within(dialog).queryByText('kc|ki')).toBeNull();
     expect(
@@ -215,7 +218,6 @@ describe('SubstitutePoolComponent', () => {
     expect(within(dialog).queryByRole('button', { name: /Off/ })).toBeNull();
     await userEvent.click(within(dialog).getByRole('button', { name: /Kim/ }));
     expect(within(dialog).getByRole('status')).toHaveTextContent('Gewählt: Kim');
-    // The members are the choices of "Vertritt", one per person.
     const select = within(dialog).getByRole('combobox', { name: 'Vertritt' });
     expect(await optionLabels(select)).toEqual([
       'Für alle Mitglieder',
@@ -260,6 +262,7 @@ describe('SubstitutePoolComponent', () => {
     expect(within(dialog).getByRole('alert')).toHaveTextContent('Aktion fehlgeschlagen.');
   });
 
+  /** The stream lives on after a failure. One character sends no request and says nothing yet. */
   it('says so when the search finds nobody and when it fails', async () => {
     const admin = makeAdmin({
       listPrincipals: jest
@@ -275,10 +278,8 @@ describe('SubstitutePoolComponent', () => {
     expect(await screen.findByText('Keine Person gefunden.')).toBeInTheDocument();
     await userEvent.type(search, 'z');
     await waitFor(() => expect(admin.listPrincipals).toHaveBeenCalledTimes(2));
-    // The stream lives on after a failure.
     await userEvent.clear(search);
     expect(screen.queryByText('Keine Person gefunden.')).toBeNull();
-    // One character sends no request and says nothing yet.
     await userEvent.type(search, 'k');
     expect(admin.listPrincipals).toHaveBeenCalledTimes(2);
     expect(screen.queryByText('Keine Person gefunden.')).toBeNull();
@@ -321,6 +322,7 @@ describe('SubstitutePoolComponent', () => {
     expect(delegations.substitutes).toHaveBeenLastCalledWith('g-2');
   });
 
+  /** A nameless account reads "Ohne Namen", never its sub. */
   it('guards add and remove and drops a choice when the search text changes', async () => {
     const delegations = makeDelegations();
     const { fixture } = await setup({ delegations });
@@ -343,7 +345,6 @@ describe('SubstitutePoolComponent', () => {
     c.removing.set(new Set(['s-1']));
     c.remove(ENTRIES[0]);
     expect(delegations.removeSubstitute).not.toHaveBeenCalled();
-    // D7: a nameless account reads "Ohne Namen", never its sub.
     expect(c.label({ ...PEOPLE[1], sub: 'kc|x' })).toBe('Ohne Namen');
     expect(c.label({ ...PEOPLE[1], email: 'e@x.de' })).toBe('e@x.de');
   });

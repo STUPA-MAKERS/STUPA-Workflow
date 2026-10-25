@@ -1,9 +1,11 @@
-"""Pure form engine T-11 (validate_definition, effective_form, validate_answers).
+"""Pure form engine (validate_definition, effective_form, validate_answers).
 
-Acceptance criteria: every field type passes and fails as expected. Required fields
+The tests prove: every field type passes and fails as expected. Required fields
 apply. A visible visibleIf field becomes mandatory. compute derives the right value.
 An unknown type raises an error. effective_form builds the sections. extract_promoted
 reads the promoted values.
+
+The ReDoS tests check the input length cap and the wall-clock timeout of a pattern.
 """
 
 from __future__ import annotations
@@ -69,14 +71,17 @@ def test_validate_definition_promoted_numeric_ok() -> None:
 
 
 def test_validate_definition_rejects_bad_pattern() -> None:
-    # S1: without this gate, a broken regex pattern causes a 500 at answer time.
+    """Reject a broken regex at save time, else it causes a 500 at answer time."""
     with pytest.raises(FormDefinitionError, match="invalid validation pattern"):
         validate_definition([_field("t", "text", validation={"pattern": "["})])
 
 
 def test_validate_definition_rejects_bad_jsonlogic() -> None:
-    # FormFieldDef validates JsonLogic at build time. This test bends the field after
-    # the build to reach the defensive storage gate in validate_definition.
+    """Reject broken JsonLogic in the defensive storage gate.
+
+    FormFieldDef validates JsonLogic at build time, so the test bends the field after the
+    build.
+    """
     f = _field("t", "text")
     f.visible_if = {"system": ["rm", "-rf"]}
     with pytest.raises(FormDefinitionError, match="invalid expression"):
@@ -117,6 +122,7 @@ def test_effective_form_splits_at_section_markers() -> None:
 
 
 def test_effective_form_leading_section_titles_first_section() -> None:
+    """Inject the title field into the intro section when no title field exists."""
     sections = effective_form(
         [
             _field("intro", "section", label={"de": "Start"}),
@@ -125,12 +131,11 @@ def test_effective_form_leading_section_titles_first_section() -> None:
     )
     assert [s.key for s in sections] == ["intro"]
     assert sections[0].label == {"de": "Start"}
-    # No title field is present, so the engine injects one into the intro section.
     assert [f.key for f in sections[0].fields] == [SYSTEM_TITLE_KEY, "a"]
 
 
 def test_validate_answers_ignores_section_markers() -> None:
-    # A section marker is never required and it carries no answer value.
+    """Never require a section marker; it carries no answer value."""
     result = validate_answers(
         [_field("s", "section", label={"de": "X"}), _field("name", "text")],
         {"name": "ok"},
@@ -164,7 +169,8 @@ def test_positions_too_few_offers_and_no_preferred() -> None:
 
 
 def test_positions_default_min_offers_is_three() -> None:
-    field = _positions_field()  # no validation block, so minOffers falls back to 3
+    """Fall back to minOffers 3 without a validation block."""
+    field = _positions_field()
     value = [_position("P", ("A", 1, True), ("B", 2, False))]
     errors: list[FieldError] = []
     _validate_value(field, value, errors)
@@ -188,7 +194,7 @@ def test_positions_min_positions() -> None:
 
 
 def test_positions_engine_max_positions_ceiling() -> None:
-    # The engine ceiling applies even without maxPositions (#sec-audit AUD-047).
+    """Apply a configured maxPositions."""
     field = _positions_field(validation={"minOffers": 1, "maxPositions": 2})
     value = [_position(f"P{i}", ("A", 5, True)) for i in range(3)]
     errors: list[FieldError] = []
@@ -197,7 +203,8 @@ def test_positions_engine_max_positions_ceiling() -> None:
 
 
 def test_positions_engine_default_max_positions() -> None:
-    field = _positions_field(validation={"minOffers": 1})  # no maxPositions, so the cap applies
+    """Apply the engine cap without maxPositions."""
+    field = _positions_field(validation={"minOffers": 1})
     value = [_position(f"P{i}", ("A", 5, True)) for i in range(201)]
     errors: list[FieldError] = []
     _validate_value(field, value, errors)
@@ -213,7 +220,7 @@ def test_positions_engine_max_offers_ceiling() -> None:
 
 
 def test_positions_no_offers_opt_out_with_reason_needs_one_offer() -> None:
-    # The engine allows the opt-out by default. One offer plus a reason beats minOffers 3.
+    """Accept one offer plus a reason instead of minOffers 3; the opt-out is on by default."""
     field = _positions_field(validation={"minOffers": 3})
     value = [
         _position("Spezialgerät", ("Einziger Anbieter", 500, True))
@@ -251,25 +258,27 @@ def test_positions_no_offers_rejected_when_disallowed() -> None:
 
 
 def test_table_default_max_rows_ceiling() -> None:
-    # A table without maxRows keeps the default cap on the row count.
+    """Keep the default cap on the row count without maxRows."""
     f = _field("rows", "table")
     with pytest.raises(AnswerValidationError):
         validate_answers([f], {"rows": [{"i": n} for n in range(1001)]})
 
 
 def test_table_explicit_max_rows_zero_rejects_any_row() -> None:
-    # AUD-047 regression: an explicit maxRows=0 is valid (ge=0) and must reject every
-    # row. A falsy `or` must not fall back to the default cap of 1000.
+    """Reject every row at an explicit maxRows=0.
+
+    maxRows=0 is valid (ge=0), so a falsy `or` must not fall back to the default cap of
+    1000. An empty table stays valid, because 0 rows is not more than 0.
+    """
     f = _field("rows", "table", validation={"maxRows": 0})
     with pytest.raises(AnswerValidationError) as exc:
         validate_answers([f], {"rows": [{"a": 1}, {"b": 2}, {"c": 3}]})
     assert "rows" in _errkeys(exc.value)
-    # An empty table stays valid at maxRows=0 because 0 rows is not more than 0.
     assert validate_answers([f], {"rows": []}) == {"rows": []}
 
 
 def test_table_configured_max_rows_capped_at_engine_ceiling() -> None:
-    # A builder value above the engine cap cannot lift that cap.
+    """Keep the engine cap when the builder sets a higher value."""
     f = _field("rows", "table", validation={"maxRows": 100000})
     with pytest.raises(AnswerValidationError):
         validate_answers([f], {"rows": [{"i": n} for n in range(1001)]})
@@ -295,8 +304,8 @@ def test_extract_promoted_positions_feeds_amount() -> None:
     assert extract_promoted(fields, data) == {"amount": Decimal("650")}
 
 
-# Requested funding, separate from the cost total.
 def _funding_form(**kw: Any) -> list[FormFieldDef]:
+    """Build a form with a requested funding, separate from the cost total."""
     return [_positions_field(validation={"minOffers": 1}), _field("foerderung", "funding", **kw)]
 
 
@@ -422,17 +431,18 @@ def test_text_valid_and_constraints() -> None:
 
 
 def test_text_runtime_bad_pattern_is_422_not_500() -> None:
-    # Defense in depth: validate_definition normally rejects a broken pattern. At
-    # runtime a broken pattern must not cause a 500.
+    """Give a field error, not a 500, for a broken pattern at runtime.
+
+    This is defense in depth, because validate_definition normally rejects it.
+    """
     f = _field("t", "text", validation={"pattern": "["})
     with pytest.raises(AnswerValidationError) as ei:
         validate_answers([f], {"t": "x"})
     assert ei.value.errors[0].msg == "field has an invalid validation pattern"
 
 
-# ReDoS hardening: input length cap plus wall-clock timeout (security.md)
 def test_pattern_value_over_length_cap_is_rejected() -> None:
-    # A value above _PATTERN_MAX_INPUT_LEN never matches. The engine skips the match.
+    """Never match a value above `_PATTERN_MAX_INPUT_LEN`; the engine skips the match."""
     from app.modules.forms.validation import _PATTERN_MAX_INPUT_LEN
 
     f = _field("t", "text", validation={"pattern": ".*"})
@@ -443,7 +453,7 @@ def test_pattern_value_over_length_cap_is_rejected() -> None:
 
 
 def test_pattern_value_at_length_cap_still_matches() -> None:
-    # A value exactly at the limit runs the normal match. The cap does not cut in.
+    """Run the normal match for a value exactly at the cap."""
     from app.modules.forms.validation import _PATTERN_MAX_INPUT_LEN
 
     f = _field("t", "text", validation={"pattern": "a*"})
@@ -452,8 +462,7 @@ def test_pattern_value_at_length_cap_still_matches() -> None:
 
 
 def test_pattern_match_timeout_is_422(monkeypatch: pytest.MonkeyPatch) -> None:
-    # A wall-clock timeout (ReDoS) gives a field error. It never stalls the event
-    # loop and it never gives a 500.
+    """Give a field error for a match timeout; never stall the event loop or give a 500."""
     from concurrent.futures import TimeoutError as FutureTimeout
 
     from app.modules.forms import validation as val_mod
@@ -474,6 +483,7 @@ def test_pattern_match_timeout_is_422(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_number_valid_and_range() -> None:
+    """Accept a number in range and reject a bool and values out of range."""
     f = _field("n", "number", validation={"min": 0, "max": 10})
     assert validate_answers([f], {"n": 5}) == {"n": 5}
     with pytest.raises(AnswerValidationError):
@@ -481,7 +491,7 @@ def test_number_valid_and_range() -> None:
     with pytest.raises(AnswerValidationError):
         validate_answers([f], {"n": 11})
     with pytest.raises(AnswerValidationError):
-        validate_answers([_field("n", "number")], {"n": True})  # a bool is not a number
+        validate_answers([_field("n", "number")], {"n": True})
     with pytest.raises(AnswerValidationError):
         validate_answers([_field("n", "number")], {"n": "x"})
 
@@ -496,13 +506,15 @@ def test_currency_valid() -> None:
 @pytest.mark.parametrize("ftype", ["number", "currency"])
 @pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf"), "NaN", "Infinity"])
 def test_number_currency_non_finite_is_422_not_500(ftype: str, bad: object) -> None:
-    # B1: Decimal("NaN") builds without an error. A min or max compare then raises
-    # decimal.InvalidOperation and gives a 500. This must end as a 422 field error.
+    """Give a field error, not a 500, for NaN or Infinity.
+
+    ``Decimal("NaN")`` builds without an error, but a min or max compare raises
+    ``decimal.InvalidOperation``. The range constraints are the path that really breaks.
+    """
     plain = _field("n", ftype)
     with pytest.raises(AnswerValidationError) as ei:
         validate_answers([plain], {"n": bad})
     assert ei.value.errors[0].msg == "must be a finite number"
-    # Also test the range constraints, because that is the path that really breaks.
     ranged = _field("n", ftype, validation={"min": 0, "max": 10})
     with pytest.raises(AnswerValidationError):
         validate_answers([ranged], {"n": bad})
@@ -526,14 +538,14 @@ def test_select_valid_invalid() -> None:
 
 @pytest.mark.parametrize("bad", [1, True, 1.0, ["a"], {"a": 1}])
 def test_select_non_string_is_422_not_500(bad: object) -> None:
-    # FieldOption.value is a str. A non-string value, also an unhashable dict or
-    # list, must end as an invalid option and never as a 500.
+    """Reject a non-string value, also an unhashable one, as an invalid option."""
     f = _field("s", "select", options=[{"value": "a", "label": {"de": "A"}}])
     with pytest.raises(AnswerValidationError):
         validate_answers([f], {"s": bad})
 
 
 def test_multiselect_valid_invalid() -> None:
+    """Accept valid options and reject an invalid option and a non-list."""
     f = _field(
         "m",
         "multiselect",
@@ -543,12 +555,11 @@ def test_multiselect_valid_invalid() -> None:
     with pytest.raises(AnswerValidationError):
         validate_answers([f], {"m": ["a", "z"]})
     with pytest.raises(AnswerValidationError):
-        validate_answers([f], {"m": "a"})  # not a list
+        validate_answers([f], {"m": "a"})
 
 
 def test_multiselect_unhashable_element_is_422_not_500() -> None:
-    # An unhashable element such as a dict or a list must not raise a TypeError in
-    # the membership test. It must end as an invalid option.
+    """Reject an unhashable element as an invalid option without a TypeError."""
     f = _field("m", "multiselect", options=[{"value": "a", "label": {"de": "A"}}])
     with pytest.raises(AnswerValidationError):
         validate_answers([f], {"m": ["a", {"nested": 1}]})
@@ -558,10 +569,10 @@ def test_multiselect_unhashable_element_is_422_not_500() -> None:
 
 @pytest.mark.parametrize("ftype", ["gremium_select", "budget_select"])
 def test_dynamic_select_uuid_valid_invalid(ftype: str) -> None:
+    """Accept a uuid, reject other values, and skip an empty string of an optional field."""
     f = _field("ziel", ftype)
     good = "00000000-0000-0000-0000-0000000060e1"
     assert validate_answers([f], {"ziel": good}) == {"ziel": good}
-    # An empty string counts as absent. The engine skips it because the field is optional.
     for bad in ("not-a-uuid", 42):
         with pytest.raises(AnswerValidationError):
             validate_answers([f], {"ziel": bad})
@@ -576,8 +587,8 @@ def test_email_field_valid_invalid() -> None:
 
 
 def test_iban_field_checksum() -> None:
+    """Accept a valid test IBAN with spaces and reject a bad checksum."""
     f = _field("iban", "iban")
-    # A valid test IBAN (mod 97). The engine accepts spaces.
     assert validate_answers([f], {"iban": "DE89 3704 0044 0532 0130 00"}) == {
         "iban": "DE89 3704 0044 0532 0130 00"
     }
@@ -633,8 +644,10 @@ def test_markdown_valid() -> None:
 
 
 def test_unknown_type_errors() -> None:
-    # FormFieldDef.type is a Literal. This test drives the internal dispatcher with a
-    # fake field to reach the defensive else branch.
+    """Reach the defensive else branch with a fake field type.
+
+    FormFieldDef.type is a Literal, so the test drives the internal dispatcher directly.
+    """
     errors: list[FieldError] = []
     _validate_value(SimpleNamespace(key="x", type="bogus"), "v", errors)  # type: ignore[arg-type]
     assert errors and "unknown field type" in errors[0].msg
@@ -663,8 +676,10 @@ def test_visible_if_visible_enforces_required() -> None:
 
 
 def test_visible_if_eval_error_is_conservatively_visible() -> None:
-    # T-05: and/or do not short-circuit. {">": [var y, 0]} raises when y is missing.
-    # The field then counts as visible, so required applies.
+    """Treat a visibleIf that raises as visible, so required applies.
+
+    `and` and `or` do not short-circuit, so ``{">": [var y, 0]}`` raises for a missing y.
+    """
     f = _field(
         "x",
         "text",
@@ -686,21 +701,24 @@ def test_compute_derives_value() -> None:
 
 
 def test_compute_failure_reports_error() -> None:
+    """Report a compute error such as a division by zero."""
     fields = [_field("total", "computed", compute={"/": [{"var": "a"}, {"var": "b"}]})]
     with pytest.raises(AnswerValidationError) as ei:
-        validate_answers(fields, {"a": 1, "b": 0})  # division by zero
+        validate_answers(fields, {"a": 1, "b": 0})
     assert _errkeys(ei.value) == {"total"}
 
 
 def test_compute_value_visible_in_visible_if() -> None:
+    """Use a computed value in visibleIf.
+
+    A total of 5 keeps the note hidden. A total of 11 makes it visible and required.
+    """
     fields = [
         _field("qty", "number"),
         _field("total", "computed", compute={"+": [{"var": "qty"}, 1]}),
         _field("note", "text", required=True, visibleIf={">": [{"var": "total"}, 5]}),
     ]
-    # total is 5, so note stays hidden and no required error appears.
     assert "note" not in validate_answers(fields, {"qty": 4})
-    # total is 11, so note becomes visible and required applies.
     with pytest.raises(AnswerValidationError) as ei:
         validate_answers(fields, {"qty": 10})
     assert _errkeys(ei.value) == {"note"}
@@ -731,6 +749,6 @@ def test_extract_promoted_unparseable_numeric_skipped() -> None:
 
 @pytest.mark.parametrize("bad", [float("nan"), float("inf"), "NaN", "Infinity"])
 def test_extract_promoted_non_finite_skipped(bad: object) -> None:
-    # B1: never pass a Decimal NaN or a Decimal Infinity on as an amount.
+    """Never pass NaN or Infinity on as the amount."""
     fields = [_field("amount", "currency", isPromoted=True, promoteTarget="amount")]
     assert extract_promoted(fields, {"amount": bad}) == {}

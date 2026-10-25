@@ -12,7 +12,7 @@ import type { AltchaChallenge } from '@core/api/models';
  * guard), so every request that needs one calls `solve` again.
  *
  * The widget (`app-altcha`) uses it for the submit; the draft uploads of the wizard
- * use it without a widget for the first anonymous upload (Z4).
+ * use it without a widget for the first anonymous upload.
  */
 @Injectable({ providedIn: 'root' })
 export class AltchaService {
@@ -30,7 +30,11 @@ export class AltchaService {
   }
 }
 
-/** Solve the proof of work: find `number` with `SHA-256(salt+number) == challenge`. */
+/**
+ * Solve the proof of work: find `number` with `SHA-256(salt+number) == challenge`.
+ *
+ * Standard base64 (btoa) is safe here, because the payload holds only ASCII.
+ */
 export async function solveChallenge(c: AltchaChallenge): Promise<string> {
   for (let number = 0; number <= c.maxnumber; number++) {
     if ((await sha256Hex(`${c.salt}${number}`)) === c.challenge) {
@@ -41,7 +45,6 @@ export async function solveChallenge(c: AltchaChallenge): Promise<string> {
         salt: c.salt,
         signature: c.signature,
       };
-      // Standard base64 (btoa) is safe here: the payload holds only ASCII.
       return btoa(JSON.stringify(payload));
     }
   }

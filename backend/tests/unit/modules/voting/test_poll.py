@@ -15,7 +15,7 @@ from uuid import UUID, uuid4
 import pydantic
 import pytest
 
-from app.modules.admin import gremium_roles
+from app.modules.auth import policy
 from app.modules.auth.principal import Principal
 from app.modules.voting import poll as poll_mod
 from app.modules.voting.election import own_ballot as any_ballot
@@ -95,9 +95,6 @@ def _audits(db: Any) -> list[Any]:
 
 def _cfg(mode: str = "single", **over: Any) -> PollConfig:
     return PollConfig.model_validate(_pcfg(mode, **over))
-
-
-# ---------------------------------------------------------------- config
 
 
 def test_config_projection_of_the_modes() -> None:
@@ -181,9 +178,6 @@ def test_internal_create_of_a_poll_has_no_quorum() -> None:
     assert isinstance(payload.config, PollConfig)
 
 
-# ---------------------------------------------------------------- tally
-
-
 def test_answers_round_trip() -> None:
     raw = encode_poll_answers({"o2": "no", "o1": "yes"})
     assert raw == '{"o1":"yes","o2":"no"}'
@@ -235,9 +229,6 @@ def test_tally_date_with_maybe_only_still_has_a_best_date() -> None:
     out = tally_poll([encode_poll_answers({"o1": "no", "o2": "maybe", "o3": "no"})], _cfg("date"))
     assert out.order[0] == "o2"
     assert out.top == ("o2",)
-
-
-# ---------------------------------------------------------------- helpers
 
 
 def test_build_config_wraps_the_error_in_422() -> None:
@@ -303,9 +294,6 @@ def test_result_of_keeps_maybe_none_outside_the_date_mode() -> None:
     assert poll_mod.dump_result(out)["counts"] == {"o1": 1, "o2": 0, "o3": 0}
 
 
-# ---------------------------------------------------------------- cast
-
-
 async def test_cast_single_poll_stores_the_list() -> None:
     vote = _pvote()
     db = fake_session(result(vote), result(uuid4()))
@@ -342,9 +330,6 @@ async def test_cast_motion_refuses_date_answers() -> None:
         await VotingService(fake_session(result(vote))).cast(
             vote.id, _voter(), {"yes": "yes"}, now=NOW
         )
-
-
-# ---------------------------------------------------------------- read
 
 
 async def test_get_open_poll_shows_the_running_count() -> None:
@@ -387,9 +372,6 @@ async def test_get_closed_poll_carries_the_stored_result() -> None:
     assert out.poll_result is not None and out.poll_result.top == ["o3"]
 
 
-# ---------------------------------------------------------------- create
-
-
 async def test_create_internal_poll_writes_kind_config_and_audit() -> None:
     payload = VoteCreateInternal(
         config=_cfg("date"), eligibleGroup=GID, eligibleCount=5, question="Wann?"
@@ -424,11 +406,11 @@ def manage(monkeypatch: pytest.MonkeyPatch) -> set[UUID]:
     """Stub the gremium ids where the principal holds ``vote.manage``."""
     ids: set[UUID] = {GID}
 
-    async def _ids_for(_s: Any, _p: Principal, perm: str) -> set[UUID]:
+    async def _ids_for(_s: Any, _p: Principal, perm: str, _now: object = None) -> set[UUID]:
         assert perm == "vote.manage"
         return ids
 
-    monkeypatch.setattr(gremium_roles, "gremium_ids_for", _ids_for)
+    monkeypatch.setattr(policy, "held_gremium_ids", _ids_for)
     return ids
 
 
@@ -519,9 +501,6 @@ async def test_create_poll_with_bad_options_422(manage: set[UUID]) -> None:
     assert err.value.code == "poll_invalid"
 
 
-# ---------------------------------------------------------------- open
-
-
 async def test_open_gremium_poll_audits_the_kind() -> None:
     vote = _pvote(status="draft")
     db = fake_session(result(vote))
@@ -545,9 +524,6 @@ async def test_open_check_skips_a_meeting_poll_and_a_motion() -> None:
     service = PollService(VotingService(fake_session()))
     await service.check_open(_pvote(meeting_id=uuid4(), closes_at=None), NOW)  # type: ignore[arg-type]
     await service.check_open(_vote(), NOW)  # type: ignore[arg-type]
-
-
-# ---------------------------------------------------------------- close
 
 
 @pytest.mark.usefixtures("_patch_flow")
@@ -579,9 +555,10 @@ async def test_close_poll_without_now_stamps_the_time() -> None:
 
 
 async def test_close_meeting_poll_fixes_the_attendance() -> None:
+    """The close of a meeting poll stores 4 present members and 2 admitted guests."""
     vote = _pvote(meeting_id=uuid4())
     db = fake_session(result(vote), result('["o1"]'))
-    db.scalar_results = [4, 2]  # present members, admitted guests
+    db.scalar_results = [4, 2]
     out = await VotingService(db).close(vote.id, _voter(), now=NOW)
     assert out.tally.present_members == 4
     assert out.tally.present_guests == 2
@@ -589,26 +566,32 @@ async def test_close_meeting_poll_fixes_the_attendance() -> None:
 
 
 async def test_close_meeting_poll_with_guests_counts_them_as_eligible() -> None:
+    """The admitted guests of a meeting poll with guests count as eligible.
+
+    The fake session serves the admitted guests, no guest ballots and no guest markers.
+    The scalar is the number of present members.
+    """
     vote = _pvote(meeting_id=uuid4(), config=_pcfg(guestsVote=True))
     db = fake_session(
         result(vote),
         result('["o1"]'),
-        result(uuid4()),  # admitted guests
-        result(),  # guest ballots
-        result(),  # guest markers
+        result(uuid4()),
+        result(),
+        result(),
     )
-    db.scalar_results = [3]  # present members
+    db.scalar_results = [3]
     out = await VotingService(db).close(vote.id, _voter(), now=NOW)
     assert out.tally.eligible == 4
     assert vote.eligible_count == 4
 
 
-# ---------------------------------------------------------------- edit
-
-
 async def test_patch_changes_question_options_and_end() -> None:
+    """A patch changes the question, the options and the end.
+
+    The fake session serves the vote, the audit lock, the audit prev hash and the vote.
+    """
     vote = _pvote(config=_pcfg("multi", maxChoices=2), reminded_at=NOW)
-    db = fake_session(result(vote), result(), result(), result(vote))  # audit: lock, prev hash
+    db = fake_session(result(vote), result(), result(), result(vote))
     end = NOW + timedelta(days=5)
     payload = PollPatch.model_validate(
         {
@@ -631,8 +614,12 @@ async def test_patch_changes_question_options_and_end() -> None:
 
 
 async def test_patch_max_choices_keeps_the_options() -> None:
+    """A patch of maxChoices keeps the options.
+
+    The fake session serves the vote, the audit lock, the audit prev hash and the vote.
+    """
     vote = _pvote(config=_pcfg("multi"))
-    db = fake_session(result(vote), result(), result(), result(vote))  # audit: lock, prev hash
+    db = fake_session(result(vote), result(), result(), result(vote))
     payload = PollPatch.model_validate({"maxChoices": 2})
     await PollService(VotingService(db)).patch(vote.id, payload, _voter(), now=NOW)
     assert vote.config["maxChoices"] == 2
@@ -640,16 +627,24 @@ async def test_patch_max_choices_keeps_the_options() -> None:
 
 
 async def test_patch_date_options_keep_the_dates() -> None:
+    """A patch of the date options keeps the dates.
+
+    The fake session serves the vote, the audit lock, the audit prev hash and the vote.
+    """
     vote = _pvote(config=_pcfg("date"))
-    db = fake_session(result(vote), result(), result(), result(vote))  # audit: lock, prev hash
+    db = fake_session(result(vote), result(), result(), result(vote))
     payload = PollPatch.model_validate({"options": [{"start": D2}, {"start": D3}]})
     await PollService(VotingService(db)).patch(vote.id, payload, _voter(), now=NOW)
     assert [o["id"] for o in vote.config["options"]] == ["o1", "o2"]
 
 
 async def test_patch_without_a_field_only_audits() -> None:
+    """A patch without a field only writes the audit entry.
+
+    The fake session serves the vote, the audit lock, the audit prev hash and the vote.
+    """
     vote = _pvote()
-    db = fake_session(result(vote), result(), result(), result(vote))  # audit: lock, prev hash
+    db = fake_session(result(vote), result(), result(), result(vote))
     await PollService(VotingService(db)).patch(vote.id, PollPatch(), _voter(), now=NOW)
     [entry] = _audits(db)
     assert entry.data["changed"] == []

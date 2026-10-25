@@ -2,10 +2,10 @@
 
 The meeting payload advertises `canManageVotes`. The client renders the open, close and
 delete buttons from it. `MeetingService.can_manage_votes` computes it for the session
-manager, the protokollant, and a gremium role with `vote.manage`. The lifecycle gate of
-the voting module used to admit only `vote.manage`, so the protokollant could create,
-open and even delete a vote of the meeting, but never close it. The open vote then
-stranded until a `vote.manage` holder stepped in.
+manager, the protokollant, and a gremium role with `vote.manage`. A lifecycle gate that
+admits only `vote.manage` lets the protokollant create, open and delete a vote of the
+meeting, but never close it, so the open vote strands until a `vote.manage` holder steps
+in.
 
 These tests pin the invariant: the capability the API advertises equals the capability
 the gate admits.
@@ -57,8 +57,11 @@ def _patch_gremium_perms(
 
 
 async def _advertised(meeting: Any, principal: Principal) -> bool:
-    """Run the rule the meeting payload publishes as `canManageVotes`."""
-    db = fake_session(result(PID))  # `_principal_id` for the protokollant check
+    """Run the rule the meeting payload publishes as `canManageVotes`.
+
+    The fake session serves ``_principal_id`` for the protokollant check.
+    """
+    db = fake_session(result(PID))
     return await MeetingService(db).can_manage_votes(meeting, principal)
 
 
@@ -121,7 +124,7 @@ async def test_former_global_meeting_manage_no_longer_manages(
 async def test_read_token_of_protokollant_may_not_close_the_vote(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """F16: the scope cap also stops the protokollant path and the gremium roles."""
+    """The scope cap also stops the protokollant path and the gremium roles."""
     _patch_gremium_perms(monkeypatch, {"vote.manage": {GID}, "session.manage": {GID}})
     principal = Principal(
         sub="protokoll", scope_permissions=frozenset({"application.read"})
@@ -149,10 +152,13 @@ async def test_plain_member_may_not_close_the_vote(
 async def test_vanished_meeting_falls_back_to_the_gremium_rule(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A vote whose meeting no longer exists keeps the gremium-scoped `vote.manage`."""
+    """A vote whose meeting no longer exists keeps the gremium-scoped `vote.manage`.
+
+    ``get`` finds no meeting.
+    """
     _patch_gremium_perms(monkeypatch, {})
     vote = SimpleNamespace(id=uuid4(), eligible_group=str(GID), meeting_id=uuid4())
-    db = fake_session(result(vote))  # `get` finds no meeting
+    db = fake_session(result(vote))
     with pytest.raises(ForbiddenError, match="manage"):
         await VotingService(db).assert_can_manage_vote(vote.id, Principal(sub="x"))
 
@@ -193,3 +199,15 @@ async def test_run_vote_needs_the_protokollant_for_a_meeting_vote(
 
     monkeypatch.setattr(VotingService, "meeting_id_of", _loose)
     await svc.assert_can_run_vote(uuid4(), object())  # type: ignore[arg-type]
+
+
+async def test_admin_votes_token_may_close_the_vote(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An admin token with `vote.manage` but no `session.manage` passes the gremium rule."""
+    _patch_gremium_perms(monkeypatch, {})
+    meeting = _meeting(protokollant_id=uuid4())
+    principal = Principal(
+        sub="ops", roles=["admin"], scope_permissions=frozenset({"vote.manage"})
+    )
+    assert await _parity(meeting, principal) is True

@@ -1,4 +1,4 @@
-"""Lifecycle of magic links without a fixed scope (Z1, O3, O4, F5; real Postgres).
+"""Lifecycle of magic links without a fixed scope (real Postgres).
 
 * A request expires no other link. Only the redeem expires the older links of the
   same application. A newer link that is not redeemed yet stays valid.
@@ -73,24 +73,27 @@ async def _setup(
 async def test_redeem_expires_only_the_older_links(
     maker: async_sessionmaker[AsyncSession], settings: Settings
 ) -> None:
+    """Expire only the older links on a redeem.
+
+    The requests alone expire nothing. A redeem expires the older link, and the redeemed
+    link and the newer one stay usable. A redeem of the newest link then ends the middle
+    link too.
+    """
     _, app_id = await _setup(maker)
     oldest = await issue_magic_token(maker, settings, app_id)
     middle = await issue_magic_token(maker, settings, app_id)
     newest = await issue_magic_token(maker, settings, app_id)
-    # The requests alone expire nothing.
     assert [link.expires_at for link in await _links(maker, app_id)] == [None] * 3
 
     assert await redeem(maker, settings, middle) == "edit"
     first, second, third = await _links(maker, app_id)
-    assert first.expires_at is not None  # older: expired by the redeem
+    assert first.expires_at is not None
     assert second.expires_at is None and third.expires_at is None
 
     with pytest.raises(GoneError):
         await redeem(maker, settings, oldest)
-    # The redeemed link stays usable, and so does the newer one.
     assert await redeem(maker, settings, middle) == "edit"
     assert await redeem(maker, settings, newest) == "edit"
-    # Now the newest redeem ended the middle link too.
     with pytest.raises(GoneError):
         await redeem(maker, settings, middle)
 
@@ -98,7 +101,7 @@ async def test_redeem_expires_only_the_older_links(
 async def test_locked_state_gives_an_edit_session(
     maker: async_sessionmaker[AsyncSession], settings: Settings
 ) -> None:
-    """F5: a link in a locked state opened only `view` before. Now it opens `edit`."""
+    """A link in a locked state opened only `view` before. Now it opens `edit`."""
     seed, app_id = await _setup(maker)
     async with maker() as session:
         await session.execute(
@@ -123,7 +126,7 @@ async def test_locked_state_gives_an_edit_session(
 async def test_old_view_link_opens_an_edit_session(
     maker: async_sessionmaker[AsyncSession], settings: Settings
 ) -> None:
-    """O4: a single-use view link from before O3 still works once, now with edit."""
+    """An older single-use view link still works once, now with edit."""
     _, app_id = await _setup(maker)
     async with maker() as session:
         session.add(
@@ -164,13 +167,13 @@ async def test_view_link_without_expiry_violates_the_check(
 async def test_archive_expires_every_link(
     maker: async_sessionmaker[AsyncSession], settings: Settings
 ) -> None:
+    """Expire every link on archive; a restore does not revive the link."""
     _, app_id = await _setup(maker)
     token = await issue_magic_token(maker, settings, app_id)
     async with maker() as session:
         await ApplicationsService(session).set_archived(app_id, archived=True, actor="a")
     with pytest.raises(GoneError):
         await redeem(maker, settings, token)
-    # Bringing it back does not revive the link.
     async with maker() as session:
         await ApplicationsService(session).set_archived(app_id, archived=False, actor="a")
     with pytest.raises(GoneError):
@@ -192,11 +195,14 @@ async def test_anonymize_removes_every_link(
 async def test_retention_purge_keeps_unlimited_links(
     maker: async_sessionmaker[AsyncSession], settings: Settings
 ) -> None:
-    """A NULL `expires_at` never matches the purge. Only an ended link goes."""
+    """Keep unlimited links in the retention purge.
+
+    A NULL `expires_at` never matches the purge. Only an ended link goes.
+    """
     _, app_id = await _setup(maker)
     await issue_magic_token(maker, settings, app_id)
     newer = await issue_magic_token(maker, settings, app_id)
-    await redeem(maker, settings, newer)  # expires the first link
+    await redeem(maker, settings, newer)
 
     later = datetime.now(UTC) + timedelta(seconds=1)
     _, purged = await retention._purge_expired(maker, later)

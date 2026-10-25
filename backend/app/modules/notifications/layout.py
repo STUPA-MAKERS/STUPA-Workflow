@@ -16,7 +16,7 @@ from __future__ import annotations
 import html
 import re
 
-# Footer trigger hint per mail kind ("you receive this email because ...").
+#: Footer reason per mail kind ("you receive this email because ...").
 _REASONS: dict[str, dict[str, str]] = {
     "magic_link": {
         "de": "Sie erhalten diese E-Mail, weil für Ihre Adresse ein "
@@ -47,12 +47,6 @@ _REASONS: dict[str, dict[str, str]] = {
         "Gremiums finalisiert wurde.",
         "en": "You are receiving this email because a meeting protocol of "
         "your committee was finalized.",
-    },
-    "deadline": {
-        "de": "Sie erhalten diese E-Mail, weil eine Frist zu einem Antrag "
-        "näher rückt, der Sie betrifft.",
-        "en": "You are receiving this email because a deadline on an "
-        "application that concerns you is approaching.",
     },
     "task": {
         "de": "Sie erhalten diese E-Mail, weil ein Antrag einen Schritt "
@@ -154,8 +148,8 @@ def reason_text(kind: str, lang: str) -> str:
     return table.get(lang, table["de"])
 
 
-# A URL in the already escaped text ends before whitespace or "<". The code
-# below splits off trailing punctuation, so "https://x.de/y." stays clickable.
+#: URL in the escaped text; it ends before whitespace or "<". The linker splits off
+#: trailing punctuation, so "https://x.de/y." stays clickable.
 _URL_RE = re.compile(r"https?://[^\s<]+")
 _TRAILING_PUNCT = ".,;:!?)]"
 _LINK_STYLE = "color:#0b6e4f;word-break:break-all;"

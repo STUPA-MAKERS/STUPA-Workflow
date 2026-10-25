@@ -18,6 +18,10 @@ def test_text_to_html_escapes_and_paragraphs() -> None:
 
 
 def test_render_layout_wraps_content_with_footer() -> None:
+    """Wrap the content in the layout with a footer.
+
+    The footer holds the trigger note and a link to the notification settings.
+    """
     out = render_layout(
         content_html="<p>Inhalt</p>",
         title='Update zu "Beamer" <kaufen>',
@@ -30,7 +34,6 @@ def test_render_layout_wraps_content_with_footer() -> None:
     assert "<p>Inhalt</p>" in out
     assert "&lt;kaufen&gt;" in out
     assert "StuPa &lt;Plattform&gt;" in out
-    # The footer holds the trigger note and a link to the notification settings.
     assert "Sie erhalten diese E-Mail" in out
     assert "https://antrag.example.org/account/notifications" in out
 

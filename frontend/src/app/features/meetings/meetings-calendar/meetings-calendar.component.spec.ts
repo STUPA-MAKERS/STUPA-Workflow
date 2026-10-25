@@ -147,7 +147,7 @@ function load(view: View, items: MeetingOutWire[] = MONTH, gremien: { id: string
   return req;
 }
 
-// The tests click through whole views; a busy runner needs more than the default 5 s.
+/** The tests click through whole views, and a busy runner needs more than the default 5 s. */
 jest.setTimeout(15_000);
 
 describe('MeetingsCalendarComponent', () => {
@@ -225,6 +225,7 @@ describe('MeetingsCalendarComponent', () => {
     expect(await runAxe(view.container)).toHaveNoViolations();
   });
 
+  /** A closed meeting has no beamer and no live facts. */
   it('selects a day on a click; a day of another month shows that month', async () => {
     const view = await setup();
     load(view);
@@ -232,7 +233,6 @@ describe('MeetingsCalendarComponent', () => {
     const panel = screen.getByRole('complementary');
     expect(within(panel).getByRole('heading', { name: 'Di, 15.09.2026' })).toBeInTheDocument();
     const card = within(panel).getByRole('article', { name: '33. Sitzung' });
-    // A closed meeting has no beamer; no live facts.
     expect(within(card).queryByRole('button', { name: /Beamer/ })).toBeNull();
     expect(within(card).queryByText(/TOP \d von/)).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: /16\. September/ }));
@@ -249,6 +249,10 @@ describe('MeetingsCalendarComponent', () => {
     expect(within(fa).queryByRole('button', { name: /Beamer/ })).toBeNull();
   });
 
+  /**
+   * Until the month arrives, an empty day shows a placeholder. September has no 31st, so the
+   * selection moves to the last day.
+   */
   it('moves a month back and on, keeps the day where it can, and goes back to today', async () => {
     const view = await setup();
     load(view);
@@ -256,11 +260,9 @@ describe('MeetingsCalendarComponent', () => {
     monthReq(view.http).flush([]);
     expect(screen.getByRole('heading', { name: 'August 2026' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Nächster Monat' }));
-    // Until the month arrives, an empty day shows a placeholder.
     expect(view.container.querySelector('.cal__daySec .skel')).not.toBeNull();
     monthReq(view.http).flush([]);
     view.fixture.detectChanges();
-    // 31 does not exist in September: the last day.
     expect(screen.getByRole('heading', { name: 'Mi, 30.09.2026' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Voriger Monat' }));
     monthReq(view.http).flush([]);
@@ -273,6 +275,7 @@ describe('MeetingsCalendarComponent', () => {
     expect(screen.getByRole('heading', { name: 'Di, 29.09.2026 · Heute' })).toBeInTheDocument();
   });
 
+  /** The day of another month shows that month. */
   it('moves the selected day with the arrow keys, Home and End', async () => {
     const view = await setup();
     load(view);
@@ -285,7 +288,6 @@ describe('MeetingsCalendarComponent', () => {
     fireEvent.keyDown(grid, { key: 'End' });
     view.fixture.detectChanges();
     expect(sel()).toMatch(/^Sonntag, 4\. Oktober/);
-    // The day of another month shows that month.
     monthReq(view.http).flush([]);
     fireEvent.keyDown(grid, { key: 'Home' });
     fireEvent.keyDown(grid, { key: 'ArrowUp' });
@@ -300,6 +302,7 @@ describe('MeetingsCalendarComponent', () => {
     expect(document.activeElement).toBe(grid.querySelector('.cal__cell--sel .cal__day'));
   });
 
+  /** A meeting without a date has no day to show; one without a time shows its weekday. */
   it('lists the upcoming meetings without the live one; a click shows their day', async () => {
     const view = await setup();
     load(view);
@@ -315,7 +318,6 @@ describe('MeetingsCalendarComponent', () => {
     monthReq(view.http).flush([]);
     view.fixture.detectChanges();
     expect(screen.getByRole('button', { name: 'Kommend 0' })).toHaveAttribute('aria-current', 'true');
-    // A meeting without a date has no day to show; one without a time shows its weekday.
     const cmp = view.fixture.componentInstance;
     cmp.showMeeting({ ...view.timeline.upcomingItems()[0], date: null });
     expect(cmp.rowTime({ ...view.timeline.upcomingItems()[0], startTime: null })).toBe('Di');
@@ -364,6 +366,10 @@ describe('MeetingsCalendarComponent', () => {
     jest.useRealTimers();
   });
 
+  /**
+   * The late answer of the first request changes nothing. "Erneut versuchen" reads the month again
+   * with the same filter.
+   */
   it('reads the month again for another Gremium and drops a late answer', async () => {
     const view = await setup();
     load(view, MONTH, [{ id: 'g-1', name: 'StuPa' }, { id: 'g-2', name: 'Finanzausschuss' }]);
@@ -376,13 +382,11 @@ describe('MeetingsCalendarComponent', () => {
     view.timeline.gremiumFilter.set('g-gone');
     view.fixture.detectChanges();
     const second = monthReq(view.http);
-    // The late answer of the first request changes nothing.
     first.flush([FA]);
     second.flush(null, { status: 500, statusText: 'e' });
     view.fixture.detectChanges();
     expect(screen.getByRole('alert')).toHaveTextContent('Die Sitzungen des Monats konnten nicht geladen werden.');
     expect(screen.getByRole('button', { name: 'Gremium: Alle Gremien' })).toBeInTheDocument();
-    // "Erneut versuchen" reads the month again with the same filter.
     screen.getByRole('button', { name: 'Erneut versuchen' }).click();
     const again = monthReq(view.http);
     expect(again.request.params.get('gremiumId')).toBe('g-gone');

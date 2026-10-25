@@ -1,4 +1,4 @@
-"""Add `meeting.started_at`, keep the votes of a deleted agenda item (Z7, O9, F21).
+"""Add `meeting.started_at`, keep the votes of a deleted agenda item.
 
 The upgrade:
 
@@ -6,11 +6,11 @@ The upgrade:
    `planned` to `live` sets it once. This is idempotent: a fresh database already
    gets the column from the `create_all` baseline (0001), and a migrated database
    gets it through `ADD COLUMN IF NOT EXISTS`. There is no backfill. The audit log
-   holds no meeting start (meetings were not audited before F12), and an invented
+   holds no meeting start (older meetings were not audited), and an invented
    value would show up in a protocol that is rendered again. The migration logs the
    number of live and closed meetings that stay NULL. A reader falls back to the
    planned start.
-2. changes the foreign key `vote.agenda_item_id` to `ON DELETE SET NULL` (F21). Before,
+2. changes the foreign key `vote.agenda_item_id` to `ON DELETE SET NULL`. Before,
    a meeting delete cascaded through the agenda items to the votes, their ballots and
    their protocol references, although `vote.meeting_id` is `SET NULL`. The migration
    drops every foreign key on that column, whatever its name, and creates it again
@@ -71,6 +71,7 @@ def _replace_agenda_item_fk(on_delete: str) -> None:
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     bind = op.get_bind()
     op.execute("ALTER TABLE meeting ADD COLUMN IF NOT EXISTS started_at timestamptz")
     left = bind.execute(
@@ -88,5 +89,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     _replace_agenda_item_fk("CASCADE")
     op.execute("ALTER TABLE meeting DROP COLUMN IF EXISTS started_at")

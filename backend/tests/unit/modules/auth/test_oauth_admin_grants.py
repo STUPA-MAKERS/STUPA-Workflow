@@ -11,7 +11,7 @@ import uuid
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import Any
 
 from fastapi.testclient import TestClient
 
@@ -113,7 +113,6 @@ def _principal_row(
     )
 
 
-# --- RBAC ---------------------------------------------------------------------------
 def test_list_without_admin_users_is_403_problem_json() -> None:
     client = _build_client(principal=_plain_user())
     resp = client.get(GRANTS)
@@ -144,7 +143,6 @@ def test_revoke_without_session_is_401_problem_json() -> None:
     assert resp.headers["content-type"].startswith("application/problem+json")
 
 
-# --- list ---------------------------------------------------------------------------
 def test_admin_lists_grants_of_another_principal() -> None:
     db = fake_session(result((_token_row(), _principal_row())))
     db.scalar_results.append(1)
@@ -166,22 +164,26 @@ def test_admin_lists_grants_of_another_principal() -> None:
 
 
 def test_list_never_leaks_a_token_secret_or_a_uuid_as_a_name() -> None:
+    """Leak no token secret and no UUID as a name in the list.
+
+    Neither a hash value nor a hash field name reaches the client. The name field
+    carries a name, never the principal UUID.
+    """
     db = fake_session(result((_token_row(), _principal_row())))
     db.scalar_results.append(1)
     client = _build_client(db=db)
     resp = client.get(GRANTS)
     raw = resp.text
-    # Neither a hash value nor a hash field name reaches the client.
     assert "secret-access-hash" not in raw
     assert "secret-refresh-hash" not in raw
     assert "TokenHash" not in raw and "token_hash" not in raw
-    # The name field carries a name, never the principal UUID (see no-uuids-in-ui).
     item = resp.json()["items"][0]
     assert item["principalName"] == "Agent Owner"
     assert item["principalName"] != str(OWNER_ID)
 
 
 def test_list_falls_back_to_email_then_to_null() -> None:
+    """Fall back to the email, then to null, never to the UUID."""
     db = fake_session(
         result(
             (_token_row(), _principal_row(display_name=None)),
@@ -195,26 +197,26 @@ def test_list_falls_back_to_email_then_to_null() -> None:
     client = _build_client(db=db)
     items = client.get(GRANTS).json()["items"]
     assert items[0]["principalName"] == "owner@example.de"
-    # Neither a display name nor an email: null, never the UUID.
     assert items[1]["principalName"] is None
     assert items[1]["principalEmail"] is None
 
 
 def test_list_empty_total_none_gives_zero() -> None:
-    db = fake_session(result())  # no rows, `scalar` gives None
+    """Give a total of zero when `scalar` returns None for no rows."""
+    db = fake_session(result())
     client = _build_client(db=db)
     body = client.get(GRANTS).json()
     assert body == {"items": [], "total": 0, "limit": 50, "offset": 0}
 
 
 def test_list_filters_by_principal() -> None:
+    """Filter the list by principal in the SQL."""
     db = fake_session(result((_token_row(), _principal_row())))
     db.scalar_results.append(1)
     client = _build_client(db=db)
     resp = client.get(GRANTS, params={"principalId": str(OWNER_ID), "limit": 10, "offset": 5})
     assert resp.status_code == 200
     assert resp.json()["limit"] == 10 and resp.json()["offset"] == 5
-    # The filter reached the SQL, so the query is scoped to that principal.
     assert "principal_id" in str(db.statements[-1])
 
 
@@ -231,7 +233,6 @@ def test_list_rejects_a_non_uuid_principal_filter() -> None:
     assert resp.status_code == 422
 
 
-# --- revoke -------------------------------------------------------------------------
 def test_revoke_unknown_grant_is_404_problem_json() -> None:
     db = fake_session(result())
     client = _build_client(db=db)
@@ -241,6 +242,7 @@ def test_revoke_unknown_grant_is_404_problem_json() -> None:
 
 
 def test_revoke_foreign_grant_succeeds_and_is_audited() -> None:
+    """Revoke a foreign grant and audit it with id references only, never a token secret."""
     row = _token_row()
     db = fake_session(result(row))
     client = _build_client(db=db)
@@ -257,7 +259,6 @@ def test_revoke_foreign_grant_succeeds_and_is_audited() -> None:
     assert entry.data["principalId"] == str(OWNER_ID)
     assert entry.data["clientId"] == "antragsplattform-mcp"
     assert entry.data["scope"] == "read votes:write"
-    # The audit payload carries id references only, never a token secret.
     assert "secret-access-hash" not in str(entry.data)
 
 
@@ -290,9 +291,8 @@ async def test_revoked_grant_no_longer_authenticates() -> None:
     client = _build_client(db=db)
     assert client.delete(f"{GRANTS}/{GRANT_ID}").status_code == 204
 
-    # Same row, now through the runtime check.
     lookup = fake_session(result(row))
     resolved = await oauth_service.resolve_access_token(
-        cast(Any, lookup), token="apat_whatever", now=NOW
+        lookup, token="apat_whatever", now=NOW
     )
     assert resolved is None

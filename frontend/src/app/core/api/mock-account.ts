@@ -23,7 +23,6 @@ let prefs: NotificationPreference[] = [
   { kind: 'meeting', enabled: true },
   { kind: 'delegation', enabled: true },
   { kind: 'protocol', enabled: false },
-  { kind: 'deadline', enabled: true },
   { kind: 'privacy', enabled: true },
 ];
 
@@ -106,7 +105,6 @@ function consentRequest(): ConsentRequest {
   return {
     clientId: 'antragsplattform-mcp',
     canUseMcp: !noMcp(),
-    // The demo person holds no flow rights, so one scope shows the "not held" line.
     requestedScopes: keys.map((key) => ({ key, held: key !== 'flows:write' })),
     lifetimes: ['1h', '8h', '1d', '30d', '90d', 'never'],
     defaultLifetime: '30d',

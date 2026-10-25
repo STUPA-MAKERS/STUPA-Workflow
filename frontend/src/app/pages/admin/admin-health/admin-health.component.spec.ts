@@ -63,13 +63,17 @@ async function setup(perms: string[], api: Partial<Record<keyof AdminApiService,
   return { view, api: fake };
 }
 
-function tileTexts(container: HTMLElement): string[] {
+function tileTexts(container: Element): string[] {
   return [...container.querySelectorAll('.ah__tile')].map((t) => (t.textContent ?? '').replace(/\s+/g, ' ').trim());
 }
 
 describe('AdminHealthComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
+  /**
+   * The backup tile shows the newest archive, not the first of the list. The tiles show their own
+   * placeholders, so the calls skip the global overlay.
+   */
   it('shows the three tiles with their links', async () => {
     const { view, api } = await setup(ALL);
     expect(screen.getByRole('heading', { name: 'Zustand' })).toBeInTheDocument();
@@ -83,12 +87,10 @@ describe('AdminHealthComponent', () => {
     expect(audit).toContain('Audit-Kette intakt');
     expect(audit).toContain('Zuletzt geprüft');
     expect(audit).toContain('18.412 Einträge');
-    // The newest archive, not the first of the list.
     expect(back).toContain('Letztes Backup');
     expect(back).toContain('Manuell · Fertig · 413 MB');
     expect(erasure).toContain('2 offene Löschanträge');
     expect(erasure).toContain('Art. 17 DSGVO');
-    // The tiles show their own placeholders, so the calls skip the global overlay.
     expect(api.listErasures).toHaveBeenCalledWith('open', { quiet: true });
     expect(api.listBackups).toHaveBeenCalledWith({ quiet: true });
     expect(api.verifyAuditChain).not.toHaveBeenCalled();
@@ -234,6 +236,7 @@ describe('AdminHealthComponent', () => {
     expect(tile?.querySelector('.ah__alert')?.textContent).toContain('Letzte Sicherung fehlgeschlagen');
   });
 
+  /** A second set of tiles in the same session (a return to /admin) takes the result. */
   it('runs the live chain check only one time per session', async () => {
     const verify = jest.fn(() => of({ valid: true, checked: 12, brokenAt: null, reason: null }));
     const { view } = await setup(['audit.read', 'audit.verify'], {
@@ -241,7 +244,6 @@ describe('AdminHealthComponent', () => {
       verifyAuditChain: verify,
     });
     view.fixture.destroy();
-    // A second set of tiles in the same session (a return to /admin) takes the result.
     const second = TestBed.createComponent(AdminHealthComponent);
     second.detectChanges();
     expect(verify).toHaveBeenCalledTimes(1);

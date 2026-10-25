@@ -200,7 +200,7 @@ describe('GremiumDecisionsComponent', () => {
   });
 
   it('reports a failed read and reads again', async () => {
-    const decisions = jest.fn(() => throwError(() => new Error('x')));
+    const decisions = jest.fn((): ReturnType<GremienApiService['decisions']> => throwError(() => new Error('x')));
     const view = await setup({ api: gremienApiMock({ decisions }) });
     restore = view.restore;
     expect(screen.getByRole('alert')).toHaveTextContent('Die Beschlüsse konnten nicht geladen werden.');

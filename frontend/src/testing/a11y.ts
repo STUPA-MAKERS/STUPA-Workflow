@@ -10,14 +10,22 @@
  * `styles/contrast.spec.ts` checks the contrasts against the CD tokens instead, with a
  * deterministic result.
  */
-import { axe, type AxeResults, type JestAxeConfigureOptions } from 'jest-axe';
+import { axe, type JestAxeConfigureOptions } from 'jest-axe';
 
-export const A11Y_RULES: JestAxeConfigureOptions = {
+type AxeResults = Awaited<ReturnType<typeof axe>>;
+
+export interface A11yOptions extends JestAxeConfigureOptions {
+  rules?: Record<string, { enabled: boolean }>;
+}
+
+export const A11Y_RULES: A11yOptions = {
   rules: {
-    // jsdom cannot compute this rule. The token test covers it instead.
+    /** jsdom cannot compute this rule. The token test covers it instead. */
     'color-contrast': { enabled: false },
-    // A single component renders without a <main> landmark wrapper. The shell view
-    // scan checks the landmark structure, not each fragment.
+    /**
+     * A single component renders without a <main> landmark wrapper. The shell view scan checks the
+     * landmark structure, not each fragment.
+     */
     region: { enabled: false },
   },
 };
@@ -28,10 +36,7 @@ export const A11Y_RULES: JestAxeConfigureOptions = {
  * For a full-view scan of the shell with its landmarks, enable `region` again through
  * `extraRules`.
  */
-export function runAxe(
-  target: Element | Document,
-  extraRules?: JestAxeConfigureOptions,
-): Promise<AxeResults> {
+export function runAxe(target: Element | Document, extraRules?: A11yOptions): Promise<AxeResults> {
   return axe(target as Element, {
     ...A11Y_RULES,
     ...extraRules,

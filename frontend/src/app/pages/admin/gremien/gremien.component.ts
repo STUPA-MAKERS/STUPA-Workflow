@@ -54,14 +54,15 @@ interface Setting {
 }
 
 /**
- * Gremien administration (`/admin/gremien`, boards Verwaltung-Gremium-Dialog and
- * Verwaltung-Gremiumrolle-Dialog).
+ * Gremien administration (`/admin/gremien`).
  *
  * One row per gremium: name, slug, "n Mitglieder · n Rollen", the link to the members,
  * edit, delete and the toggle. An open row shows the settings (gaps N38) and the role
  * matrix of the gremium (`app-gremium-role-matrix`); the first row starts open. The
  * memberships come from the OIDC groups, so this page has no member editing. The dialog
  * `app-gremium-dialog` creates and edits a gremium.
+ *
+ * The disclosure is a native button, because it needs aria-expanded on the button itself.
  */
 @Component({
   selector: 'app-admin-gremien',
@@ -252,14 +253,12 @@ export class AdminGremienComponent {
     recipients: string[] | null;
   }): void {
     this.dialogGremium.set(undefined);
-    // `null`: the dialog did not save the recipients, so the row keeps what it shows.
     if (event.recipients) this.setRecipients(event.gremium.id, event.recipients);
     this.toast.success(
       this.i18n.translate(
         event.created ? 'admin.gremien.toast.created' : 'admin.gremien.toast.updated',
       ),
     );
-    // A new gremium opens, so its roles show at once.
     if (event.created) this.expanded.open(event.gremium.id);
     this.reload(false);
   }
@@ -271,7 +270,6 @@ export class AdminGremienComponent {
   protected onBaseSaved(event: { gremium: Gremium; created: boolean }): void {
     if (event.created && !this.isOpen(event.gremium)) {
       this.expanded.open(event.gremium.id);
-      // The recipients of the new gremium are not saved: read what the server has.
       this.loadRecipients(event.gremium.id);
     }
     this.reload(false);
@@ -306,7 +304,7 @@ export class AdminGremienComponent {
     });
   }
 
-  /** `first`: the first load opens the first row, as on the board. */
+  /** `first`: the first load opens the first row. */
   protected reload(first: boolean): void {
     if (first) this.loading.set(true);
     this.loadError.set(false);

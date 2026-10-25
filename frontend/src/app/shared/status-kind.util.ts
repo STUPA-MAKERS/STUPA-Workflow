@@ -41,7 +41,6 @@ export function flowColorKind(hex: string | null | undefined): StatusKind {
   const rgb = parseHex(hex);
   if (!rgb) return 'neutral';
   const { h, s } = hueSaturation(rgb);
-  // A grey has no hue to go by.
   if (s < 0.15) return 'neutral';
   if (h < 20 || h >= 330) return 'error';
   if (h < 65) return 'warn';
@@ -52,7 +51,7 @@ export function flowColorKind(hex: string | null | undefined): StatusKind {
 /**
  * The result of a closed vote.
  *
- * A tie is a rejection (O18): the motion did not get a majority. The UI never says
+ * A tie is a rejection: the motion did not get a majority. The UI never says
  * "Stimmengleichheit", so a tie shows the label of `rejected`.
  */
 export function voteResultStatus(result: VoteResult): StatusView {

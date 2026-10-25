@@ -75,7 +75,6 @@ from app.modules.tickets.schemas import (
     TicketRef,
     TicketReporter,
 )
-from app.search import escape_like
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError, ValidationProblem
 from app.shared.mentions import (
     check_mentions,
@@ -91,6 +90,7 @@ from app.shared.people import (
     permission_holders,
     person_of,
 )
+from app.shared.search import escape_like
 
 #: ``T-0040``, ``t0040``, ``0040`` and ``40`` all name ticket 40.
 _NUMBER_RE = re.compile(r"^(?:t-?)?0*(\d{1,9})$", re.IGNORECASE)
@@ -197,11 +197,10 @@ class TicketService:
         files: FilesService | None = None,
         todos: TicketTodoHooks | None = None,
     ) -> None:
+        """Bind the service to a session and its file and to-do helpers."""
         self.session = session
         self.files = files or FilesService(session)
         self.todos = todos
-
-    # -- report -----------------------------------------------------------------
 
     async def create(
         self,
@@ -350,8 +349,6 @@ class TicketService:
         await self.session.commit()
         logger.info("report held back by sender block %s", block_id)
         return SwallowedReport(number=int(number or 0))
-
-    # -- sender blocks ------------------------------------------------------------
 
     @staticmethod
     def block_target(ticket: Ticket) -> BlockTarget | None:
@@ -517,8 +514,6 @@ class TicketService:
         if removed is None:
             raise NotFoundError(f"block {block_id} not found")
         await self.session.commit()
-
-    # -- reads ------------------------------------------------------------------
 
     async def list(
         self,
@@ -709,8 +704,6 @@ class TicketService:
             return set()
         return await self.todos.readable_cards(ids, principal)
 
-    # -- writes -----------------------------------------------------------------
-
     async def patch(
         self, ticket_id: uuid.UUID, payload: TicketPatch, principal: Principal
     ) -> TicketDetail:
@@ -814,8 +807,11 @@ class TicketService:
         actor: uuid.UUID | None,
         payload: dict[str, JsonValue],
     ) -> None:
-        # The clock of the process, not now() of the transaction: one change can
-        # write two events, and the timeline orders them by this time.
+        """Add an event of a ticket, stamped with the clock of the process.
+
+        It is not now() of the transaction, because one change can write two events, and
+        the timeline orders them by this time.
+        """
         self.session.add(
             TicketEvent(
                 ticket_id=ticket.id,
@@ -838,10 +834,11 @@ class TicketService:
                 files without a draft token, or a draft that is missing, expired,
                 foreign or infected, or a mention of a person who does not hold
                 ``ticket.manage`` (``mention_not_member``) (HTTP 422).
+
+        With files the ticket row is locked, so the retention cron (which locks it too)
+        cannot anonymize the ticket between the check and the commit; the cron runs once
+        and would not see the file again.
         """
-        # With files the ticket row is locked, so the retention cron (which locks it
-        # too) cannot anonymize it between this check and the commit: it ran once and
-        # would not see the file again.
         ticket = await self._get(ticket_id, lock=bool(payload.attachment_ids))
         author = await self._require_account(principal)
         wanted = await self._checked_mentions(payload.mentions)
@@ -975,8 +972,6 @@ class TicketService:
         return _note_row(
             note, ticket, accounts, me, files.get(note.id, []), for_reporter=for_reporter
         )
-
-    # -- the view of the reporter -----------------------------------------------
 
     async def _reporter_ticket(
         self, ticket_id: uuid.UUID, principal: Principal, *, lock: bool = False
@@ -1124,9 +1119,11 @@ class TicketService:
                 ``sender_blocked``).
             ValidationProblem: Files without a draft token, or a draft that is missing,
                 expired, foreign or infected (HTTP 422).
+
+        The ticket row is always locked, because an anonymization between the check and
+        the commit would miss the new note and leave the reporter on an anonymized
+        ticket.
         """
-        # Always under the row lock: an anonymization that runs between the check and the
-        # commit would miss the new note and leave the reporter on an anonymized ticket.
         ticket, me = await self._reporter_ticket(ticket_id, principal, lock=True)
         if await self._sender_blocked(ticket):
             raise ForbiddenError("The sender is blocked.", code=SENDER_BLOCKED)
@@ -1191,8 +1188,6 @@ class TicketService:
         note, _me = await self._own_note(ticket.id, note_id, principal)
         return note
 
-    # -- anonymization ----------------------------------------------------------
-
     async def anonymize(self, ticket: Ticket, *, actor: str) -> None:
         """Remove the personal data of a ticket, without a commit.
 
@@ -1225,8 +1220,6 @@ class TicketService:
         ticket.reporter_email = None
         ticket.context = {}
         ticket.anonymized_at = _now()
-
-    # -- helpers ----------------------------------------------------------------
 
     async def _get(self, ticket_id: uuid.UUID, *, lock: bool = False) -> Ticket:
         if lock:
@@ -1470,11 +1463,14 @@ def _event_out(
     accounts: dict[uuid.UUID, _Account],
     readable_cards: set[uuid.UUID] | None = None,
 ) -> TicketEventOut:
+    """Build the API form of a ticket event.
+
+    The card title of a ``todo_done`` event shows only to a reader of the board of the card.
+    """
     payload: dict[str, JsonValue] = dict(event.payload or {})
     if event.kind == "todo_done" and _uuid_or_none(payload.get("cardId")) not in (
         readable_cards or set()
     ):
-        # The card title shows only to a reader of the board of the card.
         payload["cardTitle"] = None
     if event.kind == "assignee":
         for key in ("from", "to"):

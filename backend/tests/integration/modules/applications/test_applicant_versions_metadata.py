@@ -1,4 +1,4 @@
-"""A11/O17: the applicant reads the version metadata, without values (real Postgres).
+"""The applicant reads the version metadata, without values (real Postgres).
 
 The magic-link applicant and the logged-in creator without a read permission get the
 number, the time, the changed keys and the editor of every version. `data` and `diff`
@@ -45,9 +45,13 @@ async def test_applicant_reads_version_metadata_only(
     maker: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Serve the version metadata only to the applicant.
+
+    v2 comes from a member and v3 from the applicant through the magic link. The member edit
+    names the Gremium, the own edits stay the applicant.
+    """
     seed = await seed_read_world(maker)
     app_id = await create_app(maker, seed, actor="applicant")
-    # v2 by a member, v3 by the applicant through the magic link.
     await patch(
         maker,
         app_id,
@@ -69,7 +73,6 @@ async def test_applicant_reads_version_metadata_only(
     assert all(v["data"] is None and v["diff"] is None for v in versions)
     assert all(v["at"] for v in versions)
     assert [v["changedKeys"] for v in versions] == [[], ["note"], ["title"]]
-    # A12: the member edit names the Gremium, the own edits stay the applicant.
     assert [v["changedBy"] for v in versions] == ["applicant", GREMIUM_NAME, "applicant"]
 
     as_principal(api, Principal(sub="reader", permissions={"application.read"}))
@@ -86,6 +89,7 @@ async def test_logged_in_creator_reads_version_metadata(
     maker: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Serve the version metadata to the creator without any permission."""
     seed = await seed_read_world(maker)
     app_id = await create_app(maker, seed, actor=seed.owner_sub)
     await patch(
@@ -96,7 +100,6 @@ async def test_logged_in_creator_reads_version_metadata(
     )
 
     api = build_read_api(migrated[1], monkeypatch)
-    # The creator without any permission: before A11 this route answered 403.
     as_principal(api, Principal(sub=seed.owner_sub, display_name=OWNER_NAME))
     versions = get_json(api, f"/api/applications/{app_id}/versions")
     assert isinstance(versions, list)

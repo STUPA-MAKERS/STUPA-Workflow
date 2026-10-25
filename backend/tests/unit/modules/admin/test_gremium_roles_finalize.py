@@ -1,8 +1,8 @@
-"""F4 and O7: `protocol.finalize` is an assignable gremium permission.
+"""`protocol.finalize` is an assignable gremium permission.
 
-Before the fix the gremium role catalog did not know the key, so a save stripped it
-from every role, and no gremium role could finalize a protocol. The forced roles
-`vorstand` and `manager` now carry it by default. `member` does not.
+The gremium role catalog must know the key, because a save strips an unknown key from
+every role, and then no gremium role can finalize a protocol. The forced roles
+`vorstand` and `manager` carry it by default. `member` does not.
 """
 
 from __future__ import annotations
@@ -36,16 +36,22 @@ def test_forced_roles_default_to_finalize_for_the_board_only() -> None:
 
 
 def test_global_catalog_drops_the_superseded_keys() -> None:
-    """The global keys that a gremium permission replaced are gone (F11 included)."""
+    """Drop the global keys that a gremium permission replaced.
+
+    The global read and delete rights of the meeting domain stay.
+    """
     for key in ("meeting.manage", "protocol.finalize", "application.create"):
         assert key not in PERMISSION_CATALOGUE
-    # The global read and delete rights of the meeting domain stay.
     assert "meeting.view_all" in PERMISSION_CATALOGUE
     assert "meeting.delete_finalized" in PERMISSION_CATALOGUE
 
 
 async def test_create_role_keeps_protocol_finalize() -> None:
-    db = fake_session(result(), result(), result())  # existing, audit lock, prev hash
+    """Keep protocol.finalize on a new role.
+
+    The execute calls are the existing-role check, the audit lock and the prev hash.
+    """
+    db = fake_session(result(), result(), result())
     orig_flush = db.flush
 
     async def _flush() -> None:

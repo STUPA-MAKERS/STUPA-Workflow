@@ -1,9 +1,9 @@
-"""Integration helpers for applications without an account (Z1).
+"""Integration helpers for applications without an account.
 
 The helpers seed a gremium, an application type with an active form and an active
 flow `eingang` (edit allowed) -> `gesperrt` (edit locked). They create applications
-through the service, issue magic links and redeem them. The flow has no actions and
-no deadlines, so the helpers need no dispatcher.
+through the service, issue magic links and redeem them. The flow has no actions,
+so the helpers need no dispatcher.
 """
 
 from __future__ import annotations

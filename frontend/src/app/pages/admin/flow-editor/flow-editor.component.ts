@@ -5,13 +5,16 @@ import {
   HostListener,
   computed,
   effect,
+  DestroyRef,
   inject,
   signal,
+  untracked,
   viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
+import type { TranslationKey } from '@core/i18n/translations';
 import {
   ButtonComponent,
   EmptyStateComponent,
@@ -51,9 +54,9 @@ import { FabComponent } from '@shared/ui/fab/fab.component';
 import { VersionHistoryComponent } from '../version-history/version-history.component';
 import { FlowCanvasInteraction, type TempEdge } from './flow-canvas-interaction';
 import { createFlowCanvasView } from './flow-canvas-view';
+import { FLOW_LAYOUTER, type LevelLayout } from './flow-elk';
 import { FlowEditorOptionsService } from './flow-editor-options.service';
 import {
-  NODE_W,
   type GuardGroup,
   type Selection,
   type TransitionLists,
@@ -84,11 +87,29 @@ import { TransitionDetailComponent } from './transition-detail.component';
 import { TransitionInspectorComponent } from './transition-inspector.component';
 import { TransitionListsComponent } from './transition-lists.component';
 
+/** How far one press of a scroll tongue pans the canvas, in screen px. */
+const PAN_STEP = 240;
+/** How long a tongue has to be held before it starts repeating. */
+const HOLD_DELAY_MS = 300;
+/** How often a held tongue pans once it repeats. */
+const HOLD_INTERVAL_MS = 90;
+/** Sub-pixel slack, so rounding at an edge does not read as hidden content. */
+const EDGE_SLACK = 1;
+
+/** A side of the canvas, and the direction its scroll tongue pans to. */
+export type PanSide = 'left' | 'right' | 'up' | 'down';
+
+/** The smallest scale of the start view: below it the labels are too small to read. */
+const MIN_FIT_SCALE = 0.75;
+
 /**
- * Flow editor as a visual drag-and-drop canvas (board Admin-Flow-Editor).
+ * Flow editor as a visual drag-and-drop canvas.
  *
- * The user moves the states freely as nodes. Node positions persist in `layout`.
- * To draw a transition, the user drags from a connector dot onto a target node.
+ * The editor places the states itself: ELK lays out each level from its structure
+ * (`flow-elk.ts`) whenever it changes, and the lines run in right angles between the
+ * layers. The positions stored in `layout` are only the places until the first layout
+ * answers. Hovering or selecting a state, or selecting a transition, draws everything
+ * else faint. To draw a transition, the user drags from a connector dot onto a target node.
  * A click on a node or an edge opens it in the inspector beside the canvas: a state
  * with its settings and its incoming and outgoing transitions, a transition with its
  * settings, its guard and its actions. "Versionen" in the header shows the version
@@ -160,7 +181,6 @@ export class FlowEditorComponent {
   protected readonly globalRoleOptions = this.opts.globalRoleOptions;
   protected readonly webhookOptions = this.opts.webhookOptions;
   protected readonly budgetTree = this.opts.budgetTree;
-  protected readonly deadlinePolicyOptions = this.opts.deadlinePolicyOptions;
 
   protected readonly graph = signal<FlowGraph>(autoLayout(emptyFlowGraph()));
   /**
@@ -191,7 +211,14 @@ export class FlowEditorComponent {
   /** Viewport (zoom and pan) in world coordinates. A null value fits the whole content. */
   protected readonly view = signal<ViewRect | null>(null);
 
-  protected readonly NODE_W = NODE_W;
+  /** The state under the pointer (focus). */
+  protected readonly hoverKey = signal<string | null>(null);
+
+  private readonly layouter = inject(FLOW_LAYOUTER);
+  /** The last layout that answered, with the input it answers. */
+  private readonly levelLayout = signal<{ key: string; layout: LevelLayout } | null>(null);
+  /** The layouter failed: the canvas shows the stored places. */
+  private readonly layoutFailed = signal(false);
 
   private readonly vm = createFlowCanvasView({
     graph: this.graph,
@@ -199,6 +226,12 @@ export class FlowEditorComponent {
     selection: this.selection,
     multiSel: this.multiSel,
     multiSelGroups: this.multiSelGroups,
+    hover: this.hoverKey,
+    layout: computed(() => {
+      const r = this.levelLayout();
+      if (!r) return null;
+      return r.key === this.layoutKey() ? r.layout : { pos: r.layout.pos, routes: new Map() };
+    }),
     stateLabel: (s) => this.label(s),
     guardDotLabel: (g) => this.guardGroupLabel(g),
   });
@@ -211,15 +244,21 @@ export class FlowEditorComponent {
   protected readonly nodes = this.vm.nodes;
   protected readonly edges = this.vm.edges;
   protected readonly contentBounds = this.vm.contentBounds;
+  private readonly layoutKey = computed(() => JSON.stringify(this.vm.layoutInput()));
+  /**
+   * The canvas waits for its first layout, so the boxes do not jump from the stored
+   * places to the laid-out ones. Without a layouter or after a failure it shows at once.
+   */
+  protected readonly layoutPending = computed(
+    () => !!this.layouter && !this.layoutFailed() && this.levelLayout() === null,
+  );
 
   private readonly pointer = new FlowCanvasInteraction({
     svg: () => this.canvas()?.nativeElement,
     graph: () => this.graph(),
     updateGraph: (fn) => this.graph.update(fn),
-    positions: () => this.vm.positions(),
     nodes: () => this.vm.nodes(),
     contentBounds: () => this.fitBounds(),
-    deepKeys: (id) => this.vm.deepKeys(id),
     openGroup: (id) => this.openGroup(id),
     selection: this.selection,
     multiSel: this.multiSel,
@@ -228,15 +267,22 @@ export class FlowEditorComponent {
     view: this.view,
   });
 
+  /**
+   * The canvas box is measured, so a small flow shows at its real size instead of blown up to the
+   * full box. The level is laid out again whenever its structure changes. Only the answer to the
+   * newest input counts; an older one that answers late is dropped. The drill-down context must
+   * never point at a deleted group, because undo, redo or a dissolve from another path can delete
+   * it; it then falls back to the top level. Only structural graph changes (states and transitions,
+   * not positions) are undo steps, so node moves do not flood the history.
+   */
   constructor() {
-    // Load the active global flow. Keep the empty graph when there is none.
+    inject(DestroyRef).onDestroy(() => this.stopHold());
     this.api
       .getGlobalFlow()
       .pipe(takeUntilDestroyed())
       .subscribe({
         next: (graph) => {
           if (graph && graph.states?.length) {
-            // The initial load is not an undo step.
             this.applyingHistory = true;
             this.graph.set(autoLayout(normalizeFlowGraph(graph)));
           }
@@ -244,30 +290,36 @@ export class FlowEditorComponent {
           this.loaded.set(true);
           this.loading.set(false);
         },
-        // Core editor data: surface the failure instead of an empty canvas. The
-        // validation stays hidden: there is no flow to have findings about.
         error: () => {
           this.loading.set(false);
           this.toast.error(this.i18n.translate('admin.flow.loadFailed'));
         },
       });
 
-    // Measure the canvas box, so a small flow shows at its real size instead of
-    // blown up to the full box.
     observeElementSize(
       () => this.canvasWrap()?.nativeElement,
       ({ width, height }) => this.canvasSize.set({ w: Math.round(width), h: Math.round(height) }),
     );
 
-    // The drill-down context must never point at a deleted group. Undo, redo or a
-    // dissolve from another path can delete it. Fall back to the top level.
+    effect(() => {
+      const input = this.vm.layoutInput();
+      const key = this.layoutKey();
+      const layouter = this.layouter;
+      if (!layouter || untracked(this.levelLayout)?.key === key) return;
+      const many = (n: number): string => this.i18n.translate('admin.flow.bundle', { n });
+      layouter(input, many).then(
+        (layout) => {
+          if (key === this.layoutKey()) this.levelLayout.set({ key, layout });
+        },
+        () => this.layoutFailed.set(true),
+      );
+    });
+
     effect(() => {
       const id = this.currentGroupId();
       if (id && !this.vm.groupById().has(id)) this.currentGroupId.set(null);
     });
 
-    // Record structural graph changes as undo steps. Structural means states and
-    // transitions, not positions. Node moves must not flood the history.
     effect(() => {
       const g = this.graph();
       if (this.applyingHistory) {
@@ -277,7 +329,7 @@ export class FlowEditorComponent {
       }
       if (g === this.lastGraph) return;
       if (structuralKey(g) !== structuralKey(this.lastGraph)) this.history.record(this.lastGraph);
-      this.lastGraph = g; // Follow layout-only changes too.
+      this.lastGraph = g;
     });
   }
 
@@ -299,17 +351,22 @@ export class FlowEditorComponent {
   });
 
   /**
-   * The view that fits the whole content. A flow smaller than the canvas box keeps its
-   * real size (scale 1) and sits in the middle of the box; a larger flow scales down to
-   * fit. Before the box is measured (and in tests) it is the content bounds.
+   * The start view. A flow smaller than the canvas box keeps its real size (scale 1)
+   * and sits in the middle of the box; a larger flow scales down to fit, but not below
+   * `MIN_FIT_SCALE`, where the labels would be too small to read. A flow that does not
+   * fit then starts at its left end (the initial state), centred in height, and the
+   * reader pans to the rest. Before the box is measured (and in tests) it is the content
+   * bounds.
    */
   protected readonly fitBounds = computed(() => {
     const b = this.contentBounds();
     const { w, h } = this.canvasSize();
     if (!w || !h) return b;
-    const fw = Math.max(b.w, w);
-    const fh = Math.max(b.h, h);
-    return { x: b.x - (fw - b.w) / 2, y: b.y - (fh - b.h) / 2, w: fw, h: fh };
+    const scale = Math.min(1, Math.max(MIN_FIT_SCALE, Math.min(w / b.w, h / b.h)));
+    const vw = w / scale;
+    const vh = h / scale;
+    const x = vw >= b.w ? b.x - (vw - b.w) / 2 : b.x;
+    return { x, y: b.y - (vh - b.h) / 2, w: vw, h: vh };
   });
 
   protected readonly viewBox = computed(() => {
@@ -323,6 +380,86 @@ export class FlowEditorComponent {
     const v = this.view();
     return v ? Math.round((this.fitBounds().w / v.w) * 100) : 100;
   });
+
+  /**
+   * How much content each side of the canvas hides, in world units. The visible area is
+   * the viewBox widened to the aspect of the box (`xMidYMid meet`), so a box that is
+   * wider than the view shows more than the view itself.
+   */
+  protected readonly hiddenBy = computed<Record<PanSide, number> & { scale: number }>(() => {
+    const { w, h } = this.canvasSize();
+    const v = this.view() ?? this.fitBounds();
+    if (!w || !h || !v.w || !v.h) return { left: 0, right: 0, up: 0, down: 0, scale: 1 };
+    const scale = Math.min(w / v.w, h / v.h);
+    const vw = w / scale;
+    const vh = h / scale;
+    const x = v.x - (vw - v.w) / 2;
+    const y = v.y - (vh - v.h) / 2;
+    const b = this.contentBounds();
+    const slack = EDGE_SLACK / scale;
+    const past = (n: number): number => (n > slack ? n : 0);
+    return {
+      left: past(x - b.x),
+      right: past(b.x + b.w - (x + vw)),
+      up: past(y - b.y),
+      down: past(b.y + b.h - (y + vh)),
+      scale,
+    };
+  });
+
+  /** The tongue that is held down, for its pressed colour. */
+  protected readonly heldSide = signal<PanSide | null>(null);
+  private holdTimer?: ReturnType<typeof setTimeout>;
+  private holdTick?: ReturnType<typeof setInterval>;
+
+  /** One step towards a side; the last step stops at the edge of the content. */
+  protected pan(side: PanSide): void {
+    const hidden = this.hiddenBy();
+    const d = Math.min(PAN_STEP / hidden.scale, hidden[side]);
+    if (d <= 0) return;
+    if (side === 'left') this.pointer.panBy(-d, 0);
+    else if (side === 'right') this.pointer.panBy(d, 0);
+    else if (side === 'up') this.pointer.panBy(0, -d);
+    else this.pointer.panBy(0, d);
+  }
+
+  /**
+   * Press to step, hold to keep going, as the tongues of the tables do: a wide flow
+   * should not need fifteen clicks.
+   */
+  protected onTonguePress(event: PointerEvent, side: PanSide): void {
+    if (event.button !== 0) return;
+    this.stopHold();
+    this.pan(side);
+    this.heldSide.set(side);
+    this.holdTimer = setTimeout(() => {
+      this.holdTick = setInterval(() => this.pan(side), HOLD_INTERVAL_MS);
+    }, HOLD_DELAY_MS);
+  }
+
+  /** Release, leave or cancel: the repeat stops with the gesture that started it. */
+  protected stopHold(): void {
+    if (this.holdTimer !== undefined) clearTimeout(this.holdTimer);
+    if (this.holdTick !== undefined) clearInterval(this.holdTick);
+    this.holdTimer = undefined;
+    this.holdTick = undefined;
+    this.heldSide.set(null);
+  }
+
+  /** Enter and Space step once; the key repeat of the platform does the rest. */
+  protected onTongueKey(event: KeyboardEvent, side: PanSide): void {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    this.pan(side);
+  }
+
+  protected readonly panSides: readonly PanSide[] = ['left', 'right', 'up', 'down'];
+  protected readonly panLabel: Record<PanSide, TranslationKey> = {
+    left: 'admin.flow.panLeft',
+    right: 'admin.flow.panRight',
+    up: 'admin.flow.panUp',
+    down: 'admin.flow.panDown',
+  };
 
   /** The meta of the header: the active version, once known. */
   protected readonly versionMeta = computed(() => {
@@ -518,10 +655,6 @@ export class FlowEditorComponent {
     this.graph.update((g) => ops.setStateGremiumSource(g, key, source));
   }
 
-  protected setStateDeadlinePolicy(key: string, policyKey: string): void {
-    this.graph.update((g) => ops.setStateDeadlinePolicy(g, key, policyKey));
-  }
-
   /** The state takes its gremium from the cost center (a dynamic vote state). */
   protected targetIsBudgetVote(key: string): boolean {
     const s = this.stateByKey(key);
@@ -654,12 +787,6 @@ export class FlowEditorComponent {
 
   protected recipientNeedsRef(kind: string): boolean {
     return recipientNeedsRef(kind);
-  }
-
-  protected relayout(): void {
-    const ctx = this.currentGroupId();
-    this.graph.update((g) => ops.relayoutLevel(g, ctx));
-    this.resetView();
   }
 
   protected createGroupFromSelection(): void {

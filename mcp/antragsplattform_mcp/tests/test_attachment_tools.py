@@ -3,9 +3,9 @@
 The first part fakes the API and checks the arguments that the tools hand to it. The
 second part runs the real `ApiClient` against an `httpx.MockTransport` and checks the
 exact multipart request on the wire: the path, the part name `file`, the file name, the
-part content type and the form field `field_key`. These are the names of `POST /api/applications/{id}/attachments` in
-`backend/app/modules/files/router.py`. `test_attachment_contract.py` runs the same
-tools against that router itself.
+part content type and the form field `field_key`. These are the names of
+`POST /api/applications/{id}/attachments` in `backend/app/modules/files/router.py`.
+`test_attachment_contract.py` runs the same tools against that router itself.
 """
 
 from __future__ import annotations
@@ -14,8 +14,8 @@ import asyncio
 from email.parser import BytesParser
 from email.policy import default as email_default
 from pathlib import Path
-from urllib.parse import quote
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 import pytest
@@ -181,6 +181,7 @@ def _parts(request: httpx.Request) -> dict[str, Any]:
     out: dict[str, Any] = {}
     for part in msg.iter_parts():
         name = part.get_param("name", header="content-disposition")
+        assert isinstance(name, str)
         out[name] = (
             part.get_filename(),
             part.get_content_type() if part.get("content-type") else None,

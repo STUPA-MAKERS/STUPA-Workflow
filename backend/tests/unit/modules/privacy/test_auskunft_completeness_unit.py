@@ -1,4 +1,4 @@
-"""Unit tests for the completeness of the DSGVO Auskunft (Art. 15, AUD-015).
+"""Unit tests for the completeness of the DSGVO Auskunft (Art. 15).
 
 The tests need no database. They prove that `AuskunftService.collect` gathers more
 than the applications and the versions. It also collects the comments the subject may
@@ -25,6 +25,10 @@ _AT = datetime(2026, 6, 21, 9, 30, 0, tzinfo=UTC)
 
 
 async def test_collect_gathers_comments_and_attachments() -> None:
+    """Gather the comments and attachments.
+
+    The queue returns the type names, no state and no principal.
+    """
     app_id = uuid4()
     type_id = uuid4()
     applicant = Applicant(application_id=app_id, email="z@example.org", name="Z Person")
@@ -58,8 +62,8 @@ async def test_collect_gathers_comments_and_attachments() -> None:
             result(comment),
             result(attachment),
         ],
-        execute=[result((type_id, {"de": "Typ"}))],  # type_names, no state
-        scalar=[None],  # no principal
+        execute=[result((type_id, {"de": "Typ"}))],
+        scalar=[None],
     )
 
     data = await AuskunftService(db).collect("z@example.org", locale="de")
@@ -130,7 +134,11 @@ def test_build_workbook_renders_comment_and_attachment_sheets() -> None:
 
 
 def test_build_workbook_backward_compatible_without_new_kwargs() -> None:
-    """The comments and attachments defaults keep old callers with four kwargs valid."""
+    """Build the workbook without the comments and attachments kwargs.
+
+    Their defaults keep callers with four kwargs valid and give empty but valid extra
+    sheets.
+    """
     from io import BytesIO
 
     from openpyxl import load_workbook
@@ -142,6 +150,5 @@ def test_build_workbook_backward_compatible_without_new_kwargs() -> None:
         principal=None,
     )
     wb = load_workbook(BytesIO(blob))
-    # empty but valid extra sheets
     assert "Kommentare" in wb.sheetnames
     assert "Anhänge" in wb.sheetnames

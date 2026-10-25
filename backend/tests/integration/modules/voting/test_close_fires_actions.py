@@ -1,4 +1,4 @@
-"""F2: a vote close runs the actions of the fired branch (real Postgres).
+"""A vote close runs the actions of the fired branch (real Postgres).
 
 Before the fix the REST close `POST /votes/{id}/close` used a local dispatcher
 dependency that `app.main` did not override. The branch then fired without its
@@ -163,6 +163,12 @@ async def _assert_actions_ran(
 def api(
     migrated: tuple[str, str], monkeypatch: pytest.MonkeyPatch
 ) -> Iterator[FastAPI]:
+    """Serve the real app wiring against the test database.
+
+    The TestClient runs the app on its own event loop, so the app gets its own engine
+    without a pool, and no connection crosses the loops. The real wiring builds the
+    dispatcher chain per request, and its sessionmaker points at the test database.
+    """
     settings = load_settings(
         database_url=migrated[1],
         session_secret="session-secret-close-actions-0",
@@ -170,8 +176,6 @@ def api(
         cookie_secure=False,
     )
 
-    # The TestClient runs the app on its own event loop. It gets its own engine without
-    # a pool, so no connection crosses the loops.
     maker = async_sessionmaker(
         create_async_engine(migrated[1], poolclass=NullPool), expire_on_commit=False
     )
@@ -180,8 +184,6 @@ def api(
         async with maker() as db:
             yield db
 
-    # The real app wiring builds the dispatcher chain per request. Point its
-    # sessionmaker at the test database.
     monkeypatch.setattr(main_mod, "get_sessionmaker", lambda: maker)
     application = create_app(settings)
     application.dependency_overrides[get_settings] = lambda: settings
@@ -209,9 +211,9 @@ async def test_rest_close_runs_branch_actions(
 async def test_worker_auto_close_runs_branch_actions(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
+    """Without ``flow_dispatcher`` in the ctx the worker builds the full chain itself."""
     now = datetime.now(UTC)
     seed = await _seed(maker, closes_at=now - timedelta(minutes=1))
-    # No `flow_dispatcher` in the ctx: the worker builds the full chain itself.
     ctx: dict[str, Any] = {"settings": get_settings(), "deadlines_sessionmaker": maker}
     assert await wd._close_one(ctx, seed.vote_id, now) is True
     await _assert_actions_ran(maker, seed)

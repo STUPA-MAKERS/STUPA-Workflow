@@ -1,35 +1,27 @@
-"""arq cron task: scheduled deadline and vote processing.
+"""arq cron task: scheduled vote, flow and reminder processing.
 
 `process_deadlines` runs every minute against a tz-aware `now` in UTC. It runs these
 idempotent steps:
 
-1. Reminders. A deadline inside or past the lead window with no reminder yet gets
-   `notify(deadline_approaching)` and a `reminded_at` timestamp, exactly once. There
-   is no lower bound: after an outage longer than the lead window the reminder is
-   late but still fires only once.
-2. Auto-transitions and requeue. An expired deadline with `action_on_pass` calls
-   `flow.fire` with the `deadlinePassed` guard and `manual=False`. The task then
-   clears `action_on_pass` as the idempotency marker. `kind="requeue"` returns the
-   application through the referenced transition.
-3. Vote auto-close. An open vote past `closes_at` goes to `voting.close`, which
+1. Vote auto-close. An open vote past `closes_at` goes to `voting.close`, which
    tallies the vote and fires the result branch. The close always ends the vote, also
    when the branch is blocked (`branchFired=false`, audit `vote_branch_blocked`), so
    the cron never grabs the same vote again.
-4. Auto-transitions. A confirmed application in a state with an `automatic`
+2. Auto-transitions. A confirmed application in a state with an `automatic`
    transition fires it when the guard passes.
-5. Discard. An application whose email stays unconfirmed longer than
+3. Discard. An application whose email stays unconfirmed longer than
    `guest_application_settings.confirm_ttl_hours` is deleted, with its MinIO
    objects and a `guest_application_discard` audit entry without PII.
-6. To-do reminders. `process_todo_due` (`worker/todos.py`) sends `todo_due` for the
+4. To-do reminders. `process_todo_due` (`worker/todos.py`) sends `todo_due` for the
    open cards due tomorrow. A failure of this step is logged and does not stop the
    cycle.
-7. Poll reminders. `process_poll_reminders` (`worker/polls.py`) sends `poll_reminder`
+5. Poll reminders. `process_poll_reminders` (`worker/polls.py`) sends `poll_reminder`
    24 h before the end of a poll of a Gremium. A failure of this step is logged and
    does not stop the cycle.
 
 An unconfirmed guest application (`email_confirmed_at IS NULL`) rests in the flow. The
-reminder, deadline-action and auto-transition scans skip it. The magic-link verify
-starts its flow (`FlowService.start_confirmed`).
+auto-transition scan skips it. The magic-link verify starts its flow
+(`FlowService.start_confirmed`).
 
 Concurrency: each unit gets a lock in its own session with `FOR UPDATE SKIP LOCKED`.
 A second worker skips a locked unit, so nothing runs twice. The operations are also
@@ -53,11 +45,6 @@ from app.modules.applications.models import Application
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth.principal import Principal
-from app.modules.deadlines.service import (
-    DEFAULT_SCAN_LIMIT,
-    DeadlineService,
-    transition_ref,
-)
 from app.modules.files.models import Attachment
 from app.modules.files.storage import ObjectStorage, StorageError, build_object_storage
 from app.modules.flow.dispatch import ActionDispatcher, build_worker_dispatcher
@@ -65,9 +52,7 @@ from app.modules.flow.models import Transition
 from app.modules.flow.service import FlowService
 from app.modules.livevote.broker import RedisBroker
 from app.modules.livevote.service import BrokerPublisher
-from app.modules.notifications.links import application_link
-from app.modules.notifications.queue import ArqMailQueue, MailQueue
-from app.modules.notifications.service import NotificationService
+from app.modules.voting.models import Vote
 from app.modules.voting.schemas import VoteClosed
 from app.modules.voting.service import VotingService
 from app.settings import Settings, load_settings
@@ -77,11 +62,18 @@ from worker.todos import process_todo_due
 
 logger = logging.getLogger("app.deadlines")
 
-# The audit actor of the discard of unconfirmed applications.
+#: Audit actor of the discard of unconfirmed applications.
 _DISCARD_ACTOR = "system:deadlines"
+
+#: Cap per cron tick and step, oldest row first. A large backlog drains over several
+#: ticks, so one tick does not overrun the 1-minute cadence. Correctness does not
+#: change, because SKIP LOCKED and the status checks protect the run, and a row that no
+#: worker takes stays due for the next tick.
+DEFAULT_SCAN_LIMIT = 200
 
 
 async def on_startup(ctx: dict[str, Any]) -> None:
+    """Load the settings into the worker context."""
     ctx["settings"] = load_settings()
 
 
@@ -100,7 +92,7 @@ def _flow_dispatcher(ctx: dict[str, Any]) -> ActionDispatcher:
     """
     dispatcher = ctx.get("flow_dispatcher")
     if dispatcher is not None:
-        return dispatcher  # type: ignore[no-any-return]
+        return dispatcher
     return build_worker_dispatcher(
         ctx.get("redis"), _sessionmaker(ctx), ctx.get("settings")
     )
@@ -125,7 +117,7 @@ def _system_principal() -> Principal:
     """Build the actor for cron-triggered transitions.
 
     No user stands behind this principal. `application.manage` covers the role guards
-    on the requeue and result branches.
+    on the automatic transitions and the result branches.
     """
     return Principal(
         sub="system:deadlines",
@@ -134,31 +126,17 @@ def _system_principal() -> Principal:
     )
 
 
-def _mail_queue(ctx: dict[str, Any]) -> MailQueue | None:
-    """Return the mail queue over the arq Redis pool, or `None` without Redis.
-
-    Tests can inject a ready queue through `ctx['mail_queue']`.
-    """
-    queue = ctx.get("mail_queue")
-    if queue is not None:
-        return queue  # type: ignore[return-value]
-    pool = ctx.get("redis")
-    return ArqMailQueue(pool) if pool is not None else None
-
-
 async def process_deadlines(ctx: dict[str, Any]) -> str:
-    """Run reminders, auto-transitions and vote auto-close (idempotent, SKIP LOCKED)."""
+    """Run vote auto-close, auto-transitions, discard and reminders (idempotent)."""
     settings: Settings = ctx.get("settings") or load_settings()
     now = _now()
-    reminded = await _process_reminders(ctx, settings, now)
-    fired = await _process_actions(ctx, settings, now)
     closed = await _process_votes(ctx, now)
     advanced = await _process_auto_transitions(ctx)
     discarded = await _discard_unconfirmed(ctx, now, settings)
     todos = await _process_todo_due(ctx, now)
     polls = await _process_poll_reminders(ctx, now)
     return (
-        f"reminders={reminded} actions={fired} votes={closed} "
+        f"votes={closed} "
         f"auto={advanced} discarded={discarded} todos={todos} polls={polls}"
     )
 
@@ -167,7 +145,7 @@ async def _process_poll_reminders(ctx: dict[str, Any], now: datetime) -> int:
     """Run the poll reminder; a failure costs only this step."""
     try:
         return await process_poll_reminders(ctx, now)
-    except Exception:  # noqa: BLE001 - the other steps of the cycle must still count
+    except Exception:
         logger.exception("poll reminders failed")
         return 0
 
@@ -176,7 +154,7 @@ async def _process_todo_due(ctx: dict[str, Any], now: datetime) -> int:
     """Run the to-do due reminder; a failure costs only this step."""
     try:
         return await process_todo_due(ctx, now)
-    except Exception:  # noqa: BLE001 - the other steps of the cycle must still count
+    except Exception:
         logger.exception("todo_due reminders failed")
         return 0
 
@@ -187,9 +165,9 @@ async def _discard_unconfirmed(
     """Delete the applications that stay unconfirmed past the confirmation window.
 
     The window is `guest_application_settings.confirm_ttl_hours`. The step reads it
-    on every run, so a changed value applies to the waiting applications too (Z1).
+    on every run, so a changed value applies to the waiting applications too.
     The step covers every application with `email_confirmed_at IS NULL`, also one
-    that a logged-in person submitted for another email address (F23).
+    that a logged-in person submitted for another email address.
 
     The order is fixed. The step locks the due rows (`FOR UPDATE SKIP LOCKED`) and
     reads their attachment storage keys. It deletes the rows (the dependent rows
@@ -273,136 +251,6 @@ async def _remove_objects(
             logger.warning("could not remove an object of a discarded application")
 
 
-async def _process_reminders(
-    ctx: dict[str, Any], settings: Settings, now: datetime
-) -> int:
-    maker = _sessionmaker(ctx)
-    lead = timedelta(minutes=settings.deadline_reminder_lead_minutes)
-    async with maker() as session:
-        ids = await DeadlineService(session).due_reminder_ids(now, lead)
-    sent = 0
-    for deadline_id in ids:
-        try:
-            if await _remind_one(ctx, settings, deadline_id, now, lead):
-                sent += 1
-        except Exception:  # noqa: BLE001 - one broken deadline must not abort the cycle
-            logger.exception("deadline reminder failed (deadline=%s)", deadline_id)
-    return sent
-
-
-async def _remind_one(
-    ctx: dict[str, Any],
-    settings: Settings,
-    deadline_id: UUID,
-    now: datetime,
-    lead: timedelta,
-) -> bool:
-    maker = _sessionmaker(ctx)
-    queue = _mail_queue(ctx)
-    async with maker() as session:
-        svc = DeadlineService(session)
-        deadline = await svc.lock_reminder(deadline_id, now, lead)
-        if deadline is None:
-            return False  # another worker holds it, or it is no longer due
-        type_id = deadline.type_id
-        applicant_link = None
-        if deadline.application_id is not None:
-            # A guest applicant (no account) reads the application on the public
-            # applicant page.
-            created_by = await session.scalar(
-                select(Application.created_by).where(
-                    Application.id == deadline.application_id
-                )
-            )
-            applicant_link = application_link(
-                settings, deadline.application_id, guest=created_by is None
-            )
-        if type_id is None and deadline.application_id is not None:
-            type_id = await session.scalar(
-                select(Application.type_id).where(
-                    Application.id == deadline.application_id
-                )
-            )
-        notifier = NotificationService(session, queue=queue, settings=settings)
-        await notifier.handle_notify_action(
-            {"templateKey": "deadline_approaching", "recipients": [{"kind": "applicant"}]},
-            application_id=deadline.application_id,
-            application_type_id=type_id,
-            context={
-                "deadlineId": str(deadline.id),
-                "kind": deadline.kind,
-                "dueAt": deadline.due_at.isoformat(),
-            },
-            lang=None,
-            idempotency_base=f"deadline:{deadline.id}",
-            applicant_link=applicant_link,
-        )
-        await svc.mark_reminded(deadline, now)
-    logger.info("deadline reminder sent (deadline=%s kind=%s)", deadline_id, deadline.kind)
-    return True
-
-
-async def _process_actions(
-    ctx: dict[str, Any], settings: Settings, now: datetime
-) -> int:
-    maker = _sessionmaker(ctx)
-    async with maker() as session:
-        ids = await DeadlineService(session).due_action_deadline_ids(now)
-    fired = 0
-    for deadline_id in ids:
-        try:
-            if await _fire_one(ctx, deadline_id, now):
-                fired += 1
-        except Exception:  # noqa: BLE001 - one broken deadline must not abort the cycle
-            logger.exception("deadline action failed (deadline=%s)", deadline_id)
-    return fired
-
-
-async def _fire_one(ctx: dict[str, Any], deadline_id: UUID, now: datetime) -> bool:
-    maker = _sessionmaker(ctx)
-    dispatcher = _flow_dispatcher(ctx)
-    async with maker() as session:
-        svc = DeadlineService(session)
-        deadline = await svc.lock_action_deadline(deadline_id, now)
-        if deadline is None:
-            return False  # another worker holds it, or it is already consumed
-        application_id = deadline.application_id
-        transition_id = transition_ref(deadline.action_on_pass)
-        if application_id is None or transition_id is None:
-            logger.warning(
-                "deadline %s has action_on_pass without application/transition — skipped",
-                deadline_id,
-            )
-            await svc.consume_action(deadline)  # do not scan it again
-            return False
-        flow = FlowService(session, dispatcher, _publisher(ctx))
-        fired = False
-        # Stage the marker before the fire: `fire` commits it together with the state
-        # change. No window stays open for a second worker to re-grab an already-fired
-        # deadline, because the row lock releases with the commit.
-        deadline.action_on_pass = None
-        try:
-            await flow.fire(
-                application_id,
-                transition_id,
-                _system_principal(),
-                note=f"deadline:{deadline.kind}",
-                deadline_passed=True,
-                manual=False,
-            )
-            fired = True
-        except ConflictError as exc:
-            # The guard failed, or a concurrent transition already changed the state.
-            # The deadline stays consumed. Do not fire it again.
-            logger.info("deadline %s transition not applied: %s", deadline_id, exc)
-        except NotFoundError as exc:
-            logger.warning("deadline %s references missing app/transition: %s", deadline_id, exc)
-        # On the error paths `fire` does not commit, so persist the marker here.
-        # After a successful `fire` this call is a no-op.
-        await svc.consume_action(deadline)
-    return fired
-
-
 async def _process_auto_transitions(ctx: dict[str, Any]) -> int:
     """Fire the configured automatic transitions whose guard passes.
 
@@ -410,13 +258,15 @@ async def _process_auto_transitions(ctx: dict[str, Any]) -> int:
     `automatic` transition. It fires the first match with `manual=False`. Optimistic
     locking in `flow.fire` keeps the step idempotent. Each application gets its own
     session.
+
+    The scan is capped per tick, oldest first, so a large cohort drains over several ticks
+    instead of stretching one tick past the cron cadence. One broken application is logged
+    and does not abort the cycle.
     """
     maker = _sessionmaker(ctx)
     dispatcher = _flow_dispatcher(ctx)
     async with maker() as session:
         auto_states = select(Transition.from_state_id).where(Transition.automatic)
-        # Capped per tick, oldest first: a large cohort drains over several ticks
-        # instead of stretching one tick past the cron cadence.
         ids = list(
             (
                 await session.execute(
@@ -442,52 +292,101 @@ async def _process_auto_transitions(ctx: dict[str, Any]) -> int:
                     advanced += 1
         except (ConflictError, NotFoundError) as exc:
             logger.info("auto-transition skipped (app=%s): %s", application_id, exc)
-        except Exception:  # noqa: BLE001 - one broken application must not abort the cycle
+        except Exception:
             logger.exception("auto-transition failed (app=%s)", application_id)
     return advanced
 
 
+async def due_open_vote_ids(
+    session: AsyncSession, now: datetime, *, limit: int = DEFAULT_SCAN_LIMIT
+) -> list[UUID]:
+    """List the ids of open votes whose window has passed, oldest first, up to `limit`."""
+    rows = (
+        await session.execute(
+            select(Vote.id)
+            .where(
+                Vote.status == "open",
+                Vote.closes_at.isnot(None),
+                Vote.closes_at <= now,
+            )
+            .order_by(Vote.closes_at)
+            .limit(limit)
+        )
+    ).scalars().all()
+    return list(rows)
+
+
+async def lock_open_vote(
+    session: AsyncSession, vote_id: UUID, now: datetime
+) -> Vote | None:
+    """Lock an open vote that has expired, with `SKIP LOCKED`.
+
+    Returns:
+        The locked vote. It returns `None` when another worker holds the row, or
+        when the vote is closed already.
+    """
+    return (
+        await session.execute(
+            select(Vote)
+            .where(
+                Vote.id == vote_id,
+                Vote.status == "open",
+                Vote.closes_at.isnot(None),
+                Vote.closes_at <= now,
+            )
+            .with_for_update(skip_locked=True)
+        )
+    ).scalar_one_or_none()
+
+
 async def _process_votes(ctx: dict[str, Any], now: datetime) -> int:
+    """Close the open votes whose time window ended; return how many closed.
+
+    One broken vote is logged and does not abort the cycle.
+    """
     maker = _sessionmaker(ctx)
     async with maker() as session:
-        ids = await DeadlineService(session).due_open_vote_ids(now)
+        ids = await due_open_vote_ids(session, now)
     closed = 0
     for vote_id in ids:
         try:
             if await _close_one(ctx, vote_id, now):
                 closed += 1
-        except Exception:  # noqa: BLE001 - one broken vote must not abort the cycle
+        except Exception:
             logger.exception("vote auto-close failed (vote=%s)", vote_id)
     return closed
 
 
 async def _close_one(ctx: dict[str, Any], vote_id: UUID, now: datetime) -> bool:
+    """Close one due vote and fire its result branch; return whether it closed.
+
+    A vote that another worker holds or that is already closed gives False. ``now`` is
+    passed on, so a time-bound vote past its window with an unmet quorum closes for good on
+    the fail branch; without it the cron re-grabs the vote forever. When the result branch
+    is blocked, the vote stays closed, the audit log holds ``vote_branch_blocked``, a person
+    moves the application by hand, and the cron does not retry.
+
+    After the commit the function replays the ``vote_closed`` broadcast that the REST router
+    normally sends, because the beamer and the voters would show the vote as open until a
+    reload. The broadcast is best effort, so a broker fault does not fail the closed vote,
+    and it is a no-op for a standalone vote.
+    """
     maker = _sessionmaker(ctx)
     dispatcher = _flow_dispatcher(ctx)
     async with maker() as session:
-        svc = DeadlineService(session)
-        vote = await svc.lock_open_vote(vote_id, now)
+        vote = await lock_open_vote(session, vote_id, now)
         if vote is None:
-            return False  # another worker holds it, or it is already closed
+            return False
         voting = VotingService(session, dispatcher)
         try:
-            # Pass `now` so a time-bound vote past its window with an unmet quorum
-            # closes for good on the fail branch. Without it the cron re-grabs the
-            # vote forever.
             closed = await voting.close(vote.id, _system_principal(), now=now)
         except ConflictError as exc:
             logger.info("vote %s auto-close skipped: %s", vote_id, exc)
             return False
     if closed.application_id is not None and not closed.branch_fired:
-        # The vote is closed for good. The audit log holds `vote_branch_blocked`, and
-        # a person moves the application by hand. The cron does not retry.
         logger.warning("vote auto-closed, result branch blocked (vote=%s)", vote_id)
     else:
         logger.info("vote auto-closed (vote=%s)", vote_id)
-    # Replay the `vote_closed` broadcast that the REST router normally sends. Without
-    # it the beamer and the voters show the time-closed vote as open until a reload.
-    # This runs after the commit and is best effort: a broker fault must not fail the
-    # already-closed vote. It is a no-op for standalone votes (`meeting_id is None`).
     await _broadcast_vote_closed(ctx, closed)
     return True
 
@@ -499,5 +398,5 @@ async def _broadcast_vote_closed(ctx: dict[str, Any], closed: VoteClosed) -> Non
         return
     try:
         await BrokerPublisher(RedisBroker(redis)).vote_closed(closed)
-    except Exception as exc:  # noqa: BLE001 - broadcast is not close-critical
+    except Exception as exc:
         logger.warning("vote_closed broadcast failed (vote=%s): %s", closed.id, exc)

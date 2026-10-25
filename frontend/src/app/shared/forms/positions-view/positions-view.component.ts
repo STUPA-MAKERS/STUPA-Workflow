@@ -35,8 +35,7 @@ interface PositionRow extends CostPosition {
 let nextId = 0;
 
 /**
- * "Kostenaufstellung": the cost positions of an answer, read-only (O19, the boards Anträge
- * and Schmal-Anträge-Detail).
+ * "Kostenaufstellung": the cost positions of an answer, read-only.
  *
  * A position shows collapsed: its name, "n Angebote · bevorzugt: <supplier>" and its
  * amount. The whole row is the button that opens it. Open, it lists every offer; the
@@ -47,7 +46,7 @@ let nextId = 0;
  * Names, suppliers and offer texts are never cut: they wrap. An offer text that is an
  * http(s) URL is a link in the open position (a link cannot sit in the row button).
  *
- * Comparison offers stay tagged attachments (O5): the offers here have no file.
+ * Comparison offers stay tagged attachments: the offers here have no file.
  */
 @Component({
   selector: 'app-positions-view',
@@ -74,8 +73,8 @@ export class PositionsViewComponent {
   /** The positions the reader opened or closed against the start state. */
   private readonly toggled = signal<ReadonlySet<number>>(new Set());
 
+  /** The texts follow a language switch, because `translate` and `money` read the locale signal. */
   protected readonly rows = computed<PositionRow[]>(() => {
-    // The texts follow a language switch: `translate` and `money` read the locale signal.
     return normalizePositions(this.value()).map((p) => ({
       ...p,
       offers: p.offers.map((o) => ({ ...o, href: offerHref(o.label) })),

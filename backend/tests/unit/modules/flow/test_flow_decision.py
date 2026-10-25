@@ -1,4 +1,7 @@
-"""FlowService: the decision of a manual transition (F1)."""
+"""FlowService: the decision of a manual transition.
+
+`_ctx` is the autouse fixture. The module imports it for its side effect.
+"""
 
 from __future__ import annotations
 
@@ -21,7 +24,7 @@ from app.shared.errors import ValidationProblem
 from tests._support.flow_fakes import fake_session, result
 from tests.unit.modules.flow.test_flow_service import _app, _ctx, _principal, _transition
 
-__all__ = ["_ctx"]  # the autouse fixture, imported for its side effect
+__all__ = ["_ctx"]
 
 
 class _Calls:

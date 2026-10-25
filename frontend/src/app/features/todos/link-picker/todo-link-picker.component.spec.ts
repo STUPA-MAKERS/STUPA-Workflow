@@ -6,7 +6,7 @@ import { asPhone } from '../../../../testing/todo-fixtures';
 import { TodoLinkPickerComponent, linkKey } from './todo-link-picker.component';
 
 const HITS: TodoLinkTarget[] = [
-  { kind: 'application', targetId: 'a-1', title: 'Haushalt 2027', detail: null },
+  { kind: 'application', targetId: 'a-1', title: 'Haushalt 2027', detail: {} },
   { kind: 'meeting', targetId: 'm-1', title: 'Sondersitzung Haushalt', detail: { date: '2026-11-03' } },
   { kind: 'agenda_item', targetId: 't-1', title: 'TOP Haushalt', detail: { position: 2 } },
   { kind: 'todo', targetId: 'k-2', title: 'Haushalt Kapitel 3', detail: { boardName: 'StuPa' } },
@@ -41,12 +41,12 @@ describe('TodoLinkPickerComponent', () => {
     expect(linkKey('ticket', 't-1')).toBe('ticket:t-1');
   });
 
+  /** The panel floats at the end of <body>, outside the parent that holds the picker. */
   it('shows nothing while closed and a panel with the focus in the field when open', async () => {
     const { open, fixture, container } = await setup();
     expect(container.querySelector('.lp')).toBeNull();
     await open();
     const panel = screen.getByRole('dialog', { name: 'Verknüpfen' });
-    // The panel floats at the end of <body>, outside the parent that holds the picker.
     expect(container.contains(panel)).toBe(false);
     expect(panel.closest('.lp-layer')?.parentElement).toBe(document.body);
     expect(document.activeElement).toBe(screen.getByRole('searchbox'));
@@ -79,6 +79,7 @@ describe('TodoLinkPickerComponent', () => {
     before.remove();
   });
 
+  /** In the middle, the browser moves the focus. */
   it('keeps Tab in the panel and stops it there', async () => {
     const { open } = await setup();
     await open();
@@ -93,7 +94,6 @@ describe('TodoLinkPickerComponent', () => {
     expect(document.activeElement).toBe(field);
     fireEvent.keyDown(field, { key: 'Tab', shiftKey: true });
     expect(document.activeElement).toBe(last);
-    // In the middle, the browser moves the focus.
     buttons[0].focus();
     fireEvent.keyDown(buttons[0], { key: 'Tab' });
     expect(document.activeElement).toBe(buttons[0]);
@@ -108,6 +108,7 @@ describe('TodoLinkPickerComponent', () => {
     expect(document.querySelector('.lp-layer')).toBeNull();
   });
 
+  /** An empty field takes the hits away at once. */
   it('searches, groups the hits and marks a linked target', async () => {
     const { open, type, linkTargets, picked } = await setup({ linked: ['application:a-1'] });
     await open();
@@ -123,11 +124,11 @@ describe('TodoLinkPickerComponent', () => {
     expect(screen.getByText('Sitzung · Di, 03.11.2026')).toBeInTheDocument();
     fireEvent.click(app);
     expect(picked).toHaveBeenCalledWith(HITS[0]);
-    // An empty field takes the hits away at once.
     fireEvent.input(screen.getByRole('searchbox'), { target: { value: '' } });
     expect(screen.queryByText('Anträge', { selector: '.lp__group' })).toBeNull();
   });
 
+  /** The icons are those of the navigation: Abstimmungen, Gremien, Rechnungen, Buchungen. */
   it('groups votes, gremien, invoices and bookings with their icons', async () => {
     const hits: TodoLinkTarget[] = [
       { kind: 'vote', targetId: 'v-1', title: 'Plakate annehmen?', detail: { voteStatus: 'open' } },
@@ -144,7 +145,6 @@ describe('TodoLinkPickerComponent', () => {
     expect(screen.getByText('Abstimmung · Offen')).toBeInTheDocument();
     expect(screen.getByText('Rechnung · Druckhaus')).toBeInTheDocument();
     expect(screen.getByText('Buchung · VS-800')).toBeInTheDocument();
-    // The icons of the navigation: Abstimmungen, Gremien, Rechnungen, Buchungen.
     expect(hits.map((h) => fixture.componentInstance.icon(h))).toEqual(['vote', 'landmark', 'receipt', 'swap']);
     fireEvent.click(screen.getByRole('button', { name: /StuPa/ }));
     expect(picked).toHaveBeenCalledWith(hits[1]);
@@ -198,6 +198,10 @@ describe('TodoLinkPickerComponent', () => {
     expect(fixture.componentInstance.open()).toBe(false);
   });
 
+  /**
+   * A second closing in the fade starts no second fade. An opening in the fade stops it. A fade
+   * that ends after an opening in it leaves the panel.
+   */
   it('fades the panel out before the layer goes, and keeps it on an opening in the fade', async () => {
     let finish: () => void = () => undefined;
     const fading = () => [{ finished: new Promise<void>((r) => (finish = r)) } as unknown as Animation];
@@ -213,10 +217,8 @@ describe('TodoLinkPickerComponent', () => {
     close();
     expect(panel).toHaveClass('motion-fade-out');
     expect(document.querySelector('.lp-layer')).not.toBeNull();
-    // A second closing in the fade starts no second fade.
     (fixture.componentInstance as unknown as { detach(): void }).detach();
     expect(anims).toHaveBeenCalledTimes(1);
-    // An opening in the fade stops it.
     fixture.componentInstance.open.set(true);
     fixture.detectChanges();
     expect(panel).not.toHaveClass('motion-fade-out');
@@ -225,7 +227,6 @@ describe('TodoLinkPickerComponent', () => {
     await fixture.whenStable();
     await Promise.resolve();
     expect(document.querySelector('.lp-layer')).toBeNull();
-    // A fade that ends after an opening in it leaves the panel.
     await open();
     const again = screen.getByRole('dialog');
     Object.defineProperty(again, 'getAnimations', { value: jest.fn(fading), configurable: true });

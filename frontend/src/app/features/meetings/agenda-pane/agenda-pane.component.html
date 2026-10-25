@@ -1,4 +1,3 @@
-<!-- In the agenda sheet the sheet header names the agenda and holds the add. -->
 <div class="ap__head" [class.ap__head--sheet]="inSheet()">
   <h2 #heading class="ap__title" [class.sr-only]="inSheet()" tabindex="-1">{{ headingText() }}</h2>
   @if (canChangeAgenda() && !inSheet()) {
@@ -89,7 +88,6 @@
   <app-empty-state shape="agenda" rows="3" [heading]="'meetings.agenda.empty' | t" />
 }
 
-<!-- Both dialogs live in the body: the scroll fade of the agenda would clip them. -->
 @if (todoOpen()) {
   <app-todo-new-dialog appBodyPortal [(open)]="todoOpen" [gremiumId]="meeting().gremiumId" [initialLinks]="todoLinks()" (created)="onTodoCreated($event)" />
 }

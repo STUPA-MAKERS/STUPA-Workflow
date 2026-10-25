@@ -1,8 +1,3 @@
-// The detail sheet of the finance pages (bookings, transfers, invoices): the header with
-// the meta line, the title and the line "Status · … · Betrag", then two columns of
-// sections with cards. The detail components `@use` this file, so the three sheets look
-// the same. Side by side the sheet is surface 1 with a large radius; one pane at a time it
-// sits on the page.
 @use 'breakpoints' as bp;
 @use 'dot-parts' as dots;
 @use 'swatch';
@@ -27,12 +22,9 @@
   background: var(--color-surface-1);
 }
 
-/* ------------------------------------------------------------------ header */
 .fd__line {
   --fd-sep: 24px;
 }
-/* Items with a dot between two of them, also after a wrap: every part draws its dot
-   before it, and the line clips the dot of the first part on each line. */
 .fd__seps {
   overflow-x: clip;
 }
@@ -63,7 +55,6 @@
   gap: 6px;
 }
 
-/* ------------------------------------------------------------------ body */
 .fd__cols {
   display: flex;
   flex-wrap: wrap;
@@ -84,8 +75,7 @@
   flex: 1 1 0;
   min-width: min(100%, 18rem);
 }
-/* On a phone the two columns become one. The sections then take the order of the Tel
-   boards: a section sets its place with --fd-phone-order (default 0 = the DOM order). */
+// A section sets its phone place with --fd-phone-order (default 0 = the DOM order).
 @include bp.phone {
   .fd__cols {
     flex-direction: column;
@@ -132,7 +122,6 @@
   color: var(--color-text-muted);
   font-weight: var(--fw-regular);
 }
-/* A card of label/value pairs. */
 .fd__card {
   margin: 0;
   padding: var(--space-3) var(--space-4);
@@ -163,7 +152,6 @@
   flex-direction: column;
   gap: var(--space-3);
 }
-/* Copyable values wrap, never an ellipsis. */
 .fd__wrap,
 .fd__note {
   overflow-wrap: anywhere;
@@ -182,7 +170,6 @@
   --ccl-gap: 8px;
 }
 
-/* A row that links to another record (application, invoice, booking). */
 .fd__link {
   position: relative;
   display: flex;
@@ -221,8 +208,6 @@
   font-weight: var(--fw-semibold);
   overflow-wrap: anywhere;
 }
-/* One line: only the cost-centre name shortens, with an ellipsis. The kind, the dots,
-   the swatch and the date keep their width. */
 .fd__linkMeta {
   display: flex;
   align-items: center;
@@ -248,7 +233,6 @@
   font-size: 0.8125rem;
 }
 
-/* "Verbucht 900,00 € von 2.890,00 €" with its bar. */
 .fd__booked {
   display: flex;
   flex-direction: column;
@@ -269,7 +253,6 @@
 }
 
 
-/* The cost-centre card with its figures. */
 .fd__ccCard {
   display: flex;
   flex-direction: column;

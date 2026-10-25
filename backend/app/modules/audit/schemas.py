@@ -32,21 +32,21 @@ class AuditEntryOut(_CamelModel):
     id: int
     at: datetime
     actor: str | None
-    # Actor display name, resolved by the router. None for a system or anonymous
-    # operation, and None for an unknown ``sub``.
+    #: Actor display name, resolved by the router. None for a system or anonymous
+    #: operation, and None for an unknown ``sub``.
     actor_name: str | None = Field(default=None, alias="actorName")
     action: str
     target_type: str | None = Field(alias="targetType")
     target_id: str | None = Field(alias="targetId")
-    # Readable target label, batch-resolved by the router. None when the target
-    # is deleted or unknown.
+    #: Readable target label, batch-resolved by the router. None when the target
+    #: is deleted or unknown.
     target_label: str | None = Field(default=None, alias="targetLabel")
     data: dict[str, Any]
-    # UUID string -> display name for the entity references inside ``data``. The
-    # router resolves them in one batch and keeps only the ids it can resolve.
+    #: UUID string -> display name for the entity references inside ``data``. The
+    #: router resolves them in one batch and keeps only the ids it can resolve.
     resolved_ids: dict[str, str] = Field(default_factory=dict, alias="resolvedIds")
-    # Revertable from the audit log, as the router determines it. The backend stays
-    # authoritative on the actual revert call and answers 409 when the entry is stale.
+    #: Revertable from the audit log, as the router determines it. The backend stays
+    #: authoritative on the actual revert call and answers 409 when the entry is stale.
     revertable: bool = False
     hash: str
     prev_hash: str | None = Field(alias="prevHash")

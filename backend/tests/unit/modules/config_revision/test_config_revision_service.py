@@ -30,7 +30,7 @@ from tests._support.auth_fakes import fake_session, result
 
 
 def _rev(**kw: object) -> ConfigRevision:
-    row = ConfigRevision(**kw)  # type: ignore[arg-type]
+    row = ConfigRevision(**kw)
     if getattr(row, "id", None) is None:
         row.id = uuid.uuid4()
     return row
@@ -71,14 +71,16 @@ def test_flatten_unknown_entity_is_identity() -> None:
 
 
 def test_lock_key_stable_distinct_and_in_bigint_range() -> None:
+    """Give a lock key that is deterministic, distinct and fits into a Postgres bigint."""
     k = _lock_key("flow", "global")
-    assert k == _lock_key("flow", "global")  # deterministic
+    assert k == _lock_key("flow", "global")
     assert _lock_key("form", "x") != _lock_key("form", "y")
-    assert -(2**63) <= k < 2**63  # fits into a Postgres bigint
+    assert -(2**63) <= k < 2**63
 
 
 async def test_record_first_revision_no_prev() -> None:
-    db = fake_session(result(), result(), result(), result())  # lock, head None, two audits
+    """Record the first revision without prev: the lock, head None and two audits."""
+    db = fake_session(result(), result(), result(), result())
     rev = await ConfigRevisionService(db).record(
         entity_type=ENTITY_FLOW,
         entity_id=GLOBAL_ID,
@@ -94,8 +96,9 @@ async def test_record_first_revision_no_prev() -> None:
 
 
 async def test_record_chains_from_head() -> None:
+    """Chain a revision from the head: the lock, the head as prev and two audits."""
     prev = _rev(entity_type=ENTITY_FLOW, entity_id=GLOBAL_ID, version=2, snapshot={})
-    db = fake_session(result(), result(prev), result(), result())  # lock, head prev, 2 audits
+    db = fake_session(result(), result(prev), result(), result())
     rev = await ConfigRevisionService(db).record(
         entity_type=ENTITY_FLOW,
         entity_id=GLOBAL_ID,
@@ -142,8 +145,12 @@ async def test_diff_first_revision_is_all_added() -> None:
     assert d["removed"] == {} and d["changed"] == {}
 
 
-# RevertService error branches. An integration test covers the success path.
 async def test_revert_unknown_entry_404() -> None:
+    """Answer 404 for an unknown entry.
+
+    This and the following tests cover the error branches of RevertService. An
+    integration test covers the success path.
+    """
     with pytest.raises(NotFoundError):
         await RevertService(fake_session(result())).revert(1, "admin")
 
@@ -156,9 +163,13 @@ async def test_revert_without_revision_id_conflict() -> None:
 
 
 async def test_revert_missing_recorded_revision_404() -> None:
+    """Answer 404 when the recorded revision is missing.
+
+    The entry select returns the entry, and the get for the recorded revision returns
+    None.
+    """
     rid = uuid.uuid4()
     entry = AuditEntry(id=1, action="config_change", data={"revisionId": str(rid)})
-    # The entry select returns the entry, and the get for the recorded revision returns None.
     with pytest.raises(NotFoundError):
         await RevertService(fake_session(result(entry), gets=[None])).revert(1, "admin")
 
@@ -175,7 +186,7 @@ async def test_revert_first_state_nothing_to_revert() -> None:
 
 
 async def test_revert_status_missing_state_ids_not_revertable() -> None:
-    # A status_change without from and to in data makes the dispatcher return not_revertable.
+    """Return not_revertable for a status_change without from and to in data."""
     entry = AuditEntry(
         id=1, action="status_change", target_id="app-1", data={"toStateId": "b"}
     )
@@ -185,7 +196,7 @@ async def test_revert_status_missing_state_ids_not_revertable() -> None:
 
 
 async def test_revert_non_revertable_budget_action() -> None:
-    # Deletions such as budget_expense_delete are not revertable by design.
+    """Refuse a deletion such as budget_expense_delete, which is not revertable by design."""
     entry = AuditEntry(
         id=1, action="budget_expense_delete", target_id="x", data={}
     )
@@ -195,6 +206,11 @@ async def test_revert_non_revertable_budget_action() -> None:
 
 
 async def test_revert_stale_when_newer_head_exists() -> None:
+    """Report stale when a newer head exists.
+
+    The queue holds the entry select, a head scalar that differs from the recorded
+    revision, then the recorded revision and its prev.
+    """
     rid, pid = uuid.uuid4(), uuid.uuid4()
     entry = AuditEntry(id=1, action="config_change", data={"revisionId": str(rid)})
     recorded = _rev(entity_type=ENTITY_FLOW, entity_id=GLOBAL_ID, version=2)
@@ -203,7 +219,6 @@ async def test_revert_stale_when_newer_head_exists() -> None:
     prev = _rev(entity_type=ENTITY_FLOW, entity_id=GLOBAL_ID, version=1)
     prev.id = pid
     head = _rev(entity_type=ENTITY_FLOW, entity_id=GLOBAL_ID, version=3)
-    # Queue: the entry select, a head scalar that differs from recorded, then recorded and prev.
     db = fake_session(result(entry), result(head), gets=[recorded, prev])
     with pytest.raises(ConflictError) as ei:
         await RevertService(db).revert(1, "admin")

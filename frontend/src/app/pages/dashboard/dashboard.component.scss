@@ -3,9 +3,6 @@
 @use 'scroll-fade' as fade;
 @use 'press';
 
-/* One column that scrolls with the page (narrow, phone): the head, "Heute", the work
-   list. Wide, the host is a pane page (`.pane-page` in styles.scss) and a grid: the list
-   column on the start side, the sheet "Heute" on the end side over the full height. */
 :host {
   --dash-fade: var(--space-6);
   display: flex;
@@ -13,8 +10,8 @@
   gap: var(--space-6);
 }
 
-/* Flex and grid items default to min-width: auto, so a long title without a break would
-   push a column past the viewport. Clamp the chain to 0 and let the rows cut it. */
+// Flex and grid items default to min-width: auto, so a long title without a break would push a
+// column past the viewport.
 :host > * {
   min-width: 0;
 }
@@ -43,23 +40,18 @@
   min-height: 0;
 }
 
-/* ------------------------------------------------------------------ head */
-
-/* The search pill at the start. */
 .dash__top {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
 }
-/* The pill shrinks before anything wraps. */
 .dash__search {
   flex: 1 1 0;
   min-width: 0;
   max-width: 600px;
 }
 
-/* A link that looks like a kit button (the kit button is a <button> only). */
 .dash__btn {
   display: inline-flex;
   flex: none;
@@ -99,7 +91,6 @@
   width: 100%;
 }
 
-/* The account button at the end of the phone pill. */
 .dash__me {
   display: inline-flex;
   margin-inline-end: 6px;
@@ -115,7 +106,7 @@
   padding: 6px 10px;
   border-radius: var(--radius-pill);
   color: var(--color-accent-text);
-  font-size: 0.8125rem; /* 13px */
+  font-size: 0.8125rem;
   font-weight: var(--fw-semibold);
   text-decoration: none;
   white-space: nowrap;
@@ -145,15 +136,12 @@
   white-space: nowrap;
 }
 
-/* ------------------------------------------------------------------ work list */
-
 .dash__work {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
 }
 
-/* The tabs and "Alle … öffnen" share one rule under them. */
 .dash__tabbar {
   display: flex;
   flex: none;
@@ -172,7 +160,6 @@
   gap: var(--space-2);
   padding-inline: 14px;
 }
-/* The count as a small plate, so it reads as a number of rows and not as a label. */
 .dash__tabs ::ng-deep .tabs__count {
   padding: 0 7px;
   border-radius: var(--radius-pill);
@@ -181,10 +168,6 @@
   line-height: 18px;
 }
 
-/* Wide: the panel scrolls inside the list column; the tabs stay.
-
-   The rows of the work list sit on surface 2, as the row groups of the other lists on
-   the page background, with the page background between them (board B). */
 .dash__panel {
   min-width: 0;
   @include surface.context(1);
@@ -192,7 +175,6 @@
 }
 :host(.dash--wide) .dash__panel {
   flex: 1 1 auto;
-  /* Room for "Antrag stellen" below the last row. */
   padding-bottom: calc(56px + var(--space-6));
   min-height: 0;
   overflow-y: auto;
@@ -204,14 +186,13 @@
   @include fade.fade-y(var(--dash-fade));
 }
 
-/* A title takes up to two lines in the table, then the ellipsis. */
+// The clamp uses a margin, not a padding, because the clamp cuts at the content box and a
+// padding would show the top of the third line.
 .dash__cellTitle {
   display: -webkit-box;
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-  /* A margin, not a padding: the clamp cuts at the content box, and a padding would show
-     the top of the third line. */
   margin-block: 6px;
   font-weight: var(--fw-medium);
   overflow-wrap: anywhere;
@@ -220,12 +201,10 @@
   white-space: nowrap;
 }
 
-/* The note starts at the edge of the filters and the rows. */
 .dash__loadError {
   margin: var(--space-4) 0;
 }
 
-/* Empty tab: the empty state, and for a new user the card "Antrag stellen" beside it. */
 .dash__emptyGrid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -259,10 +238,6 @@
   color: var(--color-on-accent-container);
 }
 
-/* ------------------------------------------------------------------ "Heute" */
-
-/* The sheet: surface 1, round, the body scrolls inside it (wide). Narrow, the same block
-   is a card at the top of the page. */
 .dash__today {
   display: flex;
   flex-direction: column;
@@ -296,7 +271,6 @@
   min-height: 0;
   padding: 0 14px 14px;
 }
-/* Without the title "Heute" (no meeting today), the body keeps the inset at the top. */
 .dash__todayBody:first-child {
   padding-top: 14px;
 }
@@ -327,7 +301,6 @@
   margin-inline-end: -4px;
 }
 
-/* The live meeting: a block on surface 2 with its progress on surface 3. */
 .dash__live {
   display: flex;
   flex-direction: column;
@@ -383,7 +356,7 @@
   border-radius: var(--radius-lg);
   background: var(--color-surface-3);
 }
-/* On surface 3 the muted text keeps 4.5:1; the subtle text does not. */
+// On surface 3 the muted text keeps 4.5:1; the subtle text does not.
 .dash__progress .dash__sub {
   color: var(--color-text-muted);
 }
@@ -417,9 +390,6 @@
   font-weight: var(--fw-semibold);
 }
 
-/* Row feedback. In a row group the rows already sit on surface 2, the hover colour of
-   the list item, so hover and press take surface 3. The row keeps the corners the group
-   gives it. */
 .rowgroup > app-list-item ::ng-deep .li {
   border-radius: inherit;
 }
@@ -432,9 +402,6 @@
   }
 }
 
-/* ------------------------------------------------------------------ narrow */
-
-/* Narrow (not a phone): the blocks of "Heute" sit side by side in the card. */
 @include bp.narrow {
   .dash__todayBody {
     display: grid;
@@ -444,12 +411,9 @@
   }
 }
 
-/* ------------------------------------------------------------------ phone */
-
 :host(.dash--phone) {
   gap: var(--space-5);
 }
-/* Phone: "Heute" is a band on the page, not a card; its blocks keep their surfaces. */
 :host(.dash--phone) .dash__today {
   border-radius: 0;
   background: none;
@@ -467,8 +431,17 @@
 :host(.dash--phone) .dash__tabs ::ng-deep .tabs__tab {
   padding-inline: var(--space-2);
 }
-/* Phone: "Alle … öffnen" under the rows, at the end edge. */
 :host(.dash--phone) .dash__all {
   align-self: flex-end;
   margin-inline-end: -4px;
+}
+:host(.dash--phone) .dash__pager {
+  --tab-pager-bleed: var(--space-4);
+  --tab-pager-page-top: var(--space-2);
+}
+.dash__page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
 }

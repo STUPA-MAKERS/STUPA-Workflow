@@ -52,7 +52,7 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
 };
 
 /**
- * "Board-Einstellungen" (frame 9, `todo.configure`): the name, the columns (rename,
+ * "Board-Einstellungen" (`todo.configure`): the name, the columns (rename,
  * order by drag or by the menu, the done column, add, delete), the labels (name and
  * colour from the fixed palette) and the archive of done cards. Every change saves at
  * once; `changed` gives the board to the page.
@@ -175,8 +175,6 @@ export class TodoBoardSettingsComponent {
     this.run(this.api.patchBoard(this.board().id, { archiveAfterDays: n }));
   }
 
-  // ------------------------------------------------------------------ columns
-
   columnMenu(col: TodoColumn, index: number): RowMenuSection[] {
     const t = (key: TranslationKey) => this.i18n.translate(key);
     const items: RowMenuItem[] = [{ id: 'rename', label: t('todos.settings.renameColumn'), icon: 'edit' }];
@@ -287,14 +285,15 @@ export class TodoBoardSettingsComponent {
     this.run(this.api.deleteColumn(this.board().id, col.id, this.moveTo()), () => this.deleting.set(null));
   }
 
-  // ------------------------------------------------------------------ labels
-
   editLabel(label: TodoLabel | null): void {
     this.labelEdit.set(label?.id ?? '');
     this.labelName.set(label?.name ?? '');
     this.labelColor.set(label?.color ?? 'green');
   }
 
+  /**
+   * It uses the board as it is now, because a poll during the request may have brought newer cards.
+   */
   saveLabel(): void {
     const id = this.labelEdit();
     const name = this.labelName().trim();
@@ -307,7 +306,6 @@ export class TodoBoardSettingsComponent {
     req.subscribe({
       next: (label) => {
         this.busy.set(false);
-        // The board as it is now: a poll during the request may have brought newer cards.
         const now = this.board();
         const labels = id ? now.labels.map((l) => (l.id === id ? label : l)) : [...now.labels, label];
         this.changed.emit({ ...now, labels: labels.sort((a, b) => a.name.localeCompare(b.name)) });

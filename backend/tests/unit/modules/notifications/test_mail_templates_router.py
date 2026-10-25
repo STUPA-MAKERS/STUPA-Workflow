@@ -1,4 +1,4 @@
-"""Mail template router tests (#5-4): endpoint wiring and the admin.notifications gate.
+"""Mail template router tests: endpoint wiring and the admin.notifications gate.
 
 Other unit tests cover the service (CRUD and preview). These tests fake the service and
 check the wiring and the permission gate only.
@@ -62,7 +62,7 @@ class _FakeService:
             placeholders=payload.placeholders or {},
         )
 
-    async def preview_template(self, template_id, req):  # noqa: ANN001
+    async def preview_template(self, template_id, req):
         return MailPreviewOut(
             subject="Anmeldung", text="Hallo Max", html=None, lang=req.lang
         )

@@ -82,7 +82,7 @@ export interface CostCentreGroup {
 }
 
 /**
- * The cost-centre field of the finance forms (board "Buchung · Kostenstelle wählen").
+ * The cost-centre field of the finance forms.
  *
  * The closed field is a filled field like `app-select`: the label, then the swatch, the
  * name and the path key of the pick in mono. The whole field opens the list. The list
@@ -103,6 +103,8 @@ export interface CostCentreGroup {
  * - Keyboard: the search keeps the focus; Arrow Down/Up, Home and End move the active
  *   row (`aria-activedescendant`), Enter picks it, Escape closes and returns to the
  *   field.
+ *
+ * On desktop the list is a popover in the top layer, so no pane or scrolling container clips it.
  */
 @Component({
   selector: 'app-cost-centre-select',
@@ -223,7 +225,6 @@ export class CostCentreSelectComponent {
               });
             }
             lastParent = n.parentId;
-            // While a search runs, the path line names the parents: the hits stand flat.
             lines.push({ kind: 'choice', choice: this.choice(n, top, q ? 1 : depth, q, 0) });
           }
           walk(n.children ?? [], depth + 1, [...trail, n]);
@@ -264,8 +265,8 @@ export class CostCentreSelectComponent {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private rendered: AfterRenderRef | null = null;
 
+  /** A resize across the phone limit swaps the popover and the sheet, so the list closes. */
   constructor() {
-    // A resize across the phone limit swaps the popover and the sheet: close the list.
     effect(() => {
       this.phone();
       untracked(() => this.close(false));
@@ -277,7 +278,6 @@ export class CostCentreSelectComponent {
     watchAnchoredPopover({
       isOpen: () => this.popoverOpen(),
       inside: () => [this.host.nativeElement, this.menu()?.nativeElement],
-      // A scroll inside the list itself does not move the field.
       ownScroll: () => this.menu()?.nativeElement,
       close: () => this.close(false),
       follow: () => this.follow(),
@@ -304,12 +304,15 @@ export class CostCentreSelectComponent {
 
   protected onSearch(value: string): void {
     this.query.set(value);
-    // The first hit becomes active, so Enter picks it.
     const first = this.choices().find((c) => c.depth > 0) ?? this.choices()[0];
     this.active.set(value.trim() && first ? first.index : this.startIndex());
   }
 
-  /** Keys in the search field: move in the list, pick, close. */
+  /**
+   * Keys in the search field: move in the list, pick, close.
+   *
+   * The field takes the Escape, so the form or the sheet around it stays open.
+   */
   protected onListKey(event: KeyboardEvent): void {
     const count = this.choices().length;
     const i = this.active();
@@ -341,7 +344,6 @@ export class CostCentreSelectComponent {
         return;
       }
       case 'Escape':
-        // The field takes the Escape: the form or the sheet around it stays open.
         event.preventDefault();
         event.stopPropagation();
         this.close(true);

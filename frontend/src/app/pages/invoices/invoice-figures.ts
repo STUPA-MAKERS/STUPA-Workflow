@@ -22,7 +22,7 @@ export function countedBookings(bookings: readonly InvoiceBooking[]): InvoiceBoo
 
 /**
  * "Verbucht 900,00 € von 2.890,00 €": the sum of the expense bookings on the invoice
- * against its gross amount. Null when the server sends no bookings (a backend before A6).
+ * against its gross amount. Null when the server sends no bookings (an older backend).
  */
 export function bookedOn(invoice: Invoice): InvoiceBooked | null {
   const bookings = invoice.linkedBookings;

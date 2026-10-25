@@ -1,4 +1,4 @@
-"""BudgetStatsService (T-17) without a DB: the MV refresh in both branches."""
+"""BudgetStatsService without a DB: the MV refresh in both branches."""
 
 from __future__ import annotations
 

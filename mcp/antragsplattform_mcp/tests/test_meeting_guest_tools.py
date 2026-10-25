@@ -1,4 +1,4 @@
-"""Tests for the guest tools of a public meeting (#17).
+"""Tests for the guest tools of a public meeting.
 
 The tools only forward to the lead routes; no tool casts a ballot.
 """

@@ -4,12 +4,12 @@ import { TodoBoardSkeletonComponent } from './todo-board-skeleton.component';
 describe('TodoBoardSkeletonComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
+  /** The done column (the last) ends without it, as the board does. */
   it('draws four columns of tiles and the place of "+ To-Do" at the foot of each open column', async () => {
     const { container, fixture } = await render(TodoBoardSkeletonComponent, { inputs: { canWrite: true } });
     const cols = container.querySelectorAll('.bv__col');
     expect(cols).toHaveLength(4);
     expect(container.querySelectorAll('.bv__col .bsk__tile').length).toBeGreaterThan(4);
-    // The done column (the last) ends without it, as the board does.
     expect(container.querySelectorAll('.bsk__add')).toHaveLength(3);
     expect(cols[3].querySelector('.bsk__add')).toBeNull();
     expect((fixture.nativeElement as HTMLElement).getAttribute('aria-hidden')).toBe('true');

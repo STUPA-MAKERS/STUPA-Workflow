@@ -63,13 +63,13 @@ def test_search_requires_authentication_401(client: TestClient) -> None:
 
 
 def test_search_returns_hits_for_a_principal(app: FastAPI, client: TestClient) -> None:
+    """Return the hits; the query, the language default and the caller reach the service."""
     _principal(app)
     r = client.get("/api/search", params={"q": "abc"})
     assert r.status_code == 200
     body: dict[str, Any] = r.json()
     assert body["hits"][0]["kind"] == "application"
     assert body["hits"][0]["url"] == "/applications/a-1"
-    # The query, the language default and the caller all reach the service.
     assert body["hits"][0]["title"] == "abc/de/me"
 
 
@@ -80,7 +80,7 @@ def test_search_passes_the_requested_language(app: FastAPI, client: TestClient) 
 
 
 def test_search_without_a_query_is_not_an_error(app: FastAPI, client: TestClient) -> None:
-    # The palette calls this on every keystroke, including the first.
+    """Accept a search without a query, because the palette calls it on every keystroke."""
     _principal(app)
     assert client.get("/api/search").status_code == 200
 
@@ -88,7 +88,10 @@ def test_search_without_a_query_is_not_an_error(app: FastAPI, client: TestClient
 def test_an_overlong_query_is_rejected_rather_than_scanned(
     app: FastAPI, client: TestClient
 ) -> None:
-    # A DoS bound, not a validation rule: a trigram scan over a very long string costs
-    # more than any real query needs.
+    """Reject an overlong query instead of a scan.
+
+    This is a DoS bound, not a validation rule: a trigram scan over a very long string costs
+    more than any real query needs.
+    """
     _principal(app)
     assert client.get("/api/search", params={"q": "x" * 201}).status_code == 422

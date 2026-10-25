@@ -41,7 +41,7 @@ type AgendaAction = 'done' | 'rename' | 'up' | 'down' | 'nonPublic' | 'remove' |
 
 /**
  * Add, rename, reorder and remove agenda items: the meeting lead with write access, while
- * the meeting is planned or live and the protocol is not locked (O22, O25).
+ * the meeting is planned or live and the protocol is not locked.
  */
 export function canChangeAgenda(meeting: Meeting, locked: boolean): boolean {
   return meeting.canWrite && !locked && meeting.status !== 'closed';
@@ -65,18 +65,20 @@ export interface AgendaMove {
  * entry of the row menu.
  *
  * The row menu holds every agenda change (N21): rename (free text only), move up and
- * down, the non-public switch and the remove. Drag and drop also reorders (frame 7): the
+ * down, the non-public switch and the remove. Drag and drop also reorders: the
  * list is a drop list of `@angular/cdk/drag-drop`, with the lifted row and the dashed
  * drop box of the to-do board. A touch starts the drag only after a long press, so a
  * swipe still scrolls the agenda; the menu moves without a pointer. Only a
- * planned or live meeting changes its agenda (O25); a closed meeting keeps the
- * non-public switch while the protocol is a draft (O22). An item with an open or
+ * planned or live meeting changes its agenda; a closed meeting keeps the
+ * non-public switch while the protocol is a draft. An item with an open or
  * closed vote stays on the agenda, so its remove is disabled with the reason. The remove
  * asks first ("TOP entfernen?"), because the text of the item goes with it.
  *
- * "To-Do anlegen" (frame 5) is in the menu of every item for a person with `todo.write`
+ * "To-Do anlegen" is in the menu of every item for a person with `todo.write`
  * in the gremium of the meeting, also on a closed meeting: it opens "Neues To-Do" on the
  * gremium board, linked to the TOP and to its application.
+ *
+ * Both dialogs live in the body, because the scroll fade of the agenda would clip them.
  */
 @Component({
   selector: 'app-agenda-pane',
@@ -228,7 +230,7 @@ export class AgendaPaneComponent {
   /**
    * The reason why the item cannot be removed, or `null`.
    *
-   * An open or closed vote keeps the item (409 `agenda_item_has_vote`, O25). A draft or
+   * An open or closed vote keeps the item (409 `agenda_item_has_vote`). A draft or
    * cancelled vote goes with the item, but only for a person with the vote right
    * (`canManageVotes`); the agenda right alone gets 403.
    */
@@ -272,7 +274,6 @@ export class AgendaPaneComponent {
     if (!this.canChangeAgenda()) return [{ items: [nonPublic] }];
 
     const edit: RowMenuItem[] = [];
-    // An application item carries the title of the application.
     if (!item.applicationId) {
       edit.push({ id: 'rename', label: t('meetings.agenda.rename'), icon: 'edit' });
     }

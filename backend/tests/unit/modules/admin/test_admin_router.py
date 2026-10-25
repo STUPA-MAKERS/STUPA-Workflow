@@ -1,4 +1,4 @@
-"""Router tests for admin and config (T-24): endpoint wiring and RBAC with a faked service.
+"""Router tests for admin and config: endpoint wiring and RBAC with a faked service.
 
 These tests prove four things.
 
@@ -89,7 +89,7 @@ class _FakeConfig:
             )
         ]
 
-    async def create_gremium(self, payload, actor):  # noqa: ANN001
+    async def create_gremium(self, payload, actor):
         return GremiumOut(
             id=uuid4(),
             name=payload.name,
@@ -102,15 +102,15 @@ class _FakeConfig:
     session = None
     was_public = False
 
-    async def gremium_protocols_public(self, gremium_id):  # noqa: ANN001
+    async def gremium_protocols_public(self, gremium_id):
         return self.was_public
 
-    async def gremium_public_preview(self, gremium_id):  # noqa: ANN001
+    async def gremium_public_preview(self, gremium_id):
         if str(gremium_id).startswith("00000000"):
             raise NotFoundError("nope")
         return GremiumPublicPreview(final_count=6, missing_count=5)
 
-    async def update_gremium(self, gremium_id, payload, actor):  # noqa: ANN001
+    async def update_gremium(self, gremium_id, payload, actor):
         if str(gremium_id).startswith("00000000"):
             raise NotFoundError("nope")
         return GremiumOut(
@@ -123,10 +123,10 @@ class _FakeConfig:
             protocols_public=bool(payload.protocols_public),
         )
 
-    async def get_gremium_mail_recipients(self, gremium_id):  # noqa: ANN001
+    async def get_gremium_mail_recipients(self, gremium_id):
         return GremiumMailRecipients(recipients=["list@x.de"])
 
-    async def set_gremium_mail_recipients(self, gremium_id, payload, actor):  # noqa: ANN001
+    async def set_gremium_mail_recipients(self, gremium_id, payload, actor):
         self.mail_recipients = list(payload.recipients)
         return payload
 
@@ -143,7 +143,7 @@ class _FakeConfig:
             )
         ]
 
-    async def create_application_type(self, payload, actor):  # noqa: ANN001
+    async def create_application_type(self, payload, actor):
         return ApplicationTypeOut(
             id=uuid4(),
             gremium_id=payload.gremium_id,
@@ -154,7 +154,7 @@ class _FakeConfig:
             active_form_version_id=None,
         )
 
-    async def update_application_type(self, type_id, payload, actor):  # noqa: ANN001
+    async def update_application_type(self, type_id, payload, actor):
         return ApplicationTypeOut(
             id=type_id,
             gremium_id=None,
@@ -165,7 +165,7 @@ class _FakeConfig:
             active_form_version_id=None,
         )
 
-    async def delete_application_type(self, type_id, actor):  # noqa: ANN001
+    async def delete_application_type(self, type_id, actor):
         return None
 
     async def list_roles(self):
@@ -179,12 +179,13 @@ class _FakeConfig:
         ]
 
     async def get_active_global_flow(self):
-        return None  # an empty flow is enough for the gate tests (#5-2)
+        """Return an empty flow, which is enough for the gate tests."""
+        return None
 
-    async def create_global_flow_version(self, payload, actor):  # noqa: ANN001
+    async def create_global_flow_version(self, payload, actor):
         return FlowVersionOut(id=uuid4(), version=2, active=True)
 
-    async def create_role(self, payload, actor):  # noqa: ANN001
+    async def create_role(self, payload, actor):
         return RoleOut(
             id=uuid4(),
             key=payload.key,
@@ -192,7 +193,7 @@ class _FakeConfig:
             permissions=payload.permissions,
         )
 
-    async def update_role(self, role_id, payload, actor):  # noqa: ANN001
+    async def update_role(self, role_id, payload, actor):
         return RoleOut(
             id=role_id,
             key="admin",
@@ -203,7 +204,7 @@ class _FakeConfig:
     async def list_role_assignments(self):
         return []
 
-    async def search_principals(self, query, limit=50, **_filters):  # noqa: ANN001, ANN003
+    async def search_principals(self, query, limit=50, **_filters):
         return [
             PrincipalOut(
                 id=uuid4(),
@@ -235,17 +236,17 @@ class _FakeConfig:
     async def list_group_mappings(self):
         return []
 
-    async def create_group_mapping(self, payload, actor):  # noqa: ANN001
+    async def create_group_mapping(self, payload, actor):
         return GroupMappingOut(
             id=uuid4(),
             oidc_group=payload.oidc_group,
             role_id=payload.role_id,
         )
 
-    async def update_group_mapping(self, mapping_id, payload, actor):  # noqa: ANN001
+    async def update_group_mapping(self, mapping_id, payload, actor):
         return GroupMappingOut(id=mapping_id, oidc_group="g", role_id=uuid4())
 
-    async def delete_group_mapping(self, mapping_id, actor):  # noqa: ANN001
+    async def delete_group_mapping(self, mapping_id, actor):
         self.deleted_mapping = mapping_id
 
     async def list_webhooks(self):
@@ -259,7 +260,7 @@ class _FakeConfig:
             )
         ]
 
-    async def create_webhook(self, payload, actor):  # noqa: ANN001
+    async def create_webhook(self, payload, actor):
         if payload.name == "dup":
             raise ConflictError("exists")
         return WebhookOut(
@@ -270,7 +271,7 @@ class _FakeConfig:
             active=payload.active,
         )
 
-    async def update_webhook(self, webhook_id, payload, actor):  # noqa: ANN001
+    async def update_webhook(self, webhook_id, payload, actor):
         if str(webhook_id).startswith("00000000"):
             raise NotFoundError("nope")
         return WebhookOut(
@@ -281,7 +282,7 @@ class _FakeConfig:
             active=False,
         )
 
-    async def delete_webhook(self, webhook_id, actor):  # noqa: ANN001
+    async def delete_webhook(self, webhook_id, actor):
         if str(webhook_id).startswith("00000000"):
             raise NotFoundError("nope")
         self.deleted_webhook = webhook_id
@@ -295,7 +296,7 @@ class _FakeSite:
     async def get(self):
         return SiteConfigOut(version=self._version, branding=self._branding)
 
-    async def save(self, branding, actor):  # noqa: ANN001
+    async def save(self, branding, actor):
         self._branding = branding
         self._version += 1
         return await self.get()
@@ -305,7 +306,7 @@ class _FakeSite:
 
         return getattr(self, "_help", HelpTicketsSettings())
 
-    async def put_help_tickets(self, payload, actor):  # noqa: ANN001
+    async def put_help_tickets(self, payload, actor):
         self._help = payload
         return payload
 
@@ -317,9 +318,9 @@ class _FakeSite:
 
 
 class _FakeGremiumRoles:
-    """Minimal fake for the Gremium roles and memberships (#5-3 gate tests)."""
+    """Minimal fake for the Gremium roles and memberships (gate tests)."""
 
-    async def list_roles(self, gremium_id):  # noqa: ANN001
+    async def list_roles(self, gremium_id):
         return [
             GremiumRoleOut(
                 id=uuid4(),
@@ -331,7 +332,7 @@ class _FakeGremiumRoles:
             )
         ]
 
-    async def list_memberships(self, gremium_id):  # noqa: ANN001
+    async def list_memberships(self, gremium_id):
         return [
             GremiumMembershipOut(
                 id=uuid4(),
@@ -348,12 +349,12 @@ class _FakeOidcMappings:
     async def list_membership_mappings(self):
         return []
 
-    async def create_membership_mapping(self, payload, actor):  # noqa: ANN001
+    async def create_membership_mapping(self, payload, actor):
         return GremiumMembershipMappingOut(
             id=uuid4(), gremium_id=payload.gremium_id, oidc_group=payload.oidc_group
         )
 
-    async def update_membership_mapping(self, mapping_id, payload, actor):  # noqa: ANN001
+    async def update_membership_mapping(self, mapping_id, payload, actor):
         if str(mapping_id).startswith("00000000"):
             raise NotFoundError("nope")
         return GremiumMembershipMappingOut(
@@ -362,14 +363,14 @@ class _FakeOidcMappings:
             oidc_group=payload.oidc_group or "stupa",
         )
 
-    async def delete_membership_mapping(self, mapping_id, actor):  # noqa: ANN001
+    async def delete_membership_mapping(self, mapping_id, actor):
         if str(mapping_id).startswith("00000000"):
             raise NotFoundError("nope")
 
     async def list_role_mappings(self):
         return []
 
-    async def create_role_mapping(self, payload, actor):  # noqa: ANN001
+    async def create_role_mapping(self, payload, actor):
         return GremiumRoleMappingOut(
             id=uuid4(),
             gremium_id=uuid4(),
@@ -377,7 +378,7 @@ class _FakeOidcMappings:
             oidc_group=payload.oidc_group,
         )
 
-    async def update_role_mapping(self, mapping_id, payload, actor):  # noqa: ANN001
+    async def update_role_mapping(self, mapping_id, payload, actor):
         if str(mapping_id).startswith("00000000"):
             raise NotFoundError("nope")
         return GremiumRoleMappingOut(
@@ -387,15 +388,16 @@ class _FakeOidcMappings:
             oidc_group=payload.oidc_group or "stupa-board",
         )
 
-    async def delete_role_mapping(self, mapping_id, actor):  # noqa: ANN001
+    async def delete_role_mapping(self, mapping_id, actor):
         if str(mapping_id).startswith("00000000"):
             raise NotFoundError("nope")
 
 
 @pytest.fixture
 def app() -> FastAPI:
+    """Build the app with one fake instance per app, so the state survives between calls."""
     application = create_app()
-    config, site = _FakeConfig(), _FakeSite()  # one instance per app, so the state survives
+    config, site = _FakeConfig(), _FakeSite()
     application.dependency_overrides[get_config_service] = lambda: config
     application.dependency_overrides[get_site_config_service] = lambda: site
     return application
@@ -428,7 +430,8 @@ def test_forbidden_without_permission(app: FastAPI, client: TestClient) -> None:
 
 
 def test_roles_write_needs_admin_roles_not_just_config(app: FastAPI, client: TestClient) -> None:
-    _as(app, {"admin.types"})  # may read config areas, but must not write roles
+    """Refuse a role write to a principal that may only read config areas."""
+    _as(app, {"admin.types"})
     assert client.get("/api/admin/roles").status_code == 200
     r = client.post("/api/admin/roles", json={"key": "x", "label": {}, "permissions": []})
     assert r.status_code == 403
@@ -473,7 +476,10 @@ def test_update_gremium_404(app: FastAPI, client: TestClient) -> None:
 
 
 def test_gremium_mail_recipients_roundtrip(app: FastAPI, client: TestClient) -> None:
-    """#protocol-recipients: GET returns the list. PUT replaces it with validated addresses."""
+    """Round-trip the protocol recipients: GET lists them, PUT replaces them validated.
+
+    The server drops case-insensitive duplicates and keeps the order.
+    """
     _as_admin(app)
     gid = uuid4()
     r = client.get(f"/api/admin/gremien/{gid}/mail-recipients")
@@ -483,7 +489,6 @@ def test_gremium_mail_recipients_roundtrip(app: FastAPI, client: TestClient) -> 
         json={"recipients": ["a@x.de", " a@X.de ", "b@y.org"]},
     )
     assert r.status_code == 200
-    # The server drops case-insensitive duplicates and keeps the order.
     assert r.json() == {"recipients": ["a@x.de", "b@y.org"]}
 
 
@@ -499,11 +504,13 @@ def test_gremium_mail_recipients_rejects_implausible_address(
 
 
 def test_gremien_authed_list_without_admin_perm(app: FastAPI, client: TestClient) -> None:
-    """#68: every logged-in principal may read `GET /api/gremien`.
+    """Every logged-in principal may read `GET /api/gremien`.
 
     The endpoint feeds a dropdown, so it also works without ``admin.config``.
+
+    The test principal is logged in, but has no permission.
     """
-    _as(app, set())  # logged in, but without any permission
+    _as(app, set())
     r = client.get("/api/gremien")
     assert r.status_code == 200
     assert r.json()[0]["cdVariantId"] is None
@@ -528,17 +535,23 @@ def test_application_types_crud(app: FastAPI, client: TestClient) -> None:
 def test_application_type_delete_requires_own_permission(
     app: FastAPI, client: TestClient
 ) -> None:
-    """The delete needs the separate permission admin.types_delete, not admin.types."""
+    """The delete needs the separate permission admin.types_delete, not admin.types.
+
+    admin.types alone covers create and update, but not the delete. With the separate
+    delete permission the call returns 204.
+    """
     type_id = uuid4()
-    # admin.types alone covers create and update. It does NOT allow the delete.
     _as(app, {"admin.types"})
     assert client.delete(f"/api/admin/application-types/{type_id}").status_code == 403
-    # With the separate delete permission the call returns 204.
     _as(app, {"admin.types_delete"})
     assert client.delete(f"/api/admin/application-types/{type_id}").status_code == 204
 
 
 def test_roles_and_assignments_and_mappings(app: FastAPI, client: TestClient) -> None:
+    """Read the roles, the assignments and the mappings.
+
+    Role assignments are read-only, because the roles come from the OIDC group mappings.
+    """
     _as_admin(app)
     assert client.get("/api/admin/roles").json()[0]["permissions"] == ["admin.gremien"]
     created = client.post(
@@ -549,7 +562,6 @@ def test_roles_and_assignments_and_mappings(app: FastAPI, client: TestClient) ->
     patched = client.patch(f"/api/admin/roles/{uuid4()}", json={"permissions": ["audit.read"]})
     assert patched.status_code == 200
     pid, rid = str(uuid4()), str(uuid4())
-    # Role assignments are read-only. The roles come from the OIDC group mappings.
     assert client.get("/api/admin/role-assignments").status_code == 200
     r = client.post("/api/admin/role-assignments", json={"principalId": pid, "roleId": rid})
     assert r.status_code == 405
@@ -573,21 +585,22 @@ def test_list_principals_camelcase(app: FastAPI, client: TestClient) -> None:
 
 
 def test_list_principals_needs_admin_roles(app: FastAPI, client: TestClient) -> None:
-    _as(app, {"admin.types"})  # an area admin without gremien or roles must not read this
+    """Refuse the principal list to an area admin without gremien or roles."""
+    _as(app, {"admin.types"})
     assert client.get("/api/admin/principals").status_code == 403
 
 
 def test_gremien_admin_can_manage_members_without_admin_roles(
     app: FastAPI, client: TestClient
 ) -> None:
-    """#5-3: the members subpage runs under admin.gremien.
+    """The members subpage runs under admin.gremien.
 
     A principal without admin.roles must still read the memberships, the Gremium roles for
     the role dropdown and the principals for the name typeahead. Without these reads the
-    table stays empty.
+    table stays empty. The test principal deliberately has no admin.roles.
     """
     app.dependency_overrides[get_gremium_role_service] = lambda: _FakeGremiumRoles()
-    _as(app, {"admin.gremien"})  # deliberately WITHOUT admin.roles
+    _as(app, {"admin.gremien"})
     gid = uuid4()
     assert client.get(f"/api/admin/gremien/{gid}/memberships").status_code == 200
     assert client.get(f"/api/admin/gremien/{gid}/roles").status_code == 200
@@ -620,7 +633,7 @@ def test_members_endpoints_forbidden_for_unrelated_area(app: FastAPI, client: Te
 def test_flow_editor_can_read_its_sources_without_admin_types(
     app: FastAPI, client: TestClient
 ) -> None:
-    """#5-2: the flow editor runs under flow.configure.
+    """The flow editor runs under flow.configure.
 
     The editor reads the global flow, the roles and the webhooks as option sources. These
     reads must work without admin.types, admin.roles and webhook.manage. Otherwise the
@@ -636,10 +649,10 @@ _FLOW_GRAPH = {"graph": {"states": [], "transitions": [], "layout": None}}
 
 
 def test_flow_save_accepts_flow_configure(app: FastAPI, client: TestClient) -> None:
-    """#g7: `flow.configure` opens the editor AND saves it.
+    """Let `flow.configure` open the editor and save it.
 
-    Before the fix the route gate and the save gate disagreed: the editor opened on
-    `flow.configure` and the save answered 403 without `admin.types`.
+    The route gate and the save gate must agree. Otherwise the editor opens on
+    `flow.configure` and the save answers 403 without `admin.types`.
     """
     _as(app, {"flow.configure"})
     r = client.post("/api/admin/flow-versions/global", json=_FLOW_GRAPH)
@@ -647,14 +660,14 @@ def test_flow_save_accepts_flow_configure(app: FastAPI, client: TestClient) -> N
 
 
 def test_flow_save_still_accepts_admin_types(app: FastAPI, client: TestClient) -> None:
-    """#g7: the gate is any-of, so an existing `admin.types` holder keeps the save."""
+    """Keep the save for an `admin.types` holder, because the gate is any-of."""
     _as(app, {"admin.types"})
     r = client.post("/api/admin/flow-versions/global", json=_FLOW_GRAPH)
     assert r.status_code == 201
 
 
 def test_flow_save_forbidden_without_either(app: FastAPI, client: TestClient) -> None:
-    """#g7: neither key means 403 as problem+json. A read-only key is not enough."""
+    """Answer 403 as problem+json without either key; a read-only key is not enough."""
     _as(app, {"budget.structure"})
     r = client.post("/api/admin/flow-versions/global", json=_FLOW_GRAPH)
     assert r.status_code == 403
@@ -663,7 +676,7 @@ def test_flow_save_forbidden_without_either(app: FastAPI, client: TestClient) ->
 
 
 def test_global_flow_readable_by_budget_structure(app: FastAPI, client: TestClient) -> None:
-    """#5-2: the budget tree (budget.structure) reads the global flow.
+    """The budget tree (budget.structure) reads the global flow.
 
     The tree needs the flow for the status dropdowns (accepted and denied).
     """
@@ -672,7 +685,7 @@ def test_global_flow_readable_by_budget_structure(app: FastAPI, client: TestClie
 
 
 def test_application_types_readable_by_form_configure(app: FastAPI, client: TestClient) -> None:
-    """#5-2: the form editor (form.configure) reads the application-type list."""
+    """The form editor (form.configure) reads the application-type list."""
     _as(app, {"form.configure"})
     assert client.get("/api/admin/application-types").status_code == 200
 
@@ -707,14 +720,19 @@ def test_role_assignment_delete_is_gone(app: FastAPI, client: TestClient) -> Non
 
 
 def test_group_mapping_delete_204_and_gate(app: FastAPI, client: TestClient) -> None:
-    """#5-4: admin.roles may now delete a group mapping."""
+    """Let admin.roles delete a group mapping; a wrong area permission gives 403."""
     _as_admin(app)
     assert client.delete(f"/api/admin/group-mappings/{uuid4()}").status_code == 204
-    _as(app, {"admin.types"})  # the wrong area permission, so 403
+    _as(app, {"admin.types"})
     assert client.delete(f"/api/admin/group-mappings/{uuid4()}").status_code == 403
 
 
 def test_webhooks_crud_and_validation(app: FastAPI, client: TestClient) -> None:
+    """Create, read, update and validate webhooks.
+
+    A non-http URL fails the schema with 422. The frontend posts the full object with an
+    empty id, and the server ignores that id.
+    """
     _as_admin(app)
     assert client.get("/api/admin/webhooks").json()[0]["name"] == "n8n"
     ok = client.post(
@@ -722,13 +740,11 @@ def test_webhooks_crud_and_validation(app: FastAPI, client: TestClient) -> None:
         json={"name": "h", "url": "https://h/x", "events": ["status_changed"]},
     )
     assert ok.status_code == 201
-    # A non-http URL fails the schema with 422.
     bad = client.post(
         "/api/admin/webhooks",
         json={"name": "h", "url": "ftp://h/x", "events": ["status_changed"]},
     )
     assert bad.status_code == 422
-    # The frontend posts the full object with an empty id. The server ignores that id.
     withid = client.post(
         "/api/admin/webhooks",
         json={
@@ -745,13 +761,16 @@ def test_webhooks_crud_and_validation(app: FastAPI, client: TestClient) -> None:
 
 
 def test_webhook_delete_204_404_and_gate(app: FastAPI, client: TestClient) -> None:
-    """DELETE /admin/webhooks/{id}: 204 happy path, 404 unknown, 403 without the gate."""
+    """DELETE /admin/webhooks/{id}: 204 happy path, 404 unknown, 403 without the gate.
+
+    A wrong area permission gives 403.
+    """
     assert client.delete(f"/api/admin/webhooks/{uuid4()}").status_code == 401
     _as_admin(app)
     assert client.delete(f"/api/admin/webhooks/{uuid4()}").status_code == 204
     missing = "00000000-0000-0000-0000-000000000000"
     assert client.delete(f"/api/admin/webhooks/{missing}").status_code == 404
-    _as(app, {"admin.gremien"})  # the wrong area permission, so 403
+    _as(app, {"admin.gremien"})
     assert client.delete(f"/api/admin/webhooks/{uuid4()}").status_code == 403
 
 
@@ -799,7 +818,10 @@ def test_gremium_mappings_crud_and_gate(
     body: dict[str, str],
     patch_body: dict[str, str],
 ) -> None:
-    """Both gremium mappings: CRUD under admin.group_mappings, 401, 403, 404, 422."""
+    """Both gremium mappings: CRUD under admin.group_mappings, 401, 403, 404, 422.
+
+    The permission of the gremien page is not enough.
+    """
     app.dependency_overrides[get_oidc_mapping_service] = lambda: _FakeOidcMappings()
     mid, missing = uuid4(), "00000000-0000-0000-0000-000000000000"
     assert client.post(base, json=body).status_code == 401
@@ -817,7 +839,7 @@ def test_gremium_mappings_crud_and_gate(
     assert client.patch(f"{base}/{missing}", json=patch_body).status_code == 404
     assert client.delete(f"{base}/{mid}").status_code == 204
     assert client.delete(f"{base}/{missing}").status_code == 404
-    _as(app, {"admin.gremien"})  # the gremien page permission is not enough
+    _as(app, {"admin.gremien"})
     assert client.get(base).status_code == 403
     assert client.delete(f"{base}/{mid}").status_code == 403
 
@@ -910,7 +932,7 @@ def test_mutating_endpoints_declare_400(app: FastAPI) -> None:
 def test_privacy_admin_reads_principals_for_the_erasure_picker(
     app: FastAPI, client: TestClient
 ) -> None:
-    """D1: the account erasure on the privacy page picks a person by name or e-mail.
+    """The account erasure on the privacy page picks a person by name or e-mail.
 
     `privacy.manage` alone must read the principal search, and nothing else of the
     user administration.
@@ -929,7 +951,7 @@ def test_gremium_switch_on_schedules_the_backfill(
 
     seen: list[object] = []
 
-    async def _schedule(request, session, settings, gremium_id):  # noqa: ANN001
+    async def _schedule(request, session, settings, gremium_id):
         seen.append(gremium_id)
 
     monkeypatch.setattr(protocol_router, "schedule_public_backfill", _schedule)

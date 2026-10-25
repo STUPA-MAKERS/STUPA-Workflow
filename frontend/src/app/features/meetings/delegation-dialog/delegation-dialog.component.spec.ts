@@ -66,6 +66,7 @@ async function setup(context: MeetingDelegationContext = ctx()) {
 }
 
 describe('DelegationDialogComponent', () => {
+  /** A member without a name has a placeholder, never an id. */
   it('lists the own substitutes apart from the other members', async () => {
     const { dialog, group } = await setup();
     expect(within(dialog()).getByText('35. Sitzung · Di., 13.10.2026')).toBeInTheDocument();
@@ -75,7 +76,6 @@ describe('DelegationDialogComponent', () => {
     const others = group('Andere Mitglieder');
     expect(within(others).getAllByRole('radio')).toHaveLength(3);
     expect(within(others).getByText('Mara Keller')).toBeInTheDocument();
-    // A member without a name has a placeholder, never an id.
     expect(within(others).getByText('Ohne Namen')).toBeInTheDocument();
     expect(within(dialog()).getByText(/^bis .*13\.10\.2026/)).toBeInTheDocument();
   });
@@ -85,6 +85,7 @@ describe('DelegationDialogComponent', () => {
     expect(within(dialog()).queryByRole('radiogroup', { name: 'Deine Stellvertretung' })).toBeNull();
   });
 
+  /** A click on a row that is off picks nothing. */
   it('turns the other members off after the deadline, but keeps the substitutes', async () => {
     const { dialog, group } = await setup(ctx({ deadlinePassed: true }));
     expect(within(dialog()).getByText(/^Frist abgelaufen/)).toBeInTheDocument();
@@ -95,7 +96,6 @@ describe('DelegationDialogComponent', () => {
     within(group('Deine Stellvertretung'))
       .getAllByRole('radio')
       .forEach((r) => expect(r).toBeEnabled());
-    // A click on a row that is off picks nothing.
     fireEvent.change(within(group('Andere Mitglieder')).getAllByRole('radio')[0]);
     expect(within(dialog()).getByRole('button', { name: 'Vertretung einrichten' })).toBeDisabled();
   });
@@ -115,12 +115,15 @@ describe('DelegationDialogComponent', () => {
     http.verify();
   });
 
+  /**
+   * The search waits 250 ms with a timer, so the test advances the jest fake timers. A failed
+   * search falls back to the members that match on the client; an empty search asks nobody.
+   */
   it('asks the server when external substitutes are allowed', async () => {
     jest.useFakeTimers();
     try {
       const { dialog, group, http, fixture } = await setup(ctx({ delegationAllowExternal: true }));
       const box = within(dialog()).getByRole('searchbox', { name: 'Mitglied suchen' });
-      // The search waits 250 ms with a timer, so advance the jest fake timers.
       fireEvent.input(box, { target: { value: 'ext' } });
       await jest.advanceTimersByTimeAsync(260);
       http.expectOne(`${BASE}/delegations/meetings/mt-1/recipients?q=ext`).flush([
@@ -131,8 +134,6 @@ describe('DelegationDialogComponent', () => {
       const others = within(group('Andere Mitglieder'));
       expect(others.getAllByRole('radio')).toHaveLength(1);
       expect(others.getByText('Extern')).toBeInTheDocument();
-      // A failed search falls back to the members that match on the client; an empty
-      // search asks nobody.
       fireEvent.input(box, { target: { value: 'boom' } });
       await jest.advanceTimersByTimeAsync(260);
       http

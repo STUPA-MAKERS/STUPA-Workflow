@@ -10,7 +10,8 @@ Permission scope:
 
 A constraint violation gives 422. The checked constraints are children <=
 parent and fiscal-year disjointness. A delete of a node that still has children
-or allocations gives 409.
+or allocations gives 409. A money mutation on a closed fiscal year gives 409
+``fiscal_year_closed``.
 """
 
 from __future__ import annotations
@@ -74,9 +75,9 @@ from app.shared.paging import Page
 
 router = APIRouter(tags=["budget"])
 
-# Body cap on Content-Length for a receipt upload, applied before FastAPI
-# buffers the body. It adds defense in depth next to the nginx cap and the
-# in-app size check.
+#: Body cap on Content-Length for a receipt upload, applied before FastAPI
+#: buffers the body. It adds defense in depth next to the nginx cap and the
+#: in-app size check.
 _enforce_invoice_body = body_cap("attachment_max_bytes")
 
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
@@ -92,9 +93,11 @@ def get_budget_tree_service(
     settings: SettingsDep,
     principal: Annotated[Principal, Depends(require_principal())],
 ) -> BudgetTreeService:
-    # Only the invoice import uses the storage. ``actor`` is the principal
-    # ``sub`` for the audit trail of the money mutations. All budget endpoints
-    # require authentication.
+    """Build the budget tree service for an authenticated principal.
+
+    Only the invoice import uses the storage. ``actor`` is the principal ``sub`` for the
+    audit trail of the money mutations.
+    """
     storage = getattr(request.app.state, "object_storage", None)
     return BudgetTreeService(session, storage=storage, settings=settings, actor=principal.sub)
 
@@ -102,8 +105,8 @@ def get_budget_tree_service(
 ServiceDep = Annotated[BudgetTreeService, Depends(get_budget_tree_service)]
 
 
-# Global full view of the budget tab: `access.BUDGET_READ_PERMISSIONS`. Each of them
-# shows ALL nodes. Without one of them the gremium scope (view_gremium_id) applies.
+#: Global full view of the budget tab: `access.BUDGET_READ_PERMISSIONS`. Each of them
+#: shows ALL nodes. Without one of them the gremium scope (view_gremium_id) applies.
 _has_full_view = has_budget_read
 
 
@@ -297,7 +300,7 @@ async def list_budget_expenses(
     "/budgets/{budget_id}/expenses",
     response_model=ExpenseOut,
     status_code=status.HTTP_201_CREATED,
-    responses=_errors(400, 401, 403, 404, 422),
+    responses=_errors(400, 401, 403, 404, 409, 422),
 )
 async def create_budget_expense(
     budget_id: UUID,
@@ -313,7 +316,7 @@ async def create_budget_expense(
     "/budget-expenses/{expense_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     dependencies=[Depends(require_principal("budget.book"))],
-    responses=_errors(401, 403, 404),
+    responses=_errors(401, 403, 404, 409),
 )
 async def delete_budget_expense(expense_id: UUID, service: ServiceDep) -> None:
     """Delete a booked expense or income."""
@@ -337,7 +340,7 @@ async def list_sub_bookings(expense_id: UUID, service: ServiceDep) -> list[Expen
     "/budget-expenses/{expense_id}/sub-bookings",
     response_model=ExpenseOut,
     status_code=status.HTTP_201_CREATED,
-    responses=_errors(401, 403, 404, 422),
+    responses=_errors(401, 403, 404, 409, 422),
 )
 async def create_sub_booking(
     expense_id: UUID,
@@ -353,12 +356,11 @@ async def create_sub_booking(
     return await service.create_sub_booking(expense_id, payload, actor=principal.sub)
 
 
-# Flat bookings tab: the next expense routes are not scoped to one node.
 @router.post(
     "/expenses",
     response_model=ExpenseOut,
     status_code=status.HTTP_201_CREATED,
-    responses=_errors(400, 401, 403, 404, 422),
+    responses=_errors(400, 401, 403, 404, 409, 422),
 )
 async def book_expense(
     payload: ExpenseCreate,
@@ -377,7 +379,6 @@ async def book_expense(
 @router.get(
     "/expenses",
     response_model=Page[ExpenseOut],
-    # Every budget role reads this: view, structure and book see the bookings.
     dependencies=[
         Depends(require_any_permission(*BUDGET_READ_PERMISSIONS))
     ],
@@ -408,6 +409,10 @@ async def list_expenses(
     ``budget`` includes the subtree. ``kind`` is ``expense`` or ``income``.
     ``q`` searches the descriptions. ``amountMin`` and ``amountMax`` bound the
     amount. ``sort`` and ``order`` set the column sort.
+
+    Every budget role reads the bookings: view, structure and book. ``sort`` passes
+    through unchanged, because it is already Literal-validated and the service knows all
+    four columns.
     """
     return await service.list_expenses_paged(
         expense_id=expense_id,
@@ -420,8 +425,6 @@ async def list_expenses(
         amount_max=amount_max,
         created_from=created_from,
         created_to=created_to,
-        # ``sort`` is already Literal-validated, so it passes through
-        # unchanged. The ``sort_map`` of the service knows all four columns.
         sort=sort,
         order=order,
         limit=limit,
@@ -448,7 +451,7 @@ async def export_expenses_xlsx(
 ) -> Response:
     """Export the filtered bookings as ``.xlsx``, with the same content as the list.
 
-    The optional ``ids`` (#expenses-ux) restricts the export to the selected
+    The optional ``ids`` restricts the export to the selected
     bookings. The route narrows the filtered page to those IDs, so the
     selection stays a subset of the current filter.
     """
@@ -490,7 +493,7 @@ async def export_expenses_xlsx(
 @router.patch(
     "/budget-expenses/{expense_id}",
     response_model=ExpenseOut,
-    responses=_errors(400, 401, 403, 404, 422),
+    responses=_errors(400, 401, 403, 404, 409, 422),
 )
 async def update_budget_expense(
     expense_id: UUID,
@@ -506,7 +509,7 @@ async def update_budget_expense(
     "/budget-transfers",
     response_model=TransferOut,
     status_code=status.HTTP_201_CREATED,
-    responses=_errors(400, 401, 403, 404, 422),
+    responses=_errors(400, 401, 403, 404, 409, 422),
 )
 async def create_transfer(
     payload: TransferCreate,
@@ -588,7 +591,7 @@ async def update_transfer(
     "/budget-transfers/{transfer_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     dependencies=[Depends(require_principal("budget.book"))],
-    responses=_errors(401, 403, 404),
+    responses=_errors(401, 403, 404, 409),
 )
 async def delete_transfer(transfer_id: UUID, service: ServiceDep) -> None:
     """Delete a transfer, that is both of its bookings.
@@ -599,7 +602,7 @@ async def delete_transfer(transfer_id: UUID, service: ServiceDep) -> None:
     await service.delete_transfer(transfer_id)
 
 
-# Every budget role may read an invoice. A write needs budget.book.
+#: Every budget role may read an invoice. A write needs budget.book.
 _INVOICE_READ = Depends(require_any_permission(*BUDGET_READ_PERMISSIONS))
 
 
@@ -681,6 +684,7 @@ async def create_invoice(
     service: ServiceDep,
     principal: Annotated[Principal, Depends(require_principal("budget.book"))],
 ) -> InvoiceOut:
+    """Create an invoice, optionally with the receipt of a ZUGFeRD import."""
     return await service.create_invoice(payload, actor=principal.sub)
 
 
@@ -693,6 +697,7 @@ async def create_invoice(
 async def update_invoice(
     invoice_id: UUID, payload: InvoiceUpdate, service: ServiceDep
 ) -> InvoiceOut:
+    """Update the fields of an invoice that the payload sets."""
     return await service.update_invoice(invoice_id, payload)
 
 
@@ -703,13 +708,13 @@ async def update_invoice(
     responses=_errors(401, 403, 404),
 )
 async def delete_invoice(invoice_id: UUID, service: ServiceDep) -> None:
+    """Delete an invoice. Its bookings stay, without the invoice link."""
     await service.delete_invoice(invoice_id)
 
 
 @router.post(
     "/invoices/parse",
     response_model=InvoiceParseResult,
-    # Write permission: the import stores the original PDF and reads its data.
     dependencies=[Depends(_enforce_invoice_body)],
     responses=_errors(401, 403, 413, 415, 422, 503),
 )
@@ -723,6 +728,8 @@ async def parse_invoice(
     A PDF without valid Factur-X data yields 422 ``invoice_not_zugferd``. The
     UI then offers manual entry. A currency other than EUR yields 422
     ``invoice_currency_unsupported``.
+
+    The route needs the write permission, because the import stores the original PDF.
     """
     data = await file.read()
     try:
@@ -742,8 +749,6 @@ async def parse_invoice(
 @router.post(
     "/invoices/file",
     response_model=InvoiceFileResult,
-    # Write permission: the route stores the original PDF, also for a receipt
-    # without ZUGFeRD data.
     dependencies=[Depends(_enforce_invoice_body)],
     responses=_errors(401, 403, 413, 415, 503),
 )
@@ -756,6 +761,9 @@ async def upload_invoice_file(
 
     The route returns a file handle for the entry dialog, so that a manually
     entered invoice also carries a receipt.
+
+    The route needs the write permission, because it stores the original PDF, also for a
+    receipt without ZUGFeRD data.
     """
     data = await file.read()
     return await service.store_invoice_file(data, filename=file.filename)
@@ -817,7 +825,7 @@ async def create_fiscal_year(
 ) -> FiscalYearOut:
     """Create a fiscal year.
 
-    The fiscal years of one top budget must stay disjoint. An overlap gives 422.
+    Each year exists at most once per top budget. A duplicate year gives 422.
     """
     return await service.create_fiscal_year(budget_id, payload)
 
@@ -826,7 +834,7 @@ async def create_fiscal_year(
     "/budgets/{budget_id}/fiscal-years/{fiscal_year_id}",
     response_model=FiscalYearOut,
     dependencies=[Depends(require_principal("budget.structure"))],
-    responses=_errors(400, 401, 403, 404, 422),
+    responses=_errors(400, 401, 403, 404, 409, 422),
 )
 async def update_fiscal_year(
     budget_id: UUID,
@@ -836,6 +844,45 @@ async def update_fiscal_year(
 ) -> FiscalYearOut:
     """Update a fiscal year. The route checks the disjointness again."""
     return await service.update_fiscal_year(budget_id, fiscal_year_id, payload)
+
+
+@router.post(
+    "/budgets/{budget_id}/fiscal-years/{fiscal_year_id}/close",
+    response_model=FiscalYearOut,
+    responses=_errors(401, 403, 404, 422),
+)
+async def close_fiscal_year(
+    budget_id: UUID,
+    fiscal_year_id: UUID,
+    service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_principal("budget.structure"))],
+) -> FiscalYearOut:
+    """Close a fiscal year ("abschließen").
+
+    The year is then frozen: bookings, transfers, allocations and application
+    assignments on it answer 409 `fiscal_year_closed`. A closed year stays
+    closed on a second call.
+    """
+    return await service.set_fiscal_year_closed(
+        budget_id, fiscal_year_id, closed=True, actor=principal.sub
+    )
+
+
+@router.post(
+    "/budgets/{budget_id}/fiscal-years/{fiscal_year_id}/reopen",
+    response_model=FiscalYearOut,
+    responses=_errors(401, 403, 404, 422),
+)
+async def reopen_fiscal_year(
+    budget_id: UUID,
+    fiscal_year_id: UUID,
+    service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_principal("budget.structure"))],
+) -> FiscalYearOut:
+    """Reopen a closed fiscal year. Its money data can change again."""
+    return await service.set_fiscal_year_closed(
+        budget_id, fiscal_year_id, closed=False, actor=principal.sub
+    )
 
 
 @router.delete(
@@ -860,7 +907,7 @@ async def delete_fiscal_year(
     "/budgets/{budget_id}/allocations/{fiscal_year_id}",
     response_model=AllocationOut,
     dependencies=[Depends(require_principal("budget.structure"))],
-    responses=_errors(400, 401, 403, 404, 422),
+    responses=_errors(400, 401, 403, 404, 409, 422),
 )
 async def set_allocation(
     budget_id: UUID,
@@ -876,7 +923,7 @@ async def set_allocation(
     "/applications/{application_id}/assign-budget",
     response_model=AssignBudgetOut,
     dependencies=[Depends(require_principal("application.manage"))],
-    responses=_errors(400, 401, 403, 404, 422),
+    responses=_errors(400, 401, 403, 404, 409, 422),
 )
 async def assign_budget(
     application_id: UUID, payload: AssignBudgetRequest, service: ServiceDep
@@ -892,7 +939,7 @@ async def assign_budget(
     "/applications/{application_id}/move-fiscal-year",
     response_model=AssignBudgetOut,
     dependencies=[Depends(require_principal("application.manage"))],
-    responses=_errors(400, 401, 403, 404, 422),
+    responses=_errors(400, 401, 403, 404, 409, 422),
 )
 async def move_fiscal_year(
     application_id: UUID, payload: MoveFiscalYearRequest, service: ServiceDep

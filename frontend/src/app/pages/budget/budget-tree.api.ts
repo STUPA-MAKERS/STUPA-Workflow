@@ -41,11 +41,11 @@ export interface Expense {
   applicationId: Uuid | null;
   applicationTitle: string | null;
   transferId: Uuid | null;
-  // `actor` = raw principal `sub` (audit). `actorName` = server-resolved display
-  // name. Always show `actorName` in the UI, never the UUID.
+  /** The raw principal `sub` (audit). The UI shows `actorName`, never the UUID. */
   actor: string | null;
+  /** The display name of `actor`, resolved by the server. */
   actorName: string | null;
-  // Extra metadata, all optional. Dates as ISO date (YYYY-MM-DD).
+  /** Extra metadata from here on, all optional. Dates are ISO dates (YYYY-MM-DD). */
   invoiceDate: string | null;
   paymentDate: string | null;
   correspondent: string | null;
@@ -53,13 +53,15 @@ export interface Expense {
   referenceNumber: string | null;
   paymentMethod: PaymentMethod | null;
   category: string | null;
-  // Linked invoice: 1 invoice : N bookings.
+  /** The linked invoice. One invoice can back many bookings. */
   invoiceId: Uuid | null;
   invoiceNumber: string | null;
-  // Sub-bookings: `parentExpenseId` set -> this booking IS a sub-booking.
-  // `childCount` > 0 -> it HAS sub-bookings. Such a booking expands, `amount` is
-  // the sum of the children, and `amount` is then read-only.
+  /** Set when this booking is a sub-booking. */
   parentExpenseId: Uuid | null;
+  /**
+   * The number of sub-bookings. A booking with sub-bookings expands, and its `amount` is the
+   * sum of the children and read-only.
+   */
   childCount: number;
   createdAt: string;
 }
@@ -204,8 +206,8 @@ export interface Invoice {
   actor: string | null;
   createdAt: string;
   /**
-   * The bookings that reference this invoice (A6), in booking order. The server sends
-   * only the bookings on cost centres the reader may see. A backend before A6 sends no
+   * The bookings that reference this invoice, in booking order. The server sends
+   * only the bookings on cost centres the reader may see. An older backend sends no
    * field at all: the list then hides its bookings column instead of asking for the
    * bookings of each invoice one by one.
    */
@@ -320,7 +322,7 @@ export interface InvoicePage {
   total: number;
   limit: number;
   offset: number;
-  /** The segment counts. A backend before FE10c sends none. */
+  /** The segment counts. An older backend sends none. */
   counts?: InvoiceSegmentCounts;
 }
 
@@ -397,6 +399,9 @@ export interface BudgetNode {
   fiscalStartDay?: number;
 }
 
+/** The problem code of a money mutation on a closed fiscal year (409). */
+export const FISCAL_YEAR_CLOSED = 'fiscal_year_closed';
+
 export interface FiscalYear {
   id: Uuid;
   budgetId: Uuid;
@@ -407,6 +412,9 @@ export interface FiscalYear {
   startDate: string;
   endDate: string;
   active: boolean;
+  /** Set while the year is closed ("abgeschlossen"): its money data is frozen, and
+   *  every booking, transfer, limit or assignment on it answers 409. */
+  closedAt?: string | null;
 }
 
 export interface BudgetNodeCreate {
@@ -477,15 +485,13 @@ export class BudgetTreeApi {
   private readonly http = inject(HttpClient);
   private readonly base = inject(API_BASE_URL);
 
+  /**
+   * The budget and dashboard pages have their own loading indicator; every other call only fills
+   * the nav or a dropdown, so it suppresses the global overlay. It is cached, because five pages
+   * ask for the whole tree and a mutation under `/budgets` drops every entry there.
+   */
   tree(gremiumId?: string): Observable<BudgetTreeNode[]> {
     const params = gremiumId ? { gremium: gremiumId } : undefined;
-    // The budget and dashboard pages have their own loading indicator. Every other
-    // call only hydrates the nav or a dropdown, so suppress the global overlay.
-    //
-    // Cached: the whole tree comes down in one request, five pages ask for it, and it
-    // changes only when someone edits a cost centre — which invalidates it, because a
-    // mutation under `/budgets` drops every entry there. Every caller sets a signal from
-    // `next`, so the second emission simply corrects what is already on screen.
     return this.http.get<BudgetTreeNode[]>(`${this.base}/budgets`, {
       params,
       context: cached(TREE_TTL_MS, skipLoading()),
@@ -524,6 +530,12 @@ export class BudgetTreeApi {
    *  bookings, allocations or applications still reference the year. */
   deleteFiscalYear(topId: Uuid, fyId: Uuid): Observable<void> {
     return this.http.delete<void>(`${this.base}/budgets/${topId}/fiscal-years/${fyId}`);
+  }
+
+  /** Close a fiscal year, or reopen it. Needs P(`budget.structure`). */
+  setFiscalYearClosed(topId: Uuid, fyId: Uuid, closed: boolean): Observable<FiscalYear> {
+    const action = closed ? 'close' : 'reopen';
+    return this.http.post<FiscalYear>(`${this.base}/budgets/${topId}/fiscal-years/${fyId}/${action}`, {});
   }
 
   setAllocation(id: Uuid, fiscalYearId: Uuid, allocated: string): Observable<unknown> {
@@ -721,9 +733,8 @@ export class BudgetTreeApi {
   }
 }
 
-// The shared path simplification lives in @shared/budget-path. This file imports it,
-// uses it below, and re-exports it so that the existing imports keep working.
 import { simplifyPathKey } from '@shared/budget-path';
+/** Re-exported from `@shared/budget-path`, so the imports from this file keep working. */
 export { simplifyPathKey };
 
 /** Tree (recursive) -> flat option list (pre-order, "pathKey - name", simplified). */

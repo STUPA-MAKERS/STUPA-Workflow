@@ -35,7 +35,6 @@
 .jl__title {
   font-weight: var(--fw-semibold);
 }
-/* A URL is never cut: it wraps anywhere and stays selectable (UI rule). */
 .jl__url {
   overflow-wrap: anywhere;
   word-break: break-all;

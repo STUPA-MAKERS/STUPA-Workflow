@@ -69,8 +69,7 @@ const KIND_LABEL: Record<TicketKind, TranslationKey> = {
 };
 
 /**
- * The dialog "Problem melden" (frame 17; on a phone the kit dialog is a bottom sheet,
- * frames 27 and 28).
+ * The dialog "Problem melden" (on a phone the kit dialog is a bottom sheet).
  *
  * The kind (Fehler / Frage / Idee), a short title, the description, files, and the
  * technical context that goes along (page, browser, window, language). Without a session
@@ -119,7 +118,6 @@ export class ReportDialogComponent {
   env: () => ReportEnv = currentEnv;
 
   protected readonly accept = UPLOAD_ACCEPT;
-  protected readonly maxTitle = MAX_TITLE;
 
   readonly kind = signal<TicketKind>('bug');
   readonly title = signal('');
@@ -173,7 +171,6 @@ export class ReportDialogComponent {
     const at = this.openedAt();
     if (at) {
       const locale = this.i18n.formatLocale();
-      // "Do, 15.10.2026, 18:31:07": the weekday without its abbreviation dot.
       const weekday = weekdayName(at, locale);
       const rest = new Intl.DateTimeFormat(locale, {
         day: '2-digit',
@@ -203,8 +200,6 @@ export class ReportDialogComponent {
   private readonly injector = inject(Injector);
 
   constructor() {
-    // Each opening reads the page it was opened on. A closed draft stays; a sent report
-    // starts a fresh one.
     effect(() => {
       if (!this.help.reportOpen()) return;
       untracked(() => this.prepare());
@@ -303,6 +298,10 @@ export class ReportDialogComponent {
     this.help.closeReport();
   }
 
+  /**
+   * The send button that had the focus is gone, so the focus moves to the confirmation and a screen
+   * reader reads the ticket number.
+   */
   send(): void {
     this.tried.set(true);
     if (!this.valid() || this.sending()) return;
@@ -326,10 +325,7 @@ export class ReportDialogComponent {
           this.sending.set(false);
           this.drafts.clear();
           this.sentNumber.set(res.number);
-          // With a session the tab "Tickets" shows the own tickets from now on.
           if (!anonymous) this.auth.markReportedTicket();
-          // The send button that had the focus is gone: the focus moves to the
-          // confirmation, so a screen reader reads the ticket number.
           afterNextRender(() => this.sentBox()?.nativeElement.focus(), { injector: this.injector });
         },
         error: (err: unknown) => {
@@ -349,7 +345,6 @@ export class ReportDialogComponent {
     if (err.status === 413) return 'help.report.error.tooLarge';
     if (err.status === 429) return 'help.report.error.rateLimit';
     if (err.status === 422) {
-      // A lost draft file: mark it, the reporter attaches it again.
       return this.drafts.markFailed(problem).length ? 'help.report.error.files' : 'help.report.error.invalid';
     }
     return 'help.report.error.generic';

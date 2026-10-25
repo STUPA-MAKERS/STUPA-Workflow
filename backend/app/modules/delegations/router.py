@@ -9,7 +9,7 @@ The server is authoritative for RBAC. Every route needs a session. The service
 checks the domain rules: gates, deadline, recipient circle and chains. A holder
 of `admin.delegations` sees and revokes every delegation. During a live meeting
 the meeting lead (`session.manage` in the gremium) enters a substitution for a
-missing member and revokes a delegation (O6). A holder of `admin.delegations`
+missing member and revokes a delegation. A holder of `admin.delegations`
 or of the gremium role with `session.manage` manages the pool. The routes
 report errors as `ProblemDetail`.
 """
@@ -49,13 +49,14 @@ def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
 
 
 def get_delegation_service(session: DbSession, settings: SettingsDep) -> DelegationService:
+    """Return the delegation service of the request."""
     return DelegationService(session, settings)
 
 
 ServiceDep = Annotated[DelegationService, Depends(get_delegation_service)]
 AutoMailerDep = Annotated[AutoMailer, Depends(get_auto_mailer)]
-# Authentication is enough here, because any member may delegate the own vote.
-# The service checks the domain entitlement, such as the voting membership.
+#: Authentication is enough here, because any member may delegate the own vote.
+#: The service checks the domain entitlement, such as the voting membership.
 Member = Annotated[Principal, Depends(require_principal())]
 
 
@@ -65,6 +66,7 @@ async def list_delegations(
     principal: Member,
     meeting_id: Annotated[UUID | None, Query(alias="meetingId")] = None,
 ) -> list[DelegationOut]:
+    """List the delegations that the caller sees, optionally for one meeting."""
     return await service.list(principal, meeting_id)
 
 
@@ -87,10 +89,11 @@ async def create_delegation(
 
     Without `delegatorId` the caller delegates for themselves while the meeting is
     planned. With `delegatorId` the meeting lead enters a substitution for a
-    missing member while the meeting is live (O6).
+    missing member while the meeting is live.
+
+    Send a mail to the delegate afterwards. The mail kind is `delegation`, and the user can opt out.
     """
     out = await service.create(payload, principal)
-    # Notify the delegate. The mail kind is "delegation" and the user can opt out.
     info = await meeting_delegation_mail_info(getattr(service, "session", None), out.id)
     pool = getattr(request.app.state, "arq_pool", None)
     background.add_task(mailer.delegation_changed, settings, info, granted=True, pool=pool)
@@ -111,8 +114,10 @@ async def revoke_delegation(
     request: Request,
     mailer: AutoMailerDep,
 ) -> Response:
-    """Revoke a delegation: the delegator before the start, the lead while live (O6)."""
-    # Collect the mail data before the revoke. The row is gone afterwards.
+    """Revoke a delegation: the delegator before the start, the lead while live.
+
+    Collect the mail data before the revoke, because the row is gone afterwards.
+    """
     info = await meeting_delegation_mail_info(getattr(service, "session", None), delegation_id)
     await service.revoke(delegation_id, principal)
     pool = getattr(request.app.state, "arq_pool", None)
@@ -147,7 +152,7 @@ async def recipients(
     """List the recipients for the typeahead: members, pool and maybe external users.
 
     With `delegatorId` the meeting lead gets the pool substitutes of that member
-    for the lead entry during a live meeting (O6).
+    for the lead entry during a live meeting.
     """
     return await service.recipients(meeting_id, q, principal, delegator_id)
 
@@ -174,6 +179,7 @@ async def list_substitutes(
     principal: Member,
     gremium_id: Annotated[UUID, Query(alias="gremiumId")],
 ) -> list[SubstituteOut]:
+    """List the substitute pool of a gremium."""
     return await service.substitutes_list(gremium_id, principal)
 
 
@@ -186,6 +192,7 @@ async def list_substitutes(
 async def create_substitute(
     payload: SubstituteCreate, service: ServiceDep, principal: Member
 ) -> SubstituteOut:
+    """Add a substitute to the pool of a gremium."""
     return await service.substitute_create(payload, principal)
 
 
@@ -197,5 +204,6 @@ async def create_substitute(
 async def delete_substitute(
     substitute_id: UUID, service: ServiceDep, principal: Member
 ) -> Response:
+    """Remove a substitute from the pool of a gremium."""
     await service.substitute_delete(substitute_id, principal)
     return Response(status_code=204)

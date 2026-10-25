@@ -99,6 +99,7 @@ describe('GremienComponent', () => {
     expect(s.frame.fill()).toBe(false);
   });
 
+  /** Without gremium.view_all there is no other gremium and no chip. */
   it('shows the own gremien with role, members and the next meeting', async () => {
     const s = await start('/gremien');
     restore = s.restore;
@@ -109,7 +110,6 @@ describe('GremienComponent', () => {
     expect(rows.map((r) => r.sub)).toEqual(['Mitglied · 31 Mitglieder', 'Vorstand · 1 Mitglied']);
     expect(rows[0].next).toEqual({ kind: 'date', text: 'Di, 20.10.', title: 'Nächste Sitzung: 34. Sitzung' });
     expect(rows[1].next).toEqual({ kind: 'live' });
-    // Without gremium.view_all no other gremium and no chip.
     expect(s.cmp.others()).toEqual([]);
     expect(s.cmp.viewAll()).toBe(false);
     expect(screen.queryByText('Weitere Gremien')).toBeNull();
@@ -160,7 +160,7 @@ describe('GremienComponent', () => {
   });
 
   it('reports a failed read and reads again', async () => {
-    const overview = jest.fn(() => throwError(() => new Error('x')));
+    const overview = jest.fn((): ReturnType<GremienApiService['overview']> => throwError(() => new Error('x')));
     const s = await start('/gremien', { overview });
     restore = s.restore;
     expect(screen.getByRole('alert')).toHaveTextContent('Die Gremien konnten nicht geladen werden.');

@@ -1,5 +1,3 @@
-<!-- The dialog is where a link is minted, read once and revoked; the token itself exists
-     in the response and nowhere else. -->
 <app-dialog
   [open]="open()"
   [title]="'applications.share.title' | t"
@@ -7,11 +5,9 @@
   (closed)="close()"
 >
   @if (freshUrl(); as url) {
-    <!-- Shown once. The server keeps a hash, so closing this dialog loses the token. -->
     <div class="sld__fresh">
       <p class="sld__hint">{{ 'applications.share.onceHint' | t }}</p>
       <div class="sld__freshRow">
-        <!-- The whole link, wrapped, selectable and a real link: a copyable value is never cut. -->
         <p class="sld__url mono"><span class="sr-only">{{ 'applications.share.url' | t }}: </span><a class="sld__link" [href]="url" target="_blank" rel="noopener"><code>{{ url }}</code></a></p>
         <app-copy-button
           [text]="url"

@@ -45,6 +45,7 @@ describe('GremiumAttendanceComponent', () => {
     (downloadBlob as jest.Mock).mockClear();
   });
 
+  /** The quota sorts ascending: 1/2, 2/2, then the person without a meeting. */
   it('shows the matrix with the counts, the marks, the sums and the average', async () => {
     const view = await setup({ fill: true });
     restore = view.restore;
@@ -56,7 +57,6 @@ describe('GremiumAttendanceComponent', () => {
     const heads = within(table).getAllByRole('columnheader').map((h) => h.textContent?.replace(/\s+/g, ' ').trim());
     expect(heads).toEqual(['Mitglied', 'Sep2 Sitzungen', 'Okt0 Sitzungen', 'Gesamt 2 Sitzungen']);
 
-    // Quota ascending: 1/2, 2/2, then the person without a meeting.
     const names = within(table)
       .getAllByRole('rowheader')
       .map((h) => (h.querySelector('.gat__name') ?? h).textContent?.trim());
@@ -193,7 +193,7 @@ describe('GremiumAttendanceComponent', () => {
   });
 
   it('reports a failed read and reads again', async () => {
-    const attendanceFn = jest.fn(() => throwError(() => new Error('x')));
+    const attendanceFn = jest.fn((): ReturnType<GremienApiService['attendance']> => throwError(() => new Error('x')));
     const view = await setup({ api: gremienApiMock({ attendance: attendanceFn }) });
     restore = view.restore;
     expect(screen.getByRole('alert')).toHaveTextContent('Die Anwesenheit konnte nicht geladen werden.');

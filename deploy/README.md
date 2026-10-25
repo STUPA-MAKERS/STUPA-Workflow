@@ -52,20 +52,6 @@ revisions before the application starts.
 `migrate` can also run as its own database user (`DB_MIGRATION_URL`), separate from the
 runtime user of the application.
 
-### Switch from pytex to typst — ONE-OFF manual step
-
-The `typst` service replaces the `pytex` service. After the deploy that carries the
-switch, remove the old container and its cache volume:
-
-```bash
-docker compose up -d --build --remove-orphans
-docker volume rm antragsplattform_pytex_cache
-```
-
-The `PYTEX_*` keys in `.env` have no effect any more. Remove them. The `TYPST_*` defaults
-fit production: the body cap is 32 MiB, the value that production set for pytex. Set
-`TYPST_URL` only when the service runs under a different name.
-
 ### Orphaned application PDFs — ONE-OFF manual step
 
 Applications no longer render a PDF. Migration `a7c3f1e59d84` drops the `render_job` table,
@@ -81,7 +67,7 @@ docker compose exec api python -m scripts.drop_application_pdfs --delete  # remo
 
 It walks the `pdf/` prefix and skips `pdf/protocol/`, which protocols still use.
 
-### Least-privilege database roles (security.md §4/§10) — MANUAL production step
+### Least-privilege database roles — MANUAL production step
 
 > ⚠️ **Not automatic.** Compose runs only `alembic upgrade head` (DDL/DML). It creates
 > **no** roles and revokes **no** grants. Without this step the platform works, but
@@ -129,7 +115,7 @@ you set their values. If the values are missing, the platform keeps the matching
 and does not crash. For the full reference see the
 [Configuration wiki](https://github.com/frederikbeimgraben/antragsplattform/wiki/Configuration).
 
-### Bootstrap of the first admins (#70) — mandatory step with real OIDC auth
+### Bootstrap of the first admins — mandatory step with real OIDC auth
 
 Under real OIDC auth (no mock) a fresh schema has **no** admin. Nobody holds `admin.*`, so
 nobody can grant a role in the role and permission UI (`/admin/users`). To keep the platform

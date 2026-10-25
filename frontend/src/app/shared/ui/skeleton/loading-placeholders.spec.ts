@@ -34,14 +34,16 @@ function templates(dir: string): string[] {
   return out;
 }
 
-/** A template that reads `loading()` and draws no placeholder of any kind. */
+/**
+ * A template that reads `loading()` and draws no placeholder of any kind. A table component of the
+ * page (`app-expenses-table`) that gets `[loading]` wraps `app-data-table`, and that one draws the
+ * rows.
+ */
 function withoutPlaceholder(): string[] {
   return [...templates(PAGES_ROOT), ...templates(FEATURES_ROOT)].filter((file) => {
     if (ALLOWED.some((a) => file.endsWith(a))) return false;
     const src = readFileSync(file, 'utf8');
     if (!/\bloading\w*\(\)/.test(src)) return false;
-    // A table component of the page (`app-expenses-table`) that gets `[loading]` wraps
-    // `app-data-table`, and that one draws the rows.
     return !/app-skeleton|app-data-table|skel|<app-[\w-]+-table\b[^>]*\[loading\]/.test(src);
   });
 }
@@ -59,11 +61,11 @@ describe('loading placeholders', () => {
     expect(withoutPlaceholder()).toEqual([]);
   });
 
+  /**
+   * Without `[loading]` the table renders its empty text ("no roles", "no results") while the
+   * request is still out, which asserts that there is nothing before anything has arrived.
+   */
   it('every table says when it is loading', () => {
-    // Without `[loading]` the table renders its empty text — "no roles", "no results" —
-    // while the request is still out, which asserts there is nothing when nothing has
-    // arrived yet. Seven pages had this and none of them was reported; they were simply
-    // fast enough that nobody caught the flash.
     expect(tablesWithoutLoading()).toEqual([]);
   });
 });

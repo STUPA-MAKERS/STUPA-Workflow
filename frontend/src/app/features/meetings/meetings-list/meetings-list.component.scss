@@ -2,8 +2,7 @@
 @use 'scroll-fade' as fade;
 @use '../../../shared/ui/list-pane' as lp;
 
-/* The list/detail pane page of the applications and the tasks
-   (applications-list.component.scss), with the meetings as rows. */
+// The list/detail pane page of applications-list.component.scss.
 
 :host {
   @include lp.stack;
@@ -11,21 +10,15 @@
 .mtl {
   min-width: 0;
 }
-/* One pane at a time the column takes at least the free height and the page scrolls. */
 .mtl:not(.mtl--split) {
   @include lp.single-column;
 }
 .mtl:not(.mtl--split) > app-list-detail {
   flex: 1 0 auto;
 }
-/* Side by side the page does not scroll: each pane scrolls inside itself. */
 .mtl--split {
   @include lp.split-column;
 }
-
-/* ------------------------------------------------------------------ list pane */
-/* The column, its header and the search bar are the shared list geometry: `.ld-pane`
-   (styles.scss) and `app-page-header` with `pane`. */
 
 .mtl__chips {
   @include lp.chips;
@@ -34,10 +27,8 @@
   max-width: 100%;
 }
 
-/* ------------------------------------------------------------------ rows */
 .mtl__scroll {
   @include lp.scroll(--mtl-fade);
-  /* The FAB covers the end of the list: room to scroll the last row above it. */
   padding-bottom: calc(56px + var(--space-6));
   @include fade.fade-y(var(--mtl-fade));
 }
@@ -58,8 +49,7 @@
 .mtl__skel .mtl__month {
   padding-top: var(--space-2);
 }
-/* The loading shape: a bar about as wide as "Oktober 2026", and the lead tile in the size
-   of `app-date-block`, so the rows have their loaded height. */
+// Sized like "Oktober 2026" and `app-date-block`, so the rows have their loaded height.
 .mtl__skelMonth {
   width: 7rem;
 }
@@ -78,7 +68,6 @@
   color: var(--color-text-subtle);
 }
 
-/* The time over the number of agenda items, at the end of the row. */
 .mtl__trail {
   display: flex;
   align-items: center;
@@ -110,11 +99,9 @@
   padding-inline: var(--space-2);
 }
 
-/* ------------------------------------------------------------------ detail pane */
 .mtl__detail {
   @include lp.detail;
 }
-/* The empty sheet side by side: the same sheet as an open meeting, so nothing jumps. */
 .mtl__none {
   display: flex;
   flex: 1 1 auto;

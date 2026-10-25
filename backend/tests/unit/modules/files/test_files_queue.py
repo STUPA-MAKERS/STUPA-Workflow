@@ -1,4 +1,4 @@
-"""Unit tests for the scan queue (T-13): arq enqueue and the idempotent job key."""
+"""Unit tests for the scan queue: arq enqueue and the idempotent job key."""
 
 from __future__ import annotations
 
@@ -29,9 +29,10 @@ async def test_enqueue_uses_idempotent_job_id() -> None:
 
 
 async def test_enqueue_dedup_logs_when_job_none() -> None:
-    pool = _FakePool(job=None)  # an already known job returns None
+    """Log, without an error, when arq returns None for a known job."""
+    pool = _FakePool(job=None)
     await ArqScanQueue(pool).enqueue(uuid.uuid4())
-    assert pool.calls  # no error, only a log line
+    assert pool.calls
 
 
 def test_scan_queue_from_pool() -> None:

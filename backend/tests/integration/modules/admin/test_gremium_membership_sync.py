@@ -129,6 +129,11 @@ async def _login(
 async def test_login_writes_changes_and_removes_memberships(
     session: AsyncSession, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Write, change and remove memberships at login.
+
+    The role group alone makes nobody a member. A member without a role mapping has the
+    forced role `member`, and a member in the role group has that role.
+    """
     gremium, member, board = await _gremium(session)
     svc = OidcMappingService(session)
     members, chairs = f"{gremium.slug}-m", f"{gremium.slug}-b"
@@ -136,17 +141,14 @@ async def test_login_writes_changes_and_removes_memberships(
     await svc.create_role_mapping(_role_for(chairs, board), _ACTOR)
     sub = f"s-{uuid.uuid4()}"
 
-    # The role group alone makes nobody a member.
     row = await _login(session, monkeypatch, sub, [chairs])
     assert await _roles_of(session, row) == {}
 
-    # A member without a role mapping has the forced role `member`.
     row = await _login(session, monkeypatch, sub, [members])
     assert await _roles_of(session, row) == {gremium.id: member.id}
     resolved = await resolve_principal(session, row, datetime.now(UTC))
     assert vote_group_key(gremium.id) in resolved.groups
 
-    # A member in the role group has that role.
     row = await _login(session, monkeypatch, sub, [members, chairs])
     assert await _roles_of(session, row) == {gremium.id: board.id}
 
@@ -155,6 +157,7 @@ async def test_login_writes_changes_and_removes_memberships(
 
 
 async def test_mapping_changes_sync_all_principals(session: AsyncSession) -> None:
+    """Sync all principals on a mapping change; a role in use by a mapping cannot be deleted."""
     gremium, member, board = await _gremium(session)
     members, chairs = f"{gremium.slug}-all", f"{gremium.slug}-chairs"
     alice = await _principal(session, [members, chairs])
@@ -174,7 +177,6 @@ async def test_mapping_changes_sync_all_principals(session: AsyncSession) -> Non
     [listed] = [m for m in await svc.list_role_mappings() if m.id == role_mapping.id]
     assert listed.gremium_id == gremium.id
 
-    # The role is in use by the mapping, so nobody can delete it.
     custom = GremiumRole(gremium_id=gremium.id, key="custom", name_i18n={}, permissions=[])
     session.add(custom)
     await session.commit()
@@ -196,9 +198,12 @@ async def test_mapping_changes_sync_all_principals(session: AsyncSession) -> Non
 
 
 async def test_duplicate_mappings_give_409(session: AsyncSession) -> None:
+    """Answer 409 for a duplicate mapping.
+
+    The 409 rolls the session back and expires the loaded rows, so the test builds the
+    payloads before. The same group may link to another gremium.
+    """
     gremium, _member, board = await _gremium(session)
-    # The 409 rolls the session back and expires the loaded rows, so build the
-    # payloads before.
     member_dup, role_dup = _member_of("dup", gremium), _role_for("dup-role", board)
     svc = OidcMappingService(session)
     await svc.create_membership_mapping(member_dup, _ACTOR)
@@ -207,7 +212,6 @@ async def test_duplicate_mappings_give_409(session: AsyncSession) -> None:
     await svc.create_role_mapping(role_dup, _ACTOR)
     with pytest.raises(ConflictError, match="already maps"):
         await svc.create_role_mapping(role_dup, _ACTOR)
-    # The same group may link to another gremium.
     other, _, _ = await _gremium(session)
     await svc.create_membership_mapping(_member_of("dup", other), _ACTOR)
 
@@ -248,6 +252,10 @@ async def test_global_group_mapping_has_no_gremium_column(session: AsyncSession)
 
 
 async def test_membership_list_carries_name_and_email(session: AsyncSession) -> None:
+    """Carry name and email in the membership list.
+
+    A row with open dates and an active principal counts as an active member.
+    """
     gremium, member, _board = await _gremium(session)
     group = f"{gremium.slug}-m"
     named = await _principal(session, [group])
@@ -265,5 +273,4 @@ async def test_membership_list_carries_name_and_email(session: AsyncSession) -> 
     assert by_principal[named.id].gremium_role_id == member.id
     assert by_principal[plain.id].display_name is None
     assert by_principal[plain.id].email is None
-    # Open dates and an active principal: the row counts as an active member.
     assert by_principal[named.id].active is True

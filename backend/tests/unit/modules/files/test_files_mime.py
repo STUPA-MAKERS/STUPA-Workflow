@@ -1,4 +1,4 @@
-"""Unit tests for MIME sniffing and the allowlist (T-13, security.md section 6).
+"""Unit tests for MIME sniffing and the allowlist.
 
 A fake `magic` module replaces `libmagic`. The unit run needs no system libmagic.
 """
@@ -66,8 +66,7 @@ def test_validate_png_ok(fake_magic: dict[str, str]) -> None:
 
 
 def test_validate_docx_zip_sniff_ok(fake_magic: dict[str, str]) -> None:
-    # OOXML sometimes sniffs as application/zip. That is valid for .docx when the
-    # container carries the OOXML structure.
+    """Accept a .docx sniffed as zip when the container has the OOXML structure."""
     fake_magic["mime"] = "application/zip"
     assert validate_upload("brief.docx", _ooxml_zip("word/")) == "application/zip"
 
@@ -79,7 +78,7 @@ def test_validate_xlsx_pptx_zip_sniff_ok(fake_magic: dict[str, str]) -> None:
 
 
 def test_validate_arbitrary_zip_as_docx_rejected(fake_magic: dict[str, str]) -> None:
-    # Any ZIP without OOXML structure, disguised as .docx, is rejected (AUD-021).
+    """Reject a ZIP without OOXML structure disguised as .docx."""
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as zf:
         zf.writestr("evil.sh", "rm -rf /")
@@ -89,14 +88,14 @@ def test_validate_arbitrary_zip_as_docx_rejected(fake_magic: dict[str, str]) -> 
 
 
 def test_validate_zip_wrong_format_dir_rejected(fake_magic: dict[str, str]) -> None:
-    # Word structure but declared as .xlsx: the top-level directory is wrong.
+    """Reject a Word structure declared as .xlsx: the top-level directory is wrong."""
     fake_magic["mime"] = "application/zip"
     with pytest.raises(MimeRejected):
         validate_upload("tab.xlsx", _ooxml_zip("word/"))
 
 
 def test_validate_corrupt_zip_as_docx_rejected(fake_magic: dict[str, str]) -> None:
-    # Only the magic header and no readable ZIP, so the file is rejected.
+    """Reject a magic header without a readable ZIP."""
     fake_magic["mime"] = "application/zip"
     with pytest.raises(MimeRejected):
         validate_upload("brief.docx", b"PK\x03\x04")
@@ -109,7 +108,7 @@ def test_validate_disallowed_type_rejected(fake_magic: dict[str, str]) -> None:
 
 
 def test_validate_mismatch_ext_rejected(fake_magic: dict[str, str]) -> None:
-    # PDF content declared as .png: the sniff result differs from the extension.
+    """Reject PDF content declared as .png."""
     fake_magic["mime"] = "application/pdf"
     with pytest.raises(MimeRejected):
         validate_upload("photo.png", b"%PDF")

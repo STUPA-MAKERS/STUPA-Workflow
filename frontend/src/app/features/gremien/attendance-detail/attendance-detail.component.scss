@@ -11,14 +11,12 @@
   color: var(--color-text);
 }
 
-/* Desktop: a popover in the top layer, under its cell. */
 .gad--pop {
   width: min(22rem, calc(100vw - 16px));
   max-height: min(28rem, calc(100vh - 16px));
   @include om.menu($padding: 6px 0 var(--space-2), $radius: var(--radius-xl));
 }
-/* Hidden until placed, and not rendered outside the top layer (see the calendar
-   subscription, which works the same way). */
+// Hidden until placed; outside the top layer it does not render (as in calendar-subscribe).
 .gad--pop:not(.gad--placed) {
   visibility: hidden;
 }
@@ -26,7 +24,6 @@
   display: none;
 }
 
-/* Phone: the top-layer box of the bottom sheet has no box of its own. */
 .gad__layer {
   @include om.layer;
 }

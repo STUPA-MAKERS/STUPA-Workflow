@@ -42,11 +42,13 @@ from app.shared.errors import NotFoundError
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
-# Promoted target that the service synchronizes into the numeric `application.amount`.
+    from app.modules.forms.models import FormField
+
+#: Promoted target that the service synchronizes into the numeric `application.amount`.
 _AMOUNT_TARGET = "amount"
 
 
-def _field_from_row(row: Any) -> FormFieldDef:  # noqa: ANN401 — form_field row
+def _field_from_row(row: FormField) -> FormFieldDef:
     """Convert a `form_field` row to a `FormFieldDef`.
 
     The mapping uses camelCase input keys, as `forms.service` does.
@@ -78,15 +80,18 @@ def _title_of(data: dict[str, Any] | None) -> str | None:
 
 
 def _state_out(state: State | None, color_override: str | None = None) -> StateOut | None:
+    """Serialize a state.
+
+    An existing application can point at an old state row with color NULL after a re-save of
+    the global flow. So ``color_override`` from the active global flow (same state key)
+    wins, with the stored row as fallback.
+    """
     if state is None:
         return None
     return StateOut(
         id=state.id,
         key=state.key,
         label=state.label_i18n,
-        # After a re-save of the global flow, an existing application points at an old
-        # state row with color=NULL. The color therefore comes from the active global
-        # flow through the same state key, with the stored row as fallback.
         color=color_override if color_override is not None else state.color,
         editAllowed=state.edit_allowed,
         kind=state.kind,
@@ -94,7 +99,7 @@ def _state_out(state: State | None, color_override: str | None = None) -> StateO
 
 
 def state_since_subquery() -> Subquery:
-    """Build the grouped subquery ``(app_id, since)`` of the last status change (A9).
+    """Build the grouped subquery ``(app_id, since)`` of the last status change.
 
     ``since`` is the time of the newest ``status_event`` of each application. The
     creation writes the first event, so every application has one. A caller joins
@@ -110,15 +115,15 @@ def state_since_subquery() -> Subquery:
     )
 
 
-# Actor value of a magic-link applicant in `status_event`, `submission_version` and
-# the audit log.
+#: Actor value of a magic-link applicant in `status_event`, `submission_version` and
+#: the audit log.
 APPLICANT_ACTOR = "applicant"
 
-# Actor value of an automatic action. The plain value is ``system``; a source adds a
-# suffix, for example ``system:deadlines``.
+#: Actor value of an automatic action. The plain value is ``system``; a source adds a
+#: suffix, for example ``system:deadlines``.
 SYSTEM_ACTOR = "system"
 _SYSTEM_PREFIX = SYSTEM_ACTOR + ":"
-# The key of the plain ``system`` actor in `ActorOut.key`.
+#: The key of the plain ``system`` actor in `ActorOut.key`.
 SYSTEM_AUTO_KEY = "auto"
 
 
@@ -138,7 +143,7 @@ async def gremium_actor_name(session: AsyncSession, gremium_id: UUID | None) -> 
     """Return the name of a Gremium, as the applicant view shows it for a member.
 
     The applicant view and the comment mail to the applicant show this name
-    instead of a member name (A12, O16). Without a Gremium the result is None, so
+    instead of a member name. Without a Gremium the result is None, so
     no member name leaks either.
     """
     if gremium_id is None:
@@ -154,7 +159,7 @@ async def pii_keys_for_type(session: AsyncSession, type_id: UUID) -> set[str]:
     Anonymization uses this set. An application is pinned to its `form_version_id`.
     A field that only a later version marks as PII is unknown to the pinned row.
     GDPR erasure follows the current intent, so the function takes the union. The
-    O21 strip of the detail, the versions and the attachments uses the same set.
+    PII strip of the detail, the versions and the attachments uses the same set.
     """
     from app.modules.forms.models import FormField, FormVersion
 
@@ -216,14 +221,21 @@ class ApplicationsServiceBase:
     """Shared base for the DB-backed application operations, bound to one session."""
 
     def __init__(self, session: AsyncSession) -> None:
+        """Bind the service to a database session."""
         self.session = session
 
     async def _get_app(
         self, application_id: UUID, *, allow_unconfirmed: bool = True, lock: bool = False
     ) -> Application:
-        # ``lock`` reads the row FOR NO KEY UPDATE, the lock that serializes a comment
-        # with files against the anonymization. The mode does not block the foreign
-        # key checks of rows that point at the application.
+        """Load an application or raise 404.
+
+        ``lock`` reads the row FOR NO KEY UPDATE, the lock that serializes a comment with files
+        against the anonymization. The mode does not block the foreign key checks of rows that
+        point at the application. An unconfirmed guest submission stays invisible until the
+        magic link confirms it. The principal and Gremium item routes pass
+        ``allow_unconfirmed=False`` and get 404 instead of 403, which prevents an existence
+        oracle. The owning applicant reads with the default.
+        """
         app = (
             await self.session.get(
                 Application,
@@ -236,10 +248,6 @@ class ApplicationsServiceBase:
         )
         if app is None:
             raise NotFoundError(f"application {application_id} not found")
-        # An unconfirmed guest submission stays invisible until the magic link confirms
-        # it. The principal and Gremium item routes pass allow_unconfirmed=False and get
-        # 404 instead of 403, which prevents an existence oracle. The owning applicant
-        # reads through the magic link with the default.
         if not allow_unconfirmed and app.email_confirmed_at is None:
             raise NotFoundError(f"application {application_id} not found")
         return app
@@ -305,7 +313,7 @@ class ApplicationsServiceBase:
         return await pii_keys_for_type(self.session, type_id)
 
     async def _state_since_map(self, app_ids: Iterable[UUID]) -> dict[UUID, datetime]:
-        """Map each application id to the time of its last status change (A9).
+        """Map each application id to the time of its last status change.
 
         One grouped query for all ids. An id without a status event is missing from
         the map; the caller falls back to ``created_at``.
@@ -322,7 +330,7 @@ class ApplicationsServiceBase:
     async def _gremium_actor(self, app: Application) -> str | None:
         """Return the name of the Gremium of the application.
 
-        The applicant view shows this name instead of a member name (A12, O16).
+        The applicant view shows this name instead of a member name.
         Without a Gremium the result is None, so no member name leaks either.
         """
         return await gremium_actor_name(self.session, app.gremium_id)
@@ -330,12 +338,12 @@ class ApplicationsServiceBase:
     async def _applicant_actors(self, app: Application, *, magic_link_view: bool) -> set[str]:
         """Return the actor values that name the applicant of one application.
 
-        The applicant view keeps these actors and shows the Gremium for all others
-        (A12, O16). The magic-link actor is always one of them.
+        The applicant view keeps these actors and shows the Gremium for all others.
+        The magic-link actor is always one of them.
 
         The ``sub`` of the logged-in creator is one of them in two cases: the viewer
         is that creator, or the creator submitted with the own account email. A
-        creator can submit for another email (F23), for example a member who
+        creator can submit for another email, for example a member who
         submits for a student. The magic-link view then belongs to a different
         person, and the creator is a member like any other. The comparison ignores
         case, as the create route does.
@@ -375,11 +383,11 @@ class ApplicationsServiceBase:
         """Serialize one application.
 
         ``include_pii`` adds the applicant block (email, name). ``strip_pii_fields``
-        removes the ``isPII`` form fields from ``data`` (O21) and lists their keys in
+        removes the ``isPII`` form fields from ``data`` and lists their keys in
         ``hiddenKeys``, so the client can tell a removed field from an empty one.
 
         ``applicant_view`` and ``magic_link_view`` resolve the capturing person of a
-        capture (#11) like a timeline actor: the applicant sees the Gremium.
+        capture like a timeline actor: the applicant sees the Gremium.
         """
         state = await self._get_state(app.current_state_id)
         version = await self._current_version(app.id)
@@ -430,7 +438,7 @@ class ApplicationsServiceBase:
     async def _decision_out(
         self, app: Application, *, applicant_view: bool
     ) -> DecisionOut | None:
-        """Return the valid decision of an application (F1), or None before one.
+        """Return the valid decision of an application, or None before one.
 
         The applicant view names the Gremium only: no vote link, no meeting and no
         agenda number.
@@ -499,7 +507,7 @@ class ApplicationsServiceBase:
 
         The function reads all principal names in one query (no N+1). In the
         ``applicant_view`` every actor that is not the applicant becomes the
-        Gremium of the application (A12, O16), so the applicant never sees a
+        Gremium of the application, so the applicant never sees a
         member name. See `_applicant_actors` for ``magic_link_view``.
         """
         wanted = {v for v in values if v}

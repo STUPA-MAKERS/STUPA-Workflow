@@ -78,7 +78,7 @@ const ERROR_TEXTS: Record<string, TranslationKey> = {
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
- * "Antrag erfassen" (#11): capture an application on behalf of an applicant.
+ * "Antrag erfassen": capture an application on behalf of an applicant.
  *
  * The form has the pattern of "Buchung hinzufügen" (`booking-form`): a fixed head with
  * the title and the close button, a body of sections that scrolls with a fade, and a
@@ -96,6 +96,9 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  *
  * The server validates the data like a normal submission; a 422 goes onto the fields it
  * names. On success the component emits `created` with the new id.
+ *
+ * The component provides the field types of the form (`provideFormly`), so Formly is not
+ * part of the initial bundle.
  */
 @Component({
   selector: 'app-application-capture',
@@ -119,8 +122,6 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     SkeletonComponent,
     DraftFilesComponent,
   ],
-  // The field types of the form (`provideFormly`) come with the component, so Formly is not
-  // part of the initial bundle.
   providers: [
     provideFormly(),
     DraftAttachmentsService,
@@ -147,7 +148,6 @@ export class ApplicationCaptureComponent {
   readonly closed = output<void>();
   readonly created = output<Uuid>();
 
-  // --- applicant -----------------------------------------------------------------
   readonly mode = signal<ApplicantMode>('account');
   readonly query = signal('');
   readonly candidates = signal<ApplicantCandidate[]>([]);
@@ -175,7 +175,6 @@ export class ApplicationCaptureComponent {
   readonly emailMatch = signal<ApplicantCandidate | null>(null);
   private emailSeq = 0;
 
-  // --- application ---------------------------------------------------------------
   readonly typeId = signal('');
   readonly effForm = signal<EffectiveForm | null>(null);
   readonly loadingForm = signal(false);
@@ -263,8 +262,6 @@ export class ApplicationCaptureComponent {
     return p ? candidateLabel(p) : '';
   });
 
-  // --- applicant -----------------------------------------------------------------
-
   setMode(value: string): void {
     this.mode.set(value === 'guest' ? 'guest' : 'account');
     this.emailMatch.set(null);
@@ -314,7 +311,6 @@ export class ApplicationCaptureComponent {
         this.emailMatch.set(match);
         this.mode.set('account');
       },
-      // A failed lookup leaves the new person; the server matches again.
       error: () => undefined,
     });
   }, APPLICANT_SEARCH_DELAY_MS);
@@ -326,8 +322,6 @@ export class ApplicationCaptureComponent {
     else this.guestName.set(text);
     this.mode.set('guest');
   }
-
-  // --- application ---------------------------------------------------------------
 
   selectType(id: string): void {
     if (!id || id === this.typeId()) return;
@@ -379,8 +373,6 @@ export class ApplicationCaptureComponent {
       .subscribe(() => this.formTick.update((n) => n + 1));
     return form;
   }
-
-  // --- submit --------------------------------------------------------------------
 
   close(): void {
     void this.drafts.discard();

@@ -76,10 +76,11 @@ export interface GremiumRow {
  * - One pane at a time (narrow, phone): the list, then the gremium with a way back.
  *
  * The search filters the loaded list in the browser: the list is short and complete.
+ *
+ * Side by side it is a pane page (`styles.scss`): the panes fill the free height.
  */
 @Component({
   selector: 'app-gremien',
-  // A pane page (styles.scss): side by side the panes fill the free height.
   host: { '[class.pane-page]': 'split()' },
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -183,7 +184,6 @@ export class GremienComponent implements OnDestroy {
   ]);
 
   constructor() {
-    // The shown gremien read their first tab ahead, so a click shows it at once.
     prefetchDetails({
       items: computed(() => [...this.mine(), ...this.others()]),
       key: (r) => r.item.id,
@@ -200,7 +200,6 @@ export class GremienComponent implements OnDestroy {
 
     effect(() => this.frame.fill.set(this.split()));
 
-    // Side by side a gremium always shows: the first own one, else the first visible one.
     effect(() => {
       const split = this.split();
       const loading = this.store.loading();

@@ -54,8 +54,8 @@ describe('meetings-display.util', () => {
     expect(voteResultVariant('tie')).toBe('info');
   });
 
+  /** `neutral` is a tag (a grey plate). A status shows as coloured text only. */
   it('never maps a status to the neutral tag variant', () => {
-    // `neutral` is a tag (a grey plate). A status shows as coloured text only.
     const variants = [
       ...(['draft', 'open', 'closed', 'cancelled'] as const).map(voteStatusVariant),
       ...['passed', 'rejected', 'tie', null, undefined, 'unknown'].map(voteResultVariant),
@@ -64,7 +64,7 @@ describe('meetings-display.util', () => {
     expect(variants).not.toContain('accent');
   });
 
-  it('gives a member only the labels "Anwesend" and "Abwesend" (Z2)', () => {
+  it('gives a member only the labels "Anwesend" and "Abwesend"', () => {
     expect(memberAttendanceKey('present')).toBe('meetings.attendance.selfPresent');
     expect(memberAttendanceKey('excused')).toBe('meetings.attendance.selfExcused');
     expect(memberAttendanceKey('absent')).toBe('meetings.attendance.selfExcused');
@@ -146,10 +146,10 @@ describe('meetings-display.util', () => {
       expect(meetingTimeText({ ...base, startTime: null }, 'de')).toEqual({ text: '', since: false });
     });
 
-    it('shows a live meeting as "since" its real start (O9)', () => {
+    /** A meeting that started before the real start was stored shows the planned start. */
+    it('shows a live meeting as "since" its real start', () => {
       const live = { ...base, status: 'live', startedAt: at(18, 4) } as Meeting;
       expect(meetingTimeText(live, 'de')).toEqual({ text: '18:04', since: true });
-      // Started before the real start was stored: the planned start.
       expect(meetingTimeText({ ...live, startedAt: null }, 'de')).toEqual({ text: '18:00', since: false });
     });
 

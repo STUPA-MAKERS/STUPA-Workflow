@@ -13,7 +13,12 @@ interface Position {
   offers: Offer[];
 }
 
-/** Render the standalone type with a stubbed Formly `field` so methods are callable. */
+/**
+ * Render the standalone type with a stubbed Formly `field` so methods are callable.
+ * FormlyPositionsType overrides showError to read invalid and touched or dirty, so the
+ * `options.showError` hook stays unused; it remains for FieldType compatibility. When requested,
+ * the setup forces invalid and touched for the overridden showError.
+ */
 async function setup(opts: {
   value?: unknown;
   props?: Record<string, unknown>;
@@ -24,15 +29,12 @@ async function setup(opts: {
   const field = {
     formControl: control,
     props: opts.props ?? {},
-    // FormlyPositionsType overrides showError to read invalid + touched/dirty,
-    // so this hook stays unused. It remains for FieldType compatibility.
     options: { showError: () => false },
   };
   const { fixture } = await render(FormlyPositionsType, {
     componentInputs: { field: field as never },
   });
   const cmp = fixture.componentInstance;
-  // The overridden showError needs invalid + touched. Force both when requested.
   if (opts.showError) {
     control.setErrors({ positions: true });
     control.markAsTouched();
@@ -167,6 +169,7 @@ describe('FormlyPositionsType — add/remove/edit mutations', () => {
     expect(v[0].offers[0].value).toBeCloseTo(1234.56);
   });
 
+  /** The test targets offer index 0, so the inner map also takes the k !== oi branch. */
   it('offer mutations leave sibling positions untouched (else branch of map)', async () => {
     const sibling: Position = {
       label: 'Other',
@@ -187,7 +190,6 @@ describe('FormlyPositionsType — add/remove/edit mutations', () => {
     });
     cmp.addOffer(0);
     cmp.removeOffer(0, 2);
-    // Target offer index 0 so the inner map also exercises the k !== oi (else) branch.
     cmp.setOfferLabel(0, 0, 'renamed');
     cmp.setOfferValue(0, 0, '7');
     cmp.setPreferred(0, 0);
@@ -262,13 +264,13 @@ describe('FormlyPositionsType — value text & parsing', () => {
     expect(prot(cmp).offerValueText(0, 0)).toBe('');
   });
 
+  /** DE uses the decimal separator of the locale, with no grouping. */
   it('offerValueText: returns the raw value while editing that exact cell', async () => {
     const { cmp } = await setup({
       value: [{ label: 'P', offers: [{ label: 'A', value: 12.5, preferred: true }] }],
     });
     prot(cmp).beginEditValue(0, 0);
     expect(prot(cmp).editing).toEqual({ pi: 0, oi: 0 });
-    // DE: the decimal separator of the locale, no grouping.
     expect(prot(cmp).offerValueText(0, 0)).toBe('12,5');
     prot(cmp).endEditValue();
     expect(prot(cmp).editing).toBeNull();
@@ -295,12 +297,15 @@ describe('FormlyPositionsType — value text & parsing', () => {
     expect(prot(cmp).offerValueText(5, 0)).toBe('');
   });
 
+  /**
+   * Invalid text is never 0. In DE one dot with at most 2 digits after it is a decimal; 3 decimals
+   * are too many.
+   */
   it('parseNum reads amounts in the UI locale and gives null for invalid text', async () => {
     const { cmp } = await setup();
     const parse = (s: string): number | null => prot(cmp).parseNum(s);
     expect(parse('')).toBeNull();
     expect(parse('   ')).toBeNull();
-    // Invalid text is never 0.
     expect(parse('abc')).toBeNull();
     expect(parse('1234,56')).toBeCloseTo(1234.56);
     expect(parse('1.234,56')).toBeCloseTo(1234.56);
@@ -308,7 +313,6 @@ describe('FormlyPositionsType — value text & parsing', () => {
     expect(parse('12,')).toBe(12);
     expect(parse('€ 50')).toBe(50);
     expect(parse('-5')).toBe(-5);
-    // DE: one dot with at most 2 digits after it is a decimal; 3 decimals are too many.
     expect(parse('1234.56')).toBeCloseTo(1234.56);
     expect(parse('12.50')).toBeCloseTo(12.5);
     expect(parse('1.2345')).toBeNull();
@@ -342,6 +346,7 @@ describe('FormlyPositionsType — typing into an amount cell', () => {
   const value = (control: FormControl, oi = 0): number | null =>
     (control.value as Position[])[0].offers[oi].value;
 
+  /** On blur the cell shows the formatted value. */
   it.each([
     ['12,', 12],
     ['1,5', 1.5],
@@ -356,12 +361,12 @@ describe('FormlyPositionsType — typing into an amount cell', () => {
     expect(value(control)).toBeCloseTo(expected);
     expect(prot(cmp).amountInvalid(0, 0)).toBe(false);
     prot(cmp).endEditValue();
-    // On blur the cell shows the formatted value.
     expect(prot(cmp).offerValueText(0, 0)).toBe(
       new Intl.NumberFormat('de-DE', { minimumFractionDigits: 2 }).format(expected),
     );
   });
 
+  /** On the next focus the invalid text stays for correction. */
   it.each([['abc'], ['12,345'], ['1.2345']])(
     'keeps invalid text %p after blur, stores null and shows the error',
     async (raw) => {
@@ -378,7 +383,6 @@ describe('FormlyPositionsType — typing into an amount cell', () => {
         'Kein gültiger Betrag',
       );
       expect(control.invalid).toBe(true);
-      // Focus again: the invalid text stays for correction.
       prot(cmp).beginEditValue(0, 0);
       expect(prot(cmp).offerValueText(0, 0)).toBe(raw);
       cmp.setOfferValue(0, 0, '12,5');
@@ -389,13 +393,13 @@ describe('FormlyPositionsType — typing into an amount cell', () => {
     },
   );
 
+  /** A second blur without a cell under edit does nothing. */
   it('an empty cell shows nothing on focus and clears its entry on blur', async () => {
     const { cmp } = await setup({ value: one() });
     prot(cmp).beginEditValue(0, 0);
     expect(prot(cmp).offerValueText(0, 0)).toBe('');
     prot(cmp).endEditValue();
     expect(prot(cmp).rawValues().size).toBe(0);
-    // A second blur without a cell under edit does nothing.
     prot(cmp).endEditValue();
     expect(prot(cmp).editing).toBeNull();
   });
@@ -496,6 +500,7 @@ describe('FormlyPositionsType — validation reflection', () => {
     expect(control.errors).toEqual({ positions: true });
   });
 
+  /** A no-op mutation triggers the revalidation. */
   it('accepts a fully valid positions array', async () => {
     const { cmp, control } = await setup({
       props: { minOffers: 1, minPositions: 1 },
@@ -506,7 +511,6 @@ describe('FormlyPositionsType — validation reflection', () => {
         },
       ],
     });
-    // Commit a no-op mutation to trigger revalidate.
     cmp.setPositionLabel(0, 'Catering');
     expect(control.errors).toBeNull();
     expect(control.valid).toBe(true);
@@ -575,7 +579,7 @@ describe('FormlyPositionsType — inline error helpers', () => {
   it('showError requires invalid + (touched|dirty)', async () => {
     const { cmp, control } = await setup({ value: [] });
     control.setErrors({ positions: true });
-    expect(cmp.showError).toBe(false); // pristine and untouched
+    expect(cmp.showError).toBe(false);
     control.markAsTouched();
     expect(cmp.showError).toBe(true);
   });

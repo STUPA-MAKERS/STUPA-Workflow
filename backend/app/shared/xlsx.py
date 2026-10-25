@@ -15,6 +15,10 @@ from io import BytesIO
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:  # pragma: no cover - types only
+    from uuid import UUID
+
+    from openpyxl.worksheet.worksheet import Worksheet
+
     from app.modules.applications.schemas import ApplicationListItem
     from app.modules.budget.tree_schemas import BudgetTreeNodeOut
 
@@ -27,12 +31,12 @@ def _num(value: Decimal | float | None) -> float | None:
     return float(value) if value is not None else None
 
 
-# Leading characters that can start an active formula or a DDE call when Excel or
-# LibreOffice opens the file. This is CSV and XLSX formula injection.
+#: Leading characters that start an active formula or a DDE call when Excel or
+#: LibreOffice opens the file (CSV and XLSX formula injection).
 _FORMULA_PREFIXES: tuple[str, ...] = ("=", "+", "-", "@", "\t", "\r")
 
 
-def _safe(value: Any) -> Any:
+def _safe[T](value: T) -> T | str:
     """Neutralize formula injection.
 
     A string that starts with a dangerous character gets a leading apostrophe. The
@@ -45,12 +49,12 @@ def _safe(value: Any) -> Any:
     return value
 
 
-def _append(worksheet: Any, row: Sequence[Any]) -> None:
+def _append(worksheet: Worksheet, row: Sequence[object]) -> None:
     """Append a row with `ws.append` and protect every cell against formula injection."""
     worksheet.append([_safe(cell) for cell in row])
 
 
-def _autosize(worksheet: Any, headers: Sequence[str]) -> None:
+def _autosize(worksheet: Worksheet, headers: Sequence[str]) -> None:
     """Fit each column width roughly to its longest cell."""
     widths = [len(str(h)) for h in headers]
     for row in worksheet.iter_rows(min_row=2, values_only=True):
@@ -62,7 +66,7 @@ def _autosize(worksheet: Any, headers: Sequence[str]) -> None:
         worksheet.column_dimensions[get_column_letter(i)].width = min(width + 2, 60)
 
 
-def _header_row(worksheet: Any, headers: Sequence[str]) -> None:
+def _header_row(worksheet: Worksheet, headers: Sequence[str]) -> None:
     from openpyxl.styles import Font
 
     worksheet.append(list(headers))
@@ -82,8 +86,8 @@ def _iter_nodes(
 def build_budget_workbook(
     roots: Sequence[BudgetTreeNodeOut],
     *,
-    fiscal_year_labels: dict[Any, str],
-    fiscal_year_id: Any | None = None,
+    fiscal_year_labels: Mapping[UUID, str],
+    fiscal_year_id: UUID | None = None,
 ) -> bytes:
     """Build the budget tree as `.xlsx` bytes, with one sheet per fiscal year.
 
@@ -94,6 +98,9 @@ def build_budget_workbook(
             entry gets the sheet title `HHJ`.
         fiscal_year_id: Filter to a single fiscal year and write only its sheet. Pass
             `None` to write a sheet for every fiscal year.
+
+    The sheets follow the first appearance of each fiscal year in tree order, so the sheet
+    order stays stable.
     """
     from openpyxl import Workbook
 
@@ -108,7 +115,6 @@ def build_budget_workbook(
     ]
     nodes = list(_iter_nodes(roots))
 
-    # Collect the fiscal years in tree order, which keeps the sheet order stable.
     fy_order: list[Any] = []
     for _depth, node in nodes:
         for alloc in node.by_fiscal_year:
@@ -202,7 +208,7 @@ def build_applications_workbook(
     ]
     wb = Workbook()
     ws = wb.active
-    assert ws is not None  # noqa: S101 - openpyxl always returns an active sheet
+    assert ws is not None
     ws.title = "Anträge"
     _header_row(ws, headers)
 
@@ -249,7 +255,7 @@ def build_expenses_workbook(items: Iterable[Any], locale: str = "de") -> bytes:
     ]
     wb = Workbook()
     ws = wb.active
-    assert ws is not None  # noqa: S101 - openpyxl always returns an active sheet
+    assert ws is not None
     ws.title = "Buchungen"
     _header_row(ws, headers)
     for e in items:
@@ -288,7 +294,7 @@ def build_auskunft_workbook(
 
     wb = Workbook()
     ws_account = wb.active
-    assert ws_account is not None  # noqa: S101 - openpyxl always returns an active sheet
+    assert ws_account is not None
     ws_account.title = "Konto"
     acc_headers = ["Feld", "Wert"]
     _header_row(ws_account, acc_headers)

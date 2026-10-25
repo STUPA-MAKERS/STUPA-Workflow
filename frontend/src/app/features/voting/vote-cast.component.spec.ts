@@ -66,6 +66,10 @@ const NO_DELEGATION: VoteDelegationStatus = {
   delegatedByName: null,
 };
 
+/**
+ * The server sets the capability flags of the caller on GET /votes/{id}. The delete navigates away,
+ * so both target routes must resolve.
+ */
 async function setup(opts: {
   vote?: Vote;
   getError?: unknown;
@@ -86,7 +90,6 @@ async function setup(opts: {
   /** The read answers twice, as a vote read ahead does: the kept vote, then this one. */
   newer?: Partial<Vote>;
 } = {}) {
-  // The server sets the capability flags of the caller on GET /votes/{id}.
   const served: Vote = {
     canCast: opts.canCast ?? true,
     canManage: opts.canManage ?? false,
@@ -148,7 +151,6 @@ async function setup(opts: {
     : null;
   const r = await render(VoteCastComponent, {
     providers: [
-      // The delete navigates away, so both target routes must resolve.
       provideRouter([
         { path: 'voting', children: [] },
         { path: 'voting/beamer/:id', children: [] },
@@ -197,11 +199,11 @@ async function castOwn(choice = 'Ja'): Promise<void> {
 }
 
 describe('VoteCastComponent', () => {
+  /** The meeting line links to the meeting, as the header line of a phone does. */
   it('shows the vote as a card with meeting, item and rule (board Arbeit-Abstimmungen)', async () => {
     const { getMeeting } = await setup();
     expect(screen.getByRole('article', { name: 'Abstimmung' })).toBeInTheDocument();
     expect(screen.getByText('Offen')).toBeInTheDocument();
-    // The meeting line links to the meeting, as the header line of a phone does.
     expect(screen.getByRole('link', { name: '34. Sitzung · TOP 3' })).toHaveAttribute('href', '/meetings/m1');
     expect(screen.getByText('Zweidrittelmehrheit')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: 'Soll der Antrag gefördert werden?' })).toBeInTheDocument();
@@ -221,6 +223,7 @@ describe('VoteCastComponent', () => {
     expect(list).not.toBeNull();
   });
 
+  /** The ballot says thanks itself, so no toast repeats it. */
   it('casts in two steps over REST and reloads the vote', async () => {
     const { castBallot, getVote, railStatus, toast } = await setup();
     await userEvent.click(own().getByRole('button', { name: 'Ja' }));
@@ -230,7 +233,6 @@ describe('VoteCastComponent', () => {
     expect(screen.getByText('Danke! Deine Stimme: Ja')).toBeInTheDocument();
     expect(railStatus.refresh).toHaveBeenCalled();
     expect(getVote).toHaveBeenLastCalledWith('v1', { quiet: true });
-    // The ballot says thanks itself; no toast repeats it.
     expect(toast.success).not.toHaveBeenCalled();
   });
 
@@ -439,10 +441,10 @@ describe('VoteCastComponent', () => {
     beforeEach(() => (restore = matchMediaQueries(MEDIA.phone)));
     afterEach(() => restore());
 
+    /** The way back goes to the list; the meeting line goes to the meeting. */
     it('shows the phone header with the way back to the list', async () => {
       await setup();
       expect(screen.getByRole('link', { name: 'Zurück' })).toHaveAttribute('href', '/voting');
-      // The way back goes to the list; the meeting line goes to the meeting.
       expect(screen.getByRole('link', { name: 'TOP 3 · 34. Sitzung' })).toHaveAttribute(
         'href',
         '/meetings/m1',
@@ -671,6 +673,10 @@ describe('VoteCastComponent', () => {
       expect(page?.notify).not.toHaveBeenCalled();
     });
 
+    /**
+     * A reload of v1 answers after the move to v2. The read of v2 fails late, and its context and
+     * its delegation answer late. v3 shows at once.
+     */
     it('drops the late answers of the vote it left', async () => {
       const ctx = new Subject<never>();
       const meeting = new Subject<{ id: string; title: string }>();
@@ -678,16 +684,13 @@ describe('VoteCastComponent', () => {
       const failing = new Subject<Vote>();
       const reloadSlow = new Subject<Vote>();
       const { params, getVote, getMeeting, voteStatus, fixture } = await setup();
-      // A reload of v1 that answers after the move to v2.
       getVote.mockReturnValueOnce(reloadSlow as never);
       fixture.componentInstance.onCastDone();
-      // v2: its read fails late, its context and its delegation answer late.
       getVote.mockReturnValueOnce(failing as never);
       getMeeting.mockReturnValueOnce(meeting as never);
       voteStatus.mockReturnValueOnce(status as never);
       params.next(convertToParamMap({ id: 'v2' }));
       fixture.detectChanges();
-      // v3 is shown at once.
       getVote.mockReturnValue(of(vote({ id: 'v3', question: 'Dritte Frage?' })) as never);
       getMeeting.mockReturnValue(ctx as never);
       params.next(convertToParamMap({ id: 'v3' }));

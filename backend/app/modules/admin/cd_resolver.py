@@ -42,9 +42,9 @@ class ResolvedCdVariant:
 
     Attributes:
         base_variant: Which document family the design was drawn for, ``report`` or
-            ``protocol``. Descriptive only — no render path reads it. It used to be
-            passed to pytex as the document shape, which rendered every application of
-            a protocol-based design as a meeting protocol, and the reverse.
+            ``protocol``. Descriptive only: no render path reads it, because as the
+            document shape it would render every application of a protocol-based
+            design as a meeting protocol, and the reverse.
         title_logos: Title-page logos in order — vendored names AND/OR asset
             file names.
         footer_logos: Footer logos in the same value form.

@@ -6,8 +6,10 @@ import { AuthService } from '@core/auth/auth.service';
 import type { McpSetup, OAuthGrant } from '@core/api/models';
 import * as downloadUtil from '@stupa-makers/ui-kit';
 
-// The kit re-exports `downloadBlob` through getters, which a spy cannot replace. A plain
-// copy of the module lets each test spy on it.
+/**
+ * The kit re-exports `downloadBlob` through getters, which a spy cannot replace. A plain copy of
+ * the module lets each test spy on it.
+ */
 jest.mock('@stupa-makers/ui-kit', () => ({
   __esModule: true,
   ...jest.requireActual('@stupa-makers/ui-kit'),
@@ -92,6 +94,7 @@ function rows(): HTMLElement[] {
 describe('AccountGrantsComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
+  /** No raw ISO time and no scope key shows. A missing time is a dash. */
   it('lists the grants with scope labels, Erstellt and Läuft ab, and counts them', async () => {
     await setup();
     expect(screen.getByRole('heading', { name: 'Aktive Zugriffe · 2' })).toBeInTheDocument();
@@ -99,10 +102,8 @@ describe('AccountGrantsComponent', () => {
     expect(first).toHaveTextContent('Lesen, Sitzungen verwalten');
     expect(first).toHaveTextContent(`Erstellt ${fmt('2026-06-01T10:00:00Z')}`);
     expect(first).toHaveTextContent(`Läuft ab ${fmt('2026-07-01T10:00:00Z')}`);
-    // No raw ISO time and no scope key.
     expect(first).not.toHaveTextContent('2026-07-01T10:00:00Z');
     expect(first).not.toHaveTextContent('meetings:write');
-    // A missing time is a dash.
     expect(second).toHaveTextContent('Erstellt —');
   });
 
@@ -209,12 +210,12 @@ describe('AccountGrantsComponent', () => {
     expect(screen.queryByRole('heading', { name: 'MCP-Server' })).toBeNull();
   });
 
+  /** The install command shows without the shell comment of the server. */
   it('shows the MCP card: download, steps, config and the platform URL', async () => {
     const { api } = await setup({ canMcp: true });
     expect(api.mcpConfig).toHaveBeenCalled();
     expect(screen.getByRole('heading', { name: 'MCP-Server' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /MCP-Paket herunterladen/ })).toBeInTheDocument();
-    // The install command without the shell comment of the server.
     expect(screen.getByText('pip install -e .')).toBeInTheDocument();
     expect(screen.getByText(/"command": "antragsplattform-mcp"/)).toBeInTheDocument();
     const url = screen.getByRole('link', { name: SETUP.baseUrl });

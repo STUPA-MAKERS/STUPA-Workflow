@@ -1,6 +1,3 @@
-<!-- Boards Fin-Buchungen and the other Fin-Buchung* boards: the list beside a detail
-     sheet, like the applications page. Side by side the page does not scroll: the list
-     scrolls below its search and chips, the sheet scrolls inside itself. -->
 <div class="exp" [class.exp--split]="split()">
   <app-list-detail [detailOpen]="detailOpen()" (back)="closeDetail()">
     <section list class="ld-pane" aria-labelledby="exp-title">
@@ -36,8 +33,6 @@
         </ng-container>
       </app-page-header>
 
-      <!-- The search and the chips never scroll away: one pane at a time they stick to
-           the top of the viewport; side by side only the rows below them scroll. -->
       <app-sticky-bar class="ld-pane__filters">
         <app-search-pill
           [placeholder]="'expenses.search' | t"
@@ -45,7 +40,7 @@
           [value]="q()"
           (valueChange)="onSearch($event)"
         />
-        <div class="exp__chips" role="group" appScrollFade="x" [attr.aria-label]="'expenses.filter.group' | t">
+        <div class="exp__chips" role="group" [attr.aria-label]="'expenses.filter.group' | t">
           @if (budgetTree().length) {
             <app-cost-centre-select
               class="exp__chip"
@@ -85,9 +80,6 @@
         </div>
 
         @if (selecting() && tab() === 'bookings') {
-          <!-- Board Fin-Buchungen-Auswahl: the selection bar below the filters, so it sticks
-               with them. One pane at a time (and on a phone) it also holds the bulk actions;
-               side by side they are in the sheet. -->
           <app-selection-bar
             inline
             [count]="selectedCount()"
@@ -107,7 +99,6 @@
             }
           </app-selection-bar>
         } @else if (canManage()) {
-          <!-- The transfer list needs `budget.book`: a reader gets no views. -->
           <app-segmented
             width="fill"
             [ariaLabel]="'expenses.views' | t"
@@ -132,8 +123,6 @@
       >
         @if (tab() === 'transfers') {
           @if (transferLoading()) {
-<!-- The shape of the loaded list (a month heading, rows in the geometry of
-               `app-list-item`), shown after 300ms. -->
             <div class="exp__skel skel-in">
               <h2 class="sec exp__month" aria-hidden="true">
                 <span class="skel-text skel-text--accent exp__skelMonth"></span>
@@ -183,12 +172,14 @@
                               <app-icon name="right" [size]="17" />
                             </span>
                           }
-                          <app-row-menu
-                            class="exp__menu"
-                            [label]="'expenses.rowMenu' | t: { description: t.description }"
-                            [sections]="transferMenu()"
-                            (selected)="onTransferMenu($event, t)"
-                          />
+                          @if (canChange(t.fiscalYearId)) {
+                            <app-row-menu
+                              class="exp__menu"
+                              [label]="'expenses.rowMenu' | t: { description: t.description }"
+                              [sections]="transferMenu()"
+                              (selected)="onTransferMenu($event, t)"
+                            />
+                          }
                         </span>
                       </span>
                     </app-list-item>
@@ -208,8 +199,6 @@
           }
         } @else {
           @if (loading()) {
-<!-- The shape of the loaded list (a month heading, rows in the geometry of
-               `app-list-item`), shown after 300ms. -->
             <div class="exp__skel skel-in">
               <h2 class="sec exp__month" aria-hidden="true">
                 <span class="skel-text skel-text--accent exp__skelMonth"></span>
@@ -356,7 +345,7 @@
             [transfer]="t"
             [costCentres]="costCentres()"
             [fyLabel]="fyLabel(t.fiscalYearId)"
-            [canManage]="canManage()"
+            [canManage]="canChange(t.fiscalYearId)"
             [split]="split()"
             [phone]="phone()"
             (edit)="openTransferEdit(t)"
@@ -374,7 +363,7 @@
             [application]="linkedApplication()"
             [subRows]="sub.subOf(e.id)"
             [subLoading]="sub.isLoadingSub(e.id)"
-            [canManage]="canManage()"
+            [canManage]="canChange(e.fiscalYearId)"
             [split]="split()"
             [phone]="phone()"
             (edit)="openEdit($event)"
@@ -395,7 +384,6 @@
         @default {
           @if (split()) {
             @if (!loading() && !(tab() === 'transfers' ? transferItems().length : items().length)) {
-              <!-- Board Fin-Buchungen-Leer: an empty list leaves a neutral sheet. -->
               <app-detail-none [inset]="false" [ghost]="true" />
             } @else {
               <app-detail-none
@@ -419,8 +407,6 @@
   </app-empty-state>
 </ng-template>
 
-<!-- The bulk actions as icons: the phone title row and the selection bar of the narrow
-     layout. -->
 <ng-template #bulkIcons>
   <app-button
     variant="text"
@@ -450,8 +436,6 @@
   ><app-icon name="trash" /></app-button>
 </ng-template>
 
-<!-- The form of a booking or a transfer: in the detail pane, or in a bottom sheet on a
-     phone. -->
 <ng-template #form let-inSheet>
   @switch (formMode()) {
     @case ('create') {
@@ -520,7 +504,6 @@
   </app-side-sheet>
 }
 
-<!-- "Umbuchen" one pane at a time; side by side it is a section of the bulk panel. -->
 <app-side-sheet [side]="sheetSide()" [heading]="'expenses.bulk.reassignTitle' | t" [(open)]="bulkReassignOpen">
   <app-bulk-panel
     variant="reassign"

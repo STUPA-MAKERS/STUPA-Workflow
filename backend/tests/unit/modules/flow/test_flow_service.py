@@ -1,14 +1,19 @@
-"""Unit tests for the flow and status engine (T-14, flows §3/§9).
+"""Unit tests for the flow and status engine.
 
 The suite runs without a DB. `FlowService` reads through a result-queue fake. The tests
 patch the `fields_complete` signal, which keeps its own branch coverage in
 `test_flow_context`. Every engine branch then takes a deterministic path.
+
+The sections cover the vote cancel on a non-branch exit, `branch_transition` and
+`fire_branch`, the audit-log revert (`revert_status`), the privileged override
+(`force_status`) and the agenda pick of a manual transition.
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
 from types import SimpleNamespace
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -45,13 +50,11 @@ def _ctx(monkeypatch: pytest.MonkeyPatch) -> None:
         principal: Principal,
         *,
         manual: bool,
-        deadline_passed: bool = False,
         as_applicant: bool = False,
     ) -> GuardContext:
         return GuardContext(
             manual=manual,
             roles=frozenset(principal.roles) if manual else frozenset(),
-            deadline_passed=deadline_passed,
             actor_is_applicant=as_applicant,
         )
 
@@ -87,7 +90,7 @@ def _transition(
     from_id: object,
     to_id: object,
     guard: object = None,
-    actions: list | None = None,
+    actions: list[Any] | None = None,
     branch: str | None = None,
     requires_action: bool = True,
 ) -> SimpleNamespace:
@@ -124,7 +127,7 @@ async def test_available_filters_by_guard_and_order() -> None:
 
 
 async def test_available_excludes_result_branches() -> None:
-    # A result branch of a vote or an approval never fires by hand.
+    """Hide a result branch; it never fires by hand."""
     flow_id, draft = uuid4(), uuid4()
     app = _app(draft, flow_id)
     passed = _transition(flow_id=flow_id, from_id=draft, to_id=uuid4(), branch="pass")
@@ -135,8 +138,10 @@ async def test_available_excludes_result_branches() -> None:
 
 
 async def test_fire_branch_transition_manually_409() -> None:
-    # A direct POST with the id of a branch transition must not set the vote outcome
-    # behind the back of the vote.
+    """Answer 409 for a manual fire of a branch transition.
+
+    A direct POST must not set the vote outcome behind the back of the vote.
+    """
     app = _app(uuid4(), uuid4())
     transition = _transition(
         flow_id=app.flow_version_id,
@@ -164,6 +169,7 @@ async def test_fire_automatic_transition_manually_409() -> None:
 
 
 async def test_applicant_transitions_only_actor_is_applicant_gated() -> None:
+    """Offer only the transition that actorIsApplicant opens; roleIs fails without a role."""
     flow_id, draft = uuid4(), uuid4()
     app = _app(draft, flow_id)
     t_open = _transition(
@@ -174,28 +180,28 @@ async def test_applicant_transitions_only_actor_is_applicant_gated() -> None:
     )
     db = fake_session(result(app), result(t_open, t_closed))
     out = await FlowService(db).available_applicant_transitions(app.id)
-    # Only the transition that actorIsApplicant opens. roleIs fails without a role.
     assert [t.id for t in out] == [t_open.id]
 
 
 async def test_fire_as_applicant_rejects_unopened_transition() -> None:
+    """Reject a transition that the applicant gate does not open."""
     flow_id, draft = uuid4(), uuid4()
     app = _app(draft, flow_id)
     closed = _transition(
         flow_id=flow_id, from_id=draft, to_id=uuid4(), guard={"roleIs": "chair"}
     )
-    db = fake_session(result(closed))  # only _load_transition runs
+    db = fake_session(result(closed))
     with pytest.raises(ForbiddenError):
         await FlowService(db).fire_as_applicant(app.id, closed.id)
 
 
 async def test_fire_as_applicant_fires_opened_transition() -> None:
+    """Fire a transition that the applicant gate opens."""
     flow_id, draft, accepted = uuid4(), uuid4(), uuid4()
     app = _app(draft, flow_id)
     opened = _transition(
         flow_id=flow_id, from_id=draft, to_id=accepted, guard={"actorIsApplicant": True}
     )
-    # fire_as_applicant: _load_transition (gate check) → fire: _load_app, _load_transition, update.
     db = fake_session(result(opened), result(app), result(opened), result(rowcount=1))
     res = await FlowService(db).fire_as_applicant(app.id, opened.id, note="ok")
     assert res.new_state_id == accepted
@@ -210,19 +216,26 @@ async def test_available_empty_when_no_current_state() -> None:
 
 
 async def test_available_unknown_application_404() -> None:
-    db = fake_session(result())  # no application
+    """Answer 404 for an unknown application."""
+    db = fake_session(result())
     with pytest.raises(NotFoundError):
         await FlowService(db).available_transitions(uuid4(), _principal())
 
 
 async def test_fire_commits_status_event_and_dispatches() -> None:
+    """Commit the status event and dispatch the actions.
+
+    The explicit notify action reaches the applicant, so the implicit applicant mail drops
+    out and only the implicit task mail stays. The status event id comes from the flushed
+    event.
+    """
     flow_id, draft, review = uuid4(), uuid4(), uuid4()
     app = _app(draft, flow_id)
     transition = _transition(
         flow_id=flow_id,
         from_id=draft,
         to_id=review,
-        guard={"and": [{"roleIs": "chair"}, {"deadlinePassed": False}]},
+        guard={"and": [{"roleIs": "chair"}, {"budgetFitsApplication": False}]},
         actions=[{"type": "notify", "recipients": [{"kind": "applicant"}]}],
     )
     rec = _Recorder()
@@ -232,8 +245,6 @@ async def test_fire_commits_status_event_and_dispatches() -> None:
     res = await svc.fire(app.id, transition.id, _principal(), note="los")
 
     assert res.new_state_id == review
-    # The explicit notify action plus the implicit task mail (#4-3). The implicit
-    # applicant mail drops out, because the explicit action already reaches the applicant.
     assert res.dispatched_actions == ["notify", "taskNotify"]
     assert db.committed == 1
     event = db.added[0]
@@ -242,7 +253,6 @@ async def test_fire_commits_status_event_and_dispatches() -> None:
     assert event.transition_id == transition.id
     assert event.actor == "mgr-1"
     assert event.note == "los"
-    # status_event_id comes from the flushed event.
     assert res.status_event_id == event.id
     assert rec.batches and rec.batches[0][0].type == "notify"
 
@@ -254,17 +264,19 @@ async def test_fire_unknown_application_404() -> None:
 
 
 async def test_fire_unknown_transition_404() -> None:
+    """Answer 404 for a missing transition."""
     app = _app(uuid4(), uuid4())
-    db = fake_session(result(app), result())  # the transition is missing
+    db = fake_session(result(app), result())
     with pytest.raises(NotFoundError):
         await FlowService(db).fire(app.id, uuid4(), _principal())
 
 
 async def test_fire_transition_other_flow_404() -> None:
+    """Answer 404 for a transition of another flow version."""
     app = _app(uuid4(), uuid4())
     transition = _transition(
         flow_id=uuid4(), from_id=app.current_state_id, to_id=uuid4()
-    )  # a different flow_version
+    )
     db = fake_session(result(app), result(transition))
     with pytest.raises(NotFoundError, match="does not belong"):
         await FlowService(db).fire(app.id, transition.id, _principal())
@@ -313,13 +325,11 @@ async def test_fire_default_dispatcher_when_none() -> None:
     db = fake_session(result(app), result(transition), result(rowcount=1))
     res = await flow_service.FlowService(db).fire(app.id, transition.id, _principal())
     assert res.new_state_id == to
-    # Without explicit actions the implicit auto mails stay (#4-3).
     assert res.dispatched_actions == ["notify", "taskNotify"]
 
 
-# fire cancels the open votes on a non-branch exit.
-def _vote_cancel_updates(db) -> list:
-    """Return the locking `SELECT ... FROM vote` statements that load the votes to cancel."""
+def _vote_cancel_updates(db) -> list[Any]:
+    """Return the vote cancel UPDATEs that a fire wrote."""
     return [
         s
         for s in db.statements
@@ -344,14 +354,15 @@ async def test_fire_manual_exit_cancels_open_votes() -> None:
 
     A manual exit is for example "abort the vote" from a vote state. The service cancels
     the open votes in the same transaction.
+
+    A draft of the left state goes. A draft of the entered state stays, because it belongs
+    to that state.
     """
     flow_id, voting, aborted = uuid4(), uuid4(), uuid4()
     app = _app(voting, flow_id)
     abort = _transition(flow_id=flow_id, from_id=voting, to_id=aborted)
     vote = _open_vote(app.id)
-    # A draft of the state the application leaves goes.
     draft = _open_vote(app.id, status="draft", opens_state_id=voting)
-    # A draft of the state the application enters stays (it belongs to that state).
     kept = _open_vote(app.id, status="draft", opens_state_id=aborted)
     db = fake_session(
         result(app), result(abort), result(rowcount=1), result(vote, draft, kept)
@@ -368,7 +379,7 @@ async def test_fire_manual_exit_cancels_open_votes() -> None:
 
 
 async def test_fire_publishes_vote_cancelled_after_commit() -> None:
-    """F19: each cancelled vote goes out as `vote_cancelled`. A broker fault is logged."""
+    """Each cancelled vote goes out as `vote_cancelled`. A broker fault is logged."""
     flow_id, voting, aborted = uuid4(), uuid4(), uuid4()
     app = _app(voting, flow_id)
     abort = _transition(flow_id=flow_id, from_id=voting, to_id=aborted)
@@ -425,7 +436,7 @@ async def test_fire_branch_exit_does_not_cancel_votes() -> None:
 
 
 async def test_available_transitions_carry_requires_action_flag() -> None:
-    """#requires-action: the flag travels into `TransitionOut` for the tasks-tab filter."""
+    """Carry the `requiresAction` flag into `TransitionOut` for the tasks-tab filter."""
     flow_id, draft = uuid4(), uuid4()
     app = _app(draft, flow_id)
     required = _transition(flow_id=flow_id, from_id=draft, to_id=uuid4())
@@ -441,7 +452,7 @@ async def test_available_transitions_carry_requires_action_flag() -> None:
 
 
 async def test_auto_advance_never_fires_out_of_vote_states() -> None:
-    """#vote-bypass: auto_advance never fires out of a vote state.
+    """Never fire auto_advance out of a vote state.
 
     An old flow can still hold an automatic transition out of a vote state. The vote
     decides the state. Otherwise an application could reach "accepted" without a vote.
@@ -451,24 +462,10 @@ async def test_auto_advance_never_fires_out_of_vote_states() -> None:
     auto_exit = _transition(flow_id=flow_id, from_id=voting, to_id=uuid4())
     auto_exit.automatic = True
     vote_state = SimpleNamespace(id=voting, kind="vote", config={"gremiumId": "g"})
-    # _load_app → _load_state (vote!) → stop before _outgoing.
     db = fake_session(result(app), result(vote_state))
     res = await FlowService(db).auto_advance(app.id, _principal())
     assert res is None
     assert db.committed == 0
-
-
-async def test_available_transitions_uses_explicit_deadline_passed() -> None:
-    flow_id, draft = uuid4(), uuid4()
-    app = _app(draft, flow_id)
-    t = _transition(
-        flow_id=flow_id, from_id=draft, to_id=uuid4(), guard={"deadlinePassed": True}
-    )
-    db = fake_session(result(app), result(t))  # no _deadline_passed query
-    out = await FlowService(db).available_transitions(
-        app.id, _principal(), deadline_passed=True
-    )
-    assert [x.id for x in out] == [t.id]
 
 
 async def test_applicant_transitions_empty_when_no_current_state() -> None:
@@ -484,43 +481,33 @@ async def test_auto_advance_none_when_no_current_state() -> None:
 
 
 async def test_auto_advance_no_matching_automatic_returns_none() -> None:
+    """Return None when only a manual transition exists."""
     flow_id, draft = uuid4(), uuid4()
     app = _app(draft, flow_id)
     state = SimpleNamespace(id=draft, kind="normal", config={})
-    manual = _transition(flow_id=flow_id, from_id=draft, to_id=uuid4())  # automatic=False
+    manual = _transition(flow_id=flow_id, from_id=draft, to_id=uuid4())
     db = fake_session(result(app), result(state), result(manual))
     assert await FlowService(db).auto_advance(app.id, _principal()) is None
 
 
 async def test_auto_advance_fires_matching_automatic_transition() -> None:
+    """Fire an automatic transition without a guard."""
     flow_id, draft, done = uuid4(), uuid4(), uuid4()
     app = _app(draft, flow_id)
     state = SimpleNamespace(id=draft, kind="normal", config={})
     auto_t = _transition(flow_id=flow_id, from_id=draft, to_id=done)
-    auto_t.automatic = True  # guard None, so it fires
+    auto_t.automatic = True
     db = fake_session(
-        result(app), result(state), result(auto_t),  # _load_app, _load_state, _outgoing
-        result(app), result(auto_t), result(rowcount=1),  # fire(): load + update
+        result(app), result(state), result(auto_t),
+        result(app), result(auto_t), result(rowcount=1),
     )
     res = await FlowService(db).auto_advance(app.id, _principal())
     assert res is not None
     assert res.new_state_id == done
 
 
-# branch_transition and fire_branch.
-async def test_auto_advance_with_explicit_deadline_skips_db_derive() -> None:
-    # deadline_passed is set (not None), so the code derives nothing from the DB
-    # (branch 308->310).
-    flow_id, draft = uuid4(), uuid4()
-    app = _app(draft, flow_id)
-    state = SimpleNamespace(id=draft, kind="normal", config={})
-    manual = _transition(flow_id=flow_id, from_id=draft, to_id=uuid4())  # automatic=False
-    db = fake_session(result(app), result(state), result(manual))
-    res = await FlowService(db).auto_advance(app.id, _principal(), deadline_passed=False)
-    assert res is None
-
-
 async def test_branch_transition_returns_none_when_absent() -> None:
+    """Return None when the state has no such branch."""
     flow_id, draft = uuid4(), uuid4()
     app = _app(draft, flow_id)
     fail = _transition(flow_id=flow_id, from_id=draft, to_id=uuid4(), branch="fail")
@@ -537,31 +524,16 @@ async def test_branch_transition_finds_matching_branch() -> None:
 
 
 async def test_fire_branch_fires_matching_branch() -> None:
+    """Fire the matching branch."""
     flow_id, draft, done = uuid4(), uuid4(), uuid4()
     app = _app(draft, flow_id)
     passed = _transition(flow_id=flow_id, from_id=draft, to_id=done, branch="pass")
     db = fake_session(
-        result(app), result(passed),  # branch_transition: _load_app, _outgoing
-        result(app), result(passed), result(rowcount=1),  # fire(): load + update
+        result(app), result(passed),
+        result(app), result(passed), result(rowcount=1),
     )
     res = await FlowService(db).fire_branch(app.id, "pass", _principal())
     assert res.new_state_id == done
-
-
-async def test_fire_materializes_deadline_of_entered_state() -> None:
-    # to_state loads, so refresh(app) and schedule_state_deadline run (branch 481->482).
-    flow_id, draft, review = uuid4(), uuid4(), uuid4()
-    app = _app(draft, flow_id)
-    t = _transition(flow_id=flow_id, from_id=draft, to_id=review)
-    to_state = SimpleNamespace(id=review, config={})  # no policy key, so schedule only commits
-    db = fake_session(
-        result(app), result(t), result(rowcount=1),  # _load_app, _load_transition, UPDATE
-        result(), result(), result(),  # vote cancel SELECT + audit (lock, prev-hash)
-        result(to_state),  # _load_state(to_state)
-        result(),  # schedule_state_deadline: DELETE of the old deadlines
-    )
-    res = await FlowService(db, _Recorder()).fire(app.id, t.id, _principal())
-    assert res.new_state_id == review
 
 
 async def test_fire_branch_404_when_no_matching_branch() -> None:
@@ -573,171 +545,10 @@ async def test_fire_branch_404_when_no_matching_branch() -> None:
         await FlowService(db).fire_branch(app.id, "pass", _principal())
 
 
-async def test_schedule_deadline_unknown_policy_just_commits(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    class _PolSvc:
-        def __init__(self, _session: object) -> None: ...
-
-        async def get_by_key(self, _key: str) -> None:
-            return None
-
-    monkeypatch.setattr(flow_service, "DeadlinePolicyService", _PolSvc)
-    app = SimpleNamespace(
-        id=uuid4(), created_at=None, updated_at=None, received_on=None, flow_version_id=uuid4()
-    )
-    state = SimpleNamespace(id=uuid4(), config={"deadlinePolicyKey": "missing"})
-    db = fake_session(result())  # only the DELETE of the old deadlines
-    await FlowService(db).schedule_state_deadline(app, state)  # pyright: ignore[reportArgumentType]
-    assert db.committed == 1
-
-
-async def test_schedule_deadline_unresolvable_due_just_commits(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    class _PolSvc:
-        def __init__(self, _session: object) -> None: ...
-
-        async def get_by_key(self, _key: str) -> SimpleNamespace:
-            return SimpleNamespace(kind="absolute")
-
-    monkeypatch.setattr(flow_service, "DeadlinePolicyService", _PolSvc)
-    monkeypatch.setattr(flow_service, "resolve_due_at", lambda *_a, **_k: None)
-    app = SimpleNamespace(
-        id=uuid4(), created_at=None, updated_at=None, received_on=None, flow_version_id=uuid4()
-    )
-    state = SimpleNamespace(id=uuid4(), config={"deadlinePolicyKey": "sem"})
-    db = fake_session(result())
-    await FlowService(db).schedule_state_deadline(app, state)  # pyright: ignore[reportArgumentType]
-    assert db.committed == 1
-
-
-# schedule_state_deadline picks the target transition by a satisfiable guard.
-class _PolSvcOk:
-    def __init__(self, _session: object) -> None: ...
-
-    async def get_by_key(self, _key: str) -> SimpleNamespace:
-        return SimpleNamespace(kind="absolute")
-
-
-class _CaptureDeadlineService:
-    """Intercept `DeadlineService.create` and keep the last `action_on_pass`."""
-
-    last_action_on_pass: object = "<unset>"
-
-    def __init__(self, _session: object) -> None: ...
-
-    async def create(self, **kwargs: object) -> SimpleNamespace:
-        _CaptureDeadlineService.last_action_on_pass = kwargs.get("action_on_pass")
-        return SimpleNamespace(id=uuid4())
-
-
-def _deadline_state_setup(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(flow_service, "DeadlinePolicyService", _PolSvcOk)
-    monkeypatch.setattr(
-        flow_service, "resolve_due_at", lambda *_a, **_k: datetime_now()
-    )
-    monkeypatch.setattr(flow_service, "DeadlineService", _CaptureDeadlineService)
-    _CaptureDeadlineService.last_action_on_pass = "<unset>"
-
-
-def datetime_now() -> object:
-    from datetime import UTC, datetime
-
-    return datetime.now(UTC)
-
-
-async def test_schedule_deadline_picks_first_satisfiable_guard(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    # Two deadlinePassed candidates. Only the second one holds in the cron context.
-    # action_on_pass must point to the second one, not always to the first one.
-    _deadline_state_setup(monkeypatch)
-    flow_id, src = uuid4(), uuid4()
-    t1 = _transition(
-        flow_id=flow_id, from_id=src, to_id=uuid4(),
-        guard={"and": [{"deadlinePassed": True}, {"roleIs": "chair"}]},
-    )
-    t2 = _transition(
-        flow_id=flow_id, from_id=src, to_id=uuid4(), guard={"deadlinePassed": True}
-    )
-    # eval_guard: t1 with roleIs fails in the role-free cron context. t2 holds.
-    monkeypatch.setattr(
-        flow_service, "eval_guard", lambda guard, _ctx: guard == t2.guard
-    )
-    app = SimpleNamespace(
-        id=uuid4(),
-        created_at=None,
-        updated_at=None,
-        received_on=None,
-        flow_version_id=flow_id,
-        data={},
-    )
-    state = SimpleNamespace(id=src, config={"deadlinePolicyKey": "sem"})
-    db = fake_session(result(), result(t1, t2))  # DELETE old deadlines, then SELECT transitions
-    await FlowService(db).schedule_state_deadline(app, state)  # pyright: ignore[reportArgumentType]
-    assert _CaptureDeadlineService.last_action_on_pass == {"transitionId": str(t2.id)}
-
-
-async def test_schedule_deadline_falls_back_to_first_when_none_satisfiable(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    # No candidate holds, so the code pins the first candidate as a pure marker.
-    _deadline_state_setup(monkeypatch)
-    flow_id, src = uuid4(), uuid4()
-    t1 = _transition(
-        flow_id=flow_id, from_id=src, to_id=uuid4(),
-        guard={"and": [{"deadlinePassed": True}, {"roleIs": "chair"}]},
-    )
-    t2 = _transition(
-        flow_id=flow_id, from_id=src, to_id=uuid4(),
-        guard={"and": [{"deadlinePassed": True}, {"roleIs": "treasurer"}]},
-    )
-    monkeypatch.setattr(flow_service, "eval_guard", lambda *_a, **_k: False)
-    app = SimpleNamespace(
-        id=uuid4(),
-        created_at=None,
-        updated_at=None,
-        received_on=None,
-        flow_version_id=flow_id,
-        data={},
-    )
-    state = SimpleNamespace(id=src, config={"deadlinePolicyKey": "sem"})
-    db = fake_session(result(), result(t1, t2))
-    await FlowService(db).schedule_state_deadline(app, state)  # pyright: ignore[reportArgumentType]
-    assert _CaptureDeadlineService.last_action_on_pass == {"transitionId": str(t1.id)}
-
-
-async def test_schedule_deadline_no_candidate_pins_null_marker(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    # No deadlinePassed transition, so action_on_pass stays None (pure marker, _pick None).
-    _deadline_state_setup(monkeypatch)
-    flow_id, src = uuid4(), uuid4()
-    t = _transition(
-        flow_id=flow_id, from_id=src, to_id=uuid4(), guard={"roleIs": "chair"}
-    )
-    app = SimpleNamespace(
-        id=uuid4(),
-        created_at=None,
-        updated_at=None,
-        received_on=None,
-        flow_version_id=flow_id,
-        data={},
-    )
-    state = SimpleNamespace(id=src, config={"deadlinePolicyKey": "sem"})
-    db = fake_session(result(), result(t))
-    await FlowService(db).schedule_state_deadline(app, state)  # pyright: ignore[reportArgumentType]
-    assert _CaptureDeadlineService.last_action_on_pass is None
-
-
-# Tests for revert_status (#config-versioning: audit-log revert).
 async def test_revert_status_stale_when_not_in_target_state() -> None:
     """Revert gives 409 stale_revert when the application left the target state."""
     to_id, from_id = uuid4(), uuid4()
-    app = _app(uuid4(), uuid4())  # current_state_id != to_id
+    app = _app(uuid4(), uuid4())
     db = fake_session(result(app))
     with pytest.raises(ConflictError) as ei:
         await FlowService(db).revert_status(
@@ -750,7 +561,7 @@ async def test_revert_status_stale_when_not_in_target_state() -> None:
 async def test_revert_status_conflict_when_update_rowcount_zero() -> None:
     """A concurrent transition between read and UPDATE gives rowcount 0: 409 and rollback."""
     to_id, from_id = uuid4(), uuid4()
-    app = _app(to_id, uuid4())  # current == to_id
+    app = _app(to_id, uuid4())
     db = fake_session(result(app), result(rowcount=0))
     with pytest.raises(ConflictError) as ei:
         await FlowService(db).revert_status(
@@ -764,7 +575,7 @@ async def test_revert_status_conflict_when_update_rowcount_zero() -> None:
 async def test_revert_status_moves_back_without_restored_state() -> None:
     """Happy path with a target state that does not load.
 
-    The revert writes the event and the audit entry. It skips the deadline reschedule.
+    The revert writes the event and the audit entry.
     """
     to_id, from_id = uuid4(), uuid4()
     app = _app(to_id, uuid4())
@@ -780,29 +591,12 @@ async def test_revert_status_moves_back_without_restored_state() -> None:
     assert sid == event.id
 
 
-async def test_revert_status_reschedules_restored_state_deadline() -> None:
-    """Happy path with a loadable target state: the deadline reschedule branch runs."""
-    to_id, from_id = uuid4(), uuid4()
-    app = _app(to_id, uuid4())
-    restored = SimpleNamespace(id=from_id, config={})
-    # _load_app, UPDATE, vote cancel SELECT, record(lock, prev), _load_state→restored.
-    db = fake_session(
-        result(app), result(rowcount=1), result(), result(), result(), result(restored)
-    )
-    await FlowService(db).revert_status(
-        app.id, from_state_id=from_id, to_state_id=to_id, actor="admin",
-        reverted_audit_id=7,
-    )
-    # schedule_state_deadline commits (delete plus an early return without a policy key).
-    assert db.committed >= 1
-
-
-# Tests for force_status: a privileged direct override.
 def _target_state(state_id: object, flow_id: object) -> SimpleNamespace:
+    """Build a target state of a flow."""
     return SimpleNamespace(id=state_id, flow_version_id=flow_id, kind="normal", config={})
 
 
-def _vote_cancel_stmts(db) -> list:
+def _vote_cancel_stmts(db) -> list[Any]:
     return _vote_cancel_updates(db)
 
 
@@ -820,7 +614,7 @@ async def test_force_status_unknown_target_state_404() -> None:
     """An unknown target state gives 404 and no state change."""
     flow_id = uuid4()
     app = _app(uuid4(), flow_id)
-    db = fake_session(result(app), result())  # _load_state(target) → None
+    db = fake_session(result(app), result())
     with pytest.raises(NotFoundError):
         await FlowService(db).force_status(app.id, uuid4(), _principal(), note="x")
     assert db.committed == 0
@@ -833,7 +627,7 @@ async def test_force_status_foreign_flow_state_404() -> None:
     """
     flow_id, target_id = uuid4(), uuid4()
     app = _app(uuid4(), flow_id)
-    foreign = _target_state(target_id, uuid4())  # a different flow_version
+    foreign = _target_state(target_id, uuid4())
     db = fake_session(result(app), result(foreign))
     with pytest.raises(NotFoundError, match="does not belong"):
         await FlowService(db).force_status(app.id, target_id, _principal(), note="x")
@@ -868,48 +662,31 @@ async def test_force_status_happy_writes_event_audit_and_cancels_votes() -> None
     """Happy path with a loadable target state.
 
     The service writes a StatusEvent without a transition and a forced audit entry. It
-    cancels the open votes and materializes the deadline again.
+    cancels the open votes.
+
+    The override is silent: it dispatches no notification. One locking SELECT loads the
+    votes to cancel.
     """
     flow_id, cur, target_id = uuid4(), uuid4(), uuid4()
     app = _app(cur, flow_id)
     target = _target_state(target_id, flow_id)
-    to_state = SimpleNamespace(id=target_id, config={})  # no policy key, schedule only commits
     db = fake_session(
-        result(app), result(target), result(rowcount=1),  # _load_app, _load_state, UPDATE
-        result(), result(), result(),  # vote cancel SELECT + audit (lock, prev-hash)
-        result(to_state),  # _load_state(to_state)
-        result(),  # schedule_state_deadline: DELETE of the old deadlines
+        result(app), result(target), result(rowcount=1),
+        result(), result(), result(),
     )
     res = await FlowService(db).force_status(
         app.id, target_id, _principal(), note="admin override"
     )
     assert res.new_state_id == target_id
-    assert res.dispatched_actions == []  # silent: no notifications
+    assert res.dispatched_actions == []
     assert db.committed >= 1
-    # An event without a transition, with a reason and an actor.
     event = db.added[0]
     assert event.from_state_id == cur
     assert event.to_state_id == target_id
     assert event.transition_id is None
     assert event.actor == "mgr-1"
     assert event.note == "admin override"
-    # One locking SELECT loads the votes to cancel.
     assert len(_vote_cancel_stmts(db)) == 1
-
-
-async def test_force_status_happy_without_loadable_target_state() -> None:
-    """A target state that does not load after the commit skips the deadline reschedule."""
-    flow_id, cur, target_id = uuid4(), uuid4(), uuid4()
-    app = _app(cur, flow_id)
-    target = _target_state(target_id, flow_id)
-    db = fake_session(
-        result(app), result(target), result(rowcount=1),
-        result(), result(), result(),  # cancel votes + audit
-        result(),  # _load_state(to_state) → None
-    )
-    res = await FlowService(db).force_status(app.id, target_id, _principal(), note="x")
-    assert res.new_state_id == target_id
-    assert db.committed == 1  # only the force commit, no schedule commit
 
 
 async def test_list_states_returns_flow_states() -> None:
@@ -931,13 +708,14 @@ async def test_list_states_returns_flow_states() -> None:
 
 
 async def test_list_states_unknown_application_404() -> None:
-    db = fake_session(result())  # no application
+    """Answer 404 for an unknown application."""
+    db = fake_session(result())
     with pytest.raises(NotFoundError):
         await FlowService(db).list_states(uuid4())
 
 
-# A1: the agenda pick on a manual transition.
 def test_agenda_gremium_id_reads_the_first_agenda_action() -> None:
+    """Read the Gremium of the first agenda action."""
     gid = uuid4()
     assert flow_service.agenda_gremium_id(None) is None
     assert flow_service.agenda_gremium_id([{"type": "notify"}]) is None
@@ -950,15 +728,17 @@ def test_agenda_gremium_id_reads_the_first_agenda_action() -> None:
 
 
 async def test_available_flags_the_agenda_only_into_a_vote_state() -> None:
-    # Only a fire into a vote state takes a meeting (`_check_agenda_meeting`). The UI
-    # asks for one only where `addsToAgenda` is set.
+    """Flag `addsToAgenda` only for a fire into a vote state.
+
+    Only such a fire takes a meeting (`_check_agenda_meeting`), so the UI asks for one only
+    there.
+    """
     flow_id, draft, voting, done, gid = uuid4(), uuid4(), uuid4(), uuid4(), uuid4()
     app = _app(draft, flow_id)
     action = [{"type": "addToNextSession", "gremiumId": str(gid)}]
     to_vote = _transition(flow_id=flow_id, from_id=draft, to_id=voting, actions=action)
     to_done = _transition(flow_id=flow_id, from_id=draft, to_id=done, actions=action)
     plain = _transition(flow_id=flow_id, from_id=draft, to_id=voting)
-    # _load_app, _outgoing; the target states come through `get`.
     db = fake_session(result(app), result(to_vote, to_done, plain))
     vote_state = SimpleNamespace(id=voting, kind="vote", config={"gremiumId": str(gid)})
     done_state = SimpleNamespace(id=done, kind="normal", config={})
@@ -970,22 +750,10 @@ async def test_available_flags_the_agenda_only_into_a_vote_state() -> None:
     assert (out[plain.id].adds_to_agenda, out[plain.id].agenda_gremium_id) == (False, None)
 
 
-async def test_schedule_deadline_without_commit_leaves_it_to_the_caller() -> None:
-    app = SimpleNamespace(
-        id=uuid4(), created_at=None, updated_at=None, received_on=None, flow_version_id=uuid4()
-    )
-    state = SimpleNamespace(id=uuid4(), config={})
-    db = fake_session(result())  # the DELETE of the old deadlines
-    out = await FlowService(db).schedule_state_deadline(  # pyright: ignore[reportArgumentType]
-        app, state, commit=False  # pyright: ignore[reportArgumentType]
-    )
-    assert out is None
-    assert db.committed == 0
-
-
 async def test_fire_with_meeting_adds_in_tx_and_skips_the_action(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Add the agenda item in the transaction and skip the action after the commit."""
     flow_id, draft, voting, gid, meeting_id = uuid4(), uuid4(), uuid4(), uuid4(), uuid4()
     app = _app(draft, flow_id)
     t = _transition(
@@ -1007,8 +775,8 @@ async def test_fire_with_meeting_adds_in_tx_and_skips_the_action(
     monkeypatch.setattr(FlowService, "_check_agenda_meeting", _check)
     monkeypatch.setattr(FlowService, "_add_to_agenda_in_tx", _add)
     db = fake_session(
-        result(app), result(t), result(rowcount=1),  # _load_app, _load_transition, UPDATE
-        result(), result(), result(),  # vote cancel SELECT + audit (lock, prev-hash)
+        result(app), result(t), result(rowcount=1),
+        result(), result(), result(),
     )
     rec = _Recorder()
     res = await FlowService(db, rec).fire(
@@ -1055,7 +823,7 @@ async def _check(
 ) -> None:
     db = fake_session(result(to_state) if to_state is not None else result())
     db.get_results = [meeting]
-    await FlowService(db)._check_agenda_meeting(  # noqa: SLF001
+    await FlowService(db)._check_agenda_meeting(
         transition, uuid4(), _principal()  # pyright: ignore[reportArgumentType]
     )
 
@@ -1134,34 +902,37 @@ async def test_add_to_agenda_in_tx(
     app_id, meeting_id = uuid4(), uuid4()
     svc = FlowService(db)
     if error is None:
-        await svc._add_to_agenda_in_tx(  # noqa: SLF001
+        await svc._add_to_agenda_in_tx(
             app_id, meeting_id, non_public=False, actor="mgr"
         )
         assert added == [(meeting_id, app_id, False, "mgr")]
         assert db.rolled_back == 0
     else:
         with pytest.raises(ValidationProblem):
-            await svc._add_to_agenda_in_tx(  # noqa: SLF001
+            await svc._add_to_agenda_in_tx(
                 app_id, meeting_id, non_public=False, actor="mgr"
             )
         assert db.rolled_back == 1
 
 
 async def test_stage_branch_race_leaves_the_rollback_to_the_savepoint() -> None:
-    """F20: a lost race in the vote close does not roll back the whole transaction.
+    """A lost race in the vote close does not roll back the whole transaction.
 
     The vote close stages its branch in a SAVEPOINT. A full rollback here would also
     drop the staged vote close, so `stage_branch` raises without a rollback.
+
+    The fake answers the loads of `branch_transition` and `stage_fire`, then an UPDATE that
+    lost the race.
     """
     flow_id, voting = uuid4(), uuid4()
     app = _app(voting, flow_id)
     passed = _transition(flow_id=flow_id, from_id=voting, to_id=uuid4(), branch="pass")
     db = fake_session(
-        result(app),  # branch_transition: _load_app
-        result(passed),  # branch_transition: the pass exit
-        result(app),  # stage_fire: _load_app
-        result(passed),  # stage_fire: _load_transition
-        result(rowcount=0),  # the optimistic UPDATE lost the race
+        result(app),
+        result(passed),
+        result(app),
+        result(passed),
+        result(rowcount=0),
     )
     with pytest.raises(ConflictError):
         await FlowService(db, _Recorder()).stage_branch(app.id, "pass", _principal())
@@ -1169,20 +940,3 @@ async def test_stage_branch_race_leaves_the_rollback_to_the_savepoint() -> None:
     assert db.committed == 0
 
 
-async def test_after_commit_can_skip_the_deadline() -> None:
-    """The vote close already staged the deadline, so `after_commit` skips it."""
-    flow_id, voting, approved = uuid4(), uuid4(), uuid4()
-    app = _app(voting, flow_id)
-    passed = _transition(flow_id=flow_id, from_id=voting, to_id=approved, branch="pass")
-    staged = flow_service.StagedFire(
-        application=app,  # type: ignore[arg-type]
-        transition=passed,  # type: ignore[arg-type]
-        to_state_id=approved,
-        status_event_id=uuid4(),
-        agenda_added=False,
-        cancelled_vote_ids=(),
-    )
-    db = fake_session()
-    res = await FlowService(db, _Recorder()).after_commit(staged, schedule_deadline=False)
-    assert res.new_state_id == approved
-    assert db.statements == []  # no state load, no deadline query

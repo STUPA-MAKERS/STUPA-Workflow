@@ -1,12 +1,16 @@
-"""deadline_policy scheduling: time of day, timezone and recurring dates (#90).
+"""deadline_policy scheduling: time of day, timezone and recurring dates.
 
-Phase 1 of the deadline-definition redesign. The change is additive and idempotent.
+The change is additive and idempotent.
 
 * `at_time` (`"HH:MM"`) and `timezone` (IANA zone) snap the resolved due date to a
   wall-clock time. The snap stays correct across DST. If both columns stay NULL, the
   old instant arithmetic applies. The migration needs no backfill.
 * `dates` (a JSONB list of `"YYYY-MM-DD"`) backs the new `recurring` kind, a rolling
   submission window. The migration widens the kind `CheckConstraint` to allow it.
+
+Every statement uses `ALTER TABLE IF EXISTS`. Revision e5b16898d639 drops the table
+and removes its model, so a fresh database built by the 0001 baseline has no
+`deadline_policy` here.
 """
 
 from __future__ import annotations
@@ -22,34 +26,36 @@ depends_on: str | Sequence[str] | None = None
 
 
 _UPGRADE: tuple[str, ...] = (
-    "ALTER TABLE deadline_policy ADD COLUMN IF NOT EXISTS at_time text",
-    "ALTER TABLE deadline_policy ADD COLUMN IF NOT EXISTS timezone text",
-    "ALTER TABLE deadline_policy ADD COLUMN IF NOT EXISTS dates jsonb",
-    "ALTER TABLE deadline_policy DROP CONSTRAINT IF EXISTS deadline_policy_kind",
+    "ALTER TABLE IF EXISTS deadline_policy ADD COLUMN IF NOT EXISTS at_time text",
+    "ALTER TABLE IF EXISTS deadline_policy ADD COLUMN IF NOT EXISTS timezone text",
+    "ALTER TABLE IF EXISTS deadline_policy ADD COLUMN IF NOT EXISTS dates jsonb",
+    "ALTER TABLE IF EXISTS deadline_policy DROP CONSTRAINT IF EXISTS deadline_policy_kind",
     (
-        "ALTER TABLE deadline_policy ADD CONSTRAINT deadline_policy_kind "
+        "ALTER TABLE IF EXISTS deadline_policy ADD CONSTRAINT deadline_policy_kind "
         "CHECK (kind IN ('absolute','relative_submitted','relative_changed',"
         "'recurring'))"
     ),
 )
 
 _DOWNGRADE: tuple[str, ...] = (
-    "ALTER TABLE deadline_policy DROP CONSTRAINT IF EXISTS deadline_policy_kind",
+    "ALTER TABLE IF EXISTS deadline_policy DROP CONSTRAINT IF EXISTS deadline_policy_kind",
     (
-        "ALTER TABLE deadline_policy ADD CONSTRAINT deadline_policy_kind "
+        "ALTER TABLE IF EXISTS deadline_policy ADD CONSTRAINT deadline_policy_kind "
         "CHECK (kind IN ('absolute','relative_submitted','relative_changed'))"
     ),
-    "ALTER TABLE deadline_policy DROP COLUMN IF EXISTS dates",
-    "ALTER TABLE deadline_policy DROP COLUMN IF EXISTS timezone",
-    "ALTER TABLE deadline_policy DROP COLUMN IF EXISTS at_time",
+    "ALTER TABLE IF EXISTS deadline_policy DROP COLUMN IF EXISTS dates",
+    "ALTER TABLE IF EXISTS deadline_policy DROP COLUMN IF EXISTS timezone",
+    "ALTER TABLE IF EXISTS deadline_policy DROP COLUMN IF EXISTS at_time",
 )
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     for stmt in _UPGRADE:
         op.execute(stmt)
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     for stmt in _DOWNGRADE:
         op.execute(stmt)

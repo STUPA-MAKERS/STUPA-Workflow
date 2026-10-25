@@ -10,6 +10,14 @@ export type TranslationKey = keyof typeof de;
 /** The shape of `I18nService.translate`, for pure helpers that take the translator as an argument. */
 export type Translate = (key: TranslationKey, params?: Record<string, string | number>) => string;
 
+/**
+ * The DE catalog, the reference for every key.
+ *
+ * The `ui.*` keys name controls only; a page passes its own visible text. The `formly.*`
+ * texts apply when the form definition sets no explicit label, placeholder or error text.
+ * The `actor.system.*` keys hold one key for each system actor that the backend writes
+ * (`system:<key>`).
+ */
 export const de = {
   'app.title': 'STUPA Antragsplattform',
   'app.skipToContent': 'Zum Inhalt springen',
@@ -59,8 +67,6 @@ export const de = {
   'action.save': 'Speichern',
   'common.loading': 'Wird geladen …',
 
-  // Shared building blocks (shared/ui). Only the names of controls; a page passes its
-  // own visible text.
   'ui.rowMenu.trigger': 'Weitere Aktionen',
   'ui.selection.toolbar': 'Auswahl',
   'ui.history.noDate': 'Ohne Datum',
@@ -68,7 +74,6 @@ export const de = {
   'ui.history.hideValues': 'Werte ausblenden',
   'ui.history.before': 'Vorher',
   'ui.history.after': 'Nachher',
-  // The floating "new" action of a page (app-fab). One key per thing it creates.
   'fab.application': 'Antrag stellen',
   'fab.meeting': 'Sitzung anlegen',
   'fab.todo': 'To-Do anlegen',
@@ -82,7 +87,6 @@ export const de = {
   'fab.webhook': 'Webhook anlegen',
   'fab.cdVariant': 'Variante anlegen',
   'fab.form': 'Formular anlegen',
-  'fab.deadline': 'Frist anlegen',
   'account.menu.apiAccess': 'API-Zugang',
   'account.menu.notifications': 'Benachrichtigungen',
   'account.frame.title': 'Konto',
@@ -113,7 +117,6 @@ export const de = {
   'account.notifications.kind.meeting': 'Sitzungen',
   'account.notifications.kind.delegation': 'Delegationen',
   'account.notifications.kind.protocol': 'Protokolle',
-  'account.notifications.kind.deadline': 'Frist-Erinnerungen',
   'account.notifications.kind.privacy': 'Datenschutz/Löschanträge',
   'search.title': 'Suche',
   'search.placeholder': 'Antrag, Sitzung, Kostenstelle, Seite …',
@@ -390,7 +393,6 @@ export const de = {
   'apply.positions.value': 'Wert (€)',
   'apply.positions.preferred': 'Bevorzugt',
   'apply.positions.positionValue': 'Positionswert',
-  // Zusammenfassung im Prüfschritt: gezählte Kostenpositionen.
   'apply.positions.countOne': '1 Kostenposition',
   'apply.positions.countOther': '{count} Kostenpositionen',
   'apply.positions.remove': 'Entfernen',
@@ -412,8 +414,6 @@ export const de = {
     'Bitte begründe, warum keine Vergleichsangebote möglich sind.',
   'apply.positions.noOffersBadge': 'Ohne Vergleichsangebote',
 
-  // Generic formly field types (@shared/formly). These texts appear when the form
-  // definition sets no explicit label, placeholder or error text.
   'formly.field.error': 'Ungültige Eingabe',
   'formly.select.placeholder': 'Bitte wählen …',
   'formly.select.error': 'Bitte eine Option wählen.',
@@ -437,7 +437,7 @@ export const de = {
   'apply.nav.next': 'Weiter',
   'apply.autosave': 'Entwurf in diesem Tab gespeichert',
 
-  // U+2011 (non-breaking hyphen): a narrow screen must not break "E-Mail".
+  /** U+2011 (non-breaking hyphen): a narrow screen must not break "E-Mail". */
   'apply.confirm.heading': 'Fast geschafft — E\u2011Mail bestätigen',
   'apply.confirm.badge': 'Bestätigung ausstehend',
   'apply.confirm.body':
@@ -449,7 +449,7 @@ export const de = {
     'Keine E-Mail erhalten? Prüfe den Spam-Ordner. Bewahre den Link vertraulich auf — er öffnet deinen Antrag.',
   'apply.confirm.home': 'Zur Startseite',
 
-  // Angemeldete Person: das Backend bestätigt die Adresse schon beim Anlegen.
+  /** For a signed-in submitter: the backend confirms the address at creation time. */
   'apply.submitted.heading': 'Antrag eingereicht',
   'apply.submitted.badge': 'Eingereicht',
   'apply.submitted.body':
@@ -562,7 +562,6 @@ export const de = {
   'dashboard.col.status': 'Status',
   'dashboard.col.waiting': 'Wartet',
   'dashboard.col.since': 'Seit',
-  // No break before the dot or the number: a separator never starts a line.
   'dashboard.waiting.today': 'heute',
   'dashboard.waiting.one': '1 Tag',
   'dashboard.waiting.other': '{n} Tage',
@@ -757,11 +756,9 @@ export const de = {
   'applications.capture.incomplete': 'Bitte alle Pflichtangaben ausfüllen.',
   'applications.capture.done': 'Antrag erfasst. Die antragstellende Person bekommt eine E-Mail.',
   'applications.capture.error': 'Der Antrag konnte nicht erfasst werden.',
-  // Edit mode of the detail (board Anträge-Bearbeiten).
   'applications.edit.title': 'Antrag bearbeiten',
   'applications.edit.saved': 'Gespeichert. Version {version} angelegt.',
   'applications.edit.invalid': 'Prüfe die markierten Felder.',
-  // Agenda dialog (board Anträge-Tagesordnung, A1).
   'applications.agenda.title': 'Auf Tagesordnung setzen',
   'applications.agenda.pick': 'Sitzung wählen',
   'applications.agenda.suggested': 'Vorschlag',
@@ -774,10 +771,8 @@ export const de = {
   'applications.agenda.added': 'Auf die Tagesordnung von „{meeting}“ gesetzt.',
   'applications.agenda.itemsOne': '1 TOP',
   'applications.agenda.itemsOther': '{count} TOPs',
-  // Answers of a form, read-only (@shared/forms/answer-view, O19).
   'forms.answers.other': 'Weitere Angaben',
   'forms.answers.computed': 'berechnet',
-  // Cost positions (@shared/forms/positions-view and the positions editor).
   'forms.positions.offerOne': '1 Angebot',
   'forms.positions.offerOther': '{count} Angebote',
   'forms.positions.preferredBy': 'bevorzugt: {name}',
@@ -861,8 +856,6 @@ export const de = {
   'applications.comments.placeholder': 'Kommentar schreiben …',
   'applications.comments.author.committee': 'Gremium',
   'applications.comments.author.applicant': 'Antragsteller:in',
-  // The actor of a status change, an edit or a comment (shared/actor-label.util.ts).
-  // One key for each system actor that the backend writes (`system:<key>`).
   'actor.deleted': 'Ehemaliges Konto',
   'actor.system.auto': 'System · Automatisch',
   'actor.system.deadlines': 'System · Fristen',
@@ -1053,7 +1046,7 @@ export const de = {
   'meetings.vote.question': 'Beschlussfrage',
   'meetings.vote.questionPlaceholder': 'Worüber wird abgestimmt?',
   'meetings.vote.questionPrefill': 'Soll der Antrag „{name}“ wie beschrieben gefördert werden?',
-  // F1: the prefill of the question follows the decision proposal.
+  /** The prefill of the question follows the decision proposal. */
   'meetings.vote.questionPrefillDecision':
     'Soll der Antrag „{name}“ mit {approved} (beantragt {requested}) und {conditions} gefördert werden?',
   'meetings.vote.questionPrefillAmount':
@@ -1061,7 +1054,6 @@ export const de = {
   'meetings.vote.questionPrefillConditions':
     'Soll der Antrag „{name}“ mit {conditions} gefördert werden?',
 
-  // F1: approval with deviations (decision proposal, decision section, decision dialog).
   'decision.section': 'Beschlussvorschlag',
   'decision.switch': 'Mit Abweichungen genehmigen',
   'decision.amount': 'Förderbetrag',
@@ -1107,7 +1099,6 @@ export const de = {
   'meetings.vote.openBlocked': 'Erst die offene Abstimmung schließen oder abbrechen.',
   'meetings.vote.close': 'Abstimmung schließen',
   'meetings.vote.cancel': 'Abstimmung abbrechen',
-  // F2: personnel elections.
   'meetings.vote.kind.label': 'Art der Abstimmung',
   'meetings.vote.kind.motion': 'Beschluss',
   'meetings.vote.kind.election': 'Wahl',
@@ -1121,7 +1112,7 @@ export const de = {
   'election.names.one': '1 Name',
   'election.names.other': '{n} Namen',
   'election.abstentionsLabel': 'Enthaltungen',
-  // A candidate whose name the DSGVO erasure removed (`erased`).
+  /** A candidate whose name the DSGVO erasure removed (`erased`). */
   'election.candidate.erased': 'Gelöscht',
   'election.dialog.round': 'Wahlgang',
   'election.dialog.roundPlaceholder': 'z. B. Wahl der Sitzungsleitung',
@@ -1588,7 +1579,6 @@ export const de = {
   'voting.beamer.votesOf': '{cast} von {eligible} Stimmen',
 
   'admin.home.title': 'Verwaltung',
-  'admin.deadlines.dateCountOne': '1 Termin',
   'budget.tree.expendedTitle': 'Ausgegeben {amount}',
   'budget.tree.incomeTitle': 'Einnahmen {amount}',
   'admin.webhook.edit': 'Webhook bearbeiten',
@@ -1640,11 +1630,6 @@ export const de = {
   'budget.tree.deleteBlocked':
     'Eine Kostenstelle mit Unter-Kostenstellen oder Zuteilungen lässt sich nicht löschen.',
   'budget.tree.fyState': 'Status',
-  'admin.deadlines.edit': 'Frist bearbeiten',
-  'admin.deadlines.keyLocked': 'Der Schlüssel ist unveränderlich.',
-  'admin.deadlines.daysValue': '{n} Tage',
-  'admin.deadlines.dateCount': '{n} Termine',
-  'admin.deadlines.noNextDate': 'Kein Termin mehr',
   'admin.guest.title': 'Anträge ohne Konto',
   'admin.guest.hours': 'Unbestätigte Anträge verwerfen nach',
   'admin.guest.hoursUnit': 'Stunden',
@@ -1799,8 +1784,8 @@ export const de = {
   'admin.nav.formsDesc': 'Antragsfelder zusammenstellen',
   'admin.nav.flow': 'Flow-Editor',
   'admin.nav.flowDesc': 'Status und Übergänge',
-  'admin.nav.deadlines': 'Fristen',
-  'admin.nav.deadlinesDesc': 'Benannte Fristen für den Flow',
+  'admin.nav.deadlines': 'Fristen & Fenster',
+  'admin.nav.deadlinesDesc': 'Sitzungsfenster und Bestätigung von Gastanträgen',
   'admin.nav.costCentres': 'Kostenstellen',
   'admin.nav.costCentresDesc': 'Budgets und Kostenstellen',
   'admin.nav.branding': 'Branding',
@@ -1922,11 +1907,25 @@ export const de = {
   'budget.tree.fyExisting': 'Vorhandene Haushaltsjahre',
   'budget.tree.fyActive': 'Aktiv',
   'budget.tree.fyEdit': 'Haushaltsjahr bearbeiten',
+  'budget.tree.fyClosed': 'abgeschlossen',
+  'budget.tree.fyChipClosed': 'HHJ {year} · abgeschlossen',
+  'budget.tree.fyClose': 'Abschließen',
+  'budget.tree.fyReopen': 'Wieder öffnen',
+  'budget.tree.fyCloseTitle': 'Haushaltsjahr {year} abschließen?',
+  'budget.tree.fyCloseConfirm':
+    'Danach sind in diesem Jahr keine Buchungen, Umbuchungen, Limits und Antragszuordnungen mehr möglich, bis es wieder geöffnet wird.',
+  'budget.tree.fyReopenTitle': 'Haushaltsjahr {year} wieder öffnen?',
+  'budget.tree.fyReopenConfirm':
+    'Danach können Buchungen, Umbuchungen, Limits und Antragszuordnungen in diesem Jahr wieder geändert werden.',
+  'budget.tree.toast.fyClosed': 'Haushaltsjahr {year} abgeschlossen.',
+  'budget.tree.toast.fyReopened': 'Haushaltsjahr {year} wieder geöffnet.',
+  'budget.fy.closedLabel': '{year} · abgeschlossen',
+  'budget.fy.closedError': 'Das Haushaltsjahr ist abgeschlossen.',
   'budget.tree.fyDelete': 'Haushaltsjahr löschen',
   'budget.tree.fyDeleteTitle': 'Haushaltsjahr löschen?',
   'budget.tree.fyDeleteConfirm':
     'Das Haushaltsjahr {year} wird gelöscht. Das lässt sich nicht rückgängig machen.',
-  // 409-Gründe: der Server nennt genau eine dieser Ursachen.
+  /** A 409 reason, like the next keys: the server names exactly one of these causes. */
   'budget.tree.fyBlocked.bookings':
     'Auf diesem Haushaltsjahr liegen noch Buchungen. Bitte diese zuerst löschen oder in ein anderes Jahr umbuchen.',
   'budget.tree.fyBlocked.allocations':
@@ -2003,7 +2002,6 @@ export const de = {
   'admin.form.allowNoOffers': 'Verzicht auf Vergleichsangebote erlauben',
 
   'admin.flow.title': 'Flow-Editor',
-  // Flow-Validierung: was der Editor an einem Graphen bemängelt, bevor gespeichert wird.
   'admin.flow.err.noStates': 'Der Flow hat keine Status.',
   'admin.flow.err.duplicateKeys': 'Doppelte Status-Schlüssel: {keys}',
   'admin.flow.err.invalidKey':
@@ -2059,8 +2057,6 @@ export const de = {
   'admin.flow.cfgGremiumPh': 'Gremium wählen …',
   'admin.flow.cfgRole': 'Entscheidende Rolle',
   'admin.flow.cfgRolePh': 'Rolle wählen …',
-  'admin.flow.cfgDeadline': 'Frist',
-  'admin.flow.cfgDeadlinePh': 'Keine Frist',
   'admin.flow.guardPriority': 'Guard-Priorität',
   'admin.flow.guardDefault': 'Kein Guard (Catch-all)',
   'admin.flow.branch': 'Ergebnis-Zweig',
@@ -2074,11 +2070,15 @@ export const de = {
   'admin.flow.guardValue': 'Wert',
   'admin.flow.addAction': 'Aktion hinzufügen',
   'admin.flow.diagram': 'Diagramm',
-  'admin.flow.relayout': 'Neu anordnen',
+  'admin.flow.bundle': '{n} Übergänge',
   'admin.flow.undo': 'Rückgängig',
   'admin.flow.redo': 'Wiederholen',
   'admin.flow.zoom': 'Zoom',
   'admin.flow.zoomIn': 'Vergrößern',
+  'admin.flow.panLeft': 'Nach links verschieben',
+  'admin.flow.panRight': 'Nach rechts verschieben',
+  'admin.flow.panUp': 'Nach oben verschieben',
+  'admin.flow.panDown': 'Nach unten verschieben',
   'admin.flow.zoomOut': 'Verkleinern',
   'admin.flow.zoomReset': 'Ansicht zurücksetzen',
   'admin.flow.connectHint': 'Ziehen, um einen Übergang zu erstellen',
@@ -2100,7 +2100,6 @@ export const de = {
   'admin.flow.guardOp.permissionIs': 'Akteur hat Berechtigung',
   'admin.flow.guardOp.fieldsComplete': 'Pflichtfelder vollständig',
   'admin.flow.guardOp.voteResult': 'Abstimmungsergebnis ist',
-  'admin.flow.guardOp.deadlinePassed': 'Frist abgelaufen',
   'admin.flow.guardOp.manual': 'Nur manuell',
   'admin.flow.guardHint.roleIs': 'Rollen-Schlüssel, z. B. „referent" oder „admin".',
   'admin.flow.guardHint.permissionIs': 'Berechtigungs-Schlüssel, z. B. „application.manage".',
@@ -2208,7 +2207,6 @@ export const de = {
   'admin.flow.actionDesc.openVote':
     'Öffnet eine Abstimmung für den Antrag in der laufenden Sitzung.',
   'admin.flow.actionDesc.requeue': 'Legt den Antrag zur erneuten Bearbeitung/Wiedervorlage zurück.',
-  // Flow editor (FE12b): header, toolbar, legend, colours, guard builder, versions.
   'admin.flow.versions': 'Versionen',
   'admin.flow.versionsClose': 'Zurück zur Bearbeitung',
   'admin.flow.versionActive': 'Version {n} aktiv',
@@ -2273,7 +2271,7 @@ export const de = {
     '„{name}“ wird mit seiner Zustellhistorie gelöscht. Das lässt sich nicht rückgängig machen.',
   'admin.webhook.deleted': 'Webhook gelöscht.',
   'admin.webhook.deleteFailed': 'Löschen fehlgeschlagen.',
-  // Zustelldiagnose: der Server hält je Webhook nur den jüngsten Versuch fest.
+  /** The delivery diagnosis: the server keeps only the newest attempt per webhook. */
   'admin.webhook.delivery.title': 'Zustellstatus',
   'admin.webhook.delivery.state': 'Status',
   'admin.webhook.delivery.reason': 'Ursache',
@@ -2391,6 +2389,8 @@ export const de = {
   'admin.audit.action.budget_assign': 'Antrag zugeordnet',
   'admin.audit.action.budget_move_fiscal_year': 'Haushaltsjahr verschoben',
   'admin.audit.action.budget_fiscal_year_delete': 'Haushaltsjahr gelöscht',
+  'admin.audit.action.budget_fiscal_year_close': 'Haushaltsjahr abgeschlossen',
+  'admin.audit.action.budget_fiscal_year_reopen': 'Haushaltsjahr wieder geöffnet',
   'admin.audit.action.application_archive': 'Antrag archiviert',
   'admin.audit.action.application_unarchive': 'Antrag aus dem Archiv geholt',
   'admin.audit.action.application_share': 'Freigabelink erstellt',
@@ -2431,7 +2431,6 @@ export const de = {
   'admin.audit.targetType.meeting': 'Sitzung',
   'admin.audit.targetType.guest_application_settings': 'Anträge ohne Konto',
   'admin.audit.targetType.meeting_settings': 'Sitzung eröffnen',
-  // Quotation marks around a resolved target name. Each locale brings its own pair.
   'admin.audit.revert.action': 'Zurücknehmen',
   'admin.audit.revert.title': 'Änderung zurücknehmen?',
   'admin.audit.revert.confirm':
@@ -2553,29 +2552,8 @@ export const de = {
   'admin.notifications.error': 'Einstellungen konnten nicht geladen werden.',
   'admin.notifications.saveError': 'Speichern fehlgeschlagen. Versuche es noch einmal.',
 
-  'admin.deadlines.title': 'Fristen',
-  'admin.deadlines.create': 'Frist anlegen',
-  'admin.deadlines.empty': 'Noch keine Fristen angelegt.',
-  'admin.deadlines.kind': 'Art',
-  'admin.deadlines.date': 'Datum',
-  'admin.deadlines.offsetDays': 'Frist in Tagen',
-  'admin.deadlines.dates': 'Termine',
-  'admin.deadlines.addDate': 'Termin hinzufügen',
-  'admin.deadlines.removeDate': 'Termin entfernen',
-  'admin.deadlines.atTime': 'Uhrzeit',
-  'admin.deadlines.timezone': 'Zeitzone',
-  'admin.deadlines.deleteTitle': 'Frist löschen?',
-  'admin.deadlines.deleteConfirm':
-    '„{name}“ wird gelöscht. Der Flow findet die Frist danach nicht mehr. Das lässt sich nicht rückgängig machen.',
-  'admin.deadlines.col.name': 'Bezeichnung',
-  'admin.deadlines.col.kind': 'Art',
-  'admin.deadlines.col.value': 'Frist',
-  'admin.deadlines.kind.absolute': 'Festes Datum',
-  'admin.deadlines.kind.relative_submitted': 'Einreichung + X Tage',
-  'admin.deadlines.kind.relative_changed': 'Letzte Änderung + X Tage',
-  'admin.deadlines.kind.recurring': 'Wiederkehrende Termine',
+  'admin.deadlines.title': 'Fristen & Fenster',
 
-  // Agent-Tokens (OAuth-Zugänge) aller Personen — Verwaltungssicht mit Not-Aus.
   'admin.oauthGrants.title': 'Agent-Zugänge',
   'admin.oauthGrants.loading': 'Zugänge werden geladen …',
   'admin.oauthGrants.error': 'Die Zugänge konnten nicht geladen werden.',
@@ -2601,7 +2579,6 @@ export const de = {
   'admin.oauthGrants.alreadyGone': 'Dieser Zugang bestand nicht mehr.',
   'admin.oauthGrants.revokeFailed': 'Der Zugang konnte nicht widerrufen werden.',
 
-  // Corporate-design variants: the logo sets of the rendered documents.
   'admin.cdVariants.title': 'Dokument-Varianten',
   'admin.cdVariants.create': 'Dokument-Variante anlegen',
   'admin.cdVariants.edit': 'Dokument-Variante bearbeiten',
@@ -2661,7 +2638,6 @@ export const de = {
   'admin.deleg.revoked': 'Vertretung widerrufen.',
   'admin.deleg.revokeFailed': 'Widerruf fehlgeschlagen.',
 
-  // Substitute pool, shown in the Gremium member administration.
   'admin.substitutes.title': 'Stellvertretungen',
   'admin.substitutes.add': 'Stellvertretung hinzufügen',
   'admin.substitutes.search': 'Person suchen',
@@ -2675,7 +2651,6 @@ export const de = {
   'admin.substitutes.duplicate': 'Dieser Eintrag existiert bereits.',
   'admin.substitutes.failed': 'Aktion fehlgeschlagen.',
 
-  // Meeting delegation: card on the meeting page plus dialog.
   'delegation.card.title': 'Vertretung',
   'delegation.card.deadline': 'Einrichtbar bis {date}.',
   'delegation.card.deadlinePassed':
@@ -2696,7 +2671,6 @@ export const de = {
   'delegation.toast.revoked': 'Vertretung widerrufen.',
   'delegation.toast.revokeFailed': 'Widerruf fehlgeschlagen.',
 
-  // Participant view of a meeting and the beamer (FE9).
   'participant.attendance.title': 'Deine Anwesenheit',
   'participant.attendance.delegated':
     'Du lässt dich in dieser Sitzung vertreten. Widerrufe die Vertretung, um dich anwesend zu melden.',
@@ -2812,7 +2786,7 @@ export const de = {
   'admin.forms.advanced': 'Erweiterte Optionen',
   'admin.forms.duplicate': 'Duplizieren',
 
-  // Question groups. One group container is one wizard step.
+  /** A question group. One group container is one wizard step. */
   'admin.form.groupStep': 'Abschnitt {n}',
   'admin.form.groupTitleDe': 'Gruppen-Titel (DE)',
   'admin.form.groupTitleEn': 'Gruppen-Titel (EN)',
@@ -2823,7 +2797,6 @@ export const de = {
   'admin.form.moveGroupUp': 'Gruppe nach oben',
   'admin.form.moveGroupDown': 'Gruppe nach unten',
   'admin.form.dragGroup': 'Gruppe zum Umsortieren ziehen',
-  // Form editor (FE12b): outline, type menu, settings card.
   'admin.form.outline': 'Fragen des Formulars',
   'admin.form.groupMenu': 'Aktionen für Abschnitt {n}',
   'admin.form.typeMenu': 'Fragetyp wählen',
@@ -2853,6 +2826,7 @@ export const de = {
   'budget.dash.treeBar': '{percent} % ausgelastet',
   'budget.dash.year': 'Haushaltsjahr',
   'budget.dash.yearShort': 'HHJ {year}',
+  'budget.dash.yearShortClosed': 'HHJ {year} · abgeschlossen',
   'budget.dash.export': 'Exportieren',
   'budget.dash.exportError': 'Der Export ist fehlgeschlagen.',
   'budget.dash.fig.allocated': 'Zuteilung',
@@ -3140,7 +3114,6 @@ export const de = {
   'admin.mailTemplates.key.application_captured': 'Antrag im Auftrag erfasst',
   'admin.mailTemplates.key.status_update': 'Status-Änderung',
   'admin.mailTemplates.key.status_update_team': 'Status-Änderung (Team)',
-  'admin.mailTemplates.key.deadline_approaching': 'Frist-Erinnerung',
   'admin.mailTemplates.key.task_new': 'Neue Aufgabe',
   'admin.mailTemplates.key.task_reminder': 'Aufgaben-Erinnerung',
   'admin.mailTemplates.key.comment_applicant': 'Kommentar (Antragsteller:in)',
@@ -3311,7 +3284,6 @@ export const de = {
   'invoices.toast.paid': 'Rechnung als bezahlt markiert.',
   'invoices.untitled': 'Rechnung ohne Lieferant',
   'invoices.detail.noBookings': 'Noch keine Buchung.',
-  // Public meeting with QR code (#17).
   'vote.majorityCast.simple': 'Einfache Mehrheit der abgegebenen Stimmen',
   'vote.majorityCast.absolute': 'Absolute Mehrheit der abgegebenen Stimmen',
   'vote.majorityCast.two_thirds': 'Zwei-Drittel-Mehrheit der abgegebenen Stimmen',
@@ -3573,7 +3545,6 @@ export const de = {
     'Für {n} davon gibt es noch keine öffentliche Fassung. Die Plattform erzeugt sie jetzt; bis dahin erscheinen sie nicht.',
   'admin.gremien.publicConfirm.confirm': 'Veröffentlichen',
   'admin.audit.action.protocol_publication': 'Protokoll-Veröffentlichung geändert',
-  // The tab "Gremien" (/gremien).
   'gremien.title': 'Gremien',
   'gremien.filters': 'Filter',
   'gremien.none': 'Gremium wählen',
@@ -3905,7 +3876,6 @@ export const de = {
   'admin.helpTickets.error.blocked': 'Die gesperrten Absender konnten nicht geladen werden.',
   'admin.helpTickets.error.unblock': 'Die Sperre konnte nicht aufgehoben werden.',
 
-  // To-Dos (boards, card, list, settings) and the group "To-Dos" of Aufgaben.
   'nav.todos': 'Boards',
   'tasks.group.applications': 'Anträge',
   'tasks.group.todos': 'To-Dos',

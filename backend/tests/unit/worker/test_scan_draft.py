@@ -1,4 +1,4 @@
-"""The scan handles draft uploads and rows that disappear during the scan (Z4).
+"""The scan handles draft uploads and rows that disappear during the scan.
 
 * A draft with a finding is quarantined like a bound file. Its audit entry carries
   `draft: true` instead of an application id.
@@ -48,7 +48,7 @@ AUDITS: list[dict[str, Any]] = []
 def _audit(monkeypatch: pytest.MonkeyPatch) -> None:
     AUDITS.clear()
 
-    async def _record(session: object, **kw: Any) -> None:  # noqa: ANN401
+    async def _record(session: object, **kw: Any) -> None:
         AUDITS.append(kw)
 
     monkeypatch.setattr(files_service, "audit_record", _record)
@@ -99,6 +99,10 @@ async def test_clean_draft_is_stored() -> None:
 
 @pytest.mark.parametrize("clean", [True, False])
 async def test_row_removed_during_the_scan_is_skipped(clean: bool) -> None:
+    """Skip a row that is removed during the scan.
+
+    The deleter owns the object, so the scan removes nothing.
+    """
     session = _StaleSession()
     att = _draft(session)
     storage = FakeStorage()
@@ -107,7 +111,6 @@ async def test_row_removed_during_the_scan_is_skipped(clean: bool) -> None:
     )
     assert stored is False
     assert session.rolled_back == 1
-    # The deleter owns the object. The scan removes nothing.
     assert storage.removed == []
 
 
@@ -128,7 +131,7 @@ async def test_row_removed_before_the_audit_flush_is_skipped(
         async def rollback(self) -> None:
             self.rolled_back += 1
 
-    async def _stale(session: object, **kw: Any) -> None:  # noqa: ANN401
+    async def _stale(session: object, **kw: Any) -> None:
         raise StaleDataError("row is gone")
 
     monkeypatch.setattr(files_service, "audit_record", _stale)

@@ -24,7 +24,7 @@ async def test_exchange_code_expired_rejected() -> None:
     db = fake_session(result(row))
     with pytest.raises(oauth.OAuthError) as exc:
         await oauth_service.exchange_code(
-            db,  # pyright: ignore[reportArgumentType]
+            db,
             code="c",
             code_verifier="v",
             redirect_uri="r",
@@ -43,7 +43,8 @@ async def test_exchange_code_atomic_claim_lost_rejected(
     """Reject a code that passes validation but loses the atomic claim.
 
     The atomic `UPDATE ... RETURNING` returns zero rows, because a concurrent request
-    already used the code (AUD-003). The service raises `invalid_grant`.
+    already used the code. The service raises `invalid_grant`. The SELECT returns the
+    valid code row, and the UPDATE ... RETURNING returns nothing.
     """
     monkeypatch.setattr(oauth, "verify_pkce_s256", lambda *_: True)
     row = SimpleNamespace(
@@ -54,11 +55,10 @@ async def test_exchange_code_atomic_claim_lost_rejected(
         redirect_uri="r",
         code_challenge="chal",
     )
-    # 1) SELECT returns the valid code row, 2) UPDATE ... RETURNING returns nothing.
     db = fake_session(result(row), result())
     with pytest.raises(oauth.OAuthError) as exc:
         await oauth_service.exchange_code(
-            db,  # pyright: ignore[reportArgumentType]
+            db,
             code="c",
             code_verifier="v",
             redirect_uri="r",
@@ -75,7 +75,8 @@ async def test_refresh_tokens_atomic_rotate_lost_rejected() -> None:
     """Reject a refresh token that passes validation but loses the atomic rotation.
 
     The rotation `UPDATE` returns zero rows, because a concurrent request already
-    rotated the token (AUD-020). The service raises `invalid_grant`.
+    rotated the token. The service raises `invalid_grant`. The statements select the
+    token and the active principal, and the UPDATE ... RETURNING gives nothing.
     """
     row = SimpleNamespace(
         id=uuid4(),
@@ -85,11 +86,10 @@ async def test_refresh_tokens_atomic_rotate_lost_rejected() -> None:
         principal_id=uuid4(),
     )
     principal = SimpleNamespace(active=True)
-    # 1) SELECT token, 2) SELECT principal (active), 3) UPDATE ... RETURNING gives nothing.
     db = fake_session(result(row), result(principal), result())
     with pytest.raises(oauth.OAuthError) as exc:
         await oauth_service.refresh_tokens(
-            db,  # pyright: ignore[reportArgumentType]
+            db,
             refresh_token="rt",
             client_id="mcp",
             now=NOW,
@@ -105,7 +105,7 @@ async def test_refresh_tokens_client_mismatch_rejected() -> None:
     db = fake_session(result(row))
     with pytest.raises(oauth.OAuthError) as exc:
         await oauth_service.refresh_tokens(
-            db,  # pyright: ignore[reportArgumentType]
+            db,
             refresh_token="rt",
             client_id="mcp",
             now=NOW,
@@ -122,7 +122,7 @@ async def test_refresh_tokens_expired_rejected() -> None:
     db = fake_session(result(row))
     with pytest.raises(oauth.OAuthError) as exc:
         await oauth_service.refresh_tokens(
-            db,  # pyright: ignore[reportArgumentType]
+            db,
             refresh_token="rt",
             client_id="mcp",
             now=NOW,

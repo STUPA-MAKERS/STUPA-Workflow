@@ -1,18 +1,11 @@
 @use 'breakpoints' as bp;
 @use 'scroll-fade' as fade;
 
-/* The session page is a pane page that runs edge to edge: it takes the free height of
-   the main column of the shell (`flex: 1 1 0`, no height from the viewport), and pulls
-   the block padding and the page gutter of the main region back. The page has no footer.
-   Above the phone limit the page itself does not scroll; the agenda, the sheet and the
-   vote cards scroll inside themselves. A scroll area with round cards in it has the
-   radius of the cards, so its corners clip a card that scrolls past an end. */
 :host {
   display: flex;
   flex: 1 1 0;
   flex-direction: column;
   min-height: 0;
-  /* The top inset stays: the header starts below the status bar of an installed app. */
   margin-block: calc(var(--app-top-safe-area, 0px) - var(--main-pad-top, var(--space-8)))
     calc(-1 * var(--main-pad-bottom, var(--space-8)));
   margin-inline: calc(-1 * var(--layout-gutter));
@@ -22,7 +15,6 @@
   color: var(--color-text-muted);
 }
 
-/* ------------------------------------------------------------------ header */
 .mp__head {
   display: flex;
   flex: none;
@@ -40,7 +32,6 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  /* The height of the buttons beside it (Beamer-Ansicht, QR-Code). */
   height: var(--control-height);
   padding: 0 var(--space-3);
   border: var(--border-width) solid var(--color-border);
@@ -48,7 +39,7 @@
   background: transparent;
   color: var(--color-text-muted);
   font: inherit;
-  font-size: 0.84375rem; /* 13.5px */
+  font-size: 0.84375rem;
   font-weight: var(--fw-medium);
   white-space: nowrap;
   cursor: pointer;
@@ -82,7 +73,6 @@
 .mp__beamer {
   flex: none;
 }
-/* ------------------------------------------------------------------ body */
 .mp__body {
   display: flex;
   flex: 1 1 auto;
@@ -121,7 +111,6 @@
   background: var(--color-surface-1);
 }
 
-/* Wide: agenda | sheet | votes, each column scrolls inside itself. */
 .mp__body--wide {
   display: grid;
   grid-template-columns: 320px minmax(0, 1fr);
@@ -155,15 +144,11 @@
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  /* The radius of the vote cards: the column is the window they scroll in. */
   border-radius: var(--radius-xl);
   scroll-padding-block: var(--space-4);
 }
 
-/* Below wide (above the phone limit) the body is the one scroll area of the vote cards
-   and the sheet. Its edges are the edges of the cards and it has their radius, so a card
-   that scrolls past an end is clipped round, not with a straight line; an end fades
-   while more content lies past it. */
+// The radius of the cards, so a card that scrolls past an end is clipped round, not straight.
 @include bp.below-wide {
   .mp__body:not(.mp__body--wide) {
     margin-inline: var(--space-3);
@@ -174,7 +159,6 @@
   }
 }
 
-/* ------------------------------------------------------------------ dock */
 .mp__dock {
   flex: none;
   margin: var(--space-3) var(--space-3) var(--space-3) 0;
@@ -185,15 +169,11 @@
   }
 }
 
-/* Phone: the page scrolls as one, the dock sits on the viewport above the navigation
-   bar, and the page keeps the height of the dock free below its content. Further page
-   actions go into the session menu. */
 @include bp.phone {
   :host {
     flex: 1 0 auto;
     min-height: 100dvh;
     margin-inline: calc(-1 * var(--space-4));
-    /* The dock height plus the side gap of the body, so the last card ends clear of it. */
     padding-bottom: calc(var(--fx-dock-h, 0px) + var(--space-3));
   }
   .mp__head {
@@ -203,7 +183,6 @@
     min-height: 0;
     padding: var(--space-2) var(--space-2) var(--space-2) var(--space-1);
   }
-  /* The room state is in the attendance popover of the dock. */
   .mp__presence {
     display: none;
   }
@@ -229,7 +208,6 @@
   }
 }
 
-/* The shared top and bottom fade: an end fades only while more content lies past it. */
 .mp__agenda,
 .mp__votes,
 .mp__prep {

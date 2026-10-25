@@ -7,7 +7,7 @@ The service owns three things:
   encrypted archive,
 * `apply_archive`, which puts an archive back.
 
-The heavy work runs in the arq worker (`tasks.py`), never in a request. A dump of the
+The heavy work runs in the arq worker (`worker/backup.py`), never in a request. A dump of the
 whole platform takes as long as it takes, and an API worker that blocks on it stops
 serving everyone else.
 
@@ -23,7 +23,7 @@ import logging
 import os
 import tarfile
 import tempfile
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Generator
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -43,8 +43,8 @@ from app.settings import Settings
 
 logger = logging.getLogger(__name__)
 
-# Content type of an archive object. The bytes are age ciphertext, so nothing more
-# specific applies and nothing must ever render it inline.
+#: Content type of an archive object. The bytes are age ciphertext, so nothing more
+#: specific applies and nothing must ever render it inline.
 ARCHIVE_CONTENT_TYPE = "application/octet-stream"
 
 
@@ -64,13 +64,13 @@ class ArchiveResult:
 
 
 def archive_key(backup_id: UUID, created_at: datetime) -> str:
-    """Object key of an archive: sortable by time, unique by id."""
+    """Build the object key of an archive: sortable by time, unique by id."""
     stamp = created_at.astimezone(UTC).strftime("%Y%m%dT%H%M%SZ")
     return f"antrag-{stamp}-{backup_id}.tar.age"
 
 
 def download_name(created_at: datetime) -> str:
-    """File name the browser saves an exported archive under."""
+    """Build the file name that the browser saves an exported archive under."""
     return f"antrag-{created_at.astimezone(UTC).strftime('%Y%m%dT%H%M%SZ')}.tar.age"
 
 
@@ -86,19 +86,22 @@ def libpq_dsn(database_url: str) -> str:
 
 
 @contextmanager
-def temp_file(suffix: str) -> Iterator[IO[bytes]]:
-    """Open a named temporary file that is removed on the way out."""
+def temp_file(suffix: str) -> Generator[IO[bytes]]:
+    """Open a named temporary file that is removed on the way out.
+
+    The removal ignores an ``OSError``, because the file can already be gone.
+    """
     handle = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)  # noqa: SIM115
     try:
         yield handle
     finally:
         handle.close()
-        with suppress(OSError):  # the file may already be gone
+        with suppress(OSError):
             os.unlink(handle.name)
 
 
 @contextmanager
-def _open_staged(staged: list[tuple[str, Path]]) -> Iterator[list[tuple[str, IO[bytes]]]]:
+def _open_staged(staged: list[tuple[str, Path]]) -> Generator[list[tuple[str, IO[bytes]]]]:
     """Open every staged object for reading and close them all on the way out."""
     handles: list[tuple[str, IO[bytes]]] = []
     try:
@@ -121,12 +124,11 @@ class BackupService:
         attachments: BulkObjectStorage | None = None,
         archives: BulkObjectStorage | None = None,
     ) -> None:
+        """Bind the service to a session, the settings and the two buckets."""
         self.session = session
         self.settings = settings
         self.attachments = attachments
         self.archives = archives
-
-    # ---------------------------------------------------------------- catalogue
 
     async def list(self, *, limit: int = 100, offset: int = 0) -> list[Backup]:
         """Return the catalogue, newest first."""
@@ -240,6 +242,8 @@ class BackupService:
         back. The result is the union, which is what the operator needs — every archive
         that actually exists in the bucket is listed again.
 
+        ``rowcount`` lives on the cursor result, not on the generic Result type.
+
         Returns:
             The number of rows written back.
         """
@@ -247,7 +251,6 @@ class BackupService:
             return 0
         stmt = pg_insert(Backup).values(rows).on_conflict_do_nothing(index_elements=["id"])
         result = await self.session.execute(stmt)
-        # `rowcount` lives on the cursor result rather than the generic Result type.
         return int(getattr(result, "rowcount", 0) or 0)
 
     async def export_stream(self, row: Backup) -> AsyncIterator[bytes]:
@@ -263,8 +266,6 @@ class BackupService:
         if self.archives is None or not row.storage_key:
             raise BackupError("this backup has no stored archive")
         return await self.archives.get_stream(row.storage_key)
-
-    # ------------------------------------------------------------------ archive
 
     async def build_archive(self, row: Backup) -> ArchiveResult:
         """Dump the database and the bucket into one encrypted archive.
@@ -335,17 +336,25 @@ class BackupService:
         return staged
 
     async def _schema_revision(self) -> str | None:
-        """Read the alembic head the live database sits at."""
+        """Read the alembic head the live database sits at.
+
+        Any error gives None, because a fresh database can lack the table.
+        """
         try:
             value = await self.session.scalar(
                 text("SELECT version_num FROM alembic_version LIMIT 1")
             )
-        except Exception:  # noqa: BLE001 — a fresh database may not have the table
+        except Exception:
             return None
         return str(value) if value is not None else None
 
     async def _pg_dump(self, target_path: str) -> None:
         """Run `pg_dump --format=custom` into `target_path`.
+
+        The dump leaves out the rows of ``auth_session``. Sessions hold IdP refresh
+        tokens that live for months, so an archive must not carry them, and a restore
+        must not bring back a session that was logged out after the backup. A restore
+        therefore ends every session.
 
         Raises:
             BackupError: `pg_dump` is missing, timed out, or exited non-zero.
@@ -356,10 +365,6 @@ class BackupService:
                 "--format=custom",
                 "--no-owner",
                 "--no-privileges",
-                # Sessions hold IdP refresh tokens that live for months. An archive
-                # must not carry them, and a restore must not bring back a session
-                # that was logged out after the backup. A restore therefore ends
-                # every session.
                 "--exclude-table-data=auth_session",
                 f"--file={target_path}",
                 "--dbname",
@@ -367,8 +372,6 @@ class BackupService:
             ],
             what="pg_dump",
         )
-
-    # ------------------------------------------------------------------ restore
 
     async def apply_archive(self, path: str) -> arch.ArchiveManifest:
         """Decrypt `path`, restore the database, and mirror the bucket back.
@@ -416,7 +419,10 @@ class BackupService:
         """Read and parse the mounted age private key.
 
         Raises:
-            BackupError: No identity file is configured, or it is unreadable.
+            BackupError: No identity file is configured, or it is unreadable. An
+                unreadable file is almost always the file mode, not the path: the
+                container runs as a non-root user and ``/secrets`` is a read-only bind
+                mount, so a 0600 key of the deploying user is not readable in here.
         """
         path = self.settings.backup_age_identity_file
         if not path:
@@ -424,9 +430,6 @@ class BackupService:
         try:
             raw = open(path, encoding="utf-8").read()  # noqa: SIM115
         except OSError as exc:
-            # Almost always the file mode rather than the path: the container runs as a
-            # non-root user and /secrets is a read-only bind mount, so a 0600 key owned
-            # by the deploying user cannot be read from in here.
             raise BackupError(
                 "the age identity file is not readable — check that it exists and that "
                 "the container user may read it"
@@ -439,7 +442,10 @@ class BackupService:
         `--clean --if-exists` drops what is there first, so the result matches the
         archive exactly rather than merging into it. The audit trigger blocks UPDATE
         and DELETE on `audit_entry` but not the DROP that `--clean` issues, so the
-        chain comes back as the archive holds it.
+        chain comes back as the archive holds it. A non-zero exit is tolerated,
+        because ``--clean`` warns for every object the target does not have yet, and
+        those warnings set a non-zero exit even on a good restore. The caller verifies
+        the outcome instead.
 
         Raises:
             BackupError: `pg_restore` is missing, timed out, or failed hard.
@@ -457,9 +463,6 @@ class BackupService:
                 dump_path,
             ],
             what="pg_restore",
-            # `--clean` warns for every object the target does not have yet, and those
-            # warnings set a non-zero exit even on a good restore. The caller verifies
-            # the outcome instead of trusting the code.
             tolerate_nonzero=True,
         )
 
@@ -514,8 +517,6 @@ class BackupService:
                 await self.attachments.remove(stale)
             except StorageError:
                 logger.warning("could not remove a stale object during restore")
-
-    # ------------------------------------------------------------- subprocesses
 
     async def _run(self, argv: list[str], *, what: str, tolerate_nonzero: bool = False) -> None:
         """Run one libpq tool with a timeout.

@@ -1,4 +1,4 @@
-"""Stored audit-chain checks (Z6/O8) and the role-key pre-check (A10).
+"""Stored audit-chain checks and the role-key pre-check.
 
 The upgrade:
 
@@ -9,7 +9,7 @@ The upgrade:
    `hash_mismatch`. A third CHECK binds `valid` to an empty `reason`. An index on
    `started_at DESC` serves the read of the newest check.
 2. logs every `role.key` and every `gremium_role.key` that does not match
-   `^[a-z][a-z0-9_]*$` (A10). It changes nothing. From now on the admin API rejects
+   `^[a-z][a-z0-9_]*$`. It changes nothing. From now on the admin API rejects
    such a key on create with 422. An existing role keeps its key, because other rows
    and the OIDC group mappings point at it.
 
@@ -66,7 +66,7 @@ _CREATE: tuple[str, ...] = (
 
 
 def _report_bad_role_keys() -> None:
-    """Log the role keys that do not match the A10 pattern. Change nothing."""
+    """Log the role keys that do not match the role key pattern. Change nothing."""
     bind = op.get_bind()
     roles = bind.execute(
         sa.text("SELECT key FROM role WHERE key !~ :p ORDER BY key"), {"p": _KEY_PATTERN}
@@ -96,10 +96,12 @@ def _report_bad_role_keys() -> None:
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     for statement in _CREATE:
         op.execute(statement)
     _report_bad_role_keys()
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     op.execute(f"DROP TABLE IF EXISTS {_TABLE}")

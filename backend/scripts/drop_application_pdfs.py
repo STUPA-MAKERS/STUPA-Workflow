@@ -27,6 +27,7 @@ _PREFIX = "pdf/"
 
 
 async def main(*, delete: bool) -> int:
+    """List or delete the orphaned application PDFs; return the exit code."""
     settings = load_settings()
     storage = build_object_storage(settings)
     if storage is None:

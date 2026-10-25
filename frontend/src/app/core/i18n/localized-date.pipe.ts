@@ -33,7 +33,6 @@ export function formatMoment(
   if (value === null || value === undefined || value === '') return '';
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return '';
-  // "Di, 13.10.2026" and "Di, 13.10.2026, 17:00" (24 h): the weekday without its dot.
   if (format === 'weekdayDate') return weekdayDate(date, locale);
   if (format === 'weekdayShort') return weekdayDate(date, locale, { time: true });
   return new Intl.DateTimeFormat(locale, OPTIONS[format]).format(date);

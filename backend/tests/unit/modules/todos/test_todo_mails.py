@@ -77,7 +77,7 @@ def test_the_kinds_are_registered() -> None:
 
 async def test_the_assigned_mail(sent: list[dict[str, Any]]) -> None:
     actor = PrincipalRow(id=ME, sub="me", display_name="Ada", email="ada@x.org")
-    session, b, c = _session(actor=actor)
+    session, _b, c = _session(actor=actor)
     mail = TodoMail("assigned", c.id, (OTHER,), ME)
     assert await mails.send_todo_mail(session, queue=None, settings=SETTINGS, mail=mail)  # type: ignore[arg-type]
     (out,) = sent
@@ -135,7 +135,7 @@ async def test_notify_counts_and_survives_a_failure(sent: list[dict[str, Any]]) 
     async def _boom(*_a: Any, **_k: Any) -> Any:
         raise RuntimeError("db")
 
-    broken.get = _boom  # type: ignore[method-assign]
+    broken.get = _boom
     empty, _b2, _c2 = _session(emails=[])
     count = await mails.notify_todo_mails(
         queue=None,

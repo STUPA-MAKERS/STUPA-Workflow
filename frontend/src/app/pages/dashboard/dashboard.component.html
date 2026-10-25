@@ -1,5 +1,3 @@
-<!-- One DOM order for every width: the head, the greeting, "Heute", the work list. Wide,
-     the grid of the host puts "Heute" into a sheet at the end edge (variant B). -->
 <div class="dash__top">
   @if (phone()) {
     <app-search-pill
@@ -40,7 +38,6 @@
   [title]="'dashboard.greeting' | t: { name: firstName() }"
 />
 
-<!-- "Heute": the live meeting and the next meetings. -->
 <aside
   class="dash__today"
   [attr.aria-labelledby]="hasToday() ? 'dash-today-h' : null"
@@ -146,108 +143,123 @@
   </div>
 </aside>
 
-<!-- The work list: one table, two tabs. -->
 <section class="dash__work" [attr.aria-label]="'dashboard.work.label' | t">
-  <div class="dash__tabbar">
-    <app-tabs
-      #tabBar
-      class="dash__tabs"
+  @if (phone()) {
+    <app-tab-pager
+      class="dash__tabs dash__pager"
       idPrefix="dash"
       [ariaLabel]="'dashboard.work.label' | t"
       [tabs]="tabs()"
       [active]="tab()"
+      [paged]="true"
       (activeChange)="setTab($event)"
-    />
-    <!-- Phone: the link goes under the rows, so the tabs keep the width. -->
-    @if (!phone()) {
-      <ng-container *ngTemplateOutlet="allLinkTpl" />
-    }
-  </div>
+    >
+      <ng-template appTabPage let-id>
+        <div class="dash__page">
+          <div class="dash__panel">
+            <ng-container *ngTemplateOutlet="workTpl; context: { $implicit: id }" />
+          </div>
+          <ng-container *ngTemplateOutlet="allLinkTpl; context: { $implicit: id }" />
+        </div>
+      </ng-template>
+    </app-tab-pager>
+  } @else {
+    <div class="dash__tabbar">
+      <app-tabs
+        #tabBar
+        class="dash__tabs"
+        idPrefix="dash"
+        [ariaLabel]="'dashboard.work.label' | t"
+        [tabs]="tabs()"
+        [active]="tab()"
+        (activeChange)="setTab($event)"
+      />
+      <ng-container *ngTemplateOutlet="allLinkTpl; context: { $implicit: tab() }" />
+    </div>
 
-  <div
-    class="dash__panel"
-    role="tabpanel"
-    appScrollFade="y"
-    [id]="tabBar.panelId(tab())"
-    [attr.aria-labelledby]="tabBar.tabId(tab())"
-  >
-    <!-- While the tab loads, the table draws its own skeleton rows (a phone: the skeleton). -->
-    @if (tabError()) {
-      <app-note class="dash__loadError" kind="error" icon="alert" role="alert" retryable (retry)="retryTab()">{{ 'dashboard.error' | t }}</app-note>
-    } @else if (tabEmpty()) {
-      <div class="dash__emptyGrid" [class.dash__emptyGrid--two]="newUser() && applyTypes().length">
-        @switch (tab()) {
-          @case ('mine') {
-            <app-empty-state [shape]="phone() ? 'row' : 'table'" rows="3" [heading]="'dashboard.empty.mine' | t" [body]="'dashboard.empty.mineBody' | t" />
-          }
-          @default {
-            <app-empty-state [shape]="phone() ? 'row' : 'table'" rows="3" [heading]="'dashboard.empty.tasks' | t" [body]="'dashboard.empty.tasksBody' | t" />
-          }
-        }
-        @if (newUser() && applyTypes().length) {
-          <section class="dash__apply" aria-labelledby="dash-apply-h">
-            <h3 id="dash-apply-h" class="dash__applyH">{{ 'dashboard.apply.title' | t }}</h3>
-            <div class="rowgroup">
-              @for (type of applyTypes(); track type.id) {
-                <app-list-item [title]="type.name" link="/apply" [linkQueryParams]="{ type: type.id }">
-                  <span lead class="dash__typeIcon"><app-icon name="fileplus" [size]="20" /></span>
-                  <app-icon trail class="dash__chev" name="right" [size]="17" />
-                </app-list-item>
-              }
-            </div>
-          </section>
-        }
-      </div>
-    } @else if (phone() && tabLoading()) {
-      <app-skeleton variant="rows" [count]="4" [label]="'dashboard.loading' | t" />
-    } @else if (phone()) {
-      <div class="rowgroup">
-        @for (r of tab() === 'mine' ? mineRows() : taskRows(); track r.id) {
-          <app-list-item [title]="r.title" [link]="r.link" [wrap]="true">
-            <span sub>
-              @if (r.statusLabel) {
-                <app-status-text [kind]="r.statusKind">{{ r.statusLabel }}</app-status-text>
-              }
-            </span>
-            <span trail class="dash__date num" [attr.title]="r.sinceTitle">{{ r.since }}</span>
-          </app-list-item>
-        }
-      </div>
-    } @else {
-      <app-data-table
-        surface="rowgroup"
-        [columns]="workColumns()"
-        [rows]="tab() === 'mine' ? mineRows() : taskRows()"
-        [loading]="tabLoading()"
-        [skeletonRowCount]="4"
-        [loadingText]="'dashboard.loading' | t"
-        [rowKey]="rowKey"
-        [clickable]="true"
-        (rowClick)="openRow($event)"
-      >
-        <ng-template appCell="title" let-r><span class="dash__cellTitle" [title]="$any(r).title">{{ $any(r).title }}</span></ng-template>
-        <ng-template appCell="type" let-r><span class="dash__muted">{{ $any(r).type || '—' }}</span></ng-template>
-        <ng-template appCell="status" let-r><app-status-text [kind]="$any(r).statusKind">{{ $any(r).statusLabel }}</app-status-text></ng-template>
-        <ng-template appCell="since" let-r><span class="dash__muted num" [attr.title]="$any(r).sinceTitle">{{ $any(r).since }}</span></ng-template>
-        <ng-template appCell="amount" let-r><span class="mono dash__amount">{{ $any(r).amount ?? '—' }}</span></ng-template>
-        <ng-template appCell="go"><app-icon class="dash__chev" name="right" [size]="17" /></ng-template>
-      </app-data-table>
-    }
-  </div>
-  @if (phone()) {
-    <ng-container *ngTemplateOutlet="allLinkTpl" />
+    <div
+      class="dash__panel"
+      role="tabpanel"
+      appScrollFade="y"
+      [id]="tabBar.panelId(tab())"
+      [attr.aria-labelledby]="tabBar.tabId(tab())"
+    >
+      <ng-container *ngTemplateOutlet="workTpl; context: { $implicit: tab() }" />
+    </div>
   }
   @if (wide()) {
-    <!-- Wide: the button stands at the end of the work list, beside the sheet "Heute". -->
     <app-fab [label]="'fab.application' | t" link="/apply" [contained]="true" />
   }
 </section>
 
-<ng-template #allLinkTpl>
-  @if (allLink(); as all) {
-    @if (!tabEmpty() && !tabLoading() && !tabError()) {
-      <a class="dash__more dash__all" [routerLink]="all.link" [queryParams]="all.query">{{ all.key | t }}</a>
-    }
+<ng-template #workTpl let-t>
+  @if (errorOf(t)) {
+    <app-note class="dash__loadError" kind="error" icon="alert" role="alert" retryable (retry)="retryTab(t)">{{ 'dashboard.error' | t }}</app-note>
+  } @else if (emptyOf(t)) {
+    <div class="dash__emptyGrid" [class.dash__emptyGrid--two]="newUser() && applyTypes().length">
+      @switch (t) {
+        @case ('mine') {
+          <app-empty-state [shape]="phone() ? 'row' : 'table'" rows="3" [heading]="'dashboard.empty.mine' | t" [body]="'dashboard.empty.mineBody' | t" />
+        }
+        @default {
+          <app-empty-state [shape]="phone() ? 'row' : 'table'" rows="3" [heading]="'dashboard.empty.tasks' | t" [body]="'dashboard.empty.tasksBody' | t" />
+        }
+      }
+      @if (newUser() && applyTypes().length) {
+        <section class="dash__apply" [attr.aria-labelledby]="'dash-apply-h-' + t">
+          <h3 class="dash__applyH" [id]="'dash-apply-h-' + t">{{ 'dashboard.apply.title' | t }}</h3>
+          <div class="rowgroup">
+            @for (type of applyTypes(); track type.id) {
+              <app-list-item [title]="type.name" link="/apply" [linkQueryParams]="{ type: type.id }">
+                <span lead class="dash__typeIcon"><app-icon name="fileplus" [size]="20" /></span>
+                <app-icon trail class="dash__chev" name="right" [size]="17" />
+              </app-list-item>
+            }
+          </div>
+        </section>
+      }
+    </div>
+  } @else if (phone() && loadingOf(t)) {
+    <app-skeleton variant="rows" [count]="4" [label]="'dashboard.loading' | t" />
+  } @else if (phone()) {
+    <div class="rowgroup">
+      @for (r of rowsOf(t); track r.id) {
+        <app-list-item [title]="r.title" [link]="r.link" [wrap]="true">
+          <span sub>
+            @if (r.statusLabel) {
+              <app-status-text [kind]="r.statusKind">{{ r.statusLabel }}</app-status-text>
+            }
+          </span>
+          <span trail class="dash__date num" [attr.title]="r.sinceTitle">{{ r.since }}</span>
+        </app-list-item>
+      }
+    </div>
+  } @else {
+    <app-data-table
+      surface="rowgroup"
+      [columns]="workColumns()"
+      [rows]="rowsOf(t)"
+      [loading]="loadingOf(t)"
+      [skeletonRowCount]="4"
+      [loadingText]="'dashboard.loading' | t"
+      [rowKey]="rowKey"
+      [clickable]="true"
+      (rowClick)="openRow($event)"
+    >
+      <ng-template appCell="title" let-r><span class="dash__cellTitle" [title]="$any(r).title">{{ $any(r).title }}</span></ng-template>
+      <ng-template appCell="type" let-r><span class="dash__muted">{{ $any(r).type || '—' }}</span></ng-template>
+      <ng-template appCell="status" let-r><app-status-text [kind]="$any(r).statusKind">{{ $any(r).statusLabel }}</app-status-text></ng-template>
+      <ng-template appCell="since" let-r><span class="dash__muted num" [attr.title]="$any(r).sinceTitle">{{ $any(r).since }}</span></ng-template>
+      <ng-template appCell="amount" let-r><span class="mono dash__amount">{{ $any(r).amount ?? '—' }}</span></ng-template>
+      <ng-template appCell="go"><app-icon class="dash__chev" name="right" [size]="17" /></ng-template>
+    </app-data-table>
+  }
+</ng-template>
+
+<ng-template #allLinkTpl let-t>
+  @if (!emptyOf(t) && !loadingOf(t) && !errorOf(t)) {
+    @let all = allLinkOf(t);
+    <a class="dash__more dash__all" [routerLink]="all.link" [queryParams]="all.query">{{ all.key | t }}</a>
   }
 </ng-template>
 

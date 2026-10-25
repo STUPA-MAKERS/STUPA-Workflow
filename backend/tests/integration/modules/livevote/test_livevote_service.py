@@ -1,12 +1,11 @@
-"""Integration test for live voting (T-16) against real Postgres and Redis.
+"""Integration test for live voting against real Postgres and Redis.
 
 The tests run against real infrastructure.
 
 * MeetingService CRUD and meeting control. The schema keeps the FK
   ``vote.meeting_id → meeting.id``.
 * **Cast race**: parallel casts of the same voter pass the lock and a DB ``UNIQUE``
-  constraint. Exactly **one** ballot survives. See api.md section 4, acceptance
-  criterion "parallel casts give 1 ballot".
+  constraint. Exactly **one** ballot survives.
 * **Redis pub/sub fan-out** over **two** broker instances, which are two app instances
   on one Redis. A publish on A reaches the subscriber of B. See the acceptance
   criterion "fan-out over 2 instances".
@@ -48,15 +47,11 @@ from app.shared.errors import BadRequestError, ConflictError
 
 pytestmark = pytest.mark.integration
 
-_CONFIG = VoteConfig.model_validate(
-    {"options": ["yes", "no"], "majorityRule": "simple"}
-)
+_CONFIG = VoteConfig.model_validate({"options": ["yes", "no"], "majorityRule": "simple"})
 
 
 @pytest.fixture
-async def session(
-    migrated: tuple[str, str], engine: Engine
-) -> AsyncIterator[AsyncSession]:
+async def session(migrated: tuple[str, str], engine: Engine) -> AsyncIterator[AsyncSession]:
     eng = create_async_engine(migrated[1])
     maker = async_sessionmaker(eng, expire_on_commit=False)
     async with maker() as s:
@@ -88,11 +83,13 @@ async def _gremium_and_application(session: AsyncSession) -> tuple[Gremium, Appl
 
 
 async def _member(session: AsyncSession, gremium: Gremium) -> PrincipalRow:
-    """Create an active Gremium member as a candidate protocol writer."""
+    """Create an active Gremium member as a candidate protocol writer.
+
+    The member holds `protocol.write`, so the member can keep the minutes.
+    """
     p = PrincipalRow(sub=f"s-{uuid.uuid4()}", display_name="Max P", email="m@x.de")
     session.add(p)
     await session.flush()
-    # O20: the member can keep the minutes.
     role = GremiumRole(
         gremium_id=gremium.id,
         key=f"r-{uuid.uuid4()}",
@@ -115,13 +112,17 @@ async def _member(session: AsyncSession, gremium: Gremium) -> PrincipalRow:
 
 
 async def test_meeting_crud_and_patch(session: AsyncSession) -> None:
+    """Create, read and patch a meeting.
+
+    An admin may control the meeting; any other user needs a board membership. The create
+    needs a date and a start time. A start without a protocol writer gives 409, because the
+    protocol needs one.
+    """
     gremium, _ = await _gremium_and_application(session)
     member = await _member(session, gremium)
     await session.commit()
     svc = MeetingService(session)
-    # An admin may control the meeting. Any other user needs a board membership.
     principal = Principal(sub="adm", roles=["admin"])
-    # The create call needs a date and a start time.
     created = await svc.create(
         MeetingCreate(
             gremiumId=gremium.id,
@@ -136,7 +137,6 @@ async def test_meeting_crud_and_patch(session: AsyncSession) -> None:
     fetched = await svc.get(created.id, principal)
     assert fetched.title == "GV"
 
-    # A start without a protocol writer gives 409. The protocol needs one.
     with pytest.raises(ConflictError):
         await svc.patch(created.id, MeetingPatch(status="live"), principal)
 
@@ -151,25 +151,28 @@ async def test_meeting_crud_and_patch(session: AsyncSession) -> None:
 
 
 async def test_list_timeline_keyset_pagination(session: AsyncSession) -> None:
-    """Timeline keyset: past goes backward, upcoming forward, undated last."""
+    """Timeline keyset: past goes backward, upcoming forward, undated last.
+
+    The meetings are inserted directly, because `MeetingCreate` needs a date and a start
+    time and this test needs an undated meeting for the end of the sort order. Today is in
+    2026, so 2020 and 2021 are past and 2030 and 2031 upcoming. Upcoming runs earliest first
+    with the undated meeting last, and the cursor pages through the list. Past runs most
+    recent first, going backward; undated and upcoming meetings stay out.
+    """
     gremium, _ = await _gremium_and_application(session)
     svc = MeetingService(session)
     principal = Principal(sub="adm", roles=["admin"])
 
-    # Direct insert: ``MeetingCreate`` now needs a date and a start time. This test also
-    # needs an UNDATED meeting for the end of the sort order.
     async def mk(title: str, day: _date | None = None) -> None:
         session.add(Meeting(gremium_id=gremium.id, title=title, date=day, status="planned"))
         await session.commit()
 
-    # Today is 2026: 2020 and 2021 are past, 2030 and 2031 upcoming, undated goes last.
     await mk("past-2020", _date(2020, 1, 1))
     await mk("past-2021", _date(2021, 6, 15))
     await mk("fut-2030", _date(2030, 1, 1))
     await mk("fut-2031", _date(2031, 1, 1))
     await mk("undated")
 
-    # upcoming: earliest first, undated last. The cursor pages through the list.
     up: list[str] = []
     cursor: str | None = None
     while True:
@@ -182,7 +185,6 @@ async def test_list_timeline_keyset_pagination(session: AsyncSession) -> None:
             break
     assert up == ["fut-2030", "fut-2031", "undated"]
 
-    # past: most recent first, going backward. Undated and upcoming meetings stay out.
     past: list[str] = []
     cursor = None
     while True:
@@ -206,9 +208,16 @@ async def test_list_timeline_rejects_bad_cursor(session: AsyncSession) -> None:
 async def test_list_filter_gremien_visibility(session: AsyncSession) -> None:
     """List only the Gremien that have at least ONE visible meeting.
 
-    `/meetings/gremien` (#meetings-filter) hides a Gremium of the member that has no
+    `/meetings/gremien` hides a Gremium of the member that has no
     meeting. It also hides a Gremium with a meeting where the principal is NOT a member.
     An admin sees every Gremium that has any meeting.
+
+    The member belongs to `g_with`, which has a meeting, and not to `g_other`. `g_empty` has
+    no meeting. Both `g_empty` and `g_other` drop out. An admin sees every Gremium with a
+    meeting, and never a Gremium without one.
+
+    The same member also joins `g_empty`, which has no meeting, and `g_empty` must not show
+    up.
     """
     svc = MeetingService(session)
     g_with = Gremium(name="Mit Sitzung", slug=f"g-{uuid.uuid4()}")
@@ -217,8 +226,7 @@ async def test_list_filter_gremien_visibility(session: AsyncSession) -> None:
     session.add_all([g_with, g_empty, g_other])
     await session.flush()
 
-    member = await _member(session, g_with)  # member of g_with, which has a meeting
-    # The same member also joins g_empty, which has NO meeting. It must NOT show up.
+    member = await _member(session, g_with)
     role2 = GremiumRole(gremium_id=g_empty.id, key=f"r-{uuid.uuid4()}", name_i18n={"de": "M"})
     session.add(role2)
     await session.flush()
@@ -231,20 +239,18 @@ async def test_list_filter_gremien_visibility(session: AsyncSession) -> None:
             valid_until=None,
         )
     )
-    # One meeting in g_with (member) and one in g_other (not a member).
     session.add(Meeting(gremium_id=g_with.id, title="A", date=_date(2026, 7, 1), status="planned"))
     session.add(Meeting(gremium_id=g_other.id, title="B", date=_date(2026, 7, 2), status="planned"))
     await session.commit()
 
     member_principal = Principal(sub=member.sub, roles=[])
     seen = await svc.list_filter_gremien(member_principal)
-    # Both g_empty (no meeting) and g_other (not a member) drop out.
     assert [g.name for g in seen] == ["Mit Sitzung"]
 
     admin_gremien = await svc.list_filter_gremien(Principal(sub="adm", roles=["admin"]))
     admin_seen = {g.name for g in admin_gremien}
-    assert {"Mit Sitzung", "Fremd"} <= admin_seen  # every Gremium WITH a meeting
-    assert "Ohne Sitzung" not in admin_seen  # never a Gremium without a meeting
+    assert {"Mit Sitzung", "Fremd"} <= admin_seen
+    assert "Ohne Sitzung" not in admin_seen
 
 
 async def test_open_vote_lookup(session: AsyncSession) -> None:
@@ -270,7 +276,12 @@ async def test_open_vote_lookup(session: AsyncSession) -> None:
 async def test_parallel_casts_yield_single_ballot(
     session: AsyncSession, migrated: tuple[str, str]
 ) -> None:
-    """Race: many parallel casts of the same voter give exactly one ballot."""
+    """Race: many parallel casts of the same voter give exactly one ballot.
+
+    A voter needs the gremium `vote.cast` in the Gremium of the vote, because `service.cast`
+    fails closed. The right is the namespaced key `vote:<gremium>`, which only a real
+    `vote.cast` membership sets; the bare UUID string does not work.
+    """
     gremium, application = await _gremium_and_application(session)
     meeting = Meeting(gremium_id=gremium.id, title="GV", status="live")
     session.add(meeting)
@@ -286,9 +297,6 @@ async def test_parallel_casts_yield_single_ballot(
     session.add(vote)
     await session.commit()
 
-    # A voter needs the gremium `vote.cast` in the GREMIUM of the vote (service.cast,
-    # fail-closed). The right is the namespaced key ``vote:<gremium>`` (AUD-066), which
-    # only a real vote.cast membership sets. The bare UUID string does not work.
     from app.modules.auth.rbac import vote_group_key
 
     principal = Principal(sub="alice", groups={vote_group_key(gremium.id)})
@@ -322,7 +330,10 @@ async def test_parallel_casts_yield_single_ballot(
 
 
 async def test_redis_pubsub_fanout_two_instances(redis_url: str) -> None:
-    """Two brokers (two app instances) on one Redis: a publish on A reaches B."""
+    """Two brokers (two app instances) on one Redis: a publish on A reaches B.
+
+    The test lets the subscription settle before the publish.
+    """
     import redis.asyncio as aioredis
 
     client_a = aioredis.from_url(redis_url)
@@ -342,7 +353,7 @@ async def test_redis_pubsub_fanout_two_instances(redis_url: str) -> None:
                 raise AssertionError("no message")  # pragma: no cover
 
             reader = asyncio.create_task(_first())
-            await asyncio.sleep(0.1)  # let the subscription settle before the publish
+            await asyncio.sleep(0.1)
             await instance_a.publish(channel, {"type": "vote_tally", "counts": {"yes": 1}})
             received = await asyncio.wait_for(reader, timeout=5)
         assert received == {"type": "vote_tally", "counts": {"yes": 1}}
@@ -352,6 +363,10 @@ async def test_redis_pubsub_fanout_two_instances(redis_url: str) -> None:
 
 
 async def test_redis_lock_blocks_concurrent_holder(redis_url: str) -> None:
+    """Refuse a second holder while the first holder keeps the Redis lock.
+
+    The lock is free again after the release.
+    """
     import redis.asyncio as aioredis
 
     client = aioredis.from_url(redis_url)
@@ -361,8 +376,7 @@ async def test_redis_lock_blocks_concurrent_holder(redis_url: str) -> None:
         async with locker.acquire("vote:x:cast:bob") as first:
             assert first is True
             async with locker.acquire("vote:x:cast:bob") as second:
-                assert second is False  # taken while the first holder keeps the lock
-        # free again after the release
+                assert second is False
         async with locker.acquire("vote:x:cast:bob") as again:
             assert again is True
     finally:
@@ -385,7 +399,7 @@ async def test_broker_publisher_roundtrip_over_redis(redis_url: str) -> None:
         meetingId=mid,
         eligibleGroup="stupa",
         config=_CONFIG,
-        status="open",  # type: ignore[arg-type]
+        status="open",
         secret=False,
         tally=TallyOut(counts={"yes": 2, "no": 0}, eligible=5, quorumMet=False),
     )
@@ -409,9 +423,13 @@ async def test_broker_publisher_roundtrip_over_redis(redis_url: str) -> None:
 
 
 async def test_agenda_set_body_renames_freetext_top_only(session: AsyncSession) -> None:
-    """``set_body(title=...)`` renames free-text agenda items but never application ones."""
+    """``set_body(title=...)`` renames free-text agenda items but never application ones.
+
+    The body needs a live meeting; the rename alone also passes when planned. An application
+    item ignores the title, which comes from the application. With `body=None` the existing
+    body stays, but the rename still happens.
+    """
     gremium, application = await _gremium_and_application(session)
-    # The body needs a live meeting (O22). The rename alone also passes when planned.
     meeting = Meeting(gremium_id=gremium.id, title="GV", status="live")
     session.add(meeting)
     await session.flush()
@@ -429,12 +447,10 @@ async def test_agenda_set_body_renames_freetext_top_only(session: AsyncSession) 
     assert by_id[free.id].title == "Neuer Titel"
     assert by_id[free.id].body == "hello"
 
-    # Application item: set_body ignores the title, which comes from the application.
     items = await svc.set_body(meeting.id, backed.id, body="x", title="HACK")
     refreshed = await session.get(MeetingAgendaItem, backed.id)
     assert refreshed is not None and refreshed.title is None
 
-    # With body=None the existing body stays, but the rename still happens.
     items = await svc.set_body(meeting.id, free.id, title="Wieder anders")
     by_id = {i.id: i for i in items}
     assert by_id[free.id].title == "Wieder anders"
@@ -447,12 +463,16 @@ async def test_list_timeline_fuzzy_search(session: AsyncSession) -> None:
     An active query merges past and upcoming into ONE list sorted by relevance with
     offset paging. The test hits the real trigram path. A typo still matches. Meetings
     out of scope and other Gremien drop out. The match comes first.
+
+    An admin sees every Gremium. The typo "Haushaltsitzung" with one s still gives a trigram
+    match in one list. The search joins the Gremium name and therefore finds all three
+    meetings.
     """
     gremium = Gremium(name="Studierendenparlament", slug=f"g-{uuid.uuid4()}")
     session.add(gremium)
     await session.commit()
     svc = MeetingService(session)
-    principal = Principal(sub="adm", roles=["admin"])  # an admin sees every Gremium
+    principal = Principal(sub="adm", roles=["admin"])
     for title, day in (
         ("Haushaltssitzung", _date(2026, 6, 20)),
         ("Wahlausschuss", _date(2026, 1, 10)),
@@ -463,12 +483,10 @@ async def test_list_timeline_fuzzy_search(session: AsyncSession) -> None:
             principal,
         )
 
-    # The typo "Haushaltsitzung" with one s still gives a trigram match in one list.
     page = await svc.list_timeline(principal, direction="upcoming", q="Haushaltsitzung", limit=20)
     assert page.next_cursor is None
     assert [m.title for m in page.items] == ["Haushaltssitzung"]
 
-    # The search joins the Gremium name and therefore finds ALL three meetings.
     by_gremium = await svc.list_timeline(
         principal, direction="upcoming", q="Studierendenparlament", limit=20
     )

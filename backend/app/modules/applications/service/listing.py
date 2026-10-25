@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from sqlalchemy import ARRAY, ColumnElement, Text, and_, case, cast, false, func, or_, select
@@ -20,10 +20,14 @@ from app.modules.applications.service.service_base import (
     _title_of,
     state_since_subquery,
 )
+from app.modules.auth.principal import Principal
 from app.modules.budget.tree_models import Budget
 from app.modules.flow.models import State
-from app.search import dialect_of, trigram_rank
 from app.shared.paging import Page
+from app.shared.search import dialect_of, trigram_rank
+
+if TYPE_CHECKING:
+    from app.modules.flow.service import FlowService
 
 
 class ListingOps(ApplicationsServiceBase):
@@ -63,13 +67,13 @@ class ListingOps(ApplicationsServiceBase):
         holds every application. That is the full view for `application.read` and for
         admin.
 
-        `state_ids` keeps the applications in one of these states (A4). None or an
+        `state_ids` keeps the applications in one of these states. None or an
         empty list does not filter.
 
-        Each item carries `stateSince`, the time of the last status change (A9). One
+        Each item carries `stateSince`, the time of the last status change. One
         grouped subquery over `status_event` gives it for the whole page.
 
-        `hide_pii_in_search` is for a caller without the PII right (O21). The search
+        `hide_pii_in_search` is for a caller without the PII right. The search
         `q` then skips the `isPII` field values, except in the own applications
         (`created_by == owner_sub`). Without this rule the search is an oracle: a
         guessed name or IBAN would tell which readable application holds it.
@@ -82,15 +86,19 @@ class ListingOps(ApplicationsServiceBase):
         without every caller remembering to ask. `True` lists only the archived ones and
         `None` lists both. The count follows the same filter, or the total would promise
         rows the page does not contain.
+
+        An unconfirmed guest application stays invisible until the applicant confirms the email.
+        The cost-center filter covers the subtree through the `path_key` prefix; an unknown cost
+        center gives an empty list. The fuzzy search reads meaningful text only: the title and
+        the string answer values of the `data` JSONB, no ids, enums or numbers (see
+        `_search_text` for the dialects and the PII projection). An active search puts the most
+        relevant row first, and the chosen sort acts as a deterministic tiebreak. `created_to`
+        is inclusive, so the filter ends at 00:00 UTC of the next day.
         """
-        # An unconfirmed guest application stays invisible until the applicant confirms
-        # the email. An existing or logged-in application carries `email_confirmed_at`.
         filters: list[ColumnElement[bool]] = [Application.email_confirmed_at.is_not(None)]
         read_scope = await self._read_scope(owner_sub=owner_sub, committee_sub=committee_sub)
         if read_scope is not None:
             filters.append(read_scope)
-        # Archived applications leave the working list by default. `None` asks for both,
-        # which is what a search across everything wants.
         if archived is False:
             filters.append(Application.archived_at.is_(None))
         elif archived is True:
@@ -102,8 +110,6 @@ class ListingOps(ApplicationsServiceBase):
         if type_id is not None:
             filters.append(Application.type_id == type_id)
         if budget_id is not None:
-            # The filter covers the cost center and its whole subtree through the
-            # `path_key` prefix. An unknown cost center gives an empty list.
             node_path = await self.session.scalar(
                 select(Budget.path_key).where(Budget.id == budget_id)
             )
@@ -117,9 +123,6 @@ class ListingOps(ApplicationsServiceBase):
                     )
                 )
                 filters.append(Application.budget_id.in_(descendants))
-        # The fuzzy search reads meaningful text only: the title and the string answer
-        # values of the `data` JSONB. It skips ids, enums and numbers. See
-        # `_search_text` for the dialects and for the PII projection (O21).
         rank_expr: ColumnElement[Any] | None = None
         if q and q.strip():
             dialect = dialect_of(self.session)
@@ -137,12 +140,10 @@ class ListingOps(ApplicationsServiceBase):
         if created_from is not None:
             filters.append(Application.created_at >= datetime.combine(created_from, time.min, UTC))
         if created_to is not None:
-            # `created_to` is inclusive, so the filter ends at 00:00 UTC of the next day.
             end = datetime.combine(created_to + timedelta(days=1), time.min, UTC)
             filters.append(Application.created_at < end)
 
         since_sq = state_since_subquery()
-        # `stateSince` falls back to the creation time, as the items do below.
         sort_col: ColumnElement[Any] | InstrumentedAttribute[Any]
         if sort == "amount":
             sort_col = Application.amount
@@ -151,8 +152,6 @@ class ListingOps(ApplicationsServiceBase):
         else:
             sort_col = Application.created_at
         ordering = (sort_col.asc() if order == "asc" else sort_col.desc()).nulls_last()
-        # An active search puts the most relevant row first. The chosen sort then acts
-        # as a deterministic tiebreak. Without a search the order does not change.
         order_by = (rank_expr.desc(), ordering) if rank_expr is not None else (ordering,)
 
         total = await self.session.scalar(
@@ -205,7 +204,7 @@ class ListingOps(ApplicationsServiceBase):
             clauses.extend(await self._committee_read_clauses(committee_sub))
         return or_(*clauses) if clauses else None
 
-    async def read_scope_for(self, principal: Any) -> ColumnElement[bool] | None:
+    async def read_scope_for(self, principal: Principal) -> ColumnElement[bool] | None:
         """Build the read scope of `principal` as one SQL clause, or None for all.
 
         This is the rule of `GET /applications` without `mine`: a principal with
@@ -242,7 +241,7 @@ class ListingOps(ApplicationsServiceBase):
 
         Postgres uses `app_search_text(data)`, the trigram index expression. The
         SQLite fallback of the unit stubs reads the whole `data` blob as text.
-        ``hidden_keys`` leaves these top-level keys out of `data` first (O21). An
+        ``hidden_keys`` leaves these top-level keys out of `data` first. An
         application with ``created_by == owner_sub`` keeps all keys, because the
         creator reads the own PII. The projection cannot use the trigram index;
         the read scope of such a caller is small.
@@ -284,6 +283,10 @@ class ListingOps(ApplicationsServiceBase):
         Both functions must cover the same paths. A listed application must also be
         openable, and an openable application must also be listed.
 
+        Path (a) first collects the root paths with a matching `view_gremium_id`, then takes
+        every application whose `budget_id` points at such a path or a descendant. Path (b) is a
+        plain filter, because the flow engine keeps the snapshot in sync with the state.
+
         Returns:
             An empty list when the principal holds no active membership. The caller
             then adds no extra scope.
@@ -295,10 +298,6 @@ class ListingOps(ApplicationsServiceBase):
             return []
         clauses: list[ColumnElement[bool]] = []
 
-        # (a) View cost centers of a member Gremium, the node or an ancestor, with the
-        #     whole subtree. First collect the root paths with a matching
-        #     `view_gremium_id`. Then take every application whose `budget_id` points
-        #     at such a path or at a descendant.
         root_paths = (
             await self.session.scalars(
                 select(Budget.path_key).where(Budget.view_gremium_id.in_(member_ids))
@@ -315,13 +314,8 @@ class ListingOps(ApplicationsServiceBase):
             )
             clauses.append(Application.budget_id.in_(scoped))
 
-        # (b) A member Gremium decides the current `vote` state. The flow engine keeps
-        #     the snapshot `vote_gremium_id` in sync with the state, so a plain filter
-        #     suffices.
         clauses.append(Application.vote_gremium_id.in_(member_ids))
 
-        # (c) Legacy: the application has a `Vote` in a meeting of a member Gremium.
-        #     This mirrors `access._committee_can_read` (c).
         from app.modules.livevote.models import Meeting
         from app.modules.voting.models import Vote
 
@@ -347,7 +341,7 @@ class ListingOps(ApplicationsServiceBase):
         gremium_names = {gid: name for gid, name in gremium_rows}
         return type_names, gremium_names
 
-    async def list_tasks(self, principal: Any) -> list[ApplicationListItem]:
+    async def list_tasks(self, principal: Principal) -> list[ApplicationListItem]:
         """List the open tasks of the principal.
 
         A task is an application that the principal can read AND act on now. The
@@ -368,7 +362,10 @@ class ListingOps(ApplicationsServiceBase):
         readable, confirmed applications that have an open vote or a manual exit
         with `requiresAction`.
 
-        Each task carries `stateSince`, the time of the last status change (A9).
+        Each task carries `stateSince`, the time of the last status change.
+
+        One grouped query computes `stateSince` for the kept tasks only. An application without
+        a status event keeps its creation time.
         """
         from app.modules.flow.service import FlowService
 
@@ -408,15 +405,13 @@ class ListingOps(ApplicationsServiceBase):
                     stateSince=app.created_at,
                 )
             )
-        # One grouped query for the kept tasks only (A9). An application without a
-        # status event keeps its creation time.
         since_by_app = await self._state_since_map(item.id for item in items)
         for item in items:
             item.state_since = since_by_app.get(item.id, item.state_since)
         return items
 
     async def _task_filters(
-        self, principal: Any, *, can_transition: bool
+        self, principal: Principal, *, can_transition: bool
     ) -> list[ColumnElement[bool]]:
         """Build the SQL pre-filter of `list_tasks`.
 
@@ -458,7 +453,7 @@ class ListingOps(ApplicationsServiceBase):
         return filters
 
     async def _casts_in_open_vote(
-        self, application_id: UUID, principal: Any, now: datetime
+        self, application_id: UUID, principal: Principal, now: datetime
     ) -> bool:
         """Tell whether an open vote of the application takes a ballot of the principal.
 
@@ -480,7 +475,7 @@ class ListingOps(ApplicationsServiceBase):
 
     @staticmethod
     async def _fires_task_transition(
-        flow: Any, app: Application, principal: Any, *, can_transition: bool
+        flow: FlowService, app: Application, principal: Principal, *, can_transition: bool
     ) -> bool:
         """Tell whether the principal may fire a manual transition with `requiresAction`.
 

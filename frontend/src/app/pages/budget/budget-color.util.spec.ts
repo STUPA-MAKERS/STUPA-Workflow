@@ -30,7 +30,9 @@ function node(id: string, color: string | null, children: BudgetTreeNode[] = [])
 }
 
 describe('resolveNodeColors', () => {
-  // root (none) → faculty (blue) → group (none) → leaf (none); root → other (none)
+  /**
+   * The tree is root (none) → faculty (blue) → group (none) → leaf (none), and root → other (none).
+   */
   const tree = [
     node('root', null, [
       node('faculty', '#0075bf', [node('group', null, [node('leaf', null)])]),
@@ -78,10 +80,11 @@ describe('shadeColor', () => {
     expect(shadeColor('#336699', 0)).toBe('#336699');
   });
 
+  /** The steps are 18 % of 255 towards white, 18 % towards 0, then 36 %. */
   it('mixes odd steps towards white and even steps towards black', () => {
-    expect(shadeColor('#000000', 1)).toBe('#2e2e2e'); // 18% of 255
-    expect(shadeColor('#ffffff', 2)).toBe('#d1d1d1'); // 18% towards 0
-    expect(shadeColor('#000000', 3)).toBe('#5c5c5c'); // 36%
+    expect(shadeColor('#000000', 1)).toBe('#2e2e2e');
+    expect(shadeColor('#ffffff', 2)).toBe('#d1d1d1');
+    expect(shadeColor('#000000', 3)).toBe('#5c5c5c');
   });
 
   it('expands a short hex and leaves anything else unchanged', () => {

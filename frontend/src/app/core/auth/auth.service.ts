@@ -20,10 +20,11 @@ import { HttpCacheService } from '@core/cache/http-cache.service';
  */
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  // Resolve `ApiClient`, and with it `HttpClient`, lazily and not in the field
-  // initializer. Otherwise the root `AuthService` pulls `HttpClient` into every
-  // component that injects it only for `can()` or `roles()`. Their specs then fail
-  // with NG0201.
+  /**
+   * Resolves `ApiClient`, and with it `HttpClient`, lazily and not in the field initializer,
+   * because otherwise the root `AuthService` pulls `HttpClient` into every component that
+   * injects it only for `can()` or `roles()`, and their specs fail with NG0201.
+   */
   private readonly injector = inject(Injector);
   private readonly location = inject(LOCATION);
   private readonly isInstalledApp = inject(IS_INSTALLED_APP);
@@ -181,6 +182,9 @@ export class AuthService {
    *
    * If the backend supplies an RP-initiated logout URL for the IdP SSO, the
    * browser follows it. Otherwise the browser goes to the home page.
+   *
+   * Cached responses are scoped to whoever asked for them, so the next person at this browser must
+   * not inherit a list they were never allowed to see.
    */
   logout(): void {
     this.api
@@ -189,8 +193,6 @@ export class AuthService {
       .subscribe((res) => {
         this._principal.set(null);
         this.principal$ = undefined;
-        // Cached responses are scoped to whoever asked for them. The next person at this
-        // browser must not inherit a list they were never allowed to see.
         this.cache.clear();
         this.location.assign(res.logout_url ?? '/');
       });

@@ -9,7 +9,7 @@ function nameOf(p: KeeperPeriod): string {
 }
 
 /**
- * The span of one period: the TOP numbers, else the times (Z3, O2).
+ * The span of one period: the TOP numbers, else the times.
  *
  * An ended period reads "TOP 1–3" (one TOP: "TOP 3"). The running period reads
  * "ab TOP 3"; a later period (a handover) also names its start time, "ab TOP 3, 18:55".
@@ -113,7 +113,6 @@ export function handoverPreview(
   const pos = currentPosition(m, agenda);
   const nowIso = now.toISOString();
   const started = m.keeperPeriods.filter((p) => p.fromAt !== null);
-  // A meeting from before the periods existed: the current minute-taker since the start.
   const periods: KeeperPeriod[] = started.length
     ? started.map((p) => ({ ...p }))
     : m.protokollantId

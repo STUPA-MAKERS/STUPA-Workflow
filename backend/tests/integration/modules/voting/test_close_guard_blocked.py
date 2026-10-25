@@ -1,4 +1,4 @@
-"""F20: a blocked result branch does not block the vote close (real Postgres).
+"""A blocked result branch does not block the vote close (real Postgres).
 
 The close stages the tally, the result, `status=closed` and `closed_at`. It stages the
 `pass` or `fail` transition in a SAVEPOINT and commits ONCE. When the guard of the
@@ -17,7 +17,6 @@ from sqlalchemy import Engine
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.modules.applications.models import Application
-from app.modules.deadlines.service import DeadlineService
 from app.modules.voting.models import Vote
 from app.modules.voting.service import VotingService
 from tests.integration.modules.voting.vote_support import (
@@ -27,6 +26,7 @@ from tests.integration.modules.voting.vote_support import (
     seed_vote_flow,
     voter,
 )
+from worker.deadlines import due_open_vote_ids
 
 pytestmark = pytest.mark.integration
 
@@ -57,8 +57,12 @@ class _CommitCounter:
 
 
 async def _assert_blocked(
-    session: AsyncSession, vote_id, app_id, voting_state, branch: str, reason: str  # noqa: ANN001
+    session: AsyncSession, vote_id, app_id, voting_state, branch: str, reason: str
 ) -> None:
+    """Assert a closed vote whose branch is blocked and audited with the reason.
+
+    The application has no status change, because the branch rolled back.
+    """
     vote = await session.get(Vote, vote_id)
     assert vote is not None
     await session.refresh(vote)
@@ -73,7 +77,6 @@ async def _assert_blocked(
     assert [e.action for e in entries] == ["vote_close", "vote_branch_blocked"]
     assert entries[1].data["branch"] == branch
     assert entries[1].data["reason"] == reason
-    # The application has no status change: the branch rolled back.
     app_actions = [e.action for e in await audit_actions(session, app_id)]
     assert "status_change" not in app_actions
 
@@ -119,11 +122,11 @@ async def test_cron_does_not_retry_a_blocked_close(session: AsyncSession) -> Non
     row.closes_at = NOW + timedelta(minutes=5)
     await session.commit()
     later = NOW + timedelta(hours=1)
-    assert vote_id in await DeadlineService(session).due_open_vote_ids(later)
+    assert vote_id in await due_open_vote_ids(session, later)
 
     out = await VotingService(session).close(vote_id, manager(), now=later)
     assert out.branch_fired is False
-    assert vote_id not in await DeadlineService(session).due_open_vote_ids(later)
+    assert vote_id not in await due_open_vote_ids(session, later)
 
 
 async def test_fired_branch_commits_once(

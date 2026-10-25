@@ -7,7 +7,7 @@ from uuid import UUID
 
 from sqlalchemy import delete, distinct, func, or_, select
 
-from app.modules.admin.gremium_roles import GremiumRoleService, _time_valid_clause
+from app.modules.admin.gremium_roles import GremiumRoleService, membership_active_clause
 from app.modules.admin.models import (
     ApplicationType,
     CdVariant,
@@ -53,6 +53,7 @@ class GremiumOps(ConfigServiceBase):
     """Gremium CRUD and the protocol recipient list."""
 
     async def list_gremien(self) -> list[GremiumOut]:
+        """List the gremien by name."""
         rows = (await self.session.scalars(select(Gremium).order_by(Gremium.name))).all()
         return [_gremium_out(r) for r in rows]
 
@@ -76,7 +77,7 @@ class GremiumOps(ConfigServiceBase):
                     func.count(distinct(GremiumMembership.principal_id)),
                 )
                 .join(PrincipalRow, PrincipalRow.id == GremiumMembership.principal_id)
-                .where(_time_valid_clause(now), PrincipalRow.active.is_(True))
+                .where(membership_active_clause(now), PrincipalRow.active.is_(True))
                 .group_by(GremiumMembership.gremium_id)
             )
         ).all()
@@ -99,6 +100,11 @@ class GremiumOps(ConfigServiceBase):
         ]
 
     async def create_gremium(self, payload: GremiumCreate, actor: str) -> GremiumOut:
+        """Create a gremium with its forced roles and its default to-do board.
+
+        Raises:
+            ConflictError: The slug exists already.
+        """
         if await self._gremium_by_slug(payload.slug) is not None:
             raise ConflictError(f"gremium slug {payload.slug!r} already exists")
         await self._require_cd_variant(payload.cd_variant_id)
@@ -115,9 +121,7 @@ class GremiumOps(ConfigServiceBase):
         )
         self.session.add(row)
         await self.session.flush()
-        # Every new gremium gets the forced roles chair and secretary.
         await GremiumRoleService(self.session).ensure_forced_roles(row.id)
-        # ... and its to-do board with the four default columns.
         await ensure_gremium_board(self.session, row.id, row.name)
         await self._audit(
             actor,
@@ -172,6 +176,17 @@ class GremiumOps(ConfigServiceBase):
     async def update_gremium(
         self, gremium_id: UUID, payload: GremiumUpdate, actor: str
     ) -> GremiumOut:
+        """Update a gremium.
+
+        ``cdVariantId`` and ``quorumPercent`` are clearable to null, so
+        ``model_fields_set`` separates "not sent" from "set to null". A change of the
+        publication flag puts the old and the new value into the audit entry, because
+        the switch publishes or hides protocols at once.
+
+        Raises:
+            NotFoundError: No gremium has this id.
+            ConflictError: The new slug exists already.
+        """
         row = await self.session.get(Gremium, gremium_id)
         if row is None:
             raise NotFoundError(f"gremium {gremium_id} not found")
@@ -181,7 +196,6 @@ class GremiumOps(ConfigServiceBase):
             row.slug = payload.slug
         if payload.name is not None:
             row.name = payload.name
-        # cdVariantId is clearable to null, so "not sent" and "set to null" differ.
         if "cd_variant_id" in payload.model_fields_set:
             await self._require_cd_variant(payload.cd_variant_id)
             row.cd_variant_id = payload.cd_variant_id
@@ -193,8 +207,6 @@ class GremiumOps(ConfigServiceBase):
             row.delegation_lead_minutes = payload.delegation_lead_minutes
         if payload.delegation_allow_external is not None:
             row.delegation_allow_external = payload.delegation_allow_external
-        # quorumPercent is clearable to NULL. model_fields_set separates the case
-        # "not sent" from the case "set to null".
         if "quorum_percent" in payload.model_fields_set:
             row.quorum_percent = payload.quorum_percent
         data: dict[str, object] | None = None
@@ -202,8 +214,6 @@ class GremiumOps(ConfigServiceBase):
             payload.protocols_public is not None
             and payload.protocols_public != bool(row.protocols_public)
         ):
-            # The audit entry names the old and the new value of the publication
-            # flag, because the switch publishes or hides protocols at once.
             data = {
                 "field": "protocolsPublic",
                 "old": bool(row.protocols_public),
@@ -223,9 +233,25 @@ class GremiumOps(ConfigServiceBase):
         ``write_delete``). A meeting with an open vote refuses the delete, a final
         protocol needs ``meeting.delete_finalized``, and every vote of the meeting
         goes with a ``vote_delete`` audit entry. A vote of the gremium without a
-        meeting stays (user decision 2026-10-11), because it records a decision,
+        meeting stays, because it records a decision,
         for example the vote of an application. An open one refuses the delete.
         One refusal stops the whole delete, and nothing changes.
+
+        A pre-check refuses a gremium that still holds applications, directly or
+        through one of its types, because ``application.type_id`` is RESTRICT and
+        ``application.gremium_id`` has no ON DELETE: the delete would break an FK and
+        end in a 500. A type can move to another gremium, so both ways count. The
+        pre-check runs first, so no audit entry is written for a doomed delete. A
+        gremium that decides a running vote (``application.vote_gremium_id``) is
+        refused too, because the application would stay in its vote state without a
+        deciding gremium.
+
+        The to-do comment file rows are locked before the first audit entry, because
+        ``finalize_scan`` of an infected file locks its row first and then waits for
+        the lock of the audit chain. The board cascade deletes those rows but not
+        their objects, which can hold personal data, so the rows go first with an
+        audit entry each. The objects go only after the commit, because a failed
+        commit brings the rows back and a row without its object is a broken file.
 
         The delete locks the gremium row first. A concurrent insert of a meeting
         (or a vote of one) takes a key-share lock on that row through its foreign
@@ -250,12 +276,6 @@ class GremiumOps(ConfigServiceBase):
         )
         if row is None:
             raise NotFoundError(f"gremium {gremium_id} not found")
-        # application_type.gremium_id cascades, but application.type_id is RESTRICT,
-        # and application.gremium_id has no ON DELETE. A type can move to another
-        # gremium, so an application can name this gremium while its type does not.
-        # A delete of a gremium that still holds applications by either way breaks an
-        # FK and ends in a 500. This pre-check returns 409 instead, so no audit entry
-        # is written for a doomed delete.
         from app.modules.applications.models import Application
 
         in_use = await self.session.scalar(
@@ -271,8 +291,6 @@ class GremiumOps(ConfigServiceBase):
         )
         if in_use is not None:
             raise ConflictError("gremium has existing applications and cannot be deleted")
-        # The Gremium decides a running vote (`application.vote_gremium_id`). A delete
-        # would leave the application in its vote state without a deciding Gremium.
         deciding = await self.session.scalar(
             select(Application.id).where(Application.vote_gremium_id == gremium_id).limit(1)
         )
@@ -283,16 +301,9 @@ class GremiumOps(ConfigServiceBase):
                 code="gremium_decides_vote",
             )
         comment_ids = await self._lock_gremium_todos(gremium_id)
-        # The file rows are locked before the first audit entry of the vote delete,
-        # because ``finalize_scan`` of an infected file locks its row first and then
-        # waits for the lock of the audit chain (``FilesService.lock_for_messages``).
         files = FilesService(self.session, storage=self.storage)
         await files.lock_for_messages("todo_comment", comment_ids)
         await self._delete_gremium_votes(gremium_id, principal)
-        # The board cascade deletes the attachment rows of the to-do comments, but not
-        # their objects, which can hold personal data. The rows go first, with an
-        # audit entry each. The objects go only after the commit, because a failed
-        # commit brings the rows back, and a row without its object is a broken file.
         storage_keys = await files.drop_for_messages(
             "todo_comment", comment_ids, actor=principal.sub
         )
@@ -338,8 +349,11 @@ class GremiumOps(ConfigServiceBase):
         advisory lock of the audit chain until the commit, and a vote cancel or
         close locks its vote first and audits after it. A row lock after the first
         audit entry could therefore close a deadlock cycle.
+
+        The vote lock also holds the votes without a meeting, so an open one refuses
+        the delete. Those votes stay; only the votes of the meetings go. The imports
+        are local, because livevote and voting import the admin models.
         """
-        # Local imports: livevote and voting import the admin models.
         from app.modules.livevote.models import Meeting
         from app.modules.livevote.service import MeetingService
         from app.modules.voting.service import VotingService
@@ -359,10 +373,7 @@ class GremiumOps(ConfigServiceBase):
             meeting.id: await meeting_service.check_deletable(meeting, principal)
             for meeting in meetings
         }
-        # The lock also holds the votes without a meeting, so that an open one refuses
-        # the delete. These votes stay: only the votes of the meetings go.
         votes = await voting.lock_for_gremium_delete(gremium_id, list(finalized))
-        # The locks are all taken: from here on, only deletes and audit entries.
         for meeting in meetings:
             deleted = await voting.delete_locked_votes(
                 [vote for vote in votes if vote.meeting_id == meeting.id],

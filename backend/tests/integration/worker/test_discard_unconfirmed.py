@@ -1,9 +1,9 @@
-"""The worker discards unconfirmed applications after `confirm_ttl_hours` (Z1, F23).
+"""The worker discards unconfirmed applications after `confirm_ttl_hours`.
 
 * The window comes from `guest_application_settings` on every run. A shorter value
   applies to the applications that already wait.
 * The discard covers every unconfirmed application, also one that a logged-in person
-  submitted for another email address (F23), not only `created_by IS NULL`.
+  submitted for another email address, not only `created_by IS NULL`.
 * It deletes the rows, removes the storage objects of the attachments and writes one
   `guest_application_discard` audit entry per application, without PII.
 """
@@ -129,6 +129,11 @@ async def _discards(maker: async_sessionmaker[AsyncSession]) -> list[AuditEntry]
 async def test_discard_covers_every_unconfirmed_application(
     maker: async_sessionmaker[AsyncSession], settings: Settings
 ) -> None:
+    """Discard every unconfirmed application.
+
+    A quarantined attachment has no object left. No PII reaches the log: neither the email
+    nor a field value. A second run finds nothing.
+    """
     seed = await seed_guest_flow(maker)
     old_guest = await create_guest_application(maker, seed)
     fresh_guest = await create_guest_application(maker, seed)
@@ -140,7 +145,7 @@ async def test_discard_covers_every_unconfirmed_application(
         await _age(maker, app_id, hours=13)
     await _age(maker, fresh_guest, hours=11)
     await _attach(maker, old_guest, "obj/old-guest")
-    await _attach(maker, old_guest, None)  # quarantined: no object left
+    await _attach(maker, old_guest, None)
     await _attach(maker, foreign, "obj/foreign")
 
     storage = _Storage()
@@ -166,11 +171,9 @@ async def test_discard_covers_every_unconfirmed_application(
     for entry in entries:
         assert entry.actor == "system:deadlines"
         assert entry.target_type == "application"
-        # No PII: neither the email nor a field value reaches the log.
         text = repr(entry.data)
         assert "@" not in text and "Gastantrag" not in text
 
-    # A second run finds nothing.
     assert await wd._discard_unconfirmed(ctx, datetime.now(UTC), settings) == 0
     assert len(await _discards(maker)) == 2
 

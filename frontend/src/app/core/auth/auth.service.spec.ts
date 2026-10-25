@@ -49,9 +49,10 @@ describe('AuthService', () => {
     http.verify();
   });
 
+  /** The load is memoized, so there is only one HTTP call. */
   it('loads the principal once and exposes permission checks', () => {
     auth.ensureLoaded().subscribe();
-    auth.ensureLoaded().subscribe(); // Memoized, so only one HTTP call.
+    auth.ensureLoaded().subscribe();
     http.expectOne('/api/auth/me').flush(PRINCIPAL);
 
     expect(auth.isAuthenticated()).toBe(true);
@@ -195,8 +196,12 @@ describe('AuthService', () => {
     expect(auth.canInAnyGremium('protocol.finalize')).toBe(true);
   });
 
+  /**
+   * Without a principal every derived signal uses its empty or false fallback, and a report marks
+   * nothing. With a principal that lacks the optional fields the fallbacks still apply. A report of
+   * this session opens the tab at once; a second report changes nothing.
+   */
   it('defaults the derived signals when the principal omits them / is anonymous', () => {
-    // Anonymous. Every derived signal uses its empty or false fallback.
     expect(auth.userId()).toBeNull();
     expect(auth.gremien()).toEqual([]);
     expect(auth.roles()).toEqual([]);
@@ -205,19 +210,16 @@ describe('AuthService', () => {
     expect(auth.hasScopedBudgetView()).toBe(false);
     expect(auth.inSubstitutePool()).toBe(false);
     expect(auth.hasReportedTickets()).toBe(false);
-    // Without a principal a report marks nothing.
     auth.markReportedTicket();
     expect(auth.hasReportedTickets()).toBe(false);
 
     auth.ensureLoaded().subscribe();
-    // Authenticated, but the optional fields are absent. The fallbacks still apply.
     http.expectOne('/api/auth/me').flush(PRINCIPAL);
     expect(auth.gremien()).toEqual([]);
     expect(auth.sessionManageGremien()).toEqual([]);
     expect(auth.hasScopedBudgetView()).toBe(false);
     expect(auth.inSubstitutePool()).toBe(false);
     expect(auth.hasReportedTickets()).toBe(false);
-    // A report of this session opens the tab at once; a second report changes nothing.
     auth.markReportedTicket();
     expect(auth.hasReportedTickets()).toBe(true);
     const marked = auth.principal();
@@ -247,15 +249,16 @@ describe('AuthService', () => {
     expect(authed).toBe(false);
   });
 
+  /** An empty permission list makes canAny true, so any session passes. */
   it('grants admins every permission via can()/canAny()', () => {
     auth.ensureLoaded().subscribe();
     http.expectOne('/api/auth/me').flush({ ...PRINCIPAL, roles: ['admin'], permissions: [] });
     expect(auth.can('anything.at.all')).toBe(true);
     expect(auth.canAny('whatever')).toBe(true);
-    // An empty permission list makes canAny true. Any session passes.
     expect(auth.canAny()).toBe(true);
   });
 
+  /** Logout resets the cached principal$, so a new ensureLoaded calls /me again. */
   it('re-loads the principal after logout clears the memoised observable', () => {
     auth.ensureLoaded().subscribe();
     http.expectOne('/api/auth/me').flush(PRINCIPAL);
@@ -263,7 +266,6 @@ describe('AuthService', () => {
     auth.logout();
     http.expectOne('/api/auth/logout').flush({ logout_url: null });
 
-    // Logout reset the cached principal$. A new ensureLoaded calls /me again.
     auth.ensureLoaded().subscribe();
     http.expectOne('/api/auth/me').flush(PRINCIPAL);
     expect(auth.isAuthenticated()).toBe(true);

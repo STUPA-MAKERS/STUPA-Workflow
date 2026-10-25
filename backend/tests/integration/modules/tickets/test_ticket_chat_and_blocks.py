@@ -93,12 +93,14 @@ async def _by_number(maker: async_sessionmaker[AsyncSession], number: str) -> Ti
         return await session.scalar(select(Ticket).where(Ticket.number == int(number[2:])))
 
 
-# -- note files ------------------------------------------------------------------
-
-
 async def test_a_note_binds_its_files_and_a_manager_downloads_them(
     api: Api, maker: async_sessionmaker[AsyncSession], settings: Settings
 ) -> None:
+    """Bind the files of a note for a manager download.
+
+    The application delete route never reaches a message file, and without ``ticket.manage``
+    the file does not exist.
+    """
     await add_principal(maker, sub=MANAGER.sub, email=MANAGER.email, name="Mia")
     ticket_id = await _ticket(maker, email="x@example.org")
     storage = MemoryStorage()
@@ -126,10 +128,8 @@ async def test_a_note_binds_its_files_and_a_manager_downloads_them(
         down = client.get(f"/api/attachments/{clean}/download")
         assert down.status_code == 200 and down.content == b"%PDF-1.4\n"
         assert client.get(f"/api/attachments/{pending}/download").status_code == 409
-        # The application delete route never reaches a message file.
         assert client.delete(f"/api/attachments/{clean}").status_code == 404
 
-        # Without ticket.manage the file does not exist.
         api.login(PLAIN)
         for path in (f"/api/attachments/{clean}", f"/api/attachments/{clean}/download"):
             resp = client.get(path)
@@ -215,6 +215,10 @@ async def test_a_note_rejects_foreign_drafts_and_files_on_an_anonymized_ticket(
 async def test_removing_a_note_or_a_ticket_removes_the_note_files(
     api: Api, maker: async_sessionmaker[AsyncSession], settings: Settings
 ) -> None:
+    """Remove the note files with the note or the ticket.
+
+    A note marked deleted hides its remaining files.
+    """
     await add_principal(maker, sub=MANAGER.sub, email=MANAGER.email, name="Mia")
     ticket_id = await _ticket(maker, email="x@example.org")
     storage = MemoryStorage()
@@ -234,7 +238,6 @@ async def test_removing_a_note_or_a_ticket_removes_the_note_files(
     async with maker() as session:
         assert await session.get(Attachment, first) is None
         assert await session.get(Attachment, second) is not None
-        # A note marked deleted hides its remaining files.
         await session.execute(
             update(TicketNote)
             .where(TicketNote.id == uuid.UUID(notes[1]))
@@ -245,19 +248,22 @@ async def test_removing_a_note_or_a_ticket_removes_the_note_files(
     with TestClient(api.app) as client:
         assert client.get(f"/api/attachments/{second}").status_code == 404
     async with maker() as session:
-        files = FilesService(session, storage=storage, settings=settings)  # pyright: ignore[reportArgumentType]
+        files = FilesService(session, storage=storage, settings=settings)
         await files.delete_for_ticket(ticket_id, actor="test")
         await session.commit()
         assert await session.get(Attachment, second) is None
     assert f"drafts/{second}/b.pdf" not in storage.blobs
 
 
-# -- sender blocks ---------------------------------------------------------------
-
-
 async def test_a_blocked_account_reports_into_the_void(
     api: Api, maker: async_sessionmaker[AsyncSession]
 ) -> None:
+    """Hold back the reports of a blocked account.
+
+    A second block changes nothing. A signed-out report with the account address in another
+    case is held back too. The held-back reports used numbers, so the next real one follows
+    them.
+    """
     await add_principal(maker, sub=MANAGER.sub, email=MANAGER.email, name="Mia")
     pid = await add_principal(maker, sub=PLAIN.sub, email="Pia@Example.org", name="Pia")
     ticket_id = await _ticket(maker, reporter=pid)
@@ -266,14 +272,12 @@ async def test_a_blocked_account_reports_into_the_void(
         blocked = client.post(f"/api/tickets/{ticket_id}/block-sender")
         assert blocked.status_code == 200, blocked.text
         assert blocked.json()["senderBlocked"] is True
-        # A second block changes nothing.
         assert client.post(f"/api/tickets/{ticket_id}/block-sender").status_code == 200
 
         api.login(PLAIN)
         first = client.post("/api/tickets", json=_REPORT)
         assert first.status_code == 201, first.text
         assert set(first.json()) == {"number"}
-        # Signed out with the account's address, in another case: held back too.
         api.login(None)
         second = client.post("/api/tickets", json={**_REPORT, "email": "PIA@example.org"})
         assert second.status_code == 201
@@ -295,7 +299,6 @@ async def test_a_blocked_account_reports_into_the_void(
         api.login(PLAIN)
         third = client.post("/api/tickets", json=_REPORT)
         assert third.status_code == 201
-    # The held-back reports used numbers, so the next real one follows them.
     numbers = [int(r.json()["number"][2:]) for r in (first, second, third)]
     assert numbers == sorted(numbers) and len(set(numbers)) == 3
     stored = await _by_number(maker, third.json()["number"])
@@ -306,6 +309,10 @@ async def test_a_blocked_account_reports_into_the_void(
 async def test_a_blocked_address_also_holds_back_its_account(
     api: Api, maker: async_sessionmaker[AsyncSession]
 ) -> None:
+    """Hold back the reports of the account of a blocked address.
+
+    Another address still reports.
+    """
     await add_principal(maker, sub=PLAIN.sub, email="gast@example.org")
     ticket_id = await _ticket(maker, email="Gast@Example.org")
     with TestClient(api.app) as client:
@@ -322,7 +329,6 @@ async def test_a_blocked_address_also_holds_back_its_account(
         )
         api.login(PLAIN)
         assert client.post("/api/tickets", json=_REPORT).status_code == 201
-        # Another address still reports.
         api.login(None)
         other = client.post("/api/tickets", json={**_REPORT, "email": "else@example.org"})
         assert other.status_code == 201
@@ -330,13 +336,18 @@ async def test_a_blocked_address_also_holds_back_its_account(
     async with maker() as session:
         count = await session.scalar(select(func.count()).select_from(Ticket))
         hits = await session.scalar(select(TicketSenderBlock.hit_count))
-    assert count == 2  # the source ticket and the other report
+    assert count == 2
     assert hits == 2
 
 
 async def test_a_block_of_the_other_identity_shows_and_lifts_on_the_ticket(
     api: Api, maker: async_sessionmaker[AsyncSession]
 ) -> None:
+    """Show and lift a block of the other identity on the ticket.
+
+    The e-mail block swallows the reports of the account, so the account ticket shows the
+    sender as blocked, and an account block shows and lifts on the e-mail ticket.
+    """
     await add_principal(maker, sub=MANAGER.sub, email=MANAGER.email, name="Mia")
     pid = await add_principal(maker, sub=PLAIN.sub, email="Ada@Example.org")
     by_mail = await _ticket(maker, email="ada@example.org")
@@ -344,15 +355,12 @@ async def test_a_block_of_the_other_identity_shows_and_lifts_on_the_ticket(
     with TestClient(api.app) as client:
         api.login(MANAGER)
         assert client.post(f"/api/tickets/{by_mail}/block-sender").status_code == 200
-        # The e-mail block swallows the reports of the account, so the account ticket
-        # shows the sender as blocked.
         assert client.get(f"/api/tickets/{by_account}").json()["senderBlocked"] is True
         lifted = client.delete(f"/api/tickets/{by_account}/block-sender")
         assert lifted.status_code == 200 and lifted.json()["senderBlocked"] is False
         assert client.get("/api/tickets/blocked-senders").json() == []
         assert client.get(f"/api/tickets/{by_mail}").json()["senderBlocked"] is False
 
-        # The other way round: an account block shows and lifts on the e-mail ticket.
         assert client.post(f"/api/tickets/{by_account}/block-sender").status_code == 200
         assert client.get(f"/api/tickets/{by_mail}").json()["senderBlocked"] is True
         assert client.delete(f"/api/tickets/{by_mail}/block-sender").status_code == 200

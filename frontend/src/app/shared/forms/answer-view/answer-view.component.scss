@@ -1,5 +1,3 @@
-/* The grid follows the width of the view, not of the window: the detail sheet is
-   narrower than the viewport beside the list. */
 :host {
   display: flex;
   flex-direction: column;
@@ -19,9 +17,6 @@
   padding: 0 var(--space-1);
 }
 
-/* Two short fields side by side, as on the boards. Inside the row the cells have no
-   surface of their own. The cells align at the top, so both labels stay on one line
-   when one value wraps. */
 .av__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

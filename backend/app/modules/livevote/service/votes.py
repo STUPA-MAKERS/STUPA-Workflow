@@ -10,7 +10,7 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.orm import aliased
 
-from app.modules.admin.gremium_roles import _time_valid_clause
+from app.modules.admin.gremium_roles import membership_active_clause
 from app.modules.admin.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.applications.decision import DecisionIn
 from app.modules.auth.models import Principal as PrincipalRow
@@ -39,6 +39,26 @@ class VoteReadOps(MeetingServiceBase):
 
         With a `principal` each vote carries `myBallot` and `representedCast` for that
         caller. Without one (a broadcast) both stay empty.
+
+        Rebuild the counts, the leading option and the failed reason per vote from the
+        ballots. This is the reload path; the live WebSocket path already carries these
+        values. One batched query keeps this free of N+1. An election counts ballots and
+        candidates (`tally_election`), a poll only counts (`tally_poll`).
+
+        A vote with guests expects the ballots of the admitted guests too, and counts the
+        guests who voted and left since then. A closed vote shows the attendance fixed at
+        the close; a cancelled vote and an older closed vote have none.
+
+        The substitute ballots of absent delegators per meeting and gremium top up the
+        reveal denominator. The voting service applies the same rule in
+        `open_tally_revealed`, so the two paths cannot drift. The query runs only when an
+        open, non-secret vote exists, because only then does the denominator feed a reveal
+        decision.
+
+        The reveal rule matches the voting service. A closed vote reveals. A non-secret vote
+        reveals when all expected ballots are in: the present members plus the substitutes
+        of absent delegators. In every other case the counts and the leading option stay
+        hidden, to prevent an interim leak.
         """
         if not meeting_ids:
             return {}
@@ -51,17 +71,11 @@ class VoteReadOps(MeetingServiceBase):
             .scalars()
             .all()
         )
-        # Rebuild the counts, the leading option, and the failed reason per vote from
-        # the ballots. This is the reload path. The live WebSocket path already carries
-        # these values. One batched query keeps this free of N+1.
         tallies = await self._vote_tallies(rows)
-        # F2: an election counts ballots and candidates (`tally_election`).
         elections = await self._election_tallies([v for v in rows if is_election(v)])
-        # A poll only counts (`tally_poll`).
         polls = await self._poll_tallies([v for v in rows if is_poll(v)])
         present_by_meeting = await self._present_by_meeting(meeting_ids)
         guests_by_meeting = await self.admitted_guests_by_meeting(meeting_ids)
-        # #17: a vote with guests counts the guests who voted and left since then too.
         guest_votes = [
             v.id
             for v in rows
@@ -69,20 +83,13 @@ class VoteReadOps(MeetingServiceBase):
             and bool((v.config if isinstance(v.config, dict) else {}).get("guestsVote"))
         ]
         late_guests = await self._departed_guest_voters(guest_votes) if guest_votes else {}
-        # The substitute ballots of absent delegators per meeting and gremium top up
-        # the reveal denominator. The voting service applies the same rule in
-        # `open_tally_revealed`, so the two paths cannot drift. The query runs only
-        # when an open, non-secret vote exists. Only then does the denominator feed a
-        # reveal decision. A closed or secret vote never reveals through it.
         needs_deleg = any(
             v.meeting_id is not None
             and v.status not in ("closed", "cancelled")
             and not bool((v.config if isinstance(v.config, dict) else {}).get("secret"))
             for v in rows
         )
-        absent_deleg = (
-            await self._absent_delegated_by_meeting(meeting_ids) if needs_deleg else {}
-        )
+        absent_deleg = await self._absent_delegated_by_meeting(meeting_ids) if needs_deleg else {}
         own: dict[UUID, MyBallot] = {}
         represented: set[UUID] = set()
         if principal is not None and rows:
@@ -106,25 +113,16 @@ class VoteReadOps(MeetingServiceBase):
             members: int | None
             guests: int | None
             if v.status in ("closed", "cancelled"):
-                # The attendance fixed at the close (#17). A cancelled vote and an
-                # older closed vote have none.
                 members = getattr(v, "present_members", None)
                 guests = getattr(v, "present_guests", None)
             else:
                 members = present_by_meeting.get(v.meeting_id, 0)
                 guests = guests_by_meeting.get(v.meeting_id, 0)
-            # A vote with guests expects the ballots of the admitted guests too, and
-            # keeps the guests who voted and left since then.
             present = present_by_meeting.get(v.meeting_id, 0)
             if config.guests_vote and v.status not in ("closed", "cancelled"):
                 extra = late_guests.get(v.id, 0)
                 guests = (guests or 0) + extra
                 present += guests_by_meeting.get(v.meeting_id, 0) + extra
-            # The reveal rule matches the voting service. A closed vote reveals. A
-            # non-secret vote reveals when all expected ballots are in. The expected
-            # ballots are the present members plus the substitutes of absent
-            # delegators. In every other case, hide the counts and the leading option
-            # to prevent an interim leak.
             if v.status == "closed":
                 revealed = True
             elif secret:
@@ -184,10 +182,8 @@ class VoteReadOps(MeetingServiceBase):
                 choices.setdefault(vid, []).append(choice)
         return {v.id: tally_poll(choices.get(v.id, []), poll_config(v)) for v in votes}
 
-    async def _election_tallies(
-        self, votes: Sequence[Vote]
-    ) -> dict[UUID, ElectionOutcome]:
-        """Tally the elections of the reload path (F2), one query per ballot table."""
+    async def _election_tallies(self, votes: Sequence[Vote]) -> dict[UUID, ElectionOutcome]:
+        """Tally the elections of the reload path, one query per ballot table."""
         if not votes:
             return {}
         from app.modules.voting.models import SecretBallot
@@ -212,7 +208,7 @@ class VoteReadOps(MeetingServiceBase):
         }
 
     async def assert_candidates_exist(self, principal_ids: list[UUID]) -> None:
-        """Check that every account of an election candidate exists (F2).
+        """Check that every account of an election candidate exists.
 
         Raises:
             ValidationProblem: An account is unknown (``candidate_unknown``).
@@ -317,7 +313,7 @@ class VoteReadOps(MeetingServiceBase):
         return {mid: n for mid, n in rows}
 
     async def _departed_guest_voters(self, vote_ids: list[UUID]) -> dict[UUID, int]:
-        """Count per vote the guests with a ballot who are no longer admitted (#17)."""
+        """Count per vote the guests with a ballot who are no longer admitted."""
         from app.modules.voting.service import GUEST_VOTER_PREFIX
 
         admitted = {
@@ -346,7 +342,7 @@ class VoteReadOps(MeetingServiceBase):
         return {vid: len(subs - admitted) for vid, subs in voters.items()}
 
     async def admitted_guests_by_meeting(self, meeting_ids: list[UUID]) -> dict[UUID, int]:
-        """Return `{meeting_id: number of admitted guests}` (#17)."""
+        """Return `{meeting_id: number of admitted guests}`."""
         if not meeting_ids:
             return {}
         rows = (
@@ -510,7 +506,7 @@ class VoteReadOps(MeetingServiceBase):
         ).scalar_one_or_none()
 
     async def present_member_count(self, meeting_id: UUID) -> int:
-        """Return the present members of the meeting (#17: the base of a guest vote)."""
+        """Return the present members of the meeting (the base of a guest vote)."""
         return (await self._present_by_meeting([meeting_id])).get(meeting_id, 0)
 
     async def vote_eligible_count(self, gremium_id: UUID) -> int:
@@ -522,7 +518,7 @@ class VoteReadOps(MeetingServiceBase):
                 .join(GremiumRole, GremiumRole.id == GremiumMembership.gremium_role_id)
                 .where(
                     GremiumMembership.gremium_id == gremium_id,
-                    _time_valid_clause(now),
+                    membership_active_clause(now),
                 )
             )
         ).all()

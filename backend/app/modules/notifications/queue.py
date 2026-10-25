@@ -18,27 +18,34 @@ logger = logging.getLogger("app.mail")
 
 MAIL_TASK_NAME = "send_mail"
 
-# Cap on the in-memory dedup cache of `DirectMailQueue`. The cache drops the
-# oldest keys first (LRU). Production dedups through the arq `_job_id`, not
-# through this cache.
+#: Cap of the in-memory dedup cache of ``DirectMailQueue`` (LRU). Production dedups
+#: through the arq ``_job_id``, not through this cache.
 DIRECT_QUEUE_SEEN_MAX = 4096
 
 
 class MailQueue(Protocol):
     """Enqueue interface used by the service."""
 
-    async def enqueue(self, msg: MailMessage) -> None: ...
+    async def enqueue(self, msg: MailMessage) -> None:
+        """Enqueue one mail."""
+        ...
 
 
 @dataclass(slots=True)
 class ArqMailQueue:
-    """arq-backed queue: `send_mail` job with an idempotent job id."""
+    """arq-backed queue: `send_mail` job with an idempotent job id.
 
-    pool: object  # arq.ArqRedis, loosely typed to keep arq out of the API surface
+    ``pool`` is an ``arq.ArqRedis``, typed loosely to keep arq out of the API surface.
+    """
+
+    pool: object
 
     async def enqueue(self, msg: MailMessage) -> None:
-        # The `_job_id` is the idempotency key. arq drops an already-present job
-        # id and returns None, so there is no double send.
+        """Enqueue a ``send_mail`` job keyed by the idempotency key.
+
+        arq drops a job whose id is already present and returns None, so there is no
+        double send.
+        """
         job = await self.pool.enqueue_job(  # type: ignore[attr-defined]
             MAIL_TASK_NAME, msg.to_payload(), _job_id=msg.idempotency_key or None
         )
@@ -59,6 +66,7 @@ class DirectMailQueue:
     _seen: OrderedDict[str, None] = field(default_factory=OrderedDict)
 
     async def enqueue(self, msg: MailMessage) -> None:
+        """Send the mail at once unless its key was already seen."""
         key = msg.idempotency_key
         if key and key in self._seen:
             self._seen.move_to_end(key)

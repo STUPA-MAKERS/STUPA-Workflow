@@ -33,7 +33,7 @@ import { dayMonth, daysUntil } from '@shared/date-format';
 import { formatMoney } from '@shared/format-money';
 
 /**
- * The detail of an invoice (boards Fin-Rechnungen, Fin-Schmal-Rechnung, Fin-Tel-Rechnung):
+ * The detail of an invoice:
  * "Rechnung · <Nummer>", the supplier, "Status · fällig … · in n Tagen · Brutto", the
  * actions "Als bezahlt markieren" and "Buchung anlegen", then the receipt, the amounts
  * (net, VAT with its rate, gross), the data and the bookings with the booked share.
@@ -156,9 +156,8 @@ export class InvoiceDetailComponent {
     return signedEur(b.kind, b.amount, this.i18n.formatLocale());
   }
 
+  /** Only the date part counts, because a `createdAt` keeps the day the server wrote. */
   day(iso: string | null): string {
-    // Only the date part counts (a `createdAt` keeps the day the server wrote), as in the
-    // month groups.
     return dayMonth(iso?.slice(0, 10), this.i18n.formatLocale());
   }
 

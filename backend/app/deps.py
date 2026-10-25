@@ -78,6 +78,9 @@ async def _principal_from_access_token(
 
     Returns:
         The scoped principal, or `None` when the token is invalid or expired.
+
+    The kill switch re-checks ``mcp.use`` against the UNSCOPED permission set (before the
+    scope cap), because revoking ``mcp.use`` must invalidate the tokens already issued.
     """
     resolved = await oauth_service.resolve_access_token(db, token=token, now=now)
     if resolved is None:
@@ -89,8 +92,6 @@ async def _principal_from_access_token(
     if row is None or row.active is False:
         return None
     principal = await rbac.resolve_principal(db, row, now)
-    # Kill switch: revoking `mcp.use` must invalidate already-issued tokens, so
-    # re-check against the UNSCOPED permission set (before scope capping).
     if not principal.has("mcp.use"):
         return None
     principal.scope_permissions = oauth.scope_permissions(oauth.parse_scope(scope))
@@ -109,6 +110,9 @@ async def get_current_principal(
 
     Returns:
         The resolved principal, or `None` when no credential is valid.
+
+    A long session checks the account at the IdP from time to time. The check can end the
+    session and can change the groups and memberships of the row.
     """
     now = datetime.now(UTC)
     bearer = _principal_bearer_token(request)
@@ -133,8 +137,6 @@ async def get_current_principal(
     ).scalar_one_or_none()
     if row is None or row.active is False:
         return None
-    # A long session checks the account at the IdP from time to time. The check can
-    # end the session, and it can change the groups and memberships of the row.
     if not await renew_principal_session(
         db, settings, session=session, principal=row, now=now
     ):
@@ -155,6 +157,10 @@ async def get_current_applicant(
     in `applicant_session`. Access needs a row that exists, is not revoked and is not
     expired. A token forged from `SESSION_SECRET` alone matches no row and gives
     `None`.
+
+    An applicant session has no fixed scope: each action checks the current state, and the
+    edit service answers 409 in a locked state. So a ``view`` session from before that rule
+    also acts as ``edit``.
     """
     token = _bearer_token(request, settings)
     if not token:
@@ -168,9 +174,6 @@ async def get_current_applicant(
     )
     if row is None or row.scope not in ("edit", "view"):
         return None
-    # An applicant session has no fixed scope (O4, F5). Each action checks the
-    # current state, and the edit service answers 409 in a locked state. So a
-    # `view` session from before that change also acts as `edit`.
     return Applicant(application_id=str(row.application_id), scope="edit")
 
 

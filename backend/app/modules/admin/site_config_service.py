@@ -7,12 +7,16 @@ allows at most one active version. Inactive rows from the time of the draft stay
 as history and are never read as a draft.
 
 ``admin.branding.Branding`` validates the branding. A logo must be an image and
-inline SVG is not allowed. Invalid branding fails with 422.
+inline SVG is not allowed. Invalid branding fails with 422. Every write of a
+branding from a request (save, restore, revert) scans each inline logo with ClamAV
+before the store (``files.scanner.scan_or_raise``), because the stored bytes are the
+bytes of the client: an infected logo fails with 415, and a missing or failed
+scanner in production with 503.
 """
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -39,36 +43,43 @@ from app.modules.config_revision.service import (
     GLOBAL_ID,
     ConfigRevisionService,
 )
-from app.settings import get_settings
+from app.modules.files.scanner import scan_or_raise
+from app.settings import Settings, get_settings
 
-# Fallback app names for the case where the config leaves them empty. They match the
-# defaults in ``frontend/public/manifest.webmanifest``.
+#: Fallback app names for the case where the config leaves them empty. They match the
+#: defaults in ``frontend/public/manifest.webmanifest``.
 DEFAULT_APP_NAME = "STUPA Antragsplattform"
 DEFAULT_APP_SHORT_NAME = "STUPA"
 
-# The manifest colour per theme: the surface of the bottom bar (``--color-surface-3`` of
-# the ui-kit tokens). Chrome cannot draw an installed Android app under the system
-# navigation bar and paints that bar with a manifest colour, ``theme_color`` or
-# ``background_color`` depending on the version. Both take the bottom bar surface, so the
-# two bars meet without a seam in every version; the splash screen shows the same colour.
-# The status bar follows the ``theme-color`` meta tag of the page (frontend ThemeService),
-# so it keeps the page background. The manifest has no per-scheme variant, so the
-# frontend links ``?scheme=dark`` while the dark theme is in effect.
+#: The manifest colour per theme: the surface of the bottom bar (``--color-surface-3`` of
+#: the ui-kit tokens). Chrome cannot draw an installed Android app under the system
+#: navigation bar and paints that bar with a manifest colour, ``theme_color`` or
+#: ``background_color`` depending on the version. Both take the bottom bar surface, so the
+#: two bars meet without a seam in every version; the splash screen shows the same colour.
+#: The status bar follows the ``theme-color`` meta tag of the page (frontend ThemeService),
+#: so it keeps the page background. The manifest has no per-scheme variant, so the
+#: frontend links ``?scheme=dark`` while the dark theme is in effect.
 MANIFEST_COLORS: dict[str, str] = {"light": "#e6e9e5", "dark": "#262a27"}
 
-# The icon of a manifest shortcut: the app icon at 96 px, the size that Android asks for.
-_SHORTCUT_ICON: dict = {"src": "icons/icon-96x96.png", "sizes": "96x96", "type": "image/png"}
+#: The icon of a manifest shortcut: the app icon at 96 px, the size that Android asks for.
+_SHORTCUT_ICON: dict[str, Any] = {
+    "src": "icons/icon-96x96.png",
+    "sizes": "96x96",
+    "type": "image/png",
+}
 
-# The static manifest fields, that is everything except name and short_name.
-# They are the single source of truth for the PWA manifest that the API serves.
-_MANIFEST_BASE: dict = {
+#: The static manifest fields, that is everything except name and short_name.
+#: They are the single source of truth for the PWA manifest that the API serves.
+#: The fixed ``id`` keeps an installed app the same app when ``start_url`` changes.
+#: The shortcut names are German like ``lang`` and equal those of
+#: ``frontend/public/manifest.webmanifest``. ``launch_handler`` opens an app link in
+#: the running app, not in a second window.
+_MANIFEST_BASE: dict[str, Any] = {
     "description": (
         "Antragsplattform des Studierendenparlaments — Anträge, Abstimmungen, "
         "Sitzungsprotokolle und Budget."
     ),
     "lang": "de",
-    # A fixed identity. Without it the browser derives the id from start_url, and a
-    # later change of start_url makes an installed app a different app.
     "id": "/",
     "display": "standalone",
     "scope": "./",
@@ -125,16 +136,11 @@ _MANIFEST_BASE: dict = {
             "purpose": "maskable",
         },
     ],
-    # The menu of a long press on the home screen icon (Android, desktop). The names are
-    # German, because the manifest is German (`lang`). Keep them equal to
-    # frontend/public/manifest.webmanifest.
     "shortcuts": [
         {"name": "Neuer Antrag", "url": "apply", "icons": [_SHORTCUT_ICON]},
         {"name": "Meine To-Dos", "url": "todos", "icons": [_SHORTCUT_ICON]},
         {"name": "Sitzungen", "url": "meetings", "icons": [_SHORTCUT_ICON]},
     ],
-    # A link into the app opens in the running app and navigates there, not in a second
-    # window. A browser without navigate-existing takes its own default.
     "launch_handler": {"client_mode": ["navigate-existing", "auto"]},
 }
 
@@ -156,10 +162,29 @@ async def active_branding(session: AsyncSession) -> Branding:
 
 
 class SiteConfigService:
-    """Site-config operations bound to an ``AsyncSession``."""
+    """Site-config operations bound to an ``AsyncSession``.
 
-    def __init__(self, session: AsyncSession) -> None:
+    Without explicit settings the logo scan reads ``get_settings()``, so the scan
+    never falls back to a skip.
+    """
+
+    def __init__(self, session: AsyncSession, *, settings: Settings | None = None) -> None:
+        """Bind the service to a session and the settings."""
         self.session = session
+        self.settings = settings
+
+    async def _scan_logos(self, branding: Branding) -> None:
+        """Scan every inline logo of the branding before the store.
+
+        Raises:
+            UnsupportedMediaTypeError: The virus scan found a signature (415).
+            ServiceUnavailableError: The virus scan is unavailable in production (503).
+        """
+        settings = self.settings or get_settings()
+        for asset in branding.logos.values():
+            data = asset.inline_bytes()
+            if data is not None:
+                await scan_or_raise(data, settings)
 
     async def _active(self) -> SiteConfigVersion | None:
         return (
@@ -197,7 +222,7 @@ class SiteConfigService:
         actor: str,
         *,
         action: AuditAction = AuditAction.CONFIG_CHANGE,
-        extra_data: dict | None = None,
+        extra_data: dict[str, Any] | None = None,
     ) -> SiteConfigOut:
         """Replay a branding config as the new active version (restore or revert).
 
@@ -207,8 +232,10 @@ class SiteConfigService:
         the values of the active version, because the "Hilfe & Tickets" page is
         their only writer: a restore of an older snapshot would otherwise bring
         back its ticket settings, or the defaults (``publicEnabled=true``) for a
-        snapshot without them.
+        snapshot without them. The inline logos pass the virus scan first
+        (``_scan_logos``).
         """
+        await self._scan_logos(branding)
         latest = await self._latest()
         base = latest.version if latest is not None else 0
         payload = _with_help_tickets_of(branding, _branding(await self._active()))
@@ -235,7 +262,7 @@ class SiteConfigService:
         The response also holds ``confirmTtlHours`` and ``linkTtlDays`` from the
         guest settings, so the wizard can tell a guest how long the confirmation
         waits and how long the link works. ``attachmentLimits`` comes from the
-        settings of the draft upload (Z4).
+        settings of the draft upload.
         """
         active = await self._active()
         guest = await load_guest_settings(self.session)
@@ -298,7 +325,7 @@ class SiteConfigService:
         await self.session.commit()
         return _help_tickets_of(branding)
 
-    async def manifest(self, scheme: Literal["light", "dark"] = "light") -> dict:
+    async def manifest(self, scheme: Literal["light", "dark"] = "light") -> dict[str, Any]:
         """Build the PWA manifest from the active branding config.
 
         ``name`` and ``short_name`` come from the config. An empty value falls
@@ -315,7 +342,7 @@ class SiteConfigService:
         }
 
 
-def _with_help_tickets_of(branding: Branding, source: Branding) -> dict:
+def _with_help_tickets_of(branding: Branding, source: Branding) -> dict[str, Any]:
     """Dump ``branding`` with ``help`` and ``tickets`` taken from ``source``."""
     return branding.model_copy(update={"help": source.help, "tickets": source.tickets}).model_dump(
         by_alias=True

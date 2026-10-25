@@ -1,7 +1,6 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  DestroyRef,
   ElementRef,
   Injector,
   afterNextRender,
@@ -49,7 +48,8 @@ import { AdminApiService } from '../admin/admin-api.service';
 import { FabComponent } from '@shared/ui/fab/fab.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { PALETTE, resolveNodeColors } from './budget-color.util';
-import { BudgetTreeApi, type BudgetTreeNode, type FiscalYear } from './budget-tree.api';
+import { BudgetTreeApi, FISCAL_YEAR_CLOSED, type BudgetTreeNode, type FiscalYear } from './budget-tree.api';
+import { problemCode } from '@core/api/problem';
 import { formatMoney } from '@shared/format-money';
 
 /** A visible tree row: a node, its depth and whether it has children. */
@@ -85,7 +85,7 @@ const MID_TABLE_MIN = 700;
 const MAX_CUTOFF_DAY = 28;
 
 /**
- * The cost centres of the admin area (boards Admin-Kostenstellen, Admin-Kostenstelle-Dialog).
+ * The cost centres of the admin area.
  *
  * A toolbar holds the budget-wide actions: the accepted and bound flow states, the
  * fiscal-year cutoff, "Haushaltsjahr anlegen" (with the list of the years to correct or
@@ -95,7 +95,7 @@ const MAX_CUTOFF_DAY = 28;
  * The table is the cost-centre tree of the picked budget: a node with children folds, the
  * name stands over its key path, the five amounts of the year follow (Zugeteilt, Gebunden,
  * Ausgegeben, Einnahmen, Verfügbar), then the colour: a node shows its own colour, the
- * colour of the nearest coloured parent in a muted look (O19), or an empty box. Each row
+ * colour of the nearest coloured parent in a muted look, or an empty box. Each row
  * edits its node, sets its allocation for the year, adds a sub cost centre (an inline row
  * at the end of its subtree) and deletes it after a confirmation.
  *
@@ -141,7 +141,6 @@ export class BudgetTreeComponent {
   private readonly toast = inject(ToastService);
   private readonly auth = inject(AuthService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
-  private readonly destroyRef = inject(DestroyRef);
   private readonly injector = inject(Injector);
 
   /** Phone: the toolbar actions go into the header menu, the rows into cards. */
@@ -152,7 +151,6 @@ export class BudgetTreeComponent {
   /** The amounts a narrow page leaves out; lines under "Verfügbar" show them. */
   readonly hidden = computed<ReadonlySet<'expended' | 'income'>>(() => {
     const w = this.width();
-    // A phone shows cards: they stack the amounts and have room for all five.
     if (this.phone() || w === 0 || w >= FULL_TABLE_MIN) return new Set();
     return w >= MID_TABLE_MIN ? new Set(['income']) : new Set(['expended', 'income']);
   });
@@ -224,6 +222,8 @@ export class BudgetTreeComponent {
   readonly fyDelete = signal<FiscalYear | null>(null);
   /** Translated reason why the delete was refused (409), else `null`. */
   readonly fyDeleteBlocked = signal<string | null>(null);
+  /** The fiscal year to close, or to reopen when it is closed. */
+  readonly fyCloseTarget = signal<FiscalYear | null>(null);
 
   readonly selectedTop = computed<BudgetTreeNode | null>(
     () => this.tree().find((n) => n.id === this.selectedTopId()) ?? null,
@@ -253,15 +253,16 @@ export class BudgetTreeComponent {
     return this.i18n.translate('budget.tree.topChip', { name: t.name, key: t.key, cutoff: this.cutoffLabel() });
   });
 
-  /** The fiscal years as segments, newest first; an inactive year says so. */
+  /** The fiscal years as segments, newest first; an inactive or a closed year says so. */
   readonly fyOptions = computed<SegmentedOption[]>(() =>
     [...this.fiscalYears()]
       .sort((a, b) => b.year - a.year)
       .map((fy) => ({
         value: fy.id,
-        label: fy.active
-          ? this.i18n.translate('budget.tree.fyChip', { year: fy.display })
-          : this.i18n.translate('budget.tree.fyChipInactive', { year: fy.display }),
+        label: this.i18n.translate(
+          fy.closedAt ? 'budget.tree.fyChipClosed' : fy.active ? 'budget.tree.fyChip' : 'budget.tree.fyChipInactive',
+          { year: fy.display },
+        ),
       })),
   );
 
@@ -302,14 +303,14 @@ export class BudgetTreeComponent {
     return id ? (this.findNode(id) ?? null) : null;
   });
 
+  /**
+   * The name column keeps a minimum width, so a narrow sheet scrolls the table sideways instead of
+   * squeezing the names and keys.
+   */
   readonly columns = computed<ColumnDef[]>(() => {
     const t = (k: TranslationKey): string => this.i18n.translate(k);
-    // The amounts get a fixed width, so the name column takes the free width.
     const money = (key: string, label: TranslationKey): ColumnDef => ({ key, label: t(label), align: 'end', width: AMOUNT_WIDTH });
     const cols: ColumnDef[] = [
-      // D6: the admin navigation stays beside the table at every width. The name column
-      // keeps a minimum width, so a narrow sheet scrolls the table sideways instead of
-      // squeezing the names and keys to a few characters.
       { key: 'node', label: t('budget.tree.col.node'), card: 'title', width: '13rem' },
       money('allocated', 'budget.tree.col.allocated'),
       money('bound', 'budget.tree.col.bound'),
@@ -320,7 +321,6 @@ export class BudgetTreeComponent {
     cols.push(
       money('available', 'budget.tree.col.available'),
       { key: 'color', label: t('budget.tree.col.color'), width: '4rem' },
-      // Only the ⋮ menu: the row itself opens the edit.
       { key: 'actions', label: t('budget.tree.col.actions'), align: 'end', width: '3.5rem', card: 'actions', sticky: 'end' },
     );
     return cols;
@@ -348,20 +348,17 @@ export class BudgetTreeComponent {
   });
   readonly fyRowId = (r: unknown): string => (r as FiscalYear).id;
 
+  /** The page is measured, because beside the admin navigation it is narrower than the viewport. */
   constructor() {
     this.reload();
-    // Measure the page: beside the admin navigation it is narrower than the viewport.
     observeElementSize(
       () => this.host.nativeElement,
       (size) => this.width.set(size.width),
     );
-    // Gremien for the visibility select in the edit dialog.
     this.adminApi.listGremienOptions().subscribe({
       next: (list) => this.gremiumOptions.set(list.map((g) => ({ value: g.id, label: g.name }))),
       error: () => this.gremiumOptions.set([]),
     });
-    // The global flow gives the state keys for the accepted/denied config. An error
-    // stays silent.
     this.adminApi.getGlobalFlow().subscribe({
       next: (graph) =>
         this.stateOptions.set(
@@ -456,7 +453,11 @@ export class BudgetTreeComponent {
             id: 'limit',
             label: t('budget.tree.setLimit'),
             icon: 'euro',
-            disabledReason: this.selectedFyId() ? null : t('budget.tree.noFy'),
+            disabledReason: !this.selectedFyId()
+              ? t('budget.tree.noFy')
+              : this.selectedFyClosed()
+                ? t('budget.fy.closedError')
+                : null,
           },
           { id: 'child', label: t('budget.tree.addChild'), icon: 'plus' },
         ],
@@ -465,8 +466,9 @@ export class BudgetTreeComponent {
     ];
   });
 
-  /** The ⋮ menu of a fiscal year. The row itself opens the edit. */
-  readonly fyMenu = computed<RowMenuSection[]>(() => [
+  /** The ⋮ menu of an open fiscal year. The row itself opens the edit. */
+  private readonly fyMenuOpen = computed<RowMenuSection[]>(() => [
+    { items: [{ id: 'close', label: this.i18n.translate('budget.tree.fyClose'), icon: 'lock' }] },
     {
       items: [
         { id: 'delete', label: this.i18n.translate('budget.tree.fyDelete'), icon: 'trash', danger: true },
@@ -474,8 +476,29 @@ export class BudgetTreeComponent {
     },
   ]);
 
+  /** The ⋮ menu of a closed fiscal year: a closed year cannot be deleted. */
+  private readonly fyMenuClosed = computed<RowMenuSection[]>(() => [
+    { items: [{ id: 'reopen', label: this.i18n.translate('budget.tree.fyReopen'), icon: 'undo' }] },
+    {
+      items: [
+        {
+          id: 'delete',
+          label: this.i18n.translate('budget.tree.fyDelete'),
+          icon: 'trash',
+          danger: true,
+          disabledReason: this.i18n.translate('budget.fy.closedError'),
+        },
+      ],
+    },
+  ]);
+
+  fyMenu(fy: FiscalYear): RowMenuSection[] {
+    return fy.closedAt ? this.fyMenuClosed() : this.fyMenuOpen();
+  }
+
   onFyMenu(fy: FiscalYear, item: RowMenuItem): void {
     if (item.id === 'delete') this.askFyDelete(fy);
+    else this.askFyClose(fy);
   }
 
   onRowMenu(node: BudgetTreeNode, item: RowMenuItem): void {
@@ -576,7 +599,7 @@ export class BudgetTreeComponent {
       target.delete(key);
     } else {
       target.add(key);
-      other.delete(key); // A state is never accepted and denied at the same time.
+      other.delete(key);
     }
     this.api
       .updateNode(top.id, { acceptedStateKeys: [...accepted], deniedStateKeys: [...denied] })
@@ -586,7 +609,7 @@ export class BudgetTreeComponent {
       });
   }
 
-  // Create a top budget.
+  /** Set a field of the new top budget. */
   patchTop<K extends 'key' | 'name'>(key: K, value: string): void {
     this.newTop.update((t) => ({ ...t, [key]: value }));
   }
@@ -654,9 +677,13 @@ export class BudgetTreeComponent {
     this.stateConfigOpen.set(false);
   }
 
-  // The inline row for a sub cost centre.
+  /**
+   * Open the inline row for a sub cost centre.
+   *
+   * The focus moves to the key field of the new row, because the row can stand far below the button
+   * and the focus scrolls it into view inside the pane.
+   */
   startAddChild(node: BudgetTreeNode): void {
-    // The row stands at the end of the subtree, so the subtree must be open.
     this.collapsed.update((set) => {
       const next = new Set(set);
       next.delete(node.id);
@@ -664,8 +691,6 @@ export class BudgetTreeComponent {
     });
     this.addingChildOf.set(node.id);
     this.childDraft.set({ key: '', name: '' });
-    // The row can stand far below the button, after a large subtree. Move the focus to
-    // its key field: the focus also scrolls the row into view inside the pane.
     afterNextRender(() => this.focusChildKey(), { injector: this.injector });
   }
 
@@ -700,7 +725,7 @@ export class BudgetTreeComponent {
       });
   }
 
-  // Delete a node after a confirmation.
+  /** Delete a node after a confirmation. */
   askDeleteNode(node: BudgetTreeNode): void {
     this.nodeDeleteBlocked.set(false);
     this.nodeDelete.set(node);
@@ -722,7 +747,6 @@ export class BudgetTreeComponent {
         this.reload();
       },
       error: (err: { status?: number }) => {
-        // 409: the node still has sub cost centres or allocations. The dialog says so.
         if (err?.status === 409) {
           this.nodeDeleteBlocked.set(true);
           return;
@@ -732,7 +756,7 @@ export class BudgetTreeComponent {
     });
   }
 
-  // The edit dialog with every setting of a node.
+  /** Open the edit dialog with every setting of a node. */
   openEditNode(node: BudgetTreeNode): void {
     this.editNode.set(node);
     this.editKey.set(node.key);
@@ -789,6 +813,7 @@ export class BudgetTreeComponent {
     this.editColor.set('');
   }
 
+  /** The deciding gremium goes out only on a change, because each sent field is audited. */
   saveEditNode(): void {
     const node = this.editNode();
     if (!node) return;
@@ -799,12 +824,10 @@ export class BudgetTreeComponent {
       .updateNode(node.id, {
         key,
         name,
-        // '' clears the own colour; the node then takes the colour of its parent.
         color: this.editColor(),
         active: this.editActive(),
         hiddenInBudget: this.editHidden(),
         viewGremiumId: this.editViewGremium() || null,
-        // Send the deciding gremium only on a change: each sent field is audited.
         ...(this.editDecisionGremium() !== (node.decisionGremiumId ?? '')
           ? { decisionGremiumId: this.editDecisionGremium() || null }
           : {}),
@@ -840,16 +863,27 @@ export class BudgetTreeComponent {
         this.limitNode.set(null);
         this.reload();
       },
-      error: () => this.toast.error(this.i18n.translate('budget.tree.toast.failed')),
+      error: (err: unknown) =>
+        this.toast.error(
+          this.i18n.translate(
+            problemCode(err) === FISCAL_YEAR_CLOSED ? 'budget.fy.closedError' : 'budget.tree.toast.failed',
+          ),
+        ),
     });
   }
 
-  /** The label of the selected fiscal year ("2026"), for the limit dialog. */
-  readonly selectedFyLabel = computed(
-    () => this.fiscalYears().find((fy) => fy.id === this.selectedFyId())?.display ?? '',
+  /** The selected fiscal year, or null. */
+  private readonly selectedFy = computed(
+    () => this.fiscalYears().find((fy) => fy.id === this.selectedFyId()) ?? null,
   );
 
-  // Fiscal years, which live inside the budget.
+  /** The label of the selected fiscal year ("2026"), for the limit dialog. */
+  readonly selectedFyLabel = computed(() => this.selectedFy()?.display ?? '');
+
+  /** Whether the selected fiscal year is closed. Its limits are then frozen. */
+  readonly selectedFyClosed = computed(() => !!this.selectedFy()?.closedAt);
+
+  /** Set the year of the new fiscal year, which lives inside the budget. */
   patchFyYear(value: string): void {
     const year = Math.trunc(Number(value)) || new Date().getFullYear();
     this.newFy.set({ year });
@@ -880,8 +914,11 @@ export class BudgetTreeComponent {
     });
   }
 
-  // Correct or remove a fiscal year. Each runs in its own dialog. The manage dialog
-  // closes first and opens again afterwards, so no two dialogs stack.
+  /**
+   * Open the dialog that corrects a fiscal year. Correct and remove each run in their own
+   * dialog. The manage dialog closes first and opens again afterwards, so no two dialogs
+   * stack.
+   */
   openFyEdit(fy: FiscalYear): void {
     this.fyOpen.set(false);
     this.fyEdit.set(fy);
@@ -910,7 +947,6 @@ export class BudgetTreeComponent {
           this.closeFyEdit();
           this.loadFiscalYears(top);
         },
-        // 422 means the year already exists in this budget. Name that reason.
         error: (err: { status?: number }) =>
           this.toast.error(
             this.i18n.translate(
@@ -918,6 +954,36 @@ export class BudgetTreeComponent {
             ),
           ),
       });
+  }
+
+  askFyClose(fy: FiscalYear): void {
+    this.fyOpen.set(false);
+    this.fyCloseTarget.set(fy);
+  }
+
+  closeFyClose(): void {
+    this.fyCloseTarget.set(null);
+    this.fyOpen.set(true);
+  }
+
+  /** Close the target year, or reopen it when it is closed. */
+  doFyClose(): void {
+    const fy = this.fyCloseTarget();
+    const top = this.selectedTopId();
+    if (!fy || !top) return;
+    const close = !fy.closedAt;
+    this.api.setFiscalYearClosed(top as Uuid, fy.id, close).subscribe({
+      next: () => {
+        this.toast.success(
+          this.i18n.translate(close ? 'budget.tree.toast.fyClosed' : 'budget.tree.toast.fyReopened', {
+            year: fy.display,
+          }),
+        );
+        this.closeFyClose();
+        this.loadFiscalYears(top);
+      },
+      error: () => this.toast.error(this.i18n.translate('budget.tree.toast.failed')),
+    });
   }
 
   askFyDelete(fy: FiscalYear): void {
@@ -943,7 +1009,6 @@ export class BudgetTreeComponent {
         this.loadFiscalYears(top);
       },
       error: (err: { status?: number; error?: { detail?: string } }) => {
-        // 409 keeps the dialog open and names the rows that still hang on the year.
         if (err?.status === 409) {
           const msg = this.i18n.translate(this.fyBlockerKey(err.error?.detail));
           this.fyDeleteBlocked.set(msg);

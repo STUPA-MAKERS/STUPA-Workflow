@@ -92,8 +92,7 @@ export interface InvoiceFormHost {
 }
 
 /**
- * The invoice form (boards Fin-Rechnung-Import, Fin-Rechnung-Bearbeiten,
- * Fin-Tel-Rechnung-Import): a new invoice, the review of an imported one, or the edit of
+ * The invoice form: a new invoice, the review of an imported one, or the edit of
  * one. It replaces the detail sheet.
  *
  * Beside the fields sits the receipt: the imported or attached PDF (with the button that
@@ -102,6 +101,9 @@ export interface InvoiceFormHost {
  * erkannt" and, when an invoice with the same number exists, warns about it with
  * "Vorhandene öffnen" (N31). Number, supplier and gross are required for a new invoice.
  * The status is a segmented control "Offen | Bezahlt".
+ *
+ * The receipt shows as one file card, not as pages, because the server sends a PDF as a download
+ * only.
  */
 @Component({
   selector: 'app-invoice-form',

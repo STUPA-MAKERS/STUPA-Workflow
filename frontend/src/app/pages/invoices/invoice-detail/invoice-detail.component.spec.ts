@@ -74,9 +74,12 @@ async function setup(inputs: Record<string, unknown> = {}) {
 const text = () => (document.body.textContent ?? '').replace(/\s+/g, ' ');
 
 describe('InvoiceDetailComponent', () => {
+  /**
+   * The title opens the sheet on the line of the actions; no line stands above it. A booking opens
+   * on the bookings page; a sub-booking opens its parent.
+   */
   it('shows the head, the receipt, the amounts with the VAT rate, the data and the bookings', async () => {
     await setup();
-    // The title opens the sheet on the line of the actions; no line stands above it.
     expect(document.querySelector('app-sheet-bar .sheet-bar__title [appSheetBarTitle]')).not.toBeNull();
     expect(document.querySelector('.sheet-bar__kicker')).toBeNull();
     expect(screen.getByRole('heading', { name: 'Radhaus Müller GmbH' })).toBeInTheDocument();
@@ -85,7 +88,6 @@ describe('InvoiceDetailComponent', () => {
     expect(text()).toContain('2.890,00 €');
     expect(screen.getByText('Anzahlung geleistet')).toBeInTheDocument();
     expect(screen.getByText('RE-2026-118.pdf')).toBeInTheDocument();
-    // A booking opens on the bookings page; a sub-booking opens its parent.
     const links = screen.getAllByRole('link');
     expect(links[0].getAttribute('href')).toBe('/expenses?id=b-1');
     expect(links[1].getAttribute('href')).toBe('/expenses?id=b-1');
@@ -106,6 +108,7 @@ describe('InvoiceDetailComponent', () => {
     expect(screen.getByRole('link', { name: 'Rechnung prüfen' }).getAttribute('href')).toBe('/todos?card=k-1');
   });
 
+  /** A paid invoice is not due. */
   it('says how the due date stands', async () => {
     const { view } = await setup({ invoice: { ...INVOICE, dueDate: inDays(1) } });
     expect(screen.getByText('morgen fällig')).toBeInTheDocument();
@@ -118,7 +121,6 @@ describe('InvoiceDetailComponent', () => {
     view.fixture.componentRef.setInput('invoice', { ...INVOICE, dueDate: inDays(-3) });
     view.fixture.detectChanges();
     expect(screen.getByText('seit 3 Tagen überfällig')).toBeInTheDocument();
-    // A paid invoice is not due.
     view.fixture.componentRef.setInput('invoice', { ...INVOICE, status: 'paid' });
     view.fixture.detectChanges();
     expect(screen.queryByText(/fällig$|Tagen$/)).toBeNull();
