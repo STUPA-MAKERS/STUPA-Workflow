@@ -23,7 +23,6 @@
   @include gremien-tab.tools;
 }
 
-/* The column labels above the rows (desktop). */
 .gmb__cols {
   display: flex;
   align-items: center;
@@ -102,7 +101,6 @@
   color: var(--color-text-muted);
   font-size: var(--fs-small);
 }
-/* An address is never cut: it wraps anywhere and stays fully readable. */
 .gmb__mail {
   flex: 0 1 15rem;
   min-width: 0;

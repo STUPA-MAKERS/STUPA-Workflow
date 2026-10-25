@@ -130,7 +130,7 @@ export class GremiumDetailComponent {
     return g?.isMember ? localized(g.roleName, this.i18n.locale(), g.roleKey ?? '') : '';
   });
 
-  /** The facts that are true, in the order of the board. */
+  /** The facts that are true, in display order. */
   readonly facts = computed<string[]>(() => {
     const g = this.gremium();
     if (!g) return [];

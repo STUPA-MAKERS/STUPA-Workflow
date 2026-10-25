@@ -1,7 +1,6 @@
 @use 'breakpoints' as bp;
 @use '../../../shared/ui/dialog-form' as df;
 
-/* The dialog host adds no box, so a closed dialog takes no gap in the page. */
 @include df.host;
 .sd-form {
   @include df.form;

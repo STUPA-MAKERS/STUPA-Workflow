@@ -1,9 +1,5 @@
 @use 'scroll-fade' as fade;
 
-/* The detail pane of the page "Abstimmungen". Side by side the vote sits on a sheet
-   (surface 1, large radius) that fills the pane, as the open application does. One pane
-   at a time it sits on the page, and the panel keeps its card (board
-   Arbeit-Abstimmungen). */
 :host {
   display: flex;
   flex: 1 1 auto;
@@ -37,13 +33,11 @@
   width: 60%;
   height: 2rem;
 }
-/* The empty sheet: the empty state fills it and centres itself. */
 .vc--empty.vc--sheet {
   padding-top: var(--space-6);
 }
 
 
-/* The vote below the bar: the reconnect line and the panel, in the rhythm of the sheet. */
 .vc__body {
   display: flex;
   flex-direction: column;
@@ -51,9 +45,8 @@
   min-width: 0;
 }
 
-/* Side by side the sheet is as high as the pane, and the vote scrolls inside it. The
-   padding of the sheet moves into the scroll area, so the scroll area does not cut a
-   focus ring at its sides. */
+// The padding of the sheet moves into the scroll area, so the scroll area does not cut a
+// focus ring at its sides.
 :host(.vc-host--split) {
   min-height: 0;
 }
@@ -62,9 +55,6 @@
   padding: 0;
   overflow: hidden;
 }
-/* The actions on the line of the question (the bar of the vote panel): 4px between the beamer button
-   and the menu. The menu reaches into the sheet padding, so its glyph lines up with
-   the end edge of the content. */
 .vc__actions {
   display: flex;
   flex: none;
@@ -82,8 +72,6 @@
   padding: 0 var(--space-6) var(--space-6);
   scroll-padding-block: var(--space-5);
 }
-/* The shared fade of a scroll area: an end fades only while more of the vote lies past
-   it (`appScrollFade` sets the classes). */
 .vc--ready.vc--sheet .vc__body {
   @include fade.fade-y(var(--space-5));
 }
@@ -109,7 +97,6 @@
   }
 }
 
-/* Board Telefon-Abstimmen: the phone header sits closer to the panel. */
 .vc--phone {
   gap: var(--space-2);
 }

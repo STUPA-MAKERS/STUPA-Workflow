@@ -12,8 +12,7 @@ import { renderMarkdown } from '../meetings/meetings.util';
 import { shortRef } from './apply.util';
 
 /**
- * Confirmation page after a submission (boards Oeffentlich-Bestaetigen and
- * Oeffentlich-Eingereicht).
+ * Confirmation page after a submission.
  *
  * The page has two states, because the backend treats the two submitters
  * differently:

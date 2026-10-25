@@ -49,7 +49,7 @@ export function isHttpUrl(text: string): boolean {
 }
 
 /**
- * "Hilfe & Tickets" (frame 25, permission `admin.site`): where the help menu leads and how
+ * "Hilfe & Tickets" (permission `admin.site`): where the help menu leads and how
  * reports are handled.
  *
  * `GET/PUT /admin/help-tickets` saves directly, without the draft of the branding:

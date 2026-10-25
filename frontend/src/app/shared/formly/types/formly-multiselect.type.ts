@@ -18,7 +18,7 @@ interface MultiOption {
 
 /**
  * Formly field type `multiselect`: several choices in one field box, as a dropdown
- * (board Anträge-Bearbeiten, "Kategorie: Party, Erstsemester").
+ *.
  *
  * The box looks like the `select` field and shows the chosen labels, joined by a comma.
  * A click anywhere on the box opens the choices in the shared sheet, as the "Status"

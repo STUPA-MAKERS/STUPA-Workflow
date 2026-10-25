@@ -98,7 +98,7 @@ export class ExpenseDialogsState {
   readonly editNote = signal('');
   readonly confirmDelete = signal<Expense | null>(null);
 
-  // Linked invoices. One invoice can back many bookings.
+  /** The invoices to link. One invoice can back many bookings. */
   readonly invoices = signal<Invoice[]>([]);
   readonly newInvoiceId = signal('');
   readonly editInvoiceId = signal('');

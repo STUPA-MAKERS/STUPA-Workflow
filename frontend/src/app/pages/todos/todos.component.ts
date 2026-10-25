@@ -119,7 +119,7 @@ const DUE_TEXT: Record<BoardFilter['due'], TranslationKey> = {
 };
 
 /**
- * "Boards" (`/todos`, `/todos/:boardId`): one board of the person (frames 0–9, 11–14, 34).
+ * "Boards" (`/todos`, `/todos/:boardId`): one board of the person.
  *
  * `/todos` opens the personal board "Meine To-Dos", else the board of the first own Gremium;
  * a board in the URL wins. The header holds "Board | Liste" and, at its end, the board
@@ -157,6 +157,10 @@ const DUE_TEXT: Record<BoardFilter['due'], TranslationKey> = {
  * `board` is the ETag read of the board. The rows below the board and "Alle" take their
  * own pings. While a card is held or a move of the page is in flight, the pings wait.
  * While the socket is up, the poll reads every 120 seconds instead of 30.
+ *
+ * It is a pane page (`styles.scss`) except for the list on a phone: on a phone the board
+ * fills the free height too, so its column pages scroll inside, while the list scrolls as a
+ * page.
  */
 @Component({
   selector: 'app-todos',
@@ -192,8 +196,6 @@ const DUE_TEXT: Record<BoardFilter['due'], TranslationKey> = {
     TodoMoveSheetComponent,
     TodoTransferDialogComponent,
   ],
-  // On a phone the board fills the free height too, so its column pages scroll inside;
-  // the list scrolls as a page.
   host: { '[class.pane-page]': "!phone() || view() === 'board'", class: 'todos-host' },
   templateUrl: './todos.component.html',
   styleUrl: './todos.component.scss',
@@ -768,8 +770,6 @@ export class TodosComponent implements OnDestroy {
     });
   }
 
-  // ------------------------------------------------------------------ live
-
   /** A card is held anywhere on the page or a write is in flight: a live change waits. */
   private busy(): boolean {
     return this.hold() || !!this.rowsView()?.dragging();
@@ -898,8 +898,6 @@ export class TodosComponent implements OnDestroy {
     if (this.filter().assignee === 'me') this.loadMine();
   }
 
-  // ------------------------------------------------------------------ header
-
   pickBoard(id: Uuid): void {
     const list = id !== ALL_BOARDS && this.view() === 'list';
     void this.router.navigate(['/todos', id], { queryParams: { view: list ? 'list' : null } });
@@ -925,8 +923,6 @@ export class TodosComponent implements OnDestroy {
     this.newOpen.set(true);
   }
 
-  // ------------------------------------------------------------------ filters
-
   setAssignee(value: string): void {
     if (value === 'me' && !this.all()) this.loadMine();
     this.filter.update((f) => ({ ...f, assignee: value }));
@@ -945,8 +941,6 @@ export class TodosComponent implements OnDestroy {
     this.search.clear();
     this.filter.set(NO_FILTER);
   }
-
-  // ------------------------------------------------------------------ cards
 
   openCard(id: Uuid): void {
     void this.router.navigate([], { relativeTo: this.route, queryParams: { card: id }, queryParamsHandling: 'merge' });
@@ -1106,8 +1100,6 @@ export class TodosComponent implements OnDestroy {
     this.wrote();
     this.board.set({ ...placeTile(board, card), archivedCount: Math.max(0, board.archivedCount - 1) });
   }
-
-  // ------------------------------------------------------------------ sheet
 
   /** A long press on a tile (phone): the "Verschieben" sheet for it. */
   onTileMenu(request: TileMenuRequest): void {

@@ -1,13 +1,9 @@
 @use 'option-menu' as menu;
 
-/* The host is a flex column: the log takes the space, the composer stays below it.
-   A consumer bounds the log with `--chat-log-max` (a column that scrolls as a whole),
-   gives the host a height (a sheet), or lets it fill a column that grows with the page:
-   `--chat-log-basis: 0` then makes the log add only `--chat-log-min` to the height of
-   the column, so a long thread scrolls inside the log and never stretches the column; moves the pinned phone composer with
-   `--chat-composer-bottom`, carries its surface further down with
-   `--chat-composer-foot` and out over the side padding of the page with
-   `--chat-composer-bleed`; `--chat-composer-surface` is the fill of that bar. `--chat-bubble` is the fill of the messages of others. */
+// Custom properties of a consumer: `--chat-log-max` bounds the log; `--chat-log-basis: 0` makes
+// the log add only `--chat-log-min` to a growing column; `--chat-composer-bottom`, `-foot`,
+// `-bleed` and `-surface` place and fill the pinned phone composer; `--chat-bubble` fills the
+// messages of others.
 :host {
   position: relative;
   display: flex;
@@ -16,14 +12,11 @@
   min-width: 0;
   min-height: 0;
 }
-/* The delete dialog and the phone menu open in the top layer. Out of the flow, their
-   hosts add no gap below the composer. */
 :host > app-dialog,
 :host > app-side-sheet {
   position: absolute;
 }
 
-/* ------------------------------------------------------------------ log */
 .chat__logWrap {
   position: relative;
   display: flex;
@@ -31,7 +24,6 @@
   flex-direction: column;
   min-height: 0;
 }
-/* Desktop: a rounded outline frames the log; no rule above the composer, no fade. */
 .chat__log {
   display: flex;
   flex: 1 1 var(--chat-log-basis, auto);
@@ -50,18 +42,11 @@
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
-/* The content sits at the bottom while it is shorter than the log. */
 .chat__log > :first-child {
   margin-top: auto;
 }
-/* Phone: the log runs edge to edge, and it scrolls right up to the rule of the composer:
-   the host has no gap, so a message is never cut short of that line. The padding at the
-   foot keeps the last message where the gap put it. A consumer whose log starts at a line
-   above it (the tabs of a ticket) moves the log up to that line and keeps the first
-   message in place with `--chat-log-inset-top`. */
-/* The on-screen keyboard shrinks the viewport (`interactive-widget=resizes-content`) and a
-   bottom sheet with it. The minimum of the log then yields to the viewport, because a log
-   taller than the space left runs on under the pinned composer. */
+// The on-screen keyboard shrinks the viewport (`interactive-widget=resizes-content`), so the
+// minimum of the log yields to it; a taller log would run on under the pinned composer.
 :host(.chat--phone) {
   gap: 0;
 }
@@ -71,9 +56,8 @@
   border: 0;
   border-radius: 0;
 }
-/* Messages above the log fade out while the log is scrolled down, because no line ends
-   the log at the top (the head of a sheet). A consumer whose log ends at a line sets
-   `--chat-log-fade-top: 0px`. */
+// No line ends the log at the top, so it fades there. A consumer whose log ends at a line sets
+// `--chat-log-fade-top: 0px`.
 :host(.chat--phone) .chat__log.is-fade-start {
   -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--chat-log-fade-top, var(--space-5)));
   mask-image: linear-gradient(to bottom, transparent, #000 var(--chat-log-fade-top, var(--space-5)));
@@ -113,19 +97,16 @@
 .chat__dot {
   padding: 0 6px;
 }
-/* The empty thread sits in the middle of the log. */
 .chat__empty {
   margin-block: auto;
 }
 
-/* ------------------------------------------------------------------ messages */
 .chat__row {
   display: flex;
   align-items: flex-end;
   gap: 10px;
   min-width: 0;
 }
-/* A group is tight; a new group keeps the gap of the log. */
 .chat__row:not(.chat__row--head) {
   margin-top: -6px;
 }
@@ -137,7 +118,6 @@
   flex: none;
   width: 32px;
 }
-/* The avatar sits beside the last bubble, above the time line. */
 .chat__row--tail .chat__av {
   margin-bottom: 22px;
 }
@@ -194,7 +174,6 @@
 .chat__row--own.chat__row--tail .chat__bubble {
   border-bottom-right-radius: 4px;
 }
-/* Internal where a thread holds both kinds: a warning outline, no fill. */
 .chat__row .chat__bubble--internal {
   background: transparent;
   box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--color-warning) 70%, transparent);
@@ -322,7 +301,6 @@
   padding: 0;
   list-style: none;
 }
-/* A file is a tile: a type icon, the name in mono and "PNG · 96 KB" under it. */
 .chat__file {
   display: inline-flex;
   align-items: center;
@@ -349,7 +327,6 @@
   background: color-mix(in srgb, var(--color-text) 8%, transparent);
   color: var(--color-text-muted);
 }
-/* A file in the scan or in quarantine: the same tile, no link. */
 .chat__file--off {
   cursor: default;
 }
@@ -400,9 +377,6 @@
   border-radius: 4px;
 }
 
-/* Edit and delete of an own message: visible on hover or focus. */
-/* The actions float over the top edge of the bubble, at its end: inside the bubble's
-   width, so they never leave the log, and absolute, so the hidden pill takes no width. */
 .chat__line {
   position: relative;
 }
@@ -421,8 +395,6 @@
   opacity: 0;
   transition: opacity var(--motion-fast) var(--ease-standard);
 }
-/* Over a message of another person (a moderator) the actions sit at the bubble's start,
-   so a short bubble does not push them over the avatar. */
 .chat__row:not(.chat__row--own) .chat__acts {
   inset-inline-end: auto;
   inset-inline-start: 0;
@@ -435,7 +407,6 @@
     opacity: 1;
   }
 }
-/* The message the actions belong to carries an accent edge while they show. */
 .chat__line:has(.chat__acts:focus-within) .chat__bubble {
   box-shadow: inset 0 0 0 1.5px var(--color-accent);
 }
@@ -500,14 +471,12 @@
   outline-offset: 2px;
 }
 
-/* ------------------------------------------------------------------ composer */
 .chat__composer {
   display: flex;
   flex: none;
   flex-direction: column;
   gap: var(--space-2);
 }
-/* Phone: a pinned bar above the bottom navigation, on its own surface. */
 :host(.chat--phone) .chat__composer {
   position: sticky;
   bottom: var(--chat-composer-bottom, var(--app-bottom-inset, 0px));
@@ -518,8 +487,6 @@
   background: var(--chat-composer-surface, var(--color-surface));
   box-shadow: 0 var(--chat-composer-foot, 0px) 0 0 var(--chat-composer-surface, var(--color-surface));
 }
-/* One row of the box is as tall as its buttons (`--chat-row`). The buttons sit at the
-   foot, so a long text grows upwards and its last line stays level with them. */
 .chat__box {
   --chat-row: 40px;
   display: flex;
@@ -533,8 +500,6 @@
 .chat__box:has(.chat__input:focus-visible) {
   box-shadow: inset 0 0 0 2px var(--color-focus-ring);
 }
-/* Grows with its text up to 6 lines, then scrolls. The padding centers one line in a
-   row, so a single line (or the placeholder) sits on the middle of the buttons. */
 .chat__input {
   flex: 1 1 auto;
   min-width: 0;
@@ -564,7 +529,6 @@
   display: none;
 }
 
-/* The files of the composer: a chip per file above the text box. */
 .chat__drafts {
   display: flex;
   flex-wrap: wrap;
@@ -573,7 +537,7 @@
   padding: 0;
   list-style: none;
 }
-/* The item is a flex box, so the chip in it has no line box below it. */
+// The item is a flex box, so the chip in it has no line box below it.
 .chat__draft {
   display: flex;
   max-width: 100%;
@@ -617,7 +581,6 @@
   }
 }
 
-/* ------------------------------------------------------------------ phone menu */
 .chat__menu {
   display: flex;
   flex-direction: column;
@@ -651,9 +614,6 @@
   color: var(--color-danger);
 }
 
-/* ------------------------------------------------------------------ mentions */
-/* The "@" list: the option menu of the app, above the composer (below an edit), as wide
-   as its text box. The text box keeps the focus, so the list needs no focus ring. */
 .chat__box,
 .chat__mentionAnchor {
   position: relative;
@@ -685,8 +645,6 @@
   min-width: 0;
   overflow-wrap: anywhere;
 }
-/* A mentioned person in a message: the name in bold, in the accent (in an own bubble,
-   which already has the accent, in its text colour). No underline: it is no link. */
 .chat__text ::ng-deep .chat__mention {
   color: var(--color-accent-text);
   font-weight: var(--fw-semibold);

@@ -81,7 +81,7 @@ export interface TicketGroup {
 }
 
 /**
- * "Tickets" (permission `ticket.manage`, frames 18, 29): the list of the tickets beside
+ * "Tickets" (permission `ticket.manage`): the list of the tickets beside
  * the detail of the open one, in the geometry of the applications page.
  *
  * The chips filter by state (default "Offen": new and in progress), kind and assignee;
@@ -140,7 +140,7 @@ export class TicketsComponent implements OnDestroy {
   readonly split = computed(() => this.layout()?.collapsed() === false);
   readonly selectedId = signal<Uuid | null>(null);
 
-  // Filters, from the query params.
+  /** The search text of the filters, from the query params. */
   readonly q = signal('');
   readonly statusFilter = signal<TicketStatusFilter>('open');
   readonly kindFilter = signal<TicketKind | ''>('');
@@ -290,8 +290,6 @@ export class TicketsComponent implements OnDestroy {
     this.frame.fill.set(false);
   }
 
-  // --- filters ------------------------------------------------------------
-
   setStatus(value: string): void {
     this.navigate({ status: value === 'open' ? null : value || null });
   }
@@ -341,8 +339,6 @@ export class TicketsComponent implements OnDestroy {
   private readSelection(): void {
     this.selectedId.set(this.route.snapshot.firstChild?.paramMap.get('id') ?? null);
   }
-
-  // --- loading ------------------------------------------------------------
 
   /** One page: every ticket for the team, the own ones for the reporter. */
   private fetch(query: TicketQuery): Observable<TicketPage> {

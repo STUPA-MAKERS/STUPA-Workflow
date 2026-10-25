@@ -1,6 +1,5 @@
 @use './inspector';
 
-/* Transparent wrapper. The blocks join the flex column of the panel directly. */
 :host {
   display: contents;
 }
@@ -22,7 +21,6 @@
   list-style: none;
 }
 
-/* A transition: its label, then the states and the guard. The whole row is the button. */
 .tl__row {
   display: flex;
   flex-direction: column;
@@ -58,7 +56,6 @@
   flex: none;
   color: var(--color-warning);
 }
-/* The states and the guard wrap; a separator never starts a line on its own. */
 .tl__meta {
   display: flex;
   flex-wrap: wrap;

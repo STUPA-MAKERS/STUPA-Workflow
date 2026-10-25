@@ -1,7 +1,5 @@
 @use 'breakpoints' as bp;
 
-/* The sheet: one surface card that fills its box. Only the body scrolls, so the title
-   and the format bar stay in view while the text grows. */
 :host {
   display: flex;
   flex-direction: column;
@@ -82,7 +80,6 @@
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
-/* The field keeps the size of the heading, so the head does not jump when it opens. */
 .ts__titleInput {
   width: calc(100% + var(--space-2));
   min-width: 0;
@@ -191,13 +188,11 @@
   background: var(--color-border);
 }
 
-/* The note of a public gremium sits above the editor, in line with the text. */
 .ts__public {
   flex: none;
   margin: var(--space-4) 28px 0;
 }
 
-/* The editor is the page: its own frame goes, the sheet is the surface. */
 .ts__editor {
   display: block;
   flex: 1 1 auto;
@@ -216,20 +211,17 @@
   min-height: 16rem;
   line-height: 1.7;
 }
-/* A paragraph keeps the gap of a list, so a blank line in the text shows as one. */
+// A paragraph keeps the gap of a list, so a blank line in the text shows as one.
 .ts__editor ::ng-deep .mde__host .ProseMirror > p {
   margin: var(--space-2) 0;
 }
 .ts__editor ::ng-deep .mde__host .ProseMirror > p:first-child {
   margin-top: 0;
 }
-/* A read-only text (a final protocol, a reader) is a text to read: full contrast, as on
-   the boards. The missing format bar already says that nobody types here. */
 .ts__editor ::ng-deep .mde__host--disabled {
   opacity: 1;
 }
-/* The editor is a lazy chunk (Tiptap, KaTeX). Until it is there, three text lines in the
-   font and the line height of the editor hold the place; they show only after 300ms. */
+// The editor is a lazy chunk. Until it loads, three text lines hold the place after 300ms.
 .ts__editor--wait p {
   margin: 0;
   font-size: 0.96875rem;
@@ -268,8 +260,6 @@
   font-size: var(--fs-small);
   color: var(--color-text-muted);
 }
-/* The keeper line of a closed meeting, below the title. */
-/* The to-dos linked to the item, between the title and the text. */
 .ts__todos {
   flex: none;
   padding: 0 var(--space-5) 10px;
@@ -289,9 +279,6 @@
   flex: none;
 }
 
-/* Phone: the title may take two lines, and the gutters shrink.
-   The format buttons and the save state take the first row, "Erledigt" and the view switch the
-   second, because the three do not fit in one row of a phone. */
 @include bp.phone {
   .ts__head {
     padding: var(--space-4) var(--space-4) var(--space-2);
@@ -353,13 +340,10 @@
   }
 }
 
-/* The switch between the formatted text and its Markdown source. */
 .ts__mode {
   flex: none;
 }
 
-/* The Markdown source: the same type size and inset as the formatted text, so the text
-   keeps its place when the view changes. */
 .ts__editor--raw {
   display: flex;
 }

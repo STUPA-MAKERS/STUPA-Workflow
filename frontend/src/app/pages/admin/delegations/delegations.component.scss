@@ -23,7 +23,6 @@
   list-style: none;
 }
 
-/* One row: the meeting, from → to, the tags, the action. */
 .dl__row {
   display: grid;
   grid-template-columns: minmax(12rem, 1.4fr) minmax(10rem, 1.1fr) minmax(7rem, 0.7fr) auto;

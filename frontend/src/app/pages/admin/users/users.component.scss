@@ -17,7 +17,6 @@
   min-width: 0;
 }
 
-/* The filter chips below the search. */
 .au__chips {
   display: flex;
   flex-wrap: wrap;
@@ -31,8 +30,6 @@
   list-style: none;
 }
 
-/* One row: the person, three fields, the action. The fields drop below the person in a
-   narrower container. */
 .au__row {
   display: grid;
   grid-template-columns: 2rem minmax(11rem, 1.3fr) minmax(7rem, 1fr) minmax(9rem, 1.2fr) 9rem 10rem;
@@ -65,7 +62,6 @@
   min-width: 0;
   font-weight: var(--fw-semibold);
 }
-/* An e-mail address wraps; it is never cut. */
 .au__mail {
   font-size: var(--fs-sm);
   color: var(--color-text-muted);
@@ -97,7 +93,6 @@
 .au__val--muted {
   color: var(--color-text-muted);
 }
-/* A last login older than 90 days: the account may hold rights it should not. */
 .au__val--stale,
 .au__staleHint {
   color: var(--color-warning);
@@ -106,7 +101,6 @@
   font-size: var(--fs-xs);
 }
 
-/* An OIDC group keeps its exact spelling from the IdP. */
 .au__tags {
   display: flex;
   flex-wrap: wrap;
@@ -120,7 +114,6 @@
   gap: var(--space-2);
 }
 
-/* "zusammengeführt in <Name>": the old account is a reference to the new one. */
 .au__mergedTag {
   font-size: var(--fs-sm);
   color: var(--color-text-muted);

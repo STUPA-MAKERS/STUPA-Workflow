@@ -62,9 +62,8 @@ interface AgendaRow {
 }
 
 /**
- * The detail sheet of one meeting in the list view of the overview (board Sitzungen,
- * variant A): what a reader needs to see whether the meeting is ready, without opening
- * it.
+ * The detail sheet of one meeting in the list view of the overview: what a reader needs to see
+ * whether the meeting is ready, without opening it.
  *
  * Header: Gremium and date, the title, status · time · minute-taker (a warning while a
  * planned meeting has none), "Sitzung öffnen", "Beamer-Ansicht" (a live or planned

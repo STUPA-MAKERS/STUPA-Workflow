@@ -48,7 +48,6 @@
 }
 @include pp.dot-list('.pd__dates');
 @include pp.pill-button('.pd__btn');
-/* The PDF of the public version with its size, at the end of the head. */
 .pd__pdf {
   display: flex;
   flex: none;
@@ -88,7 +87,6 @@
   font-size: var(--fs-sm);
 }
 
-/* The agenda: rows 2px apart on surface 1, only the outer corners round. */
 .pd__tops {
   display: flex;
   flex-direction: column;
@@ -180,7 +178,6 @@
   margin: 0;
   font-weight: var(--fw-semibold);
 }
-/* A personnel election: the elected names. */
 .pd__elected {
   margin: 0;
   font-weight: var(--fw-medium);
@@ -276,7 +273,6 @@
   border-radius: var(--radius-sm);
 }
 
-/* Narrow: the agenda first, the attendance and the notes on the version below it. */
 @media (max-width: 960px) {
   .pd__cols {
     flex-direction: column;
@@ -313,7 +309,6 @@
   }
 }
 
-/* The conditions of the decision, below the tally. */
 .pd__conds {
   display: flex;
   flex-direction: column;

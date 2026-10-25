@@ -4,7 +4,6 @@
   display: block;
 }
 
-/* The page: header, then rows + answers beside the history (wide), else stacked. */
 .sp {
   display: flex;
   flex-direction: column;
@@ -83,7 +82,6 @@
   font-size: 0.8125rem;
 }
 
-/* The rows: edit, attachments, comments. */
 .sp__rows {
   margin: 0;
   padding: 0;
@@ -139,11 +137,9 @@
   color: var(--color-text-muted);
 }
 
-/* Edit mode: the bar sticks to the top of the window. */
 .sp--edit {
   gap: var(--space-4);
 }
-/* The bar has the same edges as the form below it; on a phone it spans the gutters. */
 .sp__editBar {
   position: sticky;
   top: var(--app-top-safe-area, 0px);
@@ -168,13 +164,13 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* Targets of a programmatic focus only (tabindex -1, not in the tab order): no ring.
-   The text of the bar clips its overflow, so a ring would show as a stray line. */
+// Programmatic focus targets only. The bar text clips its overflow, so a ring shows as a stray
+// line.
 .sp__title:focus,
 .sp__editText strong:focus {
   outline: none;
 }
-/* The end of the form keeps room for the floating "Speichern" (56px and 16px around it). */
+// Room for the floating "Speichern": 56px and 16px around it.
 .sp__edit {
   padding-bottom: calc(56px + 2 * var(--space-4));
 }
@@ -182,8 +178,6 @@
   scroll-margin-top: 5rem;
 }
 
-/* Comments in the side sheet: the chat fills the body, its log scrolls inside, and the
-   composer sits at the foot of the sheet. */
 .sp__chat {
   flex: 1 1 auto;
   min-height: 0;
@@ -193,7 +187,6 @@
   --chat-composer-surface: transparent;
   --chat-composer-bleed: var(--space-4);
 }
-/* The end states (expired link, not found): one card in the free space. */
 .sp__end {
   display: flex;
   flex: 1 0 auto;
@@ -226,7 +219,6 @@
   margin-top: var(--space-2);
 }
 
-/* One column: the rows, then the history (as on the board), then the answers. */
 @include bp.below-wide {
   .sp__grid {
     grid-template-columns: minmax(0, 1fr);

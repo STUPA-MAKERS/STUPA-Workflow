@@ -15,7 +15,6 @@
   --sh-title-min: 0;
 }
 
-/* Two fields side by side; one column in a narrow sheet. */
 .gs__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -35,7 +34,6 @@
   min-width: 0;
 }
 
-/* The lifetime: the select, and beside it the days once "Begrenzt" is set. */
 .gs__link {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

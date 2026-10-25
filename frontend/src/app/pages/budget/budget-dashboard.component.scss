@@ -8,7 +8,6 @@
   gap: var(--space-4);
 }
 
-/* The page title of the design system (d2). On the wide layout it heads the pane. */
 .bd__title {
   margin: 0;
   font-size: var(--fs-d2);
@@ -17,9 +16,6 @@
   letter-spacing: -0.01em;
 }
 
-/* No cost centres or no fiscal year: the page holds nothing but the empty state. The
-   host takes the free height of the shell main, and the empty state centres in the
-   height below the title. */
 :host:has(> .bd__empty) {
   flex: 1 0 auto;
 }
@@ -42,18 +38,12 @@
   }
 }
 
-/* ------------------------------------------------------------------ frame
-   Wide: the pane (title, year, overview, search, tree) beside the sheet.
-   Narrower: the title and the chips on top, the sheet below, the tree in a side sheet. */
 .bd {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
   min-width: 0;
 }
-/* The wide layout does not scroll as a page: the pane and the sheet each scroll inside
-   themselves. The host is then a pane page (`.pane-page` in styles.scss): it takes the
-   free height of the main column of the shell and gives it to the grid. */
 .bd--wide {
   display: grid;
   flex: 1 1 0;
@@ -63,8 +53,6 @@
   min-height: 0;
 }
 
-/* The pane (`.ld-pane`, styles.scss) takes the full height of the frame and does not
-   scroll itself: the title, the search and the chips stay; only the tree scrolls. */
 .bd--wide .bd__pane {
   overflow: hidden;
 }
@@ -76,8 +64,6 @@
   min-width: 0;
   min-height: 0;
 }
-/* The side sheet has the surface-2 background of the search field. The field takes the
-   next surface, so that its edge shows. */
 .bd__paneBody--side app-search-pill {
   --sp-bg: var(--color-surface-3);
 }
@@ -87,8 +73,6 @@
   flex-direction: column;
   gap: var(--space-4);
 }
-/* The title and the actions on one line: the actions sit at the end, on the baseline of
-   the title, and do not wrap below it. A phone has the "more" menu instead. */
 .bd__topRow {
   display: flex;
   align-items: baseline;
@@ -114,17 +98,12 @@
   gap: var(--space-2);
   min-width: 0;
 }
-/* The path chip (the global `.chip`) shrinks with a long path: its text ends in an
-   ellipsis. */
 .bd__pathChip {
   flex: 0 1 auto;
   min-width: 0;
   max-width: 100%;
 }
 
-/* ------------------------------------------------------------------ fades
-   An end of a scrolling list fades only when there is more content past it
-   (`appScrollFade` sets the classes). The tree and the wide sheet share the mask. */
 .bd__tree,
 .bd__sheetBody {
   --bd-fade: var(--space-6);
@@ -134,10 +113,6 @@
   @include fade.fade-y(var(--bd-fade));
 }
 
-/* ------------------------------------------------------------------ tree
-   The tree is the only part of the pane that scrolls. An end fades only when there are
-   more rows past it (`appScrollFade` sets the classes). The scroll padding keeps a row
-   that gets the focus clear of the fade. */
 .bd__tree {
   display: flex;
   flex: 1 1 auto;
@@ -149,7 +124,6 @@
   overscroll-behavior: contain;
   scroll-padding-block: var(--bd-fade);
 }
-/* The rows keep their size; the list scrolls instead of squeezing them. */
 .bd__tree > * {
   flex: none;
 }
@@ -241,9 +215,6 @@
   font-size: 0.78125rem;
 }
 
-/* ------------------------------------------------------------------ sheet
-   The card carries the background; the body inside it holds the content and, on the
-   wide layout, scrolls. So the fade masks the content and never the card. */
 .bd__sheet {
   display: flex;
   flex-direction: column;
@@ -270,9 +241,6 @@
   scrollbar-width: thin;
 }
 
-/* The bar on top of the wide sheet (`app-sheet-bar`): the breadcrumb is the kicker, the
-   actions sit at the end on the same axis. It stays in place while the body scrolls, and
-   takes the side padding of the sheet, as on the other detail sheets. */
 .bd__bar {
   padding-inline: var(--space-6);
 }
@@ -281,12 +249,11 @@
   flex-wrap: nowrap;
   margin-inline-start: var(--space-3);
 }
-/* The title sits below the bar at the gap of every detail sheet. */
 .bd--wide .bd__sheetBody {
   padding-top: var(--sheet-head-gap);
 }
-/* The title is a child of the scrolling flex column. It clips its text (ellipsis), so
-   without `flex: none` the column would shrink it to zero height. */
+// The title clips its text, so without `flex: none` the scrolling column would shrink it to zero
+// height.
 .bd__name {
   flex: none;
   margin: 0;
@@ -306,8 +273,6 @@
   gap: var(--space-2);
 }
 
-/* The six figures in one band, split by thin rules. Each figure takes the width of its
-   amount, so a large amount gets more room; a band that does not fit wraps. */
 .bd__figs {
   display: flex;
   flex-wrap: wrap;
@@ -382,7 +347,6 @@
   flex: none;
 }
 
-/* "Auslastung je Budget": a name and three numbers per row, the bar below. */
 .bd__usage {
   display: flex;
   flex-direction: column;
@@ -416,7 +380,6 @@
 .bd__uname {
   min-width: 0;
 }
-/* The requested amount below the name: only on a phone, which drops the column. */
 .bd__ureq {
   display: none;
   font-size: 0.75rem;
@@ -430,8 +393,7 @@
   text-align: end;
   white-space: nowrap;
 }
-/* The narrowest widths that still hold the column heads and an amount such as
-   "20.100 €", so the name column gets the rest. */
+// The narrowest widths that still hold the column heads and an amount such as "20.100 €".
 .bd__c1 {
   width: 4.5rem;
 }
@@ -489,7 +451,6 @@
   margin-block: var(--space-2) var(--space-3);
 }
 
-/* ------------------------------------------------------------------ narrower */
 @include bp.below-wide {
   .bd__figs {
     display: grid;

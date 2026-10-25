@@ -1,4 +1,3 @@
-/* Quiet and centred: a line of small text, with the configured columns above it. */
 :host {
   display: block;
 }
@@ -17,11 +16,8 @@
   color: var(--color-text-muted);
 }
 
-/* Separated list. Every part has a dot in the --ft-sep strip before it. The list starts
-   --ft-sep before the edge of its clip, so the strip of each part that starts a line
-   (also the first part) is outside the clip. A wrapped line thus never starts with a dot,
-   and no line ends with one.
-   Only the start side clips, so the other sides stay open for the focus ring. */
+// Each part has a dot in the --ft-sep strip before it, and the list starts --ft-sep before its
+// clip, so a line never starts with a dot. Only the start side clips, for the focus ring.
 .ft__clip {
   display: flex;
   justify-content: center;
@@ -56,8 +52,6 @@
   color: var(--color-text-subtle);
 }
 
-/* Narrow footer: the copyright and the legal links are two centred rows. The copyright
-   then has no separator. */
 .ft__parts {
   flex-direction: column;
   align-items: center;
@@ -74,7 +68,6 @@
   text-align: center;
 }
 
-/* Wide footer: one line, with a dot between the copyright and the first link. */
 @container ft (min-width: 56rem) {
   .ft__parts {
     flex-direction: row;

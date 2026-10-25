@@ -31,7 +31,7 @@ import { dayMonth } from '@shared/date-format';
 import { formatMoney } from '@shared/format-money';
 
 /**
- * The bulk actions of the selected bookings (board Fin-Buchungen-Auswahl). Side by side
+ * The bulk actions of the selected bookings. Side by side
  * the panel replaces the detail sheet: "n Buchungen ausgewählt", "Umbuchen" (cost centre
  * and category, "unverändert lassen" when empty), the selected rows with their sum, the
  * export and the delete (at most five).

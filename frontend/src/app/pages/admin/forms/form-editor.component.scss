@@ -1,5 +1,3 @@
-// Form editor (boards Admin-Formular-Editor, Admin-Formular-Editor-Kosten): the outline,
-// the cards of the shown group, and the form settings with the versions.
 @use 'field' as f;
 @use 'breakpoints' as bp;
 @use 'scroll-fade' as fade;
@@ -10,8 +8,6 @@
   flex-direction: column;
   min-width: 0;
 }
-/* Wide: the admin frame passes the free height down (route data `adminPane`); the page
-   takes it and only its columns scroll. */
 :host(.fe-pane) {
   flex: 1 1 0;
   min-height: 0;
@@ -21,7 +17,6 @@
   flex: 1 1 auto;
   min-width: 0;
 }
-/* Wide: the page takes the free height and does not scroll. */
 .fe--wide {
   min-height: 0;
 }
@@ -36,9 +31,6 @@
   padding-block: var(--space-4);
 }
 
-/* ---- Columns ------------------------------------------------------------------ */
-
-/* Phone: one column — the outline, the cards, the settings and the versions. */
 .fe__cols {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -46,7 +38,6 @@
   min-width: 0;
 }
 
-/* Narrow: the outline beside the cards; the settings follow the cards. */
 @include bp.narrow {
   .fe__cols {
     grid-template-columns: 17rem minmax(0, 1fr);
@@ -60,7 +51,6 @@
   }
 }
 
-/* Wide: three columns that reach down to the footer gap. Each scrolls inside itself. */
 @include bp.wide {
   .fe__cols {
     flex: 1 1 0;
@@ -83,8 +73,6 @@
     @include fade.fade-y(var(--space-5));
   }
 }
-
-/* ---- Outline --------------------------------------------------------------------- */
 
 .fe__outline {
   display: flex;
@@ -110,7 +98,6 @@
   cursor: grab;
 }
 
-/* The group heading: a caption in the accent colour; a click shows the group. */
 .fe__groupName {
   flex: 1 1 auto;
   min-width: 0;
@@ -171,7 +158,6 @@
   color: var(--color-text-subtle);
 }
 
-/* The whole row text is the button: a click anywhere on it selects the question. */
 .fe__rowBtn {
   display: flex;
   flex: 1 1 auto;
@@ -233,7 +219,6 @@
   align-self: flex-start;
 }
 
-/* The menu of the question types: two columns at the button (`menuPos`). */
 .fe__menu {
   position: fixed;
   z-index: 40;
@@ -275,7 +260,6 @@
   box-shadow: inset 0 0 0 2px var(--color-focus-ring);
 }
 
-/* The bottom sheet of the question types on a phone: one column. */
 .fe__sheetMenu {
   display: flex;
   flex-direction: column;
@@ -288,8 +272,6 @@
   align-self: flex-start;
   margin: var(--space-3) 0 0 var(--space-2);
 }
-
-/* ---- Cards ----------------------------------------------------------------------- */
 
 .fe__main,
 .fe__side {
@@ -308,7 +290,6 @@
   border-radius: var(--radius-xl);
   background: var(--color-surface-1);
 }
-/* The selected question: an accent outline on the inside of the card. */
 .fe__card--sel {
   box-shadow: inset 0 0 0 2px var(--color-accent);
 }
@@ -330,7 +311,6 @@
   color: var(--color-text-muted);
 }
 
-/* Type, key and the required box on one line. */
 .fe__base {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
@@ -341,7 +321,6 @@
   padding-inline: var(--space-2);
 }
 
-/* Two fields side by side: the DE and the EN text. */
 .fe__pair {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -362,7 +341,6 @@
   padding: 0;
 }
 
-/* The cost positions: a panel one surface up; its fields one more. */
 .fe__panel {
   gap: var(--space-3);
   padding: var(--space-4);
@@ -397,7 +375,6 @@
   max-width: 18rem;
 }
 
-/* A text area in the look of the filled fields (JsonLogic, the description). */
 .fe__code {
   display: flex;
   flex-direction: column;
@@ -426,7 +403,6 @@
   box-shadow: inset 0 0 0 2px var(--color-focus-ring);
 }
 
-/* A filled text area with its label inside the box, as `app-input` (the description). */
 .fe__area {
   @include f.box;
   @include f.box-labelled;
@@ -440,8 +416,7 @@
 .fe__area:focus-within .fe__areaLabel {
   @include f.label-focus;
 }
-/* The description grows with its text (three lines at least), so no line shows cut. A
-   browser without field-sizing keeps the three rows and scrolls. */
+// A browser without field-sizing keeps the three rows and scrolls.
 .fe__area textarea {
   @include f.control;
   & {
@@ -455,12 +430,10 @@
   }
 }
 
-/* Keys, option values and patterns in the mono face (the value only, not the label). */
 .fe__mono ::ng-deep input {
   font-family: var(--font-mono);
 }
 
-/* "Erweiterte Optionen": a line, then a toggle row over the full width. */
 .fe__advanced {
   display: flex;
   flex-direction: column;
@@ -515,8 +488,6 @@
   font-size: var(--fs-sm);
 }
 
-/* ---- Settings column ------------------------------------------------------------- */
-
 .fe__meta {
   gap: var(--space-3);
 }
@@ -527,8 +498,6 @@
   max-width: 12rem;
   margin-left: 1.75rem;
 }
-
-/* ---- Preview --------------------------------------------------------------------- */
 
 .fe__preview {
   display: flex;
@@ -605,8 +574,6 @@
   border: 0;
   border-top: 1px solid var(--color-border);
 }
-
-/* ---- Phone ----------------------------------------------------------------------- */
 
 @include bp.phone {
   .fe__card {

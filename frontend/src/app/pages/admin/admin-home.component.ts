@@ -3,7 +3,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { EmptyStateComponent } from '@stupa-makers/ui-kit';
 
 /**
- * The page pane of `/admin` before an admin page is open (board Verwaltung).
+ * The page pane of `/admin` before an admin page is open.
  *
  * The admin frame shows the navigation beside it, so this pane is the empty sheet of
  * the other list/detail pages ("Keine Seite geöffnet"), on the same surface as an open

@@ -1,12 +1,6 @@
 @use 'breakpoints' as bp;
 @use 'scroll-fade' as fade;
 
-/* The session page is a pane page that runs edge to edge: it takes the free height of
-   the main column of the shell (`flex: 1 1 0`, no height from the viewport), and pulls
-   the block padding and the page gutter of the main region back. The page has no footer.
-   Above the phone limit the page itself does not scroll; the agenda, the sheet and the
-   vote cards scroll inside themselves. A scroll area with round cards in it has the
-   radius of the cards, so its corners clip a card that scrolls past an end. */
 :host {
   display: flex;
   flex: 1 1 0;
@@ -21,7 +15,6 @@
   color: var(--color-text-muted);
 }
 
-/* ------------------------------------------------------------------ header */
 .mp__head {
   display: flex;
   flex: none;
@@ -80,7 +73,6 @@
 .mp__beamer {
   flex: none;
 }
-/* ------------------------------------------------------------------ body */
 .mp__body {
   display: flex;
   flex: 1 1 auto;
@@ -119,7 +111,6 @@
   background: var(--color-surface-1);
 }
 
-/* Wide: agenda | sheet | votes, each column scrolls inside itself. */
 .mp__body--wide {
   display: grid;
   grid-template-columns: 320px minmax(0, 1fr);
@@ -157,10 +148,7 @@
   scroll-padding-block: var(--space-4);
 }
 
-/* Below wide (above the phone limit) the body is the one scroll area of the vote cards
-   and the sheet. Its edges are the edges of the cards and it has their radius, so a card
-   that scrolls past an end is clipped round, not with a straight line; an end fades
-   while more content lies past it. */
+// The radius of the cards, so a card that scrolls past an end is clipped round, not straight.
 @include bp.below-wide {
   .mp__body:not(.mp__body--wide) {
     margin-inline: var(--space-3);
@@ -171,7 +159,6 @@
   }
 }
 
-/* ------------------------------------------------------------------ dock */
 .mp__dock {
   flex: none;
   margin: var(--space-3) var(--space-3) var(--space-3) 0;
@@ -182,9 +169,6 @@
   }
 }
 
-/* Phone: the page scrolls as one, the dock sits on the viewport above the navigation
-   bar, and the page keeps the height of the dock free below its content. Further page
-   actions go into the session menu. */
 @include bp.phone {
   :host {
     flex: 1 0 auto;
@@ -224,7 +208,6 @@
   }
 }
 
-/* The shared top and bottom fade: an end fades only while more content lies past it. */
 .mp__agenda,
 .mp__votes,
 .mp__prep {

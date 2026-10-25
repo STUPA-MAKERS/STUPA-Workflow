@@ -1,7 +1,7 @@
 import type { TranslationKey } from '@core/i18n/translations';
 import type { IconName } from '@stupa-makers/ui-kit';
 
-/** A group of the admin navigation (board Verwaltung), in navigation order. */
+/** A group of the admin navigation, in navigation order. */
 export type AdminGroupKey =
   | 'people'
   | 'gremien'
@@ -42,17 +42,20 @@ export const ADMIN_GROUPS: readonly { key: AdminGroupKey; title: TranslationKey 
 /**
  * Every admin page. The admin navigation, the admin home page and the permission list
  * of the "Verwaltung" rail entry (`ADMIN_AREA_PERMISSIONS`) all follow this list.
+ *
+ * - The kill switch for agent tokens of any person (`oauth-grants`) and the lifetimes of an
+ *   SSO login (`login-settings`) need the users permission, because they belong to the
+ *   people that permission manages.
+ * - The flow editor route and its save both accept either key.
  */
 export const ADMIN_PAGES: readonly AdminPage[] = [
   { link: 'users', title: 'admin.nav.users', desc: 'admin.nav.usersDesc', icon: 'users', group: 'people', permissions: ['admin.users'] },
   { link: 'roles', title: 'admin.nav.roles', desc: 'admin.nav.rolesDesc', icon: 'shield', group: 'people', permissions: ['admin.roles'] },
   { link: 'group-mappings', title: 'admin.nav.groupMappings', desc: 'admin.nav.groupMappingsDesc', icon: 'key', group: 'people', permissions: ['admin.group_mappings'] },
-  // The kill switch for agent tokens of any person needs the users permission.
   { link: 'oauth-grants', title: 'admin.nav.oauthGrants', desc: 'admin.nav.oauthGrantsDesc', icon: 'key', group: 'people', permissions: ['admin.users'] },
   { link: 'gremien', title: 'admin.nav.gremien', desc: 'admin.nav.gremienDesc', icon: 'landmark', group: 'gremien', permissions: ['admin.gremien'] },
   { link: 'delegations', title: 'admin.nav.delegations', desc: 'admin.nav.delegationsDesc', icon: 'repeat', group: 'gremien', permissions: ['admin.delegations'] },
   { link: 'forms', title: 'admin.nav.forms', desc: 'admin.nav.formsDesc', icon: 'form', group: 'applications', permissions: ['form.configure'] },
-  // The flow editor route and its save both accept either key.
   { link: 'flow', title: 'admin.nav.flow', desc: 'admin.nav.flowDesc', icon: 'flow', group: 'applications', permissions: ['flow.configure', 'admin.types'] },
   { link: 'deadlines', title: 'admin.nav.deadlines', desc: 'admin.nav.deadlinesDesc', icon: 'clock', group: 'applications', permissions: ['admin.deadlines'] },
   { link: 'cost-centres', title: 'admin.nav.costCentres', desc: 'admin.nav.costCentresDesc', icon: 'euro', group: 'finance', permissions: ['budget.structure'] },
@@ -64,7 +67,6 @@ export const ADMIN_PAGES: readonly AdminPage[] = [
   { link: 'webhooks', title: 'admin.nav.webhooks', desc: 'admin.nav.webhooksDesc', icon: 'webhook', group: 'communication', permissions: ['webhook.manage'] },
   { link: 'help-tickets', title: 'admin.nav.helpTickets', desc: 'admin.nav.helpTicketsDesc', icon: 'help', group: 'communication', permissions: ['admin.site', 'ticket.manage'] },
   { link: 'audit', title: 'admin.nav.audit', desc: 'admin.nav.auditDesc', icon: 'shieldok', group: 'security', permissions: ['audit.read'] },
-  // The lifetimes of an SSO login belong to the people the users permission manages.
   { link: 'login-settings', title: 'admin.nav.loginSettings', desc: 'admin.nav.loginSettingsDesc', icon: 'key', group: 'security', permissions: ['admin.users'] },
   { link: 'privacy', title: 'admin.nav.privacy', desc: 'admin.nav.privacyDesc', icon: 'lock', group: 'security', permissions: ['privacy.manage'] },
   { link: 'backups', title: 'admin.nav.backups', desc: 'admin.nav.backupsDesc', icon: 'db', group: 'security', permissions: ['backup.manage'] },

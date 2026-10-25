@@ -3,7 +3,6 @@
   min-width: 0;
 }
 
-/* A combinator: a box one surface up, its fields one more. */
 .ge__box {
   display: flex;
   flex-direction: column;
@@ -13,7 +12,6 @@
   background: var(--color-surface-3);
   --color-surface-sunken: var(--color-surface-4);
 }
-/* A combinator inside a combinator: no second box, the indent shows the nesting. */
 .ge__children .ge__box {
   padding: 0;
   background: none;
@@ -61,12 +59,7 @@
   container-type: inline-size;
 }
 
-/*
- * A comparison. In a narrow leaf (the inspector panel, a phone) the field has its own
- * line, then the operator and the value. A wide leaf has all three on one line. The
- * operator column is as wide as its label "Operator" and the chevron need; the value
- * itself is short (= != < <= > >=).
- */
+// The operator column is as wide as its label "Operator" and the chevron need.
 .ge__compare {
   display: grid;
   grid-template-columns: 7.5rem minmax(0, 1fr);
@@ -84,7 +77,6 @@
   }
 }
 
-/* Keys and values in the mono face (the value only, not the label). */
 .ge__mono ::ng-deep input {
   font-family: var(--font-mono);
 }

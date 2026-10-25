@@ -144,8 +144,7 @@
   --tb-font: var(--fs-small);
   --tb-nums: normal;
 }
-/* A border, not an inset shadow, so the ring is equally wide on every side (see the
-   agenda pane). */
+// A border, not an inset shadow, so the ring is equally wide on every side.
 .gv__itemText {
   display: flex;
   flex-direction: column;

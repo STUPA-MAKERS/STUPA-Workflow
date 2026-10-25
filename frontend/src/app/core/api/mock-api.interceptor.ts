@@ -59,25 +59,35 @@ const MOCK_PRINCIPAL: Principal = {
   display_name: 'Demo Mitglied',
   email: 'demo@stupa.example',
   roles: ['member'],
-  // The mock grants every permission a gated view needs, so the dev, harness
-  // and demo builds show those views. `application.manage` drives the RBAC
-  // actions on the detail page. The gremium permissions below (`session.manage`,
-  // `vote.manage`, `vote.cast`, `protocol.write`, `protocol.finalize`) drive the
-  // vote views, the beamer, the meeting management and the protocol editor.
-  // `admin.site`, `admin.gremien`, `admin.types`, `form.configure`,
-  // `flow.configure`, `admin.group_mappings` and `webhook.manage` drive the admin UIs.
+  /**
+   * The mock grants every permission a gated view needs, so the dev, harness and demo
+   * builds show those views.
+   *
+   * - `application.manage` drives the RBAC actions on the detail page.
+   * - `application.transition`, `.export`, `.share`, `.archive`, `.delete` and
+   *   `.force_status` drive the row menu and the header of the applications page.
+   * - `application.create_on_behalf` drives "Antrag erfassen" on the applications page.
+   * - The gremium permissions (`session.manage`, `vote.manage`, `vote.cast`,
+   *   `protocol.write`, `protocol.finalize`) drive the vote views, the beamer, the meeting
+   *   management and the protocol editor.
+   * - `admin.site`, `admin.gremien`, `admin.types`, `form.configure`, `flow.configure`,
+   *   `admin.group_mappings` and `webhook.manage` drive the admin UIs. `admin.users` and
+   *   the keys after it drive the other pages of the admin frame: people and rights,
+   *   gremien, the security and data pages.
+   * - The `budget.*` keys drive the budget page and its export.
+   * - `mcp.use` drives "API-Zugang" in the account menu, the account navigation and the
+   *   MCP setup.
+   * - `ticket.manage` drives the tickets of the help menu.
+   */
   permissions: [
     'application.read',
     'application.manage',
-    // The row menu and the header of the applications page: transitions, export, share
-    // links, archive, delete and force status.
     'application.transition',
     'application.export',
     'application.share',
     'application.archive',
     'application.delete',
     'application.force_status',
-    // "Antrag erfassen" on the applications page.
     'application.create_on_behalf',
     'admin.site',
     'admin.gremien',
@@ -88,8 +98,6 @@ const MOCK_PRINCIPAL: Principal = {
     'form.configure',
     'flow.configure',
     'webhook.manage',
-    // The other admin pages of the admin frame: people and rights, gremien, the
-    // security and data pages.
     'admin.users',
     'admin.users.merge',
     'admin.users.revoke_groups',
@@ -102,15 +110,11 @@ const MOCK_PRINCIPAL: Principal = {
     'audit.revert',
     'privacy.manage',
     'backup.manage',
-    // `budget.view`, `budget.structure`, `budget.book` and `budget.export` drive the
-    // budget page and its export.
     'budget.view',
     'budget.structure',
     'budget.book',
     'budget.export',
-    // "API-Zugang" in the account menu and the account navigation, and the MCP setup.
     'mcp.use',
-    // The tickets of the help menu.
     'ticket.manage',
   ],
   groups: [],
@@ -138,7 +142,7 @@ const MOCK_VOTE: Vote = {
   meetingId: 'd0000000-0000-0000-0000-000000000001',
   agendaItemId: 'ag-s3',
   question: 'Soll der Antrag „Förderung Ersti-Wochenende“ wie beschrieben gefördert werden?',
-  // A vote names the gremium that votes by its id.
+  /** A vote names the gremium that votes by its id. */
   eligibleGroup: 'g0000000-0000-0000-0000-000000000001',
   config: {
     options: ['yes', 'no', 'abstain'],
@@ -156,7 +160,7 @@ const MOCK_VOTE: Vote = {
   quorum: { type: 'percent', value: 50 },
   openedAt: '2026-06-06T09:00:00Z',
   closedAt: null,
-  // Not every present member voted yet, so the server hides the counts.
+  /** Not every present member voted yet, so the server hides the counts. */
   tally: { counts: {}, eligible: 12, voted: 8, present: 12, revealed: false, quorumMet: true, leading: null },
   myBallot: { cast: false, choice: null },
   representedCast: false,
@@ -178,6 +182,7 @@ const MOCK_ELECTION: ElectionConfig = {
   abstainCountsQuorum: true,
   guestsVote: false,
 };
+/** A closed personnel election on the non-public item; a tie waits for the lot. */
 const MOCK_ELECTION_ROW: MeetingVoteOutWire = {
   id: MOCK_ELECTION_ID,
   applicationId: null,
@@ -483,8 +488,10 @@ const MOCK_EFFECTIVE_FORM: EffectiveForm = {
       ],
     },
     {
-      // One field of each remaining type, so the wizard of "Sonstiger Antrag" shows
-      // every field look of the forms engine.
+      /**
+       * One field of each remaining type, so the wizard of "Sonstiger Antrag" shows every field
+       * look of the forms engine.
+       */
       key: 'more',
       label: { de: 'Eckdaten', en: 'Key facts' },
       fields: [
@@ -765,7 +772,7 @@ const MOCK_TASKS: ApplicationListItemWire[] = [
     title: 'Hardware für Fachschaftsraum',
     createdAt: '2026-06-06T08:15:00Z',
     updatedAt: '2026-06-07T16:00:00Z',
-    // The time of the last status change: "Wartet seit" counts from here.
+    /** The time of the last status change: "Wartet seit" counts from here. */
     stateSince: '2026-06-07T16:00:00Z',
   },
   {
@@ -784,7 +791,7 @@ const MOCK_TASKS: ApplicationListItemWire[] = [
     currency: 'EUR',
     title: 'Förderung Sommerfest',
     createdAt: '2026-06-04T11:00:00Z',
-    // No stateSince, as from an older server: the page falls back to updatedAt.
+    /** The row has no `stateSince`, so the page falls back to `updatedAt`. */
     updatedAt: '2026-06-08T09:30:00Z',
   },
 ];
@@ -890,7 +897,6 @@ const MOCK_TRANSITIONS: TransitionOutWire[] = [
 
 const LOGOUT_OUT = { logout_url: null };
 
-// Meetings and protocol: mutable in-memory state.
 const MOCK_MEETING_ID = 'd0000000-0000-0000-0000-000000000001';
 const MOCK_PROTOCOL_ID = 'e0000000-0000-0000-0000-000000000099';
 
@@ -901,29 +907,31 @@ let MOCK_MEETING: MeetingOutWire = {
   startTime: '18:00:00',
   status: 'live',
   activeApplicationId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-  // The room handles the third item of the seeded agenda below.
+  /** The room handles the third item of the seeded agenda below. */
   currentAgendaItemId: 'ag-s3',
-  // The start page reads these (P5a): "seit 18:04", "Jetzt: TOP 3 · …", "3 / 6".
+  /** The start page reads these three fields: "seit 18:04", "Jetzt: TOP 3 · …", "3 / 6". */
   startedAt: '2026-06-12T16:04:00Z',
   currentAgendaItem: { position: 3, title: 'Förderung Ersti-Wochenende' },
   agendaItemCount: 6,
   gremiumId: null,
   gremiumName: 'Studierendenparlament',
   protocolId: MOCK_PROTOCOL_ID,
-  // The demo user keeps the minutes: an id of the roster below, so that the settings
-  // dialog preselects the same person that the list row shows.
+  /**
+   * The demo user keeps the minutes: an id of the roster below, so that the settings dialog
+   * preselects the same person that the list row shows.
+   */
   protokollantId: MOCK_PRINCIPAL.sub,
   protokollantName: MOCK_PRINCIPAL.display_name,
   isProtokollant: true,
   canControl: true,
-  // The demo user leads the meeting: the dialogs of the meeting page show.
+  /** The demo user leads the meeting: the dialogs of the meeting page show. */
   canManage: true,
   canWrite: true,
   canManageVotes: true,
   canFinalize: true,
-  // The demo user holds `vote.cast` in the gremium of the meeting.
+  /** The demo user holds `vote.cast` in the gremium of the meeting. */
   canVote: true,
-  // The demo user keeps the minutes since the start; a handover adds a period.
+  /** The demo user keeps the minutes since the start; a handover adds a period. */
   keeperPeriods: [
     {
       principalId: MOCK_PRINCIPAL.sub,
@@ -937,13 +945,13 @@ let MOCK_MEETING: MeetingOutWire = {
     },
   ],
   plannedHandover: null,
-  // The meeting is public, guests vote; the lead sees the code and the requests.
+  /** The meeting is public, guests vote; the lead sees the code and the requests. */
   publicJoin: true,
   guestsMode: 'vote',
   joinCode: '7KQ4MP',
   admittedGuests: 7,
   pendingGuests: 3,
-  // The gremium of the live meeting has no quorum, so it may be public.
+  /** The gremium of the live meeting has no quorum, so it may be public. */
   publicJoinAllowed: true,
   votes: [
     {
@@ -958,20 +966,19 @@ let MOCK_MEETING: MeetingOutWire = {
       counts: { ja: 12, nein: 3, enthaltung: 1 },
       leading: 'ja',
       closesAt: null,
-      // Not every present member voted yet, so the tally stays hidden.
+      /** Not every present member voted yet, so the tally stays hidden. */
       voted: 9,
       present: 12,
       revealed: false,
       majorityRule: 'simple',
       secret: false,
-      // A vote with guests: no quorum, the majority of the cast votes.
+      /** A vote with guests: no quorum, the majority of the cast votes. */
       quorum: null,
       guestsVote: true,
       presentMembers: 5,
       presentGuests: 7,
       openedAt: '2026-06-12T16:48:00Z',
     },
-    // A closed personnel election on the non-public item; a tie waits for the lot.
     MOCK_ELECTION_ROW,
     {
       id: 'a0000000-0000-0000-0000-0000000000a2',
@@ -1000,11 +1007,11 @@ const MOCK_PLANNED_MEETING: MeetingOutWire = {
   status: 'planned',
   gremiumId: null,
   gremiumName: 'Haushaltsausschuss',
-  // This gremium has a quorum: no public participation (the switch is locked).
+  /** This gremium has a quorum: no public participation (the switch is locked). */
   publicJoinAllowed: false,
   votes: [],
   createdAt: '2026-06-01T10:00:00Z',
-  // The demo user leads it and nobody keeps the minutes yet: the preparation shows.
+  /** The demo user leads it and nobody keeps the minutes yet: the preparation shows. */
   protocolId: null,
   protokollantId: null,
   protokollantName: null,
@@ -1022,8 +1029,10 @@ const MOCK_PLANNED_AGENDA = [
 ];
 
 /**
- * GET /delegations: the user represents a member in the planned meeting, and in the live
- * meeting Vera Vertretung is represented by Sven Stellvertreter (the lead sees it and can revoke it).
+ * GET /delegations: the user represents a member in the planned meeting, and in the live meeting
+ * Vera Vertretung is represented by Sven Stellvertreter (the lead sees it and can revoke it). Two
+ * delegations of upcoming meetings feed the admin overview: one with the vote, one to a pool
+ * substitute.
  */
 let MOCK_DELEGATIONS: Delegation[] = [
   {
@@ -1060,8 +1069,6 @@ let MOCK_DELEGATIONS: Delegation[] = [
     revocable: true,
     direction: null,
   },
-  // Two delegations of upcoming meetings for the admin overview: one with the vote, one
-  // to a pool substitute.
   {
     id: 'f0000000-0000-0000-0000-000000000003',
     meetingId: 'd0000000-0000-0000-0000-000000000106',
@@ -1277,18 +1284,20 @@ interface MockAttendance {
   canVote: boolean;
 }
 
-/** The roster of the mock Gremium. The demo user is in it with the id of the principal. */
+/**
+ * The roster of the mock Gremium. The demo user is in it with the id of the principal.
+ * Vera Vertretung has a delegation for the live meeting, so "present" gives 409. Olga Offen
+ * is a member without a vote, so the lead cannot enter a substitute for her.
+ */
 let MOCK_ATTENDANCE: MockAttendance[] = [
   { principalId: MOCK_PRINCIPAL.sub, displayName: MOCK_PRINCIPAL.display_name ?? null, email: MOCK_PRINCIPAL.email ?? null, status: null, source: null, note: null, isSelf: true, canKeepProtocol: true, canVote: true },
   { principalId: 'p-2', displayName: 'Max Mustermann', email: 'max@example.com', status: 'present', source: 'lead', note: null, isSelf: false, canKeepProtocol: true, canVote: true },
   { principalId: 'p-3', displayName: 'Erika Beispiel', email: 'erika@example.com', status: 'excused', source: 'self', note: 'Prüfung', isSelf: false, canKeepProtocol: false, canVote: true },
   { principalId: 'p-4', displayName: 'Uli Übernahme', email: 'uli@example.com', status: 'present', source: 'self', note: null, isSelf: false, canKeepProtocol: true, canVote: true },
   { principalId: 'p-5', displayName: 'Rolf Redner', email: 'rolf@example.com', status: 'present', source: 'lead', note: null, isSelf: false, canKeepProtocol: true, canVote: true },
-  // Vera Vertretung has a delegation for the live meeting, so "present" gives 409.
   { principalId: 'p-6', displayName: 'Vera Vertretung', email: 'vera@example.com', status: 'excused', source: 'self', note: null, isSelf: false, canKeepProtocol: true, canVote: true },
   { principalId: 'p-7', displayName: 'Sven Stellvertreter', email: 'sven@example.com', status: 'present', source: 'self', note: null, isSelf: false, canKeepProtocol: false, canVote: true },
   { principalId: 'p-8', displayName: 'Fritz Fehlend', email: 'fritz@example.com', status: 'absent', source: 'lead', note: null, isSelf: false, canKeepProtocol: false, canVote: true },
-  // Olga Offen is a member without a vote: the lead cannot enter a substitute for her.
   { principalId: 'p-9', displayName: 'Olga Offen', email: 'olga@example.com', status: null, source: null, note: null, isSelf: false, canKeepProtocol: false, canVote: false },
 ];
 

@@ -41,11 +41,11 @@ export interface Expense {
   applicationId: Uuid | null;
   applicationTitle: string | null;
   transferId: Uuid | null;
-  // `actor` = raw principal `sub` (audit). `actorName` = server-resolved display
-  // name. Always show `actorName` in the UI, never the UUID.
+  /** The raw principal `sub` (audit). The UI shows `actorName`, never the UUID. */
   actor: string | null;
+  /** The display name of `actor`, resolved by the server. */
   actorName: string | null;
-  // Extra metadata, all optional. Dates as ISO date (YYYY-MM-DD).
+  /** Extra metadata from here on, all optional. Dates are ISO dates (YYYY-MM-DD). */
   invoiceDate: string | null;
   paymentDate: string | null;
   correspondent: string | null;
@@ -53,13 +53,15 @@ export interface Expense {
   referenceNumber: string | null;
   paymentMethod: PaymentMethod | null;
   category: string | null;
-  // Linked invoice: 1 invoice : N bookings.
+  /** The linked invoice. One invoice can back many bookings. */
   invoiceId: Uuid | null;
   invoiceNumber: string | null;
-  // Sub-bookings: `parentExpenseId` set -> this booking IS a sub-booking.
-  // `childCount` > 0 -> it HAS sub-bookings. Such a booking expands, `amount` is
-  // the sum of the children, and `amount` is then read-only.
+  /** Set when this booking is a sub-booking. */
   parentExpenseId: Uuid | null;
+  /**
+   * The number of sub-bookings. A booking with sub-bookings expands, and its `amount` is the
+   * sum of the children and read-only.
+   */
   childCount: number;
   createdAt: string;
 }
@@ -731,9 +733,8 @@ export class BudgetTreeApi {
   }
 }
 
-// The shared path simplification lives in @shared/budget-path. This file imports it,
-// uses it below, and re-exports it so that the existing imports keep working.
 import { simplifyPathKey } from '@shared/budget-path';
+/** Re-exported from `@shared/budget-path`, so the imports from this file keep working. */
 export { simplifyPathKey };
 
 /** Tree (recursive) -> flat option list (pre-order, "pathKey - name", simplified). */

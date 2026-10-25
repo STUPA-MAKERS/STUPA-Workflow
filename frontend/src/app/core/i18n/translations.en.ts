@@ -379,7 +379,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'apply.positions.value': 'Value (€)',
   'apply.positions.preferred': 'Preferred',
   'apply.positions.positionValue': 'Position value',
-  // Review-step summary: counted cost positions.
   'apply.positions.countOne': '1 cost position',
   'apply.positions.countOther': '{count} cost positions',
   'apply.positions.remove': 'Remove',
@@ -433,7 +432,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
     'No email received? Check your spam folder. Keep the link private – it opens your application.',
   'apply.confirm.home': 'Back to start',
 
-  // Signed-in submitter: the backend confirms the address at creation time.
+  /** For a signed-in submitter: the backend confirms the address at creation time. */
   'apply.submitted.heading': 'Application submitted',
   'apply.submitted.badge': 'Submitted',
   'apply.submitted.body':
@@ -1077,7 +1076,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.vote.openBlocked': 'Close or cancel the open vote first.',
   'meetings.vote.close': 'Close vote',
   'meetings.vote.cancel': 'Cancel vote',
-  // Personnel elections.
   'meetings.vote.kind.label': 'Kind of vote',
   'meetings.vote.kind.motion': 'Motion',
   'meetings.vote.kind.election': 'Election',
@@ -1890,7 +1888,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'budget.tree.fyDelete': 'Delete fiscal year',
   'budget.tree.fyDeleteTitle': 'Delete fiscal year?',
   'budget.tree.fyDeleteConfirm': 'The fiscal year {year} is deleted. This cannot be undone.',
-  // 409 reasons: the server names exactly one of these causes.
+  /** A 409 reason, like the next keys: the server names exactly one of these causes. */
   'budget.tree.fyBlocked.bookings':
     'This fiscal year still carries bookings. Delete them first, or move them to another year.',
   'budget.tree.fyBlocked.allocations':
@@ -1966,7 +1964,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.form.allowNoOffers': 'Allow opting out of comparison offers',
 
   'admin.flow.title': 'Flow editor',
-  // Flow validation: what the editor rejects in a graph before it is saved.
   'admin.flow.err.noStates': 'The flow has no states.',
   'admin.flow.err.duplicateKeys': 'Duplicate state keys: {keys}',
   'admin.flow.err.invalidKey':
@@ -2166,7 +2163,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.flow.actionDesc.budgetBook': 'Books the amount out of the cost centre for good.',
   'admin.flow.actionDesc.openVote': 'Opens a vote for the application in the running meeting.',
   'admin.flow.actionDesc.requeue': 'Puts the application back for re-processing / requeue.',
-  // Flow editor: header, toolbar, legend, colours, guard builder, versions.
   'admin.flow.versions': 'Versions',
   'admin.flow.versionsClose': 'Back to editing',
   'admin.flow.versionActive': 'version {n} active',
@@ -2231,7 +2227,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
     '“{name}” is deleted together with its delivery history. This cannot be undone.',
   'admin.webhook.deleted': 'Webhook deleted.',
   'admin.webhook.deleteFailed': 'Delete failed.',
-  // Delivery diagnosis: the server keeps only the newest attempt per webhook.
+  /** The delivery diagnosis: the server keeps only the newest attempt per webhook. */
   'admin.webhook.delivery.title': 'Delivery status',
   'admin.webhook.delivery.state': 'Status',
   'admin.webhook.delivery.reason': 'Reason',
@@ -2510,7 +2506,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
 
   'admin.deadlines.title': 'Deadlines & windows',
 
-  // Agent tokens (OAuth grants) of every principal — the admin view with a kill switch.
   'admin.oauthGrants.title': 'Agent access',
   'admin.oauthGrants.loading': 'Loading grants…',
   'admin.oauthGrants.error': 'The grants did not load.',
@@ -2536,7 +2531,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.oauthGrants.alreadyGone': 'This grant did not exist any more.',
   'admin.oauthGrants.revokeFailed': 'The grant did not revoke.',
 
-  // Corporate-design variants: the logo sets of the rendered documents.
   'admin.cdVariants.title': 'Document variants',
   'admin.cdVariants.create': 'Create a document variant',
   'admin.cdVariants.edit': 'Edit the document variant',
@@ -2594,7 +2588,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.deleg.revoked': 'Delegation revoked.',
   'admin.deleg.revokeFailed': 'Revocation failed.',
 
-  // Substitute pool, shown in the Gremium member administration.
   'admin.substitutes.title': 'Substitutes',
   'admin.substitutes.add': 'Add substitute',
   'admin.substitutes.search': 'Search person',
@@ -2608,7 +2601,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.substitutes.duplicate': 'This entry already exists.',
   'admin.substitutes.failed': 'Action failed.',
 
-  // Meeting delegation: card on the meeting page plus dialog.
   'delegation.card.title': 'Proxy',
   'delegation.card.deadline': 'Can be set up until {date}.',
   'delegation.card.deadlinePassed':
@@ -2629,7 +2621,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'delegation.toast.revoked': 'Proxy revoked.',
   'delegation.toast.revokeFailed': 'Revocation failed.',
 
-  // Participant view of a meeting and the beamer.
   'participant.attendance.title': 'Your attendance',
   'participant.attendance.delegated':
     'You have a proxy for this meeting. Revoke the proxy to report as present.',
@@ -2745,7 +2736,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.forms.advanced': 'Advanced options',
   'admin.forms.duplicate': 'Duplicate',
 
-  // Question groups. One group container is one wizard step.
+  /** A question group. One group container is one wizard step. */
   'admin.form.groupStep': 'Section {n}',
   'admin.form.groupTitleDe': 'Group title (DE)',
   'admin.form.groupTitleEn': 'Group title (EN)',
@@ -2756,7 +2747,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.form.moveGroupUp': 'Move group up',
   'admin.form.moveGroupDown': 'Move group down',
   'admin.form.dragGroup': 'Drag group to reorder',
-  // Form editor: outline, type menu, settings card.
   'admin.form.outline': 'Questions of the form',
   'admin.form.groupMenu': 'Actions for section {n}',
   'admin.form.typeMenu': 'Choose a question type',
@@ -3231,7 +3221,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'invoices.toast.paid': 'Invoice marked as paid.',
   'invoices.untitled': 'Invoice without supplier',
   'invoices.detail.noBookings': 'No booking yet.',
-  // Public meeting with QR code.
   'vote.majorityCast.simple': 'Simple majority of the votes cast',
   'vote.majorityCast.absolute': 'Absolute majority of the votes cast',
   'vote.majorityCast.two_thirds': 'Two-thirds majority of the votes cast',
@@ -3486,7 +3475,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
     '{n} of them have no public version yet. The platform makes it now; until then they do not appear.',
   'admin.gremien.publicConfirm.confirm': 'Publish',
   'admin.audit.action.protocol_publication': 'Protocol publication changed',
-  // The tab "Gremien" (/gremien).
   'gremien.title': 'Committees',
   'gremien.filters': 'Filters',
   'gremien.none': 'Choose a committee',
@@ -3818,7 +3806,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.helpTickets.error.blocked': 'The blocked senders could not be loaded.',
   'admin.helpTickets.error.unblock': 'The block could not be lifted.',
 
-  // To-dos (boards, card, list, settings) and the group "To-dos" of tasks.
   'nav.todos': 'Boards',
   'tasks.group.applications': 'Applications',
   'tasks.group.todos': 'To-dos',

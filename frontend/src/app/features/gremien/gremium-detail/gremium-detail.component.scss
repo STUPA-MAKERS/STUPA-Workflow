@@ -1,9 +1,6 @@
 @use 'breakpoints' as bp;
 @use 'dot-parts' as dots;
 
-/* The open gremium. Side by side it is a sheet (surface 1, large radius) as high as the
-   pane: the header and the tab bar stay, and only the body below them scrolls, down to
-   the bottom edge of the sheet. One pane at a time it sits on the page, which scrolls. */
 :host {
   display: flex;
   flex: 1 1 auto;
@@ -29,7 +26,6 @@
 .gd--none.gd--split {
   padding: var(--space-6);
 }
-/* The loading sheet: bars in the size of the logo, the name and the facts. */
 .gd__skelLogo {
   width: 2.5rem;
   height: 2.5rem;
@@ -46,7 +42,6 @@
 .gd__skelLine {
   width: 16rem;
 }
-/* ------------------------------------------------------------------ header */
 .gd__head {
   display: flex;
   flex: none;
@@ -65,8 +60,7 @@
   gap: 14px;
   min-width: 0;
 }
-/* In the bar the row centres the logo (48px, 40px on a phone) on the axis of the icon
-   buttons, in place of the padding the bar gives a one-line title. */
+// Centres the logo (48px, 40px on a phone) on the axis of the icon buttons.
 .gd__head .gd__titleRow {
   padding-block: 6px;
 }
@@ -74,7 +68,6 @@
   min-width: 0;
 }
 
-/* Items with a dot between two of them, also after a wrap (never a dot at a line start). */
 .gd__line {
   --gd-sep: 24px;
   overflow-x: clip;
@@ -103,12 +96,10 @@
 .gd__tabs {
   flex: none;
 }
-/* One pane: the pages of the tabs (`app-tab-pager`) have the room of the body above. */
 .gd__pager {
   --tab-pager-page-top: 22px;
 }
 
-/* ------------------------------------------------------------------ body */
 .gd__body {
   display: flex;
   flex-direction: column;
@@ -122,8 +113,6 @@
   overscroll-behavior: contain;
   padding: 22px var(--space-6) var(--space-6);
 }
-/* The attendance matrix scrolls inside itself (sticky head and first column), so the
-   body does not scroll around it. */
 .gd--split .gd__body--fill {
   overflow: hidden;
 }

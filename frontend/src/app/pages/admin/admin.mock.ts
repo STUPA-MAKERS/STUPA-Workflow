@@ -82,10 +82,13 @@ export const MOCK_PERMISSIONS: string[] = [
   'ticket.manage',
 ];
 
+/**
+ * The persons of the admin mock. The first entries are accounts of an earlier OIDC
+ * provider: these persons log in with a new `sub` and appear twice. The first one can be
+ * merged into Robin Mitglied without a conflict; a merge into Alex Admin shows the
+ * conflicts.
+ */
 export const MOCK_PRINCIPALS: AdminPrincipal[] = [
-  // Keycloak-era accounts: the OIDC provider moved to authentik, so these persons log in
-  // with a new `sub` and appear twice. The first one can be merged into Robin Mitglied
-  // without a conflict; a merge into Alex Admin shows the conflicts.
   {
     id: 'p-old-1',
     sub: 'e03ad7d7-5c1e-4f0a-9a3b-6f2a1d9c8b70',
@@ -301,8 +304,10 @@ export const MOCK_FORM_DRAFTS: Record<string, FormDraft> = {
       de: 'Bitte beschreibe dein Förderprojekt möglichst genau.\n\nAnträge werden im STUPA beraten.',
       en: 'Please describe your funding project as precisely as possible.',
     },
-    // Two steps with one field of each family that has its own options: choice options,
-    // cost positions, a currency range and a computed field.
+    /**
+     * Two steps with one field of each family that has its own options: choice options,
+     * cost positions, a currency range and a computed field.
+     */
     fields: [
       { key: 'section_0', type: 'section', label: { de: 'Vorhaben', en: 'Project' } },
       { key: 'title', type: 'text', label: { de: 'Projekttitel', en: 'Project title' }, required: true },
@@ -673,7 +678,7 @@ export const MOCK_AUDIT_ENTRIES: AuditEntry[] = [
 /**
  * The global flow of mock mode: a review step, a request for more details that comes
  * back automatically, and a vote of the STUPA with its pass and fail branches. The
- * positions put it on the grid of the board Admin-Flow-Editor.
+ * positions put it on the grid of the flow editor.
  */
 export const MOCK_FLOW: FlowGraph = {
   states: [
@@ -693,7 +698,7 @@ export const MOCK_FLOW: FlowGraph = {
       label: { de: 'Gremium-Abstimmung', en: 'Committee vote' },
       kind: 'vote',
       editAllowed: false,
-      // The gremium comes from the cost center of the application (flow variant B).
+      /** The gremium comes from the cost center of the application. */
       config: { gremiumSource: 'budget' },
     },
     { key: 'bewilligt', label: { de: 'Bewilligt', en: 'Approved' }, color: '#72a384', isTerminal: true, editAllowed: false },

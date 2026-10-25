@@ -14,7 +14,7 @@ import { DraftAttachmentsService, type DraftFile } from '../draft-attachments.se
 
 /**
  * The draft files of one field of the wizard, or of the general block "Anhänge"
- * (`fieldKey` null), board Antrag-stellen.
+ * (`fieldKey` null).
  *
  * A row per file: name (it wraps, never cut), size and scan state as status text, and
  * a delete button. A file the server lost (422 on the submit) shows "Nicht mehr

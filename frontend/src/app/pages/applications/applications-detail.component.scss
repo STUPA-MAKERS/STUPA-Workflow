@@ -12,8 +12,6 @@
   display: none !important;
 }
 
-/* The sheet the application sits on (surface 1, large radius). One pane at a time it
-   loses the sheet and sits on the page, like the other single views. */
 .ad {
   display: flex;
   flex: 1 1 auto;
@@ -26,9 +24,6 @@
   border-radius: var(--radius-2xl);
   background: var(--color-surface-1);
 }
-/* ------------------------------------------------------------------ loading shapes */
-/* The busy sheet uses the classes of the loaded one (`.ad__head`, `.ad__title`,
-   `.ad__cols`, `.rowgroup`), so only the bars need a size here. */
 .ad__skelIcon {
   display: grid;
   place-items: center;
@@ -58,7 +53,7 @@
 .ad__skelLine {
   width: 6rem;
 }
-/* The size of an `app-button` of size md, and of a typical label. */
+// The size of an `app-button` of size md, and of a typical label.
 .ad__skelButton {
   width: 11rem;
   height: var(--control-height);
@@ -79,14 +74,13 @@
 .ad__skelSec--wide {
   width: 7.5rem;
 }
-/* The attachments panel heads its section with a row as high as its upload button. */
 .ad__skelFilesHead {
   display: flex;
   align-items: center;
   min-height: var(--control-height-sm);
   padding-inline-start: var(--space-1);
 }
-/* One `app-field-row`: 58px, a 16px label line over a 22px value line. */
+// One `app-field-row`: 58px, a 16px label line over a 22px value line.
 .ad__skelRow {
   display: flex;
   flex-direction: column;
@@ -102,8 +96,8 @@
   font-size: var(--fs-md);
   line-height: 1.375rem;
 }
-/* One day of `app-history`: the date over its rows, 6px apart; a row is an 18px icon
-   beside a title line and two small lines. */
+// One day of `app-history`: the date over its rows, 6px apart; a row is an 18px icon beside a
+// title line and two small lines.
 .ad__skelDay {
   display: flex;
   flex-direction: column;
@@ -144,8 +138,7 @@
   line-height: 1.125rem;
 }
 
-/* C: the shown application while the next one loads. The sheet keeps its surface; its
-   content dims after 300ms. */
+// The content dims after 300ms while the next application loads.
 .ad--split {
   position: relative;
 }
@@ -160,28 +153,20 @@
   margin: var(--space-5) 0;
 }
 
-/* ------------------------------------------------------------------ header */
 .ad__line {
   --ad-sep: 24px;
 }
-/* Items with a dot between two of them, also after a wrap (DECISIONS: never a dot at a
-   line start or a line end).
-
-   Every part draws its dot before it, in a box of `--ad-sep`. The parts start
-   `--ad-sep` before the clip box, so the dot of the first part on each line falls
-   outside it. `overflow-x: clip` leaves the line height alone. */
+// Each part draws its dot in a `--ad-sep` box and starts `--ad-sep` before the clip, so the
+// first dot of each line is hidden. `overflow-x: clip` leaves the line height alone.
 .ad__seps {
   overflow-x: clip;
 }
 .ad__parts {
   @include dots.list(var(--ad-sep));
 }
-/* A part never breaks inside, so a wrap takes its dot to the line start, where the
-   clip hides it. */
 .ad__part {
   @include dots.part(var(--ad-sep));
 }
-/* "gebunden 900,00 € (bewilligt statt beantragt)" under the cost centre. */
 .ad__bound {
   display: block;
   font-size: var(--fs-small);
@@ -197,11 +182,8 @@
   margin-top: var(--space-2);
 }
 
-/* ------------------------------------------------------------------ body */
-/* Two columns in the ratio 1.4 : 1, as on the board. Each column has a floor: the
-   right one fits the two dates of the Details pair, the left one the attachment rows.
-   When the sheet cannot give both floors (below about 740px), the columns wrap and
-   stack. The floors use `min(100%, …)`, so a column never overflows the sheet. */
+// Each column has a floor; below about 740px of sheet the columns stack. `min(100%, …)` keeps
+// a column inside the sheet.
 .ad__cols {
   display: flex;
   flex-wrap: wrap;
@@ -245,14 +227,11 @@
   padding: 0 var(--space-1);
 }
 
-/* Two fields in one row of a field group (Eingegangen | Aktualisiert). A cell is at
-   least 11rem wide, which holds a medium date in DE and EN on one line. A narrower pair
-   puts the fields one below the other. */
+// 11rem holds a medium date in DE and EN on one line.
 .ad__pair {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
 }
-/* A date never breaks inside a word. */
 .ad__pair time {
   white-space: nowrap;
 }
@@ -262,16 +241,11 @@
   overflow-wrap: anywhere;
 }
 
-/* ------------------------------------------------------------------ edit */
 .ad--edit {
   --ad-edit-bar: 60px;
   --ad-gutter: var(--layout-gutter);
 }
-/* The bar of the edit mode takes the place of the header (board Anträge-Bearbeiten).
-   It stays at the top while the form scrolls below it, so Abbrechen is always in reach
-   ("Speichern" is the floating button) (DECISIONS: the header controls of a pane stay fixed). Side by side
-   the pane scrolls, one pane at a time the page scrolls below the bar of the layout;
-   `--ld-sticky-top` (0 side by side) holds the bar at the top of either. */
+// `--ld-sticky-top` (0 side by side) holds the bar at the top of the pane or of the page.
 .ad__editBar {
   position: sticky;
   top: var(--ld-sticky-top, 0px);
@@ -283,24 +257,16 @@
   padding: var(--space-2) 0;
   border-bottom: var(--border-width) solid var(--color-border);
 }
-/* On the sheet: the top of the sheet in surface 2. The detail pane of the list/detail
-   layout is a window with round corners, so its corners clip the bar while it is stuck
-   and the sheet scrolls under it. */
 .ad--split .ad__editBar {
   margin-inline: calc(-1 * var(--space-6));
   padding-inline: var(--space-6);
   background: var(--color-surface-2);
 }
-/* One pane at a time: fixed chrome on its own raised surface (surface 3, as the phone
-   bottom bar), from edge to edge of the page, so no field shows beside it. */
 .ad--edit:not(.ad--split) .ad__editBar {
   margin-inline: calc(-1 * var(--ad-gutter));
   padding-inline: var(--ad-gutter);
   background: var(--color-surface-3);
 }
-/* The fade below the bar: the form fades out as it scrolls under the bar (the shared
-   top fade of a scroll area). At rest it lies over the gap above the first field, in the
-   colour of the ground, so nothing shows. */
 .ad__editFade {
   position: absolute;
   inset: 100% 0 auto;
@@ -314,7 +280,6 @@
 .ad--edit.ad--split {
   --ad-edit-ground: var(--color-surface-1);
 }
-/* The page side padding of a phone (`.page-shell`). */
 @include bp.phone {
   .ad--edit {
     --ad-gutter: var(--space-4);
@@ -328,7 +293,6 @@
   flex: none;
   color: var(--color-text-muted);
 }
-/* The buttons keep their width; the title gives way. */
 .ad__editBar app-button {
   flex: none;
 }
@@ -338,15 +302,12 @@
   margin: 0;
   font-size: var(--fs-md);
 }
-/* The fields of the form: the global `.fe-form` grid (styles.scss). */
-/* The end of the form keeps room for the floating "Speichern" (56px and 16px around it). */
+// Room for the floating "Speichern": 56px and 16px around it.
 .ad__edit {
   min-width: 0;
   padding-bottom: calc(56px + 2 * var(--space-4));
 }
 
-/* ------------------------------------------------------------------ comments */
-/* The count of the comments on the header action: a small plate after the label. */
 .ad__commentsN {
   display: inline-grid;
   place-items: center;
@@ -359,10 +320,6 @@
   font-size: var(--fs-small);
   font-weight: var(--fw-medium);
 }
-/* The chat fills the sheet: the sheet passes its height down (`contentScrolls`), the log
-   takes the height between the head of the sheet and the composer and scrolls inside, and
-   the composer stays at the foot. The sheet is surface 2, so the messages of others take
-   the next step. */
 .ad__chat {
   flex: 1 1 auto;
   min-height: 0;
@@ -373,22 +330,16 @@
   --chat-composer-surface: transparent;
   --chat-composer-bleed: var(--space-4);
 }
-/* The bottom sheet of a phone has no height of its own: it takes the height of its
-   content up to 85dvh. A log with basis 0 adds only its min-height, so the sheet stays
-   at half the screen. Here the log takes the height of the thread, the sheet grows with
-   it to its cap, and the log then scrolls inside. */
+// A log with basis 0 adds only its min-height, so here the log takes the height of the thread
+// and the sheet grows with it to its 85dvh cap.
 .ad__chat--sheet {
   --chat-log-basis: auto;
 }
 
-/* ------------------------------------------------------------------ dialogs */
-/* The tree scrolls here, above the fiscal year. An end fades only
-   when more rows are past it (`appScrollFade` sets the classes). */
 .ad__ccFy {
   display: block;
   margin-top: var(--space-3);
 }
-/* Same affordance as the 404 page: a way out, styled as a button. */
 
 @include bp.phone {
   .ad__pair {
@@ -396,10 +347,6 @@
   }
 }
 
-/* Phone, one pane: the rule under the head and the line under the tabs run over the page
-   gutter (`.page-shell`, --space-4 on a phone) to the screen edges, as on the boards;
-   the head and the tabs keep their place. The pages of the tabs run to the edges too, so
-   a page that a swipe moves leaves at the edge of the screen. */
 @include bp.phone {
   .ad:not(.ad--split) .ad__head {
     margin-inline: calc(-1 * var(--space-4));

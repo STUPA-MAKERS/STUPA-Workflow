@@ -8,9 +8,9 @@
  *
  * - Every connector dot is a port at its fixed place on the east side of its box. Lines
  *   start at their dot and end in the middle of the west side of the target box.
- * - Transitions with the same source and target join into one line after their dots
- *   (`mergeEdges`), and the bundle carries one label: the name of a single transition, both names for two,
- *   else the count.
+ * - Transitions with the same source and target join into one line after their dots (`mergeEdges`),
+ *   and the bundle carries one label: the name of a single transition, both names for two, else the
+ *   count.
  * - Edge labels get their own place in the layer between source and target, so a label
  *   never covers a box or another label.
  * - Proxies (the ends outside an open group) sit in the first layer (sources) or in the
@@ -146,6 +146,12 @@ export function roundedPath(points: readonly Point[], r = 10): string {
   return p.length > 1 ? `${d} L ${last.x} ${last.y}` : d;
 }
 
+/**
+ * The ELK options of the whole graph. The order of the states and transitions in the flow
+ * is the tie breaker, so an edit that does not change the structure does not move the
+ * boxes. The top padding leaves room above a box for the kind of a vote state
+ * ("Abstimmung").
+ */
 const ROOT_OPTIONS: Record<string, string> = {
   'elk.algorithm': 'layered',
   'elk.direction': 'RIGHT',
@@ -158,12 +164,9 @@ const ROOT_OPTIONS: Record<string, string> = {
   'elk.spacing.edgeLabel': '4',
   'elk.layered.mergeEdges': 'true',
   'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
-  // The order of the states and transitions in the flow is the tie breaker, so an edit
-  // that does not change the structure does not move the boxes.
   'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
   'elk.layered.cycleBreaking.strategy': 'MODEL_ORDER',
   'elk.edgeLabels.inline': 'false',
-  // Room above a box for the kind of a vote state ("Abstimmung").
   'elk.padding': '[top=50,left=40,bottom=40,right=40]',
 };
 

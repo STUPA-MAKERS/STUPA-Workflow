@@ -26,11 +26,6 @@
   align-items: center;
   gap: var(--space-2);
 }
-/*
- * The end slot sits at the end of the row through space-between, and at the start of its own
- * line when it wraps. A count next to the title takes the free space when actions follow it,
- * and an end slot without a title pushes itself to the end.
- */
 .sh__count:has(+ .sh__end:not(:empty)) {
   margin-inline-end: auto;
 }

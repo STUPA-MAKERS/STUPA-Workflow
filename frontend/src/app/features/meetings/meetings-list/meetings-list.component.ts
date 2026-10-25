@@ -64,7 +64,7 @@ import { weekdayName } from '@shared/date-format';
 import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.directive';
 
 /**
- * The list view of the meeting overview (`/meetings`, board Sitzungen, variant A): a
+ * The list view of the meeting overview (`/meetings`): a
  * list/detail pane page like the applications and the tasks.
  *
  * Left: the title with the switch "Liste | Kalender" and the calendar subscription, the

@@ -18,7 +18,6 @@
   font-weight: var(--fw-medium);
 }
 
-/* Before → after, on surface 3. */
 .hd__pair {
   display: flex;
   align-items: center;
@@ -114,7 +113,6 @@
   color: var(--color-danger);
 }
 
-/* A phone: "Ändern" goes below the pair, so both names keep their room. */
 @include bp.phone {
   .hd__pair {
     flex-wrap: wrap;

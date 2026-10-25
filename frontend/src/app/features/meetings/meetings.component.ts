@@ -63,6 +63,9 @@ import { beamerUrl } from '../voting/beamer-link.util';
  * and the lead, and the participant view for a member. This component wires
  * the component-scoped services and the meeting dialogs; its public surface also
  * drives the specs.
+ *
+ * The overview in a pane layout (the list beside the detail, the wide calendar) fills the
+ * free height and scrolls only inside its panes.
  */
 @Component({
   selector: 'app-meetings',
@@ -95,8 +98,6 @@ import { beamerUrl } from '../voting/beamer-link.util';
     AgendaItemDialogComponent,
     HandoverDialogComponent,
   ],
-  // The overview in a pane layout (the list beside the detail, the wide calendar) fills
-  // the free height and scrolls only inside its panes.
   host: { '[class.pane-page]': 'overviewPane()' },
   templateUrl: './meetings.component.html',
   styleUrl: './meetings.component.scss',
@@ -409,7 +410,6 @@ export class MeetingsComponent {
     this.agendaSvc.setNonPublic(m.id, item, nonPublic);
   }
 
-  // The display helpers below are pure, see meetings-display.util.
   voteOptionLabel(opt: string): string {
     return voteOptionLabel(opt, (key) => this.i18n.translate(key));
   }

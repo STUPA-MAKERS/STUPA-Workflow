@@ -14,10 +14,12 @@ import { axe, type AxeResults, type JestAxeConfigureOptions } from 'jest-axe';
 
 export const A11Y_RULES: JestAxeConfigureOptions = {
   rules: {
-    // jsdom cannot compute this rule. The token test covers it instead.
+    /** jsdom cannot compute this rule. The token test covers it instead. */
     'color-contrast': { enabled: false },
-    // A single component renders without a <main> landmark wrapper. The shell view
-    // scan checks the landmark structure, not each fragment.
+    /**
+     * A single component renders without a <main> landmark wrapper. The shell view scan checks the
+     * landmark structure, not each fragment.
+     */
     region: { enabled: false },
   },
 };

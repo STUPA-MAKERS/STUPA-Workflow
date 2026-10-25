@@ -5,8 +5,6 @@
 :host {
   display: contents;
 }
-/* Four sections (Allgemein, Spalten, Labels, Archiv), each an accent heading over a row
-   group, as on the admin settings pages. The row group draws the separators. */
 .bs {
   display: flex;
   flex-direction: column;
@@ -18,8 +16,6 @@
   flex-direction: column;
   gap: var(--space-2);
 }
-/* The heading row has the height of the small text button beside it, so a section with
-   a button and one without start their content at the same distance. */
 .bs__secHead {
   display: flex;
   align-items: center;
@@ -128,7 +124,6 @@
 .bs__none {
   color: var(--color-text-muted);
 }
-/* A label is a compact filled pill, one step above its row. */
 .bs__label {
   height: 30px;
   padding-inline: var(--space-3);
@@ -163,8 +158,6 @@
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
-/* A switch row, as on the admin settings pages: the label at the start, the switch at
-   the end. */
 .bs__row {
   display: flex;
   flex-direction: column;

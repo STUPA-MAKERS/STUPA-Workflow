@@ -111,7 +111,7 @@ const SORTS: readonly { field: ExpenseSortField; order: 'asc' | 'desc'; key: str
 ];
 
 /**
- * Bookings (boards Fin-Buchungen and the other Fin-Buchung* boards): a list of bookings
+ * Bookings: a list of bookings
  * or transfers beside a detail sheet, like the applications page.
  *
  * The list: title with export, sort and a menu; the search and the chips (cost centre as
@@ -124,11 +124,12 @@ const SORTS: readonly { field: ExpenseSortField; order: 'asc' | 'desc'; key: str
  * A booking is standalone or bound to an application. A standalone booking needs a cost
  * centre and a fiscal year; a bound booking takes both from the application. This class
  * is a facade over the state modules; its public surface drives the specs.
+ *
+ * Side by side it is a pane page (`styles.scss`): the panes fill the free height and scroll
+ * by themselves.
  */
 @Component({
   selector: 'app-expenses',
-  // A pane page (styles.scss): side by side the panes fill the free height and scroll by
-  // themselves.
   host: { '[class.pane-page]': 'split()' },
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -175,7 +176,7 @@ const SORTS: readonly { field: ExpenseSortField; order: 'asc' | 'desc'; key: str
 export class ExpensesComponent implements OnDestroy {
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
-  // The state modules share this root toast instance. Specs spy on it here.
+  /** The state modules share this root toast instance, so specs spy on it here. */
   private readonly toast = inject(ToastService);
   private readonly api = inject(BudgetTreeApi);
   private readonly apps = inject(ApiClient);
@@ -183,8 +184,10 @@ export class ExpensesComponent implements OnDestroy {
   private readonly router = inject(Router);
   private readonly frame = inject(PageFrameService);
 
-  // The state modules. The template hands them to the forms, which read and set their
-  // signals directly; the methods below are the facade the specs drive.
+  /**
+   * The list state. The template hands the state modules to the forms, which read and set
+   * their signals directly; the methods of this class are the facade the specs drive.
+   */
   protected readonly list = new ExpensesListState();
   protected readonly sub = new ExpenseSubBookingsState(this.list);
   protected readonly transfers = new ExpenseTransfersState(this.list);
@@ -224,7 +227,6 @@ export class ExpensesComponent implements OnDestroy {
   /** The display label of every cost centre: name, path and swatch colour. */
   readonly costCentres = computed(() => costCentreIndex(this.budgetTree()));
 
-  // --- the open row ------------------------------------------------------------------
   /** The booking open in the detail (`?id=`). */
   readonly selectedId = signal('');
   /** The transfer open in the detail (`?transfer=`). */
@@ -253,7 +255,6 @@ export class ExpensesComponent implements OnDestroy {
     return this.transferItems().find((t) => t.transferId === id) ?? null;
   });
 
-  // --- linked records of the open booking --------------------------------------------
   /** The invoice of the open booking, from the cache or loaded once. */
   readonly linkedInvoice = signal<Invoice | null>(null);
   /** The application of the open booking, when the reader may read it. */
@@ -264,7 +265,6 @@ export class ExpensesComponent implements OnDestroy {
   readonly closedFys = signal<ReadonlySet<string>>(new Set());
   private readonly fyRequested = new Set<string>();
 
-  // --- selection (bulk) ------------------------------------------------------------
   /** The rows show check boxes. */
   readonly selecting = signal(false);
   readonly selected = signal<ReadonlySet<Uuid>>(new Set());
@@ -312,7 +312,6 @@ export class ExpensesComponent implements OnDestroy {
     return null;
   });
 
-  // --- filters ---------------------------------------------------------------------
   /** Phone: filters and pickers open from the bottom; wider: from the start edge. */
   readonly sheetSide = computed(() => (this.phone() ? 'bottom' : 'start'));
 
@@ -334,7 +333,6 @@ export class ExpensesComponent implements OnDestroy {
     { value: 'transfers', label: this.i18n.translate('expenses.tab.transfers') },
   ]);
 
-  // --- header menus ----------------------------------------------------------------
   readonly sortSections = computed<RowMenuSection[]>(() => {
     const current = `${this.sortField()}:${this.sortOrder()}`;
     return [
@@ -383,7 +381,6 @@ export class ExpensesComponent implements OnDestroy {
     }
   }
 
-  // --- forms -----------------------------------------------------------------------
   readonly createOpen = this.dialogs.createOpen;
   readonly editing = this.dialogs.editing;
   readonly confirmDelete = this.dialogs.confirmDelete;
@@ -422,9 +419,11 @@ export class ExpensesComponent implements OnDestroy {
     }
   });
 
-  // Transfers tab. The route also admits `budget.view`, but the server lists, edits
-  // and deletes transfers only for `budget.book` (the create permission). So the tab
-  // shows only when `canManage()` is true.
+  /**
+   * The open tab. The transfers tab shows only when `canManage()` is true, because the
+   * route also admits `budget.view`, but the server lists, edits and deletes transfers only
+   * for `budget.book` (the create permission).
+   */
   readonly tab = signal<ExpensesTab>('bookings');
   readonly transferItems = this.transfers.items;
   readonly transferTotal = this.transfers.total;
@@ -742,7 +741,6 @@ export class ExpensesComponent implements OnDestroy {
     this.frame.fill.set(false);
   }
 
-  // --- formatting ------------------------------------------------------------------
   money(amount: string): string {
     return formatMoney(amount, this.i18n.formatLocale());
   }
@@ -773,7 +771,6 @@ export class ExpensesComponent implements OnDestroy {
     return this.canManage() && !this.closedFys().has(fyId);
   }
 
-  // --- the open row ------------------------------------------------------------------
   /** Open a booking in the detail. The URL keeps it, so the back button closes it. */
   openBooking(id: string): void {
     this.dialogs.closeForms();
@@ -806,7 +803,6 @@ export class ExpensesComponent implements OnDestroy {
     });
   }
 
-  // --- filters ---------------------------------------------------------------------
   setKind(k: string): void {
     this.list.setKind(k === 'expense' || k === 'income' ? k : '');
   }
@@ -874,7 +870,6 @@ export class ExpensesComponent implements OnDestroy {
     this.transfers.loadMore();
   }
 
-  // --- forms -----------------------------------------------------------------------
   openCreate(): void {
     this.dialogs.openCreate();
   }
@@ -1019,7 +1014,6 @@ export class ExpensesComponent implements OnDestroy {
     return this.i18n.translate('expenses.rowMenu', { description: e.description });
   }
 
-  // --- selection -------------------------------------------------------------------
   startSelecting(): void {
     if (!this.canManage()) return;
     this.selecting.set(true);

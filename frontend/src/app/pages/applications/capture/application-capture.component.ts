@@ -96,6 +96,9 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  *
  * The server validates the data like a normal submission; a 422 goes onto the fields it
  * names. On success the component emits `created` with the new id.
+ *
+ * The component provides the field types of the form (`provideFormly`), so Formly is not
+ * part of the initial bundle.
  */
 @Component({
   selector: 'app-application-capture',
@@ -119,8 +122,6 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     SkeletonComponent,
     DraftFilesComponent,
   ],
-  // The field types of the form (`provideFormly`) come with the component, so Formly is not
-  // part of the initial bundle.
   providers: [
     provideFormly(),
     DraftAttachmentsService,
@@ -147,7 +148,6 @@ export class ApplicationCaptureComponent {
   readonly closed = output<void>();
   readonly created = output<Uuid>();
 
-  // --- applicant -----------------------------------------------------------------
   readonly mode = signal<ApplicantMode>('account');
   readonly query = signal('');
   readonly candidates = signal<ApplicantCandidate[]>([]);
@@ -175,7 +175,6 @@ export class ApplicationCaptureComponent {
   readonly emailMatch = signal<ApplicantCandidate | null>(null);
   private emailSeq = 0;
 
-  // --- application ---------------------------------------------------------------
   readonly typeId = signal('');
   readonly effForm = signal<EffectiveForm | null>(null);
   readonly loadingForm = signal(false);
@@ -263,8 +262,6 @@ export class ApplicationCaptureComponent {
     return p ? candidateLabel(p) : '';
   });
 
-  // --- applicant -----------------------------------------------------------------
-
   setMode(value: string): void {
     this.mode.set(value === 'guest' ? 'guest' : 'account');
     this.emailMatch.set(null);
@@ -326,8 +323,6 @@ export class ApplicationCaptureComponent {
     this.mode.set('guest');
   }
 
-  // --- application ---------------------------------------------------------------
-
   selectType(id: string): void {
     if (!id || id === this.typeId()) return;
     this.typeId.set(id);
@@ -378,8 +373,6 @@ export class ApplicationCaptureComponent {
       .subscribe(() => this.formTick.update((n) => n + 1));
     return form;
   }
-
-  // --- submit --------------------------------------------------------------------
 
   close(): void {
     void this.drafts.discard();

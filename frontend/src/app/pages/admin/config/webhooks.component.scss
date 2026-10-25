@@ -36,7 +36,6 @@
 .wh__name {
   font-weight: var(--fw-semibold);
 }
-/* The target URL is shown whole: it wraps and stays selectable. */
 .wh__url {
   margin: 0;
   font-size: var(--fs-sm);
@@ -72,7 +71,6 @@
   --button-hover-bg: var(--color-surface-3);
 }
 
-/* The delivery diagnosis inside the card, one surface up. */
 .wh__status {
   display: flex;
   flex-direction: column;
@@ -122,7 +120,6 @@
   --dialog-footer-gap: var(--space-2);
 }
 
-/* A narrow sheet: the controls go below the hook, the facts in two columns. */
 @container (max-width: 40rem) {
   .wh__row {
     flex-direction: column;

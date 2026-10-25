@@ -37,7 +37,7 @@ import {
 } from '@stupa-makers/ui-kit';
 
 /**
- * "Vertretung einrichten" (board Teilnahme-Vertretung): the member picks who represents
+ * "Vertretung einrichten": the member picks who represents
  * them in one meeting.
  *
  * - "Deine Stellvertretung": the substitutes of the member (the pool of the gremium,

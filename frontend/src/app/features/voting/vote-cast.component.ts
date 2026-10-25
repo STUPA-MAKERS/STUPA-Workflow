@@ -72,16 +72,16 @@ const NOT_CAST: MyBallot = { cast: false, choice: null };
  * - A meeting vote names its meeting and agenda item ("34. Sitzung · TOP 3") and links
  *   the beamer for a person who may run the meeting. A vote without a meeting links its
  *   application, and a draft of it can be deleted.
- * - A phone gets the layout of board Telefon-Abstimmen: back to the list,
+ * - A phone gets its own layout: back to the list,
  *   "Abstimmung", the meeting line as a link to the meeting ("Antrag öffnen" for a vote
  *   without a meeting), and the button bar of the ballot pinned at the bottom.
  * - The route reuses the component from one vote to the next, so the pane loads again
  *   on each change of `:id`.
  * - Under the vote: the to-do cards that link it (`app-todo-linked-list`).
+ * - Side by side the sheet fills the pane and scrolls inside itself.
  */
 @Component({
   selector: 'app-vote-cast',
-  // Side by side the sheet fills the pane and scrolls inside itself.
   host: { '[class.vc-host--split]': 'split()' },
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -155,8 +155,11 @@ export class VoteCastComponent implements OnDestroy {
     };
   });
 
-  // Delete a standalone vote. The route accepts it only while the vote is a draft with
-  // no ballots, and it refuses a meeting-bound vote: that one goes through its meeting.
+  /**
+   * The confirmation to delete a standalone vote. The route accepts the delete only while
+   * the vote is a draft with no ballots. It refuses a meeting-bound vote, because that one
+   * goes through its meeting.
+   */
   readonly confirmDelete = signal(false);
   readonly deleting = signal(false);
   readonly canDelete = computed(() => {

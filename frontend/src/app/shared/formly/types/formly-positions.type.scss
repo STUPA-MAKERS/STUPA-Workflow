@@ -1,5 +1,3 @@
-// The positions editor (board Anträge-Bearbeiten): one card per position on surface 2,
-// the fields of the ui-kit look (grey box, label inside), no edge and no shadow.
 @use 'field' as f;
 
 :host {
@@ -72,7 +70,6 @@
   min-width: 0;
 }
 
-/* The collapsed position: one button over the row. */
 .pos__summary {
   display: flex;
   flex: 1 1 auto;
@@ -104,7 +101,6 @@
   flex-direction: column;
   min-width: 0;
 }
-/* The name and the preferred supplier (often a URL) are never cut: they wrap. */
 .pos__sumName {
   min-width: 0;
   font-size: var(--fs-md);
@@ -128,7 +124,6 @@
   transform: rotate(180deg);
 }
 
-/* Icon buttons: the whole circle is the target, the icon takes no pointer. */
 .pos__icon {
   display: inline-flex;
   flex: none;
@@ -161,7 +156,6 @@
   cursor: not-allowed;
 }
 
-/* Open: the body sits under the field, set in by the chevron column. */
 .pos__body {
   display: flex;
   flex-direction: column;
@@ -241,13 +235,11 @@
   align-self: flex-start;
 }
 
-/* A field of the editor in the ui-kit look. */
 .pf {
   @include f.box;
   @include f.box-labelled;
   cursor: text;
 }
-/* On the card (surface 2) the fields take the next surface, so they stand out. */
 .pf {
   background: var(--color-surface-3);
 }
@@ -269,7 +261,6 @@
   @include f.control;
   @include f.control-labelled;
 }
-/* The amount: its euro sign stays inside the box, after the number. */
 .pos__money .pf__control {
   padding-inline-end: 2rem;
   text-align: end;
@@ -287,8 +278,6 @@
   resize: vertical;
 }
 
-/* A narrow editor (a phone): the supplier takes the line beside the radio; the amount
-   and the bin go below it. */
 @container (max-width: 30rem) {
   .pos__body {
     padding-inline-start: 0;

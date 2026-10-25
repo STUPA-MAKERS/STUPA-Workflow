@@ -103,7 +103,7 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
 };
 
 /**
- * One card with all its fields (frames 2–4, 10, 12–13): the board drawer and the right
+ * One card with all its fields: the board drawer and the right
  * pane of "Aufgaben" use it.
  *
  * Side by side: the thread (`app-chat`: the comments and the events, with no heading of its
@@ -127,7 +127,8 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
  * own pings.
  *
  * The activity chat exists only while its sheet shows, so a hidden chat does not mark the thread as
- * seen.
+ * seen. The phone and the wide layout render the chat in two branches. The page provides
+ * `ChatDrafts` and owns the composer files, so a breakpoint change keeps them.
  */
 @Component({
   selector: 'app-todo-card-detail',
@@ -160,8 +161,6 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
     TodoMoveSheetComponent,
     TodoTransferDialogComponent,
   ],
-  // The phone and the wide layout render the chat in two branches: the page owns its
-  // composer files, so a breakpoint change keeps them.
   providers: [ChatDrafts],
   host: { '[class.cd--phone]': 'phone()', '[class.cd--pane]': "mode() === 'pane'" },
   templateUrl: './todo-card-detail.component.html',
@@ -297,8 +296,6 @@ export class TodoCardDetailComponent {
       untracked(() => this.liveRead());
     });
   }
-
-  // ------------------------------------------------------------------ derived
 
   /**
    * The board of the page when it holds this card, else null. The page also opens the
@@ -450,8 +447,6 @@ export class TodoCardDetailComponent {
     return c ? ['/todos', c.boardId] : null;
   });
 
-  // ------------------------------------------------------------------ helpers for the template
-
   name(ref: { displayName: string | null } | null): string {
     return personName(ref as never, this.t);
   }
@@ -471,8 +466,6 @@ export class TodoCardDetailComponent {
   linkSub(link: TodoLink): string {
     return linkSub(link, this.i18n.formatLocale(), this.i18n.locale(), this.t);
   }
-
-  // ------------------------------------------------------------------ load
 
   /** Read the card again (after a refusal, or from outside). */
   reload(): void {
@@ -593,8 +586,6 @@ export class TodoCardDetailComponent {
       },
     });
   }
-
-  // ------------------------------------------------------------------ writes
 
   /**
    * Run a write that answers with the card; the answer replaces it. `cardRoute` says the
@@ -995,8 +986,6 @@ export class TodoCardDetailComponent {
       else if (outcome === 'failed') this.toast.error(this.t('todos.card.linkFailed'));
     });
   }
-
-  // ------------------------------------------------------------------ comments
 
   private postComment(req: ChatSend): Observable<TodoComment> {
     return this.api.addComment(this.cardId(), req.body, req.mentions ?? [], req);

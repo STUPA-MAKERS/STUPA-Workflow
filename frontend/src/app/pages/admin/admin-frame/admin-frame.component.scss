@@ -8,13 +8,6 @@
   min-width: 0;
 }
 
-/* One column below wide: the navigation (home page only) above the page.
-
-   The frame has no width cap of its own and no centring. The route is `wide`, so the
-   columns start on the same content edge next to the rail as the other list and detail
-   pages (applications, budget, bookings): the side padding of the shell main is the only
-   inset. A cap with `margin-inline: auto` pushed the navigation away from the rail on a
-   wide screen. */
 .af {
   display: flex;
   flex-direction: column;
@@ -22,12 +15,6 @@
   width: 100%;
 }
 
-/* Wide: a pane page (`.pane-page` on the host, see styles.scss). The frame takes the
-   free height of the shell main and does not scroll as a page. The navigation and the
-   page sheet each scroll inside themselves. */
-/* The column has the one list width of the app and the same gap to the sheet as every
-   list/detail page (`--ld-list-width`, `--ld-gap` in styles.scss), on the home page and
-   beside every admin page. */
 .af--split {
   display: grid;
   flex: 1 1 0;
@@ -37,8 +24,6 @@
   min-height: 0;
 }
 
-/* The column is a list column (`.ld-pane`, styles.scss). One column keeps its wider
-   gap. */
 .af:not(.af--split) .af__nav {
   gap: var(--space-4);
 }
@@ -46,7 +31,6 @@
   min-height: 0;
 }
 
-/* The entries scroll inside the column; the title and the search stay. */
 .af__navBody {
   display: flex;
   flex-direction: column;
@@ -60,9 +44,6 @@
   overscroll-behavior: contain;
   scrollbar-width: thin;
 }
-/* One column: the title, the search, the tiles and the entries start on the content
-   edge, the same as the gremien under them. The inset only keeps the focus rings and
-   the fades clear of the edge of the scrolling column. */
 .af:not(.af--split) {
   --ph-inset: 0px;
 }
@@ -96,7 +77,6 @@
   list-style: none;
 }
 
-/* The home page below wide: the entries fill the width in columns. */
 .af:not(.af--split) .af__list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
@@ -154,10 +134,6 @@
 .af__page {
   min-width: 0;
 }
-/* A swipe back moves the page with `left` (`SwipeBackDirective`). The page lies on the
-   page background without a surface, so while it moves it gets that background from
-   window edge to window edge and at least one screen down, with the short shadow of an
-   edge on its left side. */
 .af__page--swiping {
   position: relative;
   z-index: 1;
@@ -175,19 +151,12 @@
   pointer-events: none;
 }
 
-/* Without the sheet the page sits on the page background: the rows of a row-group
-   table (`surface="rowgroup"`) take that colour between them. */
 .af:not(.af--split) .af__page {
   --dt-gap: var(--color-bg);
 }
 
-/* Wide: the page sits on a sheet that reaches down to the bottom of the window. The
-   sheet is a window with round corners: it clips (`overflow: hidden` with the radius),
-   and its body is the scroll container. So the round corners clip the content at the
-   top and at the bottom in every scroll position, and a straight cut by a rectangular
-   scroll box (or by the viewport edge) cannot occur. A sticky bar of the page sticks to
-   the top or the bottom of the body. The scroll padding keeps an element that gets the
-   focus clear of the corners and the fades. */
+// The sheet clips with its radius and its body scrolls, so the round corners clip the content
+// in every scroll position.
 .af--split .af__page {
   display: flex;
   flex-direction: column;
@@ -209,18 +178,11 @@
   overscroll-behavior: contain;
   scroll-padding-block: var(--af-fade);
 }
-/* The page in the sheet keeps its content height, and the body scrolls. A page with
-   columns of its own (the mail templates) takes the free height of the body with
-   `flex: 1 1 0` (`:host-context(.af--split)`) and scrolls its columns inside itself. */
 .af--split .af__pageBody > ::ng-deep * {
   flex-shrink: 0;
 }
-/* The shared fades of a scroll area: an end fades only while content is hidden past it
-   (`appScrollFade` sets the classes). The mask is on the body, so the sheet keeps its
-   colour and its shape. */
-/* A page with a sticky bar (`app-sticky-bar`, the users search) has the fade of the bar
-   at the top. The top fade of the body would make the stuck bar transparent, so the body
-   fades only at the end. */
+// The mask is on the body, so the sheet keeps its colour and its shape.
+// The top fade of the body would make the stuck bar transparent, so the body fades only at the end.
 .af--split .af__pageBody.is-fade-start:has(app-sticky-bar:not(.stb--off)) {
   mask-image: none;
 }
@@ -230,29 +192,19 @@
 .af--split .af__pageBody {
   @include fade.fade-y(var(--af-fade));
 }
-/* A mask makes the body the containing block of every `position: fixed` element in it.
-   An open dialog or side sheet of the page would then cover only the sheet and be cut by
-   its round corners (the merge dialog of the users list, a long list with the end fade).
-   While an overlay of the page is open, the body has no fade. The state wins over every
-   fade rule above, whatever their specificity. */
+// A mask makes the body the containing block of every `position: fixed` element in it, so an
+// open overlay of the page would be cut by the sheet. While one is open, the body has no fade.
 .af--split .af__pageBody:has(.dialog__backdrop, .ss__scrim) {
   mask-image: none !important;
 }
-/* A page with a floating "new" button (`app-fab`): the button is fixed in the window, at
-   the foot of the sheet. The mask would make the body its containing block, so it would
-   scroll away with the page and fade at the end; the body has no fade then. The page
-   ends with room for the button, so its last row scrolls above it (the 56px button, 16px
-   below and above it). One column the page scrolls as a whole and the body ends with the
-   same room. */
+// The mask would make the body the containing block of the fixed button, so the body has no
+// fade. The page ends with room for the 56px button and 16px below and above it.
 .af--split .af__pageBody:has(app-fab) {
   mask-image: none !important;
 }
 .af .af__pageBody:has(app-fab) {
   padding-bottom: calc(56px + 2 * var(--space-4));
 }
-/* On the sheet the button stands at the side padding of the body (`--fab-inset`), so its
-   end lines up with the end of the content and it clears the round corner of the sheet.
-   The body ends with the button, its inset and 16px above it. */
 .af--split {
   --fab-inset: var(--space-6);
 }
@@ -260,8 +212,6 @@
   padding-bottom: calc(56px + var(--space-6) + var(--space-4));
 }
 
-/* Wide, a full-width page with columns of its own (`adminPane`): the frame passes the
-   free height down, and the page scrolls only inside its columns. */
 .af--pane,
 .af--pane .af__page,
 .af--pane .af__pageBody {

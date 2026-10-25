@@ -7,20 +7,12 @@
 @use 'press';
 @use 'sass:meta';
 
-// Tailwind adds utilities only. tailwind.config.js disables preflight, so there is no
-// base reset and no visual change. Sass passes the unknown at-rules through to PostCSS
-// and Tailwind unchanged. The utilities come last so that they apply after the base
-// styles.
+// tailwind.config.js disables preflight, so Tailwind adds utilities only. The utilities come last,
+// so they apply after the base styles.
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-// Text utilities of the design system. The ui-kit base styles bring `.num` (tabular
-// numbers), `.mono` (IBM Plex Mono), `.ell` (one line with an ellipsis; add a `title`),
-// `.cap` (caption) and `.kbd` (a key). The app adds the section heading.
-
-// Section heading above a group of rows or fields (for example "Details", "Verlauf"):
-// accent text, semibold. The surrounding layout sets the spacing.
 .sec {
   margin: 0;
   font-size: 0.84375rem;
@@ -29,18 +21,12 @@
   color: var(--color-accent-text);
 }
 
-// An admin page (every page under /admin and the cost centres): the header, then the
-// blocks of the page, one gap apart. The pages set `app-page-header [flush]`, so this gap
-// is the only space between the title and the first block, and it is the same on every
-// page.
 .admin-page {
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
 }
 
-// The heading of a section of an admin page, of a card on such a page, or of a block in
-// a detail or a dialog. One look for all of them; the surrounding layout sets the space.
 .section-title {
   margin: 0;
   font-size: var(--fs-h3);
@@ -49,17 +35,13 @@
   color: var(--color-text);
 }
 
-// The click rows (`.hitrow`) and the row groups (`.rowgroup`, `app-field-group`) of the
-// ui-kit. They are global, because the rows are projected content. Loaded here, so they
-// keep their place in the cascade after the utilities.
+// Global, because the rows are projected content. Loaded here, so they keep their place in the
+// cascade after the utilities.
 @include meta.load-css('rowgroup');
 
-// The installed app does not bounce as a whole page and has no pull-to-refresh: an
-// overscroll at the top edge reloaded the app by accident in Chrome, and on iOS the page
-// with the bars moved with the finger, which a native app never does. A browser tab keeps
-// both. The panes that scroll inside themselves keep `overscroll-behavior: contain`, so
-// they still end their own scroll without handing it to the page. `manipulation` stops
-// the double-tap zoom; the pinch zoom stops in `lockInstalledAppZoom` (zoom-lock.ts).
+// The installed app neither bounces nor pulls to refresh, because an overscroll at the top reloaded
+// it in Chrome and moved the bars on iOS. `manipulation` stops the double-tap zoom; the pinch
+// zoom stops in `lockInstalledAppZoom` (zoom-lock.ts).
 @media (display-mode: standalone), (display-mode: fullscreen) {
   html,
   body {
@@ -68,15 +50,9 @@
   }
 }
 
-// Phone with an on-screen keyboard: while a text field has the focus and the keyboard is
-// open, the bottom bar goes away and the pinned elements (chat composer, dock, FAB,
-// wizard bar) drop to the bottom edge. The viewport has
-// `interactive-widget=resizes-content` (index.html), so on Android the keyboard shrinks
-// the layout viewport, and the bar would otherwise stand between the field and the
-// keyboard. The focus alone is not enough: Android closes the keyboard on the back
-// gesture and the field keeps the focus, so the bar must come back then.
-// `frame--keyboard` (KeyboardService) is set only while the keyboard is open. A field in
-// the bar itself does not count, so its own sheet never closes under the finger.
+// With `interactive-widget=resizes-content` (index.html) the bottom bar would stand between the
+// field and the keyboard. Focus alone is not enough, because Android closes the keyboard on the
+// back gesture and the field keeps the focus, so `frame--keyboard` (KeyboardService) decides.
 @media (pointer: coarse) {
   .frame--phone.frame--keyboard:has(
       :is(
@@ -103,31 +79,14 @@
   }
 }
 
-// Nested surfaces step up: a table on a container that is itself a surface takes the
-// next higher surface (see `surface.context` in the ui-kit). The shared sheets set their
-// own context: the side sheet, the dialog, the detail pane of the list/detail layout.
-// The admin pages sit on one shared sheet of the admin frame (surface 1) when the frame
-// is wide. Without the sheet, the page sits on the page background and the tables keep
-// surface 1.
 .af--split .af__page {
   @include surface.context(1);
 }
 
-// A pane page: the page does not scroll as a page. It fills the free height of the main
-// column of the shell, and its panes scroll inside themselves (budget, bookings and the
-// applications list beside the detail). The page host gets the class, for example with
-// `host: { '[class.pane-page]': 'wide()' }`.
-//
-// - `flex: 1 1 0` takes the free height of `.main` (a flex column). A basis of 0 keeps the
-//   rows from pushing the page taller than the viewport.
-// - The bottom padding of `.main` is for a page that scrolls. A pane page pulls it back
-//   and keeps only `--pane-foot-gap`, which the shell sets: the page gutter (plus the
-//   safe area in the installed app). Work pages have no footer (route data `footer`).
-// - A large sheet with round corners in a pane page must clip what scrolls in it: the
-//   rounded element is the scroll container, or an `overflow: hidden` parent of it.
-// - A side sheet of the page is an overlay. Closed, it is empty, but as a flex item it
-//   would still take the gap of the host. `display: contents` gives it no box of its own.
-//   A dialog has no box anywhere (see `app-dialog` below).
+// A pane page fills the free height of `.main` and its panes scroll inside themselves. A basis
+// of 0 keeps the rows from pushing it taller than the viewport. It pulls the bottom padding
+// back and keeps only `--pane-foot-gap`. A closed side sheet would still take the gap, so it gets
+// `display: contents`.
 .pane-page {
   flex: 1 1 0;
   min-height: 0;
@@ -137,31 +96,19 @@
   display: contents;
 }
 
-// A dialog is an overlay: its backdrop is fixed. Open or closed, the `app-dialog` host adds
-// no box, so it takes no gap and no track in the flex column or grid of the page that holds
-// it. With a box, an open dialog in a flex column moves everything after it by one gap (the
-// meeting dock rose by 24px while "TOP hinzufügen" was open). Global, because the dialog of
-// the UI kit sets no display on its host.
+// Global, because the dialog of the UI kit sets no display on its host: with a box, an open dialog
+// in a flex column moves everything after it by one gap.
 app-dialog {
   display: contents;
 }
 
-// ONE list/detail geometry: the column width `--ld-list-width`, the gap `--ld-gap` and
-// the list column `.ld-pane` of the ui-kit. Every page with a list or a navigation column
-// beside a sheet (applications, tasks, votes, meetings, bookings, invoices, the budget
-// tree, Verwaltung) takes them from there; list-geometry.contract.spec.ts fails if a page
-// sets them itself.
+// list-geometry.contract.spec.ts fails if a page sets the list/detail geometry itself.
 @include meta.load-css('list-detail');
 
-// The header of a detail sheet: the gap between the sheet bar (`app-sheet-bar`) and the
-// title, and between the lines below the title. Every detail sheet takes it from this
-// token, so the titles sit at the same height on every page.
 :root {
   --sheet-head-gap: 10px;
 }
 
-// The title of a detail sheet (`.sheet-title`) and the status line below it
-// (`.sheet-line`): one size on every detail view, so the views do not set them.
 .sheet-title {
   margin: 0;
   font-size: var(--fs-d2);
@@ -184,9 +131,6 @@ app-dialog {
   }
 }
 
-// The head of a detail sheet (`.sheet-head`): the sheet bar, the title and the lines
-// below it, closed by a rule. Every detail sheet uses it, so the title and the rule sit
-// at the same place on every page. A sheet without the rule (a phone) overrides it.
 .sheet-head {
   display: flex;
   flex-direction: column;
@@ -195,9 +139,8 @@ app-dialog {
   border-bottom: var(--border-width) solid var(--color-border);
 }
 
-// A touch screen keeps the interface unselectable (`base.scss` of the kit). The Markdown
-// and the chat texts are content: a long press selects them, and the menu of the browser
-// opens on them (`core/touch/touch-context-menu.ts` names the same elements).
+// The Markdown and the chat texts stay selectable on a touch screen;
+// `core/touch/touch-context-menu.ts` names the same elements.
 @media (hover: none) and (pointer: coarse) {
   .mdv,
   .chat__text {
@@ -205,8 +148,6 @@ app-dialog {
   }
 }
 
-// The way back of a detail sheet whose item is gone (`.sheet-back-link`): a tonal pill
-// link to the list.
 .sheet-back-link {
   display: inline-flex;
   align-items: center;
@@ -227,10 +168,8 @@ app-dialog {
   }
 }
 
-// Mobile: the page itself must NEVER scroll horizontally. An element that overflows,
-// such as a long link or a wide table cell, may only scroll inside its own overflow
-// container. `clip` instead of `hidden`: it makes no new scroll container, so
-// `position: sticky` keeps working.
+// `clip` instead of `hidden`, because it makes no scroll container, so `position: sticky` keeps
+// working.
 @include bp.phone {
   html,
   body {
@@ -239,9 +178,7 @@ app-dialog {
 }
 
 
-// The edit grid of a form (`toFormlySections`): two columns, long fields (`fe-full`)
-// over both, one column below a 32rem container. The applications detail, the apply
-// wizard and the status page share it. Global, because Formly draws the fields.
+// Global, because Formly draws the fields.
 .fe-form {
   min-width: 0;
   container-type: inline-size;
@@ -255,9 +192,7 @@ app-dialog {
 .fe-form .fe-grid > formly-field {
   min-width: 0;
 }
-// A field that `visibleIf` hides keeps its `formly-field` host, but Formly removes its
-// content. The empty host takes no cell, so the next field moves up and the grid has
-// no holes. A grid item is a block box anyway, so no other rule sets `display`.
+// A field that `visibleIf` hides keeps its empty `formly-field` host, which must take no cell.
 .fe-form .fe-grid > formly-field:empty {
   display: none;
 }
@@ -270,29 +205,16 @@ app-dialog {
   }
 }
 
-/* ---------------------------------------------------------------------------
-   Route motion (`core/motion/motion.ts`). The router names the kind of a navigation on
-   `<html data-motion>` while its view transition runs.
-   - section: the old page fades out fast, the new one fades in and rises (fade-through).
-   - push: on a phone, the new page slides in from the end over the old one, which recedes.
-   - pop: the reverse, faster.
-   Reduced motion skips the transition in the router.
-
-   The page moves as the root snapshot, not as a snapshot of `.main`. The root snapshot
-   is always the viewport, so both images have the same size and position. `.main` is as
-   tall as its page and moves with the scroll of the document, so a group of its own
-   would morph from the old box to the new one: after a scroll, or between a page that
-   scrolls and a pane page, the new page would slide in from where the old one was and
-   the headings of both would run over each other. The frame (rail, bottom bar) gets
-   groups of its own, so it stays still above the moving page. */
+// The page moves as the root snapshot, not as a group of `.main`, because `.main` moves with the
+// document scroll and its own group would morph from the old box to the new one. The frame gets
+// groups of its own, so it stays still.
 :root[data-motion] .frame__rail {
   view-transition-name: rail;
 }
-/* The bottom bar is a group of its own, so the moving page never paints over it. */
+// A group of its own, so the moving page never paints over the bottom bar.
 :root[data-motion] .bb {
   view-transition-name: bottom-bar;
 }
-/* Shows between the old and the new page of a fade-through, and behind a receding page. */
 :root[data-motion]::view-transition {
   background: var(--color-bg);
 }
@@ -353,17 +275,6 @@ app-dialog {
   }
 }
 
-/* ---------------------------------------------------------------------------
-   Motion utilities for `animate.enter` / `animate.leave` (Angular keeps a leaving element
-   until its animation ends). Global, so every component can bind them by name.
-   - `.motion-expand-in` / `.motion-expand-out`: a section that opens below its toggle. It
-     grows from height 0 where the browser can animate to `auto`, and fades in after a
-     short delay; closing fades first, then the height goes.
-   - `.motion-rise-in`: a new entry in a list (a chat message, a row): it fades in and
-     rises by --motion-shift-sm.
-   - `.motion-fade-in`: content that takes the place of other content (the board and the
-     list of a view switch): it only fades in, it does not move.
-   - `.motion-fade-out`: an entry that goes. */
 .motion-expand-in,
 .motion-expand-out {
   interpolate-size: allow-keywords;
@@ -375,8 +286,6 @@ app-dialog {
 .motion-expand-out {
   animation: motion-expand-out var(--motion-base) var(--ease-standard) forwards;
 }
-/* A popover that is not an option menu (account, help): it grows from its anchor edge and
-   fades in; it fades out faster, without moving. */
 .motion-pop-in {
   animation: motion-pop-in var(--motion-fast) var(--ease-enter);
 }
@@ -400,10 +309,7 @@ app-dialog {
   pointer-events: none;
   animation: motion-fade-out var(--motion-xs) var(--ease-exit) forwards;
 }
-/* A tab panel that shows after a tab change (Details | Aktivität and the other tab bars of
-   the app). The panels stay in the DOM behind `hidden`, and a change from `display: none`
-   starts the animation again, so one rule covers every tab bar. Reduced motion cuts it to
-   nothing (`base.scss` of the kit). */
+// A change from `display: none` starts the animation again, so one rule covers every tab bar.
 [role='tabpanel']:not([hidden]) {
   animation: motion-fade-in var(--motion-base) var(--ease-standard);
 }

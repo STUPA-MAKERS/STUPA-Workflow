@@ -16,8 +16,6 @@ import { ApiClient } from '@core/api/api-client.service';
 import type { SearchHit, SearchKind, SearchResults } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-// By path, not through the `@shared/ui` barrel: the shell is in the initial bundle, and
-// the barrel would pull every shared block a lazy page uses into it.
 import {
   EmptyStateComponent,
   HighlightComponent,

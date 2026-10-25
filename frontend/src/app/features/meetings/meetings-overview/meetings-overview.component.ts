@@ -18,7 +18,7 @@ import { type MeetingsView, readStoredView, storeView } from '../meetings-overvi
 import { MeetingsTimelineService } from '../meetings-timeline.service';
 
 /**
- * The meeting overview (`/meetings`, board Sitzungen, variant C): the list view
+ * The meeting overview (`/meetings`): the list view
  * (`app-meetings-list`, list and detail) or the calendar view (`app-meetings-calendar`),
  * with the switch "Liste | Kalender" in the header of both.
  *

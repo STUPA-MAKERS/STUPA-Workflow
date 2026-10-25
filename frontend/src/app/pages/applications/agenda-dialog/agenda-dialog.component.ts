@@ -37,7 +37,7 @@ interface MeetingChoice {
 }
 
 /**
- * "Auf Tagesordnung setzen" (board Anträge-Tagesordnung): fire a transition with
+ * "Auf Tagesordnung setzen": fire a transition with
  * `addsToAgenda` and choose the meeting whose agenda gets the application.
  *
  * The dialog offers only the planned meetings of `agendaGremiumId`; the server takes no

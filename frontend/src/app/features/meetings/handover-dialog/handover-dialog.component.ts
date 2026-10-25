@@ -32,7 +32,7 @@ interface ModeOption {
 }
 
 /**
- * "Protokollführung übergeben" (board Sitzung-Protokoll-Uebergabe).
+ * "Protokollführung übergeben".
  *
  * The dialog shows the current and the new minute-taker ("Bisher" → "Neu", "Ändern" goes
  * back to the picker), the time of the handover and the keeper line of the protocol head

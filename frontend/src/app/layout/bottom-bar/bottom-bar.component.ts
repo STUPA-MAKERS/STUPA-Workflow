@@ -3,8 +3,6 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { filter } from 'rxjs';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-// By path, not through the `@shared/ui` barrel: the shell is in the initial bundle, and
-// the barrel would pull every shared block a lazy page uses into it.
 import { IconComponent, SideSheetComponent } from '@stupa-makers/ui-kit';
 import { HelpMenuComponent } from '../../features/help/help-menu/help-menu.component';
 import { CommandPaletteService } from '../../features/search/command-palette.service';
@@ -13,9 +11,9 @@ import { NavMarkComponent } from '../nav-mark/nav-mark.component';
 import { BOTTOM_BAR_KEYS, NavService, type NavItem } from '../nav.service';
 
 /**
- * The phone navigation (viewport <= 768px): Start, Anträge, Sitzungen and Aufgaben, then
- * "Mehr". "Mehr" opens a bottom sheet with the other areas the principal may open (with
- * their counts), the search, the help menu and the account menu. It replaces the hamburger drawer of the old header.
+ * The phone navigation (viewport <= 768px): Start, Anträge, Sitzungen and Aufgaben, then "Mehr".
+ * "Mehr" opens a bottom sheet with the other areas the principal may open (with their counts), the
+ * search, the help menu and the account menu.
  *
  * The shell shows the bar only under the phone media query (`MEDIA.phone`).
  */

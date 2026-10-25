@@ -1,14 +1,12 @@
 @use 'field' as f;
 @use '../../../shared/ui/dialog-form' as df;
 
-/* The dialog adds no box to the shell; a closed dialog takes no room. */
 @include df.host;
 
 .rd {
   @include df.form;
 }
 
-/* The handbook as a quiet accent row: a real link, opened in a new tab. */
 .rd__wiki {
   display: flex;
   align-items: center;
@@ -30,7 +28,6 @@
   outline-offset: 2px;
 }
 
-/* The description: a filled field like the kit inputs, with its label inside. */
 .rd__body {
   --textarea-min-height: 5.5rem;
 }
@@ -40,7 +37,6 @@
   color: var(--color-danger);
 }
 
-/* ------------------------------------------------------------------ files */
 .rd__files {
   display: flex;
   flex-direction: column;
@@ -75,7 +71,6 @@
   flex-direction: column;
   min-width: 0;
 }
-/* A file name wraps; it is never cut. */
 .rd__chipName {
   font-size: var(--fs-small);
   overflow-wrap: anywhere;
@@ -110,7 +105,6 @@
   display: none;
 }
 
-/* ------------------------------------------------------------------ context */
 .rd__ctx {
   min-width: 0;
 }
@@ -155,7 +149,6 @@
 .rd__ctxRow dt {
   color: var(--color-text-muted);
 }
-/* A URL is never cut: it wraps anywhere. */
 .rd__ctxRow dd {
   margin: 0;
   overflow-wrap: anywhere;
@@ -167,7 +160,6 @@
   font-size: var(--fs-small);
 }
 
-/* ------------------------------------------------------------------ sent */
 .rd__sent {
   display: flex;
   flex-direction: column;
@@ -176,7 +168,7 @@
   padding: var(--space-4) 0;
   text-align: center;
 }
-/* The confirmation takes the focus only to be read out; it is no control. */
+// Focused only to be read out: it is no control, so it shows no ring.
 .rd__sent:focus {
   outline: none;
 }

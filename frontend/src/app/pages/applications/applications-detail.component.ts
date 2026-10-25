@@ -118,8 +118,8 @@ type DetailTab = 'app' | 'history' | 'files';
 const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
 
 /**
- * Application detail: the sheet beside the list (board Anträge), or alone with tabs on a
- * narrow screen (board Schmal-Anträge-Detail).
+ * Application detail: the sheet beside the list, or alone with tabs on a
+ * narrow screen.
  *
  * Header: "<Typ> · Version n", the title, "status · gremium · amount", the firable
  * transitions as buttons, and the actions (share links, edit, archive, and a menu with
@@ -128,7 +128,7 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
  * (status changes and versions by day) and the comments.
  *
  * A transition with `addsToAgenda` opens the agenda dialog, which asks for the meeting.
- * "Bearbeiten" turns the sheet into the edit form (board Anträge-Bearbeiten): the bar
+ * "Bearbeiten" turns the sheet into the edit form: the bar
  * "Antrag bearbeiten · Speichern legt Version n+1 an" with Abbrechen over the fields of
  * the form by section. The floating "Speichern" shows after the first change of a field.
  * A 422 of the server shows on its field.
@@ -148,7 +148,11 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
  * DOM, so the attachment count and the scroll of a list survive a tab change. The edit form has no
  * form element, so Enter in a field does not save the whole application. The comment chat exists
  * only while its sheet shows (open, or still sliding out), because projected content lives even
- * where the sheet does not render it, and a hidden chat would mark the thread as seen.
+ * where the sheet does not render it, and a hidden chat would mark the thread as seen. The
+ * page provides `ChatDrafts`, so the composer files stay with the page too.
+ *
+ * The component provides the field types of the form (`provideFormly`), so Formly is not
+ * part of the initial bundle.
  */
 @Component({
   selector: 'app-applications-detail',
@@ -194,9 +198,6 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
     TodoLinkedListComponent,
     SideSheetComponent,
   ],
-  // The field types of the form (`provideFormly`) come with the component, so Formly is not
-  // part of the initial bundle.
-  // The chat is content of the comments sheet and stays with the page; so do its files.
   providers: [provideFormly(), ChatDrafts],
   templateUrl: './applications-detail.component.html',
   styleUrl: './applications-detail.component.scss',
@@ -404,7 +405,7 @@ export class ApplicationsDetailComponent {
     this.budgetDialogOpen.set(true);
   }
 
-  // Inline editing for the creator or a manager, plus delete.
+  /** Inline editing for the creator or a manager. */
   readonly editing = signal(false);
   readonly editFields = signal<FormlyFieldConfig[]>([]);
   readonly savingEdit = signal(false);
@@ -417,8 +418,10 @@ export class ApplicationsDetailComponent {
   readonly confirmErase = signal(false);
   readonly requestingErasure = signal(false);
 
-  // Force status is a privileged override that needs `application.force_status`. The
-  // dialog loads the flow states itself.
+  /**
+   * Force status is a privileged override that needs `application.force_status`. The dialog
+   * loads the flow states itself.
+   */
   readonly canForceStatus = computed(() => this.auth.can('application.force_status'));
   readonly forceDialogOpen = signal(false);
 

@@ -15,7 +15,7 @@ interface BarRow {
   tone: SegTone;
 }
 
-/** Ja in the accent, Nein in the error colour, Enthaltung grey (board Beamer). */
+/** Ja in the accent, Nein in the error colour, Enthaltung grey. */
 const TONES: Record<string, SegTone> = { yes: 'filled', no: 'error', abstain: 'muted' };
 
 /**
