@@ -190,11 +190,11 @@ SHARE_CSP = (
 
 
 def share_csp(logo_url: str | None) -> str:
-    """The policy for one rendered page, naming where its logo may come from.
+    """Return the CSP of one rendered page, with the allowed source of its logo.
 
-    `img-src https:` would allow every host on the internet to be contacted from a page
-    an outsider opens. The page loads one image, so the policy names exactly where that
-    one may come from: this origin, plus the configured logo's own source if there is one.
+    `img-src https:` allows a page that an outsider opens to contact every host on the
+    internet. The page loads one image, so the policy names exactly where that one may come
+    from: this origin, plus the source of the configured logo if there is one.
     """
     source = _logo_source(logo_url)
     if source is None or source == "'self'":
@@ -203,19 +203,17 @@ def share_csp(logo_url: str | None) -> str:
 
 
 def _render_logo(logo_url: str | None, app_name: str) -> str:
-    """The header mark.
+    """Render the header mark.
 
-    A deployment's own logo wins. Without one the page uses the platform's wordmark,
-    which is where the mark in the app header comes from too — it is a bundled asset and
-    NOT part of the site config, which is why a page that only read the config showed the
-    app name as text while every other page showed a logo.
+    The logo of the deployment wins. Without one the page uses the wordmark of the platform,
+    like the app header. The wordmark is a bundled asset and NOT part of the site config, so
+    a page that reads only the config shows the app name as text.
 
-    Two files, one per theme. Both are rendered and CSS hides one, rather than a
-    `<picture>` choosing at load: a `<picture>` picks its source when the document is
-    parsed and does NOT re-pick when the reader's system theme flips afterwards, which
-    left the black-text mark sitting on the dark header until a reload. A media query
-    keeps working for as long as the page is open, and this page carries no script to fix
-    it up. The second copy is one more small same-origin SVG.
+    The page renders two files, one per theme, and CSS hides one. A `<picture>` picks its
+    source when the document is parsed and does NOT re-pick when the system theme of the
+    reader flips, so the black-text mark stays on the dark header until a reload. A media
+    query keeps working while the page is open, and the page carries no script. The second
+    copy is one more small same-origin SVG.
     """
     if logo_url and _logo_source(logo_url) is not None:
         return (
@@ -231,28 +229,26 @@ def _render_logo(logo_url: str | None, app_name: str) -> str:
 
 
 def _logo_source(logo_url: str | None) -> str | None:
-    """The CSP source for a logo, or `None` where it must not be loaded at all.
+    """Return the CSP source for a logo, or `None` where it must not load at all.
 
-    `BrandingAsset.url` allows four shapes, and all three safe ones have to be handled
-    here or the header silently falls back to the bare app name:
+    `BrandingAsset.url` allows four shapes. The function handles all three safe ones,
+    because otherwise the header falls back to the bare app name:
 
-    * a `data:` URL — the logo travels inside the page;
-    * an ABSOLUTE PATH, which is the platform serving its own logo. Same origin, so it
-      needs `'self'` and it reaches no third party at all. This is the ordinary case for
-      an instance that uploaded a logo, and refusing it was a bug: the page rendered the
-      name where the deployment had configured a mark.
+    * a `data:` URL: the logo travels inside the page;
+    * an ABSOLUTE PATH: the platform serves its own logo. It is the same origin, so it
+      needs `'self'` and reaches no third party. This is the ordinary case for an
+      instance that uploaded a logo. A protocol-relative `//host/...` is no absolute
+      path: it is a remote host that inherits the scheme of the page.
     * an `https:` URL, named down to its own origin rather than a blanket `https:`.
 
-    `http:` is the one that stays refused: it would be mixed content, and it would hand
-    that host the IP address of everyone who opens the link, in the clear.
+    `http:` stays refused, because it is mixed content and it hands that host the IP address
+    of everyone who opens the link, in the clear.
     """
     if not logo_url:
         return None
     raw = logo_url.strip()
     if raw.lower().startswith("data:"):
         return "data:"
-    # An absolute path, but not the protocol-relative `//host/...`, which is a remote
-    # host wearing a path's clothes and inherits the page's scheme.
     if raw.startswith("/") and not raw.startswith("//"):
         return "'self'"
     parts = urlsplit(raw)
@@ -275,10 +271,11 @@ def render_share_page(
     `app_url` is the application inside the SPA. A reader who has an account should not
     have to search for what they were just sent; one without an account meets the login,
     which is the correct answer rather than a dead end.
+
+    The og:title is the ONE piece of the application that reaches a chat server.
     """
     text = _TEXT.get(lang, _TEXT["de"])
     title = escape(view.title)
-    # The og:title is the ONE piece of the application that reaches a chat server.
     og_title = f"{title} — {escape(app_name)}"
 
     meta_bits = [
@@ -356,11 +353,10 @@ def render_share_page(
 
 
 def _amount(view: PublicApplication, lang: str) -> str | None:
-    """The headline amount, in the same money format as the breakdown below it.
+    """Return the headline amount, in the same money format as the breakdown below it.
 
-    It used to be the stored decimal and the currency code joined with a space, so one
-    page showed "1730.00 EUR" above "1.730,00 €" — the same number written two ways, which
-    reads as two different numbers.
+    The stored decimal with the currency code ("1730.00 EUR") above "1.730,00 €" reads as
+    two different numbers.
     """
     if not view.amount:
         return None
@@ -371,10 +367,10 @@ def _amount(view: PublicApplication, lang: str) -> str | None:
 
 
 def _render_block(block: PositionBlock, text: dict[str, str]) -> str:
-    """One cost breakdown: every position, every comparison offer, and the total.
+    """Render one cost breakdown: every position, every comparison offer, and the total.
 
-    The losing quotes are part of the answer rather than noise — without them a reader
-    cannot check the claim that the cheapest offer was taken.
+    The losing quotes are part of the answer rather than noise. Without them a reader cannot
+    check the claim that the cheapest offer was taken.
     """
     positions = "\n".join(_render_position(p, text) for p in block.positions)
     total = ""
@@ -390,11 +386,12 @@ def _render_block(block: PositionBlock, text: dict[str, str]) -> str:
 
 
 def _render_position(position: Position, text: dict[str, str]) -> str:
-    """One position: its name, what it is worth, its quotes and any opt-out reason."""
-    # The badge comes FIRST, before the label it belongs to. An offer label is free text
-    # and can run to several lines — a product name with a URL in it does. With the badge
-    # after the label it wrapped onto a line of its own at the bottom of that block, where
-    # it sat directly above the NEXT offer and read as marking that one instead.
+    """Render one position: its name, its value, its quotes and any opt-out reason.
+
+    The badge comes FIRST, before the label it belongs to. An offer label is free text and
+    can run to several lines, for example a product name with a URL. A badge after the label
+    wraps onto a line of its own above the NEXT offer and reads as marking that one instead.
+    """
     offers = "\n".join(
         f'        <li class="offer{" offer--pref" if o.preferred else ""}">'
         + (f'<span class="tag tag--pref">{escape(text["preferred"])}</span>' if o.preferred else "")

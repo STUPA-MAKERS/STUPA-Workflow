@@ -86,6 +86,10 @@ class ReadOps(ApplicationsServiceBase):
         never sees the name of a member. ``magic_link_view`` marks the magic-link
         reader; see `_applicant_actors` for the creator who submitted for another
         email.
+
+        All actors resolve in one batch, because the UI must never show a raw sub or key. A vote
+        close writes the note ``vote:<result>`` and the vote id. A meeting delete deletes the
+        vote and clears the id: the event stays and the application keeps its status.
         """
         app = await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
         rows = (
@@ -97,23 +101,17 @@ class ReadOps(ApplicationsServiceBase):
             )
         ).all()
         out: list[TimelineEventOut] = []
-        # Resolve every actor in one batch. The user interface must never show a
-        # raw sub or key.
         actors = await self._resolve_actors(
             app,
             (ev.actor for ev, _ in rows),
             applicant_view=applicant_view,
             magic_link_view=magic_link_view,
         )
-        # The decisions that the status changes carried.
         decisions = await decisions_by_event(self.session, application_id)
         for ev, label in rows:
             decision = decisions.get(ev.id) if decisions else None
             to_state = await self._get_state(ev.to_state_id)
             info = actors.get(ev.actor) if ev.actor else None
-            # A vote close writes the note ``vote:<result>`` and the vote id. A meeting
-            # delete deletes the vote and clears the id: the event stays, the vote is
-            # gone (the application keeps its status).
             from_vote = (ev.note or "").startswith("vote:")
             out.append(
                 TimelineEventOut(

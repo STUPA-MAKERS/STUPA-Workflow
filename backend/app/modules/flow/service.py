@@ -158,17 +158,19 @@ class StagedFire:
 
     The caller commits. `after_commit` then publishes the cancelled votes and
     dispatches the actions.
+
+    Attributes:
+        agenda_added: The agenda item came in the same transaction, so the engine does not
+            run the `addToNextSession` action again.
+        cancelled_vote_ids: The votes that the transition cancelled. Their
+            `vote_cancelled` events go out after the commit.
     """
 
     application: Application
     transition: Transition
     to_state_id: UUID
     status_event_id: UUID
-    # The agenda item came in the same transaction. The engine does not run the
-    # `addToNextSession` action again.
     agenda_added: bool
-    # The votes that the transition cancelled. Their `vote_cancelled` events go out
-    # after the commit.
     cancelled_vote_ids: tuple[UUID, ...]
 
 
@@ -178,6 +180,10 @@ class FlowService:
     `publisher` sends `vote_cancelled` for the meeting votes that a state change
     cancels. Without it no event goes out, and a live client sees the change on its
     next reload.
+
+    `_SYSTEM` is the actor of the automatic transitions that a confirmation starts. No user
+    stands behind it. It has the roles and permissions of the cron actor, so a guard gives
+    the same result on both paths.
     """
 
     def __init__(
@@ -186,6 +192,7 @@ class FlowService:
         dispatcher: ActionDispatcher | None = None,
         publisher: MeetingPublisher | None = None,
     ) -> None:
+        """Bind the engine to a session, an action dispatcher and an optional publisher."""
         self.session = session
         self.dispatcher: ActionDispatcher = dispatcher or NullActionDispatcher()
         self.publisher = publisher
@@ -413,16 +420,18 @@ class FlowService:
         The worker or cron calls this in a cycle with `manual=False`. The optimistic
         locking in `fire` keeps it idempotent.
 
+        The method is fail-closed. Only the vote or a manual abort decides a vote state, so the
+        method never fires an automatic exit from a vote state, even when a legacy flow still
+        holds one. The graph validator rejects such an exit on save. Otherwise the application
+        would be approved at once without any vote. An automatic transition into a vote state
+        without a resolvable Gremium does not fire either. The next candidate may still fire.
+
         Returns:
             The result of the fired transition, or `None` when none fired.
         """
         app = await self._load_app(application_id)
         if app.current_state_id is None:
             return None
-        # Fail-closed: only the vote or a manual abort decides a vote state. This code
-        # never fires an automatic exit from a vote state, even when a legacy flow still
-        # holds one. The graph validator rejects such an exit on save. Otherwise the
-        # application would be approved at once without any vote.
         state = await self._load_state(app.current_state_id)
         if state is not None and state.kind == "vote":
             return None
@@ -432,8 +441,6 @@ class FlowService:
         for t in await self._outgoing(app):
             if not (t.automatic and eval_guard(t.guard, ctx)):
                 continue
-            # Fail closed: an automatic transition into a vote state without a
-            # resolvable Gremium does not fire. The next candidate may still fire.
             if not await self._enterable(
                 await self.session.get(State, t.to_state_id), app.budget_id
             ):
@@ -447,9 +454,6 @@ class FlowService:
                 )
         return None
 
-    # Actor of the automatic transitions that a confirmation starts. No user stands
-    # behind it. It has the roles and permissions of the cron actor, so a guard gives
-    # the same result on both paths.
     _SYSTEM = Principal(
         sub="system:confirmation", roles=["system"], permissions={"application.manage"}
     )
@@ -480,14 +484,15 @@ class FlowService:
         The idempotency key of the task mail holds the id of the latest status event.
         A second call therefore sends no second mail.
 
+        The rollback after a failed step keeps the session usable for the caller: the verify
+        commits, and the create refreshes the application.
+
         Returns:
             The result of the automatic transition, or `None` when none fired.
         """
         app = await self._load_app(application_id)
         if app.current_state_id is None:
             return None
-        # The dispatchers read in their own sessions. Commit the confirmation first, so
-        # that they see the application as confirmed.
         await self.session.commit()
         try:
             fired = await self.auto_advance(application_id, self._SYSTEM)
@@ -499,9 +504,7 @@ class FlowService:
                 "auto-transition on confirmation skipped (app=%s): %s", application_id, exc
             )
             return None
-        except Exception:  # a failed start must not fail the committed confirmation
-            # Roll back the failed step, so the caller can still use the session (the
-            # verify commits, the create refreshes the application).
+        except Exception:
             await self.session.rollback()
             logger.exception("flow start on confirmation failed (app=%s)", application_id)
             return None
@@ -623,11 +626,12 @@ class FlowService:
         leaves (see `VotingService.cancel_for_application`). The other drafts stay. The
         method does not commit.
 
+        The import of `VotingService` is local, because `voting.service` imports `FlowService`
+        and a module-level import would create a cycle.
+
         Returns:
             The ids of the cancelled votes.
         """
-        # Local import: `voting.service` imports FlowService. A module-level import here
-        # would create a cycle.
         from app.modules.voting.service import VotingService
 
         votes = await VotingService(self.session).cancel_for_application(
@@ -653,7 +657,7 @@ class FlowService:
         for vote_id in vote_ids:
             try:
                 await self.publisher.vote_cancelled(await voting.get(vote_id))
-            except Exception:  # the broadcast is best effort
+            except Exception:
                 logger.warning("vote_cancelled broadcast failed (vote=%s)", vote_id)
 
     async def fire(
@@ -731,6 +735,27 @@ class FlowService:
         to the caller: the voting close runs this in a SAVEPOINT, and a full rollback
         there would also drop the staged vote close.
 
+        A user never fires a branch transition directly, because that would set the vote outcome
+        without a vote. Only the vote outcome fires it, through `stage_branch` with
+        `manual=False`. A user does not fire an automatic transition either: the list of the
+        available transitions hides it, so this gate, the list and the task list agree.
+
+        A decision applies before the guard, so `budgetFitsApplication` checks the approved
+        amount. A vote target with `gremiumSource: "budget"` and no resolvable Gremium refuses
+        the application (409 `no_vote_gremium`, fail closed). A non-vote target clears the
+        Gremium snapshot. The `from`-state condition of the `UPDATE` is the optimistic lock:
+        when a concurrent transition has already moved `current_state_id`, the row count is 0
+        and the caller gets 409.
+
+        A non-branch exit from a vote state is a manual vote cancel. It cancels the open and
+        draft votes in the same transaction. Otherwise a vote stays open and its `close()` finds
+        no branch in the new state, and a draft can open later outside its vote state. A
+        vote-outcome branch cancels nothing, because `close()` already closed the vote.
+
+        The audit entry goes into the same transaction as the state change, so both stay atomic.
+        It holds id references only, no PII. A note is free text, so the entry keeps only its
+        presence.
+
         Raises:
             NotFoundError: The application or the transition does not exist (404).
             ConflictError: The state does not match, the guard fails, or another
@@ -747,18 +772,11 @@ class FlowService:
                 "Transition is not available from the current state.",
                 code="conflict",
             )
-        # Only the vote outcome fires a branch transition, the pass or fail exit of a
-        # vote state. It arrives through stage_branch with manual=False. A user must
-        # never fire one directly, because that would set the vote outcome without a
-        # vote.
         if manual and transition.branch is not None:
             raise ConflictError(
                 "Branch transitions are fired by the vote outcome, not manually.",
                 code="conflict",
             )
-        # The worker fires an automatic transition when its guard holds. The list of
-        # the available transitions hides it, so a person must not fire it either. The
-        # list and this gate then agree, and so does the task list.
         if manual and transition.automatic:
             raise ConflictError(
                 "Automatic transitions are fired by the system, not manually.",
@@ -767,9 +785,6 @@ class FlowService:
 
         old_approved: Decimal | None = None
         if decision is not None:
-            # A decision needs an accepted target state and a fitting amount. It
-            # applies before the guard, so `budgetFitsApplication` checks the approved
-            # amount.
             old_approved = app.approved_amount
             target_state = await self._load_state(transition.to_state_id)
             await check_decision_target(
@@ -782,9 +797,6 @@ class FlowService:
         )
         if not eval_guard(transition.guard, ctx):
             raise ConflictError("Transition guard not satisfied.", code="guard_failed")
-        # The snapshot of the deciding Gremium for the target state. A vote state with
-        # `gremiumSource: "budget"` and no resolvable Gremium refuses the application
-        # (409 `no_vote_gremium`, fail closed). A non-vote target clears the snapshot.
         target = await self.session.get(State, transition.to_state_id)
         vote_gremium = await self._entry_snapshot(app, transition.from_state_id, target)
         if meeting_id is not None:
@@ -792,8 +804,6 @@ class FlowService:
                 transition, meeting_id, principal, vote_gremium=vote_gremium
             )
 
-        # Optimistic locking through the `from`-state condition. A concurrent transition
-        # has already moved `current_state_id`, so rowcount is 0 and the caller gets 409.
         from_state_id = transition.from_state_id
         to_state_id = transition.to_state_id
         result = cast(
@@ -829,11 +839,6 @@ class FlowService:
         await self.session.flush()
         status_event_id = event.id
 
-        # A non-branch exit from a vote state is a manual vote cancel. It cancels the
-        # open and draft votes of the application in the same transaction.
-        # Otherwise a vote would stay open and its close() would find no branch in the
-        # new state, and a draft could open later outside its vote state. A
-        # vote-outcome branch cancels nothing, because close() already closed the vote.
         cancelled: tuple[UUID, ...] = ()
         if transition.branch is None:
             cancelled = await self._cancel_votes(
@@ -843,9 +848,6 @@ class FlowService:
                 entered_state_id=to_state_id,
             )
 
-        # Audit trail: record the status change append-only in the same transaction as
-        # the state change, so both stay atomic. The entry holds id references only, no
-        # PII and no raw note. A note is free text, so the entry keeps only its presence.
         await AuditService(self.session).record(
             actor=principal.sub,
             action=AuditAction.STATUS_CHANGE,
@@ -888,6 +890,9 @@ class FlowService:
 
         The work is the `vote_cancelled` events and the worker actions. The actions
         are idempotent and retryable.
+
+        When the agenda item is already in place, the method skips the `addToNextSession`
+        action, so the item does not appear twice.
         """
         await self._publish_cancelled(staged.cancelled_vote_ids)
         transition = staged.transition
@@ -899,7 +904,6 @@ class FlowService:
             status_event_id=staged.status_event_id,
         )
         if staged.agenda_added:
-            # The agenda item is already in place. Do not add it a second time.
             dispatched = [a for a in dispatched if a.type != "addToNextSession"]
         dispatched += build_implicit_notifications(
             transition.actions,
@@ -929,13 +933,14 @@ class FlowService:
         `addToNextSession` action, or without one `vote_gremium`, the Gremium that the
         target vote state gives the application.
 
+        The import of `Meeting` is local, because `livevote` imports the voting module, that
+        imports `FlowService`, and a module-level import would create a cycle.
+
         Raises:
             ValidationProblem: The transition has no `addToNextSession` action, its
                 target is not a vote state, or the meeting is unknown, not readable,
                 not `planned` or of another Gremium (422).
         """
-        # Local import: `livevote` imports the voting module, and that imports
-        # FlowService. A module-level import here would create a cycle.
         from app.modules.livevote.models import Meeting
         from app.modules.livevote.service import MeetingService
 
@@ -1014,6 +1019,9 @@ class FlowService:
         its audit entry), the method swaps them back (redo). The new audit entry records
         the swap, so the chain of reverts stays consistent.
 
+        The `UPDATE` uses optimistic locking as in `fire`: when a concurrent transition has
+        already moved the state, the row count is 0 and the caller gets 409.
+
         Returns:
             The id of the new status event.
         """
@@ -1023,12 +1031,8 @@ class FlowService:
                 "A newer status change exists; revert that first.",
                 code="stale_revert",
             )
-        # The restored state may be a vote state. It gets its snapshot as on a
-        # transition, and it refuses the application (409) without a Gremium.
         restored = await self.session.get(State, from_state_id)
         vote_gremium = await self._entry_snapshot(app, to_state_id, restored)
-        # Optimistic locking as in `fire`. A concurrent transition has already moved the
-        # state, so rowcount is 0 and the caller gets 409.
         result = cast(
             "CursorResult[Any]",
             await self.session.execute(
@@ -1080,7 +1084,6 @@ class FlowService:
                 ),
             }
         )
-        # Audit as a reversed status_change, so the revert is itself revertable (redo).
         await AuditService(self.session).record(
             actor=actor,
             action=AuditAction.STATUS_CHANGE,
@@ -1161,6 +1164,12 @@ class FlowService:
         fires no webhook. A manual override stays silent. `allow_unconfirmed` works as
         in `_load_app`.
 
+        A forced vote state refuses the application without a resolvable Gremium (409
+        `no_vote_gremium`), because nobody could vote on it there. The `UPDATE` uses optimistic
+        locking as in `fire`. The cancel of the open votes is necessary because the `close()` of
+        such a vote finds no branch in the new state, so the vote would stay open forever. The
+        audit entry holds both state ids, so the audit log can revert it.
+
         Raises:
             NotFoundError: The target state does not belong to the flow of the
                 application (404).
@@ -1183,12 +1192,7 @@ class FlowService:
             raise ConflictError(
                 "Application is already in the target state.", code="conflict"
             )
-        # A forced vote state gets its snapshot as on a transition. A vote state with
-        # `gremiumSource: "budget"` and no resolvable Gremium refuses the force too
-        # (409 `no_vote_gremium`): nobody could vote on the application there.
         vote_gremium = await self._entry_snapshot(app, from_state_id, target)
-        # Optimistic locking as in fire() and revert_status. A concurrent transition has
-        # already moved the state, so rowcount is 0 and the caller gets 409.
         result = cast(
             "CursorResult[Any]",
             await self.session.execute(
@@ -1217,19 +1221,12 @@ class FlowService:
         self.session.add(event)
         await self.session.flush()
         status_event_id = event.id
-        # The force leaves a state that may be a vote state. Cancel the open votes so
-        # that none hangs open. Its close() would otherwise find no branch in the new
-        # state and the vote would stay open forever. Cancel the drafts of the old
-        # state too, so that none opens later outside its vote state.
         cancelled = await self._cancel_votes(
             app.id,
             actor=principal.sub,
             left_state_id=from_state_id,
             entered_state_id=target_state_id,
         )
-        # Audit as a forced status_change with id references only, no PII and no raw
-        # note. The entry carries both state ids, so the audit log can revert it and undo
-        # a mistake.
         await AuditService(self.session).record(
             actor=principal.sub,
             action=AuditAction.STATUS_CHANGE,

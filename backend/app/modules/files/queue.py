@@ -27,16 +27,22 @@ SCAN_TASK_NAME = "scan_attachment"
 class ScanQueue(Protocol):
     """Enqueue interface that the service uses."""
 
-    async def enqueue(self, attachment_id: UUID) -> None: ...
+    async def enqueue(self, attachment_id: UUID) -> None:
+        """Enqueue the scan of one attachment."""
+        ...
 
 
 @dataclass(slots=True)
 class ArqScanQueue:
-    """Queue on top of arq: a ``scan_attachment`` job with an idempotent job id."""
+    """Queue on top of arq: a ``scan_attachment`` job with an idempotent job id.
 
-    pool: object  # arq.ArqRedis, typed loosely to keep arq out of the API surface
+    ``pool`` is an ``arq.ArqRedis``, typed loosely to keep arq out of the API surface.
+    """
+
+    pool: object
 
     async def enqueue(self, attachment_id: UUID) -> None:
+        """Enqueue the scan job. arq drops a second job with the same id."""
         job = await self.pool.enqueue_job(  # type: ignore[attr-defined]
             SCAN_TASK_NAME, str(attachment_id), _job_id=f"scan:{attachment_id}"
         )

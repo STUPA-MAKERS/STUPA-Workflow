@@ -43,9 +43,8 @@ from app.shared.errors import ConflictError, NotFoundError
 
 logger = logging.getLogger("app.flow.actions")
 
-# Actor for the money mutations that the flow engine makes itself. A side effect of a
-# transition has no human principal in scope. The house rule says that every budget
-# mutation leaves an audit trail (see BudgetTreeService.assign_budget).
+#: Audit actor of the money mutations that the flow engine makes itself. A transition side
+#: effect has no human principal, and every budget mutation needs an audit trail.
 _FLOW_ACTOR = "system:flow"
 
 
@@ -60,6 +59,11 @@ class FlowExtrasActionDispatcher:
     sessionmaker: async_sessionmaker[AsyncSession]
 
     async def dispatch(self, actions: Sequence[DispatchedAction]) -> None:
+        """Run each action and log the failure of a single action.
+
+        A failed action must not undo the committed state change, and it must not block the
+        remaining actions of the transition. So the method catches every error of an action.
+        """
         for action in actions:
             try:
                 if action.type == "addToNextSession":
@@ -72,8 +76,7 @@ class FlowExtrasActionDispatcher:
                     await self._assign_budget_from_applicant_gremium(action)
                 elif action.type == "assignBudgetFromMap":
                     await self._assign_budget_from_map(action)
-            except Exception:  # an action failure must not undo the
-                # committed state change nor block the transition's remaining actions.
+            except Exception:
                 logger.exception(
                     "flow action %s failed (key=%s) — skipped",
                     action.type,
@@ -81,9 +84,12 @@ class FlowExtrasActionDispatcher:
                 )
 
     async def _add_to_next_session(self, action: DispatchedAction) -> None:
-        # `Meeting.date` is a local calendar day, so compare it with the local date.
-        # Only a `planned` meeting takes a new agenda item. A live or closed meeting
-        # of today is not "the next session".
+        """Append the application to the next planned meeting of the agenda Gremium.
+
+        `Meeting.date` is a local calendar day, so the method compares it with the local date.
+        Only a `planned` meeting takes a new agenda item. A live or closed meeting of today is
+        not "the next session".
+        """
         today = datetime.now(ZoneInfo(get_settings().local_timezone)).date()
         async with self.sessionmaker() as session:
             gremium_id = await self._agenda_gremium(session, action)
@@ -325,6 +331,14 @@ class FlowExtrasActionDispatcher:
         finds the cost center already set and changes nothing, so it writes no second
         audit entry.
 
+        The method locks and re-reads the row. A concurrent state change into a vote state then
+        waits for this commit, or this read sees it. The method skips the change while the
+        deciding Gremium of the running vote comes from the current cost center
+        (`application.vote_gremium_id`), and when the fiscal year is closed, because a closed
+        fiscal year is frozen. The manual route gives 409 in both cases. It sets the active open
+        fiscal year only when it is unambiguous, otherwise it leaves it open. The audit entry
+        mirrors `BudgetTreeService`, because every money mutation needs an audit trail.
+
         Returns:
             `True` after the assignment. The caller commits. `False` when the node is
             missing, the application sits in a closed fiscal year, or the application
@@ -334,14 +348,10 @@ class FlowExtrasActionDispatcher:
         if node is None:
             logger.warning("assignBudget: budget %s missing — skipped", budget_id)
             return False
-        # Lock and re-read the row: a concurrent state change into a vote state then
-        # waits for this commit, or this read sees it.
         await session.get(
             Application, app.id, with_for_update=True, populate_existing=True
         )
         if await in_budget_vote_state(session, app):
-            # The deciding Gremium of the running vote came from the current cost
-            # center (`application.vote_gremium_id`). The manual route gives 409 here.
             logger.warning(
                 "assignBudget: application %s is in a vote whose Gremium comes from "
                 "the cost center — no change",
@@ -351,7 +361,6 @@ class FlowExtrasActionDispatcher:
         if app.fiscal_year_id is not None:
             current_fy = await session.get(FiscalYear, app.fiscal_year_id)
             if current_fy is not None and current_fy.closed_at is not None:
-                # A closed fiscal year is frozen. The manual route gives 409 here.
                 logger.warning(
                     "assignBudget: application %s sits in a closed fiscal year — no change",
                     app.id,
@@ -375,10 +384,8 @@ class FlowExtrasActionDispatcher:
                 )
             )
         ).all()
-        # Set the active open fiscal year only when it is unambiguous. Otherwise leave it open.
         if len(active_ids) == 1:
             app.fiscal_year_id = active_ids[0]
-        # A money mutation needs an audit trail. House rule, mirrors BudgetTreeService.
         await audit_record(
             session,
             actor=_FLOW_ACTOR,

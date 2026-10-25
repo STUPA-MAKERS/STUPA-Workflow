@@ -57,7 +57,7 @@ class SignedUrlOut(BaseModel):
     """
 
     url: str
-    expiresIn: int  # advisory cache hint in seconds, not a URL expiry
+    expiresIn: int
 
 
 class MessageAttachmentOut(BaseModel):

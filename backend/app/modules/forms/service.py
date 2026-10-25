@@ -62,7 +62,7 @@ def _row_to_field_def(row: FormField) -> FormFieldDef:
     )
 
 
-# Field types whose options the server injects at render time, not the form builder.
+#: Field types whose options the server injects at render time, not the form builder.
 DYNAMIC_OPTION_TYPES: frozenset[str] = frozenset({"gremium_select", "budget_select"})
 
 
@@ -116,6 +116,7 @@ class FormsService:
     """DB-backed form operations, bound to one ``AsyncSession``."""
 
     def __init__(self, session: AsyncSession) -> None:
+        """Bind the service to a database session."""
         self.session = session
 
     async def _get_type(self, type_id: UUID) -> ApplicationType:
@@ -144,6 +145,10 @@ class FormsService:
 
         ``form_version_id`` overrides the active version. A running application uses this
         to render and edit its pinned form instead of the changed active one.
+
+        The server injects the options of the dynamic picker fields only here. Each type costs
+        one lookup, and only when the form holds such a field. A marker section carries its own
+        label. ``main`` and ``budget`` use the default labels.
         """
         app_type = await self._get_type(type_id)
         version_id = form_version_id or app_type.active_form_version_id
@@ -153,8 +158,6 @@ class FormsService:
         type_fields = await self._fields_of_version(version_id)
         sections = effective_form(type_fields)
 
-        # The server injects the options of the dynamic picker fields only here. Each type
-        # costs one lookup, and only when the form holds such a field.
         present = {f.type for s in sections for f in s.fields} & DYNAMIC_OPTION_TYPES
         options_by_type: dict[str, list[FieldOption]] = {}
         if "gremium_select" in present:
@@ -169,7 +172,6 @@ class FormsService:
             sections=[
                 FormSectionOut(
                     key=s.key,
-                    # A marker section carries its own label. main and budget use defaults.
                     label=s.label or SECTION_LABELS.get(s.key) or SECTION_LABELS["main"],
                     fields=_inject_dynamic_options(s.fields, options_by_type),
                 )
@@ -223,11 +225,13 @@ class FormsService:
         and a linked audit entry. ``action`` and ``extra_data`` carry the restore and
         revert path.
 
+        The service validates the input before any DB access, so a broken definition gives 422,
+        not 500.
+
         Raises:
             ValidationProblem: The form definition is invalid.
             NotFoundError: The application type does not exist.
         """
-        # Validate the input before DB access. A broken definition gives 422, not 500.
         try:
             validate_definition(payload.fields)
         except FormDefinitionError as exc:

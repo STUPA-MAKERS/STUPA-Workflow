@@ -29,19 +29,19 @@ import httpx
 
 from app.settings import Settings
 
-# The service signals a PDF through the Content-Type. Any other body breaks the contract.
+#: The service signals a PDF through the Content-Type. Any other body breaks the contract.
 _PDF_CONTENT_TYPE = "application/pdf"
 _MAX_ERROR_DETAIL = 300
 _MARKDOWN_CONTENT_TYPE = "text/markdown; charset=utf-8"
-# The multipart field names of the ``/render`` contract.
+#: The multipart field names of the ``/render`` contract.
 _SOURCE_FIELD = "source"
 _CONFIG_FIELD = "config"
 _ASSETS_FIELD = "assets"
-# The service reads the asset name from the file name of the part, so the part needs
-# one. The bytes are opaque to the service; the template loads them as an image.
+#: The service reads the asset name from the file name of the part, so the part needs
+#: one. The bytes are opaque to the service; the template loads them as an image.
 _ASSET_CONTENT_TYPE = "application/octet-stream"
 
-# One multipart file part: ``(field, (filename, content, content_type))``.
+#: One multipart file part: ``(field, (filename, content, content_type))``.
 type _FilePart = tuple[str, tuple[str, bytes, str]]
 
 
@@ -64,6 +64,13 @@ class TypstError(RuntimeError):
     """
 
     def __init__(self, detail: str, *, status: int | None = None, retryable: bool) -> None:
+        """Store the reason, the HTTP status and the retry flag.
+
+        Args:
+            detail: The short reason.
+            status: The HTTP status of the service, or None for a transport error.
+            retryable: The failure is transient.
+        """
         super().__init__(detail)
         self.status = status
         self.retryable = retryable
@@ -123,6 +130,10 @@ class TypstClient:
         asset selects that uploaded file. With both empty the client sends the raw
         body. The service owns the asset-name rule and answers 400 for a bad name.
 
+        Only a config or an asset needs the multipart shape. On a refusal the client keeps the
+        reason of the scrubbed ``{"error": …}`` body, for example a malformed formula,
+        truncated, so the server log and the 422 show the cause instead of an opaque 503.
+
         Raises:
             TypstError: The service refused or failed the render, or it returned a
                 body that is not a PDF.
@@ -131,7 +142,6 @@ class TypstClient:
         if variant is not None:
             params["variant"] = variant
         url = self.base_url.rstrip("/") + "/render"
-        # Only a config or an asset needs the multipart shape.
         multipart = bool(config) or bool(assets)
         try:
             async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
@@ -153,9 +163,6 @@ class TypstClient:
             raise TypstError(f"typst unreachable ({type(exc).__name__})", retryable=True) from exc
 
         if response.status_code != httpx.codes.OK:
-            # The scrubbed ``{"error": …}`` body carries the reason, for example a
-            # malformed formula. We keep it, defensively truncated, so the server log
-            # and the 422 show the cause instead of an opaque 503.
             raise TypstError(
                 f"typst render failed (status {response.status_code}): "
                 f"{_error_detail(response)}",

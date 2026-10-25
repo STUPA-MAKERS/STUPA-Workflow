@@ -47,6 +47,7 @@ class GuestSettingsService:
     """Read and change the guest application settings."""
 
     def __init__(self, session: AsyncSession) -> None:
+        """Bind the service to a database session."""
         self.session = session
 
     async def get(self) -> GuestApplicationSettings:

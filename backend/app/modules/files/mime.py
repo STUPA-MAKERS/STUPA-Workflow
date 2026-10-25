@@ -16,7 +16,9 @@ import io
 import os
 import zipfile
 
-# The allowlist holds sniffed types, never the type that the client claims.
+#: The allowlist holds sniffed types, never the type that the client claims. Zip is
+#: allowed only for .docx, .xlsx and .pptx, and only when the container carries the OOXML
+#: structure (`_is_ooxml_container`), because libmagic sometimes sniffs OOXML as zip.
 ALLOWED_MIME_TYPES: frozenset[str] = frozenset(
     {
         "application/pdf",
@@ -24,9 +26,6 @@ ALLOWED_MIME_TYPES: frozenset[str] = frozenset(
         "image/jpeg",
         "image/gif",
         "image/webp",
-        # Legacy Office and OOXML. libmagic sometimes sniffs OOXML as application/zip.
-        # Zip is allowed only for .docx, .xlsx and .pptx, and only when the container
-        # carries the OOXML structure. See _is_ooxml_container.
         "application/zip",
         "application/msword",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -40,8 +39,8 @@ ALLOWED_MIME_TYPES: frozenset[str] = frozenset(
     }
 )
 
-# An older libmagic often sniffs an OOXML container as ``application/zip``. The map
-# accepts that type on purpose.
+#: An older libmagic often sniffs an OOXML container as ``application/zip``. The map
+#: accepts that type on purpose.
 _OOXML_ZIP = {"application/zip"}
 _EXT_TO_MIME: dict[str, frozenset[str]] = {
     ".pdf": frozenset({"application/pdf"}),
@@ -69,10 +68,10 @@ _EXT_TO_MIME: dict[str, frozenset[str]] = {
     ".odp": frozenset({"application/vnd.oasis.opendocument.presentation"}),
 }
 
-# The structural check uses this map when libmagic sniffs OOXML only as
-# ``application/zip``. A real OOXML package holds ``[Content_Types].xml`` and the
-# top-level directory of the format, that is word/, xl/ or ppt/. An arbitrary ZIP
-# therefore cannot pose as an Office document.
+#: The structural check uses this map when libmagic sniffs OOXML only as
+#: ``application/zip``. A real OOXML package holds ``[Content_Types].xml`` and the
+#: top-level directory of the format (word/, xl/ or ppt/), so an arbitrary ZIP cannot
+#: pose as an Office document.
 _OOXML_REQUIRED_DIR: dict[str, str] = {
     ".docx": "word/",
     ".xlsx": "xl/",
@@ -88,10 +87,12 @@ def sniff_mime(data: bytes) -> str:
     """Return the MIME type that libmagic sniffs from the bytes.
 
     Empty input gives ``application/x-empty``.
+
+    The import of ``magic`` is lazy, because only the upload path needs libmagic.
     """
     if not data:
         return "application/x-empty"
-    import magic  # lazy import: only the upload path needs libmagic
+    import magic
 
     return magic.from_buffer(data, mime=True)
 

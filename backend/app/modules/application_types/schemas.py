@@ -26,13 +26,14 @@ class ApplicationTypeListQuery(PageParams):
     `extra="forbid"` rejects an unknown query parameter with 422 instead of a
     silent ignore. The cap on `offset` is the int4 maximum, so the DB OFFSET
     cannot overflow into a 500.
+
+    The `offset` cap is an overflow guard, not a business page limit. The `Lang` enum
+    rejects an invalid value such as `lang=null` with 422 instead of ignoring it.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    # The int4 maximum is an overflow guard, not a business page limit.
     offset: int = Field(default=0, ge=0, le=2_147_483_647)
-    # The Lang enum rejects an invalid value such as `lang=null` with 422 instead of ignoring it.
     lang: Lang = DEFAULT_LANG
 
 
@@ -40,12 +41,14 @@ class ApplicationTypeListItem(_CamelModel):
     """One application type in the list.
 
     `key` and `gremiumId` are admin-only. They stay `null` without the permission.
+
+    `active` means that the type accepts a submission, because an active form version
+    exists.
     """
 
     id: UUID
     name: str
     has_budget: bool = Field(alias="hasBudget")
-    # active means that the type accepts a submission because an active form version exists.
     active: bool
     active_form_version_id: UUID | None = Field(default=None, alias="activeFormVersionId")
     key: str | None = None

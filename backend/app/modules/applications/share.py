@@ -17,13 +17,17 @@ The database stores ``HMAC-SHA256(pepper, token)`` and never the plaintext, like
 
 What the public view omits, and why:
 
-* **Comments** and **version history** — the user asked for both to stay out. They are the
-  committee's working record, not the decision.
+* **Comments** and **version history**. They are the committee's working record, not the
+  decision.
 * **Fields marked ``is_pii``** — the same rule ``be-pdf`` already applies to the gremium
   PDF. Reusing it rather than writing a second one means the two can never drift into
   disagreeing about what counts as personal.
 * **The applicant record** entirely. A name is the most obviously personal thing on an
   application and the least necessary to understand it.
+
+The page uses the SAME offer parser and total as the form validator. A second
+implementation would let the page and the validated total disagree about what an
+application costs, and the page is the copy an outsider reads.
 """
 
 from __future__ import annotations
@@ -42,10 +46,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.applications.models import Application, ApplicationShare
 from app.modules.auth import tokens
-
-# The SAME offer parser and total the form validator uses. A second implementation here
-# would let the page and the validated total disagree about what an application costs,
-# and the page is the copy an outsider reads.
 from app.modules.forms.validation import _offer_value, positions_total
 from app.shared.config_schemas import FieldOption, FormFieldDef
 from app.shared.errors import NotFoundError
@@ -128,7 +128,10 @@ class PublicApplication:
 
 
 def new_token() -> str:
-    """A fresh share token. The plaintext exists here and in the URL, nowhere else."""
+    """Return a fresh share token.
+
+    The plaintext exists here and in the URL, nowhere else.
+    """
     return secrets.token_urlsafe(TOKEN_BYTES)
 
 
@@ -140,7 +143,15 @@ def clamp_ttl(days: int | None) -> int:
 
 
 class ShareService:
+    """Create, list, revoke and resolve the share links of applications."""
+
     def __init__(self, session: AsyncSession, *, pepper: str) -> None:
+        """Bind the service to a session and the token pepper.
+
+        Args:
+            session: The database session.
+            pepper: The secret that the token HMAC uses.
+        """
         self.session = session
         self.pepper = pepper
 
@@ -158,11 +169,13 @@ class ShareService:
         The plaintext is returned once and never stored. A caller who loses it makes a new
         link; there is no way to recover the old one, which is the same promise the
         magic-link flow makes.
+
+        The method checks the application first. Without this check the INSERT trips the foreign
+        key, and the caller gets a 500 where the route promises a 404. It flushes, because `id`
+        and `created_at` are server defaults that stay None before the INSERT, and the response
+        model then has nothing to serialize.
         """
         at = now or datetime.now(UTC)
-        # Check the application first. Without this the INSERT trips the foreign key and
-        # the caller gets a 500 where the route promises a 404 — and a 500 for a typo in
-        # a URL reads as "the server broke" rather than "no such application".
         if await self.session.get(Application, application_id) is None:
             raise NotFoundError("no such application")
         token = new_token()
@@ -174,9 +187,6 @@ class ShareService:
             label=label,
         )
         self.session.add(row)
-        # Flush, do not just add. `id` and `created_at` are server defaults
-        # (`gen_random_uuid()` and `now()`), so before the INSERT they are both None and
-        # the response model has nothing to serialize.
         await self.session.flush()
         return row, token
 
@@ -201,12 +211,15 @@ class ShareService:
     async def revoke(
         self, share_id: UUID, *, application_id: UUID, now: datetime | None = None
     ) -> ApplicationShare:
-        """Stop honouring a link. Idempotent: revoking twice keeps the first timestamp."""
+        """Stop honouring a link.
+
+        The call is idempotent: a second revoke keeps the first timestamp. The query is scoped
+        to the application in the path, so a share id of one application cannot be revoked
+        through the route of another.
+        """
         row = await self.session.scalar(
             select(ApplicationShare).where(
                 ApplicationShare.id == share_id,
-                # Scoped to the application in the path, so a share id from one
-                # application cannot be revoked through another's route.
                 ApplicationShare.application_id == application_id,
             )
         )
@@ -244,6 +257,11 @@ def build_public_view(
 
     The field loop mirrors `be-pdf`'s: skip `is_pii`, resolve the label, format the value.
     Everything not explicitly copied here stays behind.
+
+    A cost breakdown is the substance of a funding application. Flattened to one line it
+    says nothing, so it becomes a block instead of a row. A field that flattens to nothing
+    is left out rather than printed empty, because a list of structured rows renders as
+    ", , ,": punctuation around values that this page does not show.
     """
     data: dict[str, Any] = app.data if isinstance(app.data, dict) else {}
     currency = app.currency or _DEFAULT_CURRENCY
@@ -256,17 +274,12 @@ def build_public_view(
         if value in (None, "", [], {}):
             continue
         label = resolve_i18n(f.label, lang, "de") or f.key
-        # A cost breakdown is the substance of a funding application. Flattened to one
-        # line it says nothing, so it becomes a block instead of a row.
         if f.type == "positions":
             block = _positions_block(value, label=label, lang=lang, currency=currency)
             if block is not None:
                 blocks.append(block)
             continue
         text = _format_field(f, value, lang=lang, currency=currency)
-        # A field that flattens to nothing is left out rather than printed empty. A list
-        # of structured rows would otherwise render as ", , ," — punctuation around
-        # values this page deliberately does not show.
         if not text.strip(" ,"):
             continue
         shown.append((label, text))
@@ -291,6 +304,9 @@ def _positions_block(
     The answer is JSONB written by whatever form version was active at the time, so every
     level checks its own shape. A public route may not raise on an old answer: that turns
     a valid link into a 500.
+
+    A position with neither a name nor a single readable offer carries nothing and is left
+    out.
     """
     if not isinstance(value, list):
         return None
@@ -319,7 +335,6 @@ def _positions_block(
                 if is_preferred and preferred is None:
                     preferred = num
         pos_label = str(raw.get("label") or "").strip()
-        # A position with neither a name nor a single readable offer carries nothing.
         if not pos_label and not offers:
             continue
         reason = raw.get("noOffersReason") if raw.get("noOffers") is True else None
@@ -407,6 +422,7 @@ def _day(value: object) -> str:
 
 
 def to_decimal(value: object) -> Decimal | None:
+    """Return a finite ``Decimal`` for a number value, else ``None``."""
     if isinstance(value, bool) or value is None:
         return None
     try:
@@ -444,20 +460,21 @@ def _group(digits: str, sep: str) -> str:
 
 
 def _format(value: object) -> str:
-    """Flatten one answer to a display string. No HTML, no markup — the template escapes."""
+    """Flatten one answer to a display string. No HTML, no markup — the template escapes.
+
+    A structured answer has no sensible one-line form, and a guess risks printing a key that
+    nobody meant to publish, so it gives an empty string. A reference field holds the id of
+    its target. On a public page that id names nothing the reader can use and publishes an
+    internal identifier, so the value is dropped.
+    """
     if isinstance(value, bool):
         return "Ja" if value else "Nein"
     if isinstance(value, list):
         parts = [p for p in (_format(v) for v in value) if p]
         return ", ".join(parts)
     if isinstance(value, dict):
-        # A structured answer has no sensible one-line form, and guessing one risks
-        # printing a key nobody meant to publish.
         return ""
     text = str(value)
-    # A reference field holds the id of the thing it points at. On a public page that id
-    # names nothing the reader can use and publishes an internal identifier, so the
-    # value is dropped rather than shown raw.
     if _is_uuid(text):
         return ""
     return text

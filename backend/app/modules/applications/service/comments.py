@@ -144,6 +144,11 @@ class CommentOps(ApplicationsServiceBase):
         (``Access.can_see_internal``). Every mention is new, so ``added_mentions``
         holds all of them.
 
+        With files the method locks the application row before the anonymized check, as the
+        anonymization locks it. Otherwise a comment that binds files while the application is
+        anonymized keeps them, because no later step looks for them. The 201 response always has
+        ``isOwn`` true, because the creator is the viewer.
+
         Raises:
             NotFoundError: The application does not exist or is hidden (404).
             ValidationProblem: Files on an anonymized application
@@ -151,9 +156,6 @@ class CommentOps(ApplicationsServiceBase):
                 that is missing, expired, foreign or infected (422). A mention that
                 the caller may not make (422, ``mention_not_member``).
         """
-        # With files the application row is locked before the anonymized check, as
-        # the anonymization locks it. Otherwise a comment that binds files while the
-        # application is anonymized keeps them, because no later step looks for them.
         app = await self._get_app(
             application_id, allow_unconfirmed=allow_unconfirmed, lock=bool(attachment_ids)
         )
@@ -196,11 +198,11 @@ class CommentOps(ApplicationsServiceBase):
             id=comment.id,
             author=info.legacy(author) if author else None,
             authorKind=author_kind,  # type: ignore[arg-type] — validated against CHECK
-            authorInfo=info,  # validated against CHECK
+            authorInfo=info,
             body=comment.body,
             visibility=visibility,  # type: ignore[arg-type]
             at=comment.at,
-            isOwn=True,  # the creator is always the viewer of the 201 response
+            isOwn=True,
             attachments=files.get(comment.id, []),
             mentions=refs.get(comment.id, []),
         )
@@ -253,9 +255,9 @@ class CommentOps(ApplicationsServiceBase):
         )
 
         def _info(c: Comment) -> ActorOut:
+            """Resolve the author of a comment. An applicant comment stores no sub."""
             if c.author and c.author in actors:
                 return actors[c.author]
-            # An applicant comment stores no sub.
             return ActorOut(kind="applicant" if c.author_kind == "applicant" else "deleted")
 
         files = await self._comment_files([c.id for c in rows])
@@ -452,9 +454,10 @@ class CommentOps(ApplicationsServiceBase):
     ) -> None:
         """Remove a comment for good, with its files.
 
-        Until this route existed, an internal comment posted as public could
-        only be removed by anonymizing the whole application. With a ``files``
-        service that has the object storage, the objects of the files go too.
+        With a ``files`` service that has the object storage, the objects of the files go too.
+        The method locks the file rows before the first audit entry, because ``finalize_scan``
+        of an infected file locks its row first and then waits for the lock of the audit chain
+        (``FilesService.lock_for_messages``).
 
         Raises:
             NotFoundError: The application or the comment does not exist (404).
@@ -469,9 +472,6 @@ class CommentOps(ApplicationsServiceBase):
             can_manage=can_manage,
         )
         files = files or FilesService(self.session)
-        # The file rows are locked before the first audit entry, because
-        # ``finalize_scan`` of an infected file locks its row first and then waits for
-        # the lock of the audit chain (``FilesService.lock_for_messages``).
         await files.lock_for_messages("comment", [comment.id])
         await self._audit_comment(comment, AuditAction.COMMENT_DELETE, actor=actor)
         await files.delete_for_messages("comment", [comment.id], actor=actor)

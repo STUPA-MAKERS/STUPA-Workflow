@@ -32,7 +32,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, CreatedAtMixin, TimestampMixin, UUIDPkMixin
 
-# Guest applications: the default and the upper bound of the confirmation window.
+#: Guest applications: the default and the upper bound of the confirmation window.
 DEFAULT_CONFIRM_TTL_HOURS = 12
 MAX_CONFIRM_TTL_HOURS = 720
 
@@ -42,6 +42,52 @@ class Application(UUIDPkMixin, TimestampMixin, Base):
 
     `data` holds the current field values as JSONB with a GIN index. The service
     syncs the promoted `amount` and `currency` columns from `data`.
+
+    The default list filters archived rows out, so every listing query touches the index on
+    ``archived_at``.
+
+    Attributes:
+        budget_id: Cost center in the budget tree, most often a leaf. The budget
+            assignment sets the fiscal year, not the submission, and
+            ``move-fiscal-year`` moves it.
+        vote_gremium_id: Snapshot of the Gremium that decides the current vote state.
+            The flow engine sets it when the application enters a ``vote`` state (the
+            fixed ``gremiumId`` of the state, or the effective deciding Gremium of the
+            cost center for ``gremiumSource: "budget"``). It clears it when the
+            application leaves the vote state, in the same transaction as the state
+            change. Every reader of "the Gremium of the vote" (read scope, tasks,
+            agenda, vote create, task mail) reads this column.
+        approved_amount: The amount of the valid decision, a denormalized copy for the
+            budget roll-up, the guard ``budgetFitsApplication`` and the lists. NULL
+            means "as requested" or "no decision": the committed amount is then
+            ``amount``.
+        created_by: OIDC ``sub`` of the creating principal, ``None`` for an anonymous
+            submission. The creator reads, edits and deletes the own application
+            without ``application.manage``.
+        email_confirmed_at: Email confirmation of a guest submission. Until it is set,
+            the application stays invisible, and the platform discards it after 12 h.
+            A logged-in submission counts as confirmed at once, because the OIDC mail
+            is trusted. A guest confirms through the magic-link verify route.
+        archived_at: Archived: out of the working list, still fully readable. It is a
+            timestamp, because it answers "whether" and "when" in one column. It is
+            NOT a flow state, because an application can be archived from any state.
+            It is NOT anonymization either: archiving hides nothing and deletes
+            nothing, while ``be-privacy`` erases PII under the DSGVO.
+        archived_by: OIDC ``sub`` of whoever archived it. It is no foreign key,
+            because the record of who archived must survive the removal of the
+            principal, as with ``created_by``.
+        captured_by: OIDC ``sub`` of the person with
+            ``application.create_on_behalf`` who entered an application that reached
+            the platform another way, for example as a PDF or a mail. It is NOT the
+            owner: ``created_by`` names the applicant account, or stays None for a
+            guest applicant. It is no foreign key, so the record survives the removal
+            of the account. The three capture columns stay None for an application
+            that the applicant submitted.
+        capture_intake: The free-text intake channel ("Eingang"), for example
+            "per PDF" or "per Mail".
+        received_on: The date on which the application reached the Gremium. The
+            capturing person sets it (default: the day of the capture). It is
+            information only.
     """
 
     __tablename__ = "application"
@@ -55,69 +101,30 @@ class Application(UUIDPkMixin, TimestampMixin, Base):
     gremium_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("gremium.id"), nullable=True
     )
-    # Cost center in the budget tree, most often a leaf, plus the fiscal year.
-    # The budget assignment sets the fiscal year, not the submission.
-    # `move-fiscal-year` moves it.
     budget_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("budget.id"), nullable=True
     )
     fiscal_year_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("fiscal_year.id"), nullable=True
     )
-    # Snapshot of the Gremium that decides the current vote state. The flow engine sets
-    # it when the application enters a ``vote`` state (the fixed ``gremiumId`` of the
-    # state, or the effective deciding Gremium of the cost center for
-    # ``gremiumSource: "budget"``) and clears it when the application leaves the vote
-    # state, in the same transaction as the state change. Every reader of "the Gremium
-    # of the vote" (read scope, tasks, agenda, vote create, task mail) reads this column.
     vote_gremium_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("gremium.id", ondelete="SET NULL"), nullable=True
     )
     amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     currency: Mapped[str | None] = mapped_column(CHAR(3), nullable=True)
-    # The amount of the valid decision (`application_decision`), a denormalized copy for
-    # the budget roll-up, the guard `budgetFitsApplication` and the lists. NULL means
-    # "as requested" or "no decision": the committed amount is then `amount`.
     approved_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     data: Mapped[dict] = mapped_column(JSONB, server_default="{}")
     lang: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # OIDC ``sub`` of the creating principal. An anonymous submission stores ``None``.
-    # The creator reads, edits and deletes the own application without
-    # ``application.manage``.
     created_by: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Email-confirmation timestamp for a guest submission. Until it is set, the
-    # application stays invisible, and the platform discards it after 12 h. A
-    # logged-in submission counts as confirmed at once, because the OIDC mail is
-    # trusted. A guest confirms through the magic-link verify route.
     email_confirmed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    # Archived: out of the working list, still fully readable. A timestamp rather than a
-    # flag, because it answers "whether" and "when" in one column and makes the un-archive
-    # obvious. Deliberately NOT a flow state: an application can be archived from any
-    # state, and the flow is about where a decision stands, not about whether the record
-    # is still in front of anyone.
-    #
-    # This is NOT anonymization. `be-privacy` erases PII under the DSGVO; archiving hides
-    # nothing and deletes nothing. The two must never be confused for one another.
     archived_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    # OIDC ``sub`` of whoever archived it. NOT a foreign key: a principal can be removed
-    # and the record of who archived must survive that, the same way ``created_by`` does.
     archived_by: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Captured on behalf of the applicant. A person with
-    # ``application.create_on_behalf`` entered an application that reached the
-    # platform another way, for example as a PDF or a mail. ``captured_by`` is the OIDC
-    # ``sub`` of that person. It is NOT the owner: ``created_by`` names the applicant
-    # account, or stays None for a guest applicant. Like ``created_by`` it is no foreign
-    # key, so the record survives the removal of the account. All three columns stay
-    # None for an application that the applicant submitted.
     captured_by: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # The free-text intake channel ("Eingang"), for example "per PDF" or "per Mail".
     capture_intake: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # The date on which the application reached the Gremium. The capturing person sets
-    # it (default: the day of the capture). It is information only.
     received_on: Mapped[date | None] = mapped_column(Date, nullable=True)
 
     __table_args__ = (
@@ -134,8 +141,6 @@ class Application(UUIDPkMixin, TimestampMixin, Base):
         Index("ix_application_vote_gremium_id", "vote_gremium_id"),
         Index("ix_application_type_id", "type_id"),
         Index("ix_application_created_at", "created_at"),
-        # The default list filters archived rows out, so every listing query touches
-        # this column.
         Index("ix_application_archived_at", "archived_at"),
     )
 
@@ -179,7 +184,16 @@ class SubmissionVersion(UUIDPkMixin, Base):
 
 
 class StatusEvent(UUIDPkMixin, Base):
-    """Status-timeline entry (one transition)."""
+    """Status-timeline entry (one transition).
+
+    Attributes:
+        vote_id: The vote whose close fired this event (the ``pass`` or ``fail``
+            branch). NULL for every other event. A meeting delete deletes the votes of
+            the meeting and sets this reference to NULL first. The note
+            ``vote:<result>`` stays, so the timeline shows "vote deleted (with its
+            meeting)" for such an event. The foreign key is ``SET NULL`` as a second
+            line of defense.
+    """
 
     __tablename__ = "status_event"
 
@@ -198,11 +212,6 @@ class StatusEvent(UUIDPkMixin, Base):
         DateTime(timezone=True), server_default=func.now()
     )
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # The vote whose close fired this event (the ``pass`` or ``fail`` branch). NULL for
-    # every other event. A meeting delete deletes the votes of the meeting, and it sets
-    # this reference to NULL first. The note ``vote:<result>`` stays, so the timeline
-    # shows "vote deleted (with its meeting)" for such an event. The foreign key is
-    # ``SET NULL`` as a second line of defense.
     vote_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("vote.id", ondelete="SET NULL"), nullable=True
     )
@@ -220,6 +229,18 @@ class ApplicationDecision(UUIDPkMixin, Base):
     a row. The valid decision is the newest row with `superseded_at IS NULL`. A new
     decision supersedes the old one. Nobody edits a row: only a new decision or an
     audit revert of its status change replaces it.
+
+    A partial unique index allows at most one valid decision per application, so two
+    concurrent writes cannot both stay valid.
+
+    Attributes:
+        approved_amount: NULL means "as requested" (``application.amount``).
+        conditions: The conditions (Auflagen) as a list of texts.
+        vote_id: The vote whose close made the decision. NULL for a manual transition.
+        status_event_id: The status event of the transition that carried the decision.
+            NULL when a passed vote could not fire its branch.
+        decided_by: The OIDC ``sub`` of the person who fired the transition. NULL for a
+            vote.
     """
 
     __tablename__ = "application_decision"
@@ -227,23 +248,17 @@ class ApplicationDecision(UUIDPkMixin, Base):
     application_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("application.id", ondelete="CASCADE")
     )
-    # NULL means "as requested" (`application.amount`).
     approved_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
-    # The conditions (Auflagen) as a list of texts.
     conditions: Mapped[list[str]] = mapped_column(JSONB, server_default="[]")
-    # The vote whose close made the decision. NULL for a manual transition.
     vote_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("vote.id", ondelete="SET NULL"), nullable=True
     )
-    # The status event of the transition that carried the decision. NULL when a passed
-    # vote could not fire its branch.
     status_event_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("status_event.id", ondelete="SET NULL"), nullable=True
     )
     decided_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
-    # The OIDC `sub` of the person who fired the transition. NULL for a vote.
     decided_by: Mapped[str | None] = mapped_column(Text, nullable=True)
     superseded_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
@@ -252,8 +267,6 @@ class ApplicationDecision(UUIDPkMixin, Base):
     __table_args__ = (
         Index("ix_application_decision_application_id", "application_id"),
         Index("ix_application_decision_status_event_id", "status_event_id"),
-        # At most one valid decision per application. Two concurrent writes cannot
-        # both stay valid.
         Index(
             "uq_application_decision_one_valid",
             "application_id",
@@ -280,6 +293,10 @@ class MagicLink(UUIDPkMixin, CreatedAtMixin, Base):
     the applicant can still request a new link for an archived application, because
     an archived application stays readable. Anonymizing removes the email, so no new
     link is possible. The verify route answers 410 for a used or expired link.
+
+    A CHECK allows a link without an expiry only for an edit link. The UNIQUE index on the
+    hash backs the atomic single-use redemption (``UPDATE ... WHERE used_at IS NULL``) and
+    prevents an ambiguous hash collision.
     """
 
     __tablename__ = "magic_link"
@@ -299,15 +316,10 @@ class MagicLink(UUIDPkMixin, CreatedAtMixin, Base):
 
     __table_args__ = (
         CheckConstraint("scope IN ('edit','view')", name="magic_link_scope"),
-        # Only an edit link can live without an expiry. The old short view links
-        # always have one.
         CheckConstraint(
             "expires_at IS NOT NULL OR scope = 'edit'",
             name="magic_link_unlimited_edit_only",
         ),
-        # The UNIQUE index backs the atomic single-use redemption
-        # (UPDATE ... WHERE used_at IS NULL). It also prevents an ambiguous hash
-        # collision.
         Index("ix_magic_link_token_hash", "token_hash", unique=True),
     )
 
@@ -361,6 +373,11 @@ class ApplicationShare(UUIDPkMixin, CreatedAtMixin, Base):
 
     NOT single-use, unlike a magic link: the whole point is that several people open it,
     and often more than once.
+
+    ``created_by`` is the OIDC ``sub`` of the creator, next to a private note. It is no
+    foreign key, like ``created_by`` on the application, because the record of who made a
+    record public must outlive the account. The hash index is UNIQUE, because two rows with
+    the same digest make the lookup ambiguous.
     """
 
     __tablename__ = "application_share"
@@ -373,15 +390,10 @@ class ApplicationShare(UUIDPkMixin, CreatedAtMixin, Base):
     revoked_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    # OIDC ``sub`` of whoever created the link, and a note they can leave for themselves.
-    # Not a foreign key, like ``created_by`` on the application: the record of who made a
-    # record public has to outlive the account.
     created_by: Mapped[str | None] = mapped_column(Text, nullable=True)
     label: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
-        # UNIQUE: the lookup is by hash, and two rows with the same digest would make the
-        # answer ambiguous at exactly the moment it must not be.
         Index("ix_application_share_token_hash", "token_hash", unique=True),
         Index("ix_application_share_application_id", "application_id"),
     )
@@ -393,6 +405,9 @@ class Comment(UUIDPkMixin, Base):
     RBAC shows `visibility='internal'` to a principal only. It shows `'public'`
     also to the applicant behind the magic link. `author_kind` separates a
     principal author from an applicant author. ``mentions`` holds principal ids.
+
+    Only a member who reads the internal comments is mentionable, and the applicant view
+    never shows ``mentions``.
     """
 
     __tablename__ = "comment"
@@ -404,9 +419,6 @@ class Comment(UUIDPkMixin, Base):
     author_kind: Mapped[str] = mapped_column(Text)
     body: Mapped[str] = mapped_column(Text)
     visibility: Mapped[str] = mapped_column(Text)
-    # The principal ids (as strings) of the members that the comment mentions. Only a
-    # member who reads the internal comments is mentionable, and the applicant view
-    # never shows the list.
     mentions: Mapped[list[str]] = mapped_column(
         JSONB, default=list, server_default=text("'[]'::jsonb")
     )

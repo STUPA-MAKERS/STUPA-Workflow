@@ -54,12 +54,11 @@ RENDER_MAX_ASSET_BYTES: Final[int] = 8 * 1024 * 1024
 #: The most image cleans that run at the same time in one process.
 CLEAN_CONCURRENCY: Final[int] = 2
 
-# The clean is CPU and memory work in a thread. The semaphore holds the number of
-# parallel cleans in one process at ``CLEAN_CONCURRENCY``, so parallel uploads cannot
-# take all the CPU or the memory of the API.
+#: Caps the parallel cleans (CPU and memory work in a thread) at ``CLEAN_CONCURRENCY``,
+#: so parallel uploads cannot take all the CPU or the memory of the API.
 _clean_slots: Final[asyncio.Semaphore] = asyncio.Semaphore(CLEAN_CONCURRENCY)
-# A cancelled request releases ``_clean_slots`` while its thread still works. The
-# thread semaphore holds the limit in that case too.
+#: A cancelled request releases ``_clean_slots`` while its thread still works. This
+#: semaphore holds the limit in that case too.
 _clean_threads: Final[threading.BoundedSemaphore] = threading.BoundedSemaphore(
     CLEAN_CONCURRENCY
 )
@@ -70,7 +69,7 @@ def _clean_bounded(data: bytes) -> CleanImage:
     with _clean_threads:
         return clean_image(data)
 
-# Stored type -> the extension of the typst asset name.
+#: Stored type -> the extension of the typst asset name.
 _ASSET_EXT: Final[dict[str, str]] = {
     "image/png": "png",
     "image/jpeg": "jpg",
@@ -104,6 +103,10 @@ class MediaService:
         max_bytes: int = 10 * 1024 * 1024,
         settings: Settings | None = None,
     ) -> None:
+        """Bind the service to a session, the storage and the upload limits.
+
+        Without ``storage`` an upload gives 503. ``settings`` None means ``get_settings()``.
+        """
         self.session = session
         self.storage = storage
         self.max_bytes = max_bytes

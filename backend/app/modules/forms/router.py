@@ -10,6 +10,9 @@ Endpoints:
 
 Every error response declares ``ProblemDetail``, so the OpenAPI contract matches the
 status, the content type and the schema.
+
+A 400 means a malformed JSON body (parse error). A 422 means a failed schema or
+definition validation.
 """
 
 from __future__ import annotations
@@ -44,6 +47,7 @@ def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
 
 
 def get_forms_service(session: DbSession) -> FormsService:
+    """Build the forms service of a request."""
     return FormsService(session)
 
 
@@ -81,7 +85,6 @@ async def get_form_draft(
     "/admin/application-types/{type_id}/form-versions",
     response_model=FormVersionOut,
     status_code=201,
-    # 400 = malformed JSON body (parse error). 422 = schema or definition validation.
     responses=_errors(400, 401, 403, 404, 422),
 )
 async def create_form_version(

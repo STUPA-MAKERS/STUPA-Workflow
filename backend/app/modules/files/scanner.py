@@ -15,8 +15,8 @@ from typing import Protocol
 from app.settings import Settings
 from app.shared.errors import ServiceUnavailableError, UnsupportedMediaTypeError
 
-# The official EICAR test signature. It is not a real virus. Quarantine tests and fakes
-# use it.
+#: The official EICAR test signature. It is not a real virus. Quarantine tests and fakes
+#: use it.
 EICAR_TEST_BYTES = (
     rb"X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
 )
@@ -40,7 +40,9 @@ class ScanVerdict:
 class VirusScanner(Protocol):
     """Scan interface that the worker uses."""
 
-    async def scan(self, data: bytes) -> ScanVerdict: ...
+    async def scan(self, data: bytes) -> ScanVerdict:
+        """Scan the bytes and return the verdict."""
+        ...
 
 
 @dataclass(slots=True)
@@ -55,6 +57,13 @@ class ClamdScanner:
     timeout_seconds: float = 60.0
 
     def _scan_sync(self, data: bytes) -> ScanVerdict:
+        """Scan the bytes with the clamd INSTREAM command, blocking.
+
+        clamd answers ``{"stream": ("OK"|"FOUND", signature_or_None)}``.
+
+        Raises:
+            ScannerError: clamd returned no result.
+        """
         import io
 
         import clamd
@@ -62,7 +71,6 @@ class ClamdScanner:
         daemon = clamd.ClamdNetworkSocket(
             host=self.host, port=self.port, timeout=self.timeout_seconds
         )
-        # clamd format: {"stream": ("OK"|"FOUND", signature_or_None)}
         result = daemon.instream(io.BytesIO(data))
         if not result or "stream" not in result:
             raise ScannerError("clamd returned no result")
@@ -72,9 +80,14 @@ class ClamdScanner:
         return ScanVerdict(clean=False, signature=signature or "unknown")
 
     async def scan(self, data: bytes) -> ScanVerdict:
+        """Scan the bytes in a thread pool.
+
+        Raises:
+            ScannerError: The scan failed. The error is transient, so the caller retries.
+        """
         try:
             return await asyncio.to_thread(self._scan_sync, data)
-        except Exception as exc:  # transient -> ScannerError (retry)
+        except Exception as exc:
             raise ScannerError(f"scan failed: {type(exc).__name__}") from exc
 
 
