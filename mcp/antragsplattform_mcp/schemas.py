@@ -55,7 +55,9 @@ def check_vote_config(config: dict[str, Any]) -> None:
 # Flow graph, shared by the flow tools.
 class StateDef(WireModel):
     key: str = Field(description="State key, ^[a-z][a-z0-9_]*$")
-    label: I18nMap = Field(description='Display label per language, e.g. {"de": "...", "en": "..."}')
+    label: I18nMap = Field(
+        description='Display label per language, e.g. {"de": "...", "en": "..."}'
+    )
     color: str | None = None
     editAllowed: bool = True
     isInitial: bool = False
@@ -79,7 +81,9 @@ class StateDef(WireModel):
 class StateDefPatch(WireModel):
     """Partial state update. Only the keys you provide change."""
 
-    key: str | None = Field(default=None, description="New key (renames cascade to transitions/layout/groups)")
+    key: str | None = Field(
+        default=None, description="New key (renames cascade to transitions/layout/groups)"
+    )
     label: I18nMap | None = None
     color: str | None = None
     editAllowed: bool | None = None
@@ -425,7 +429,9 @@ class BudgetNodeUpdate(WireModel):
 class ExpenseUpdate(WireModel):
     amount: str | None = Field(default=None, description="Decimal string > 0")
     description: str | None = None
-    budgetId: str | None = Field(default=None, description="Move the booking to another cost centre")
+    budgetId: str | None = Field(
+        default=None, description="Move the booking to another cost centre"
+    )
     invoiceDate: str | None = Field(default=None, description="ISO date; null clears")
     paymentDate: str | None = Field(default=None, description="ISO date; null clears")
     correspondent: str | None = None
@@ -706,7 +712,9 @@ TicketStatus = Literal["new", "in_progress", "done", "rejected"]
 
 class TodoLinkIn(WireModel):
     kind: TodoLinkKind
-    targetId: str = Field(description="The id of the linked object; the caller must be able to read it")
+    targetId: str = Field(
+        description="The id of the linked object; the caller must be able to read it"
+    )
 
 
 class TodoCardCreate(WireModel):
@@ -716,7 +724,8 @@ class TodoCardCreate(WireModel):
     descriptionMd: str | None = Field(default=None, description="Markdown, up to 20000 characters")
     dueDate: str | None = Field(default=None, description="ISO date YYYY-MM-DD")
     assigneeIds: list[str] | None = Field(
-        default=None, description="Principal ids; each must be a member of the board (422 otherwise)"
+        default=None,
+        description="Principal ids; each must be a member of the board (422 otherwise)",
     )
     labelIds: list[str] | None = Field(default=None, description="Label ids of the same board")
     links: list[TodoLinkIn] | None = None

@@ -16,8 +16,8 @@ import os
 import re
 import tempfile
 from pathlib import Path
-from urllib.parse import unquote
 from typing import Literal
+from urllib.parse import unquote
 
 from mcp.server.fastmcp import FastMCP
 
@@ -759,8 +759,8 @@ async def list_attachments(application_id: str) -> dict:
 
     Each entry holds `id`, `filename`, `mime` (the type that the server sniffed),
     `size` and `scanned`. `scanned` stays false until the ClamAV scan reports clean;
-    only then does `download_attachment` work. Upload with `upload_attachment`. A caller without the PII right does not see the files of the
-    `isPII` form fields.
+    only then does `download_attachment` work. Upload with `upload_attachment`.
+    A caller without the PII right does not see the files of the `isPII` form fields.
     """
     return await api().get(f"/applications/{application_id}/attachments")
 
