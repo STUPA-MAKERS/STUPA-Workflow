@@ -6,6 +6,13 @@ import type { FlowGraph, Guard } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
 import { BudgetTreeApi } from '../../budget/budget-tree.api';
 import { FlowEditorComponent } from './flow-editor.component';
+import {
+  FLOW_LAYOUTER,
+  type LayoutInput,
+  type LayoutRoute,
+  type LevelLayout,
+  type LevelLayouter,
+} from './flow-elk';
 
 interface Overrides {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -20,6 +27,8 @@ interface Overrides {
   listGremienOptions?: any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tree?: any;
+  /** The automatic layout; none by default, so the boxes keep the stored places. */
+  layouter?: LevelLayouter | null;
 }
 
 const BUDGET_TREE = [
@@ -104,6 +113,7 @@ async function setup(over: Overrides = {}) {
       { provide: AdminApiService, useValue: api },
       { provide: BudgetTreeApi, useValue: budgetApi },
       { provide: ToastService, useValue: toast },
+      { provide: FLOW_LAYOUTER, useValue: over.layouter ?? null },
     ],
   });
   return { ...view, createGlobalFlowVersion, getGlobalFlow, toast };
@@ -263,7 +273,6 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     c.setTransitionLabel(0, 'de', 'go');
     c.setTransitionEndpoint(0, 'to', 'b');
 
-    c.relayout();
     c.save();
     expect(createGlobalFlowVersion).toHaveBeenCalled();
     const graph = createGlobalFlowVersion.mock.calls[0][0] as FlowGraph;
@@ -938,7 +947,7 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
   });
 
   // Canvas pointer interaction: drag, connect, group drag and pan.
-  it('drags a node, then a click without movement selects it', async () => {
+  it('selects a node on press; the layout keeps it in place', async () => {
     const { fixture } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
@@ -946,17 +955,11 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     stubCanvas(c);
     c.selection.set(null);
     const before = { ...c.graph().layout.positions.a };
-    // drag with movement updates the position
     c.onNodePointerDown(ptr(0, 0), 'a');
     c.onCanvasPointerMove(ptr(120, 80));
-    expect(c.graph().layout.positions.a).not.toEqual(before);
     c.onCanvasPointerUp(ptr(120, 80));
-    expect(c.selection()).toBeNull(); // moved → not selected
-
-    // click without movement selects
-    c.onNodePointerDown(ptr(0, 0), 'b');
-    c.onCanvasPointerUp(ptr(0, 0));
-    expect(c.selection()).toEqual({ kind: 'state', key: 'b' });
+    expect(c.graph().layout.positions.a).toEqual(before);
+    expect(c.selection()).toEqual({ kind: 'state', key: 'a' });
   });
 
   it('shift-click toggles multi-selection of a node', async () => {
@@ -1008,7 +1011,7 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(c.graph().transitions).toHaveLength(before);
   });
 
-  it('group pointer: drag moves members, click opens; shift toggles multi-select', async () => {
+  it('group pointer: a press opens the group; shift toggles multi-select', async () => {
     const { fixture } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
@@ -1026,17 +1029,10 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     c.onGroupPointerDown(ptr(0, 0, { shiftKey: true }), gid);
     expect([...c.multiSelGroups()]).toEqual([]);
 
-    // drag moves all member positions
     const beforeB = { ...c.graph().layout.positions.b };
     c.onGroupPointerDown(ptr(0, 0), gid);
-    c.onCanvasPointerMove(ptr(50, 30));
-    c.onCanvasPointerUp(ptr(50, 30));
-    expect(c.graph().layout.positions.b.x).not.toBe(beforeB.x);
-
-    // click without movement opens the group
-    c.onGroupPointerDown(ptr(0, 0), gid);
-    c.onCanvasPointerUp(ptr(0, 0));
     expect(c.currentGroupId()).toBe(gid);
+    expect(c.graph().layout.positions.b).toEqual(beforeB);
   });
 
   it('pans on empty-canvas drag and clears selection', async () => {
@@ -1192,25 +1188,6 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(c.graph().states).toHaveLength(0);
   });
 
-  it('relayout arranges the current level including a child group block', async () => {
-    const { fixture } = await setup();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const c = fixture.componentInstance as any;
-    buildValid(c);
-    c.addState();
-    c.setStateKey('state', 'c');
-    c.graph.update((g: FlowGraph) => ({
-      ...g,
-      transitions: [...(g.transitions ?? []), { from: 'a', to: 'c', actions: [] }],
-    }));
-    c.multiSel.set(new Set(['b', 'c']));
-    c.createGroupFromSelection();
-    c.relayout();
-    // every visible state still has a position
-    expect(c.graph().layout.positions.a).toBeDefined();
-    expect(c.graph().layout.positions.b).toBeDefined();
-  });
-
   it('addState inside an open group makes the new state a member', async () => {
     const { fixture } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1227,17 +1204,17 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(c.groups().find((g: { id: string }) => g.id === gid).stateKeys).toContain(newKey);
   });
 
-  it('clearSelection is suppressed while a drag/connect is active', async () => {
+  it('clearSelection is suppressed while a connect is active', async () => {
     const { fixture } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
     buildValid(c);
     stubCanvas(c);
     c.selection.set({ kind: 'state', key: 'a' });
-    c.onNodePointerDown(ptr(0, 0), 'a');
-    c.clearSelection(); // suppressed because drag is active
+    c.onConnectPointerDown(ptr(150, 26), 'a');
+    c.clearSelection(); // suppressed because a connect is active
     expect(c.selection()).toEqual({ kind: 'state', key: 'a' });
-    c.onCanvasPointerUp(ptr(0, 0));
+    c.onCanvasPointerUp(ptr(9999, 9999));
   });
 
   it('deleteSelected removes the selected transition', async () => {
@@ -1410,7 +1387,8 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     // The edges() computed calls outDotYFor with t.branch set for branch-specific y offsets.
     const eds = c.edges();
     expect(eds).toHaveLength(2);
-    expect(eds[0].y1).not.toBe(eds[1].y1);
+    // Same target column, different dots: the curves start at different heights.
+    expect(eds[0].d).not.toBe(eds[1].d);
   });
 
   it('creating a group while drilled into a group nests it (sub-group)', async () => {
@@ -1674,15 +1652,6 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     c.openGroup(gid);
     c.dissolveCurrentGroup();
     expect(c.groups()).toHaveLength(0);
-  });
-
-  it('relayout tolerates a layout-less graph', async () => {
-    const { fixture } = await setup();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const c = fixture.componentInstance as any;
-    bare(c);
-    c.relayout();
-    expect(c.graph().layout.positions.a).toBeDefined();
   });
 
   it('compare reads/labels tolerate missing or object/list values', async () => {
@@ -2188,9 +2157,9 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     fixture.detectChanges();
     const eds = c.edges();
     expect(eds.length).toBe(2);
-    // both edges resolve a y coordinate (no throw on the fallback paths)
-    expect(typeof eds[0].y1).toBe('number');
-    expect(typeof eds[1].y1).toBe('number');
+    // both edges resolve a path (no throw on the fallback paths)
+    expect(eds[0].d).toMatch(/^M /);
+    expect(eds[1].d).toMatch(/^M /);
   });
 
   it('keeps branch order when neither branch has positioned targets', async () => {
@@ -2429,12 +2398,9 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     c.openGroup(gid);
     fixture.detectChanges();
     const eds = c.edges();
-    // both proxy→state and state→proxy edges resolve coordinates
+    // both proxy→state and state→proxy edges resolve a path
     expect(eds.length).toBeGreaterThanOrEqual(2);
-    for (const e of eds) {
-      expect(typeof e.x1).toBe('number');
-      expect(typeof e.x2).toBe('number');
-    }
+    for (const e of eds) expect(e.d).not.toMatch(/NaN|undefined/);
   });
 
   it('toSvg falls back to client coords when getScreenCTM returns null', async () => {
@@ -2529,47 +2495,6 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(c.selection()).toEqual({ kind: 'state', key: 'a' });
   });
 
-  it('clamps a node drag to non-negative coordinates', async () => {
-    const { fixture } = await setup();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const c = fixture.componentInstance as any;
-    buildValid(c);
-    stubCanvas(c);
-    c.graph.update((g: FlowGraph) => ({
-      ...g,
-      layout: { positions: { a: { x: 10, y: 10 }, b: { x: 300, y: 0 } } },
-    }));
-    c.onNodePointerDown(ptr(10, 10), 'a');
-    c.onCanvasPointerMove(ptr(-100, -100)); // negative target → Math.max(0, …) clamps
-    expect(c.graph().layout.positions.a).toEqual({ x: 0, y: 0 });
-    c.onCanvasPointerUp(ptr(-100, -100));
-  });
-
-  it('clamps a group drag to non-negative coordinates', async () => {
-    const { fixture } = await setup();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const c = fixture.componentInstance as any;
-    buildValid(c);
-    c.addState();
-    c.setStateKey('state', 'c');
-    c.multiSel.set(new Set(['b', 'c']));
-    c.createGroupFromSelection();
-    const gid = c.groupBoxes()[0].id;
-    stubCanvas(c);
-    c.graph.update((g: FlowGraph) => ({
-      ...g,
-      layout: {
-        ...g.layout,
-        positions: { ...g.layout.positions, b: { x: 5, y: 5 }, c: { x: 5, y: 5 } },
-      },
-    }));
-    c.onGroupPointerDown(ptr(0, 0), gid);
-    c.onCanvasPointerMove(ptr(-200, -200)); // negative → clamp members to 0
-    expect(c.graph().layout.positions.b.x).toBe(0);
-    expect(c.graph().layout.positions.b.y).toBe(0);
-    c.onCanvasPointerUp(ptr(-200, -200));
-  });
-
   it('creating a connection seeds the transitions array when it is missing', async () => {
     const { fixture } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -2586,42 +2511,6 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     c.onCanvasPointerUp(ptr(310, 26)); // drop on b → `g.transitions ?? []` seeds it
     expect(c.graph().transitions).toHaveLength(1);
     expect(c.graph().transitions[0]).toMatchObject({ from: 'a', to: 'b' });
-  });
-
-  it('relayout inside a group ignores proxy edges and an unmarked initial', async () => {
-    const { fixture } = await setup();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const c = fixture.componentInstance as any;
-    // State a has no initial flag. The chain runs a to b to c to d, with b and c
-    // grouped. The a-to-b transition enters the group, and the c-to-d transition leaves it.
-    c.addState();
-    c.addState();
-    c.addState();
-    c.addState();
-    c.setStateKey('state', 'a');
-    c.setStateKey('state2', 'b');
-    c.setStateKey('state3', 'c');
-    c.setStateKey('state4', 'd');
-    // deliberately NO setInitial → relayout's `initialKey ? … : false` else arm
-    c.graph.update((g: FlowGraph) => ({
-      ...g,
-      states: g.states.map((s: { isInitial?: boolean }) => ({ ...s, isInitial: false })),
-      transitions: [
-        { from: 'a', to: 'b', actions: [] },
-        { from: 'b', to: 'c', actions: [] },
-        { from: 'c', to: 'd', actions: [] },
-        { from: 'a', to: 'a', actions: [] }, // self-loop → a null edgeEnd (the `if (!e)`)
-      ],
-    }));
-    c.multiSel.set(new Set(['b', 'c']));
-    c.createGroupFromSelection();
-    const gid = c.groupBoxes()[0].id;
-    c.openGroup(gid);
-    // inside the group, a (left proxy) → b and c → d (right proxy): proxy ends give
-    // entId === null, exercising the relayout proxy branch.
-    c.relayout();
-    expect(c.graph().layout.positions.b).toBeDefined();
-    expect(c.graph().layout.positions.c).toBeDefined();
   });
 
   it('proxies use MARGIN bounds when a drilled-in level has no node/box positions', async () => {
@@ -2677,23 +2566,11 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(c.graph().transitions ?? []).toEqual([]);
   });
 
-  it('drag, group-drag and connect tolerate a layout-less graph', async () => {
+  it('connect tolerates a layout-less graph', async () => {
     const { fixture } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
-    // node drag with no layout at all → onCanvasPointerMove's `g.layout ?? {}` paths
-    c.graph.set({
-      states: [
-        { key: 'a', label: { de: 'A' }, isInitial: true },
-        { key: 'b', label: { de: 'B' } },
-      ],
-    } as unknown as FlowGraph);
     stubCanvas(c);
-    c.onNodePointerDown(ptr(0, 0), 'a');
-    c.onCanvasPointerMove(ptr(40, 40)); // seeds layout.positions from {}
-    expect(c.graph().layout.positions.a).toBeDefined();
-    c.onCanvasPointerUp(ptr(40, 40));
-
     // connect-create on a layout-less graph with manual positions for nodeAt()
     c.graph.set({
       states: [
@@ -2705,32 +2582,6 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     c.onConnectPointerDown(ptr(150, 26), 'a');
     c.onCanvasPointerUp(ptr(310, 26));
     expect(c.graph().transitions).toHaveLength(1);
-  });
-
-  it('group drag tolerates a layout that has groups but no positions map', async () => {
-    const { fixture } = await setup();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const c = fixture.componentInstance as any;
-    c.addState();
-    c.addState();
-    c.setStateKey('state', 'a');
-    c.setStateKey('state2', 'b');
-    c.setInitial('a');
-    // layout has groups but the positions map is entirely absent → onCanvasPointerMove
-    // reads `g.layout?.positions ?? {}` (right side) without throwing.
-    c.graph.set({
-      states: [
-        { key: 'a', label: { de: 'A' }, isInitial: true },
-        { key: 'b', label: { de: 'B' } },
-      ],
-      transitions: [],
-      layout: { groups: [{ id: 'g1', name: 'G', stateKeys: ['a', 'b'] }] },
-    } as unknown as FlowGraph);
-    stubCanvas(c);
-    c.onGroupPointerDown(ptr(0, 0), 'g1'); // drag the group directly by id
-    c.onCanvasPointerMove(ptr(30, 30)); // deepKeys present but no positions → no moves
-    expect(c.graph().layout.positions).toBeDefined();
-    c.onCanvasPointerUp(ptr(30, 30));
   });
 
   it('group drag tolerates a graph whose layout has only groups', async () => {
@@ -2836,29 +2687,6 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(c.groups().some((g: { id: string }) => g.id === 'sibling')).toBe(true);
   });
 
-  it('relayout treats a group containing the initial state as the initial entity', async () => {
-    const { fixture } = await setup();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const c = fixture.componentInstance as any;
-    c.addState();
-    c.addState();
-    c.addState();
-    c.setStateKey('state', 'a');
-    c.setStateKey('state2', 'b');
-    c.setStateKey('state3', 'c');
-    c.setInitial('b'); // initial is b, which will live inside the group
-    c.graph.update((g: FlowGraph) => ({
-      ...g,
-      transitions: [{ from: 'a', to: 'b', actions: [] }],
-    }));
-    c.multiSel.set(new Set(['b', 'c']));
-    c.createGroupFromSelection(); // group {b,c} contains the initial b
-    // relayout at top level: the group's isInitial = deepKeys.includes('b') → true
-    c.relayout();
-    expect(c.graph().layout.positions.a).toBeDefined();
-    expect(c.graph().layout.positions.b).toBeDefined();
-  });
-
   it('proxy label uses the raw key when the external state is unknown', async () => {
     const { fixture } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -2908,54 +2736,6 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     fixture.detectChanges();
     // no transitions → no proxies, but the computed runs without throwing
     expect(c.proxies()).toEqual({ left: [], right: [] });
-  });
-
-  it('relayout skips a child group whose members have no positions', async () => {
-    const { fixture } = await setup();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const c = fixture.componentInstance as any;
-    c.addState();
-    c.addState();
-    c.addState();
-    c.setStateKey('state', 'a');
-    c.setStateKey('state2', 'b');
-    c.setStateKey('state3', 'c');
-    c.setInitial('a');
-    // group {b,c} but b/c have NO positions → relayout's `if (!pts.length) continue`
-    c.graph.update((g: FlowGraph) => ({
-      ...g,
-      transitions: [{ from: 'a', to: 'b', actions: [] }],
-      layout: {
-        positions: { a: { x: 0, y: 0 } }, // b, c missing
-        groups: [{ id: 'g1', name: 'G', stateKeys: ['b', 'c'] }],
-      },
-    }));
-    c.relayout();
-    // a still gets a position. The position-less group block is skipped without error.
-    expect(c.graph().layout.positions.a).toBeDefined();
-  });
-
-  it('relayout marks no group as initial when the graph has no initial state', async () => {
-    const { fixture } = await setup();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const c = fixture.componentInstance as any;
-    c.addState();
-    c.addState();
-    c.addState();
-    c.setStateKey('state', 'a');
-    c.setStateKey('state2', 'b');
-    c.setStateKey('state3', 'c');
-    // clear any initial flag
-    c.graph.update((g: FlowGraph) => ({
-      ...g,
-      states: g.states.map((s: { isInitial?: boolean }) => ({ ...s, isInitial: false })),
-      transitions: [{ from: 'a', to: 'b', actions: [] }],
-    }));
-    c.multiSel.set(new Set(['b', 'c']));
-    c.createGroupFromSelection(); // child group {b,c} at top level
-    // relayout at top: initialKey is undefined → group isInitial uses the `: false` arm
-    c.relayout();
-    expect(c.graph().layout.positions.a).toBeDefined();
   });
 
   it('renameGroup leaves other groups untouched', async () => {
@@ -3110,9 +2890,84 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
       expect(fit.x).toBe(b.x - 200);
       expect(fit.y).toBe(b.y - 100);
       expect(c.viewBox()).toBe(`${fit.x} ${fit.y} ${fit.w} ${fit.h}`);
-      // A box smaller than the flow fits the flow (it scales down).
-      c.canvasSize.set({ w: 10, h: 10 });
-      expect(c.fitBounds()).toEqual(b);
+      // A box a little smaller than the flow fits the flow (it scales down).
+      c.canvasSize.set({ w: b.w * 0.8, h: b.h * 0.8 });
+      const down = c.fitBounds();
+      expect(down.x).toBeCloseTo(b.x);
+      expect(down.w).toBeCloseTo(b.w);
+      // Far smaller, it stops at the smallest readable scale and starts at the left end.
+      c.canvasSize.set({ w: 30, h: 30 });
+      const min = c.fitBounds();
+      expect(min.w).toBeCloseTo(40);
+      expect(min.x).toBe(b.x);
+      expect(min.y).toBeCloseTo(b.y + (b.h - 40) / 2);
+    });
+
+    it('shows a scroll tongue on each side that hides content and pans towards it', async () => {
+      const { fixture } = await setup({ getGlobalFlow: jest.fn(() => of(TAGGED)) });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const c = fixture.componentInstance as any;
+      const b = c.contentBounds();
+      const tongue = (side: string): HTMLButtonElement =>
+        fixture.nativeElement.querySelector(`.fe__tongue[data-side="${side}"]`);
+      // Unmeasured, or a box larger than the flow: nothing is hidden.
+      fixture.detectChanges();
+      for (const side of ['left', 'right', 'up', 'down']) expect(tongue(side).disabled).toBe(true);
+      c.canvasSize.set({ w: b.w + 400, h: b.h + 200 });
+      fixture.detectChanges();
+      expect(tongue('right').disabled).toBe(true);
+
+      // A small box: the view starts at the left end at scale 0.75 (40 × 40 in the world).
+      c.canvasSize.set({ w: 30, h: 30 });
+      fixture.detectChanges();
+      const hidden = c.hiddenBy();
+      expect(hidden.left).toBe(0);
+      expect(hidden.right).toBeCloseTo(b.w - 40);
+      expect(hidden.up).toBeCloseTo((b.h - 40) / 2);
+      expect(hidden.down).toBeCloseTo((b.h - 40) / 2);
+      expect(tongue('left').disabled).toBe(true);
+      expect(tongue('left').getAttribute('aria-hidden')).toBe('true');
+      expect(tongue('right').disabled).toBe(false);
+      expect(tongue('right')).toHaveClass('fe__tongue--on');
+      expect(tongue('right')).toHaveAccessibleName('Nach rechts verschieben');
+
+      // The last step stops exactly at the edge of the content.
+      c.pan('down');
+      expect(c.hiddenBy().down).toBe(0);
+      expect(c.view().y + 40).toBeCloseTo(b.y + b.h);
+      c.pan('down');
+      expect(c.view().y + 40).toBeCloseTo(b.y + b.h);
+      c.onTongueKey(new KeyboardEvent('keydown', { key: 'Enter' }), 'up');
+      expect(c.hiddenBy().up).toBe(0);
+      const y = c.view().y;
+      c.onTongueKey(new KeyboardEvent('keydown', { key: 'a' }), 'down');
+      expect(c.view().y).toBe(y);
+
+      // Press steps once, hold repeats, release stops.
+      jest.useFakeTimers();
+      try {
+        const x0 = c.view().x;
+        c.onTonguePress({ button: 2 } as PointerEvent, 'right');
+        expect(c.view().x).toBe(x0);
+        c.onTonguePress({ button: 0 } as PointerEvent, 'right');
+        const x1 = c.view().x;
+        expect(x1).toBeGreaterThan(x0);
+        expect(c.heldSide()).toBe('right');
+        jest.advanceTimersByTime(300 + 90);
+        expect(c.view().x).toBeGreaterThan(x1);
+        c.stopHold();
+        expect(c.heldSide()).toBeNull();
+        const x2 = c.view().x;
+        jest.advanceTimersByTime(1000);
+        expect(c.view().x).toBe(x2);
+        c.onTonguePress({ button: 0 } as PointerEvent, 'left');
+        fixture.destroy();
+        const x3 = c.view().x;
+        jest.advanceTimersByTime(1000);
+        expect(c.view().x).toBe(x3);
+      } finally {
+        jest.useRealTimers();
+      }
     });
 
     it('shows the versions in the inspector and names the active version in the header', async () => {
@@ -3154,6 +3009,169 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
       expect(screen.getByRole('heading', { name: 'Ausgehend (2)' })).toBeInTheDocument();
       screen.getByRole('button', { name: /^Automatisch:/ }).click();
       expect(c.selection()).toEqual({ kind: 'transition', index: 0 });
+    });
+  });
+
+  describe('automatic layout', () => {
+    /** Places box i at x = 300 i and draws every line as `M i …`; bundles by target. */
+    function fakeLayouter() {
+      return jest.fn(async (input: LayoutInput, many: (n: number) => string): Promise<LevelLayout> => {
+        const pos = new Map(input.boxes.map((b, i) => [b.id, { x: 300 * i, y: 10 }] as const));
+        const routes = new Map<number, LayoutRoute>();
+        const seen = new Map<string, number[]>();
+        for (const l of input.links) {
+          const k = `${l.src}>${l.dst}`;
+          seen.set(k, [...(seen.get(k) ?? []), l.index]);
+        }
+        for (const l of input.links) {
+          const bundle = seen.get(`${l.src}>${l.dst}`)!;
+          const first = bundle[0] === l.index;
+          routes.set(l.index, {
+            d: `M ${l.index} 0 L 9 9`,
+            label: first ? { x: 5, y: 6, text: bundle.length > 1 ? many(bundle.length) : l.label } : null,
+            bundle,
+          });
+        }
+        return { pos, routes };
+      });
+    }
+
+    async function laidOut(layouter: LevelLayouter = fakeLayouter()) {
+      const view = await setup({ layouter });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const c = view.fixture.componentInstance as any;
+      buildValid(c);
+      c.graph.update((g: FlowGraph) => ({
+        ...g,
+        transitions: [
+          { from: 'a', to: 'b', label: { de: 'Eins' }, actions: [] },
+          { from: 'a', to: 'b', guard: { roleIs: 'x' }, label: { de: 'Zwei' }, actions: [] },
+          { from: 'a', to: 'b', guard: { roleIs: 'y' }, automatic: true, actions: [] },
+        ],
+      }));
+      view.fixture.detectChanges();
+      await view.fixture.whenStable();
+      return { ...view, c };
+    }
+
+    it('places the boxes and draws the lines of the layout, one label per bundle', async () => {
+      const layouter = fakeLayouter();
+      const { c } = await laidOut(layouter);
+      expect(layouter).toHaveBeenCalled();
+      const input = layouter.mock.calls.at(-1)![0] as LayoutInput;
+      expect(input.boxes.map((b) => b.id)).toEqual(['state:a', 'state:b']);
+      expect(input.links.map((l) => l.port)).toEqual(['out', JSON.stringify({ roleIs: 'x' }), JSON.stringify({ roleIs: 'y' })]);
+      expect(c.layoutPending()).toBe(false);
+      const nodes = c.nodes();
+      expect(nodes.map((n: { x: number }) => n.x)).toEqual([0, 300]);
+      const edges = c.edges();
+      expect(edges.map((e: { d: string }) => e.d)).toEqual(['M 0 0 L 9 9', 'M 1 0 L 9 9', 'M 2 0 L 9 9']);
+      expect(edges[0]).toMatchObject({ label: '3 Übergänge', labeled: true, mx: 5, my: 6, automatic: false, color: null });
+      expect(edges[1]).toMatchObject({ label: '', labeled: false });
+      // A press on any line of the bundle selects all of it.
+      c.selectEdge(1);
+      expect(c.edges().every((e: { selected: boolean }) => e.selected)).toBe(true);
+    });
+
+    it('keeps the places but drops the lines while a new layout is on its way', async () => {
+      let hold = false;
+      let release: () => void = () => undefined;
+      const inner = fakeLayouter();
+      const layouter = jest.fn((input: LayoutInput, many: (n: number) => string) => {
+        if (!hold) return inner(input, many);
+        return new Promise<LevelLayout>((resolve) => (release = () => void inner(input, many).then(resolve)));
+      });
+      const { c, fixture } = await laidOut(layouter);
+      hold = true;
+      c.setStateLabel('b', 'de', 'Ein viel längerer Name');
+      fixture.detectChanges();
+      expect(c.nodes()[1].x).toBe(300);
+      expect(c.edges()[0].d).toMatch(/^M \d+ \d+ C /);
+      release();
+      await fixture.whenStable();
+      await new Promise((r) => setTimeout(r));
+      expect(c.edges()[0].d).toBe('M 0 0 L 9 9');
+    });
+
+    it('leaves out the lines of a group without placed members; a bundle of automatic lines keeps its bolt', async () => {
+      const layouter = fakeLayouter();
+      const { fixture } = await setup({ layouter });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const c = fixture.componentInstance as any;
+      c.graph.set({
+        states: [
+          { key: 'a', label: { de: 'A' }, isInitial: true },
+          { key: 'b', label: { de: 'B' } },
+          { key: 'c', label: { de: 'C' } },
+          { key: 'd', label: { de: 'D' } },
+        ],
+        transitions: [
+          { from: 'a', to: 'b', actions: [] },
+          { from: 'c', to: 'a', actions: [] },
+          { from: 'a', to: 'd', automatic: true, color: '#f00', actions: [] },
+          { from: 'a', to: 'd', automatic: true, guard: { roleIs: 'x' }, actions: [] },
+          { from: 'd', to: 'a', color: '#0f0', actions: [] },
+        ],
+        layout: {
+          positions: { a: { x: 0, y: 0 }, d: { x: 300, y: 0 } },
+          groups: [{ id: 'g1', name: 'G', stateKeys: ['b', 'c'] }],
+        },
+      } as unknown as FlowGraph);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      await new Promise((r) => setTimeout(r));
+      expect(c.groupBoxes()).toEqual([]);
+      const edges = c.edges();
+      expect(edges.map((e: { index: number }) => e.index)).toEqual([2, 3, 4]);
+      expect(edges[0]).toMatchObject({ automatic: true, color: null, labeled: true });
+      expect(edges[2]).toMatchObject({ automatic: false, color: '#0f0' });
+    });
+
+    it('shows the stored places when the layout fails', async () => {
+      const { c } = await laidOut(jest.fn(() => Promise.reject(new Error('elk'))));
+      await new Promise((r) => setTimeout(r));
+      expect(c.layoutPending()).toBe(false);
+      expect(c.edges()[0].d).toMatch(/ C /);
+    });
+
+    it('hides the canvas until the first layout answers', async () => {
+      const { c, fixture } = await laidOut(jest.fn(() => new Promise<LevelLayout>(() => undefined)));
+      expect(c.layoutPending()).toBe(true);
+      expect(fixture.nativeElement.querySelector('.fe__canvas')).toHaveClass('fe__canvas--loading');
+    });
+
+    it('draws everything outside the focus faint: hover, selected state, selected transition', async () => {
+      const { fixture } = await setup();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const c = fixture.componentInstance as any;
+      buildValid(c);
+      c.addState();
+      c.setStateKey('state', 'c');
+      c.graph.update((g: FlowGraph) => ({
+        ...g,
+        transitions: [...g.transitions, { from: 'b', to: 'c', actions: [] }],
+      }));
+      c.selection.set(null);
+      fixture.detectChanges();
+      const dim = () => ({
+        nodes: c.nodes().filter((n: { dim: boolean }) => n.dim).map((n: { key: string }) => n.key),
+        edges: c.edges().filter((e: { dim: boolean }) => e.dim).map((e: { index: number }) => e.index),
+      });
+      expect(dim()).toEqual({ nodes: [], edges: [] });
+      // The pointer on a: a, its neighbour b and the line a → b stay.
+      fixture.nativeElement.querySelector('.fe__node-g').dispatchEvent(new Event('pointerenter'));
+      expect(c.hoverKey()).toBe('a');
+      expect(dim()).toEqual({ nodes: ['c'], edges: [1] });
+      // The faint lines come first, so the focus paints on top.
+      expect(c.edges().map((e: { index: number }) => e.index)).toEqual([1, 0]);
+      fixture.nativeElement.querySelector('.fe__node-g').dispatchEvent(new Event('pointerleave'));
+      expect(c.hoverKey()).toBeNull();
+      c.selection.set({ kind: 'state', key: 'c' });
+      expect(dim()).toEqual({ nodes: ['a'], edges: [0] });
+      c.selection.set({ kind: 'transition', index: 0 });
+      expect(dim()).toEqual({ nodes: ['c'], edges: [1] });
+      c.selection.set({ kind: 'transition', index: 99 });
+      expect(dim()).toEqual({ nodes: [], edges: [] });
     });
   });
 });

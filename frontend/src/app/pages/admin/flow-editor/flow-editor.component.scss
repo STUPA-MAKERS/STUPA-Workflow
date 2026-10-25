@@ -2,6 +2,7 @@
 // and the inspector beside it.
 @use 'breakpoints' as bp;
 @use 'scroll-fade' as fade;
+@use 'press';
 
 :host {
   display: flex;
@@ -167,13 +168,112 @@
   display: block;
   width: 100%;
   height: 100%;
-  /* touch-action: none stops pen and touch panning from fighting the drag logic. */
+  /* touch-action: none stops pen and touch panning from fighting the pan and connect logic. */
   touch-action: none;
   user-select: none;
   cursor: grab;
 }
 .fe__canvas:active {
   cursor: grabbing;
+}
+
+/* The scroll tongues, as on the wide tables (ui-kit data table): flush with the middle
+   of each side, rounded on the inner side only. */
+.fe__tongue {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  cursor: pointer;
+  background: var(--color-surface-3);
+  color: var(--color-text-muted);
+  border: var(--border-width) solid var(--color-border);
+  box-shadow: var(--shadow-elevated);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity var(--motion-base, 200ms) var(--ease-standard, ease),
+    background var(--motion-fast, 120ms) var(--ease-standard, ease),
+    color var(--motion-fast, 120ms) var(--ease-standard, ease),
+    border-color var(--motion-fast, 120ms) var(--ease-standard, ease),
+    scale var(--motion-xs) var(--ease-standard);
+  @include press.press;
+}
+.fe__tongue--on {
+  opacity: 1;
+  pointer-events: auto;
+}
+/* The size stays the same on hover: a repeat-click target that grows moves its own edge
+   away mid-click. The colour carries the hover. */
+.fe__tongue--held {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border-color: var(--color-accent);
+}
+@media (hover: hover) {
+  .fe__tongue:hover {
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+    border-color: var(--color-accent);
+  }
+}
+.fe__tongue:focus-visible {
+  outline: 2px solid var(--color-focus-ring, var(--color-primary));
+  outline-offset: 2px;
+}
+.fe__tongue svg {
+  display: block;
+  width: 13px;
+  height: 13px;
+}
+.fe__tongue[data-side='left'],
+.fe__tongue[data-side='right'] {
+  top: 50%;
+  width: 18px;
+  height: 54px;
+  translate: 0 -50%;
+}
+.fe__tongue[data-side='up'],
+.fe__tongue[data-side='down'] {
+  left: 50%;
+  width: 54px;
+  height: 18px;
+  translate: -50% 0;
+}
+.fe__tongue[data-side='left'] {
+  left: 0;
+  border-left: 0;
+  border-radius: 0 10px 10px 0;
+}
+.fe__tongue[data-side='right'] {
+  right: 0;
+  border-right: 0;
+  border-radius: 10px 0 0 10px;
+}
+.fe__tongue[data-side='right'] svg {
+  rotate: 180deg;
+}
+.fe__tongue[data-side='up'] {
+  top: 0;
+  border-top: 0;
+  border-radius: 0 0 10px 10px;
+}
+.fe__tongue[data-side='up'] svg {
+  rotate: 90deg;
+}
+.fe__tongue[data-side='down'] {
+  bottom: 0;
+  border-bottom: 0;
+  border-radius: 10px 10px 0 0;
+}
+.fe__tongue[data-side='down'] svg {
+  rotate: -90deg;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fe__tongue {
+    transition: none;
+  }
 }
 
 /* The legend at the bottom left of the canvas. */
@@ -211,7 +311,26 @@
 /* ---- Canvas: nodes and edges ----------------------------------------------------- */
 
 .fe__node-g {
-  cursor: grab;
+  cursor: pointer;
+}
+
+/* The focus (a hovered or selected state, a selected transition) draws everything
+   that is not related to it faint. */
+.fe__node-g,
+.fe__edge-g {
+  transition: opacity var(--motion-fast, 120ms) var(--ease-standard, ease);
+}
+.fe__node-g.fe__dim {
+  opacity: 0.35;
+}
+.fe__edge-g.fe__dim {
+  opacity: 0.12;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fe__node-g,
+  .fe__edge-g {
+    transition: none;
+  }
 }
 
 /* A state: surface 2, an edge in the state colour (or the outline colour). */
@@ -219,7 +338,7 @@
   fill: var(--color-surface-2);
   stroke: var(--color-text-subtle);
   stroke-width: 2;
-  cursor: grab;
+  cursor: pointer;
 }
 .fe__node--sel {
   stroke: var(--color-accent);
@@ -285,9 +404,15 @@
 .fe__connector--guard {
   stroke: var(--color-info, var(--color-accent));
 }
+/* The text beside a dot. A halo in the canvas colour keeps it legible where a line
+   passes under it. */
 .fe__dot-label {
   fill: var(--color-text-muted);
   font-size: 10.5px;
+  paint-order: stroke;
+  stroke: var(--color-surface-1);
+  stroke-width: 3px;
+  stroke-linejoin: round;
   pointer-events: none;
   user-select: none;
 }

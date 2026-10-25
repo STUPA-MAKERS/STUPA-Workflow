@@ -1,21 +1,17 @@
 /**
  * Pointer, zoom and pan state machine of the flow canvas.
  *
- * This class owns the transient drag, connect and pan handles. It reaches graph and
+ * The layout places every box (`flow-elk.ts`), so a box does not move under the
+ * pointer: a press on a state selects it, a press on a group box opens it. This class
+ * owns the transient connect and pan handles. It reaches graph and
  * selection state through the host context. The component stays the single source of
  * truth.
  */
 import type { WritableSignal } from '@angular/core';
 import type { FlowGraph, TransitionBranch, TransitionDef } from '../admin.models';
 import { blankTransition } from '../flow-graph.util';
-import {
-  NODE_H,
-  NODE_W,
-  type Point,
-  type Selection,
-  type ViewRect,
-} from './flow-editor.models';
-import { addTransition, moveStatesBy, setStatePosition } from './flow-graph-ops.util';
+import type { Point, Selection, ViewRect } from './flow-editor.models';
+import { addTransition } from './flow-graph-ops.util';
 
 export interface TempEdge {
   x1: number;
@@ -28,10 +24,8 @@ export interface FlowCanvasHost {
   svg(): SVGSVGElement | undefined;
   graph(): FlowGraph;
   updateGraph(fn: (g: FlowGraph) => FlowGraph): void;
-  positions(): Record<string, Point>;
-  nodes(): ReadonlyArray<{ key: string; x: number; y: number; h: number }>;
+  nodes(): ReadonlyArray<{ key: string; x: number; y: number; w: number; h: number }>;
   contentBounds(): ViewRect;
-  deepKeys(groupId: string): string[];
   openGroup(id: string): void;
   selection: WritableSignal<Selection>;
   multiSel: WritableSignal<ReadonlySet<string>>;
@@ -41,9 +35,6 @@ export interface FlowCanvasHost {
 }
 
 export class FlowCanvasInteraction {
-  private drag: { key: string; dx: number; dy: number; moved: boolean } | null = null;
-  /** Group drag: moves all (deep) member positions together. */
-  private groupDrag: { id: string; lastX: number; lastY: number; moved: boolean } | null = null;
   private connectFrom: string | null = null;
   /** Branch (pass/fail) when dragging from a branch dot. */
   private connectBranch: string | null = null;
@@ -54,8 +45,8 @@ export class FlowCanvasInteraction {
 
   constructor(private readonly host: FlowCanvasHost) {}
 
-  /** Grab a node to move it. A click without movement selects the node instead.
-   *  Shift-click toggles the multi-selection that "create group" reads. */
+  /** A press on a node selects it. Shift-click toggles the multi-selection that
+   *  "create group" reads. */
   nodePointerDown(event: PointerEvent, key: string): void {
     event.stopPropagation();
     if (event.shiftKey) {
@@ -65,14 +56,11 @@ export class FlowCanvasInteraction {
       this.host.multiSel.set(next);
       return;
     }
-    const p = this.toSvg(event);
-    const pos = this.host.positions()[key] ?? { x: 0, y: 0 };
-    this.drag = { key, dx: p.x - pos.x, dy: p.y - pos.y, moved: false };
-    (event.target as Element).setPointerCapture?.(event.pointerId);
+    this.host.selection.set({ kind: 'state', key });
   }
 
-  /** Grab a group box. A drag moves all deep members. A plain click OPENS the
-   *  group (drill-down). Shift-click toggles the multi-selection. */
+  /** A press on a group box OPENS the group (drill-down). Shift-click toggles the
+   *  multi-selection. */
   groupPointerDown(event: PointerEvent, id: string): void {
     event.stopPropagation();
     if (event.shiftKey) {
@@ -82,9 +70,7 @@ export class FlowCanvasInteraction {
       this.host.multiSelGroups.set(next);
       return;
     }
-    const p = this.toSvg(event);
-    this.groupDrag = { id, lastX: p.x, lastY: p.y, moved: false };
-    (event.target as Element).setPointerCapture?.(event.pointerId);
+    this.host.openGroup(id);
   }
 
   /** Start to draw a new edge from a connector dot. A branch dot or a guard dot
@@ -105,30 +91,11 @@ export class FlowCanvasInteraction {
   }
 
   pointerMove(event: PointerEvent): void {
-    if (this.drag) {
+    const temp = this.host.tempEdge();
+    if (this.connectFrom && temp) {
+      // The line starts at the dot that was pressed and follows the pointer.
       const p = this.toSvg(event);
-      const nx = Math.max(0, Math.round(p.x - this.drag.dx));
-      const ny = Math.max(0, Math.round(p.y - this.drag.dy));
-      const key = this.drag.key;
-      this.drag.moved = true;
-      this.host.updateGraph((g) => setStatePosition(g, key, nx, ny));
-      return;
-    }
-    if (this.groupDrag) {
-      const p = this.toSvg(event);
-      const dx = p.x - this.groupDrag.lastX;
-      const dy = p.y - this.groupDrag.lastY;
-      this.groupDrag.lastX = p.x;
-      this.groupDrag.lastY = p.y;
-      this.groupDrag.moved = true;
-      const deepKeys = this.host.deepKeys(this.groupDrag.id);
-      this.host.updateGraph((g) => moveStatesBy(g, deepKeys, dx, dy));
-      return;
-    }
-    if (this.connectFrom) {
-      const from = this.host.positions()[this.connectFrom];
-      const p = this.toSvg(event);
-      this.host.tempEdge.set({ x1: from.x + NODE_W, y1: from.y + NODE_H / 2, x2: p.x, y2: p.y });
+      this.host.tempEdge.set({ ...temp, x2: p.x, y2: p.y });
       return;
     }
     if (this.panGrab) {
@@ -146,17 +113,6 @@ export class FlowCanvasInteraction {
   pointerUp(event: PointerEvent): void {
     if (this.panGrab) {
       this.panGrab = null;
-      return;
-    }
-    if (this.drag) {
-      // A click without movement selects. A drag only commits the new position.
-      if (!this.drag.moved) this.host.selection.set({ kind: 'state', key: this.drag.key });
-      this.drag = null;
-      return;
-    }
-    if (this.groupDrag) {
-      if (!this.groupDrag.moved) this.host.openGroup(this.groupDrag.id);
-      this.groupDrag = null;
       return;
     }
     if (this.connectFrom) {
@@ -189,7 +145,7 @@ export class FlowCanvasInteraction {
   }
 
   clearSelection(): void {
-    if (!this.drag && !this.connectFrom && !this.groupDrag) {
+    if (!this.connectFrom) {
       this.host.selection.set(null);
       if (this.host.multiSel().size) this.host.multiSel.set(new Set());
     }
@@ -212,6 +168,12 @@ export class FlowCanvasInteraction {
   zoomOut(): void {
     const v = this.ensureView();
     this.applyZoom(v, 1.2, { x: v.x + v.w / 2, y: v.y + v.h / 2 });
+  }
+
+  /** Move the view by a distance in world units (the scroll tongues). */
+  panBy(dx: number, dy: number): void {
+    const v = this.ensureView();
+    this.host.view.set({ ...v, x: v.x + dx, y: v.y + dy });
   }
 
   /** Reset the zoom so the view fits the whole content again. */
@@ -258,7 +220,7 @@ export class FlowCanvasInteraction {
    *  nodes of the current level count. To connect into a group, drill down first. */
   private nodeAt(p: Point): string | null {
     for (const n of this.host.nodes()) {
-      if (p.x >= n.x && p.x <= n.x + NODE_W && p.y >= n.y && p.y <= n.y + n.h) {
+      if (p.x >= n.x && p.x <= n.x + n.w && p.y >= n.y && p.y <= n.y + n.h) {
         return n.key;
       }
     }
