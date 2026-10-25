@@ -13,9 +13,10 @@
       } @else {
         <h1 class="ph__title" [class.sr-only]="docked()" [attr.id]="titleId()">{{ title() }}</h1>
       }
-      @if (!factsInBar()) {
-        <ng-container *ngTemplateOutlet="facts" />
+      @if (meta()) {
+        <span class="ph__meta">{{ meta() }}</span>
       }
+      <ng-content select="[heading]" />
     </div>
     @if (subtitle()) {
       <p class="ph__subtitle">{{ subtitle() }}</p>
@@ -25,17 +26,5 @@
     <div class="ph__actions"><ng-container *ngTemplateOutlet="actions" /></div>
   }
 </div>
-<!-- The actions render here, or in the bar of a one-view page while it shows. There the
-     meta and the heading slot go in front of them, on the line of the small title. -->
-<ng-template #actions>
-  @if (factsInBar()) {
-    <span class="ph__barFacts"><ng-container *ngTemplateOutlet="facts" /></span>
-  }
-  <ng-content select="[actions]" />
-</ng-template>
-<ng-template #facts>
-  @if (meta()) {
-    <span class="ph__meta">{{ meta() }}</span>
-  }
-  <ng-content select="[heading]" />
-</ng-template>
+<!-- The actions render here, or in the bar of a one-view page while it shows. -->
+<ng-template #actions><ng-content select="[actions]" /></ng-template>

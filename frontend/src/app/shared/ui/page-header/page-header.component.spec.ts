@@ -1,8 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
-import { ListDetailBarComponent, ListDetailNav, MEDIA } from '@stupa-makers/ui-kit';
-import { matchMediaQueries } from '../../../../testing/meeting-fixtures';
+import { ListDetailBarComponent, ListDetailNav } from '@stupa-makers/ui-kit';
 import { PageHeaderComponent } from './page-header.component';
 
 /** An admin page below wide: the frame shows the bar, the page has its header. */
@@ -12,8 +11,7 @@ import { PageHeaderComponent } from './page-header.component';
   providers: [ListDetailNav],
   template: `
     <app-list-detail-bar />
-    <app-page-header title="Flow-Editor" meta="Version 24 aktiv">
-      <span heading>Gültig</span>
+    <app-page-header title="Flow-Editor">
       <button actions type="button">Mehr</button>
     </app-page-header>
   `,
@@ -128,27 +126,5 @@ describe('PageHeaderComponent', () => {
     // The bar shows the title; the header keeps it for screen readers only.
     expect(screen.getByRole('heading', { level: 1, name: 'Flow-Editor' })).toHaveClass('sr-only');
     expect(view.fixture.componentInstance.nav.title()).toBe('Flow-Editor');
-  });
-
-  it('below the bar puts the meta and the heading slot into the bar, in front of the actions', async () => {
-    const view = await render(OneViewPageComponent, { providers: [provideRouter([])] });
-    view.fixture.detectChanges();
-    const facts = view.container.querySelector('.ld__barActions .ph__barFacts');
-    expect(facts?.textContent).toContain('Version 24 aktiv');
-    expect(facts?.textContent).toContain('Gültig');
-    expect(view.container.querySelector('.ph__heading .ph__meta')).toBeNull();
-  });
-
-  it('below the bar on a phone keeps the meta and the heading slot under the bar', async () => {
-    const restore = matchMediaQueries(MEDIA.phone);
-    try {
-      const view = await render(OneViewPageComponent, { providers: [provideRouter([])] });
-      view.fixture.detectChanges();
-      expect(view.container.querySelector('.ph__barFacts')).toBeNull();
-      expect(view.container.querySelector('.ph__heading .ph__meta')?.textContent).toContain('Version 24 aktiv');
-      expect(view.container.querySelector('.ph__heading')?.textContent).toContain('Gültig');
-    } finally {
-      restore();
-    }
   });
 });

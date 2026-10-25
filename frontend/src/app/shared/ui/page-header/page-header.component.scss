@@ -73,15 +73,6 @@
   align-items: center;
 }
 
-/* The meta and the heading slot in the bar, in front of the actions. */
-.ph__barFacts {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3);
-  margin-right: var(--space-2);
-  white-space: nowrap;
-}
-
 /* A short fact about the page, such as "8 offen". It is part of the title block, not a
    control, so it does not go into the actions slot. */
 .ph__meta {
