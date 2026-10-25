@@ -72,9 +72,7 @@ async def rotate_my_calendar(
         404: _PROBLEM,
     },
 )
-async def calendar_feed(
-    token: str, db: DbSession, settings: SettingsDep
-) -> Response:
+async def calendar_feed(token: str, db: DbSession, settings: SettingsDep) -> Response:
     """Serve the public iCal feed for a feed token.
 
     An unknown or deactivated token gives a 404.

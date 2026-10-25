@@ -388,9 +388,7 @@ async def test_cast_rejects_vote_from_other_meeting() -> None:
     voting = _MeetingBoundVoting(other_meeting)
     conn = _conn(beamer=False)
     conn.voting = voting  # type: ignore[assignment]
-    await conn._handle_cast(
-        {"type": "cast", "voteId": str(uuid4()), "choice": "yes"}
-    )
+    await conn._handle_cast({"type": "cast", "voteId": str(uuid4()), "choice": "yes"})
     assert voting.cast_calls == 0
     assert conn.ws.sent == [{"type": "error", "code": "not_eligible"}]  # type: ignore[attr-defined]
 
@@ -412,9 +410,7 @@ async def test_cast_allows_vote_from_own_meeting() -> None:
         published.append(vote)
 
     conn.publisher.vote_tally = _stub_tally
-    await conn._handle_cast(
-        {"type": "cast", "voteId": str(uuid4()), "choice": "yes"}
-    )
+    await conn._handle_cast({"type": "cast", "voteId": str(uuid4()), "choice": "yes"})
     assert voting.cast_calls == 1
     assert published
     assert all(s.get("code") != "not_eligible" for s in conn.ws.sent)  # type: ignore[attr-defined]

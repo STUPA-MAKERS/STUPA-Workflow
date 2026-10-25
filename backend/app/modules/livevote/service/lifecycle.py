@@ -43,9 +43,7 @@ logger = logging.getLogger(__name__)
 
 #: The only status changes of a meeting. A repeat of the current status is a
 #: no-op and not in this set.
-_TRANSITIONS: frozenset[tuple[str, str]] = frozenset(
-    {("planned", "live"), ("live", "closed")}
-)
+_TRANSITIONS: frozenset[tuple[str, str]] = frozenset({("planned", "live"), ("live", "closed")})
 
 #: The planning fields that MEETING_UPDATE records, as (model attribute, JSON key).
 _AUDITED_FIELDS: tuple[tuple[str, str], ...] = (

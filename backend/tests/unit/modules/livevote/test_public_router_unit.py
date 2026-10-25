@@ -122,8 +122,6 @@ def test_public_rest_routes(rest: Any) -> None:
     assert ("me", "tok") in fake.calls and ("cast", "yes") in fake.calls
 
 
-
-
 def _guest(status: str = "pending") -> SimpleNamespace:
     return SimpleNamespace(id=uuid4(), meeting_id=MID, seq=3, display_name="Jana", status=status)
 

@@ -199,9 +199,7 @@ class AgendaService:
         apps = {
             a.id: a
             for a in (
-                await self.session.scalars(
-                    select(Application).where(Application.id.in_(app_ids))
-                )
+                await self.session.scalars(select(Application).where(Application.id.in_(app_ids)))
             ).all()
         }
         state_ids = {a.current_state_id for a in apps.values() if a.current_state_id}
@@ -209,9 +207,7 @@ class AgendaService:
             {
                 s.id: s
                 for s in (
-                    await self.session.scalars(
-                        select(State).where(State.id.in_(state_ids))
-                    )
+                    await self.session.scalars(select(State).where(State.id.in_(state_ids)))
                 ).all()
             }
             if state_ids
@@ -295,9 +291,7 @@ class AgendaService:
             row.non_public = non_public
             changed.append("nonPublic")
         if changed:
-            await self._audit(
-                AuditAction.AGENDA_ITEM_UPDATE, actor=actor, item=row, fields=changed
-            )
+            await self._audit(AuditAction.AGENDA_ITEM_UPDATE, actor=actor, item=row, fields=changed)
         await self.session.flush()
         await self.session.commit()
         return await self.list(meeting_id)
@@ -388,9 +382,7 @@ class AgendaService:
             r.id: r
             for r in (
                 await self.session.scalars(
-                    select(MeetingAgendaItem).where(
-                        MeetingAgendaItem.meeting_id == meeting_id
-                    )
+                    select(MeetingAgendaItem).where(MeetingAgendaItem.meeting_id == meeting_id)
                 )
             ).all()
         }
@@ -539,15 +531,11 @@ class AgendaService:
             )
             return True
 
-        app = await self.session.get(
-            Application, application_id, populate_existing=True
-        )
+        app = await self.session.get(Application, application_id, populate_existing=True)
         if app is None:
             raise NotFoundError(f"application {application_id} not found")
         if app.vote_gremium_id is None or app.vote_gremium_id != meeting.gremium_id:
-            raise ConflictError(
-                "application is not in a voting state for this committee"
-            )
+            raise ConflictError("application is not in a voting state for this committee")
         existing = (
             await self.session.execute(
                 select(MeetingAgendaItem.id).where(
@@ -566,9 +554,7 @@ class AgendaService:
         )
         self.session.add(item)
         await self.session.flush()
-        await self._audit(
-            AuditAction.AGENDA_ITEM_ADD, actor=actor, item=item, nonPublic=non_public
-        )
+        await self._audit(AuditAction.AGENDA_ITEM_ADD, actor=actor, item=item, nonPublic=non_public)
         return True
 
     async def add_todo_in_tx(

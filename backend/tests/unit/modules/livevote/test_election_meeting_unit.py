@@ -287,8 +287,6 @@ async def test_ballots_of_decodes_an_election_ballot() -> None:
     assert own[row.id].choices == ["c2"]
 
 
-
-
 def _vote_out(**over: Any) -> VoteOut:
     base: dict[str, Any] = {
         "id": uuid4(),

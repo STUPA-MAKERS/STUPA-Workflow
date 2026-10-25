@@ -69,8 +69,6 @@ def _person(sub: str) -> SimpleNamespace:
     return SimpleNamespace(id=uuid4(), sub=sub)
 
 
-
-
 def _lead_payload(a: Any, b: Any, *, voting: bool = True) -> DelegationCreate:
     return DelegationCreate(
         meetingId=MEETING_ID, delegateId=b.id, delegatorId=a.id, delegateVoting=voting
@@ -339,8 +337,6 @@ async def test_lead_recipients_need_the_lead() -> None:
         await _svc(db).recipients(MEETING_ID, "", _actor("m"), uuid4())
 
 
-
-
 async def test_list_for_the_lead_shows_the_whole_meeting() -> None:
     """Show the lead every delegation of the meeting.
 
@@ -449,8 +445,6 @@ async def test_revoke_unknown_principal_403() -> None:
     db.get_results = [row, _meeting("planned")]
     with pytest.raises(ForbiddenError):
         await _svc(db).revoke(row.id, _actor())
-
-
 
 
 class _CreateService:

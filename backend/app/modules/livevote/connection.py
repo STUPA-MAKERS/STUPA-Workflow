@@ -443,17 +443,9 @@ class LiveVoteConnection:
             await self._send_state()
             connection_id: str | None = None
             if not self.beamer:
-                name = (
-                    self.principal.display_name
-                    or self.principal.email
-                    or self.principal.sub
-                )
-                connection_id, names = PRESENCE.join(
-                    self.meeting_id, self.principal.sub, name
-                )
-                await self.broker.publish(
-                    channel, ViewersEvent(viewers=names).dump()
-                )
+                name = self.principal.display_name or self.principal.email or self.principal.sub
+                connection_id, names = PRESENCE.join(self.meeting_id, self.principal.sub, name)
+                await self.broker.publish(channel, ViewersEvent(viewers=names).dump())
             pump = asyncio.create_task(self._pump(subscription))
             receive = asyncio.create_task(self._receive())
             try:
@@ -466,17 +458,13 @@ class LiveVoteConnection:
                     except WebSocketDisconnect:
                         pass
                     except Exception:
-                        logger.warning(
-                            "live-vote pump/receive task failed", exc_info=True
-                        )
+                        logger.warning("live-vote pump/receive task failed", exc_info=True)
             finally:
                 pump.cancel()
                 receive.cancel()
                 if connection_id is not None:
                     names = PRESENCE.leave(self.meeting_id, connection_id)
                     try:
-                        await self.broker.publish(
-                            channel, ViewersEvent(viewers=names).dump()
-                        )
+                        await self.broker.publish(channel, ViewersEvent(viewers=names).dump())
                     except Exception:
                         logger.debug("viewers broadcast on leave failed", exc_info=True)

@@ -47,15 +47,11 @@ from app.shared.errors import BadRequestError, ConflictError
 
 pytestmark = pytest.mark.integration
 
-_CONFIG = VoteConfig.model_validate(
-    {"options": ["yes", "no"], "majorityRule": "simple"}
-)
+_CONFIG = VoteConfig.model_validate({"options": ["yes", "no"], "majorityRule": "simple"})
 
 
 @pytest.fixture
-async def session(
-    migrated: tuple[str, str], engine: Engine
-) -> AsyncIterator[AsyncSession]:
+async def session(migrated: tuple[str, str], engine: Engine) -> AsyncIterator[AsyncSession]:
     eng = create_async_engine(migrated[1])
     maker = async_sessionmaker(eng, expire_on_commit=False)
     async with maker() as s:

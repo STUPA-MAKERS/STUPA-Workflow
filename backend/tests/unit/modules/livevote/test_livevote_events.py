@@ -150,9 +150,7 @@ def test_vote_opened_event_carries_secret_flag() -> None:
 
 
 def test_vote_closed_event_carries_result_and_counts_only() -> None:
-    dumped = VoteClosedEvent(
-        voteId=uuid4(), result="passed", counts={"yes": 7, "no": 1}
-    ).dump()
+    dumped = VoteClosedEvent(voteId=uuid4(), result="passed", counts={"yes": 7, "no": 1}).dump()
     assert dumped["type"] == "vote_closed"
     assert dumped["result"] == "passed"
     assert dumped["counts"] == {"yes": 7, "no": 1}

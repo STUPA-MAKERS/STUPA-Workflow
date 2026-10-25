@@ -126,9 +126,7 @@ async def test_lead_enters_a_substitution_for_a_missing_member(
         assert row is not None
         assert (row.created_by, row.via_pool) == (s.lead, True)
         entry = (
-            await session.scalars(
-                select(AuditEntry).where(AuditEntry.target_id == out["id"])
-            )
+            await session.scalars(select(AuditEntry).where(AuditEntry.target_id == out["id"]))
         ).one()
     assert entry.action == "delegation_grant"
     assert entry.actor == s.lead
@@ -418,9 +416,7 @@ async def test_lead_entry_waits_for_a_parallel_present_report(
         )
         await writer.flush()
         entry = asyncio.create_task(
-            DelegationService(lead_session, service_settings).create(
-                payload, Principal(sub=s.lead)
-            )
+            DelegationService(lead_session, service_settings).create(payload, Principal(sub=s.lead))
         )
         await asyncio.sleep(0.5)
         assert not entry.done()

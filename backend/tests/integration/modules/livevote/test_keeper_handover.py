@@ -170,7 +170,8 @@ async def test_handover_now_moves_the_keeper_rights(
     assert after_bert["isProtokollant"] is True
     assert states and states[-1].protokollant_id == bert
     entries = [
-        e for e in await audit_actions(maker, target_id=s.meeting_id)
+        e
+        for e in await audit_actions(maker, target_id=s.meeting_id)
         if e.action == "protokollant_handover"
     ]
     assert len(entries) == 1

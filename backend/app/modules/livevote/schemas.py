@@ -159,9 +159,7 @@ class MeetingVoteOut(_CamelModel):
     #: Reason for the rejection after the close: ``quorum`` for a missed quorum,
     #: ``majority`` for a missed majority. The value stays ``None`` while the vote is
     #: open and on ``passed`` or ``tie``.
-    failed_reason: Literal["quorum", "majority"] | None = Field(
-        default=None, alias="failedReason"
-    )
+    failed_reason: Literal["quorum", "majority"] | None = Field(default=None, alias="failedReason")
     #: The rules of the vote, for the vote card.
     majority_rule: Literal["simple", "absolute", "two_thirds"] = Field(
         default="simple", alias="majorityRule"
@@ -514,9 +512,7 @@ class MeetingVoteOpenBody(_CamelModel):
     #: manipulate it against the real roster. This field holds an explicit percent
     #: quorum from 0 to 100. ``None`` selects the Gremium default when the Gremium
     #: sets one.
-    quorum_percent: int | None = Field(
-        default=None, alias="quorumPercent", ge=0, le=100
-    )
+    quorum_percent: int | None = Field(default=None, alias="quorumPercent", ge=0, le=100)
     #: The admitted guests vote too. ``None`` picks the default: on in a meeting
     #: where guests vote, on a public agenda item; else off. Such a vote has no quorum.
     guests_vote: bool | None = Field(default=None, alias="guestsVote")
@@ -636,9 +632,7 @@ def clean_guest_name(value: str) -> str:
     )
     name = " ".join(visible.split())
     if not GUEST_NAME_MIN <= len(name) <= GUEST_NAME_MAX:
-        raise ValueError(
-            f"displayName must have {GUEST_NAME_MIN} to {GUEST_NAME_MAX} characters"
-        )
+        raise ValueError(f"displayName must have {GUEST_NAME_MIN} to {GUEST_NAME_MAX} characters")
     return name
 
 

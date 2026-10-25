@@ -356,9 +356,7 @@ async def get_meeting(meeting_id: UUID, service: ServiceDep, principal: ReaderDe
     return await service.get(meeting_id, principal)
 
 
-@router.delete(
-    "/meetings/{meeting_id}", status_code=204, responses=_errors(401, 403, 404, 409)
-)
+@router.delete("/meetings/{meeting_id}", status_code=204, responses=_errors(401, 403, 404, 409))
 async def delete_meeting(meeting_id: UUID, service: ServiceDep, principal: ReaderDep) -> None:
     """Delete a meeting.
 
@@ -758,8 +756,6 @@ async def open_prepared_meeting_vote(
     return await service.get(meeting_id, principal)
 
 
-
-
 @router.delete(
     "/meetings/{meeting_id}/votes/{vote_id}",
     response_model=MeetingOut,
@@ -1111,9 +1107,7 @@ async def rename_meeting_guest(
 ) -> MeetingGuestOut:
     """Give a guest another name. The audit entry holds the guest id only."""
     await _require_manage(service, meeting_id, principal)
-    return await guests.rename(
-        meeting_id, guest_id, payload.display_name, actor_sub=principal.sub
-    )
+    return await guests.rename(meeting_id, guest_id, payload.display_name, actor_sub=principal.sub)
 
 
 @router.get(
@@ -1207,9 +1201,7 @@ async def _serve(
     frame and closes with 4403, the code that the RBAC rejection also uses.
     """
     try:
-        authorization = await _authorize(
-            websocket, meeting_id, principal, meetings, beamer=beamer
-        )
+        authorization = await _authorize(websocket, meeting_id, principal, meetings, beamer=beamer)
     finally:
         await voting.session.rollback()
     if authorization is None:

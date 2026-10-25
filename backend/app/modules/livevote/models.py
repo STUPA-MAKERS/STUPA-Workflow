@@ -38,9 +38,7 @@ class Meeting(UUIDPkMixin, CreatedAtMixin, Base):
 
     __tablename__ = "meeting"
 
-    gremium_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("gremium.id", ondelete="CASCADE")
-    )
+    gremium_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("gremium.id", ondelete="CASCADE"))
     title: Mapped[str] = mapped_column(Text)
     date: Mapped[_date | None] = mapped_column(Date, nullable=True)
     #: Planned start time, not the time the meeting really starts.
@@ -52,14 +50,10 @@ class Meeting(UUIDPkMixin, CreatedAtMixin, Base):
     #: The real start. The transition from `planned` to `live` sets it once. It
     #: stays NULL for a meeting that started before the column existed: the audit log
     #: holds no start time for it. A reader then falls back to the planned start.
-    started_at: Mapped[_datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    started_at: Mapped[_datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     #: The transition to `closed`, which is terminal, sets this automatically. It
     #: gives the end line on the title page of the protocol.
-    closed_at: Mapped[_datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    closed_at: Mapped[_datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     active_application_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("application.id", ondelete="SET NULL"), nullable=True
     )
@@ -91,9 +85,7 @@ class Meeting(UUIDPkMixin, CreatedAtMixin, Base):
     join_code: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
-        CheckConstraint(
-            "status IN ('planned','live','closed')", name="meeting_status"
-        ),
+        CheckConstraint("status IN ('planned','live','closed')", name="meeting_status"),
         CheckConstraint("guests_mode IN ('vote','watch')", name="guests_mode"),
         Index("ix_meeting_gremium_id", "gremium_id"),
         Index(
@@ -120,25 +112,17 @@ class MeetingAttendance(UUIDPkMixin, TimestampMixin, Base):
 
     __tablename__ = "meeting_attendance"
 
-    meeting_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("meeting.id", ondelete="CASCADE")
-    )
-    principal_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("principal.id", ondelete="CASCADE")
-    )
+    meeting_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("meeting.id", ondelete="CASCADE"))
+    principal_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("principal.id", ondelete="CASCADE"))
     status: Mapped[str] = mapped_column(Text)
     source: Mapped[str] = mapped_column(Text, server_default="lead")
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
         UniqueConstraint("meeting_id", "principal_id", name="uq_attendance_meeting_principal"),
-        CheckConstraint(
-            "status IN ('present','excused','absent')", name="attendance_status"
-        ),
+        CheckConstraint("status IN ('present','excused','absent')", name="attendance_status"),
         CheckConstraint("source IN ('self','lead')", name="attendance_source"),
-        CheckConstraint(
-            "source <> 'self' OR status IN ('present','excused')", name="self_status"
-        ),
+        CheckConstraint("source <> 'self' OR status IN ('present','excused')", name="self_status"),
         Index("ix_attendance_meeting", "meeting_id"),
     )
 
@@ -153,9 +137,7 @@ class MeetingAgendaItem(UUIDPkMixin, CreatedAtMixin, Base):
 
     __tablename__ = "meeting_agenda_item"
 
-    meeting_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("meeting.id", ondelete="CASCADE")
-    )
+    meeting_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("meeting.id", ondelete="CASCADE"))
     #: NULL marks a free-text agenda item with no application. The `title` column
     #: then holds the text of the item.
     application_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -215,9 +197,7 @@ class ProtocolKeeperPeriod(UUIDPkMixin, CreatedAtMixin, Base):
 
     __tablename__ = "protocol_keeper_period"
 
-    meeting_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("meeting.id", ondelete="CASCADE")
-    )
+    meeting_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("meeting.id", ondelete="CASCADE"))
     principal_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("principal.id"))
     from_at: Mapped[_datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     to_at: Mapped[_datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -279,29 +259,21 @@ class MeetingGuest(UUIDPkMixin, CreatedAtMixin, Base):
 
     __tablename__ = "meeting_guest"
 
-    meeting_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("meeting.id", ondelete="CASCADE")
-    )
+    meeting_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("meeting.id", ondelete="CASCADE"))
     seq: Mapped[int] = mapped_column(Integer)
     display_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(Text, server_default="pending")
     #: SHA-256 of the device token, never the token itself. NULL after the close.
     token_hash: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     requested_at: Mapped[_datetime] = mapped_column(DateTime(timezone=True))
-    decided_at: Mapped[_datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    decided_at: Mapped[_datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     #: The meeting lead who decided last. Principal rows are never deleted, but a
     #: merge or an erasure must not fail on this reference.
     decided_by: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("principal.id", ondelete="SET NULL"), nullable=True
     )
-    admitted_at: Mapped[_datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    last_seen_at: Mapped[_datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    admitted_at: Mapped[_datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_seen_at: Mapped[_datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         CheckConstraint(
@@ -354,9 +326,7 @@ class MeetingSettings(Base):
 
     __table_args__ = (
         CheckConstraint("id = 1", name="singleton"),
-        CheckConstraint(
-            f"open_lead_minutes BETWEEN 0 AND {MAX_LEAD_MINUTES}", name="open_lead"
-        ),
+        CheckConstraint(f"open_lead_minutes BETWEEN 0 AND {MAX_LEAD_MINUTES}", name="open_lead"),
         CheckConstraint(
             "confirm_lead_minutes BETWEEN 0 AND open_lead_minutes", name="confirm_lead"
         ),

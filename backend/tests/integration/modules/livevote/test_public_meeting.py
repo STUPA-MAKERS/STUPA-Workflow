@@ -250,8 +250,6 @@ def open_vote(lead: TestClient, s: Seed, item: uuid.UUID, **body: Any) -> dict[s
     )
 
 
-
-
 async def test_create_and_patch_public_settings(
     maker: async_sessionmaker[AsyncSession], ctx: Ctx
 ) -> None:
@@ -302,8 +300,6 @@ async def test_join_link_of_a_meeting_without_public_join(
         resp = lead.get(f"/api/meetings/{s.meeting_id}/join-link")
         assert resp.status_code == 409 and resp.json()["code"] == "meeting_not_public"
         assert lead.post(f"/api/meetings/{s.meeting_id}/join-code/rotate").status_code == 409
-
-
 
 
 async def test_join_admit_and_guest_view_without_non_public_content(
@@ -497,8 +493,6 @@ async def test_remove_rename_admit_all_and_leave(
     assert "Anna" not in names and "Bert" not in names
     actions = [e.action for e in await audits(maker)]
     assert {"guest_admit_all", "guest_renamed", "guest_removed"} <= set(actions)
-
-
 
 
 async def test_guest_votes_without_quorum_and_late_admission(
@@ -863,8 +857,6 @@ def _drain_until(
         if message.get("type") == kind:
             return message
     raise AssertionError(f"no {kind} event")
-
-
 
 
 async def test_altcha_csrf_and_rate_limits(

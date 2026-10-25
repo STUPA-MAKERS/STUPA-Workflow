@@ -74,14 +74,13 @@ class SubstituteCreate(_CamelModel):
 
 class SubstituteOut(_CamelModel):
     """A substitute pool entry, with the member name for a member-bound entry."""
+
     id: UUID
     gremium_id: UUID = Field(serialization_alias="gremiumId")
     member_id: UUID | None = Field(default=None, serialization_alias="memberId")
     member_name: str | None = Field(default=None, serialization_alias="memberName")
     substitute_id: UUID = Field(serialization_alias="substituteId")
-    substitute_name: str | None = Field(
-        default=None, serialization_alias="substituteName"
-    )
+    substitute_name: str | None = Field(default=None, serialization_alias="substituteName")
 
 
 class RecipientOut(_CamelModel):
@@ -102,12 +101,8 @@ class MeetingDelegationContext(_CamelModel):
     gremium_id: UUID = Field(serialization_alias="gremiumId")
     #: Feature gates: the gremium switch and the global vote-delegation flag.
     allow_vote_delegation: bool = Field(serialization_alias="allowVoteDelegation")
-    voting_delegation_enabled: bool = Field(
-        serialization_alias="votingDelegationEnabled"
-    )
-    delegation_allow_external: bool = Field(
-        serialization_alias="delegationAllowExternal"
-    )
+    voting_delegation_enabled: bool = Field(serialization_alias="votingDelegationEnabled")
+    delegation_allow_external: bool = Field(serialization_alias="delegationAllowExternal")
     #: Deadline in UTC for a delegation from outside the pool. None means the meeting
     #: has no date and only the status gate applies. A pool delegation runs until the
     #: meeting starts.
@@ -117,9 +112,7 @@ class MeetingDelegationContext(_CamelModel):
     #: True when the caller is a voting member and may delegate here.
     can_delegate: bool = Field(serialization_alias="canDelegate")
     #: The own outgoing delegation, at most one, and the incoming delegations.
-    my_delegation: DelegationOut | None = Field(
-        default=None, serialization_alias="myDelegation"
-    )
+    my_delegation: DelegationOut | None = Field(default=None, serialization_alias="myDelegation")
     incoming: list[DelegationOut] = Field(default_factory=list)
     recipients: list[RecipientOut] = Field(default_factory=list)
 
@@ -129,11 +122,7 @@ class VoteDelegationStatus(_CamelModel):
 
     #: The own vote for this ballot is delegated away. A cast would return 403.
     blocked: bool
-    delegated_to_name: str | None = Field(
-        default=None, serialization_alias="delegatedToName"
-    )
+    delegated_to_name: str | None = Field(default=None, serialization_alias="delegatedToName")
     #: True when the caller casts a delegated vote. The UI shows an "as substitute" badge.
     exercising: bool
-    delegated_by_name: str | None = Field(
-        default=None, serialization_alias="delegatedByName"
-    )
+    delegated_by_name: str | None = Field(default=None, serialization_alias="delegatedByName")

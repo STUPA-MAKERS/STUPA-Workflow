@@ -65,9 +65,7 @@ def _local_to_utc(day: _date, clock: _time) -> datetime:
     return datetime.combine(day, clock, tzinfo=_LOCAL_TZ).astimezone(UTC)
 
 
-def _build_event(
-    event: MeetingEvent, *, domain: str, default_duration: timedelta
-) -> Event:
+def _build_event(event: MeetingEvent, *, domain: str, default_duration: timedelta) -> Event:
     """Build one VEVENT for a meeting.
 
     An all-day event has DTSTART as a plain DATE and no DTEND, so it lasts one day. A timed event
@@ -125,7 +123,5 @@ def build_calendar(
     cal.add("x-wr-calname", calendar_name)
     cal.add("x-wr-timezone", "Europe/Berlin")
     for event in events:
-        cal.add_component(
-            _build_event(event, domain=domain, default_duration=default_duration)
-        )
+        cal.add_component(_build_event(event, domain=domain, default_duration=default_duration))
     return cal.to_ical()

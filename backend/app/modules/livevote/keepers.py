@@ -51,8 +51,7 @@ async def member_permissions(
             .where(
                 GremiumMembership.gremium_id == gremium_id,
                 (GremiumMembership.valid_from.is_(None)) | (GremiumMembership.valid_from <= now),
-                (GremiumMembership.valid_until.is_(None))
-                | (GremiumMembership.valid_until > now),
+                (GremiumMembership.valid_until.is_(None)) | (GremiumMembership.valid_until > now),
             )
         )
     ).all()
@@ -147,9 +146,7 @@ async def keeper_summaries(
         p.from_agenda_item_id is not None or p.to_agenda_item_id is not None for p in periods
     )
     positions = (
-        await agenda_positions(session, list({p.meeting_id for p in periods}))
-        if referenced
-        else {}
+        await agenda_positions(session, list({p.meeting_id for p in periods})) if referenced else {}
     )
     for p in periods:
         row = KeeperPeriodOut(

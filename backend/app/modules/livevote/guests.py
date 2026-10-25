@@ -148,7 +148,6 @@ class GuestService:
         self.publisher = publisher
         self.base_url = base_url.rstrip("/")
 
-
     async def _meeting(self, meeting_id: UUID, *, for_update: bool = False) -> Meeting:
         stmt = select(Meeting).where(Meeting.id == meeting_id)
         if for_update:
@@ -268,7 +267,6 @@ class GuestService:
             target_id=str(meeting.id),
             data={"meetingId": str(meeting.id), "gremiumId": str(meeting.gremium_id), **data},
         )
-
 
     async def ensure_code(self, meeting: Meeting) -> None:
         """Give the meeting a join code when it has none."""
@@ -435,7 +433,6 @@ class GuestService:
                 .where(MeetingGuest.meeting_id == meeting_id, MeetingGuest.admitted_at.is_not(None))
             )
         ) or 0
-
 
     async def list(self, meeting_id: UUID) -> list[MeetingGuestOut]:
         """List the guests: the open requests first, then the others."""
@@ -616,7 +613,6 @@ class GuestService:
         await self.session.commit()
         await self.publish(meeting_id, events)
         return self._link(code)
-
 
     async def meeting_by_code(self, code: str, *, for_update: bool = False) -> Meeting:
         """Find the open public meeting of a join code.
@@ -903,7 +899,6 @@ class GuestService:
         )
         return await self._public_item(item_id)
 
-
     async def _me(self, meeting: Meeting, guest: MeetingGuest, now: datetime) -> GuestMe:
         view = await self._view(meeting, guest) if guest.status == "admitted" else None
         return GuestMe(
@@ -1043,9 +1038,7 @@ class GuestService:
                     kind=view.kind,
                     election=view.election.public() if view.election is not None else None,
                     electionResult=(
-                        view.election_result.public()
-                        if view.election_result is not None
-                        else None
+                        view.election_result.public() if view.election_result is not None else None
                     ),
                     poll=view.poll,
                     pollResult=view.poll_result,

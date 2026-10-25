@@ -257,9 +257,7 @@ class PermissionOps(MeetingServiceBase):
             return
         raise ForbiddenError("not allowed to view this meeting")
 
-    async def meeting_read_scope(
-        self, principal: Principal
-    ) -> tuple[set[UUID] | None, set[UUID]]:
+    async def meeting_read_scope(self, principal: Principal) -> tuple[set[UUID] | None, set[UUID]]:
         """Return the read scope of `assert_can_read` as two id sets.
 
         The first set holds the gremien whose meetings the principal can read. `None`

@@ -471,10 +471,7 @@ async def test_is_participant_member(monkeypatch: pytest.MonkeyPatch) -> None:
 async def test_is_participant_view_all() -> None:
     svc = MeetingService(_QueueSession())  # type: ignore[arg-type]
     assert (
-        await svc.is_participant(
-            uuid4(), uuid4(), _principal("meeting.view_all", sub="v")
-        )
-        is True
+        await svc.is_participant(uuid4(), uuid4(), _principal("meeting.view_all", sub="v")) is True
     )
 
 
@@ -796,9 +793,7 @@ async def test_votes_for_config_not_dict() -> None:
 
     mid = uuid4()
     vrow = _vote_row(meeting_id=mid, status="closed", result="passed")
-    vrow.config = VoteConfig.model_validate(
-        {"options": ["yes", "no"], "majorityRule": "simple"}
-    )
+    vrow.config = VoteConfig.model_validate({"options": ["yes", "no"], "majorityRule": "simple"})
     sess = _QueueSession(
         executes=[
             res(vrow),
@@ -1169,9 +1164,7 @@ async def test_create_ok_no_protokollant() -> None:
     sess = _QueueSession()
     svc = MeetingService(sess)  # type: ignore[arg-type]
     out = await svc.create(
-        MeetingCreate(
-            gremiumId=uuid4(), title="GV", date=date(2026, 6, 20), startTime=time(18, 0)
-        ),
+        MeetingCreate(gremiumId=uuid4(), title="GV", date=date(2026, 6, 20), startTime=time(18, 0)),
         _admin(),
     )
     assert out.status == "planned"
@@ -1415,9 +1408,7 @@ async def test_patch_set_times_and_end() -> None:
     from app.modules.livevote.schemas import MeetingPatch
 
     svc = MeetingService(_QueueSession(executes=[res(m)]))  # type: ignore[arg-type]
-    out = await svc.patch(
-        m.id, MeetingPatch(startTime=time(18, 0), endTime=time(20, 0)), _admin()
-    )
+    out = await svc.patch(m.id, MeetingPatch(startTime=time(18, 0), endTime=time(20, 0)), _admin())
     assert m.start_time == time(18, 0)
     assert m.end_time == time(20, 0)
     assert out.start_time == time(18, 0)
@@ -1588,11 +1579,7 @@ async def test_agenda_item_has_vote_excludes_cancelled() -> None:
     sess = _QueueSession(executes=[res()])
     svc = MeetingService(sess)  # type: ignore[arg-type]
     await svc.agenda_item_has_vote(uuid4())
-    rendered = str(
-        sess.last_statement.compile(
-            compile_kwargs={"literal_binds": True}
-        )
-    )
+    rendered = str(sess.last_statement.compile(compile_kwargs={"literal_binds": True}))
     assert "status" in rendered and "cancelled" in rendered
 
 
@@ -1826,9 +1813,7 @@ async def test_set_body_updates_all_fields(audit_calls: list[dict[str, Any]]) ->
         scalars_q=[[]],
     )
     svc = AgendaService(sess)  # type: ignore[arg-type]
-    await svc.set_body(
-        m.id, item.id, body="**md**", title=" new ", non_public=True, actor="mgr"
-    )
+    await svc.set_body(m.id, item.id, body="**md**", title=" new ", non_public=True, actor="mgr")
     assert item.body == "**md**"
     assert item.title == "new"
     assert item.non_public is True
@@ -1901,9 +1886,7 @@ async def test_set_body_after_close_with_draft_protocol_is_audited(
     """
     m = _meeting(status="closed")
     item = _agenda_item(body="old")
-    sess = _QueueSession(
-        executes=[res(m), res(item), res(m)], scalars_q=[[]], scalar_q=["draft"]
-    )
+    sess = _QueueSession(executes=[res(m), res(item), res(m)], scalars_q=[[]], scalar_q=["draft"])
     await AgendaService(sess).set_body(m.id, item.id, body="fixed", actor="mgr")  # type: ignore[arg-type]
     assert item.body == "fixed"
     [entry] = audit_calls
@@ -2165,8 +2148,12 @@ async def test_remove_deletes_draft_and_cancelled_votes(
     m = _meeting(status="live")
     item = _agenda_item()
     draft = SimpleNamespace(
-        id=uuid4(), status="draft", application_id=None, meeting_id=m.id,
-        agenda_item_id=item.id, eligible_group=str(m.gremium_id),
+        id=uuid4(),
+        status="draft",
+        application_id=None,
+        meeting_id=m.id,
+        agenda_item_id=item.id,
+        eligible_group=str(m.gremium_id),
     )
     sess = _QueueSession(executes=[res(m), res(item), res(draft), res(m)], scalars_q=[[]])
     await AgendaService(sess).remove(m.id, item.id, actor="mgr", may_delete_votes=True)  # type: ignore[arg-type]
@@ -2202,9 +2189,7 @@ async def test_remove_after_close_conflicts() -> None:
 def _member(*, sub: str = "sub-1", display_name: str = "Alice") -> Any:
     from types import SimpleNamespace
 
-    return SimpleNamespace(
-        id=uuid4(), sub=sub, display_name=display_name, email=f"{sub}@x"
-    )
+    return SimpleNamespace(id=uuid4(), sub=sub, display_name=display_name, email=f"{sub}@x")
 
 
 async def test_attendance_meeting_not_found() -> None:
@@ -2573,9 +2558,7 @@ class _FakeAgendaService:
         self.may_delete_votes = may_delete_votes
         return []
 
-    async def reorder(
-        self, meeting_id: UUID, item_ids: list[UUID], *, actor: str
-    ) -> list[Any]:
+    async def reorder(self, meeting_id: UUID, item_ids: list[UUID], *, actor: str) -> list[Any]:
         self.calls.append("reorder")
         self.actors.append(actor)
         return []
@@ -2620,9 +2603,7 @@ class _FakeVotingService:
             applicationId=uuid4(),
             meetingId=None,
             eligibleGroup="g",
-            config=VoteConfig.model_validate(
-                {"options": ["yes", "no"], "majorityRule": "simple"}
-            ),
+            config=VoteConfig.model_validate({"options": ["yes", "no"], "majorityRule": "simple"}),
             status="open",
             secret=False,
             tally=TallyOut(counts={}, eligible=0, quorumMet=True),
@@ -2803,18 +2784,14 @@ def test_set_own_attendance_ok(app: FastAPI, client: TestClient, fakes) -> None:
 def test_set_member_attendance_forbidden(app: FastAPI, client: TestClient, fakes) -> None:
     fakes["meeting"]._meeting_out = _meeting_out(can_write=False)
     _login(app)
-    r = client.put(
-        f"/api/meetings/{uuid4()}/attendance/{uuid4()}", json={"status": "absent"}
-    )
+    r = client.put(f"/api/meetings/{uuid4()}/attendance/{uuid4()}", json={"status": "absent"})
     assert r.status_code == 403
 
 
 def test_set_member_attendance_ok(app: FastAPI, client: TestClient, fakes) -> None:
     fakes["meeting"]._meeting_out = _meeting_out(can_write=True)
     _login(app)
-    r = client.put(
-        f"/api/meetings/{uuid4()}/attendance/{uuid4()}", json={"status": "present"}
-    )
+    r = client.put(f"/api/meetings/{uuid4()}/attendance/{uuid4()}", json={"status": "present"})
     assert r.status_code == 200
     assert "set_for" in fakes["attendance"].calls
 
@@ -2835,9 +2812,7 @@ def test_set_own_attendance_absent_is_422(app: FastAPI, client: TestClient, fake
     assert "set_self" not in fakes["attendance"].calls
 
 
-def test_set_own_attendance_note_needs_excused(
-    app: FastAPI, client: TestClient, fakes
-) -> None:
+def test_set_own_attendance_note_needs_excused(app: FastAPI, client: TestClient, fakes) -> None:
     _login(app)
     r = client.put(
         f"/api/meetings/{uuid4()}/attendance/me", json={"status": "present", "note": "x"}
@@ -2869,9 +2844,7 @@ def test_set_own_attendance_passes_note(app: FastAPI, client: TestClient, fakes)
     }
 
 
-def test_set_own_attendance_without_note_keeps_it(
-    app: FastAPI, client: TestClient, fakes
-) -> None:
+def test_set_own_attendance_without_note_keeps_it(app: FastAPI, client: TestClient, fakes) -> None:
     _login(app)
     r = client.put(f"/api/meetings/{uuid4()}/attendance/me", json={"status": "excused"})
     assert r.status_code == 200
@@ -2879,9 +2852,7 @@ def test_set_own_attendance_without_note_keeps_it(
     assert fakes["attendance"].kwargs["note"] is None
 
 
-def test_set_member_attendance_null_note_clears(
-    app: FastAPI, client: TestClient, fakes
-) -> None:
+def test_set_member_attendance_null_note_clears(app: FastAPI, client: TestClient, fakes) -> None:
     fakes["meeting"]._meeting_out = _meeting_out(can_write=True)
     _login(app)
     r = client.put(
@@ -2953,9 +2924,7 @@ def test_remove_agenda_item_ok(
 
     The vote right decides whether the remove may delete the votes of the item.
     """
-    fakes["meeting"]._meeting_out = _meeting_out(
-        can_write=True, can_manage_votes=can_manage_votes
-    )
+    fakes["meeting"]._meeting_out = _meeting_out(can_write=True, can_manage_votes=can_manage_votes)
     _login(app)
     r = client.delete(f"/api/meetings/{uuid4()}/agenda/{uuid4()}")
     assert r.status_code == 200
@@ -2966,18 +2935,14 @@ def test_remove_agenda_item_ok(
 def test_reorder_agenda_forbidden(app: FastAPI, client: TestClient, fakes) -> None:
     fakes["meeting"]._meeting_out = _meeting_out(can_write=False)
     _login(app)
-    r = client.put(
-        f"/api/meetings/{uuid4()}/agenda/order", json={"itemIds": [str(uuid4())]}
-    )
+    r = client.put(f"/api/meetings/{uuid4()}/agenda/order", json={"itemIds": [str(uuid4())]})
     assert r.status_code == 403
 
 
 def test_reorder_agenda_ok(app: FastAPI, client: TestClient, fakes) -> None:
     fakes["meeting"]._meeting_out = _meeting_out(can_write=True)
     _login(app)
-    r = client.put(
-        f"/api/meetings/{uuid4()}/agenda/order", json={"itemIds": [str(uuid4())]}
-    )
+    r = client.put(f"/api/meetings/{uuid4()}/agenda/order", json={"itemIds": [str(uuid4())]})
     assert r.status_code == 200
     assert "reorder" in fakes["agenda"].calls
 
@@ -3013,9 +2978,7 @@ def test_set_agenda_body_passes_the_state_rules_to_the_service(
 def test_set_agenda_body_ok_broadcasts(app: FastAPI, client: TestClient, fakes) -> None:
     fakes["meeting"]._meeting_out = _meeting_out(status="live", can_write=True)
     _login(app)
-    r = client.patch(
-        f"/api/meetings/{uuid4()}/agenda/{uuid4()}", json={"title": "Rename"}
-    )
+    r = client.patch(f"/api/meetings/{uuid4()}/agenda/{uuid4()}", json={"title": "Rename"})
     assert r.status_code == 200
     assert "set_body" in fakes["agenda"].calls
     assert fakes["meeting"].broadcasts == 1
@@ -3061,18 +3024,14 @@ def test_set_agenda_body_live_only_the_protokollant_writes(
 def test_open_vote_forbidden(app: FastAPI, client: TestClient, fakes) -> None:
     fakes["meeting"]._meeting_out = _meeting_out(can_manage_votes=False)
     _login(app)
-    r = client.post(
-        f"/api/meetings/{uuid4()}/votes", json={"agendaItemId": str(uuid4())}
-    )
+    r = client.post(f"/api/meetings/{uuid4()}/votes", json={"agendaItemId": str(uuid4())})
     assert r.status_code == 403
 
 
 def test_open_vote_not_live_conflict(app: FastAPI, client: TestClient, fakes) -> None:
     fakes["meeting"]._meeting_out = _meeting_out(status="planned", can_manage_votes=True)
     _login(app)
-    r = client.post(
-        f"/api/meetings/{uuid4()}/votes", json={"agendaItemId": str(uuid4())}
-    )
+    r = client.post(f"/api/meetings/{uuid4()}/votes", json={"agendaItemId": str(uuid4())})
     assert r.status_code == 409
     assert r.json()["code"] == "meeting_not_started"
 
@@ -3173,9 +3132,7 @@ def test_open_vote_application_already_has_vote_conflict(
 
     fakes["meeting"].agenda_item_has_vote = _has_vote
     _login(app)
-    r = client.post(
-        f"/api/meetings/{uuid4()}/votes", json={"agendaItemId": str(uuid4())}
-    )
+    r = client.post(f"/api/meetings/{uuid4()}/votes", json={"agendaItemId": str(uuid4())})
     assert r.status_code == 409
 
 
@@ -3192,9 +3149,7 @@ def test_open_vote_application_not_in_vote_state_conflict(
 
     fakes["meeting"].application_state_kind = _kind
     _login(app)
-    r = client.post(
-        f"/api/meetings/{uuid4()}/votes", json={"agendaItemId": str(uuid4())}
-    )
+    r = client.post(f"/api/meetings/{uuid4()}/votes", json={"agendaItemId": str(uuid4())})
     assert r.status_code == 409
 
 
@@ -3212,9 +3167,7 @@ def test_open_vote_stale_agenda_item_of_another_gremium_conflict(
 
     fakes["meeting"].application_vote_gremium = _other
     _login(app)
-    r = client.post(
-        f"/api/meetings/{uuid4()}/votes", json={"agendaItemId": str(uuid4())}
-    )
+    r = client.post(f"/api/meetings/{uuid4()}/votes", json={"agendaItemId": str(uuid4())})
     assert r.status_code == 409
     assert r.json()["code"] == "vote_gremium_mismatch"
 
@@ -3225,9 +3178,7 @@ async def test_application_vote_gremium() -> None:
     assert await svc.application_vote_gremium(uuid4()) == gid
 
 
-def test_open_vote_default_quorum_from_gremium(
-    app: FastAPI, client: TestClient, fakes
-) -> None:
+def test_open_vote_default_quorum_from_gremium(app: FastAPI, client: TestClient, fakes) -> None:
     fakes["meeting"]._meeting_out = _meeting_out(status="live", can_manage_votes=True)
 
     async def _quorum(gremium_id: UUID) -> int | None:
@@ -3235,9 +3186,7 @@ def test_open_vote_default_quorum_from_gremium(
 
     fakes["meeting"].gremium_quorum_percent = _quorum
     _login(app)
-    r = client.post(
-        f"/api/meetings/{uuid4()}/votes", json={"agendaItemId": str(uuid4())}
-    )
+    r = client.post(f"/api/meetings/{uuid4()}/votes", json={"agendaItemId": str(uuid4())})
     assert r.status_code == 200
 
 
@@ -3441,9 +3390,7 @@ def test_delete_meeting_vote_forbidden(app: FastAPI, client: TestClient, fakes) 
 
 
 @pytest.mark.parametrize("status", ["planned", "live"])
-def test_delete_meeting_vote_ok(
-    app: FastAPI, client: TestClient, fakes, status: str
-) -> None:
+def test_delete_meeting_vote_ok(app: FastAPI, client: TestClient, fakes, status: str) -> None:
     """Delete a meeting vote.
 
     The service writes `vote_delete` for this actor.
@@ -3522,7 +3469,11 @@ async def test_authorize_unauthenticated() -> None:
 async def test_authorize_not_found() -> None:
     ws = _FakeWS()
     out = await _authorize(
-        ws, uuid4(), _principal(), _AuthMeetings(raise_not_found=True), beamer=False  # type: ignore[arg-type]
+        ws,
+        uuid4(),
+        _principal(),
+        _AuthMeetings(raise_not_found=True),
+        beamer=False,  # type: ignore[arg-type]
     )
     assert out is None
     assert ws.closed_code == WS_NOT_FOUND
@@ -3531,7 +3482,11 @@ async def test_authorize_not_found() -> None:
 async def test_authorize_beamer_needs_manage() -> None:
     ws = _FakeWS()
     out = await _authorize(
-        ws, uuid4(), _principal(), _AuthMeetings(), beamer=True  # type: ignore[arg-type]
+        ws,
+        uuid4(),
+        _principal(),
+        _AuthMeetings(),
+        beamer=True,  # type: ignore[arg-type]
     )
     assert out is None
     assert ws.closed_code == WS_FORBIDDEN
@@ -3546,7 +3501,11 @@ async def test_authorize_beamer_ok() -> None:
     ws = _FakeWS()
     meetings = _AuthMeetings(manager=True)
     out = await _authorize(
-        ws, uuid4(), _principal(), meetings, beamer=True  # type: ignore[arg-type]
+        ws,
+        uuid4(),
+        _principal(),
+        meetings,
+        beamer=True,  # type: ignore[arg-type]
     )
     assert out is not None
     assert meetings.manage_asked == [meetings.last.gremium_id]
@@ -3568,7 +3527,11 @@ async def test_authorize_voter_not_participant() -> None:
 async def test_authorize_voter_ok() -> None:
     ws = _FakeWS()
     out = await _authorize(
-        ws, uuid4(), _principal(), _AuthMeetings(participant=True), beamer=False  # type: ignore[arg-type]
+        ws,
+        uuid4(),
+        _principal(),
+        _AuthMeetings(participant=True),
+        beamer=False,  # type: ignore[arg-type]
     )
     assert out is not None
 
@@ -3735,9 +3698,7 @@ async def test_broker_publisher_skips_unbound_votes() -> None:
 
     broker = _capture_broker()
     pub = BrokerPublisher(broker)
-    cfg = VoteConfig.model_validate(
-        {"options": ["yes", "no"], "majorityRule": "simple"}
-    )
+    cfg = VoteConfig.model_validate({"options": ["yes", "no"], "majorityRule": "simple"})
     unbound = VoteOut(
         id=uuid4(),
         applicationId=uuid4(),
@@ -3841,9 +3802,7 @@ async def test_list_timeline_upcoming_with_cursor() -> None:
         ]
     )
     svc = MeetingService(sess)  # type: ignore[arg-type]
-    page = await svc.list_timeline(
-        _admin(), direction="upcoming", cursor=cursor, limit=20
-    )
+    page = await svc.list_timeline(_admin(), direction="upcoming", cursor=cursor, limit=20)
     assert [i.id for i in page.items] == [m.id]
     assert page.next_cursor is None
 

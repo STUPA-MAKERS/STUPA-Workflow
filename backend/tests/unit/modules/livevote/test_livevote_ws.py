@@ -205,8 +205,9 @@ def test_unauthenticated_is_closed_before_accept() -> None:
 def test_unknown_meeting_is_closed() -> None:
     app, _, _ = _build(meeting=None, principal=_voter())
     client = TestClient(app)
-    with pytest.raises(WebSocketDisconnect), client.websocket_connect(
-        "/api/ws/meetings/" + str(uuid4())
+    with (
+        pytest.raises(WebSocketDisconnect),
+        client.websocket_connect("/api/ws/meetings/" + str(uuid4())),
     ):
         pass
 
@@ -244,9 +245,7 @@ def test_subscribe_resends_state_with_open_vote() -> None:
     meeting = _meeting()
     vote_out = _vote_out(meeting.id)
     open_vote = types.SimpleNamespace(id=vote_out.id)
-    app, _, _ = _build(
-        meeting=meeting, principal=_voter(), vote_out=vote_out, open_vote=open_vote
-    )
+    app, _, _ = _build(meeting=meeting, principal=_voter(), vote_out=vote_out, open_vote=open_vote)
     client = TestClient(app)
     with client.websocket_connect(_url(meeting)) as ws:
         assert _recv(ws)["type"] == "meeting_state"
@@ -282,9 +281,7 @@ def test_cast_records_vote_and_broadcasts_tally() -> None:
 def test_cast_errors_map_to_error_event(exc: Exception, expected: str) -> None:
     meeting = _meeting()
     vote_out = _vote_out(meeting.id)
-    app, _, _ = _build(
-        meeting=meeting, principal=_voter(), vote_out=vote_out, voting_exc=exc
-    )
+    app, _, _ = _build(meeting=meeting, principal=_voter(), vote_out=vote_out, voting_exc=exc)
     client = TestClient(app)
     with client.websocket_connect(_url(meeting)) as ws:
         assert _recv(ws)["type"] == "meeting_state"
@@ -403,16 +400,21 @@ def _auth_db(*, naive: bool):
     if naive:
         vf, vu = vf.replace(tzinfo=None), vu.replace(tzinfo=None)
     auth_session = AuthSession(
-        sid=_SID, principal_id=pid, expires_at=now + timedelta(hours=1),
-        refresh_token=None, id_token=None, revalidated_at=now,
+        sid=_SID,
+        principal_id=pid,
+        expires_at=now + timedelta(hours=1),
+        refresh_token=None,
+        id_token=None,
+        revalidated_at=now,
     )
-    principal_row = PrincipalRow(
-        sub="member", email=None, display_name="M", oidc_groups=[]
-    )
+    principal_row = PrincipalRow(sub="member", email=None, display_name="M", oidc_groups=[])
     principal_row.id = pid
     assignment = RoleAssignment(
-        principal_id=pid, role_id=uuid4(), gremium_id=_GREMIUM,
-        valid_from=vf, valid_until=vu,
+        principal_id=pid,
+        role_id=uuid4(),
+        gremium_id=_GREMIUM,
+        valid_from=vf,
+        valid_until=vu,
     )
 
     def factory():
@@ -440,11 +442,9 @@ def _build_real_handshake(*, naive: bool):
     meeting = _meeting()
     app = create_app()
     app.dependency_overrides[get_session] = _auth_db(naive=naive)
-    app.dependency_overrides[get_meeting_service_ws] = (
-        lambda: _FakeMeetingService(meeting, None)
-    )
-    app.dependency_overrides[get_voting_service_ws] = (
-        lambda: _FakeVotingService(_vote_out(meeting.id))
+    app.dependency_overrides[get_meeting_service_ws] = lambda: _FakeMeetingService(meeting, None)
+    app.dependency_overrides[get_voting_service_ws] = lambda: _FakeVotingService(
+        _vote_out(meeting.id)
     )
     app.dependency_overrides[get_broker_ws] = lambda: InMemoryBroker()
     app.dependency_overrides[get_locker_ws] = lambda: InMemoryLocker()
@@ -495,8 +495,9 @@ def test_handshake_foreign_origin_is_rejected() -> None:
     client = TestClient(app)
     name, value = _signed_cookie()
     client.cookies.set(name, value)
-    with pytest.raises(WebSocketDisconnect) as exc, client.websocket_connect(
-        _url(meeting), headers={"origin": "https://evil.example"}
+    with (
+        pytest.raises(WebSocketDisconnect) as exc,
+        client.websocket_connect(_url(meeting), headers={"origin": "https://evil.example"}),
     ):
         pass
     assert exc.value.code == 4403
@@ -515,15 +516,14 @@ def test_real_flow_dispatcher_override_reaches_the_socket(suffix: str) -> None:
     meeting = _meeting()
     app = create_app()
     app.dependency_overrides[get_session] = _auth_db(naive=False)
-    app.dependency_overrides[get_meeting_service_ws] = (
-        lambda: _FakeMeetingService(meeting, None)
-    )
+    app.dependency_overrides[get_meeting_service_ws] = lambda: _FakeMeetingService(meeting, None)
     app.dependency_overrides[get_broker_ws] = lambda: InMemoryBroker()
     app.dependency_overrides[get_locker_ws] = lambda: InMemoryLocker()
     assert get_voting_service_ws not in app.dependency_overrides
     client = TestClient(app)
-    with pytest.raises(WebSocketDisconnect) as exc, client.websocket_connect(
-        _url(meeting) + suffix
+    with (
+        pytest.raises(WebSocketDisconnect) as exc,
+        client.websocket_connect(_url(meeting) + suffix),
     ):
         pass
     assert exc.value.code == 4401
@@ -534,9 +534,7 @@ def test_real_flow_dispatcher_override_opens_the_socket_with_a_cookie() -> None:
     meeting = _meeting()
     app = create_app()
     app.dependency_overrides[get_session] = _auth_db(naive=False)
-    app.dependency_overrides[get_meeting_service_ws] = (
-        lambda: _FakeMeetingService(meeting, None)
-    )
+    app.dependency_overrides[get_meeting_service_ws] = lambda: _FakeMeetingService(meeting, None)
     app.dependency_overrides[get_broker_ws] = lambda: InMemoryBroker()
     app.dependency_overrides[get_locker_ws] = lambda: InMemoryLocker()
     client = TestClient(app)

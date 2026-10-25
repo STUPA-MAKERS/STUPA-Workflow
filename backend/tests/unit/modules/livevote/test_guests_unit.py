@@ -123,8 +123,6 @@ class Recorder:
         self.events.append(("tally", vote))
 
 
-
-
 def test_codes_tokens_and_qr() -> None:
     """Create codes, tokens and the QR matrix.
 
@@ -145,8 +143,6 @@ def test_retry_after() -> None:
     assert GuestService._retry_after(guest(status="rejected", decided_at=NOW), NOW) == 180  # type: ignore[arg-type]
     late = guest(status="removed", decided_at=NOW - timedelta(minutes=5))
     assert GuestService._retry_after(late, NOW) == 0  # type: ignore[arg-type]
-
-
 
 
 async def test_meeting_and_guest_lookups_404() -> None:
@@ -348,8 +344,6 @@ async def test_publish_paths() -> None:
     await GuestService(db(), failing).publish(MID, GuestEvents(requested=[out]))  # type: ignore[arg-type]
 
 
-
-
 async def test_meeting_by_code_and_head() -> None:
     with pytest.raises(NotFoundError) as unknown:
         await GuestService(db(result())).meeting_by_code("zzz")
@@ -502,6 +496,7 @@ async def test_cast_rules(monkeypatch: pytest.MonkeyPatch) -> None:
 
     An unknown vote, a vote of another meeting and a vote of a non-public item give 404.
     """
+
     class FakeVoting:
         def __init__(self) -> None:
             self.casts: list[Any] = []

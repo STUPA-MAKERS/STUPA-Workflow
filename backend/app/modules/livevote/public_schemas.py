@@ -103,6 +103,7 @@ class GuestAgendaItem(_CamelModel):
 
 class GuestTally(_CamelModel):
     """The tally of a vote, as a guest sees it."""
+
     counts: dict[str, int]
     voted: int
     present: int

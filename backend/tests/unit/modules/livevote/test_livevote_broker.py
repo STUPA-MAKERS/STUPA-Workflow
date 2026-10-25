@@ -28,9 +28,10 @@ async def test_inmemory_fanout_across_two_instances() -> None:
     instance_a = InMemoryBroker(hub)
     instance_b = InMemoryBroker(hub)
 
-    async with instance_a.subscribe("meeting:1") as sub_a, instance_b.subscribe(
-        "meeting:1"
-    ) as sub_b:
+    async with (
+        instance_a.subscribe("meeting:1") as sub_a,
+        instance_b.subscribe("meeting:1") as sub_b,
+    ):
         await instance_a.publish("meeting:1", {"type": "vote_tally", "n": 1})
         a = await asyncio.wait_for(_first(sub_a), timeout=1)
         b = await asyncio.wait_for(_first(sub_b), timeout=1)

@@ -200,9 +200,7 @@ async def _protocol_writer(maker: async_sessionmaker[AsyncSession], gremium_id: 
         session.add_all([row, role])
         await session.flush()
         session.add(
-            GremiumMembership(
-                principal_id=row.id, gremium_id=gremium_id, gremium_role_id=role.id
-            )
+            GremiumMembership(principal_id=row.id, gremium_id=gremium_id, gremium_role_id=role.id)
         )
         await session.commit()
     return sub
@@ -235,9 +233,9 @@ async def test_protocol_writer_cannot_remove_an_item_with_votes(
         assert await session.get(MeetingAgendaItem, s.item_ids[0]) is not None
         assert await session.get(Vote, s.vote_ids["cancelled"]) is not None
         ballots = await session.scalar(
-            select(func.count()).select_from(Ballot).where(
-                Ballot.vote_id == s.vote_ids["cancelled"]
-            )
+            select(func.count())
+            .select_from(Ballot)
+            .where(Ballot.vote_id == s.vote_ids["cancelled"])
         )
         assert ballots == 1
     actions = [e.action for e in await audit_actions(maker)]

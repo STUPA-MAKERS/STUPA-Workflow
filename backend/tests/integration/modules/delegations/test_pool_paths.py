@@ -101,9 +101,7 @@ async def test_outsider_has_no_pool_standing(
     with TestClient(api) as client:
         me = client.get("/api/auth/me")
         detail = client.get(f"/api/meetings/{mid}")
-        groups = client.get(
-            "/api/delegations/substitute-groups", params={"gremiumId": str(gid)}
-        )
+        groups = client.get("/api/delegations/substitute-groups", params={"gremiumId": str(gid)})
     assert me.json()["in_substitute_pool"] is False
     assert detail.status_code == 403
     assert groups.status_code in {404, 405}

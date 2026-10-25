@@ -55,9 +55,7 @@ async def rotate_calendar_token(db: AsyncSession, sub: str) -> str | None:
     return row.calendar_token
 
 
-async def principal_by_calendar_token(
-    db: AsyncSession, token: str
-) -> PrincipalRow | None:
+async def principal_by_calendar_token(db: AsyncSession, token: str) -> PrincipalRow | None:
     """Resolve an active principal by feed token.
 
     An empty token, an unknown principal or a deactivated principal gives `None`.

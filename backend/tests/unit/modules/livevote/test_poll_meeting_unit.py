@@ -160,8 +160,6 @@ async def test_poll_tallies_without_polls() -> None:
     assert await svc._poll_tallies([]) == {}
 
 
-
-
 def _vote_out(**over: Any) -> VoteOut:
     base: dict[str, Any] = {
         "id": uuid4(),

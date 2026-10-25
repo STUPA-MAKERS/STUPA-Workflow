@@ -82,9 +82,7 @@ def test_window_without_start_time_starts_at_midnight() -> None:
     assert window.opens_at == window.confirm_until - timedelta(minutes=30)
 
 
-@pytest.mark.parametrize(
-    "meeting", [_meeting("live"), _meeting("closed"), _meeting(day=None)]
-)
+@pytest.mark.parametrize("meeting", [_meeting("live"), _meeting("closed"), _meeting(day=None)])
 def test_no_window(meeting: Meeting) -> None:
     assert open_window(meeting, _settings(), TZ) is None
 

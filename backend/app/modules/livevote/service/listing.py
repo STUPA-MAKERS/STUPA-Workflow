@@ -279,6 +279,7 @@ class ListingOps(PermissionOps, VoteReadOps):
             if prot_ids
             else {}
         )
+
         async def ids_for(perm: str) -> set[UUID]:
             return expand(await gremium_ids_with(self.session, principal, perm), all_gids)
 

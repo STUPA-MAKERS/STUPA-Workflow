@@ -267,9 +267,7 @@ async def test_service_create_sets_planned_and_commits() -> None:
     svc = MeetingService(session)  # type: ignore[arg-type]
     gid = uuid4()
     out = await svc.create(
-        MeetingCreate(
-            gremiumId=gid, title="GV", date=date(2026, 6, 20), startTime=time(18, 0)
-        ),
+        MeetingCreate(gremiumId=gid, title="GV", date=date(2026, 6, 20), startTime=time(18, 0)),
         _principal(),
     )
     assert out.status == "planned"
@@ -501,9 +499,7 @@ async def test_service_patch_protokollant_locked_after_finalize(
     monkeypatch.setattr(MeetingService, "_protocol_final", _final)
     svc = MeetingService(_FakeSession(existing=meeting))  # type: ignore[arg-type]
     with pytest.raises(ConflictError):
-        await svc.patch(
-            meeting.id, MeetingPatch(protokollantId=uuid4()), _principal()
-        )
+        await svc.patch(meeting.id, MeetingPatch(protokollantId=uuid4()), _principal())
 
 
 class _DeletableSession(_FakeSession):
@@ -597,13 +593,9 @@ async def test_service_patch_closed_session_settings_frozen() -> None:
     meeting = _meeting(status="closed")
     svc = MeetingService(_FakeSession(existing=meeting))  # type: ignore[arg-type]
     with pytest.raises(ConflictError):
-        await svc.patch(
-            meeting.id, MeetingPatch(date=date(2026, 7, 1)), _principal()
-        )
+        await svc.patch(meeting.id, MeetingPatch(date=date(2026, 7, 1)), _principal())
     with pytest.raises(ConflictError):
-        await svc.patch(
-            meeting.id, MeetingPatch(protokollantId=uuid4()), _principal()
-        )
+        await svc.patch(meeting.id, MeetingPatch(protokollantId=uuid4()), _principal())
     assert meeting.date is None
 
 
@@ -629,9 +621,7 @@ async def test_pool_substitute_sees_committee_timeline(
 
     monkeypatch.setattr(livevote_permissions_mod, "gremium_member_ids", _members)
     svc = MeetingService(fake_session(result(pool_g)))
-    visible = await svc._visible_gremium_ids(
-        Principal(sub="sub-1", permissions=set())
-    )
+    visible = await svc._visible_gremium_ids(Principal(sub="sub-1", permissions=set()))
     assert visible == {member_g, pool_g}
 
 
@@ -648,9 +638,7 @@ async def test_pool_substitute_not_live_participant_without_delegation() -> None
     gremium = uuid4()
     meeting = uuid4()
     svc = MeetingService(fake_session(result(), result()))
-    is_part = await svc.is_participant(
-        meeting, gremium, Principal(sub="sub-1", permissions=set())
-    )
+    is_part = await svc.is_participant(meeting, gremium, Principal(sub="sub-1", permissions=set()))
     assert is_part is False
 
 
@@ -764,6 +752,4 @@ async def test_view_all_can_read_foreign_meeting(
 
     monkeypatch.setattr(mod, "gremium_member_ids", _none)
     svc = MeetingService(fake_session(result(meeting)))
-    await svc.assert_can_read(
-        meeting.id, Principal(sub="viewer", permissions={"meeting.view_all"})
-    )
+    await svc.assert_can_read(meeting.id, Principal(sub="viewer", permissions={"meeting.view_all"}))

@@ -38,14 +38,10 @@ class MeetingDelegation(UUIDPkMixin, CreatedAtMixin, Base):
 
     __tablename__ = "meeting_delegation"
 
-    meeting_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("meeting.id", ondelete="CASCADE")
-    )
+    meeting_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("meeting.id", ondelete="CASCADE"))
     #: Denormalized copy of the gremium of the meeting. It removes the join from
     #: the hot voting-right check and from the "my delegations" queries.
-    gremium_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("gremium.id", ondelete="CASCADE")
-    )
+    gremium_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("gremium.id", ondelete="CASCADE"))
     delegator_principal_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("principal.id", ondelete="CASCADE")
     )
@@ -87,9 +83,7 @@ class DelegationSubstitute(UUIDPkMixin, CreatedAtMixin, Base):
 
     __tablename__ = "delegation_substitute"
 
-    gremium_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("gremium.id", ondelete="CASCADE")
-    )
+    gremium_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("gremium.id", ondelete="CASCADE"))
     #: NULL marks a gremium-wide substitute that represents every member.
     member_principal_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("principal.id", ondelete="CASCADE"), nullable=True

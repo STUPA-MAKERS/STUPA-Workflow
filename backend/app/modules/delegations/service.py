@@ -737,9 +737,7 @@ class DelegationService:
         by_lead = False
         if not actor.has(_ADMIN_PERM):
             meeting = await self._meeting(row.meeting_id)
-            by_lead = meeting.status == "live" and await self._can_manage(
-                meeting.gremium_id, actor
-            )
+            by_lead = meeting.status == "live" and await self._can_manage(meeting.gremium_id, actor)
             if not by_lead:
                 me = await self._principal_row(sub=actor.sub)
                 if me is None or row.delegator_principal_id != me.id:

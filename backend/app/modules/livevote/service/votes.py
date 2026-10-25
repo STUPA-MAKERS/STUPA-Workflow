@@ -89,9 +89,7 @@ class VoteReadOps(MeetingServiceBase):
             and not bool((v.config if isinstance(v.config, dict) else {}).get("secret"))
             for v in rows
         )
-        absent_deleg = (
-            await self._absent_delegated_by_meeting(meeting_ids) if needs_deleg else {}
-        )
+        absent_deleg = await self._absent_delegated_by_meeting(meeting_ids) if needs_deleg else {}
         own: dict[UUID, MyBallot] = {}
         represented: set[UUID] = set()
         if principal is not None and rows:
@@ -184,9 +182,7 @@ class VoteReadOps(MeetingServiceBase):
                 choices.setdefault(vid, []).append(choice)
         return {v.id: tally_poll(choices.get(v.id, []), poll_config(v)) for v in votes}
 
-    async def _election_tallies(
-        self, votes: Sequence[Vote]
-    ) -> dict[UUID, ElectionOutcome]:
+    async def _election_tallies(self, votes: Sequence[Vote]) -> dict[UUID, ElectionOutcome]:
         """Tally the elections of the reload path, one query per ballot table."""
         if not votes:
             return {}

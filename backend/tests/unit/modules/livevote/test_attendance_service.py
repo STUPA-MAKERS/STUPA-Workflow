@@ -47,8 +47,6 @@ async def test_set_for_conflict_when_closed() -> None:
     assert db.committed == 0
 
 
-
-
 def _member(sub: str) -> SimpleNamespace:
     return SimpleNamespace(id=uuid4(), sub=sub, display_name=sub, email=f"{sub}@x")
 
@@ -320,8 +318,6 @@ async def test_roster_marks_the_vote_and_the_keeper_right() -> None:
         "b": (True, True),
         "f": (False, False),
     }
-
-
 
 
 async def test_cast_marks_a_member_without_record_present(

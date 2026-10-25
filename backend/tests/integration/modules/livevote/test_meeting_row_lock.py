@@ -85,9 +85,7 @@ async def test_close_waits_for_an_open_and_sees_the_open_vote(
     """
     s = await seed(maker, status="live", votes=("draft",), protocol="draft")
     async with maker() as opener, maker() as closer:
-        await opener.scalar(
-            select(Meeting.id).where(Meeting.id == s.meeting_id).with_for_update()
-        )
+        await opener.scalar(select(Meeting.id).where(Meeting.id == s.meeting_id).with_for_update())
         vote = await opener.get(Vote, s.vote_ids["draft"])
         assert vote is not None
         task = _spawn(
@@ -112,9 +110,7 @@ async def test_remove_waits_for_an_open_and_keeps_the_item(
 ) -> None:
     s = await seed(maker, status="live", votes=("draft",))
     async with maker() as opener, maker() as remover:
-        await opener.scalar(
-            select(Meeting.id).where(Meeting.id == s.meeting_id).with_for_update()
-        )
+        await opener.scalar(select(Meeting.id).where(Meeting.id == s.meeting_id).with_for_update())
         vote = await opener.get(Vote, s.vote_ids["draft"])
         assert vote is not None
         task = _spawn(
@@ -137,9 +133,7 @@ async def test_open_refuses_a_planned_meeting(
     s = await seed(maker, status="planned", votes=("draft",))
     async with maker() as session:
         with pytest.raises(ConflictError) as ei:
-            await VotingService(session).open(
-                s.vote_ids["draft"], now=datetime.now(UTC), actor="x"
-            )
+            await VotingService(session).open(s.vote_ids["draft"], now=datetime.now(UTC), actor="x")
     assert ei.value.code == "meeting_not_started"
 
 

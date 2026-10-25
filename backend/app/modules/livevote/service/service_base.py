@@ -178,9 +178,7 @@ class MeetingServiceBase:
                 app_id: title_of(data)
                 for app_id, data in (
                     await self.session.execute(
-                        select(Application.id, Application.data).where(
-                            Application.id.in_(app_ids)
-                        )
+                        select(Application.id, Application.data).where(Application.id.in_(app_ids))
                     )
                 ).all()
             }

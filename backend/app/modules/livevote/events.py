@@ -193,9 +193,7 @@ class VoteClosedEvent(_CamelModel):
     counts: dict[str, int]
     #: Why the vote failed. Set for `rejected` only, when the vote missed the
     #: quorum or the majority. `None` for `passed` and for `tie`.
-    failed_reason: Literal["quorum", "majority"] | None = Field(
-        default=None, alias="failedReason"
-    )
+    failed_reason: Literal["quorum", "majority"] | None = Field(default=None, alias="failedReason")
     #: The result of an election (elected, runoff, pending lot). Aggregates and
     #: candidate ids only.
     kind: VoteKind = "motion"

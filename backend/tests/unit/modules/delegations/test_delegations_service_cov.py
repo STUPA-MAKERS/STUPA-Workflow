@@ -289,9 +289,7 @@ async def test_create_me_principal_missing_403() -> None:
     db = fake_session(result())
     db.get_results = [_meeting(), _gremium()]
     with pytest.raises(ForbiddenError, match="Delegator principal not found"):
-        await _svc(db).create(
-            DelegationCreate(meetingId=MEETING_ID, delegateId=uuid4()), _actor()
-        )
+        await _svc(db).create(DelegationCreate(meetingId=MEETING_ID, delegateId=uuid4()), _actor())
 
 
 async def test_create_nonvoting_existing_to_same_recipient_does_not_conflict() -> None:
@@ -343,9 +341,7 @@ async def test_create_voting_existing_other_recipient_no_conflict() -> None:
     assert db.committed == 1
 
 
-def _joined_row(
-    me_id: Any, *, outgoing: bool = True
-) -> tuple[Any, Any, Any]:
+def _joined_row(me_id: Any, *, outgoing: bool = True) -> tuple[Any, Any, Any]:
     d = SimpleNamespace(
         id=uuid4(),
         meeting_id=MEETING_ID,
@@ -1313,9 +1309,7 @@ async def test_create_acquires_meeting_advisory_lock() -> None:
         member_ids=[delegate.id],
         existing=[],
     )
-    await _svc(db).create(
-        DelegationCreate(meetingId=MEETING_ID, delegateId=delegate.id), _actor()
-    )
+    await _svc(db).create(DelegationCreate(meetingId=MEETING_ID, delegateId=delegate.id), _actor())
     locks = [s for s in db.statements if isinstance(s, TextClause)]
     assert any("pg_advisory_xact_lock" in str(s) for s in locks)
 

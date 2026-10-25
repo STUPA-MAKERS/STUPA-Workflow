@@ -348,9 +348,7 @@ class HandoverOps(PermissionOps, VoteReadOps):
         meeting = await self._live_for_handover(meeting_id, principal)
         planned = await self._drop_planned(meeting.id)
         if planned is None:
-            raise NotFoundError(
-                "the meeting has no planned handover", code="no_planned_handover"
-            )
+            raise NotFoundError("the meeting has no planned handover", code="no_planned_handover")
         await self._audit_handover(
             meeting,
             principal.sub,
