@@ -86,7 +86,7 @@ COMMENT_MENTIONED_PLACEHOLDERS: dict[str, str] = {
     "commentAuthorInitials": "Initialen der Kommentar-Autor:in",
 }
 
-# The chat bubble of the comment mails, with the names of the ticket context.
+#: Chat bubble of the comment mails, with the placeholder names of the ticket context.
 _NOTE_BUBBLE_HTML = (
     _CHAT_BUBBLE_HTML.replace("{{ commentAuthorInitials }}", "{{ authorInitials }}")
     .replace("{{ commentAuthor }}", "{{ author }}")
@@ -275,7 +275,7 @@ async def notify_comment_mentions(
                 recipients=recipients,
                 actor_sub=actor_sub,
             )
-    except Exception:  # a mail must never break the comment
+    except Exception:
         logger.exception("comment_mentioned mail failed")
         return 0
 
@@ -353,6 +353,6 @@ async def notify_ticket_mentions(
             return await send_ticket_mentions(
                 session, queue=queue, settings=settings, note_id=note_id, recipients=recipients
             )
-    except Exception:  # a mail must never break the note
+    except Exception:
         logger.exception("ticket_mentioned mail failed")
         return 0

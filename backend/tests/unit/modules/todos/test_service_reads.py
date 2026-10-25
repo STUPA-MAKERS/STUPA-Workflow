@@ -216,6 +216,10 @@ async def test_search_is_scoped() -> None:
 
 
 async def test_card_for_agenda_rules() -> None:
+    """Check the rules of the agenda card.
+
+    The board lock comes first, then the card lock, which is the order of every card write.
+    """
     gid = uuid.uuid4()
     b = board(gremium_id=gid)
     col = column(b.id)
@@ -226,7 +230,6 @@ async def test_card_for_agenda_rules() -> None:
     session.put(b, live, archived, personal, mine)
     service = _svc(session)
     assert await service.card_for_agenda(live.id, gid, USER) is live
-    # The board lock comes first, then the card lock: the order of every card write.
     board_lock, card_lock = (_sql(stmt) for stmt in session.statements[:2])
     assert board_lock.startswith("SELECT todo_board.id") and "FOR UPDATE" in board_lock
     assert "FROM todo_card" in card_lock and "FOR NO KEY UPDATE" in card_lock

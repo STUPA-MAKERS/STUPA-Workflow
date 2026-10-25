@@ -168,9 +168,6 @@ def _matches(header: str | None, etag: str) -> bool:
     )
 
 
-# -- boards ---------------------------------------------------------------------
-
-
 @router.get("/boards", response_model=list[TodoBoardSummary], responses=_errors(401, 403))
 async def list_boards(
     service: ServiceDep,
@@ -340,9 +337,6 @@ async def delete_label(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-# -- across boards ------------------------------------------------------------------
-
-
 @router.get("/mine", response_model=TodoMine, responses=_errors(401, 403))
 async def mine(service: ServiceDep, principal: Member) -> TodoMine:
     """The open cards assigned to the caller, with the count due within 7 days."""
@@ -420,9 +414,6 @@ async def linked(
 ) -> list[TodoLinkedCard]:
     """The readable live cards that link to the target (back-references)."""
     return await service.linked(kind, target_id, principal)
-
-
-# -- cards ------------------------------------------------------------------------
 
 
 @router.post(

@@ -32,6 +32,7 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
+#: The partial unique index allows at most one valid decision per application.
 _UPGRADE: tuple[str, ...] = (
     """
     CREATE TABLE IF NOT EXISTS application_decision (
@@ -63,7 +64,6 @@ _UPGRADE: tuple[str, ...] = (
         "CREATE INDEX IF NOT EXISTS ix_application_decision_status_event_id "
         "ON application_decision (status_event_id)"
     ),
-    # At most one valid decision per application.
     (
         "CREATE UNIQUE INDEX IF NOT EXISTS uq_application_decision_one_valid "
         "ON application_decision (application_id) WHERE superseded_at IS NULL"
@@ -80,10 +80,12 @@ _DOWNGRADE: tuple[str, ...] = (
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     for stmt in _UPGRADE:
         op.execute(stmt)
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     for stmt in _DOWNGRADE:
         op.execute(stmt)

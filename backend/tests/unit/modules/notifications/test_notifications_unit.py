@@ -26,7 +26,6 @@ SETTINGS = load_settings(
 )
 
 
-# Tests for mail.py
 def test_idempotency_key_deterministic_and_distinct() -> None:
     a = compute_idempotency_key("status_changed", "app1", "rule1")
     b = compute_idempotency_key("status_changed", "app1", "rule1")
@@ -56,7 +55,7 @@ def test_build_email_message_text_and_html() -> None:
     assert email["To"] == "a@x.de"
     assert email["Subject"] == "S"
     assert SETTINGS.mail_from in email["From"]
-    assert email.is_multipart()  # text plus an HTML alternative
+    assert email.is_multipart()
 
 
 def test_build_email_message_without_from_name() -> None:
@@ -74,7 +73,7 @@ async def test_capturing_sender_collects() -> None:
 
 async def test_smtp_sender_no_recipients_is_noop() -> None:
     sender = SmtpMailSender(SETTINGS)
-    await sender.send(MailMessage(to=(), subject="S", text="b"))  # no network call
+    await sender.send(MailMessage(to=(), subject="S", text="b"))
 
 
 async def test_smtp_sender_sends_via_aiosmtplib(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -92,7 +91,6 @@ async def test_smtp_sender_sends_via_aiosmtplib(monkeypatch: pytest.MonkeyPatch)
     assert captured["kw"]["hostname"] == "mail.local"  # type: ignore[index]
 
 
-# Tests for templating.py
 def test_render_mail_uses_requested_lang_and_html() -> None:
     out = render_mail(
         subject_i18n={"de": "Hallo {{ name }}", "en": "Hi {{ name }}"},
@@ -145,13 +143,17 @@ def test_render_mail_unknown_placeholder_raises() -> None:
 
 
 def test_render_mail_subject_strips_crlf_header_injection() -> None:
+    """Strip CR and LF from the subject against header injection.
+
+    The content stays; only the line break goes.
+    """
     out = render_mail(
         subject_i18n={"de": "Betreff {{ x }}"},
         body_i18n={"de": "b"},
         context={"x": "ok\r\nBcc: evil@x.de"},
     )
     assert "\n" not in out.subject and "\r" not in out.subject
-    assert "Bcc:" in out.subject  # the content stays, only the line break goes
+    assert "Bcc:" in out.subject
 
 
 def test_render_html_autoescape() -> None:
@@ -161,10 +163,9 @@ def test_render_html_autoescape() -> None:
         body_html_i18n={"de": "{{ v }}"},
         context={"v": "<x>"},
     )
-    assert out.html == "&lt;x&gt;"  # autoescape in the HTML body
+    assert out.html == "&lt;x&gt;"
 
 
-# Tests for queue.py
 async def test_arq_queue_enqueues_with_idempotent_job_id() -> None:
     calls: list[tuple[str, dict, str | None]] = []
 
@@ -180,21 +181,23 @@ async def test_arq_queue_enqueues_with_idempotent_job_id() -> None:
 
 
 async def test_arq_queue_dedup_logs_when_none(caplog: pytest.LogCaptureFixture) -> None:
+    """Take the dedup path without an error when arq returns None for an existing job id."""
+
     class FakePool:
         async def enqueue_job(self, *a, **k):
-            return None  # arq: the job id already exists
+            return None
 
     q = ArqMailQueue(FakePool())
     await q.enqueue(MailMessage(to=("a@x.de",), subject="s", text="b", idempotency_key="dup"))
-    # No error. The queue took the dedup path.
 
 
 async def test_direct_queue_sends_once_per_key() -> None:
+    """Send a message once per idempotency key."""
     sender = CapturingMailSender()
     q = DirectMailQueue(sender)
     msg = MailMessage(to=("a@x.de",), subject="s", text="b", idempotency_key="k")
     await q.enqueue(msg)
-    await q.enqueue(msg)  # the same key is deduplicated
+    await q.enqueue(msg)
     assert len(sender.sent) == 1
 
 
@@ -207,7 +210,6 @@ async def test_direct_queue_without_key_always_sends() -> None:
     assert len(sender.sent) == 2
 
 
-# Tests for schemas.py
 def test_template_out_serializes_camel() -> None:
     from uuid import uuid4
 
@@ -223,7 +225,6 @@ def test_template_out_serializes_camel() -> None:
     assert "subjectI18n" in dumped and "bodyHtmlI18n" in dumped
 
 
-# Tests for provider.py
 async def test_create_mail_pool_failure_returns_none(monkeypatch: pytest.MonkeyPatch) -> None:
     import arq
 

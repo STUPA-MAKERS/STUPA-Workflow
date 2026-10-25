@@ -42,9 +42,6 @@ C2 = uuid.UUID(int=22)
 USER = Principal(sub="live-user", permissions={"todo.write"})
 
 
-# -- the collector ----------------------------------------------------------------
-
-
 def test_one_card_pings_the_card_and_several_collapse_to_the_board() -> None:
     pings = BoardPings()
     pings.touch(B1, C1)
@@ -58,11 +55,14 @@ def test_one_card_pings_the_card_and_several_collapse_to_the_board() -> None:
 
 
 def test_a_board_change_and_a_removed_card() -> None:
+    """Collect a board change and a removed card.
+
+    A card that left stays gone, also after a later write in the same request.
+    """
     pings = BoardPings()
     pings.touch(B1)
     pings.touch(B1, C1)
     pings.touch(B2, C1, removed=True)
-    # A card that left stays gone, also after a later write in the same request.
     pings.touch(B2, C1)
     assert pings.drain() == [
         {"type": "board", "boardId": str(B1)},
@@ -90,9 +90,6 @@ async def test_a_failed_publish_is_swallowed_and_the_next_still_goes() -> None:
     ]
     await publish_pings(broker, messages)  # type: ignore[arg-type]
     assert broker.sent == [(f"todo-board:{B2}", {"type": "board", "boardId": str(B2)})]
-
-
-# -- the connection -----------------------------------------------------------------
 
 
 class _Access:
@@ -345,6 +342,11 @@ def _ping(board_id: uuid.UUID) -> dict[str, Any]:
 async def test_the_pump_checks_again_after_the_recheck_age(
     access: type[_Access], monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Check the access again after the recheck age.
+
+    The right to B2 is gone, and after the recheck age the next ping checks again. A ping of
+    a board that is not subscribed never triggers a check.
+    """
     access.allowed = {B1, B2}
     clock = _Clock()
     calls: list[float] = []
@@ -367,7 +369,6 @@ async def test_the_pump_checks_again_after_the_recheck_age(
     clock.now += RECHECK_SECONDS - 1
     await conn._pump(_pings(_ping(B2)))
     assert calls == [1000.0] and ws.sent[-1] == _ping(B2)
-    # The right to B2 is gone; after the recheck age the next ping checks again.
     access.allowed = {B1}
     clock.now += 2
     await conn._pump(_pings(_ping(B2), _ping(B1)))
@@ -375,7 +376,6 @@ async def test_the_pump_checks_again_after_the_recheck_age(
     assert conn.board_ids == {str(B1)}
     assert ws.sent[-2:] == [_ping(B2), _ping(B1)]
     assert session.rolled_back == 2  # type: ignore[attr-defined]
-    # A ping of a board that is not subscribed never triggers a check.
     clock.now += RECHECK_SECONDS * 2
     await conn._pump(_pings(_ping(B2)))
     assert len(calls) == 2 and ws.closed == []
@@ -408,6 +408,10 @@ async def test_the_pump_closes_4401_when_the_session_is_gone(access: type[_Acces
 async def test_a_recheck_after_a_parallel_subscribe_reads_nothing(
     access: type[_Access],
 ) -> None:
+    """Read nothing in a recheck that follows a parallel subscribe.
+
+    The subscribe holds the lock. The recheck waits and then finds a fresh check.
+    """
     clock = _Clock()
     calls: list[float] = []
 
@@ -425,7 +429,6 @@ async def test_a_recheck_after_a_parallel_subscribe_reads_nothing(
         clock=clock,
     )
     clock.now += RECHECK_SECONDS
-    # The subscribe holds the lock; the recheck waits and then finds a fresh check.
     async with conn._check_lock:
         recheck = asyncio.create_task(conn._recheck())
         await asyncio.sleep(0)
@@ -475,9 +478,6 @@ async def test_a_failing_pump_ends_the_run(access: type[_Access]) -> None:
     await asyncio.sleep(0.05)
     await broker.publish(board_channel(B1), {"type": "board", "boardId": str(B1)})
     await asyncio.wait_for(task, 2)
-
-
-# -- the endpoint ---------------------------------------------------------------------
 
 
 def _app(principal: Principal | None, broker: InMemoryBroker) -> Any:

@@ -16,33 +16,30 @@ from __future__ import annotations
 
 from app.main import app
 
-# Properties that stay snake_case on purpose. The frontend reads these names as
-# they are, so a change here is a breaking contract change on both sides.
+#: Properties that stay snake_case on purpose. The frontend reads these names as
+#: they are, so a change here is a breaking contract change on both sides.
+#: ``display_name`` to ``has_reported_tickets`` belong to ``MeOut``, a plain BaseModel
+#: that ``Principal`` in ``frontend/src/app/core/api/models.ts`` mirrors field for field;
+#: ``logout_url`` is mirrored the same way. RFC 6749 fixes the wire names of the token
+#: endpoint and of an OAuth error, so a camel name would break every standard client.
+#: ``field_key`` is the multipart field that ``ApiClient.uploadAttachment`` writes.
+#: ``application_id`` is the magic-link contract (``MagicLinkVerifyOut``).
 _ALLOWED: frozenset[str] = frozenset(
     {
-        # `MeOut` is a plain BaseModel, not a camel model. `Principal` in
-        # `frontend/src/app/core/api/models.ts` mirrors it field for field.
         "display_name",
         "session_manage_gremien",
         "gremium_permissions",
         "has_scoped_budget_view",
         "in_substitute_pool",
         "has_reported_tickets",
-        # `LogoutOut.logout_url`, mirrored the same way.
         "logout_url",
-        # RFC 6749 fixes the wire names of the token endpoint and of an OAuth
-        # error. A camel name here would break every standard client.
         "grant_type",
         "client_id",
         "code_verifier",
         "redirect_uri",
         "refresh_token",
         "error_description",
-        # The multipart field name of the attachment upload.
-        # `ApiClient.uploadAttachment` writes exactly this name.
         "field_key",
-        # The magic-link contract. `MagicLinkVerifyOut` in the frontend models
-        # mirrors `application_id` as it is.
         "application_id",
     }
 )

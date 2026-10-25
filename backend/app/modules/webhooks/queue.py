@@ -29,16 +29,22 @@ def job_id_for(delivery_id: UUID) -> str:
 class WebhookQueue(Protocol):
     """Enqueue interface used by the service."""
 
-    async def enqueue(self, delivery_id: UUID) -> None: ...
+    async def enqueue(self, delivery_id: UUID) -> None:
+        """Enqueue one delivery."""
+        ...
 
 
 @dataclass(slots=True)
 class ArqWebhookQueue:
-    """arq-backed queue that enqueues `deliver_webhook` with an idempotent job id."""
+    """arq-backed queue that enqueues `deliver_webhook` with an idempotent job id.
 
-    pool: object  # arq.ArqRedis, typed loosely to keep the arq import out of the API
+    ``pool`` is an ``arq.ArqRedis``, typed loosely to keep the arq import out of the API.
+    """
+
+    pool: object
 
     async def enqueue(self, delivery_id: UUID) -> None:
+        """Enqueue a ``deliver_webhook`` job; arq drops a duplicate job id."""
         job = await self.pool.enqueue_job(  # type: ignore[attr-defined]
             WEBHOOK_TASK_NAME, str(delivery_id), _job_id=job_id_for(delivery_id)
         )

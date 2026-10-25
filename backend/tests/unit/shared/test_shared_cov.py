@@ -119,20 +119,17 @@ def test_budget_workbook_empty_tree() -> None:
 def test_budget_workbook_one_year_with_and_without_alloc() -> None:
     """One fiscal year, one node with an allocation and one child without one."""
     fy = uuid4()
-    child = _node("child", path_key="VS-root-child")  # no allocation gives None columns
+    child = _node("child", path_key="VS-root-child")
     root = _node("root", allocs=[_alloc(fy)], children=[child])
     labels = {fy: "Haushalt 2026"}
     data = xlsx.build_budget_workbook([root], fiscal_year_labels=labels)
     wb = _load(data)
     assert wb.sheetnames == ["Haushalt 2026"]
     ws = wb["Haushalt 2026"]
-    # header + root + child = 3 rows
     assert ws.max_row == 3
-    # root: allocation numbers as float
     assert ws.cell(row=2, column=1).value == "root"
     assert ws.cell(row=2, column=3).value == 1000.0
     assert ws.cell(row=2, column=5).value == 50.0
-    # child: indented, with None columns
     assert ws.cell(row=3, column=1).value == "    child"
     assert ws.cell(row=3, column=3).value is None
     assert ws.cell(row=3, column=7).value == "EUR"
@@ -154,12 +151,11 @@ def test_budget_workbook_repeated_fiscal_year_dedup() -> None:
     """Several nodes with the same fiscal year give one sheet, because fy_order dedupes."""
     fy = uuid4()
     a = _node("a", allocs=[_alloc(fy)])
-    b = _node("b", allocs=[_alloc(fy)])  # the same fy adds no second fy_order entry
+    b = _node("b", allocs=[_alloc(fy)])
     data = xlsx.build_budget_workbook([a, b], fiscal_year_labels={fy: "2026"})
     wb = _load(data)
     assert wb.sheetnames == ["2026"]
     ws = wb["2026"]
-    # header + a + b = 3 rows, both nodes on the same sheet
     assert ws.max_row == 3
 
 
@@ -190,8 +186,8 @@ def test_sheet_title_sanitizes_illegal_chars() -> None:
 
 
 def test_sheet_title_empty_becomes_hhj() -> None:
+    """Fall back to "HHJ" when nothing is left after the cleanup."""
     used: set[str] = set()
-    # Only illegal characters and whitespace. strip() leaves nothing, so HHJ wins.
     assert xlsx._sheet_title("   ", used) == "HHJ"
 
 
@@ -243,7 +239,7 @@ def test_applications_workbook_full_row() -> None:
 
 
 def test_applications_workbook_locale_label_fallbacks() -> None:
-    # locale fr is absent, so the chain falls back to de and then to en
+    """Fall back from the missing locale to de and then to en."""
     only_en = _list_item(state=_state({"en": "Approved"}))
     data = xlsx.build_applications_workbook(
         [only_en], type_names={}, gremium_names={}, locale="fr"
@@ -253,7 +249,7 @@ def test_applications_workbook_locale_label_fallbacks() -> None:
 
 
 def test_applications_workbook_empty_label_dict() -> None:
-    # A state with an empty label gives an empty string, because no locale matches.
+    """Write an empty label when no locale matches."""
     blank = _list_item(state=_state({}))
     data = xlsx.build_applications_workbook(
         [blank], type_names={}, gremium_names={}
@@ -263,15 +259,15 @@ def test_applications_workbook_empty_label_dict() -> None:
 
 
 def test_applications_workbook_no_state_no_gremium_no_title() -> None:
+    """Write empty cells for a None title, an empty gremium and a None state."""
     item = _list_item(state=None, gremiumId=None, title=None, amount=None, currency=None)
     data = xlsx.build_applications_workbook(
         [item], type_names={}, gremium_names={}
     )
     ws = _load(data)["Anträge"]
-    # A None title, an empty gremium and a None state all give "".
     assert ws.cell(row=2, column=1).value is None or ws.cell(row=2, column=1).value == ""
     assert ws.cell(row=2, column=4).value is None or ws.cell(row=2, column=4).value == ""
-    assert ws.cell(row=2, column=5).value is None  # _num(None)
+    assert ws.cell(row=2, column=5).value is None
 
 
 class _Expense:
@@ -295,11 +291,11 @@ def test_expenses_workbook_de_labels() -> None:
 
 
 def test_expenses_workbook_en_labels_and_unknown_kind() -> None:
+    """Write English labels and the raw value of an unknown kind."""
     items = [_Expense(kind="income"), _Expense(kind="weird")]
     data = xlsx.build_expenses_workbook(items, locale="en")
     ws = _load(data)["Buchungen"]
     assert ws.cell(row=2, column=2).value == "Income"
-    # An unknown kind falls back to the raw value.
     assert ws.cell(row=3, column=2).value == "weird"
 
 
@@ -316,10 +312,11 @@ def test_expenses_workbook_none_fields() -> None:
     data = xlsx.build_expenses_workbook(items)
     ws = _load(data)["Buchungen"]
     assert ws.cell(row=2, column=3).value is None or ws.cell(row=2, column=3).value == ""
-    assert ws.cell(row=2, column=6).value is None  # _num(None)
+    assert ws.cell(row=2, column=6).value is None
 
 
 def test_auskunft_workbook_with_principal_and_rows() -> None:
+    """Write the account sheet and the application JSON with sorted keys."""
     principal = {
         "sub": "auth0|abc",
         "email": "a@b.c",
@@ -355,17 +352,17 @@ def test_auskunft_workbook_with_principal_and_rows() -> None:
     wb = _load(data)
     assert wb.sheetnames == ["Konto", "Anträge", "Versionen"]
     konto = wb["Konto"]
-    assert konto.cell(row=2, column=2).value == "a@b.c"  # email of the request
+    assert konto.cell(row=2, column=2).value == "a@b.c"
     assert konto.cell(row=3, column=2).value == "auth0|abc"
-    assert konto.cell(row=6, column=2).value == "ja"  # active=True
+    assert konto.cell(row=6, column=2).value == "ja"
     apps = wb["Anträge"]
-    # The JSON is sorted (sort_keys), so "a" comes before "b".
     assert apps.cell(row=2, column=6).value == '{"a": 1, "b": 2}'
     versions_ws = wb["Versionen"]
     assert versions_ws.cell(row=2, column=2).value == 1
 
 
 def test_auskunft_workbook_inactive_principal() -> None:
+    """Write "nein" for an inactive account and an empty last login."""
     principal = {
         "sub": None,
         "email": None,
@@ -377,23 +374,22 @@ def test_auskunft_workbook_inactive_principal() -> None:
         email="x@y.z", applications=[], versions=[], principal=principal
     )
     konto = _load(data)["Konto"]
-    assert konto.cell(row=6, column=2).value == "nein"  # active False
-    # A None last login becomes "" through _fmt_dt.
+    assert konto.cell(row=6, column=2).value == "nein"
     assert konto.cell(row=7, column=2).value is None or konto.cell(row=7, column=2).value == ""
 
 
 def test_auskunft_workbook_no_principal() -> None:
+    """Write only the header and the e-mail row without a principal."""
     data = xlsx.build_auskunft_workbook(
         email="x@y.z", applications=[], versions=[], principal=None
     )
     wb = _load(data)
     konto = wb["Konto"]
-    # Only the header and the email row, no principal rows.
     assert konto.max_row == 2
 
 
 def test_auskunft_workbook_empty_app_and_version_data() -> None:
-    # A missing data key gives json.dumps({}). A missing id gives an empty string.
+    """Write ``{}`` for missing data and an empty id."""
     applications = [{"typeName": None, "status": None, "applicantName": None}]
     versions = [{"version": None, "changedBy": None}]
     data = xlsx.build_auskunft_workbook(
@@ -413,7 +409,7 @@ def test_num_and_fmt_dt_helpers() -> None:
 
 
 def test_autosize_caps_width_at_60() -> None:
-    # A very long cell caps the column width at 60.
+    """Cap the column width at 60 for a very long cell."""
     long_name = "z" * 200
     fy = uuid4()
     root = _node(long_name, allocs=[_alloc(fy)])
@@ -424,20 +420,20 @@ def test_autosize_caps_width_at_60() -> None:
 
 def test_to_decimal_variants() -> None:
     assert _to_decimal(None) is None
-    assert _to_decimal(True) is None  # bool is excluded
+    assert _to_decimal(True) is None
     assert _to_decimal(False) is None
     assert _to_decimal("3.14") == Decimal("3.14")
     assert _to_decimal(5) == Decimal("5")
-    assert _to_decimal("notanumber") is None  # InvalidOperation
-    assert _to_decimal(object()) is None  # TypeError → None
+    assert _to_decimal("notanumber") is None
+    assert _to_decimal(object()) is None
 
 
 def test_to_date_variants() -> None:
     assert _to_date(datetime(2026, 6, 16, 1, 2)) == date(2026, 6, 16)
     assert _to_date(date(2026, 6, 16)) == date(2026, 6, 16)
     assert _to_date("2026-06-16T10:00:00") == date(2026, 6, 16)
-    assert _to_date("not-a-date") is None  # ValueError → None
-    assert _to_date(123) is None  # not a str, date or datetime, so None
+    assert _to_date("not-a-date") is None
+    assert _to_date(123) is None
 
 
 def test_to_bool_variants() -> None:
@@ -448,7 +444,7 @@ def test_to_bool_variants() -> None:
     assert _to_bool("nope") is False
     assert _to_bool(1) is True
     assert _to_bool(0) is False
-    assert _to_bool([1]) is True  # bool(value) fallback
+    assert _to_bool([1]) is True
 
 
 def test_ops_for_type() -> None:
@@ -457,13 +453,13 @@ def test_ops_for_type() -> None:
     assert "<" in ops_for_type("date")
     assert ops_for_type("bool") == frozenset({"=="})
     assert "in" in ops_for_type("text")
-    assert "in" in ops_for_type("anything_else")  # the default is the text ops
+    assert "in" in ops_for_type("anything_else")
 
 
 def test_apply_ordered_unknown_op_is_false() -> None:
     assert _apply_ordered("==", 1, 1) is True
     assert _apply_ordered("<", 1, 2) is True
-    assert _apply_ordered("~~", 1, 2) is False  # an unknown operator gives False
+    assert _apply_ordered("~~", 1, 2) is False
 
 
 def test_compare_requires_object() -> None:
@@ -491,8 +487,8 @@ def test_compare_empty_left_value_is_false() -> None:
 
 
 def test_compare_numeric_uncoercible_operand_is_false() -> None:
+    """Fail closed when the operand does not coerce to Decimal."""
     ctx = GuardContext(field_values={"amount": "5"}, field_types={"amount": "number"})
-    # The operand does not coerce to Decimal, so the guard gives False.
     assert eval_guard(
         {"compare": {"field": "amount", "op": ">", "value": "x"}}, ctx
     ) is False
@@ -506,14 +502,16 @@ def test_compare_date_uncoercible_is_false() -> None:
 
 
 def test_compare_text_in_non_list_is_false() -> None:
+    """Fail closed when ``in`` gets a non-list value."""
     ctx = GuardContext(field_values={"k": "a"}, field_types={"k": "text"})
-    # The op "in" with a non-list gives False and does not crash.
     assert eval_guard({"compare": {"field": "k", "op": "in", "value": "abc"}}, ctx) is False
 
 
 def test_compare_text_unknown_op_after_type_check_is_false() -> None:
-    # Text allows only ==, != and in. ops_for_type filters a numeric operator out
-    # first, so the guard fails closed to False.
+    """Fail closed for a numeric operator on a text field.
+
+    Text allows only ==, != and in. ``ops_for_type`` filters the operator out first.
+    """
     ctx = GuardContext(field_values={"k": "a"}, field_types={"k": "text"})
     assert eval_guard({"compare": {"field": "k", "op": "<", "value": "b"}}, ctx) is False
 
@@ -528,17 +526,16 @@ def test_guard_requires_applicant_nested_in_combinator() -> None:
 
 
 def test_guard_requires_applicant_combinator_single_child_not_list() -> None:
-    # 'not' with a single non-list child that holds the gate.
+    """Find the gate under ``not`` with a single non-list child."""
     assert guard_requires_applicant({"not": {"actorIsApplicant": True}}) is True
 
 
 def test_guard_requires_applicant_false_cases() -> None:
     assert guard_requires_applicant(None) is False
-    assert guard_requires_applicant({}) is False  # len != 1
-    assert guard_requires_applicant({"a": 1, "b": 2}) is False  # several keys
+    assert guard_requires_applicant({}) is False
+    assert guard_requires_applicant({"a": 1, "b": 2}) is False
     assert guard_requires_applicant("notadict") is False  # type: ignore[arg-type]
-    assert guard_requires_applicant({"roleIs": "x"}) is False  # a leaf without the gate
-    # A combinator without the gate. The walk ignores every non-dict child.
+    assert guard_requires_applicant({"roleIs": "x"}) is False
     assert guard_requires_applicant({"and": [{"roleIs": "x"}, "junk"]}) is False
 
 
@@ -588,7 +585,7 @@ def test_validate_action_notify_recipients_not_a_list() -> None:
 
 
 def test_redos_prone_detects_nested_unbounded() -> None:
-    # The classic catastrophic form: a repeat inside a repeated subpattern.
+    """Detect the classic catastrophic form: a repeat inside a repeated subpattern."""
     assert _redos_prone(r"(a+)+") is True
     assert _redos_prone(r"(a*)*") is True
     assert _redos_prone(r"([ab]+)+") is True
@@ -597,50 +594,42 @@ def test_redos_prone_detects_nested_unbounded() -> None:
 def test_redos_prone_allows_safe_patterns() -> None:
     assert _redos_prone(r"^[A-Z]{2}\d{2}$") is False
     assert _redos_prone(r"abc") is False
-    assert _redos_prone(r"a+") is False  # only one simple quantifier
+    assert _redos_prone(r"a+") is False
     assert _redos_prone(r"[0-9]*") is False
 
 
 def test_redos_prone_branch_inside_repeat() -> None:
-    # The walk visits the BRANCH children. It detects a nested unbounded quantifier
-    # inside a repeated branch.
+    """Detect a nested unbounded quantifier inside a repeated branch."""
     assert _redos_prone(r"(a+|b)+") is True
 
 
 def test_redos_prone_repeat_nested_in_repeat_body() -> None:
-    # `has_unbounded_repeat` must recurse through a MAX_REPEAT while it walks the body.
-    # For a MAX_REPEAT, children() returns av[2].
+    """Recurse through a MAX_REPEAT in the body of a repeat."""
     assert _redos_prone(r"(a+b+)+") is True
 
 
 def test_redos_prone_has_unbounded_recurses_through_bounded_repeat() -> None:
-    # The outer unbounded `+` calls has_unbounded_repeat(body). The body holds a
-    # BOUNDED `{2}` that does not hit maxrepeat. children() walks that MAX_REPEAT and
-    # finds the inner `a+`.
+    """Find the inner ``a+`` through a bounded ``{2}`` in an unbounded repeat."""
     assert _redos_prone(r"((a+){2})+") is True
 
 
 def test_redos_prone_bounded_outer_with_nested_inner() -> None:
-    # The outer quantifier is bounded ({1,2}). `walk(body)` recurses and finds the
-    # inner nested unbounded (a+)+, so the result is True.
+    """Find a nested unbounded repeat inside a bounded outer quantifier."""
     assert _redos_prone(r"((a+)+){1,2}") is True
 
 
 def test_redos_prone_top_level_branch_with_redos_alternative() -> None:
-    # A top-level BRANCH without an enclosing repeat. The elif path of walk visits the
-    # branch children, and one of them is ReDoS prone.
+    """Detect a ReDoS-prone alternative of a top-level branch."""
     assert _redos_prone(r"(a+)+|safe") is True
 
 
 def test_redos_prone_bounded_outer_repeat_is_safe() -> None:
-    # The outer quantifier is bounded ({1,3}), so the has_unbounded_repeat path does
-    # not apply. walk continues into the body and finds no nested unbounded repeat.
+    """Accept a bounded outer quantifier over a single unbounded repeat."""
     assert _redos_prone(r"(a+){1,3}") is False
 
 
 def test_redos_prone_invalid_pattern_returns_false() -> None:
-    # An unparsable pattern makes walk raise. The outer except returns False, so only
-    # the length bound still applies.
+    """Return False for an unparsable pattern, so only the length bound applies."""
     assert _redos_prone(r"(") is False
 
 
@@ -650,7 +639,7 @@ def test_field_validation_pattern_ok() -> None:
 
 
 def test_field_validation_pattern_none() -> None:
-    # An explicit pattern=None still runs the validator, which exits early on None.
+    """Run the validator on an explicit None pattern, which exits early."""
     v = FieldValidation.model_validate({"min": 1, "pattern": None})
     assert v.pattern is None
 

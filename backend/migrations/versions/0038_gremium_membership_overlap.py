@@ -25,9 +25,16 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    # 1) Clean up existing overlaps before the constraint applies. Keep the membership
-    #    with the later start in each pair. The smaller id loses the tie break, so the
-    #    cleanup stays deterministic.
+    """Clean up the overlaps, install btree_gist and add the EXCLUDE constraint.
+
+    The cleanup keeps the membership with the later start in each pair; the smaller id loses
+    the tie, so it stays deterministic. A GIST EXCLUDE over equality columns needs
+    btree_gist; when the deploy role lacks the right, a database admin creates the extension
+    first and this step is a no-op (as for pg_trgm in 0027). On a fresh database 0001
+    already created the constraint, because ``create_all`` emits it from the model; on an
+    existing one 0001 ran before the model change, so this step adds it. ``ADD CONSTRAINT``
+    has no ``IF NOT EXISTS``, hence the check over ``pg_constraint``.
+    """
     op.execute(
         """
         DELETE FROM gremium_membership a
@@ -47,17 +54,8 @@ def upgrade() -> None:
         """
     )
 
-    # 2) A GIST EXCLUDE over equality columns (=) needs btree_gist. If the deploy role
-    #    lacks the rights, a database admin must create the extension first. This step
-    #    is then a no-op (compare 0027 and pg_trgm).
     op.execute("CREATE EXTENSION IF NOT EXISTS btree_gist")
 
-    # 3) The EXCLUDE constraint matches the ExcludeConstraint in the ORM exactly. On a
-    #    fresh database 0001 already created the table WITH this constraint, because
-    #    ``create_all`` emits it from the model. This step is then a no-op. On an
-    #    existing database 0001 ran before the model change and left the table WITHOUT
-    #    the constraint, so this step adds it. ``ADD CONSTRAINT`` has no
-    #    ``IF NOT EXISTS``, hence the existence check over ``pg_constraint``.
     op.execute(
         """
         DO $$
@@ -82,9 +80,12 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """Drop the EXCLUDE constraint.
+
+    btree_gist stays installed, because other objects may use it (as 0027 treats pg_trgm).
+    Deleted overlaps do not come back.
+    """
     op.execute(
         "ALTER TABLE gremium_membership "
         "DROP CONSTRAINT IF EXISTS ex_gremium_membership_no_overlap"
     )
-    # btree_gist stays installed on purpose, because other objects may use it. This
-    # mirrors how 0027 treats pg_trgm. Deleted overlaps are not recoverable.

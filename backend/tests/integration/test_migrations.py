@@ -25,7 +25,7 @@ def _new_type(conn) -> str:
 
 
 def test_upgrade_and_downgrade_clean(alembic_cfg: Config, engine: Engine) -> None:
-    # The fixture already upgraded to head. This test runs the round trip head, base, head.
+    """Run the round trip head, base, head; the fixture already upgraded to head."""
     command.downgrade(alembic_cfg, "base")
     with engine.connect() as conn:
         remaining = conn.execute(
@@ -221,7 +221,6 @@ def test_drop_type_flows_repairs_legacy_duplicates(engine: Engine) -> None:
     spec.loader.exec_module(mod)
 
     with engine.begin() as conn:
-        # Rebuild the legacy schema: drop the new invariants and add the old column back.
         conn.execute(text("DROP INDEX IF EXISTS uq_flow_version_one_active_global"))
         conn.execute(
             text(
@@ -340,6 +339,10 @@ def test_drop_global_meeting_permissions(alembic_cfg: Config, engine: Engine) ->
     The upgrade gives `protocol.finalize` to the forced gremium roles `vorstand` and
     `manager` only, and deletes the three global keys from every role. The downgrade
     restores the seed grants and takes `protocol.finalize` off every gremium role.
+
+    The test stops at 3a0b9672fcba, because b0c8fd389e10 also gives the key to ``schrift``.
+    The downgrade is lossy by design: a custom role does not get its key back. A second
+    upgrade adds the key exactly once.
     """
     command.downgrade(alembic_cfg, "14ed7a68a641")
     with engine.begin() as conn:
@@ -390,7 +393,6 @@ def test_drop_global_meeting_permissions(alembic_cfg: Config, engine: Engine) ->
             ).all()
         ]
 
-    # Stop at 3a0b9672fcba: b0c8fd389e10 also gives the key to `schrift`.
     command.upgrade(alembic_cfg, "3a0b9672fcba")
     with engine.connect() as conn:
         perms = _gremium_perms(conn)
@@ -405,7 +407,6 @@ def test_drop_global_meeting_permissions(alembic_cfg: Config, engine: Engine) ->
     assert dropped == []
     assert kept == ["application.read"]
 
-    # The downgrade restores the seed grants of the seeded roles.
     command.downgrade(alembic_cfg, "14ed7a68a641")
     with engine.connect() as conn:
         perms = _gremium_perms(conn)
@@ -414,10 +415,8 @@ def test_drop_global_meeting_permissions(alembic_cfg: Config, engine: Engine) ->
     assert ("manager", "meeting.manage") in restored
     assert ("admin", "protocol.finalize") in restored
     assert ("protocol", "meeting.manage") in restored
-    # Lossy by design: a custom role does not get its key back.
     assert all(key != "sitzungsdienst" for key, _ in restored)
 
-    # The upgrade runs again cleanly and adds the key exactly once.
     command.upgrade(alembic_cfg, "head")
     with engine.connect() as conn:
         perms = _gremium_perms(conn)
@@ -434,6 +433,12 @@ def test_drop_global_vote_permissions(
     from every global role, and gives `protocol.finalize` to each gremium role with
     `session.manage`. The downgrade restores the seed grants of 0002 and keeps
     `protocol.finalize`.
+
+    The report is read from stderr, because ``env.py`` runs ``fileConfig``, which resets the
+    handlers of the alembic loggers, and the console handler of ``alembic.ini`` writes to
+    stderr. ``head`` also runs the to-do migration, which grants ``todo.write`` to every
+    gremium role, so the comparison leaves the to-do grants out and checks them on their
+    own.
     """
     command.downgrade(alembic_cfg, "3a0b9672fcba")
     with engine.begin() as conn:
@@ -524,8 +529,6 @@ def test_drop_global_vote_permissions(
             ).all()
         ]
 
-    # `env.py` runs `fileConfig`, which resets the handlers of the alembic loggers. The
-    # console handler of `alembic.ini` writes the report to stderr, so read it there.
     capfd.readouterr()
     command.upgrade(alembic_cfg, "head")
     report = capfd.readouterr().err
@@ -537,8 +540,6 @@ def test_drop_global_vote_permissions(
         votes = set(conn.execute(text("SELECT id FROM vote")).scalars().all())
         perms = _gremium_perms(conn)
     assert dropped == []
-    # `head` also runs the to-do migration, which grants `todo.write` to every gremium
-    # role. Compare without the to-do grants and check that grant on its own.
     todo = {"todo.write", "todo.configure"}
     stripped = {key: [p for p in ps if p not in todo] for key, ps in perms.items()}
     assert stripped["sitzungsleitung"] == ["session.manage", "protocol.write", "protocol.finalize"]
@@ -546,14 +547,12 @@ def test_drop_global_vote_permissions(
     assert stripped["vorsitz"] == ["session.manage", "protocol.finalize"]
     assert all("todo.write" in perms[key] for key in ("sitzungsleitung", "schrift", "vorsitz"))
     assert kept == ["application.read"]
-    # Report, delete nothing.
     assert {free_vote, foreign_vote, good_vote} <= votes
     assert str(free_vote) in report
     assert str(foreign_vote) in report
     assert str(good_vote) not in report
     assert "'wahlleitung' loses the permission(s): vote.manage" in report
 
-    # The downgrade restores the seed grants of the seeded roles only.
     command.downgrade(alembic_cfg, "3a0b9672fcba")
     with engine.connect() as conn:
         restored = _dropped(conn)
@@ -562,12 +561,10 @@ def test_drop_global_vote_permissions(
     assert ("manager", "vote.manage") in restored
     assert ("member", "vote.cast") in restored
     assert all(key != "wahlleitung" for key, _ in restored)
-    # The downgrade keeps the `protocol.finalize` grants (see the migration docstring).
     with engine.connect() as conn:
         perms = _gremium_perms(conn)
     assert "protocol.finalize" in perms["sitzungsleitung"]
 
-    # The upgrade runs again cleanly and adds the key exactly once.
     command.upgrade(alembic_cfg, "head")
     with engine.connect() as conn:
         assert _dropped(conn) == []
@@ -585,6 +582,9 @@ def test_drop_vote_notification_kind(
     The upgrade deletes their preference rows and the stored overrides of the role
     mail templates, and logs each deleted template. It keeps every other row. The
     downgrade changes nothing.
+
+    The test cleans up ``principal`` and ``mail_template`` itself, because they are not in
+    the truncate list of the fixture.
     """
     command.downgrade(alembic_cfg, "b0c8fd389e10")
     with engine.begin() as conn:
@@ -624,7 +624,6 @@ def test_drop_vote_notification_kind(
     assert "'role_assigned'" in report
     assert "'role_revoked'" in report
 
-    # The downgrade is a no-op, and a second upgrade finds nothing to delete.
     command.downgrade(alembic_cfg, "b0c8fd389e10")
     with engine.connect() as conn:
         assert conn.execute(
@@ -632,7 +631,6 @@ def test_drop_vote_notification_kind(
             {"p": pid},
         ).scalar_one() == 1
     command.upgrade(alembic_cfg, "head")
-    # `principal` and `mail_template` are not in the truncate list of the fixture.
     with engine.begin() as conn:
         conn.execute(text("DELETE FROM principal WHERE id = :p"), {"p": pid})
         conn.execute(text("DELETE FROM mail_template WHERE key = 'meeting_created'"))
@@ -647,6 +645,9 @@ def test_vote_closed_at_backfill_and_allow_change_strip(
     branch, at or after the open time, and keeps NULL where the audit log has no such
     entry. It removes `allowChange` from every vote config and reports the meeting
     votes with the result `tie`. The downgrade drops the column.
+
+    Of two status changes of the branch, one before the open (an older vote of the same
+    application) and the real one, the backfill takes the first at or after the open time.
     """
     command.downgrade(alembic_cfg, "1a9feecb23a5")
     with engine.begin() as conn:
@@ -726,9 +727,6 @@ def test_vote_closed_at_backfill_and_allow_change_strip(
             result="tie",
         )
         running = _vote("open", '{"options": ["yes", "no"], "majorityRule": "simple"}')
-        # Two status changes of the branch: one BEFORE the open (an older vote of the
-        # same application) and the real one. The backfill takes the first one at or
-        # after the open time.
         for at in ("2026-05-01 09:00:00+00", "2026-06-01 10:07:00+00",
                    "2026-06-01 11:00:00+00"):
             conn.execute(
@@ -896,6 +894,10 @@ def test_guest_application_settings_and_unlimited_links(
     `magic_link.expires_at` nullable and allows NULL only for an edit link. The
     existing links keep their expiry. The downgrade gives a link without an expiry
     seven days, restores NOT NULL and drops the table.
+
+    Another template with the seed text of the magic-link mail stays as it is. The test
+    leaves the schema at head, because the teardown truncates
+    ``guest_application_settings``.
     """
     command.downgrade(alembic_cfg, "eff772f93d8e")
     with engine.begin() as conn:
@@ -928,8 +930,6 @@ def test_guest_application_settings_and_unlimited_links(
             ),
             {"a": app_id},
         )
-        # The seed text of the magic-link mail. Another template with the same text
-        # must stay as it is.
         conn.execute(
             text(
                 "INSERT INTO mail_template (key, body_i18n) VALUES ('magic_link', "
@@ -1012,7 +1012,6 @@ def test_guest_application_settings_and_unlimited_links(
         ).scalar_one()
         assert body == _SEED_MAGIC_LINK_BODY
         conn.execute(text("DELETE FROM mail_template WHERE key = 'mig_probe'"))
-    # Leave the schema at head: the teardown truncates `guest_application_settings`.
     command.upgrade(alembic_cfg, "head")
 
 
@@ -1074,7 +1073,7 @@ def test_attendance_self_status_check_not_valid(
     with engine.begin() as conn:
         check = _self_status_check(conn)
         assert check is not None
-        assert check[1] is False  # NOT VALID
+        assert check[1] is False
         assert "source <> 'self'" in check[0]
         status = conn.execute(
             text("SELECT status FROM meeting_attendance WHERE id = :i"), {"i": legacy}
@@ -1093,7 +1092,6 @@ def test_attendance_self_status_check_not_valid(
             text("UPDATE meeting_attendance SET note = 'x' WHERE id = :i"), {"i": legacy}
         )
     with engine.begin() as conn:
-        # A lead row keeps "absent", and the older row moves to an allowed status.
         conn.execute(
             text(
                 "INSERT INTO meeting_attendance (meeting_id, principal_id, status, source) "
@@ -1209,15 +1207,11 @@ def test_attachment_drafts(alembic_cfg: Config, engine: Engine) -> None:
             "ix_attachment_draft_token_expires_at",
         } <= token_indexes
     for bad in (
-        # Neither an application nor a draft token.
         "INSERT INTO attachment (filename, mime, size) VALUES ('x', 'a/b', 1)",
-        # Both an application and a draft token.
         "INSERT INTO attachment (application_id, filename, mime, size, "
         "draft_token_hash, draft_expires_at) VALUES (:a, 'x', 'a/b', 1, '\\x01', now())",
-        # A draft token without an end.
         "INSERT INTO attachment (filename, mime, size, draft_token_hash) "
         "VALUES ('x', 'a/b', 1, '\\x01')",
-        # A bound row with an end but no token.
         "INSERT INTO attachment (application_id, filename, mime, size, "
         "draft_expires_at) VALUES (:a, 'x', 'a/b', 1, now())",
     ):
@@ -1273,7 +1267,6 @@ def test_protocol_keeper_period_backfill(
             ).scalar_one()
 
         live = meeting("live", started_at="2026-06-20T16:05:00+00:00")
-        # Planned start 18:00 Berlin (16:00 UTC), but closed at 15:30 UTC.
         early = meeting(
             "closed", date="2026-06-20", start_time="18:00", closed_at="2026-06-20T15:30:00+00:00"
         )
@@ -1316,7 +1309,6 @@ def test_protocol_keeper_period_backfill(
     assert {r.principal_id for r in rows.values()} == {keeper}
     assert all(r.from_agenda_item_id is None for r in rows.values())
 
-    # The partial unique indexes allow one running and one planned period per meeting.
     with pytest.raises(IntegrityError), engine.begin() as conn:
         conn.execute(
             text(
@@ -1407,7 +1399,6 @@ def test_substitute_groups(alembic_cfg: Config, engine: Engine) -> None:
         assert conn.execute(
             text("SELECT to_regclass('uq_substitute_group_member_gremium_member')")
         ).scalar() is not None
-        # The pool entry from before the upgrade stays.
         assert conn.execute(
             text("SELECT count(*) FROM delegation_substitute WHERE gremium_id = :g"),
             {"g": gremium},
@@ -1427,7 +1418,6 @@ def test_substitute_groups(alembic_cfg: Config, engine: Engine) -> None:
             {"grp": group, "p": person, "g": gremium},
         )
 
-    # The composite foreign key refuses a gremium copy that differs from the group.
     with pytest.raises(IntegrityError), engine.begin() as conn:
         conn.execute(
             text(
@@ -1436,7 +1426,6 @@ def test_substitute_groups(alembic_cfg: Config, engine: Engine) -> None:
             ),
             {"grp": group, "p": person, "g": other},
         )
-    # The CHECK refuses an unknown kind.
     with pytest.raises(IntegrityError), engine.begin() as conn:
         conn.execute(
             text(
@@ -1444,7 +1433,6 @@ def test_substitute_groups(alembic_cfg: Config, engine: Engine) -> None:
             ),
             {"grp": group},
         )
-    # The group delete cascades to its rows.
     with engine.begin() as conn:
         conn.execute(text("DELETE FROM substitute_group WHERE id = :grp"), {"grp": group})
         assert conn.execute(
@@ -1512,7 +1500,6 @@ def test_drop_substitute_groups(alembic_cfg: Config, engine: Engine) -> None:
     command.upgrade(alembic_cfg, "head")
     with engine.begin() as conn:
         assert tables(conn) == set()
-        # The pool entry stays.
         assert conn.execute(
             text("SELECT count(*) FROM delegation_substitute WHERE gremium_id = :g"),
             {"g": gremium},
@@ -1521,7 +1508,6 @@ def test_drop_substitute_groups(alembic_cfg: Config, engine: Engine) -> None:
     command.downgrade(alembic_cfg, "4c2570138998")
     with engine.begin() as conn:
         assert tables(conn) == {"substitute_group", "substitute_group_member"}
-        # Lossy: the rows do not come back.
         assert conn.execute(text("SELECT count(*) FROM substitute_group")).scalar_one() == 0
         names = set(
             conn.execute(
@@ -1580,7 +1566,6 @@ def test_audit_verification_and_role_key_report(
 
     with engine.begin() as conn:
         assert _has_table(conn, "audit_verification")
-        # The pre-check changes nothing.
         assert conn.execute(
             text("SELECT key FROM role WHERE id = :i"), {"i": role}
         ).scalar_one() == f"Kasse-{suffix}"
@@ -1666,6 +1651,8 @@ def test_todo_link_budget_vote_gremium(alembic_cfg: Config, engine: Engine) -> N
     The upgrade adds ``vote_id``, ``gremium_id``, ``invoice_id`` and ``expense_id`` with
     their indexes and widens ``ck_todo_link_one_target``. The downgrade deletes the links
     of the new kinds, drops the columns and keeps the other links.
+
+    A second run of the upgrade on the new schema changes nothing.
     """
     new = ("vote_id", "gremium_id", "invoice_id", "expense_id")
 
@@ -1699,7 +1686,6 @@ def test_todo_link_budget_vote_gremium(alembic_cfg: Config, engine: Engine) -> N
     with engine.begin() as conn:
         assert not set(new) & columns(conn)
     command.upgrade(alembic_cfg, "head")
-    # Idempotent: a second run of the upgrade on the new schema changes nothing.
     command.downgrade(alembic_cfg, "066ff25554e2")
     command.upgrade(alembic_cfg, "head")
     with engine.begin() as conn:

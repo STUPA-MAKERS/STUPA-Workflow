@@ -53,6 +53,12 @@ def _transfer(client: TestClient, card_id: str, board_id: str, **kw: Any) -> Any
 async def test_a_card_moves_to_another_gremium_board_and_back(
     api: Api, maker: async_sessionmaker[AsyncSession]
 ) -> None:
+    """Move a card to another gremium board and back.
+
+    Both boards change: the card leaves the one and is on the other. Back in the first
+    column of the first board, the card is open again and keeps the label by name. Only the
+    first entry into done writes to the ticket.
+    """
     gid, gboard = await add_gremium(maker, "StuPa")
     aid, aboard = await add_gremium(maker, "AStA")
     me, me_id = await add_person(maker, "Mia")
@@ -128,7 +134,6 @@ async def test_a_card_moves_to_another_gremium_board_and_back(
         assert [
             e["payload"]["cardTitle"] for e in ticket["events"] if e["kind"] == "todo_done"
         ] == ["Fix"]
-        # Both boards changed: the card left the one and is on the other.
         source = client.get(f"/api/todos/boards/{gid_s}", headers={"If-None-Match": source_etag})
         assert source.status_code == 200
         assert card["id"] not in [c["id"] for c in source.json()["cards"]]
@@ -136,7 +141,6 @@ async def test_a_card_moves_to_another_gremium_board_and_back(
         assert read.status_code == 200
         assert card["id"] in [c["id"] for c in read.json()["cards"]]
 
-        # Back to the first column of the first board: open again, the label by name.
         back = _ok(_transfer(client, card["id"], gid_s))
         first = _ok(client.get(f"/api/todos/boards/{gid_s}"))["columns"][0]
         assert (back["boardId"], back["columnId"]) == (gid_s, first["id"])
@@ -146,7 +150,6 @@ async def test_a_card_moves_to_another_gremium_board_and_back(
         event = back["events"][-1]
         assert event["payload"]["droppedLabels"] == []
         assert event["payload"]["droppedAssignees"] == 0
-        # Only the first entry into done wrote to the ticket.
         ticket = _ok(client.get(f"/api/tickets/{tid}"))
         assert len([e for e in ticket["events"] if e["kind"] == "todo_done"]) == 1
 
@@ -181,6 +184,7 @@ async def test_a_done_card_stays_done_in_the_target_done_column(
 async def test_a_shared_card_never_moves_into_a_personal_board(
     api: Api, maker: async_sessionmaker[AsyncSession]
 ) -> None:
+    """Never move a shared card into a personal board; shared to shared stays allowed."""
     gid, gboard = await add_gremium(maker)
     team = await add_team_board(maker, "ticket.manage")
     me, me_id = await add_person(maker, "Mia")
@@ -192,13 +196,16 @@ async def test_a_shared_card_never_moves_into_a_personal_board(
             card = _ok(client.post("/api/todos/cards", json={"boardId": board, "title": "A"}), 201)
             _problem(_transfer(client, card["id"], personal), 403, "transfer_to_personal")
             assert _ok(client.get(f"/api/todos/cards/{card['id']}"))["boardId"] == board
-        # Shared to shared stays allowed.
         _ok(_transfer(client, card["id"], str(gboard)))
 
 
 async def test_a_card_of_my_personal_board_stays_mine(
     api: Api, maker: async_sessionmaker[AsyncSession]
 ) -> None:
+    """Keep a card of my personal board mine.
+
+    When I am not a member of the target, the card moves without an assignee.
+    """
     gid, gboard = await add_gremium(maker)
     me, me_id = await add_person(maker, "Mia")
     await add_member(maker, gid, me_id, "todo.write")
@@ -215,7 +222,6 @@ async def test_a_card_of_my_personal_board_stays_mine(
         assert api.mails == []
         mine = _ok(client.get("/api/todos/mine/boards"))
         assert [c["id"] for b in mine for c in b["cards"]] == [card["id"]]
-        # Not a member of the target: the card moves without an assignee.
         api.login(Principal(sub=admin.sub, roles=["admin"]))
         own = _ok(client.get("/api/todos/boards"))[0]
         assert own["kind"] == "personal"
@@ -224,6 +230,10 @@ async def test_a_card_of_my_personal_board_stays_mine(
 
 
 async def test_the_transfer_errors(api: Api, maker: async_sessionmaker[AsyncSession]) -> None:
+    """Refuse the invalid transfers.
+
+    Someone without the board cannot move a card onto it.
+    """
     gid, gboard = await add_gremium(maker)
     me, me_id = await add_person(maker, "Mia")
     other, _ = await add_person(maker, "Otto")
@@ -248,7 +258,6 @@ async def test_the_transfer_errors(api: Api, maker: async_sessionmaker[AsyncSess
         )
         _ok(client.delete(f"/api/todos/cards/{card['id']}"), 204)
         _problem(_transfer(client, card["id"], str(gboard)), 409, "card_archived")
-        # Someone without the board cannot move a card onto it.
         api.login(other)
         theirs = _ok(client.post("/api/todos/cards", json={"boardId": foreign, "title": "B"}), 201)
         _problem(_transfer(client, theirs["id"], str(gboard)), 404, "not_found")

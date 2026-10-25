@@ -27,13 +27,23 @@ logger = logging.getLogger("app.ratelimit")
 
 @dataclass(frozen=True)
 class RateLimitResult:
+    """Outcome of one hit.
+
+    Attributes:
+        retry_after: Seconds until the next allowed attempt (0 when allowed).
+    """
+
     allowed: bool
-    retry_after: int  # Seconds until the next allowed attempt (0 when allowed).
+    retry_after: int
 
 
 @runtime_checkable
 class RateLimiter(Protocol):
-    async def hit(self, key: str, *, limit: int, window_seconds: int) -> RateLimitResult: ...
+    """Sliding-window rate limiter."""
+
+    async def hit(self, key: str, *, limit: int, window_seconds: int) -> RateLimitResult:
+        """Count one attempt for ``key`` and report whether it stays within ``limit``."""
+        ...
 
 
 def _wall_clock() -> float:
@@ -46,6 +56,7 @@ class NullRateLimiter:
     """Disabled rate limiter that allows every request."""
 
     async def hit(self, key: str, *, limit: int, window_seconds: int) -> RateLimitResult:
+        """Allow the attempt."""
         return RateLimitResult(allowed=True, retry_after=0)
 
 
@@ -56,10 +67,12 @@ class InMemoryRateLimiter:
     """
 
     def __init__(self, *, now: Callable[[], float] | None = None) -> None:
+        """Start empty windows; ``now`` replaces the wall clock in tests."""
         self._hits: defaultdict[str, deque[float]] = defaultdict(deque)
         self._now = now or _wall_clock
 
     async def hit(self, key: str, *, limit: int, window_seconds: int) -> RateLimitResult:
+        """Count one attempt for ``key`` in the window of the process."""
         now = self._now()
         window_start = now - window_seconds
         bucket = self._hits[key]
@@ -87,16 +100,21 @@ class RedisRateLimiter:
         prefix: str = "rl:",
         now: Callable[[], float] | None = None,
     ) -> None:
+        """Wrap a Redis client."""
         self._client = client
         self._prefix = prefix
         self._now = now or _wall_clock
 
     async def hit(self, key: str, *, limit: int, window_seconds: int) -> RateLimitResult:
+        """Count one attempt for ``key`` in the shared window.
+
+        The member holds a uuid, so workers that share the ZSET key do not collide. A
+        blocked attempt removes its own entry, so it does not count. A Redis error
+        allows the request (fail open: availability over throttling).
+        """
         now = self._now()
         window_start = now - window_seconds
         redis_key = f"{self._prefix}{key}"
-        # A unique member from a uuid prevents a collision between workers that share
-        # the same ZSET key.
         member = f"{now}:{uuid4().hex}"
         try:
             pipe = self._client.pipeline()  # type: ignore[attr-defined]
@@ -107,7 +125,6 @@ class RedisRateLimiter:
             results = await pipe.execute()
             count = int(results[2])
             if count > limit:
-                # Remove our own entry, so a blocked attempt does not count.
                 await self._client.zrem(redis_key, member)  # type: ignore[attr-defined]
                 oldest = await self._client.zrange(  # type: ignore[attr-defined]
                     redis_key, 0, 0, withscores=True
@@ -117,6 +134,6 @@ class RedisRateLimiter:
                 )
                 return RateLimitResult(allowed=False, retry_after=max(1, retry_after))
             return RateLimitResult(allowed=True, retry_after=0)
-        except Exception as exc:  # fail-open: availability over throttling
+        except Exception as exc:
             logger.warning("rate-limit backend unavailable, allowing request: %s", exc)
             return RateLimitResult(allowed=True, retry_after=0)

@@ -35,25 +35,19 @@ ROLE = {"roleIs": "admin"}
 @pytest.mark.parametrize(
     ("guard", "expected"),
     [
-        # Leaves alone: both polarities fold to always-true (NULL), and either one
-        # makes the transition manual.
         ({"deadlinePassed": True}, None),
         ({"deadlinePassed": False}, None),
         ({"not": {"deadlinePassed": True}}, None),
         ({"not": {"deadlinePassed": False}}, None),
         ({"not": {"not": {"deadlinePassed": True}}}, None),
-        # `and`: the leaf drops out, a single rest is unwrapped.
         ({"and": [{"deadlinePassed": True}, FIELD]}, FIELD),
         ({"and": [{"deadlinePassed": False}, FIELD, ROLE]}, {"and": [FIELD, ROLE]}),
-        # `or`: a satisfied leaf makes the whole `or` true.
         ({"or": [{"deadlinePassed": True}, FIELD]}, None),
         ({"or": [{"deadlinePassed": False}, FIELD]}, None),
-        # Under `not`, the polarity flips and `and`/`or` fold accordingly.
         ({"not": {"and": [{"deadlinePassed": True}, FIELD]}}, None),
         ({"not": {"and": [{"deadlinePassed": False}, FIELD]}}, None),
         ({"not": {"or": [{"deadlinePassed": False}, FIELD]}}, {"not": FIELD}),
         ({"not": {"or": [{"deadlinePassed": True}, FIELD]}}, {"not": FIELD}),
-        # Nested mix.
         (
             {"and": [ROLE, {"or": [FIELD, {"not": {"deadlinePassed": True}}]}]},
             ROLE,
@@ -62,11 +56,17 @@ ROLE = {"roleIs": "admin"}
             {"and": [ROLE, {"not": {"or": [FIELD, {"deadlinePassed": True}]}}]},
             {"and": [ROLE, {"not": FIELD}]},
         ),
-        # A single non-list child is accepted like the evaluator does.
         ({"and": {"deadlinePassed": True}}, None),
     ],
 )
 def test_rewrite_guard(guard: dict[str, Any], expected: Any) -> None:
+    """Fold the dropped leaf out of a guard.
+
+    A leaf alone folds to always-true (None) in both polarities, and either makes the
+    transition manual. Under ``and`` the leaf drops out and a single rest is unwrapped;
+    under ``or`` a satisfied leaf makes the whole ``or`` true. Under ``not`` the
+    polarity flips. A single non-list child is accepted, as the evaluator does.
+    """
     new_guard, touched = MIG.rewrite_guard(guard)
     assert new_guard == expected
     assert touched is True
@@ -82,12 +82,15 @@ def test_guard_without_operator_is_unchanged(guard: Any) -> None:
 
 
 def test_rewrite_transition_makes_every_touched_transition_manual() -> None:
+    """Make every touched transition manual.
+
+    A "not passed" guard on an automatic transition must not start to fire.
+    """
     passed = {"from": "a", "to": "b", "automatic": True, "guard": {"deadlinePassed": True}}
     before = {"from": "a", "to": "c", "automatic": True, "guard": {"deadlinePassed": False}}
     plain = {"from": "a", "to": "d", "automatic": True, "guard": FIELD}
 
     assert MIG.rewrite_transition(passed) == {**passed, "guard": None, "automatic": False}
-    # A "not passed" guard on an automatic transition must not start to fire.
     assert MIG.rewrite_transition(before) == {**before, "guard": None, "automatic": False}
     assert MIG.rewrite_transition(plain) == plain
 
@@ -107,8 +110,11 @@ class _Conn:
 
 
 def test_rewrite_transitions_skips_a_guard_that_only_names_the_operator() -> None:
-    # The SELECT matches by text, so a field called `deadlinePassed` comes back too.
-    # Its transition keeps its guard and its `automatic` flag.
+    """Skip a guard that only names the operator as a field.
+
+    The SELECT matches by text, so a field called ``deadlinePassed`` comes back too; its
+    transition keeps its guard and its ``automatic`` flag.
+    """
     conn = _Conn([("t1", {"hasField": "deadlinePassed"}), ("t2", {"deadlinePassed": True})])
     MIG._rewrite_transitions(conn)
     assert conn.updates == [{"g": None, "id": "t2"}]

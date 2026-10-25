@@ -149,14 +149,15 @@ def test_every_kind_has_a_url_that_names_the_record() -> None:
     `/admin/users`: picking one of five people out of the palette opened the whole user
     list, and the reader searched a second time. One table rather than a URL built at
     each source, so a kind added later cannot quietly repeat that.
+
+    Filled in, the URL has to differ from the plain page, because a template that ignores
+    its id would still pass the ``{id}`` check if the id sat in a comment.
     """
     kinds = set(get_args(SearchKind))
     assert set(HIT_URL) == kinds
 
     for kind, template in HIT_URL.items():
         assert "{id}" in template, kind
-        # Filled in, the URL has to differ from the plain page: a template that ignores
-        # its id would still pass the check above if the id sat in a comment.
         assert template.format(id="X") != template.format(id="Y"), kind
 
 

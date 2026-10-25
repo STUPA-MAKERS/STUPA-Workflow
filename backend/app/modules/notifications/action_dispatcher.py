@@ -133,6 +133,7 @@ class NotificationActionDispatcher:
     settings: Settings
 
     async def dispatch(self, actions: Sequence[DispatchedAction]) -> None:
+        """Run the notify and task-notify actions; log every other type."""
         for action in actions:
             if action.type == "notify":
                 await self._dispatch_notify(action)
@@ -146,6 +147,17 @@ class NotificationActionDispatcher:
                 )
 
     async def _dispatch_notify(self, action: DispatchedAction) -> None:
+        """Send the mails of one ``notify`` action with the application context.
+
+        An action without a language that goes to the applicant alone uses the language
+        of the application. This comes before the status label, because a body in one
+        language with a label in another is worse than a consistent mail. A list with a
+        team member keeps the default language, because one message serves them all. The
+        context always sets ``status``, because the default and status templates use it
+        and StrictUndefined fails the render without it. It also carries the approved
+        amount and the conditions of the decision. A guest applicant (``created_by`` is
+        None) gets the link to the public applicant page.
+        """
         async with self.sessionmaker() as session:
             app_type_id, current_state_id, app_data, confirmed, created_by = (
                 await session.execute(
@@ -170,20 +182,12 @@ class NotificationActionDispatcher:
             }
             raw_lang = action.params.get("lang")
             lang = str(raw_lang) if raw_lang else None
-            # The action names no language and the mail goes to the applicant
-            # alone: the applicant reads it in the language of their own
-            # application. This must come before the status label below, because
-            # a body in one language with a label in another is worse than a
-            # consistent mail. A recipient list with a team member in it keeps
-            # the default language, because one message serves them all.
             if lang is None and _applicant_only(action.params.get("recipients")):
                 lang = await resolve_application_lang(
                     session,
                     application_id=action.application_id,
                     settings=self.settings,
                 )
-            # Default and status templates reference `{{ status }}`. Without a
-            # value StrictUndefined makes the render fail.
             if current_state_id is not None:
                 label_i18n = await session.scalar(
                     select(State.label_i18n).where(State.id == current_state_id)
@@ -193,7 +197,6 @@ class NotificationActionDispatcher:
                         label_i18n.get(lang or self.settings.mail_default_lang)
                         or next(iter(label_i18n.values()))
                     )
-            # The approved amount and the conditions of the decision.
             context.update(
                 await _decision_context(
                     session, action, lang or self.settings.mail_default_lang
@@ -212,19 +215,20 @@ class NotificationActionDispatcher:
                 context=context,
                 lang=lang,
                 idempotency_base=action.idempotency_key,
-                # A guest applicant has no account (`created_by` is None) and reads
-                # the application on the public applicant page.
                 applicant_link=application_link(
                     self.settings, action.application_id, guest=created_by is None
                 ),
                 team_link=application_link(self.settings, action.application_id),
             )
 
-
     async def _dispatch_task(self, action: DispatchedAction) -> None:
         """Send a task mail because the application reached an actionable state.
 
         The dispatcher resolves the recipients at send time (task semantics).
+
+        The mail goes out only when the new state is actionable (a vote state, or a
+        manual transition with requiresAction), because "you can act" is wrong for a
+        pass-through or an end state.
         """
         from app.modules.notifications.recipients import (
             actionable_principal_emails,
@@ -252,9 +256,6 @@ class NotificationActionDispatcher:
                 if state_id is not None
                 else None
             )
-            # Send the task mail only when the new state is actionable: a vote
-            # state, or a manual transition with requiresAction. For a
-            # pass-through state or an end state "you can act" would be wrong.
             if not await state_actionable(session, state):
                 return
             recipients = await actionable_principal_emails(

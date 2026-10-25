@@ -53,14 +53,14 @@ def _delivery(
 
 
 _IP = "93.184.216.34"
-_IP_URL = f"https://{_IP}/h"  # target after pinning, the Host header stays hook.test
+#: Target after pinning; the Host header stays hook.test.
+_IP_URL = f"https://{_IP}/h"
 
 
 def _public_resolver(_host: str) -> list[str]:
     return [_IP]
 
 
-# Tests for dispatch_to_webhook.
 async def test_dispatch_to_webhook_dedup_skips_existing() -> None:
     hook = _hook()
     base = "app:evt:0:webhook"
@@ -74,6 +74,7 @@ async def test_dispatch_to_webhook_dedup_skips_existing() -> None:
 
 
 async def test_dispatch_to_webhook_race_integrity_error_is_deduped() -> None:
+    """Dedupe a racing insert; the savepoint rollback discards the delivery."""
     from sqlalchemy.exc import IntegrityError
 
     hook = _hook()
@@ -87,12 +88,11 @@ async def test_dispatch_to_webhook_race_integrity_error_is_deduped() -> None:
     )
     assert n == 0
     assert queue.enqueued == []
-    assert session.added == []  # the savepoint rollback discarded the delivery
+    assert session.added == []
 
 
 async def test_dispatch_to_webhook_without_queue_returns_one() -> None:
-    # The insert succeeds but no queue exists. The delivery stays pending, and the
-    # call returns 1 without an enqueue.
+    """Keep the delivery pending and return 1 when no queue exists."""
     hook = _hook()
     session = FakeSession()
     session.store[hook.id] = hook
@@ -134,6 +134,7 @@ async def test_deliver_ssrf_block_is_permanent_dead() -> None:
 
 @respx.mock
 async def test_deliver_ok_pins_ip_and_signs() -> None:
+    """Connect to the validated IP, keep the original host and sign the body."""
     hook = _hook(url="https://hook.test/h")
     route = respx.post(_IP_URL).mock(return_value=httpx.Response(204))
     session = FakeSession()
@@ -147,7 +148,6 @@ async def test_deliver_ok_pins_ip_and_signs() -> None:
     assert delivery.status == "ok"
     assert delivery.response_code == 204
     sent = route.calls.last.request
-    # Pinning: the client connects to the validated IP and keeps the original host.
     assert sent.url.host == _IP
     assert sent.headers["Host"] == "hook.test"
     assert sent.headers["X-Signature"].startswith("sha256=")
@@ -156,9 +156,11 @@ async def test_deliver_ok_pins_ip_and_signs() -> None:
 
 @respx.mock
 async def test_deliver_pins_validated_ip_no_rebind() -> None:
-    # DNS rebinding: the first resolution gives a public IP, the second an internal one.
-    # The service pins the validated IP and never resolves again, so the client never
-    # reaches the internal address.
+    """Pin the validated IP against DNS rebinding.
+
+    The first resolution gives a public IP, the second an internal one. The service resolves
+    once and never reaches the internal address.
+    """
     calls: list[str] = []
 
     def _rebinding(host: str) -> list[str]:
@@ -167,7 +169,6 @@ async def test_deliver_pins_validated_ip_no_rebind() -> None:
 
     hook = _hook(url="https://hook.test/h")
     route = respx.post(_IP_URL).mock(return_value=httpx.Response(200))
-    # The client must NEVER request the internal IP.
     internal = respx.post("https://10.0.0.5/h").mock(return_value=httpx.Response(200))
     session = FakeSession()
     delivery = _delivery(hook.id)
@@ -177,7 +178,7 @@ async def test_deliver_pins_validated_ip_no_rebind() -> None:
             delivery.id, http_client=client, resolver=_rebinding
         )
     assert outcome.kind == "ok"
-    assert calls == ["hook.test"]  # resolved exactly once, no re-resolve
+    assert calls == ["hook.test"]
     assert route.called
     assert not internal.called
 
@@ -211,7 +212,7 @@ async def test_deliver_5xx_retries_with_backoff() -> None:
             delivery.id, http_client=client, resolver=_public_resolver
         )
     assert outcome.kind == "retry"
-    assert outcome.defer == SETTINGS.webhook_retry_backoff_seconds  # 30 * 2**0
+    assert outcome.defer == SETTINGS.webhook_retry_backoff_seconds
     assert delivery.status == "failed"
     assert delivery.attempts == 1
     assert delivery.next_at is not None
@@ -235,9 +236,10 @@ async def test_deliver_dead_after_max_tries() -> None:
 
 @respx.mock
 async def test_deliver_caps_oversized_response_body() -> None:
-    # A malicious receiver answers 2xx with a huge body of more than 64 KiB. The service
-    # streams the body and discards it after the limit. The status code still decides
-    # the outcome. This guards against an out-of-memory crash.
+    """Discard a huge 2xx body after the cap; the status code still decides.
+
+    This guards the worker against an out-of-memory crash.
+    """
     from app.modules.webhooks.service import _MAX_RESPONSE_BYTES
 
     big_body = b"x" * (_MAX_RESPONSE_BYTES * 4)
@@ -257,8 +259,7 @@ async def test_deliver_caps_oversized_response_body() -> None:
 
 @respx.mock
 async def test_deliver_small_response_body_read_fully() -> None:
-    # A small body below the limit ends the read loop without a break. The status
-    # code stays.
+    """Read a small body to its end without a break; the status code stays."""
     hook = _hook(url="https://hook.test/h")
     respx.post(_IP_URL).mock(return_value=httpx.Response(200, content=b"ok"))
     session = FakeSession()
@@ -304,10 +305,12 @@ class _DripStream(httpx.AsyncByteStream):
 
 
 async def test_deliver_slow_drip_response_hits_total_deadline() -> None:
-    # A slow-drip receiver answers 2xx and then drips the body forever. Without a total
-    # deadline the shared worker slot would hang. The service caps the total time with
-    # a call to asyncio.timeout(webhook_timeout_seconds). The TimeoutException counts
-    # as a transport error, so the delivery retries.
+    """Retry a slow-drip receiver after the total deadline.
+
+    Without a total deadline the shared worker slot would hang.
+    ``asyncio.timeout(webhook_timeout_seconds)`` caps the time, and the TimeoutException
+    counts as a transient transport error.
+    """
     settings = load_settings(webhook_timeout_seconds=0.05)
 
     def _handler(_request: httpx.Request) -> httpx.Response:
@@ -324,7 +327,5 @@ async def test_deliver_slow_drip_response_hits_total_deadline() -> None:
             svc.deliver(delivery.id, http_client=client, resolver=_public_resolver),
             timeout=5.0,
         )
-    # The total deadline fired, so the service retries the transient transport error
-    # instead of hanging.
     assert outcome.kind == "retry"
     assert delivery.response_code is None

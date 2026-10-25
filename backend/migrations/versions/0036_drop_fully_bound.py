@@ -19,10 +19,12 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     op.execute("ALTER TABLE budget DROP COLUMN IF EXISTS fully_bound")
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     op.execute(
         "ALTER TABLE budget ADD COLUMN IF NOT EXISTS "
         "fully_bound boolean NOT NULL DEFAULT false"

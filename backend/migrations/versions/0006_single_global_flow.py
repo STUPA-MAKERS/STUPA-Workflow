@@ -101,9 +101,10 @@ END $$;
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     op.execute(_FORCE)
 
 
 def downgrade() -> None:
-    # Not reversible, because the deleted old versions are gone. This no-op is on purpose.
+    """Do nothing: the deleted old versions are gone, so the revision is not reversible."""
     pass

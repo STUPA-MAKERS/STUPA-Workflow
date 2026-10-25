@@ -125,10 +125,13 @@ def test_payload_cap_413() -> None:
 
 
 def test_rate_limit_ip_blocks_with_retry_after() -> None:
+    """Block over the IP limit with Retry-After.
+
+    Each request uses another mail, so only the IP limit applies.
+    """
     settings = _settings(rl_magic_link_ip_per_hour=5, rl_magic_link_mail_per_hour=99)
     limiter = InMemoryRateLimiter(now=lambda: 0.0)
     client = TestClient(_app(settings=settings, limiter=limiter))
-    # Every request uses a different mail, so only the IP limit of 5 applies.
     for i in range(5):
         assert client.post("/ml", json={"email": f"u{i}@x.de"}).status_code == 200
     blocked = client.post("/ml", json={"email": "u9@x.de"})
@@ -148,7 +151,7 @@ def test_rate_limit_mail_blocks() -> None:
 
 
 def test_canonical_mail_key_folds_variants() -> None:
-    # Plus tags, letter case and whitespace fold to the same key.
+    """Fold plus tags, letter case and whitespace to the same key."""
     base = canonical_mail_key("victim@gmail.com")
     assert canonical_mail_key("victim+1@gmail.com") == base
     assert canonical_mail_key("victim+anything.else@gmail.com") == base
@@ -170,10 +173,10 @@ def test_rate_limit_mail_blocks_across_plus_tag_variants() -> None:
 
 
 def test_rate_limit_skips_mail_when_absent() -> None:
+    """Skip the mail limit for a missing or invalid mail field, so no 429 follows."""
     settings = _settings(rl_magic_link_ip_per_hour=99, rl_magic_link_mail_per_hour=1)
     limiter = InMemoryRateLimiter(now=lambda: 0.0)
     client = TestClient(_app(settings=settings, limiter=limiter))
-    # A missing or invalid mail field skips the mail limit, so no 429 follows.
     assert client.post("/ml", json={"email": 123}).status_code == 200
     assert client.post("/ml", json={"nope": "x"}).status_code == 200
 
@@ -197,7 +200,7 @@ async def test_rate_limit_bypassed_for_oauth_principal() -> None:
 
     from app.modules.auth.principal import Principal
 
-    settings = _settings(rl_attachments_per_hour=0)  # blocks every throttled caller
+    settings = _settings(rl_attachments_per_hour=0)
     limiter = InMemoryRateLimiter(now=lambda: 0.0)
     req = SimpleNamespace(client=SimpleNamespace(host="1.2.3.4"), headers={})
     mcp = Principal(sub="u-mcp", scope_permissions=frozenset({"application.manage"}))
@@ -237,8 +240,7 @@ def test_altcha_invalid_400() -> None:
 
 
 def test_altcha_non_json_body_treated_as_missing() -> None:
-    # A broken non-JSON body hides the field. The dependency treats it as missing and
-    # answers 400, not 500.
+    """Treat the field of a broken non-JSON body as missing and answer 400, not 500."""
     client = TestClient(_app(settings=_settings(), verifier=_verifier()))
     resp = client.post("/altcha", content=b"not json", headers={"content-type": "application/json"})
     assert resp.status_code == 400
@@ -272,9 +274,8 @@ def test_challenge_returns_solvable_challenge() -> None:
     verify_solution(solve_challenge(challenge), ALTCHA_SECRET, now=0)
 
 
-# The real routers enforce ALTCHA before they touch the database or start
-# a background task.
 def test_magic_link_router_rejects_missing_altcha() -> None:
+    """Enforce ALTCHA in the real router before it touches the database or starts a task."""
     settings = _settings(altcha_hmac_secret=ALTCHA_SECRET)
     app = create_app(settings)
     from app.settings import get_settings
@@ -305,18 +306,15 @@ def test_applications_router_rejects_missing_altcha() -> None:
     assert resp.json()["code"] == "altcha_failed"
 
 
-# The format check of the altcha field runs BEFORE the logic and stays active even when
-# the verification switch is off. Contract `negative_data_rejection` requires a 4xx for a
-# malformed payload.
-#
-# Exact CI reproduction: this control-character string negated the `null` variant of the
-# `anyOf[string,null]` schema but still counted as a string, so the endpoint answered 202.
+#: A malformed ALTCHA field. The format check runs BEFORE the logic and stays active when
+#: the verification is off, because the contract check ``negative_data_rejection``
+#: requires a 4xx. This control-character string negates the ``null`` variant of the
+#: ``anyOf[string,null]`` schema but still counts as a string.
 _MALFORMED_ALTCHA = "ZÈ♯æL¾&"
 
 
 def test_magic_link_malformed_altcha_422_even_when_disabled() -> None:
-    # Without an ALTCHA secret the verification is off, which matches CI. A structurally
-    # invalid payload must still get a 422 in problem+json, not a 202.
+    """Answer 422 for a malformed payload without an ALTCHA secret, which matches CI."""
     app = create_app(_settings())
     resp = TestClient(app).post(
         "/api/auth/magic-link", json={"email": "a@b.de", "altcha": _MALFORMED_ALTCHA}

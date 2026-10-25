@@ -121,6 +121,9 @@ async def notify_erasure_rejected(
     """Notify the data subject that the request was rejected, with the reason.
 
     The function sends nothing when the email is unknown.
+
+    The rejected request leaves the application as it is, so the mail links to it; a guest
+    (no account) gets the public applicant page.
     """
     if not email:
         return
@@ -129,8 +132,6 @@ async def notify_erasure_rejected(
 
     sessionmaker = get_sessionmaker()
     async with sessionmaker() as session:
-        # The rejected request leaves the application as it is, so the data subject
-        # can still open it. A guest (no account) opens the public applicant page.
         row = (
             await session.execute(
                 select(ErasureRequest.application_id, Application.created_by)

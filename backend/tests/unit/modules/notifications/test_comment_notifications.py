@@ -42,7 +42,10 @@ class _FakeService:
 
 @pytest.fixture(autouse=True)
 def _patch_service(monkeypatch: pytest.MonkeyPatch) -> None:
-    # Reset the class attribute, so a test never reads the service of the test before.
+    """Patch the notification service of the module with a fake.
+
+    The class attribute is reset, so a test never reads the service of the test before.
+    """
     _FakeService.last = None
     monkeypatch.setattr(mod, "NotificationService", _FakeService)
 
@@ -58,7 +61,7 @@ def _app_row(
 
 
 async def test_principal_public_comment_mails_applicant() -> None:
-    # scalars: one preference filter query with no opt-outs.
+    """Mail the applicant, who opens the application at the comment."""
     session = cast(AsyncSession, FakeSession(executes=[_app_row()], scalars=[[]]))
     app_id = uuid.uuid4()
     comment_id = uuid.uuid4()
@@ -80,7 +83,6 @@ async def test_principal_public_comment_mails_applicant() -> None:
     assert "Beamer" in msg.subject
     assert "Bitte Angebot nachreichen." in msg.text
     assert msg.html == "<html>comment</html>"
-    # An applicant with an account opens the application at the comment.
     base = SETTINGS.public_base_url.rstrip("/")
     assert (
         f"Antrag öffnen: {base}/applications/{app_id}#comment-{comment_id}" in msg.text
@@ -109,14 +111,15 @@ async def test_principal_comment_links_a_guest_to_the_applicant_page() -> None:
     base = SETTINGS.public_base_url.rstrip("/")
     text = svc.enqueued[0].text
     assert f"Antrag öffnen: {base}/antrag/{app_id}" in text
-    # The guest page takes no comment fragment.
     assert "#comment" not in text
 
 
 async def test_principal_public_comment_uses_the_application_language() -> None:
-    """The applicant reads the comment mail in the language of their application."""
-    # executes: the application row, then the (lang, gremium_id) row of that
-    # application. scalars: the preference filter with no opt-outs.
+    """The applicant reads the comment mail in the language of their application.
+
+    The fakes feed the application row, then its (lang, gremium_id) row, and the preference
+    filter without opt-outs.
+    """
     session = cast(
         AsyncSession,
         FakeSession(executes=[_app_row(), [("en", None)]], scalars=[[]]),
@@ -140,6 +143,7 @@ async def test_principal_public_comment_uses_the_application_language() -> None:
 
 
 async def test_internal_comment_sends_nothing() -> None:
+    """Send nothing for an internal comment; the check comes first, so no service is built."""
     session = cast(AsyncSession, FakeSession(executes=[_app_row()]))
     sent = await send_comment_notifications(
         session,
@@ -152,20 +156,22 @@ async def test_internal_comment_sends_nothing() -> None:
         body="intern",
     )
     assert sent == 0
-    # The internal check comes first, so the function builds no service at all.
     assert _FakeService.last is None
 
 
 async def test_applicant_comment_mails_actionable_team(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Mail the team that can act.
+
+    For a guest application, the team opens the application at the comment.
+    """
     async def fake_actionable(
         session: Any, *, application_id: Any, state: Any
     ) -> list[str]:
         return ["team@x.de", "vorstand@x.de"]
 
     monkeypatch.setattr(mod, "actionable_principal_emails", fake_actionable)
-    # A guest application: the team still opens the application, at the comment.
     session = cast(
         AsyncSession,
         FakeSession(executes=[_app_row(created_by=None)], scalars=[[]]),
@@ -196,7 +202,7 @@ async def test_applicant_comment_mails_actionable_team(
 
 
 async def test_preference_optout_blocks_comment_mail() -> None:
-    # The preference filter reports the applicant address as opted out.
+    """Send nothing when the preference filter reports the applicant as opted out."""
     session = cast(AsyncSession, FakeSession(executes=[_app_row()], scalars=[["applicant@x.de"]]))
     sent = await send_comment_notifications(
         session,
@@ -227,11 +233,13 @@ def _capture_context(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
 async def test_principal_comment_mail_names_the_gremium_not_the_member(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The applicant mail shows the Gremium, never the member name."""
+    """The applicant mail shows the Gremium, never the member name.
+
+    The fakes feed the application row, its (lang, gremium_id) row, the Gremium name and the
+    preference filter.
+    """
     seen = _capture_context(monkeypatch)
     gremium_id = uuid.uuid4()
-    # executes: the application row, then the (lang, gremium_id) row for the
-    # language. scalar: the Gremium name. scalars: the preference filter.
     session = cast(
         AsyncSession,
         FakeSession(
@@ -284,7 +292,6 @@ async def test_principal_comment_mail_without_gremium_uses_the_committee_label()
     msg = svc.enqueued[0]
     assert "from Committee:" in msg.text
     assert "Max Mitglied" not in msg.text
-
 
 
 async def test_applicant_comment_mail_keeps_the_display_name(

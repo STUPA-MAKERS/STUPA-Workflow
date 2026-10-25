@@ -1,4 +1,8 @@
-"""Recipient resolver tests. `FakeSession` answers every database query."""
+"""Recipient resolver tests. `FakeSession` answers every database query.
+
+The admin bypass of the recipient lookup is one central query with one admin key, so no
+duplicate ``Role.key == "admin"`` literal is left.
+"""
 
 from __future__ import annotations
 
@@ -84,13 +88,8 @@ async def test_resolve_dedup_across_specs() -> None:
     assert out == ["a@x.de", "b@y.de"]
 
 
-# The admin bypass of the recipient lookup is ONE central query with ONE admin
-# key. No duplicate `Role.key == "admin"` literal is left.
-
-
 def test_admin_role_key_matches_principal_has_bypass() -> None:
-    # `Principal.has` bypasses through `ADMIN_ROLE_KEY in roles`. The set query MUST use
-    # the same key, otherwise the notification diverges.
+    """Use the key of ``Principal.has``, or the notification diverges from the bypass."""
     admin = Principal(sub="s", roles=[ADMIN_ROLE_KEY], permissions=set())
     assert admin.has("any.perm") is True
     non_admin = Principal(sub="s", roles=["editor"], permissions=set())
@@ -98,33 +97,32 @@ def test_admin_role_key_matches_principal_has_bypass() -> None:
 
 
 def test_permission_stmt_includes_admin_bypass_via_constant() -> None:
+    """Build the admin bypass from the central constant.
+
+    The bypass checks the active flag and the validity window.
+    """
     sql = _sql("application.transition")
-    # The admin bypass uses the central constant, not a literal per resolver.
     assert f"key = '{ADMIN_ROLE_KEY}'" in sql
     assert "permission = 'application.transition'" in sql
-    # The active flag and the validity window of the assignment apply too.
     assert "active" in sql
     assert "valid_from" in sql and "valid_until" in sql
 
 
 def test_permission_stmt_gremium_scope_optional() -> None:
+    """Add no Gremium filter without ``gremium_id``, so the recipient set is global."""
     gid = uuid.uuid4()
     scoped = _sql("application.transition", gremium_id=gid)
     unscoped = _sql("application.transition")
     assert "gremium_id" in scoped
-    # Without gremium_id there is NO Gremium filter, so the recipient set is global.
     assert "gremium_id" not in unscoped
 
 
 def test_both_resolvers_share_one_query_builder() -> None:
-    # Both actionable_principal_emails (task mail) and _emails_for_permission (rule
-    # recipient) build the same admin bypass. The identical core clause for the same
-    # permission proves it.
+    """Build the same admin bypass for the task mail and the rule recipient."""
     rule_sql = _sql("application.transition")
     assert rule_sql.count(f"key = '{ADMIN_ROLE_KEY}'") == 1
 
 
-# #task-recipients: identity row seed statement
 def _rows_sql(perm: str, **kw: object) -> str:
     stmt = principal_rows_with_permission_stmt(perm, datetime.now(UTC), **kw)  # type: ignore[arg-type]
     return str(stmt.compile(compile_kwargs={"literal_binds": True}))
@@ -143,8 +141,7 @@ def test_rows_stmt_projects_identity_columns() -> None:
 
 
 def test_rows_stmt_shares_permission_conds_with_email_stmt() -> None:
-    # Same seed clauses as the email projection: admin arm, permission arm,
-    # active flag and the assignment validity window.
+    """Seed the identity rows with the clauses of the e-mail projection."""
     sql = _rows_sql("application.transition")
     assert f"key = '{ADMIN_ROLE_KEY}'" in sql
     assert "permission = 'application.transition'" in sql
@@ -158,7 +155,6 @@ def test_rows_stmt_gremium_scope_optional() -> None:
     assert "gremium_id" not in _rows_sql("application.transition")
 
 
-# firable_candidates: pure guard matrix (task-list parity)
 BASE_CTX = GuardContext(manual=True)
 
 
@@ -214,6 +210,7 @@ def test_firable_committee_gate_pass_and_fail() -> None:
 
 
 def test_firable_actor_is_applicant_via_created_by() -> None:
+    """Treat nobody as the applicant when ``created_by`` is None."""
     creator = _candidate(sub="creator", email="c@x.de")
     other = _candidate(sub="other", email="o@x.de")
     guard = {"actorIsApplicant": True}
@@ -221,7 +218,6 @@ def test_firable_actor_is_applicant_via_created_by() -> None:
         [creator, other], _transitions(guard), BASE_CTX, created_by="creator"
     )
     assert out == [creator]
-    # created_by None -> nobody counts as applicant.
     assert (
         firable_candidates([creator], _transitions(guard), BASE_CTX, created_by=None)
         == []
@@ -229,8 +225,10 @@ def test_firable_actor_is_applicant_via_created_by() -> None:
 
 
 def test_firable_admin_with_only_unsatisfied_guards_excluded() -> None:
-    # THE bug: admins got task mail even without a firable
-    # transition. The code now drops an admin without a matching guard gate.
+    """Drop an admin whose guard gates all fail.
+
+    An admin gets no task mail without a firable transition.
+    """
     admin = _candidate(sub="adm", email="admin@x.de", roles=frozenset({ADMIN_ROLE_KEY}))
     out = firable_candidates(
         [admin], _transitions({"roleIs": "chair"}), BASE_CTX, created_by=None
@@ -245,7 +243,7 @@ def test_firable_admin_with_open_transition_included() -> None:
 
 
 def test_firable_guard_error_counts_as_not_firable() -> None:
-    # Two operators in one guard -> GuardError -> fail-closed, no exception.
+    """Fail closed on a guard with two operators (GuardError), without an exception."""
     broken = {"roleIs": "chair", "isInCommittee": "g"}
     chair = _candidate(sub="a", email="a@x.de", roles=frozenset({"chair"}))
     assert (
@@ -279,26 +277,26 @@ def test_firable_empty_transitions_empty() -> None:
 
 
 async def test_candidates_batch_resolution_roles_groups_committees() -> None:
+    """Resolve roles, groups and committees in batches.
+
+    An assignment scope counts as a group key, as in ``resolve_principal``.
+    """
     pid1, pid2 = uuid.uuid4(), uuid.uuid4()
     g_scope, g_member = uuid.uuid4(), uuid.uuid4()
     session = FakeSession(
         executes=[
-            # Seed: (id, sub, email, oidc_groups)
             [
                 (pid1, "s1", "one@x.de", ["idp-group"]),
                 (pid2, "s2", "two@x.de", None),
             ],
-            # Active RoleAssignments: (principal_id, Role.key, gremium_id)
             [
                 (pid1, "chair", None),
                 (pid2, "admin", g_scope),
             ],
-            # GroupMappings: (oidc_group, Role.key)
             [
                 ("idp-group", "mapped-role"),
                 (str(g_scope), "scope-role"),
             ],
-            # Active GremiumMemberships: (principal_id, gremium_id)
             [(pid1, g_member)],
         ]
     )
@@ -309,7 +307,6 @@ async def test_candidates_batch_resolution_roles_groups_committees() -> None:
     assert by_sub["s1"].email == "one@x.de"
     assert by_sub["s1"].roles == frozenset({"chair", "mapped-role"})
     assert by_sub["s1"].committees == frozenset({str(g_member)})
-    # Assignment gremium scope counts as a group key (parity with resolve_principal).
     assert by_sub["s2"].roles == frozenset({"admin", "scope-role"})
     assert by_sub["s2"].committees == frozenset()
 
@@ -331,8 +328,7 @@ async def test_candidates_rows_without_email_skipped() -> None:
 
 
 async def test_candidates_no_groups_skips_mapping_query() -> None:
-    # Without any group (no OIDC group and no assignment scope) the membership query
-    # comes next. The FIFO queue proves that the code issues no mapping query.
+    """Skip the mapping query without any group; the FIFO fake proves it."""
     pid, gid = uuid.uuid4(), uuid.uuid4()
     session = FakeSession(
         executes=[
@@ -348,7 +344,6 @@ async def test_candidates_no_groups_skips_mapping_query() -> None:
     assert out[0].committees == frozenset({str(gid)})
 
 
-# actionable_principal_emails end to end
 def _app_ns(**over: Any) -> SimpleNamespace:
     base: dict[str, Any] = {
         "id": uuid.uuid4(),
@@ -368,7 +363,6 @@ def _app_ns(**over: Any) -> SimpleNamespace:
 
 async def test_actionable_vote_state_unchanged() -> None:
     gid = uuid.uuid4()
-    # The vote state reads the snapshot `vote_gremium_id`, not the state config.
     session = FakeSession(scalar=[gid], scalars=[["v@x.de"]])
     out = await actionable_principal_emails(
         cast(AsyncSession, session),
@@ -396,11 +390,9 @@ async def test_resolver_vote_and_budget_gremium(monkeypatch: pytest.MonkeyPatch)
     assert await resolver.resolve([{"kind": "budgetGremium"}], application_id=app_id) == [
         "b@x.de"
     ]
-    # No snapshot and no cost center: nobody.
     assert await resolver.resolve(
         [{"kind": "voteGremium"}, {"kind": "budgetGremium"}], application_id=app_id
     ) == []
-    # Without an application both kinds resolve to nobody.
     assert await resolver.resolve([{"kind": "voteGremium"}]) == []
 
 
@@ -437,8 +429,10 @@ async def test_actionable_no_requires_action_transitions_empty() -> None:
 async def test_actionable_excludes_admin_without_firable_guard(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # THE bug end to end: only a principal whose guard fires gets
-    # mail. The admin with an unsatisfied guard drops out.
+    """Mail only a principal whose guard fires.
+
+    The admin with an unsatisfied guard drops out.
+    """
     captured: dict[str, Any] = {}
 
     async def fake_base(_s: Any, app: Any, *, manual: bool) -> GuardContext:
@@ -455,7 +449,7 @@ async def test_actionable_excludes_admin_without_firable_guard(
         executes=[
             [(pid1, "s1", "chair@x.de", None), (pid2, "s2", "admin@x.de", None)],
             [(pid1, "chair", None), (pid2, ADMIN_ROLE_KEY, None)],
-            [],  # no groups -> memberships next (mapping query skipped)
+            [],
         ],
     )
     out = await actionable_principal_emails(
@@ -496,5 +490,5 @@ async def test_actionable_seeds_with_app_gremium_and_dedups(
     out = await actionable_principal_emails(
         cast(AsyncSession, session), application_id=app.id, state=None
     )
-    assert out == ["a@x.de", "dup@x.de"]  # sorted + deduplicated
+    assert out == ["a@x.de", "dup@x.de"]
     assert seen["gremium_id"] == gid

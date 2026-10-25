@@ -47,14 +47,14 @@ def _origin(url: str) -> tuple[str, str] | None:
 
 
 def platform_page_url(value: str | None) -> str | None:
-    """Keep ``value`` only when it names a page of the platform, else ``None``.
+    r"""Keep ``value`` only when it names a page of the platform, else ``None``.
 
     A page is an absolute http(s) URL on the origin of ``PUBLIC_BASE_URL``, or a path
     that starts with one ``/`` and resolves against ``PUBLIC_BASE_URL`` to that origin.
     The route is public and the ticket detail shows the url as a link, so a url to
     another host is dropped instead of being stored. A value with whitespace or a control
     character is dropped too, because a browser removes tab, CR and LF before it parses,
-    so ``/\\t/evil.example`` would become ``//evil.example`` and name another host.
+    so ``/\t/evil.example`` would become ``//evil.example`` and name another host.
     """
     if value is None or any(ord(ch) < 0x21 or ord(ch) == 0x7F for ch in value):
         return None
@@ -121,6 +121,8 @@ class TicketReporter(_CamelModel):
 
 
 class TicketListItem(_CamelModel):
+    """A ticket row of the work list."""
+
     id: UUID
     number: str
     kind: TicketKind
@@ -133,6 +135,8 @@ class TicketListItem(_CamelModel):
 
 
 class TicketAttachment(_CamelModel):
+    """A file of the ticket report."""
+
     id: UUID
     filename: str
     mime: str
@@ -141,12 +145,15 @@ class TicketAttachment(_CamelModel):
 
     @classmethod
     def of(cls, out: AttachmentOut) -> TicketAttachment:
+        """Build the ticket form of an attachment."""
         return cls(
             id=out.id, filename=out.filename, mime=out.mime, size=out.size, scanned=out.scanned
         )
 
 
 class TicketEventOut(_CamelModel):
+    """An event of the ticket timeline."""
+
     id: UUID
     kind: TicketEventKind
     actor: PersonRef | None = None
@@ -155,6 +162,13 @@ class TicketEventOut(_CamelModel):
 
 
 class TicketNoteOut(_CamelModel):
+    """A note or message of a ticket.
+
+    Attributes:
+        mentions: The mentioned holders of ``ticket.manage`` in stored order. The view
+            of the reporter (``/tickets/mine``) gets an empty list.
+    """
+
     id: UUID
     author: PersonRef
     body: str
@@ -164,12 +178,12 @@ class TicketNoteOut(_CamelModel):
     attachments: list[MessageAttachmentOut] = Field(default_factory=list)
     visibility: NoteVisibility = "internal"
     from_reporter: bool = Field(default=False, serialization_alias="fromReporter")
-    # The mentioned holders of ``ticket.manage``, in the stored order. The view of the
-    # reporter (``/tickets/mine``) gets an empty list.
     mentions: list[PersonRef] = Field(default_factory=list)
 
 
 class TicketRef(_CamelModel):
+    """A reference to another ticket by id and number."""
+
     id: UUID
     number: str
 
@@ -183,6 +197,8 @@ class ContextTarget(_CamelModel):
 
 
 class TicketDetail(TicketListItem):
+    """A ticket with body, context, files, notes and events."""
+
     body: str
     context: dict[str, JsonValue] = Field(default_factory=dict)
     attachments: list[TicketAttachment] = Field(default_factory=list)
@@ -226,12 +242,12 @@ class NoteCreate(MessageFilesIn, _CamelIn):
     """A new note. The body may be empty only with at least one file.
 
     ``visibility`` defaults to ``internal``; ``public`` lets the reporter account read it.
+    ``mentions`` holds the principal ids of mentioned holders of ``ticket.manage`` (at
+    most 50, duplicates drop); another id gives 422 ``mention_not_member``.
     """
 
     body: str = Field(max_length=10000)
     visibility: NoteVisibility = "internal"
-    # The principal ids of the mentioned holders of ``ticket.manage`` (at most 50,
-    # duplicates drop). Another id gives 422 ``mention_not_member``.
     mentions: list[UUID] = Field(default_factory=list, max_length=MAX_MENTIONS)
 
 
@@ -291,6 +307,8 @@ class TicketBlockedSender(_CamelModel):
 
 
 class TicketCounts(_CamelModel):
+    """Ticket counts per status."""
+
     new: int = 0
     in_progress: int = Field(default=0, serialization_alias="inProgress")
     done: int = 0

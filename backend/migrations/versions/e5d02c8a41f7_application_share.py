@@ -30,6 +30,8 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
+#: The hash is UNIQUE, because the lookup is by hash, and two rows with the same digest would
+#: make the answer ambiguous at exactly the moment it must not be.
 _UPGRADE: tuple[str, ...] = (
     """
     CREATE TABLE IF NOT EXISTS application_share (
@@ -44,8 +46,6 @@ _UPGRADE: tuple[str, ...] = (
         label text
     )
     """,
-    # UNIQUE: the lookup is by hash, and two rows with the same digest would make the
-    # answer ambiguous at exactly the moment it must not be.
     (
         "CREATE UNIQUE INDEX IF NOT EXISTS ix_application_share_token_hash "
         "ON application_share (token_hash)"
@@ -69,10 +69,12 @@ _DOWNGRADE: tuple[str, ...] = (
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     for stmt in _UPGRADE:
         op.execute(stmt)
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     for stmt in _DOWNGRADE:
         op.execute(stmt)

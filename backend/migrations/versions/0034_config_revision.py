@@ -71,6 +71,7 @@ _SEED_PERM = (
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     op.execute(_TABLE)
     op.execute(_INDEX)
     op.execute(_TRIGGER_FN)
@@ -91,6 +92,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     op.execute("DELETE FROM role_permission WHERE permission = 'audit.revert'")
     op.execute("DROP TRIGGER IF EXISTS trg_config_revision_no_truncate ON config_revision")
     op.execute("DROP TRIGGER IF EXISTS trg_config_revision_no_delete ON config_revision")

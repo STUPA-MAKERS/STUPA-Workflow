@@ -41,6 +41,7 @@ def _action(action_type: str, params: dict | None = None) -> DispatchedAction:
 
 
 async def test_dispatch_notify_calls_service(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Call the service; an applicant with an account and the team both open the application."""
     captured: dict[str, object] = {}
 
     class FakeService:
@@ -68,7 +69,6 @@ async def test_dispatch_notify_calls_service(monkeypatch: pytest.MonkeyPatch) ->
     assert kw["lang"] == "en"  # type: ignore[index]
     assert kw["context"]["applicationId"] == str(action.application_id)  # type: ignore[index]
     assert kw["context"]["applicationTitle"] == "Beamer"  # type: ignore[index]
-    # An applicant with an account and the team both open the application.
     url = f"{SETTINGS.public_base_url.rstrip('/')}/applications/{action.application_id}"
     assert kw["applicant_link"].url == url  # type: ignore[index]
     assert kw["team_link"].url == url  # type: ignore[index]
@@ -113,7 +113,7 @@ async def test_dispatch_skips_non_notify(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setattr(mod, "NotificationService", FakeService)
     disp = NotificationActionDispatcher(_sessionmaker(FakeSession()), None, SETTINGS)
     await disp.dispatch([_action("webhook"), _action("budgetReserve")])
-    assert called == []  # the dispatcher never built or called the service
+    assert called == []
 
 
 async def test_dispatch_notify_merges_context(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -168,7 +168,7 @@ async def test_dispatch_task_notify_sends_kind_mail(
     monkeypatch.setattr(recipients_mod, "state_actionable", fake_state_actionable)
     session = FakeSession(
         executes=[[({"title": "Beamer"}, uuid.uuid4(), True)]],
-        scalar=[None],  # the state lookup needs no hit
+        scalar=[None],
     )
     disp = NotificationActionDispatcher(_sessionmaker(session), None, SETTINGS)
     action = _action("taskNotify")
@@ -210,10 +210,7 @@ async def test_dispatch_task_notify_skips_non_actionable_state(
     disp = NotificationActionDispatcher(_sessionmaker(session), None, SETTINGS)
     await disp.dispatch([_action("taskNotify")])
 
-    assert "recipients" not in captured  # the dispatcher skipped the send
-
-
-# --- The applicant mail follows the language of the application ----------------
+    assert "recipients" not in captured
 
 
 class _CapturingService:
@@ -247,6 +244,9 @@ async def test_applicant_only_notify_uses_the_application_language(
 
     The test drives the real `NotificationService`, so the assertion covers the
     rendered subject and body, not only the language argument.
+
+    The fakes feed the application row, its language (en), the state label, and no opt-out
+    or template override.
     """
     from app.modules.notifications.service import NotificationService
     from tests._support.notifications_fakes import FakeQueue, FakeResolver
@@ -260,11 +260,11 @@ async def test_applicant_only_notify_uses_the_application_language(
     state_id = uuid.uuid4()
     session = FakeSession(
         executes=[
-            [(uuid.uuid4(), state_id, {"title": "Beamer"}, True, "sub-1")],  # the application row
-            [("en", None)],  # resolve_application_lang: application.lang is en
+            [(uuid.uuid4(), state_id, {"title": "Beamer"}, True, "sub-1")],
+            [("en", None)],
         ],
-        scalar=[{"de": "Genehmigt", "en": "Approved"}],  # the state label
-        scalars=[[], []],  # nobody opted out, and no template override in the DB
+        scalar=[{"de": "Genehmigt", "en": "Approved"}],
+        scalars=[[], []],
     )
     queue = FakeQueue()
     disp = NotificationActionDispatcher(_sessionmaker(session), queue, SETTINGS)
@@ -293,10 +293,10 @@ async def test_applicant_only_notify_without_a_state_label(
     captured = _capture(monkeypatch)
     session = FakeSession(
         executes=[
-            [(uuid.uuid4(), uuid.uuid4(), None, True, "sub-1")],  # application row with a state
-            [("en", None)],  # resolve_application_lang
+            [(uuid.uuid4(), uuid.uuid4(), None, True, "sub-1")],
+            [("en", None)],
         ],
-        scalar=[None],  # the state carries no label
+        scalar=[None],
     )
     disp = NotificationActionDispatcher(_sessionmaker(session), None, SETTINGS)
     await disp.dispatch([_applicant_notify({"recipients": [{"kind": "applicant"}]})])
@@ -372,9 +372,6 @@ async def test_notify_with_non_dict_recipients_keeps_the_default_language(
     disp = NotificationActionDispatcher(_sessionmaker(session), None, SETTINGS)
     await disp.dispatch([_applicant_notify({"recipients": ["applicant"]})])
     assert captured["lang"] is None
-
-
-# --- An unconfirmed guest application gets no flow mail -----------------------
 
 
 @pytest.mark.parametrize(

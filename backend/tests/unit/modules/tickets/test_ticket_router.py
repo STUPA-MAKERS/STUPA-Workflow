@@ -432,11 +432,11 @@ def test_only_a_public_note_of_the_team_mails(env: _Env) -> None:
 
 
 def test_a_message_of_the_reporter_mails_the_team(env: _Env) -> None:
+    """Mail the team about a message of the reporter; an edit sends nothing."""
     env.login(Principal(sub="plain"))
     client = TestClient(env.app)
     assert client.post(f"/api/tickets/mine/{TID}/notes", json={"body": "n"}).status_code == 201
     assert env.note_mails.sent == [NOTE_ID]
-    # An edit sends nothing.
     client.patch(f"/api/tickets/mine/{TID}/notes/{TID}", json={"body": "m"})
     assert env.note_mails.sent == [NOTE_ID]
 
@@ -446,8 +446,6 @@ def test_validation_problem_is_the_shape_of_the_assignee_error() -> None:
         router_mod._assignee_filter("x")
     assert router_mod._assignee_filter(None) is None
 
-
-# -- the view of the reporter --------------------------------------------------------
 
 _MINE = [
     ("get", "/api/tickets/mine"),
@@ -495,6 +493,10 @@ def test_the_reporter_list_of_a_session_without_an_account_is_empty(env: _Env) -
 
 
 def test_the_reporter_routes_answer(env: _Env) -> None:
+    """Answer on the routes of the reporter.
+
+    A reporter has no visibility switch, so the field is refused.
+    """
     env.login(Principal(sub="plain"))
     client = TestClient(env.app)
     detail = client.get(f"/api/tickets/mine/{TID}").json()
@@ -506,7 +508,6 @@ def test_the_reporter_routes_answer(env: _Env) -> None:
     (args, kw) = env.service.calls[-1][1]
     assert args[1].body == "n"
     assert kw["pepper"]
-    # A reporter has no visibility switch: the field is refused.
     assert (
         client.post(
             f"/api/tickets/mine/{TID}/notes", json={"body": "n", "visibility": "internal"}

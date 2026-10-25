@@ -141,6 +141,9 @@ def parse_solution(payload_b64: str) -> Solution:
 
     Raises:
         AltchaError: The payload has an invalid structure.
+
+    A bool is refused as the number, because bool is a subclass of int; a negative number is
+    invalid too.
     """
     try:
         raw = base64.b64decode(payload_b64, validate=True)
@@ -159,7 +162,6 @@ def parse_solution(payload_b64: str) -> Solution:
         raise AltchaError("unsupported algorithm")
     if not (isinstance(challenge, str) and isinstance(salt, str) and isinstance(signature, str)):
         raise AltchaError("malformed altcha payload")
-    # bool is a subclass of int. Exclude it here. A negative number is also invalid.
     if isinstance(number, bool) or not isinstance(number, int) or number < 0:
         raise AltchaError("malformed altcha payload")
     return Solution(
@@ -225,19 +227,25 @@ class ReplayGuard(Protocol):
     ``seen`` returns ``True`` when the key already appeared inside the window.
     """
 
-    async def seen(self, key: str, ttl_seconds: int) -> bool: ...
+    async def seen(self, key: str, ttl_seconds: int) -> bool:
+        """Record the key and report whether it was already seen."""
+        ...
 
 
 class InMemoryReplayGuard:
     """Process-local replay protection for tests and single-worker development."""
 
     def __init__(self, *, now: Callable[[], int] | None = None) -> None:
+        """Start an empty store; ``now`` replaces the wall clock in tests."""
         self._seen: dict[str, int] = {}
         self._now = now or _wall_clock
 
     async def seen(self, key: str, ttl_seconds: int) -> bool:
+        """Record the key and report whether it was already seen.
+
+        Each call drops the expired entries, so the store does not grow without a bound.
+        """
         now = self._now()
-        # Drop the expired entries so the store does not grow without a bound.
         self._seen = {k: exp for k, exp in self._seen.items() if exp > now}
         if key in self._seen:
             return True
@@ -261,17 +269,22 @@ class RedisReplayGuard:
         prefix: str = "altcha:seen:",
         fallback: ReplayGuard | None = None,
     ) -> None:
+        """Wrap a Redis client; ``fallback`` serves when Redis fails."""
         self._client = client
         self._prefix = prefix
         self._fallback: ReplayGuard = fallback or InMemoryReplayGuard()
 
     async def seen(self, key: str, ttl_seconds: int) -> bool:
-        # SET key 1 NX EX ttl returns None when the key exists, which means a replay.
+        """Record the key with SET NX EX and report a replay.
+
+        SET NX returns None when the key exists, which means a replay. When Redis is
+        down, the process-local fallback answers.
+        """
         try:
             stored = await self._client.set(  # type: ignore[attr-defined]
                 f"{self._prefix}{key}", "1", nx=True, ex=ttl_seconds
             )
-        except Exception as exc:  # Redis down -> process-local fallback
+        except Exception as exc:
             logging.getLogger("app.altcha").warning(
                 "altcha replay store unavailable, falling back to per-worker guard: %s",
                 exc,
@@ -300,6 +313,7 @@ class AltchaVerifier:
         replay_ttl_seconds: int = 600,
         now: Callable[[], int] | None = None,
     ) -> None:
+        """Bind the verifier to the HMAC secret and the replay guard."""
         self._secret = secret
         self._replay = replay
         self._replay_ttl = replay_ttl_seconds
@@ -322,4 +336,5 @@ class NullAltchaVerifier:
     """No-op verifier used when ALTCHA is off because no secret is configured."""
 
     async def verify(self, payload_b64: str | None) -> None:
+        """Accept every solution."""
         return None

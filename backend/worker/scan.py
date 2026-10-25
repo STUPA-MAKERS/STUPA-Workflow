@@ -34,6 +34,7 @@ logger = logging.getLogger("app.files")
 
 
 async def on_startup(ctx: dict[str, Any]) -> None:
+    """Load the settings, the scanner and the object storage into the worker context."""
     settings = load_settings()
     ctx["settings"] = settings
     ctx["scanner"] = build_scanner(settings)

@@ -29,8 +29,8 @@ from app.modules.notifications import (
 )
 from app.modules.notifications import service as _svc
 
-# task_reminder: the worker (``worker/task_reminders.py``) sends it. The worker imports
-# these constants from here. The app never imports the worker.
+#: Subject of ``task_reminder``. The worker (``worker/task_reminders.py``) sends it and
+#: imports these constants from here, because the app never imports the worker.
 TASK_REMINDER_SUBJECT: dict[str, str] = {
     "de": "Erinnerung: offene Aufgabe"
     "{% if applicationTitle %} — „{{ applicationTitle }}“{% endif %}",
@@ -46,9 +46,8 @@ TASK_REMINDER_BODY: dict[str, str] = {
     "waiting for action for {{ daysOpen }} days"
     "{% if status %} (status: {{ status }}){% endif %}.\n",
 }
-# status_update_team: the team-facing default for a flow `notify` action without an
-# explicit templateKey and with non-applicant recipients. The applicant default
-# (`status_update`) reads "Your application" and is wrong for the team.
+#: Subject of ``status_update_team``, the team default of a ``notify`` action without
+#: ``templateKey``, because ``status_update`` reads "Your application".
 STATUS_UPDATE_TEAM_SUBJECT: dict[str, str] = {
     "de": "Statuswechsel: Antrag{% if applicationTitle %} „{{ applicationTitle }}“{% endif %}",
     "en": 'Status change: application{% if applicationTitle %} "{{ applicationTitle }}"{% endif %}',
@@ -78,12 +77,13 @@ class MailTemplateSpec:
     placeholders: dict[str, str]
 
 
-# The order of this tuple is the display order in the editor.
+#: Mail kinds in the display order of the editor. ``status_update`` shares the builtin of
+#: the notification service.
 TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
     MailTemplateSpec(
         "status_update",
         "status_update",
-        _svc._BUILTIN_NOTIFY_SUBJECT,  # shared builtin
+        _svc._BUILTIN_NOTIFY_SUBJECT,
         _svc._BUILTIN_NOTIFY_BODY,
         {
             "link": "Link zum Antrag (ohne den Platzhalter hängt die Mail ihn an)",

@@ -52,6 +52,7 @@ _IX_TOKEN_EXPIRES = "ix_attachment_draft_token_expires_at"
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     op.execute("ALTER TABLE attachment ALTER COLUMN application_id DROP NOT NULL")
     op.execute("ALTER TABLE attachment ADD COLUMN IF NOT EXISTS draft_token_hash bytea")
     op.execute(
@@ -87,6 +88,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     op.execute(f"DROP TABLE IF EXISTS {_TOKENS}")
     op.execute("DELETE FROM attachment WHERE application_id IS NULL")
     op.execute(f"DROP INDEX IF EXISTS {_IX_TOKEN}")

@@ -19,7 +19,7 @@ from app.settings import load_settings
 
 NOW = datetime(2026, 10, 1, 12, 0, tzinfo=UTC)
 
-# The real token purge. The fixture below replaces it for the loop tests.
+#: The real token purge. A fixture replaces it for the loop tests.
 _PURGE_TOKENS = wfd._purge_tokens
 TOKEN_RUNS: list[datetime] = []
 
@@ -57,13 +57,13 @@ def _batches(monkeypatch: pytest.MonkeyPatch, batches: list[tuple[int, list[str]
 
 
 async def test_purge_loops_until_a_short_batch(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Purge in a loop until a batch is short; the token purge runs once, after the drafts."""
     monkeypatch.setattr(wfd, "PURGE_BATCH", 2)
     _batches(monkeypatch, [(2, ["a", "b"]), (2, ["c"]), (1, ["d"])])
     storage = _Storage()
     ctx = {"files_sessionmaker": object(), "object_storage": storage}
     assert await wfd.purge_draft_attachments(ctx, now=NOW) == 5
     assert storage.removed == ["a", "b", "c", "d"]
-    # The token purge runs once, after the drafts.
     assert TOKEN_RUNS == [NOW]
 
 
@@ -89,10 +89,13 @@ async def test_purge_uses_the_current_time_by_default(
 async def test_remove_objects_tolerates_errors_and_missing_storage(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Tolerate storage errors and a missing storage.
+
+    Without keys there is nothing to do, not even a storage lookup. With no storage in the
+    context and none configured, the objects stay, with a warning.
+    """
     await wfd._remove_objects({"object_storage": _Storage(fail=True)}, ["a"])
-    # No keys: nothing to do, not even a storage lookup.
     await wfd._remove_objects({}, [])
-    # No storage in the context and none configured: the objects stay, with a warning.
     monkeypatch.setattr(wfd, "build_object_storage", lambda _settings: None)
     await wfd._remove_objects({"settings": load_settings()}, ["a"])
 

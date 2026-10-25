@@ -39,7 +39,7 @@ depends_on: str | Sequence[str] | None = None
 
 _XOR = "ck_attachment_draft_xor_application"
 
-# (column, referenced table) of the new owners of an attachment.
+#: (column, referenced table) of the new owners of an attachment.
 _OWNERS: tuple[tuple[str, str], ...] = (
     ("ticket_note_id", "ticket_note"),
     ("todo_comment_id", "todo_comment"),
@@ -116,10 +116,12 @@ _DOWNGRADE: tuple[str, ...] = (
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     for stmt in _UPGRADE:
         op.execute(stmt)
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     for stmt in _DOWNGRADE:
         op.execute(stmt)

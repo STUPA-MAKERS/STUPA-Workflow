@@ -51,7 +51,7 @@ _UPGRADE: tuple[str, ...] = (
     "('account.manage', 'budget.reconcile_ignore')",
 )
 
-# Structure only — the rows are gone for good.
+#: Structure only — the rows are gone for good.
 _DOWNGRADE: tuple[str, ...] = (
     """
     CREATE TABLE IF NOT EXISTS account (
@@ -163,10 +163,12 @@ _DOWNGRADE: tuple[str, ...] = (
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     for stmt in _UPGRADE:
         op.execute(stmt)
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     for stmt in _DOWNGRADE:
         op.execute(stmt)

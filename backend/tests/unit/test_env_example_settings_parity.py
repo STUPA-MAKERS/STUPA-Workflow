@@ -20,31 +20,28 @@ from pydantic import AliasChoices
 
 from app.settings import Settings
 
-# From tests/unit/, parents[2] is backend and parents[3] is the repo root that holds deploy/.
+#: From tests/unit/, parents[2] is backend and parents[3] is the repo root that holds deploy/.
 _EXAMPLE = (
     Path(__file__).resolve().parents[3] / "deploy" / ".env.example"
 ).read_text(encoding="utf-8")
 
-# Keys in the template that the API deliberately does not read.
+#: Keys in the template that the API deliberately does not read.
+#: The postgres and ALTCHA images and the compose interpolation read their keys, and
+#: the typst service reads its own (``typst/typst_service/app.py``, ``compiler.py``). No
+#: "documented but dead" key is listed on purpose: a key an operator can set that
+#: changes nothing is worse than no key at all, so such a key leaves the template.
 _NOT_READ_BY_THE_API = {
-    # docker compose interpolation and the postgres/altcha images.
     "POSTGRES_DB": "postgres image",
     "POSTGRES_USER": "postgres image",
     "POSTGRES_PASSWORD": "postgres image",
     "ALTCHA_ROOT_PASSWORD": "altcha sidecar",
     "WEB_PORT": "compose interpolation",
     "WEB_HOST": "compose interpolation",
-    # The typst service reads these itself (typst/typst_service/app.py, compiler.py).
     "TYPST_MAX_BODY_BYTES": "typst service",
     "TYPST_MAX_ASSETS": "typst service",
     "TYPST_MAX_ASSET_BYTES": "typst service",
     "TYPST_COMPILE_TIMEOUT_S": "typst service",
     "TYPST_MAX_CONCURRENCY": "typst service",
-    # The "documented but dead" group is empty on purpose. Eight keys sat here — a
-    # Nextcloud export that was never written, a webhook key replaced by a per-webhook
-    # secret, an SMTP sender replaced by MAIL_FROM, and an audit role the migrations
-    # hardcode. They are gone from the template rather than described in it: a key an
-    # operator can set that changes nothing is worse than no key at all.
 }
 
 _KEY_RE = re.compile(r"^\s*(?:#\s*)?([A-Z][A-Z0-9_]*)=", re.MULTILINE)
@@ -87,8 +84,8 @@ def test_webhook_allowlist_uses_the_canonical_name() -> None:
     assert not re.search(r"^WEBHOOK_ALLOWLIST=", _EXAMPLE, re.MULTILINE)
 
 
-# The magic-link lifetime moved into `guest_application_settings`. These keys
-# are gone from `Settings` and from the template.
+#: The magic-link lifetime moved into `guest_application_settings`. These keys
+#: are gone from `Settings` and from the template.
 _REMOVED_KEYS = ("MAGIC_LINK_EDIT_TTL_DAYS", "MAGIC_LINK_ACTION_TTL_MINUTES")
 
 

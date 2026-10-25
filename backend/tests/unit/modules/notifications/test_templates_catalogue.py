@@ -40,14 +40,17 @@ def test_builtins_are_shared_objects() -> None:
 
 
 def test_dead_role_templates_are_gone() -> None:
-    # No code sends the role mails, so the catalogue does not offer them.
+    """Leave the role mails out of the catalogue, because no code sends them."""
     assert "role_assigned" not in CATALOGUE_BY_KEY
     assert "role_revoked" not in CATALOGUE_BY_KEY
 
 
 def test_status_update_team_mirrors_status_update() -> None:
-    # Team-facing default of the notify action. It uses the same kind and the
-    # same placeholder set as `status_update`, backed by the single-source builtins.
+    """Give ``status_update_team`` the kind and the placeholders of ``status_update``.
+
+    It is the team-facing default of the notify action, backed by the single-source
+    builtins.
+    """
     team = CATALOGUE_BY_KEY["status_update_team"]
     base = CATALOGUE_BY_KEY["status_update"]
     assert team.kind == "status_update"
@@ -64,7 +67,7 @@ def test_worker_reminder_uses_catalogue() -> None:
 
 
 def test_all_sent_keys_are_catalogued() -> None:
-    # Every template_key that a sender really uses must stay editable in the catalogue.
+    """Keep every template_key that a sender really uses editable in the catalogue."""
     sent = {
         "status_update",
         "status_update_team",

@@ -35,7 +35,7 @@ down_revision: str | None = "ed7ea60b3551"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-# (table, column, foreign-key name, index name)
+#: (table, column, foreign-key name, index name)
 _COLUMNS: tuple[tuple[str, str, str, str], ...] = (
     (
         "budget",
@@ -53,6 +53,12 @@ _COLUMNS: tuple[tuple[str, str, str, str], ...] = (
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision.
+
+    The backfill gives an application in a vote state the fixed Gremium of that state. Only
+    an existing Gremium qualifies, so the foreign key holds, and the compare ignores the
+    case, because a config can hold the UUID in upper case.
+    """
     for table, column, fk, ix in _COLUMNS:
         op.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} uuid")
         op.execute(
@@ -70,9 +76,6 @@ def upgrade() -> None:
             """
         )
         op.execute(f"CREATE INDEX IF NOT EXISTS {ix} ON {table} ({column})")
-    # Backfill: an application in a vote state gets the fixed Gremium of that state.
-    # Only an existing Gremium qualifies, so the foreign key holds. The compare ignores
-    # the case, because a config can hold the UUID in upper case.
     op.execute(
         """
         UPDATE application AS a
@@ -87,6 +90,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     for table, column, fk, ix in reversed(_COLUMNS):
         op.execute(f"DROP INDEX IF EXISTS {ix}")
         op.execute(f"ALTER TABLE {table} DROP CONSTRAINT IF EXISTS {fk}")

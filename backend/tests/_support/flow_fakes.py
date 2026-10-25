@@ -60,14 +60,18 @@ class FakeSession:
     """Stub for `AsyncSession` where `execute` returns the results in order."""
 
     def __init__(self, results: Iterable[FakeResult] = ()) -> None:
+        """Set up the result queues.
+
+        ``session.get(Model, id)`` in the delegation service has its own queue,
+        independent of the ``execute`` order; the default ``None`` means not found. The
+        statements are recorded, so a test can check one, for example the vote
+        cancellation UPDATE.
+        """
         self._results = list(results)
         self.scalar_results: list[Any] = []
-        # Separate queue for `session.get(Model, id)` in the delegation service. It is
-        # independent of the `execute` order. The default `None` means not found.
         self.get_results: list[Any] = []
         self.added: list[Any] = []
         self.deleted: list[Any] = []
-        # Recorded so a test can check a statement, for example the vote cancellation UPDATE.
         self.statements: list[Any] = []
         self.flushed = 0
         self.committed = 0

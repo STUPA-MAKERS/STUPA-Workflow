@@ -137,6 +137,8 @@ async def process_todo_due(ctx: dict[str, Any], now: datetime | None = None) -> 
 
     Returns:
         The number of reminded cards.
+
+    One bad card is logged and does not stop the run.
     """
     local = (now or datetime.now(UTC)).astimezone(BERLIN)
     if local.hour < DUE_HOUR:
@@ -187,7 +189,7 @@ async def process_todo_due(ctx: dict[str, Any], now: datetime | None = None) -> 
                     due=tomorrow,
                 ):
                     sent += 1
-            except Exception:  # one bad card must not stop the run
+            except Exception:
                 logger.exception("todo_due mail failed for %s", card.id)
                 continue
             card.due_reminded_on = tomorrow

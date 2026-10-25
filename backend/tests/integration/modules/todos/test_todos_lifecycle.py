@@ -75,6 +75,7 @@ async def _create(
 
 
 async def test_the_archive_cron(maker: async_sessionmaker[AsyncSession]) -> None:
+    """Archive the old done cards; a board without a limit never archives."""
     me, me_id = await add_person(maker, "Ada")
     board, columns = await _personal(maker, me_id)
     done = columns[-1]
@@ -101,7 +102,6 @@ async def test_the_archive_cron(maker: async_sessionmaker[AsyncSession]) -> None
     assert rows[old].archived_at is not None
     assert rows[fresh].archived_at is None and rows[open_card].archived_at is None
     assert [(e.card_id, e.actor_id) for e in events] == [(old, None)]
-    # A board without a limit never archives.
     async with maker() as session:
         await session.execute(text("UPDATE todo_board SET archive_after_days = NULL"))
         await session.execute(
@@ -244,6 +244,11 @@ async def test_the_due_reminder_skips_a_former_member(
 
 
 async def test_erasure_and_auskunft(maker: async_sessionmaker[AsyncSession]) -> None:
+    """Erase and export the to-do data of a person.
+
+    The board of Otto does not accept Ada, so the test writes the assignment and a comment
+    directly.
+    """
     me, me_id = await add_person(maker, "Ada")
     other, other_id = await add_person(maker, "Otto")
     mine, _ = await _personal(maker, me_id)
@@ -255,7 +260,6 @@ async def test_erasure_and_auskunft(maker: async_sessionmaker[AsyncSession]) -> 
             {"e": "ada@example.org", "i": me_id},
         )
         await session.commit()
-    # Otto's board does not accept Ada; write the assignment and a comment directly.
     shared = await _create(maker, other, theirs.id, title="Gemeinsam")
     async with maker() as session:
         session.add(TodoAssignee(card_id=shared, principal_id=me_id))
@@ -279,6 +283,7 @@ async def test_erasure_and_auskunft(maker: async_sessionmaker[AsyncSession]) -> 
 
 
 async def test_the_account_merge(maker: async_sessionmaker[AsyncSession]) -> None:
+    """Move the to-do data at an account merge; the count holds one assignment and one board."""
     old, old_id = await add_person(maker, "Alt")
     new, new_id = await add_person(maker, "Neu")
     third, third_id = await add_person(maker, "Dritt")
@@ -308,7 +313,7 @@ async def test_the_account_merge(maker: async_sessionmaker[AsyncSession]) -> Non
     async with maker() as session:
         preview = await PrincipalMergeService(session).preview(old_id, new_id, actor="merge-admin")
     todos = next(a for a in preview.areas if a.area == "todos")
-    assert todos.combined == 2  # one assignment, one board
+    assert todos.combined == 2
     async with maker() as session:
         await PrincipalMergeService(session).merge(old_id, new_id, actor="merge-admin")
     async with maker() as session:

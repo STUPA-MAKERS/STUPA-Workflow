@@ -358,6 +358,10 @@ async def test_votes_with_a_question_need_no_title_lookup(vote_scope: dict[str, 
 
 
 async def test_gremien_follow_the_gremien_tab(gremium_scope: dict[str, Any]) -> None:
+    """Resolve the gremien by the rules of the gremien tab.
+
+    The scope is read once per resolver.
+    """
     session = ScriptedSession(
         execute=[[(G1, "StuPa")], [(G1, "StuPa")], [(G1, "StuPa"), (G2, "AStA")]]
     )
@@ -366,7 +370,6 @@ async def test_gremien_follow_the_gremien_tab(gremium_scope: dict[str, Any]) -> 
     seen = out[("gremium", G1)]
     assert (seen.title, seen.url) == ("StuPa", f"/gremien/{G1}")
     assert out[("gremium", G2)] == HIDDEN
-    # The scope is read once per resolver.
     await resolver.resolve([("gremium", G1)], USER)
     assert gremium_scope["calls"] == 1
 
@@ -432,6 +435,10 @@ def _expense(expense_id: uuid.UUID = EXPENSE, **kw: Any) -> Any:
 
 
 async def test_expenses_need_a_budget_read_permission() -> None:
+    """Require a budget read permission for the expenses.
+
+    A sub-booking opens its parent row, because the list shows it there.
+    """
     sub = _expense(uuid.uuid4(), parent=EXPENSE, payment=date(2026, 4, 9), kind="income")
     session = ScriptedSession(execute=[[(_expense(), "VS-800"), (sub, "VS-800-04")]])
     resolver = LinkResolver(session, FakeAccess())  # type: ignore[arg-type]
@@ -442,7 +449,6 @@ async def test_expenses_need_a_budget_read_permission() -> None:
     assert (seen.detail.amount, seen.detail.cost_centre) == ("42.50", "VS-800")
     assert (seen.detail.booking_kind, seen.detail.counterparty) == ("expense", "Druckerei")
     assert seen.detail.date == "2026-04-03"
-    # A sub-booking opens its parent row: the list shows it there.
     child = out[("expense", sub.id)]
     assert child.url == f"/expenses?id={EXPENSE}"
     assert child.detail is not None and child.detail.date == "2026-04-09"

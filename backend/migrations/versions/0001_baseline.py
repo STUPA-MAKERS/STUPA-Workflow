@@ -69,16 +69,18 @@ WITH DATA
 
 
 def upgrade() -> None:
+    """Create the extensions, the whole schema, the audit triggers and the views.
+
+    The extensions come before ``create_all``, because column defaults and types need them.
+    btree_gist gives the uuid equality operator class for the GIST EXCLUDE constraint
+    ``ex_gremium_membership_no_overlap``, which ``create_all`` emits inline from the model;
+    without it CREATE TABLE fails with "data type uuid has no default operator class for
+    gist". An installed database ran 0001 without the constraint, and 0038 adds it there.
+    ``REFRESH … CONCURRENTLY`` needs a unique index on each materialized view.
+    """
     bind = op.get_bind()
-    # The extensions must exist before create_all. Column defaults and types need them.
     op.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto")
     op.execute("CREATE EXTENSION IF NOT EXISTS citext")
-    # btree_gist gives the uuid equality operator class for the GIST EXCLUDE constraint
-    # on `gremium_membership` (`ex_gremium_membership_no_overlap`).
-    # `create_all` emits that constraint inline from the model. On a fresh database
-    # the extension MUST therefore exist before create_all. If it does not, CREATE TABLE
-    # fails with "data type uuid has no default operator class for gist".
-    # (An installed database ran 0001 without the constraint. There 0038 adds it later.)
     op.execute("CREATE EXTENSION IF NOT EXISTS btree_gist")
 
     Base.metadata.create_all(bind=bind)
@@ -98,7 +100,6 @@ def upgrade() -> None:
     )
     op.execute(_GRANT)
 
-    # `REFRESH … CONCURRENTLY` needs a unique index on each materialized view.
     op.execute(_MV_STATUS)
     op.execute(
         "CREATE UNIQUE INDEX uq_mv_status_distribution "
@@ -107,12 +108,14 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """Drop the views, the schema, the function and the extensions.
+
+    The views go first, because they depend on the tables. ``deadline`` and
+    ``deadline_policy`` go before ``drop_all``, because they reference ``application``;
+    e5b16898d639 removed their models, and its downgrade recreates them.
+    """
     bind = op.get_bind()
-    # Drop the materialized views first, because they depend on the tables. Then drop
-    # the schema, then the function and the extensions.
     op.execute("DROP MATERIALIZED VIEW IF EXISTS mv_status_distribution")
-    # Revision e5b16898d639 removed the models of these tables, and its downgrade
-    # recreates them. They reference `application`, so they must go before drop_all.
     op.execute("DROP TABLE IF EXISTS deadline")
     op.execute("DROP TABLE IF EXISTS deadline_policy")
     Base.metadata.drop_all(bind=bind)

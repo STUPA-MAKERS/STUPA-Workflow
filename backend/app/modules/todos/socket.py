@@ -73,7 +73,7 @@ RECHECK_SECONDS = 300.0
 MAX_CONNECTIONS_PER_PRINCIPAL = 5
 _connection_counts: dict[str, int] = {}
 
-# The inbound throttle of the meeting socket: a burst of 10 frames, then 5 per second.
+#: Inbound throttle, as on the meeting socket: a burst of 10 frames, then 5 per second.
 _THROTTLE_RATE = 5.0
 _THROTTLE_BURST = 10.0
 
@@ -116,6 +116,7 @@ class TodoLiveConnection:
         resolve: PrincipalResolver | None = None,
         clock: Clock = time.monotonic,
     ) -> None:
+        """Bind the socket to the principal, the session, the broker and a clock."""
         self.ws = websocket
         self.principal = principal
         self.session = session
@@ -147,6 +148,9 @@ class TodoLiveConnection:
 
         Returns:
             ``None`` when the session of the socket is gone.
+
+        Each call builds a new access check, because its cache must not keep a right
+        that is gone.
         """
         try:
             if self._resolve is not None:
@@ -164,7 +168,6 @@ class TodoLiveConnection:
                     await self.session.scalars(select(TodoBoard).where(TodoBoard.id.in_(wanted)))
                 ).all()
             }
-            # A new access per subscribe: its cache must not keep a right that is gone.
             access = BoardAccess(self.session)
             return [
                 board_id
@@ -198,11 +201,12 @@ class TodoLiveConnection:
 
         Returns:
             False when the session is gone; the socket is then closed.
+
+        A subscribe that held the lock checked a moment ago, so it skips the check.
         """
         if self._clock() - self._checked_at < RECHECK_SECONDS:
             return True
         async with self._check_lock:
-            # A subscribe that held the lock checked a moment ago.
             if self._clock() - self._checked_at < RECHECK_SECONDS:
                 return True
             kept = await self._readable(sorted(uuid.UUID(b) for b in self.board_ids))
@@ -226,10 +230,13 @@ class TodoLiveConnection:
             return None
 
     async def _receive(self) -> None:
+        """Read and handle the client frames in a loop.
+
+        Every frame counts against the throttle, a bad one too, so a flood of garbage
+        costs the same as a flood of subscribes.
+        """
         while True:
             raw = await self._frame()
-            # Every frame counts against the throttle, a bad one too, so a flood of
-            # garbage costs the same as a flood of subscribes.
             if not self._allow_frame():
                 await self._error("rate_limited")
                 continue
@@ -252,7 +259,10 @@ class TodoLiveConnection:
                 await self.ws.send_json(message)
 
     async def run(self) -> None:
-        """Forward the pings and read the client frames until the disconnect."""
+        """Forward the pings and read the client frames until the disconnect.
+
+        A dead task tears the socket down.
+        """
         async with self.broker.subscribe_pattern(CHANNEL_PATTERN) as subscription:
             pump = asyncio.create_task(self._pump(subscription))
             receive = asyncio.create_task(self._receive())
@@ -265,7 +275,7 @@ class TodoLiveConnection:
                         task.result()
                     except WebSocketDisconnect:
                         pass
-                    except Exception:  # a dead task tears the socket down
+                    except Exception:
                         logger.warning("to-do socket task failed", exc_info=True)
             finally:
                 pump.cancel()
@@ -307,8 +317,10 @@ async def todo_socket(
     broker: Annotated[PatternBroker, Depends(get_todo_ws_broker)],
     resolve: Annotated[PrincipalResolver, Depends(get_todo_ws_resolver)],
 ) -> None:
-    """The change pings of the subscribed boards (``subscribe``, then ``card…``/``board``)."""
-    # The handshake read the session and the principal: end that transaction first.
+    """The change pings of the subscribed boards (``subscribe``, then ``card…``/``board``).
+
+    The handshake read the session and the principal, so that transaction ends first.
+    """
     await session.rollback()
     if principal is None:
         await websocket.close(code=WS_UNAUTHENTICATED)

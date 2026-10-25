@@ -208,11 +208,8 @@ async def require_public_or_session(
         Depends(enforce_ticket_payload_limit),
         Depends(rate_limit_tickets),
         Depends(require_public_or_session),
-        # ALTCHA applies to a report without a session only.
         Depends(verify_altcha_unless_authenticated),
     ],
-    # 400 invalid ALTCHA, 403 public reports off, 413 body too large, 422 validation
-    # (missing email, bad drafts), 429 rate limit.
     responses=_errors(400, 403, 413, 422, 429),
 )
 async def create_ticket(
@@ -226,6 +223,10 @@ async def create_ticket(
     send_mails: Annotated[TicketMailSender, Depends(get_ticket_mail_sender)],
 ) -> TicketCreated:
     """Report a problem, a question or an idea.
+
+    ALTCHA applies to a report without a session only. Errors: 400 invalid ALTCHA, 403
+    public reports off, 413 body too large, 422 validation (missing email, bad drafts),
+    429 rate limit.
 
     With a session the account is the reporter and ``email`` is ignored. Without
     one, ``email`` is required (422). ``attachmentIds`` and ``draftToken`` bind the

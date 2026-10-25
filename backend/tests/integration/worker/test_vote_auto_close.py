@@ -93,6 +93,10 @@ async def _seed_flow(session: AsyncSession) -> tuple[ApplicationType, dict[str, 
 
 
 async def _make_app(session: AsyncSession, app_type: ApplicationType, state: State) -> Application:
+    """Create an application with a confirmed email, as the magic-link verify does.
+
+    The cron skips unconfirmed guest applications.
+    """
     app, _ = await ApplicationsService(session).create(
         ApplicationCreate.model_validate(
             {"typeId": str(app_type.id), "data": {"title": "T"},
@@ -102,8 +106,6 @@ async def _make_app(session: AsyncSession, app_type: ApplicationType, state: Sta
     row = await session.get(Application, app.id)
     assert row is not None
     row.current_state_id = state.id
-    # The cron skips unconfirmed guest applications. Confirm the email, as the
-    # magic-link verify does.
     row.email_confirmed_at = datetime.now(UTC)
     await session.commit()
     return row
@@ -120,6 +122,7 @@ def _ctx(maker: async_sessionmaker[AsyncSession]) -> dict[str, object]:
 async def test_vote_auto_close_fires_branch(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
+    """Close the vote at its deadline and fire the result branch."""
     async with maker() as s:
         app_type, states = await _seed_flow(s)
         app = await _make_app(s, app_type, states["voting"])
@@ -147,4 +150,4 @@ async def test_vote_auto_close_fires_branch(
         assert closed.result == "passed"
         moved = await s.get(Application, app.id)
         assert moved is not None
-        assert moved.current_state_id == states["approved"].id  # the result branch fired
+        assert moved.current_state_id == states["approved"].id

@@ -65,8 +65,11 @@ def test_spread_is_sorted_and_unique(count: int) -> None:
 
 
 def test_thousands_of_appends_and_prepends_need_no_recursion() -> None:
-    # The recursive midpoint took one frame per leading ``z`` and failed after
-    # about 6000 appends; the loop has no such limit.
+    """Append and prepend thousands of times without recursion.
+
+    A recursive midpoint takes one frame per leading ``z`` and fails after about 6000
+    appends. The loop has no such limit.
+    """
     last = between(None, None)
     for _ in range(8000):
         rank = between(last, None)

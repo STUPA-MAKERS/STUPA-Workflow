@@ -11,9 +11,8 @@ from typing import Literal
 
 I18nMap = dict[str, str]
 
-# The supported UI languages. Routes use this type for a query or body field, so the API
-# rejects an invalid value such as `lang=null` with a 422 problem+json instead of letting
-# it pass.
+#: Supported UI languages. A route uses this type for a query or body field, so the API
+#: rejects an invalid value such as ``lang=null`` with a 422 instead of letting it pass.
 Lang = Literal["de", "en"]
 
 DEFAULT_LANG: Lang = "de"

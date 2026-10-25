@@ -122,7 +122,7 @@ ROLE_NAMES = {
     "protocol": {"de": "Protokoll", "en": "Protocol"},
     "finance": {"de": "Finanzen", "en": "Finance"},
 }
-# The final permission catalog. Keep it in sync with app.shared.permissions.
+#: Final permission catalog; keep it in sync with ``app.shared.permissions``.
 _FULL = (
     "application.read",
     "application.create",
@@ -168,10 +168,10 @@ ROLE_PERMISSIONS = {
     ],
 }
 
-# Corporate-design variants (#cd-variants). A variant selects only the document
-# logos. The seeded set reproduces the five hardcoded variants of before. Each
-# logo is a vendored pytex name, so the seed writes nothing into MinIO.
-# (key, display name, base variant, title logos, footer logos)
+#: Corporate-design variants. A variant selects only the document logos. The seed holds
+#: the five original variants. Each logo is a vendored pytex name, so the seed writes
+#: nothing into MinIO. ``CD_VARIANTS`` rows are (key, display name, base variant, title
+#: logos, footer logos).
 CD_VARIANT_IDS = {
     "stupa": "00000000-0000-0000-0000-0000000000d1",
     "asta": "00000000-0000-0000-0000-0000000000d2",
@@ -193,8 +193,8 @@ _GREMIEN = [
     (_STUPA_ID, "StuPa", "stupa", "stupa"),
     (_ASTA_ID, "AStA", "asta", "asta"),
 ]
-# Forced gremium roles. Keep them in sync with FORCED_GREMIUM_ROLES
-# (admin/gremium_roles.py).
+#: Rights of the forced gremium roles; keep them in sync with ``FORCED_GREMIUM_ROLES``
+#: (``admin/gremium_roles.py``).
 _ALL_G = ["session.manage", "vote.manage", "vote.cast", "protocol.write"]
 _FORCED_GREMIUM_ROLES = [
     ("vorstand", {"de": "Vorstand", "en": "Board"}, list(_ALL_G)),
@@ -272,9 +272,9 @@ def _node_id(path_key: str) -> str:
     return str(uuid.uuid5(_NS, path_key))
 
 
-# (key, name, children). Budget plan: income 1–5, expenses 6–11. A key that repeats
-# under the same parent gets +1 (Hilfskräfte 123→124). The dropped Ressorts stay out
-# (134 Internationalität, 136 Demokratie/Politische Bildung).
+#: Budget plan as (key, name, children): income 1–5, expenses 6–11. A key that repeats
+#: under the same parent gets +1 (Hilfskräfte 123→124). The dropped Ressorts stay out
+#: (134 Internationalität, 136 Demokratie/Politische Bildung).
 _VSM_TREE: list = [
     ("1", "Beiträge", []),
     ("2", "Einnahmen aus wirtschaftlicher Betätigung", [
@@ -333,6 +333,7 @@ _VSM_TREE: list = [
 
 
 def _flatten(nodes: list, parent_path: str, parent_id: str | None, out: list) -> None:
+    """Append the budget rows of a subtree; only a top-level node has a gremium_id."""
     for key, name, children in nodes:
         path_key = f"{parent_path}-{key}"
         node_id = _node_id(path_key)
@@ -340,7 +341,7 @@ def _flatten(nodes: list, parent_path: str, parent_id: str | None, out: list) ->
             {
                 "id": node_id,
                 "parent_id": parent_id,
-                "gremium_id": None,  # only a top-level node carries a gremium_id
+                "gremium_id": None,
                 "key": key,
                 "path_key": path_key,
                 "name": name,
@@ -353,6 +354,7 @@ def _flatten(nodes: list, parent_path: str, parent_id: str | None, out: list) ->
 
 
 def upgrade() -> None:
+    """Seed the roles, Gremien, CD variants, mail templates and the budget plan."""
     op.bulk_insert(
         _role,
         [
@@ -462,11 +464,15 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """Delete the seed rows.
+
+    The budgets go first, deepest level first, because the self FK is RESTRICT. The top
+    budgets carry a gremium_id, so they go BEFORE the Gremium delete, or CASCADE and
+    RESTRICT conflict; the deepest node VSM-8-81-810-330 has 4 dashes. The Gremium
+    delete cascades to gremium_role. The CD variants go AFTER the Gremien, because
+    ``gremium.cd_variant_id`` is RESTRICT; their delete cascades to ``cd_variant_logo``.
+    """
     conn = op.get_bind()
-    # Delete the budgets first, deepest level first, because the self FK is RESTRICT.
-    # The top budgets carry a gremium_id, so they must go BEFORE the Gremium delete.
-    # Otherwise CASCADE and RESTRICT conflict. The deepest node VSM-8-81-810-330 has
-    # 4 dashes.
     for depth in range(4, -1, -1):
         conn.execute(
             sa.text(
@@ -476,14 +482,11 @@ def downgrade() -> None:
                 "AND length(path_key) - length(replace(path_key, '-', '')) = :d"
             ).bindparams(d=depth)
         )
-    # The Gremium delete cascades to gremium_role, so that table needs no own delete.
     conn.execute(
         sa.text(
             "DELETE FROM gremium WHERE id IN (CAST(:s AS uuid), CAST(:a AS uuid))"
         ).bindparams(s=_STUPA_ID, a=_ASTA_ID)
     )
-    # The CD variants go AFTER the Gremien, because `gremium.cd_variant_id` is
-    # RESTRICT. The delete cascades to `cd_variant_logo`.
     op.execute(
         sa.delete(_cd_variant).where(_cd_variant.c.id.in_(list(CD_VARIANT_IDS.values())))
     )

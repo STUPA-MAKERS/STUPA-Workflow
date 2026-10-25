@@ -15,8 +15,6 @@ from app.shared.filenames import (
     sanitize_storage_name,
 )
 
-# ---------------------------------------------------------------- display name
-
 
 @pytest.mark.parametrize(
     "raw",
@@ -65,7 +63,7 @@ def test_display_drops_controls_and_line_breaks() -> None:
 
 
 def test_display_drops_lone_surrogates() -> None:
-    # A surrogateescape decode leaves lone surrogates, which Postgres cannot store.
+    """Drop the lone surrogates of a surrogateescape decode, which Postgres cannot store."""
     assert sanitize_display_name("bad\udcff.pdf") == "bad.pdf"
 
 
@@ -74,7 +72,7 @@ def test_display_drops_lone_surrogates() -> None:
     ["\u202a", "\u202b", "\u202c", "\u202d", "\u202e", "\u2066", "\u2067", "\u2068", "\u2069"],
 )
 def test_display_drops_bidi_controls(bidi: str) -> None:
-    # "Rechnung\u202efdp.exe" displays as "Rechnungexe.pdf".
+    """Drop the bidi controls, so an override cannot show "Rechnungfdp.exe" as "Rechnungexe.pdf"."""
     assert sanitize_display_name(f"Rechnung{bidi}fdp.exe") == "Rechnungfdp.exe"
 
 
@@ -85,25 +83,28 @@ def test_display_drops_invisible_characters() -> None:
 @pytest.mark.parametrize(
     "fmt",
     [
-        "‎",  # LRM
-        "‏",  # RLM
-        "؜",  # ALM
-        "­",  # soft hyphen
-        "⁢",  # invisible times
-        "⁪",  # inhibit symmetric swapping
-        "￹",  # interlinear annotation anchor
-        "\U000e0041\U000e0042",  # tag characters: text a person cannot see
+        "\N{LEFT-TO-RIGHT MARK}",
+        "\N{RIGHT-TO-LEFT MARK}",
+        "\N{ARABIC LETTER MARK}",
+        "\N{SOFT HYPHEN}",
+        "\N{INVISIBLE TIMES}",
+        "\N{INHIBIT SYMMETRIC SWAPPING}",
+        "\N{INTERLINEAR ANNOTATION ANCHOR}",
+        "\N{TAG LATIN CAPITAL LETTER A}\N{TAG LATIN CAPITAL LETTER B}",
     ],
 )
 def test_display_drops_every_format_character(fmt: str) -> None:
+    """Drop every format character, tag characters included, which hide text from a person."""
     assert sanitize_display_name(f"Bericht{fmt}final.pdf") == "Berichtfinal.pdf"
 
 
 def test_display_keeps_joiners_inside_and_drops_loose_ones() -> None:
-    # Inside an emoji sequence or a word the joiner stays.
+    """Keep a joiner inside an emoji sequence or a word and drop a loose one.
+
+    At an edge, next to a dot or a space, or doubled, a joiner only hides something.
+    """
     assert sanitize_display_name("a\u200db.pdf") == "a\u200db.pdf"
     assert sanitize_display_name("می\u200cخواهم.pdf") == "می\u200cخواهم.pdf"
-    # At an edge, next to a dot or a space, or doubled, it only hides something.
     assert sanitize_display_name("\u200dabc.pdf\u200c") == "abc.pdf"
     assert sanitize_display_name("abc\u200d.pdf") == "abc.pdf"
     assert sanitize_display_name("a\u200d b.pdf") == "a b.pdf"
@@ -138,9 +139,6 @@ def test_display_cap_drops_a_joiner_that_the_cut_exposed() -> None:
     name = sanitize_display_name(stem + ".pdf")
     assert "\u200d" not in name
     assert name.endswith("x.pdf")
-
-
-# ---------------------------------------------------------------- storage name
 
 
 @pytest.mark.parametrize(
@@ -189,9 +187,6 @@ def test_storage_name_of_a_display_name_never_has_a_separator() -> None:
         out = sanitize_storage_name(sanitize_display_name(raw))
         assert "/" not in out
         assert out not in {"", ".", ".."}
-
-
-# ---------------------------------------------------------------- header
 
 
 def _parts(value: str) -> tuple[str, str, str]:
@@ -253,8 +248,11 @@ def test_disposition_round_trips_a_long_name() -> None:
 
 
 def test_disposition_caps_a_fallback_that_the_fold_expands() -> None:
-    # NFKD makes U+FDFA into 18 characters. Without the cap the header passes 5 KB,
-    # and nginx answers 502 above its proxy_buffer_size of 4 KB.
+    """Cap a fallback name that the NFKD fold expands.
+
+    NFKD makes U+FDFA into 18 characters. Without the cap the header passes 5 KB, and nginx
+    answers 502 above its proxy_buffer_size of 4 KB.
+    """
     name = "ﷺ" * 300 + ".pdf"
     value = content_disposition("attachment", name)
     _kind, plain, ext = _parts(value)

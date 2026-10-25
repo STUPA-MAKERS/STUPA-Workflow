@@ -14,8 +14,7 @@ import pytest
 from app import deps
 from app.settings import load_settings
 
-# The function reads neither the request nor the session itself: the patched
-# helpers take them.
+#: A placeholder request and session. The function does not read them; the patched helpers do.
 _ANY: Any = SimpleNamespace()
 
 

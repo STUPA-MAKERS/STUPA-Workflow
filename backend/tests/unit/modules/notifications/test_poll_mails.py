@@ -80,6 +80,7 @@ async def test_eligible_members_keeps_the_voters_with_an_address() -> None:
 
 
 async def test_start_mail_goes_to_every_voter(mails: type[_Mails]) -> None:
+    """Send one mail per voter, so no recipient sees the others."""
     vote = _poll()
     session = ScriptedSession(execute=[_members()], scalar=["StuPa"])
     sent = await polls.send_poll_mail(
@@ -91,7 +92,6 @@ async def test_start_mail_goes_to_every_voter(mails: type[_Mails]) -> None:
         reminder=False,
     )
     assert sent is True
-    # One mail per member: no recipient sees the others.
     assert [c["recipients"] for c in mails.calls] == [["a@example.org"], ["b@example.org"]]
     assert [c["idempotency_parts"] for c in mails.calls] == [
         ("poll_started", str(vote.id), "a"),

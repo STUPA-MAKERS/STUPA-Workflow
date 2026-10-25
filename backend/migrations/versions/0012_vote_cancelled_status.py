@@ -28,9 +28,9 @@ _UPGRADE: tuple[str, ...] = (
     ),
 )
 
+#: A cancelled vote becomes closed with no result, because the row would break the restored,
+#: narrower constraint.
 _DOWNGRADE: tuple[str, ...] = (
-    # Treat a cancelled vote as closed with no result. Otherwise the row breaks
-    # the restored, narrower constraint.
     "UPDATE vote SET status = 'closed' WHERE status = 'cancelled'",
     "ALTER TABLE vote DROP CONSTRAINT IF EXISTS vote_status",
     (
@@ -41,10 +41,12 @@ _DOWNGRADE: tuple[str, ...] = (
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     for stmt in _UPGRADE:
         op.execute(stmt)
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     for stmt in _DOWNGRADE:
         op.execute(stmt)

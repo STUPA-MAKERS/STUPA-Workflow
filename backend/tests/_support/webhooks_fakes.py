@@ -34,13 +34,14 @@ class _Nested:
         return self
 
     async def __aexit__(self, exc_type: Any, *_a: Any) -> bool:
+        """Let the error propagate, because the service catches IntegrityError."""
         if exc_type is not None:
             for obj in self.session.added[self.mark :]:
                 oid = getattr(obj, "id", None)
                 if oid is not None:
                     self.session.store.pop(oid, None)
             del self.session.added[self.mark :]
-        return False  # Let the error propagate. The service catches IntegrityError.
+        return False
 
 
 class FakeSession:

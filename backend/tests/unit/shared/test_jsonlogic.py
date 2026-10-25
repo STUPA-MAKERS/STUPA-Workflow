@@ -137,8 +137,9 @@ def test_non_number_arithmetic_raises() -> None:
 
 
 def test_validate_jsonlogic_ok_and_unknown() -> None:
+    """Accept a literal and valid rules; reject an unknown operator and a rule with two keys."""
     validate_jsonlogic({"and": [{"==": [{"var": "x"}, 1]}, {"in": ["a", {"var": "list"}]}]})
-    validate_jsonlogic(5)  # literal ok
+    validate_jsonlogic(5)
     with pytest.raises(JsonLogicError, match="unknown operator"):
         validate_jsonlogic({"system": ["rm"]})
     with pytest.raises(JsonLogicError):

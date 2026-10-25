@@ -8,45 +8,50 @@ catalog.
 On the sending side `NotificationService.filter_by_preference` filters the
 recipient addresses through this catalog. An unknown kind is never filtered, so
 a send fails open. The API still answers 422 when a caller saves an unknown key.
+
+The kinds:
+
+- ``status_update``: status changes and updates on own applications (flow notify).
+- ``comment``: new comments on applications that concern the user.
+- ``task``: an application reached a state where the own role can act.
+- ``task_reminder``: reminder for an open task that did not move.
+- ``meeting``: a meeting invitation or an agenda was published.
+- ``delegation``: a vote delegation was received or revoked.
+- ``protocol``: a meeting protocol was finalized.
+- ``privacy``: GDPR erasure requests (received, executed, rejected).
+- ``ticket_created``: a new ticket was reported (holders of ``ticket.manage``). The
+  confirmation to the reporter (``ticket_received``) is not here, so nobody can switch
+  it off.
+- ``ticket_message``: the reporter wrote on a ticket (the assignee, else every holder
+  of ``ticket.manage``).
+- ``ticket_answer``: the team answered publicly on a ticket that the user reported.
+- ``todo_assigned``, ``todo_mentioned``, ``todo_due``: a to-do was assigned, the user
+  was mentioned in a to-do comment, or an assigned to-do is due the next day.
+- ``mention``: the user was mentioned in an application comment or a ticket note
+  (``comment_mentioned``, ``ticket_mentioned``).
+- ``poll_started``: a poll of a Gremium of the user started (members with
+  ``vote.cast``).
+- ``poll_reminder``: 24 h before the end of a poll that the user has not answered.
 """
 
 from __future__ import annotations
 
 NOTIFICATION_KINDS: tuple[str, ...] = (
-    # Status changes and updates on own applications (flow notify actions).
     "status_update",
-    # New comments on applications that concern the user.
     "comment",
-    # An application reached a state where the own role can act.
     "task",
-    # Reminder for an open task that did not move.
     "task_reminder",
-    # A meeting invitation or an agenda was published.
     "meeting",
-    # A vote delegation was received or revoked.
     "delegation",
-    # A meeting protocol was finalized.
     "protocol",
-    # GDPR erasure requests: received, executed or rejected.
     "privacy",
-    # A new ticket was reported (holders of ticket.manage). The confirmation to the
-    # reporter (`ticket_received`) is not here, so nobody can switch it off.
     "ticket_created",
-    # The reporter wrote on a ticket (the assignee, else every holder of ticket.manage).
     "ticket_message",
-    # The team answered publicly on a ticket that the user reported.
     "ticket_answer",
-    # A to-do was assigned to the user.
     "todo_assigned",
-    # The user was mentioned in a comment of a to-do.
     "todo_mentioned",
-    # Reminder the day before an assigned to-do is due.
     "todo_due",
-    # The user was mentioned in a comment on an application or in a ticket note
-    # (`comment_mentioned`, `ticket_mentioned`).
     "mention",
-    # A poll of a Gremium of the user started (members with vote.cast).
     "poll_started",
-    # Reminder 24 h before the end of a poll that the user has not answered.
     "poll_reminder",
 )

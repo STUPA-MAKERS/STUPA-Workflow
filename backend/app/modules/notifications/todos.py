@@ -174,7 +174,7 @@ async def notify_todo_mails(
             async with _maker(sessionmaker)() as session:
                 if await send_todo_mail(session, queue=queue, settings=settings, mail=mail):
                     sent += 1
-        except Exception:  # a mail must never break the write
+        except Exception:
             logger.exception("%s mail failed", mail.kind)
     return sent
 

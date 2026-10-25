@@ -51,9 +51,8 @@ logger = logging.getLogger("app.webhooks")
 
 OutcomeKind = Literal["ok", "retry", "dead", "gone"]
 
-# Only the HTTP status code matters. The code never reads the response body for content.
-# A malicious or compromised receiver could OOM-kill the shared arq worker with a
-# multi-GB body, so the reader streams the body and stops at this hard limit.
+#: Cap of a read response body. Only the status code matters, and a malicious receiver
+#: could OOM-kill the shared worker with a multi-GB body, so the reader stops here.
 _MAX_RESPONSE_BYTES = 64 * 1024
 
 
@@ -73,6 +72,7 @@ class DeliveryOutcome:
 
 @dataclass(slots=True)
 class WebhookService:
+    """Deliver outgoing webhooks: create the delivery rows and send them from the worker."""
     session: AsyncSession
     settings: Settings
     queue: WebhookQueue | None = None
@@ -153,7 +153,14 @@ class WebhookService:
         resolver: Resolver = default_resolver,
         now: dt.datetime | None = None,
     ) -> DeliveryOutcome:
-        """Send one delivery from the worker and persist the resulting status."""
+        """Send one delivery from the worker and persist the resulting status.
+
+        A security block of the target is permanent, so it is not retried. Its log line
+        drops the error detail, because the detail holds the host and the resolved IP
+        and would leak the internal network topology. The connection is pinned to the
+        validated IP against DNS rebinding, so the client does no second resolution; the
+        Host header and the TLS SNI keep the original host.
+        """
         import httpx
 
         moment = now or dt.datetime.now(tz=dt.UTC)
@@ -175,9 +182,6 @@ class WebhookService:
                 resolver=resolver,
             )
         except SsrfError:
-            # A security block is permanent, so do not retry. The target does not change.
-            # The log line drops the error detail on purpose. That detail holds the host
-            # and the resolved IP and would leak the internal network topology.
             logger.warning(
                 "webhook delivery %s (webhook=%s) blocked by ssrf guard",
                 delivery_id,
@@ -185,8 +189,6 @@ class WebhookService:
             )
             return await self._finish(delivery, "dead", moment, response_code=None)
 
-        # Pin against DNS rebinding. Connect to the validated IP and let the client do no
-        # second resolution. The Host header and the TLS SNI keep the original host.
         ip_url, host_header = pin_url(hook.url, ips[0])
         body = canonical_body(delivery.payload)
         headers = build_headers(
@@ -234,13 +236,11 @@ class WebhookService:
                     async for chunk in response.aiter_bytes():
                         read += len(chunk)
                         if read >= _MAX_RESPONSE_BYTES:
-                            # The body is too large. Stop, the status code is known.
                             break
                     return response.status_code
                 finally:
                     await response.aclose()
         except TimeoutError as exc:
-            # The total deadline expired. Treat it like a transport timeout and retry.
             raise httpx.TimeoutException(
                 "webhook delivery exceeded total deadline"
             ) from exc
@@ -252,14 +252,16 @@ class WebhookService:
         status_code: int,
         delivery_id: UUID,
     ) -> DeliveryOutcome:
-        """Map the status code to a final state or to a retry."""
+        """Map the status code to a final state or to a retry.
+
+        A 4xx is a client or config error that a retry does not change, so it goes to
+        the dead-letter state at once.
+        """
         if 200 <= status_code < 300:
             return await self._finish(
                 delivery, "ok", moment, response_code=status_code
             )
         if 400 <= status_code < 500:
-            # A 4xx is a client error or a config error. A retry changes nothing, so go
-            # to the dead-letter state at once.
             logger.warning(
                 "webhook delivery %s dead — non-retryable %s",
                 delivery_id,

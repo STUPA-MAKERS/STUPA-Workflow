@@ -61,7 +61,7 @@ logger = logging.getLogger("alembic.runtime.migration")
 _DROPPED: tuple[str, ...] = ("vote.cast", "vote.manage")
 _DROPPED_SQL = ", ".join(f"'{p}'" for p in _DROPPED)
 
-# The seed grants of 0002 per seeded global role, for the downgrade.
+#: The seed grants of 0002 per seeded global role, for the downgrade.
 _SEED_GRANTS: dict[str, tuple[str, ...]] = {
     "admin": ("vote.cast", "vote.manage"),
     "manager": ("vote.manage",),
@@ -93,10 +93,13 @@ _ROLES_WITH_DROPPED = (
 )
 
 
-# A principal holds a global role through an active role_assignment or through an
-# OIDC group that a group_mapping links to the role. See `rbac.resolve_principal`.
-# `role_cond` filters the `role_permission` row `rp` of that role.
 def _holds_role(role_cond: str) -> str:
+    """Return the SQL condition that a principal holds the global role of ``rp``.
+
+    A principal holds a global role through an active role_assignment or through an OIDC
+    group that a group_mapping links to the role (see ``rbac.resolve_principal``).
+    ``role_cond`` filters the ``role_permission`` row ``rp`` of that role.
+    """
     return f"""
     (EXISTS (
         SELECT 1 FROM role_assignment ra
@@ -171,7 +174,7 @@ def _report() -> None:
             )
 
 
-# Step 5: a gremium role that runs the sessions also finalizes their protocols.
+#: Step 5: a gremium role that runs the sessions also finalizes their protocols.
 _GRANT_FINALIZE = """
     UPDATE gremium_role
     SET permissions = COALESCE(permissions, '[]'::jsonb) || '["protocol.finalize"]'::jsonb
@@ -181,13 +184,17 @@ _GRANT_FINALIZE = """
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     _report()
     op.execute(f"DELETE FROM role_permission WHERE permission IN ({_DROPPED_SQL})")
     op.execute(_GRANT_FINALIZE)
 
 
 def downgrade() -> None:
-    # Step 5 of the upgrade stays: see the module docstring.
+    """Downgrade the schema to the previous revision.
+
+    Step 5 of the upgrade stays (see the module docstring).
+    """
     for role_key, perms in _SEED_GRANTS.items():
         for perm in perms:
             op.execute(

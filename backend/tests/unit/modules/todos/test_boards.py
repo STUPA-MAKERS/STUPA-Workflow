@@ -55,7 +55,8 @@ async def test_the_personal_board_exists_or_a_parallel_read_won() -> None:
     assert raced.added == [] and raced.committed == 0
 
 
-def _pg():  # the dialect object
+def _pg():
+    """Return the PostgreSQL dialect object."""
     from sqlalchemy.dialects import postgresql
 
     return postgresql.dialect()

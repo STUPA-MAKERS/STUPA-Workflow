@@ -133,6 +133,7 @@ class BoardAccess:
     """The board rules of one request. It caches the per-principal lookups."""
 
     def __init__(self, session: AsyncSession) -> None:
+        """Bind the access check to a session; the rights are cached per instance."""
         self.session = session
         self._me: dict[str, uuid.UUID | None] = {}
         self._gremien: dict[tuple[_CacheKey, str], GremiumScope] = {}
@@ -153,7 +154,11 @@ class BoardAccess:
         return self._gremien[key]
 
     async def scope(self, principal: Principal) -> ReadScope:
-        """Return the read scope of the principal (empty for a token without the scope)."""
+        """Return the read scope of the principal (empty for a token without the scope).
+
+        A token reaches a team board through the global key only when its scope lets the
+        team permission through (``global_reach``).
+        """
         if _cache_key(principal) in self._scopes:
             return self._scopes[_cache_key(principal)]
         scope = ReadScope()
@@ -161,8 +166,6 @@ class BoardAccess:
         native = principal.scope_allows(TODO_WRITE)
         if everything:
             scope.all_gremien = True
-            # A token reaches a team board through the global key only when its
-            # scope lets the team permission through (``global_reach``).
             scope.all_teams = principal.scope_permissions is None
         if native:
             if not scope.all_gremien:

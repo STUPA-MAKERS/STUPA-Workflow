@@ -11,7 +11,7 @@ from app import settings as settings_mod
 from app.settings import Settings, SettingsError, load_settings
 
 REQUIRED = ["DATABASE_URL", "SESSION_SECRET", "MAGIC_LINK_SECRET"]
-# A secret needs 16 characters or more. The test values are that long.
+#: A secret needs 16 characters or more.
 _OK_SECRET = "x" * 16
 
 
@@ -65,19 +65,24 @@ def test_missing_required_secret_raises_clear_error(
 
 
 def test_optional_have_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Give the optional settings their defaults.
+
+    The forwarded IPs have a narrow default, not "*". CORS is off by default.
+    """
     monkeypatch.setenv("DATABASE_URL", "x")
     monkeypatch.setenv("SESSION_SECRET", _OK_SECRET)
     monkeypatch.setenv("MAGIC_LINK_SECRET", _OK_SECRET)
     s = load_settings(_env_file=None)
     assert s.app_name
-    assert s.forwarded_allow_ips  # narrow default, not "*"
-    assert s.cors_allow_origins == []  # CORS is off by default
+    assert s.forwarded_allow_ips
+    assert s.cors_allow_origins == []
 
 
 def test_short_secret_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fail the boot for a secret under 16 characters."""
     monkeypatch.setenv("DATABASE_URL", "x")
     monkeypatch.setenv("SESSION_SECRET", _OK_SECRET)
-    monkeypatch.setenv("MAGIC_LINK_SECRET", "too-short")  # under 16 characters, so boot fails
+    monkeypatch.setenv("MAGIC_LINK_SECRET", "too-short")
     with pytest.raises(SettingsError):
         load_settings(_env_file=None)
 
@@ -100,9 +105,10 @@ def test_strict_security_default_on_and_dev_env(monkeypatch: pytest.MonkeyPatch)
 
 
 def test_production_env_enables_strict(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Enable the strict settings in production, where "*" is forbidden for the forwarded IPs."""
     _base_env(monkeypatch)
     monkeypatch.setenv("ENVIRONMENT", "production")
-    monkeypatch.setenv("FORWARDED_ALLOW_IPS", "172.18.0.2")  # "*" is forbidden in production
+    monkeypatch.setenv("FORWARDED_ALLOW_IPS", "172.18.0.2")
     s = load_settings(_env_file=None)
     assert s.is_production is True
     assert s.strict_security_enabled is True

@@ -37,7 +37,7 @@ TRACE_HEADER = "X-Trace-Id"
 PROBLEM_JSON = "application/problem+json"
 _HOUR = 3600
 
-# Strict CSP for a pure JSON API: no active content, no framing (clickjacking).
+#: Strict CSP for a pure JSON API: no active content, no framing (clickjacking).
 _API_CSP = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
 
 _SECURITY_HEADERS = {
@@ -49,14 +49,17 @@ _SECURITY_HEADERS = {
 }
 
 _SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "TRACE"})
-# The public meeting routes. They apply their own rate limits.
+#: Prefix of the public meeting routes, which apply their own rate limits.
 PUBLIC_MEETING_PREFIX = "/api/public/meetings/"
 
 Dispatch = Callable[[Request], Awaitable[Response]]
 
 
 class RequestContextMiddleware(BaseHTTPMiddleware):
+    """Give every request a trace id and return it in ``X-Trace-Id``."""
+
     async def dispatch(self, request: Request, call_next: Dispatch) -> Response:
+        """Set ``request.state.trace_id`` and echo it on the response."""
         trace_id = uuid.uuid4().hex
         request.state.trace_id = trace_id
         response = await call_next(request)
@@ -69,15 +72,16 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
     A route can replace a default on purpose: the inline attachment preview sets its
     own CSP and ``X-Frame-Options: SAMEORIGIN`` (see `app.modules.files.router`).
+    Every answer of a public route (protocols page, QR join), an error included,
+    carries noindex, because these routes are never for search engines.
     """
 
     async def dispatch(self, request: Request, call_next: Dispatch) -> Response:
+        """Set the missing default headers on the response."""
         response = await call_next(request)
         for key, value in _SECURITY_HEADERS.items():
             response.headers.setdefault(key, value)
         if request.url.path.startswith(PUBLIC_API_PREFIX):
-            # The public routes (protocols page, QR join) are never for search
-            # engines: every answer, an error included, carries noindex.
             response.headers["X-Robots-Tag"] = "noindex"
         return response
 
@@ -114,9 +118,14 @@ class CsrfMiddleware(BaseHTTPMiddleware):
     header that `Settings.csrf_header_name` names must match the CSRF cookie. The
     compare runs in constant time. The middleware sets the CSRF cookie on any
     response that lacks it, so the frontend can mirror it.
+
+    The CSRF cookie is not HttpOnly, because the frontend must read it. SameSite=Lax
+    gives base protection, and Secure follows the auth cookies. It lives as long as the
+    longest session, so a tab that stays open does not lose it before its session ends.
     """
 
     def __init__(self, app: object, settings: Settings | None = None) -> None:
+        """Wrap the app; the settings default to the process settings."""
         super().__init__(app)  # type: ignore[arg-type]
         self._settings = settings or get_settings()
 
@@ -136,6 +145,7 @@ class CsrfMiddleware(BaseHTTPMiddleware):
         )
 
     async def dispatch(self, request: Request, call_next: Dispatch) -> Response:
+        """Refuse an unsafe cookie request with a bad token (403); issue the cookie."""
         settings = self._settings
         enforce = (
             settings.csrf_enabled
@@ -151,10 +161,6 @@ class CsrfMiddleware(BaseHTTPMiddleware):
 
         response = await call_next(request)
 
-        # Issue the CSRF cookie when it is missing. It is non-HttpOnly because the
-        # frontend must read it. SameSite=Lax gives base protection. Secure follows
-        # the auth cookies. It lives as long as the longest session, so a tab that
-        # stays open does not lose it before its session ends.
         if settings.csrf_enabled and not request.cookies.get(settings.csrf_cookie_name):
             response.set_cookie(
                 settings.csrf_cookie_name,
@@ -198,6 +204,10 @@ class DefaultWriteRateLimitMiddleware(BaseHTTPMiddleware):
     scope passes through, because BaseHTTPMiddleware forwards a non-http scope.
     The middleware answers 429 with `Retry-After` as problem+json. With rate
     limiting off, the builder returns a no-op limiter.
+
+    The public meeting routes are exempt, because they carry their own limits per IP,
+    per join code and per guest; many guests share one IP, and the default limit per IP
+    would stop a meeting in the middle of a vote.
     """
 
     def __init__(
@@ -206,15 +216,14 @@ class DefaultWriteRateLimitMiddleware(BaseHTTPMiddleware):
         settings: Settings | None = None,
         limiter: RateLimiter | None = None,
     ) -> None:
+        """Wrap the app; a test can inject the settings and the limiter."""
         super().__init__(app)  # type: ignore[arg-type]
         self._settings = settings or get_settings()
         self._limiter = limiter
 
     async def dispatch(self, request: Request, call_next: Dispatch) -> Response:
+        """Count an unsafe request against its bucket; answer 429 beyond the limit."""
         settings = self._settings
-        # The public meeting routes carry their own limits per IP, per join code
-        # and per guest. Many guests often share one IP, and the default limit per IP
-        # would stop a meeting in the middle of a vote.
         exempt = str(request.scope.get("path", "")).startswith(PUBLIC_MEETING_PREFIX)
         if request.method not in _SAFE_METHODS and not exempt:
             limiter = self._limiter or get_rate_limiter(request, settings)

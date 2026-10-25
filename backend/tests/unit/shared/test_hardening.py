@@ -50,7 +50,6 @@ def _csrf_app(settings: Settings) -> TestClient:
     return TestClient(app)
 
 
-# CSRF double-submit checks.
 def test_csrf_write_without_auth_cookie_allowed() -> None:
     """A write without an auth cookie has nothing to protect, so it passes (public POST)."""
     s = _settings()
@@ -151,6 +150,8 @@ def test_csrf_defaults_match_angular_fe_flow() -> None:
     (frontend/.../auth.interceptor.ts) reads the cookie `XSRF-TOKEN` and sends the
     header `X-XSRF-TOKEN`. This test replays the real flow. The cookie plus the
     mirrored header returns 2xx. The cookie without the header returns 403.
+
+    The frontend never writes without a token.
     """
     s = _settings()
     assert s.csrf_cookie_name == "XSRF-TOKEN"
@@ -159,10 +160,9 @@ def test_csrf_defaults_match_angular_fe_flow() -> None:
     client.cookies.set(s.session_cookie_name, "sess")
     client.cookies.set("XSRF-TOKEN", "fe-token")
     assert client.post("/w", headers={"X-XSRF-TOKEN": "fe-token"}).status_code == 200
-    assert client.post("/w").status_code == 403  # the FE never writes without a token
+    assert client.post("/w").status_code == 403
 
 
-# Default rate limit on write endpoints
 def _wlimit_app(settings: Settings, limiter: InMemoryRateLimiter) -> TestClient:
     app = FastAPI()
     app.add_middleware(
@@ -182,10 +182,11 @@ def _wlimit_app(settings: Settings, limiter: InMemoryRateLimiter) -> TestClient:
 
 
 def test_default_write_limit_blocks_second_with_retry_after() -> None:
+    """Let the first write pass and give 429 with Retry-After for the second."""
     s = _settings(rl_default_write_per_hour=1)
     client = _wlimit_app(s, InMemoryRateLimiter())
-    assert client.post("/w").status_code == 200  # the first write passes
-    resp = client.post("/w")  # the second write gives 429
+    assert client.post("/w").status_code == 200
+    resp = client.post("/w")
     assert resp.status_code == 429
     assert int(resp.headers["retry-after"]) >= 1
     assert resp.json()["code"] == "rate_limited"
@@ -193,9 +194,10 @@ def test_default_write_limit_blocks_second_with_retry_after() -> None:
 
 
 def test_default_write_limit_noop_for_safe_method() -> None:
+    """Never throttle a GET, even over the limit."""
     s = _settings(rl_default_write_per_hour=1)
     client = _wlimit_app(s, InMemoryRateLimiter())
-    for _ in range(5):  # over the limit, but a GET is never throttled
+    for _ in range(5):
         assert client.get("/r").status_code == 200
 
 
@@ -220,7 +222,6 @@ def test_default_write_limit_ignores_an_unsigned_session_cookie() -> None:
     assert client.post("/w").status_code == 429
 
 
-# Proxy trust and X-Forwarded spoofing
 def test_client_ip_ignores_x_forwarded_for() -> None:
     """`client_ip` parses no X-Forwarded-For, so a spoofed header cannot change the key.
 
@@ -239,7 +240,6 @@ def test_client_ip_ignores_x_forwarded_for() -> None:
     assert client_ip(req) == "1.2.3.4"
 
 
-# The proxy wildcard is forbidden in production
 def test_wildcard_forwarded_allow_ips_rejected_in_production() -> None:
     with pytest.raises(SettingsError):
         _settings(environment="production", forwarded_allow_ips="*")

@@ -40,6 +40,7 @@ _CK = "ck_meeting_attendance_self_status"
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     bind = op.get_bind()
     op.execute(f"ALTER TABLE meeting_attendance DROP CONSTRAINT IF EXISTS {_CK}")
     op.execute(
@@ -60,4 +61,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     op.execute(f"ALTER TABLE meeting_attendance DROP CONSTRAINT IF EXISTS {_CK}")

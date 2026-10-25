@@ -23,20 +23,23 @@ from tests.unit.modules.todos.fakes import (
 
 
 async def test_erase_todos_drops_the_assignments_and_the_personal_board() -> None:
+    """Drop the assignments and the personal board at an erasure.
+
+    The board and its cards are locked, in id order, before the comment ids are read. Only
+    the rows are deleted here, and the objects wait for the commit of the caller. The file
+    rows are locked before the first audit entry of the drop.
+    """
     comment_id = uuid.uuid4()
     session = ScriptedSession(scalars=[[comment_id]])
     files = FakeFiles()
     keys = await erase_todos(session, ME, files=files, actor="admin")  # type: ignore[arg-type]
     board_lock, card_lock, lookup, first, second = (str(s) for s in session.statements)
-    # The board and its cards are locked, in id order, before the comment ids are read.
     assert board_lock.startswith("SELECT todo_board.id") and "todo_board.kind" in board_lock
     assert "ORDER BY todo_board.id" in board_lock and board_lock.endswith("FOR UPDATE")
     assert card_lock.startswith("SELECT todo_card.id") and "todo_board.owner_id" in card_lock
     assert "ORDER BY todo_card.id" in card_lock and card_lock.endswith("FOR UPDATE")
     assert "todo_comment.id" in lookup and "todo_board.owner_id" in lookup
-    # Only the rows go here; the objects wait for the commit of the caller.
     assert files.dropped == [([comment_id], "admin")] and files.removed == []
-    # The file rows are locked before the first audit entry of the drop.
     assert files.locked == [[comment_id]]
     assert keys == [f"key-{comment_id}"]
     assert first.startswith("DELETE FROM todo_assignee")
@@ -50,6 +53,7 @@ async def test_erase_todos_builds_its_own_files_service() -> None:
 
 
 async def test_todo_export() -> None:
+    """Export the to-do data; without comments no file query runs."""
     assert await todo_export(ScriptedSession(), []) == {"cards": [], "comments": []}  # type: ignore[arg-type]
     b = board(name="StuPa")
     col = column(b.id, "Offen")
@@ -84,7 +88,6 @@ async def test_todo_export() -> None:
         }
     ]
     assert "attachment.todo_comment_id IN" in str(session.statements[2])
-    # Without comments no file query runs.
     session = ScriptedSession(execute=[[], []])
     out = await todo_export(session, [ME])  # type: ignore[arg-type]
     assert out["comments"] == []

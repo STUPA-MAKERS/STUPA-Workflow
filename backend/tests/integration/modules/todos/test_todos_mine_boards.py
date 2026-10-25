@@ -47,6 +47,14 @@ def _card(client: TestClient, board_id: str, title: str, **kw: Any) -> dict[str,
 async def test_the_rows_hold_only_my_live_cards_on_boards_i_read(
     api: Api, maker: async_sessionmaker[AsyncSession]
 ) -> None:
+    """Hold only my live cards on the boards that I can read.
+
+    The team members come from the roles in the database, so the test writes the assignee
+    there. A move through the normal route reorders the row on the source board. The other
+    person sees only their own cards. The ETag follows the viewer, so my tag does not match
+    the rows of another person. Without the membership, the AStA board is gone, although the
+    card still names me. Without the permission, the team board is gone too.
+    """
     stupa, stupa_board = await add_gremium(maker, "StuPa")
     asta, asta_board = await add_gremium(maker, "AStA")
     _fsi, fsi_board = await add_gremium(maker, "FSI")
@@ -74,7 +82,6 @@ async def test_the_rows_hold_only_my_live_cards_on_boards_i_read(
         _ok(client.delete(f"/api/todos/cards/{gone['id']}"), 204)
         asta_card = _card(client, str(asta_board), "Haushalt", assigneeIds=[str(me_id)])
         ticket = _card(client, str(team_board), "Ticket")
-        # The team members come from the roles in the database; write the assignee there.
         async with maker() as session:
             session.add(TodoAssignee(card_id=uuid.UUID(ticket["id"]), principal_id=me_id))
             await session.commit()
@@ -94,7 +101,6 @@ async def test_the_rows_hold_only_my_live_cards_on_boards_i_read(
         assert [c["id"] for c in rows[0]["cards"]] == [asta_card["id"]]
         assert [c["title"] for c in rows[2]["cards"]] == ["Ticket"]
 
-        # A move through the normal route reorders the row on the source board.
         _ok(
             client.post(
                 f"/api/todos/cards/{second['id']}/move",
@@ -107,16 +113,12 @@ async def test_the_rows_hold_only_my_live_cards_on_boards_i_read(
         etag = client.get(ROWS).headers["ETag"]
         assert client.get(ROWS, headers={"If-None-Match": etag}).status_code == 304
 
-        # The other person sees only their own cards.
         api.login(other)
         theirs = _ok(client.get(ROWS))
         assert [b["name"] for b in theirs] == ["StuPa"]
         assert [c["title"] for c in theirs[0]["cards"]] == ["Raum", "Fremd"]
-        # The ETag follows the viewer: my tag does not match the rows of another person.
         assert client.get(ROWS, headers={"If-None-Match": etag}).status_code == 200
 
-    # Without the membership the AStA board is gone, although the card still names me;
-    # without the permission the team board is gone too.
     async with maker() as session:
         await session.execute(
             delete(GremiumMembership).where(

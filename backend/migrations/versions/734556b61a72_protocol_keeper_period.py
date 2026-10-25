@@ -78,7 +78,7 @@ _CREATE: tuple[str, ...] = (
     "ON protocol_keeper_period (meeting_id) WHERE from_at IS NULL",
 )
 
-# One period per live or closed meeting with a protokollant and without a period.
+#: One period per live or closed meeting with a protokollant and without a period.
 _BACKFILL = """
     INSERT INTO protocol_keeper_period (meeting_id, principal_id, from_at, to_at, handed_over_by)
     SELECT m.id, m.protokollant_id, s.from_at,
@@ -106,6 +106,7 @@ _BACKFILL = """
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     for stmt in _CREATE:
         op.execute(stmt)
     added = op.get_bind().execute(sa.text(_BACKFILL)).rowcount
@@ -113,4 +114,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     op.execute("DROP TABLE IF EXISTS protocol_keeper_period")

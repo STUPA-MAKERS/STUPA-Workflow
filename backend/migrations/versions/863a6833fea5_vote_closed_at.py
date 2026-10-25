@@ -68,6 +68,7 @@ RETURNING v.id
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     bind = op.get_bind()
     op.execute("ALTER TABLE vote ADD COLUMN IF NOT EXISTS closed_at timestamptz")
 
@@ -110,5 +111,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # `allowChange` is not restored: see the module docstring.
+    """Downgrade the schema to the previous revision.
+
+    ``allowChange`` is not restored (see the module docstring).
+    """
     op.execute("ALTER TABLE vote DROP COLUMN IF EXISTS closed_at")

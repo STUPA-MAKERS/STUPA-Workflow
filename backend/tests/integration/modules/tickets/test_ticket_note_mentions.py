@@ -44,6 +44,12 @@ async def _ticket(maker: async_sessionmaker[AsyncSession], reporter: uuid.UUID) 
 async def test_a_team_note_mentions_managers_and_mails_the_new_ones(
     api: Api, maker: async_sessionmaker[AsyncSession]
 ) -> None:
+    """Mention managers in a team note and mail the new ones.
+
+    At first every mention is new, and the mail drops the author itself. A stored mention of
+    a person who lost ``ticket.manage`` stays on an edit. The reporter sees the public note
+    without the mentions and cannot mention.
+    """
     me = await add_principal(maker, sub=MANAGER.sub, email=MANAGER.email, name="Mia", role="admin")
     ada = await add_principal(maker, name="Ada", role="admin")
     bob = await add_principal(maker, name="Bob", role="admin")
@@ -77,7 +83,6 @@ async def test_a_team_note_mentions_managers_and_mails_the_new_ones(
             {"principalId": str(me), "displayName": "Mia"},
         ]
         note_id = uuid.UUID(note["id"])
-        # Every mention is new; the mail drops the author itself.
         assert mails.calls == [(note_id, [ada, me])]
 
         kept = client.patch(f"/api/tickets/{ticket_id}/notes/{note_id}", json={"body": "neu"})
@@ -100,7 +105,6 @@ async def test_a_team_note_mentions_managers_and_mails_the_new_ones(
         assert refused.status_code == 422
         assert refused.json()["code"] == "mention_not_member"
 
-        # A stored mention of a person who lost ticket.manage stays on an edit.
         async with maker() as session:
             row = await session.get(TicketNote, note_id)
             assert row is not None
@@ -121,7 +125,6 @@ async def test_a_team_note_mentions_managers_and_mails_the_new_ones(
         detail = client.get(f"/api/tickets/{ticket_id}").json()
         assert [m["displayName"] for m in detail["notes"][0]["mentions"]] == ["Bob", "Ada"]
 
-        # The reporter sees the public note without the mentions and cannot mention.
         api.login(Principal(sub=reporter_sub))
         mine = client.get(f"/api/tickets/mine/{ticket_id}").json()
         assert mine["notes"][0]["mentions"] == []

@@ -36,6 +36,7 @@ class TicketTodoBridge:
         *,
         broker: PatternBroker | None = None,
     ) -> None:
+        """Bind the bridge to a session, the to-do service and the ping broker."""
         self.session = session
         self.todos = service or TodoService(session)
         self.broker = broker
@@ -68,7 +69,12 @@ class TicketTodoBridge:
         return len(await self._open_cards(ticket_id, principal))
 
     async def complete(self, ticket_id: uuid.UUID, principal: Principal) -> None:
-        """Move the open linked cards that the principal can write into done."""
+        """Move the open linked cards that the principal can write into done.
+
+        One transaction locks every board of the loop. The order by board id (the order
+        of the archive cron) keeps two closes on the same boards apart, and the stable
+        sort keeps the creation order of the cards of one board.
+        """
         cards = [
             (card, board)
             for card, board in await self._open_cards(ticket_id, principal)
@@ -78,9 +84,6 @@ class TicketTodoBridge:
         if not cards or actor is None:
             return
         moved = False
-        # One transaction locks every board of the loop; the order by board id (the
-        # order of the archive cron) keeps two closes on the same boards apart.
-        # The sort is stable, so the cards of one board keep their creation order.
         for card, board in sorted(cards, key=lambda pair: pair[1].id):
             moved = await self.todos.complete(card, board, actor) or moved
         if moved:
