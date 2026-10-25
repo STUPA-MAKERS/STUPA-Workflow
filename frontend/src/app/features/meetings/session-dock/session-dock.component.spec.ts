@@ -80,10 +80,10 @@ describe('SessionDockComponent', () => {
       expect(screen.getByText('Deine Stimme', { exact: false })).toHaveTextContent('Deine Stimme: Ja');
     });
 
+    /** The way back wins over the own ballot. */
     it('points back to the item that runs now', async () => {
       const { on } = await setup({ meeting: meeting({ currentAgendaItemId: 't-2' }), myVote: 'Ja' });
       expect(screen.getByText('Jetzt läuft TOP 2 · Bericht des Finanzreferats')).toBeInTheDocument();
-      // The way back wins over the own ballot.
       expect(screen.queryByText(/Deine Stimme/)).toBeNull();
       await userEvent.click(screen.getByRole('button', { name: 'Zurück zu Jetzt' }));
       expect(on.jumpNow).toHaveBeenCalledWith('t-2');
@@ -97,6 +97,7 @@ describe('SessionDockComponent', () => {
       expect(screen.getByText('Jetzt läuft TOP 2 · Unbenannter TOP')).toBeInTheDocument();
     });
 
+    /** The sheet belongs to the page; the dock opens no popover for it. */
     it('counts the present members and opens the attendance sheet of the page', async () => {
       const { fixture } = await setup();
       const chip = screen.getByTitle('Anwesenheit');
@@ -104,7 +105,6 @@ describe('SessionDockComponent', () => {
       await userEvent.click(chip);
       expect(fixture.componentInstance.panel()).toBe('attendance');
       expect(chip).toHaveAttribute('aria-expanded', 'true');
-      // The sheet is the page's; the dock opens no popover for it.
       expect(screen.queryByRole('dialog')).toBeNull();
       await userEvent.click(chip);
       expect(fixture.componentInstance.panel()).toBe('none');
@@ -126,6 +126,7 @@ describe('SessionDockComponent', () => {
       expect(dock.panel()).toBe('none');
     });
 
+    /** In right-to-left text the end edge is the left edge. */
     it('puts the end edge of the minute-taker menu in line with the end edge of its chip', async () => {
       const { fixture, container } = await setup();
       const rect = (left: number, right: number) => ({ left, right, top: 0, bottom: 0 }) as DOMRect;
@@ -135,7 +136,6 @@ describe('SessionDockComponent', () => {
       await userEvent.click(chip);
       const pop = container.querySelector('.sd__pop') as HTMLElement;
       expect(pop.style.getPropertyValue('--sd-pop-end')).toBe('120px');
-      // Right to left: the end edge is the left edge.
       await userEvent.click(chip);
       (fixture.nativeElement as HTMLElement).style.direction = 'rtl';
       await userEvent.click(chip);
@@ -146,11 +146,11 @@ describe('SessionDockComponent', () => {
   describe('handover during a live meeting', () => {
     const chip = (): HTMLElement => screen.getByTitle('Protokollführung übergeben');
 
+    /** The tooltip names the minute-taker in full, for a name that the chip cuts off. */
     it('shows the minute-taker without the handover to a member who neither leads nor keeps the minutes', async () => {
       await setup({ meeting: meeting({ canManage: false, isProtokollant: false }) });
       expect(screen.queryByTitle('Protokollführung übergeben')).toBeNull();
       expect(screen.getByText('Protokoll: Pia Protokoll')).toBeInTheDocument();
-      // The tooltip names the minute-taker in full, for a name the chip cuts off.
       expect(screen.getByTitle('Protokoll: Pia Protokoll')).toHaveClass('sd__chip--static');
     });
 
@@ -159,13 +159,13 @@ describe('SessionDockComponent', () => {
       expect(chip()).toHaveTextContent('Protokoll: Pia Protokoll');
     });
 
+    /** The current minute-taker is marked and is no target. */
     it('passes a pick on to the handover dialog, only for members who can keep the minutes', async () => {
       const { on } = await setup({ attendance: WITH_VOTER });
       await userEvent.click(chip());
       const menu = screen.getByRole('dialog', { name: 'Protokollführung übergeben' });
       expect(within(menu).getByText('Protokollführung übergeben an')).toBeInTheDocument();
       expect(within(menu).queryByRole('button', { name: /Vera Votum/ })).toBeNull();
-      // The current minute-taker is marked and is no target.
       const current = within(menu).getByRole('button', { name: /Pia Protokoll/ });
       expect(current).toHaveAttribute('aria-current', 'true');
       expect(current).toHaveTextContent('Anwesend · führt das Protokoll');
@@ -180,6 +180,7 @@ describe('SessionDockComponent', () => {
       expect(screen.queryByRole('dialog', { name: 'Protokollführung übergeben' })).toBeNull();
     });
 
+    /** Without a known TOP number the plan says "with the next item". */
     it('shows and discards the planned handover', async () => {
       const plan = {
         principalId: 'pr-2',
@@ -200,7 +201,6 @@ describe('SessionDockComponent', () => {
       await userEvent.click(within(menu).getByRole('button', { name: 'Verwerfen' }));
       expect(on.cancelHandover).toHaveBeenCalled();
       expect(fixture.componentInstance.panel()).toBe('none');
-      // Without a known TOP number the plan says "with the next item".
       fixture.componentRef.setInput('meeting', meeting({ plannedHandover: { ...plan, fromPosition: null } }));
       fixture.detectChanges();
       await userEvent.click(chip());
@@ -313,9 +313,9 @@ describe('SessionDockComponent', () => {
       expect(screen.queryByRole('button', { name: 'Nächster TOP' })).toBeNull();
     });
 
+    /** The chip can cut the names off, so the tooltip names them in full and then says why. */
     it('names every minute-taker once, locked, and keeps the attendance', async () => {
       const { fixture } = await setup({ meeting: closed() });
-      // The chip can cut the names off: the tooltip names them in full, then says why.
       const keepers = screen.getByTitle(/Sitzung geschlossen — die Protokollführung steht fest\.$/);
       expect(keepers.getAttribute('title')).toBe(
         'Protokoll: Pia Protokoll, Mika Mitglied\nSitzung geschlossen — die Protokollführung steht fest.',
@@ -335,6 +335,7 @@ describe('SessionDockComponent', () => {
   });
 
   describe('on a phone', () => {
+    /** There is no popover and no own backdrop, because the sheet has its scrim. */
     it('opens the minute-taker menu as a bottom sheet over the navigation bar', async () => {
       const { fixture, container, on } = await setup(
         { meeting: planned({ protokollantId: null, protokollantName: null }) },
@@ -347,7 +348,6 @@ describe('SessionDockComponent', () => {
       let sheet = screen.getByRole('dialog', { name: 'Protokollführung wählen' });
       expect(sheet).toHaveClass('ss', 'ss--bottom');
       expect(sheet.querySelector('.ss__handle')).not.toBeNull();
-      // No popover and no own backdrop: the sheet has its scrim.
       expect(container.querySelector('.sd__pop')).toBeNull();
       expect(container.querySelector('.sd__backdrop')).toBeNull();
       expect(host.style.zIndex).toBe('var(--z-dialog)');

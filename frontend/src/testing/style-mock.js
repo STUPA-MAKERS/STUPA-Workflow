@@ -1,3 +1,2 @@
-// Jest stub for *.css and *.scss imports, for example a component stylesheet.
-// Unit tests do not use styles.
+/** Jest stub for *.css and *.scss imports, because unit tests do not use styles. */
 module.exports = {};

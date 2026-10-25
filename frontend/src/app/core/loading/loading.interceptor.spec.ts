@@ -84,6 +84,7 @@ describe('loadingInterceptor', () => {
     expect(dec).toHaveBeenCalledTimes(1);
   });
 
+  /** Outside it the context counts again, and quietly() still wins inside it. */
   it('counts a quiet GET inside visibly(), and reports it as active', () => {
     expect(loading.active()).toBe(false);
     visibly(() => http.get('/api/list', { context: skipLoading() }).subscribe());
@@ -91,7 +92,6 @@ describe('loadingInterceptor', () => {
     expect(loading.active()).toBe(true);
     httpMock.expectOne('/api/list').flush({});
     expect(loading.active()).toBe(false);
-    // Outside it the context counts again, and quietly() still wins inside it.
     http.get('/api/poll', { context: skipLoading() }).subscribe();
     visibly(() => quietly(() => http.get('/api/ahead').subscribe()));
     expect(inc).toHaveBeenCalledTimes(1);

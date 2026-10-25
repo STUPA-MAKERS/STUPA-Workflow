@@ -16,6 +16,7 @@ const APPS: AssignableApplication[] = [
   { applicationId: 'a-3', title: null },
 ];
 
+/** The dialog opens on a free-text item. Most specs work on the application list. */
 async function setup(
   open = true,
   kind: 'application' | 'freetext' = 'application',
@@ -34,7 +35,6 @@ async function setup(
     ],
   });
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
-  // The dialog opens on a free-text item. Most specs work on the application list.
   if (kind === 'application') {
     view.fixture.componentInstance.setKind('application');
     view.fixture.detectChanges();
@@ -131,6 +131,7 @@ describe('AgendaItemDialogComponent', () => {
     expect(screen.getByLabelText(/Titel/)).toBeInTheDocument();
   });
 
+  /** The dialog sends one request at a time. */
   it('adds a free-text item', async () => {
     const { http, fixture, cmp, added } = await setup();
     flushApps(http, fixture);
@@ -138,20 +139,21 @@ describe('AgendaItemDialogComponent', () => {
     expect(submitButton()).toBeDisabled();
     await userEvent.type(screen.getByLabelText(/Titel/), '  Verschiedenes ');
     await userEvent.click(submitButton());
-    cmp.submit(); // one request at a time
+    cmp.submit();
     const req = http.expectOne('/api/meetings/m-1/agenda');
     expect(req.request.body).toEqual({ title: 'Verschiedenes', nonPublic: false });
     req.flush([]);
     expect(added).toHaveBeenCalledWith([]);
   });
 
+  /** The to-do kind is offered only with todo.write in the gremium. */
   it('accepts only the known kinds', async () => {
     const { http, fixture, cmp } = await setup();
     flushApps(http, fixture);
     cmp.setKind('freetext');
     cmp.setKind('other');
     cmp.setKind(null);
-    cmp.setKind('todo'); // only with todo.write in the gremium
+    cmp.setKind('todo');
     expect(cmp.kind()).toBe('freetext');
     cmp.setKind('application');
     expect(cmp.kind()).toBe('application');
@@ -197,11 +199,11 @@ describe('AgendaItemDialogComponent', () => {
     expect(seg).toHaveClass('seg-host--fill');
   });
 
+  /** While loading, the rows of the skeleton sit in the area. */
   it('keeps one area for every kind, so the dialog keeps its height', async () => {
     const { http, fixture, cmp } = await setup();
     const area = () => document.querySelector('.aid__area') as HTMLElement;
     expect(area()).toHaveAttribute('data-kind', 'application');
-    // Loading: the rows of the skeleton sit in the area.
     expect(area().querySelector('app-skeleton')).not.toBeNull();
     flushApps(http, fixture);
     expect(area().querySelector('.aid__list')).not.toBeNull();
@@ -234,16 +236,18 @@ describe('AgendaItemDialogComponent', () => {
     expect(await runAxe(document.body)).toHaveNoViolations();
   });
 
+  /**
+   * With nothing to find at all, the way on is a free-text item, not a reset. ngModel writes the
+   * field after a microtask.
+   */
   it('switches an empty list to a free-text item, with the search text as its title', async () => {
     const { http, fixture, cmp } = await setup();
     flushApps(http, fixture, []);
     await userEvent.type(screen.getByRole('searchbox', { name: 'Antrag suchen' }), ' Mensa ');
-    // Nothing to find at all: the way on is a free-text item, not a reset.
     expect(screen.getByText('Keine zuweisbaren Anträge')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Als Freitext anlegen' }));
     expect(cmp.kind()).toBe('freetext');
     expect(cmp.freetext()).toBe('Mensa');
-    // ngModel writes the field after a microtask.
     await fixture.whenStable();
     fixture.detectChanges();
     expect(screen.getByLabelText(/Titel/)).toHaveValue('Mensa');
@@ -321,13 +325,13 @@ describe('AgendaItemDialogComponent', () => {
       fixture.detectChanges();
     }
 
+    /** Before the load there are no cards. */
     it('is offered only with todo.write in the gremium of the meeting', async () => {
       const { http, fixture, cmp, canInGremium } = await setup(true, 'freetext');
       flushApps(http, fixture);
       expect(screen.queryByRole('radio', { name: 'To-Do' })).toBeNull();
       expect(canInGremium).toHaveBeenCalledWith('g-1', 'todo.write');
       expect(screen.getAllByRole('radio')).toHaveLength(2);
-      // Nothing loaded yet: no cards.
       expect(cmp.shownTodos()).toEqual([]);
     });
 
@@ -364,6 +368,7 @@ describe('AgendaItemDialogComponent', () => {
       expect(screen.getByRole('searchbox', { name: 'To-Do suchen' })).toBeInTheDocument();
     });
 
+    /** Back on "To-Do" the list stays loaded. */
     it('puts the picked card on the agenda, non-public at once', async () => {
       const { http, fixture, added, cmp } = await todoSetup();
       flushBoard(http, fixture);
@@ -376,7 +381,6 @@ describe('AgendaItemDialogComponent', () => {
       expect(req.request.body).toEqual({ todoId: 'k-3', nonPublic: true });
       req.flush([{ id: 't-9', applicationId: null, todoId: 'k-3', title: 'Wahlordnung lesen', position: 1 }]);
       expect(added).toHaveBeenCalledWith([expect.objectContaining({ todoId: 'k-3' })]);
-      // Back on "To-Do" the list stays loaded.
       cmp.setKind('freetext');
       cmp.setKind('todo');
       http.expectNone('/api/todos/boards');

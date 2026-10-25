@@ -105,6 +105,11 @@ describe('UserMergeComponent', () => {
     expect(api.listPrincipals).not.toHaveBeenCalled();
   });
 
+  /**
+   * An inactive account without a name shows its e-mail and the tag. Each row carries the last
+   * login twice: as a column at the end (wide) and as a line below the e-mail (narrow). CSS shows
+   * one of them.
+   */
   it('lists the accounts to pick, without the old one and without merged ones', async () => {
     await setup();
     expect(screen.getByRole('dialog')).toBeInTheDocument();
@@ -112,11 +117,8 @@ describe('UserMergeComponent', () => {
     const list = screen.getByRole('list', { name: 'Konten zur Auswahl' });
     expect(list.querySelectorAll('li')).toHaveLength(2);
     expect(screen.queryByText('Schon weg')).toBeNull();
-    // An inactive account without a name shows its e-mail and the tag.
     expect(screen.getAllByText('off@x').length).toBeGreaterThan(0);
     expect(screen.getByText('deaktiviert')).toBeInTheDocument();
-    // Each row carries the last login twice: as a column at the end (wide) and as a line
-    // below the e-mail (narrow). CSS shows one of them.
     expect(list.querySelectorAll('.um__hitLogin--trail')).toHaveLength(2);
     expect(list.querySelectorAll('.um__hitLogin--sub')).toHaveLength(2);
     expect(screen.getAllByText(/nie/)).toHaveLength(4);
@@ -132,6 +134,7 @@ describe('UserMergeComponent', () => {
     expect(screen.getByText('Keine Benutzer gefunden.')).toBeInTheDocument();
   });
 
+  /** An area without rows does not show. */
   it('shows the preview: both accounts, the areas with rows, the warning', async () => {
     const { api } = await setup();
     await pickNew();
@@ -142,7 +145,6 @@ describe('UserMergeComponent', () => {
     expect(screen.getByText('3 übertragen')).toBeInTheDocument();
     expect(screen.getByText('2 zusammengefasst')).toBeInTheDocument();
     expect(screen.getByText('1 entfernt')).toBeInTheDocument();
-    // An area without rows does not show.
     expect(screen.queryByText('Kommentare')).toBeNull();
     expect(screen.getByText(/Das alte Konto wird gesperrt/)).toBeInTheDocument();
     expect(screen.getByText(/zeigen danach Erika Neu/)).toBeInTheDocument();
@@ -179,6 +181,7 @@ describe('UserMergeComponent', () => {
     expect(container.ownerDocument.querySelector('.um__areas')).toBeNull();
   });
 
+  /** There is no confirmation box, and the danger button says why it is off. */
   it('lists the conflicts with an explanation and keeps the merge blocked', async () => {
     const api = makeApi({
       previewPrincipalMerge: jest.fn(() =>
@@ -199,7 +202,6 @@ describe('UserMergeComponent', () => {
     expect(screen.getByText('Beide Konten haben in derselben Abstimmung abgestimmt')).toBeInTheDocument();
     expect(screen.getByText('Haushalt 2026')).toBeInTheDocument();
     expect(screen.getByText(/Führe den Löschantrag unter Datenschutz aus/)).toBeInTheDocument();
-    // No confirmation box; the danger button says why it is off.
     expect(screen.queryByLabelText(/Ich habe die Vorschau geprüft/)).toBeNull();
     const go = screen.getByRole('button', { name: 'Konten zusammenführen' });
     expect(go).toBeDisabled();

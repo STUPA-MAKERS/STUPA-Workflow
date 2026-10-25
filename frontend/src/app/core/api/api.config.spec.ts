@@ -50,9 +50,11 @@ describe('api.config', () => {
     expect(detectMockFlag(locWith(''))).toBe(false);
   });
 
+  /**
+   * `new URLSearchParams(location.search)` throws because `.search` is a throwing getter.
+   * `detectMockFlag` must catch the error and return false.
+   */
   it('swallows errors thrown while reading URL/localStorage (catch branch)', () => {
-    // `new URLSearchParams(location.search)` throws because `.search` is a
-    // throwing getter. `detectMockFlag` must catch the error and return false.
     const throwing = {
       get search(): string {
         throw new Error('boom');

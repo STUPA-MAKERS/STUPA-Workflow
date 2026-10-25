@@ -150,7 +150,7 @@ function flushSheet(http: HttpTestingController, id: string): void {
 const titles = (el: HTMLElement): (string | undefined)[] =>
   Array.from(el.querySelectorAll('.li__title')).map((b) => b.textContent?.trim());
 
-// The tests click through whole views; a busy runner needs more than the default 5 s.
+/** The tests click through whole views, and a busy runner needs more than the default 5 s. */
 jest.setTimeout(15_000);
 
 describe('MeetingsListComponent', () => {
@@ -169,6 +169,7 @@ describe('MeetingsListComponent', () => {
     expect(titles(screen.getByRole('region', { name: 'Vergangen · September 2026' }))).toEqual(['33. Sitzung']);
   });
 
+  /** In the one-pane layout a chevron says that the row opens a step. */
   it('shows the status, the Gremium, the time and the number of agenda items', async () => {
     const view = await setup();
     load(view);
@@ -185,7 +186,6 @@ describe('MeetingsListComponent', () => {
     expect(within(closedRow).getByText('Geschlossen')).toHaveClass('st--muted');
     expect(within(closedRow).getByText('Di, 18:04')).toBeInTheDocument();
     expect(closedRow.querySelector('app-date-block')).toHaveClass('db--muted');
-    // One pane at a time a chevron says that the row opens a step.
     expect(liveRow.querySelector('app-row-chevron')).not.toBeNull();
   });
 
@@ -285,11 +285,11 @@ describe('MeetingsListComponent', () => {
     expect(screen.queryByRole('button', { name: /^Gremium/ })).toBeNull();
   });
 
+  /** A meeting from a server without the agenda count comes without it. */
   it('shows the hits of a search in one list, says when none matches, and loads more', async () => {
     const view = await setup();
     load(view);
     view.timeline.searchQuery.set('35');
-    // A meeting of an older server comes without the agenda count.
     view.timeline.searchItems.set([
       { ...view.timeline.upcomingItems()[1], agendaItemCount: undefined },
       view.timeline.pastItems()[0],
@@ -344,6 +344,10 @@ describe('MeetingsListComponent', () => {
       view.http.match(() => true);
     });
 
+    /**
+     * A save of that meeting reaches the sheet; a save of another one does not change it. A delete
+     * of it clears the selection.
+     */
     it('reads a deep-linked meeting that is not in the first pages, and drops a failed one', async () => {
       const view = await setup({ url: '/?sel=m-99' });
       load(view);
@@ -352,14 +356,12 @@ describe('MeetingsListComponent', () => {
       flushSheet(view.http, 'm-99');
       view.fixture.detectChanges();
       expect(screen.getByRole('heading', { level: 2, name: 'Alte Sitzung' })).toBeInTheDocument();
-      // A save of that meeting reaches the sheet; a save of another one does not change it.
       const updated = { ...view.timeline.pastItems()[0], id: 'm-99', title: 'Alte Sitzung (neu)' };
       view.timeline.replaceInTimeline(updated);
       view.fixture.detectChanges();
       view.timeline.replaceInTimeline({ ...updated, id: 'm-other' });
       view.fixture.detectChanges();
       expect(screen.getByRole('heading', { level: 2, name: 'Alte Sitzung (neu)' })).toBeInTheDocument();
-      // A delete of it clears the selection.
       view.timeline.removeFromTimeline('m-99');
       view.fixture.detectChanges();
       await view.fixture.whenStable();
@@ -383,6 +385,10 @@ describe('MeetingsListComponent', () => {
       expect(screen.queryByRole('button', { name: 'Erneut laden' })).not.toBeInTheDocument();
     });
 
+    /**
+     * A later change of the list state does not read it again; only the button does. Without a
+     * selection there is nothing to read again.
+     */
     it('keeps a deep link after a server or network error and reads it again on request', async () => {
       const view = await setup({ url: '/?sel=m-500' });
       load(view);
@@ -391,7 +397,6 @@ describe('MeetingsListComponent', () => {
       view.fixture.detectChanges();
       expect(view.router.url).toBe('/?sel=m-500');
       expect(screen.getByRole('alert')).toHaveTextContent('Sitzung nicht geladen');
-      // A later change of the list state does not read it again; only the button does.
       view.timeline.loadingList.set(true);
       view.fixture.detectChanges();
       view.timeline.loadingList.set(false);
@@ -410,7 +415,6 @@ describe('MeetingsListComponent', () => {
       view.fixture.detectChanges();
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
       expect(screen.getByRole('heading', { level: 2, name: 'Wieder da' })).toBeInTheDocument();
-      // No selection: nothing to read again.
       await view.router.navigateByUrl('/');
       view.fixture.componentInstance.retrySelected();
       view.http.expectNone('/api/meetings/m-500');
@@ -497,6 +501,7 @@ describe('MeetingsListComponent', () => {
   });
 
   describe('phone', () => {
+    /** A phone shows the subscription as a bottom sheet. */
     it('has the title, the floating "Sitzung anlegen" and a menu with the calendar subscription', async () => {
       const view = await setup({ media: [MEDIA.phone] });
       load(view);
@@ -509,11 +514,11 @@ describe('MeetingsListComponent', () => {
       view.http.expectOne('/api/calendar/me').flush({ url: null });
       await view.fixture.whenStable();
       view.fixture.detectChanges();
-      // A phone shows the subscription as a bottom sheet.
       expect(screen.getByRole('dialog', { name: 'Kalender-Abo' })).toHaveTextContent('Abo-Link erzeugen');
       expect(view.router.url).toBe('/');
     });
 
+    /** A menu item that the page does not know does nothing. */
     it('puts the time and the agenda count into the sub line and wraps the title', async () => {
       const view = await setup({ media: [MEDIA.phone], canCreate: false });
       load(view);
@@ -524,7 +529,6 @@ describe('MeetingsListComponent', () => {
       expect(liveRow.querySelector('.li')).toHaveClass('li--wrap');
       expect(screen.queryByRole('button', { name: 'Sitzung' })).toBeNull();
       expect(screen.getByRole('searchbox')).toHaveAttribute('placeholder', 'Sitzungen suchen …');
-      // A menu item that the page does not know does nothing.
       view.fixture.componentInstance.onPhoneMenu({ id: 'x', label: 'x' });
       expect(view.router.url).toBe('/');
     });

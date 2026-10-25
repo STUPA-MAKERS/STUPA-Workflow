@@ -27,10 +27,10 @@ describe('isInstalledApp', () => {
     expect(isInstalledApp({ navigator: {} })).toBe(false);
   });
 
+  /** The setup mock of matchMedia matches nothing, which is a browser tab. */
   it('reads the window through the default token', () => {
     const spy = jest.spyOn(window, 'matchMedia');
     const read = TestBed.inject(IS_INSTALLED_APP);
-    // The setup mock of matchMedia matches nothing: a browser tab.
     expect(read()).toBe(false);
     expect(spy).toHaveBeenCalledWith('(display-mode: standalone)');
     spy.mockRestore();

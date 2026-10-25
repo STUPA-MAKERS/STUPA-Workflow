@@ -71,12 +71,12 @@ async function setup(inputs: Record<string, unknown> = {}) {
 }
 
 describe('BulkPanelComponent', () => {
+  /** The bound booking keeps its cost centre, and the hint names it. */
   it('names the selection with its common cost centre and its sum', async () => {
     await setup();
     expect(screen.getByRole('heading', { name: '2 Buchungen ausgewählt' })).toBeInTheDocument();
     expect(screen.getAllByText('Gesamthaushalt').length).toBeGreaterThan(0);
     expect(screen.getAllByText(/−1\.020,00/).length).toBe(2);
-    // The bound booking keeps its cost centre: the hint names it.
     expect(screen.getByText(/„Honorar“ ist mit einem Antrag verknüpft/)).toBeInTheDocument();
   });
 

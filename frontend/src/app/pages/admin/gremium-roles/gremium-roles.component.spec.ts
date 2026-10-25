@@ -45,6 +45,7 @@ async function setup(api = makeApi(), params: Record<string, string> = { id: 'g-
 describe('GremiumRolesComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
+  /** The page title names the page; the matrix has no heading of its own here. */
   it('shows the matrix of the gremium from the route, with the gremium in the title', async () => {
     const api = await setup();
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
@@ -52,7 +53,6 @@ describe('GremiumRolesComponent', () => {
     );
     expect(api.listGremiumRoles).toHaveBeenCalledWith('g-1', { quiet: true });
     expect(screen.getByRole('rowheader', { name: /^Vorsitz/ })).toBeInTheDocument();
-    // The page title names the page; the matrix has no heading of its own here.
     expect(screen.queryByRole('heading', { name: 'Gremienrollen und Berechtigungen' })).toBeNull();
   });
 

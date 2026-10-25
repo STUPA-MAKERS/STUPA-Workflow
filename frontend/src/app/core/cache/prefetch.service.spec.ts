@@ -44,8 +44,8 @@ describe('PrefetchService', () => {
     expect(tree).toHaveBeenCalledTimes(1);
   });
 
+  /** A prefetch for them would only get a 403. */
   it('spends no request on someone who may not see the budget', () => {
-    // A prefetch for them would buy a 403.
     const { tree } = setup({ perms: [] });
     TestBed.inject(PrefetchService);
     TestBed.tick();
@@ -59,9 +59,11 @@ describe('PrefetchService', () => {
     expect(tree).toHaveBeenCalledTimes(1);
   });
 
+  /**
+   * The effect runs again whenever anything it reads changes. Without the guard, a token refresh
+   * refetches the whole tree for no reason.
+   */
   it('runs once, not on every signal change', () => {
-    // The effect re-runs whenever anything it reads changes. Without the guard, a token
-    // refresh would refetch the whole tree for no reason.
     const { authed, tree } = setup();
     TestBed.inject(PrefetchService);
     TestBed.tick();
@@ -72,9 +74,11 @@ describe('PrefetchService', () => {
     expect(tree).toHaveBeenCalledTimes(1);
   });
 
+  /**
+   * Nothing waits on it, and the page that really needs the tree asks again and reports its own
+   * error.
+   */
   it('stays silent when the prefetch fails', () => {
-    // Nothing is waiting on it, and the page that really needs the tree asks again and
-    // reports its own error.
     const tree = jest.fn(() => throwError(() => new Error('down')));
     TestBed.configureTestingModule({
       providers: [

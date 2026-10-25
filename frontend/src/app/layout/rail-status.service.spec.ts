@@ -109,8 +109,11 @@ describe('RailStatusService', () => {
     expect(env.svc.live()).toBe(true);
   });
 
+  /**
+   * A meeting that started before its planned time sorts after earlier planned ones. A live meeting
+   * ends the walk, even when more pages exist.
+   */
   it('reads the next page while no live meeting has shown up', () => {
-    // A meeting that started before its planned time sorts after earlier planned ones.
     const env = setup();
     signIn(env);
     jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
@@ -122,7 +125,6 @@ describe('RailStatusService', () => {
     const second = env.http.expectOne((r) => r.url === TIMELINE);
     expect(second.request.params.get('cursor')).toBe('c1');
     second.flush({ items: [meeting('live')], nextCursor: 'c2' });
-    // A live meeting ends the walk, even when more pages exist.
     env.http.expectNone((r) => r.url === TIMELINE);
     expect(env.svc.live()).toBe(true);
   });
@@ -206,6 +208,7 @@ describe('RailStatusService', () => {
     visibility.mockRestore();
   });
 
+  /** The stream survives the failure, so the next refresh asks again. */
   it('keeps the count empty when the task request fails and the live flag off when the timeline fails', () => {
     const env = setup();
     signIn(env);
@@ -216,7 +219,6 @@ describe('RailStatusService', () => {
     expect(env.svc.taskCount()).toBeNull();
     expect(env.svc.live()).toBe(false);
 
-    // The stream survives the failure: the next refresh asks again.
     env.svc.refresh();
     jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
     answer(env, 2);
@@ -236,6 +238,7 @@ describe('RailStatusService', () => {
     expect(env.svc.live()).toBe(false);
   });
 
+  /** A failed count shows no badge, and the other marks stay. */
   it('counts the new tickets only with ticket.manage, and forgets them at sign-out', () => {
     const env = setup();
     signIn(env, { ...MEMBER, permissions: ['ticket.manage'] } as Principal);
@@ -246,7 +249,6 @@ describe('RailStatusService', () => {
     answer(env, 1);
     expect(env.svc.ticketCount()).toBe(2);
 
-    // A failed count shows no badge, the other marks stay.
     env.svc.refresh();
     jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
     env.http.expectOne((r) => r.url === '/api/tickets/counts').flush({}, { status: 500, statusText: 'x' });
@@ -272,6 +274,7 @@ describe('RailStatusService', () => {
     expect(env.svc.ticketCount()).toBeNull();
   });
 
+  /** dueSoonCount plays no part: only the open items count. */
   it('adds all my open To-Dos to the task count, due or not; a failed read counts 0', () => {
     const env = setup();
     signIn(env);
@@ -279,7 +282,6 @@ describe('RailStatusService', () => {
     answer(env, 2, 'planned', 3);
     expect(env.svc.taskCount()).toBe(5);
 
-    // dueSoonCount plays no part: only the open items count.
     env.svc.refresh();
     jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
     env.http.expectOne((r) => r.url === MINE).flush({ items: [{ id: 'k0' }], dueSoonCount: 4 });

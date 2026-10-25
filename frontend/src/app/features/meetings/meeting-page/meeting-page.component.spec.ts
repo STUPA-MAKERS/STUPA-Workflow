@@ -143,7 +143,7 @@ describe('MeetingPageComponent', () => {
       expect(screen.getByText(/^StuPa · Do, 15\.10\.2026$/)).toBeInTheDocument();
     });
 
-    it('lists the people who have the meeting open (N22)', async () => {
+    it('lists the people who have the meeting open', async () => {
       await setup();
       const chip = screen.getByRole('button', { name: '2 live' });
       expect(chip).toHaveAttribute('title', 'Live dabei: Pia Protokoll, Alina Admin');
@@ -165,6 +165,10 @@ describe('MeetingPageComponent', () => {
       expect(screen.queryByRole('button', { name: '0 live' })).toBeNull();
     });
 
+    /**
+     * The open vote is on another item than the one in the sheet. No line stands beside the button:
+     * the reason is its tooltip only.
+     */
     it('closes a live meeting, and an open vote on any item blocks the close', async () => {
       const { on, fixture } = await setup();
       const close = screen.getByRole('button', { name: 'Sitzung schließen' });
@@ -172,13 +176,11 @@ describe('MeetingPageComponent', () => {
       expect(close).toBeEnabled();
       await userEvent.click(close);
       expect(on.closeSession).toHaveBeenCalledTimes(1);
-      // The open vote is on another item than the one in the sheet.
       fixture.componentRef.setInput('meeting', meeting({ votes: [vote({ agendaItemId: AGENDA[1].id })] }));
       fixture.detectChanges();
       const blocked = screen.getByRole('button', { name: 'Sitzung schließen' });
       expect(blocked).toBeDisabled();
       expect(blocked).toHaveAttribute('title', 'Erst die offene Abstimmung schließen oder abbrechen.');
-      // No line beside the button: the reason is its tooltip only.
       expect(screen.queryByText('Erst die offene Abstimmung schließen oder abbrechen.')).toBeNull();
       await userEvent.click(blocked);
       expect(on.closeSession).toHaveBeenCalledTimes(1);
@@ -216,12 +218,12 @@ describe('MeetingPageComponent', () => {
       flushDelegations();
     });
 
+    /** The beamer route needs session.manage, so a minute-taker without it gets no beamer. */
     it('offers only the attendance to a member without the manage right', async () => {
       await setup({ meeting: meeting({ canManage: false }) });
       const menu = await openMenu();
       expect(within(menu).queryByRole('menuitem', { name: 'Sitzung bearbeiten' })).toBeNull();
       expect(within(menu).queryByRole('menuitem', { name: 'Sitzung löschen' })).toBeNull();
-      // The beamer route needs session.manage: a minute-taker without it gets no beamer.
       expect(within(menu).queryByRole('menuitem', { name: 'Beamer-Ansicht' })).toBeNull();
     });
 
@@ -267,6 +269,7 @@ describe('MeetingPageComponent', () => {
       expect(screen.getByRole('dialog', { name: 'Tagesordnung' })).toHaveClass('ss--start');
     });
 
+    /** A closed meeting has nothing for the beamer. */
     it('moves the close into the menu on a phone; the finalize stays in the protocol bar', async () => {
       const { on, fixture } = await setup({}, [MEDIA.phone]);
       expect(screen.queryByRole('button', { name: 'Sitzung schließen' })).toBeNull();
@@ -277,7 +280,6 @@ describe('MeetingPageComponent', () => {
       fixture.detectChanges();
       menu = await openMenu();
       expect(within(menu).queryByRole('menuitem', { name: 'Finalisieren & versenden' })).toBeNull();
-      // A closed meeting has nothing for the beamer.
       expect(within(menu).queryByRole('menuitem', { name: 'Beamer-Ansicht' })).toBeNull();
       await userEvent.keyboard('{Escape}');
       await userEvent.click(screen.getByRole('button', { name: 'Finalisieren & versenden' }));
@@ -293,13 +295,13 @@ describe('MeetingPageComponent', () => {
   describe('planned', () => {
     const planned = (over: Partial<Meeting> = {}) => meeting({ status: 'planned', ...over });
 
+    /** There is no sheet and no vote column before the opening. */
     it('shows the checklist and keeps the opening disabled without a minute-taker', async () => {
       await setup({ meeting: planned({ protokollantId: null, protokollantName: null }), protocol: null });
       expect(screen.getByRole('heading', { name: 'Sitzung vorbereiten' })).toBeInTheDocument();
       const starts = screen.getAllByRole('button', { name: 'Sitzung eröffnen' });
       expect(starts).toHaveLength(2);
       starts.forEach((b) => expect(b).toBeDisabled());
-      // No sheet and no vote column before the opening.
       expect(screen.queryByText('Noch kein TOP geöffnet')).toBeNull();
       expect(screen.queryByRole('complementary')).toBeNull();
     });
@@ -312,12 +314,12 @@ describe('MeetingPageComponent', () => {
       expect(on.startSession).toHaveBeenCalledTimes(2);
     });
 
+    /** The header and the checklist both name the time. */
     it('keeps the opening disabled before the open window and says when it opens', async () => {
       const soon = (min: number): string => new Date(Date.now() + min * 60_000).toISOString();
       const { on } = await setup({ meeting: planned({ opensAt: soon(30), confirmUntil: soon(80) }), protocol: null });
       const starts = screen.getAllByRole('button', { name: 'Sitzung eröffnen' });
       starts.forEach((b) => expect(b).toBeDisabled());
-      // The header and the checklist both name the time.
       expect(screen.getAllByText(/^Eröffnen ab /)).toHaveLength(2);
       expect(starts[0].getAttribute('title')).toMatch(/^Eröffnen ab /);
       expect(on.startSession).not.toHaveBeenCalled();
@@ -343,12 +345,12 @@ describe('MeetingPageComponent', () => {
       expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Tagesordnung · 3 TOPs' }));
     });
 
+    /** The text of the item can be written before the start, without a protocol. */
     it('opens a picked item of the preparation pane to prepare it, and goes back', async () => {
       const { on } = await setup({ meeting: planned({ canManageVotes: true }), protocol: null }, [MEDIA.wide]);
       await userEvent.click(screen.getByRole('button', { name: 'Bericht des Finanzreferats' }));
       expect(on.selectTop).toHaveBeenCalledWith('t-2');
       expect(screen.queryByRole('heading', { name: 'Sitzung vorbereiten' })).toBeNull();
-      // The text of the item can be written before the start, without a protocol.
       expect(screen.getByRole('toolbar', { name: 'Format' })).toBeInTheDocument();
       await userEvent.click(screen.getByRole('button', { name: 'Zurück zur Vorbereitung' }));
       expect(screen.getByRole('heading', { name: 'Sitzung vorbereiten' })).toBeInTheDocument();
@@ -399,6 +401,7 @@ describe('MeetingPageComponent', () => {
       expect(screen.queryByRole('dialog', { name: 'Tagesordnung' })).toBeNull();
     });
 
+    /** A closed meeting changes no agenda. */
     it('puts the add into the header of the agenda sheet', async () => {
       const { on, fixture } = await setup();
       await userEvent.click(screen.getByTitle('Tagesordnung öffnen'));
@@ -408,7 +411,6 @@ describe('MeetingPageComponent', () => {
       expect(adds[0].closest('.ss__head')).toBeTruthy();
       await userEvent.click(adds[0]);
       expect(on.addTop).toHaveBeenCalledTimes(1);
-      // A closed meeting changes no agenda.
       fixture.componentRef.setInput('meeting', meeting({ status: 'closed' }));
       fixture.detectChanges();
       expect(within(sheet).queryByRole('button', { name: 'TOP hinzufügen' })).toBeNull();
@@ -435,9 +437,9 @@ describe('MeetingPageComponent', () => {
       expect(on.removeFromAgenda).toHaveBeenCalledWith('t-2');
     });
 
+    /** Text selected in the rename field fires a native `select` that bubbles. */
     it('passes on no native event that bubbles out of the agenda as a value', async () => {
       const { on } = await setup({ renamingTopId: 't-1', renameDraft: 'Neu' }, [MEDIA.wide]);
-      // Text selected in the rename field fires a native `select` that bubbles.
       const input = screen.getByRole('textbox', { name: 'TOP umbenennen' });
       input.dispatchEvent(new Event('select', { bubbles: true }));
       expect(on.selectTop).not.toHaveBeenCalled();
@@ -452,13 +454,15 @@ describe('MeetingPageComponent', () => {
       expect(on.cancelRename).toHaveBeenCalled();
     });
 
+    /**
+     * The step forward names the item that the room leaves, so the server ticks it. The step back
+     * ticks nothing.
+     */
     it('steps through the agenda from the dock', async () => {
       const { on } = await setup({ top: AGENDA[1], topIndex: 1 });
-      // The step forward names the item that the room leaves, so the server ticks it.
       await userEvent.click(screen.getByRole('button', { name: 'Nächster TOP' }));
       expect(on.nextTop).toHaveBeenCalledWith({ id: 't-3', from: 't-2' });
       expect(on.selectTop).not.toHaveBeenCalled();
-      // The step back ticks nothing.
       await userEvent.click(screen.getByRole('button', { name: 'Vorheriger TOP' }));
       expect(on.selectTop).toHaveBeenCalledWith('t-1');
       expect(on.nextTop).toHaveBeenCalledTimes(1);
@@ -513,13 +517,13 @@ describe('MeetingPageComponent', () => {
       expect(container.querySelector('.mde__host--disabled')).toBeTruthy();
     });
 
+    /** The page asks when the handover takes effect, with the dialog of MeetingsComponent. */
     it('passes the dock actions on', async () => {
       const { on, flushDelegations } = await setup({ meeting: meeting({ currentAgendaItemId: 't-2' }) });
       await userEvent.click(screen.getByRole('button', { name: 'Zurück zu Jetzt' }));
       expect(on.selectTop).toHaveBeenCalledWith('t-2');
       await userEvent.click(screen.getByTitle('Protokollführung übergeben'));
       await userEvent.click(screen.getByRole('button', { name: /Mika Mitglied/ }));
-      // The page asks when the handover takes effect: the dialog of MeetingsComponent.
       expect(on.pickHandover).toHaveBeenCalledWith('pr-2');
       await userEvent.click(screen.getByTitle('Anwesenheit'));
       const sheet = screen.getByRole('dialog', { name: 'Anwesenheit' });
@@ -574,6 +578,7 @@ describe('MeetingPageComponent', () => {
   });
 
   describe('votes', () => {
+    /** A second vote can be prepared while the open one runs. */
     it('shows the open vote first and runs it', async () => {
       const votes = [
         vote({ id: 'v-0', status: 'cancelled', question: 'Vertagen?' }),
@@ -591,7 +596,6 @@ describe('MeetingPageComponent', () => {
       expect(on.castVote).toHaveBeenCalledWith({ voteId: 'v-1', choice: 'yes' });
       await userEvent.click(screen.getByRole('button', { name: 'Beschlussfrage löschen' }));
       expect(on.voteDelete).toHaveBeenCalledWith('v-0');
-      // A second vote can be prepared while the open one runs.
       expect(screen.getByRole('button', { name: 'Beschlussfrage hinzufügen' })).toBeEnabled();
     });
 
@@ -601,6 +605,9 @@ describe('MeetingPageComponent', () => {
       expect(on.voteOpen).toHaveBeenCalledWith('v-1');
     });
 
+    /**
+     * A free-text item can still prepare a new question. Once the other vote ends, both come back.
+     */
     it('opens no second vote while a vote on another item is open', async () => {
       const votes = [
         vote({ id: 'v-1', status: 'draft' }),
@@ -612,12 +619,10 @@ describe('MeetingPageComponent', () => {
       expect(open).toHaveAttribute('title', 'Erst die offene Abstimmung schließen oder abbrechen.');
       await userEvent.click(open);
       expect(on.voteOpen).not.toHaveBeenCalled();
-      // A free-text item can still prepare a new question.
       expect(screen.getByRole('button', { name: 'Beschlussfrage hinzufügen' })).toBeEnabled();
       fixture.componentRef.setInput('meeting', meeting({ votes: [votes[1]] }));
       fixture.detectChanges();
       expect(screen.getByRole('button', { name: 'Beschlussfrage hinzufügen' })).toBeEnabled();
-      // Once the other vote ends, both come back.
       fixture.componentRef.setInput(
         'meeting',
         meeting({ votes: [votes[0], { ...votes[1], status: 'closed', result: 'passed' }] }),
@@ -676,9 +681,12 @@ describe('MeetingPageComponent', () => {
       expect(screen.queryByRole('button', { name: 'Beschlussfrage hinzufügen' })).toBeNull();
     });
 
+    /**
+     * A trailing hard break from a phone keyboard must not survive as an empty line. An empty text
+     * takes the result alone.
+     */
     it('carries the result into the text until it is there, then goes quiet', async () => {
       const closed = vote({ status: 'closed', result: 'passed', counts: { yes: 3, no: 1, abstain: 0 }, leading: 'yes', revealed: true });
-      // A trailing hard break from a phone keyboard must not survive as an empty line.
       const { on, fixture } = await setup({ meeting: meeting({ votes: [closed] }), top: item({ body: 'Aussprache.\\\n' }) });
       await userEvent.click(screen.getByRole('button', { name: 'Ins Protokoll übernehmen' }));
       const payload = on.bodyChange.mock.calls[0][0] as { itemId: string; body: string };
@@ -689,7 +697,6 @@ describe('MeetingPageComponent', () => {
       fixture.componentRef.setInput('top', item({ body: payload.body }));
       fixture.detectChanges();
       expect(screen.queryByRole('button', { name: 'Ins Protokoll übernehmen' })).toBeNull();
-      // An empty text takes the result alone.
       fixture.componentRef.setInput('top', item({ body: null }));
       fixture.detectChanges();
       await userEvent.click(screen.getByRole('button', { name: 'Ins Protokoll übernehmen' }));

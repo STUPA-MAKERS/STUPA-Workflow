@@ -39,6 +39,7 @@ describe('TodoLiveService', () => {
 
   afterEach(() => jest.useRealTimers());
 
+  /** The newest subscriber goes first. */
   it('opens one socket, counts the boards and closes with the last one', async () => {
     const a: TodoPing[] = [];
     const one = live.changes$(['b1', 'b2']).subscribe((p) => a.push(p));
@@ -46,7 +47,6 @@ describe('TodoLiveService', () => {
     await flush();
     expect(channels).toHaveLength(1);
     const ch = channels[0];
-    // The newest subscriber goes first.
     expect(ch.sent).toEqual([{ type: 'subscribe', boardIds: ['b2', 'b1'] }]);
     ch.frames.next({ type: 'subscribed', boardIds: ['b1', 'b2'] });
     expect(live.connected()).toBe(true);
@@ -79,12 +79,12 @@ describe('TodoLiveService', () => {
     expect(channels[0].sent.at(-1)!.boardIds).toEqual(ids.slice(0, TODO_LIVE_MAX_BOARDS));
   });
 
+  /** A second view of the same boards opens, then the first one goes: the set never changes. */
   it('sends nothing when the set of boards stays the same', async () => {
     const first = live.changes$(['b1', 'b2']).subscribe();
     await flush();
     const ch = channels[0];
     expect(ch.sent).toHaveLength(1);
-    // A second view of the same boards, then the first one goes: the set never changed.
     const second = live.changes$(['b2', 'b1']).subscribe();
     await flush();
     first.unsubscribe();
@@ -107,6 +107,10 @@ describe('TodoLiveService', () => {
     expect(seen).toEqual([]);
   });
 
+  /**
+   * Only the first subscriber after the reconnect pings; a later one on the same socket does not. A
+   * frame of the old socket is ignored.
+   */
   it('connects again after a drop and pings every board then', async () => {
     jest.useFakeTimers({ doNotFake: ['queueMicrotask'] });
     const seen: TodoPing[] = [];
@@ -120,10 +124,8 @@ describe('TodoLiveService', () => {
     expect(channels[1].sent).toEqual([{ type: 'subscribe', boardIds: ['b1'] }]);
     channels[1].frames.next({ type: 'subscribed', boardIds: ['b1'] });
     expect(seen).toEqual([{ type: 'board', boardId: 'b1' }]);
-    // Only the first subscribed after the reconnect pings; a later one on the same socket not.
     channels[1].frames.next({ type: 'subscribed', boardIds: ['b1'] });
     expect(seen).toHaveLength(1);
-    // A frame of the old socket is ignored.
     channels[0].frames.next({ type: 'card', boardId: 'b1', cardId: 'c' });
     expect(seen).toHaveLength(1);
   });

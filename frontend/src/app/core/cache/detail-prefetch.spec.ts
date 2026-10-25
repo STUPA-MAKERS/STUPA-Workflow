@@ -44,6 +44,10 @@ describe('prefetchDetails', () => {
   const pending = () => mock.match(() => true);
   const tick = () => new Promise((resolve) => setTimeout(resolve));
 
+  /**
+   * On the click the read ahead comes first, and the read behind it adds nothing when it is the
+   * same. A detail read never runs the bar, because the detail paints the kept answer meanwhile.
+   */
   it('reads the shown rows ahead four at a time, quietly, and a click paints from them', async () => {
     const { fixture, host, loading } = setup();
     const inc = jest.spyOn(loading, 'inc');
@@ -58,7 +62,6 @@ describe('prefetchDetails', () => {
     expect(rest.map((r) => r.request.url)).toEqual(['/api/things/e']);
     rest[0].flush({ id: 'e' });
 
-    // The click: the read ahead first, the read behind it adds nothing when it is the same.
     const seen: unknown[] = [];
     host.read('b').subscribe((b) => seen.push(b));
     expect(seen).toEqual([{ id: 'b' }]);
@@ -67,7 +70,6 @@ describe('prefetchDetails', () => {
     host.read('c').subscribe((b) => seen.push(b));
     mock.expectOne('/api/things/c').flush({ id: 'c', changed: true });
     expect(seen).toEqual([{ id: 'b' }, { id: 'c' }, { id: 'c', changed: true }]);
-    // A detail read never runs the bar: the detail paints the kept answer meanwhile.
     expect(inc).not.toHaveBeenCalled();
   });
 

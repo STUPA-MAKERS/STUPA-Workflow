@@ -45,6 +45,10 @@ function row(text: RegExp) {
 
 describe('BallotComponent · poll', () => {
   describe('date mode', () => {
+    /**
+     * While one date lacks its answer, the button stays off. A second click changes the answer
+     * before the cast. The answer never changes after the cast: the rows lock and keep the answers.
+     */
     it('asks Ja, Vielleicht and Nein for every date and sends once each has an answer', async () => {
       const { caster, castDone, container } = await setup(DATE_POLL);
       const user = userEvent.setup();
@@ -57,10 +61,8 @@ describe('BallotComponent · poll', () => {
       ]);
       await user.click(first.getByRole('radio', { name: 'Ja' }));
       expect(first.getByRole('radio', { name: 'Ja' })).toHaveAttribute('aria-checked', 'true');
-      // One date still lacks its answer: the button stays off.
       const submit = screen.getByRole('button', { name: 'Antworten abgeben' });
       expect(submit).toBeDisabled();
-      // A second click changes the answer before the cast.
       await user.click(first.getByRole('radio', { name: 'Vielleicht' }));
       await user.click(row(/ 4\.11\./).getByRole('radio', { name: 'Nein' }));
       expect(submit).toBeEnabled();
@@ -69,7 +71,6 @@ describe('BallotComponent · poll', () => {
       await user.click(submit);
       expect(caster).toHaveBeenCalledWith({ o1: 'maybe', o2: 'no' }, false);
       expect(castDone).toHaveBeenCalled();
-      // The answer never changes after the cast: the rows lock and keep the answers.
       for (const b of screen.getAllByRole('radio')) expect(b).toBeDisabled();
       expect(row(/ 3\.11\./).getByRole('radio', { name: 'Vielleicht' })).toHaveAttribute(
         'aria-checked',

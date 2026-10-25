@@ -172,6 +172,11 @@ describe('ApplicationCaptureComponent', () => {
     expect(s.comp.query()).toBe('');
   });
 
+  /**
+   * The failed second search clears the hits; the late first answer changes nothing. A short text
+   * cancels the running search. The error of an old search is ignored when a later stale answer
+   * comes.
+   */
   it('drops a late answer and a failed search', async () => {
     jest.useFakeTimers();
     const first = new Subject<ApplicantCandidate[]>();
@@ -185,18 +190,15 @@ describe('ApplicationCaptureComponent', () => {
     jest.advanceTimersByTime(APPLICANT_SEARCH_DELAY_MS);
     s.comp.onSearch('ann');
     jest.advanceTimersByTime(APPLICANT_SEARCH_DELAY_MS);
-    // The failed second search clears the hits; the late first answer changes nothing.
     first.next([ANNA]);
     expect(s.comp.candidates()).toEqual([]);
     expect(s.comp.searching()).toBe(false);
-    // A short text cancels the running search.
     s.comp.onSearch('x');
     expect(s.comp.searching()).toBe(false);
     s.comp.onSearch('zz');
     jest.advanceTimersByTime(APPLICANT_SEARCH_DELAY_MS);
     s.flush();
     expect(screen.getByText('Kein Konto gefunden.')).toBeTruthy();
-    // A failed search with a later stale answer: the error of an old search is ignored.
     const late = new Subject<ApplicantCandidate[]>();
     search.mockReturnValueOnce(late).mockReturnValueOnce(of([ANNA]));
     s.comp.onSearch('aa');
@@ -394,6 +396,11 @@ describe('ApplicationCaptureComponent', () => {
     expect(s.comp.canSubmit()).toBe(true);
   });
 
+  /**
+   * An invalid address asks nothing. Back on a new person the note goes, and an address without an
+   * exact match stays. A failed lookup leaves the new person. A late answer after a switch to the
+   * account mode changes nothing. A pending lookup ends with the component.
+   */
   it('switches a guest e-mail of an account to that account', async () => {
     jest.useFakeTimers();
     const search = jest
@@ -404,7 +411,6 @@ describe('ApplicationCaptureComponent', () => {
       .mockReturnValueOnce(of([ANNA]));
     const s = await setup({ search });
     s.comp.setMode('guest');
-    // An invalid address asks nothing.
     s.comp.onGuestEmail('anna@');
     jest.advanceTimersByTime(APPLICANT_SEARCH_DELAY_MS);
     expect(search).not.toHaveBeenCalled();
@@ -417,17 +423,14 @@ describe('ApplicationCaptureComponent', () => {
     expect(screen.getByTestId('cap-email-match').textContent).toContain(
       'Zu dieser E-Mail gibt es ein Konto: Anna Antrag',
     );
-    // Back to a new person: the note goes; an address without an exact match stays.
     s.comp.setMode('guest');
     expect(s.comp.emailMatch()).toBeNull();
     s.comp.onGuestEmail('other@example.org');
     jest.advanceTimersByTime(APPLICANT_SEARCH_DELAY_MS);
     expect(s.comp.mode()).toBe('guest');
-    // A failed lookup leaves the new person.
     s.comp.onGuestEmail('anna@example.org');
     jest.advanceTimersByTime(APPLICANT_SEARCH_DELAY_MS);
     expect(s.comp.mode()).toBe('guest');
-    // A late answer after a switch to the account mode changes nothing.
     s.comp.onGuestEmail('anna@example.org');
     s.comp.setMode('account');
     jest.advanceTimersByTime(APPLICANT_SEARCH_DELAY_MS);
@@ -435,7 +438,6 @@ describe('ApplicationCaptureComponent', () => {
     expect(s.comp.emailMatch()).toBeNull();
     s.comp.clearPick();
     expect(s.comp.picked()).toBeNull();
-    // A pending lookup ends with the component.
     s.comp.setMode('guest');
     s.comp.onGuestEmail('anna@example.org');
     s.fixture.destroy();

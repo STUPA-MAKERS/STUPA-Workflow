@@ -96,6 +96,7 @@ describe('Rechte entziehen — mock mode', () => {
     expect(missing).toMatchObject({ status: 404 });
   });
 
+  /** The live delegation stays until the meeting ends. */
   it('revokes everything: the person keeps the account, but no ties', async () => {
     const s = svc(true);
     const p = await firstValueFrom(s.previewPrincipalRevoke('p-12'));
@@ -113,7 +114,6 @@ describe('Rechte entziehen — mock mode', () => {
     expect(res.keptLiveDelegations).toBe(1);
     expect(res.deactivated).toBe(true);
     const after = await firstValueFrom(s.previewPrincipalRevoke('p-12'));
-    // The live delegation stays until the meeting ends.
     expect(after.gremien.map((g) => g.gremiumId)).toEqual(['g-asta']);
     expect(after.gremien[0].liveDelegations).toHaveLength(1);
     expect(after.globalRoles).toEqual([]);
@@ -134,6 +134,7 @@ describe('Rechte entziehen — mock mode', () => {
   });
 });
 
+/** One dev row has no group list at all. */
 describe('Rechte entziehen — mock store edge cases', () => {
   /** A store full of loose ends: unnamed people, unknown roles and Gremien, no role mapping. */
   function store(): RevokeMockStore {
@@ -150,7 +151,6 @@ describe('Rechte entziehen — mock store edge cases', () => {
         },
         { id: 'x-2', sub: 'kc|two', displayName: null, email: 'two@x', oidcGroups: [], assignments: [] },
         { id: 'x-3', sub: 'kc|three', displayName: null, email: null, oidcGroups: [], assignments: [] },
-        // A dev row without a group list at all.
         { id: 'x-4', sub: 'kc|four', assignments: [] } as unknown as AdminPrincipal,
       ],
       gremien: [{ id: 'g-a', name: 'A', slug: 'a', cdVariantId: null, defaultLang: 'de', allowVoteDelegation: true }],
@@ -178,18 +178,21 @@ describe('Rechte entziehen — mock store edge cases', () => {
     };
   }
 
+  /**
+   * Unknown Gremien have no name and sort first. Without a role mapping and an implicit gremium
+   * role, the membership is a plain `member`. `member` is never a right to take away; unknown roles
+   * keep their id as key.
+   */
   it('falls back to keys, empty labels and null names where the store knows nothing', () => {
     const p = mockRevokePreview(store(), 'x-1', 'kc|someone-else')!;
     expect(p.isSelf).toBe(false);
     expect(p.principal).toEqual({ id: 'x-1', displayName: null, email: null, lastLogin: null, active: true });
-    // Unknown Gremien have no name and sort first.
     expect(p.gremien.map((g) => [g.gremiumId, g.name])).toEqual([
       ['g-b', ''],
       ['g-ghost', ''],
       ['g-a', 'A'],
     ]);
     const a = p.gremien[2];
-    // No role mapping and no implicit gremium role: the membership is a plain `member`.
     expect(a.membership).toEqual({ roleKey: 'member', roleLabel: {}, groups: ['grp-a'] });
     expect(a.groups).toEqual(['grp-a']);
     expect(a.poolEntries).toEqual([
@@ -210,7 +213,6 @@ describe('Rechte entziehen — mock store edge cases', () => {
         validUntil: null,
       },
     ]);
-    // `member` is never a right to take away; unknown roles keep their id as key.
     expect(p.globalRoles).toEqual([
       { roleId: 'r-missing', roleKey: 'r-missing', roleLabel: {}, groups: ['grp-role'], assignments: [] },
       {
@@ -238,6 +240,7 @@ describe('Rechte entziehen — mock store edge cases', () => {
     expect(mockRevokePreview(store(), 'x-1', 'kc|x')!.isSelf).toBe(true);
   });
 
+  /** The unmapped group stays. */
   it('refuses the own account and revokes twice in a row', () => {
     const st = store();
     expect(
@@ -262,7 +265,7 @@ describe('Rechte entziehen — mock store edge cases', () => {
     const after = mockRevokePreview(st, 'x-1', null)!;
     expect(after.gremien).toEqual([]);
     expect(after.globalRoles).toEqual([]);
-    expect(mockHasAccess(st, st.principals[0])).toBe(true); // the unmapped group stays
+    expect(mockHasAccess(st, st.principals[0])).toBe(true);
     const again = mockApplyRevoke(st, 'x-1', { gremiumIds: ['g-c'], globalRoleIds: [], deactivate: true }, null);
     expect(again).toMatchObject({ deactivated: true, removedGroups: [] });
     expect(st.revoked['x-1']).toEqual(['g-a', 'g-b', 'g-ghost', 'g-c']);

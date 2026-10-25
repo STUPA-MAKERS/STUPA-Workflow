@@ -20,6 +20,10 @@ function fakeAuth(perms: string[]): Partial<AuthService> {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Api = Record<string, any>;
 
+/**
+ * The page opens on form.configure, but create and delete each need their own admin key. The
+ * default grants both, so the dialog tests reach the button.
+ */
 async function setup(opts: { api?: Api; perms?: string[] } = {}) {
   const createApplicationType = jest.fn((b: ApplicationTypeCreateBody) =>
     of({ id: 'f-new', name: b.name, gremiumId: null, hasBudget: false, activeFormVersionId: null }),
@@ -36,8 +40,6 @@ async function setup(opts: { api?: Api; perms?: string[] } = {}) {
   const view = await render(FormsListComponent, {
     providers: [
       { provide: AdminApiService, useValue: api },
-      // The page opens on form.configure, but create and delete each need their own
-      // admin key. The default grants both so the dialog tests reach the button.
       {
         provide: AuthService,
         useValue: fakeAuth(opts.perms ?? ['admin.types', 'admin.types_delete']),
@@ -101,11 +103,11 @@ describe('FormsListComponent — loading & errors', () => {
     expect(c.loading()).toBe(false);
   });
 
+  /** Without a mapping the cell shows the dash fallback. */
   it('falls back to an empty gremien list when that fetch fails', async () => {
     const { c } = await setup({
       api: { listGremienOptions: jest.fn(() => throwError(() => new Error('x'))) },
     });
-    // No mapping -> dash fallback.
     expect(c.gremiumName('g1')).toBe('—');
   });
 
@@ -156,6 +158,7 @@ describe('FormsListComponent — display helpers', () => {
     ]);
   });
 
+  /** The name links to the editor, and each row menu names its type. */
   it('shows the budget, the status as text and the version of each type', async () => {
     const rows: ApplicationTypeFull[] = [
       { ...type('f1', 'Förderantrag'), hasBudget: true, activeFormVersionId: 'fv-1', activeFormVersion: 7 },
@@ -168,7 +171,6 @@ describe('FormsListComponent — display helpers', () => {
     expect(screen.getByText('Entwurf')).toBeInTheDocument();
     expect(screen.getByText('v7')).toBeInTheDocument();
     expect(c.versionLabel(rows[1])).toBe('—');
-    // The name links to the editor, and each row menu names its type.
     expect(screen.getByRole('link', { name: 'Förderantrag' })).toHaveAttribute('href', '/admin/forms/f1');
     expect(screen.getByRole('button', { name: 'Aktionen: Raumantrag' })).toBeInTheDocument();
   });
@@ -248,9 +250,11 @@ describe('FormsListComponent — create gate', () => {
     expect(screen.getByRole('button', { name: 'Formular anlegen' })).toBeInTheDocument();
   });
 
+  /**
+   * The page itself opens on form.configure. The create posts an application type, which needs
+   * admin.types, so the button must not be offered.
+   */
   it('hides the create button for a form manager without admin.types', async () => {
-    // The page itself opens on form.configure. The create posts an application type,
-    // which needs admin.types, so the button must not be offered.
     const { c } = await setup({ perms: ['form.configure'] });
     expect(c.canCreate()).toBe(false);
     expect(screen.queryByRole('button', { name: 'Formular anlegen' })).toBeNull();
@@ -313,6 +317,7 @@ describe('FormsListComponent — delete flow', () => {
     expect(deleteApplicationType).not.toHaveBeenCalled();
   });
 
+  /** The row is kept. */
   it('toasts a delete failure and resets the deleting flag (e.g. 409)', async () => {
     const { c, toast } = await setup({
       api: { deleteApplicationType: jest.fn(() => throwError(() => new Error('409'))) },
@@ -320,7 +325,7 @@ describe('FormsListComponent — delete flow', () => {
     c.askDelete(type('f1', 'Förderantrag'));
     c.confirmDeleteType();
     expect(c.deleting()).toBe(false);
-    expect(c.types()).toHaveLength(1); // row kept
+    expect(c.types()).toHaveLength(1);
     expect(toast.error).toHaveBeenCalled();
   });
 });

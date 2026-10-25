@@ -23,7 +23,7 @@ function renderWith(
 }
 
 describe('AltchaComponent', () => {
-  // jsdom has no Web Crypto `subtle`. The browser and localhost have it.
+  /** jsdom has no Web Crypto `subtle`. The browser and localhost have it. */
   beforeAll(() => {
     if (!globalThis.crypto?.subtle) {
       Object.defineProperty(globalThis, 'crypto', { value: webcrypto, configurable: true });
@@ -38,6 +38,11 @@ describe('AltchaComponent', () => {
     expect(screen.getByRole('button', { name: /not a robot/i })).toBeInTheDocument();
   });
 
+  /**
+   * `findByText` polls until the verified state renders again, because the DOM update follows the
+   * `solved` emit one change-detection cycle later and a direct check is flaky under load. When
+   * solved, the box is ticked, the label stays, and the note is only for a screen reader.
+   */
   it('fetches a challenge, solves the PoW and emits the base64 solution', async () => {
     const c = challengeForZero();
     const solved = jest.fn();
@@ -55,9 +60,6 @@ describe('AltchaComponent', () => {
       }),
     );
     await waitFor(() => expect(solved).toHaveBeenCalledWith(expected));
-    // `findByText` polls until the verified state re-renders. The DOM update follows the
-    // `solved` emit one change-detection cycle later, so a direct check is flaky under load.
-    // Solved: the box is ticked, the label stays, the note is only for a screen reader.
     expect(await screen.findByText('Verifizierung abgeschlossen.')).toHaveClass('sr-only');
     expect(screen.getByText('Ich bin kein Roboter')).toBeInTheDocument();
   });
@@ -69,6 +71,10 @@ describe('AltchaComponent', () => {
     await waitFor(() => expect(unavailable).toHaveBeenCalled());
   });
 
+  /**
+   * The test calls solve() directly, so it awaits the rejected firstValueFrom. The try/catch of the
+   * component then handles the error deterministically.
+   */
   it('enters the error state when the challenge request fails', async () => {
     const solved = jest.fn();
     const unavailable = jest.fn();
@@ -76,8 +82,6 @@ describe('AltchaComponent', () => {
       solved,
       unavailable,
     });
-    // Call solve() directly so the test awaits the rejected firstValueFrom. The
-    // try/catch of the component then handles the error deterministically.
     await fixture.componentInstance.solve();
     fixture.detectChanges();
     expect(fixture.componentInstance.state()).toBe('error');
@@ -86,8 +90,8 @@ describe('AltchaComponent', () => {
     expect(unavailable).not.toHaveBeenCalled();
   });
 
+  /** No number in [0..maxnumber] matches the challenge hash, so solveChallenge throws. */
   it('enters the error state when the PoW is unsolvable within maxnumber', async () => {
-    // No number in [0..maxnumber] matches the challenge hash, so solveChallenge throws.
     const unsolvable: AltchaChallenge = {
       algorithm: 'SHA-256',
       challenge: 'deadbeef'.repeat(8), // 64 hex chars, the loop never makes this value

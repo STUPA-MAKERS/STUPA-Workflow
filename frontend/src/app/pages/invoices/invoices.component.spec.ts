@@ -10,8 +10,10 @@ import { USE_MOCK_API } from '@core/api/api.config';
 import { ToastService } from '@stupa-makers/ui-kit';
 import * as downloadUtil from '@stupa-makers/ui-kit';
 
-// The kit re-exports `downloadBlob` through getters, which a spy cannot replace. A plain
-// copy of the module lets each test spy on it.
+/**
+ * The kit re-exports `downloadBlob` through getters, which a spy cannot replace. A plain copy of
+ * the module lets each test spy on it.
+ */
 jest.mock('@stupa-makers/ui-kit', () => ({
   __esModule: true,
   ...jest.requireActual('@stupa-makers/ui-kit'),
@@ -72,7 +74,7 @@ const FILE_RES: InvoiceFileResult = {
   fileMime: 'application/pdf',
 };
 
-// Fake auth with a switch. The component maps `canManage()` to can('budget.book').
+/** Fake auth with a switch. The component maps `canManage()` to can('budget.book'). */
 class FakeAuth {
   allowed = true;
   can(_perm: string): boolean {
@@ -91,6 +93,7 @@ interface SetupOpts {
   queryParams?: Record<string, string>;
 }
 
+/** The constructor calls reload, which fires GET /api/invoices. */
 async function setup(opts: SetupOpts = {}) {
   localStorage.setItem('ap.locale', 'de');
   const auth = new FakeAuth();
@@ -116,7 +119,6 @@ async function setup(opts: SetupOpts = {}) {
   const http = TestBed.inject(HttpTestingController);
   const toast = TestBed.inject(ToastService);
 
-  // The constructor calls reload, which fires GET /api/invoices.
   const req = http.expectOne((r) => r.url.endsWith('/api/invoices') && r.method === 'GET');
   if (opts.error) {
     req.flush(null, { status: 500, statusText: 'Server Error' });
@@ -152,8 +154,8 @@ describe('InvoicesComponent', () => {
     expect(c.hasMore()).toBe(true);
   });
 
+  /** A global-search hit lands here: the list stays whole, and the invoice opens beside it. */
   it('opens the invoice the URL names and loads it when the list does not hold it', async () => {
-    // Where a global-search hit lands: the list stays whole, the invoice opens beside it.
     const { c, http, fixture } = await setup({ queryParams: { id: 'i-42' } });
     expect(c.selectedId()).toBe('i-42');
     expect(c.activeFilterCount()).toBe(0);
@@ -175,6 +177,7 @@ describe('InvoicesComponent', () => {
     expect(c.detailView()).toBe('missing');
   });
 
+  /** A filter of the URL reloads the list; one that goes away clears. */
   it('opens another invoice when the palette sends it here, without a new list', async () => {
     localStorage.setItem('ap.locale', 'de');
     const params = new BehaviorSubject(convertToParamMap({ id: 'i-1' }));
@@ -200,7 +203,6 @@ describe('InvoicesComponent', () => {
     http.expectNone((r) => r.url.endsWith('/api/invoices'));
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((view.fixture.componentInstance as any).selectedInvoice()?.id).toBe('i-9');
-    // A filter of the URL reloads the list; one that goes away clears.
     params.next(convertToParamMap({ id: 'i-9', seg: 'paid', q: 'acme' }));
     const again = http.expectOne((r) => r.url.endsWith('/api/invoices'));
     expect(again.request.params.get('status')).toBe('paid');
@@ -213,6 +215,7 @@ describe('InvoicesComponent', () => {
     http.verify();
   });
 
+  /** The same segment again sends nothing; an unknown one is "all". */
   it('writes the segment and the filters back into the URL', async () => {
     const { c, http, fixture } = await setup();
     const navigate = jest.spyOn(TestBed.inject(Router), 'navigate');
@@ -226,7 +229,6 @@ describe('InvoicesComponent', () => {
       }),
     );
     http.expectOne((r) => r.url.endsWith('/api/invoices')).flush(page([], 0));
-    // The same segment again sends nothing; an unknown one is "all".
     c.setSegment('inbox');
     c.setSegment('nonsense');
     expect(c.segment()).toBe('all');
@@ -257,15 +259,17 @@ describe('InvoicesComponent', () => {
     expect(c.hasMore()).toBe(false);
   });
 
-  // These two hold what the shared table brings: the header and the skeleton stay
-  // through a filter, a search or a reload, and the pinned actions column survives one.
+  /**
+   * The header and the skeleton of the shared table stay through a filter, a search or a reload,
+   * and the pinned actions column survives one. The no-op call keeps the auth reference alive.
+   */
   it('money() formats in de-DE vs en-GB per locale', async () => {
     const { c } = await setup();
     const de = c.money('119.00');
     expect(de).toContain('119');
     expect(de).toContain('€');
     localStorage.setItem('ap.locale', 'en');
-    TestBed.inject(AuthService); // This no-op call keeps the auth reference alive.
+    TestBed.inject(AuthService);
     const i18n = c.i18n;
     i18n.setLocale('en');
     const en = c.money('119.00');
@@ -279,6 +283,7 @@ describe('InvoicesComponent', () => {
     expect(status?.textContent?.trim()).toBe('Bezahlt');
   });
 
+  /** There is no second page while page 0 reloads. */
   it('keeps the old rows dimmed and inert while a filter loads, with a bar under the chips', async () => {
     const { c, http, container, fixture } = await setup({ initial: [inv({ id: 'a' })] });
     c.setSegment('inbox');
@@ -288,7 +293,7 @@ describe('InvoicesComponent', () => {
     expect(container.querySelector('.inv__groups')).toHaveClass('skel-stale');
     expect(container.querySelector('.inv__groups')).toHaveAttribute('inert');
     expect(container.querySelector('.skel-progress')).not.toBeNull();
-    c.loadMore(); // no second page while page 0 reloads
+    c.loadMore();
     lastInvoicesReq(http).flush(page([inv({ id: 'b' })]));
     fixture.detectChanges();
     expect(c.reloading()).toBe(false);
@@ -381,16 +386,18 @@ describe('InvoicesComponent', () => {
     req.flush(page([]));
   });
 
+  /** Whitespace does not count as an active filter. */
   it('activeFilterCount counts non-empty filters and the search', async () => {
     const { c } = await setup();
     expect(c.activeFilterCount()).toBe(0);
     c.q.set('acme');
     c.grossMin.set(' 5 ');
-    c.grossMax.set('   '); // Whitespace does not count as an active filter.
+    c.grossMax.set('   ');
     c.issueFrom.set('2026-01-01');
     expect(c.activeFilterCount()).toBe(3);
   });
 
+  /** Only limit and offset remain. */
   it('resetFilters clears every filter and reloads', async () => {
     const { c, http } = await setup();
     c.q.set('acme');
@@ -403,7 +410,7 @@ describe('InvoicesComponent', () => {
     c.resetFilters();
     expect(c.activeFilterCount()).toBe(0);
     const req = lastInvoicesReq(http);
-    expect(req.request.params.keys().length).toBe(2); // Only limit and offset remain.
+    expect(req.request.params.keys().length).toBe(2);
     req.flush(page([]));
   });
 
@@ -447,15 +454,14 @@ describe('InvoicesComponent', () => {
     expect(c.loadingMore()).toBe(false);
   });
 
-  // Drag and drop on the page (`appFileDrop`; the counting has its own spec).
   const pdfFile = () => new File(['x'], 'a.pdf', { type: 'application/pdf' });
   const fileDrag = (file?: File) => ({ dataTransfer: { types: ['Files'], files: file ? [file] : [] } });
   const pageOf = (container: Element) => container.querySelector('.inv') as HTMLElement;
   const overlay = (container: Element) => container.querySelector('app-drop-overlay');
 
+  /** A cancelled dragenter (false) takes the drag. */
   it('shows the overlay while a manager drags files over the page', async () => {
     const { fixture, container } = await setup();
-    // A cancelled dragenter (false) takes the drag.
     expect(fireEvent.dragEnter(pageOf(container), fileDrag())).toBe(false);
     fixture.detectChanges();
     expect(overlay(container)).not.toBeNull();
@@ -521,18 +527,20 @@ describe('InvoicesComponent', () => {
     http.expectNone((r) => r.url.includes('/invoices/parse'));
   });
 
+  /**
+   * Into the zone, the page counts the leave of the page, not the enter of the zone. There is one
+   * import: the one of the zone.
+   */
   it('leaves a drag and a drop on the drop zone to the zone', async () => {
     const { fixture, container, http } = await setup();
     const zone = container.querySelector('app-file-drop-zone') as HTMLElement;
     const inner = zone.querySelector('*') as HTMLElement;
     fireEvent.dragEnter(pageOf(container), fileDrag());
-    // Into the zone: the page counts the leave of the page, not the enter of the zone.
     fireEvent.dragEnter(inner, fileDrag());
     fireEvent.dragLeave(pageOf(container), fileDrag());
     fixture.detectChanges();
     expect(overlay(container)).toBeNull();
     fireEvent.drop(inner, fileDrag(pdfFile()));
-    // One import: the zone's own.
     expect(http.match((r) => r.url.endsWith('/api/invoices/parse')).length).toBe(1);
   });
 
@@ -589,19 +597,21 @@ describe('InvoicesComponent', () => {
     expect(c.newNet()).toBe('');
   });
 
+  /**
+   * The type of grossAmount is string, but the server can omit it. This covers the fallback `?? ''`
+   * branch.
+   */
   it('parse without a gross amount defaults it to empty', async () => {
     const { c, http } = await setup();
     const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
     c.onFilePicked({ target: { files: [file], value: 'x' } } as unknown as Event);
-    // The type of grossAmount is string, but the server can omit it. This covers the
-    // fallback `?? ''` branch.
     http
       .expectOne((r) => r.url.endsWith('/api/invoices/parse'))
       .flush({ ...PARSE, grossAmount: null });
     expect(c.newGross()).toBe('');
   });
 
-  it('parse flagged as duplicate shows the warning in the review dialog (N31)', async () => {
+  it('parse flagged as duplicate shows the warning in the review dialog', async () => {
     const { c, http, fixture } = await setup();
     const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
     c.onFilePicked({ target: { files: [file], value: 'x' } } as unknown as Event);
@@ -639,6 +649,10 @@ describe('InvoicesComponent', () => {
     expect(c.importDuplicate()).toBeNull();
   });
 
+  /**
+   * The openCreate call clears the fields, the attachFile call starts the upload, and the dialog
+   * says why the fields are empty.
+   */
   it('not-zugferd parse error opens an empty dialog and attaches the file', async () => {
     const { c, http } = await setup();
     const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
@@ -647,14 +661,11 @@ describe('InvoicesComponent', () => {
       .expectOne((r) => r.url.endsWith('/api/invoices/parse'))
       .flush({ code: 'invoice_not_zugferd' }, { status: 422, statusText: 'Unprocessable' });
     expect(c.createOpen()).toBe(true);
-    // The openCreate call cleared the fields.
     expect(c.newNumber()).toBe('');
-    // The attachFile call started the upload.
     const up = http.expectOne((r) => r.url.endsWith('/api/invoices/file'));
     up.flush(FILE_RES);
     expect(c.importToken()).toBe('tok-upload');
     expect(c.importFileName()).toBe('manual.pdf');
-    // The dialog says why the fields are empty.
     expect(c.importNotice()).toBe('manual');
   });
 
@@ -788,6 +799,7 @@ describe('InvoicesComponent', () => {
     http.expectNone((r) => r.url.endsWith('/api/invoices') && r.method === 'POST');
   });
 
+  /** The reload fires a fresh GET. */
   it('create() submits trimmed fields, includes the file handle, toasts and reloads', async () => {
     const { c, http, toast } = await setup();
     const spy = jest.spyOn(toast, 'success');
@@ -824,17 +836,16 @@ describe('InvoicesComponent', () => {
     expect(c.saving()).toBe(false);
     expect(c.createOpen()).toBe(false);
     expect(spy).toHaveBeenCalled();
-    // The reload fired a fresh GET.
     lastInvoicesReq(http).flush(page([inv({ id: 'new' })]));
   });
 
+  /** Every optional field stays blank, and there is no importToken. */
   it('create() sends nulls for blank optional fields and no file handle', async () => {
     const { c, http } = await setup();
     c.openCreate();
     c.newNumber.set('R-1');
     c.newSupplier.set('Sup');
     c.newGross.set('5');
-    // Every optional field stays blank and there is no importToken.
     const ev = { preventDefault: jest.fn() } as unknown as Event;
     c.create(ev);
     const req = http.expectOne((r) => r.url.endsWith('/api/invoices') && r.method === 'POST');
@@ -855,6 +866,7 @@ describe('InvoicesComponent', () => {
     lastInvoicesReq(http).flush(page([inv()]));
   });
 
+  /** The importFileMime value stays empty, which covers the fileMime null branch. */
   it('create() with a file handle but no mime sends fileMime null', async () => {
     const { c, http } = await setup();
     c.openCreate();
@@ -863,7 +875,6 @@ describe('InvoicesComponent', () => {
     c.newGross.set('5');
     c.importToken.set('tok');
     c.importFileName.set('f.pdf');
-    // The importFileMime value stays empty here. This covers the fileMime null branch.
     const ev = { preventDefault: jest.fn() } as unknown as Event;
     c.create(ev);
     const req = http.expectOne((r) => r.url.endsWith('/api/invoices') && r.method === 'POST');
@@ -910,6 +921,7 @@ describe('InvoicesComponent', () => {
     expect(c.createOpen()).toBe(true);
   });
 
+  /** A stored invoice without number and supplier saves without them. */
   it('openEdit loads the invoice into the edit signals (with nulls → empty)', async () => {
     const { c } = await setup();
     const target = inv({
@@ -930,7 +942,6 @@ describe('InvoicesComponent', () => {
     expect(c.editSupplier()).toBe('');
     expect(c.editGross()).toBe('99');
     expect(c.editStatus()).toBe('paid');
-    // A stored invoice without number and supplier saves without them.
     expect(c.editNumberRequired()).toBe(false);
     expect(c.editSupplierRequired()).toBe(false);
     expect(c.canSubmitEdit()).toBe(true);
@@ -948,6 +959,7 @@ describe('InvoicesComponent', () => {
     expect(c.canSubmitEdit()).toBe(false);
   });
 
+  /** The status moves the invoice to another segment, so the list loads again. */
   it('saveEdit marks an invoice without number and supplier as paid', async () => {
     const { c, http } = await setup({
       initial: [inv({ id: 'e1', number: null, supplier: null, status: 'open', grossAmount: '40' })],
@@ -960,7 +972,6 @@ describe('InvoicesComponent', () => {
     req.flush(inv({ id: 'e1', number: null, supplier: null, status: 'paid' }));
     expect(c.editing()).toBe(null);
     expect(c.items()[0].status).toBe('paid');
-    // The status moves the invoice to another segment: the list loads again.
     lastInvoicesReq(http).flush(page([]));
   });
 
@@ -1097,6 +1108,7 @@ describe('InvoicesComponent', () => {
     expect(c.confirmDelete()).toBe(target);
   });
 
+  /** The counts of the segments change, so the list loads again. */
   it('doDelete removes the row, decrements the total and toasts', async () => {
     const { c, http, toast } = await setup({
       initial: [inv({ id: 'd1' }), inv({ id: 'd2' })],
@@ -1111,7 +1123,6 @@ describe('InvoicesComponent', () => {
     expect(c.items().map((x: Invoice) => x.id)).toEqual(['d2']);
     expect(c.total()).toBe(1);
     expect(spy).toHaveBeenCalled();
-    // The counts of the segments change: the list loads again.
     lastInvoicesReq(http).flush(page([inv({ id: 'd2' })], 1));
   });
 
@@ -1190,6 +1201,7 @@ describe('InvoicesComponent', () => {
   });
 });
 
+/** The test captures the observer to drive its callback by hand. */
 describe('InvoicesComponent infinite-scroll effect', () => {
   class FakeAuth2 {
     can(): boolean {
@@ -1197,7 +1209,6 @@ describe('InvoicesComponent infinite-scroll effect', () => {
     }
   }
 
-  // Capture the observer to drive its callback manually.
   let lastCb: ((entries: { isIntersecting: boolean }[]) => void) | null = null;
   let disconnected = false;
 
@@ -1222,6 +1233,10 @@ describe('InvoicesComponent infinite-scroll effect', () => {
     TestBed.inject(HttpTestingController).verify();
   });
 
+  /**
+   * The initial load returns 1 of 2, so more rows remain. Entries that do not intersect load
+   * nothing; an intersecting entry makes loadMore fetch the next page.
+   */
   it('observes the sentinel and calls loadMore when it intersects', async () => {
     const view = await render(InvoicesComponent, {
       providers: [
@@ -1234,18 +1249,15 @@ describe('InvoicesComponent infinite-scroll effect', () => {
       ],
     });
     const http = TestBed.inject(HttpTestingController);
-    // The initial load returns 1 of 2, so more rows remain.
     http
       .expectOne((r) => r.url.endsWith('/api/invoices') && r.method === 'GET')
       .flush(page([inv({ id: 'a' })], 2));
     view.fixture.detectChanges();
 
     expect(lastCb).not.toBeNull();
-    // Entries that do not intersect load nothing.
     lastCb?.([{ isIntersecting: false }]);
     http.expectNone((r) => r.url.endsWith('/api/invoices') && r.method === 'GET');
 
-    // An intersecting entry makes loadMore fetch the next page.
     lastCb?.([{ isIntersecting: true }]);
     http
       .expectOne((r) => r.url.endsWith('/api/invoices') && r.method === 'GET')
@@ -1269,10 +1281,11 @@ describe('InvoicesComponent filter declaration', () => {
     segment(): string;
   }
 
+  /**
+   * A filter that is in one of the count, reset and request lists and missing in another is
+   * invisible: the control moves, and the list does not change.
+   */
   it('resets every filter it declares and keeps the segment', async () => {
-    // The count, the reset and the request each kept their own list. A filter added to
-    // one and forgotten in another is invisible: the control moves, and the list does
-    // not change. This is what /applications was reported broken for.
     const { c, http } = await setup({ queryParams: { seg: 'paid' } });
     const host = c as unknown as FilterHost;
     for (const f of host.filterSignals) f.signal.set('x');
@@ -1300,8 +1313,6 @@ describe('InvoicesComponent filter declaration', () => {
     expect(host.activeFilterCount()).toBe(host.filterSignals.length);
   });
 });
-
-// --- list/detail ---------------------------------------------------
 
 /** Let `matchMedia` match the queries that contain one of the given parts. */
 function setViewport(...parts: string[]): void {
@@ -1338,6 +1349,7 @@ describe('InvoicesComponent (list/detail)', () => {
     TestBed.inject(HttpTestingController).verify();
   });
 
+  /** A row without supplier is named by its number. */
   it('lists the invoices by month with status, number and due date', async () => {
     setViewport('min-width: 1200px');
     const { container } = await setup({
@@ -1346,7 +1358,6 @@ describe('InvoicesComponent (list/detail)', () => {
     const months = [...container.querySelectorAll('.inv__month')].map((h) => h.textContent?.trim());
     expect(months).toEqual(['Januar 2026', 'Dezember 2025']);
     expect(screen.getByRole('link', { name: /ACME GmbH/ }).getAttribute('href')).toContain('id=i-1');
-    // A row without supplier is named by its number.
     expect(screen.getByRole('link', { name: /^R-2/ })).toBeInTheDocument();
     expect(screen.getByText('fällig 31.01.')).toBeInTheDocument();
     expect(screen.getByText('Keine Rechnung geöffnet')).toBeInTheDocument();
@@ -1364,13 +1375,16 @@ describe('InvoicesComponent (list/detail)', () => {
     lastInvoicesReq(http).flush(page([]));
   });
 
+  /**
+   * The tree loads once, for the swatches of the bookings. A second click while it runs sends
+   * nothing. A paid invoice is not marked again.
+   */
   it('shows the open invoice and its actions; marks it paid and creates a booking', async () => {
     setViewport('min-width: 1200px');
     const { c, http, fixture, toast } = await setup({ initial: [inv({ linkedBookings: [BOOKING] })] });
     const navigate = jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
     c.selectedId.set('i-1');
     fixture.detectChanges();
-    // The tree loads once, for the swatches of the bookings.
     http.expectOne((r) => r.url.endsWith('/api/budgets')).flush([]);
     fixture.detectChanges();
     expect(screen.getByRole('heading', { name: 'ACME GmbH' })).toBeInTheDocument();
@@ -1380,7 +1394,6 @@ describe('InvoicesComponent (list/detail)', () => {
     const success = jest.spyOn(toast, 'success');
     await userEvent.click(screen.getByRole('button', { name: 'Als bezahlt markieren' }));
     expect(c.markingPaid()).toBe('i-1');
-    // A second click while it runs sends nothing.
     c.markPaid(c.items()[0]);
     const patch = http.expectOne((r) => r.url.endsWith('/api/invoices/i-1') && r.method === 'PATCH');
     expect(patch.request.body).toEqual({ status: 'paid' });
@@ -1388,7 +1401,6 @@ describe('InvoicesComponent (list/detail)', () => {
     expect(success).toHaveBeenCalledWith('Rechnung als bezahlt markiert.');
     lastInvoicesReq(http).flush(page([inv({ status: 'paid', linkedBookings: [BOOKING] })]));
     expect(c.items()[0].status).toBe('paid');
-    // A paid invoice is not marked again.
     c.markPaid(c.items()[0]);
     navigate.mockRestore();
   });
@@ -1414,6 +1426,10 @@ describe('InvoicesComponent (list/detail)', () => {
     expect(c.selectedInvoice().status).toBe('paid');
   });
 
+  /**
+   * The reload of the segment no longer holds the paid invoice. The kept copy is current, so there
+   * is no request by id.
+   */
   it('keeps the open invoice in the detail when "mark paid" drops it from "Eingang"', async () => {
     const { c, http, fixture } = await setup({ queryParams: { id: 'i-1', seg: 'inbox' } });
     expect(c.segment()).toBe('inbox');
@@ -1422,13 +1438,11 @@ describe('InvoicesComponent (list/detail)', () => {
     http
       .expectOne((r) => r.url.endsWith('/api/invoices/i-1') && r.method === 'PATCH')
       .flush(inv({ status: 'paid' }));
-    // The reload of the segment no longer holds the paid invoice.
     lastInvoicesReq(http).flush(page([inv({ id: 'i-9' })]));
     fixture.detectChanges();
     expect(c.items().map((i: Invoice) => i.id)).toEqual(['i-9']);
     expect(c.detailView()).toBe('invoice');
     expect(c.selectedInvoice().status).toBe('paid');
-    // The kept copy is current: no request by id.
     http.expectNone((r) => r.url.endsWith('/api/invoices/i-1') && r.method === 'GET');
   });
 
@@ -1442,6 +1456,7 @@ describe('InvoicesComponent (list/detail)', () => {
     expect(c.selectedInvoice().id).toBe('i-1');
   });
 
+  /** A form opened on the open row stays while the URL keeps that row. */
   it('closes an open form when the URL opens another row', async () => {
     const { c } = await setup({ initial: [inv(), inv({ id: 'i-2' })] });
     c.openEdit(c.items()[0]);
@@ -1450,7 +1465,6 @@ describe('InvoicesComponent (list/detail)', () => {
     expect(c.formMode()).toBeNull();
     expect(c.detailView()).toBe('invoice');
     expect(c.selectedInvoice().id).toBe('i-2');
-    // A form opened on the open row stays while the URL keeps that row.
     c.openEdit(c.items()[1]);
     c.adoptUrl(convertToParamMap({ id: 'i-2' }));
     expect(c.formMode()).toBe('edit');
@@ -1540,9 +1554,10 @@ describe('InvoicesComponent (list/detail)', () => {
     navigate.mockRestore();
   });
 
+  /** Before the search there is nothing to open. */
   it('searches the number of a duplicate in every segment ("Vorhandene öffnen")', async () => {
     const { c, http } = await setup({ queryParams: { seg: 'paid' } });
-    c.openDuplicate(); // nothing to open yet
+    c.openDuplicate();
     const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
     c.onFilePicked({ target: { files: [file], value: 'x' } } as unknown as Event);
     http.expectOne((r) => r.url.endsWith('/api/invoices/parse')).flush({ ...PARSE, duplicate: true, number: 'DUP' });
@@ -1557,6 +1572,10 @@ describe('InvoicesComponent (list/detail)', () => {
     req.flush(page([]));
   });
 
+  /**
+   * The phone has the floating "Rechnung anlegen" and the form in a bottom sheet; the button hides
+   * while the form is open.
+   */
   it('opens the file picker from the header menu of a phone', async () => {
     setViewport('max-width: 768px');
     const { c, container } = await setup();
@@ -1566,8 +1585,6 @@ describe('InvoicesComponent (list/detail)', () => {
     expect(click).toHaveBeenCalled();
     c.onHeaderMenu({ id: 'other', label: '' });
     expect(click).toHaveBeenCalledTimes(1);
-    // The phone has the floating "Rechnung anlegen" and the form in a bottom sheet; the
-    // button hides while the form is open.
     await userEvent.click(screen.getByRole('button', { name: 'Rechnung anlegen' }));
     expect(screen.getByRole('dialog', { name: 'Rechnung hinzufügen' }).classList.contains('ss--bottom')).toBe(true);
     expect(c.detailView()).toBe('none');

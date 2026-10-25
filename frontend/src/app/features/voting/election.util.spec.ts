@@ -43,6 +43,7 @@ const ERASED: ElectionConfig = {
 };
 
 describe('election.util', () => {
+  /** The label is checked in both languages. */
   it('shows the label of the viewer for an erased candidate', () => {
     expect(candidateLabel({ id: 'c2', name: 'Ben' }, t)).toBe('Ben');
     expect(candidateLabel({ id: 'c2', name: 'Ben', erased: false }, t)).toBe('Ben');
@@ -56,7 +57,6 @@ describe('election.util', () => {
       'Cem',
       'election.abstentionsLabel',
     ]);
-    // The label in both languages.
     expect(CATALOG.de['election.candidate.erased']).toBe('Gelöscht');
     expect(CATALOG.en['election.candidate.erased']).toBe('Deleted');
   });
@@ -86,25 +86,26 @@ describe('election.util', () => {
     expect(seatsText(4, t)).toBe('election.seats.other{"n":4}');
   });
 
+  /**
+   * The cases are only names (every seat has a vote), names and abstentions, and only abstentions
+   * (the full abstention). Without a config one seat counts.
+   */
   it('counts the names and the abstentions of a multi-seat ballot', () => {
     const three = { ...ELECTION, seats: 3 };
     expect(namesText(1, t)).toBe('election.names.one');
     expect(namesText(2, t)).toBe('election.names.other{"n":2}');
-    // Only names: every seat has a vote.
     expect(electionCountText(ELECTION, ['c1', 'c2'], t)).toBe('election.names.other{"n":2}');
-    // Names and abstentions.
     expect(electionCountText(three, ['c1', 'c2'], t)).toBe(
       'election.names.other{"n":2}, election.abstentions.one',
     );
     expect(electionCountText(three, ['c1'], t)).toBe(
       'election.names.one, election.abstentions.other{"n":2}',
     );
-    // Only abstentions: the full abstention.
     expect(electionCountText(three, [], t)).toBe('election.abstentions.other{"n":3}');
-    // Without a config one seat counts.
     expect(electionCountText(null, ['c1'], t)).toBe('election.names.one');
   });
 
+  /** The last case is an open vote with revealed counts and no stored result. */
   it('builds the bars best first with the tags and the abstentions', () => {
     const result: ElectionResult = {
       counts: { c1: 3, c2: 5, c3: 3 },
@@ -120,7 +121,6 @@ describe('election.util', () => {
       ['c3', 3, false, true],
       ['abstain', 1, false, false],
     ]);
-    // An open vote with revealed counts and no stored result.
     const open = electionBars(ELECTION, null, { c1: 1, abstain: 2 }, t);
     expect(open.find((b) => b.id === 'c1')?.count).toBe(1);
     expect(open.at(-1)).toMatchObject({ id: 'abstain', count: 2 });
@@ -167,6 +167,7 @@ describe('election.util', () => {
     expect(runoffPending('runoff', null)).toBe(false);
   });
 
+  /** A list row reads an election with `electionStatus` and a motion with the plain status. */
   it('writes the result line, the caption and the status', () => {
     const er: ElectionResult = { counts: {}, abstentions: 0, ballots: 0, elected: ['c2', 'c1'] };
     expect(electionResultLine(ELECTION, 'elected', er, t)).toBe(
@@ -181,7 +182,6 @@ describe('election.util', () => {
     expect(electionStatus('runoff').key).toBe('election.status.runoff');
     expect(electionStatus('tie').key).toBe('election.status.tie');
     expect(electionStatus('rejected').kind).toBe('error');
-    // A list row reads an election with `electionStatus`, a motion as before.
     expect(closedStatus('election', 'elected').key).toBe('election.status.elected');
     expect(closedStatus('motion', 'passed').key).toBe('vote.result.passed');
     expect(closedStatus(undefined, 'tie').key).toBe('vote.result.rejected');

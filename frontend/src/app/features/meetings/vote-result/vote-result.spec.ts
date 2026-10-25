@@ -39,6 +39,7 @@ describe('voteResultInfo', () => {
 });
 
 describe('voteResultResolver', () => {
+  /** An open vote and a vote of another meeting stay plain. */
   it('finds a closed vote of the meeting by its question, also when escaped or bold', () => {
     const resolve = voteResultResolver(
       [closed, vote({ id: 'v-2', status: 'open', question: 'Offen?' })],
@@ -47,7 +48,6 @@ describe('voteResultResolver', () => {
     );
     expect(resolve('Wird der Nachtragshaushalt beschlossen?')?.result?.label).toBe('Angenommen');
     expect(resolve('**Wird  der Nachtragshaushalt beschlossen?**')?.result?.label).toBe('Angenommen');
-    // An open vote and a vote of another meeting stay plain.
     expect(resolve('Offen?')).toBeNull();
     expect(resolve('Ganz andere Frage?')).toBeNull();
   });
@@ -72,6 +72,7 @@ describe('voteResultResolver', () => {
     expect(resolve('Vorsitz (2. Wahlgang)')).not.toBeNull();
   });
 
+  /** Without a matching kind line the last vote wins. */
   it('tells two polls with one question apart by the kind line of the card', () => {
     const base = { ...closed, kind: 'poll' as const, question: 'Test für TOP', result: null };
     const multi = {
@@ -87,7 +88,6 @@ describe('voteResultResolver', () => {
     const resolve = voteResultResolver([date, multi], t, 'de');
     expect(resolve('Test für TOP', ['Terminumfrage'])?.caption).toMatch(/^Terminumfrage/);
     expect(resolve('Test für TOP', ['Umfrage · Mehrfachwahl, höchstens 2'])?.caption).toMatch(/Mehrfachwahl/);
-    // Without a matching kind line the last vote wins.
     expect(resolve('Test für TOP')?.caption).toMatch(/Mehrfachwahl/);
   });
 

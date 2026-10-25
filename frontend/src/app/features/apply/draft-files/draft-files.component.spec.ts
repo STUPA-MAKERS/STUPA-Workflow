@@ -92,6 +92,7 @@ describe('DraftFilesComponent', () => {
     expect(screen.queryByRole('checkbox')).toBeNull();
   });
 
+  /** The summary belongs to the general block. */
   it('shows only the files of its field and the pending uploads', async () => {
     await setup(
       { fieldKey: 'offer', required: true, error: 'Bitte lade mindestens eine Datei hoch.' },
@@ -107,7 +108,6 @@ describe('DraftFilesComponent', () => {
     expect(screen.getByText(/Wird hochgeladen/)).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent('Bitte lade mindestens eine Datei hoch.');
     expect(screen.getByText('*')).toBeInTheDocument();
-    // The summary is the general block's.
     expect(screen.queryByText(/von 20 Dateien/)).toBeNull();
   });
 

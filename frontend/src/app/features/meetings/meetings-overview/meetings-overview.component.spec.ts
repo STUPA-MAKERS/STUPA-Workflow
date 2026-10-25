@@ -58,6 +58,7 @@ async function setup(opts: { media?: string[]; view?: string; managed?: string[]
 }
 
 describe('MeetingsOverviewComponent', () => {
+  /** The narrow calendar scrolls as a page. */
   it('shows the list by default and keeps a switch to the calendar per browser', async () => {
     const { fixture, http } = await setup();
     expect(fixture.nativeElement.querySelector('app-meetings-list')).not.toBeNull();
@@ -67,7 +68,6 @@ describe('MeetingsOverviewComponent', () => {
     expect(localStorage.getItem(VIEW_STORAGE_KEY)).toBe('calendar');
     expect(fixture.nativeElement.querySelector('app-meetings-calendar')).not.toBeNull();
     http.match((r) => r.url === '/api/meetings').forEach((r) => r.flush([]));
-    // The narrow calendar scrolls as a page.
     expect(fixture.componentInstance.pane()).toBe(false);
   });
 

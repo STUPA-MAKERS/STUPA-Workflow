@@ -59,11 +59,11 @@ function makeApi(o: ApiOverrides = {}) {
 
 let loc: LocationMock;
 
+/** ngModel writes to the boxes asynchronously. */
 async function setup(api = makeApi()) {
   const view = await render(OAuthConsentComponent, {
     providers: [{ provide: ApiClient, useValue: api }, provideLocationMock(loc)],
   });
-  // ngModel writes to the boxes asynchronously.
   await view.fixture.whenStable();
   view.fixture.detectChanges();
   const cmp = view.fixture.componentInstance;
@@ -82,6 +82,7 @@ describe('OAuthConsentComponent', () => {
     expect(screen.getByText('antragsplattform-mcp')).toBeInTheDocument();
   });
 
+  /** No raw key and no translation key shows. */
   it('lists every requested scope by its label, the held ones ticked', async () => {
     const { container } = await setup();
     const boxes = screen.getAllByRole('checkbox') as HTMLInputElement[];
@@ -90,7 +91,6 @@ describe('OAuthConsentComponent', () => {
     for (const label of LABELS) {
       expect(screen.getByRole('checkbox', { name: new RegExp(`^${label}`) })).toBeInTheDocument();
     }
-    // No raw key and no translation key shows.
     expect(container.textContent).not.toContain('account.scope.');
     expect(screen.queryByText('meetings:write')).toBeNull();
     expect(await runAxe(container)).toHaveNoViolations();
@@ -176,6 +176,7 @@ describe('OAuthConsentComponent', () => {
     expect(loc.assign).toHaveBeenCalledWith('http://127.0.0.1/cb?error=access_denied');
   });
 
+  /** The person can still deny, so the client learns the outcome. */
   it('without mcp.use: shows the error line, no choices, and disables "Erlauben"', async () => {
     const api = makeApi({
       consentRequest: jest.fn(() => of({ ...clone(REQ), canUseMcp: false })),
@@ -186,7 +187,6 @@ describe('OAuthConsentComponent', () => {
     );
     expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
     expect(screen.getByRole('button', { name: 'Erlauben' })).toBeDisabled();
-    // The person can still deny, so the client learns the outcome.
     await userEvent.click(screen.getByRole('button', { name: 'Ablehnen' }));
     expect(api.submitConsent).toHaveBeenCalledWith(expect.objectContaining({ approve: false }));
   });

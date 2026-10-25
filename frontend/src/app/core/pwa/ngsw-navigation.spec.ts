@@ -19,8 +19,8 @@ interface NgswConfig {
 /** Paths the SERVER answers with its own HTML. None may reach the Angular router. */
 const SERVER_RENDERED = ['/s/**', '/api/**'];
 
+/** The project root is four levels up from src/app/core/pwa. */
 function config(): NgswConfig {
-  // Four levels up from src/app/core/pwa to the project root.
   const path = join(__dirname, '..', '..', '..', '..', 'ngsw-config.json');
   return JSON.parse(readFileSync(path, 'utf8')) as NgswConfig;
 }

@@ -84,6 +84,7 @@ function makeApi(over: Partial<Record<string, jest.Mock>> = {}) {
   };
 }
 
+/** NgModel writes its value after a microtask. */
 async function setup(opts: { api?: ReturnType<typeof makeApi>; perms?: string[] } = {}) {
   const api = opts.api ?? makeApi();
   const perms = opts.perms ?? ['admin.gremien', 'admin.gremium_roles', 'admin.group_mappings'];
@@ -96,7 +97,6 @@ async function setup(opts: { api?: ReturnType<typeof makeApi>; perms?: string[] 
       { provide: AuthService, useValue: { can: (p: string) => perms.includes(p) } },
     ],
   });
-  // NgModel writes its value after a microtask.
   await view.fixture.whenStable();
   view.fixture.detectChanges();
   return { ...view, api, toast };
@@ -114,6 +114,7 @@ async function pick(name: string, label: string): Promise<void> {
 describe('AdminGremienComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
+  /** The row has no inline link or icons: the ⋮ menu holds edit, members and delete. */
   it('lists the gremien with slug and counts; the first row starts open', async () => {
     const { api } = await setup();
     const first = item('Studierendenparlament');
@@ -121,7 +122,6 @@ describe('AdminGremienComponent', () => {
     expect(within(first).getByText('23 Mitglieder · 4 Rollen')).toBeInTheDocument();
     expect(within(item('AStA')).getByText('1 Mitglied · 1 Rolle')).toBeInTheDocument();
     expect(within(item('Ohne Zahlen')).queryByText(/Rolle/)).toBeNull();
-    // The row has no inline link or icons: the ⋮ menu holds edit, members and delete.
     expect(within(first).queryByRole('link')).toBeNull();
     expect(within(first).getByRole('button', { name: 'Weitere Aktionen: Studierendenparlament' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Studierendenparlament/ })).toHaveAttribute(
@@ -171,6 +171,7 @@ describe('AdminGremienComponent', () => {
     ).toBeInTheDocument();
   });
 
+  /** Opening again reads the recipients only once. */
   it('opens and closes a row with its name and with the chevron', async () => {
     const { api } = await setup();
     await userEvent.click(screen.getByRole('button', { name: /^AStA/ }));
@@ -184,7 +185,6 @@ describe('AdminGremienComponent', () => {
     expect(value('Zusätzliche Protokoll-Empfänger')).toBe('Keine');
     await userEvent.click(screen.getByRole('button', { name: 'Zuklappen: AStA' }));
     expect(screen.getByRole('button', { name: /^AStA/ })).toHaveAttribute('aria-expanded', 'false');
-    // Opening again reads the recipients only once.
     await userEvent.click(screen.getByRole('button', { name: 'Aufklappen: AStA' }));
     expect(api.getGremiumMailRecipients.mock.calls.filter(([id]) => id === 'g-2')).toHaveLength(1);
   });

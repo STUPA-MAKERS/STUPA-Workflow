@@ -89,6 +89,7 @@ function setup(opts: { votes?: Vote[]; status?: VoteDelegationStatus | Error } =
 }
 
 describe('ParticipantVoteService', () => {
+  /** The room closes v1 and opens v2 at once, so the read of v1 comes last. */
   it('drops a read that arrives after the read of a newer vote', () => {
     const { svc, api, set } = setup();
     const reads = new Map<string, Subject<Vote>>();
@@ -98,7 +99,6 @@ describe('ParticipantVoteService', () => {
       return read;
     });
     set(row({ id: 'v1' }));
-    // The room closes v1 and opens v2 at once: the read of v1 comes last.
     set(row({ id: 'v2', question: 'Zweite Frage?' }));
     reads.get('v2')!.next(vote({ id: 'v2', question: 'Zweite Frage?' }));
     reads.get('v1')!.next(vote({ id: 'v1' }));
@@ -107,6 +107,7 @@ describe('ParticipantVoteService', () => {
     expect(svc.vote()?.question).toBe('Zweite Frage?');
   });
 
+  /** The turnout of the live row replaces the turnout of the read; the counts stay hidden. */
   it('reads the vote and the delegation state once per id and status', () => {
     const { svc, api, delegations, set } = setup();
     set(row());
@@ -114,7 +115,6 @@ describe('ParticipantVoteService', () => {
     expect(delegations.voteStatus).toHaveBeenCalledWith('v1');
     set(row({ voted: 6 }));
     expect(api.getVote).toHaveBeenCalledTimes(1);
-    // The turnout of the live row replaces the turnout of the read; the counts stay hidden.
     expect(svc.vote()?.tally.voted).toBe(6);
     expect(svc.vote()?.tally.counts).toEqual({});
     set(row({ voted: 9, revealed: true, counts: { yes: 9 } }));
@@ -123,13 +123,13 @@ describe('ParticipantVoteService', () => {
     expect(svc.vote()?.tally.counts).toEqual({});
   });
 
+  /** The same vote again keeps the delegation state. */
   it('reads the vote again when its status changes, and shows the read after the close', () => {
     const closed = vote({ status: 'closed', result: 'passed' });
     const { svc, api, delegations, set } = setup({ votes: [vote(), closed] });
     set(row());
     set(row({ status: 'closed' }));
     expect(api.getVote).toHaveBeenCalledTimes(2);
-    // The same vote again: the delegation state stays.
     expect(delegations.voteStatus).toHaveBeenCalledTimes(1);
     expect(svc.vote()).toEqual(closed);
     expect(svc.notice()).toBeNull();

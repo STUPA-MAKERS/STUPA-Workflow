@@ -125,6 +125,11 @@ function httpError(status: number, error: unknown = null): HttpErrorResponse {
 describe('ReportDialogComponent', () => {
   afterEach(() => localStorage.clear());
 
+  /**
+   * A signed-in reporter gives no e-mail and solves no ALTCHA. The context rows are the page
+   * without the query, the browser and the window. The tab "Tickets" shows the own report after the
+   * send. The focused send button is gone, so the focus moves to the confirmation.
+   */
   it('sends a signed-in report with the context and shows only the number', async () => {
     const { open, create, drafts, fixture, auth } = await setup();
     await open();
@@ -132,10 +137,8 @@ describe('ReportDialogComponent', () => {
       'href',
       'https://wiki.example.org/handbook',
     );
-    // A signed-in reporter gives no e-mail and solves no ALTCHA.
     expect(screen.queryByLabelText(/Deine E-Mail/)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Ich bin kein Roboter/ })).not.toBeInTheDocument();
-    // The context rows: the page without the query, the browser and the window.
     expect(screen.getByText('https://stupa.example.org/applications/A-1')).toBeInTheDocument();
     expect(screen.getByText('Firefox 131 · Linux')).toBeInTheDocument();
     expect(screen.getByText('1440 × 900 · Deutsch')).toBeInTheDocument();
@@ -163,20 +166,18 @@ describe('ReportDialogComponent', () => {
       altcha: null,
     });
     expect(drafts.clear).toHaveBeenCalled();
-    // The tab "Tickets" shows the own report from now on.
     expect(auth).toHaveBeenCalled();
     expect(screen.getByRole('status')).toHaveTextContent('Deine Meldung hat die Nummer T-0043');
     expect(screen.queryByRole('button', { name: 'Senden' })).not.toBeInTheDocument();
-    // The focused send button is gone: the focus moves to the confirmation.
     await fixture.whenStable();
     expect(document.activeElement).toBe(screen.getByRole('status'));
   });
 
+  /** Closing keeps the draft. */
   it('starts a fresh report after a send, and keeps a closed draft', async () => {
     const { open, help, fixture, c } = await setup();
     await open();
     await fill('Erster Versuch', 'Text');
-    // Closing keeps the draft.
     await userEvent.click(screen.getAllByRole('button', { name: 'Abbrechen' }).at(-1)!);
     fixture.detectChanges();
     expect(help.reportOpen()).toBe(false);
@@ -185,7 +186,6 @@ describe('ReportDialogComponent', () => {
 
     await userEvent.click(sendButton());
     fixture.detectChanges();
-    // "Schließen" after the send.
     await userEvent.click(screen.getAllByRole('button', { name: 'Schließen' }).at(-1)!);
     await open();
     expect(c.title()).toBe('');
@@ -216,6 +216,7 @@ describe('ReportDialogComponent', () => {
     expect(create).not.toHaveBeenCalled();
   });
 
+  /** An unsolved ALTCHA blocks the send. Without a session there is no tab to show. */
   it('asks a visitor for the e-mail and the ALTCHA solution', async () => {
     const { open, create, fixture, c, auth } = await setup({ signedIn: false });
     await open();
@@ -229,7 +230,6 @@ describe('ReportDialogComponent', () => {
     expect(screen.getByText('Bitte eine gültige E-Mail-Adresse eingeben.')).toBeInTheDocument();
     await userEvent.clear(email);
     await userEvent.type(email, 'jana@example.org');
-    // Unsolved: no send.
     await userEvent.click(sendButton());
     expect(create).not.toHaveBeenCalled();
 
@@ -239,7 +239,6 @@ describe('ReportDialogComponent', () => {
     expect(create).toHaveBeenCalledWith(
       expect.objectContaining({ email: 'jana@example.org', altcha: 'solution-1' }),
     );
-    // Without a session there is no tab to show.
     expect(auth).not.toHaveBeenCalled();
   });
 
@@ -254,6 +253,7 @@ describe('ReportDialogComponent', () => {
     expect(create).toHaveBeenCalledWith(expect.objectContaining({ altcha: null }));
   });
 
+  /** The widget asks again. */
   it.each([
     [httpError(400, { code: 'altcha_failed' }), 'Die Prüfung „Kein Roboter“ ist abgelaufen. Bitte noch einmal bestätigen.'],
     [httpError(403), 'Meldungen ohne Konto sind ausgeschaltet. Bitte melde dich an.'],
@@ -273,7 +273,6 @@ describe('ReportDialogComponent', () => {
     fixture.detectChanges();
     expect(screen.getByRole('alert')).toHaveTextContent(text);
     expect(c.altcha()).toBeNull();
-    // The widget asks again.
     expect(altchaButton()).toHaveTextContent('Ich bin kein Roboter');
     expect(c.sending()).toBe(false);
   });
@@ -313,10 +312,13 @@ describe('ReportDialogComponent', () => {
     c.setKind('other');
     c.setKind(null);
     expect(c.kind()).toBe('question');
-    // The English window line.
     expect(screen.getByText('1440 × 900 · English')).toBeInTheDocument();
   });
 
+  /**
+   * A paste with a file becomes an attachment; a paste of text stays text. Over the limit a toast
+   * shows and only the free room is taken. When full, nothing more is uploaded.
+   */
   it('attaches picked and pasted files up to the limit', async () => {
     const { open, drafts, toast, fixture, c } = await setup();
     await open();
@@ -334,7 +336,6 @@ describe('ReportDialogComponent', () => {
     expect(screen.getByText('shot.png')).toBeInTheDocument();
     expect(input.value).toBe('');
 
-    // A paste with a file becomes an attachment; a paste of text stays text.
     const form = document.querySelector('form.rd') as HTMLFormElement;
     const pasteFile = new Event('paste', { bubbles: true, cancelable: true }) as ClipboardEvent;
     Object.defineProperty(pasteFile, 'clipboardData', { value: { files: [new File(['y'], 'p.pdf', { type: 'application/pdf' })] } });
@@ -351,14 +352,12 @@ describe('ReportDialogComponent', () => {
     fixture.detectChanges();
     expect(screen.getByText('p.pdf')).toBeInTheDocument();
 
-    // Over the limit: a toast and only the room is taken.
     const many = Array.from({ length: MAX_TICKET_FILES }, (_, i) => new File(['z'], `m${i}.png`, { type: 'image/png' }));
     await c.addFiles(many);
     expect(toast.error).toHaveBeenCalledWith('Höchstens 5 Dateien.');
     expect(drafts.upload).toHaveBeenLastCalledWith(many.slice(0, MAX_TICKET_FILES - 2));
     fixture.detectChanges();
     expect(screen.queryByRole('button', { name: 'Datei anhängen' })).not.toBeInTheDocument();
-    // Full: nothing more is uploaded.
     drafts.upload.mockClear();
     await c.addFiles([png]);
     expect(drafts.upload).not.toHaveBeenCalled();
@@ -372,6 +371,7 @@ describe('ReportDialogComponent', () => {
     expect(toast.error).toHaveBeenCalledWith('big.zip: Die Meldung ist zu groß. Bitte Anhänge entfernen.');
   });
 
+  /** The send waits for the upload. */
   it('shows the scan state, a lost file and an upload in flight, and removes a file', async () => {
     const { open, drafts, toast, fixture } = await setup();
     drafts.files.set([
@@ -381,7 +381,6 @@ describe('ReportDialogComponent', () => {
     drafts.pending.set([{ key: 1, filename: 'up.png', size: 1, fieldKey: null }]);
     await open();
     expect(screen.getByText('up.png')).toBeInTheDocument();
-    // The send waits for the upload.
     expect(sendButton()).toBeDisabled();
 
     await userEvent.click(screen.getByRole('button', { name: /lost\.png/ }));

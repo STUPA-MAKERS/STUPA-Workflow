@@ -121,12 +121,15 @@ describe('round-trip', () => {
     });
   });
 
+  /**
+   * A positions field promotes without the flag. The flag is stripped, because the backend answers
+   * 422.
+   */
   it('keeps isPromoted only for numeric types', () => {
     const num = normalizeFormField(
       field({ key: 'amount', type: 'currency', isPromoted: true, promoteTarget: 'amount' }),
     );
     expect(num.isPromoted).toBe(true);
-    // A positions field promotes without the flag. Strip it, because the backend sends 422.
     const pos = normalizeFormField(field({ key: 'positions', type: 'positions', isPromoted: true }));
     expect(pos.isPromoted).toBeUndefined();
     expect(pos.promoteTarget).toBeUndefined();

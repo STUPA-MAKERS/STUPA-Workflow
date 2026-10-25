@@ -26,6 +26,7 @@ describe('validateGuard (mirror of backend validate_guard)', () => {
     expect(() => validateGuard(undefined)).not.toThrow();
   });
 
+  /** These conditions are also allowed on automatic transitions. */
   it('accepts whitelist condition + actor operators', () => {
     expect(() => validateGuard({ roleIs: 'stupa' })).not.toThrow();
     expect(() => validateGuard({ budgetHasDecisionGremium: true })).not.toThrow();
@@ -33,7 +34,6 @@ describe('validateGuard (mirror of backend validate_guard)', () => {
     expect(() =>
       validateGuard({ compare: { field: 'amount', op: '>', value: 100 } }),
     ).not.toThrow();
-    // These conditions are also allowed on automatic transitions.
     expect(() => validateGuard({ applicationTypeIs: 'qsm' }, false)).not.toThrow();
     expect(() => validateGuard({ attachmentPresent: true }, false)).not.toThrow();
   });
@@ -55,6 +55,7 @@ describe('validateGuard (mirror of backend validate_guard)', () => {
     );
   });
 
+  /** Conditions are allowed on automatic transitions. */
   it('forbids actor gates on automatic transitions', () => {
     expect(reason(() => validateGuard({ roleIs: 'x' }, false))).toEqual({
       key: 'admin.flow.err.guardActorManualOnly',
@@ -63,10 +64,12 @@ describe('validateGuard (mirror of backend validate_guard)', () => {
     expect(reason(() => validateGuard({ isInCommittee: 'g' }, false)).key).toBe(
       'admin.flow.err.guardActorManualOnly',
     );
-    // Conditions are allowed on automatic transitions.
     expect(() => validateGuard({ budgetHasDecisionGremium: true }, false)).not.toThrow();
   });
 
+  /**
+   * A compare value that is not an object and a missing op fail; `in` with a proper list passes.
+   */
   it('validates the compare structure', () => {
     expect(reason(() => validateGuard({ compare: { field: '', op: '==' } })).key).toBe(
       'admin.flow.err.compareField',
@@ -78,28 +81,27 @@ describe('validateGuard (mirror of backend validate_guard)', () => {
     expect(
       reason(() => validateGuard({ compare: { field: 'x', op: 'in', value: 'notalist' } })).key,
     ).toBe('admin.flow.err.compareInList');
-    // compare value is not an object at all
     expect(reason(() => validateGuard({ compare: 'oops' })).key).toBe(
       'admin.flow.err.compareShape',
     );
-    // op missing → not a string
     expect(reason(() => validateGuard({ compare: { field: 'x' } })).key).toBe(
       'admin.flow.err.compareUnknownOp',
     );
-    // `in` with a proper list passes
     expect(() => validateGuard({ compare: { field: 'x', op: 'in', value: [1, 2] } })).not.toThrow();
   });
 
+  /**
+   * An actor op nested under `and` on an automatic transition is rejected, and a condition op
+   * nested under `or` is fine. A guard with no operator at all names the empty operator list
+   * instead of leaving a gap.
+   */
   it('validates nested combinator children with actor restrictions', () => {
-    // actor op nested under and on an automatic transition is rejected
     expect(reason(() => validateGuard({ and: [{ roleIs: 'x' }] }, false)).key).toBe(
       'admin.flow.err.guardActorManualOnly',
     );
-    // condition op nested under or is fine even on automatic transitions
     expect(() =>
       validateGuard({ or: [{ budgetHasDecisionGremium: true }, { hasField: 'iban' }] }, false),
     ).not.toThrow();
-    // A guard with no operator at all names the empty operator list rather than leaving a gap.
     expect(reason(() => validateGuard({}))).toEqual({
       key: 'admin.flow.err.guardOneOperator',
       params: { ops: '—' },
@@ -141,6 +143,7 @@ describe('validateAction (mirror of backend validate_action)', () => {
     expect(() => validateAction({ type: 'assignBudgetFromField', field: 'ziel_ks' })).not.toThrow();
   });
 
+  /** The gremium of addToNextSession is optional; a present but empty one is wrong. */
   it('rejects missing required fields', () => {
     expect(reason(() => validateAction({ type: 'webhook' })).key).toBe(
       'admin.flow.err.actionWebhook',
@@ -151,7 +154,6 @@ describe('validateAction (mirror of backend validate_action)', () => {
     expect(
       reason(() => validateAction({ type: 'notify', recipients: [{ kind: 'gremium' }] })),
     ).toEqual({ key: 'admin.flow.err.notifyRecipientValue', params: { kind: 'gremium' } });
-    // The gremium of addToNextSession is optional; a present but empty one is wrong.
     expect(() => validateAction({ type: 'addToNextSession' })).not.toThrow();
     expect(reason(() => validateAction({ type: 'addToNextSession', gremiumId: '' })).key).toBe(
       'admin.flow.err.actionGremium',
@@ -173,7 +175,6 @@ describe('validateAction (mirror of backend validate_action)', () => {
     expect(() => validateAction(null)).toThrow(GuardError);
     // @ts-expect-error array is not a record
     expect(reason(() => validateAction([])).key).toBe('admin.flow.err.actionShape');
-    // missing/non-string type
     // @ts-expect-error no type field
     expect(reason(() => validateAction({})).key).toBe('admin.flow.err.actionUnknownType');
   });
@@ -199,7 +200,6 @@ describe('validateAction (mirror of backend validate_action)', () => {
     expect(
       reason(() => validateAction({ type: 'notify', recipients: [{ kind: 'wat' }] })).key,
     ).toBe('admin.flow.err.notifyRecipientInvalid');
-    // recipients not an array at all
     expect(reason(() => validateAction({ type: 'notify', recipients: 'x' })).key).toBe(
       'admin.flow.err.notifyRecipients',
     );

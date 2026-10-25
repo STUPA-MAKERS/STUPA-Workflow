@@ -26,6 +26,7 @@ function clipboard(ok = true) {
 }
 
 describe('JoinLinkComponent', () => {
+  /** A second copy restarts the timer. */
   it('shows the code and the full URL, copies it and asks before a new link', async () => {
     const writeText = clipboard();
     const rotate = jest.fn();
@@ -39,7 +40,6 @@ describe('JoinLinkComponent', () => {
     fixture.detectChanges();
     expect(writeText).toHaveBeenCalledWith(LINK.joinUrl);
     expect(screen.getByRole('button', { name: /Kopiert/ })).toBeInTheDocument();
-    // A second copy restarts the timer.
     screen.getByRole('button', { name: /Kopiert/ }).click();
     await Promise.resolve();
     await Promise.resolve();

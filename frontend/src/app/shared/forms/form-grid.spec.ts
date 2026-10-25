@@ -91,19 +91,23 @@ async function renderGrid(model: Record<string, unknown>) {
 }
 
 describe('form grid with hidden fields', () => {
+  /**
+   * The rule for every host sets no `display`, so it cannot win over the rule above (or over the
+   * `:host:empty` rule of Formly).
+   */
   it('gives the empty host of a hidden field no grid cell', () => {
     expect(rule(styles, '.fe-form .fe-grid > formly-field:empty')).toMatch(/display: none;/);
-    // The rule for every host sets no `display`, so it cannot win over the rule above
-    // (or over the `:host:empty` rule of Formly).
     expect(rule(styles, '.fe-form .fe-grid > formly-field')).not.toMatch(/display:/);
   });
 
+  /**
+   * With a heading and 6 fields every field keeps its host, hidden or not. "Fakultät" follows "Art
+   * des Antragstellers" in the next cell, with no hole between them.
+   */
   it('leaves the host of a hidden field empty, so the next field takes its cell', async () => {
     const { hosts, cells } = await renderGrid({ art: 'person' });
-    // Heading + 6 fields: every field keeps its host, hidden or not.
     expect(hosts()).toHaveLength(7);
     expect(hosts().filter((h) => h.matches(':empty'))).toHaveLength(3);
-    // "Fakultät" follows "Art des Antragstellers" in the next cell, no hole between them.
     expect(cells()).toEqual(['Antragsteller', 'Art des Antragstellers', 'Fakultät', 'Rolle']);
   });
 

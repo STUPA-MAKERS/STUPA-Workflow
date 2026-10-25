@@ -57,6 +57,7 @@ describe('PollResultComponent', () => {
     expect(await runAxe(container)).toHaveNoViolations();
   });
 
+  /** A date poll has no abstention row. */
   it('a date poll shows "3 (+2)" and explains the numbers', async () => {
     const result: PollResult = {
       counts: { o1: 3, o2: 3, o3: 0 },
@@ -72,7 +73,6 @@ describe('PollResultComponent', () => {
     expect(first.querySelector('.bars__pct')!.textContent!.trim()).toBe('(+2)');
     expect(rows()[0]).toMatch(/^Di, 3\.11\./);
     expect(screen.queryByText(/bester Termin/i)).toBeNull();
-    // A date poll has no abstention row.
     expect(rows()).toHaveLength(3);
     expect(screen.getByText('Zahl = Ja, (+n) = Vielleicht')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: /: 3 Ja, 2 Vielleicht/ })).toBeInTheDocument();

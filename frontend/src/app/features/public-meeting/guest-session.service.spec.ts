@@ -68,6 +68,7 @@ describe('GuestSessionService', () => {
     TestBed.resetTestingModule();
   });
 
+  /** The same state again keeps the one channel. */
   it('loads the head and the own state, then follows the guest channel', () => {
     setup();
     expect(svc.state()).toBe('loading');
@@ -75,7 +76,6 @@ describe('GuestSessionService', () => {
     expect(svc.state()).toBe('admitted');
     expect(channels).toHaveLength(1);
     expect(channels[0].sent).toEqual([{ type: 'subscribe' }]);
-    // The same state again keeps the one channel.
     svc.refresh();
     expect(channels).toHaveLength(1);
   });
@@ -154,6 +154,7 @@ describe('GuestSessionService', () => {
     expect(svc.state()).toBe('error');
   });
 
+  /** A first read without a code keeps the form; a later one reports the error. */
   it('gives the join form to a device without a request', () => {
     setup();
     api['guestMe'].mockReturnValue(throwError(() => problem(401, 'guest_token_missing')));
@@ -162,7 +163,6 @@ describe('GuestSessionService', () => {
     api['guestMe'].mockReturnValue(throwError(() => problem(404, 'guest_not_found')));
     svc.load('7KQ4MP');
     expect(svc.state()).toBe('join');
-    // A first read without a code keeps the form; a later one reports the error.
     api['guestMe'].mockReturnValue(throwError(() => problem(500)));
     svc.load('7KQ4MP');
     expect(svc.state()).toBe('join');

@@ -50,6 +50,7 @@ async function setup(over: Partial<Inputs> = {}) {
 
 describe('VoteCardComponent', () => {
   describe('an open vote', () => {
+    /** The lead gets no interim tally and no line that explains it. */
     it('shows the question, the rules and the progress, but no tally before all voted', async () => {
       await setup({
         vote: vote({
@@ -66,7 +67,6 @@ describe('VoteCardComponent', () => {
       expect(screen.getByText('3 von 4 Anwesenden haben abgestimmt')).toBeInTheDocument();
       expect(screen.getByText('75 %')).toBeInTheDocument();
       expect(screen.getByRole('img', { name: '3 von 4 Anwesenden haben abgestimmt' })).toBeInTheDocument();
-      // No interim tally for the lead, and no line that explains it.
       expect(screen.queryByText(/Zwischenstand sichtbar/)).toBeNull();
       expect(screen.queryByRole('definition')).toBeNull();
     });
@@ -107,6 +107,7 @@ describe('VoteCardComponent', () => {
       expect(screen.getByText('0 %')).toBeInTheDocument();
     });
 
+    /** An open vote is part of the record, so there is no delete. */
     it('closes and cancels; close and cancel are both danger actions', async () => {
       const { on, container } = await setup();
       const close = screen.getByRole('button', { name: 'Abstimmung schließen' });
@@ -117,7 +118,6 @@ describe('VoteCardComponent', () => {
       expect(cancel).toHaveClass('btn--danger');
       await userEvent.click(cancel);
       expect(on.cancel).toHaveBeenCalledWith('v-1');
-      // An open vote is part of the record: no delete.
       expect(screen.queryByRole('button', { name: 'Beschlussfrage löschen' })).toBeNull();
       expect(container.querySelectorAll('.vc__actions app-button')).toHaveLength(2);
     });
@@ -167,6 +167,7 @@ describe('VoteCardComponent', () => {
       closedAt: '2026-10-15T17:02:00Z',
     });
 
+    /** A closed vote is part of the record (409 `vote_not_deletable`). */
     it('shows the result, the counts and the insert into the text', async () => {
       const { on } = await setup({ vote: closed, canInsert: true });
       expect(screen.getByText('Abstimmung geschlossen')).toBeInTheDocument();
@@ -175,15 +176,14 @@ describe('VoteCardComponent', () => {
       expect(screen.getByText('Enthaltung')).toBeInTheDocument();
       await userEvent.click(screen.getByRole('button', { name: 'Ins Protokoll übernehmen' }));
       expect(on.insertResult).toHaveBeenCalledWith(closed);
-      // A closed vote is part of the record (409 `vote_not_deletable`).
       expect(screen.queryByRole('button', { name: 'Beschlussfrage löschen' })).toBeNull();
     });
 
+    /** The folded card leaves the result to the text. */
     it('says "Im Protokoll" once the text holds the result, and offers no insert then', async () => {
       await setup({ vote: closed, canInsert: true, inProtocol: true });
       expect(screen.getByText('Im Protokoll')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Ins Protokoll übernehmen' })).toBeNull();
-      // The folded card leaves the result to the text.
       expect(screen.queryByText('Angenommen')).toBeNull();
     });
 
@@ -210,6 +210,7 @@ describe('VoteCardComponent', () => {
       expect(on.remove).toHaveBeenCalledWith('v-1');
     });
 
+    /** The planned vote can still go. */
     it('keeps a planned vote shut while another vote of the meeting is open', async () => {
       const { on } = await setup({ vote: vote({ status: 'draft' }), otherOpen: true });
       const open = screen.getByRole('button', { name: 'Abstimmung öffnen' });
@@ -218,7 +219,6 @@ describe('VoteCardComponent', () => {
       expect(screen.getByText('Erst die offene Abstimmung schließen oder abbrechen.')).toHaveClass('vc__hint');
       await userEvent.click(open);
       expect(on.open).not.toHaveBeenCalled();
-      // The planned vote can still go.
       expect(screen.getByRole('button', { name: 'Beschlussfrage löschen' })).toBeEnabled();
     });
 

@@ -17,6 +17,9 @@ const PDF = Buffer.from(
  * ALTCHA and without ClamAV, so the file stays "In Prüfung". The final click on "Antrag
  * absenden" is not part of the assertion; `02-magic-link-flow.spec.ts` covers the real
  * application creation and the follow-up journey.
+ * The first radio is the first application type. The system field `title` is mandatory, and the
+ * file field takes a draft upload. The contact email address is mandatory. The review shows the
+ * answers, the contact and the file.
  */
 test('@gating öffentlicher Apply-Wizard: alle Schritte bis Review-Zusammenfassung', async ({
   page,
@@ -26,12 +29,9 @@ test('@gating öffentlicher Apply-Wizard: alle Schritte bis Review-Zusammenfassu
   await expect(page.getByRole('heading', { level: 1, name: 'Antrag stellen' })).toBeVisible();
   await expect(page.getByRole('list', { name: 'Antrags-Fortschritt' })).toBeVisible();
 
-  // Step 1: pick the application type. The first radio is the first type.
   await page.getByRole('radio').first().click();
   await page.getByRole('button', { name: 'Weiter' }).click();
 
-  // Step 2: the fields of the seeded form version. The system field `title` is
-  // mandatory; the file field takes a draft upload.
   await expect(page.getByRole('heading', { level: 2, name: 'Angaben zum Vorhaben' })).toBeVisible();
   await page.locator('formly-form input[type="text"]').first().fill('E2E Testantrag');
   await page
@@ -41,12 +41,10 @@ test('@gating öffentlicher Apply-Wizard: alle Schritte bis Review-Zusammenfassu
   await expect(page.locator('app-draft-files').getByText('Angebot.pdf').first()).toBeVisible();
   await page.getByRole('button', { name: 'Weiter' }).click();
 
-  // Step 3: contact. The email address is mandatory.
   await expect(page.getByRole('heading', { level: 2, name: 'Kontakt' })).toBeVisible();
   await page.locator('input[type="email"]').fill(email);
   await page.getByRole('button', { name: 'Weiter' }).click();
 
-  // Step 4: the review shows the answers, the contact and the file.
   await expect(page.getByRole('heading', { level: 2, name: 'Prüfen & absenden' })).toBeVisible();
   const review = page.locator('.wz__review');
   await expect(review.getByText(email)).toBeVisible();

@@ -19,9 +19,9 @@ const MEETING = {
   protokollantId: 'p-2',
 } as unknown as Meeting;
 
+/** The current minute-taker stays in the list, also without protocol.write. */
 const ROSTER: Attendance[] = [
   { principalId: 'p-1', displayName: 'Mara Keller', email: null, status: null, source: null, note: null, isSelf: false, canKeepProtocol: true },
-  // The current minute-taker stays in the list, also without protocol.write.
   { principalId: 'p-2', displayName: 'Tom Brandt', email: null, status: null, source: null, note: null, isSelf: false, canKeepProtocol: false },
   { principalId: 'p-3', displayName: null, email: 'lea@x.de', status: null, source: null, note: null, isSelf: false, canKeepProtocol: true },
   { principalId: 'p-4', displayName: null, email: null, status: null, source: null, note: null, isSelf: false, canKeepProtocol: true },
@@ -173,11 +173,12 @@ describe('MeetingSettingsDialogComponent', () => {
     http.verify();
   });
 
+  /** A second save while the first runs is ignored. */
   it('explains a minute-taker without the protocol right and another refusal', async () => {
     const { http, fixture, cmp, saved, toasts } = await setup();
     flushRoster(http, fixture);
     cmp.save();
-    cmp.save(); // a second save while the first runs is ignored
+    cmp.save();
     http
       .expectOne('/api/meetings/m-1')
       .flush({ code: 'protokollant_needs_protocol_write' }, { status: 422, statusText: 'x' });

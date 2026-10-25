@@ -81,6 +81,10 @@ describe('todos.util', () => {
       expect(linkTitle(link({ kind: 'ticket', title: null }), t)).toBe('Ticket (kein Zugriff)');
     });
 
+    /**
+     * A title that already names the TOP or the number does not repeat it. Without access or detail
+     * only the kind shows.
+     */
     it('lists the facts of each kind below the title', () => {
       const sub = (l: Parameters<typeof linkSub>[0]) => linkSub(l, 'de-DE', 'de', t);
       expect(sub(link({ detail: { stateLabel: { de: 'In Prüfung', en: 'In review' } } }))).toBe('Antrag · In Prüfung');
@@ -94,7 +98,6 @@ describe('todos.util', () => {
         'TOP · 33. Sitzung · TOP 2',
       );
       expect(sub(link({ kind: 'agenda_item', detail: {} }))).toBe('TOP');
-      // A title that already names the TOP or the number does not repeat it.
       expect(
         sub(link({ kind: 'agenda_item', title: 'TOP 2: Haushalt', detail: { meetingTitle: 'Sondersitzung', position: 2 } })),
       ).toBe('TOP · Sondersitzung');
@@ -110,12 +113,12 @@ describe('todos.util', () => {
         'To-Do · StuPa · Offen',
       );
       expect(sub(link({ kind: 'todo', detail: {} }))).toBe('To-Do');
-      // Without access or detail only the kind.
       expect(sub(link({ accessible: false, detail: { stateLabel: { de: 'x' } } }))).toBe('Antrag');
       expect(sub(link({ detail: null }))).toBe('Antrag');
       expect(sub({ kind: 'todo', targetId: 'k', title: 'x', detail: { boardName: 'B' } })).toBe('To-Do · B');
     });
 
+    /** A title that is the supplier names neither twice; without an amount the date shows. */
     it('lists the facts of a vote, a gremium, an invoice and a booking', () => {
       const sub = (l: Parameters<typeof linkSub>[0]) => linkSub(l, 'de-DE', 'de', t);
       const eur = (v: string) => formatMoney(v, 'de-DE');
@@ -128,7 +131,6 @@ describe('todos.util', () => {
       expect(
         sub(link({ kind: 'invoice', title: 'RE-7', detail: { number: 'RE-7', counterparty: 'Druckhaus', amount: '119.00' } })),
       ).toBe(`Rechnung · Druckhaus · ${eur('119.00')}`);
-      // A title that is the supplier names neither twice; without an amount the date.
       expect(
         sub(link({ kind: 'invoice', title: 'Druckhaus', detail: { number: 'RE-8', counterparty: 'Druckhaus', date: '2026-11-03' } })),
       ).toBe('Rechnung · RE-8 · Di, 03.11.2026');
@@ -321,13 +323,13 @@ describe('todos.util', () => {
       expect(ids(insertTile(b, visitor, { columnId: 'c-2' })).at(-1)).toBe('k-9@c-2');
     });
 
+    /** An unknown neighbour and an empty column put it at the end. */
     it('moves a card at once, after or before a neighbour or to the end', () => {
       const b = board();
       const ids = (x: ReturnType<typeof board>) => x.cards.map((c) => `${c.id}@${c.columnId}`);
       expect(ids(applyMove(b, 'k-3', { columnId: 'c-1', afterId: 'k-1' }))).toEqual(['k-1@c-1', 'k-3@c-1', 'k-2@c-1']);
       expect(ids(applyMove(b, 'k-3', { columnId: 'c-1', beforeId: 'k-1' }))).toEqual(['k-3@c-1', 'k-1@c-1', 'k-2@c-1']);
       expect(ids(applyMove(b, 'k-1', { columnId: 'c-1' }))).toEqual(['k-2@c-1', 'k-1@c-1', 'k-3@c-4']);
-      // An unknown neighbour and an empty column put it at the end.
       expect(ids(applyMove(b, 'k-1', { columnId: 'c-2', afterId: 'nope' }))).toEqual(['k-2@c-1', 'k-3@c-4', 'k-1@c-2']);
       const moved = applyMove(b, 'k-1', { columnId: 'c-2' });
       expect(moved.columns.find((c) => c.id === 'c-2')?.cardCount).toBe(1);
@@ -348,6 +350,7 @@ describe('todos.util', () => {
       expect(removed.columns[0].cardCount).toBe(1);
     });
 
+    /** A tile that the board does not hold (a restored card) also goes in by its rank. */
     it('places a tile that changed its column by its rank, else in place', () => {
       const b = board({ cards: [
         tile({ id: 'k-1', columnId: 'c-1', rank: 'a' }),
@@ -360,7 +363,6 @@ describe('todos.util', () => {
       const renamed = placeTile(b, tile({ id: 'k-3', columnId: 'c-4', rank: 'd', title: 'Neu' }));
       expect(order(renamed)).toEqual(order(b));
       expect(renamed.cards[2].title).toBe('Neu');
-      // A tile the board does not hold (a restored card) also goes in by its rank.
       expect(order(placeTile(b, tile({ id: 'k-9', columnId: 'c-1' })))).toEqual(['k-1@c-1', 'k-9@c-1', 'k-2@c-4', 'k-3@c-4']);
       expect(order(placeTile(b, tile({ id: 'k-9', columnId: 'c-4', rank: 'c' })))).toEqual(['k-1@c-1', 'k-2@c-4', 'k-9@c-4', 'k-3@c-4']);
       const added = placeTile(b, tile({ id: 'k-9', columnId: 'c-2' }));
@@ -368,6 +370,7 @@ describe('todos.util', () => {
       expect(added.columns.find((c) => c.id === 'c-2')?.cardCount).toBe(1);
     });
 
+    /** A list without a kind lets the card in, because the server decides. */
     it('never moves a card of a shared board into a personal board', () => {
       expect(canTransfer('personal', 'gremium')).toBe(true);
       expect(canTransfer('personal', 'personal')).toBe(true);
@@ -384,7 +387,6 @@ describe('todos.util', () => {
       expect(DROP_ENTER.personal(from('personal'))).toBe(true);
       expect(DROP_ENTER.gremium(from('personal'))).toBe(true);
       expect(DROP_ENTER.team(from('gremium'))).toBe(true);
-      // A list without a kind lets the card in: the server decides.
       expect(dropEnter('personal')(from())).toBe(true);
     });
 
@@ -400,6 +402,9 @@ describe('todos.util', () => {
       expect(moveErrorText(null, 'todos.error.move')).toBe('todos.error.move');
     });
 
+    /**
+     * Another user moves k-1 between k-2 and k-3, then to the end of the column, then to the top.
+     */
     it('re-places a tile whose rank changed inside its column', () => {
       const b = board({ cards: [
         tile({ id: 'k-1', columnId: 'c-4', rank: 'b' }),
@@ -407,11 +412,8 @@ describe('todos.util', () => {
         tile({ id: 'k-3', columnId: 'c-4', rank: 'f' }),
       ] });
       const order = (x: typeof b) => x.cards.map((c) => c.id);
-      // Another user moved k-1 between k-2 and k-3.
       expect(order(placeTile(b, tile({ id: 'k-1', columnId: 'c-4', rank: 'e' })))).toEqual(['k-2', 'k-1', 'k-3']);
-      // ... to the end of the column.
       expect(order(placeTile(b, tile({ id: 'k-1', columnId: 'c-4', rank: 'z' })))).toEqual(['k-2', 'k-3', 'k-1']);
-      // ... to the top.
       expect(order(placeTile(b, tile({ id: 'k-3', columnId: 'c-4', rank: 'a' })))).toEqual(['k-3', 'k-1', 'k-2']);
     });
 

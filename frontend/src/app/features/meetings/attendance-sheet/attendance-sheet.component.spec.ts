@@ -118,6 +118,7 @@ describe('AttendanceSheetComponent', () => {
     expect(within(sheet()).getByText('Kein Mitglied gefunden.')).toBeInTheDocument();
   });
 
+  /** The chosen state sends nothing, and an open row has nothing to reset. */
   it('lets the lead set the four states, "Offen" as a reset', async () => {
     const { statusChange, reset } = await setup();
     const mika = row('Mika Mitglied');
@@ -130,31 +131,32 @@ describe('AttendanceSheetComponent', () => {
     expect(statusChange).toHaveBeenLastCalledWith({ member: expect.objectContaining({ principalId: 'pr-2' }), status: 'present' });
     await userEvent.click(within(mika).getByRole('radio', { name: 'Unentschuldigt' }));
     expect(statusChange).toHaveBeenLastCalledWith({ member: expect.objectContaining({ principalId: 'pr-2' }), status: 'absent' });
-    // The chosen state sends nothing.
     statusChange.mockClear();
     await userEvent.click(within(mika).getByRole('radio', { name: 'Entschuldigt' }));
     expect(statusChange).not.toHaveBeenCalled();
     await userEvent.click(within(mika).getByRole('radio', { name: 'Offen' }));
     expect(reset).toHaveBeenCalledWith(expect.objectContaining({ principalId: 'pr-2' }));
-    // An open row has nothing to reset.
     reset.mockClear();
     await userEvent.click(within(row('Alina Admin')).getByRole('radio', { name: 'Offen' }));
     expect(reset).not.toHaveBeenCalled();
   });
 
+  /**
+   * The sheet takes the focus when it opens, so the test waits for that first. The focused option
+   * is the tab stop of the row, and a focus move does not change the state. A step onto "Offen"
+   * does not reset the record. When the focus leaves the row, its tab stop is the chosen option
+   * again.
+   */
   it('moves the focus with the arrow keys and sets the state only on Enter', async () => {
     const { statusChange, reset, fixture } = await setup();
-    // The sheet takes the focus when it opens; wait for that first.
     await new Promise((r) => setTimeout(r, 50));
     const radio = (name: string) => within(row('Mika Mitglied')).getByRole('radio', { name });
     radio('Entschuldigt').focus();
     await userEvent.keyboard('{ArrowRight}');
     expect(radio('Unentschuldigt')).toHaveFocus();
-    // The focused option is the tab stop of the row; the state did not change.
     expect(radio('Unentschuldigt')).toHaveAttribute('tabindex', '0');
     expect(radio('Entschuldigt')).toHaveAttribute('tabindex', '-1');
     expect(radio('Entschuldigt')).toHaveAttribute('aria-checked', 'true');
-    // A step onto "Offen" does not reset the record.
     await userEvent.keyboard('{ArrowRight}');
     expect(radio('Offen')).toHaveFocus();
     expect(statusChange).not.toHaveBeenCalled();
@@ -162,7 +164,6 @@ describe('AttendanceSheetComponent', () => {
     await userEvent.keyboard('{ArrowLeft}{Enter}');
     expect(statusChange).toHaveBeenCalledTimes(1);
     expect(statusChange).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'absent' }));
-    // When the focus leaves the row, its tab stop is the chosen option again.
     radio('Unentschuldigt').blur();
     fixture.detectChanges();
     expect(radio('Entschuldigt')).toHaveAttribute('tabindex', '0');
@@ -181,21 +182,21 @@ describe('AttendanceSheetComponent', () => {
     expect(within(sheet()).getByText('führt das Protokoll', { selector: '.as__sub' })).toBeInTheDocument();
   });
 
+  /** The own row says so. */
   it('shows the source and the reason in the sub line', async () => {
     await setup();
     expect(within(sheet()).getAllByText('durch Sitzungsleitung', { selector: '.as__sub' })).toHaveLength(2);
     expect(within(sheet()).getByText('Grund: Prüfung')).toBeInTheDocument();
-    // The own row says so.
     expect(within(sheet()).getByText('(du)')).toBeInTheDocument();
   });
 
+  /** Every other row is read-only: an excuse reads "Abwesend" to a member. */
   it('gives a member only the own row, as present or absent', async () => {
     const { statusChange } = await setup({ meeting: meeting({ canControl: false }) });
     const own = row('Pia Protokoll');
     expect(within(own).getAllByRole('radio').map((r) => r.textContent?.trim())).toEqual(['Anwesend', 'Abwesend']);
     await userEvent.click(within(own).getByRole('radio', { name: 'Abwesend' }));
     expect(statusChange).toHaveBeenCalledWith({ member: expect.objectContaining({ principalId: 'pr-1' }), status: 'excused' });
-    // Every other row is read-only: an excuse reads "Abwesend" to a member.
     expect(within(sheet()).getAllByRole('radiogroup')).toHaveLength(1);
     expect(within(sheet()).getAllByText('Abwesend', { selector: 'app-status-text' }).length).toBeGreaterThan(0);
     expect(within(sheet()).getByText('Offen', { selector: 'app-status-text' })).toBeInTheDocument();
@@ -229,31 +230,35 @@ describe('AttendanceSheetComponent', () => {
     expect(within(sheet()).getByText('durch Sitzungsleitung · führt das Protokoll')).toBeInTheDocument();
   });
 
+  /** The live list is for a running meeting. */
   it('freezes every row of a closed meeting', async () => {
     await setup({ meeting: meeting({ status: 'closed' }) });
     expect(within(sheet()).queryByRole('radiogroup')).toBeNull();
     expect(within(sheet()).getByText('Unentschuldigt', { selector: 'app-status-text' })).toBeInTheDocument();
-    // The live list is for a running meeting.
     expect(within(sheet()).queryByText(/Live dabei/)).toBeNull();
   });
 
+  /**
+   * Mika Mitglied has an excuse the lead set, so the row has a menu; the others keep a gap. When no
+   * row has a menu, no row keeps a gap, so the control ends at the inset of the row.
+   */
   it('keeps a gap for the row menu only while some row has a menu', async () => {
-    // Mika Mitglied: an excuse the lead set, so the row has a menu; the others keep a gap.
     const { rerender } = await setup({ meeting: meeting({ canManage: false }) });
     const gaps = () => sheet().querySelectorAll('.as__menuGap').length;
     expect(within(sheet()).getByRole('button', { name: 'Aktionen für Mika Mitglied' })).toBeInTheDocument();
     expect(gaps()).toBe(ROSTER.length - 1);
-    // No row has a menu: no row keeps a gap, so the control ends at the inset of the row.
     await rerender({ inputs: { attendance: [ROSTER[0], ROSTER[2], ROSTER[4]] }, partialUpdate: true });
     expect(within(sheet()).queryByRole('button', { name: /^Aktionen für/ })).toBeNull();
     expect(gaps()).toBe(0);
   });
 
+  /**
+   * The lead edits the own reason and the reason of a row the lead set; the own reason of a member
+   * stays with the member. Escape leaves the reason as it is.
+   */
   it('edits the reason of an excuse from the row menu', async () => {
     const roster: Attendance[] = [{ ...ROSTER[0], status: 'excused', note: null }, ROSTER[1], ROSTER[3]];
     const { statusChange } = await setup({ attendance: roster, meeting: meeting({ canManage: false }) });
-    // The lead edits the own reason and the reason of a row the lead set; a member's own
-    // reason stays the member's.
     expect(within(sheet()).getByRole('button', { name: 'Aktionen für Mika Mitglied' })).toBeInTheDocument();
     expect(within(sheet()).queryByRole('button', { name: 'Aktionen für Vera Vertretung' })).toBeNull();
     await userEvent.click(within(sheet()).getByRole('button', { name: 'Aktionen für Pia Protokoll' }));
@@ -266,7 +271,6 @@ describe('AttendanceSheetComponent', () => {
       status: 'excused',
       note: 'Krank',
     });
-    // Escape leaves the reason as it is.
     statusChange.mockClear();
     await userEvent.click(within(sheet()).getByRole('button', { name: 'Aktionen für Pia Protokoll' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Grund eintragen' }));
@@ -295,11 +299,14 @@ describe('AttendanceSheetComponent', () => {
     expect(within(row('Vera Vertretung')).getByRole('radio', { name: 'Anwesend' })).not.toHaveAttribute('aria-disabled');
   });
 
+  /**
+   * The refusal reloads the delegations, so the page knows the delegation. The revoke ends the
+   * conflict: the page clears it, and the alert goes away.
+   */
   it('marks the row the server refused (409 delegation_active) and offers the revoke', async () => {
     const { fixture, http, conflictResolved } = await setup();
     fixture.componentRef.setInput('conflictId', 'pr-4');
     fixture.detectChanges();
-    // The refusal reloads the delegations: now the page knows the delegation.
     http.expectOne((r) => r.url.endsWith('/delegations')).flush([delegation()]);
     fixture.detectChanges();
     const alert = within(sheet()).getByRole('alert');
@@ -307,7 +314,6 @@ describe('AttendanceSheetComponent', () => {
     await userEvent.click(within(alert).getByRole('button', { name: 'Vertretung widerrufen' }));
     http.expectOne('/api/delegations/d-1').flush(null);
     http.expectOne((r) => r.url.endsWith('/delegations')).flush([]);
-    // The revoke ends the conflict: the page clears it, and the alert goes away.
     expect(conflictResolved).toHaveBeenCalledWith('pr-4');
     fixture.componentRef.setInput('conflictId', null);
     fixture.detectChanges();
@@ -325,6 +331,10 @@ describe('AttendanceSheetComponent', () => {
     expect(conflictResolved).not.toHaveBeenCalled();
   });
 
+  /**
+   * A revoke of the own delegation in the section updates the rows at once. A new delegation in the
+   * section blocks "Anwesend" again. A revoke in the list of the lead loads the section again.
+   */
   it('loads the rows again after a change in the own-delegation section, and the section after a revoke here', async () => {
     const own = delegation({ id: 'd-own', delegatorId: 'pr-1', delegatorName: 'Pia Protokoll', direction: 'outgoing' });
     const context: MeetingDelegationContext = {
@@ -338,7 +348,6 @@ describe('AttendanceSheetComponent', () => {
     const { fixture, http, conflictResolved } = await setup({ conflictId: 'pr-1' }, [own], [], context);
     const pia = () => row('Pia Protokoll');
     expect(within(pia()).getByRole('radio', { name: 'Anwesend' })).toHaveAttribute('aria-disabled', 'true');
-    // The member revokes the own delegation in the section: the rows know it at once.
     const section = within(sheet()).getByRole('region', { name: 'Vertretung' });
     await userEvent.click(within(section).getByRole('button', { name: 'Vertretung widerrufen' }));
     http.expectOne('/api/delegations/d-own').flush(null);
@@ -348,7 +357,6 @@ describe('AttendanceSheetComponent', () => {
     expect(within(pia()).getByRole('radio', { name: 'Anwesend' })).not.toHaveAttribute('aria-disabled');
     expect(within(sheet()).queryByText(/vertreten durch/)).toBeNull();
     expect(conflictResolved).toHaveBeenCalledWith('pr-1');
-    // A new delegation in the section blocks "Anwesend" again.
     await userEvent.click(within(section).getByRole('button', { name: 'Vertretung einrichten' }));
     const dialog = screen.getByRole('dialog', { name: 'Vertretung einrichten' });
     await userEvent.click(within(dialog).getByRole('radio', { name: /Max Mitglied/ }));
@@ -358,13 +366,13 @@ describe('AttendanceSheetComponent', () => {
     http.expectOne((r) => r.method === 'GET' && r.url.endsWith('/delegations')).flush([own]);
     fixture.detectChanges();
     expect(within(pia()).getByRole('radio', { name: 'Anwesend' })).toHaveAttribute('aria-disabled', 'true');
-    // A revoke in the list of the lead loads the section again.
     await userEvent.click(within(within(sheet()).getByRole('region', { name: 'Vertretungen' })).getByRole('button', { name: 'Widerrufen' }));
     http.expectOne('/api/delegations/d-own').flush(null);
     http.expectOne((r) => r.url.endsWith('/delegations')).flush([]);
     http.expectOne((r) => r.url.includes('/delegations/meetings/')).flush({ ...context, myDelegation: null });
   });
 
+  /** A member who does not lead sees no list of the delegations. */
   it('says only the refusal when the delegation cannot be revoked here', async () => {
     const { fixture, http } = await setup({ meeting: meeting({ canManage: false }) });
     fixture.componentRef.setInput('conflictId', 'pr-4');
@@ -373,7 +381,6 @@ describe('AttendanceSheetComponent', () => {
     fixture.detectChanges();
     expect(within(sheet()).getByRole('alert')).toHaveTextContent('Vertretung aktiv');
     expect(within(sheet()).queryByRole('button', { name: 'Vertretung widerrufen' })).toBeNull();
-    // A member who does not lead sees no list of the delegations.
     expect(within(sheet()).queryByRole('region', { name: 'Vertretungen' })).toBeNull();
   });
 
@@ -384,6 +391,11 @@ describe('AttendanceSheetComponent', () => {
     expect(toast.error).toHaveBeenCalled();
   });
 
+  /**
+   * "Anwesend" of the delegator stays blocked, and a click sends nothing. The arrow keys skip the
+   * blocked option; other keys do nothing. From "Entschuldigt" to the left, "Anwesend" is blocked,
+   * so the focus wraps to "Offen".
+   */
   it('guards the control: no change while saving, a blocked option, and other keys', async () => {
     const { statusChange, reset, fixture } = await setup({ saving: true }, [delegation()]);
     const mika = row('Mika Mitglied');
@@ -394,15 +406,12 @@ describe('AttendanceSheetComponent', () => {
     expect(reset).not.toHaveBeenCalled();
     fixture.componentRef.setInput('saving', false);
     fixture.detectChanges();
-    // "Anwesend" of the delegator stays blocked; a click sends nothing.
     await userEvent.click(within(row('Vera Vertretung')).getByRole('radio', { name: 'Anwesend' }));
     expect(statusChange).not.toHaveBeenCalled();
-    // The arrow keys skip the blocked option; other keys do nothing.
     await new Promise((r) => setTimeout(r, 50));
     within(row('Vera Vertretung')).getByRole('radio', { name: 'Entschuldigt' }).focus();
     await userEvent.keyboard('{Enter}{a}');
     expect(statusChange).not.toHaveBeenCalled();
-    // From "Entschuldigt" left: "Anwesend" is blocked, so the focus wraps to "Offen".
     await userEvent.keyboard('{ArrowLeft}');
     expect(within(row('Vera Vertretung')).getByRole('radio', { name: 'Offen' })).toHaveFocus();
     expect(reset).not.toHaveBeenCalled();
@@ -491,10 +500,12 @@ describe('AttendanceSheetComponent', () => {
   describe('The lead enters a substitute from the pool', () => {
     const menu = (name: string) => within(sheet()).queryByRole('button', { name: `Aktionen für ${name}` });
 
+    /**
+     * Missing members are excused (Mika), open (Alina) and absent (Fritz). Pia is present and the
+     * lead herself; Vera already has a delegation.
+     */
     it('offers the entry for a missing member without a delegation', async () => {
       await setup({}, [delegation()]);
-      // Missing: excused (Mika), open (Alina), absent (Fritz). Pia is present and the
-      // lead herself; Vera already has a delegation.
       for (const name of ['Mika Mitglied', 'Alina Admin', 'Fritz Fehlend']) {
         expect(menu(name)).toBeInTheDocument();
       }
@@ -504,13 +515,15 @@ describe('AttendanceSheetComponent', () => {
       expect(await screen.findByRole('menuitem', { name: 'Vertretung eintragen' })).toBeInTheDocument();
     });
 
+    /**
+     * Fritz already substitutes a member of another row, and the server refuses chains. A member
+     * with the vote right, and a row without the flag, keep the entry.
+     */
     it('offers no entry for a member without a vote or a member who already substitutes', async () => {
       const roster = ROSTER.map((a) => (a.displayName === 'Alina Admin' ? { ...a, canVote: false } : a));
-      // Fritz already substitutes a member of another row: no chains (the server refuses).
       await setup({ attendance: roster }, [delegation({ id: 'd-2', delegatorId: 'pr-7', delegateId: 'pr-5' })]);
       expect(menu('Alina Admin')).toBeNull();
       expect(menu('Fritz Fehlend')).toBeNull();
-      // A member with the vote right, and a row without the flag (older server), keep it.
       expect(menu('Mika Mitglied')).toBeInTheDocument();
       expect(menu('Vera Vertretung')).toBeInTheDocument();
     });

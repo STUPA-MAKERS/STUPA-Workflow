@@ -62,12 +62,12 @@ async function setup() {
 describe('ForceStatusDialogComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
+  /** A state without a label falls back to its key. */
   it('loads the flow states when it opens and leaves the current one out', async () => {
     const { http, cmp, openIt } = await setup();
     http.verify();
     openIt();
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-    // A state without a label falls back to its key.
     expect(cmp.options().map((o) => o.value)).toEqual(['s2', 's3']);
     expect(cmp.options().map((o) => o.label)).toEqual(['In Prüfung', 'closed']);
   });
@@ -116,12 +116,14 @@ describe('ForceStatusDialogComponent', () => {
     expect(error).toHaveBeenCalledTimes(1);
   });
 
+  /**
+   * The test clicks the footer button, because the close button of the dialog has the same name.
+   */
   it('closes on "Abbrechen" and starts empty on the next opening', async () => {
     const { http, host, cmp, detectChanges, openIt } = await setup();
     openIt();
     cmp.choice.set('s2');
     cmp.note.set('Grund');
-    // The footer button; the close button of the dialog has the same name.
     const cancel = screen.getAllByRole('button', { name: 'Abbrechen' }).find((b) => !b.classList.contains('dialog__close'));
     await userEvent.click(cancel!);
     expect(host.open()).toBe(false);

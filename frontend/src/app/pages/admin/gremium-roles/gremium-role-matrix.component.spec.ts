@@ -61,6 +61,7 @@ function makeApi(over: Partial<Record<string, jest.Mock>> = {}) {
   };
 }
 
+/** NgModel writes its value after a microtask. */
 async function setup(
   opts: {
     api?: ReturnType<typeof makeApi>;
@@ -80,7 +81,6 @@ async function setup(
     ],
     componentInputs: { gremiumId: 'g-1', gremiumName: 'Studierendenparlament', ...opts.inputs },
   });
-  // NgModel writes its value after a microtask.
   await view.fixture.whenStable();
   view.fixture.detectChanges();
   const counts: number[] = [];
@@ -114,6 +114,7 @@ describe('GremiumRoleMatrixComponent', () => {
     expect(keys).toEqual(ALL);
   });
 
+  /** The member role names the groups that give the membership. */
   it('sorts the forced roles first and shows the groups of each role', async () => {
     await setup();
     const names = screen
@@ -122,7 +123,6 @@ describe('GremiumRoleMatrixComponent', () => {
     expect(names).toEqual(['Vorstand', 'Mitglied', 'Kasse', 'Protokoll']);
     expect(within(row('Vorstand')).getByText('stupa-vorstand, stupa-sprecher')).toBeInTheDocument();
     expect(within(row('Vorstand')).getByText('Pflichtrolle')).toBeInTheDocument();
-    // The member role names the groups that give the membership.
     expect(within(row('Mitglied')).getByText(/Mitgliedschaft über/)).toHaveTextContent(
       'Mitgliedschaft über stupa',
     );

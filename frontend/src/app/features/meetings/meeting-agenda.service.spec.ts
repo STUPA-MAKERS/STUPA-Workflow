@@ -13,9 +13,11 @@ const item = (body: string): AgendaItem => ({
   position: 0,
 });
 
-// A read of the agenda that started before a save must not set the text of the
-// minute-taker back. The next insert (a vote result) appends to that text, so an older
-// text from the server would replace what the minute-taker typed last.
+/**
+ * A read of the agenda that started before a save must not set the text of the minute-taker back.
+ * The next insert (a vote result) appends to that text, so an older text from the server would
+ * replace what the minute-taker typed last.
+ */
 describe('MeetingAgendaService — text of the minute-taker', () => {
   let svc: MeetingAgendaService;
   let reads: Subject<AgendaItem[]>[];
@@ -52,6 +54,10 @@ describe('MeetingAgendaService — text of the minute-taker', () => {
 
   const body = (): string | null | undefined => svc.agenda()[0]?.body;
 
+  /**
+   * A text that waits for the autosave stays. While the save runs and the server has not confirmed
+   * it, the text stays too.
+   */
   it('shows a live draft, but never over a text that this tab has not saved yet', () => {
     svc.applyDraft('t-1', 'Entwurf');
     expect(body()).toBe('Entwurf');
@@ -60,11 +66,9 @@ describe('MeetingAgendaService — text of the minute-taker', () => {
     expect(svc.agenda()[0]).toBe(same[0]);
     svc.applyDraft('t-9', 'anderes');
     expect(svc.agenda()).toHaveLength(1);
-    // A text that waits for the autosave stays.
     svc.onTopBodyChange('m-1', 't-1', 'Eigener Text');
     svc.applyDraft('t-1', 'Entwurf 2');
     expect(body()).toBe('Eigener Text');
-    // The save runs, but the server has not confirmed it: the text stays too.
     jest.advanceTimersByTime(1000);
     svc.applyDraft('t-1', 'Entwurf 3');
     expect(body()).toBe('Eigener Text');
@@ -73,17 +77,19 @@ describe('MeetingAgendaService — text of the minute-taker', () => {
     expect(body()).toBe('Entwurf 4');
   });
 
+  /**
+   * The save broadcasts meeting_state, and the page reads the agenda again. The pending save
+   * confirms the newest text; then the server text counts again.
+   */
   it('keeps the newer local text when an older read of the agenda arrives', () => {
     svc.onTopBodyChange('m-1', 't-1', 'Erster Satz.');
     jest.advanceTimersByTime(1000);
-    // The save broadcasts meeting_state, and the page reads the agenda again.
     svc.load('m-1');
     svc.onTopBodyChange('m-1', 't-1', 'Erster Satz. Mein liebevoller Satz.');
     saves[0].next([item('Erster Satz.')]);
     reads[0].next([item('Erster Satz.')]);
     expect(body()).toBe('Erster Satz. Mein liebevoller Satz.');
 
-    // The pending save confirms the newest text; then the server text counts again.
     jest.advanceTimersByTime(1000);
     saves[1].next([item('Erster Satz. Mein liebevoller Satz.')]);
     svc.load('m-1');
@@ -148,12 +154,12 @@ describe('MeetingAgendaService — the item a link names', () => {
     svc = TestBed.inject(MeetingAgendaService);
   });
 
+  /** A later read keeps the selection that the user makes after that. */
   it('selects the named item at the first read, ahead of the item the room handles', () => {
     svc.requestTop('t-3');
     svc.load('m-1', 't-2');
     reads[0].next(rows('t-1', 't-2', 't-3'));
     expect(svc.selectedTopId()).toBe('t-3');
-    // A later read keeps the selection the user makes after that.
     svc.selectTop(null, 't-1');
     svc.load('m-1', 't-2');
     reads[1].next(rows('t-1', 't-2', 't-3'));

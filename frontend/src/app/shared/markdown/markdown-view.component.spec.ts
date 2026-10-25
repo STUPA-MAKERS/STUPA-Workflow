@@ -3,13 +3,13 @@ import { fireEvent, render, screen } from '@testing-library/angular';
 import { MarkdownViewComponent } from './markdown-view.component';
 
 describe('MarkdownViewComponent', () => {
+  /** The renderer escapes raw HTML and never runs it. */
   it('renders the source as sanitized markdown HTML', async () => {
     await render(MarkdownViewComponent, {
       inputs: { src: '**fett** und\n<script>alert(1)</script>' },
     });
     const strong = screen.getByText('fett');
     expect(strong.tagName).toBe('STRONG');
-    // The renderer escapes raw HTML and never runs it.
     expect(document.querySelector('script')).toBeNull();
     expect(screen.getByText(/<script>/)).toBeInTheDocument();
   });
@@ -62,10 +62,10 @@ describe('MarkdownViewComponent', () => {
     expect(nav).not.toHaveBeenCalled();
   });
 
+  /** Without a router the browser follows the link; jsdom only records the default. */
   it('leaves an already handled click and a missing router alone', async () => {
     await render(MarkdownViewComponent, { inputs: { src: '[In](/todos)' } });
     const link = screen.getByRole('link', { name: 'In' });
-    // Without a router the browser follows the link; jsdom only records the default.
     link.addEventListener('click', (e) => e.preventDefault());
     expect(fireEvent.click(link)).toBe(false);
   });

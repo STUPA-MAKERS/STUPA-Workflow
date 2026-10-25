@@ -33,8 +33,8 @@ describe('escapeHtml', () => {
 });
 
 describe('voteSnippet', () => {
+  /** The backend `build_vote_snippet` writes the identical block. */
   it('renders the protocol vote callout with the title and one tally line', () => {
-    // The backend's `build_vote_snippet` writes the identical block.
     expect(voteSnippet(vote())).toBe(
       '> [!abstimmung] **Förderung Ersti-Wochenende**\n> yes: 12, no: 3, abstain: 1',
     );
@@ -119,13 +119,15 @@ describe('renderMarkdown', () => {
     expect(bad).not.toContain('href');
   });
 
+  /**
+   * A URL that carries a quote must never become an href attribute. The Markdown link stays text;
+   * the autolink stops before the escaped quote, and no raw double-quote leaks into the rendered
+   * HTML.
+   */
   it('rejects a link whose URL contains a double-quote (no attribute break-out)', () => {
     const out = renderMarkdown('[x](https://e"x=)');
-    // A URL that carries a quote must never become an href attribute. The Markdown link
-    // stays text; the autolink stops before the escaped quote.
     expect(out).toContain('[x](');
     expect(out).not.toMatch(/href="[^"]*&quot;/);
-    // … and no raw double-quote may leak into the rendered HTML.
     expect(out).not.toContain('"x=');
     expect(out).toContain('&quot;');
   });

@@ -130,6 +130,7 @@ describe('VotePanelComponent', () => {
     expect(screen.getByText('34. Sitzung des Studierendenparlaments')).toBeInTheDocument();
   });
 
+  /** The server shows the counts of a vote without a meeting while it runs. */
   it('links the application of a vote without a meeting and counts the eligible voters', async () => {
     await setup({
       context: { meeting: null, position: null },
@@ -140,15 +141,14 @@ describe('VotePanelComponent', () => {
     });
     expect(screen.getByRole('link', { name: 'Antrag öffnen' })).toHaveAttribute('href', '/applications/a1');
     expect(screen.getByText('3 von 12 Stimmberechtigten haben abgestimmt')).toBeInTheDocument();
-    // The server shows the counts of a vote without a meeting while it runs.
     expect(screen.getByRole('list', { name: 'Ergebnis, 3 Stimmen' })).toBeInTheDocument();
     expect(screen.queryByText(/Zwischenstand/)).not.toBeInTheDocument();
   });
 
+  /** Only the status and the rules remain, with one separator between them. */
   it('shows no meeting line and no link for a motion without both', async () => {
     await setup({ context: { meeting: null, position: null }, vote: vote({ meetingId: null, applicationId: null }) });
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
-    // Only the status and the rules remain, with one separator between them.
     expect(screen.getAllByText('·')).toHaveLength(1);
   });
 
@@ -181,11 +181,11 @@ describe('VotePanelComponent', () => {
       expect(screen.getByText('20 von 20 Stimmen · Quorum: erreicht')).toBeInTheDocument();
     });
 
+    /** Without `voted`, the sum of the counts is the number of ballots. */
     it('names a missed quorum of a vote that failed on majority', async () => {
       await setup({
         vote: closed({ voted: undefined, quorumMet: false, failedReason: 'majority' }, { result: 'failed' }),
       });
-      // Without `voted`, the sum of the counts is the number of ballots.
       expect(screen.getByText('20 von 20 Stimmen · Quorum: nicht erreicht')).toBeInTheDocument();
     });
 
@@ -219,17 +219,19 @@ describe('VotePanelComponent', () => {
     expect(screen.getByRole('heading', { name: 'Als Vertretung für Jonas Weber' })).toBeInTheDocument();
   });
 
+  /**
+   * The meta line follows the question, as on every detail view. The turnout comes before the
+   * ballot on a phone.
+   */
   it('uses the phone layout of board Telefon-Abstimmen', async () => {
     const { fixture } = await setup({ layout: 'phone' });
     expect(fixture.nativeElement).toHaveClass('vpn--phone');
     const title = screen.getByRole('heading', { level: 1 });
     expect(title).toHaveTextContent('Soll der Antrag gefördert werden?');
-    // The meta line follows the question, as on every detail view.
     const meta = title.nextElementSibling as HTMLElement;
     expect(meta).toHaveClass('sheet-line');
     expect(meta.textContent?.replace(/\s+/g, '')).toBe('Offen·EinfacheMehrheit');
     expect(screen.getByRole('heading', { name: 'Deine Stimme' })).toBeInTheDocument();
-    // The turnout comes before the ballot on a phone.
     const progress = fixture.nativeElement.querySelector('app-vote-progress') as HTMLElement;
     const ballot = fixture.nativeElement.querySelector('app-ballot') as HTMLElement;
     expect(progress.compareDocumentPosition(ballot) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

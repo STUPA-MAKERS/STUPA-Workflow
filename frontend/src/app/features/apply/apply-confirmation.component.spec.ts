@@ -65,8 +65,10 @@ describe('ApplyConfirmationComponent', () => {
     expect(screen.queryByText(/E\u2011Mail bestätigen/)).not.toBeInTheDocument();
   });
 
-  // The backend confirms the address of a signed-in submitter at creation time, so the
-  // "confirm your email / discarded after 12 hours" copy is false for that caller.
+  /**
+   * The backend confirms the address of a signed-in submitter at creation time, so the "confirm
+   * your email / discarded after 12 hours" copy is false for that caller.
+   */
   it('tells a signed-in submitter the application is submitted and links to the record', async () => {
     await setup(true);
     expect(screen.getByText('Antrag eingereicht')).toBeInTheDocument();
@@ -96,9 +98,11 @@ describe('ApplyConfirmationComponent', () => {
     expect(screen.queryByRole('link', { name: 'Antrag öffnen' })).not.toBeInTheDocument();
   });
 
-  // A 36-character UUID is unreadable and [[no-uuids-in-ui]] forbids it on screen. The
-  // applicant reads or writes down the short prefix; the full id stays in the URL, in
-  // the record link and in the magic-link email.
+  /**
+   * A 36-character UUID is unreadable, and the UI must not show UUIDs. The applicant reads or
+   * writes down the short prefix. The full id stays in the URL, in the record link and in the
+   * magic-link email.
+   */
   it('shortens the anonymous reference to an 8-character uppercase prefix', async () => {
     await setup(false);
     expect(screen.getByText(SHORT_REF)).toBeInTheDocument();
@@ -122,7 +126,7 @@ describe('ApplyConfirmationComponent', () => {
     expect(screen.getByText('AB12')).toBeInTheDocument();
   });
 
-  // The admin sets the confirmation window; the public site config carries it.
+  /** The admin sets the confirmation window, and the public site config carries it. */
   it('shows the configured confirmation window instead of the default', async () => {
     await setup(false, FULL_ID, 48);
     expect(screen.getByText(/nach 48 Stunden automatisch verworfen/)).toBeInTheDocument();

@@ -41,15 +41,18 @@ describe('VoteOpenDialogComponent · poll', () => {
     expect(cmp.kind()).toBe('motion');
   });
 
+  /**
+   * A poll is open unless the lead switches the secrecy on. A single poll has no majority rule and
+   * no stepper. One option is too few. A label that is on the list already stays out (case and
+   * spaces ignored).
+   */
   it('builds a single poll: question, options, reorder, remove, open', async () => {
     const { http, cmp, opened, container } = await setup();
     const user = userEvent.setup();
     await user.click(screen.getByRole('radio', { name: 'Umfrage' }));
     expect(screen.getByRole('heading', { name: 'Umfrage öffnen' })).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: 'Einzelwahl' })).toHaveAttribute('aria-checked', 'true');
-    // A poll is open unless the lead switches the secrecy on.
     expect(screen.getByRole('switch', { name: 'Geheime Umfrage' })).toHaveAttribute('aria-checked', 'false');
-    // No majority rule and no stepper for a single poll.
     expect(screen.queryByText('Höchstens wählbar')).toBeNull();
 
     const question = screen.getByLabelText('Frage');
@@ -58,12 +61,10 @@ describe('VoteOpenDialogComponent · poll', () => {
     const add = screen.getByRole('button', { name: 'Hinzufügen' });
     expect(add).toBeDisabled();
     await user.type(screen.getByLabelText('Neue Option'), 'Stuttgart{Enter}');
-    // One option is too few.
     expect(footerButton('Umfrage öffnen')).toBeDisabled();
     await user.type(screen.getByLabelText('Neue Option'), 'Tübingen');
     await user.click(add);
     await user.type(screen.getByLabelText('Neue Option'), 'Ulm{Enter}');
-    // A label on the list already stays out (case and spaces ignored).
     await user.type(screen.getByLabelText('Neue Option'), '  ulm ');
     expect(add).toBeDisabled();
     await user.clear(screen.getByLabelText('Neue Option'));
@@ -91,6 +92,7 @@ describe('VoteOpenDialogComponent · poll', () => {
     expect(opened).toHaveBeenCalled();
   });
 
+  /** "Vorbereiten" saves a draft. */
   it('a multi poll sends its limit; a poll needs its question', async () => {
     const { http, cmp } = await setup();
     const user = userEvent.setup();
@@ -105,7 +107,6 @@ describe('VoteOpenDialogComponent · poll', () => {
     expect(cmp.canSubmit()).toBe(false);
     cmp.question.set('Was essen wir?');
     expect(cmp.canSubmit()).toBe(true);
-    // "Vorbereiten" saves a draft.
     cmp.submit(true);
     const req = http.expectOne('/api/meetings/m-1/votes');
     expect(req.request.body).toEqual({

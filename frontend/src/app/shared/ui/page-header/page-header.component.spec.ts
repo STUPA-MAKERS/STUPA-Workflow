@@ -48,27 +48,31 @@ describe('PageHeaderComponent', () => {
     expect(host.classList.contains('ph--rail')).toBe(false);
   });
 
+  /**
+   * This is for a parent that already spaces its children with a gap. Without it the margin and the
+   * gap both apply, and the band under the title grows to the sum.
+   */
   it('drops its bottom margin when flush', async () => {
-    // For a parent that already spaces its children with a gap. Without this the margin
-    // and the gap both apply and the band under the title grows to the sum.
     const host = await setup({ flush: true });
     expect(host.classList.contains('ph--flush')).toBe(true);
   });
 
+  /**
+   * A rail page centres its main column between two margins, and it is also a `wide` route, which
+   * removes the cap from `.main`. Without `rail` the header fills the viewport and starts at the
+   * gutter while its table starts at the centred column.
+   */
   it('takes the content cap back when the page is a rail layout', async () => {
-    // A rail page centres its main column between two margins, and it is also a `wide`
-    // route, which removes the cap from `.main`. Without `rail` the header filled the
-    // viewport and started at the gutter while its table started at the centred column:
-    // at 1920px the title sat at x=24 and the table at x=363.
     const host = await setup({ rail: true });
     expect(host.classList.contains('ph--rail')).toBe(true);
   });
 
+  /**
+   * A rail page whose host is a flex column with a gap needs both: the cap, so the header sits on
+   * the content column, and the flush, so its own margin does not stack on top of the gap of the
+   * parent.
+   */
   it('can be both flush and railed, which four pages need at once', async () => {
-    // A rail page whose host is a flex column with a gap needs both: the cap so the
-    // header sits on the content column, and the flush so its own margin does not stack
-    // on top of the parent's gap. Missing the second one put 40px of nothing under the
-    // heading on the budget tab.
     const host = await setup({ rail: true, flush: true });
     expect(host.classList.contains('ph--rail')).toBe(true);
     expect(host.classList.contains('ph--flush')).toBe(true);
@@ -110,13 +114,14 @@ describe('PageHeaderComponent', () => {
     expect(host.querySelector('h1.ph__title')?.hasAttribute('id')).toBe(false);
   });
 
+  /** Beside an admin page the Verwaltung navigation is no heading, because the page has the h1. */
   it('renders the title as a paragraph when it is no heading of the page', async () => {
-    // The Verwaltung navigation beside an admin page: the page has the h1.
     const host = await setup({ pane: true, titleTag: 'p' });
     expect(host.querySelector('h1')).toBeNull();
     expect(host.querySelector('p.ph__title')?.textContent).toBe('Anträge');
   });
 
+  /** The bar shows the title; the header keeps it for screen readers only. */
   it('below the bar of a one-view page hands its actions and its title to the bar and drops the breadcrumbs', async () => {
     const view = await render(OneViewPageComponent, { providers: [provideRouter([])] });
     view.fixture.detectChanges();
@@ -124,7 +129,6 @@ describe('PageHeaderComponent', () => {
     expect(action.closest('.ld__barActions')).not.toBeNull();
     expect(view.container.querySelector('.ph__actions')).toBeNull();
     expect(view.container.querySelector('app-breadcrumbs')).toBeNull();
-    // The bar shows the title; the header keeps it for screen readers only.
     expect(screen.getByRole('heading', { level: 1, name: 'Flow-Editor' })).toHaveClass('sr-only');
     expect(view.fixture.componentInstance.nav.title()).toBe('Flow-Editor');
   });

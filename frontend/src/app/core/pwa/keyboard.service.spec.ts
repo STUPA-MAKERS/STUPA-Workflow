@@ -26,12 +26,12 @@ describe('KeyboardService', () => {
     Object.defineProperty(window, 'visualViewport', { configurable: true, value: undefined });
   });
 
+  /** The back gesture closes the keyboard; the field keeps the focus. */
   it('is open while the keyboard takes the lower part of the viewport, and closed after it', () => {
     const kb = create(new FakeViewport());
     expect(kb.open()).toBe(false);
     vv?.set({ height: 420 });
     expect(kb.open()).toBe(true);
-    // The back gesture closes the keyboard; the field keeps the focus.
     vv?.set({ height: 760 });
     expect(kb.open()).toBe(false);
   });

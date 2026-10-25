@@ -120,6 +120,10 @@ const toastSpy = {
   error: jest.fn(),
 };
 
+/**
+ * The initial reload() sends a tree GET and one fiscal-years GET per top. Here the only top is
+ * b-vs.
+ */
 async function setup(m: Mocks = { gremien: 'ok', flow: 'null' }) {
   toastSpy.success.mockClear();
   toastSpy.error.mockClear();
@@ -133,8 +137,6 @@ async function setup(m: Mocks = { gremien: 'ok', flow: 'null' }) {
     ],
   });
   const http = TestBed.inject(HttpTestingController);
-  // The initial reload() sends a tree GET and one fiscal-years GET per top. Here the
-  // only top is b-vs.
   http.expectOne((r) => r.url.endsWith('/budgets') && r.method === 'GET').flush(TREE);
   http.expectOne((r) => r.url.endsWith('/budgets/b-vs/fiscal-years')).flush([FY]);
   view.fixture.detectChanges();
@@ -183,6 +185,10 @@ describe('BudgetTreeComponent', () => {
     expect(c.selectedTopLabel()).toBe('VS – VS-Mittel');
   });
 
+  /**
+   * The inline create row stands after the last row of the subtree of the parent, and its label
+   * names the nested parent. A parent that is not in the visible rows places no create row.
+   */
   it('exposes the columns and identity helpers', async () => {
     const { c } = await setup();
     expect(c.columns().map((col: { key: string }) => col.key)).toEqual([
@@ -198,48 +204,47 @@ describe('BudgetTreeComponent', () => {
     const row = { node: TREE[0], depth: 0 };
     expect(c.rowId(row)).toBe('b-vs');
     expect(c.childExpanded(row)).toBe(false);
-    // The inline create row stands after the last row of the parent's subtree.
     c.addingChildOf.set('b-vs');
     expect(c.childExpanded(row)).toBe(false);
     expect(c.childExpanded({ node: TREE[0].children[0], depth: 1 })).toBe(true);
     c.addingChildOf.set('b-800');
     expect(c.childExpanded({ node: TREE[0].children[0], depth: 1 })).toBe(true);
-    // The label of the inline row names the nested parent.
     expect(c.childParent()?.id).toBe('b-800');
-    // A parent that is not in the visible rows places no create row.
     c.addingChildOf.set('ghost');
     expect(c.childExpanded(row)).toBe(false);
     expect(c.childParent()).toBeNull();
   });
 
+  /**
+   * The sheet beside the admin navigation at 1440 px shows every amount. Intl puts a no-break space
+   * before the currency sign. The lines are text in the cell, so a keyboard or touch user reads
+   * them too. Without an allocation view there are no lines.
+   */
   it('leaves out the amounts a narrow page has no room for and shows them under "Verfügbar"', async () => {
     const { c, fixture } = await setup();
     const keys = (): string[] => c.columns().map((col: { key: string }) => col.key);
-    // The sheet beside the admin navigation at 1440 px shows every amount.
     c.width.set(904);
     expect(keys()).toEqual(expect.arrayContaining(['expended', 'income']));
     expect(c.hiddenAmounts(TREE[0])).toEqual([]);
     c.width.set(780);
     expect(keys()).not.toContain('income');
     expect(keys()).toContain('expended');
-    // Intl puts a no-break space before the currency sign.
     const plain = (t: string): string => t.replace(/\u00a0/g, ' ');
     expect(c.hiddenAmounts(TREE[0]).map(plain)).toEqual(['Einnahmen 0 €']);
     c.width.set(680);
     expect(keys()).not.toContain('expended');
     expect(c.hiddenAmounts(TREE[0]).map(plain)).toEqual(['Ausgegeben 50 €', 'Einnahmen 0 €']);
-    // The lines are text in the cell, so a keyboard or touch user reads them too.
     fixture.detectChanges();
     const more = [...(fixture.nativeElement as HTMLElement).querySelectorAll('.bt__more')].map((el) => plain(el.textContent ?? '').trim());
     expect(more).toContain('Ausgegeben 50 €');
     c.width.set(1200);
     expect(keys()).toContain('income');
-    // Without an allocation view there are no lines.
     c.width.set(700);
     c.selectedFyId.set('other');
     expect(c.hiddenAmounts(TREE[0])).toEqual([]);
   });
 
+  /** A sub cost centre opens its folded parent, so the inline row can show. */
   it('folds and unfolds a subtree', async () => {
     const { c, fixture } = await setup();
     const fold = screen.getByRole('button', { name: /^Unter-Kostenstellen ein- oder ausklappen: VS-Mittel/ });
@@ -249,7 +254,6 @@ describe('BudgetTreeComponent', () => {
     expect(c.rows().map((r: { node: { id: string } }) => r.node.id)).toEqual(['b-vs']);
     expect(c.isCollapsed('b-vs')).toBe(true);
     expect(fold).toHaveAttribute('aria-expanded', 'false');
-    // A sub cost centre opens its folded parent, so the inline row can show.
     c.startAddChild(TREE[0]);
     expect(c.isCollapsed('b-vs')).toBe(false);
     c.toggleCollapse('b-vs');
@@ -411,6 +415,7 @@ describe('BudgetTreeComponent', () => {
     expect(c.loading()).toBe(false);
   });
 
+  /** An empty pick does nothing. */
   it('picks the newest active fiscal year, else the newest one', async () => {
     const { c, http } = await setup();
     expect(c.selectedFyId()).toBe('fy-1');
@@ -422,7 +427,6 @@ describe('BudgetTreeComponent', () => {
     c.selectTop('b-vs');
     http.expectOne((r) => r.url.endsWith('/budgets/b-vs/fiscal-years')).flush([closed]);
     expect(c.selectedFyId()).toBe('fy-new');
-    // An empty pick does nothing.
     c.selectTop('');
     http.verify();
   });
@@ -435,12 +439,12 @@ describe('BudgetTreeComponent', () => {
     expect(c.selectedFyId()).toBe('fy-1');
   });
 
+  /** The selected top gets an empty fiscal-years list, so fys[0]?.id ?? '' gives ''. */
   it('resets the selected fy to "" when the selected top has no fiscal years on reload', async () => {
     const { c, http } = await setup();
     c.selectedFyId.set('fy-1');
     c['reload']();
     http.expectOne((r) => r.url.endsWith('/budgets') && r.method === 'GET').flush(TREE);
-    // The selected top gets an empty fiscal-years list, so fys[0]?.id ?? '' gives ''.
     http.expectOne((r) => r.url.endsWith('/budgets/b-vs/fiscal-years')).flush([]);
     expect(c.fiscalYears()).toEqual([]);
     expect(c.selectedFyId()).toBe('');
@@ -514,11 +518,11 @@ describe('BudgetTreeComponent', () => {
     expect(c.selectedFyId()).toBe('fy-1');
   });
 
+  /** selectTop clears the fy, and loadFiscalYears keeps it only if the list still holds it. */
   it('loadFiscalYears keeps an already-valid selected fy', async () => {
     const { c, http } = await setup();
     c.selectedFyId.set('fy-1');
     c.selectTop('b-vs');
-    // selectTop wiped the fy. loadFiscalYears keeps it only if the list still holds it.
     http.expectOne((r) => r.url.endsWith('/budgets/b-vs/fiscal-years')).flush([FY]);
     expect(c.selectedFyId()).toBe('fy-1');
   });
@@ -541,6 +545,7 @@ describe('BudgetTreeComponent', () => {
     expect(c.fiscalYears()).toEqual([]);
   });
 
+  /** An invalid colour blocks the save. */
   it('picks a colour, takes a typed hex value and clears it again', async () => {
     const { c, http } = await setup();
     c.openEditNode(fullNode({ id: 'b-x', color: '  #00AA00 ' }));
@@ -549,7 +554,6 @@ describe('BudgetTreeComponent', () => {
     expect(c.editColor()).toBe('#abcdef');
     c.editColor.set('#12');
     expect(c.editColorInvalid()).toBe(true);
-    // An invalid colour blocks the save.
     c.saveEditNode();
     http.verify();
     c.clearColor();
@@ -563,21 +567,22 @@ describe('BudgetTreeComponent', () => {
     const { c, http } = await setup();
     c.selectedTopId.set('none');
     c.toggleState('accepted', 'x');
-    http.verify(); // The component sent no PATCH.
+    http.verify();
   });
 
   it('toggleState removes an already-set key', async () => {
     const { c, http } = await setup();
-    c.toggleState('accepted', 'accepted'); // The key is set, so the toggle removes it.
+    c.toggleState('accepted', 'accepted');
     const patch = http.expectOne((r) => r.url.endsWith('/budgets/b-vs') && r.method === 'PATCH');
     expect(patch.request.body).toEqual({ acceptedStateKeys: [], deniedStateKeys: ['denied'] });
     patch.flush({});
     flushReload(http);
   });
 
+  /** 'denied' sits in deniedKeys and moves to accepted. */
   it('toggleState adds a new accepted key and removes it from denied (mutual exclusion)', async () => {
     const { c, http } = await setup();
-    c.toggleState('accepted', 'denied'); // 'denied' sits in deniedKeys and moves to accepted.
+    c.toggleState('accepted', 'denied');
     const patch = http.expectOne((r) => r.url.endsWith('/budgets/b-vs') && r.method === 'PATCH');
     expect(patch.request.body).toEqual({
       acceptedStateKeys: ['accepted', 'denied'],
@@ -642,13 +647,13 @@ describe('BudgetTreeComponent', () => {
     expect(c.newTop().name).toBe('AStA-Mittel');
   });
 
+  /** The cutoff day must exist in every month, so it is 1..28. */
   it('patchTopStichtag clamps month to 1..12 and day to 1..28, defaulting non-numbers to 1', async () => {
     const { c } = await setup();
     c.patchTopStichtag('fiscalStartMonth', '99');
     expect(c.newTop().fiscalStartMonth).toBe(12);
     c.patchTopStichtag('fiscalStartMonth', '0');
     expect(c.newTop().fiscalStartMonth).toBe(1);
-    // The cutoff day must exist in every month: 1..28.
     c.patchTopStichtag('fiscalStartDay', '99');
     expect(c.newTop().fiscalStartDay).toBe(28);
     c.patchTopStichtag('fiscalStartDay', 'abc');
@@ -666,6 +671,7 @@ describe('BudgetTreeComponent', () => {
     http.verify();
   });
 
+  /** TREE holds no b-asta, so the reload sets keep=false and falls back to b-vs. */
   it('createTop POSTs, selects the new node, closes and reloads', async () => {
     const { c, http, toast } = await setup();
     c.openTop();
@@ -684,7 +690,6 @@ describe('BudgetTreeComponent', () => {
     expect(c.selectedTopId()).toBe('b-asta');
     expect(c.topOpen()).toBe(false);
     expect(toast.success).toHaveBeenCalled();
-    // TREE holds no b-asta, so the reload sets keep=false and falls back to b-vs.
     flushReload(http);
     expect(c.selectedTopId()).toBe('b-vs');
   });
@@ -708,6 +713,10 @@ describe('BudgetTreeComponent', () => {
     http.verify();
   });
 
+  /**
+   * The reload() runs, then loadFiscalYears(top.id), which gives 1 tree GET and 2 fiscal-years
+   * GETs.
+   */
   it('saveStichtag PATCHes the clamped value, toasts, reloads + reloads fiscal years', async () => {
     const { c, http, toast } = await setup();
     c.saveStichtag('fiscalStartMonth', '13');
@@ -715,8 +724,6 @@ describe('BudgetTreeComponent', () => {
     expect(patch.request.body).toEqual({ fiscalStartMonth: 12 });
     patch.flush({});
     expect(toast.success).toHaveBeenCalled();
-    // The reload() runs, then loadFiscalYears(top.id). That gives 1 tree GET and 2
-    // fiscal-years GETs.
     http.expectOne((r) => r.url.endsWith('/budgets') && r.method === 'GET').flush(TREE);
     http.match((r) => r.url.endsWith('/budgets/b-vs/fiscal-years')).forEach((req) => req.flush([FY]));
   });
@@ -814,7 +821,7 @@ describe('BudgetTreeComponent', () => {
 
   it('deletes a cost centre only after the confirmation, then reloads', async () => {
     const { c, http, toast, fixture } = await setup();
-    c.deleteNode(); // nothing to confirm yet
+    c.deleteNode();
     http.verify();
     await userEvent.click(screen.getByRole('button', { name: 'Aktionen: Dezentrale Einrichtungen' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Löschen' }));
@@ -930,6 +937,7 @@ describe('BudgetTreeComponent', () => {
       decisionGremiumSourceId: 'd-mid',
     });
 
+    /** An own value replaces the inherited line with nothing. */
     it('names the ancestor that supplies the inherited gremium', async () => {
       const { c } = await setup();
       c.tree.set([ROOT, LONE]);
@@ -937,17 +945,16 @@ describe('BudgetTreeComponent', () => {
       c.openEditNode(ROOT.children[0].children[0]);
       expect(c.editDecisionGremium()).toBe('');
       expect(c.decisionGremiumHint()).toBe('Geerbt von VSM · Studierendenschaft: StuPa');
-      // An own value replaces the inherited line with nothing.
       c.editDecisionGremium.set('g-1');
       expect(c.decisionGremiumHint()).toBe('');
     });
 
+    /** A root with an own value that the user clears has nothing above it. */
     it('says that no gremium decides for a root or a tree without one', async () => {
       const { c } = await setup();
       c.tree.set([ROOT, LONE]);
       c.openEditNode(LONE);
       expect(c.decisionGremiumHint()).toContain('Kein Gremium hier und darüber');
-      // A root with an own value that the user clears: nothing above it.
       c.openEditNode(ROOT);
       expect(c.editDecisionGremium()).toBe('g-1');
       c.editDecisionGremium.set('');
@@ -1087,10 +1094,10 @@ describe('BudgetTreeComponent', () => {
 
   it('saveLimit does nothing without a node or fiscal year', async () => {
     const { c, http } = await setup();
-    c.saveLimit(); // No node.
+    c.saveLimit();
     c.openLimit(TREE[0]);
     c.selectedFyId.set('');
-    c.saveLimit(); // No fiscal year.
+    c.saveLimit();
     http.verify();
   });
 
@@ -1185,8 +1192,7 @@ describe('BudgetTreeComponent', () => {
     expect(toast.error).toHaveBeenCalled();
   });
 
-  // --- edit a fiscal year ---------------------------------------------------
-
+  /** Closing the edit hands control back to the manage dialog. */
   it('openFyEdit closes the manage dialog and seeds the form', async () => {
     const { c } = await setup();
     c.openFy();
@@ -1195,7 +1201,6 @@ describe('BudgetTreeComponent', () => {
     expect(c.fyEdit()).toEqual(FY);
     expect(c.fyEditYear()).toBe(2026);
     expect(c.fyEditActive()).toBe(true);
-    // Closing the edit hands control back to the manage dialog.
     c.closeFyEdit();
     expect(c.fyEdit()).toBeNull();
     expect(c.fyOpen()).toBe(true);
@@ -1209,6 +1214,7 @@ describe('BudgetTreeComponent', () => {
     expect(c.fyEditYear()).toBe(new Date().getFullYear());
   });
 
+  /** The fiscal-year segments follow the correction. */
   it('saveFyEdit PATCHes the year and the active flag, then reloads', async () => {
     const { c, http, toast } = await setup();
     c.openFyEdit(FY);
@@ -1226,7 +1232,6 @@ describe('BudgetTreeComponent', () => {
     http
       .expectOne((r) => r.url.endsWith('/budgets/b-vs/fiscal-years'))
       .flush([{ ...FY, year: 2027, display: '2027' }]);
-    // The fiscal-year segments follow the correction.
     expect(c.fyOptions()[0].label).toBe('HHJ 2027');
   });
 
@@ -1252,14 +1257,12 @@ describe('BudgetTreeComponent', () => {
 
   it('saveFyEdit is a no-op without a year under edit or without a top', async () => {
     const { c, http } = await setup();
-    c.saveFyEdit(); // nothing under edit
+    c.saveFyEdit();
     c.openFyEdit(FY);
     c.selectedTopId.set('');
-    c.saveFyEdit(); // no top budget
+    c.saveFyEdit();
     http.verify();
   });
-
-  // --- delete a fiscal year -------------------------------------------------
 
   it('askFyDelete closes the manage dialog and clears an earlier block reason', async () => {
     const { c } = await setup();
@@ -1287,6 +1290,7 @@ describe('BudgetTreeComponent', () => {
     expect(c.fiscalYears()).toEqual([]);
   });
 
+  /** The dialog stays open and shows the reason, and a toast repeats it. */
   it.each([
     ['fiscal year still has bookings; remove them first', 'budget.tree.fyBlocked.bookings'],
     ['fiscal year still has allocations; remove them first', 'budget.tree.fyBlocked.allocations'],
@@ -1302,7 +1306,6 @@ describe('BudgetTreeComponent', () => {
     http
       .expectOne((r) => r.method === 'DELETE')
       .flush({ detail }, { status: 409, statusText: 'conflict' });
-    // The dialog stays open and shows the reason. A toast repeats it.
     expect(c.fyDelete()).not.toBeNull();
     expect(c.fyDeleteBlocked()).toBe(expected);
     expect(toast.error).toHaveBeenCalledWith(expected);
@@ -1331,14 +1334,12 @@ describe('BudgetTreeComponent', () => {
 
   it('doFyDelete is a no-op without a confirmed year or without a top', async () => {
     const { c, http } = await setup();
-    c.doFyDelete(); // nothing confirmed
+    c.doFyDelete();
     c.askFyDelete(FY);
     c.selectedTopId.set('');
-    c.doFyDelete(); // no top budget
+    c.doFyDelete();
     http.verify();
   });
-
-  // --- permission gating ----------------------------------------------------
 
   it('hides the fiscal-year row actions without budget.structure', async () => {
     const { c } = await setup({ gremien: 'ok', flow: 'null', can: false });
@@ -1369,8 +1370,6 @@ describe('BudgetTreeComponent', () => {
     c.openFyEdit(FY);
     expect(c.fyEdit()).toBe(FY);
   });
-
-  // --- close and reopen a fiscal year -----------------------------------------
 
   const CLOSED: FiscalYear = { ...FY, closedAt: '2026-03-01T00:00:00Z' };
 
@@ -1428,12 +1427,12 @@ describe('BudgetTreeComponent', () => {
     http.verify();
   });
 
+  /** A year that someone else closed meanwhile makes the server answer 409. */
   it('freezes the limit of a closed year', async () => {
     const { c, http, toast } = await setup();
     c.fiscalYears.set([CLOSED]);
     expect(c.selectedFyClosed()).toBe(true);
     expect(c.rowMenu()[0].items[0].disabledReason).toBe('Das Haushaltsjahr ist abgeschlossen.');
-    // A year closed by someone else in the meantime: the server answers 409.
     c.openLimit(TREE[0].children[0]);
     c.limitValue.set('500');
     c.saveLimit();
@@ -1452,9 +1451,11 @@ describe('BudgetTreeComponent', () => {
     expect(screen.getByRole('spinbutton', { name: 'Jahr' })).toBeDisabled();
   });
 
+  /**
+   * `<main>` in a routed page template lands inside the `<main id="main">` of the shell. HTML
+   * forbids that, and it gives a screen reader two "main" landmarks.
+   */
   it('nests no second main landmark inside the shell main', async () => {
-    // `<main>` in a routed page template lands inside the `<main id="main">` of the
-    // shell. HTML forbids that, and it gives a screen reader two "main" landmarks.
     const view = await setup();
     expect(view.container.querySelectorAll('main')).toHaveLength(0);
     const region = view.container.querySelector('.bt');
@@ -1467,6 +1468,7 @@ describe('BudgetTreeComponent', () => {
     beforeEach(() => (restore = matchMediaQueries(MEDIA.phone)));
     afterEach(() => restore());
 
+    /** The cards have room for all five amounts, whatever the width. */
     it('floats "Budget anlegen" and puts the header and row actions in menus', async () => {
       const { fixture } = await setup();
       expect(screen.queryByRole('toolbar')).not.toBeInTheDocument();
@@ -1474,15 +1476,14 @@ describe('BudgetTreeComponent', () => {
       expect(screen.getByRole('button', { name: 'Weitere Aktionen' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Aktionen: VS-Mittel' })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Kostenstelle bearbeiten: VS-Mittel' })).not.toBeInTheDocument();
-      // The cards have room for all five amounts, whatever the width.
       const c = fixture.componentInstance as unknown as { width: { set(v: number): void }; columns(): { key: string }[] };
       c.width.set(300);
       expect(c.columns().map((col) => col.key)).toContain('income');
     });
   });
 
+  /** The data tables observe their own boxes too, so the stub keeps each callback by element. */
   it('measures its width with a ResizeObserver and stops on destroy', async () => {
-    // The data tables observe their own boxes too, so the stub keeps each callback by element.
     const watchers = new Map<Element, ResizeObserverCallback>();
     const disconnect = jest.fn();
     const original = (globalThis as { ResizeObserver?: unknown }).ResizeObserver;
