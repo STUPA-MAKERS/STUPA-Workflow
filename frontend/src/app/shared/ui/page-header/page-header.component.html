@@ -13,10 +13,9 @@
       } @else {
         <h1 class="ph__title" [class.sr-only]="docked()" [attr.id]="titleId()">{{ title() }}</h1>
       }
-      @if (meta()) {
-        <span class="ph__meta">{{ meta() }}</span>
+      @if (!docked()) {
+        <ng-container *ngTemplateOutlet="facts" />
       }
-      <ng-content select="[heading]" />
     </div>
     @if (subtitle()) {
       <p class="ph__subtitle">{{ subtitle() }}</p>
@@ -28,3 +27,11 @@
 </div>
 <!-- The actions render here, or in the bar of a one-view page while it shows. -->
 <ng-template #actions><ng-content select="[actions]" /></ng-template>
+<!-- The meta and the heading slot: beside the title, or the second line of the bar of a
+     one-view page while it shows the title. -->
+<ng-template #facts>
+  @if (meta()) {
+    <span class="ph__meta">{{ meta() }}</span>
+  }
+  <ng-content select="[heading]" />
+</ng-template>

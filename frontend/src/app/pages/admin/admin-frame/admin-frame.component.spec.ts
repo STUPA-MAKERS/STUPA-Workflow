@@ -24,10 +24,15 @@ function fakeAuth(perms: string[]): Partial<AuthService> {
 /** Every permission of an admin page. */
 const ALL = [...new Set(ADMIN_PAGES.flatMap((p) => p.permissions))];
 
-/** Let `matchMedia` report a wide viewport (or not). jsdom has none of its own. */
-function matchWide(wide: boolean): void {
+/**
+ * Let `matchMedia` report a wide viewport, a phone or the width between. jsdom has none
+ * of its own.
+ */
+function matchWide(wide: boolean, phone = false): void {
   window.matchMedia = ((query: string) => ({
-    matches: wide && query.includes('min-width: 1200px'),
+    matches:
+      (wide && query.includes('min-width: 1200px')) ||
+      (phone && query.includes('max-width: 768px')),
     media: query,
     onchange: null,
     addEventListener: () => undefined,
@@ -38,8 +43,8 @@ function matchWide(wide: boolean): void {
   })) as unknown as typeof window.matchMedia;
 }
 
-async function setup(perms: string[], url = '/admin/users', wide = true) {
-  matchWide(wide);
+async function setup(perms: string[], url = '/admin/users', wide = true, phone = false) {
+  matchWide(wide, phone);
   const api = {
     latestAuditVerification: jest.fn(() => of(null)),
     verifyAuditChain: jest.fn(() => of({ valid: true, checked: 1, brokenAt: null, reason: null })),
@@ -355,8 +360,8 @@ describe('AdminFrameComponent', () => {
     expect(page.container.querySelector('.af')).not.toHaveClass('af--split');
   });
 
-  it('below wide: an admin page sits below the bar of a one-view page', async () => {
-    const view = await setup(ALL, '/admin/users', false);
+  it('on a phone: an admin page sits below the bar of a one-view page', async () => {
+    const view = await setup(ALL, '/admin/users', false, true);
     expect(view.container.querySelector('app-list-detail-bar')).not.toBeNull();
     expect(view.container.querySelector('.af__pageBody')).toHaveClass('ld-under-bar');
     await userEvent.click(screen.getByRole('button', { name: 'Zur Liste' }));
@@ -364,16 +369,31 @@ describe('AdminFrameComponent', () => {
     expect(view.fixture.debugElement.injector.get(Router).url).toBe('/admin');
   });
 
-  it('below wide: the back arrow leads to the parent page of the route', async () => {
-    const view = await setup(ALL, '/admin/forms/f1', false);
+  it('on a phone: the back arrow leads to the parent page of the route', async () => {
+    const view = await setup(ALL, '/admin/forms/f1', false, true);
     await userEvent.click(screen.getByRole('button', { name: 'Zur Liste' }));
     await view.fixture.whenStable();
     expect(view.fixture.debugElement.injector.get(Router).url).toBe('/admin/forms');
   });
 
-  it('has no bar on the home page below wide', async () => {
-    const home = await setup(ALL, '/admin', false);
+  it('has no bar on the home page of a phone', async () => {
+    const home = await setup(ALL, '/admin', false, true);
     expect(home.container.querySelector('app-list-detail-bar')).toBeNull();
+  });
+
+  it.each([
+    ['/admin/users'],
+    ['/admin/flow'],
+  ] as const)('has no bar on %s between phone and wide: the header keeps its crumb', async (url) => {
+    const view = await setup(ALL, url, false);
+    expect(view.container.querySelector('app-list-detail-bar')).toBeNull();
+    expect(view.container.querySelector('.af__pageBody')).not.toHaveClass('ld-under-bar');
+  });
+
+  it('has no bar on a wide full-width editor: the header keeps its crumb and title', async () => {
+    const wide = await setup(ALL, '/admin/flow');
+    expect(wide.container.querySelector('app-list-detail-bar')).toBeNull();
+    expect(wide.container.querySelector('.af__pageBody')).not.toHaveClass('ld-under-bar');
   });
 
   it('has no bar beside the navigation', async () => {
@@ -421,8 +441,8 @@ describe('AdminFrameComponent', () => {
 });
 
 /** The frame in account mode, as the route `account` sets it (`data: { frame: 'account' }`). */
-async function setupAccount(perms: string[], url = '/account', wide = true) {
-  matchWide(wide);
+async function setupAccount(perms: string[], url = '/account', wide = true, phone = false) {
+  matchWide(wide, phone);
   const api = {
     latestAuditVerification: jest.fn(() => of(null)),
     verifyAuditChain: jest.fn(),
@@ -537,8 +557,8 @@ describe('AdminFrameComponent in account mode', () => {
     expect(screen.getByText('MCP-Server und Zugriffe von Agenten')).toBeInTheDocument();
   });
 
-  it('below wide: an account page fills the width and the back arrow of the bar leads back', async () => {
-    const view = await setupAccount(['mcp.use'], '/account/grants', false);
+  it('on a phone: an account page fills the width and the back arrow of the bar leads back', async () => {
+    const view = await setupAccount(['mcp.use'], '/account/grants', false, true);
     expect(screen.queryByRole('navigation')).toBeNull();
     expect(view.container.querySelector('.af__page')).not.toHaveClass('af__hidden');
     const back = screen.getByRole('button', { name: 'Zur Liste' });
