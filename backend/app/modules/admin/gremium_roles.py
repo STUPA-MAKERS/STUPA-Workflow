@@ -69,8 +69,8 @@ FORCED_ROLE_DEFAULT_PERMS: dict[str, list[str]] = {
 }
 
 
-def _time_valid_clause(now: datetime) -> ColumnElement[bool]:
-    """Build the clause: the ``gremium_membership`` is active at ``now``."""
+def membership_active_clause(now: datetime) -> ColumnElement[bool]:
+    """Build the clause: the ``gremium_membership`` is active at ``now`` (half-open term)."""
     return (
         (GremiumMembership.valid_from.is_(None))
         | (GremiumMembership.valid_from <= now)
@@ -90,7 +90,7 @@ async def active_gremium_roles(
             select(GremiumMembership.gremium_id, GremiumRole)
             .join(GremiumRole, GremiumRole.id == GremiumMembership.gremium_role_id)
             .join(PrincipalRow, PrincipalRow.id == GremiumMembership.principal_id)
-            .where(PrincipalRow.sub == sub, _time_valid_clause(now))
+            .where(PrincipalRow.sub == sub, membership_active_clause(now))
         )
     ).all()
     return [(gid, role) for gid, role in rows]
@@ -153,7 +153,7 @@ def _membership_out(
 
 
 def _valid_at(row: GremiumMembership, now: datetime) -> bool:
-    """Return True if the membership is valid at ``now`` (see ``_time_valid_clause``)."""
+    """Return True if the membership is valid at ``now`` (see ``membership_active_clause``)."""
     return (row.valid_from is None or row.valid_from <= now) and (
         row.valid_until is None or row.valid_until > now
     )

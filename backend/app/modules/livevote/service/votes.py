@@ -10,7 +10,7 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.orm import aliased
 
-from app.modules.admin.gremium_roles import _time_valid_clause
+from app.modules.admin.gremium_roles import membership_active_clause
 from app.modules.admin.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.applications.decision import DecisionIn
 from app.modules.auth.models import Principal as PrincipalRow
@@ -518,7 +518,7 @@ class VoteReadOps(MeetingServiceBase):
                 .join(GremiumRole, GremiumRole.id == GremiumMembership.gremium_role_id)
                 .where(
                     GremiumMembership.gremium_id == gremium_id,
-                    _time_valid_clause(now),
+                    membership_active_clause(now),
                 )
             )
         ).all()

@@ -27,7 +27,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.db import get_sessionmaker
-from app.modules.admin.gremium_roles import _time_valid_clause
+from app.modules.admin.gremium_roles import membership_active_clause
 from app.modules.admin.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.notifications.links import vote_link
@@ -100,7 +100,7 @@ async def eligible_members(
             .join(GremiumRole, GremiumRole.id == GremiumMembership.gremium_role_id)
             .where(
                 GremiumMembership.gremium_id == gremium_id,
-                _time_valid_clause(now),
+                membership_active_clause(now),
                 PrincipalRow.active.is_(True),
                 PrincipalRow.email.is_not(None),
             )

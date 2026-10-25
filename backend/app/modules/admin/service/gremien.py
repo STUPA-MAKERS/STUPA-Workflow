@@ -7,7 +7,7 @@ from uuid import UUID
 
 from sqlalchemy import delete, distinct, func, or_, select
 
-from app.modules.admin.gremium_roles import GremiumRoleService, _time_valid_clause
+from app.modules.admin.gremium_roles import GremiumRoleService, membership_active_clause
 from app.modules.admin.models import (
     ApplicationType,
     CdVariant,
@@ -77,7 +77,7 @@ class GremiumOps(ConfigServiceBase):
                     func.count(distinct(GremiumMembership.principal_id)),
                 )
                 .join(PrincipalRow, PrincipalRow.id == GremiumMembership.principal_id)
-                .where(_time_valid_clause(now), PrincipalRow.active.is_(True))
+                .where(membership_active_clause(now), PrincipalRow.active.is_(True))
                 .group_by(GremiumMembership.gremium_id)
             )
         ).all()

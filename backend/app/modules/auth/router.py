@@ -69,15 +69,6 @@ def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
     return {code: _PROBLEM for code in codes}
 
 
-def _cookie_kwargs(settings: SettingsDep) -> dict[str, object]:
-    return {
-        "httponly": True,
-        "secure": settings.cookie_secure,
-        "samesite": "lax",
-        "path": "/",
-    }
-
-
 @router.get(
     "/login",
     status_code=status.HTTP_307_TEMPORARY_REDIRECT,
@@ -126,7 +117,7 @@ async def login(
             sessions.safe_return_to(return_to),
         ),
         max_age=_TX_MAX_AGE,
-        **_cookie_kwargs(settings),  # type: ignore[arg-type]
+        **sessions.cookie_kwargs(settings),  # type: ignore[arg-type]
     )
     return response
 
@@ -199,7 +190,7 @@ async def callback(
         settings.session_cookie_name,
         cookie,
         max_age=days * 24 * 3600,
-        **_cookie_kwargs(settings),  # type: ignore[arg-type]
+        **sessions.cookie_kwargs(settings),  # type: ignore[arg-type]
     )
     response.delete_cookie(settings.oidc_tx_cookie_name, path="/")
     return response
@@ -276,7 +267,7 @@ async def _renew_session_cookie(
         settings.session_cookie_name,
         sessions.sign_principal_sid(settings.session_secret, row.sid),
         max_age=max(int((row.expires_at - now).total_seconds()), 0),
-        **_cookie_kwargs(settings),  # type: ignore[arg-type]
+        **sessions.cookie_kwargs(settings),  # type: ignore[arg-type]
     )
 
 
@@ -503,6 +494,6 @@ async def verify_magic_link(
         settings.applicant_cookie_name,
         token,
         max_age=settings.applicant_session_ttl_hours * 3600,
-        **_cookie_kwargs(settings),  # type: ignore[arg-type]
+        **sessions.cookie_kwargs(settings),  # type: ignore[arg-type]
     )
     return MagicLinkVerifyOut(application_id=UUID(app_id), scope=scope)
