@@ -37,6 +37,8 @@ from app.modules.applications.service.service_base import (
     _title_of,
     _whitelist,
 )
+from app.modules.auth.principal import Principal
+from app.modules.forms.models import FormField
 from app.shared.config_schemas import FormFieldDef
 from app.shared.errors import (
     ConflictError,
@@ -219,7 +221,7 @@ def _state(**over: Any) -> _Obj:
 
 
 def test_field_from_row_maps_all_columns() -> None:
-    row = _Obj(
+    row = FormField(
         key="cost",
         type="currency",
         label_i18n={"de": "Kosten"},
@@ -241,7 +243,7 @@ def test_field_from_row_maps_all_columns() -> None:
 
 def test_field_from_row_validation_falsy_becomes_none() -> None:
     """A falsy `validation` value such as `{}` becomes `None` through the or shortcut."""
-    row = _Obj(
+    row = FormField(
         key="x", type="text", label_i18n={"de": "x"}, help_i18n=None,
         required=False, validation={}, visible_if=None, compute=None,
         options=None, is_pii=False, is_promoted=False, promote_target=None,
@@ -1197,24 +1199,15 @@ async def test_name_maps_en_missing_falls_to_de() -> None:
     assert types[tid] == "X"
 
 
-def _principal(**over: Any) -> SimpleNamespace:
-    """Build a principal fake.
+def _principal(
+    *, sub: str = "me", roles: list[str] | None = None, _perms: set[str] | None = None
+) -> Principal:
+    """Build a real principal, so `has` is the production rule.
 
-    `has` mirrors `Principal.has`: the admin role holds every right. Otherwise a test could
-    pass against behaviour that production does not have.
+    The admin role holds every right. A fake `has` could let a test pass against
+    behaviour that production does not have.
     """
-    base: dict[str, Any] = {
-        "sub": "me",
-        "roles": [],
-        "groups": set(),
-        "scope_permissions": None,
-    }
-    base.update(over)
-    ns = SimpleNamespace(**base)
-    perms: set[str] = over.get("_perms", set())
-    roles: list[str] = base["roles"]
-    ns.has = lambda p, _perms=perms, _roles=roles: "admin" in _roles or p in _perms
-    return ns
+    return Principal(sub=sub, roles=roles or [], permissions=_perms or set())
 
 
 def _sql(clause: Any) -> str:

@@ -31,7 +31,7 @@ _log = logging.getLogger("app.settings")
 CsvList = Annotated[list[str], NoDecode]
 
 
-def _split_csv(value: Any) -> Any:
+def _split_csv(value: object) -> object:
     """Turn a comma-separated (or JSON) env value into a list of trimmed entries."""
     if not isinstance(value, str):
         return value
@@ -255,7 +255,7 @@ class Settings(BaseSettings):
         mode="before",
     )
     @classmethod
-    def _empty_oidc_value_is_unset(cls, value: Any) -> Any:
+    def _empty_oidc_value_is_unset(cls, value: object) -> object:
         """Read an empty or blank OIDC value as not set.
 
         `deploy/.env.example` ships `OIDC_CLIENT_SECRET=` empty. Without this step the
@@ -353,7 +353,7 @@ class Settings(BaseSettings):
 
     @field_validator("cors_allow_origins", "webhook_host_allowlist", mode="before")
     @classmethod
-    def _accept_csv_lists(cls, value: Any) -> Any:
+    def _accept_csv_lists(cls, value: object) -> object:
         """Accept a comma-separated list, as `deploy/.env.example` documents it."""
         return _split_csv(value)
 
@@ -497,7 +497,7 @@ class Settings(BaseSettings):
         )
 
 
-def load_settings(**overrides: Any) -> Settings:
+def load_settings(**overrides: Any) -> Settings:  # noqa: ANN401
     """Load the settings.
 
     Raises:

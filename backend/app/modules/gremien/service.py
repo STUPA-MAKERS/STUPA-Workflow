@@ -35,6 +35,7 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy import (
     ColumnElement,
+    Select,
     Text,
     and_,
     case,
@@ -589,7 +590,9 @@ class GremienService:
             rows=rows,
         )
 
-    def _attendance_counts(self, gremium_id: UUID, in_range: ColumnElement[bool]) -> Any:
+    def _attendance_counts(
+        self, gremium_id: UUID, in_range: ColumnElement[bool]
+    ) -> Select[Any, Any, Any, Any, Any]:
         """Run the one aggregation of the matrix: (principal, month, present, excused, delegated).
 
         The attendance records and the vote transfers go into one ``UNION ALL`` and one

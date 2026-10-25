@@ -2141,7 +2141,7 @@ def _by_card[R: (TodoCheckItem, TodoEvent, TodoComment)](
     return out
 
 
-def _uuid_of(value: Any) -> uuid.UUID | None:
+def _uuid_of(value: object) -> uuid.UUID | None:
     if isinstance(value, uuid.UUID):
         return value
     if isinstance(value, str):

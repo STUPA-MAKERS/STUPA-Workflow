@@ -14,7 +14,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import ColumnElement, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.models import GremiumMembership, GremiumRole, GremiumRoleMapping
@@ -69,7 +69,7 @@ FORCED_ROLE_DEFAULT_PERMS: dict[str, list[str]] = {
 }
 
 
-def _time_valid_clause(now: datetime):
+def _time_valid_clause(now: datetime) -> ColumnElement[bool]:
     """Build the clause: the ``gremium_membership`` is active at ``now``."""
     return (
         (GremiumMembership.valid_from.is_(None))

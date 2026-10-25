@@ -137,7 +137,7 @@ class AgendaService:
         *,
         actor: str | None,
         item: MeetingAgendaItem,
-        **extra: Any,
+        **extra: object,
     ) -> None:
         """Write one agenda audit entry with id references only, never a text."""
         await audit_record(

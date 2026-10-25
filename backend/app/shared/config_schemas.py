@@ -66,7 +66,7 @@ def _redos_prone(pattern: str) -> bool:
     except Exception:  # pragma: no cover - CPython internals unavailable
         return False
 
-    def children(op_name: str, av: Any) -> tuple:
+    def children(op_name: str, av: Any) -> tuple[Any, ...]:  # noqa: ANN401
         if op_name in ("MAX_REPEAT", "MIN_REPEAT"):
             return (av[2],)
         if op_name == "SUBPATTERN":
@@ -75,7 +75,7 @@ def _redos_prone(pattern: str) -> bool:
             return tuple(av[1])
         return ()
 
-    def has_unbounded_repeat(toks: Any) -> bool:
+    def has_unbounded_repeat(toks: Any) -> bool:  # noqa: ANN401
         for op, av in toks:
             if op.name in ("MAX_REPEAT", "MIN_REPEAT") and av[1] is maxrepeat:
                 return True
@@ -83,7 +83,7 @@ def _redos_prone(pattern: str) -> bool:
                 return True
         return False
 
-    def walk(toks: Any) -> bool:
+    def walk(toks: Any) -> bool:  # noqa: ANN401
         for op, av in toks:
             if op.name in ("MAX_REPEAT", "MIN_REPEAT"):
                 _min, _max, body = av

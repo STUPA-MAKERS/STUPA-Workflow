@@ -18,6 +18,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Annotated, Any
 from urllib.parse import urlencode, urlparse
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Form, Query, Request, Response, status
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -251,7 +252,7 @@ async def token(
     )
 
 
-async def _principal_row_id(db: DbSession, principal: Principal) -> Any:
+async def _principal_row_id(db: DbSession, principal: Principal) -> UUID | None:
     return (
         await db.execute(select(PrincipalRow.id).where(PrincipalRow.sub == principal.sub))
     ).scalar_one_or_none()

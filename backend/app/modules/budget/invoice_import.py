@@ -16,11 +16,12 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal, InvalidOperation
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 from xml.parsers import expat as expat_errors
 
 if TYPE_CHECKING:
     from pycheval import MinimumInvoice
+    from pycheval.money import Money
 
 #: CII namespaces (CrossIndustryInvoice 100 — ZUGFeRD 2.x / Factur-X).
 _NS_RSM = "urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100"
@@ -162,7 +163,7 @@ def parse_zugferd_pdf(data: bytes) -> ParsedInvoice:
 _MAX_INVOICE_AMOUNT = Decimal("9999999999.99")
 
 
-def _amount(money: Any | None) -> Decimal | None:
+def _amount(money: Money | None) -> Decimal | None:
     """Read ``Money.amount`` defensively, keeping ``None`` as ``None``."""
     return money.amount if money is not None else None
 

@@ -526,7 +526,7 @@ async def principals_with_access(session: AsyncSession, ids: list[UUID]) -> set[
     return {r for r in rows if r is not None}
 
 
-def _role(row: Any) -> RoleInfo:
+def _role(row: Role | GremiumRole) -> RoleInfo:
     """Build the role info of a ``Role`` or a ``GremiumRole`` row."""
     return RoleInfo(id=row.id, key=row.key, label=dict(row.name_i18n or {}))
 
