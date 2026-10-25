@@ -43,12 +43,19 @@ def _card(client: TestClient, board_id: str, title: str, **kw: Any) -> dict[str,
 
 
 async def test_the_personal_board_flow(api: Api, maker: async_sessionmaker[AsyncSession]) -> None:
+    """Walk the personal board through its whole life.
+
+    A second read creates nothing new. The actor assigns themselves, so no mail goes out. A
+    move between two cards opens a done card again. The test covers the optimistic lock,
+    ETag and 304, labels, checklist and comments, links (the back-reference is not offered
+    for a to-do), mine, archive and restore, a column delete with its cards, the moving done
+    flag and the palette search.
+    """
     me, me_id = await add_person(maker, "Ada")
     api.login(me)
     with TestClient(api.app) as client:
         boards = _ok(client.get("/api/todos/boards"))
         assert [(b["name"], b["kind"]) for b in boards] == [("Meine To-Dos", "personal")]
-        # A second read creates nothing new.
         assert len(_ok(client.get("/api/todos/boards"))) == 1
         bid = boards[0]["id"]
         board = _ok(client.get(f"/api/todos/boards/{bid}"))
@@ -60,8 +67,7 @@ async def test_the_personal_board_flow(api: Api, maker: async_sessionmaker[Async
         c = _card(client, bid, "Cee", columnId=done)
         assert c["completedAt"] is not None
         assert a["rank"] < b["rank"]
-        assert api.mails == []  # the actor assigned themselves
-        # Move C between A and B in the first column: it is open again.
+        assert api.mails == []
         moved = _ok(
             client.post(
                 f"/api/todos/cards/{c['id']}/move",
@@ -74,14 +80,12 @@ async def test_the_personal_board_flow(api: Api, maker: async_sessionmaker[Async
             json={"columnId": first, "afterId": b["id"], "beforeId": a["id"]},
         )
         assert bad.status_code == 422 and bad.json()["code"] == "rank_neighbors_invalid"
-        # Optimistic lock.
         patched = _ok(
             client.patch(f"/api/todos/cards/{a['id']}", json={"version": 1, "title": "A2"})
         )
         assert patched["version"] == 2
         stale = client.patch(f"/api/todos/cards/{a['id']}", json={"version": 1, "title": "A3"})
         assert stale.status_code == 409 and stale.json()["code"] == "card_version_conflict"
-        # ETag and 304.
         read = client.get(f"/api/todos/boards/{bid}")
         etag = read.headers["ETag"]
         assert (
@@ -93,7 +97,6 @@ async def test_the_personal_board_flow(api: Api, maker: async_sessionmaker[Async
             client.get(f"/api/todos/boards/{bid}", headers={"If-None-Match": etag}).status_code
             == 200
         )
-        # Labels, checklist, comments.
         label = _ok(
             client.post(f"/api/todos/boards/{bid}/labels", json={"name": "Eilig", "color": "red"}),
             201,
@@ -125,7 +128,6 @@ async def test_the_personal_board_flow(api: Api, maker: async_sessionmaker[Async
             json={"body": "x", "mentions": [str(uuid.uuid4())]},
         )
         assert stranger.status_code == 422
-        # Links to another card, and the back-reference is not offered for todo.
         detail = _ok(
             client.post(
                 f"/api/todos/cards/{a['id']}/links", json={"kind": "todo", "targetId": c["id"]}
@@ -138,23 +140,19 @@ async def test_the_personal_board_flow(api: Api, maker: async_sessionmaker[Async
         assert again.status_code == 409
         hits = _ok(client.get("/api/todos/link-targets?q=Cee&kind=todo"))
         assert c["id"] in {h["targetId"] for h in hits}
-        # Mine, archive, restore.
         mine = _ok(client.get("/api/todos/mine"))
         assert [i["title"] for i in mine["items"]] == ["A2"] and mine["dueSoonCount"] == 1
         assert client.delete(f"/api/todos/cards/{c['id']}").status_code == 204
         archive = _ok(client.get(f"/api/todos/boards/{bid}/archive?q=Cee"))
         assert archive["total"] == 1
         assert _ok(client.post(f"/api/todos/cards/{c['id']}/restore"))["archivedAt"] is None
-        # Delete a column with its cards.
         wait = board["columns"][2]["id"]
         _ok(client.post(f"/api/todos/cards/{c['id']}/move", json={"columnId": wait}))
         assert client.delete(f"/api/todos/boards/{bid}/columns/{wait}").status_code == 409
         out = _ok(client.delete(f"/api/todos/boards/{bid}/columns/{wait}?moveTo={first}"))
         assert [col["position"] for col in out["columns"]] == [0, 1, 2]
-        # The done flag moves.
         out = _ok(client.patch(f"/api/todos/boards/{bid}/columns/{first}", json={"isDone": True}))
         assert [col["isDone"] for col in out["columns"]] == [True, False, False]
-        # Search of the palette.
         hits = _ok(client.get("/api/search?q=A2"))
     assert any(
         h["kind"] == "todo" for h in hits.get("hits", hits if isinstance(hits, list) else [])
@@ -171,6 +169,7 @@ async def test_the_personal_board_flow(api: Api, maker: async_sessionmaker[Async
 async def test_gremium_boards_follow_the_gremium_roles(
     api: Api, maker: async_sessionmaker[AsyncSession]
 ) -> None:
+    """Grant the gremium boards by the gremium roles; a token without the scope sees nothing."""
     gid, bid = await add_gremium(maker)
     writer, writer_id = await add_person(maker, "Wera")
     lead, lead_id = await add_person(maker, "Lena")
@@ -202,13 +201,16 @@ async def test_gremium_boards_follow_the_gremium_roles(
         )
         mine = _ok(client.get("/api/todos/mine"))
         assert [i["id"] for i in mine["items"]] == [card["id"]]
-        # A token without the scope sees nothing.
         api.login(Principal(sub=lead.sub, scope_permissions=frozenset({"vote.cast"})))
         assert client.get("/api/todos/boards").status_code == 403
         assert client.get(f"/api/todos/cards/{card['id']}").status_code == 404
 
 
 async def test_many_cards_in_one_read(api: Api, maker: async_sessionmaker[AsyncSession]) -> None:
+    """Return cards in id order, an archived one too, without unknown cards or repeats.
+
+    A reader without the board gets none of its cards, where the single read is 404.
+    """
     gid, bid = await add_gremium(maker)
     writer, writer_id = await add_person(maker, "Wera")
     outsider, _ = await add_person(maker, "Olaf")
@@ -223,14 +225,12 @@ async def test_many_cards_in_one_read(api: Api, maker: async_sessionmaker[AsyncS
         got = _ok(
             client.get("/api/todos/cards", params={"ids": [b["id"], unknown, a["id"], b["id"]]})
         )
-        # The order of the ids, an archived card too, no unknown card, no repeat.
         assert [c["id"] for c in got] == [b["id"], a["id"]]
         assert got[0] == _ok(client.get(f"/api/todos/cards/{b['id']}"))
         assert got[1]["archivedAt"] is not None
         assert client.get("/api/todos/cards").status_code == 422
         too_many = [str(uuid.uuid4()) for _ in range(51)]
         assert client.get("/api/todos/cards", params={"ids": too_many}).status_code == 422
-        # A reader without the board gets none of its cards, where the single read is 404.
         api.login(outsider)
         assert _ok(client.get("/api/todos/cards", params={"ids": [b["id"]]})) == []
 
@@ -252,6 +252,7 @@ async def test_team_boards_follow_the_permission(
 async def test_ticket_coupling_and_back_references(
     api: Api, maker: async_sessionmaker[AsyncSession]
 ) -> None:
+    """Couple tickets and cards; a manager who cannot read the board sees no title."""
     gid, bid = await add_gremium(maker)
     manager, manager_id = await add_person(maker, "Mia")
     await add_member(maker, gid, manager_id, "todo.write")
@@ -275,7 +276,6 @@ async def test_ticket_coupling_and_back_references(
         event = next(e for e in done["events"] if e["kind"] == "todo_done")
         assert event["payload"]["cardTitle"] == "Fix"
         assert _ok(client.get(f"/api/todos/cards/{card['id']}"))["completedAt"] is not None
-        # A manager who cannot read the board sees no title.
         other, _ = await add_person(maker, "Otto")
         api.login(Principal(sub=other.sub, permissions={"ticket.manage"}))
         event = next(
@@ -287,6 +287,10 @@ async def test_ticket_coupling_and_back_references(
 async def test_a_card_becomes_an_agenda_item(
     api: Api, maker: async_sessionmaker[AsyncSession]
 ) -> None:
+    """Turn a card into an agenda item.
+
+    The card links the agenda item, not the meeting.
+    """
     from datetime import date
 
     from app.modules.livevote.models import Meeting
@@ -310,7 +314,7 @@ async def test_a_card_becomes_an_agenda_item(
         assert detail["links"][0]["kind"] == "agenda_item"
         assert detail["links"][0]["detail"]["position"] == 1
         linked = _ok(client.get(f"/api/todos/linked?kind=meeting&targetId={meeting.id}"))
-        assert linked == []  # the card links the item, not the meeting
+        assert linked == []
         personal = next(b for b in _ok(client.get("/api/todos/boards")) if b["kind"] == "personal")
         mine = _card(client, personal["id"], "Privat")
         wrong = client.post(f"/api/meetings/{meeting.id}/agenda", json={"todoId": mine["id"]})
@@ -323,6 +327,13 @@ async def test_a_card_becomes_an_agenda_item(
 async def test_votes_gremien_invoices_and_bookings_as_link_targets(
     api: Api, maker: async_sessionmaker[AsyncSession]
 ) -> None:
+    """Link votes, Gremien, invoices and bookings.
+
+    Without a budget permission the invoice and the booking redact, and the picker offers
+    neither. A delete of the target removes the link (ON DELETE CASCADE). The budget rows
+    are cleaned up by the test, because they are no part of the to-do cleanup and other
+    tests count invoices.
+    """
     from datetime import date
     from decimal import Decimal
 
@@ -393,8 +404,6 @@ async def test_votes_gremien_invoices_and_bookings_as_link_targets(
             for h in _ok(client.get("/api/todos/link-targets?q=Finanzer&kind=gremium"))
         }
 
-        # Without a budget permission the invoice and the booking redact, and the picker
-        # offers neither.
         api.login(lead)
         by_kind = {
             link["kind"]: link
@@ -410,7 +419,6 @@ async def test_votes_gremien_invoices_and_bookings_as_link_targets(
         )
         assert bad.status_code == 422
 
-    # A delete of the target removes the link (ON DELETE CASCADE).
     async with maker() as session:
         await session.delete(await session.get(Vote, ids["vote"]))
         await session.commit()
@@ -422,7 +430,6 @@ async def test_votes_gremien_invoices_and_bookings_as_link_targets(
             }
             assert kinds == {"gremium", "invoice", "expense"}
     finally:
-        # The budget rows are no part of the to-do cleanup; other tests count invoices.
         async with maker() as session:
             await session.delete(await session.get(BudgetExpense, ids["expense"]))
             await session.delete(await session.get(Invoice, ids["invoice"]))

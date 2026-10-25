@@ -83,6 +83,14 @@ def engine(migrated: tuple[str, str]) -> Iterator[Engine]:
         eng.dispose()
 
 
+#: Tables that the ``engine`` fixture truncates after each test. The meeting and vote
+#: tables are listed, because the ``application`` CASCADE does not reach them, and they
+#: would leak between tests (``uq_flow_version_version``, vote or ballot collisions);
+#: their CASCADE clears the children. The single-row settings fall back to the defaults
+#: after the truncate, so a changed setting does not leak. ``attachment_draft_token``,
+#: ``audit_verification`` and ``ticket_sender_block`` have no FK that a CASCADE follows.
+#: ``ticket`` and ``todo_board`` clear their child rows by CASCADE; a test creates the
+#: boards it needs (``ensure_gremium_board``, ``GET /todos/boards``).
 _DATA_TABLES = (
     "applicant",
     "application",
@@ -92,32 +100,18 @@ _DATA_TABLES = (
     "form_field",
     "form_version",
     "application_type",
-    # Meeting and vote domain (#PII-Re-Add test isolation). The `application`
-    # CASCADE does not reach these tables. Without this list they leak between tests, for
-    # example as `uq_flow_version_version`, vote or ballot collisions. CASCADE also clears
-    # the children: agenda_item, attendance, protocol, ballot and others.
     "meeting",
     "vote",
     "ballot",
     "protocol",
     "task_reminder_log",
-    # Single-row settings. After the truncate the code falls back to the
-    # defaults, so a test that changes them does not leak into the next one.
     "guest_application_settings",
     "meeting_settings",
     "login_settings",
-    # Draft tokens of the wizard. No FK reaches this table, so the `application`
-    # CASCADE does not clear it.
     "attachment_draft_token",
-    # Stored audit-chain checks. No FK reaches this table either.
     "audit_verification",
-    # Tickets. CASCADE also clears the notes, the events and the ticket attachments.
     "ticket",
-    # Sender blocks. A block of an e-mail address has no FK to a ticket or an account
-    # that a CASCADE follows.
     "ticket_sender_block",
-    # To-do boards. CASCADE also clears the columns, the cards and their rows. A test
-    # creates the boards it needs (`ensure_gremium_board`, `GET /todos/boards`).
     "todo_board",
 )
 
@@ -141,12 +135,14 @@ def clear_privacy_tables(eng: Engine) -> None:
 
 
 def _truncate(eng: Engine) -> None:
+    """Truncate the data tables and the audit log.
+
+    A trigger keeps ``audit_entry`` append-only, also against TRUNCATE. This maintenance
+    transaction is the only place that bypasses it, because ``session_replication_role =
+    replica`` turns off the user triggers; the trigger itself stays. A separate test proves
+    that normal operation rejects the write.
+    """
     with eng.begin() as conn:
-        # A trigger keeps `audit_entry` append-only, also against TRUNCATE. This
-        # maintenance transaction is the only place that bypasses the protection, because
-        # `session_replication_role = replica` turns off the user triggers. The trigger
-        # itself stays in place. A separate test proves that normal operation rejects the
-        # write.
         conn.execute(text("SET LOCAL session_replication_role = replica"))
         conn.execute(text("TRUNCATE audit_entry RESTART IDENTITY"))
         conn.execute(text("SET LOCAL session_replication_role = origin"))

@@ -20,6 +20,8 @@ principal toggle, delete role and the PWA manifest.
 The `list_tasks` and `get_form` routes and the DSGVO erasure request also run here.
 
 All tests are pure unit tests. They need no real database, no Redis and no network.
+
+The tuple at the end keeps some imports in use for a strict linter.
 """
 
 from __future__ import annotations
@@ -112,7 +114,6 @@ def _request(
     )
 
 
-# app.search
 def test_dialect_of_without_bind_defaults_postgres() -> None:
     """Without a bound engine `dialect_of` falls back to the production default."""
     sess = SimpleNamespace(bind=None)
@@ -126,13 +127,15 @@ def test_dialect_of_with_bind_reports_dialect_name() -> None:
 
 
 def test_trigram_rank_postgres_single_column() -> None:
-    """One column makes `rank` a single `word_similarity` call without `greatest`."""
+    """One column makes `rank` a single `word_similarity` call without `greatest`.
+
+    The WHERE clause is the comparison ``rank > threshold``.
+    """
     col = column("title")
     where, rank = search_mod.trigram_rank("foo", [col], threshold=0.3)
     txt = str(rank)
     assert "word_similarity" in txt
     assert "greatest" not in txt
-    # The WHERE clause is the comparison `rank > threshold`.
     assert ">" in str(where)
 
 
@@ -146,15 +149,17 @@ def test_trigram_rank_postgres_multi_column_uses_greatest() -> None:
 
 
 def test_trigram_rank_sqlite_fallback_uses_ilike_and_zero_rank() -> None:
-    """A dialect other than Postgres gives an ILIKE substring OR and rank `0.0`."""
+    """A dialect other than Postgres gives an ILIKE substring OR and rank `0.0`.
+
+    The constant rank 0.0 allows an unconditional ORDER BY rank, and the OR spans all
+    columns as coalesce expressions.
+    """
     where, rank = search_mod.trigram_rank(
         "term", [column("a"), column("b")], dialect="sqlite"
     )
-    # The constant rank literal 0.0 allows an unconditional ORDER BY rank.
     assert isinstance(rank, type(literal(0.0)))
     where_txt = str(where).lower()
     assert "like" in where_txt
-    # The OR spans all columns as two coalesce expressions.
     assert " or " in where_txt
 
 
@@ -170,14 +175,13 @@ def test_trigram_rank_none_query_postgres() -> None:
     assert "word_similarity" in str(rank)
 
 
-# app.deps: OAuth bearer path and require_any_permission
 def test_principal_bearer_token_apat_prefix() -> None:
     req = _request(headers={"Authorization": "Bearer apat_tok123"})
     assert deps._principal_bearer_token(req) == "apat_tok123"
 
 
 def test_principal_bearer_token_non_apat_ignored() -> None:
-    # A signed applicant bearer carries no apat_ prefix, so this path ignores it.
+    """Ignore a signed applicant bearer, which carries no ``apat_`` prefix."""
     req = _request(headers={"Authorization": "Bearer some.signed.applicant"})
     assert deps._principal_bearer_token(req) is None
 
@@ -240,7 +244,10 @@ async def test_principal_from_access_token_inactive_row(
 async def test_principal_from_access_token_ok_caps_scope(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A valid token gives an RBAC principal with permissions capped to the scope."""
+    """A valid token gives an RBAC principal with permissions capped to the scope.
+
+    The scope cap is set, which neutralizes the admin bypass.
+    """
 
     async def _resolve(*a: object, **k: object) -> tuple[Any, str]:
         return (uuid4(), "read")
@@ -261,7 +268,6 @@ async def test_principal_from_access_token_ok_caps_scope(
         _DB(), "apat_x", datetime.now(UTC)  # type: ignore[arg-type]
     )
     assert out is not None
-    # The scope cap is set and not None. This neutralizes the admin bypass.
     assert out.scope_permissions is not None
 
 
@@ -296,7 +302,6 @@ def test_require_any_permission_ok_when_one_matches() -> None:
     assert require_any_permission("a", "b")(principal=p) is p
 
 
-# app.middleware: CSRF and the default write rate limit, driven through the classes
 async def _passthrough(_request: Request) -> Response:
     """Return a response with a headers stub and a cookies stub as a minimal `call_next`."""
     return cast("Response", _FakeResponse())
@@ -402,10 +407,11 @@ async def test_write_rate_limit_allows_under_limit() -> None:
     req = _request(method="POST")
     resp = await mw.dispatch(req, _passthrough)
     assert resp.status_code == 200
-    assert limiter.calls and limiter.calls[0][1] == 100  # rl_default_write_per_hour
+    assert limiter.calls and limiter.calls[0][1] == 100
 
 
 async def test_write_rate_limit_blocks_over_limit_429() -> None:
+    """Answer 429 over the limit and clamp a negative Retry-After to 0."""
     limiter = _Limiter(allowed=False, retry_after=-5)
     mw = DefaultWriteRateLimitMiddleware(
         app=object(), settings=_settings(), limiter=limiter
@@ -413,7 +419,6 @@ async def test_write_rate_limit_blocks_over_limit_429() -> None:
     req = _request(method="DELETE")
     resp = await mw.dispatch(req, _passthrough)
     assert resp.status_code == 429
-    # The middleware clamps Retry-After to zero or more, so -5 becomes 0.
     assert resp.headers["Retry-After"] == "0"
     assert resp.media_type == middleware.PROBLEM_JSON
 
@@ -442,7 +447,6 @@ async def test_write_rate_limit_default_limiter_from_request(
     assert fallback.calls
 
 
-# app.modules.admin.router: service factories and the remaining endpoints
 def test_admin_service_factories_construct() -> None:
     """The three service factory dependencies build their service from the session."""
     from app.modules.admin.gremium_roles import GremiumRoleService
@@ -484,8 +488,8 @@ class _AdminConfigFake:
     async def delete_role(self, role_id: Any, actor: str) -> None:
         self.deleted_role = role_id
 
-    # The endpoint gates need these reads for the principal injection.
     async def list_roles(self) -> list[RoleOut]:
+        """Return no roles; the endpoint gates read them for the principal injection."""
         return []
 
 
@@ -626,13 +630,12 @@ def test_admin_manifest_webmanifest(
     assert client.get("/api/manifest.webmanifest?scheme=blue").status_code == 422
 
 
-# app.modules.applications.router: factory, senders, list_tasks, form and erasure
 def test_applications_service_factory_and_sender_getters() -> None:
+    """Return the module functions as the default senders when no override replaced them."""
     from app.modules.applications.service import ApplicationsService
 
     svc = get_applications_service(SimpleNamespace())  # type: ignore[arg-type]
     assert isinstance(svc, ApplicationsService)
-    # The default senders are the module functions that no override replaced.
     assert get_magic_link_sender() is _deliver_magic_link
     assert get_comment_mail_sender() is _deliver_comment_mails
 
@@ -678,7 +681,11 @@ class _FakeSessionmaker:
 async def _run_deliver_magic_link(
     monkeypatch: pytest.MonkeyPatch, *, lang_row: object | None
 ) -> dict[str, Any]:
-    """Run the applications-router magic-link background task against fakes."""
+    """Run the applications-router magic-link background task against fakes.
+
+    The fake auth service calls the injected deliver once to cover the inner closure, and
+    the fake NotificationService keeps the real mailer out.
+    """
     import app.modules.applications.router as ar
 
     fake_db = _FakeMagicSession(lang_row)
@@ -690,10 +697,8 @@ async def _run_deliver_magic_link(
     async def _request_magic_link(db, settings, *, email, application_id, deliver):
         seen["email"] = email
         seen["application_id"] = application_id
-        # Call the injected deliver once to cover the inner closure.
         await deliver(email, "https://link/x")
 
-    # The send_magic_link of NotificationService must not touch the real mailer.
     class _NS:
         def __init__(self, *a: object, **k: object) -> None:
             pass
@@ -714,11 +719,13 @@ async def _run_deliver_magic_link(
 async def test_deliver_magic_link_invokes_request_magic_link(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """`_deliver_magic_link` opens its own session, calls the auth service and commits."""
+    """`_deliver_magic_link` opens its own session, calls the auth service and commits.
+
+    Without an application row the mail keeps the default language.
+    """
     seen = await _run_deliver_magic_link(monkeypatch, lang_row=None)
     assert seen["email"] == "user@example.org"
     assert seen["application_id"] == seen["expected_application_id"]
-    # No application row: the mail keeps the default language.
     assert seen["delivered"] == ("user@example.org", "https://link/x", "de")
     assert seen["committed"] is True
 
@@ -780,7 +787,6 @@ async def test_deliver_comment_mails_invokes_send(
     assert captured["author_name"] == "Mia M."
 
 
-# Router endpoints (list_tasks, get_form, erasure) driven through TestClient
 def _state() -> StateOut:
     return StateOut(
         id=uuid4(), key="draft", label={"de": "E"}, color="#abcdef", editAllowed=True
@@ -882,7 +888,11 @@ class _ErasureFake:
 def test_request_erasure_202(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A GDPR erasure request returns 202 and notifies the data protection officers."""
+    """A GDPR erasure request returns 202 and notifies the data protection officers.
+
+    TestClient runs the background task synchronously, so the notification fires within the
+    call.
+    """
     import app.modules.applications.router as ar
     from app.db import get_session
     from app.deps import get_current_applicant
@@ -912,7 +922,6 @@ def test_request_erasure_202(
     client = TestClient(application)
     r = client.post(f"/api/applications/{app_id}/erasure-request")
     assert r.status_code == 202
-    # TestClient runs the background task synchronously, so the notification fires here.
     assert notified.get("subject_type") == "applicant"
 
 
@@ -969,18 +978,18 @@ def test_create_application_in_handler_payload_cap_413() -> None:
     """The in-handler cap on the serialized `data` gives 413.
 
     The cap still fires when the Content-Length dependency lets the body pass.
+
+    The test makes the Content-Length dependency a no-op, so the handler check decides.
     """
     from app.shared.antiabuse import enforce_application_payload_limit
 
     application, svc = _create_app_for_post()
-    # Make the Content-Length dependency a no-op. The handler check at router
-    # lines 162-165 is then the cap that decides.
     application.dependency_overrides[enforce_application_payload_limit] = lambda: None
     application.dependency_overrides[get_current_principal] = lambda: None
     client = TestClient(application)
     body = {
         "typeId": str(uuid4()),
-        "data": {"blob": "x" * 70_000},  # serialized size is over max_application_payload_bytes
+        "data": {"blob": "x" * 70_000},
         "applicantEmail": "a@example.org",
         "lang": "de",
     }
@@ -1021,5 +1030,4 @@ def test_create_application_derives_name_from_principal_only() -> None:
     assert svc.created is True
 
 
-# This reference keeps the imports in use for a strict linter.
 _ = (column, GremiumOut, contextlib)

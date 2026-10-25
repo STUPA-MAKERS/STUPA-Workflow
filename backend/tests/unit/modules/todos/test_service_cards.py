@@ -90,9 +90,6 @@ def _setup(**kw: Any) -> tuple[ScriptedSession, Any, Any, Any, TodoService]:
     return session, b, col, c, service
 
 
-# -- detail -------------------------------------------------------------------------
-
-
 async def test_card_404s() -> None:
     session = ScriptedSession(scalar=[None])
     service = _svc(session)
@@ -125,6 +122,10 @@ class _WriteOn(FakeAccess):
 
 
 async def test_a_readable_board_without_the_write_right_answers_403() -> None:
+    """Answer 403 for a write on a board the caller only reads; the read still works.
+
+    A transfer needs the write right on the target board too.
+    """
     session, b, col, c, _service = _setup()
     service = TodoService(
         session,  # type: ignore[arg-type]
@@ -140,9 +141,7 @@ async def test_a_readable_board_without_the_write_right_answers_403() -> None:
     with pytest.raises(ForbiddenError) as create:
         await service.create(CardCreate(boardId=b.id, title="Neu"), USER)
     assert create.value.code == "todo_write_required"
-    # The read still works.
     assert await service.card(c.id, USER) is OUT
-    # A transfer needs the write right on the target board too.
     target = board()
     session.put(target)
     service.access = _WriteOn({b.id})  # type: ignore[assignment]
@@ -215,9 +214,6 @@ async def test_card_detail_resolves_people_links_events_and_comments(
     assert [a.display_name for a in out.assignees] == ["Otto"]
 
 
-# -- create -------------------------------------------------------------------------
-
-
 def _create(b: Any, **kw: Any) -> CardCreate:
     return CardCreate.model_validate({"boardId": str(b.id), "title": " Neu ", **kw})
 
@@ -287,9 +283,6 @@ async def test_create_in_the_done_column_completes_and_tells_the_tickets() -> No
     assert service.outbox == []
 
 
-# -- patch --------------------------------------------------------------------------
-
-
 async def test_patch_checks_the_version() -> None:
     session, _b, _col, c, service = _setup(version=3)
     session.scalar_q.append(c)
@@ -327,9 +320,6 @@ async def test_patch_without_a_change_keeps_the_version() -> None:
         c.id, CardPatch.model_validate({"version": 1, "descriptionMd": "neu"}), USER
     )
     assert c.version == 2 and c.title == "Gleich"
-
-
-# -- move ---------------------------------------------------------------------------
 
 
 def _move(col: Any, **kw: Any) -> CardMove:
@@ -382,12 +372,16 @@ async def test_move_rebalances_on_equal_ranks() -> None:
 
 
 async def test_move_into_done_and_back() -> None:
+    """Move a card into the done column and back.
+
+    The card is read again after the board lock, so a parallel move is seen. A card from a
+    column that is gone has no column name.
+    """
     session, b, col, c, service = _setup()
     done = column(b.id, "Erledigt", 1, is_done=True)
     session.scalars_q[:] = [[col, done], [], [TICKET]]
     await service.move(c.id, _move(done), USER)
     assert c.column_id == done.id and c.completed_at is not None
-    # The card is read again after the board lock, so a parallel move is seen.
     assert session.refreshed == [c]
     assert "FOR UPDATE" in str(session.statements[0])
     (moved,) = _events(session)
@@ -398,7 +392,6 @@ async def test_move_into_done_and_back() -> None:
     session.scalars_q[:] = [[col, done], []]
     await service.move(c.id, _move(col), USER)
     assert c.column_id == col.id and c.completed_at is None
-    # From a column that is gone (no name).
     c.column_id = uuid.uuid4()
     session.scalars_q[:] = [[col, done], []]
     await service.move(c.id, _move(col), USER)
@@ -406,19 +399,22 @@ async def test_move_into_done_and_back() -> None:
 
 
 async def test_complete_moves_an_open_card_into_done() -> None:
+    """Move an open card into done; skip without a done column or when done already.
+
+    Every call takes the board lock before it reads the done column.
+    """
     session, b, col, c, service = _setup()
     done = column(b.id, "Erledigt", 1, is_done=True)
     tail = card(b, done, rank="k")
     session.scalars_q[:] = [[col], [col, done], [tail], [], [col, done]]
-    assert await service.complete(c, b, ME) is False  # no done column
+    assert await service.complete(c, b, ME) is False
     assert await service.complete(c, b, ME) is True
     assert c.column_id == done.id and c.rank > "k" and c.completed_at is not None
-    assert await service.complete(c, b, ME) is False  # done already
+    assert await service.complete(c, b, ME) is False
     c.column_id = uuid.uuid4()
     session.scalars_q[:] = [[done], [], []]
     assert await service.complete(c, b, None) is True  # type: ignore[arg-type]
     assert _events(session)[-1].payload["fromColumnName"] == ""
-    # Every call takes the board lock before it reads the done column.
     locks = [s for s in session.statements if "FOR UPDATE" in str(s)]
     assert len(locks) == 4
     assert session.refreshed == [c] * 4
@@ -450,6 +446,9 @@ def _target(session: ScriptedSession, **kw: Any) -> tuple[Any, Any, Any]:
 
 
 async def test_transfer_errors() -> None:
+    """Refuse the invalid transfers; both boards are locked in id order before the card is read
+    again.
+    """
     session, b, col, c, service = _setup()
     t, first, _done = _target(session)
     with pytest.raises(ValidationProblem) as same:
@@ -463,7 +462,6 @@ async def test_transfer_errors() -> None:
     with pytest.raises(ValidationProblem) as wrong:
         await service.transfer(c.id, _transfer(t, col), USER)
     assert wrong.value.code == "column_not_on_board"
-    # Both boards are locked, in id order, before the card is read again.
     locks = [str(s) for s in session.statements if "FOR UPDATE" in str(s)]
     assert len(locks) == 2 and session.refreshed == [c]
     c.archived_at = NOW_UTC
@@ -532,6 +530,11 @@ async def test_transfer_into_the_done_column_maps_labels_and_assignees() -> None
 
 
 async def test_transfer_keeps_a_done_card_done_and_opens_it_elsewhere() -> None:
+    """Keep a done card done in a done column and open it again elsewhere.
+
+    The default target is the first column of the other board. A column that is gone has no
+    name.
+    """
     since = datetime(2026, 9, 1, tzinfo=UTC)
     session, _b, _col, c, service = _setup(completed_at=since)
     t, first, done = _target(session)
@@ -540,12 +543,11 @@ async def test_transfer_keeps_a_done_card_done_and_opens_it_elsewhere() -> None:
     assert c.completed_at == since
     assert not any(isinstance(o, TicketEvent) for o in session.added)
     deletes = [str(s) for s in session.statements if str(s).startswith("DELETE")]
-    assert len(deletes) == 1  # every assignee is a member: nothing to drop
-    # Back to the first column of another board (the default): open again.
+    assert len(deletes) == 1
     other = board(name="Drei")
     other_first = column(other.id, "Offen")
     session.put(other)
-    c.column_id = uuid.uuid4()  # a column that is gone has no name
+    c.column_id = uuid.uuid4()
     session.scalars_q[:] = [[other_first], [], [], [], []]
     await service.transfer(c.id, _transfer(other), USER)
     assert (c.board_id, c.column_id, c.completed_at) == (other.id, other_first.id, None)
@@ -553,19 +555,23 @@ async def test_transfer_keeps_a_done_card_done_and_opens_it_elsewhere() -> None:
 
 
 async def test_a_shared_card_never_moves_into_a_personal_board() -> None:
+    """Refuse a transfer from a gremium or team board into a personal board."""
     session, b, _col, c, service = _setup()
     personal, _first, _done = _target(session, kind="personal", gremium_id=None, owner_id=ME)
     with pytest.raises(ForbiddenError) as exc:
         await service.transfer(c.id, _transfer(personal), USER)
     assert exc.value.code == "transfer_to_personal"
     assert c.board_id == b.id and session.committed == 0
-    # A team board is shared too.
     b.kind, b.gremium_id, b.permission = "team", None, "ticket.manage"
     with pytest.raises(ForbiddenError):
         await service.transfer(c.id, _transfer(personal), USER)
 
 
 async def test_a_card_of_my_personal_board_takes_me_as_assignee() -> None:
+    """Make the actor the assignee of a card that leaves the own personal board.
+
+    Nobody is added when the actor is not a member of the target or an assignee exists.
+    """
     session, b, _col, c, service = _setup()
     b.kind, b.gremium_id, b.owner_id = "personal", None, ME
     t, first, _done = _target(session)
@@ -575,7 +581,6 @@ async def test_a_card_of_my_personal_board_takes_me_as_assignee() -> None:
     assert mine.principal_id == ME and mine.card_id == c.id
     assert [e.kind for e in _events(session)] == ["moved", "assigned"]
     assert service.outbox == []
-    # Not a member of the target, or an assignee already: nobody is added.
     for members, assignees in (({OTHER}, []), ({ME, OTHER}, [OTHER])):
         back = board(kind="personal", gremium_id=None, owner_id=ME)
         session.put(back)
@@ -588,6 +593,10 @@ async def test_a_card_of_my_personal_board_takes_me_as_assignee() -> None:
 
 
 async def test_a_write_after_a_parallel_transfer_answers_card_moved() -> None:
+    """Answer ``card_moved`` when the card read after the board lock is on another board.
+
+    Every other card write goes through the same lock.
+    """
     session, b, col, c, service = _setup()
     elsewhere = board()
 
@@ -601,14 +610,12 @@ async def test_a_write_after_a_parallel_transfer_answers_card_moved() -> None:
     c.board_id = b.id
     assert await service.complete(c, b, ME) is False
     assert c.board_id == elsewhere.id and _events(session) == []
-    # The card lock: the card read after the board lock is on another board.
     c.board_id = b.id
     gone = card(elsewhere, column(elsewhere.id), id=c.id)
     session.scalar_q.append(gone)
     with pytest.raises(ConflictError) as locked:
         await service.patch(c.id, CardPatch(version=1, title="Neu"), USER)
     assert locked.value.code == "card_moved"
-    # Every other card write goes through the same lock.
     session.scalar_q.append(gone)
     with pytest.raises(ConflictError) as archived:
         await service.archive_card(c.id, USER)
@@ -617,6 +624,10 @@ async def test_a_write_after_a_parallel_transfer_answers_card_moved() -> None:
 
 
 async def test_a_respread_pings_the_whole_board() -> None:
+    """Ping the whole board when a move or a transfer respreads a column.
+
+    A transfer that respreads the target column pings the target board.
+    """
     session, b, col, c, service = _setup(rank="q")
     a, d = card(b, col, rank="b"), card(b, col, rank="c")
     session.scalars_q[:] = [[col], [a, d]]
@@ -626,7 +637,6 @@ async def test_a_respread_pings_the_whole_board() -> None:
     session.scalars_q[:] = [[col], [a, d]]
     await service.move(c.id, _move(col, afterId=a.id, beforeId=d.id), USER)
     assert service.pings.drain() == [{"type": "board", "boardId": str(b.id)}]
-    # A transfer that respreads the target column pings the target board.
     t, first, _done = _target(session)
     x, y = card(t, first, rank="b"), card(t, first, rank="b")
     body = CardTransfer.model_validate(
@@ -689,9 +699,6 @@ def test_append_keeps_short_ranks_and_rebalances_long_ones() -> None:
     assert new[0].rank == "i"
 
 
-# -- archive ------------------------------------------------------------------------
-
-
 async def test_archive_and_restore_are_idempotent() -> None:
     session, _b, _col, c, service = _setup()
     session.scalar_q[:] = [c] * 4
@@ -721,10 +728,8 @@ async def test_restore_in_the_done_column_restarts_the_archive_clock() -> None:
     assert c.completed_at == c.updated_at
 
 
-# -- assignees and labels -------------------------------------------------------------
-
-
 async def test_assignees() -> None:
+    """Add and remove assignees; each remove locks the board before its delete."""
     session, _b, _col, c, service = _setup()
     session.scalar_q[:] = [c, None, c, OTHER, c]
     await service.add_assignee(c.id, OTHER, USER)
@@ -738,7 +743,6 @@ async def test_assignees() -> None:
         await service.add_assignee(c.id, uuid.uuid4(), USER)
     from tests.unit.modules.todos.fakes import Rows
 
-    # Each remove locks the board (one execute) before its delete.
     session.execute_q[:] = [Rows(), Rows(rowcount=1), Rows(), Rows(rowcount=0)]
     session.scalar_q[:] = [c, c]
     await service.remove_assignee(c.id, OTHER, USER)
@@ -764,9 +768,6 @@ async def test_card_labels() -> None:
     assert session.committed == 2
 
 
-# -- checklist ----------------------------------------------------------------------
-
-
 async def test_checklist() -> None:
     session, _b, _col, c, service = _setup()
     session.scalar_q[:] = [c, None, c, 0, *([c] * 6)]
@@ -789,9 +790,6 @@ async def test_checklist() -> None:
     assert session.deleted == [second]
     actions = [e.payload["action"] for e in _events(session)]
     assert actions == ["added", "added", "renamed", "done", "undone", "removed"]
-
-
-# -- links --------------------------------------------------------------------------
 
 
 async def test_links() -> None:
@@ -822,17 +820,16 @@ async def test_links() -> None:
     assert _events(session)[1].payload == {"linkKind": "ticket", "targetId": str(TICKET)}
 
 
-# -- comments -----------------------------------------------------------------------
-
-
 async def test_comments(people: dict[uuid.UUID, PersonRef]) -> None:
+    """Write, edit and delete comments; the board is locked before the card, as in every to-do
+    write.
+    """
     people[OTHER] = PersonRef(principal_id=OTHER, display_name="Otto")
     session, _b, _col, c, service = _setup()
     session.scalar_q[:] = [c, c]
     with pytest.raises(ValidationProblem) as exc:
         await service.add_comment(c.id, "x", [uuid.uuid4()], USER)
     assert exc.value.code == "mention_not_member"
-    # The board is locked before the card, the order of every to-do write.
     board_lock, card_lock = (str(st) for st in session.statements[:2])
     assert board_lock.startswith("SELECT todo_board.id") and board_lock.endswith("FOR UPDATE")
     assert card_lock.startswith("SELECT todo_card") and card_lock.endswith("FOR UPDATE")
@@ -870,6 +867,10 @@ async def test_comments(people: dict[uuid.UUID, PersonRef]) -> None:
 async def test_comment_files_bind_list_and_go_with_the_comment(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Bind the files of a comment, list them and delete them with the comment.
+
+    Without files nothing is bound.
+    """
     calls: list[tuple[str, dict[str, Any]]] = []
 
     async def _check(_s: object, **kw: Any) -> str | None:
@@ -902,7 +903,6 @@ async def test_comment_files_bind_list_and_go_with_the_comment(
     assert edited.attachments == [shot]
     await service.delete_comment(c.id, row.id, USER)
     assert files.removed == [([row.id], USER.sub)]
-    # Without files nothing is bound.
     calls.clear()
     await service.add_comment(c.id, "x", [], USER)
     assert [k for k, _ in calls] == ["check"]
