@@ -16,6 +16,8 @@ app/
     guards.py        guard evaluator (whitelist operators, no eval)
     jsonlogic.py     JsonLogic evaluator for form visibleIf/compute
     config_schemas.py  camelCase base model (alias, extra=forbid)
+    search.py        trigram/ILIKE fuzzy search of the list services
+    ...              see the `conventions` skill for the full list
   modules/
     auth/            OIDC (PKCE) + magic link, sessions, RBAC, OAuth2/MCP
     forms/           versioned forms, definition and answer validation
@@ -36,14 +38,19 @@ app/
     privacy/         GDPR erasure queue, anonymization, subject-access export, retention
     backup/          age-encrypted platform backups and in-app restore (/admin/backups)
     calendar/        personal ICS feed of the meetings
+    gremien/         read-only "Gremien" tab: members, meetings, attendance, decisions
+    media/           Markdown images: upload, re-encode, serve
+    tickets/         help-menu tickets: public report, work routes, retention
+    todos/           to-do boards (gremium, personal, team), live updates
     avatars/         Gravatar proxy for person avatars
     search/          global search over every record the caller may see
     antiabuse/       ALTCHA challenge/verify, rate limit, payload cap
     admin/           config CRUD (Gremien, roles, application types, branding, …),
                      one permission per /admin/ page
 migrations/          Alembic (0001–0048, then hash revision ids; one head)
-worker/              arq WorkerSettings: mail/PDF/scan/webhook tasks and the crons (vote close,
-                     automatic transitions, reminders, budget rollup, retention, draft purge, backup, audit check)
+worker/              arq WorkerSettings: mail/PDF/scan/webhook/backup tasks and the crons (deadlines
+                     and vote close, task reminders, budget stats, retention, ticket anonymization,
+                     to-do archive, draft purge, public protocol heal, backup, audit check)
 tests/
 ```
 
@@ -62,8 +69,8 @@ pytest --cov --cov-report=term-missing   # with coverage (97 % gate)
 pytest -m integration              # testcontainers (Docker required)
 ```
 
-The critical modules (`auth`, `voting`, `flow`, `budget`, `webhooks`, `audit`) have their own
-gate of 100 % branch coverage:
+The critical modules (`auth`, `voting`, `flow`, `budget`, `webhooks`, `audit`, `backup`, plus
+`shared/ssrf.py` and `worker/backup.py`) have their own gate of 100 % branch coverage:
 
 ```bash
 pytest --cov --cov-report=xml

@@ -24,7 +24,7 @@ Full documentation in the [Wiki](https://github.com/STUPA-MAKERS/STUPA-Workflow/
 
 ## Features
 
-The backend works and has tests (about 4500 test functions in unit and integration suites).
+The backend works and has tests (about 5900 test functions in unit and integration suites).
 It implements:
 
 - **Auth & RBAC** — OIDC against any IdP with a discovery document, such as authentik or
@@ -101,8 +101,9 @@ backend/    FastAPI app, arq worker, modules, migrations, tests
 frontend/   Angular SPA + design system
 typst/      Markdown→PDF render service (FastAPI + Typst)
 mcp/        MCP server (agent/API access)
+admin-cli/  terminal admin tool that works on the database directly
 deploy/     docker-compose.yml, web/ (nginx + multi-stage build), .env.example
-scripts/    helper scripts (smoke, role maintenance)
+scripts/    helper scripts (smoke, e2e, restore smoke, admin CLI, role maintenance)
 ```
 
 ## Development

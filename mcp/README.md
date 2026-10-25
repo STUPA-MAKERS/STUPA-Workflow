@@ -107,7 +107,7 @@ Tickets: `tickets_list`, `tickets_get`, `tickets_note`, `tickets_update`,
 `tickets_delete_blocked_sender` (need `ticket.manage`).
 Audit: `list_audit`, `verify_audit_chain` (live), `get_latest_audit_verification` (stored).
 
-The list above is not complete. The server has about 160 tools in the modules of
+The list above is not complete. The server has about 185 tools in the modules of
 `antragsplattform_mcp/tools/`, also for flow and form editing, protocols, delegations,
 budget structure and the admin pages. `.claude/skills/mcp/SKILL.md` maps each tool group to
 its backend route.

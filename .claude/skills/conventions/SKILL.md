@@ -72,7 +72,7 @@ The non-negotiables. Source of truth: this skill, `.github/pull_request_template
 ## Alembic migrations
 
 - New revision = **hash id** (`cd backend && alembic revision -m "..."`), NOT the old `000N` prefix and
-  **no `--rev-id`**. The `0001…0017` chain stays as-is. Only new revisions get hash ids.
+  **no `--rev-id`**. The `0001…0048` chain stays as-is. Only new revisions get hash ids.
 - `alembic heads` MUST show exactly one head. `alembic upgrade head` MUST be green. Single-head is the
   one intended merge-conflict point.
 - Revision ids MUST be ≤ 32 chars (`alembic_version varchar(32)`). A longer id passes `alembic heads`
