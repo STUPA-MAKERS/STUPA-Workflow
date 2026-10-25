@@ -103,6 +103,10 @@
 .gd__tabs {
   flex: none;
 }
+/* One pane: the pages of the tabs (`app-tab-pager`) have the room of the body above. */
+.gd__pager {
+  --tab-pager-page-top: 22px;
+}
 
 /* ------------------------------------------------------------------ body */
 .gd__body {
@@ -142,5 +146,11 @@
   }
   .gd__body {
     padding-top: var(--space-4);
+  }
+  /* The line under the tabs and the pages run over the page gutter (`.page-shell`,
+     --space-4 on a phone) to the screen edges; the tabs keep their place. */
+  .gd__pager {
+    --tab-pager-bleed: var(--space-4);
+    --tab-pager-page-top: var(--space-4);
   }
 }

@@ -45,7 +45,7 @@
           [value]="q()"
           (valueChange)="onSearch($event)"
         />
-        <div class="exp__chips" role="group" appScrollFade="x" [attr.aria-label]="'expenses.filter.group' | t">
+        <div class="exp__chips" role="group" [attr.aria-label]="'expenses.filter.group' | t">
           @if (budgetTree().length) {
             <app-cost-centre-select
               class="exp__chip"

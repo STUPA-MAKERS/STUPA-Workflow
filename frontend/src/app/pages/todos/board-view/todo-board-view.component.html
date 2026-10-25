@@ -2,55 +2,49 @@
 
 @if (phone()) {
   <div class="bv bv--phone">
-    <div #tabBar class="bv__tabBar">
-      <app-tabs
-        class="bv__tabs"
-        idPrefix="bv"
-        [ariaLabel]="board().name"
-        [tabs]="tabs()"
-        [active]="phoneCol()?.id ?? null"
-        (activeChange)="selectPhoneColumn($event)"
-      />
-      <span #ink class="bv__ink" aria-hidden="true"></span>
-    </div>
-    @if (columns().length) {
-      <!-- One page per column side by side; a swipe snaps to the next page (CSS scroll
-           snap), and the ink under the tabs moves with the scroll. -->
-      <div
-        #pager
-        class="bv__pager"
-        (scroll)="onPagerScroll()"
-        (scrollend)="onPagerRest()"
-        (pointerdown)="onPagerTouch()"
-      >
-        @for (col of columns(); track col.id) {
-          <div class="bv__page" [class.bv__page--empty]="!list(col).length">
-            <div class="bv__phoneCards" role="list" [attr.aria-label]="col.name">
-              @for (card of list(col); track card.id) {
-                <app-todo-card-tile
-                  role="listitem"
-                  appLongPress
-                  [appLongPressOff]="!canWrite()"
-                  [card]="card"
-                  [labels]="labels()"
-                  [done]="col.isDone"
-                  [today]="today()"
-                  (open)="openCard.emit(card.id)"
-                  (appLongPress)="askMenu(card)"
-                />
-              } @empty {
-                <p class="bv__empty">{{ 'todos.board.columnEmpty' | t }}</p>
-              }
-              @if (more(col) > 0) {
-                <button type="button" class="bv__more" (click)="expand(col)">
-                  {{ 'todos.board.more' | t: { n: more(col) } }}
-                </button>
-              }
-            </div>
+    <!-- One page per column behind the tabs (`app-tab-pager`); a swipe moves one column. -->
+    <app-tab-pager
+      class="bv__tabPager"
+      idPrefix="bv"
+      [ariaLabel]="board().name"
+      [tabs]="tabs()"
+      [active]="phoneCol()?.id ?? null"
+      [paged]="true"
+      [fill]="fill()"
+      (activeChange)="selectPhoneColumn($event)"
+    >
+      <ng-template appTabPage let-id>
+        @if (column(id); as col) {
+          <div
+            class="bv__phoneCards"
+            role="list"
+            [class.bv__phoneCards--empty]="!list(col).length"
+            [attr.aria-label]="col.name"
+          >
+            @for (card of list(col); track card.id) {
+              <app-todo-card-tile
+                role="listitem"
+                appLongPress
+                [appLongPressOff]="!canWrite()"
+                [card]="card"
+                [labels]="labels()"
+                [done]="col.isDone"
+                [today]="today()"
+                (open)="openCard.emit(card.id)"
+                (appLongPress)="askMenu(card)"
+              />
+            } @empty {
+              <p class="bv__empty">{{ 'todos.board.columnEmpty' | t }}</p>
+            }
+            @if (more(col) > 0) {
+              <button type="button" class="bv__more" (click)="expand(col)">
+                {{ 'todos.board.more' | t: { n: more(col) } }}
+              </button>
+            }
           </div>
         }
-      </div>
-    }
+      </ng-template>
+    </app-tab-pager>
   </div>
 } @else {
   <div class="bv" cdkDropListGroup cdkScrollable>

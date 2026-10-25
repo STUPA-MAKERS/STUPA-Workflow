@@ -70,6 +70,8 @@ import {
   SideSheetComponent,
   StatusTextComponent,
   type TabItem,
+  TabPageDirective,
+  TabPagerComponent,
   TabsComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
@@ -169,6 +171,8 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
     DialogComponent,
     IconComponent,
     SelectFieldComponent,
+    TabPageDirective,
+    TabPagerComponent,
     TabsComponent,
     CostCentreSelectComponent,
     AttachmentsPanelComponent,

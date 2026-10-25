@@ -78,18 +78,18 @@
   min-width: 0;
 }
 
-/// On a phone the chips stay in one row that scrolls sideways, without a scroll bar.
-/// `$fade-ends: false` leaves the fade of the ends to the page.
-@mixin phone-chips($fade, $fade-ends: true) {
-  #{$fade}: var(--space-6);
+/// On a phone the chips stay in one row that scrolls sideways, without a scroll bar. The
+/// row runs over the page gutter (`.page-shell`, --space-4 on a phone) to the screen
+/// edges, so a chip that scrolls away is cut at the edge of the screen, not faded.
+@mixin phone-chips {
   flex-wrap: nowrap;
+  margin-inline: calc(-1 * var(--space-4));
+  padding-inline: var(--space-4);
   overflow-x: auto;
+  scroll-padding-inline: var(--space-4);
   scrollbar-width: none;
   &::-webkit-scrollbar {
     display: none;
-  }
-  @if $fade-ends {
-    @include fade.fade-x(var(#{$fade}));
   }
 }
 

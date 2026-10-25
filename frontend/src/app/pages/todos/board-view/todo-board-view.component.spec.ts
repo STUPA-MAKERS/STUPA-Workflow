@@ -408,7 +408,7 @@ describe('TodoBoardViewComponent', () => {
 
     it('asks for the "Verschieben" sheet on a long press and does not open the card', async () => {
       const { on, container } = await setup(board(), { phone: true });
-      expect(container.querySelector('.bv__page')).not.toHaveAttribute('appScrollFade');
+      expect(container.querySelector('.tp__page')).not.toHaveAttribute('appScrollFade');
       jest.useFakeTimers();
       try {
         press('Raum buchen');
@@ -449,13 +449,13 @@ describe('TodoBoardViewComponent', () => {
         'Erledigt1',
       ]);
       expect(within(screen.getByRole('list', { name: 'Offen' })).getAllByRole('listitem')).toHaveLength(2);
-      expect(container.querySelector('.bv__ink')).not.toBeNull();
+      expect(container.querySelector('.tp__ink')).not.toBeNull();
       expect(container.querySelector('.bv__dots')).toBeNull();
       fireEvent.click(screen.getByRole('button', { name: 'Haushalt Kapitel 3' }));
       expect(on.openCard).toHaveBeenCalledWith('k-2');
       // Every column is a page of the pager; an empty one says so.
-      expect(container.querySelectorAll('.bv__page')).toHaveLength(4);
-      expect(container.querySelectorAll('.bv__page--empty')).toHaveLength(2);
+      expect(container.querySelectorAll('.tp__page')).toHaveLength(4);
+      expect(container.querySelectorAll('.bv__phoneCards--empty')).toHaveLength(2);
       expect(screen.getAllByText('Keine Karten')).toHaveLength(2);
       cmp.selectPhoneColumn('c-2');
       fixture.detectChanges();
@@ -480,161 +480,17 @@ describe('TodoBoardViewComponent', () => {
       expect(within(screen.getByRole('list', { name: 'Erledigt' })).getAllByRole('listitem')).toHaveLength(5);
     });
 
-    it('scrolls the pager to a tapped tab and follows a swipe', async () => {
+    it('pages the columns with the tab pager of the kit, a swipe sets the column', async () => {
       const { cmp, fixture, container } = await setup(board(), { phone: true });
-      const pager = container.querySelector('.bv__pager') as HTMLElement;
+      const pager = container.querySelector('.tp__pager') as HTMLElement;
       Object.defineProperty(pager, 'clientWidth', { configurable: true, value: 390 });
-      const scrollTo = jest.fn();
-      pager.scrollTo = scrollTo as unknown as typeof pager.scrollTo;
-      cmp.selectPhoneColumn('c-3');
-      expect(scrollTo).toHaveBeenCalledWith({ left: 780, behavior: 'smooth' });
-      // On the way to a tapped tab, the tabs between do not light up.
-      pager.scrollLeft = 390;
+      pager.scrollLeft = 800;
       fireEvent.scroll(pager);
       expect(cmp.phoneCol()?.id).toBe('c-3');
-      pager.scrollLeft = 780;
-      fireEvent.scroll(pager);
-      expect(cmp.phoneCol()?.id).toBe('c-3');
-      // A swipe: the tab changes at the half way and clamps to the last page.
-      pager.scrollLeft = 900;
-      fireEvent.scroll(pager);
-      expect(cmp.phoneCol()?.id).toBe('c-3');
-      pager.scrollLeft = 1000;
-      fireEvent.scroll(pager);
-      expect(cmp.phoneCol()?.id).toBe('c-4');
-      pager.scrollLeft = 5000;
-      fireEvent.scroll(pager);
-      expect(cmp.phoneCol()?.id).toBe('c-4');
       fixture.detectChanges();
-      expect(screen.getByRole('tab', { name: /Erledigt/ })).toHaveAttribute('aria-selected', 'true');
-      // A finger on the pager ends the way to a tapped tab.
-      cmp.selectPhoneColumn('c-1');
-      fireEvent.pointerDown(pager);
-      pager.scrollLeft = 400;
-      fireEvent.scroll(pager);
-      expect(cmp.phoneCol()?.id).toBe('c-2');
-      // A scroll that comes to rest ends the hold of a tapped tab, wherever it rests.
-      cmp.selectPhoneColumn('c-4');
-      pager.scrollLeft = 790;
-      pager.dispatchEvent(new Event('scrollend'));
-      expect(cmp.phoneCol()?.id).toBe('c-3');
-      // A tab whose page is already there scrolls nothing and holds nothing.
-      cmp.selectPhoneColumn('c-3');
-      pager.scrollLeft = 400;
-      fireEvent.scroll(pager);
-      expect(cmp.phoneCol()?.id).toBe('c-2');
-      // Without a laid-out pager nothing moves.
-      Object.defineProperty(pager, 'clientWidth', { configurable: true, value: 0 });
-      cmp.syncPage();
-      cmp.selectPhoneColumn('c-1');
-      expect(cmp.phoneCol()?.id).toBe('c-1');
-      expect(scrollTo).toHaveBeenCalledTimes(3);
-    });
-
-    it('jumps without animation under reduced motion and right to left', async () => {
-      const { cmp, container } = await setup(board(), { phone: true });
-      const pager = container.querySelector('.bv__pager') as HTMLElement;
-      Object.defineProperty(pager, 'clientWidth', { configurable: true, value: 300 });
-      pager.style.direction = 'rtl';
-      const scrollTo = jest.fn();
-      pager.scrollTo = scrollTo as unknown as typeof pager.scrollTo;
-      const mm = window.matchMedia;
-      window.matchMedia = ((q: string) => ({ matches: q.includes('reduce') })) as unknown as typeof window.matchMedia;
-      try {
-        cmp.selectPhoneColumn('c-2');
-      } finally {
-        window.matchMedia = mm;
-      }
-      expect(scrollTo).toHaveBeenCalledWith({ left: -300, behavior: 'auto' });
-      pager.scrollLeft = -300;
-      cmp.syncPage();
-      pager.scrollLeft = -600;
-      cmp.syncPage();
-      expect(cmp.phoneCol()?.id).toBe('c-3');
-    });
-
-    it('moves the ink between two tabs while the pager is between two pages', async () => {
-      const { container } = await setup(board(), { phone: true });
-      const bar = container.querySelector('.bv__tabBar') as HTMLElement;
-      const ink = container.querySelector('.bv__ink') as HTMLElement;
-      const pager = container.querySelector('.bv__pager') as HTMLElement;
-      const rect = (left: number, width: number) =>
-        ({ left, right: left + width, width, top: 0, bottom: 44, height: 44 }) as DOMRect;
-      bar.getBoundingClientRect = () => rect(16, 380);
-      const tabs = Array.from(container.querySelectorAll<HTMLElement>('[role="tab"]'));
-      tabs.forEach((t, i) => (t.getBoundingClientRect = () => rect(16 + i * 100, 60 + i * 20)));
-      const strip = container.querySelector('[role="tablist"]') as HTMLElement;
-      strip.getBoundingClientRect = () => rect(16, 380);
-      strip.scrollBy = jest.fn() as unknown as typeof strip.scrollBy;
-      Object.defineProperty(pager, 'clientWidth', { configurable: true, value: 400 });
-      const frame = jest.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
-        cb(0);
-        return 1;
-      });
-      try {
-        pager.scrollLeft = 200;
-        fireEvent.scroll(pager);
-        expect(ink.style.transform).toBe('translateX(50px)');
-        expect(ink.style.width).toBe('70px');
-        // Past the last page the ink stays under the last tab.
-        pager.scrollLeft = 4000;
-        fireEvent.scroll(pager);
-        expect(ink.style.transform).toBe('translateX(300px)');
-        expect(ink.style.width).toBe('120px');
-      } finally {
-        frame.mockRestore();
-      }
-    });
-
-    it('shows the active tab when the tab bar is wider than the screen', async () => {
-      const { cmp, fixture, container } = await setup(board(), { phone: true });
-      const strip = container.querySelector('[role="tablist"]') as HTMLElement;
-      const rect = (left: number, width: number) =>
-        ({ left, right: left + width, width, top: 0, bottom: 44, height: 44 }) as DOMRect;
-      strip.getBoundingClientRect = () => rect(0, 300);
-      const tabs = Array.from(container.querySelectorAll<HTMLElement>('[role="tab"]'));
-      tabs.forEach((t, i) => (t.getBoundingClientRect = () => rect(-150 + i * 160, 120)));
-      const scrollBy = jest.fn();
-      strip.scrollBy = scrollBy as unknown as typeof strip.scrollBy;
-      // c-1 starts left of the strip, c-4 ends right of it, c-2 lies inside.
-      cmp.selectPhoneColumn('c-4');
-      fixture.detectChanges();
-      await fixture.whenStable();
-      expect(scrollBy).toHaveBeenLastCalledWith({ left: 150, behavior: 'smooth' });
-      cmp.selectPhoneColumn('c-1');
-      fixture.detectChanges();
-      await fixture.whenStable();
-      expect(scrollBy).toHaveBeenLastCalledWith({ left: -150, behavior: 'smooth' });
-      scrollBy.mockClear();
-      cmp.selectPhoneColumn('c-2');
-      fixture.detectChanges();
-      await fixture.whenStable();
-      expect(scrollBy).not.toHaveBeenCalled();
-    });
-
-    it('places the ink again once the web fonts are in', async () => {
-      let loaded = (): void => undefined;
-      const ready = new Promise<void>((resolve) => (loaded = resolve));
-      Object.defineProperty(document, 'fonts', { configurable: true, value: { ready } });
-      try {
-        const { cmp } = await setup(board(), { phone: true });
-        const place = jest.spyOn(cmp, 'placeInk');
-        loaded();
-        await ready;
-        await Promise.resolve();
-        expect(place).toHaveBeenCalled();
-      } finally {
-        delete (document as { fonts?: unknown }).fonts;
-      }
-    });
-
-    it('stops a pending ink frame when it goes away', async () => {
-      const { container, fixture } = await setup(board(), { phone: true });
-      const cancel = jest.spyOn(window, 'cancelAnimationFrame');
-      fireEvent.scroll(container.querySelector('.bv__pager') as HTMLElement);
-      fixture.destroy();
-      expect(cancel).toHaveBeenCalled();
-      cancel.mockRestore();
+      expect(screen.getByRole('tab', { name: /Wartet/ })).toHaveAttribute('aria-selected', 'true');
+      expect(cmp.column('c-3')?.name).toBe('Wartet');
+      expect(cmp.column('nope')).toBeNull();
     });
 
     it('shows nothing for a board without columns', async () => {

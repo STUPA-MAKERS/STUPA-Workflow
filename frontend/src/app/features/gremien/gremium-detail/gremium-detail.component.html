@@ -62,62 +62,67 @@
       }
     </header>
 
-    <app-tabs
-      #tabBar
-      class="gd__tabs"
-      idPrefix="gd"
-      [ariaLabel]="'gremien.detail.tabs' | t"
-      [tabs]="tabs()"
-      [active]="tab()"
-      (activeChange)="selectTab($event)"
-    />
+    @if (split()) {
+      <app-tabs
+        #tabBar
+        class="gd__tabs"
+        idPrefix="gd"
+        [ariaLabel]="'gremien.detail.tabs' | t"
+        [tabs]="tabs()"
+        [active]="tab()"
+        (activeChange)="selectTab($event)"
+      />
+      <div class="gd__body" [class.gd__body--fill]="tab() === 'anwesenheit'">
+        @for (t of tabs(); track t.id) {
+          <section
+            class="gd__panel"
+            role="tabpanel"
+            [id]="tabBar.panelId(t.id)"
+            [attr.aria-labelledby]="tabBar.tabId(t.id)"
+            [hidden]="tab() !== t.id"
+          >
+            <ng-container *ngTemplateOutlet="page; context: { $implicit: t.id, g }" />
+          </section>
+        }
+      </div>
+    } @else {
+      <!-- One pane: the tabs and their pages; on a phone a swipe moves to the next tab. -->
+      <app-tab-pager
+        class="gd__tabs gd__pager"
+        idPrefix="gd"
+        [ariaLabel]="'gremien.detail.tabs' | t"
+        [tabs]="tabs()"
+        [active]="tab()"
+        [paged]="phone()"
+        (activeChange)="selectTab($event)"
+      >
+        <ng-template appTabPage let-id>
+          <section class="gd__panel">
+            <ng-container *ngTemplateOutlet="page; context: { $implicit: id, g }" />
+          </section>
+        </ng-template>
+      </app-tab-pager>
+    }
 
-    <div class="gd__body" [class.gd__body--fill]="split() && tab() === 'anwesenheit'">
-      <section
-        class="gd__panel"
-        role="tabpanel"
-        [id]="tabBar.panelId('sitzungen')"
-        [attr.aria-labelledby]="tabBar.tabId('sitzungen')"
-        [hidden]="tab() !== 'sitzungen'"
-      >
-        @if (visited().has('sitzungen')) {
-          <app-gremium-meetings [gremiumId]="g.id" (count)="meetingCount.set($event)" />
+    <!-- The content of one tab; a tab renders once it was open. -->
+    <ng-template #page let-id let-g="g">
+      @if (visited().has(id)) {
+        @switch (id) {
+          @case ('sitzungen') {
+            <app-gremium-meetings [gremiumId]="g.id" (count)="meetingCount.set($event)" />
+          }
+          @case ('mitglieder') {
+            <app-gremium-members [gremiumId]="g.id" [gremiumName]="g.name" />
+          }
+          @case ('anwesenheit') {
+            <app-gremium-attendance [gremiumId]="g.id" [gremiumName]="g.name" [fill]="split()" />
+          }
+          @case ('beschluesse') {
+            <app-gremium-decisions [gremiumId]="g.id" />
+          }
         }
-      </section>
-      <section
-        class="gd__panel"
-        role="tabpanel"
-        [id]="tabBar.panelId('mitglieder')"
-        [attr.aria-labelledby]="tabBar.tabId('mitglieder')"
-        [hidden]="tab() !== 'mitglieder'"
-      >
-        @if (visited().has('mitglieder')) {
-          <app-gremium-members [gremiumId]="g.id" [gremiumName]="g.name" />
-        }
-      </section>
-      <section
-        class="gd__panel"
-        role="tabpanel"
-        [id]="tabBar.panelId('anwesenheit')"
-        [attr.aria-labelledby]="tabBar.tabId('anwesenheit')"
-        [hidden]="tab() !== 'anwesenheit'"
-      >
-        @if (visited().has('anwesenheit')) {
-          <app-gremium-attendance [gremiumId]="g.id" [gremiumName]="g.name" [fill]="split()" />
-        }
-      </section>
-      <section
-        class="gd__panel"
-        role="tabpanel"
-        [id]="tabBar.panelId('beschluesse')"
-        [attr.aria-labelledby]="tabBar.tabId('beschluesse')"
-        [hidden]="tab() !== 'beschluesse'"
-      >
-        @if (visited().has('beschluesse')) {
-          <app-gremium-decisions [gremiumId]="g.id" />
-        }
-      </section>
-    </div>
+      }
+    </ng-template>
   </article>
 
   @if (canPlan()) {
