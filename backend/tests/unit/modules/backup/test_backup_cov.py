@@ -133,7 +133,7 @@ async def test_pg_dump_writes_the_custom_format_to_the_target(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     run = _Recorder()
-    await _service_with_run(monkeypatch, run)._pg_dump("/tmp/x.dump")  # noqa: SLF001, S108
+    await _service_with_run(monkeypatch, run)._pg_dump("/tmp/x.dump")
     [(argv, what, tolerate)] = run.calls
     assert argv[0] == "pg_dump"
     assert "--format=custom" in argv
@@ -148,10 +148,10 @@ async def test_pg_restore_disconnects_the_others_first_and_tolerates_warnings(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     run = _Recorder()
-    await _service_with_run(monkeypatch, run)._pg_restore("/tmp/x.dump")  # noqa: SLF001, S108
+    await _service_with_run(monkeypatch, run)._pg_restore("/tmp/x.dump")
     assert [what for _, what, _ in run.calls] == ["psql (disconnect)", "pg_restore"]
     assert all(tolerate for _, _, tolerate in run.calls)
-    assert run.calls[1][0][-1] == "/tmp/x.dump"  # noqa: S108
+    assert run.calls[1][0][-1] == "/tmp/x.dump"
 
 
 async def test_a_failed_disconnect_does_not_stop_the_restore(
@@ -159,13 +159,13 @@ async def test_a_failed_disconnect_does_not_stop_the_restore(
 ) -> None:
     run = _Recorder(error=BackupError("psql is not installed in this image"))
     service = _service_with_run(monkeypatch, run)
-    await service._disconnect_everyone_else()  # noqa: SLF001  # must not raise
+    await service._disconnect_everyone_else()  # must not raise
     assert len(run.calls) == 1
 
 
 async def test_a_clean_exit_passes_without_a_warning() -> None:
     service = BackupService(object(), _settings())  # type: ignore[arg-type]
-    await service._run(["true"], what="pg_dump")  # noqa: SLF001
+    await service._run(["true"], what="pg_dump")
 
 
 # ------------------------------------------------------------------------- restore
@@ -190,7 +190,7 @@ async def test_apply_archive_restores_the_dump_and_mirrors_the_objects(
     service = BackupService(
         object(),  # type: ignore[arg-type]  # the restore path needs no session
         _settings(backup_age_identity_file=str(key_file)),
-        attachments=attachments,  # type: ignore[arg-type]
+        attachments=attachments,
     )
     restored: list[bytes] = []
 

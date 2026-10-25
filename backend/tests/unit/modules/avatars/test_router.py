@@ -113,7 +113,7 @@ def test_response_leaks_neither_the_email_nor_its_hash() -> None:
     resp = _client(db).get(_id_url())
     blob = (str(dict(resp.headers)) + resp.content.decode("latin-1")).lower()
     assert DIGEST not in blob
-    assert hashlib.md5(EMAIL.lower().encode()).hexdigest() not in blob  # noqa: S324
+    assert hashlib.md5(EMAIL.lower().encode()).hexdigest() not in blob
     assert EMAIL.lower() not in blob
 
 

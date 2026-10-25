@@ -91,7 +91,7 @@ def _flow_dispatcher(ctx: dict[str, Any]) -> ActionDispatcher:
     """
     dispatcher = ctx.get("flow_dispatcher")
     if dispatcher is not None:
-        return dispatcher  # type: ignore[no-any-return]
+        return dispatcher
     return build_worker_dispatcher(
         ctx.get("redis"), _sessionmaker(ctx), ctx.get("settings")
     )
@@ -144,7 +144,7 @@ async def _process_poll_reminders(ctx: dict[str, Any], now: datetime) -> int:
     """Run the poll reminder; a failure costs only this step."""
     try:
         return await process_poll_reminders(ctx, now)
-    except Exception:  # noqa: BLE001 - the other steps of the cycle must still count
+    except Exception:  # the other steps of the cycle must still count
         logger.exception("poll reminders failed")
         return 0
 
@@ -153,7 +153,7 @@ async def _process_todo_due(ctx: dict[str, Any], now: datetime) -> int:
     """Run the to-do due reminder; a failure costs only this step."""
     try:
         return await process_todo_due(ctx, now)
-    except Exception:  # noqa: BLE001 - the other steps of the cycle must still count
+    except Exception:  # the other steps of the cycle must still count
         logger.exception("todo_due reminders failed")
         return 0
 
@@ -289,7 +289,7 @@ async def _process_auto_transitions(ctx: dict[str, Any]) -> int:
                     advanced += 1
         except (ConflictError, NotFoundError) as exc:
             logger.info("auto-transition skipped (app=%s): %s", application_id, exc)
-        except Exception:  # noqa: BLE001 - one broken application must not abort the cycle
+        except Exception:  # one broken application must not abort the cycle
             logger.exception("auto-transition failed (app=%s)", application_id)
     return advanced
 
@@ -345,7 +345,7 @@ async def _process_votes(ctx: dict[str, Any], now: datetime) -> int:
         try:
             if await _close_one(ctx, vote_id, now):
                 closed += 1
-        except Exception:  # noqa: BLE001 - one broken vote must not abort the cycle
+        except Exception:  # one broken vote must not abort the cycle
             logger.exception("vote auto-close failed (vote=%s)", vote_id)
     return closed
 
@@ -387,5 +387,5 @@ async def _broadcast_vote_closed(ctx: dict[str, Any], closed: VoteClosed) -> Non
         return
     try:
         await BrokerPublisher(RedisBroker(redis)).vote_closed(closed)
-    except Exception as exc:  # noqa: BLE001 - broadcast is not close-critical
+    except Exception as exc:  # broadcast is not close-critical
         logger.warning("vote_closed broadcast failed (vote=%s): %s", closed.id, exc)

@@ -124,7 +124,7 @@ class SearchService:
         for name, run in sources.items():
             try:
                 found = await run(query, principal, lang)
-            except Exception:  # noqa: BLE001 - one broken source must not empty the palette
+            except Exception:  # one broken source must not empty the palette
                 log.exception("search source %s failed", name)
                 failed.append(name)
                 continue

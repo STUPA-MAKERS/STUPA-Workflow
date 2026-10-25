@@ -1180,7 +1180,7 @@ def _principal(**over: Any) -> SimpleNamespace:
     # Mirror `Principal.has`: the admin role holds every right. The fake used to check
     # only the explicit set, so a principal with `roles=["admin"]` behaved here unlike
     # the real one and a test could pass against behaviour production never had.
-    ns.has = lambda p, _perms=perms, _roles=roles: "admin" in _roles or p in _perms  # type: ignore[attr-defined]
+    ns.has = lambda p, _perms=perms, _roles=roles: "admin" in _roles or p in _perms
     return ns
 
 

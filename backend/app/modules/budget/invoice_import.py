@@ -117,7 +117,7 @@ def _extract_cii_xml(data: bytes) -> str:
         raise NotZugferdError(f"embedded invoice XML too large ({declared} bytes)")
     try:
         payload = chosen.content  # decompresses ONLY this attachment
-    except Exception as exc:  # noqa: BLE001 — LimitReachedError etc. -> not importable
+    except Exception as exc:  # LimitReachedError etc. -> not importable
         raise NotZugferdError(f"unreadable embedded XML: {exc}") from exc
     if len(payload) > _MAX_EMBEDDED_XML_BYTES:
         raise NotZugferdError("embedded invoice XML too large")

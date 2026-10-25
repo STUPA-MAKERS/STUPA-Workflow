@@ -365,19 +365,19 @@ async def test_the_pump_checks_again_after_the_recheck_age(
     )
     await conn._subscribe({"type": "subscribe", "boardIds": [str(B1), str(B2)]})
     clock.now += RECHECK_SECONDS - 1
-    await conn._pump(_pings(_ping(B2)))  # type: ignore[arg-type]
+    await conn._pump(_pings(_ping(B2)))
     assert calls == [1000.0] and ws.sent[-1] == _ping(B2)
     # The right to B2 is gone; after the recheck age the next ping checks again.
     access.allowed = {B1}
     clock.now += 2
-    await conn._pump(_pings(_ping(B2), _ping(B1)))  # type: ignore[arg-type]
+    await conn._pump(_pings(_ping(B2), _ping(B1)))
     assert calls == [1000.0, clock.now]
     assert conn.board_ids == {str(B1)}
     assert ws.sent[-2:] == [_ping(B2), _ping(B1)]
     assert session.rolled_back == 2  # type: ignore[attr-defined]
     # A ping of a board that is not subscribed never triggers a check.
     clock.now += RECHECK_SECONDS * 2
-    await conn._pump(_pings(_ping(B2)))  # type: ignore[arg-type]
+    await conn._pump(_pings(_ping(B2)))
     assert len(calls) == 2 and ws.closed == []
 
 
@@ -400,7 +400,7 @@ async def test_the_pump_closes_4401_when_the_session_is_gone(access: type[_Acces
     await conn._subscribe({"type": "subscribe", "boardIds": [str(B1)]})
     current[0] = None
     clock.now += RECHECK_SECONDS
-    await conn._pump(_pings(_ping(B1), _ping(B1)))  # type: ignore[arg-type]
+    await conn._pump(_pings(_ping(B1), _ping(B1)))
     assert ws.closed == [4401] and conn.board_ids == frozenset()
     assert ws.sent == [{"type": "subscribed", "boardIds": [str(B1)]}]
 
@@ -547,8 +547,8 @@ def test_the_default_broker_is_the_app_broker() -> None:
     broker = InMemoryBroker()
 
     class _Socket:
-        class app:  # noqa: N801
-            class state:  # noqa: N801
+        class app:
+            class state:
                 pass
 
     _Socket.app.state.broker = broker  # type: ignore[attr-defined]

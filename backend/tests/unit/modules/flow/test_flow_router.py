@@ -33,12 +33,12 @@ class _FakeService:
         # The `allow_unconfirmed` value of each call. Every route passes False (F15).
         self.allow_unconfirmed: list[bool] = []
 
-    async def available_transitions(  # noqa: ANN201
+    async def available_transitions(
         self,
-        application_id,  # noqa: ANN001
-        principal,  # noqa: ANN001
+        application_id,
+        principal,
         *,
-        allow_unconfirmed=True,  # noqa: ANN001
+        allow_unconfirmed=True,
     ):
         self.allow_unconfirmed.append(allow_unconfirmed)
         return [
@@ -50,17 +50,17 @@ class _FakeService:
             )
         ]
 
-    async def fire(  # noqa: ANN201
+    async def fire(
         self,
-        application_id,  # noqa: ANN001
-        transition_id,  # noqa: ANN001
-        principal,  # noqa: ANN001
+        application_id,
+        transition_id,
+        principal,
         *,
-        note=None,  # noqa: ANN001
-        meeting_id=None,  # noqa: ANN001
-        non_public=False,  # noqa: ANN001
-        allow_unconfirmed=True,  # noqa: ANN001
-        decision=None,  # noqa: ANN001
+        note=None,
+        meeting_id=None,
+        non_public=False,
+        allow_unconfirmed=True,
+        decision=None,
     ):
         self.allow_unconfirmed.append(allow_unconfirmed)
         self.fired = {
@@ -76,11 +76,11 @@ class _FakeService:
             newStateId=uuid4(), statusEventId=uuid4(), dispatchedActions=["notify"]
         )
 
-    async def available_applicant_transitions(  # noqa: ANN201
+    async def available_applicant_transitions(
         self,
-        application_id,  # noqa: ANN001
+        application_id,
         *,
-        allow_unconfirmed=True,  # noqa: ANN001
+        allow_unconfirmed=True,
     ):
         self.allow_unconfirmed.append(allow_unconfirmed)
         return [
@@ -89,13 +89,13 @@ class _FakeService:
             )
         ]
 
-    async def fire_as_applicant(  # noqa: ANN201
+    async def fire_as_applicant(
         self,
-        application_id,  # noqa: ANN001
-        transition_id,  # noqa: ANN001
+        application_id,
+        transition_id,
         *,
-        note=None,  # noqa: ANN001
-        allow_unconfirmed=True,  # noqa: ANN001
+        note=None,
+        allow_unconfirmed=True,
     ):
         self.allow_unconfirmed.append(allow_unconfirmed)
         self.fired = {
@@ -108,18 +108,18 @@ class _FakeService:
         )
 
 
-    async def list_states(self, application_id, *, allow_unconfirmed=True):  # noqa: ANN001, ANN201
+    async def list_states(self, application_id, *, allow_unconfirmed=True):
         self.allow_unconfirmed.append(allow_unconfirmed)
         return []
 
-    async def force_status(  # noqa: ANN201
+    async def force_status(
         self,
-        application_id,  # noqa: ANN001
-        target_state_id,  # noqa: ANN001
-        principal,  # noqa: ANN001
+        application_id,
+        target_state_id,
+        principal,
         *,
-        note,  # noqa: ANN001
-        allow_unconfirmed=True,  # noqa: ANN001
+        note,
+        allow_unconfirmed=True,
     ):
         self.allow_unconfirmed.append(allow_unconfirmed)
         return TransitionResult(
@@ -142,7 +142,7 @@ class _ReadGate:
         self.checked: list[object] = []
         self.deny = False
 
-    async def __call__(self, _db, application_id, principal, applicant):  # noqa: ANN001, ANN204
+    async def __call__(self, _db, application_id, principal, applicant):
         assert principal is not None
         assert applicant is None
         self.checked.append(application_id)

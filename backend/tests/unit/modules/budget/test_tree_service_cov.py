@@ -171,7 +171,7 @@ def fake_session(*results: _R, gets: list[Any] | None = None) -> Any:
     return _Session(list(results), list(gets or []))
 
 
-def _budget(  # noqa: ANN001
+def _budget(
     *, id=None, parent_id=None, path_key="VS", gremium_id=None, key="VS", name="N",
     currency="EUR", fiscal_start_month=1, fiscal_start_day=1,
     view_gremium_id=None, accepted=None, denied=None,
@@ -188,7 +188,7 @@ def _budget(  # noqa: ANN001
     return b
 
 
-def _fy(*, id=None, budget_id=None, year=2026, active=True):  # noqa: ANN001
+def _fy(*, id=None, budget_id=None, year=2026, active=True):
     f = FiscalYear(
         budget_id=budget_id, year=year,
         start_date=date(year, 1, 1), end_date=date(year, 12, 31), active=active,
@@ -197,13 +197,13 @@ def _fy(*, id=None, budget_id=None, year=2026, active=True):  # noqa: ANN001
     return f
 
 
-def _alloc(*, budget_id, fy_id, allocated):  # noqa: ANN001
+def _alloc(*, budget_id, fy_id, allocated):
     a = BudgetAllocation(budget_id=budget_id, fiscal_year_id=fy_id, allocated=Decimal(allocated))
     a.id = uuid.uuid4()
     return a
 
 
-def _app(*, id=None, budget_id=None, fiscal_year_id=None, amount=None, data=None):  # noqa: ANN001
+def _app(*, id=None, budget_id=None, fiscal_year_id=None, amount=None, data=None):
     a = Application(
         type_id=uuid.uuid4(), form_version_id=uuid.uuid4(), flow_version_id=uuid.uuid4(),
         budget_id=budget_id, fiscal_year_id=fiscal_year_id, amount=amount,
@@ -213,7 +213,7 @@ def _app(*, id=None, budget_id=None, fiscal_year_id=None, amount=None, data=None
     return a
 
 
-def _expense(  # noqa: ANN001
+def _expense(
     *, id=None, budget_id=None, fy_id=None, kind="expense", amount="10.00",
     application_id=None, invoice_id=None, transfer_id=None,
     actor=None, currency="EUR",
@@ -230,7 +230,7 @@ def _expense(  # noqa: ANN001
     return e
 
 
-def _invoice(*, id=None, number="R-1", gross="119.00", file_key=None,  # noqa: ANN001
+def _invoice(*, id=None, number="R-1", gross="119.00", file_key=None,
              file_name=None, file_mime=None):
     inv = Invoice(number=number, gross_amount=Decimal(gross), currency="EUR", status="open")
     inv.id = id or uuid.uuid4()
@@ -1563,7 +1563,7 @@ async def test_revert_node_create_delegates_to_delete_node() -> None:
     node = _budget(id=uuid.uuid4())
     svc = BudgetTreeService(fake_session(gets=[node]), actor="admin")
     stub = _AsyncStub()
-    svc.delete_node = stub  # type: ignore[method-assign]
+    svc.delete_node = stub
     await svc.revert_audit(_entry(AuditAction.BUDGET_NODE_CREATE, node.id), "admin")
     assert stub.calls and stub.calls[0][0][0] == node.id
 
@@ -1953,7 +1953,7 @@ async def test_delete_fiscal_year_with_applications_409() -> None:
 # --------------------------------------------------------------------------
 
 
-def _transfer_pair(*, transfer_id=None, src=None, dst=None, fy=None, actor=None):  # noqa: ANN001
+def _transfer_pair(*, transfer_id=None, src=None, dst=None, fy=None, actor=None):
     tid = transfer_id or uuid.uuid4()
     out = _expense(
         budget_id=src or uuid.uuid4(), fy_id=fy or uuid.uuid4(), kind="expense",
@@ -2190,7 +2190,7 @@ async def test_list_invoices_paged_without_rows_runs_no_booking_query() -> None:
     sess = fake_session(result(), counts(), result(0), result())
     page = await BudgetTreeService(sess).list_invoices_paged(visible_gremium_ids={uuid.uuid4()})
     assert page.items == []
-    assert sess._results == []  # noqa: SLF001 - nothing extra was read
+    assert sess._results == []  # nothing extra was read
 
 
 async def test_get_invoice_scoped_to_member_subtrees() -> None:
@@ -2210,7 +2210,7 @@ async def test_get_invoice_scope_without_member_gremien_hides_all_bookings() -> 
     sess = fake_session(result(("never-read",)), gets=[inv])
     out = await BudgetTreeService(sess).get_invoice(inv.id, visible_gremium_ids=set())
     assert out.linked_bookings == []
-    assert len(sess._results) == 1  # noqa: SLF001 - no query ran
+    assert len(sess._results) == 1  # no query ran
 
 
 async def test_get_invoice_scope_without_view_nodes_hides_all_bookings() -> None:
@@ -2220,7 +2220,7 @@ async def test_get_invoice_scope_without_view_nodes_hides_all_bookings() -> None
         inv.id, visible_gremium_ids={uuid.uuid4()}
     )
     assert out.linked_bookings == []
-    assert len(sess._results) == 1  # noqa: SLF001 - the booking query did not run
+    assert len(sess._results) == 1  # the booking query did not run
 
 
 async def test_visible_budget_ids_opens_the_subtrees() -> None:

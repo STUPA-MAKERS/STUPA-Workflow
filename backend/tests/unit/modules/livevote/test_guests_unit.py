@@ -506,7 +506,7 @@ async def test_cast_rules(monkeypatch: pytest.MonkeyPatch) -> None:
             uuid4(),
             "yes",
             voting=voting,  # type: ignore[arg-type]
-            now=NOW,  # type: ignore[arg-type]
+            now=NOW,
         )
     assert not_admitted.value.code == "guest_not_admitted"
     admitted = guest(status="admitted")
@@ -517,7 +517,7 @@ async def test_cast_rules(monkeypatch: pytest.MonkeyPatch) -> None:
             uuid4(),
             "yes",
             voting=voting,  # type: ignore[arg-type]
-            now=NOW,  # type: ignore[arg-type]
+            now=NOW,
         )
     assert watch.value.code == "guests_watch_only"
     vote = SimpleNamespace(id=uuid4(), meeting_id=MID, agenda_item_id=uuid4())
@@ -536,8 +536,8 @@ async def test_cast_rules(monkeypatch: pytest.MonkeyPatch) -> None:
                 vote.id,
                 "yes",
                 voting=voting,  # type: ignore[arg-type]
-                now=NOW,  # type: ignore[arg-type]
-            )  # type: ignore[arg-type]
+                now=NOW,
+            )
     for recorder in (Recorder(), Recorder(fail=True), None):
         session = db(result(admitted), result(meeting()), scalars=[False])
         session.get_results = [vote]
@@ -547,7 +547,7 @@ async def test_cast_rules(monkeypatch: pytest.MonkeyPatch) -> None:
             vote.id,
             "yes",
             voting=voting,  # type: ignore[arg-type]
-            now=NOW,  # type: ignore[arg-type]
+            now=NOW,
         )
         assert out.status == "cast"
     assert len(voting.casts) == 3

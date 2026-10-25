@@ -49,7 +49,7 @@ async def engine_async(migrated: tuple[str, str], engine: Engine) -> AsyncIterat
 
 
 @pytest.fixture
-def maker(engine_async: Any) -> async_sessionmaker[AsyncSession]:  # noqa: ANN401
+def maker(engine_async: Any) -> async_sessionmaker[AsyncSession]:
     return async_sessionmaker(engine_async, expire_on_commit=False)
 
 
@@ -233,7 +233,7 @@ async def test_comment_of_an_unknown_author_shows_no_sub(
 
 
 async def test_timeline_reads_the_principal_names_in_one_query(
-    engine_async: Any,  # noqa: ANN401
+    engine_async: Any,
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
     seed, app_id, _, _ = await _world(maker)

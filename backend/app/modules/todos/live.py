@@ -97,5 +97,5 @@ async def publish_pings(broker: PatternBroker, messages: Sequence[dict[str, obje
         board_id = uuid.UUID(str(message["boardId"]))
         try:
             await broker.publish(board_channel(board_id), message)
-        except Exception:  # noqa: BLE001 — a lost ping is covered by the poll of the page
+        except Exception:  # a lost ping is covered by the poll of the page
             logger.warning("to-do ping for board %s failed", board_id, exc_info=True)

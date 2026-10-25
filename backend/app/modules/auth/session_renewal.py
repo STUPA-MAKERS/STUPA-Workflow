@@ -108,7 +108,7 @@ async def renew_principal_session(
     Returns:
         `True` when the session stays valid, `False` when the function ended it.
     """
-    global _idp_retry_after  # noqa: PLW0603 - one backoff per process
+    global _idp_retry_after  # one backoff per process
     if not _due(session, now, settings):
         return True
     if _monotonic() < _idp_retry_after and _within_grace(session, now, settings):

@@ -126,7 +126,7 @@ async def test_get_stream_closes_and_releases_connection() -> None:
         captured["resp"] = resp
         return resp
 
-    client.get_object = _spy  # type: ignore[method-assign]
+    client.get_object = _spy
     stream = await _storage(client).get_stream("k1", chunk_size=3)
     _ = [c async for c in stream]
     assert captured["resp"].closed is True

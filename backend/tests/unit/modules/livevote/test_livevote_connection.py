@@ -243,7 +243,7 @@ async def test_receive_drops_rate_limited_frames() -> None:
     async def _noop_handle(raw: dict[str, object]) -> None:
         handled.append(raw)
 
-    conn._handle_message = _noop_handle  # type: ignore[assignment]
+    conn._handle_message = _noop_handle
     with pytest.raises(asyncio.CancelledError):
         await conn._receive()
     # The burst of 10 frames passes. The connection drops the rest as rate_limited.
@@ -306,12 +306,12 @@ async def test_run_dead_pump_tears_down_connection() -> None:
 
 
 class _StateMeetings:
-    async def get(self, _meeting_id: UUID, _principal: object = None) -> Any:  # noqa: ANN001, F821
+    async def get(self, _meeting_id: UUID, _principal: object = None) -> Any:
         return SimpleNamespace(
             active_application_id=None, current_agenda_item_id=None, status="live"
         )
 
-    async def open_vote(self, _meeting_id: UUID) -> object:  # noqa: F821
+    async def open_vote(self, _meeting_id: UUID) -> object:
         return None
 
 
@@ -373,7 +373,7 @@ async def test_cast_allows_vote_from_own_meeting() -> None:
     async def _stub_tally(vote: object) -> None:
         published.append(vote)
 
-    conn.publisher.vote_tally = _stub_tally  # type: ignore[method-assign]
+    conn.publisher.vote_tally = _stub_tally
     await conn._handle_cast(
         {"type": "cast", "voteId": str(uuid4()), "choice": "yes"}
     )
@@ -389,7 +389,7 @@ class _OpenVoteMeetings(_StateMeetings):
     def __init__(self, vote_id: UUID) -> None:
         self._vote_id = vote_id
 
-    async def open_vote(self, _meeting_id: UUID) -> object:  # noqa: F821
+    async def open_vote(self, _meeting_id: UUID) -> object:
         return SimpleNamespace(id=self._vote_id)
 
 
@@ -548,7 +548,7 @@ async def test_cast_ends_the_transaction_after_the_tally_read() -> None:
         assert session.in_tx is False
         published.append(vote)
 
-    conn.publisher.vote_tally = _tally  # type: ignore[method-assign]
+    conn.publisher.vote_tally = _tally
     await conn._handle_cast({"type": "cast", "voteId": str(uuid4()), "choice": "yes"})
     assert voting.casts == 1
     assert len(published) == 1

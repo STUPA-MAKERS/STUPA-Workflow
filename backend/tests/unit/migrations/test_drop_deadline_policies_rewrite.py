@@ -66,7 +66,7 @@ ROLE = {"roleIs": "admin"}
         ({"and": {"deadlinePassed": True}}, None),
     ],
 )
-def test_rewrite_guard(guard: dict[str, Any], expected: Any) -> None:  # noqa: ANN401
+def test_rewrite_guard(guard: dict[str, Any], expected: Any) -> None:
     new_guard, touched = MIG.rewrite_guard(guard)
     assert new_guard == expected
     assert touched is True
@@ -77,7 +77,7 @@ def test_rewrite_guard(guard: dict[str, Any], expected: Any) -> None:  # noqa: A
     "guard",
     [None, {}, FIELD, {"and": [FIELD, {"not": ROLE}]}, {"hasField": "deadlinePassed"}],
 )
-def test_guard_without_operator_is_unchanged(guard: Any) -> None:  # noqa: ANN401
+def test_guard_without_operator_is_unchanged(guard: Any) -> None:
     assert MIG.rewrite_guard(guard) == (guard, False)
 
 
@@ -99,7 +99,7 @@ class _Conn:
         self.rows = rows
         self.updates: list[dict[str, Any]] = []
 
-    def execute(self, _stmt: Any, params: dict[str, Any]) -> Any:  # noqa: ANN401
+    def execute(self, _stmt: Any, params: dict[str, Any]) -> Any:
         if "op" in params:
             return type("R", (), {"fetchall": lambda _self: self.rows})()
         self.updates.append(params)
@@ -110,7 +110,7 @@ def test_rewrite_transitions_skips_a_guard_that_only_names_the_operator() -> Non
     # The SELECT matches by text, so a field called `deadlinePassed` comes back too.
     # Its transition keeps its guard and its `automatic` flag.
     conn = _Conn([("t1", {"hasField": "deadlinePassed"}), ("t2", {"deadlinePassed": True})])
-    MIG._rewrite_transitions(conn)  # noqa: SLF001
+    MIG._rewrite_transitions(conn)
     assert conn.updates == [{"g": None, "id": "t2"}]
 
 

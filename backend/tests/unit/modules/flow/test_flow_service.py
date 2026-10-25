@@ -804,7 +804,7 @@ async def _check(
 ) -> None:
     db = fake_session(result(to_state) if to_state is not None else result())
     db.get_results = [meeting]
-    await FlowService(db)._check_agenda_meeting(  # noqa: SLF001
+    await FlowService(db)._check_agenda_meeting(
         transition, uuid4(), _principal()  # pyright: ignore[reportArgumentType]
     )
 
@@ -883,14 +883,14 @@ async def test_add_to_agenda_in_tx(
     app_id, meeting_id = uuid4(), uuid4()
     svc = FlowService(db)
     if error is None:
-        await svc._add_to_agenda_in_tx(  # noqa: SLF001
+        await svc._add_to_agenda_in_tx(
             app_id, meeting_id, non_public=False, actor="mgr"
         )
         assert added == [(meeting_id, app_id, False, "mgr")]
         assert db.rolled_back == 0
     else:
         with pytest.raises(ValidationProblem):
-            await svc._add_to_agenda_in_tx(  # noqa: SLF001
+            await svc._add_to_agenda_in_tx(
                 app_id, meeting_id, non_public=False, actor="mgr"
             )
         assert db.rolled_back == 1

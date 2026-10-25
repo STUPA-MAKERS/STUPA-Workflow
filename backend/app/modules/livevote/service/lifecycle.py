@@ -503,7 +503,7 @@ class LifecycleOps(HandoverOps):
         for event in events:
             try:
                 await self.publisher.vote_cancelled(event)
-            except Exception:  # noqa: BLE001 - the broadcast is best effort
+            except Exception:  # the broadcast is best effort
                 logger.warning("vote_cancelled broadcast failed (vote=%s)", event.id)
 
     async def broadcast_state(self, meeting_id: UUID, principal: Principal) -> None:

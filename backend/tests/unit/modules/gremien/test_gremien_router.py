@@ -215,5 +215,5 @@ def test_decisions_rejects_bad_filters(calls: _Calls, query: str) -> None:
 
 def test_service_dependency_uses_the_local_timezone() -> None:
     db = fake_session()
-    service = gremien_router._service(db, SETTINGS)  # pyright: ignore[reportPrivateUsage]
+    service = gremien_router._service(db, SETTINGS)
     assert isinstance(service, GremienService)

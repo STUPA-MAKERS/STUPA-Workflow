@@ -140,7 +140,7 @@ async def meeting_delegation_mail_info(
                 .where(MeetingDelegation.id == delegation_id)
             )
         ).first()
-    except Exception:  # noqa: BLE001 — mail info is best effort
+    except Exception:  # mail info is best effort
         logger.exception("delegation mail info failed (delegation=%s)", delegation_id)
         return None
     if row is None:
@@ -166,7 +166,7 @@ class AutoMailer:
     ) -> None:
         try:
             await self._meeting_created(settings, meeting_id, pool)
-        except Exception:  # noqa: BLE001 — mail must never break the request
+        except Exception:  # mail must never break the request
             logger.exception("meeting mail failed (meeting=%s)", meeting_id)
 
     async def delegation_changed(
@@ -179,7 +179,7 @@ class AutoMailer:
     ) -> None:
         try:
             await self._delegation_changed(settings, info, granted=granted, pool=pool)
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.exception("delegation mail failed")
 
     async def _meeting_created(

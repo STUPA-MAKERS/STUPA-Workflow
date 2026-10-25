@@ -330,7 +330,7 @@ async def test_two_cards_on_two_boards_link_each_other_at_once(
         # The link a1 -> b1 holds a1 the way ``add_link`` does. The link b1 -> a1
         # must not wait for it: its foreign key check needs only KEY SHARE on a1.
         service = TodoService(holder)
-        await service._card(a1, lead, lock=True)  # pyright: ignore[reportPrivateUsage]
+        await service._card(a1, lead, lock=True)
         linked = await asyncio.wait_for(asyncio.create_task(link_b_to_a()), 5)
         assert linked == 1
         assert len((await service.add_link(a1, "todo", b1, lead)).links) == 1

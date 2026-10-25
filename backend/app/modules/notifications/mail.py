@@ -97,7 +97,7 @@ class MailMessage:
             from_addr=payload.get("from_addr"),  # type: ignore[arg-type]
             from_name=payload.get("from_name"),  # type: ignore[arg-type]
             attachments=tuple(
-                MailAttachment.from_payload(a)  # type: ignore[arg-type]
+                MailAttachment.from_payload(a)
                 for a in raw_attachments  # type: ignore[union-attr]
             ),
         )

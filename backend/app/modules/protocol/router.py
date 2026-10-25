@@ -93,7 +93,7 @@ async def schedule_public_backfill(
     if pool is not None:
         try:
             await enqueue_public_backfill(pool, gremium_id)
-        except Exception:  # noqa: BLE001 - the gremium save already succeeded
+        except Exception:  # the gremium save already succeeded
             # The hourly heal job builds the missing versions later.
             logger.exception("public backfill enqueue failed (gremium=%s)", gremium_id)
         return
@@ -103,7 +103,7 @@ async def schedule_public_backfill(
     )
     try:
         await service.backfill_public(gremium_id)
-    except Exception:  # noqa: BLE001 - the gremium save already succeeded
+    except Exception:  # the gremium save already succeeded
         logger.exception("inline public backfill failed (gremium=%s)", gremium_id)
 
 

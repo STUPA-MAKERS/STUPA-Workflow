@@ -93,7 +93,7 @@ class MinioStorage:
 
         try:
             await asyncio.to_thread(_put)
-        except Exception as exc:  # noqa: BLE001 - map to a uniform StorageError
+        except Exception as exc:  # map to a uniform StorageError
             raise StorageError(f"put failed: {type(exc).__name__}") from exc
 
     async def get(self, key: str) -> bytes:
@@ -107,7 +107,7 @@ class MinioStorage:
 
         try:
             return await asyncio.to_thread(_get)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise StorageError(f"get failed: {type(exc).__name__}") from exc
 
     async def get_stream(
@@ -125,7 +125,7 @@ class MinioStorage:
             response = await asyncio.to_thread(
                 self.client.get_object, self.bucket, key
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise StorageError(f"get_stream failed: {type(exc).__name__}") from exc
 
         async def _iter() -> AsyncIterator[bytes]:
@@ -144,7 +144,7 @@ class MinioStorage:
     async def remove(self, key: str) -> None:
         try:
             await asyncio.to_thread(self.client.remove_object, self.bucket, key)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise StorageError(f"remove failed: {type(exc).__name__}") from exc
 
     async def list_keys(self) -> list[str]:
@@ -167,7 +167,7 @@ class MinioStorage:
 
         try:
             return await asyncio.to_thread(_list)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise StorageError(f"list failed: {type(exc).__name__}") from exc
 
     async def put_file(self, key: str, path: str, content_type: str) -> None:
@@ -179,14 +179,14 @@ class MinioStorage:
 
         try:
             await asyncio.to_thread(_put)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise StorageError(f"put_file failed: {type(exc).__name__}") from exc
 
     async def get_file(self, key: str, path: str) -> None:
         """Download straight to a file on disk, the read counterpart of `put_file`."""
         try:
             await asyncio.to_thread(self.client.fget_object, self.bucket, key, path)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise StorageError(f"get_file failed: {type(exc).__name__}") from exc
 
 

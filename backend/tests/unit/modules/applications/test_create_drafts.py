@@ -40,10 +40,10 @@ def _fake_drafts(monkeypatch: pytest.MonkeyPatch) -> type[_DraftCalls]:
     _DraftCalls.checked = []
     _DraftCalls.bound = []
 
-    async def _check(_session: Any, **kw: Any) -> None:  # noqa: ANN401
+    async def _check(_session: Any, **kw: Any) -> None:
         _DraftCalls.checked.append(kw)
 
-    async def _bind(_session: Any, **kw: Any) -> None:  # noqa: ANN401
+    async def _bind(_session: Any, **kw: Any) -> None:
         _DraftCalls.bound.append(kw)
 
     monkeypatch.setattr(create_mod, "check_drafts", _check)

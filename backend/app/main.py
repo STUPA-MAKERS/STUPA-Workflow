@@ -143,7 +143,7 @@ async def _bootstrap_admins_on_startup(settings: Settings) -> None:  # pragma: n
         async with sessionmaker() as db:
             await ensure_bootstrap_admins(db, settings)
             await db.commit()
-    except Exception:  # noqa: BLE001 — startup must never fail on bootstrap
+    except Exception:  # startup must never fail on bootstrap
         logging.getLogger("app.auth.bootstrap").warning(
             "bootstrap admin startup sweep skipped (db unavailable?)", exc_info=True
         )

@@ -97,9 +97,9 @@ def _link(token: str, settings: Settings, **kw: object) -> MagicLink:
     row = MagicLink(
         application_id="aid-1",
         token_hash=tokens.hash_token(token, settings.magic_link_secret),
-        scope=kw.get("scope", "edit"),  # type: ignore[arg-type]
-        expires_at=kw.get("expires_at", NOW + timedelta(days=1)),  # type: ignore[arg-type]
-        single_use=kw.get("single_use", False),  # type: ignore[arg-type]
+        scope=kw.get("scope", "edit"),
+        expires_at=kw.get("expires_at", NOW + timedelta(days=1)),
+        single_use=kw.get("single_use", False),
     )
     row.used_at = kw.get("used_at")  # type: ignore[assignment]
     return row
@@ -228,7 +228,7 @@ async def test_verify_magic_link_survives_a_failed_flow_start(
     monkeypatch.setattr(FlowService, "auto_advance", _advance)
     row = _link("tok", settings, scope="view", single_use=True)
     app = _app(state_id="s1")
-    app.email_confirmed_at = NOW  # type: ignore[assignment]
+    app.email_confirmed_at = NOW
     db = fake_session(
         result(row),  # the magic link
         result("claimed-id"),  # the single-use claim

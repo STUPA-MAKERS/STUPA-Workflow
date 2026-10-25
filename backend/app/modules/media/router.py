@@ -33,7 +33,7 @@ from fastapi.responses import StreamingResponse
 from app.deps import DbSession, SettingsDep, get_current_applicant, get_current_principal
 from app.modules.auth.oauth import SCOPES
 from app.modules.auth.principal import Applicant, Principal
-from app.modules.files.router import _read_capped  # pyright: ignore[reportPrivateUsage]
+from app.modules.files.router import _read_capped
 from app.modules.files.storage import ObjectStorage
 from app.modules.media.schemas import MarkdownImageOut
 from app.modules.media.service import ImageStream, MediaService

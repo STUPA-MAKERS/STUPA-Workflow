@@ -736,7 +736,7 @@ class GremienService:
                 state = "delegated"
             else:
                 recorded = records.get(mid)
-                state = recorded if recorded in ("present", "excused") else "absent"  # type: ignore[assignment]
+                state = recorded if recorded in ("present", "excused") else "absent"
             rows.append(
                 MemberMeetingOut(
                     meeting_id=mid,

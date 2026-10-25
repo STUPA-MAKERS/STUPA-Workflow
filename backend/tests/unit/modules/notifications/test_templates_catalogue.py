@@ -31,12 +31,12 @@ def test_keys_unique() -> None:
 
 
 def test_builtins_are_shared_objects() -> None:
-    assert CATALOGUE_BY_KEY["status_update"].subject_i18n is svc._BUILTIN_NOTIFY_SUBJECT  # noqa: SLF001
-    assert CATALOGUE_BY_KEY["magic_link"].body_i18n is svc._BUILTIN_MAGIC_LINK_BODY  # noqa: SLF001
-    assert CATALOGUE_BY_KEY["task_new"].subject_i18n is action_dispatcher._BUILTIN_TASK_SUBJECT  # noqa: SLF001
-    assert CATALOGUE_BY_KEY["comment_team"].body_i18n is comments._BUILTIN_TEAM_BODY  # noqa: SLF001
-    assert CATALOGUE_BY_KEY["meeting_created"].subject_i18n is auto._BUILTIN_MEETING_SUBJECT  # noqa: SLF001
-    assert CATALOGUE_BY_KEY["delegation_revoked"].body_i18n is auto._BUILTIN_DELEGATION_REVOKED_BODY  # noqa: SLF001
+    assert CATALOGUE_BY_KEY["status_update"].subject_i18n is svc._BUILTIN_NOTIFY_SUBJECT
+    assert CATALOGUE_BY_KEY["magic_link"].body_i18n is svc._BUILTIN_MAGIC_LINK_BODY
+    assert CATALOGUE_BY_KEY["task_new"].subject_i18n is action_dispatcher._BUILTIN_TASK_SUBJECT
+    assert CATALOGUE_BY_KEY["comment_team"].body_i18n is comments._BUILTIN_TEAM_BODY
+    assert CATALOGUE_BY_KEY["meeting_created"].subject_i18n is auto._BUILTIN_MEETING_SUBJECT
+    assert CATALOGUE_BY_KEY["delegation_revoked"].body_i18n is auto._BUILTIN_DELEGATION_REVOKED_BODY
 
 
 def test_dead_role_templates_are_gone() -> None:
@@ -60,7 +60,7 @@ def test_status_update_team_mirrors_status_update() -> None:
 def test_worker_reminder_uses_catalogue() -> None:
     import worker.task_reminders as tr
 
-    assert tr._BUILTIN_REMINDER_SUBJECT is CATALOGUE_BY_KEY["task_reminder"].subject_i18n  # noqa: SLF001
+    assert tr._BUILTIN_REMINDER_SUBJECT is CATALOGUE_BY_KEY["task_reminder"].subject_i18n
 
 
 def test_all_sent_keys_are_catalogued() -> None:

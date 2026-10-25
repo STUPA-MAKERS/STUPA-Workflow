@@ -449,7 +449,7 @@ class LiveVoteConnection:
                         task.result()
                     except WebSocketDisconnect:
                         pass
-                    except Exception:  # noqa: BLE001 — pump failure tears the connection down
+                    except Exception:  # pump failure tears the connection down
                         logger.warning(
                             "live-vote pump/receive task failed", exc_info=True
                         )
@@ -462,5 +462,5 @@ class LiveVoteConnection:
                         await self.broker.publish(
                             channel, ViewersEvent(viewers=names).dump()
                         )
-                    except Exception:  # noqa: BLE001 — leaving must not break the close
+                    except Exception:  # leaving must not break the close
                         logger.debug("viewers broadcast on leave failed", exc_info=True)

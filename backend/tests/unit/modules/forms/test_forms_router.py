@@ -29,7 +29,7 @@ class _FakeService:
     def __init__(self) -> None:
         self.created: tuple[object, FormVersionCreate] | None = None
 
-    async def get_effective_form(self, type_id):  # noqa: ANN001
+    async def get_effective_form(self, type_id):
         if str(type_id).startswith("00000000"):
             raise NotFoundError("application type not found")
         sections = [
@@ -46,7 +46,7 @@ class _FakeService:
             sections=sections,
         )
 
-    async def create_form_version(  # noqa: ANN001, ANN003
+    async def create_form_version(
         self, type_id, payload: FormVersionCreate, _actor="sub", **_kw
     ):
         self.created = (type_id, payload)

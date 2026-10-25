@@ -259,7 +259,7 @@ async def test_committed_rollup(session: AsyncSession) -> None:
     tree = await svc.get_tree(gremium_id=g.id)
     top_node = next(n for n in tree if n.id == top.id)
 
-    def committed(node) -> Decimal:  # noqa: ANN001
+    def committed(node) -> Decimal:
         return node.by_fiscal_year[0].committed if node.by_fiscal_year else Decimal("0")
 
     mid_node = top_node.children[0]

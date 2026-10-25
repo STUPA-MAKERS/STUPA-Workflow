@@ -59,9 +59,9 @@ def test_actor_out_serializes_camel_case() -> None:
 def _base(refs: dict[str, tuple[str, UUID]]) -> ApplicationsServiceBase:
     svc = ApplicationsServiceBase.__new__(ApplicationsServiceBase)
     svc.session = MagicMock()
-    svc._author_refs = AsyncMock(return_value=refs)  # type: ignore[method-assign]
-    svc._applicant_actors = AsyncMock(return_value={"applicant"})  # type: ignore[method-assign]
-    svc._gremium_actor = AsyncMock(return_value="StuPa")  # type: ignore[method-assign]
+    svc._author_refs = AsyncMock(return_value=refs)
+    svc._applicant_actors = AsyncMock(return_value={"applicant"})
+    svc._gremium_actor = AsyncMock(return_value="StuPa")
     return svc
 
 

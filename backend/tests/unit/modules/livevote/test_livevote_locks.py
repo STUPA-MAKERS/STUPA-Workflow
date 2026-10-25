@@ -38,14 +38,14 @@ class _FakeRedis:
         self.set_calls: list[tuple[str, str, bool, int]] = []
         self.eval_calls: list[tuple[str, str]] = []
 
-    async def set(self, key: str, value: str, *, nx: bool, px: int):  # noqa: ANN201
+    async def set(self, key: str, value: str, *, nx: bool, px: int):
         self.set_calls.append((key, value, nx, px))
         if nx and key in self._store:
             return None
         self._store[key] = value
         return True
 
-    async def eval(self, _script: str, _numkeys: int, key: str, arg: str) -> int:  # noqa: ANN001
+    async def eval(self, _script: str, _numkeys: int, key: str, arg: str) -> int:
         self.eval_calls.append((key, arg))
         if self._store.get(key) == arg:  # CAS: delete only the own lock
             del self._store[key]

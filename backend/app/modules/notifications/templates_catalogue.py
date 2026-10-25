@@ -83,8 +83,8 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
     MailTemplateSpec(
         "status_update",
         "status_update",
-        _svc._BUILTIN_NOTIFY_SUBJECT,  # noqa: SLF001 — shared builtin
-        _svc._BUILTIN_NOTIFY_BODY,  # noqa: SLF001
+        _svc._BUILTIN_NOTIFY_SUBJECT,  # shared builtin
+        _svc._BUILTIN_NOTIFY_BODY,
         {
             "link": "Link zum Antrag (ohne den Platzhalter hängt die Mail ihn an)",
             "applicationTitle": "Titel des Antrags",
@@ -115,8 +115,8 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
     MailTemplateSpec(
         "task_new",
         "task",
-        action_dispatcher._BUILTIN_TASK_SUBJECT,  # noqa: SLF001
-        action_dispatcher._BUILTIN_TASK_BODY,  # noqa: SLF001
+        action_dispatcher._BUILTIN_TASK_SUBJECT,
+        action_dispatcher._BUILTIN_TASK_BODY,
         {
             "link": "Link zur Aufgabe (ohne den Platzhalter hängt die Mail ihn an)",
             "applicationTitle": "Titel des Antrags",
@@ -140,8 +140,8 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
     MailTemplateSpec(
         "comment_applicant",
         "comment",
-        comments._BUILTIN_APPLICANT_SUBJECT,  # noqa: SLF001
-        comments._BUILTIN_APPLICANT_BODY,  # noqa: SLF001
+        comments._BUILTIN_APPLICANT_SUBJECT,
+        comments._BUILTIN_APPLICANT_BODY,
         {
             "link": "Link zum Antrag (ohne den Platzhalter hängt die Mail ihn an)",
             "applicationTitle": "Titel des Antrags",
@@ -155,8 +155,8 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
     MailTemplateSpec(
         "comment_team",
         "comment",
-        comments._BUILTIN_TEAM_SUBJECT,  # noqa: SLF001
-        comments._BUILTIN_TEAM_BODY,  # noqa: SLF001
+        comments._BUILTIN_TEAM_SUBJECT,
+        comments._BUILTIN_TEAM_BODY,
         {
             "link": "Link zum Antrag (ohne den Platzhalter hängt die Mail ihn an)",
             "applicationTitle": "Titel des Antrags",
@@ -177,8 +177,8 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
     MailTemplateSpec(
         "meeting_created",
         "meeting",
-        auto._BUILTIN_MEETING_SUBJECT,  # noqa: SLF001
-        auto._BUILTIN_MEETING_BODY,  # noqa: SLF001
+        auto._BUILTIN_MEETING_SUBJECT,
+        auto._BUILTIN_MEETING_BODY,
         {
             "link": "Link zur Sitzung (ohne den Platzhalter hängt die Mail ihn an)",
             "meetingTitle": "Titel der Sitzung",
@@ -191,8 +191,8 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
     MailTemplateSpec(
         "delegation_granted",
         "delegation",
-        auto._BUILTIN_DELEGATION_GRANTED_SUBJECT,  # noqa: SLF001
-        auto._BUILTIN_DELEGATION_GRANTED_BODY,  # noqa: SLF001
+        auto._BUILTIN_DELEGATION_GRANTED_SUBJECT,
+        auto._BUILTIN_DELEGATION_GRANTED_BODY,
         {
             "link": "Link zur Sitzung (ohne den Platzhalter hängt die Mail ihn an)",
             "meetingTitle": "Titel der Sitzung",
@@ -202,8 +202,8 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
     MailTemplateSpec(
         "delegation_revoked",
         "delegation",
-        auto._BUILTIN_DELEGATION_REVOKED_SUBJECT,  # noqa: SLF001
-        auto._BUILTIN_DELEGATION_REVOKED_BODY,  # noqa: SLF001
+        auto._BUILTIN_DELEGATION_REVOKED_SUBJECT,
+        auto._BUILTIN_DELEGATION_REVOKED_BODY,
         {
             "link": "Link zur Sitzung (ohne den Platzhalter hängt die Mail ihn an)",
             "meetingTitle": "Titel der Sitzung",
@@ -213,8 +213,8 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
     MailTemplateSpec(
         "magic_link",
         "magic_link",
-        _svc._BUILTIN_MAGIC_LINK_SUBJECT,  # noqa: SLF001
-        _svc._BUILTIN_MAGIC_LINK_BODY,  # noqa: SLF001
+        _svc._BUILTIN_MAGIC_LINK_SUBJECT,
+        _svc._BUILTIN_MAGIC_LINK_BODY,
         {"link": "Anmelde-Link"},
     ),
     MailTemplateSpec(

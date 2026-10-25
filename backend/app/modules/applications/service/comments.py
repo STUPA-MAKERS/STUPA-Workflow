@@ -196,7 +196,7 @@ class CommentOps(ApplicationsServiceBase):
             id=comment.id,
             author=info.legacy(author) if author else None,
             authorKind=author_kind,  # type: ignore[arg-type] — validated against CHECK
-            authorInfo=info,  # type: ignore[arg-type] — validated against CHECK
+            authorInfo=info,  # validated against CHECK
             body=comment.body,
             visibility=visibility,  # type: ignore[arg-type]
             at=comment.at,

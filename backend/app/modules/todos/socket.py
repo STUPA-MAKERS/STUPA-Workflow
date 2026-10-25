@@ -236,7 +236,7 @@ class TodoLiveConnection:
             if not isinstance(raw, dict):
                 await self._error("invalid_message")
             elif raw.get("type") == "subscribe":
-                if not await self._subscribe(raw):  # pyright: ignore[reportUnknownArgumentType]
+                if not await self._subscribe(raw):
                     return
             else:
                 await self._error("unknown_type")
@@ -265,7 +265,7 @@ class TodoLiveConnection:
                         task.result()
                     except WebSocketDisconnect:
                         pass
-                    except Exception:  # noqa: BLE001 — a dead task tears the socket down
+                    except Exception:  # a dead task tears the socket down
                         logger.warning("to-do socket task failed", exc_info=True)
             finally:
                 pump.cancel()

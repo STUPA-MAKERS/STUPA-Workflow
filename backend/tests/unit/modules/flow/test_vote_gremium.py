@@ -163,8 +163,8 @@ def _t(app: Any, to_id: UUID, *, actions: list | None = None, automatic: bool = 
 
 
 def test_agenda_action_helpers() -> None:
-    assert flow_service._agenda_action(None) is None  # noqa: SLF001
-    assert flow_service._agenda_action([{"type": "notify"}]) is None  # noqa: SLF001
+    assert flow_service._agenda_action(None) is None
+    assert flow_service._agenda_action([{"type": "notify"}]) is None
     assert flow_service.agenda_gremium_id([{"type": "addToNextSession"}]) is None
 
 
@@ -201,10 +201,10 @@ async def test_agenda_gremium_explicit_and_fixed() -> None:
     t_fallback = _t(app, fixed.id, actions=[{"type": "addToNextSession"}])
     db = fake_session()
     svc = FlowService(db)
-    assert await svc._agenda_gremium(t_explicit, fixed, None) == explicit  # noqa: SLF001
+    assert await svc._agenda_gremium(t_explicit, fixed, None) == explicit
     db.scalar_results = [fixed_id]
-    assert await svc._agenda_gremium(t_fallback, fixed, None) == fixed_id  # noqa: SLF001
-    assert await svc._agenda_gremium(t_fallback, None, None) is None  # noqa: SLF001
+    assert await svc._agenda_gremium(t_fallback, fixed, None) == fixed_id
+    assert await svc._agenda_gremium(t_fallback, None, None) is None
 
 
 async def test_fire_into_a_budget_vote_without_gremium_409(
@@ -293,12 +293,12 @@ async def test_check_agenda_meeting_uses_the_vote_gremium(
     meeting = SimpleNamespace(status="planned", gremium_id=gid)
     db = fake_session(result(gvote))
     db.get_results = [meeting]
-    await FlowService(db)._check_agenda_meeting(  # noqa: SLF001
+    await FlowService(db)._check_agenda_meeting(
         t, uuid4(), _principal(), vote_gremium=gid
     )
     # Without a vote Gremium the transition does not add to an agenda.
     with pytest.raises(ValidationProblem):
-        await FlowService(fake_session())._check_agenda_meeting(  # noqa: SLF001
+        await FlowService(fake_session())._check_agenda_meeting(
             t, uuid4(), _principal()
         )
 
@@ -311,16 +311,16 @@ async def test_entry_snapshot_keeps_it_on_a_move_inside_the_vote_state(
     app.vote_gremium_id = kept = uuid4()
     gvote = _state(config=BUDGET, state_id=app.current_state_id)
     svc = FlowService(fake_session())
-    assert await svc._entry_snapshot(app, gvote.id, gvote) == kept  # noqa: SLF001
+    assert await svc._entry_snapshot(app, gvote.id, gvote) == kept
     # A move from another state resolves again.
-    assert await svc._entry_snapshot(app, uuid4(), gvote) == effective["value"]  # noqa: SLF001
+    assert await svc._entry_snapshot(app, uuid4(), gvote) == effective["value"]
 
 
 def test_budget_unchanged_pins_the_cost_center() -> None:
     app = _app(uuid4())
-    assert FlowService._budget_unchanged(app, _state(kind="normal")) == []  # noqa: SLF001
-    (clause,) = FlowService._budget_unchanged(app, _state(config=BUDGET))  # noqa: SLF001
+    assert FlowService._budget_unchanged(app, _state(kind="normal")) == []
+    (clause,) = FlowService._budget_unchanged(app, _state(config=BUDGET))
     assert "IS NULL" in str(clause)
     app.budget_id = uuid4()
-    (clause,) = FlowService._budget_unchanged(app, _state(config=BUDGET))  # noqa: SLF001
+    (clause,) = FlowService._budget_unchanged(app, _state(config=BUDGET))
     assert "budget_id =" in str(clause)
