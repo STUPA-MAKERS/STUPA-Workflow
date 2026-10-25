@@ -374,12 +374,17 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
             )
         )
 
-        # Budget: a booking and an invoice.
+        # Budget: a booking and an invoice, in a year the old account closed.
         budget = Budget(parent_id=None, key=f"M{tag}", path_key=f"M{tag}", name="Merge")
         session.add(budget)
         await session.flush()
         year = FiscalYear(
-            budget_id=budget.id, year=2025, start_date=date(2025, 1, 1), end_date=date(2025, 12, 31)
+            budget_id=budget.id,
+            year=2025,
+            start_date=date(2025, 1, 1),
+            end_date=date(2025, 12, 31),
+            closed_at=datetime.now(UTC),
+            closed_by=old.sub,
         )
         session.add(year)
         await session.flush()
