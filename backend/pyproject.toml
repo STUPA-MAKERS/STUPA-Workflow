@@ -100,11 +100,14 @@ target-version = "py313"
 line-length = 100
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM", "ANN", "RUF100"]
+select = ["E", "F", "I", "UP", "B", "SIM", "ANN", "RUF100", "D"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
 # Tests type fixtures and fakes loosely. Migrations use the dynamic alembic op API.
-"tests/**" = ["ANN"]
+"tests/**" = ["ANN", "D100", "D101", "D102", "D103", "D104", "D105", "D106", "D107"]
 "migrations/**" = ["ANN"]
 
 [tool.basedpyright]
