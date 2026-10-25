@@ -5,7 +5,7 @@ description: STUPA-Workflow house rules, Definition-of-Done, test/coverage gates
 
 # Project conventions — house rules & Definition of Done
 
-The non-negotiables. Source of truth: `CONTRIBUTING.md`, `.github/pull_request_template.md`,
+The non-negotiables. Source of truth: this skill, `.github/pull_request_template.md`,
 `backend/migrations/README.md`. Each rule encodes a bug that already cost the team once.
 
 ## Workflow

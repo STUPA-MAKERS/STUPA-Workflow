@@ -123,8 +123,8 @@ npm ci
 npm run lint && npm run typecheck && npm test && npm run build
 ```
 
-TDD is mandatory. Every PR must pass the CI gate green. See
-[CONTRIBUTING.md](CONTRIBUTING.md) for the details. Never push to `main` directly. Keep
+TDD is mandatory. Every PR must pass the CI gate green. The rules are in
+`.claude/skills/conventions/SKILL.md`. Never push to `main` directly. Keep
 secrets in `deploy/.env` only, which `.gitignore` blocks. Never commit a secret.
 
 ## Branching and releases
