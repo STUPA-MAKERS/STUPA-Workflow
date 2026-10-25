@@ -31,6 +31,11 @@ The non-negotiables. Source of truth: `CONTRIBUTING.md`, `.github/pull_request_t
 - **Strictly typed inputs** — Enums/`Literal` instead of free strings. Validate query/body/path via
   Pydantic/`Annotated`. No open `str` status fields. Python ≥3.13, fully annotated, no bare `Any`
   (basedpyright runs in `standard` mode).
+- **Docstrings, not comments** — every public module, class and function in `app/`, `worker/`,
+  `scripts/` and `migrations/` has a brief Google-style docstring (ruff `D`, google convention).
+  Tests may omit them, but the ones they have follow the same format. A `#` comment in a code body
+  is the rare exception for a trick the code cannot show. A reason goes into the docstring, with
+  its "because" kept. Never refer to old tasks, issues or spec sections; state the rule itself.
 - **No `eval`** — flow/form guards run through a whitelist dispatch table (`app/shared/guards.py`,
   `app/shared/jsonlogic.py`), never `eval`.
 
