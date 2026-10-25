@@ -35,9 +35,9 @@ router = APIRouter(prefix="/principals", tags=["avatars"])
 
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 _HOUR = 3600
-# How long the browser keeps a 404: a new Gravatar shows within the hour.
+#: How long the browser keeps a 404: a new Gravatar shows within the hour.
 _MISS_MAX_AGE = 3600
-# How long the browser keeps the 404 of the switched-off proxy.
+#: How long the browser keeps the 404 of the switched-off proxy.
 _DISABLED_MAX_AGE = 300
 
 _RESPONSES: dict[int | str, dict[str, Any]] = {
@@ -73,6 +73,7 @@ def get_avatar_cache(request: Request, settings: SettingsDep) -> AvatarCache:
 
 
 def get_gravatar_fetcher(settings: SettingsDep) -> GravatarFetcher:
+    """Build the HTTP Gravatar fetcher."""
     return HttpGravatarFetcher(timeout_seconds=settings.gravatar_timeout_seconds)
 
 

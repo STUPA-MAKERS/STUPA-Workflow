@@ -29,20 +29,20 @@ from app.modules.audit.service import AuditService
 from app.modules.auth.models import Principal as PrincipalRow
 from app.shared.errors import ConflictError, NotFoundError
 
-# Granular per-gremium-role permissions of the meeting domain. The global
-# permission set does not contain them. They apply inside the gremium only and
-# resolve through the active ``gremium_membership``.
-#   session.manage  — create/edit meetings, assign minute-taker, set status
-#   vote.manage     — open/close votes
-#   vote.cast       — vote in meeting votes
-#   protocol.write  — assignable as minute-taker / write the protocol
-#   protocol.finalize — finalize and send the protocol (together with the
-#                     write access to the meeting)
-#   todo.write      — read and work on the to-do board of the gremium (cards,
-#                     moves, comments, checklists, links)
-#   todo.configure  — edit the name, the columns and the labels of that board
-# An OAuth token caps these permissions through its scope. See
-# ``app.modules.auth.policy``.
+#: Granular per-gremium-role permissions of the meeting domain. The global
+#: permission set does not contain them. They apply inside the gremium only and
+#: resolve through the active ``gremium_membership``.
+#:   session.manage  — create/edit meetings, assign minute-taker, set status
+#:   vote.manage     — open/close votes
+#:   vote.cast       — vote in meeting votes
+#:   protocol.write  — assignable as minute-taker / write the protocol
+#:   protocol.finalize — finalize and send the protocol (together with the
+#:                     write access to the meeting)
+#:   todo.write      — read and work on the to-do board of the gremium (cards,
+#:                     moves, comments, checklists, links)
+#:   todo.configure  — edit the name, the columns and the labels of that board
+#: An OAuth token caps these permissions through its scope. See
+#: ``app.modules.auth.policy``.
 GREMIUM_PERMISSIONS: tuple[str, ...] = (
     "session.manage",
     "vote.manage",
@@ -54,11 +54,10 @@ GREMIUM_PERMISSIONS: tuple[str, ...] = (
 )
 _ALL_PERMS: list[str] = list(GREMIUM_PERMISSIONS)
 
-# Forced gremium roles exist in EVERY gremium and nobody can delete them.
-# ``vorstand`` and ``manager`` get all permissions by default. ``member`` gets
-# vote.cast and todo.write. The service creates them together with the gremium and
-# backfills them idempotently on a listing. Migration 0040 backfilled the
-# gremien that already existed.
+#: Forced gremium roles exist in EVERY gremium and nobody can delete them.
+#: ``vorstand`` and ``manager`` get all permissions by default. ``member`` gets
+#: vote.cast and todo.write. The service creates them together with the gremium and
+#: backfills them idempotently on a listing.
 FORCED_GREMIUM_ROLES: tuple[tuple[str, dict[str, str], list[str]], ...] = (
     ("vorstand", {"de": "Vorstand", "en": "Board"}, list(_ALL_PERMS)),
     ("manager", {"de": "Manager", "en": "Manager"}, list(_ALL_PERMS)),
@@ -71,7 +70,7 @@ FORCED_ROLE_DEFAULT_PERMS: dict[str, list[str]] = {
 
 
 def _time_valid_clause(now: datetime):
-    """SQLAlchemy clause: the ``gremium_membership`` is active at ``now``."""
+    """Build the clause: the ``gremium_membership`` is active at ``now``."""
     return (
         (GremiumMembership.valid_from.is_(None))
         | (GremiumMembership.valid_from <= now)
@@ -164,6 +163,7 @@ class GremiumRoleService:
     """CRUD for gremium roles, plus the membership read."""
 
     def __init__(self, session: AsyncSession) -> None:
+        """Bind the service to a database session."""
         self.session = session
 
     async def _audit(self, actor: str, target_type: str, target_id: object) -> None:
@@ -208,7 +208,7 @@ class GremiumRoleService:
         return added
 
     async def list_roles(self, gremium_id: UUID) -> list[GremiumRoleOut]:
-        # Lazily backfill existing gremien so the forced roles are always present.
+        """List the roles of a gremium, and backfill its forced roles first."""
         if await self.ensure_forced_roles(gremium_id):
             await self.session.commit()
         rows = (
@@ -223,6 +223,11 @@ class GremiumRoleService:
     async def create_role(
         self, gremium_id: UUID, payload: GremiumRoleCreate, actor: str
     ) -> GremiumRoleOut:
+        """Create a role in a gremium.
+
+        Raises:
+            ConflictError: The key exists in this gremium already.
+        """
         existing = (
             await self.session.scalars(
                 select(GremiumRole).where(
@@ -250,20 +255,32 @@ class GremiumRoleService:
     async def update_role(
         self, role_id: UUID, payload: GremiumRoleUpdate, actor: str
     ) -> GremiumRoleOut:
+        """Update the name and the permissions of a role.
+
+        A forced role also accepts permission edits. Only its key and its delete stay
+        locked.
+
+        Raises:
+            NotFoundError: No gremium role has this id.
+        """
         row = await self.session.get(GremiumRole, role_id)
         if row is None:
             raise NotFoundError(f"gremium role {role_id} not found")
         if payload.name is not None:
             row.name_i18n = payload.name
         if payload.permissions is not None:
-            # A forced role also accepts permission edits. Only the key and the
-            # delete stay locked.
             row.permissions = _sanitize_perms(payload.permissions)
         await self._audit(actor, "gremium_role", row.id)
         await self.session.commit()
         return _role_out(row)
 
     async def delete_role(self, role_id: UUID, actor: str) -> None:
+        """Delete a role of a gremium.
+
+        Raises:
+            NotFoundError: No gremium role has this id.
+            ConflictError: The role is forced or still in use.
+        """
         row = await self.session.get(GremiumRole, role_id)
         if row is None:
             raise NotFoundError(f"gremium role {role_id} not found")

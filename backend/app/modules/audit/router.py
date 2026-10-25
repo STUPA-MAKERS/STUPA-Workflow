@@ -43,6 +43,7 @@ _AUTH_ERRORS: dict[int | str, dict[str, Any]] = {401: _PROBLEM, 403: _PROBLEM}
 
 
 def get_audit_service(session: DbSession) -> AuditService:
+    """Build the audit service."""
     return AuditService(session)
 
 
@@ -59,8 +60,6 @@ async def list_audit(
     service: ServiceDep,
     action: Annotated[str | None, Query()] = None,
     actor: Annotated[str | None, Query()] = None,
-    # AwareDatetime: the ``at`` column is timestamptz. asyncpg rejects a naive
-    # value with a 500, so Pydantic rejects it up front with 422.
     since: Annotated[AwareDatetime | None, Query()] = None,
     until: Annotated[AwareDatetime | None, Query()] = None,
     before: Annotated[int | None, Query(ge=1)] = None,
@@ -69,7 +68,9 @@ async def list_audit(
     """Read the audit log with keyset paging.
 
     The ``before`` cursor pages backwards and the newest entry comes first. Filter
-    by ``action``, by ``actor``, or by the time window ``since``/``until``.
+    by ``action``, by ``actor``, or by the time window ``since``/``until``. The
+    window bounds must carry a time zone, because the ``at`` column is timestamptz
+    and asyncpg rejects a naive value with a 500; Pydantic rejects it with 422.
     """
     items, has_more = await service.query_cursor(
         action=action,
@@ -122,12 +123,14 @@ async def list_audit_actors(service: ServiceDep) -> list[AuditActorOut]:
 @router.get(
     "/verify",
     response_model=ChainVerificationOut,
-    # Chain verification has its own permission (audit.verify). Reads stay audit.read.
     dependencies=[Depends(require_principal("audit.verify"))],
     responses=_AUTH_ERRORS,
 )
 async def verify_audit_chain(service: ServiceDep) -> ChainVerificationOut:
-    """Recompute the hash chain and report ``valid`` plus the first break, if any."""
+    """Recompute the hash chain and report ``valid`` plus the first break, if any.
+
+    The check has its own permission (``audit.verify``). Reads stay ``audit.read``.
+    """
     result = await service.verify_chain()
     return ChainVerificationOut(
         valid=result.valid,
@@ -140,8 +143,6 @@ async def verify_audit_chain(service: ServiceDep) -> ChainVerificationOut:
 @router.post(
     "/verify",
     response_model=AuditVerificationOut,
-    # 409 while another check runs. 429 (with Retry-After) inside the cooldown after
-    # the last manual check.
     responses={**_AUTH_ERRORS, 409: _PROBLEM, 429: _PROBLEM},
 )
 async def run_audit_verification(
@@ -153,7 +154,8 @@ async def run_audit_verification(
     The call reads the whole log, so it takes as long as the live check. Only one
     check runs at a time, and a manual check can run again only after a cooldown of
     5 minutes. The store keeps the newest 100 results, the first failed result of
-    each break and the newest result of each trigger.
+    each break and the newest result of each trigger. Another running check gives
+    409; a call inside the cooldown gives 429 with Retry-After.
     """
     row = await service.run_manual_verification(triggered_by=principal.sub)
     return AuditVerificationOut.from_row(row)
@@ -174,8 +176,6 @@ async def latest_audit_verification(service: ServiceDep) -> AuditVerificationOut
 @router.post(
     "/{entry_id}/revert",
     response_model=AuditRevertOut,
-    # Destructive. It has its own permission, separate from audit.read and audit.verify.
-    # 404 when the entry or the revision is missing. 409 when it is not revertable or stale.
     dependencies=[Depends(require_principal("audit.revert"))],
     responses={**_AUTH_ERRORS, 404: _PROBLEM, 409: _PROBLEM},
 )
@@ -183,18 +183,20 @@ async def revert_audit_entry(
     entry_id: int,
     session: DbSession,
     principal: Annotated[Principal, Depends(require_principal("audit.revert"))],
-    # A status revert that leaves a vote state cancels its votes. The publisher sends
-    # `vote_cancelled` to the live clients of the meeting.
     publisher: Annotated[MeetingPublisher, Depends(get_meeting_publisher)],
 ) -> AuditRevertOut:
     """Revert the change that ``entry_id`` describes.
 
-    The call restores the prior state. It answers 409 on a conflict. The platform
-    logs the revert itself, and that log entry is revertable too.
+    The call restores the prior state. It answers 404 when the entry or the revision
+    is missing, and 409 when it is not revertable or stale. The platform logs the
+    revert itself, and that log entry is revertable too.
+
+    The revert is destructive, so it has its own permission ``audit.revert``.
+    ``RevertService`` also re-asserts the granular permission of the original
+    operation, so the route passes the principal through. A status revert that
+    leaves a vote state cancels its votes, and the publisher sends
+    ``vote_cancelled`` to the live clients of the meeting.
     """
-    # audit.revert gates the route. RevertService also re-asserts the granular
-    # permission of the original operation. That is why the route passes the
-    # principal through.
     result = await RevertService(session, publisher).revert(entry_id, principal.sub, principal)
     return AuditRevertOut(
         revertedAuditId=result.reverted_audit_id,

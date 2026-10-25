@@ -76,15 +76,15 @@ from app.modules.voting.models import Ballot, Vote, VotedMarker
 from app.settings import Settings
 from app.shared.errors import ConflictError, FieldError, NotFoundError, ValidationProblem
 
-# The implicit global role of every person. It is no right to take away.
+#: The implicit global role of every person. It is no right to take away.
 IMPLICIT_ROLE_KEY = "member"
-# The `granted_by` of the assignment that `auth/bootstrap.py` writes, and its role.
+#: The `granted_by` of the assignment that `auth/bootstrap.py` writes, and its role.
 BOOTSTRAP_GRANTOR = "bootstrap"
 BOOTSTRAP_ROLE_KEY = "admin"
-# The gremium-role permission that makes a member a voter of the Gremium.
+#: The gremium-role permission that makes a member a voter of the Gremium.
 _VOTE_CAST = "vote.cast"
-# The meeting states in which a delegation still matters. A planned meeting has not
-# started: its delegations are revoked. A live meeting keeps them until it ends.
+#: The meeting states in which a delegation still matters. A planned meeting has not
+#: started: its delegations are revoked. A live meeting keeps them until it ends.
 _PLANNED = "planned"
 _LIVE = "live"
 
@@ -100,14 +100,18 @@ class RoleInfo:
 
 @dataclass(frozen=True, slots=True)
 class MembershipFact:
+    """A gremium membership of the person and its role."""
+
     gremium_id: UUID
     role: RoleInfo
-    # The gremium role holds `vote.cast`: the person votes in the Gremium.
+    #: The gremium role holds `vote.cast`: the person votes in the Gremium.
     can_vote: bool = False
 
 
 @dataclass(frozen=True, slots=True)
 class AssignmentFact:
+    """A role assignment of the person."""
+
     id: UUID
     role: RoleInfo
     gremium_id: UUID | None
@@ -118,6 +122,8 @@ class AssignmentFact:
 
 @dataclass(frozen=True, slots=True)
 class PoolFact:
+    """A substitute-pool entry of the person."""
+
     id: UUID
     gremium_id: UUID
     member_id: UUID | None
@@ -126,6 +132,8 @@ class PoolFact:
 
 @dataclass(frozen=True, slots=True)
 class DelegationFact:
+    """A delegation of the person in a planned or live meeting."""
+
     id: UUID
     gremium_id: UUID
     meeting_id: UUID
@@ -151,22 +159,22 @@ class Snapshot:
     assignments: list[AssignmentFact] = field(default_factory=list)
     pool: list[PoolFact] = field(default_factory=list)
     delegations: list[DelegationFact] = field(default_factory=list)
-    # (group, gremium) of the membership mappings of the person's groups.
+    #: (group, gremium) of the membership mappings of the person's groups.
     membership_maps: list[tuple[str, UUID]] = field(default_factory=list)
-    # (group, gremium, gremium role) of the role mappings of the person's groups.
+    #: (group, gremium, gremium role) of the role mappings of the person's groups.
     role_maps: list[tuple[str, UUID, UUID]] = field(default_factory=list)
-    # (group, global role) of the group mappings of the person's groups.
+    #: (group, global role) of the group mappings of the person's groups.
     group_maps: list[tuple[str, RoleInfo]] = field(default_factory=list)
     gremium_names: dict[UUID, str] = field(default_factory=dict)
-    # Display names of the other people (pool, delegations), by principal id.
+    #: Display names of the other people (pool, delegations), by principal id.
     names: dict[UUID, str | None] = field(default_factory=dict)
-    # Display names of the grantors of the assignments, by `sub`.
+    #: Display names of the grantors of the assignments, by `sub`.
     grantor_names: dict[str, str | None] = field(default_factory=dict)
-    # Open votes per Gremium that still wait for a ballot of the person.
+    #: Open votes per Gremium that still wait for a ballot of the person.
     open_tasks: dict[UUID, int] = field(default_factory=dict)
-    # The person is a configured bootstrap admin (`BOOTSTRAP_ADMIN_SUBJECTS` or
-    # `BOOTSTRAP_ADMIN_EMAILS`): the startup sweep or the next login grants the
-    # `admin` role again.
+    #: The person is a configured bootstrap admin (`BOOTSTRAP_ADMIN_SUBJECTS` or
+    #: `BOOTSTRAP_ADMIN_EMAILS`): the startup sweep or the next login grants the
+    #: `admin` role again.
     bootstrap_admin: bool = False
 
 
@@ -183,11 +191,8 @@ class RevokePlan:
     kept_live: int
 
 
-# -- Pure logic ---------------------------------------------------------------------
-
-
 def held_roles(snap: Snapshot) -> dict[UUID, RoleInfo]:
-    """The global roles of the person (groups and manual assignments), without ``member``."""
+    """Return the global roles of the person (groups and manual assignments), without ``member``."""
     roles: dict[UUID, RoleInfo] = {}
     for _group, role in snap.group_maps:
         roles[role.id] = role
@@ -198,7 +203,10 @@ def held_roles(snap: Snapshot) -> dict[UUID, RoleInfo]:
 
 
 def tied_gremien(snap: Snapshot) -> set[UUID]:
-    """Every Gremium the person is tied to by a membership, a group, a row or a delegation."""
+    """Return every Gremium the person is tied to.
+
+    A tie is a membership, a group, an assignment, a pool entry or a delegation.
+    """
     tied = {m.gremium_id for m in snap.memberships}
     tied |= {gid for _group, gid in snap.membership_maps}
     tied |= {a.gremium_id for a in snap.assignments if a.gremium_id is not None}
@@ -234,7 +242,7 @@ def group_targets(snap: Snapshot) -> dict[str, tuple[set[UUID], set[UUID]]]:
 
 
 def _ordered_groups(snap: Snapshot, wanted: Iterable[str]) -> list[str]:
-    """The groups of ``wanted`` in the order of the person's group list."""
+    """Return the groups of ``wanted`` in the order of the person's group list."""
     keep = set(wanted)
     return [g for g in snap.groups if g in keep]
 
@@ -244,7 +252,10 @@ def _iso(value: datetime | None) -> str | None:
 
 
 def _assignment_out(a: AssignmentFact, snap: Snapshot) -> RevokeAssignmentOut:
-    # The display never shows a `sub`: an unknown or nameless grantor gives None.
+    """Build the display row of an assignment.
+
+    The display never shows a ``sub``: an unknown or nameless grantor gives None.
+    """
     granted = a.granted_by
     if granted and granted != BOOTSTRAP_GRANTOR:
         granted = snap.grantor_names.get(granted)
@@ -449,7 +460,7 @@ def plan_revoke(
 
 
 def last_login_filter(before: date | None, include_never: bool) -> ColumnElement[bool] | None:
-    """The WHERE clause of the user-list filter "Letzter Login".
+    """Return the WHERE clause of the user-list filter "Letzter Login".
 
     ``before`` keeps the people whose last login is before that day (UTC);
     ``include_never`` adds the people who never logged in. Without ``before``,
@@ -463,7 +474,7 @@ def last_login_filter(before: date | None, include_never: bool) -> ColumnElement
 
 
 def has_groups_filter(has_groups: bool | None) -> ColumnElement[bool] | None:
-    """The WHERE clause of the user-list filter "Hat SSO-Gruppen" (None: no filter).
+    """Return the WHERE clause of the user-list filter "Hat SSO-Gruppen" (None: no filter).
 
     ``oidc_groups`` can be SQL NULL, a JSON ``null`` or an array, so the length is read
     only for an array (a CASE, because SQL does not short-circuit an AND).
@@ -478,12 +489,14 @@ def has_groups_filter(has_groups: bool | None) -> ColumnElement[bool] | None:
 
 
 async def principals_with_access(session: AsyncSession, ids: list[UUID]) -> set[UUID]:
-    """The principals of ``ids`` that have something a revoke can take away.
+    """Return the principals of ``ids`` that have something a revoke can take away.
 
     That is a gremium membership, a role assignment other than ``member``, a pool entry,
     a delegation in a planned or live meeting, or an SSO group that a mapping turns
     into a Gremium membership or a global role other than ``member``. A group without
-    such a mapping gives no access. One UNION query.
+    such a mapping gives no access. One UNION query. The group match uses the JSONB
+    ``?`` operator, which is true only for a string element of the array, never for
+    JSON null.
     """
     if not ids:
         return set()
@@ -501,7 +514,6 @@ async def principals_with_access(session: AsyncSession, ids: list[UUID]) -> set[
         select(MeetingDelegation.delegate_principal_id)
         .join(Meeting, Meeting.id == MeetingDelegation.meeting_id)
         .where(MeetingDelegation.delegate_principal_id.in_(ids), active_meeting),
-        # `?` is true only for a string element of a JSONB array (false for JSON null).
         select(PrincipalRow.id)
         .join(GremiumMembershipMapping, groups.has_key(GremiumMembershipMapping.oidc_group))
         .where(PrincipalRow.id.in_(ids)),
@@ -514,10 +526,8 @@ async def principals_with_access(session: AsyncSession, ids: list[UUID]) -> set[
     return {r for r in rows if r is not None}
 
 
-# -- Service ------------------------------------------------------------------------
-
-
-def _role(row: Any) -> RoleInfo:  # a Role or a GremiumRole row
+def _role(row: Any) -> RoleInfo:
+    """Build the role info of a ``Role`` or a ``GremiumRole`` row."""
     return RoleInfo(id=row.id, key=row.key, label=dict(row.name_i18n or {}))
 
 
@@ -525,6 +535,7 @@ class PrincipalRevokeService:
     """Preview and run the revoke of the rights of one person."""
 
     def __init__(self, session: AsyncSession, settings: Settings | None = None) -> None:
+        """Bind the service to a session and the settings of the bootstrap admins."""
         self.session = session
         self.settings = settings
 
@@ -557,7 +568,10 @@ class PrincipalRevokeService:
         return row
 
     async def _snapshot(self, row: PrincipalRow) -> Snapshot:
-        """Load everything that ties the principal to a Gremium or a global role."""
+        """Load everything that ties the principal to a Gremium or a global role.
+
+        Open votes count only in a Gremium where the gremium role of the person votes.
+        """
         s = self.session
         pid = row.id
         snap = Snapshot(principal_id=pid, groups=[str(g) for g in (row.oidc_groups or [])])
@@ -641,7 +655,6 @@ class PrincipalRevokeService:
         snap.grantor_names = {
             sub: ref.name for sub, ref in (await refs_by_sub(s, grantors)).items()
         }
-        # Only a Gremium where the gremium role votes has open votes for the person.
         snap.open_tasks = await self._open_tasks(
             row.sub, {m.gremium_id for m in snap.memberships if m.can_vote}
         )
@@ -747,8 +760,6 @@ class PrincipalRevokeService:
                 payload.global_role_ids,
                 deactivate=payload.deactivate,
             )
-            # The other side of each delegation gets the mail: the delegate when the
-            # person delegated, the delegator when the person was the delegate.
             mails = [
                 await meeting_delegation_mail_info(
                     self.session, d.id, to_delegator=d.delegate_id == row.id
@@ -777,12 +788,19 @@ class PrincipalRevokeService:
     async def _apply(
         self, row: PrincipalRow, plan: RevokePlan, actor: str, *, deactivate: bool
     ) -> bool:
-        """Write the plan. Does not commit. Returns True when it deactivated the account."""
+        """Write the plan. Does not commit. Returns True when it deactivated the account.
+
+        The groups get a new list, because the JSONB column registers only a
+        reassignment. The delegation revoke writes the same audit entry as the revoke route, plus
+        the marker ``byAccessRevoke``. The sessions end, because a session renews
+        itself at the IdP every few hours and would put the removed groups back; a new
+        login is then the only way back. A deactivation writes the same entry as
+        ``set_principal_active``.
+        """
         s = self.session
         audit = AuditService(s)
         if plan.removed_groups:
             gone = set(plan.removed_groups)
-            # A new list, so the JSONB column registers the change.
             row.oidc_groups = [g for g in (row.oidc_groups or []) if str(g) not in gone]
         if plan.assignments:
             await s.execute(
@@ -798,7 +816,6 @@ class PrincipalRevokeService:
             )
         for d in plan.delegations:
             await s.execute(delete(MeetingDelegation).where(MeetingDelegation.id == d.id))
-            # The same entry as the revoke route writes, plus the marker of this path.
             await audit.record(
                 actor=actor,
                 action=AuditAction.DELEGATION_REVOKE,
@@ -812,12 +829,9 @@ class PrincipalRevokeService:
             )
         await s.flush()
         await sync_principal_memberships(s, row)
-        # A session renews itself at the IdP every few hours and would put the removed
-        # groups back. Ending the sessions makes a new login the only way back.
         await end_principal_sessions(s, row.id)
         deactivated = deactivate and row.active is not False
         if deactivated:
-            # The existing deactivation path (`set_principal_active`) writes this entry.
             row.active = False
             await audit.record(
                 actor=actor,

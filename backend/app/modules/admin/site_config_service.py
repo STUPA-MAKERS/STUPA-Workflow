@@ -46,34 +46,36 @@ from app.modules.config_revision.service import (
 from app.modules.files.scanner import scan_or_raise
 from app.settings import Settings, get_settings
 
-# Fallback app names for the case where the config leaves them empty. They match the
-# defaults in ``frontend/public/manifest.webmanifest``.
+#: Fallback app names for the case where the config leaves them empty. They match the
+#: defaults in ``frontend/public/manifest.webmanifest``.
 DEFAULT_APP_NAME = "STUPA Antragsplattform"
 DEFAULT_APP_SHORT_NAME = "STUPA"
 
-# The manifest colour per theme: the surface of the bottom bar (``--color-surface-3`` of
-# the ui-kit tokens). Chrome cannot draw an installed Android app under the system
-# navigation bar and paints that bar with a manifest colour, ``theme_color`` or
-# ``background_color`` depending on the version. Both take the bottom bar surface, so the
-# two bars meet without a seam in every version; the splash screen shows the same colour.
-# The status bar follows the ``theme-color`` meta tag of the page (frontend ThemeService),
-# so it keeps the page background. The manifest has no per-scheme variant, so the
-# frontend links ``?scheme=dark`` while the dark theme is in effect.
+#: The manifest colour per theme: the surface of the bottom bar (``--color-surface-3`` of
+#: the ui-kit tokens). Chrome cannot draw an installed Android app under the system
+#: navigation bar and paints that bar with a manifest colour, ``theme_color`` or
+#: ``background_color`` depending on the version. Both take the bottom bar surface, so the
+#: two bars meet without a seam in every version; the splash screen shows the same colour.
+#: The status bar follows the ``theme-color`` meta tag of the page (frontend ThemeService),
+#: so it keeps the page background. The manifest has no per-scheme variant, so the
+#: frontend links ``?scheme=dark`` while the dark theme is in effect.
 MANIFEST_COLORS: dict[str, str] = {"light": "#e6e9e5", "dark": "#262a27"}
 
-# The icon of a manifest shortcut: the app icon at 96 px, the size that Android asks for.
+#: The icon of a manifest shortcut: the app icon at 96 px, the size that Android asks for.
 _SHORTCUT_ICON: dict = {"src": "icons/icon-96x96.png", "sizes": "96x96", "type": "image/png"}
 
-# The static manifest fields, that is everything except name and short_name.
-# They are the single source of truth for the PWA manifest that the API serves.
+#: The static manifest fields, that is everything except name and short_name.
+#: They are the single source of truth for the PWA manifest that the API serves.
+#: The fixed ``id`` keeps an installed app the same app when ``start_url`` changes.
+#: The shortcut names are German like ``lang`` and equal those of
+#: ``frontend/public/manifest.webmanifest``. ``launch_handler`` opens an app link in
+#: the running app, not in a second window.
 _MANIFEST_BASE: dict = {
     "description": (
         "Antragsplattform des Studierendenparlaments — Anträge, Abstimmungen, "
         "Sitzungsprotokolle und Budget."
     ),
     "lang": "de",
-    # A fixed identity. Without it the browser derives the id from start_url, and a
-    # later change of start_url makes an installed app a different app.
     "id": "/",
     "display": "standalone",
     "scope": "./",
@@ -130,16 +132,11 @@ _MANIFEST_BASE: dict = {
             "purpose": "maskable",
         },
     ],
-    # The menu of a long press on the home screen icon (Android, desktop). The names are
-    # German, because the manifest is German (`lang`). Keep them equal to
-    # frontend/public/manifest.webmanifest.
     "shortcuts": [
         {"name": "Neuer Antrag", "url": "apply", "icons": [_SHORTCUT_ICON]},
         {"name": "Meine To-Dos", "url": "todos", "icons": [_SHORTCUT_ICON]},
         {"name": "Sitzungen", "url": "meetings", "icons": [_SHORTCUT_ICON]},
     ],
-    # A link into the app opens in the running app and navigates there, not in a second
-    # window. A browser without navigate-existing takes its own default.
     "launch_handler": {"client_mode": ["navigate-existing", "auto"]},
 }
 
@@ -168,6 +165,7 @@ class SiteConfigService:
     """
 
     def __init__(self, session: AsyncSession, *, settings: Settings | None = None) -> None:
+        """Bind the service to a session and the settings."""
         self.session = session
         self.settings = settings
 

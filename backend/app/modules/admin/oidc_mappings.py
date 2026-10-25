@@ -54,6 +54,7 @@ class OidcMappingService:
     """CRUD for the membership mappings and the gremium role mappings."""
 
     def __init__(self, session: AsyncSession) -> None:
+        """Bind the service to a database session."""
         self.session = session
 
     async def _flush(self, message: str) -> None:
@@ -80,13 +81,12 @@ class OidcMappingService:
         await sync_all_memberships(self.session)
         await self.session.commit()
 
-    # ------------------------------------------------------------ membership
-
     async def _gremium_exists(self, gremium_id: UUID) -> None:
         if await self.session.get(Gremium, gremium_id) is None:
             raise NotFoundError(f"gremium {gremium_id} not found")
 
     async def list_membership_mappings(self) -> list[GremiumMembershipMappingOut]:
+        """List the OIDC group to gremium membership mappings."""
         rows = (
             await self.session.scalars(
                 select(GremiumMembershipMapping).order_by(GremiumMembershipMapping.oidc_group)
@@ -97,6 +97,7 @@ class OidcMappingService:
     async def create_membership_mapping(
         self, payload: GremiumMembershipMappingCreate, actor: str
     ) -> GremiumMembershipMappingOut:
+        """Create a membership mapping."""
         await self._gremium_exists(payload.gremium_id)
         row = GremiumMembershipMapping(
             gremium_id=payload.gremium_id, oidc_group=payload.oidc_group
@@ -109,6 +110,11 @@ class OidcMappingService:
     async def update_membership_mapping(
         self, mapping_id: UUID, payload: GremiumMembershipMappingUpdate, actor: str
     ) -> GremiumMembershipMappingOut:
+        """Update a membership mapping.
+
+        Raises:
+            NotFoundError: No membership mapping has this id.
+        """
         row = await self.session.get(GremiumMembershipMapping, mapping_id)
         if row is None:
             raise NotFoundError(f"gremium membership mapping {mapping_id} not found")
@@ -122,14 +128,17 @@ class OidcMappingService:
         return _membership_mapping_out(row)
 
     async def delete_membership_mapping(self, mapping_id: UUID, actor: str) -> None:
+        """Delete a membership mapping.
+
+        Raises:
+            NotFoundError: No membership mapping has this id.
+        """
         row = await self.session.get(GremiumMembershipMapping, mapping_id)
         if row is None:
             raise NotFoundError(f"gremium membership mapping {mapping_id} not found")
         await self.session.delete(row)
         await self.session.flush()
         await self._audit_sync_commit(actor, "gremium_membership_mapping", mapping_id)
-
-    # ------------------------------------------------------------ role
 
     async def _role(self, role_id: UUID) -> GremiumRole:
         role = await self.session.get(GremiumRole, role_id)
@@ -138,6 +147,7 @@ class OidcMappingService:
         return role
 
     async def list_role_mappings(self) -> list[GremiumRoleMappingOut]:
+        """List the OIDC group to gremium role mappings."""
         rows = (
             await self.session.execute(
                 select(GremiumRoleMapping, GremiumRole.gremium_id)
@@ -150,6 +160,7 @@ class OidcMappingService:
     async def create_role_mapping(
         self, payload: GremiumRoleMappingCreate, actor: str
     ) -> GremiumRoleMappingOut:
+        """Create a role mapping."""
         role = await self._role(payload.gremium_role_id)
         row = GremiumRoleMapping(gremium_role_id=role.id, oidc_group=payload.oidc_group)
         self.session.add(row)
@@ -160,6 +171,11 @@ class OidcMappingService:
     async def update_role_mapping(
         self, mapping_id: UUID, payload: GremiumRoleMappingUpdate, actor: str
     ) -> GremiumRoleMappingOut:
+        """Update a role mapping.
+
+        Raises:
+            NotFoundError: No role mapping has this id.
+        """
         row = await self.session.get(GremiumRoleMapping, mapping_id)
         if row is None:
             raise NotFoundError(f"gremium role mapping {mapping_id} not found")
@@ -172,6 +188,11 @@ class OidcMappingService:
         return _role_mapping_out(row, role.gremium_id)
 
     async def delete_role_mapping(self, mapping_id: UUID, actor: str) -> None:
+        """Delete a role mapping.
+
+        Raises:
+            NotFoundError: No role mapping has this id.
+        """
         row = await self.session.get(GremiumRoleMapping, mapping_id)
         if row is None:
             raise NotFoundError(f"gremium role mapping {mapping_id} not found")

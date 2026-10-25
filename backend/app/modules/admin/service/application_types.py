@@ -54,6 +54,11 @@ class ApplicationTypeOps(ConfigServiceBase):
     async def create_application_type(
         self, payload: ApplicationTypeCreate, actor: str
     ) -> ApplicationTypeOut:
+        """Create an application type.
+
+        Raises:
+            ConflictError: The key exists already.
+        """
         existing = (
             await self.session.scalars(
                 select(ApplicationType).where(ApplicationType.key == payload.key)
@@ -82,6 +87,11 @@ class ApplicationTypeOps(ConfigServiceBase):
     async def update_application_type(
         self, type_id: UUID, payload: ApplicationTypeUpdate, actor: str
     ) -> ApplicationTypeOut:
+        """Update an application type.
+
+        A sent ``retentionMonths`` applies always, and a sent null resets it to the
+        global default. An omitted field stays unchanged.
+        """
         row = await self._get_type(type_id)
         if payload.name_i18n is not None:
             row.name_i18n = payload.name_i18n
@@ -91,8 +101,6 @@ class ApplicationTypeOps(ConfigServiceBase):
             row.has_budget = payload.has_budget
         if payload.comparison_offers is not None:
             row.comparison_offers = payload.comparison_offers.model_dump(by_alias=True)
-        # Apply retentionMonths whenever the client sends it. A sent null resets
-        # the value to the global default. An omitted field stays unchanged.
         if "retention_months" in payload.model_fields_set:
             row.retention_months = payload.retention_months
         await self._audit(actor, AuditAction.CONFIG_CHANGE, "application_type", row.id)

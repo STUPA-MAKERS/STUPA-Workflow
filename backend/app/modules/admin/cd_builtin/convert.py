@@ -43,8 +43,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger("app.admin.cd_builtin")
 
-# Fixed advisory-lock key of the conversion. It is a constant, not user input.
-_LOCK_KEY: Final[int] = 0x43445F4255494C54  # "CD_BUILT"
+#: Fixed advisory-lock key of the conversion (``"CD_BUILT"``). It is a constant, not
+#: user input.
+_LOCK_KEY: Final[int] = 0x43445F4255494C54
 SYSTEM_ACTOR: Final[str] = "system"
 SEED_NAME: Final[str] = "StuPa"
 NEW_NAME: Final[str] = "STUPA"

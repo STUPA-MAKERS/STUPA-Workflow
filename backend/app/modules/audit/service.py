@@ -40,10 +40,11 @@ from app.shared.paging import Page
 
 logger = logging.getLogger("app.audit")
 
-# Fixed advisory-lock key. It serializes chain appends across processes.
-_CHAIN_LOCK_KEY = 0x4155_4449_5400  # "AUDIT\0"
-# Fixed advisory-lock key. It lets only one chain check run at a time.
-_VERIFY_LOCK_KEY = 0x4155_4449_5601  # "AUDIV\1"
+#: Fixed advisory-lock key (``"AUDIT\0"``). It serializes chain appends across
+#: processes. It is a constant, not user input, so SQL interpolation of it is safe.
+_CHAIN_LOCK_KEY = 0x4155_4449_5400
+#: Fixed advisory-lock key (``"AUDIV\1"``). It lets only one chain check run at a time.
+_VERIFY_LOCK_KEY = 0x4155_4449_5601
 
 
 def data_uuid_strings(data: object) -> set[str]:
@@ -86,6 +87,7 @@ class AuditService:
     """Audit service bound to an ``AsyncSession``."""
 
     def __init__(self, session: AsyncSession) -> None:
+        """Bind the service to a database session."""
         self.session = session
 
     async def record(
@@ -102,14 +104,13 @@ class AuditService:
 
         The method does not commit. It runs in the transaction of the caller. The
         ``data`` payload holds id references and metadata only. The caller is
-        responsible for keeping raw PII values out of it.
+        responsible for keeping raw PII values out of it. A transaction-scoped
+        advisory lock serializes the appends, so ``prev_hash`` stays consistent.
         """
         action_value = str(action)
         payload = data or {}
         stamp = at or datetime.now(UTC)
 
-        # Serialize appends so that `prev_hash` stays consistent. The key is a fixed
-        # integer constant and not user input, so the direct interpolation is safe.
         await self.session.execute(text(f"SELECT pg_advisory_xact_lock({_CHAIN_LOCK_KEY})"))
         prev_hash = (
             await self.session.execute(
@@ -157,7 +158,7 @@ class AuditService:
             rid = data.get("revisionId")
             if rid:
                 revision_ids[e.id] = str(rid)
-                flags[e.id] = False  # turns True only after the predecessor check
+                flags[e.id] = False
             elif e.action == AuditAction.STATUS_CHANGE:
                 flags[e.id] = bool(data.get("fromStateId") and data.get("toStateId"))
             elif e.action in REVERTABLE_BUDGET_ACTIONS:
@@ -180,7 +181,7 @@ class AuditService:
                 try:
                     uuid_map[uuid.UUID(rid)] = eid
                 except ValueError:
-                    continue  # defensive: revisionId is normally always a UUID
+                    continue
             if uuid_map:
                 rows = (
                     await self.session.execute(
@@ -200,12 +201,11 @@ class AuditService:
 
         The check is fail-closed. The method streams row by row with a server-side
         cursor instead of loading the whole chain into memory. A very long log stays
-        verifiable.
+        verifiable. ``populate_existing`` makes it read the rows as the database holds
+        them, never a copy that the identity map of this session still caches.
         """
         prev_hash: bytes | None = None
         checked = 0
-        # `populate_existing`: the check must read the rows as the database holds
-        # them, never a copy that the identity map of this session still caches.
         stream = await self.session.stream_scalars(
             select(AuditEntry)
             .order_by(AuditEntry.id.asc())
@@ -262,7 +262,6 @@ class AuditService:
         Returns:
             The stored row.
         """
-        # The key is a fixed integer constant and not user input.
         await self.session.execute(text(f"SELECT pg_advisory_xact_lock({_VERIFY_LOCK_KEY})"))
         return await self._verify_and_store_locked(
             trigger=trigger, triggered_by=triggered_by, keep=keep
@@ -277,7 +276,9 @@ class AuditService:
         """Run a manual chain check (``trigger = manual``) and store the result.
 
         The check reads the whole log inside the API request. The method therefore
-        refuses a run that it cannot do now. It does not wait for the check lock.
+        refuses a run that it cannot do now. It does not wait for the check lock. A
+        refusal rolls back at once, so the lock goes free before the request session
+        closes.
 
         Raises:
             ConflictError: Another check (cron, restore or manual) is in progress.
@@ -303,7 +304,6 @@ class AuditService:
         if last_manual is not None:
             wait = last_manual + cooldown - datetime.now(UTC)
             if wait > timedelta(0):
-                # Release the lock now, not when the request session closes.
                 await self.session.rollback()
                 raise RateLimitedError(
                     "a manual audit chain check ran a short time ago",
@@ -533,7 +533,16 @@ class AuditService:
         A config target keeps the id of the entity it configures. ``form`` therefore
         holds an ``application_type`` id and reads the same table. ``flow`` holds the
         literal id ``global`` and ``notification_settings`` holds ``1``. Both are
-        singletons with no name column, so no lookup can resolve them.
+        singletons with no name column, so no lookup can resolve them. A
+        non-UUID id (for example an export filename) is its own label.
+
+        One query serves ``form`` and ``application_type``, because the type name is
+        the only name a form has. A principal target names the account itself (the
+        merge entry names the old account); only an account without a name of its own
+        shows the name of the account it was merged into. A draft attachment has no
+        application yet, so its file name stays out of the log view until the create
+        binds it. A site-config version has no name column, so its version number is
+        the label: it tells two drafts apart and reads the same in both UI locales.
         """
         by_type: dict[str, set[uuid.UUID]] = {}
         for target_type, target_id in targets:
@@ -542,7 +551,7 @@ class AuditService:
             try:
                 by_type.setdefault(target_type, set()).add(uuid.UUID(target_id))
             except ValueError:
-                continue  # for example an export filename: target_id is the label
+                continue
 
         labels: dict[tuple[str, str], str] = {}
 
@@ -578,9 +587,6 @@ class AuditService:
             await fill(
                 "gremium", select(Gremium.id, Gremium.name).where(Gremium.id.in_(ids))
             )
-        # ``form`` and ``application_type`` both hold an application-type id, so one
-        # query serves both. A form config change writes the id of the type it belongs
-        # to, and the type name is the only name a form has.
         form_ids = by_type.get("form", set())
         type_ids = by_type.get("application_type", set())
         if form_ids or type_ids:
@@ -615,9 +621,6 @@ class AuditService:
         if ids := by_type.get("principal"):
             from app.modules.auth.identity import refs_by_id
 
-            # A target names the account itself: the merge entry names the old
-            # account. Only an account without a name of its own shows the name of
-            # the account it was merged into.
             for row_id, ref in (await refs_by_id(self.session, ids)).items():
                 if label := ref.label:
                     labels[("principal", str(row_id))] = label
@@ -636,8 +639,6 @@ class AuditService:
 
             await fill(
                 "attachment",
-                # A draft has no application yet. Its file name stays out of
-                # the log view until the create binds it.
                 select(Attachment.id, Attachment.filename).where(
                     Attachment.id.in_(ids), Attachment.application_id.is_not(None)
                 ),
@@ -652,9 +653,6 @@ class AuditService:
         if ids := by_type.get("site_config"):
             from app.modules.admin.models import SiteConfigVersion
 
-            # A site-config version has no name column. The version number is the
-            # only thing that tells two drafts apart, and it reads the same in
-            # both UI locales.
             rows = (
                 await self.session.execute(
                     select(SiteConfigVersion.id, SiteConfigVersion.version).where(
@@ -677,6 +675,10 @@ class AuditService:
         collide. An id that the method cannot resolve, and an id of a deleted row,
         are absent from the map. The method exposes no extra PII beyond the admin
         views.
+
+        The title of an application lives in its JSONB ``data``. An id of a principal
+        names the account itself (``sourceId`` of a merge names the old one). The
+        order of the lookups does not matter, because no lookup overwrites an entry.
         """
         candidates: set[uuid.UUID] = set()
         for d in data_dicts:
@@ -706,7 +708,6 @@ class AuditService:
         from app.modules.livevote.models import Meeting
         from app.modules.voting.models import Vote
 
-        # Application: the title lives in the JSONB ``data``. There is no label column.
         for row_id, data in (
             await self.session.execute(
                 select(Application.id, Application.data).where(
@@ -729,9 +730,6 @@ class AuditService:
             )
         )
 
-        # Multi-column and derived labels. The order does not matter, because ``fill``
-        # never overwrites an entry.
-        # An id names the account itself (``sourceId`` of a merge names the old one).
         for row_id, ref in (await refs_by_id(self.session, candidates)).items():
             if (label := ref.label) and str(row_id) not in labels:
                 labels[str(row_id)] = label

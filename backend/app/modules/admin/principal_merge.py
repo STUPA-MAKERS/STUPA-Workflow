@@ -140,13 +140,13 @@ from app.modules.todos.models import (
 from app.modules.voting.models import Ballot, Vote, VotedMarker
 from app.shared.errors import ConflictError, FieldError, NotFoundError, ValidationProblem
 
-# The key of the admin role in an effective-rights set: it holds every right.
+#: The key of the admin role in an effective-rights set: it holds every right.
 ALL_RIGHTS = "*"
 
-# SQLSTATE deadlock_detected and serialization_failure: a retry can succeed.
+#: SQLSTATE deadlock_detected and serialization_failure: a retry can succeed.
 _RETRY_SQLSTATES = frozenset({"40P01", "40001"})
 
-# The display order of the areas. It matches the ``MergeArea`` literal.
+#: The display order of the areas. It matches the ``MergeArea`` literal.
 AREAS: tuple[MergeArea, ...] = (
     "applications",
     "versions",
@@ -170,27 +170,23 @@ AREAS: tuple[MergeArea, ...] = (
     "todos",
 )
 
-# Every text column that stores the ``sub`` of a principal, by area. The merge rewrites
-# each one from the source ``sub`` to the target ``sub``. Two are NOT here on purpose,
-# because a trigger keeps their table append-only: ``audit_entry.actor`` and
-# ``config_revision.created_by``. Their displays resolve the old ``sub`` through
-# ``principal.merged_into`` (``auth/identity.py``).
+#: Every text column that stores the ``sub`` of a principal, by area. The merge
+#: rewrites each one to the target ``sub``. ``Ballot.voter_sub`` covers the own and the
+#: represented ballots, because a delegate votes under the ``sub`` of the delegator.
+#: ``VotedMarker`` is the identity half of a secret vote; the merge never reads the
+#: choice half. ``audit_entry.actor`` and ``config_revision.created_by`` are NOT here,
+#: because a trigger keeps their table append-only. Their displays resolve the old
+#: ``sub`` through ``principal.merged_into`` (``auth/identity.py``).
 SUB_COLUMNS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
     ("applications", Application.created_by),
     ("applications", Application.archived_by),
-    # The person who captured an application on behalf of an applicant.
     ("applications", Application.captured_by),
     ("applications", ApplicationShare.created_by),
-    # The person who fired a manual transition with a decision. NULL for a vote.
     ("applications", ApplicationDecision.decided_by),
     ("versions", SubmissionVersion.changed_by),
     ("timeline", StatusEvent.actor),
     ("comments", Comment.author),
-    # A ballot of a delegate runs under the `sub` of the delegator, so this one column
-    # covers the own and the represented ballots.
     ("votes", Ballot.voter_sub),
-    # The identity half of a secret vote. The choice half (`secret_ballot`) has no
-    # identity, and the merge never reads it.
     ("votes", VotedMarker.voter_sub),
     ("delegations", MeetingDelegation.created_by),
     ("substitutes", DelegationSubstitute.created_by),
@@ -213,18 +209,15 @@ SUB_COLUMNS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
     ("backups", AuditVerification.triggered_by),
 )
 
-# Every principal id column without a uniqueness rule, by area. The merge rewrites each
-# one from the source id to the target id. The columns with a uniqueness rule have their
-# own step below. `erasure_request.principal_id` stays on the source on purpose: the
-# request is the proof of what happened to that account (an open one blocks the merge).
+#: Every principal id column without a uniqueness rule, by area. The merge rewrites
+#: each one to the target id. ``erasure_request.principal_id`` stays on the source,
+#: because the request is the proof of what happened to that account.
 ID_COLUMNS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
     ("delegations", MeetingDelegation.delegator_principal_id),
     ("delegations", MeetingDelegation.delegate_principal_id),
     ("meetings", Meeting.protokollant_id),
     ("meetings", ProtocolKeeperPeriod.principal_id),
-    # The meeting lead who decided on a join request of a guest.
     ("meetings", MeetingGuest.decided_by),
-    # Never written so far, but it holds a principal id.
     ("config", FormVersion.created_by),
     ("tickets", Ticket.reporter_principal_id),
     ("tickets", Ticket.assignee_id),
@@ -237,10 +230,10 @@ ID_COLUMNS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
     ("todos", TodoLink.created_by),
 )
 
-# The rows of the source that the merge deletes, by area.
+#: The rows of the source that the merge deletes, by area. Rights never move to the
+#: target, because that is a privilege escalation. The target gets its own roles from
+#: the OIDC group mappings and the bootstrap at its next login.
 REMOVED_ROWS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
-    # Rights never move to the target (privilege escalation). The target gets its own
-    # roles from the OIDC group mappings and the bootstrap at its next login.
     ("roles", RoleAssignment.principal_id),
     ("sessions", AuthSession.principal_id),
     ("sessions", OAuthAuthorizationCode.principal_id),
@@ -248,8 +241,8 @@ REMOVED_ROWS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
 )
 
 
-# The principal columns with a uniqueness rule. `_combined_tables` drops the duplicates
-# of the source and rewrites the rest.
+#: The principal columns with a uniqueness rule. ``_combined_tables`` drops the
+#: duplicates of the source and rewrites the rest.
 COMBINED_COLUMNS: tuple[InstrumentedAttribute[Any], ...] = (
     NotificationPreference.principal_id,
     MeetingAttendance.principal_id,
@@ -259,8 +252,8 @@ COMBINED_COLUMNS: tuple[InstrumentedAttribute[Any], ...] = (
     TicketSenderBlock.principal_id,
 )
 
-# The principal columns that the merge leaves alone on purpose, with the reason. A guard
-# test fails when a model gains a principal column that no list above or here names.
+#: The principal columns that the merge leaves alone, with the reason. A guard test
+#: fails when a model gains a principal column that no list names.
 EXCLUDED_COLUMNS: dict[str, str] = {
     "principal.merged_into": "the merge reference itself; `_source_row` re-points it",
     "audit_entry.actor": "append-only hash chain; the display follows merged_into",
@@ -301,7 +294,7 @@ class _Tally:
         ]
 
     def data(self) -> dict[str, dict[str, int]]:
-        """The non-zero counts for the audit entry (counts only, no PII)."""
+        """Return the non-zero counts for the audit entry (counts only, no PII)."""
         return {
             a: {k: v for k, v in vars(c).items() if v}
             for a, c in self.by_area.items()
@@ -323,7 +316,7 @@ def _principal_out(row: PrincipalRow) -> MergePrincipalOut:
 
 
 def _table(column: InstrumentedAttribute[Any]) -> type[Base]:
-    """The mapped class of a column, as a DML target."""
+    """Return the mapped class of a column, as a DML target."""
     return cast("type[Base]", column.class_)
 
 
@@ -335,9 +328,8 @@ class PrincipalMergeService:
     """Preview and run the merge of an old principal into a new one."""
 
     def __init__(self, session: AsyncSession) -> None:
+        """Bind the service to a database session."""
         self.session = session
-
-    # -- Loading and the preconditions -------------------------------------------------
 
     async def _load(
         self, source_id: UUID, target_id: UUID, *, lock: bool
@@ -421,10 +413,8 @@ class PrincipalMergeService:
         )
         return bool(entries)
 
-    # -- Privileges --------------------------------------------------------------------
-
     async def _effective(self, row: PrincipalRow | None, now: datetime) -> frozenset[str]:
-        """The effective rights of a principal as the RBAC resolver sees them today.
+        """Return the effective rights of a principal as the RBAC resolver sees them today.
 
         A global permission is its key. A gremium permission is ``key@<gremium id>``.
         The ``admin`` role holds every right and gives the single key ``*``.
@@ -459,7 +449,7 @@ class PrincipalMergeService:
     async def _privileges(
         self, source: PrincipalRow, target: PrincipalRow, actor: str
     ) -> tuple[list[MergePermissionOut], bool]:
-        """The rights of the source that the target lacks, and whether the actor holds them.
+        """Return the rights of the source that the target lacks, and whether the actor holds them.
 
         Returns:
             The extra rights (sorted, with the gremium name), and True when the acting
@@ -498,12 +488,19 @@ class PrincipalMergeService:
                 out.append(MergePermissionOut(key="admin" if key == ALL_RIGHTS else key))
         return out, covered
 
-    # -- Conflicts ---------------------------------------------------------------------
-
     async def _conflicts(
         self, source: PrincipalRow, target: PrincipalRow
     ) -> list[MergeConflictOut]:
-        """Find every real conflict. Each one names the vote or the meeting."""
+        """Find every real conflict. Each one names the vote or the meeting.
+
+        The conflicts are: two ballots in the same vote (the open ``ballot`` and the
+        secret ``voted_marker`` each count); both accounts delegated their seat, or
+        both received a vote transfer, in the same meeting; one account is delegator
+        and the other delegate in the same meeting, because after the merge one person
+        would be both, which the no-chain rule forbids; a different attendance in the
+        same meeting (an equal one is a harmless duplicate); an open erasure request,
+        because its execution would erase the account that it names.
+        """
         out: list[MergeConflictOut] = []
 
         async def add(kind: MergeConflictKind, stmt: Select[Any]) -> None:
@@ -514,8 +511,6 @@ class PrincipalMergeService:
         old, new = source.id, target.id
         vote_label = func.coalesce(Vote.question, Meeting.title)
 
-        # Two ballots in the same vote. The open path (`ballot`) and the secret path
-        # (`voted_marker`, identity only) each count.
         for model in (Ballot, VotedMarker):
             a, b = aliased(model), aliased(model)
             await add(
@@ -540,14 +535,12 @@ class PrincipalMergeService:
                 conds.append(getattr(d, name) == value)
             return exists().where(*conds)
 
-        # Both accounts delegated their own seat in the same meeting.
         await add(
             "delegation_same_meeting",
             meeting_where(
                 deleg(delegator_principal_id=old), deleg(delegator_principal_id=new)
             ),
         )
-        # Both accounts received a vote transfer in the same meeting.
         await add(
             "delegation_vote_twice",
             meeting_where(
@@ -555,9 +548,6 @@ class PrincipalMergeService:
                 deleg(delegate_principal_id=new, delegate_voting=True),
             ),
         )
-        # One account is delegator and the other delegate in the same meeting. That
-        # includes a delegation from one account to the other. After the merge one
-        # person would be both, which the no-chain rule forbids.
         await add(
             "delegation_chain",
             meeting_where(
@@ -573,8 +563,6 @@ class PrincipalMergeService:
                 )
             ),
         )
-        # Both accounts have a different attendance in the same meeting. An equal
-        # attendance is a harmless duplicate.
         a_old, a_new = aliased(MeetingAttendance), aliased(MeetingAttendance)
         await add(
             "attendance_differs",
@@ -584,8 +572,6 @@ class PrincipalMergeService:
             .where(a_old.status != a_new.status)
             .order_by(Meeting.date, Meeting.title),
         )
-        # An open erasure request must be decided first: its execution would erase
-        # the account that it names.
         open_erasures = await self._count(
             select(func.count())
             .select_from(ErasureRequest)
@@ -597,15 +583,17 @@ class PrincipalMergeService:
         out.extend(MergeConflictOut(kind="erasure_open") for _ in range(open_erasures))
         return out
 
-    # -- Steps -------------------------------------------------------------------------
-
     async def _count(self, stmt: Select[Any]) -> int:
         return int(await self.session.scalar(stmt) or 0)
 
     async def _plain_columns(
         self, source: PrincipalRow, target: PrincipalRow, tally: _Tally, *, apply: bool
     ) -> None:
-        # Delete first: a removed row (an own role assignment) is never rewritten.
+        """Delete the removed rows, then rewrite the plain columns.
+
+        The delete runs first, so a removed row (an own role assignment) is never
+        rewritten.
+        """
         for area, column in REMOVED_ROWS:
             table = _table(column)
             if apply:
@@ -690,9 +678,18 @@ class PrincipalMergeService:
     async def _combined_tables(
         self, source: PrincipalRow, target: PrincipalRow, tally: _Tally, *, apply: bool
     ) -> None:
+        """Combine the rows of the tables with a uniqueness rule.
+
+        The row of the target wins for a notification kind, an attendance, a pool
+        entry, a to-do assignment and a sender block. A different attendance is a
+        conflict and never reaches this step. A moved self report ``absent`` becomes a
+        lead entry, because the NOT VALID check ``self_status`` refuses such a row on
+        every change; the status stays, so it matches the protocol PDF. A pool entry in
+        which one account substitutes for the other means nothing after the merge and
+        goes.
+        """
         old, new = source.id, target.id
 
-        # Notification preferences: the setting of the target wins for a kind.
         np = aliased(NotificationPreference)
         await self._combine(
             "notifications",
@@ -706,8 +703,6 @@ class PrincipalMergeService:
             apply=apply,
         )
 
-        # Attendance: an equal row of the target is a duplicate. A different one is a
-        # conflict and never reaches this step.
         att = aliased(MeetingAttendance)
         await self._combine(
             "attendance",
@@ -719,9 +714,6 @@ class PrincipalMergeService:
             ),
             tally,
             apply=apply,
-            # An older row can be a self report `absent`. The NOT VALID check
-            # `self_status` refuses such a row on every change, so the moved row
-            # becomes a lead entry. The status stays: it matches the protocol PDF.
             extra={
                 "source": case(
                     (
@@ -736,8 +728,6 @@ class PrincipalMergeService:
             },
         )
 
-        # Substitute pool. An entry in which one account substitutes for the other
-        # turns into "a person substitutes for themselves". It means nothing and goes.
         ds = DelegationSubstitute
         self_entry = or_(
             and_(ds.member_principal_id == old, ds.substitute_principal_id == new),
@@ -752,7 +742,6 @@ class PrincipalMergeService:
         else:
             n = await self._count(select(func.count()).select_from(ds).where(self_entry))
         tally.add("substitutes", combined=n)
-        # The member side: the same substitute for the target is a duplicate.
         other = aliased(DelegationSubstitute)
         await self._combine(
             "substitutes",
@@ -767,7 +756,6 @@ class PrincipalMergeService:
             tally,
             apply=apply,
         )
-        # To-do assignments: the target is already assigned to the same card.
         ta = aliased(TodoAssignee)
         await self._combine(
             "todos",
@@ -778,7 +766,6 @@ class PrincipalMergeService:
             tally,
             apply=apply,
         )
-        # Sender blocks: a block of the target already holds the account.
         tsb = aliased(TicketSenderBlock)
         await self._combine(
             "tickets",
@@ -790,8 +777,6 @@ class PrincipalMergeService:
             apply=apply,
         )
 
-        # The substitute side: the target already substitutes for the same member (or
-        # gremium-wide) in the gremium.
         other = aliased(DelegationSubstitute)
         await self._combine(
             "substitutes",
@@ -869,7 +854,12 @@ class PrincipalMergeService:
     async def _source_row(
         self, source: PrincipalRow, target: PrincipalRow, tally: _Tally, *, apply: bool
     ) -> datetime | None:
-        """Lock the source as a reference to the target. Return the merge time."""
+        """Lock the source as a reference to the target. Return the merge time.
+
+        Earlier merges into the source move on to the target, so a chain is one step
+        only. The membership sync treats a merged principal as without groups and
+        deletes its memberships, each with its own audit entry.
+        """
         memberships = await self._count(
             select(func.count())
             .select_from(GremiumMembership)
@@ -880,7 +870,6 @@ class PrincipalMergeService:
         if not apply:
             return None
         now = datetime.now(UTC)
-        # Earlier merges into the source move on to the target: one step only.
         await self.session.execute(
             update(PrincipalRow)
             .where(PrincipalRow.merged_into == source.id)
@@ -892,12 +881,8 @@ class PrincipalMergeService:
         source.active = False
         source.calendar_token = None
         await self.session.flush()
-        # The sync treats a merged principal as without groups and deletes its
-        # memberships, each with its own audit entry.
         await sync_principal_memberships(self.session, source)
         return now
-
-    # -- Public API --------------------------------------------------------------------
 
     async def preview(
         self, source_id: UUID, target_id: UUID, *, actor: str
@@ -939,7 +924,10 @@ class PrincipalMergeService:
             ConflictError: A precondition fails, the admin merges their own account
                 away (``merge_own_account``), or a real conflict exists
                 (``merge_conflict``, the ``errors`` list each one as
-                ``{field: kind, msg: label}``) (409). Nothing is written then.
+                ``{field: kind, msg: label}``) (409). A row that a parallel request
+                wrote after the conflict check also gives ``merge_conflict``, and a
+                deadlock or serialization failure gives ``merge_retry``, because the
+                same merge can run again. Nothing is written then.
         """
         try:
             source, target = await self._load(source_id, target_id, lock=True)
@@ -977,14 +965,11 @@ class PrincipalMergeService:
                     "sourceId": str(source.id),
                     "targetId": str(target.id),
                     "counts": tally.data(),
-                    # The rights of the source that the target did not hold. Keys only.
                     "extraPermissions": [_permission_label(p) for p in extra],
                 },
             )
             await self.session.commit()
         except IntegrityError as exc:
-            # A request wrote a clashing row after the conflict check (for example a
-            # ballot of the source that a still open session cast). Nothing is written.
             await self.session.rollback()
             raise ConflictError(
                 "The data changed during the merge. Check the preview again.",
@@ -993,8 +978,6 @@ class PrincipalMergeService:
         except DBAPIError as exc:
             await self.session.rollback()
             if _sqlstate(exc) in _RETRY_SQLSTATES:
-                # A deadlock or a serialization failure against a parallel write.
-                # Nothing is written; the same merge can run again.
                 raise ConflictError(
                     "The merge met a parallel change. Try again.", code="merge_retry"
                 ) from exc
@@ -1011,7 +994,7 @@ class PrincipalMergeService:
 
 
 def _sqlstate(exc: DBAPIError) -> str | None:
-    """The SQLSTATE of a driver error (psycopg ``pgcode``, asyncpg ``sqlstate``)."""
+    """Return the SQLSTATE of a driver error (psycopg ``pgcode``, asyncpg ``sqlstate``)."""
     for err in (exc.orig, getattr(exc.orig, "__cause__", None)):
         code = getattr(err, "pgcode", None) or getattr(err, "sqlstate", None)
         if isinstance(code, str):

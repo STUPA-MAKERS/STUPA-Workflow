@@ -59,6 +59,7 @@ class PrincipalService:
     """Principal erasure (GDPR Art. 17)."""
 
     def __init__(self, session: AsyncSession) -> None:
+        """Bind the service to a database session."""
         self.session = session
         self.storage_keys: list[str] = []
 
@@ -90,33 +91,37 @@ class PrincipalService:
         ``commit=False`` the keys collect in ``storage_keys``, and the caller removes
         them after its own commit.
 
-        The sender blocks of the account and of its e-mail go too.
+        The sender blocks of the account and of its e-mail go too. Without groups the
+        principal holds no gremium membership any more. The reason of an excuse is
+        personal data and goes; the attendance status stays, because the protocols carry
+        it. Only rows with a reason change, so an older (self, absent) row does not meet
+        the self-status check. A candidacy name and its copies in the protocol text go,
+        unless the principal was elected (a documented resolution).
+
+        The to-do rows and the comment files are locked before the first audit entry,
+        because ``finalize_scan`` of an infected file locks its row first and then waits
+        for the lock of the audit chain.
 
         Raises:
             NotFoundError: No principal has this id.
-            ConflictError: The actor is the principal itself (`erase_self`), or the
-                principal is merged into another account (`erase_merged`).
+            ConflictError: The actor is the principal itself (`erase_self`), because
+                it locks out its own session and can leave the platform without an
+                admin. Or the principal is merged into another account
+                (`erase_merged`): its rows point to the account that stays.
         """
         principal = await self.session.get(Principal, principal_id)
         if principal is None:
             raise NotFoundError(f"principal {principal_id} not found")
-        # An admin who erases the own account locks out the session that does it and
-        # can leave the platform without an admin. Another admin must do it.
         if principal.sub == actor:
             raise ConflictError(
                 "You cannot erase your own account. Ask another administrator.",
                 code="erase_self",
             )
-        # A merged account is a locked reference: its rows point to the account that
-        # stays. Erase that account instead.
         if principal.merged_into is not None:
             raise ConflictError(
                 "The account is merged into another account. Erase that account instead.",
                 code="erase_merged",
             )
-        # The to-do rows and the comment files are locked before the first audit
-        # entry, because ``finalize_scan`` of an infected file locks its row first
-        # and then waits for the lock of the audit chain.
         todo_comment_ids = await lock_personal_todos(self.session, principal_id, files=files)
         address = principal.email
         principal.email = None
@@ -124,11 +129,7 @@ class PrincipalService:
         principal.calendar_token = None
         principal.oidc_groups = None
         principal.active = False
-        # Without groups the principal holds no gremium membership any more.
         await sync_principal_memberships(self.session, principal)
-        # The reason of an excuse is personal data. The attendance status stays,
-        # because the protocols carry it. Only the rows with a reason change, so an
-        # older (self, absent) row does not meet the self-status check.
         await self.session.execute(
             update(MeetingAttendance)
             .where(
@@ -137,8 +138,6 @@ class PrincipalService:
             )
             .values(note=None)
         )
-        # The name of a candidacy in an election, and its copies in the protocol
-        # text, unless the principal was elected (a documented resolution).
         erased = await erase_candidacies(self.session, principal_id)
         await erase_candidate_names(self.session, erased)
         await anonymize_reported_tickets(
@@ -279,18 +278,20 @@ class PrivacySettingsService:
     """Single-row config: global retention default in months."""
 
     def __init__(self, session: AsyncSession) -> None:
+        """Bind the service to a database session."""
         self.session = session
 
     async def get(self) -> PrivacySettings:
+        """Return the settings row, and create it when the seed row is missing."""
         settings = await self.session.get(PrivacySettings, 1)
         if settings is None:
-            # If the migration seed row is missing (fresh schema), create it.
             settings = PrivacySettings(id=1)
             self.session.add(settings)
             await self.session.flush()
         return settings
 
     async def update(self, *, default_retention_months: int) -> PrivacySettings:
+        """Change the global retention default and commit."""
         settings = await self.get()
         settings.default_retention_months = default_retention_months
         await self.session.commit()
@@ -302,6 +303,7 @@ class ErasureRequestService:
     """Erasure-request queue (GDPR Art. 17): open -> executed | rejected."""
 
     def __init__(self, session: AsyncSession) -> None:
+        """Bind the service to a database session."""
         self.session = session
 
     async def create(
@@ -313,19 +315,26 @@ class ErasureRequestService:
         email: str | None = None,
         requested_by: str | None = None,
     ) -> ErasureRequest:
+        """Open an erasure request.
+
+        The application is checked first, so a bad FK gives 404, not 500 on flush.
+        The applicant email is captured now, because the anonymization nulls it and
+        the confirmation mail still needs it.
+
+        Raises:
+            ValidationProblem: The subject id that the subject type needs is missing.
+            NotFoundError: The application does not exist.
+        """
         if subject_type == "applicant" and application_id is None:
             raise ValidationProblem("applicant erasure requires an application_id")
         if subject_type == "principal" and principal_id is None:
             raise ValidationProblem("principal erasure requires a principal_id")
-        # Check the row first so a bad FK gives a 404, not a 500 on flush.
         if (
             application_id is not None
             and await self.session.get(Application, application_id) is None
         ):
             raise NotFoundError(f"application {application_id} not found")
         if subject_type == "applicant" and email is None and application_id is not None:
-            # Capture the applicant email now. Anonymization nulls it, but the
-            # confirmation mail still needs it.
             email = await self.session.scalar(
                 select(Applicant.email).where(Applicant.application_id == application_id)
             )
@@ -352,12 +361,14 @@ class ErasureRequestService:
         return request
 
     async def list(self, *, status: str | None = None) -> list[ErasureRequest]:
+        """List the erasure requests, the newest first, optionally by status."""
         stmt = select(ErasureRequest).order_by(ErasureRequest.created_at.desc())
         if status is not None:
             stmt = stmt.where(ErasureRequest.status == status)
         return list((await self.session.scalars(stmt)).all())
 
     async def get(self, request_id: UUID) -> ErasureRequest | None:
+        """Return an erasure request by id, or None."""
         return await self.session.get(ErasureRequest, request_id)
 
     async def _require_open(self, request_id: UUID) -> ErasureRequest:
@@ -377,6 +388,8 @@ class ErasureRequestService:
 
         The service anonymizes the application or erases the principal. If `files`
         carries an object storage, the service also removes the attachment objects.
+        An applicant request also anonymizes the tickets that the same address reported
+        without a session, because the Auskunft lists those tickets.
 
         Raises:
             NotFoundError: No erasure request has this id.
@@ -395,8 +408,6 @@ class ErasureRequestService:
                 target_type="application",
                 target_id=str(request.application_id),
             )
-            # The applicant can also have reported a ticket without a session under
-            # the same address; the Auskunft lists those tickets, so they go too.
             await anonymize_reported_tickets(
                 self.session, actor=actor, files=files, email=request.email
             )
@@ -428,6 +439,12 @@ class ErasureRequestService:
     async def reject(
         self, request_id: UUID, *, actor: str, reason: str | None = None
     ) -> ErasureRequest:
+        """Reject an open request and commit.
+
+        Raises:
+            NotFoundError: No erasure request has this id.
+            ConflictError: The request is not open.
+        """
         request = await self._require_open(request_id)
         request.status = "rejected"
         request.handled_by = actor
@@ -449,14 +466,24 @@ class AuskunftService:
     """GDPR access request (Art. 15): gather all PII stored for an email."""
 
     def __init__(self, session: AsyncSession) -> None:
+        """Bind the service to a database session."""
         self.session = session
 
     async def collect(self, email: str, *, locale: str = "de") -> dict[str, Any]:
         """Gather every record that the platform stores for one email address.
 
         The result holds the applicants and their applications with data and version
-        history. It also holds the comments that the subject can see, the attachment
-        metadata, and the matching principal.
+        history. It also holds the comments that the subject can see (the own comments
+        and the public ones, never internal notes), the attachment metadata (no binary,
+        no filename, because a filename can be PII), and the matching principal.
+
+        Several principals can share the address, because a merged account keeps its
+        email. The live account comes first: not merged, then active, then the newest
+        login. The result also holds its attendance with excuse reasons, the tickets
+        that the address reported (without a session or through the account) with
+        their attachment metadata, and the own ticket messages with file names.
+        Deleted messages keep their text until the anonymization, so they are part of
+        the export.
 
         Returns:
             Rows ready for `build_auskunft_workbook`.
@@ -540,9 +567,6 @@ class AuskunftService:
                 for v in vrows
             ]
 
-            # Restrict the result to the comments that the subject can see. These are
-            # the comments of the subject (author_kind='applicant') and the comments
-            # with visibility 'public'. The query excludes internal principal notes.
             crows = list(
                 (
                     await self.session.scalars(
@@ -580,8 +604,6 @@ class AuskunftService:
                 for c in crows
             ]
 
-            # Attachment metadata only. A filename can be PII. The export holds no
-            # binary object.
             arows = list(
                 (
                     await self.session.scalars(
@@ -605,9 +627,6 @@ class AuskunftService:
                 for at in arows
             ]
 
-        # Several rows can share the address: an account that was merged into a newer
-        # one keeps its email (account merge). The live account comes first: not
-        # merged, then active, then the newest login.
         principal_row = await self.session.scalar(
             select(Principal)
             .where(Principal.email == email)
@@ -620,7 +639,6 @@ class AuskunftService:
         )
         attendance: list[dict[str, Any]] = []
         if principal_row is not None:
-            # The attendance of the principal, with the reason of an excuse.
             arows = (
                 await self.session.execute(
                     select(MeetingAttendance, Meeting)
@@ -640,8 +658,6 @@ class AuskunftService:
                 }
                 for rec, meeting in arows
             ]
-        # The tickets that the address reported: as the e-mail of a report without a
-        # session, or through the account.
         reporter = [Ticket.reporter_email == email]
         if principal_row is not None:
             reporter.append(Ticket.reporter_principal_id == principal_row.id)
@@ -660,7 +676,6 @@ class AuskunftService:
             for t in trows
         ]
         if trows:
-            # The attachments of the reported tickets: metadata only, as above.
             number_by_ticket = {t.id: format_number(t.number) for t in trows}
             tarows = (
                 await self.session.scalars(
@@ -681,9 +696,6 @@ class AuskunftService:
             )
         ticket_notes: list[dict[str, Any]] = []
         if principal_row is not None:
-            # The own ticket messages of the account, with the names of their files: the
-            # chat of a reporter and the notes of a team member. Deleted messages keep
-            # their text until the anonymization, so they are part of the export.
             nrows = (
                 await self.session.execute(
                     select(TicketNote, Ticket.number)
@@ -808,15 +820,17 @@ def build_auskunft_workbook(
         headers: Sequence[str],
         rows: Sequence[Sequence[Any]],
     ) -> None:
+        """Add a sheet and neutralize formula injection in every cell.
+
+        Applicant text such as a comment body or a filename can start a formula. The
+        shared base sheets get the same protection from ``app.shared.xlsx._safe``.
+        """
         ws = wb.create_sheet(title=title)
         ws.append([_safe(h) for h in headers])
         for cell in ws[1]:
             cell.font = Font(bold=True)
         ws.freeze_panes = "A2"
         for row in rows:
-            # Neutralize formula injection in applicant-supplied text such as a
-            # comment body or a filename. The shared base sheets get the same
-            # protection from app.shared.xlsx._safe.
             ws.append([_safe(cell) for cell in row])
         widths = [len(str(h)) for h in headers]
         for r in ws.iter_rows(min_row=2, values_only=True):

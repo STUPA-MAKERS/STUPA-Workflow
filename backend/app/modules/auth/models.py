@@ -21,16 +21,16 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, CreatedAtMixin, UUIDPkMixin
 
-# The client kind of a principal session. `pwa` is the installed app (display mode
-# standalone), `web` every browser tab. Each kind has its own lifetime.
+#: The client kind of a principal session. `pwa` is the installed app (display mode
+#: standalone), `web` every browser tab. Each kind has its own lifetime.
 SESSION_CLIENT_WEB = "web"
 SESSION_CLIENT_PWA = "pwa"
 SESSION_CLIENTS = (SESSION_CLIENT_WEB, SESSION_CLIENT_PWA)
-# Default lifetimes of a principal session in days, after the last use.
+#: Default lifetimes of a principal session in days, after the last use.
 DEFAULT_WEB_SESSION_DAYS = 90
 DEFAULT_PWA_SESSION_DAYS = 180
-# Upper bound of both lifetimes. Browsers cap a cookie at 400 days (RFC 6265bis), so a
-# longer value would end at the browser anyway.
+#: Upper bound of both lifetimes. Browsers cap a cookie at 400 days (RFC 6265bis), so a
+#: longer value would end at the browser anyway.
 MAX_SESSION_DAYS = 400
 
 
@@ -39,6 +39,10 @@ class Principal(UUIDPkMixin, Base):
 
     The PII, the email address, stays in this table. It never enters the audit `data`
     column.
+
+    The calendar token has a unique index, not a constraint, so the migration can
+    create and drop it idempotently with ``IF [NOT] EXISTS``. Postgres allows more
+    than one NULL under a unique index.
     """
 
     __tablename__ = "principal"
@@ -50,18 +54,18 @@ class Principal(UUIDPkMixin, Base):
     last_login: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    # Deactivated principals must not log in.
+    #: Deactivated principals must not log in.
     active: Mapped[bool] = mapped_column(
         Boolean, server_default="true", default=True
     )
-    # Personal iCal feed token that the user can rotate. The subscription URL carries it
-    # in plaintext. The sensitivity is low: it exposes only the titles and times of the
-    # meetings of the own Gremien. A rotation revokes the old URL.
+    #: Personal iCal feed token that the user can rotate. The subscription URL carries it
+    #: in plaintext. The sensitivity is low: it exposes only the titles and times of the
+    #: meetings of the own Gremien. A rotation revokes the old URL.
     calendar_token: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Account merge: an admin merged this (old) principal into another one. The row
-    # stays as a locked reference: it cannot log in, and every display of its `sub`
-    # or id shows the name of `merged_into`. The audit log keeps the old `sub`.
-    # A merged principal is never the target of a merge, so the chain has one step.
+    #: Account merge: an admin merged this (old) principal into another one. The row
+    #: stays as a locked reference: it cannot log in, and every display of its `sub`
+    #: or id shows the name of `merged_into`. The audit log keeps the old `sub`.
+    #: A merged principal is never the target of a merge, so the chain has one step.
     merged_into: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("principal.id", ondelete="RESTRICT"), nullable=True
     )
@@ -70,9 +74,6 @@ class Principal(UUIDPkMixin, Base):
     )
 
     __table_args__ = (
-        # A unique index on purpose, not a constraint. The migration can then create and
-        # drop it idempotently with CREATE/DROP INDEX IF [NOT] EXISTS. Postgres allows
-        # more than one NULL under a unique index.
         Index("uq_principal_calendar_token", "calendar_token", unique=True),
         Index("ix_principal_merged_into", "merged_into"),
         CheckConstraint("merged_into IS NULL OR merged_into <> id", name="not_self_merged"),
@@ -83,6 +84,8 @@ class Principal(UUIDPkMixin, Base):
 
 
 class Role(UUIDPkMixin, Base):
+    """A global role. Its permissions live in ``role_permission``."""
+
     __tablename__ = "role"
 
     key: Mapped[str] = mapped_column(Text, unique=True)
@@ -103,7 +106,11 @@ class RolePermission(Base):
 
 
 class RoleAssignment(UUIDPkMixin, Base):
-    """Role assignment with a Gremium scope and a validity window for a delegation."""
+    """Role assignment with a Gremium scope and a validity window for a delegation.
+
+    The index on ``delegated_by`` serves the lookup of the active outgoing voting
+    delegations of a member, which the cast block needs.
+    """
 
     __tablename__ = "role_assignment"
 
@@ -115,10 +122,10 @@ class RoleAssignment(UUIDPkMixin, Base):
         ForeignKey("gremium.id", ondelete="CASCADE"), nullable=True
     )
     granted_by: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # `delegated_by` marks a self-delegation. It holds the `sub` of the member who hands
-    # over one of their own rights for a time. It is `NULL` for a plain admin assignment.
-    # It anchors the listing and the revocation of the own delegations. It also anchors
-    # the double-voting block: a delegator who handed over the voting right must not vote.
+    #: `delegated_by` marks a self-delegation. It holds the `sub` of the member who hands
+    #: over one of their own rights for a time. It is `NULL` for a plain admin assignment.
+    #: It anchors the listing and the revocation of the own delegations. It also anchors
+    #: the double-voting block: a delegator who handed over the voting right must not vote.
     delegated_by: Mapped[str | None] = mapped_column(Text, nullable=True)
     valid_from: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
@@ -130,8 +137,6 @@ class RoleAssignment(UUIDPkMixin, Base):
 
     __table_args__ = (
         Index("ix_role_assignment_principal_id", "principal_id"),
-        # Serves the lookup of the active outgoing voting delegations of a member. The
-        # cast block needs it.
         Index("ix_role_assignment_delegated_by", "delegated_by"),
     )
 
@@ -154,12 +159,12 @@ class AuthSession(UUIDPkMixin, CreatedAtMixin, Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     refresh_token: Mapped[str | None] = mapped_column(Text, nullable=True)
     id_token: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # `web` or `pwa`. It selects the lifetime from `login_settings`.
+    #: `web` or `pwa`. It selects the lifetime from `login_settings`.
     client: Mapped[str] = mapped_column(
         Text, server_default=SESSION_CLIENT_WEB, default=SESSION_CLIENT_WEB
     )
-    # The time of the last successful check at the IdP (login or refresh grant).
-    # `session_renewal` checks again after `session_revalidate_hours`.
+    #: The time of the last successful check at the IdP (login or refresh grant).
+    #: `session_renewal` checks again after `session_revalidate_hours`.
     revalidated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

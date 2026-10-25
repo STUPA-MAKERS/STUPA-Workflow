@@ -41,7 +41,6 @@ def _serializer(secret: str, salt: str) -> URLSafeTimedSerializer:
     return URLSafeTimedSerializer(secret, salt=salt)
 
 
-# Applicant session: a server-side row with an opaque sid in a signed cookie.
 def _sign_applicant_sid(secret: str, sid: str) -> str:
     return _serializer(secret, _APPLICANT_SALT).dumps(sid)
 
@@ -140,7 +139,6 @@ async def revoke_applicant_sessions(
     )
 
 
-# OIDC transaction cookie: state, PKCE verifier, nonce and the session client.
 def issue_oidc_tx(
     secret: str,
     state: str,
@@ -149,6 +147,7 @@ def issue_oidc_tx(
     client: str = SESSION_CLIENT_WEB,
     return_to: str | None = None,
 ) -> str:
+    """Sign the OIDC transaction cookie: state, PKCE verifier, nonce and client."""
     data = {"state": state, "verifier": verifier, "nonce": nonce, "client": client}
     if return_to:
         data["return_to"] = return_to
@@ -207,8 +206,8 @@ def load_oidc_tx(secret: str, value: str, max_age: int) -> dict[str, str] | None
     return tx
 
 
-# OAuth AS transaction cookie. It carries the authorize request of an MCP login across
-# the OIDC hop.
+#: OAuth AS transaction cookie. It carries the authorize request of an MCP login across
+#: the OIDC hop.
 _OAUTH_TX_FIELDS = ("client_id", "redirect_uri", "code_challenge", "scope", "state")
 
 
@@ -223,6 +222,7 @@ def issue_oauth_tx(secret: str, data: dict[str, str]) -> str:
 
 
 def load_oauth_tx(secret: str, value: str, max_age: int) -> dict[str, str] | None:
+    """Load the OAuth AS transaction cookie, or return None when it is invalid or expired."""
     try:
         data = _serializer(secret, _OAUTH_TX_SALT).loads(value, max_age=max_age)
     except (BadSignature, SignatureExpired):
@@ -236,10 +236,10 @@ def load_oauth_tx(secret: str, value: str, max_age: int) -> dict[str, str] | Non
     return {k: str(data.get(k, "")) for k in _OAUTH_TX_FIELDS}
 
 
-# Principal session: a server-side row with an opaque sid in a signed cookie.
-# The signature age bound is the longest possible session. The row (`expires_at`) is
-# the real bound, and `GET /auth/me` signs the cookie again on each app start, so an
-# active session never reaches this age.
+#: Principal session: a server-side row with an opaque sid in a signed cookie.
+#: The signature age bound is the longest possible session. The row (`expires_at`) is
+#: the real bound, and `GET /auth/me` signs the cookie again on each app start, so an
+#: active session never reaches this age.
 SESSION_COOKIE_MAX_AGE = MAX_SESSION_DAYS * 24 * 3600
 
 

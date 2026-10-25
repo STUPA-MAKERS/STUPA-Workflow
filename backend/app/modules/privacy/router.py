@@ -74,10 +74,12 @@ def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
 
 
 def get_erasure_service(session: DbSession) -> ErasureRequestService:
+    """Build the erasure-request service."""
     return ErasureRequestService(session)
 
 
 def get_settings_service(session: DbSession) -> PrivacySettingsService:
+    """Build the privacy-settings service."""
     return PrivacySettingsService(session)
 
 
@@ -108,6 +110,7 @@ async def list_erasures(
     service: ErasureServiceDep,
     status: Annotated[str | None, Query()] = None,
 ) -> list[ErasureRequestOut]:
+    """List the erasure requests, optionally by status."""
     return [_out(r) for r in await service.list(status=status)]
 
 
@@ -126,6 +129,7 @@ async def execute_erasure(
     background: BackgroundTasks,
     settings: SettingsDep,
 ) -> ErasureRequestOut:
+    """Execute an erasure request and mail the confirmation in the background."""
     files = _files_with_storage(session, request)
     result = await service.execute(request_id, actor=principal.sub, files=files)
     pool = getattr(request.app.state, "arq_pool", None)
@@ -155,6 +159,7 @@ async def reject_erasure(
     background: BackgroundTasks,
     settings: SettingsDep,
 ) -> ErasureRequestOut:
+    """Reject an erasure request and mail the reason in the background."""
     result = await service.reject(request_id, actor=principal.sub, reason=body.reason)
     pool = getattr(request.app.state, "arq_pool", None)
     background.add_task(
@@ -180,6 +185,7 @@ async def erase_principal(
     session: DbSession,
     request: Request,
 ) -> Response:
+    """Erase a principal (GDPR Art. 17)."""
     await PrincipalService(session).erase(
         principal_id,
         actor=principal.sub,
@@ -222,6 +228,7 @@ async def erase_by_email(
     responses=_errors(401, 403),
 )
 async def get_settings(service: SettingsServiceDep) -> PrivacySettingsOut:
+    """Read the privacy settings."""
     settings = await service.get()
     return PrivacySettingsOut.model_validate(settings, from_attributes=True)
 
@@ -235,6 +242,7 @@ async def get_settings(service: SettingsServiceDep) -> PrivacySettingsOut:
 async def put_settings(
     body: PrivacySettingsUpdate, service: SettingsServiceDep
 ) -> PrivacySettingsOut:
+    """Change the global retention default."""
     settings = await service.update(
         default_retention_months=body.default_retention_months
     )

@@ -29,18 +29,24 @@ RESTORE_TASK_NAME = "restore_backup"
 class BackupQueue(Protocol):
     """Enqueue interface for the routes."""
 
-    async def enqueue_create(self, backup_id: UUID) -> None: ...
+    async def enqueue_create(self, backup_id: UUID) -> None:
+        """Enqueue the archive build of a backup row."""
+        ...
 
-    async def enqueue_restore(self, backup_id: UUID, actor: str | None) -> None: ...
+    async def enqueue_restore(self, backup_id: UUID, actor: str | None) -> None:
+        """Enqueue the restore of a backup."""
+        ...
 
 
 @dataclass(slots=True)
 class ArqBackupQueue:
     """arq-backed queue for the two backup tasks."""
 
-    pool: object  # arq.ArqRedis, loosely typed to keep the arq import off the API surface
+    #: An ``arq.ArqRedis``, loosely typed to keep the arq import off the API surface.
+    pool: object
 
     async def enqueue_create(self, backup_id: UUID) -> None:
+        """Enqueue the archive build. The job id makes a second enqueue a no-op."""
         job = await self.pool.enqueue_job(  # type: ignore[attr-defined]
             CREATE_TASK_NAME, str(backup_id), _job_id=f"backup:{backup_id}"
         )
@@ -48,11 +54,12 @@ class ArqBackupQueue:
             logger.info("backup enqueue deduped (backup=%s)", backup_id)
 
     async def enqueue_restore(self, backup_id: UUID, actor: str | None) -> None:
+        """Enqueue the restore of a backup."""
         await self.pool.enqueue_job(  # type: ignore[attr-defined]
             RESTORE_TASK_NAME, str(backup_id), actor
         )
 
 
 def backup_queue_from_pool(pool: ArqRedis | None) -> BackupQueue | None:
-    """Pool → ``BackupQueue`` (or ``None`` when there is no pool)."""
+    """Wrap the pool in a ``BackupQueue``, or return ``None`` without a pool."""
     return ArqBackupQueue(pool) if pool is not None else None

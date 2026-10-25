@@ -67,8 +67,8 @@ if TYPE_CHECKING:
 
     from sqlalchemy.ext.asyncio import AsyncSession
 
-# Prefix of every CD-logo object in the bucket. It keeps the logos apart from the
-# attachments and the invoices.
+#: Prefix of every CD-logo object in the bucket. It keeps the logos apart from the
+#: attachments and the invoices.
 CD_LOGO_PREFIX = "cd-logos/"
 
 
@@ -173,12 +173,12 @@ class CdVariantService(ConfigServiceBase):
         storage: ObjectStorage | None = None,
         settings: Settings | None = None,
     ) -> None:
+        """Bind the service to a session, the object storage and the settings."""
         super().__init__(session, storage=storage)
         self.settings = settings
 
-    # --- variants ---------------------------------------------------------
-
     async def list_variants(self) -> list[CdVariantOut]:
+        """List the CD variants with their logos."""
         rows = (await self.session.scalars(select(CdVariant).order_by(CdVariant.name))).all()
         by_variant: dict[uuid.UUID, list[CdVariantLogo]] = {row.id: [] for row in rows}
         logos = (
@@ -259,8 +259,6 @@ class CdVariantService(ConfigServiceBase):
         await self.session.commit()
         for key in keys:
             await self._remove_object(key)
-
-    # --- logos ------------------------------------------------------------
 
     async def add_vendored_logo(
         self, variant_id: UUID, payload: CdVariantLogoVendoredCreate, actor: str
@@ -478,8 +476,6 @@ class CdVariantService(ConfigServiceBase):
         await self.session.commit()
         return [_logo_out(by_id[logo_id]) for logo_id in payload.logo_ids]
 
-    # --- helpers ----------------------------------------------------------
-
     async def _by_key(self, key: str) -> CdVariant | None:
         return (
             await self.session.scalars(select(CdVariant).where(CdVariant.key == key))
@@ -514,7 +510,5 @@ class CdVariantService(ConfigServiceBase):
         """Drop the object after the row is gone. A storage error must not fail the delete."""
         if self.storage is None:
             return
-        # The row is already gone and the transaction is committed. An orphan object
-        # in the bucket is harmless, so the delete stays successful.
         with contextlib.suppress(StorageError):
             await self.storage.remove(object_key)

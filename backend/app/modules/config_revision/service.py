@@ -21,12 +21,12 @@ from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.config_revision.models import ConfigRevision
 
-# Stable ``entity_type`` keys (= audit ``target_type``).
+#: Stable ``entity_type`` keys (= audit ``target_type``).
 ENTITY_FORM = "form"
 ENTITY_FLOW = "flow"
 ENTITY_SITE_CONFIG = "site_config"
 
-# Entities that do not belong to one type share this ``entity_id``.
+#: Entities that do not belong to one type share this ``entity_id``.
 GLOBAL_ID = "global"
 
 
@@ -75,7 +75,6 @@ def _flatten(entity_type: str, snapshot: dict[str, Any]) -> dict[str, Any]:
             flat["meta:layout"] = snapshot["layout"]
         return flat
     if entity_type == ENTITY_SITE_CONFIG:
-        # Branding is already a top-level map, with nested values.
         return dict(snapshot)
     return dict(snapshot)
 
@@ -84,6 +83,7 @@ class ConfigRevisionService:
     """Revision service bound to an ``AsyncSession``."""
 
     def __init__(self, session: AsyncSession) -> None:
+        """Bind the service to a database session."""
         self.session = session
 
     async def head(self, entity_type: str, entity_id: str) -> ConfigRevision | None:
@@ -99,6 +99,7 @@ class ConfigRevisionService:
         )
 
     async def get(self, revision_id: UUID | str) -> ConfigRevision | None:
+        """Return a revision by id, or None for an unknown or malformed id."""
         if isinstance(revision_id, str):
             try:
                 revision_id = UUID(revision_id)
@@ -138,10 +139,11 @@ class ConfigRevisionService:
         The method does not commit. The audit entry carries ``data.revisionId`` as an
         id reference, plus ``extra_data``. ``snapshot`` must hold config only and no
         principal PII. ``actor`` is the OIDC ``sub`` to record.
+
+        An advisory lock per entity serializes the appends, so version and prev stay
+        consistent. The lock key is a deterministic integer with no user input, so it
+        goes into the SQL text without a bind parameter.
         """
-        # Serialize the appends per entity to keep version and prev consistent. The
-        # key is a deterministic integer constant with no user input, so it goes into
-        # the SQL text directly, without a bind parameter.
         await self.session.execute(
             text(f"SELECT pg_advisory_xact_lock({_lock_key(entity_type, entity_id)})")
         )

@@ -13,6 +13,11 @@ The frontend is only a UX gate. Per-area permissions: ``admin.gremien``,
 ``notification-rules`` and ``mail-templates`` live in the notifications module.
 ``/admin/audit`` lives in audit and the form versions live in forms. This
 module does not duplicate them.
+
+Exactly one global flow applies to all application types. A site-config, branding or
+"Hilfe & Tickets" save writes a new active version directly, without a draft. The
+gremium mappings (OIDC group to gremium membership, OIDC group to gremium role) are
+separate from the global group mappings and from each other.
 """
 
 from __future__ import annotations
@@ -120,9 +125,9 @@ from app.shared.filenames import content_disposition
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 public_router = APIRouter(tags=["admin"])
-# Router for any authenticated principal WITHOUT admin rights. It serves the
-# master-data reads that several roles need as dropdown sources. It is mounted
-# without the `/admin` prefix.
+#: Router for any authenticated principal WITHOUT admin rights, mounted without the
+#: ``/admin`` prefix. It serves the master-data reads that several roles need as
+#: dropdown sources.
 authed_router = APIRouter(tags=["gremien"])
 
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
@@ -133,38 +138,49 @@ def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
 
 
 def get_config_service(session: DbSession, request: Request) -> ConfigService:
-    # The storage removes the file objects of the to-do comments of a deleted
-    # gremium. Without MinIO only the rows go.
+    """Build the config service.
+
+    The storage removes the file objects of the to-do comments of a deleted gremium.
+    Without MinIO only the rows go.
+    """
     return ConfigService(session, storage=getattr(request.app.state, "object_storage", None))
 
 
 def get_site_config_service(session: DbSession, settings: SettingsDep) -> SiteConfigService:
+    """Build the site-config service."""
     return SiteConfigService(session, settings=settings)
 
 
 def get_gremium_role_service(session: DbSession) -> GremiumRoleService:
+    """Build the gremium-role service."""
     return GremiumRoleService(session)
 
 
 def get_oidc_mapping_service(session: DbSession) -> OidcMappingService:
+    """Build the OIDC-mapping service."""
     return OidcMappingService(session)
 
 
 def get_principal_merge_service(session: DbSession) -> PrincipalMergeService:
+    """Build the account-merge service."""
     return PrincipalMergeService(session)
 
 
 def get_principal_revoke_service(
     session: DbSession, settings: SettingsDep
 ) -> PrincipalRevokeService:
+    """Build the rights-revoke service."""
     return PrincipalRevokeService(session, settings)
 
 
 def get_cd_variant_service(
     session: DbSession, request: Request, settings: SettingsDep
 ) -> CdVariantService:
-    # Only the logo upload and download touch the object storage. Without MinIO
-    # (development, contract CI) those two routes answer 503.
+    """Build the CD-variant service.
+
+    Only the logo upload and download touch the object storage. Without MinIO
+    (development, contract CI) those two routes answer 503.
+    """
     storage = getattr(request.app.state, "object_storage", None)
     return CdVariantService(session, storage=storage, settings=settings)
 
@@ -178,40 +194,34 @@ MergeServiceDep = Annotated[PrincipalMergeService, Depends(get_principal_merge_s
 RevokeServiceDep = Annotated[PrincipalRevokeService, Depends(get_principal_revoke_service)]
 AutoMailerDep = Annotated[AutoMailer, Depends(get_auto_mailer)]
 
-# Body cap on Content-Length for a logo upload, applied before FastAPI buffers
-# the body. It adds defense in depth next to the nginx cap and the authoritative
-# in-service size check.
+#: Content-Length cap for a logo upload, applied before FastAPI buffers the body.
+#: Defense in depth next to the nginx cap and the authoritative in-service check.
 _enforce_cd_logo_body = body_cap("attachment_max_bytes")
 
-# Permission gates. The gate injects the principal object for the audit actor.
 GremienAdmin = Annotated[Principal, Depends(require_principal("admin.gremien"))]
 TypesAdmin = Annotated[Principal, Depends(require_principal("admin.types"))]
-# Deleting an application type is destructive. It needs an own permission,
-# separate from admin.types.
+#: Deleting an application type is destructive, so it has its own permission.
 TypesDeleteAdmin = Annotated[Principal, Depends(require_principal("admin.types_delete"))]
 SiteAdmin = Annotated[Principal, Depends(require_principal("admin.site"))]
 RolesAdmin = Annotated[Principal, Depends(require_principal("admin.roles"))]
 WebhookAdmin = Annotated[Principal, Depends(require_principal("webhook.manage"))]
-# Per-page admin RBAC: the user and access management is gated per admin page.
-# ``admin.roles`` covers /admin/roles with the role definitions. The write
-# operations of the other pages gate on their own keys.
 UsersAdmin = Annotated[Principal, Depends(require_principal("admin.users"))]
-# Account merge. A separate key: the merge rewrites the history of two accounts and
-# cannot be undone, so the user page alone does not grant it.
+#: A separate key, because the merge rewrites the history of two accounts and cannot
+#: be undone.
 MergeAdmin = Annotated[Principal, Depends(require_principal("admin.users.merge"))]
-# Revoke the rights of a person ("Rechte entziehen"). A separate key: it clears whole
-# Gremien, the pool entries and the delegations of planned meetings. No OAuth scope
-# carries it, so it is a web-only action.
+#: Revoke the rights of a person ("Rechte entziehen"). A separate key, because it
+#: clears whole Gremien, the pool entries and the delegations of planned meetings. No
+#: OAuth scope carries it, so it is a web-only action.
 RevokeAdmin = Annotated[Principal, Depends(require_principal("admin.users.revoke_groups"))]
 GroupMappingsAdmin = Annotated[Principal, Depends(require_principal("admin.group_mappings"))]
 GremiumRolesAdmin = Annotated[Principal, Depends(require_principal("admin.gremium_roles"))]
 CdVariantsAdmin = Annotated[Principal, Depends(require_principal("admin.cd_variants"))]
-# The global flow save accepts EITHER key. See `create_global_flow` for the reason.
+#: The global flow save accepts EITHER key. ``create_global_flow`` gives the reason.
 FlowVersionAdmin = Annotated[
     Principal, Depends(require_any_permission("admin.types", "flow.configure"))
 ]
 
-# All admin area permissions (for ANY-of reads plus the admin landing page).
+#: All admin area permissions, for ANY-of reads and the admin landing page.
 _ALL_ADMIN_AREAS = (
     "admin.site",
     "admin.gremien",
@@ -233,38 +243,29 @@ _USERS = Depends(require_principal("admin.users"))
 _GROUP_MAPPINGS = Depends(require_principal("admin.group_mappings"))
 _WEBHOOK = Depends(require_principal("webhook.manage"))
 _CD_VARIANTS = Depends(require_principal("admin.cd_variants"))
-# The gremien page needs the CD-variant list as a dropdown source. It does not
-# hold the matching write permission.
+#: The gremien page needs the CD-variant list as a dropdown source.
 _CD_VARIANT_OPTIONS = Depends(require_any_permission("admin.gremien", "admin.cd_variants"))
-# Shared reads serving several admin areas (ANY-of).
 _ANY_ADMIN_AREA = Depends(require_any_permission(*_ALL_ADMIN_AREAS))
-# The gremium-members subpage (admin.gremien) needs read access to the gremium
-# roles for the role labels and to the principals for the names. The group
-# mappings page (admin.group_mappings) needs the gremium roles for its role
-# dropdown. Neither holds the matching write permission.
+#: The gremium-members page reads the gremium roles for the role labels. The group
+#: mappings page reads them for its role dropdown.
 _GREMIEN_OR_GREMIUM_ROLES = Depends(
     require_any_permission("admin.gremien", "admin.gremium_roles", "admin.group_mappings")
 )
-# The principal search serves the user page, the gremium members, the person picker
-# of the substitute pool on the delegations page (admin.delegations) and the person
-# picker of the account erasure on the privacy page (privacy.manage).
+#: The principal search serves the user page, the gremium members, the person picker
+#: of the substitute pool and the person picker of the account erasure.
 _PRINCIPAL_READERS = Depends(
     require_any_permission(
         "admin.gremien", "admin.users", "admin.delegations", "privacy.manage"
     )
 )
-# The members of a gremium: the members page (admin.gremien) and the "represents" choice
-# of the substitute pool on the delegations page (admin.delegations).
+#: The members page and the "represents" choice of the substitute pool read members.
 _MEMBERSHIP_READERS = Depends(require_any_permission("admin.gremien", "admin.delegations"))
-# Read gates for pages that need the data of another area only as a selection
-# source or a display source. The writes stay on the strict permission. The flow
-# editor reads the global flow, the roles and the webhooks. The
-# budget tree reads the global flow. The form editor reads the application types.
+#: The flow editor and the budget tree read the global flow. Writes stay on the
+#: strict permission.
 _FLOW_READABLE = Depends(
     require_any_permission("admin.types", "flow.configure", "budget.structure")
 )
-# The roles page, the users page (assignment dropdown) and several config editors
-# need the role list as a display source.
+#: The roles page, the users page and several config editors read the role list.
 _ROLES_READ = Depends(
     require_any_permission(
         "admin.site",
@@ -286,7 +287,7 @@ _TYPES_OR_FORM = Depends(require_any_permission("admin.types", "form.configure")
     responses=_errors(401, 403),
 )
 async def get_config_schemas() -> dict[str, dict[str, Any]]:
-    """JSON schemas (form/flow/voting/branding/...) for the config editors."""
+    """Return the JSON schemas (form/flow/voting/branding/...) for the config editors."""
     return export_json_schemas()
 
 
@@ -310,6 +311,7 @@ async def list_gremien(service: ServiceDep) -> list[GremiumAdminOut]:
 async def create_gremium(
     payload: GremiumCreate, service: ServiceDep, principal: GremienAdmin
 ) -> GremiumOut:
+    """Create a gremium."""
     return await service.create_gremium(payload, principal.sub)
 
 
@@ -362,6 +364,7 @@ async def gremium_public_preview(
     responses=_errors(401, 403, 404, 409),
 )
 async def delete_gremium(gremium_id: UUID, service: ServiceDep, principal: GremienAdmin) -> None:
+    """Delete a gremium with its meetings, by the rules of the meeting delete."""
     await service.delete_gremium(gremium_id, principal)
 
 
@@ -396,7 +399,6 @@ async def set_gremium_mail_recipients(
     return await service.set_gremium_mail_recipients(gremium_id, payload, principal.sub)
 
 
-# Gremium roles and the read-only memberships.
 @router.get(
     "/gremien/{gremium_id}/roles",
     response_model=list[GremiumRoleOut],
@@ -406,6 +408,7 @@ async def set_gremium_mail_recipients(
 async def list_gremium_roles(
     gremium_id: UUID, service: GremiumRoleServiceDep
 ) -> list[GremiumRoleOut]:
+    """List the roles of a gremium."""
     return await service.list_roles(gremium_id)
 
 
@@ -421,6 +424,7 @@ async def create_gremium_role(
     service: GremiumRoleServiceDep,
     principal: GremiumRolesAdmin,
 ) -> GremiumRoleOut:
+    """Create a role in a gremium."""
     return await service.create_role(gremium_id, payload, principal.sub)
 
 
@@ -435,6 +439,7 @@ async def update_gremium_role(
     service: GremiumRoleServiceDep,
     principal: GremiumRolesAdmin,
 ) -> GremiumRoleOut:
+    """Update a gremium role."""
     return await service.update_role(role_id, payload, principal.sub)
 
 
@@ -442,6 +447,7 @@ async def update_gremium_role(
 async def delete_gremium_role(
     role_id: UUID, service: GremiumRoleServiceDep, principal: GremiumRolesAdmin
 ) -> None:
+    """Delete a gremium role."""
     await service.delete_role(role_id, principal.sub)
 
 
@@ -475,8 +481,6 @@ async def list_gremien_authed(
     return await service.list_gremien()
 
 
-# Corporate-design variants: the logo sets that a Gremium renders its documents
-# with. Every route gates on `admin.cd_variants`.
 @router.get(
     "/cd-variants",
     response_model=list[CdVariantOut],
@@ -718,6 +722,7 @@ async def get_gremium_logo(
     responses=_errors(401, 403),
 )
 async def list_application_types(service: ServiceDep) -> list[ApplicationTypeOut]:
+    """List the application types."""
     return await service.list_application_types()
 
 
@@ -730,6 +735,7 @@ async def list_application_types(service: ServiceDep) -> list[ApplicationTypeOut
 async def create_application_type(
     payload: ApplicationTypeCreate, service: ServiceDep, principal: TypesAdmin
 ) -> ApplicationTypeOut:
+    """Create an application type."""
     return await service.create_application_type(payload, principal.sub)
 
 
@@ -744,6 +750,7 @@ async def update_application_type(
     service: ServiceDep,
     principal: TypesAdmin,
 ) -> ApplicationTypeOut:
+    """Update an application type."""
     return await service.update_application_type(type_id, payload, principal.sub)
 
 
@@ -763,7 +770,6 @@ async def delete_application_type(
     await service.delete_application_type(type_id, principal.sub)
 
 
-# Exactly ONE global flow applies to all application types.
 @router.get(
     "/flow-versions/global",
     response_model=FlowGraph | None,
@@ -771,7 +777,7 @@ async def delete_application_type(
     responses=_errors(401, 403),
 )
 async def get_global_flow(service: ServiceDep) -> FlowGraph | None:
-    """Graph of the active global flow — ``null`` if none exists."""
+    """Return the graph of the active global flow, or ``null``."""
     return await service.get_active_global_flow()
 
 
@@ -800,7 +806,6 @@ async def create_global_flow(
     return await service.create_global_flow_version(payload, principal.sub)
 
 
-# RBAC: principals, permissions, roles, role assignments and group mappings.
 @router.get(
     "/principals",
     response_model=list[PrincipalOut],
@@ -934,7 +939,7 @@ async def revoke_principal(
     responses=_errors(401, 403),
 )
 async def list_permissions(service: ServiceDep) -> list[str]:
-    """Catalog of selectable permission keys for the roles UI."""
+    """List the selectable permission keys for the roles UI."""
     return service.list_permissions()
 
 
@@ -945,6 +950,7 @@ async def list_permissions(service: ServiceDep) -> list[str]:
     responses=_errors(401, 403),
 )
 async def list_roles(service: ServiceDep) -> list[RoleOut]:
+    """List the global roles with their permissions."""
     return await service.list_roles()
 
 
@@ -955,6 +961,7 @@ async def list_roles(service: ServiceDep) -> list[RoleOut]:
     responses=_errors(400, 401, 403, 409, 422),
 )
 async def create_role(payload: RoleCreate, service: ServiceDep, principal: RolesAdmin) -> RoleOut:
+    """Create a global role."""
     return await service.create_role(payload, principal.sub)
 
 
@@ -966,6 +973,7 @@ async def create_role(payload: RoleCreate, service: ServiceDep, principal: Roles
 async def update_role(
     role_id: UUID, payload: RoleUpdate, service: ServiceDep, principal: RolesAdmin
 ) -> RoleOut:
+    """Update a global role."""
     return await service.update_role(role_id, payload, principal.sub)
 
 
@@ -986,6 +994,7 @@ async def delete_role(role_id: UUID, service: ServiceDep, principal: RolesAdmin)
     responses=_errors(401, 403),
 )
 async def list_role_assignments(service: ServiceDep) -> list[RoleAssignmentOut]:
+    """List the role assignments."""
     return await service.list_role_assignments()
 
 
@@ -996,6 +1005,7 @@ async def list_role_assignments(service: ServiceDep) -> list[RoleAssignmentOut]:
     responses=_errors(401, 403),
 )
 async def list_group_mappings(service: ServiceDep) -> list[GroupMappingOut]:
+    """List the OIDC group to global role mappings."""
     return await service.list_group_mappings()
 
 
@@ -1008,6 +1018,7 @@ async def list_group_mappings(service: ServiceDep) -> list[GroupMappingOut]:
 async def create_group_mapping(
     payload: GroupMappingCreate, service: ServiceDep, principal: GroupMappingsAdmin
 ) -> GroupMappingOut:
+    """Create a group mapping."""
     return await service.create_group_mapping(payload, principal.sub)
 
 
@@ -1022,6 +1033,7 @@ async def update_group_mapping(
     service: ServiceDep,
     principal: GroupMappingsAdmin,
 ) -> GroupMappingOut:
+    """Update a group mapping."""
     return await service.update_group_mapping(mapping_id, payload, principal.sub)
 
 
@@ -1029,11 +1041,10 @@ async def update_group_mapping(
 async def delete_group_mapping(
     mapping_id: UUID, service: ServiceDep, principal: GroupMappingsAdmin
 ) -> None:
+    """Delete a group mapping."""
     await service.delete_group_mapping(mapping_id, principal.sub)
 
 
-# Gremium mappings: OIDC group → gremium membership and OIDC group → gremium role.
-# They are separate from the global group mappings above and from each other.
 @router.get(
     "/gremium-membership-mappings",
     response_model=list[GremiumMembershipMappingOut],
@@ -1043,6 +1054,7 @@ async def delete_group_mapping(
 async def list_gremium_membership_mappings(
     service: OidcMappingServiceDep,
 ) -> list[GremiumMembershipMappingOut]:
+    """List the gremium membership mappings."""
     return await service.list_membership_mappings()
 
 
@@ -1075,6 +1087,7 @@ async def update_gremium_membership_mapping(
     service: OidcMappingServiceDep,
     principal: GroupMappingsAdmin,
 ) -> GremiumMembershipMappingOut:
+    """Update a gremium membership mapping."""
     return await service.update_membership_mapping(mapping_id, payload, principal.sub)
 
 
@@ -1086,6 +1099,7 @@ async def update_gremium_membership_mapping(
 async def delete_gremium_membership_mapping(
     mapping_id: UUID, service: OidcMappingServiceDep, principal: GroupMappingsAdmin
 ) -> None:
+    """Delete a gremium membership mapping."""
     await service.delete_membership_mapping(mapping_id, principal.sub)
 
 
@@ -1098,6 +1112,7 @@ async def delete_gremium_membership_mapping(
 async def list_gremium_role_mappings(
     service: OidcMappingServiceDep,
 ) -> list[GremiumRoleMappingOut]:
+    """List the gremium role mappings."""
     return await service.list_role_mappings()
 
 
@@ -1131,6 +1146,7 @@ async def update_gremium_role_mapping(
     service: OidcMappingServiceDep,
     principal: GroupMappingsAdmin,
 ) -> GremiumRoleMappingOut:
+    """Update a gremium role mapping."""
     return await service.update_role_mapping(mapping_id, payload, principal.sub)
 
 
@@ -1142,6 +1158,7 @@ async def update_gremium_role_mapping(
 async def delete_gremium_role_mapping(
     mapping_id: UUID, service: OidcMappingServiceDep, principal: GroupMappingsAdmin
 ) -> None:
+    """Delete a gremium role mapping."""
     await service.delete_role_mapping(mapping_id, principal.sub)
 
 
@@ -1152,6 +1169,7 @@ async def delete_gremium_role_mapping(
     responses=_errors(401, 403),
 )
 async def list_webhooks(service: ServiceDep) -> list[WebhookOut]:
+    """List the webhooks."""
     return await service.list_webhooks()
 
 
@@ -1164,6 +1182,7 @@ async def list_webhooks(service: ServiceDep) -> list[WebhookOut]:
 async def create_webhook(
     payload: WebhookCreate, service: ServiceDep, principal: WebhookAdmin
 ) -> WebhookOut:
+    """Create a webhook."""
     return await service.create_webhook(payload, principal.sub)
 
 
@@ -1178,6 +1197,7 @@ async def update_webhook(
     service: ServiceDep,
     principal: WebhookAdmin,
 ) -> WebhookOut:
+    """Update a webhook."""
     return await service.update_webhook(webhook_id, payload, principal.sub)
 
 
@@ -1216,12 +1236,11 @@ async def list_webhook_delivery_status(
     return await service.list_webhook_delivery_status()
 
 
-# Applications without an account: the confirmation window and the link
-# lifetime. The deadlines page (admin.deadlines) maintains them.
 DeadlinesAdmin = Annotated[Principal, Depends(require_principal("admin.deadlines"))]
 
 
 def get_guest_settings_service(session: DbSession) -> GuestSettingsService:
+    """Build the guest-settings service."""
     return GuestSettingsService(session)
 
 
@@ -1266,9 +1285,8 @@ async def put_guest_settings(
     return GuestSettingsOut.model_validate(row, from_attributes=True)
 
 
-# The open window of meetings: the earliest open and the end of the early window
-# that needs a confirmation. The deadlines page (admin.deadlines) maintains them.
 def get_meeting_settings_service(session: DbSession) -> MeetingSettingsService:
+    """Build the meeting-settings service."""
     return MeetingSettingsService(session)
 
 
@@ -1278,6 +1296,7 @@ MeetingSettingsServiceDep = Annotated[
 
 
 def get_login_settings_service(session: DbSession) -> LoginSettingsService:
+    """Build the login-settings service."""
     return LoginSettingsService(session)
 
 
@@ -1368,7 +1387,6 @@ async def put_login_settings(
     return LoginSettingsOut.model_validate(row, from_attributes=True)
 
 
-# Site config and branding: a save writes a new active version, there is no draft.
 @router.get(
     "/site-config",
     response_model=SiteConfigOut,
@@ -1376,7 +1394,7 @@ async def put_login_settings(
     responses=_errors(401, 403),
 )
 async def get_site_config(service: SiteServiceDep) -> SiteConfigOut:
-    """The active branding config and its version."""
+    """Read the active branding config and its version."""
     return await service.get()
 
 
@@ -1395,7 +1413,6 @@ async def put_site_config(
     return await service.save(payload, principal.sub)
 
 
-# The page "Hilfe & Tickets" saves directly, without draft and activate.
 @router.get(
     "/help-tickets",
     response_model=HelpTicketsSettings,
@@ -1403,7 +1420,7 @@ async def put_site_config(
     responses=_errors(401, 403),
 )
 async def get_help_tickets(service: SiteServiceDep) -> HelpTicketsSettings:
-    """The help and ticket settings of the active branding."""
+    """Read the help and ticket settings of the active branding."""
     return await service.help_tickets()
 
 
@@ -1427,21 +1444,23 @@ async def put_help_tickets(
 async def get_public_site_config(
     service: SiteServiceDep, response: Response
 ) -> PublicSiteConfigOut:
-    """Active branding config without auth (logo URLs, footer, texts)."""
+    """Read the active branding config without auth (logo URLs, footer, texts)."""
     response.headers["Cache-Control"] = "public, max-age=300"
     return await service.public()
 
 
-# Dynamic PWA manifest, auth-free. The active site config is the source of truth.
-# The edge proxy (nginx) maps the browser-linked ``/manifest.webmanifest`` to this
-# route, so name and short_name follow the configured app name. ``scheme=dark`` gives the
-# dark bar colours; the frontend links it while the dark theme is in effect.
 @public_router.get("/manifest.webmanifest", include_in_schema=False)
 async def get_manifest(
     service: SiteServiceDep,
     scheme: Annotated[Literal["light", "dark"], Query()] = "light",
 ) -> Response:
-    """PWA manifest from the active branding config (application/manifest+json)."""
+    """Serve the PWA manifest from the active branding (application/manifest+json).
+
+    The route is auth-free. The edge proxy maps the browser-linked
+    ``/manifest.webmanifest`` here, so name and short_name follow the configured app
+    name. ``scheme=dark`` gives the dark bar colours; the frontend links it while the
+    dark theme is in effect.
+    """
     import json
 
     body = json.dumps(await service.manifest(scheme), ensure_ascii=False)

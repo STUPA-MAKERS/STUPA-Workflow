@@ -27,10 +27,10 @@ class ConfigRevisionOut(_CamelModel):
     entity_id: str = Field(alias="entityId")
     version: int
     at: datetime
-    # OIDC ``sub`` of the actor plus the resolved display name, as in the audit log.
+    #: OIDC ``sub`` of the actor plus the resolved display name, as in the audit log.
     created_by: str | None = Field(default=None, alias="createdBy")
     created_by_name: str | None = Field(default=None, alias="createdByName")
-    # True for the newest state of the entity, which is the live one.
+    #: True for the newest state of the entity, which is the live one.
     is_current: bool = Field(default=False, alias="isCurrent")
 
     @classmethod
@@ -41,6 +41,7 @@ class ConfigRevisionOut(_CamelModel):
         created_by_name: str | None = None,
         is_current: bool = False,
     ) -> ConfigRevisionOut:
+        """Build the output from a row, the resolved actor name and the live flag."""
         return cls(
             id=row.id,
             entityType=row.entity_type,

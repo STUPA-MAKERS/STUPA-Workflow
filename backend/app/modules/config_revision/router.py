@@ -33,7 +33,7 @@ router = APIRouter(prefix="/admin/config-revisions", tags=["config-revision"])
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 _AUTH_ERRORS: dict[int | str, dict[str, Any]] = {401: _PROBLEM, 403: _PROBLEM}
 
-# Reads: an audit reader or a config editor. The sidebar lives in the editors.
+#: Reads: an audit reader or a config editor. The sidebar lives in the editors.
 _READABLE = Depends(
     require_any_permission(
         "audit.read", "form.configure", "flow.configure", "admin.site"
@@ -48,6 +48,7 @@ _RESTORE_PERM: dict[str, str] = {
 
 
 def get_service(session: DbSession) -> ConfigRevisionService:
+    """Build the config-revision service."""
     return ConfigRevisionService(session)
 
 
@@ -99,7 +100,7 @@ async def get_config_revision_diff(
     revision_id: UUID,
     service: ServiceDep,
 ) -> ConfigRevisionDiffOut:
-    """Field diff of a snapshot against its predecessor."""
+    """Return the field diff of a snapshot against its predecessor."""
     revision = await service.get(revision_id)
     if revision is None:
         raise NotFoundError(f"config revision {revision_id} not found")

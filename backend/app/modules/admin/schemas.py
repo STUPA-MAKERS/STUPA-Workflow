@@ -31,14 +31,13 @@ from app.shared.config_schemas import ComparisonOffers, EventName, FlowGraph
 from app.shared.i18n import I18nMap
 from app.shared.permissions import PERMISSION_CATALOGUE
 
-# A CD-variant key is a slug. It is the stable handle of the variant and never
-# changes after the create.
+#: A CD-variant key is a slug. It is the stable handle of the variant and never
+#: changes after the create.
 CD_VARIANT_KEY_PATTERN = r"^[a-z0-9]+(?:-[a-z0-9]+)*$"
 
-# A role key (global role and gremium role) starts with a lowercase letter and
-# holds lowercase letters, digits and underscores. The key is the stable handle that
-# seeds, migrations and the forced gremium roles use. A key that breaks the pattern
-# gives 422 on create. The update schemas have no key, because a key never changes.
+#: A role key (global and gremium role): a lowercase letter, then lowercase letters,
+#: digits and underscores. Seeds, migrations and the forced gremium roles use it as the
+#: stable handle, so the update schemas have no key.
 ROLE_KEY_PATTERN = r"^[a-z][a-z0-9_]*$"
 
 
@@ -95,6 +94,8 @@ class CdVariantOptionOut(_CamelModel):
 
 
 class CdVariantCreate(_CamelModel):
+    """New CD variant."""
+
     key: str = Field(min_length=1, max_length=64, pattern=CD_VARIANT_KEY_PATTERN)
     name: str = Field(min_length=1, max_length=200)
     base_variant: CdBaseVariant = Field(default="report", alias="baseVariant")
@@ -127,27 +128,29 @@ class CdVariantLogoReorder(_CamelModel):
 
 
 class GremiumOut(_CamelModel):
+    """A gremium with its delegation, quorum and publication settings."""
+
     id: UUID
     name: str
     slug: str
     cd_variant_id: UUID | None = Field(default=None, serialization_alias="cdVariantId")
     default_lang: str = Field(serialization_alias="defaultLang")
     allow_vote_delegation: bool = Field(serialization_alias="allowVoteDelegation")
-    # Lead time in minutes before the meeting start, for non-pool delegations.
-    # 0 = until the meeting start.
+    #: Lead time in minutes before the meeting start, for non-pool delegations.
+    #: 0 = until the meeting start.
     delegation_lead_minutes: int = Field(
         default=0, serialization_alias="delegationLeadMinutes"
     )
-    # Allow delegation to users outside gremium & substitute pool.
+    #: Allow delegation to users outside gremium & substitute pool.
     delegation_allow_external: bool = Field(
         default=False, serialization_alias="delegationAllowExternal"
     )
-    # Default quorum as a percentage of the eligible voters, from 0 to 100.
-    # A None value means no quorum.
+    #: Default quorum as a percentage of the eligible voters, from 0 to 100.
+    #: A None value means no quorum.
     quorum_percent: int | None = Field(
         default=None, serialization_alias="quorumPercent"
     )
-    # The final protocols of the gremium appear on the public protocols page.
+    #: The final protocols of the gremium appear on the public protocols page.
     protocols_public: bool = Field(default=False, serialization_alias="protocolsPublic")
 
 
@@ -164,6 +167,8 @@ class GremiumAdminOut(GremiumOut):
 
 
 class GremiumCreate(_CamelModel):
+    """New gremium."""
+
     name: str = Field(min_length=1)
     slug: str = Field(min_length=1)
     cd_variant_id: UUID | None = Field(default=None, alias="cdVariantId")
@@ -182,9 +187,11 @@ class GremiumCreate(_CamelModel):
 
 
 class GremiumUpdate(_CamelModel):
+    """Partial update of a gremium."""
+
     name: str | None = None
     slug: str | None = None
-    # Clearable to null: `model_fields_set` separates "not sent" from "set to null".
+    #: Clearable to null: `model_fields_set` separates "not sent" from "set to null".
     cd_variant_id: UUID | None = Field(default=None, alias="cdVariantId")
     default_lang: str | None = Field(default=None, alias="defaultLang")
     allow_vote_delegation: bool | None = Field(default=None, alias="allowVoteDelegation")
@@ -233,31 +240,36 @@ class GremiumMailRecipients(_CamelModel):
             if "@" not in addr[1:-1] or " " in addr:
                 raise ValueError(f"not a plausible email address: {addr!r}")
             cleaned.append(addr)
-        # Preserve order, drop duplicates (case-insensitive).
         seen: set[str] = set()
         return [a for a in cleaned if not (a.lower() in seen or seen.add(a.lower()))]
 
 
 class GremiumRoleOut(_CamelModel):
+    """A role of a gremium."""
+
     id: UUID
     gremium_id: UUID = Field(serialization_alias="gremiumId")
     key: str
     name: I18nMap
-    # Forced roles exist in every gremium and nobody can delete them. The
-    # frontend hides the delete action for them.
+    #: Forced roles exist in every gremium and nobody can delete them. The
+    #: frontend hides the delete action for them.
     forced: bool = False
-    # Granular meeting permissions of this role: session.manage, vote.manage,
-    # vote.cast, protocol.write and protocol.finalize.
+    #: Granular meeting permissions of this role: session.manage, vote.manage,
+    #: vote.cast, protocol.write and protocol.finalize.
     permissions: list[str] = Field(default_factory=list)
 
 
 class GremiumRoleCreate(_CamelModel):
+    """New gremium role."""
+
     key: str = Field(min_length=1, pattern=ROLE_KEY_PATTERN)
     name: I18nMap = Field(default_factory=dict)
     permissions: list[str] = Field(default_factory=list)
 
 
 class GremiumRoleUpdate(_CamelModel):
+    """Partial update of a gremium role."""
+
     name: I18nMap | None = None
     permissions: list[str] | None = None
 
@@ -308,6 +320,8 @@ class GremiumMembershipMappingOut(_CamelModel):
 
 
 class GremiumMembershipMappingCreate(_OidcGroupField):
+    """New OIDC group to gremium membership mapping."""
+
     oidc_group: str = Field(alias="oidcGroup", min_length=1, max_length=256)
     gremium_id: UUID = Field(alias="gremiumId")
 
@@ -335,6 +349,8 @@ class GremiumRoleMappingOut(_CamelModel):
 
 
 class GremiumRoleMappingCreate(_OidcGroupField):
+    """New OIDC group to gremium role mapping."""
+
     oidc_group: str = Field(alias="oidcGroup", min_length=1, max_length=256)
     gremium_role_id: UUID = Field(alias="gremiumRoleId")
 
@@ -353,6 +369,8 @@ class GremiumRoleMappingUpdate(_OidcGroupField):
 
 
 class ApplicationTypeOut(_CamelModel):
+    """An application type."""
+
     id: UUID
     gremium_id: UUID | None = Field(serialization_alias="gremiumId")
     key: str
@@ -363,13 +381,15 @@ class ApplicationTypeOut(_CamelModel):
     active_form_version_id: UUID | None = Field(
         serialization_alias="activeFormVersionId"
     )
-    # The number of the active form version. ``None`` while no version is active.
+    #: The number of the active form version. ``None`` while no version is active.
     active_form_version: int | None = Field(
         default=None, serialization_alias="activeFormVersion"
     )
 
 
 class ApplicationTypeCreate(_CamelModel):
+    """New application type."""
+
     key: str = Field(min_length=1)
     name_i18n: I18nMap = Field(alias="nameI18n")
     gremium_id: UUID | None = Field(default=None, alias="gremiumId")
@@ -383,6 +403,8 @@ class ApplicationTypeCreate(_CamelModel):
 
 
 class ApplicationTypeUpdate(_CamelModel):
+    """Partial update of an application type."""
+
     name_i18n: I18nMap | None = Field(default=None, alias="nameI18n")
     gremium_id: UUID | None = Field(default=None, alias="gremiumId")
     has_budget: bool | None = Field(default=None, alias="hasBudget")
@@ -410,6 +432,8 @@ class FlowVersionOut(_CamelModel):
 
 
 class RoleOut(_CamelModel):
+    """A global role with its permissions."""
+
     id: UUID
     key: str
     label: I18nMap
@@ -417,6 +441,8 @@ class RoleOut(_CamelModel):
 
 
 class RoleCreate(_CamelModel):
+    """New global role."""
+
     key: str = Field(min_length=1, pattern=ROLE_KEY_PATTERN)
     label: I18nMap = Field(default_factory=dict)
     permissions: list[str] = Field(default_factory=list)
@@ -428,6 +454,8 @@ class RoleCreate(_CamelModel):
 
 
 class RoleUpdate(_CamelModel):
+    """Partial update of a global role."""
+
     label: I18nMap | None = None
     permissions: list[str] | None = None
 
@@ -438,6 +466,8 @@ class RoleUpdate(_CamelModel):
 
 
 class RoleAssignmentOut(_CamelModel):
+    """A role assignment."""
+
     id: UUID
     principal_id: UUID = Field(serialization_alias="principalId")
     role_id: UUID = Field(serialization_alias="roleId")
@@ -458,23 +488,23 @@ class PrincipalOut(_CamelModel):
     last_login: str | None = Field(serialization_alias="lastLogin")
     active: bool = True
     assignments: list[RoleAssignmentOut]
-    # The OIDC groups as of the last login. They drive the group mappings.
+    #: The OIDC groups as of the last login. They drive the group mappings.
     oidc_groups: list[str] = Field(default_factory=list, serialization_alias="oidcGroups")
-    # Account merge: set when an admin merged this (old) account into another one.
-    # The account is then a locked reference and shows "merged into <name>".
+    #: Account merge: set when an admin merged this (old) account into another one.
+    #: The account is then a locked reference and shows "merged into <name>".
     merged_into_id: UUID | None = Field(default=None, serialization_alias="mergedIntoId")
     merged_into_name: str | None = Field(default=None, serialization_alias="mergedIntoName")
     merged_at: str | None = Field(default=None, serialization_alias="mergedAt")
-    # Revoke rights: true when the person has something that "Rechte entziehen"
-    # can take away: an OIDC group, a gremium membership, a role assignment other than
-    # the implicit `member`, a pool entry or a delegation in a planned or live meeting.
+    #: Revoke rights: true when the person has something that "Rechte entziehen"
+    #: can take away: an OIDC group, a gremium membership, a role assignment other than
+    #: the implicit `member`, a pool entry or a delegation in a planned or live meeting.
     has_access: bool = Field(default=False, serialization_alias="hasAccess")
 
 
-# Account merge (``admin/principal_merge.py``). The areas of the preview and the result,
-# in display order. Each area counts the rows that the merge rewrites to the new account,
-# the duplicate rows that it combines (drops, because the new account has the same row),
-# and the rows that it removes (sessions, tokens, derived memberships, the feed token).
+#: Account merge (``admin/principal_merge.py``). The areas of the preview and the result,
+#: in display order. Each area counts the rows that the merge rewrites to the new account,
+#: the duplicate rows that it combines (drops, because the new account has the same row),
+#: and the rows that it removes (sessions, tokens, derived memberships, the feed token).
 MergeArea = Literal[
     "applications",
     "versions",
@@ -498,15 +528,15 @@ MergeArea = Literal[
     "todos",
 ]
 
-# A real conflict blocks the merge. Each kind names a rule that the merged data would
-# break:
-# - ``ballot_same_vote``: both accounts voted in the same vote (open or secret).
-# - ``delegation_same_meeting``: both accounts delegated their seat in the same meeting.
-# - ``delegation_vote_twice``: both accounts received a vote transfer in the same meeting.
-# - ``delegation_chain``: one account delegated to the other, or is delegator while the
-#   other is delegate, in the same meeting.
-# - ``attendance_differs``: both accounts have a different attendance in the same meeting.
-# - ``erasure_open``: an erasure request for one of the accounts is still open.
+#: A real conflict blocks the merge. Each kind names a rule that the merged data would
+#: break:
+#: - ``ballot_same_vote``: both accounts voted in the same vote (open or secret).
+#: - ``delegation_same_meeting``: both accounts delegated their seat in the same meeting.
+#: - ``delegation_vote_twice``: both accounts received a vote transfer in the same meeting.
+#: - ``delegation_chain``: one account delegated to the other, or is delegator while the
+#:   other is delegate, in the same meeting.
+#: - ``attendance_differs``: both accounts have a different attendance in the same meeting.
+#: - ``erasure_open``: an erasure request for one of the accounts is still open.
 MergeConflictKind = Literal[
     "ballot_same_vote",
     "delegation_same_meeting",
@@ -566,8 +596,8 @@ class MergePreviewOut(_CamelModel):
     target: MergePrincipalOut
     areas: list[MergeAreaOut]
     conflicts: list[MergeConflictOut]
-    # The rights of the old account that the target lacks. The merge moves no right,
-    # but it moves ownership, so these block it unless the admin holds them all.
+    #: The rights of the old account that the target lacks. The merge moves no right,
+    #: but it moves ownership, so these block it unless the admin holds them all.
     extra_permissions: list[MergePermissionOut] = Field(
         default_factory=list, serialization_alias="extraPermissions"
     )
@@ -582,11 +612,6 @@ class MergeResultOut(_CamelModel):
     target: MergePrincipalOut
     areas: list[MergeAreaOut]
     merged_at: str = Field(serialization_alias="mergedAt")
-
-
-# Revoke rights ("Rechte entziehen", ``admin/principal_revoke.py``). The preview groups
-# everything a person has by Gremium, then by global role. Each SSO group lists every
-# Gremium and global role it leads to, so the dialog can select the co-affected entries.
 
 
 class RevokePrincipalOut(_CamelModel):
@@ -614,13 +639,13 @@ class RevokeAssignmentOut(_CamelModel):
     role_id: UUID = Field(serialization_alias="roleId")
     role_key: str = Field(serialization_alias="roleKey")
     role_label: dict[str, str] = Field(serialization_alias="roleLabel")
-    # The name of the account that granted it, or ``bootstrap``. Never a ``sub``:
-    # an unknown or nameless grantor gives None.
+    #: The name of the account that granted it, or ``bootstrap``. Never a ``sub``:
+    #: an unknown or nameless grantor gives None.
     granted_by: str | None = Field(serialization_alias="grantedBy")
     valid_from: str | None = Field(serialization_alias="validFrom")
     valid_until: str | None = Field(serialization_alias="validUntil")
-    # The bootstrap `admin` of a person who is still a configured bootstrap admin:
-    # the startup sweep or the next login grants it again.
+    #: The bootstrap `admin` of a person who is still a configured bootstrap admin:
+    #: the startup sweep or the next login grants it again.
     returns_automatically: bool = Field(
         default=False, serialization_alias="returnsAutomatically"
     )
@@ -648,7 +673,7 @@ class RevokeDelegationOut(_CamelModel):
     meeting_id: UUID = Field(serialization_alias="meetingId")
     meeting_title: str = Field(serialization_alias="meetingTitle")
     meeting_date: str | None = Field(serialization_alias="meetingDate")
-    # True: the person delegated; false: the person is the delegate.
+    #: True: the person delegated; false: the person is the delegate.
     as_delegator: bool = Field(serialization_alias="asDelegator")
     other_name: str | None = Field(serialization_alias="otherName")
     voting: bool
@@ -660,21 +685,21 @@ class RevokeGremiumOut(_CamelModel):
     gremium_id: UUID = Field(serialization_alias="gremiumId")
     name: str
     membership: RevokeMembershipOut | None = None
-    # Every SSO group of the person that leads into this Gremium. A revoke removes them.
+    #: Every SSO group of the person that leads into this Gremium. A revoke removes them.
     groups: list[str] = Field(default_factory=list)
     assignments: list[RevokeAssignmentOut] = Field(default_factory=list)
     pool_entries: list[RevokePoolEntryOut] = Field(
         default_factory=list, serialization_alias="poolEntries"
     )
-    # Delegations in meetings that have not started. A revoke revokes them.
+    #: Delegations in meetings that have not started. A revoke revokes them.
     planned_delegations: list[RevokeDelegationOut] = Field(
         default_factory=list, serialization_alias="plannedDelegations"
     )
-    # Delegations in live meetings. A revoke keeps them until the meeting ends.
+    #: Delegations in live meetings. A revoke keeps them until the meeting ends.
     live_delegations: list[RevokeDelegationOut] = Field(
         default_factory=list, serialization_alias="liveDelegations"
     )
-    # Open votes of the Gremium that still wait for a ballot of the person.
+    #: Open votes of the Gremium that still wait for a ballot of the person.
     open_tasks: int = Field(default=0, serialization_alias="openTasks")
 
 
@@ -697,13 +722,18 @@ class RevokeGroupOut(_CamelModel):
 
 
 class RevokePreviewOut(_CamelModel):
-    """``GET /admin/principals/{id}/revoke-preview``: what the person has, per Gremium."""
+    """``GET /admin/principals/{id}/revoke-preview``: what the person has, per Gremium.
+
+    The preview groups everything by Gremium, then by global role. Each SSO group
+    lists every Gremium and global role it leads to, so the dialog can select the
+    co-affected entries.
+    """
 
     principal: RevokePrincipalOut
     gremien: list[RevokeGremiumOut]
     global_roles: list[RevokeGlobalRoleOut] = Field(serialization_alias="globalRoles")
     groups: list[RevokeGroupOut]
-    # The own account: the revoke refuses it (409 ``revoke_own_account``).
+    #: The own account: the revoke refuses it (409 ``revoke_own_account``).
     is_self: bool = Field(serialization_alias="isSelf")
 
 
@@ -747,16 +777,22 @@ class GroupMappingOut(_CamelModel):
 
 
 class GroupMappingCreate(_OidcGroupField):
+    """New OIDC group to global role mapping."""
+
     oidc_group: str = Field(alias="oidcGroup", min_length=1, max_length=256)
     role_id: UUID = Field(alias="roleId")
 
 
 class GroupMappingUpdate(_OidcGroupField):
+    """Partial update of a group mapping."""
+
     oidc_group: str | None = Field(default=None, alias="oidcGroup", min_length=1, max_length=256)
     role_id: UUID | None = Field(default=None, alias="roleId")
 
 
 class WebhookOut(_CamelModel):
+    """A webhook."""
+
     id: UUID
     name: str
     url: str
@@ -769,7 +805,7 @@ class WebhookCreate(_CamelModel):
 
     name: str = Field(min_length=1)
     url: str = Field(min_length=1)
-    # Triggers are optional — they usually come from the flow graph.
+    #: Triggers are optional — they usually come from the flow graph.
     events: list[EventName] = Field(default_factory=list)
     active: bool = True
 
@@ -782,6 +818,8 @@ class WebhookCreate(_CamelModel):
 
 
 class WebhookUpdate(_CamelModel):
+    """Partial update of a webhook."""
+
     name: str | None = None
     url: str | None = None
     events: list[EventName] | None = None
@@ -890,8 +928,8 @@ class PublicSiteConfigOut(_CamelModel):
     tickets: PublicTicketsOut | None = None
 
 
-# The API caps the link lifetime at ten years. A larger value adds nothing, and a
-# far-future expiry can overflow the datetime arithmetic.
+#: The API caps the link lifetime at ten years. A larger value adds nothing, and a
+#: far-future expiry can overflow the datetime arithmetic.
 MAX_LINK_TTL_DAYS = 3650
 
 
