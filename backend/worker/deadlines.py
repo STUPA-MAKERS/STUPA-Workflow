@@ -62,17 +62,18 @@ from worker.todos import process_todo_due
 
 logger = logging.getLogger("app.deadlines")
 
-# The audit actor of the discard of unconfirmed applications.
+#: Audit actor of the discard of unconfirmed applications.
 _DISCARD_ACTOR = "system:deadlines"
 
-# Cap per cron tick and step, oldest row first. A large backlog then drains over
-# several ticks, and one tick does not overrun the 1-minute cadence. This does not
-# change correctness, because SKIP LOCKED and the status checks protect the run. A
-# row that no worker takes stays due for the next tick.
+#: Cap per cron tick and step, oldest row first. A large backlog drains over several
+#: ticks, so one tick does not overrun the 1-minute cadence. Correctness does not
+#: change, because SKIP LOCKED and the status checks protect the run, and a row that no
+#: worker takes stays due for the next tick.
 DEFAULT_SCAN_LIMIT = 200
 
 
 async def on_startup(ctx: dict[str, Any]) -> None:
+    """Load the settings into the worker context."""
     ctx["settings"] = load_settings()
 
 
@@ -144,7 +145,7 @@ async def _process_poll_reminders(ctx: dict[str, Any], now: datetime) -> int:
     """Run the poll reminder; a failure costs only this step."""
     try:
         return await process_poll_reminders(ctx, now)
-    except Exception:  # the other steps of the cycle must still count
+    except Exception:
         logger.exception("poll reminders failed")
         return 0
 
@@ -153,7 +154,7 @@ async def _process_todo_due(ctx: dict[str, Any], now: datetime) -> int:
     """Run the to-do due reminder; a failure costs only this step."""
     try:
         return await process_todo_due(ctx, now)
-    except Exception:  # the other steps of the cycle must still count
+    except Exception:
         logger.exception("todo_due reminders failed")
         return 0
 
@@ -257,13 +258,15 @@ async def _process_auto_transitions(ctx: dict[str, Any]) -> int:
     `automatic` transition. It fires the first match with `manual=False`. Optimistic
     locking in `flow.fire` keeps the step idempotent. Each application gets its own
     session.
+
+    The scan is capped per tick, oldest first, so a large cohort drains over several ticks
+    instead of stretching one tick past the cron cadence. One broken application is logged
+    and does not abort the cycle.
     """
     maker = _sessionmaker(ctx)
     dispatcher = _flow_dispatcher(ctx)
     async with maker() as session:
         auto_states = select(Transition.from_state_id).where(Transition.automatic)
-        # Capped per tick, oldest first: a large cohort drains over several ticks
-        # instead of stretching one tick past the cron cadence.
         ids = list(
             (
                 await session.execute(
@@ -289,7 +292,7 @@ async def _process_auto_transitions(ctx: dict[str, Any]) -> int:
                     advanced += 1
         except (ConflictError, NotFoundError) as exc:
             logger.info("auto-transition skipped (app=%s): %s", application_id, exc)
-        except Exception:  # one broken application must not abort the cycle
+        except Exception:
             logger.exception("auto-transition failed (app=%s)", application_id)
     return advanced
 
@@ -337,6 +340,10 @@ async def lock_open_vote(
 
 
 async def _process_votes(ctx: dict[str, Any], now: datetime) -> int:
+    """Close the open votes whose time window ended; return how many closed.
+
+    One broken vote is logged and does not abort the cycle.
+    """
     maker = _sessionmaker(ctx)
     async with maker() as session:
         ids = await due_open_vote_ids(session, now)
@@ -345,37 +352,41 @@ async def _process_votes(ctx: dict[str, Any], now: datetime) -> int:
         try:
             if await _close_one(ctx, vote_id, now):
                 closed += 1
-        except Exception:  # one broken vote must not abort the cycle
+        except Exception:
             logger.exception("vote auto-close failed (vote=%s)", vote_id)
     return closed
 
 
 async def _close_one(ctx: dict[str, Any], vote_id: UUID, now: datetime) -> bool:
+    """Close one due vote and fire its result branch; return whether it closed.
+
+    A vote that another worker holds or that is already closed gives False. ``now`` is
+    passed on, so a time-bound vote past its window with an unmet quorum closes for good on
+    the fail branch; without it the cron re-grabs the vote forever. When the result branch
+    is blocked, the vote stays closed, the audit log holds ``vote_branch_blocked``, a person
+    moves the application by hand, and the cron does not retry.
+
+    After the commit the function replays the ``vote_closed`` broadcast that the REST router
+    normally sends, because the beamer and the voters would show the vote as open until a
+    reload. The broadcast is best effort, so a broker fault does not fail the closed vote,
+    and it is a no-op for a standalone vote.
+    """
     maker = _sessionmaker(ctx)
     dispatcher = _flow_dispatcher(ctx)
     async with maker() as session:
         vote = await lock_open_vote(session, vote_id, now)
         if vote is None:
-            return False  # another worker holds it, or it is already closed
+            return False
         voting = VotingService(session, dispatcher)
         try:
-            # Pass `now` so a time-bound vote past its window with an unmet quorum
-            # closes for good on the fail branch. Without it the cron re-grabs the
-            # vote forever.
             closed = await voting.close(vote.id, _system_principal(), now=now)
         except ConflictError as exc:
             logger.info("vote %s auto-close skipped: %s", vote_id, exc)
             return False
     if closed.application_id is not None and not closed.branch_fired:
-        # The vote is closed for good. The audit log holds `vote_branch_blocked`, and
-        # a person moves the application by hand. The cron does not retry.
         logger.warning("vote auto-closed, result branch blocked (vote=%s)", vote_id)
     else:
         logger.info("vote auto-closed (vote=%s)", vote_id)
-    # Replay the `vote_closed` broadcast that the REST router normally sends. Without
-    # it the beamer and the voters show the time-closed vote as open until a reload.
-    # This runs after the commit and is best effort: a broker fault must not fail the
-    # already-closed vote. It is a no-op for standalone votes (`meeting_id is None`).
     await _broadcast_vote_closed(ctx, closed)
     return True
 
@@ -387,5 +398,5 @@ async def _broadcast_vote_closed(ctx: dict[str, Any], closed: VoteClosed) -> Non
         return
     try:
         await BrokerPublisher(RedisBroker(redis)).vote_closed(closed)
-    except Exception as exc:  # broadcast is not close-critical
+    except Exception as exc:
         logger.warning("vote_closed broadcast failed (vote=%s): %s", closed.id, exc)

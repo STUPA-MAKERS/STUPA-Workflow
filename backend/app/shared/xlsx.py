@@ -27,8 +27,8 @@ def _num(value: Decimal | float | None) -> float | None:
     return float(value) if value is not None else None
 
 
-# Leading characters that can start an active formula or a DDE call when Excel or
-# LibreOffice opens the file. This is CSV and XLSX formula injection.
+#: Leading characters that start an active formula or a DDE call when Excel or
+#: LibreOffice opens the file (CSV and XLSX formula injection).
 _FORMULA_PREFIXES: tuple[str, ...] = ("=", "+", "-", "@", "\t", "\r")
 
 
@@ -94,6 +94,9 @@ def build_budget_workbook(
             entry gets the sheet title `HHJ`.
         fiscal_year_id: Filter to a single fiscal year and write only its sheet. Pass
             `None` to write a sheet for every fiscal year.
+
+    The sheets follow the first appearance of each fiscal year in tree order, so the sheet
+    order stays stable.
     """
     from openpyxl import Workbook
 
@@ -108,7 +111,6 @@ def build_budget_workbook(
     ]
     nodes = list(_iter_nodes(roots))
 
-    # Collect the fiscal years in tree order, which keeps the sheet order stable.
     fy_order: list[Any] = []
     for _depth, node in nodes:
         for alloc in node.by_fiscal_year:
@@ -202,7 +204,7 @@ def build_applications_workbook(
     ]
     wb = Workbook()
     ws = wb.active
-    assert ws is not None  # openpyxl always returns an active sheet
+    assert ws is not None
     ws.title = "Anträge"
     _header_row(ws, headers)
 
@@ -249,7 +251,7 @@ def build_expenses_workbook(items: Iterable[Any], locale: str = "de") -> bytes:
     ]
     wb = Workbook()
     ws = wb.active
-    assert ws is not None  # openpyxl always returns an active sheet
+    assert ws is not None
     ws.title = "Buchungen"
     _header_row(ws, headers)
     for e in items:
@@ -288,7 +290,7 @@ def build_auskunft_workbook(
 
     wb = Workbook()
     ws_account = wb.active
-    assert ws_account is not None  # openpyxl always returns an active sheet
+    assert ws_account is not None
     ws_account.title = "Konto"
     acc_headers = ["Feld", "Wert"]
     _header_row(ws_account, acc_headers)

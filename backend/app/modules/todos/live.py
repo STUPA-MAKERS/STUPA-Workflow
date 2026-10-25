@@ -34,8 +34,8 @@ PingKind = Literal["card", "card_removed", "board"]
 #: The glob that one to-do socket subscribes to (one subscription per socket).
 CHANNEL_PATTERN = "todo-board:*"
 
-# The single-process fallback when the lifespan wires no broker (tests). Production
-# uses the Redis broker of the live vote on ``app.state.broker``.
+#: Single-process fallback when the lifespan wires no broker (tests). Production uses
+#: the Redis broker of the live vote on ``app.state.broker``.
 _FALLBACK_BROKER = InMemoryBroker()
 
 
@@ -65,12 +65,14 @@ class BoardPings:
     def touch(
         self, board_id: uuid.UUID, card_id: uuid.UUID | None = None, *, removed: bool = False
     ) -> None:
-        """Record a write: of the board itself (no card), of a card, or a card that left."""
+        """Record a write: of the board itself (no card), of a card, or a card that left.
+
+        A card that left the board stays gone, whatever the request did before.
+        """
         entry = self._boards.setdefault(board_id, _Touched())
         if card_id is None:
             entry.whole = True
         elif removed or entry.cards.get(card_id) != "card_removed":
-            # A card that left the board stays gone, whatever the request did before.
             entry.cards[card_id] = "card_removed" if removed else "card"
 
     def messages(self) -> list[dict[str, object]]:
@@ -92,10 +94,13 @@ class BoardPings:
 
 
 async def publish_pings(broker: PatternBroker, messages: Sequence[dict[str, object]]) -> None:
-    """Publish the pings after the commit; a broker fault is logged, never raised."""
+    """Publish the pings after the commit; a broker fault is logged, never raised.
+
+    The poll of the page covers a lost ping.
+    """
     for message in messages:
         board_id = uuid.UUID(str(message["boardId"]))
         try:
             await broker.publish(board_channel(board_id), message)
-        except Exception:  # a lost ping is covered by the poll of the page
+        except Exception:
             logger.warning("to-do ping for board %s failed", board_id, exc_info=True)

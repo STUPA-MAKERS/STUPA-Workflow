@@ -54,16 +54,19 @@ class MailTemplateUpsert(_CamelModel):
 
 
 class MailTemplateOut(_CamelModel):
-    """Template as shown in the editor: a DB override or a builtin default."""
+    """Template as shown in the editor: a DB override or a builtin default.
 
-    # A builtin template without an override has no DB id.
+    Attributes:
+        id: DB id; None for a builtin template without an override.
+        source: ``override`` comes from the DB, ``builtin`` from the catalog unchanged.
+    """
+
     id: UUID | None = None
     key: str
     subject_i18n: I18nMap = Field(serialization_alias="subjectI18n")
     body_i18n: I18nMap = Field(serialization_alias="bodyI18n")
     body_html_i18n: I18nMap = Field(serialization_alias="bodyHtmlI18n")
     placeholders: dict[str, str]
-    # 'override' comes from the DB. 'builtin' comes from the catalogue, unchanged.
     source: Literal["override", "builtin"] = "override"
 
 
@@ -107,11 +110,14 @@ class NotificationPreferencesUpdate(_CamelModel):
 
 
 class NotificationSettingsOut(_CamelModel):
-    """Platform-wide notification config (single row)."""
+    """Platform-wide notification config (single row).
+
+    Attributes:
+        task_reminder_repeat_days: 0 sends one reminder per state visit only.
+    """
 
     task_reminder_enabled: bool = Field(alias="taskReminderEnabled")
     task_reminder_after_days: int = Field(alias="taskReminderAfterDays", ge=1)
-    # A value of 0 sends one reminder per state visit only.
     task_reminder_repeat_days: int = Field(alias="taskReminderRepeatDays", ge=0)
 
 

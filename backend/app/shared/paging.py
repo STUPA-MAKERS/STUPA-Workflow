@@ -12,11 +12,15 @@ MAX_LIMIT = 200
 
 
 class PageParams(BaseModel):
+    """Limit and offset of a paged list."""
+
     limit: int = Field(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT)
     offset: int = Field(default=0, ge=0)
 
 
 class Page[T](BaseModel):
+    """One page of a list, with the total count."""
+
     items: list[T]
     total: int
     limit: int

@@ -54,13 +54,14 @@ async def _due_application_ids(
     """Return the IDs of terminal applications past their retention window.
 
     The query skips an application that the job already anonymized.
+
+    A row is due when ``updated_at`` is older than now minus the retention window.
     """
     async with maker() as session:
         default_months = (
             await session.scalar(select(PrivacySettings.default_retention_months))
         ) or 24
         retention = func.coalesce(ApplicationType.retention_months, default_months)
-        # Per-row threshold: updated_at older than (now - retention) is due.
         cutoff = func.now() - func.make_interval(0, retention)
         stmt = (
             select(Application.id)
@@ -80,6 +81,10 @@ async def _anonymize_due(
     maker: async_sessionmaker[AsyncSession],
     storage: ObjectStorage | None,
 ) -> int:
+    """Anonymize every due application; return how many succeeded.
+
+    A bad row is logged and does not abort the run.
+    """
     ids = await _due_application_ids(maker)
     count = 0
     for application_id in ids:
@@ -101,7 +106,7 @@ async def _anonymize_due(
                 )
                 await session.commit()
             count += 1
-        except Exception:  # a bad single row must not abort the run
+        except Exception:
             logger.exception("retention anonymize failed (app=%s)", application_id)
     return count
 

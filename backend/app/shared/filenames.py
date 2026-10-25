@@ -56,7 +56,7 @@ a fullwidth solidus (``U+FF0F``)."""
 
 
 def _basename(name: str) -> str:
-    """Return the last path component, for both ``/`` and ``\\`` separators."""
+    r"""Return the last path component, for both ``/`` and ``\`` separators."""
     return os.path.basename(name.replace("\\", "/"))
 
 
@@ -113,7 +113,7 @@ def _cap(name: str, limit: int) -> str:
 
 
 def sanitize_display_name(filename: str | None, *, default: str = DEFAULT_NAME) -> str:
-    """Clean a client file name for display and download, and keep its Unicode.
+    r"""Clean a client file name for display and download, and keep its Unicode.
 
     The steps are: NFC normalization, the last path component only, every space
     character as a plain space, no control, surrogate, line-separator, format (Cf,
@@ -125,7 +125,7 @@ def sanitize_display_name(filename: str | None, *, default: str = DEFAULT_NAME) 
         default: The name when nothing usable remains.
 
     Returns:
-        The display name. It never holds ``/`` or ``\\`` and is never ``.`` or ``..``.
+        The display name. It never holds ``/`` or ``\`` and is never ``.`` or ``..``.
     """
     raw = unicodedata.normalize("NFC", filename or "")
     chars = (

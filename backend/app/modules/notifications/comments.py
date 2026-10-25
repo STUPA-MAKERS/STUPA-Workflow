@@ -89,11 +89,10 @@ _BUILTIN_TEAM_BODY = {
 
 _COMMENT_EXCERPT_LEN = 1000
 
-# Stylized chat message for the HTML mail. It mirrors the web-UI chat: an
-# avatar with initials, the author name and a gray left-aligned bubble. This is
-# the look of a message from another person in the web UI.
-# Jinja renders the snippet with autoescape. The `| e ... | safe` chain turns
-# only the inserted `<br>` into markup. The comment text stays escaped.
+#: Chat bubble of the HTML mail, as the web UI shows a message of another person:
+#: initials avatar, author name, gray left-aligned bubble. Jinja renders it with
+#: autoescape; the ``| e ... | safe`` chain turns only the inserted ``<br>`` into markup,
+#: so the comment text stays escaped.
 _CHAT_BUBBLE_HTML = (
     '<table role="presentation" cellpadding="0" cellspacing="0"'
     ' style="margin:16px 0 0;">'
@@ -134,10 +133,9 @@ _BUILTIN_TEAM_BODY_HTML = {
     "{% if status %} (current status: {{ status }}){% endif %}:</p>" + _CHAT_BUBBLE_HTML,
 }
 
-# Author label used when no display name is known (applicant comments).
+#: Author label of an applicant comment without a known display name.
 _APPLICANT_AUTHOR_FALLBACK = {"de": "Antragsteller:in", "en": "Applicant"}
-# Author label of a member comment for an application without a Gremium. It is
-# the same label as the web UI shows.
+#: Author label of a member comment on an application without a Gremium (as in the UI).
 _COMMITTEE_AUTHOR_FALLBACK = {"de": "Gremium", "en": "Committee"}
 
 
@@ -177,6 +175,14 @@ async def send_comment_notifications(
 
     Returns:
         The number of mail jobs that went to the queue.
+
+    An internal member comment sends no mail at all, because applicants never see it; the
+    check comes first, because it makes every other read pointless. The applicant gets the
+    mail in the language of the application, the team in the configured default. The
+    applicant never sees a member name: a member comment names the Gremium, an applicant
+    comment keeps the display name or the localized fallback, as in the web UI. The link
+    opens the comments at this comment: for a guest the public applicant page, for an
+    account and for the team the application.
     """
     app_row = (
         await session.execute(
@@ -191,15 +197,11 @@ async def send_comment_notifications(
     if app_row is None:
         return 0
     data, state_id, gremium_id, created_by = app_row
-    # Applicants never see an internal comment, so send no mail. The check comes
-    # before every other read, because it makes them all pointless.
     if author_kind == "principal" and visibility != "public":
         return 0
     title = (data or {}).get("title")
     service = NotificationService(session, queue=queue, settings=settings)
 
-    # The applicant reads the mail in the language of their own application. A mail
-    # to the team keeps the configured default language.
     lang = (
         await resolve_application_lang(
             session, application_id=application_id, settings=settings
@@ -215,10 +217,6 @@ async def send_comment_notifications(
             iter(state.label_i18n.values())
         )
 
-    # Author label for the chat bubble. The applicant never sees a member name: a
-    # member comment names the Gremium. A comment from the applicant
-    # keeps the display name, or else the localized applicant fallback. This
-    # matches the author fallback of the web UI.
     if author_kind == "principal":
         author_label = (await gremium_actor_name(session, gremium_id) or "").strip()
         fallback = _COMMITTEE_AUTHOR_FALLBACK
@@ -228,9 +226,6 @@ async def send_comment_notifications(
     if not author_label:
         author_label = fallback.get(lang, fallback["de"])
 
-    # The applicant opens their own view: a guest (no account) the public applicant
-    # page, an account the application. The team opens the application. The link to
-    # the application opens the comments at this comment.
     link = application_link(
         settings,
         application_id,
@@ -291,7 +286,7 @@ async def send_comment_notifications(
             lang=lang,
             default_lang=settings.mail_default_lang,
         )
-    except TemplateRenderError as exc:  # defensive: the builtin covers every variable
+    except TemplateRenderError as exc:
         logger.warning("comment builtin render failed: %s", exc)
         return 0
     msg = MailMessage(

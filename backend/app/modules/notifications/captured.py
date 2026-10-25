@@ -156,5 +156,5 @@ async def notify_application_captured(
             else:
                 base = settings.public_base_url.rstrip("/")
                 await deliver(email, f"{base}/applications/{application_id}")
-    except Exception:  # best effort: a mail failure never breaks the request
+    except Exception:
         logger.exception("application_captured mail failed (application=%s)", application_id)

@@ -41,6 +41,7 @@ class WebhookActionDispatcher:
     settings: Settings
 
     async def dispatch(self, actions: Sequence[DispatchedAction]) -> None:
+        """Dispatch the webhook actions; log every other type."""
         for action in actions:
             if action.type != "webhook":
                 continue

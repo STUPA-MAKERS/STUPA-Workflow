@@ -1,5 +1,7 @@
-"""Ticket mails: ``ticket_created`` and ``ticket_message`` to the team,
-``ticket_received`` and ``ticket_answer`` to the reporter.
+"""Send the ticket mails to the team and to the reporter.
+
+``ticket_created`` and ``ticket_message`` go to the team, ``ticket_received`` and
+``ticket_answer`` to the reporter.
 
 All run as background tasks after the commit of the report or the message, each
 with its own session, and all are best effort: a mail failure never fails the
@@ -198,7 +200,7 @@ async def notify_ticket_created(
                 idempotency_parts=(TICKET_CREATED_KEY, str(ticket.id)),
                 link=ticket_link(settings, ticket.id),
             )
-    except Exception:  # a mail must never break the report
+    except Exception:
         logger.exception("ticket_created mail failed")
         return False
 
@@ -214,6 +216,10 @@ async def notify_ticket_received(
 
     Returns:
         True when a mail was enqueued.
+
+    Only an account gets the link, because only an account reads the ticket again (tab
+    "Tickets"). A report without a session names an unchecked address, so its mail carries
+    no text of the caller.
     """
     try:
         async with _maker(sessionmaker)() as session:
@@ -225,7 +231,6 @@ async def notify_ticket_received(
                 return False
             branding = await active_branding(session)
             language = (ticket.context or {}).get("language")
-            # Only an account reads the ticket again, in the tab "Tickets".
             link = (
                 ticket_link(settings, ticket.id)
                 if ticket.reporter_principal_id is not None
@@ -241,8 +246,6 @@ async def notify_ticket_received(
                 builtin_body=TICKET_RECEIVED_BODY,
                 context={
                     "number": format_number(ticket.number),
-                    # A report without a session names an unchecked address, so
-                    # its mail carries no text of the caller.
                     "title": ticket.title if ticket.reporter_principal_id else "",
                     "wikiUrl": branding.help.wiki_url,
                 },
@@ -250,7 +253,7 @@ async def notify_ticket_received(
                 lang=language if language in ("de", "en") else "de",
                 link=link,
             )
-    except Exception:  # a mail must never break the report
+    except Exception:
         logger.exception("ticket_received mail failed")
         return False
 
@@ -269,6 +272,9 @@ async def notify_ticket_note(
 
     Returns:
         True when a mail was enqueued.
+
+    A message of files only names its files, as the comment mails do; a message without text
+    and files sends nothing.
     """
     try:
         async with _maker(sessionmaker)() as session:
@@ -284,16 +290,14 @@ async def notify_ticket_note(
                 return False
             message = note.body
             if not message.strip():
-                # A message of files only names its files, as the comment mails do.
                 files = await FilesService(session).message_attachments("ticket_note", [note.id])
                 message = ", ".join(a.filename for a in files.get(note.id, []))
             if not message.strip():
-                # Neither text nor files: nothing to tell.
                 return False
             if note.author_id == ticket.reporter_principal_id:
                 return await _mail_team(session, queue, settings, ticket, note, message)
             return await _mail_reporter(session, queue, settings, ticket, note, message)
-    except Exception:  # a mail must never break the message
+    except Exception:
         logger.exception("ticket note mail failed")
         return False
 
@@ -350,7 +354,12 @@ async def _mail_reporter(
     note: TicketNote,
     message: str,
 ) -> bool:
-    # Only a live account: a deactivated or merged one cannot open the link.
+    """Mail a public team note to the reporter account (``ticket_answer``).
+
+    Only a live account gets it, because a deactivated or merged one cannot open the link.
+    The mail names the author by name only, so the e-mail of a team member never reaches the
+    reporter.
+    """
     reporter = await session.get(PrincipalRow, ticket.reporter_principal_id)
     if reporter is None or not reporter.active or reporter.merged_into is not None:
         return False
@@ -368,7 +377,6 @@ async def _mail_reporter(
         context={
             "number": format_number(ticket.number),
             "title": ticket.title,
-            # The name only: the e-mail of a team member never reaches the reporter.
             "author": (author.display_name or "") if author is not None else "",
             "message": message,
         },

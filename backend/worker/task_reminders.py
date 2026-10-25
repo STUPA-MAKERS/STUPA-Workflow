@@ -75,6 +75,8 @@ async def process_task_reminders(
 
     Returns:
         The number of reminders sent.
+
+    One failing case is logged and does not break the cycle.
     """
     now = now or datetime.now(UTC)
     settings: Settings = ctx.get("settings") or load_settings()
@@ -107,7 +109,7 @@ async def process_task_reminders(
                     state=state,
                 ):
                     sent += 1
-            except Exception:  # one case must not break the cycle
+            except Exception:
                 logger.exception("task reminder failed (application=%s)", app_id)
     return sent
 
@@ -124,6 +126,8 @@ async def _due_applications(
     An application is due when the applicant confirmed it and the state stay is older
     than `after`. The application must also have no reminder for this stay, or a last
     reminder older than `repeat`. A `repeat` of `None` means one reminder per stay.
+
+    An application already reminded for this stay is sent again only in repeat mode.
     """
     latest_event = (
         select(
@@ -184,7 +188,6 @@ async def _due_applications(
             .limit(1)
         )
         log = logs.get(app_id)
-        # Already reminded for this stay: send again only in repeat mode.
         if (
             log is not None
             and log.status_event_id == event_id
@@ -206,6 +209,11 @@ async def _remind_one(
     entered_at: datetime,
     state: State | None,
 ) -> bool:
+    """Send one task reminder and write its log; return whether a mail went out.
+
+    The log is written even without a send, for example when all recipients opted out,
+    because without it every run re-checks the same opted-out set.
+    """
     app_row = (
         await session.execute(
             select(Application.data).where(Application.id == application_id)
@@ -245,9 +253,6 @@ async def _remind_one(
         ),
         link=task_link(settings, application_id),
     )
-    # Write the log even without a send, for example when all recipients opted out.
-    # Without the log every run re-checks the same opted-out set. `sent` counts only
-    # the real mails.
     log = await session.get(TaskReminderLog, application_id)
     if log is None:
         session.add(

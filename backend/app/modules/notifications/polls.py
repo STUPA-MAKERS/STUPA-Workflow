@@ -137,7 +137,9 @@ async def send_poll_mail(
 ) -> bool:
     """Send ``poll_started`` (every eligible member) or ``poll_reminder`` (no answer yet).
 
-    Each member gets an own mail with an own idempotency key (kind, vote, member).
+    Each member gets an own mail with an own idempotency key (kind, vote, member),
+    because a shared To: line would show every member who has not answered yet, which
+    a secret poll must not reveal.
 
     Returns:
         True when at least one mail was enqueued.
@@ -160,8 +162,6 @@ async def send_poll_mail(
     }
     service = NotificationService(session, queue=queue, settings=settings)
     sent = False
-    # One mail per member: a shared To: line would show every recipient who has not
-    # answered yet, which a secret poll must not reveal.
     for sub, email in members:
         if await service.send_kind_mail(
             [email],
@@ -199,6 +199,6 @@ async def notify_poll_started(
             return await send_poll_mail(
                 session, queue=queue, settings=settings, vote=vote, now=now, reminder=False
             )
-    except Exception:  # a mail must never break the open
+    except Exception:
         logger.exception("poll_started mail failed (vote=%s)", vote_id)
         return False

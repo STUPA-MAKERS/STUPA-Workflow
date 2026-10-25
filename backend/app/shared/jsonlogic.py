@@ -20,9 +20,8 @@ import operator
 from collections.abc import Callable
 from typing import Any
 
-# Maximum nesting depth of an expression. It protects the evaluator and the validator
-# against a RecursionError on deeply nested input. The limit sits far above any real
-# visibleIf or compute expression.
+#: Maximum nesting depth of an expression. It protects the evaluator and the validator
+#: against a RecursionError on deeply nested input, far above any real expression.
 _MAX_DEPTH = 64
 
 
@@ -135,9 +134,9 @@ def _eval_multiply(args: list[Any]) -> float:
     return product
 
 
-# Map an operator to a pure function over the already evaluated arguments. `var` is not
-# here, because it resolves a path. `and` and `or` do not short-circuit. The evaluator
-# evaluates every operand first.
+#: Operator to a pure function over the evaluated arguments. ``var`` is not here, because
+#: it resolves a path. ``and`` and ``or`` do not short-circuit: every operand is
+#: evaluated first.
 _EVALUATORS: dict[str, Callable[[list[Any]], Any]] = {
     "==": _arity("==", 2)(lambda a: a[0] == a[1]),
     "!=": _arity("!=", 2)(lambda a: a[0] != a[1]),
@@ -155,7 +154,7 @@ _EVALUATORS: dict[str, Callable[[list[Any]], Any]] = {
     "in": _eval_in,
 }
 
-# The whitelist that both the evaluator and the validator use.
+#: Operator whitelist of the evaluator and the validator.
 JSONLOGIC_OPERATORS: frozenset[str] = frozenset(_EVALUATORS) | {"var"}
 
 

@@ -36,7 +36,7 @@ async def create_mail_pool(redis_url: str) -> ArqRedis | None:
             create_pool(RedisSettings.from_dsn(redis_url)),
             timeout=_POOL_OPEN_TIMEOUT,
         )
-    except Exception as exc:  # never block startup (Redis optional)
+    except Exception as exc:
         logger.warning("mail pool unavailable (%s): %s", type(exc).__name__, exc)
         return None
 

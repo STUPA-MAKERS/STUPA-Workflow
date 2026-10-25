@@ -42,6 +42,7 @@ _AUTH_ERRORS: dict[int | str, dict[str, Any]] = {401: _PROBLEM, 403: _PROBLEM}
 
 
 def get_notification_service(session: DbSession) -> NotificationService:
+    """Provide the notification service of the request session."""
     return NotificationService(session)
 
 
@@ -143,6 +144,7 @@ async def list_mail_templates(
 async def create_mail_template(
     payload: MailTemplateCreate, service: ServiceDep, _principal: NotifAdmin
 ) -> MailTemplateOut:
+    """Create a mail template."""
     return await service.create_template(payload)
 
 
@@ -157,6 +159,7 @@ async def update_mail_template(
     service: ServiceDep,
     _principal: NotifAdmin,
 ) -> MailTemplateOut:
+    """Update a mail template."""
     return await service.update_template(template_id, payload)
 
 

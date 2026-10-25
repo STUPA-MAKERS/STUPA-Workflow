@@ -67,6 +67,6 @@ async def verify_after_restore(
     """
     try:
         return await run_verification(maker, trigger="restore", triggered_by=actor)
-    except Exception:  # the restore itself is done; only log
+    except Exception:
         logger.exception("audit chain check after the restore failed")
         return None

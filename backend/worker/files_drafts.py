@@ -35,7 +35,7 @@ from app.settings import load_settings
 
 logger = logging.getLogger("app.files")
 
-# Rows per batch. The task loops until a batch comes back short.
+#: Rows per batch; the task loops until a batch comes back short.
 PURGE_BATCH = 500
 
 
