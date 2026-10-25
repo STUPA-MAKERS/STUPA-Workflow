@@ -1,6 +1,6 @@
 """Tests for the API-path hardening in `antragsplattform_mcp.client`.
 
-These tests cover AUD-022. A caller-supplied id goes into the request path. Such an id
+A caller-supplied id goes into the request path. Such an id
 must not traverse the path with `../admin/audit`. It must not smuggle a query string
 with `x?y=1` either. A legitimate route and a UUID id must pass through untouched.
 """

@@ -59,7 +59,7 @@ class TreeViewOps(BudgetTreeServiceBase):
         Every node carries allocated, committed, requested and available. Each
         top-level budget classifies its applications. An application counts as
         committed when its current flow-state key is in `accepted_state_keys` of
-        the top budget. It then binds the approved amount of its decision (F1),
+        the top budget. It then binds the approved amount of its decision,
         else the requested amount. It counts as requested when it is neither accepted nor
         denied. A denied application drops out.
         """
@@ -76,7 +76,7 @@ class TreeViewOps(BudgetTreeServiceBase):
                     Budget.path_key,
                     Application.fiscal_year_id,
                     Application.amount,
-                    # F1: an accepted application binds the approved amount of its
+                    # An accepted application binds the approved amount of its
                     # decision, else the requested amount.
                     func.coalesce(Application.approved_amount, Application.amount),
                     State.key,
@@ -129,7 +129,7 @@ class TreeViewOps(BudgetTreeServiceBase):
         for app_id, path, fy, amount, committed, state_key in app_rows:
             accepted, denied = top_config.get(path.split("-")[0], (set(), set()))
             if state_key in accepted:
-                # Reduce the binding (the approved amount, F1) by already booked
+                # Reduce the binding (the approved amount) by already booked
                 # expenses.
                 spent = spent_per_app.get(app_id, _ZERO)
                 remaining = (committed or _ZERO) - spent

@@ -1,4 +1,4 @@
-"""Static checks of the least-privilege database roles (T-41, security.md §4/§10).
+"""Static checks of the least-privilege database roles.
 
 The tests read the provisioning script `deploy/db/roles.sql`. They check that the script
 creates separate service users. They also check that it revokes UPDATE and DELETE on the
@@ -24,16 +24,13 @@ def test_roles_sql_exists_and_nonempty() -> None:
 def test_separate_service_users_created() -> None:
     for role in ("migrator", "app", "audit_writer"):
         assert f"rolname = '{role}'" in _SQL, f"role {role} not provisioned"
-    # The migration user must stay separate from the runtime user (security.md §10).
+    # The migration user must stay separate from the runtime user.
     assert "CREATE ROLE migrator LOGIN" in _SQL
     assert "CREATE ROLE app LOGIN" in _SQL
 
 
 def test_runtime_user_loses_update_delete_on_audit() -> None:
-    """The app user has no UPDATE, DELETE or TRUNCATE on `audit_entry`.
-
-    This is the acceptance criterion of T-41.
-    """
+    """The app user has no UPDATE, DELETE or TRUNCATE on `audit_entry`."""
     revoke = re.search(
         r"REVOKE\s+UPDATE,\s*DELETE,\s*TRUNCATE\s+ON\s+TABLE\s+audit_entry\s+FROM\s+app",
         _SQL,

@@ -1,14 +1,13 @@
-"""Integration (real Postgres, testcontainers): the budget tree end to end (CR #76/#78).
+"""Integration (real Postgres, testcontainers): the budget tree end to end.
 
-The tests prove the three critical constraints against a real schema (data-model
-§1/§5.8). The product owner named them in testing.md.
+The tests prove the three critical constraints against a real schema.
 
 * **Path composition** and UNIQUE(parent,key). The tree builds top, then child, then
   `VS-800`.
-* **Fiscal-year disjointness** (R7.1f/g). An overlapping fiscal year gives 422.
-* **Top-down allocation** (R7.1b). The sum of the children must stay at or below the
+* **Fiscal-year disjointness**. An overlapping fiscal year gives 422.
+* **Top-down allocation**. The sum of the children must stay at or below the
   parent, otherwise 422.
-* **Roll-up correctness** (R7.1c). The committed amount of an approved application rolls
+* **Roll-up correctness**. The committed amount of an approved application rolls
   up from the cost center to the root. The roll-up follows the `path_key` prefix.
 * A delete with children gives 409.
 """

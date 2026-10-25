@@ -1,4 +1,4 @@
-"""O12 and O25 under concurrency: the meeting row serializes close, open and remove.
+"""Under concurrency, the meeting row serializes close, open and remove.
 
 The meeting close, the vote open and the agenda-item remove all lock the meeting row
 first. The tests hold that lock in one session and start the other operation in a

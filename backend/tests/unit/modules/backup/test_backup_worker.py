@@ -201,7 +201,7 @@ def _silence_audit(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
 
 @pytest.fixture(autouse=True)
 def _verify_calls(monkeypatch: pytest.MonkeyPatch) -> list[tuple[object, str | None]]:
-    """Record the chain check after a restore instead of reading a hash chain (Z6)."""
+    """Record the chain check after a restore instead of reading a hash chain."""
     calls: list[tuple[object, str | None]] = []
 
     async def _verify(maker: object, actor: str | None) -> str:
@@ -367,7 +367,7 @@ async def test_restore_puts_the_backup_catalogue_back() -> None:
 async def test_restore_verifies_the_restored_chain(
     _verify_calls: list[tuple[object, str | None]],
 ) -> None:
-    """Z6: a finished restore checks the chain of the restored database, as its actor."""
+    """A finished restore checks the chain of the restored database, as its actor."""
     service = _FakeService(_row(status="done", storage_key="k"))
     maker = _Sessionmaker()
     ctx = _ctx(service, archives=_FakeArchives(), maker=maker)

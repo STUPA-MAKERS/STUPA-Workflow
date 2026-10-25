@@ -1,4 +1,4 @@
-"""F2 · Personnel elections in the protocol and on the public protocols page.
+"""Personnel elections in the protocol and on the public protocols page.
 
 The internal snippet names every candidate with the votes; the public snippet and the
 public decision name the elected candidates only and count the others.

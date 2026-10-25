@@ -1,4 +1,4 @@
-"""Unit tests for the flow and status engine (T-14, flows §3/§9).
+"""Unit tests for the flow and status engine.
 
 The suite runs without a DB. `FlowService` reads through a result-queue fake. The tests
 patch the `fields_complete` signal, which keeps its own branch coverage in
@@ -230,7 +230,7 @@ async def test_fire_commits_status_event_and_dispatches() -> None:
     res = await svc.fire(app.id, transition.id, _principal(), note="los")
 
     assert res.new_state_id == review
-    # The explicit notify action plus the implicit task mail (#4-3). The implicit
+    # The explicit notify action plus the implicit task mail. The implicit
     # applicant mail drops out, because the explicit action already reaches the applicant.
     assert res.dispatched_actions == ["notify", "taskNotify"]
     assert db.committed == 1
@@ -311,7 +311,7 @@ async def test_fire_default_dispatcher_when_none() -> None:
     db = fake_session(result(app), result(transition), result(rowcount=1))
     res = await flow_service.FlowService(db).fire(app.id, transition.id, _principal())
     assert res.new_state_id == to
-    # Without explicit actions the implicit auto mails stay (#4-3).
+    # Without explicit actions the implicit auto mails stay.
     assert res.dispatched_actions == ["notify", "taskNotify"]
 
 
@@ -366,7 +366,7 @@ async def test_fire_manual_exit_cancels_open_votes() -> None:
 
 
 async def test_fire_publishes_vote_cancelled_after_commit() -> None:
-    """F19: each cancelled vote goes out as `vote_cancelled`. A broker fault is logged."""
+    """Each cancelled vote goes out as `vote_cancelled`. A broker fault is logged."""
     flow_id, voting, aborted = uuid4(), uuid4(), uuid4()
     app = _app(voting, flow_id)
     abort = _transition(flow_id=flow_id, from_id=voting, to_id=aborted)
@@ -698,7 +698,7 @@ async def test_list_states_unknown_application_404() -> None:
         await FlowService(db).list_states(uuid4())
 
 
-# A1: the agenda pick on a manual transition.
+# The agenda pick on a manual transition.
 def test_agenda_gremium_id_reads_the_first_agenda_action() -> None:
     gid = uuid4()
     assert flow_service.agenda_gremium_id(None) is None
@@ -897,7 +897,7 @@ async def test_add_to_agenda_in_tx(
 
 
 async def test_stage_branch_race_leaves_the_rollback_to_the_savepoint() -> None:
-    """F20: a lost race in the vote close does not roll back the whole transaction.
+    """A lost race in the vote close does not roll back the whole transaction.
 
     The vote close stages its branch in a SAVEPOINT. A full rollback here would also
     drop the staged vote close, so `stage_branch` raises without a rollback.

@@ -1,4 +1,4 @@
-"""F2 · Personnel elections in the voting service, without a database.
+"""Personnel elections in the voting service, without a database.
 
 A result-queue fake drives every new branch: the election ballot on the member, the
 secret and the guest path, the tally read, the close without a flow branch, the lot,

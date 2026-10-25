@@ -5,15 +5,15 @@ The meeting domain is scoped per gremium. The gremium permissions `session.manag
 it. The global keys that overlapped with them go:
 
 - `meeting.manage`: the gremium permission `session.manage` replaces it.
-- `protocol.finalize`: it becomes a gremium permission (decision O7). Finalizing
-  needs the write access AND the gremium key (decision O2).
-- `application.create`: no code checked it (bug F11). The public form creates an
+- `protocol.finalize`: it becomes a gremium permission. Finalizing
+  needs the write access AND the gremium key.
+- `application.create`: no code checked it. The public form creates an
   application without a permission.
 
 The upgrade:
 
 1. adds `protocol.finalize` to the forced gremium roles `vorstand` and `manager` of
-   every gremium (O7). A custom gremium role does not get it.
+   every gremium. A custom gremium role does not get it.
 2. logs a warning with the global roles that held one of the keys, and with the
    number of principals who lose a meeting right. That is a non-admin principal who
    held the right through a global role and has no gremium role with

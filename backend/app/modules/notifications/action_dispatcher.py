@@ -57,7 +57,7 @@ def _applicant_only(raw: object) -> bool:
 async def _decision_context(
     session: AsyncSession, action: DispatchedAction, lang: str
 ) -> dict[str, object]:
-    """Return the decision placeholders of a status mail (F1).
+    """Return the decision placeholders of a status mail.
 
     `requestedAmount` and `approvedAmount` are formatted amounts. `amountDeviates`
     and `conditions` come from the decision of this status change only, so a later
@@ -193,7 +193,7 @@ class NotificationActionDispatcher:
                         label_i18n.get(lang or self.settings.mail_default_lang)
                         or next(iter(label_i18n.values()))
                     )
-            # F1: the approved amount and the conditions of the decision.
+            # The approved amount and the conditions of the decision.
             context.update(
                 await _decision_context(
                     session, action, lang or self.settings.mail_default_lang

@@ -1,9 +1,9 @@
-"""The worker discards unconfirmed applications after `confirm_ttl_hours` (Z1, F23).
+"""The worker discards unconfirmed applications after `confirm_ttl_hours`.
 
 * The window comes from `guest_application_settings` on every run. A shorter value
   applies to the applications that already wait.
 * The discard covers every unconfirmed application, also one that a logged-in person
-  submitted for another email address (F23), not only `created_by IS NULL`.
+  submitted for another email address, not only `created_by IS NULL`.
 * It deletes the rows, removes the storage objects of the attachments and writes one
   `guest_application_discard` audit entry per application, without PII.
 """

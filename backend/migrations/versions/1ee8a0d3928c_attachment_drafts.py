@@ -1,4 +1,4 @@
-"""Draft attachments of the wizard (Z4).
+"""Draft attachments of the wizard.
 
 The upgrade:
 

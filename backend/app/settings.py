@@ -165,7 +165,7 @@ class Settings(BaseSettings):
     # narrows the replay window.
     applicant_session_ttl_hours: int = 12
     cookie_secure: bool = True
-    # Device token of a guest of a public meeting (#17): HttpOnly, SameSite=Strict, path
+    # Device token of a guest of a public meeting: HttpOnly, SameSite=Strict, path
     # `/api/public/meetings`. The server keeps only its SHA-256 hash. The token stops
     # working when the meeting closes; the cookie lifetime is a safety bound.
     guest_cookie_name: str = "mg_token"
@@ -228,7 +228,7 @@ class Settings(BaseSettings):
     # Upload cap (the data model holds CHECK(size <= 10485760)) and signed-URL lifetime.
     attachment_max_bytes: int = 10 * 1024 * 1024
     attachment_url_ttl_seconds: int = 300
-    # Draft uploads of the wizard (Z4, POST /apply/attachments). Each upload moves the
+    # Draft uploads of the wizard (POST /apply/attachments). Each upload moves the
     # end of all drafts of the token to now + this many days. One token holds at most
     # this many files and bytes.
     attachment_draft_ttl_days: int = Field(default=7, ge=1)
@@ -381,11 +381,11 @@ class Settings(BaseSettings):
     # GET /principals/{id}/avatar: requests per hour per logged-in principal. A page
     # with a long member list asks for one avatar per row, so the limit stays generous.
     rl_avatar_per_hour: int = 1200
-    # GET /applications/on-behalf/applicants: searches per hour per principal (#11). The
+    # GET /applications/on-behalf/applicants: searches per hour per principal. The
     # search discloses names and e-mails of accounts; the dialog searches while the user
     # types (debounced), so the limit stays generous for a person and stops a scraper.
     rl_applicant_search_per_hour: int = 300
-    # Public meeting (#17). Many guests often share one IP (the campus NAT), so the
+    # Public meeting. Many guests often share one IP (the campus NAT), so the
     # per-IP limits stay generous: ALTCHA is the main guard of the join. The join
     # counts per IP and per join code. The reads of the public routes (the head of the
     # meeting, the own state) count per IP. The writes of an admitted or waiting guest
@@ -428,7 +428,7 @@ class Settings(BaseSettings):
                 contains "*".
         """
         if self.environment == "production" and "*" in self.forwarded_allow_ips:
-            raise ValueError('FORWARDED_ALLOW_IPS must not be "*" in production (security.md §3).')
+            raise ValueError('FORWARDED_ALLOW_IPS must not be "*" in production.')
         return self
 
     @property
@@ -465,15 +465,14 @@ class Settings(BaseSettings):
         if self.strict_security_enabled and not self.webhook_host_allowlist:
             _log.warning(
                 "WEBHOOK_HOST_ALLOWLIST is empty under strict security: webhook targets are "
-                "only restricted by the SSRF guard, not pinned to known hosts "
-                "(security.md §5)."
+                "only restricted by the SSRF guard, not pinned to known hosts."
             )
         if self.storage_enabled and not self.clamav_enabled:
             _log.warning(
                 "MINIO storage is enabled but CLAMAV is disabled: uploaded attachments "
                 "are stored and enqueued for scanning, but the worker has no scanner and "
                 "leaves them scanned=False — downloads stay quarantined (409) forever. "
-                "Configure CLAMAV_HOST or disable MINIO storage (#AUD-071)."
+                "Configure CLAMAV_HOST or disable MINIO storage."
             )
         return self
 

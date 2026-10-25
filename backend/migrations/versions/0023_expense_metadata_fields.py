@@ -1,4 +1,4 @@
-"""Bookings: extra metadata columns (#1-1/#1-2/#3/#4).
+"""Bookings: extra metadata columns.
 
 Add the invoice date, the payment date and the recipient or payer
 (`correspondent`) to `budget_expense`. Add a free `note`, the receipt number

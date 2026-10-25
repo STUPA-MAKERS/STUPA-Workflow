@@ -366,7 +366,7 @@ async def rate_limit_applicant_search(
     limiter: RateLimiterDep,
     principal: Annotated[Principal | None, Depends(get_current_principal)],
 ) -> None:
-    """``GET /applications/on-behalf/applicants``: a limit per principal per hour (#11).
+    """``GET /applications/on-behalf/applicants``: a limit per principal per hour.
 
     The search discloses the names and e-mails of the accounts, so the limit also
     applies to an OAuth token: an agent must not walk the whole directory. Without a
@@ -386,7 +386,7 @@ async def rate_limit_applicant_search(
 async def rate_limit_public_join(
     request: Request, settings: SettingsDep, limiter: RateLimiterDep
 ) -> None:
-    """``POST /public/meetings/join/{code}`` (#17): a limit per IP and per join code.
+    """``POST /public/meetings/join/{code}``: a limit per IP and per join code.
 
     Many guests share the campus NAT, so the IP limit stays generous; ALTCHA is the
     main guard. The code limit stops a flood of requests on one meeting.
@@ -412,7 +412,7 @@ async def rate_limit_public_join(
 async def rate_limit_public_read(
     request: Request, settings: SettingsDep, limiter: RateLimiterDep
 ) -> None:
-    """The reads of the public meeting routes (#17): a generous limit per IP.
+    """The reads of the public meeting routes: a generous limit per IP.
 
     The limit stops the enumeration of join codes; a guest page reads its state again
     on each live event, and many guests share one IP.

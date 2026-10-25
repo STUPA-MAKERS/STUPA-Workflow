@@ -1,4 +1,4 @@
-"""AUD-066: a raw OIDC group claim must not satisfy the gremium cast eligibility.
+"""A raw OIDC group claim must not satisfy the gremium cast eligibility.
 
 A hostile or misconfigured IdP can emit a group name that equals a gremium UUID string.
 `resolve_principal` puts both raw OIDC group claims and gremium membership keys into
@@ -31,7 +31,7 @@ def test_uuid_eligible_group_requires_namespaced_membership_key() -> None:
 
 
 def test_bare_uuid_oidc_claim_does_not_satisfy_eligibility() -> None:
-    """AUD-066 core: the gate rejects a raw OIDC group claim equal to the gremium UUID."""
+    """The gate rejects a raw OIDC group claim equal to the gremium UUID."""
     gid = uuid.uuid4()
     attacker = Principal(sub="a", groups={str(gid)})
     assert VotingService._may_cast(attacker, str(gid)) is False

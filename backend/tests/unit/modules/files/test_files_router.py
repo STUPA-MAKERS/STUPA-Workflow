@@ -1,4 +1,4 @@
-"""Router tests for files (T-13): endpoint wiring and RBAC with a faked service."""
+"""Router tests for files: endpoint wiring and RBAC with a faked service."""
 
 from __future__ import annotations
 
@@ -438,7 +438,7 @@ def test_delete_applicant_locked_state_409(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
     # A delete is a data change. In a locked state the applicant can upload, but not
-    # delete (Z1, O4).
+    # delete.
     fake_service.locked = True
     _as_applicant(app)
     r = client.delete(f"/api/attachments/{ATT_ID}")

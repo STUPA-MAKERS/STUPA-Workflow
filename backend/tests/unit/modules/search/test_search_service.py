@@ -247,7 +247,7 @@ async def test_a_nameless_record_reads_as_untitled_not_as_its_id(
     ("lang", "expected"), [("de", "Gremium"), ("en", "Committee"), ("fr", "Gremium")]
 )
 async def test_a_gremium_hit_names_its_kind_not_its_slug(lang: str, expected: str) -> None:
-    """D10: the subtitle of a Gremium hit is the kind only. The slug is an internal key."""
+    """The subtitle of a Gremium hit is the kind only. The slug is an internal key."""
     from types import SimpleNamespace
 
     gid = uuid.uuid4()
@@ -274,7 +274,7 @@ async def test_a_gremium_hit_names_its_kind_not_its_slug(lang: str, expected: st
 async def test_a_nameless_person_reads_no_name_not_its_sub(
     monkeypatch: pytest.MonkeyPatch, lang: str, expected: str
 ) -> None:
-    """D7: an account without a name and an e-mail never shows its `sub` as the title."""
+    """An account without a name and an e-mail never shows its `sub` as the title."""
     from types import SimpleNamespace
 
     from app.modules.admin.service.service import ConfigService

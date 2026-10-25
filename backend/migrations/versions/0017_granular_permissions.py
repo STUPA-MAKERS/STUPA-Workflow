@@ -1,4 +1,4 @@
-"""Finer global permissions (#6): remap the existing assignments.
+"""Finer global permissions: remap the existing assignments.
 
 The split (shared/permissions.py):
 * `admin.config`  → `admin.site` + `admin.gremien` + `admin.types`

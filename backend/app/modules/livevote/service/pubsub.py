@@ -83,7 +83,7 @@ class BrokerPublisher:
         await self._broker.publish(meeting_channel(vote.meeting_id), event.dump())
 
     async def vote_lot_drawn(self, vote: VoteOut) -> None:
-        """Send the drawn lot of an election (F2) to the room and the beamer."""
+        """Send the drawn lot of an election to the room and the beamer."""
         if vote.meeting_id is None or vote.election_result is None or vote.result is None:
             return
         event = VoteLotDrawnEvent(
@@ -97,7 +97,7 @@ class BrokerPublisher:
         event = VoteCancelledEvent(voteId=vote.id)
         await self._broker.publish(meeting_channel(vote.meeting_id), event.dump())
 
-    # Public meeting (#17). The connection layer filters these events: the guest
+    # Public meeting. The connection layer filters these events: the guest
     # events with names reach only the meeting lead, the counts reach everybody.
     async def guest_requested(self, meeting_id: UUID, guest: MeetingGuestOut) -> None:
         event = GuestRequestedEvent(guest=guest)

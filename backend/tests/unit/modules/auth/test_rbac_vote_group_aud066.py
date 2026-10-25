@@ -1,4 +1,4 @@
-"""AUD-066: an active `vote.cast` Gremium membership adds a namespaced group key.
+"""An active `vote.cast` Gremium membership adds a namespaced group key.
 
 The membership adds `vote:<gremium_id>` to `Principal.groups`, not the bare UUID as
 text. A coincident OIDC group claim can therefore not satisfy the Gremium cast
@@ -29,5 +29,5 @@ async def test_vote_cast_membership_emits_namespaced_group_key() -> None:
     )
     p = await rbac.resolve_principal(db, row, NOW)
     assert rbac.vote_group_key(gid) in p.groups
-    # The bare UUID string must NOT serve as the cast key (AUD-066).
+    # The bare UUID string must NOT serve as the cast key.
     assert gid not in p.groups

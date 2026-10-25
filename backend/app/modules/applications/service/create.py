@@ -40,7 +40,7 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True, slots=True)
 class Capture:
-    """A capture on behalf of the applicant (#11).
+    """A capture on behalf of the applicant.
 
     ``owner_sub`` is the ``sub`` of the applicant account, or None for a guest
     applicant. It becomes ``created_by``, so the applicant owns the application as if
@@ -75,7 +75,7 @@ class CreateOps(ApplicationsServiceBase):
 
         1. Load the effective form.
         2. Run ``validate_answers``. A bad answer raises 422 before any DB write.
-           Check and lock the draft uploads of the wizard (Z4, ``_check_drafts``).
+           Check and lock the draft uploads of the wizard (``_check_drafts``).
            A missing, expired, foreign or infected draft raises 422 too.
         3. Write the application, the PII row, version 1, the initial state and
            the status event. Bind the drafts to the application.
@@ -94,15 +94,15 @@ class CreateOps(ApplicationsServiceBase):
 
         ``email_confirmed`` tells whether the applicant email is already confirmed.
         The router sets it to False for a logged-in person who enters an email
-        other than the account email (F23). That application then rests like a
+        other than the account email. That application then rests like a
         guest submission. ``None`` keeps the old rule: only a guest submission
         (``actor == "applicant"``) is unconfirmed.
 
         The create writes an ``application_create`` audit entry in the same
-        transaction (F12). It holds the type, the gremium, the initial state, the
+        transaction. It holds the type, the gremium, the initial state, the
         confirmation flag and the number of bound drafts, never PII.
 
-        ``capture`` marks a capture on behalf of the applicant (#11). The owner
+        ``capture`` marks a capture on behalf of the applicant. The owner
         (``created_by``) is then ``capture.owner_sub`` and not the actor. The actor
         (the capturing person) writes version 1 and the first status event, and the
         create writes a second audit entry ``application_create_on_behalf``.
@@ -138,7 +138,7 @@ class CreateOps(ApplicationsServiceBase):
         # Store the known field keys only. The code discards an unknown key.
         clean = _whitelist(fields, payload.data)
         amount, currency = _amount_currency(fields, clean)
-        # Draft uploads of the wizard (Z4). The check locks the drafts, so nothing
+        # Draft uploads of the wizard. The check locks the drafts, so nothing
         # removes them before the bind below. It runs before the first write.
         pepper = await self._check_drafts(payload, fields, clean, draft_pepper)
 
@@ -257,7 +257,7 @@ class CreateOps(ApplicationsServiceBase):
         clean: dict[str, Any],
         draft_pepper: str | None = None,
     ) -> str | None:
-        """Check the draft uploads that the create binds (Z4).
+        """Check the draft uploads that the create binds.
 
         Without ``attachmentIds`` and ``draftToken`` the method does nothing. With
         them, it checks three things and answers 422 for each failure:

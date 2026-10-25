@@ -1,4 +1,4 @@
-"""Formula injection defense for the DSGVO Auskunft extra sheets (AUD-015).
+"""Formula injection defense for the DSGVO Auskunft extra sheets.
 
 The module-local `app.modules.privacy.service.build_auskunft_workbook` adds two
 sheets to the shared base workbook: `Kommentare` and `Anhänge`. Both hold data under

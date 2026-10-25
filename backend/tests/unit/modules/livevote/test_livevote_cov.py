@@ -693,7 +693,7 @@ async def test_votes_for_open_proxy_denominator_hides_until_proxy_votes() -> Non
             res((vrow.id, "yes"), (vrow.id, "yes")),  # open ballots: 2
             res(),  # secret ballots
             res((mid, 2)),  # present=2
-            res(),  # admitted guests (#17): none
+            res(),  # admitted guests: none
             res((mid, gid, 1)),  # one proxy vote of an absent delegator, so expected=3
         ]
     )
@@ -1107,7 +1107,7 @@ async def test_resolve_protokollant_not_member(monkeypatch: pytest.MonkeyPatch) 
 
 
 async def test_resolve_protokollant_needs_protocol_write(monkeypatch: pytest.MonkeyPatch) -> None:
-    """O20: a member without `protocol.write` cannot keep the minutes (422)."""
+    """A member without `protocol.write` cannot keep the minutes (422)."""
     from types import SimpleNamespace
 
     gid = uuid4()
@@ -1693,7 +1693,7 @@ async def test_set_body_updates_all_fields(audit_calls: list[dict[str, Any]]) ->
     assert item.title == "new"
     assert item.non_public is True
     assert sess.committed == 1
-    # The live minutes are not audited, the rename and the flag are (F12).
+    # The live minutes are not audited, the rename and the flag are.
     [entry] = audit_calls
     assert entry["action"].value == "agenda_item_update"
     assert entry["actor"] == "mgr"
@@ -1750,7 +1750,7 @@ async def test_set_non_public_on_planned_meeting_ok() -> None:
 async def test_set_body_after_close_with_draft_protocol_is_audited(
     audit_calls: list[dict[str, Any]],
 ) -> None:
-    """O22: the minutes stay open after the close while the protocol is a draft."""
+    """The minutes stay open after the close while the protocol is a draft."""
     m = _meeting(status="closed")
     item = _agenda_item(body="old")
     sess = _QueueSession(
@@ -1780,7 +1780,7 @@ async def test_set_body_after_close_with_locked_protocol_conflicts(
 
 
 async def test_rename_after_close_conflicts() -> None:
-    """O25: a rename is a change of the agenda and stops with the close."""
+    """A rename is a change of the agenda and stops with the close."""
     m = _meeting(status="closed")
     item = _agenda_item(application_id=None, title="old")
     sess = _QueueSession(executes=[res(m), res(item)])
@@ -1877,7 +1877,7 @@ async def test_add_freetext(audit_calls: list[dict[str, Any]]) -> None:
 
 
 async def test_add_after_close_conflicts() -> None:
-    """O25: a closed meeting takes no new agenda item."""
+    """A closed meeting takes no new agenda item."""
     m = _meeting(status="closed")
     sess = _QueueSession(executes=[res(m)])
     with pytest.raises(ConflictError) as ei:
@@ -1983,7 +1983,7 @@ async def test_remove_existing_and_missing(audit_calls: list[dict[str, Any]]) ->
 async def test_remove_deletes_draft_and_cancelled_votes(
     audit_calls: list[dict[str, Any]],
 ) -> None:
-    """F24: the vote FK no longer cascades, so the remove deletes these votes itself."""
+    """The vote FK no longer cascades, so the remove deletes these votes itself."""
     from types import SimpleNamespace
 
     m = _meeting(status="live")
@@ -2001,7 +2001,7 @@ async def test_remove_deletes_draft_and_cancelled_votes(
 
 @pytest.mark.parametrize("vote_status", ["open", "closed"])
 async def test_remove_with_open_or_closed_vote_conflicts(vote_status: str) -> None:
-    """O25: an item with an open or closed vote stays on the agenda."""
+    """An item with an open or closed vote stays on the agenda."""
     from types import SimpleNamespace
 
     m = _meeting(status="live")
@@ -2092,7 +2092,7 @@ async def test_set_self_inserts_new() -> None:
             res(meeting),  # _meeting
             res(member),  # _current_members (set_self)
             res(),  # _upsert finds no existing row, so it inserts
-            res(),  # no delegation of the member (O23)
+            res(),  # no delegation of the member
             res(meeting),  # roster _meeting
             res(member),  # roster _current_members
             res(),  # roster records
@@ -2110,14 +2110,14 @@ async def test_set_self_updates_existing() -> None:
 
     meeting = _meeting(status="live")
     member = _member(sub="me")
-    # An older self report with "absent" (before Z2) moves to an allowed status.
+    # An older self report with "absent" moves to an allowed status.
     existing = SimpleNamespace(status="absent", source="self", note=None)
     sess = _QueueSession(
         executes=[
             res(meeting),  # _meeting
             res(member),  # _current_members
             res(existing),  # _upsert existing
-            res(),  # no delegation of the member (O23)
+            res(),  # no delegation of the member
             res(meeting),  # roster _meeting
             res(member),  # roster members
             res(existing),  # roster records, used only for the mapping
@@ -2194,7 +2194,7 @@ def test_router_di_factories() -> None:
     assert isinstance(get_meeting_service_ws(sess, broker), MeetingService)  # type: ignore[arg-type]
     assert isinstance(get_attendance_service(sess), AttendanceService)  # type: ignore[arg-type]
     assert isinstance(get_agenda_service(sess), AgendaService)  # type: ignore[arg-type]
-    # F2: both voting factories take the flow dispatcher, so the override in
+    # Both voting factories take the flow dispatcher, so the override in
     # `app.main` reaches the live-vote routes too.
     flow_dispatcher = NullActionDispatcher()
     rest_voting = get_voting_service(sess, flow_dispatcher)  # type: ignore[arg-type]
@@ -2608,7 +2608,7 @@ def test_set_member_attendance_ok(app: FastAPI, client: TestClient, fakes) -> No
 
 
 def test_list_attendance_passes_lead_flag(app: FastAPI, client: TestClient, fakes) -> None:
-    """A7: the roster gets ``can_write`` so it can show the note to the lead."""
+    """The roster gets ``can_write`` so it can show the note to the lead."""
     fakes["meeting"]._meeting_out = _meeting_out(can_write=True)
     _login(app)
     assert client.get(f"/api/meetings/{uuid4()}/attendance").status_code == 200
@@ -2616,7 +2616,7 @@ def test_list_attendance_passes_lead_flag(app: FastAPI, client: TestClient, fake
 
 
 def test_set_own_attendance_absent_is_422(app: FastAPI, client: TestClient, fakes) -> None:
-    """Z2: a member reports only present or excused."""
+    """A member reports only present or excused."""
     _login(app)
     r = client.put(f"/api/meetings/{uuid4()}/attendance/me", json={"status": "absent"})
     assert r.status_code == 422
@@ -2777,7 +2777,7 @@ def test_set_agenda_body_forbidden(app: FastAPI, client: TestClient, fakes) -> N
 def test_set_agenda_body_passes_the_state_rules_to_the_service(
     app: FastAPI, client: TestClient, fakes
 ) -> None:
-    # The service owns the state rules (O22): a planned meeting reaches it, and the
+    # The service owns the state rules: a planned meeting reaches it, and the
     # service decides on the 409.
     fakes["meeting"]._meeting_out = _meeting_out(status="planned", can_write=True)
 
@@ -2915,7 +2915,7 @@ def test_open_vote_application_top_with_quorum_and_eligible(
 ) -> None:
     from types import SimpleNamespace
 
-    # An application agenda item with an explicit quorum_percent. AUD-042: the router
+    # An application agenda item with an explicit quorum_percent. The router
     # MUST ignore a client-supplied ``eligibleCount``. The quorum denominator always
     # comes from the real roster. The fake vote_eligible_count returns 7.
     fakes["agenda"].item_row = SimpleNamespace(id=uuid4(), application_id=uuid4())
@@ -3224,14 +3224,14 @@ def test_delete_meeting_vote_ok(
     r = client.delete(f"/api/meetings/{uuid4()}/votes/{vid}")
     assert r.status_code == 200
     assert fakes["voting"].deleted and fakes["voting"].deleted[0][0] == vid
-    # The service writes `vote_delete` for this actor (O24).
+    # The service writes `vote_delete` for this actor.
     assert fakes["voting"].deleted[0][2] == "p"
 
 
 def test_delete_meeting_vote_closed_meeting_conflict(
     app: FastAPI, client: TestClient, fakes
 ) -> None:
-    """O24: after the close a meeting vote is part of the record."""
+    """After the close a meeting vote is part of the record."""
     fakes["meeting"]._meeting_out = _meeting_out(status="closed", can_manage_votes=True)
     _login(app)
     r = client.delete(f"/api/meetings/{uuid4()}/votes/{uuid4()}")
@@ -3562,7 +3562,7 @@ async def test_get_with_votes_and_protocol() -> None:
             res((vrow.id, "yes")),  # open ballots
             res(),  # secret ballots
             res((mid, 1)),  # present
-            res(),  # admitted guests (#17): none
+            res(),  # admitted guests: none
             res(),  # _ballots_of: voting delegations of the caller
             res(),  # _ballots_of: own open ballots
             res(),  # _ballots_of: own voted markers

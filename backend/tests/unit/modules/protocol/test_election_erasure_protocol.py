@@ -1,4 +1,4 @@
-"""F2 · Erasure of a candidate name from the copies of an election in the protocol text.
+"""Erasure of a candidate name from the copies of an election in the protocol text.
 
 ``embed_votes`` writes the internal election callout into ``protocol.markdown``, and the
 protokollant can insert it into an agenda item body. After the erasure of a candidate

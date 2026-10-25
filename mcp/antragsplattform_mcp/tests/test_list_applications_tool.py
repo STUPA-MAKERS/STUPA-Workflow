@@ -1,4 +1,4 @@
-"""Tests for the `list_applications` tool and its state filter (A4).
+"""Tests for the `list_applications` tool and its state filter.
 
 The tool sends `state` as a list, so the API gets one repeated `state` parameter
 per id. A single id stays possible.

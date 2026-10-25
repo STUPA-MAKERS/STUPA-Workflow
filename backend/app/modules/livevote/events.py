@@ -90,7 +90,7 @@ class VoteOpenedEvent(_CamelModel):
     # `subscribe`, and not because the vote opened now. A client then knows that the
     # vote did not open while it watched.
     replay: bool = False
-    # F2: an election carries its seats and candidates (the ballot of the dock), and
+    # An election carries its seats and candidates (the ballot of the dock), and
     # a runoff its round.
     kind: VoteKind = "motion"
     election: ElectionConfig | None = None
@@ -141,12 +141,12 @@ class VoteTallyEvent(_CamelModel):
     leading: str | None = None
     # A secret vote hides the live bars in the frontend (showBars = !secret || isClosed).
     secret: bool = False
-    # #17: counts of the attendance, never names. ``guestsVote`` marks a vote with
+    # Counts of the attendance, never names. ``guestsVote`` marks a vote with
     # guests (no quorum).
     present_members: int | None = Field(default=None, alias="presentMembers")
     present_guests: int | None = Field(default=None, alias="presentGuests")
     guests_vote: bool = Field(default=False, alias="guestsVote")
-    # F2: for an election `counts` holds the votes per candidate id plus `abstain`,
+    # For an election `counts` holds the votes per candidate id plus `abstain`,
     # and `cast` the cast ballots. A poll holds the votes per option id (a date poll:
     # the Ja answers); `pollResult` adds the order and the Vielleicht answers once
     # revealed.
@@ -193,7 +193,7 @@ class VoteClosedEvent(_CamelModel):
     failed_reason: Literal["quorum", "majority"] | None = Field(
         default=None, alias="failedReason"
     )
-    # F2: the result of an election (elected, runoff, pending lot). Aggregates and
+    # The result of an election (elected, runoff, pending lot). Aggregates and
     # candidate ids only.
     kind: VoteKind = "motion"
     election_result: ElectionResultOut | None = Field(default=None, alias="electionResult")
@@ -201,7 +201,7 @@ class VoteClosedEvent(_CamelModel):
 
 
 class VoteLotDrawnEvent(_CamelModel):
-    """The lot of a tied election was drawn (F2): the beamer and the room show it."""
+    """The lot of a tied election was drawn: the beamer and the room show it."""
 
     type: Literal["vote_lot_drawn"] = "vote_lot_drawn"
     vote_id: UUID = Field(alias="voteId")
@@ -220,14 +220,14 @@ GuestEventReason = Literal["public_off", "rotated", "meeting_closed"]
 
 
 class GuestRequestedEvent(_CamelModel):
-    """A guest asks to join (#17). Only a connection of the meeting lead gets it."""
+    """A guest asks to join. Only a connection of the meeting lead gets it."""
 
     type: Literal["guest_requested"] = "guest_requested"
     guest: MeetingGuestOut
 
 
 class GuestUpdatedEvent(_CamelModel):
-    """A guest changed (#17). Only a connection of the meeting lead gets it.
+    """A guest changed. Only a connection of the meeting lead gets it.
 
     ``guest.status == "expired"`` means the row is gone: a voided request. ``reason``
     tells why a change happened without a decision of the lead.
@@ -239,7 +239,7 @@ class GuestUpdatedEvent(_CamelModel):
 
 
 class GuestCountsEvent(_CamelModel):
-    """Public participation and the guest counts (#17), never names.
+    """Public participation and the guest counts, never names.
 
     The member connections without ``canManage`` get ``joinCode`` as None and
     ``pendingGuests`` as 0. A guest connection gets ``admittedGuests`` only.
@@ -254,7 +254,7 @@ class GuestCountsEvent(_CamelModel):
 
 
 class GuestStatusEvent(_CamelModel):
-    """The own state of a guest on the guest channel (#17)."""
+    """The own state of a guest on the guest channel."""
 
     type: Literal["guest_status"] = "guest_status"
     status: Literal["pending", "admitted", "rejected", "removed", "left", "expired"]
@@ -295,7 +295,7 @@ class CastMessage(_CamelModel):
     type: Literal["cast"]
     vote_id: UUID = Field(alias="voteId")
     # One option; for an election with several candidates the list of the chosen
-    # candidate ids (F2); for a poll the chosen option ids, or the answer per date.
+    # candidate ids; for a poll the chosen option ids, or the answer per date.
     choice: Annotated[str, Field(min_length=1)] | list[str] | dict[str, DateAnswer]
     as_delegation: bool = Field(default=False, alias="asDelegation")
 

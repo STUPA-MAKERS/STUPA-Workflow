@@ -1,4 +1,4 @@
-"""Flow action handler `webhook` (T-19)."""
+"""Flow action handler `webhook`."""
 
 from __future__ import annotations
 

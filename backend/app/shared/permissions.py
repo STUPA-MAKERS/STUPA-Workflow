@@ -34,7 +34,7 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     # application and deciding it may be read by anyone with a URL are different
     # decisions, and someone reading through a magic link must not be able to publish.
     "application.share",
-    # Capture an application on behalf of an applicant (#11): an existing account or a
+    # Capture an application on behalf of an applicant: an existing account or a
     # guest with name and e-mail. The application belongs to the applicant; the holder
     # shows only in the history and the audit log. Global, no Gremium scope.
     # Grant it deliberately: the applicant search of the capture dialog exposes the

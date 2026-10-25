@@ -1,4 +1,4 @@
-"""Unit tests for the completeness of the DSGVO Auskunft (Art. 15, AUD-015).
+"""Unit tests for the completeness of the DSGVO Auskunft (Art. 15).
 
 The tests need no database. They prove that `AuskunftService.collect` gathers more
 than the applications and the versions. It also collects the comments the subject may

@@ -1,4 +1,4 @@
-"""Worker task `render_protocol` (T-22 async): success, retry and rollback.
+"""Worker task `render_protocol`: success, retry and rollback.
 
 The ctx holds no Redis. The mail queue stays `None` and the worker sends no mail. The
 worker also skips the `meeting_state` broadcast. These tests focus on the status

@@ -41,8 +41,8 @@ class ApplicationCreate(_CamelModel):
     empty ``applicantEmail`` or ``applicantName`` from the account. The router
     enforces the fields that an anonymous submission requires.
 
-    ``attachmentIds`` and ``draftToken`` bind the draft uploads of the wizard
-    (Z4). With them, every reference in a ``file`` field must be one of
+    ``attachmentIds`` and ``draftToken`` bind the draft uploads of the wizard.
+    With them, every reference in a ``file`` field must be one of
     ``attachmentIds``.
     """
 
@@ -57,7 +57,7 @@ class ApplicationCreate(_CamelModel):
     # The schema validates the structure and answers 422 for a malformed value.
     # `require_altcha` runs the cryptographic verification.
     altcha: AltchaSolutionStr | None = None
-    # Draft uploads of the wizard (Z4). The create binds these drafts of the token in
+    # Draft uploads of the wizard. The create binds these drafts of the token in
     # its own transaction. A list without a token answers 422. Both stay optional:
     # the upload after the create (`POST /applications/{id}/attachments`) still works.
     attachment_ids: list[UUID] = Field(
@@ -69,7 +69,7 @@ class ApplicationCreate(_CamelModel):
 
 
 class OnBehalfCreate(_CamelModel):
-    """Capture an application on behalf of an applicant (#11).
+    """Capture an application on behalf of an applicant.
 
     The applicant is EITHER an existing account (``applicantPrincipalId``) OR a guest
     with ``applicantName`` and ``applicantEmail``. The schema rejects a mix and a
@@ -174,24 +174,24 @@ class ApplicationOut(_CamelModel):
     # the timestamp and not just a flag. Archiving is NOT anonymization: this record is
     # complete and readable, it has only left the working list.
     archived_at: datetime | None = Field(default=None, alias="archivedAt")
-    # Time of the last status change (A9): the newest status event, else the creation
+    # Time of the last status change: the newest status event, else the creation
     # time. The status page shows "since" from it.
     state_since: datetime | None = Field(default=None, alias="stateSince")
-    # The ``isPII`` field keys that the server removed from ``data`` for this reader
-    # (O21). Empty for a reader with the PII right. The edit form leaves out these
+    # The ``isPII`` field keys that the server removed from ``data`` for this reader.
+    # Empty for a reader with the PII right. The edit form leaves out these
     # fields, because a patch keeps their stored values. A missing key in ``data``
     # alone does not tell "removed" from "never answered".
     hidden_keys: list[str] = Field(default_factory=list, alias="hiddenKeys")
-    # Set when a person captured the application on behalf of the applicant (#11).
+    # Set when a person captured the application on behalf of the applicant.
     capture: CaptureOut | None = None
-    # F1: the approved amount of the valid decision, null = as requested.
+    # The approved amount of the valid decision, null = as requested.
     approved_amount: Decimal | None = Field(default=None, alias="approvedAmount")
-    # F1: the valid decision (approval with deviations), null before any decision.
+    # The valid decision (approval with deviations), null before any decision.
     decision: DecisionOut | None = None
 
 
 class DecisionOut(_CamelModel):
-    """The valid decision on an application (F1, approval with deviations).
+    """The valid decision on an application (approval with deviations).
 
     ``approvedAmount`` null means "as requested". The applicant view gets the same
     block without ``voteId``. No view carries vote counts.
@@ -209,7 +209,7 @@ class DecisionOut(_CamelModel):
 
 
 class TimelineDecisionOut(_CamelModel):
-    """The decision that a status event carried (F1), for the history line."""
+    """The decision that a status event carried, for the history line."""
 
     requested_amount: Decimal | None = Field(default=None, alias="requestedAmount")
     approved_amount: Decimal | None = Field(default=None, alias="approvedAmount")
@@ -239,12 +239,12 @@ class ActorOut(_CamelModel):
       the account has no name. ``principalId`` is the id of the account, for the
       avatar (``GET /principals/{id}/avatar``).
     - ``applicant``: the applicant through the magic link. No name, because the
-      name is PII (O21).
+      name is PII.
     - ``system``: an automatic action. ``key`` names the source, for example
       ``deadlines`` for ``system:deadlines``. A plain ``system`` gives the key
       ``auto``.
     - ``gremium``: the applicant view shows the Gremium for each action of a
-      member (A12, O16). ``displayName`` holds the Gremium name, or null when the
+      member. ``displayName`` holds the Gremium name, or null when the
       application has no Gremium.
     - ``deleted``: the stored ``sub`` names no known account, or the account was
       anonymized. No name and no id.
@@ -272,10 +272,10 @@ class ActorOut(_CamelModel):
 
 
 class CaptureOut(_CamelModel):
-    """How an application captured on behalf of the applicant came in (#11).
+    """How an application captured on behalf of the applicant came in.
 
     ``capturedBy`` follows the actor rules of the timeline: the applicant view shows
-    the Gremium instead of the member (A12, O16).
+    the Gremium instead of the member.
     """
 
     captured_by: ActorOut | None = Field(default=None, alias="capturedBy")
@@ -288,13 +288,13 @@ class TimelineEventOut(_CamelModel):
     """One status change of the timeline.
 
     In the applicant view (magic link or creator), ``actor`` names the Gremium of the
-    application for every action that the applicant did not do (A12, O16).
+    application for every action that the applicant did not do.
     """
 
     from_state_id: UUID | None = Field(default=None, alias="fromStateId")
     to_state_id: UUID = Field(alias="toStateId")
     to_state: StateOut | None = Field(default=None, alias="toState")
-    # The i18n label of the fired transition (A3). Null for the creation event and
+    # The i18n label of the fired transition. Null for the creation event and
     # for a revert, which fire no transition.
     transition_label: I18nMap | None = Field(default=None, alias="transitionLabel")
     # The display string of the actor: a name, ``applicant`` or a ``system:*`` key.
@@ -310,7 +310,7 @@ class TimelineEventOut(_CamelModel):
     # is gone: a meeting delete deleted it with its meeting. The application keeps the
     # status that the vote decided.
     vote_deleted: bool = Field(default=False, alias="voteDeleted")
-    # F1: the decision that this status change carried (approved amount, number of
+    # The decision that this status change carried (approved amount, number of
     # conditions), else null.
     decision: TimelineDecisionOut | None = None
 
@@ -319,9 +319,9 @@ class VersionOut(_CamelModel):
     """One submission version.
 
     ``changedKeys`` holds the keys of the added, removed and changed fields. The
-    applicant view gets the metadata only (A11, O17): ``data`` and ``diff`` are null.
+    applicant view gets the metadata only: ``data`` and ``diff`` are null.
     A reader without the PII right gets ``data``, ``diff`` and ``changedKeys``
-    without the ``isPII`` fields (O21).
+    without the ``isPII`` fields.
     """
 
     version: int
@@ -343,14 +343,14 @@ class ApplicationListItem(_CamelModel):
     state: StateOut | None = None
     gremium_id: UUID | None = Field(default=None, alias="gremiumId")
     amount: Decimal | None = None
-    # F1: the approved amount of the valid decision, null = as requested.
+    # The approved amount of the valid decision, null = as requested.
     approved_amount: Decimal | None = Field(default=None, alias="approvedAmount")
     currency: str | None = None
     created_at: datetime = Field(alias="createdAt")
     updated_at: datetime = Field(alias="updatedAt")
     #: Set when the row is archived, so a combined list can mark it.
     archived_at: datetime | None = Field(default=None, alias="archivedAt")
-    #: Time of the last status change (A9), for "waiting since".
+    #: Time of the last status change, for "waiting since".
     state_since: datetime | None = Field(default=None, alias="stateSince")
 
 
@@ -428,7 +428,7 @@ class CommentOut(_CamelModel):
     # The files of the comment, oldest first. They are fixed at the send.
     attachments: list[MessageAttachmentOut] = Field(default_factory=list)
     # The mentioned members, in the stored order. The applicant view gets an empty
-    # list, because the applicant never sees a member name (A12, O16). An erased
+    # list, because the applicant never sees a member name. An erased
     # account shows as the deleted person (``principalId`` and ``displayName`` null).
     mentions: list[PersonRef] = Field(default_factory=list)
 

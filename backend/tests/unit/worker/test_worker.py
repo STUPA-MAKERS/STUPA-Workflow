@@ -1,4 +1,4 @@
-"""Worker (worker/main.py) unit coverage: ping and the budget rollup refresh (T-17)."""
+"""Worker (worker/main.py) unit coverage: ping and the budget rollup refresh."""
 
 from __future__ import annotations
 
@@ -30,9 +30,9 @@ def test_worker_settings_registers_tasks() -> None:
     assert process_retention in WorkerSettings.functions
     assert purge_draft_attachments in WorkerSettings.functions
     assert WorkerSettings.redis_settings is not None
-    # Nightly budget rollup, deadline scan every minute (T-44), hourly task reminders,
-    # daily DSGVO retention, the nightly backup, the hourly draft purge (Z4) and the
-    # nightly audit-chain check (Z6), the hourly heal of the public protocols and the
+    # Nightly budget rollup, deadline scan every minute, hourly task reminders,
+    # daily DSGVO retention, the nightly backup, the hourly draft purge and the
+    # nightly audit-chain check, the hourly heal of the public protocols and the
     # daily ticket anonymization and the daily to-do archive.
     assert len(WorkerSettings.cron_jobs) == 10
     from worker.todos import archive_done_todos

@@ -1,4 +1,4 @@
-"""Integration: draft uploads of the wizard over HTTP (Z4, real Postgres).
+"""Integration: draft uploads of the wizard over HTTP (real Postgres).
 
 `POST /apply/attachments` stores a file before the application exists. The first
 upload issues a draft token, each later upload sends it in `X-Draft-Token` and moves
@@ -6,7 +6,7 @@ the end of the token and of all its drafts. One token holds a limited number of 
 and bytes. `DELETE /apply/attachments/{id}` with the token removes one draft. The
 token stays valid after the delete of its last draft. A delete that races with the
 bind of the create does not remove the bound file. Each upload and each delete writes
-an audit entry with `draft: true` (F12).
+an audit entry with `draft: true`.
 
 ALTCHA is off in these settings, so the no-op verifier passes. The router unit tests
 cover the ALTCHA gate.

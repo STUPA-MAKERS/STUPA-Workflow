@@ -8,7 +8,7 @@ transient storage or scanner error raises `arq.Retry` with a linear backoff up t
 requeues it again. Idempotency comes from the job key `scan:<id>`. A second run on an
 already scanned attachment is harmless, because it writes the same result.
 
-The task loads the row by id only. It scans a draft upload of the wizard (Z4) like a
+The task loads the row by id only. It scans a draft upload of the wizard like a
 bound file, and the quarantine audit of a draft carries `draft: true`. A row can
 disappear during the scan: a delete, the draft purge or an anonymization. The task then
 returns `"gone"` and writes nothing.

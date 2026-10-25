@@ -1,4 +1,4 @@
-"""Unit tests for the lead entry during a live meeting (O6).
+"""Unit tests for the lead entry during a live meeting.
 
 The fake session answers each `execute`, `get` and `scalar` from a queue. The
 conftest of this package replaces the pool helpers in the service with helpers
@@ -69,7 +69,7 @@ def _person(sub: str) -> SimpleNamespace:
     return SimpleNamespace(id=uuid4(), sub=sub)
 
 
-# ---------------------------------------------------------------- O6 lead entry
+# ------------------------------------------------------------------- lead entry
 
 
 def _lead_payload(a: Any, b: Any, *, voting: bool = True) -> DelegationCreate:
@@ -197,7 +197,7 @@ async def test_lead_entry_refuses_the_lead_as_substitute() -> None:
 
 
 async def test_lead_entry_locks_the_meeting_row() -> None:
-    """The lead entry reads the meeting FOR UPDATE before the attendance read (O23)."""
+    """The lead entry reads the meeting FOR UPDATE before the attendance read."""
     a, b = _person("a"), _person("b")
     db = _LockSpySession(
         _lead_roles(),
@@ -262,7 +262,7 @@ async def test_lead_entry_refuses_a_second_delegation_409() -> None:
 async def test_lead_entry_reads_the_pool_of_the_member(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """O6: the lead entry asks the pool helper for the missing member."""
+    """The lead entry asks the pool helper for the missing member."""
     a, b = _person("a"), _person("b")
     seen: list[dict[str, Any]] = []
 
@@ -287,7 +287,7 @@ def _lead_view_db(*tail: Any) -> FakeSession:
 
 
 async def test_lead_recipients_list_the_pool_of_the_member() -> None:
-    """O6: the lead gets the pool substitutes of A, without A and without the lead."""
+    """The lead gets the pool substitutes of A, without A and without the lead."""
     lead, a = _person("lead"), _person("a")
     bert, carla = uuid4(), uuid4()
     db = _lead_view_db(

@@ -8,11 +8,11 @@ description: Outbound event webhooks — SSRF-guarded, HMAC-SHA256-signed HTTP P
 **Does:** Delivers signed outbound HTTP webhooks for domain events. The module separates dispatch from delivery. Dispatch finds the subscribed webhooks, creates `pending` deliveries and enqueues arq jobs. Delivery runs in the worker. The worker re-resolves DNS and runs the SSRF guard at send-time. It then HMAC-signs the request, POSTs it without redirects, and writes back status, attempts and backoff.
 
 **Key files:**
-- `service.py` — `WebhookService`: `dispatch_to_webhook` (flow side) + `deliver` (worker side), plus status classification, retry/backoff/dead-letter, `DeliveryOutcome`. `dispatch_event` (fan-out to every webhook that subscribes to an event) is removed: nothing called it (F10).
+- `service.py` — `WebhookService`: `dispatch_to_webhook` (flow side) + `deliver` (worker side), plus status classification, retry/backoff/dead-letter, `DeliveryOutcome`. `dispatch_event` (fan-out to every webhook that subscribes to an event) is removed: nothing called it.
 - `app/shared/ssrf.py` (shared with `be-avatars`, kept at 100 % branch coverage by its own entry in `[tool.coverage_critical]`) — `assert_allowed_url` (scheme/allowlist/resolved-IP check), `pin_url` (DNS-rebind pinning), `_unmap` (unwraps IPv4-mapped/6to4/NAT64), `SsrfError`, injectable `Resolver`
 - `signing.py` — HMAC-SHA256 over `"{timestamp}.{body}"`, `canonical_body`, `build_headers`. Header names `X-Signature`/`X-Timestamp`/`X-Webhook-Event`
 - `queue.py` — `WebhookQueue` Protocol + `ArqWebhookQueue`. `WEBHOOK_TASK_NAME="deliver_webhook"`, job id `webhook:<delivery_id>` (coalesces duplicate enqueues)
-- `action_dispatcher.py` — `WebhookActionDispatcher`: flow-engine `webhook` action handler → `dispatch_to_webhook`. Event `application.transition`. `flow.dispatch.build_worker_dispatcher` builds it for the API and the worker, so a vote close and an automatic transition also deliver (F2).
+- `action_dispatcher.py` — `WebhookActionDispatcher`: flow-engine `webhook` action handler → `dispatch_to_webhook`. Event `application.transition`. `flow.dispatch.build_worker_dispatcher` builds it for the API and the worker, so a vote close and an automatic transition also deliver.
 - `worker/webhook.py` (sibling, not in module dir) — arq task `deliver_webhook`. Maps `retry`→`arq.Retry`, no-redirect httpx client
 - Models live in `app/modules/admin/models.py`. Schemas live in `app/modules/admin/schemas.py`. The CRUD router lives in `app/modules/admin/router.py`
 

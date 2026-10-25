@@ -1,4 +1,4 @@
-"""AUD-071: object storage on and ClamAV off must give a startup warning.
+"""Object storage on and ClamAV off must give a startup warning.
 
 With object storage active but no scanner, the backend stores attachments and enqueues a
 scan job. The worker finds no scanner and leaves `scanned=False`. Downloads then stay in

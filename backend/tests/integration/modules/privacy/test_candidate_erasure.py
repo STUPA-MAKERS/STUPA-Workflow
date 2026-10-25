@@ -1,4 +1,4 @@
-"""F2 · Erasure of a principal from the candidate lists, against a real Postgres.
+"""Erasure of a principal from the candidate lists, against a real Postgres.
 
 ``PrincipalService.erase`` replaces the name of each candidacy of the principal who was
 not elected with ``Gelöscht``, in ``vote.config`` (JSONB) and in the election callouts

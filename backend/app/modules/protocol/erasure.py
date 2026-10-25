@@ -1,4 +1,4 @@
-"""Erasure of a candidate name from the protocol text (F2, DSGVO Art. 17).
+"""Erasure of a candidate name from the protocol text (DSGVO Art. 17).
 
 ``embed_votes`` copies the callout of an election into ``protocol.markdown``, and the
 protokollant can insert the same callout into the body of an agenda item. Both copies

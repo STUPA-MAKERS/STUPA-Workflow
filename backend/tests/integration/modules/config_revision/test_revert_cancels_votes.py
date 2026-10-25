@@ -1,4 +1,4 @@
-"""F22: an audit revert of a status change cancels the votes of the left state.
+"""An audit revert of a status change cancels the votes of the left state.
 
 The application enters the vote state, a vote opens, and the audit log reverts the
 status change. The application returns to the old state, the open vote becomes

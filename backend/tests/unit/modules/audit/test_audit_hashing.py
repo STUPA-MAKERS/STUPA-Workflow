@@ -1,4 +1,4 @@
-"""Unit tests for the canonical serialization and the hash chain (T-23, security.md §4)."""
+"""Unit tests for the canonical serialization and the hash chain."""
 
 from __future__ import annotations
 

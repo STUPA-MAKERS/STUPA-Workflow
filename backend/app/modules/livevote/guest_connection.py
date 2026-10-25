@@ -1,4 +1,4 @@
-"""WebSocket of a guest of a public meeting (#17).
+"""WebSocket of a guest of a public meeting.
 
 The guest channel listens on the same pub/sub channel `meeting:{id}` as the members,
 but it filters every event:

@@ -1,4 +1,4 @@
-"""Integration test: finalizing a protocol needs the gremium permission (O2, O7).
+"""Integration test: finalizing a protocol needs the gremium permission.
 
 The global `protocol.finalize` is gone. A principal finalizes when it has the write
 access to the meeting AND its gremium role holds `protocol.finalize`. The forced roles

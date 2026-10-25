@@ -1,4 +1,4 @@
-"""O11: a ballot never changes after the cast.
+"""A ballot never changes after the cast.
 
 A second cast of the same voter gives 409 with the code ``already_voted``. This holds
 for an open vote, for a secret vote and for the live-vote WebSocket, which sends the

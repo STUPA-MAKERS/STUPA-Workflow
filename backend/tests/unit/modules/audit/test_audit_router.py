@@ -1,4 +1,4 @@
-"""Audit router tests (T-23, api.md `/admin/audit`): wiring and RBAC without a database."""
+"""Audit router tests (`/admin/audit`): wiring and RBAC without a database."""
 
 from __future__ import annotations
 
@@ -173,7 +173,7 @@ def test_list_passes_cursor_filters_to_service() -> None:
 
 
 def test_list_rejects_naive_since_with_422() -> None:
-    # #AUD-034: a naive since or until value must not reach the timestamptz query.
+    # A naive since or until value must not reach the timestamptz query.
     # The asyncpg driver raises a DataError there, which gives 500. AwareDatetime
     # rejects the value with 422 instead.
     service = _FakeService()

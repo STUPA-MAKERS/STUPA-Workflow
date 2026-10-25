@@ -1,4 +1,4 @@
-"""Integration (real Postgres): stored audit-chain checks (Z6/O8).
+"""Integration (real Postgres): stored audit-chain checks.
 
 `verify_and_store` writes one `audit_verification` row per check and commits it. A
 tampered chain stores the first break. The store keeps the newest rows, the first failed

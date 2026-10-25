@@ -1,4 +1,4 @@
-"""O21: the search text of a reader without the PII right skips the isPII keys."""
+"""The search text of a reader without the PII right skips the isPII keys."""
 
 from __future__ import annotations
 

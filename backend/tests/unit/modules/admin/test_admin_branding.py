@@ -1,4 +1,4 @@
-"""Unit tests without a DB: branding schema validation (#21, T-24).
+"""Unit tests without a DB: branding schema validation.
 
 Security contract: a logo must be an image, must not be an inline SVG and must stay
 at or below 2 MB. A footer or legal URL must not use the `javascript:` or `data:`

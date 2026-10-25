@@ -174,7 +174,7 @@ async def restore_backup(ctx: dict[str, Any], backup_id: str, actor: str | None)
     what proves what the platform looked like beforehand.
 
     After that entry, the task verifies the restored chain and stores the result with
-    ``trigger = restore`` (Z6). A failed check does not fail the restore.
+    ``trigger = restore``. A failed check does not fail the restore.
 
     Returns:
         One of ``done``, ``failed`` or ``gone``.

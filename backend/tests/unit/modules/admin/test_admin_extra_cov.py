@@ -390,7 +390,7 @@ async def test_public_with_active_and_without() -> None:
     assert out.branding.app_name == "P"
     # Without a settings row the guest defaults apply: links without an expiry.
     assert out.link_ttl_days is None
-    # The upload limits of the wizard come from the settings (Z4).
+    # The upload limits of the wizard come from the settings.
     limits = out.model_dump(by_alias=True)["attachmentLimits"]
     assert limits == {
         "maxFileBytes": 10 * 1024 * 1024,

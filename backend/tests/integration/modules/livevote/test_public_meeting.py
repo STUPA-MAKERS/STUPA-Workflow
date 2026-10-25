@@ -1,4 +1,4 @@
-"""Public meeting with a QR code (#17) on a real Postgres.
+"""Public meeting with a QR code on a real Postgres.
 
 The tests drive the lead routes, the public guest routes and both WebSockets through
 the real app wiring: the join with its cookie, the decisions of the lead, the guest

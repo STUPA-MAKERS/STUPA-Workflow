@@ -1,4 +1,4 @@
-"""Integration: the create binds the draft uploads of the wizard (Z4, real Postgres).
+"""Integration: the create binds the draft uploads of the wizard (real Postgres).
 
 `POST /applications` takes `attachmentIds` and `draftToken`. The create checks that
 the token owns each listed draft and that no draft is expired or infected. A pending

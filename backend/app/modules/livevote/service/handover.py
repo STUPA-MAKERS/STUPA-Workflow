@@ -1,4 +1,4 @@
-"""Handover of the protocol keeper during a live meeting (Z3, O1, O20).
+"""Handover of the protocol keeper during a live meeting.
 
 A meeting keeps its minutes in periods (`ProtocolKeeperPeriod`). The start of the
 meeting opens the first period for the protokollant. A handover hands the minutes
@@ -19,10 +19,10 @@ that follow the keeper therefore move with the handover: the write access
 Rules of the handover route: the meeting is `live` (409 `meeting_not_live`). The
 caller manages the meeting (`can_manage`) or is the current keeper (403). The new
 keeper is an active member of the gremium (403) with the gremium permission
-`protocol.write` (O20: 422 `protokollant_needs_protocol_write`). Every handover,
+`protocol.write` (422 `protokollant_needs_protocol_write`). Every handover,
 every discard and every start of a planned period writes `protokollant_handover`
 and sends `meeting_state`. The start of a planned period checks the new keeper
-again (O20). When the check fails, the plan goes away (audit mode `cancel`) and
+again. When the check fails, the plan goes away (audit mode `cancel`) and
 the running keeper stays.
 """
 
@@ -56,7 +56,7 @@ class HandoverOps(PermissionOps, VoteReadOps):
     """Periods of the protocol keeper: start, handover, activation and close."""
 
     async def check_keeper(self, gremium_id: UUID, principal_id: UUID) -> PrincipalRow:
-        """Validate a new protocol keeper of the gremium (O20).
+        """Validate a new protocol keeper of the gremium.
 
         Raises:
             NotFoundError: The principal does not exist.
@@ -77,7 +77,7 @@ class HandoverOps(PermissionOps, VoteReadOps):
         return row
 
     async def _is_valid_keeper(self, gremium_id: UUID, principal_id: UUID) -> bool:
-        """Return True when `check_keeper` accepts the principal (O20)."""
+        """Return True when `check_keeper` accepts the principal."""
         try:
             await self.check_keeper(gremium_id, principal_id)
         except (NotFoundError, ForbiddenError, ValidationProblem):
@@ -200,7 +200,7 @@ class HandoverOps(PermissionOps, VoteReadOps):
         order, or when no item was current before. A move back, a repeat of the
         same item, and a clear of the item keep the planned period.
 
-        The method checks the planned keeper again before the start (O20), because
+        The method checks the planned keeper again before the start, because
         the membership or the gremium role can change after the plan. When the
         check fails, the method deletes the planned period, keeps the running one
         and writes a `protokollant_handover` entry with the mode `cancel`.
@@ -303,7 +303,7 @@ class HandoverOps(PermissionOps, VoteReadOps):
                 has no next agenda item (`no_next_item`).
             ForbiddenError: The caller may not hand over, or the target is not an
                 active member of the gremium.
-            ValidationProblem: The target lacks `protocol.write` (O20).
+            ValidationProblem: The target lacks `protocol.write`.
         """
         meeting = await self._live_for_handover(meeting_id, principal)
         await self.check_keeper(meeting.gremium_id, target)

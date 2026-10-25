@@ -25,7 +25,7 @@ typing cannot block a cast.
 
 Cast: the distributed lock `vote:{id}:cast:{sub}` serializes the casts of one
 voter. `VotingService.cast` then runs. A unique constraint in the database backs
-the cast. A ballot never changes after the cast (O11): a second cast gets the error
+the cast. A ballot never changes after the cast: a second cast gets the error
 frame `already_voted`, the same code as the REST 409. The handler broadcasts
 `vote_tally`.
 
@@ -80,11 +80,11 @@ from app.shared.ws import resolve_ws_principal as resolve_ws_principal
 logger = logging.getLogger("app.livevote")
 
 # Events the read-only beamer stream lets through. `guest_counts` carries counts and
-# the join code only, never a name (#17).
+# the join code only, never a name.
 _BEAMER_EVENTS = frozenset(
     {"meeting_state", "vote_opened", "vote_tally", "vote_closed", "vote_lot_drawn", "guest_counts"}
 )
-# #17: guest events with names. Only a connection of the meeting lead gets them.
+# Guest events with names. Only a connection of the meeting lead gets them.
 _LEAD_EVENTS = frozenset({"guest_requested", "guest_updated"})
 
 # Inbound throttle against denial of service. Every client message hits the
@@ -130,7 +130,7 @@ class LiveVoteConnection:
         can_manage: bool = False,
     ) -> None:
         self.ws = websocket
-        # #17: the meeting lead gets the guest events with names and the join code.
+        # The meeting lead gets the guest events with names and the join code.
         self.can_manage = can_manage
         self.meeting_id = meeting_id
         self.beamer = beamer
@@ -366,7 +366,7 @@ class LiveVoteConnection:
 
         The beamer gets its fixed event set. A guest event with names goes to the
         meeting lead only. A member without ``canManage`` gets the guest counts
-        without the join code and without the open requests (#17).
+        without the join code and without the open requests.
         """
         kind = message.get("type")
         if self.beamer:

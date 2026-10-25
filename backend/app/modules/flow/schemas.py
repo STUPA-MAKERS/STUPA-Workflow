@@ -34,7 +34,7 @@ class TransitionOut(_CamelModel):
     # the next planned meeting after the commit.
     adds_to_agenda: bool = Field(default=False, alias="addsToAgenda")
     agenda_gremium_id: UUID | None = Field(default=None, alias="agendaGremiumId")
-    # F1: the target is an accepted state of the top budget of the application, so a
+    # The target is an accepted state of the top budget of the application, so a
     # fire takes a `decision` (approval with deviations). The UI then opens the
     # decision dialog.
     allows_decision: bool = Field(default=False, alias="allowsDecision")
@@ -48,14 +48,14 @@ class TransitionRequest(_CamelModel):
     state change and skips the action after the commit. Without `meetingId` the
     action picks the next planned meeting after the commit. `nonPublic` marks the new
     agenda item as not public. `decision` sets the approved amount and the
-    conditions (F1).
+    conditions.
     """
 
     transition_id: UUID = Field(alias="transitionId")
     note: str | None = None
     meeting_id: UUID | None = Field(default=None, alias="meetingId")
     non_public: bool = Field(default=False, alias="nonPublic")
-    # F1: approval with deviations (approved amount, conditions). Only a transition
+    # Approval with deviations (approved amount, conditions). Only a transition
     # into an accepted state of the top budget takes it (422 `decision_not_allowed`).
     decision: DecisionIn | None = None
 

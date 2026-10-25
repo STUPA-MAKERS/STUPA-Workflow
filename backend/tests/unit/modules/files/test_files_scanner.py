@@ -1,4 +1,4 @@
-"""Unit tests for the ClamAV scanner (T-13). A fake module replaces `clamd`."""
+"""Unit tests for the ClamAV scanner. A fake module replaces `clamd`."""
 
 from __future__ import annotations
 

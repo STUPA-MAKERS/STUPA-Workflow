@@ -1,4 +1,4 @@
-"""Guest application settings: `GET/PUT /admin/guest-settings` and the public TTL (Z1).
+"""Guest application settings: `GET/PUT /admin/guest-settings` and the public TTL.
 
 * The defaults are 12 hours to confirm and links without an expiry.
 * The PUT needs `admin.deadlines`, validates the ranges and writes a `config_change`

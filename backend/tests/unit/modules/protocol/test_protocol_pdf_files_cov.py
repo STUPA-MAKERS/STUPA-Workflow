@@ -352,7 +352,7 @@ async def test_assemble_public_redacts_non_public_top() -> None:
     assert "Geheim" in internal_md
     assert "Geheim" not in public_md
     assert "nicht-öffentlicher Tagesordnungspunkt" in public_md
-    # AUD-025: a non-public title can encode the subject. The internal variant keeps it.
+    # A non-public title can encode the subject. The internal variant keeps it.
     # The public variant replaces it with a neutral heading. The single top-level `#`
     # keeps the numbering stable.
     assert "# Personalie" in internal_md
@@ -448,7 +448,7 @@ async def test_header_meta_resolves_protokollant_name() -> None:
     """Without keeper periods, protokollant_id resolves the name through `session.scalar`."""
     session = FakeSession()
     svc = _service(session)
-    # The guest count of #17 comes first (no guests).
+    # The guest count comes first (no guests).
     session.scalar_results = [0, "Frau Schmidt"]
     meeting = _meeting(protokollant_id=uuid4())
     header = await svc._header_meta(cast("Any", meeting))
@@ -460,13 +460,13 @@ async def test_header_meta_resolves_protokollant_name() -> None:
 
 
 async def test_header_meta_public_redacts_names_keeps_counts() -> None:
-    """AUD-025: `public=True` drops the protokollant and the name lists.
+    """`public=True` drops the protokollant and the name lists.
 
     Only the counters stay, as data lines. The true `present_count` stays correct.
     """
     session = FakeSession()
     svc = _service(session)
-    # The guest count of #17 comes first (no guests).
+    # The guest count comes first (no guests).
     session.scalar_results = [0, "Frau Schmidt"]
     meeting = _meeting(protokollant_id=uuid4())
     header = await svc._header_meta(cast("Any", meeting), public=True)
@@ -553,7 +553,7 @@ async def test_send_subject_and_body_include_gremium_and_date() -> None:
     )
     # has_non_public is false, then the quorate member count, then gremium_name for
     # _send. _meeting sets protokollant_id to None, so no protokollant scalar is read.
-    session.scalar_results = [0, 0, 5, "StuPa"]  # #17: the guest count first
+    session.scalar_results = [0, 0, 5, "StuPa"]  # the guest count first
     await _service(
         session, storage=ProtoStorage(), typst=FakeTypst(), mail_queue=mail
     ).finalize(PID, now=NOW)
@@ -860,7 +860,7 @@ async def test_upload_with_field_key(
     async def _record(session: object, **kw: object) -> None:
         audits.append(kw)
 
-    # The upload writes an audit entry (F12). `NotifSession` cannot run the hash chain.
+    # The upload writes an audit entry. `NotifSession` cannot run the hash chain.
     monkeypatch.setattr(files_service, "audit_record", _record)
     session = NotifSession()
     app = Application()

@@ -1,4 +1,4 @@
-"""Erasure of a person from the candidate lists of the elections (F2, DSGVO Art. 17).
+"""Erasure of a person from the candidate lists of the elections (DSGVO Art. 17).
 
 An election (``vote.kind = 'election'``) keeps the name of each candidate in
 ``vote.config.candidates``; the ballots and ``election_result`` name the candidates by

@@ -1,4 +1,4 @@
-"""Test fakes for the protocol unit suite (T-22, without DB, typst, MinIO or Redis).
+"""Test fakes for the protocol unit suite (without DB, typst, MinIO or Redis).
 
 `FakeSession` combines the two access patterns of
 `app.modules.protocol.service.ProtocolService`. It answers `get(model, id)` from a store
@@ -57,7 +57,7 @@ class FakeSession:
         # does not take the result of another query.
         if "meeting_attendance" in str(_stmt).lower():
             return FakeResult()
-        # The header also reads the keeper periods (Z3). A test that needs them sets
+        # The header also reads the keeper periods. A test that needs them sets
         # `keeper_rows`. The query never takes a result of the ordered queue.
         if "protocol_keeper_period" in str(_stmt).lower():
             return FakeResult(self.keeper_rows)

@@ -87,7 +87,7 @@ def test_webhook_allowlist_uses_the_canonical_name() -> None:
     assert not re.search(r"^WEBHOOK_ALLOWLIST=", _EXAMPLE, re.MULTILINE)
 
 
-# The magic-link lifetime moved into `guest_application_settings` (Z1). These keys
+# The magic-link lifetime moved into `guest_application_settings`. These keys
 # are gone from `Settings` and from the template.
 _REMOVED_KEYS = ("MAGIC_LINK_EDIT_TTL_DAYS", "MAGIC_LINK_ACTION_TTL_MINUTES")
 

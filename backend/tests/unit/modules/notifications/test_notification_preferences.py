@@ -1,4 +1,4 @@
-"""Tests of the notification preferences (#4-2): the API and the recipient filter."""
+"""Tests of the notification preferences: the API and the recipient filter."""
 
 from __future__ import annotations
 

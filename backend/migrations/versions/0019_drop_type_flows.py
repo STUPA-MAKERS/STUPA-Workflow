@@ -1,4 +1,4 @@
-"""Remove the rest of the per-type flow (#28 closure): only the global flow stays.
+"""Remove the rest of the per-type flow: only the global flow stays.
 
 Migration 0006 forced the cutover to one global `flow_version` row and deleted
 the old versions. The columns and constraints of the per-type model stayed in

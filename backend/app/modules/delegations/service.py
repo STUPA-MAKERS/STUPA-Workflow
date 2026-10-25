@@ -24,7 +24,7 @@ The server enforces these invariants:
   `delegation_lead_minutes` of the gremium config. A pool delegation runs until
   the meeting start. The meeting must still be `planned`, else 422. A revocation
   runs until the meeting start.
-* Lead entry (O6). During a live meeting the meeting lead (`can_manage`) enters
+* Lead entry. During a live meeting the meeting lead (`can_manage`) enters
   a substitution for a missing member (`delegatorId`). The delegate must be a
   pool substitute of that member: a personal entry for the member or a
   gremium-wide entry. The lead can also revoke a
@@ -82,9 +82,9 @@ from app.shared.errors import (
 _ADMIN_PERM = "admin.delegations"
 # Gremium-role permission that may manage the substitute pool. The same
 # permission makes the meeting lead (`can_manage`), who enters a substitution
-# during a live meeting (O6).
+# during a live meeting.
 _POOL_MANAGE_PERM = "session.manage"
-# Attendance states in which a member counts as missing (O6). No record counts
+# Attendance states in which a member counts as missing. No record counts
 # as missing too.
 _MISSING_STATES = frozenset({"excused", "absent"})
 # Advisory-lock base key. It serializes the create per meeting, so a concurrent
@@ -252,7 +252,7 @@ class DelegationService:
 
         `lock` takes the meeting row FOR UPDATE and reads the current values again.
         The attendance writers hold a share lock on the same row, so a lead entry
-        and an attendance change run one after the other (O23).
+        and an attendance change run one after the other.
 
         Raises:
             NotFoundError: No meeting has this id (404).
@@ -331,7 +331,7 @@ class DelegationService:
         """Tell if the viewer can revoke a delegation of this meeting.
 
         The delegator can revoke while the meeting is planned and has not started.
-        The meeting lead (`lead`) can also revoke while the meeting is live (O6).
+        The meeting lead (`lead`) can also revoke while the meeting is live.
         `own` is False for a row that the viewer sees only as the meeting lead.
         The lead cannot revoke such a row before the start, so it is not revocable.
         """
@@ -417,7 +417,7 @@ class DelegationService:
 
         Without `delegatorId` the caller delegates for themselves while the meeting
         is planned. With `delegatorId` the meeting lead enters a substitution for a
-        missing member while the meeting is live (O6). See `_create_by_lead`.
+        missing member while the meeting is live. See `_create_by_lead`.
 
         Raises:
             ForbiddenError: The gremium gate blocks the delegation, the recipient
@@ -499,7 +499,7 @@ class DelegationService:
     async def _create_by_lead(
         self, payload: DelegationCreate, delegator_id: UUID, actor: Principal
     ) -> DelegationOut:
-        """Enter a substitution for a missing member during a live meeting (O6).
+        """Enter a substitution for a missing member during a live meeting.
 
         The meeting lead (`can_manage`) names the missing member A (`delegatorId`)
         and a substitute B from the pool of the gremium for A: a personal entry
@@ -531,7 +531,7 @@ class DelegationService:
         # Lock the meeting row before the status and attendance reads. The
         # attendance writers hold a share lock on this row and then look for a
         # delegation. Thus a `present` report of A and this entry for A cannot
-        # both commit (O23).
+        # both commit.
         meeting = await self._meeting(payload.meeting_id, lock=True)
         if not gremium.allow_vote_delegation:
             raise ForbiddenError("Delegation is not enabled for this gremium.")
@@ -682,7 +682,7 @@ class DelegationService:
 
         A holder of `admin.delegations` sees every delegation. With `meeting_id`,
         the meeting lead (`can_manage`) sees every delegation of that meeting, so
-        the lead can revoke one during the live meeting (O6).
+        the lead can revoke one during the live meeting.
         """
         now = datetime.now(UTC)
         me = await self._principal_row(sub=actor.sub)
@@ -717,7 +717,7 @@ class DelegationService:
 
         The delegator may revoke until the meeting starts, and only while the
         meeting is `planned`. The meeting lead (`can_manage`) may revoke while the
-        meeting is `live` (O6), for example when the substituted member arrives.
+        meeting is `live`, for example when the substituted member arrives.
         A ballot that the delegate already cast stays. An admin may revoke at any
         time.
 
@@ -854,7 +854,7 @@ class DelegationService:
         With `delegation_allow_external` the search also covers the whole platform
         by name and email. The returned names are PII. Only an authorized caller
         may read them. With `delegator_id` the meeting lead gets the pool
-        substitutes of that member for the lead entry (O6), see
+        substitutes of that member for the lead entry, see
         `_lead_recipients`.
 
         Raises:
@@ -922,7 +922,7 @@ class DelegationService:
     async def _lead_recipients(
         self, gremium_id: UUID, delegator_id: UUID, q: str, actor: Principal, now: datetime
     ) -> list[RecipientOut]:
-        """List the pool substitutes of a member for the lead entry (O6).
+        """List the pool substitutes of a member for the lead entry.
 
         The list has the personal entries for the member and the gremium-wide
         entries, the same set that `_create_by_lead` accepts. The lead and the

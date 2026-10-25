@@ -1,4 +1,4 @@
-"""F10: the notification catalogue holds only the kinds that some code sends.
+"""The notification catalogue holds only the kinds that some code sends.
 
 No code sends a mail of the kind `vote` or `role_change`. The settings page must not
 offer them, and a save of them gives 422 on the API.

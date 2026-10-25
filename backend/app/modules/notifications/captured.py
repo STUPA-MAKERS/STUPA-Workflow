@@ -1,4 +1,4 @@
-"""The mail to the applicant of an application captured on their behalf (#11).
+"""The mail to the applicant of an application captured on their behalf.
 
 A person with ``application.create_on_behalf`` entered the application. The applicant
 gets one mail with a link:

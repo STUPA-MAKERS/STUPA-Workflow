@@ -1,4 +1,4 @@
-"""Draft attachments of the wizard (Z4).
+"""Draft attachments of the wizard.
 
 The wizard uploads a file before the application exists. Such a draft row has no
 ``application_id``. A draft token owns it instead. The database stores only the
@@ -152,7 +152,7 @@ class DraftAttachments:
         The token need not own a draft: the owner may have deleted all of them.
 
         The method writes an ``attachment_upload`` audit entry with ``draft: true``
-        (F12) and moves the end of the token and of all its drafts.
+        and moves the end of the token and of all its drafts.
 
         Raises:
             ValidationProblem: The token is unknown or expired (HTTP 422).

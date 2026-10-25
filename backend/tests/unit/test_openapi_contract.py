@@ -1,4 +1,4 @@
-"""OpenAPI error contract (api.md §2).
+"""OpenAPI error contract.
 
 Error responses use the problem+json media type.
 """

@@ -40,13 +40,13 @@ def test_builtins_are_shared_objects() -> None:
 
 
 def test_dead_role_templates_are_gone() -> None:
-    # F10: no code sends the role mails, so the catalogue does not offer them.
+    # No code sends the role mails, so the catalogue does not offer them.
     assert "role_assigned" not in CATALOGUE_BY_KEY
     assert "role_revoked" not in CATALOGUE_BY_KEY
 
 
 def test_status_update_team_mirrors_status_update() -> None:
-    # Team-facing default of the notify action (bug #2). It uses the same kind and the
+    # Team-facing default of the notify action. It uses the same kind and the
     # same placeholder set as `status_update`, backed by the single-source builtins.
     team = CATALOGUE_BY_KEY["status_update_team"]
     base = CATALOGUE_BY_KEY["status_update"]

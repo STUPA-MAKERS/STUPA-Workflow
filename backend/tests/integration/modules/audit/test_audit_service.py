@@ -1,6 +1,6 @@
 """Integration (real Postgres, testcontainers): audit hash chain and append-only.
 
-The tests prove these facts against a real schema (security.md §4). `AuditService.record`
+The tests prove these facts against a real schema. `AuditService.record`
 builds a linked chain with no gap. It holds an advisory lock and links each entry
 through `prev_hash`, so `verify_chain` reports `valid`. The DB itself enforces
 append-only. An UPDATE or a DELETE on `audit_entry` raises an error through the trigger

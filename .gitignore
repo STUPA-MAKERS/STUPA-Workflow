@@ -5,7 +5,7 @@ deploy/.env.smoke-bak
 .env
 *.env.local
 
-# E2E (T-40) — Laufzeit-Artefakte
+# E2E — Laufzeit-Artefakte
 deploy/e2e/.artifacts/
 frontend/e2e/.auth/
 frontend/playwright-report/
@@ -27,7 +27,7 @@ htmlcov/
 dist/
 build/
 
-# Node / Angular (T-03)
+# Node / Angular
 node_modules/
 frontend/dist/
 frontend/.angular/

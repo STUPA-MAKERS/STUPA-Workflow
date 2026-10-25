@@ -6,7 +6,7 @@ result. The file stays quarantined and nobody can download it until ``scanned`` 
 On a finding the worker deletes the object, sets ``storage_key`` to NULL and writes the
 signature into ``scan_result``.
 
-A row is either bound or a draft (Z4). A bound row has exactly one of five owners:
+A row is either bound or a draft. A bound row has exactly one of five owners:
 ``application_id``, ``ticket_id`` (the attachment of a ticket report), or one chat
 message: ``ticket_note_id``, ``todo_comment_id`` or ``comment_id`` (an application
 comment). A draft row
@@ -46,7 +46,7 @@ from app.db import Base, UUIDPkMixin
 # The database enforces this bound with CHECK(size <= 10485760).
 MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 
-# The storage-key prefix of a draft upload (Z4). The key stays the same after the bind.
+# The storage-key prefix of a draft upload. The key stays the same after the bind.
 DRAFT_KEY_PREFIX = "drafts/"
 
 
@@ -141,7 +141,7 @@ BOUND = Attachment.application_id.is_not(None)
 
 
 class AttachmentDraftToken(Base):
-    """The lifetime of one draft token of the wizard (Z4).
+    """The lifetime of one draft token of the wizard.
 
     The token lives on its own, independent of its draft rows. It stays valid until
     ``expires_at``, also when the owner deletes the last draft. Each upload with the

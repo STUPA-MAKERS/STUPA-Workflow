@@ -246,7 +246,7 @@ _GREMIEN_OR_GREMIUM_ROLES = Depends(
 )
 # The principal search serves the user page, the gremium members, the person picker
 # of the substitute pool on the delegations page (admin.delegations) and the person
-# picker of the account erasure on the privacy page (privacy.manage, D1).
+# picker of the account erasure on the privacy page (privacy.manage).
 _PRINCIPAL_READERS = Depends(
     require_any_permission(
         "admin.gremien", "admin.users", "admin.delegations", "privacy.manage"
@@ -1215,7 +1215,7 @@ async def list_webhook_delivery_status(
     return await service.list_webhook_delivery_status()
 
 
-# Applications without an account (Z1): the confirmation window and the link
+# Applications without an account: the confirmation window and the link
 # lifetime. The deadlines page (admin.deadlines) maintains them.
 DeadlinesAdmin = Annotated[Principal, Depends(require_principal("admin.deadlines"))]
 

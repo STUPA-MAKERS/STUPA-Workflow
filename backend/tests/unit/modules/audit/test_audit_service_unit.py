@@ -1,4 +1,4 @@
-"""TDD: AuditService — append-only record, verify_chain, query (T-23).
+"""TDD: AuditService — append-only record, verify_chain, query.
 
 The suite runs without a database. `execute` goes to the result-queue fake in
 `tests._support.audit_fakes`. The advisory-lock call consumes the first result. That call

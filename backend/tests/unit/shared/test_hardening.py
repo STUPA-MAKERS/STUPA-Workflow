@@ -1,6 +1,5 @@
-"""Security hardening (T-41, security.md §3/§8/§10).
+"""Security hardening.
 
-These unit tests cover the T-41 acceptance criteria.
 The CSRF double-submit check applies to every cookie-authenticated write request.
 The default rate limit on a write endpoint answers 429 plus `Retry-After`.
 The app code does NOT parse X-Forwarded-For, which blocks spoofing.
@@ -51,7 +50,7 @@ def _csrf_app(settings: Settings) -> TestClient:
     return TestClient(app)
 
 
-# CSRF double-submit checks, see security.md §10.
+# CSRF double-submit checks.
 def test_csrf_write_without_auth_cookie_allowed() -> None:
     """A write without an auth cookie has nothing to protect, so it passes (public POST)."""
     s = _settings()
@@ -163,7 +162,7 @@ def test_csrf_defaults_match_angular_fe_flow() -> None:
     assert client.post("/w").status_code == 403  # the FE never writes without a token
 
 
-# Default rate limit on write endpoints (api.md §7)
+# Default rate limit on write endpoints
 def _wlimit_app(settings: Settings, limiter: InMemoryRateLimiter) -> TestClient:
     app = FastAPI()
     app.add_middleware(
@@ -221,7 +220,7 @@ def test_default_write_limit_ignores_an_unsigned_session_cookie() -> None:
     assert client.post("/w").status_code == 429
 
 
-# Proxy trust and X-Forwarded spoofing (security.md §3)
+# Proxy trust and X-Forwarded spoofing
 def test_client_ip_ignores_x_forwarded_for() -> None:
     """`client_ip` parses no X-Forwarded-For, so a spoofed header cannot change the key.
 
@@ -240,7 +239,7 @@ def test_client_ip_ignores_x_forwarded_for() -> None:
     assert client_ip(req) == "1.2.3.4"
 
 
-# The proxy wildcard is forbidden in production (security.md §3)
+# The proxy wildcard is forbidden in production
 def test_wildcard_forwarded_allow_ips_rejected_in_production() -> None:
     with pytest.raises(SettingsError):
         _settings(environment="production", forwarded_allow_ips="*")

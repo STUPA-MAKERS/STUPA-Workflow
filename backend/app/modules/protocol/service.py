@@ -8,9 +8,9 @@ The service binds to an `AsyncSession` and drives the protocol lifecycle.
 * `update_markdown` updates the editor body. It accepts a draft only.
 * `embed_votes` appends votes as Markdown snippets and writes
   `protocol_vote_ref`. It is idempotent and skips an already referenced vote. A
-  vote of another meeting gives 422 `vote_not_in_meeting` (F25).
+  vote of another meeting gives 422 `vote_not_in_meeting`.
 * `start_finalize` starts the finalization once, and only after the close of the
-  meeting (F8, O13). It writes `protocol_finalize`.
+  meeting. It writes `protocol_finalize`.
 * `finalize` renders the Markdown through typst into a PDF. It stores the PDF
   in MinIO and mails it to MAIL_LIST(gremium). It sets `status='final'` and
   `sent_at`.
@@ -488,7 +488,7 @@ class ProtocolService:
             if vote_id in already:
                 continue  # already embedded, so no duplicate snippet
             # 404 avoids an FK IntegrityError. 422 keeps a vote of another meeting,
-            # maybe of another gremium, out of these minutes (F25).
+            # maybe of another gremium, out of these minutes.
             await self._get_vote(vote_id, meeting_id=protocol.meeting_id)
             already.add(vote_id)
             # Race-safe through ON CONFLICT (protocol_id, vote_id) DO NOTHING. If a
@@ -523,10 +523,9 @@ class ProtocolService:
         """Start the finalization and move the protocol from `draft` to `rendering`.
 
         The method commits and does not block. The caller, that is the router, then
-        enqueues the `render_protocol` worker job. It writes `protocol_finalize`
-        (F12).
+        enqueues the `render_protocol` worker job. It writes `protocol_finalize`.
 
-        The finalization happens once, after the close of the meeting (F8, O13, O2).
+        The finalization happens once, after the close of the meeting.
         A protocol under render or a final protocol gives 409. That rule blocks a
         double render and a double send. The method locks the protocol row, so two
         parallel calls run one after the other: the second call sees `rendering`
@@ -559,7 +558,7 @@ class ProtocolService:
         if public_withheld is not None and public_withheld != old_withheld:
             protocol.public_withheld = public_withheld
             await self._audit_publication(protocol, actor, old_withheld, public_withheld)
-        # #17: the finalization pseudonymizes the guests ("Gast 1 … n"). The protocol
+        # The finalization pseudonymizes the guests ("Gast 1 … n"). The protocol
         # carries them as a count only.
         from app.modules.livevote.guests import GuestService
 
@@ -861,7 +860,7 @@ class ProtocolService:
     def _start_of(self, meeting: Meeting | None) -> tuple[_date | None, _time | None]:
         """Return the local date and time of the start: the real one, else the planned.
 
-        `started_at = COALESCE(meeting.started_at, planned start)` (Z7). A meeting
+        `started_at = COALESCE(meeting.started_at, planned start)`. A meeting
         from before the real start existed shows the planned date and time.
         """
         if meeting is None:
@@ -884,7 +883,7 @@ class ProtocolService:
         return value.astimezone(self._tz()).strftime("%H:%M")
 
     async def _keeper_lines(self, meeting: Meeting) -> list[KeeperLine]:
-        """Build the header lines of the keeper periods that started (Z3, O2).
+        """Build the header lines of the keeper periods that started.
 
         A TOP number comes from the current agenda order. A period without an agenda
         item, or with a deleted one, carries the time only.
@@ -946,7 +945,7 @@ class ProtocolService:
         """Resolve the protocol keepers and the attendance groups for the header.
 
         A list entry holds the display name of the principal, or the sub as a
-        fallback. The excused members are their own group (F17). `public=True`
+        fallback. The excused members are their own group. `public=True`
         redacts the person-related header metadata for the mailed variant. The full
         attendance lists and the names of the protocol keepers must never go
         external. The method then emits the counters only, as the data lines
@@ -968,7 +967,7 @@ class ProtocolService:
         excused = [name or sub for status, name, sub in rows if status == "excused"]
         absent = [name or sub for status, name, sub in rows if status == "absent"]
         present_count = len(present)
-        # #17: the guests of a public meeting appear as a count only, never by name.
+        # The guests of a public meeting appear as a count only, never by name.
         from app.modules.livevote.guests import GuestService
 
         guests = await GuestService(self.session).attended_count(meeting.id)
@@ -1105,7 +1104,7 @@ class ProtocolService:
             ).scalars().all()
             views = [await voting.get(vote.id) for vote in votes]
             if public:
-                # F2: an election callout that the protokollant put into the text
+                # An election callout that the protokollant put into the text
                 # names every candidate with the votes. The public text carries the
                 # public form: the elected names only.
                 body = replace_vote_blocks(
@@ -1372,7 +1371,7 @@ class ProtocolService:
         Raises:
             NotFoundError: The vote does not exist.
             ValidationProblem: The vote belongs to another meeting or to none
-                (`vote_not_in_meeting`, F25).
+                (`vote_not_in_meeting`).
         """
         vote = await self.session.get(Vote, vote_id)
         if vote is None:
@@ -1388,7 +1387,7 @@ class ProtocolService:
 def _snippet(
     view: VoteOut, fallback: str, *, public: bool = False, tz: ZoneInfo | None = None
 ) -> str:
-    """Build the protocol callout of a vote: a motion, an election (F2) or a poll.
+    """Build the protocol callout of a vote: a motion, an election or a poll.
 
     ``tz`` is the local time zone of the dates of a date poll.
     """
@@ -1413,7 +1412,7 @@ def _snippet(
 
 
 def _election_snippet(view: VoteOut) -> ElectionSnippet:
-    """Map an election and its stored result on the protocol view (F2)."""
+    """Map an election and its stored result on the protocol view."""
     assert view.election is not None  # checked by the caller
     return election_snippet_of(
         view.election, view.election_result, question=view.question, round_=view.round
@@ -1427,7 +1426,7 @@ def election_snippet_of(
     question: str | None,
     round_: int,
 ) -> ElectionSnippet:
-    """Map an election config and its stored result on the protocol view (F2).
+    """Map an election config and its stored result on the protocol view.
 
     The erasure of a candidate (``protocol.erasure``) also calls it, with the config
     before and after the change.
@@ -1515,7 +1514,7 @@ def poll_snippet_of(
 
 
 def _guest_note(view: VoteOut) -> str | None:
-    """Return the base line of a vote with guests (#17), or None for a members vote."""
+    """Return the base line of a vote with guests, or None for a members vote."""
     if not view.guests_vote:
         return None
     return guest_vote_note(

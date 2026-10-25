@@ -1,4 +1,4 @@
-"""Unit tests for the MinIO storage adapter (T-13). A fake module replaces `minio`."""
+"""Unit tests for the MinIO storage adapter. A fake module replaces `minio`."""
 
 from __future__ import annotations
 

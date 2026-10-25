@@ -1,4 +1,4 @@
-"""A meeting delete deletes all votes of the meeting (replaces F21), real Postgres.
+"""A meeting delete deletes all votes of the meeting, real Postgres.
 
 The delete takes every vote of the meeting with it, in any status (draft, cancelled,
 closed, secret, with guests), together with the ballots, the secret ballots, the voted
@@ -73,7 +73,7 @@ async def test_meeting_delete_deletes_every_vote_with_its_ballots(
         closed_id = s.vote_ids["closed"]
         session.add(Ballot(vote_id=closed_id, voter_sub="s1", choice="yes"))
         session.add(Ballot(vote_id=closed_id, voter_sub="s2", choice="no"))
-        # A guest ballot of the public meeting (#17).
+        # A guest ballot of the public meeting.
         session.add(Ballot(vote_id=closed_id, voter_sub=guest_voter_sub(guest.id), choice="yes"))
         session.add(VotedMarker(vote_id=secret.id, voter_sub="s1"))
         session.add(SecretBallot(vote_id=secret.id, choice="no"))

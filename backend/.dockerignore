@@ -6,7 +6,7 @@ __pycache__/
 venv/
 tests/
 *.egg-info/
-# Never copy secrets into the build context (#20, defense in depth).
+# Never copy secrets into the build context (defense in depth).
 **/.env
 **/.env.*
 !**/.env.example

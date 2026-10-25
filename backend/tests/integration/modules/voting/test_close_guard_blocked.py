@@ -1,4 +1,4 @@
-"""F20: a blocked result branch does not block the vote close (real Postgres).
+"""A blocked result branch does not block the vote close (real Postgres).
 
 The close stages the tally, the result, `status=closed` and `closed_at`. It stages the
 `pass` or `fail` transition in a SAVEPOINT and commits ONCE. When the guard of the

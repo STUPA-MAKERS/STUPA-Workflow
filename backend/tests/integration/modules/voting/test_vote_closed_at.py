@@ -1,4 +1,4 @@
-"""Z9/O10, F12 and A5 against a real Postgres.
+"""`vote.closed_at`, the vote audit and the vote fields against a real Postgres.
 
 `close` and `cancel` set `vote.closed_at`. `closes_at` stays the planned end of the
 cast window. Open, close and cancel write audit entries with id references and

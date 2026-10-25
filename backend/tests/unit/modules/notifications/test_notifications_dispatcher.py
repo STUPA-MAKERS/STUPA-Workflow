@@ -1,4 +1,4 @@
-"""Tests of the `notify` flow action dispatcher (T-18) with a fake service."""
+"""Tests of the `notify` flow action dispatcher with a fake service."""
 
 from __future__ import annotations
 
@@ -140,7 +140,7 @@ async def test_dispatch_notify_merges_context(monkeypatch: pytest.MonkeyPatch) -
 async def test_dispatch_task_notify_sends_kind_mail(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """`taskNotify` (#4-3) resolves the recipients at send time and uses send_kind_mail."""
+    """`taskNotify` resolves the recipients at send time and uses send_kind_mail."""
     captured: dict[str, object] = {}
 
     class FakeService:
@@ -185,7 +185,7 @@ async def test_dispatch_task_notify_sends_kind_mail(
 async def test_dispatch_task_notify_skips_non_actionable_state(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """#9: the new state has no actionable transition, so no task mail goes out."""
+    """The new state has no actionable transition, so no task mail goes out."""
     captured: dict[str, object] = {}
 
     class FakeService:
@@ -213,7 +213,7 @@ async def test_dispatch_task_notify_skips_non_actionable_state(
     assert "recipients" not in captured  # the dispatcher skipped the send
 
 
-# --- #19: the applicant mail follows the language of the application ---------
+# --- The applicant mail follows the language of the application ----------------
 
 
 class _CapturingService:
@@ -243,7 +243,7 @@ def _applicant_notify(params: dict) -> DispatchedAction:
 async def test_applicant_only_notify_uses_the_application_language(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """#19: an English application gets an English mail, with the status label.
+    """An English application gets an English mail, with the status label.
 
     The test drives the real `NotificationService`, so the assertion covers the
     rendered subject and body, not only the language argument.
@@ -374,7 +374,7 @@ async def test_notify_with_non_dict_recipients_keeps_the_default_language(
     assert captured["lang"] is None
 
 
-# --- O14: an unconfirmed guest application gets no flow mail -------------------
+# --- An unconfirmed guest application gets no flow mail -----------------------
 
 
 @pytest.mark.parametrize(

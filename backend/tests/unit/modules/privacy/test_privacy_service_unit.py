@@ -375,7 +375,7 @@ async def test_auskunft_i18n_falls_back_and_handles_missing_state() -> None:
 async def test_principal_erase_erases_the_candidacies_in_the_same_transaction(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """F2: the erasure replaces the candidate names (elections and protocol text)."""
+    """The erasure replaces the candidate names (elections and protocol text)."""
     from app.modules.privacy import service as privacy_service
 
     principal = _principal()

@@ -1,4 +1,4 @@
-"""Lifecycle of magic links without a fixed scope (Z1, O3, O4, F5; real Postgres).
+"""Lifecycle of magic links without a fixed scope (real Postgres).
 
 * A request expires no other link. Only the redeem expires the older links of the
   same application. A newer link that is not redeemed yet stays valid.
@@ -98,7 +98,7 @@ async def test_redeem_expires_only_the_older_links(
 async def test_locked_state_gives_an_edit_session(
     maker: async_sessionmaker[AsyncSession], settings: Settings
 ) -> None:
-    """F5: a link in a locked state opened only `view` before. Now it opens `edit`."""
+    """A link in a locked state opened only `view` before. Now it opens `edit`."""
     seed, app_id = await _setup(maker)
     async with maker() as session:
         await session.execute(
@@ -123,7 +123,7 @@ async def test_locked_state_gives_an_edit_session(
 async def test_old_view_link_opens_an_edit_session(
     maker: async_sessionmaker[AsyncSession], settings: Settings
 ) -> None:
-    """O4: a single-use view link from before O3 still works once, now with edit."""
+    """An older single-use view link still works once, now with edit."""
     _, app_id = await _setup(maker)
     async with maker() as session:
         session.add(

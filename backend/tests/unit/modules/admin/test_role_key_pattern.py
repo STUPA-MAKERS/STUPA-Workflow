@@ -1,4 +1,4 @@
-"""A10: a role key matches ``^[a-z][a-z0-9_]*$`` (global role and gremium role).
+"""A role key matches ``^[a-z][a-z0-9_]*$`` (global role and gremium role).
 
 The schemas reject a bad key with a ``ValidationError``. The API turns it into 422
 problem+json before any service call. The update schemas carry no key at all.

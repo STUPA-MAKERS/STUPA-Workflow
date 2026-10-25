@@ -106,7 +106,7 @@ class Application(UUIDPkMixin, TimestampMixin, Base):
     # OIDC ``sub`` of whoever archived it. NOT a foreign key: a principal can be removed
     # and the record of who archived must survive that, the same way ``created_by`` does.
     archived_by: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Captured on behalf of the applicant (#11). A person with
+    # Captured on behalf of the applicant. A person with
     # ``application.create_on_behalf`` entered an application that reached the
     # platform another way, for example as a PDF or a mail. ``captured_by`` is the OIDC
     # ``sub`` of that person. It is NOT the owner: ``created_by`` names the applicant
@@ -214,7 +214,7 @@ class StatusEvent(UUIDPkMixin, Base):
 
 
 class ApplicationDecision(UUIDPkMixin, Base):
-    """One decision on an application: approval with deviations (F1).
+    """One decision on an application: approval with deviations.
 
     A passed vote with a proposal or a manual transition into an accepted state writes
     a row. The valid decision is the newest row with `superseded_at IS NULL`. A new
@@ -269,7 +269,7 @@ class MagicLink(UUIDPkMixin, CreatedAtMixin, Base):
     The database holds only `sha256(token||pepper)`. The plaintext token exists
     only in the mail link. The link binds to exactly one `application_id`.
 
-    A new link always has `scope = 'edit'` and `single_use = false` (O3, O4). The
+    A new link always has `scope = 'edit'` and `single_use = false`. The
     session it opens has no fixed scope: each action checks the current state. The
     `view` scope and `single_use` stay only for the rows written before that change.
 
@@ -406,7 +406,7 @@ class Comment(UUIDPkMixin, Base):
     visibility: Mapped[str] = mapped_column(Text)
     # The principal ids (as strings) of the members that the comment mentions. Only a
     # member who reads the internal comments is mentionable, and the applicant view
-    # never shows the list (A12, O16).
+    # never shows the list.
     mentions: Mapped[list[str]] = mapped_column(
         JSONB, default=list, server_default=text("'[]'::jsonb")
     )

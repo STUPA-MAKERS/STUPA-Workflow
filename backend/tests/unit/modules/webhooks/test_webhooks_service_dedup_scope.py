@@ -1,4 +1,4 @@
-"""AUD-048: scope the dedup pre-check query to the candidate idempotency keys.
+"""Scope the dedup pre-check query to the candidate idempotency keys.
 
 The query must bind the concrete candidate keys in an `IN` clause. It must not load
 every key ever issued for the event.

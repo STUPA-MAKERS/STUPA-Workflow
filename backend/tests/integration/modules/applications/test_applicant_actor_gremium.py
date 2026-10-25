@@ -1,4 +1,4 @@
-"""A12/O16: the applicant sees the Gremium as the actor, not the member (real Postgres).
+"""The applicant sees the Gremium as the actor, not the member (real Postgres).
 
 In the applicant view (magic link, or the creator who is no member) the timeline
 actor and the author of a member comment are the name of the Gremium of the
@@ -134,7 +134,7 @@ async def test_magic_link_applicant_sees_the_gremium_for_a_creator_of_another_em
     maker: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """F23: a member submits for another email. The applicant sees no member name."""
+    """A member submits for another email. The applicant sees no member name."""
     seed = await seed_read_world(maker)
     await _set_creator_email(maker, seed.owner_sub, "member@example.org")
     app_id = await create_app(maker, seed, actor=seed.owner_sub)
@@ -226,7 +226,7 @@ async def test_creator_in_the_gremium_read_scope_reads_as_a_member(
     maker: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """F23: a member submits for a student and still reads the own Gremium work.
+    """A member submits for a student and still reads the own Gremium work.
 
     The member has no global permission and reads through the view cost centre of
     the Gremium. The Gremium read scope comes before the creator path.
@@ -288,7 +288,7 @@ async def test_comment_mail_to_the_applicant_names_the_gremium(
     maker: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A12/O16: the mailbox shows the Gremium, as the comment list does.
+    """The mailbox shows the Gremium, as the comment list does.
 
     The route gives the display name of the member to the mail sender. The mail to
     the applicant must not show it.

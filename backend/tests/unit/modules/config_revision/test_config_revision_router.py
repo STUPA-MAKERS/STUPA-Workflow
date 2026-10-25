@@ -145,7 +145,7 @@ def test_audit_revert_requires_audit_revert_permission() -> None:
 
 
 def test_audit_revert_delegates_to_revert_service(monkeypatch: pytest.MonkeyPatch) -> None:
-    # #AUD-018: the router passes the principal as the third argument. The RevertService
+    # The router passes the principal as the third argument. The RevertService
     # then re-asserts the granular permission of the original operation.
     seen: list[Principal | None] = []
 
@@ -160,7 +160,7 @@ def test_audit_revert_delegates_to_revert_service(monkeypatch: pytest.MonkeyPatc
 
     monkeypatch.setattr("app.modules.audit.router.RevertService", _FakeRevert)
     app = create_app()
-    # Happy path: audit.revert for the router gate plus the granular flow.configure (AUD-018).
+    # Happy path: audit.revert for the router gate plus the granular flow.configure.
     app.dependency_overrides[get_current_principal] = lambda: _principal(
         "audit.revert", "flow.configure"
     )

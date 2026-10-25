@@ -1,4 +1,4 @@
-"""Wire schemas of the public guest routes of a meeting (#17).
+"""Wire schemas of the public guest routes of a meeting.
 
 A guest has no account. These models carry only what a guest may see: the head of
 the meeting, the own state and, once admitted, the participant view of the public
@@ -53,7 +53,7 @@ class GuestBallotBody(_CamelModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     # A motion takes one option; an election with several candidates the list of the
-    # chosen candidate ids (F2, at most 50 ids); a poll the chosen option ids, or one
+    # chosen candidate ids (at most 50 ids); a poll the chosen option ids, or one
     # answer per date (at most 20).
     choice: (
         Annotated[str, Field(max_length=100)]
@@ -130,7 +130,7 @@ class GuestVote(_CamelModel):
     tally: GuestTally
     my_ballot: MyBallot = Field(alias="myBallot")
     can_cast: bool = Field(default=False, alias="canCast")
-    # F2: an election with its candidates and, once closed, its result.
+    # An election with its candidates and, once closed, its result.
     kind: VoteKind = "motion"
     election: ElectionConfig | None = None
     election_result: ElectionResultOut | None = Field(default=None, alias="electionResult")

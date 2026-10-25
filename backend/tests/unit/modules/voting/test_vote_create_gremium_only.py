@@ -4,9 +4,9 @@ The global permissions `vote.manage` and `vote.cast` are gone. These tests pin t
 that replace them:
 
 - `POST /applications/{id}/votes` takes a gremium UUID as `eligibleGroup` and no
-  `eligibleCount`. The server counts the roster (F14).
+  `eligibleCount`. The server counts the roster.
 - The gremium must exist (`eligible_group_invalid`) and must be the gremium of the
-  application (`eligible_group_mismatch`, NEW-1).
+  application (`eligible_group_mismatch`).
 - The gremium permission `vote.manage` or `session.manage` manages a standalone vote.
 - An eligible voter reads the vote without `application.read`.
 - `GET /votes/{id}` carries the `canManage` and `canCast` flags of the caller.
@@ -105,16 +105,16 @@ def test_body_refuses_a_free_group_key() -> None:
 
 
 def test_body_refuses_a_client_eligible_count() -> None:
-    """F14: the client cannot send the quorum denominator."""
+    """The client cannot send the quorum denominator."""
     with pytest.raises(ValidationError):
         _body(eligibleCount=3)
 
 
-# create(): gremium check, NEW-1 and the server-side roster count.
+# create(): gremium check and the server-side roster count.
 
 
 async def test_create_stores_the_roster_count() -> None:
-    """F14: `eligible_count` is the number of members with `vote.cast` in the gremium."""
+    """`eligible_count` is the number of members with `vote.cast` in the gremium."""
     app = _application()
     db = fake_session(result(app), result(*_roster(3, others=2)))
     db.scalar_results = [GID]
@@ -145,7 +145,7 @@ async def test_create_unknown_gremium_422() -> None:
 
 
 async def test_create_other_gremium_than_the_application_422() -> None:
-    """NEW-1: a vote of gremium B cannot decide an application of gremium A."""
+    """A vote of gremium B cannot decide an application of gremium A."""
     app = _application(gremium_id=OTHER)
     db = fake_session(result(app))
     db.scalar_results = [GID]

@@ -1,4 +1,4 @@
-"""F13: the guard `attachmentPresent` counts only scanned, clean attachments.
+"""The guard `attachmentPresent` counts only scanned, clean attachments.
 
 A file that waits for the ClamAV scan is in quarantine. It must not open a transition
 that requires an attachment. The test reads the query that `_has_attachment` sends.

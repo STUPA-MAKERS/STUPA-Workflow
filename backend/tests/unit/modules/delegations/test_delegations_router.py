@@ -244,7 +244,7 @@ def test_recipients_requires_session_401() -> None:
 
 
 def test_recipients_passes_the_delegator_id() -> None:
-    """O6: the lead asks for the pool substitutes of one member."""
+    """The lead asks for the pool substitutes of one member."""
     service = _FakeService()
     a = uuid4()
     client = _client(_MEMBER, service)

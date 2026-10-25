@@ -1,4 +1,4 @@
-"""HMAC signature and headers (T-19, security.md §5)."""
+"""HMAC signature and headers."""
 
 from __future__ import annotations
 

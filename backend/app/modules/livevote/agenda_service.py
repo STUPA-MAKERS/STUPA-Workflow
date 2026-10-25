@@ -6,7 +6,7 @@ entry into a vote state, is the Gremium of the meeting.
 The agenda keeps an explicit order (`position`). It is the source of the agenda
 items in the protocol.
 
-State rules (F24, O22, O25):
+State rules:
 
 * Add, reorder, rename and remove need a `planned` or `live` meeting. A closed
   meeting gives 409 `meeting_closed`.
@@ -23,7 +23,7 @@ The done mark of an item ("TOP abhaken") follows the minutes window too. A perso
 sets and removes it by hand, and the move to the next item sets it for the item that
 the room leaves.
 
-Every change writes an audit entry (F12): `agenda_item_add`, `agenda_item_update`,
+Every change writes an audit entry: `agenda_item_add`, `agenda_item_update`,
 `agenda_item_remove`, `agenda_reorder`, `agenda_item_done` and
 `agenda_item_reopened`. A body edit of a planned or live meeting
 is the preparation or the running minutes, and its autosave is not audited. A body
@@ -48,7 +48,7 @@ from app.modules.livevote.schemas import AgendaItemOut, AssignableApplicationOut
 from app.modules.protocol.models import Protocol
 from app.shared.errors import ConflictError, NotFoundError
 
-# The meeting states that accept a change of the agenda (O25).
+# The meeting states that accept a change of the agenda.
 _AGENDA_OPEN = frozenset({"planned", "live"})
 
 
@@ -84,7 +84,7 @@ class AgendaService:
 
         ``for_update`` locks the meeting row until the commit and reads the current
         values again. The meeting close and the vote open take the same lock, so an
-        add or a remove cannot race them (O12, O25).
+        add or a remove cannot race them.
 
         Raises:
             NotFoundError: No meeting has this id.
@@ -99,7 +99,7 @@ class AgendaService:
 
     @staticmethod
     def _assert_agenda_open(meeting: Meeting) -> None:
-        """Refuse a change of the agenda structure after the close (O25).
+        """Refuse a change of the agenda structure after the close.
 
         Raises:
             ConflictError: The meeting is closed (``meeting_closed``).
@@ -111,7 +111,7 @@ class AgendaService:
             )
 
     async def _assert_minutes_open(self, meeting: Meeting) -> None:
-        """Refuse a body or ``nonPublic`` edit outside the minutes window (O22).
+        """Refuse a body or ``nonPublic`` edit outside the minutes window.
 
         The window is a ``planned`` or ``live`` meeting, or a closed meeting whose
         protocol is still a draft. A ``planned`` meeting has no protocol yet, but the
@@ -254,10 +254,10 @@ class AgendaService:
         title of its application. `non_public` hides the item content in the
         public protocol PDF.
 
-        A rename needs a `planned` or `live` meeting (O25). The body and `non_public`
-        need a `planned` or `live` meeting, or a closed meeting with a draft protocol
-        (O22). A change writes `agenda_item_update` with the
-        changed field names. The body counts only after the close.
+        A rename needs a `planned` or `live` meeting. The body and `non_public`
+        need a `planned` or `live` meeting, or a closed meeting with a draft protocol.
+        A change writes `agenda_item_update` with the changed field names. The body
+        counts only after the close.
 
         Raises:
             NotFoundError: The meeting has no agenda item with this id.
@@ -282,7 +282,7 @@ class AgendaService:
             changed.append("title")
         if non_public is not None and non_public != row.non_public:
             if non_public and await self._has_guest_vote(row.id):
-                # #17: guests saw and voted on this item. It cannot become non-public
+                # Guests saw and voted on this item. It cannot become non-public
                 # afterwards, or the guest view would have shown non-public content.
                 raise ConflictError(
                     "Guests voted on this agenda item; it cannot become non-public.",
@@ -325,7 +325,7 @@ class AgendaService:
     ) -> None:
         """Set or remove the done mark of an agenda item. It does not commit.
 
-        The mark follows the minutes window (O22): a `planned` or `live` meeting, or a
+        The mark follows the minutes window: a `planned` or `live` meeting, or a
         closed meeting with a draft protocol. A mark that does not change writes
         nothing, so a second tick keeps the time and the person of the first one. A
         change writes `agenda_item_done` or `agenda_item_reopened`. `via` names the
@@ -352,7 +352,7 @@ class AgendaService:
         await self.session.flush()
 
     async def _has_guest_vote(self, item_id: UUID) -> bool:
-        """Tell if the item has an open or closed vote with guests (#17)."""
+        """Tell if the item has an open or closed vote with guests."""
         from app.modules.voting.models import Vote
 
         found = await self.session.scalar(
@@ -376,7 +376,7 @@ class AgendaService:
 
         Raises:
             NotFoundError: The meeting does not exist.
-            ConflictError: The meeting is closed (O25).
+            ConflictError: The meeting is closed.
         """
         meeting = await self._meeting(meeting_id)
         self._assert_agenda_open(meeting)
@@ -511,7 +511,7 @@ class AgendaService:
 
         Raises:
             NotFoundError: The meeting or the application does not exist.
-            ConflictError: The meeting is closed (O25), or the application is not in
+            ConflictError: The meeting is closed, or the application is not in
                 a vote state of the Gremium.
         """
         meeting = await self._meeting(meeting_id, for_update=True)
@@ -625,7 +625,7 @@ class AgendaService:
         actor: str,
         may_delete_votes: bool,
     ) -> list[AgendaItemOut]:
-        """Remove an agenda item (F24, O25).
+        """Remove an agenda item.
 
         The meeting must be `planned` or `live`. An open or closed vote of the item
         blocks the remove. The draft and cancelled votes of the item are deleted

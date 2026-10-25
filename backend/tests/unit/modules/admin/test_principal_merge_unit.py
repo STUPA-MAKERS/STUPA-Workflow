@@ -189,7 +189,7 @@ async def test_preview_counts_every_area() -> None:
     assert [c.kind for c in out.conflicts] == ["erasure_open", "erasure_open"]
     areas = {a.area: a for a in out.areas}
     assert list(areas) == list(AREAS)
-    # Five sub columns, among them application_decision.decided_by (F1).
+    # Five sub columns, among them application_decision.decided_by.
     assert areas["applications"].rewritten == 2 * 5
     # Notifications: two duplicates of two rows, so nothing is left to rewrite.
     assert areas["notifications"].combined == 2

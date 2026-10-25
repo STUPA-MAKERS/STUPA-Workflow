@@ -1,4 +1,4 @@
-"""Tests for the audit tools: the live chain check and the stored latest check (Z6)."""
+"""Tests for the audit tools: the live chain check and the stored latest check."""
 
 from __future__ import annotations
 

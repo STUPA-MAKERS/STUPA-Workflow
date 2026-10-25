@@ -1,4 +1,4 @@
-"""F17, Z3, Z7: the header of the protocol.
+"""The header of the protocol.
 
 * The excused members are their own group. The public variant names only the
   counts.
@@ -126,7 +126,7 @@ async def test_header_lists_every_keeper_period() -> None:
 
 async def test_header_falls_back_to_the_assigned_protokollant() -> None:
     session = _AttendanceSession([])
-    # The guest count of #17 comes first (no guests), then the protokollant.
+    # The guest count comes first (no guests), then the protokollant.
     session.scalar_results = [0, "Frau Schmidt"]
     header = await _service(session)._header_meta(_meeting(protokollant_id=uuid4()))
     assert header.keepers == []

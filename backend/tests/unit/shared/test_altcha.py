@@ -1,4 +1,4 @@
-"""Server-side ALTCHA verification (security.md §7, Issue #23)."""
+"""Server-side ALTCHA verification."""
 
 from __future__ import annotations
 
@@ -208,7 +208,7 @@ async def test_redis_replay_guard_falls_back_not_noop() -> None:
     kv = _FakeKV()
     kv.fail = True
     # If Redis fails, the guard must NOT become a no-op. A no-op makes a solution
-    # replayable for 300 seconds (Review #1). The guard falls back to a process-local
+    # replayable for 300 seconds. The guard falls back to a process-local
     # guard, so single use still holds per worker.
     guard = RedisReplayGuard(kv, fallback=InMemoryReplayGuard(now=lambda: 0))
     assert await guard.seen("k", ttl_seconds=10) is False

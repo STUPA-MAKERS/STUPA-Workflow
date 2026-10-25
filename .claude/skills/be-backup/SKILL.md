@@ -9,7 +9,7 @@ description: Whole-platform backup and restore — age-encrypted archives (pg_du
 
 **Why in-app:** the shell scripts this replaced (`deploy/backup/`) could only be driven from an SSH session on the VM. The people who run this platform are a student government, not operators with a terminal.
 
-**Coverage:** CRITICAL module (D11). `modules/backup` and the worker side (`worker/backup.py`, listed as `backup.py` in coverage.xml) are in the 100 % branch gate of `[tool.coverage_critical]` in `backend/pyproject.toml`. The pure unit suite in `tests/unit/modules/backup/` reaches it with fakes, a real age key pair and a stubbed `pg_dump`/`pg_restore`.
+**Coverage:** CRITICAL module. `modules/backup` and the worker side (`worker/backup.py`, listed as `backup.py` in coverage.xml) are in the 100 % branch gate of `[tool.coverage_critical]` in `backend/pyproject.toml`. The pure unit suite in `tests/unit/modules/backup/` reaches it with fakes, a real age key pair and a stubbed `pg_dump`/`pg_restore`.
 
 **Key files:**
 - `models.py` — the `Backup` catalogue row plus the archive member names. Metadata only; the archive is in MinIO.
@@ -25,7 +25,7 @@ description: Whole-platform backup and restore — age-encrypted archives (pg_du
 - **The private age key lives in the stack.** That is the price of restoring from a browser, and it is a real reduction against the old encrypt-only design. Use a key pair for the app ONLY; the disaster-recovery pair stays off host. `deploy/secrets/` is mounted read-only into `api` and `worker`.
 - **A restore takes a `pre_restore` safety archive FIRST** and aborts entirely when that fails. No undo means no restore. A `pre_restore` row and a pinned row never count towards retention and are never pruned.
 - **The restore audit entry lands in the RESTORED chain**, because the restore replaces `audit_entry` along with everything else. The safety archive is the only record of the state before it.
-- **A finished restore verifies the restored chain** (Z6): after the restore audit entry, `restore_backup` calls `worker.audit_verify.verify_after_restore`, which stores an `audit_verification` row with `trigger = restore` and the restore actor. A failed check only logs (for example an archive from a schema without `audit_verification`); the task still returns `done`. The nightly chain check at 04:30 is a separate cron and does not depend on the backup. See be-audit.
+- **A finished restore verifies the restored chain**: after the restore audit entry, `restore_backup` calls `worker.audit_verify.verify_after_restore`, which stores an `audit_verification` row with `trigger = restore` and the restore actor. A failed check only logs (for example an archive from a schema without `audit_verification`); the task still returns `done`. The nightly chain check at 04:30 is a separate cron and does not depend on the backup. See be-audit.
 - **`pg_dump` must match the server major.** The backend image installs `postgresql-client-16` from PGDG; compose runs `postgres:16-alpine`. An older `pg_dump` refuses to run.
 - **`pg_restore` is run with `tolerate_nonzero=True`.** `--clean` warns for every object the target does not have yet, which sets a non-zero exit even on a good restore.
 - **An archive from an older alembic revision needs `alembic upgrade head` after the restore** (the deploy migrate step), because stored data from before a data migration, for example the guard rewrite of `e5b16898d639`, can fail validation on read.

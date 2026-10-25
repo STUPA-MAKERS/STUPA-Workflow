@@ -1,6 +1,6 @@
 """Integration (real Postgres, testcontainers): Gremium read scope, legacy path.
 
-Regression test for #AUD-033 (#vote-read): `access._committee_can_read` (detail) and
+Regression test: `access._committee_can_read` (detail) and
 `ApplicationsService._committee_read_clauses` (list) MUST cover the same paths. The
 historical meeting vote path is `vote → meeting.gremium_id`. It covers an application
 voted on in a meeting of a Gremium of the member. The detail check held that path, but

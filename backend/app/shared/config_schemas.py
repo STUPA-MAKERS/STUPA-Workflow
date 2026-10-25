@@ -545,7 +545,7 @@ _LEGACY_VOTE_KEYS = frozenset({"allowChange", "allow_change"})
 class VoteConfig(_CamelModel):
     """The rules of one vote, stored as JSONB in ``vote.config``.
 
-    A ballot can never change after the cast (O11), so the config has no
+    A ballot can never change after the cast, so the config has no
     ``allowChange``. Migration ``vote_closed_at`` removes the key from the old rows,
     because ``extra=forbid`` refuses it. The API still refuses the key on create. To
     read a stored row, use ``from_stored``: an old container can write the key during a
@@ -558,14 +558,14 @@ class VoteConfig(_CamelModel):
     abstain_counts_quorum: bool = Field(default=True, alias="abstainCountsQuorum")
     secret: bool = False
     tie_break: Literal["passed", "rejected", "tie"] = Field(default="rejected", alias="tieBreak")
-    # Public meeting (#17): the admitted guests vote too. Such a vote has no quorum,
+    # Public meeting: the admitted guests vote too. Such a vote has no quorum,
     # only the majority of the cast ballots counts. Only a meeting vote in a meeting
     # with ``guests_mode = vote`` sets it, never on a non-public agenda item.
     guests_vote: bool = Field(default=False, alias="guestsVote")
 
     @model_validator(mode="after")
     def _guests_vote_has_no_quorum(self) -> VoteConfig:
-        """A vote with guests has no quorum (#17): only the majority of the cast ballots."""
+        """A vote with guests has no quorum: only the majority of the cast ballots."""
         if self.guests_vote and self.quorum is not None:
             raise ValueError("a vote with guests (guestsVote) has no quorum")
         return self
@@ -588,7 +588,7 @@ class VoteConfig(_CamelModel):
         if isinstance(data, VoteConfig):
             return data
         if "seats" in data:
-            # F2: an election row (``vote.kind = 'election'``). The readers of the motion
+            # An election row (``vote.kind = 'election'``). The readers of the motion
             # rules (secret, guests, options) get the projection of the election.
             return ElectionConfig.model_validate(data).as_vote_config()
         if "mode" in data:
@@ -597,7 +597,7 @@ class VoteConfig(_CamelModel):
         return cls.model_validate({k: v for k, v in data.items() if k not in _LEGACY_VOTE_KEYS})
 
 
-# F2 · Personnel elections. The answer keys of the single-candidate ballot (Ja/Nein/
+# Personnel elections. The answer keys of the single-candidate ballot (Ja/Nein/
 # Enthaltung) and of a full abstention. A candidate id never takes one of them.
 ELECTION_RESERVED_IDS = frozenset({"yes", "no", "abstain"})
 ELECTION_MAX_CANDIDATES = 50
@@ -630,7 +630,7 @@ class ElectionCandidate(_CamelModel):
 
 
 class ElectionConfig(_CamelModel):
-    """The rules of one election (F2), stored as JSONB in ``vote.config``.
+    """The rules of one election, stored as JSONB in ``vote.config``.
 
     ``vote.kind = 'election'`` marks the row. An election has no majority rule and no
     tie break: the relative majority elects, a tie at the seat boundary goes to a

@@ -2,7 +2,7 @@
 
 The tests prove that the async SQLAlchemy engine connects to a real Postgres and runs a
 query. The default test run skips them through the `integration` marker. The CI stage
-`be-integration` runs `-m integration` with Docker. See testing.md section 5: this
+`be-integration` runs `-m integration` with Docker. This
 repository uses no database mocks.
 """
 

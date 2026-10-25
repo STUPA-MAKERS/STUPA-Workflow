@@ -1,4 +1,4 @@
-"""O18: a meeting vote has no casting vote, so a tie is ``rejected``.
+"""A meeting vote has no casting vote, so a tie is ``rejected``.
 
 The meeting-vote route stores ``tieBreak=rejected`` itself. ``MeetingVoteOpenBody`` has
 no ``tieBreak``, so a client value has no effect. An application vote outside a

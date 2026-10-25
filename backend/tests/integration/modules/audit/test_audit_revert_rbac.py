@@ -1,7 +1,7 @@
 """Integration (real Postgres, testcontainers): granular permissions on an audit revert.
 
 The audit log revert re-asserts the *granular* permission of the original operation,
-not only `audit.revert` (#AUD-018). The tests prove against a real schema that
+not only `audit.revert`. The tests prove against a real schema that
 `RevertService.revert` rejects a principal without the matching original permission
 with a 403 (`ForbiddenError`). With that permission the revert runs through. This holds
 for config, budget and status reverts. `principal=None` (internal callers and tests)

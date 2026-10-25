@@ -1,4 +1,4 @@
-"""Tests for the substitute pool tools and the lead entry of a delegation (O6)."""
+"""Tests for the substitute pool tools and the lead entry of a delegation."""
 
 from __future__ import annotations
 

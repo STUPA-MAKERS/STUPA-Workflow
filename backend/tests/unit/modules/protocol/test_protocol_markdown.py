@@ -1,4 +1,4 @@
-"""Unit tests for the protocol Markdown builder (T-22): no DB, injection-safe, snippets."""
+"""Unit tests for the protocol Markdown builder: no DB, injection-safe, snippets."""
 
 from __future__ import annotations
 
@@ -148,7 +148,7 @@ def test_frontmatter_includes_protokollant_when_set() -> None:
 
 
 def test_frontmatter_start_end_time_lines() -> None:
-    """#14: the start time and the end time travel as `beginn` and `ende`.
+    """The start time and the end time travel as `beginn` and `ende`.
 
     typst renders them into the `Zeit: Start - Ende` line of the title page.
     """
@@ -244,7 +244,7 @@ def test_build_document_applies_sanitizer_to_body() -> None:
     assert "# TOP 1" in md and "Text." in md
 
 
-# AUD-001: sanitizer bypass regression.
+# Sanitizer bypass regression.
 # The old line-oriented regex let through the multiline, the container-nested and the
 # whitespace-in-label forms of the eval-capable link reference definition. They reached
 # the typst `eval` as `LinkRefDef(label='//', dest='#')` and gave an RCE.

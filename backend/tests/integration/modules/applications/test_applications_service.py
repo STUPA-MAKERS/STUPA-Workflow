@@ -1,6 +1,6 @@
 """Integration (real Postgres, testcontainers): the ApplicationsService life cycle.
 
-The tests prove against a real schema (data-model §1/§2, flows §1/§2). Create splits off
+The tests prove against a real schema. Create splits off
 the PII and writes v1 plus the initial state. PATCH writes a new version with a diff and
 syncs the amount. An edit lock gives 409. The timeline, the version history, the list
 filters and the comment visibility work. Anonymization empties the PII and keeps the
@@ -188,7 +188,7 @@ async def test_patch_creates_version_and_diff(session: AsyncSession) -> None:
 
 
 async def test_patch_preserves_system_title_field(session: AsyncSession) -> None:
-    """Issue #1: a type without an own `title` field uses the system title field.
+    """A type without an own `title` field uses the system title field.
 
     The runtime puts that system title field in front of the form. `patch()` whitelists
     against the pinned fields, and those do not hold `title`. Without the system field,
@@ -299,7 +299,7 @@ async def test_comment_visibility(session: AsyncSession) -> None:
     assert [c.body for c in applicant_view] == ["öffentlich"]
 
 
-# AUD-032: an unconfirmed guest submission stays invisible on the item routes for a
+# An unconfirmed guest submission stays invisible on the item routes for a
 # principal, which answers 404. Only the owning applicant reads it, through the magic
 # link.
 async def test_unconfirmed_guest_app_hidden_from_principal_item_reads(
@@ -356,7 +356,7 @@ async def test_confirmed_app_readable_by_principal_item_reads(
     assert (await svc.versions(app.id)) != []
 
 
-# HIGH #1: the service drops unknown keys and never persists them.
+# The service drops unknown keys and never persists them.
 async def test_create_drops_unknown_keys(session: AsyncSession) -> None:
     app_type, _, _ = await _seed_type(session)
     svc = ApplicationsService(session)
@@ -517,7 +517,7 @@ async def test_anonymize_clears_pii_keeps_application(session: AsyncSession) -> 
 
 
 async def test_anonymize_clears_the_capture_intake(session: AsyncSession) -> None:
-    # #11: the free-text intake note can name a person, so the anonymization clears it.
+    # The free-text intake note can name a person, so the anonymization clears it.
     # The received date and the capturing member stay.
     app_type, _, _ = await _seed_type(session)
     svc = ApplicationsService(session)
@@ -636,7 +636,7 @@ async def test_delete_writes_audit_entry_without_pii(session: AsyncSession) -> N
     assert entry.target_type == "application"
     assert entry.data["typeId"] == str(app_type.id)
     assert entry.data["versionCount"] == 2
-    # No raw PII in the audit `data` (security.md §4).
+    # No raw PII in the audit `data`.
     serialized = str(entry.data)
     assert "geheim" not in serialized
     assert "Erika" not in serialized

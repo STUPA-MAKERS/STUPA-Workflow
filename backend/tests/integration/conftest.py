@@ -1,8 +1,7 @@
 """Integration fixtures: a real Postgres 16 from testcontainers plus an Alembic upgrade.
 
 The tests skip when no Docker runtime is reachable, for example on a local machine
-without Docker. The CI integration stage (T-04) runs Docker, so the tests run there.
-See data-model §4 and testing.md §5.
+without Docker. The CI integration stage runs Docker, so the tests run there.
 """
 
 from __future__ import annotations
@@ -102,15 +101,15 @@ _DATA_TABLES = (
     "ballot",
     "protocol",
     "task_reminder_log",
-    # Single-row settings (Z1). After the truncate the code falls back to the
+    # Single-row settings. After the truncate the code falls back to the
     # defaults, so a test that changes them does not leak into the next one.
     "guest_application_settings",
     "meeting_settings",
     "login_settings",
-    # Draft tokens of the wizard (Z4). No FK reaches this table, so the `application`
+    # Draft tokens of the wizard. No FK reaches this table, so the `application`
     # CASCADE does not clear it.
     "attachment_draft_token",
-    # Stored audit-chain checks (Z6). No FK reaches this table either.
+    # Stored audit-chain checks. No FK reaches this table either.
     "audit_verification",
     # Tickets. CASCADE also clears the notes, the events and the ticket attachments.
     "ticket",
@@ -143,7 +142,7 @@ def clear_privacy_tables(eng: Engine) -> None:
 
 def _truncate(eng: Engine) -> None:
     with eng.begin() as conn:
-        # A trigger keeps `audit_entry` append-only, also against TRUNCATE (T-23). This
+        # A trigger keeps `audit_entry` append-only, also against TRUNCATE. This
         # maintenance transaction is the only place that bypasses the protection, because
         # `session_replication_role = replica` turns off the user triggers. The trigger
         # itself stays in place. A separate test proves that normal operation rejects the

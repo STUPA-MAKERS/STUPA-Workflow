@@ -1,4 +1,4 @@
-"""Router tests for the protocol endpoints (T-22).
+"""Router tests for the protocol endpoints.
 
 The tests cover the endpoint wiring and the RBAC gate (protocol.write). The service is
 a fake.
@@ -167,7 +167,7 @@ def test_create_protocol_authz_delegated_to_service(
 ) -> None:
     """The router gates authentication only.
 
-    It delegates the per-Gremium permission to the service (AUD-016). The call of the
+    It delegates the per-Gremium permission to the service. The call of the
     authz hook proves the delegation.
     """
     _writer(app)  # logged in only, no global permission
@@ -232,7 +232,7 @@ def test_update_protocol_rejects_empty_body_422(app: FastAPI, client: TestClient
 def test_update_protocol_rejects_oversized_markdown_422(
     app: FastAPI, client: TestClient
 ) -> None:
-    """AUD-060: the API caps the Markdown at 512 kB and answers 422 in any deployment."""
+    """The API caps the Markdown at 512 kB and answers 422 in any deployment."""
     _writer(app)
     oversized = "x" * (512_000 + 1)
     r = client.patch(f"/api/protocols/{PROTOCOL_ID}", json={"markdown": oversized})
@@ -290,7 +290,7 @@ def test_finalize_protocol_enqueues_with_pool(
 def test_finalize_protocol_refused_while_rendering(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
-    """A second finalize during the render gives 409 and does not enqueue again (O2)."""
+    """A second finalize during the render gives 409 and does not enqueue again."""
     _writer(app)
     fake_service.status = "rendering"
     pool = _FakePool()
@@ -304,7 +304,7 @@ def test_finalize_protocol_refused_while_rendering(
 
 # Service wiring.
 def test_get_protocol_service_wires_state_infra() -> None:
-    """The storage and the mail queue come from the app state (T-20 infra), not a copy."""
+    """The storage and the mail queue come from the app state, not a copy."""
     request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(
         object_storage="STORE", arq_pool=object()
     )))

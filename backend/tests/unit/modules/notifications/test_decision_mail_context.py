@@ -1,4 +1,4 @@
-"""Tests of the decision placeholders of a status mail (F1)."""
+"""Tests of the decision placeholders of a status mail."""
 
 from __future__ import annotations
 

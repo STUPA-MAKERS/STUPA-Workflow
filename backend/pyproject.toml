@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "antragsplattform-backend"
 version = "0.0.2"
-description = "Antragsplattform backend (FastAPI + arq) — Skelett (T-02)"
+description = "Antragsplattform backend (FastAPI + arq) — Skelett"
 requires-python = ">=3.13"
 dependencies = [
     "fastapi>=0.115",
@@ -18,16 +18,16 @@ dependencies = [
     "asyncpg>=0.30",
     "alembic>=1.14",
     "greenlet>=3.1",
-    # Auth stack (T-10): OIDC token exchange (httpx), id_token verification
+    # Auth stack: OIDC token exchange (httpx), id_token verification
     # (PyJWT+crypto), signed cookies and tokens (itsdangerous).
     "httpx>=0.28",
     "pyjwt[crypto]>=2.10",
     "itsdangerous>=2.2",
-    # Notifications and mail (T-18): Jinja2 templates (subject and body, i18n DE/EN).
+    # Notifications and mail: Jinja2 templates (subject and body, i18n DE/EN).
     # The arq worker sends the mail over SMTP asynchronously, so the API never blocks.
     "jinja2>=3.1",
     "aiosmtplib>=3.0",
-    # Files and uploads (T-13): MIME sniffing (libmagic), MinIO/S3 client with signed
+    # Files and uploads: MIME sniffing (libmagic), MinIO/S3 client with signed
     # URLs, ClamAV scan through clamd. All three load lazily, only on the upload path or
     # the worker path. The contract CI runs Postgres only and never loads them.
     "python-magic>=0.4",
@@ -38,11 +38,11 @@ dependencies = [
     "clamd>=1.0.2",
     # Multipart parsing for the file upload (FastAPI UploadFile and Form).
     "python-multipart>=0.0.18",
-    # Live vote (T-16): Redis pub/sub fan-out and cast lock (redis.asyncio). arq pulled
+    # Live vote: Redis pub/sub fan-out and cast lock (redis.asyncio). arq pulled
     # redis in transitively before. The broker and the locker now use it directly, so the
     # dependency is explicit.
     "redis>=5.0",
-    # Excel export (TASKS #2): budget tree and applications as .xlsx, filter aware.
+    # Excel export: budget tree and applications as .xlsx, filter aware.
     # Loads lazily, only on the export path. Pure Python package.
     "openpyxl>=3.1",
     # ZUGFeRD/Factur-X import (#invoices): read the embedded CII XML from invoice PDFs.
@@ -56,7 +56,7 @@ dependencies = [
     # age encryption for the backup archives. pyrage is the rust `age` implementation,
     # so an archive stays readable with the standard `age` CLI off host.
     "pyrage>=1.2",
-    # QR code of the join link of a public meeting (#17). segno is BSD-3-Clause, pure
+    # QR code of the join link of a public meeting. segno is BSD-3-Clause, pure
     # Python and has no dependencies. The API sends the module matrix; the browser
     # draws it, so no QR library runs in the frontend bundle.
     "segno>=1.6",
@@ -74,7 +74,7 @@ dev = [
     "pytest-cov>=6.0",
     "coverage[toml]>=7.6",
     "httpx>=0.28",
-    # Test infrastructure (testing.md §5): testcontainers (PG/Redis/MinIO), HTTP mock,
+    # Test infrastructure: testcontainers (PG/Redis/MinIO), HTTP mock,
     # time freeze, Pydantic and SQLAlchemy factories, contract tests (Schemathesis).
     "testcontainers[postgres,redis]>=4.9",
     "respx>=0.22",
@@ -129,7 +129,7 @@ omit = ["tests/*"]
 
 [tool.coverage.report]
 show_missing = true
-# Total gate (testing.md §1): backend, unit tests only, lines and branches. The unit suite
+# Total gate: backend, unit tests only, lines and branches. The unit suite
 # now reaches 98.7 %. Fakes without a database cover all services, routers and workers.
 # The gate sits at 97 %, just below the current value. Real regressions then break the
 # build, and small swings do not turn it red by mistake. The goal is to hold or raise the
@@ -142,14 +142,14 @@ exclude_lines = [
     "\\.\\.\\.",
 ]
 
-# Critical modules: 100 % branch coverage as a separate gate (testing.md §1).
+# Critical modules: 100 % branch coverage as a separate gate.
 # scripts/coverage_critical.py checks it against coverage.xml. The paths are relative to
 # the coverage `source` (= `app`), as coverage.xml lists them, for example
 # `modules/auth/oidc.py`. The gate turns on as soon as the path exists. The negative probe
 # is tests/test_coverage_gate.py.
 # The pure unit run reaches 100 % branch coverage in each of these modules, and the
 # `coverage-gate` job in .github/workflows/ci.yml blocks on it. The backup module and
-# its worker (`worker/backup.py`) joined the list in D11.
+# its worker (`worker/backup.py`) are on the list too.
 [tool.coverage_critical]
 modules = [
     "modules/auth",

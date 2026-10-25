@@ -1,4 +1,4 @@
-"""Unit tests: unconfirmed guest applications rest in the flow (F15, F18, O14).
+"""Unit tests: unconfirmed guest applications rest in the flow.
 
 The suite runs without a DB. `FlowService` reads through the result-queue fake. The
 integration suite `test_unconfirmed_guest_rest` covers the same rules on Postgres.
@@ -39,7 +39,7 @@ def _app(*, confirmed: bool, state_id: UUID | None = None) -> SimpleNamespace:
     )
 
 
-# F15: `_load_app` hides an unconfirmed application from the routes.
+# `_load_app` hides an unconfirmed application from the routes.
 async def test_load_app_hides_unconfirmed_from_routes() -> None:
     app = _app(confirmed=False)
     svc = FlowService(fake_session(result(app)))
@@ -105,7 +105,7 @@ async def test_route_methods_404_for_unconfirmed(call: str) -> None:
         await calls[call]()
 
 
-# F18/O14: `start_confirmed` starts the flow after the confirmation.
+# `start_confirmed` starts the flow after the confirmation.
 @pytest.fixture
 def steps(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     """Patch the auto-advance step and record its calls."""

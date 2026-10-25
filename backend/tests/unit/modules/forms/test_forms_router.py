@@ -1,4 +1,4 @@
-"""Router tests for forms (T-11): endpoint wiring without a DB.
+"""Router tests for forms: endpoint wiring without a DB.
 
 `dependency_overrides` replaces the DB-backed `FormsService` with a fake. Auth runs
 through `get_current_principal`. The integration suite covers the real DB paths.
@@ -176,5 +176,5 @@ def test_openapi_declares_error_responses(app_client: TestClient) -> None:
     assert "404" in get_form["responses"]
     post = spec["paths"]["/api/admin/application-types/{type_id}/form-versions"]["post"]
     assert {"400", "401", "403", "404", "422"} <= set(post["responses"])
-    # The T-10 hook rewrites 4xx to problem+json.
+    # The error hook rewrites 4xx to problem+json.
     assert "application/problem+json" in get_form["responses"]["404"]["content"]

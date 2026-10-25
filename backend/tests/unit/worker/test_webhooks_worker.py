@@ -1,4 +1,4 @@
-"""Worker task `deliver_webhook` (T-19): ok, retry, dead and gone.
+"""Worker task `deliver_webhook`: ok, retry, dead and gone.
 
 The tests use respx to fake the network.
 """

@@ -1,4 +1,4 @@
-"""VotingService (T-15): lifecycle, RBAC and race branches without a database.
+"""VotingService: lifecycle, RBAC and race branches without a database.
 
 The real database constraints (UNIQUE double ballot, ON CONFLICT) belong to the
 integration tests. Here a result-queue fake hits every service branch in a
@@ -157,7 +157,7 @@ async def test_open_sets_window_keeps_roster_eligible() -> None:
     assert out.opened_at == NOW
     assert out.closed_at is None
     assert out.tally.eligible == 20
-    # F12: the open writes a vote_open audit entry with id references only.
+    # The open writes a vote_open audit entry with id references only.
     entries = [a for a in db.added if type(a).__name__ == "AuditEntry"]
     assert [e.action for e in entries] == ["vote_open"]
     assert entries[0].actor == "mgr"
@@ -179,7 +179,7 @@ async def test_open_unknown_vote_404() -> None:
 
 
 async def test_open_meeting_vote_in_a_closed_meeting_409() -> None:
-    """O12: the open re-reads the meeting status under the meeting row lock."""
+    """The open re-reads the meeting status under the meeting row lock."""
     mid = uuid4()
     vote = _vote(status="draft", meeting_id=mid)
     db = fake_session(result(vote))
@@ -265,7 +265,7 @@ async def test_cast_nonvoting_delegation_does_not_block_member(marks: mock.Async
         result((True, False, _voter().sub)),  # outgoing NON-voting delegation
         result(SimpleNamespace(inserted=True)),  # ballot insert
     )
-    # Gremium vote: the right to vote comes from the namespaced key (AUD-066) that a
+    # Gremium vote: the right to vote comes from the namespaced key that a
     # real vote.cast membership sets, not from the bare UUID string.
     out = await VotingService(db).cast(
         vote.id, _voter(group=vote_group_key(gid)), "yes", now=NOW
@@ -347,14 +347,14 @@ async def test_cast_open_first_vote() -> None:
     out = await VotingService(db).cast(vote.id, _voter(), "yes", now=NOW)
     assert out.status == "cast"
     assert db.committed == 1
-    # O11: the insert never updates an existing ballot.
+    # The insert never updates an existing ballot.
     insert = str(db.statements[-1])
     assert "ON CONFLICT" in insert and "DO NOTHING" in insert
     assert "DO UPDATE" not in insert
 
 
 async def test_cast_open_double_409_already_voted() -> None:
-    """O11: a second cast never changes the ballot. It gives 409 ``already_voted``."""
+    """A second cast never changes the ballot. It gives 409 ``already_voted``."""
     vote = _vote()
     db = fake_session(result(vote), result())  # an empty RETURNING means conflict
     with pytest.raises(ConflictError, match="Already voted") as ei:
@@ -494,13 +494,13 @@ async def test_close_fires_matching_branch(_patch_flow: type[_FakeFlow]) -> None
     assert _patch_flow.notes == ["vote:passed"]
     # The status event of the branch names the vote, for the timeline link.
     assert _patch_flow.vote_ids == [vote.id]
-    # F20: the branch runs in a SAVEPOINT and the close commits ONCE. after_commit runs
+    # The branch runs in a SAVEPOINT and the close commits ONCE. after_commit runs
     # after that commit.
     assert db.savepoints == 1
     assert db.savepoint_rollbacks == 0
     assert db.committed == 1
     assert _patch_flow.after == [True]
-    # F12: a vote_close entry with the result and the counts, never a voter.
+    # A vote_close entry with the result and the counts, never a voter.
     entries = _audits(db)
     assert [e.action for e in entries] == ["vote_close"]
     assert entries[0].data["result"] == "passed"
@@ -538,7 +538,7 @@ async def test_close_prefers_global_flow_branch(_patch_flow: type[_FakeFlow]) ->
 async def test_close_application_vote_without_branch_closes_and_audits(
     _patch_flow: type[_FakeFlow],
 ) -> None:
-    """F20: a missing branch transition does not block the close.
+    """A missing branch transition does not block the close.
 
     The vote closes, the audit log gets ``vote_branch_blocked`` with the reason
     ``no_branch``, and ``branchFired`` is False. A person moves the application.
@@ -586,7 +586,7 @@ async def test_close_generic_vote_without_application_just_closes(
 async def test_close_guard_failure_keeps_the_vote_closed(
     _patch_flow: type[_FakeFlow],
 ) -> None:
-    """F20: a guard failure rolls back only the SAVEPOINT.
+    """A guard failure rolls back only the SAVEPOINT.
 
     The vote stays closed, the close commits, and the audit log records the reason.
     There is no 409, so the cron never retries the vote.
@@ -741,7 +741,7 @@ async def test_cancel_without_now_stamps_the_current_time() -> None:
 
 
 async def test_cancel_for_application_cancels_open_and_drafts() -> None:
-    """F19: the open vote and the drafts of the left state go to cancelled.
+    """The open vote and the drafts of the left state go to cancelled.
 
     The method does not commit. A draft for another state stays.
     """
@@ -876,7 +876,7 @@ async def test_create_without_application_skips_lookup() -> None:
     ("status", "code"), [("planned", "meeting_not_started"), ("closed", "meeting_closed")]
 )
 async def test_create_in_a_meeting_that_is_not_live_conflicts(status: str, code: str) -> None:
-    """O12: a meeting vote needs a live meeting, read under the meeting row lock."""
+    """A meeting vote needs a live meeting, read under the meeting row lock."""
     db = fake_session()
     db.scalar_results = [status]
     payload = VoteCreateInternal.model_validate(
@@ -956,7 +956,7 @@ async def test_delete_vote_in_meeting_removes_audits_and_commits(status: str) ->
     await VotingService(db).delete(vote.id, meeting_id=mid, actor="mgr")
     assert vote in db.deleted
     assert db.committed == 1
-    # O24: every delete of a meeting vote goes into the audit log.
+    # Every delete of a meeting vote goes into the audit log.
     [entry] = _audits(db)
     assert entry.action == "vote_delete"
     assert entry.actor == "mgr"
@@ -967,7 +967,7 @@ async def test_delete_vote_in_meeting_removes_audits_and_commits(status: str) ->
 
 @pytest.mark.parametrize("status", ["open", "closed"])
 async def test_delete_open_or_closed_vote_in_meeting_conflicts(status: str) -> None:
-    """An open or closed vote is part of the record; it also keeps its TOP (O25)."""
+    """An open or closed vote is part of the record; it also keeps its TOP."""
     mid = uuid4()
     vote = _vote(meeting_id=mid, agenda_item_id=uuid4(), status=status)
     db = fake_session(result(vote))
@@ -989,7 +989,7 @@ async def test_delete_vote_from_other_meeting_404() -> None:
 
 
 async def test_delete_for_agenda_item_deletes_drafts_and_cancelled() -> None:
-    """F24: the agenda-item remove deletes the draft and cancelled votes with audit."""
+    """The agenda-item remove deletes the draft and cancelled votes with audit."""
     item = uuid4()
     draft = _vote(meeting_id=uuid4(), agenda_item_id=item, status="draft")
     cancelled = _vote(meeting_id=uuid4(), agenda_item_id=item, status="cancelled")
@@ -1023,7 +1023,7 @@ async def test_delete_for_agenda_item_needs_the_vote_right() -> None:
 
 @pytest.mark.parametrize("blocking", ["open", "closed"])
 async def test_delete_for_agenda_item_refuses_open_or_closed_vote(blocking: str) -> None:
-    """O25: an open or closed vote is part of the record and blocks the remove."""
+    """An open or closed vote is part of the record and blocks the remove."""
     item = uuid4()
     draft = _vote(agenda_item_id=item, status="draft")
     kept = _vote(agenda_item_id=item, status=blocking)
@@ -1191,7 +1191,7 @@ async def test_get_meeting_open_hidden_until_proxy_voted() -> None:
     gid = uuid4()
     vote = _vote(meeting_id=uuid4(), eligible_group=str(gid))
     db = fake_session(result(vote), result("yes", "yes"))
-    # present=2, admitted guests=0 (#17), absent-delegated=1 → expected=3
+    # present=2, admitted guests=0, absent-delegated=1 → expected=3
     db.scalar_results = [2, 0, 1]
     out = await VotingService(db).get(vote.id)
     assert out.tally.revealed is False
@@ -1202,7 +1202,7 @@ async def test_get_meeting_open_reveals_when_proxy_also_voted() -> None:
     gid = uuid4()
     vote = _vote(meeting_id=uuid4(), eligible_group=str(gid))
     db = fake_session(result(vote), result("yes", "yes", "no"))
-    # present=2, no guests (#17), 1 proxy → expected=3, voted=3 → revealed
+    # present=2, no guests, 1 proxy → expected=3, voted=3 → revealed
     db.scalar_results = [2, 0, 1]
     out = await VotingService(db).get(vote.id)
     assert out.tally.revealed is True
@@ -1320,7 +1320,7 @@ async def test_get_scoped_checks_then_returns_tally() -> None:
     p = Principal(sub="u", permissions={"application.read"})
     out = await VotingService(db).get_scoped(vote.id, p)
     assert out.tally.counts == {"yes": 1, "no": 0, "abstain": 0}
-    # A5: the caller holds no ballot and no delegation.
+    # The caller holds no ballot and no delegation.
     assert out.my_ballot is not None
     assert out.my_ballot.cast is False
     assert out.my_ballot.choice is None

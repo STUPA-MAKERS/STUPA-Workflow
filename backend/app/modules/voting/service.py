@@ -1,7 +1,7 @@
 """Voting service: create -> open -> cast -> close (or cancel).
 
 Race safety: the DB enforces one ballot per voter. A ballot never changes after the
-cast (O11).
+cast.
 
 * open (``secret=false``): ``INSERT ... ON CONFLICT (vote_id, voter_sub) DO NOTHING``.
   An empty ``RETURNING`` means a second cast -> 409 ``already_voted``.
@@ -9,10 +9,10 @@ cast (O11).
   lands without an identity in ``secret_ballot``. A second cast gives 409
   ``already_voted`` too.
 
-Close and cancel set ``closed_at``. Open, close and cancel write an audit entry
-(F12). A close always ends the vote: when the pass or fail transition of the
+Close and cancel set ``closed_at``. Open, close and cancel write an audit entry.
+A close always ends the vote: when the pass or fail transition of the
 application cannot fire, the close still commits, writes ``vote_branch_blocked`` and
-returns ``branchFired=false`` (F20).
+returns ``branchFired=false``.
 
 RBAC is fail-closed and gremium-scoped. ``vote.eligible_group`` holds the UUID of the
 gremium that votes. A ``cast`` needs the gremium permission ``vote.cast`` there: only an
@@ -89,13 +89,13 @@ def vote_gremium_mismatch_error() -> ConflictError:
 # The ballot of any vote kind: an option, a list of ids, or the answers of a date poll.
 Choice = str | list[str] | Mapping[str, str]
 
-# The voter key of a guest of a public meeting (#17): ``guest:<meeting_guest.id>``. A
+# The voter key of a guest of a public meeting: ``guest:<meeting_guest.id>``. A
 # guest is not a principal, so the key never collides with an OIDC ``sub``.
 GUEST_VOTER_PREFIX = "guest:"
 
 
 def guest_voter_sub(guest_id: UUID) -> str:
-    """Return the ``voter_sub`` of a guest ballot (#17)."""
+    """Return the ``voter_sub`` of a guest ballot."""
     return f"{GUEST_VOTER_PREFIX}{guest_id}"
 
 
@@ -119,7 +119,7 @@ async def holds_gremium_vote_role(
 ) -> bool:
     """Tell whether a gremium role gives ``vote.manage`` or ``session.manage`` here.
 
-    Both go through ``gremium_ids_for``, so the OAuth scope cap applies (F16). The
+    Both go through ``gremium_ids_for``, so the OAuth scope cap applies. The
     read rule of a vote without a meeting (``VotingService.assert_can_read``) uses
     this part alone, because that rule checks the admin role before, with a read
     right instead of ``vote.manage``.
@@ -201,7 +201,7 @@ class VotingService:
         agenda_item_id: UUID | None = None,
         planned_ok: bool = False,
     ) -> None:
-        """Lock the meeting row and require a ``live`` meeting (O12, O25).
+        """Lock the meeting row and require a ``live`` meeting.
 
         ``planned_ok`` also accepts a ``planned`` meeting. The create of a prepared
         draft vote uses it: a draft can wait in a planned meeting, but it opens only
@@ -248,13 +248,13 @@ class VotingService:
                 raise NotFoundError(f"agenda item {agenda_item_id} not found")
 
     async def delete(self, vote_id: UUID, *, meeting_id: UUID, actor: str) -> None:
-        """Delete a meeting-bound vote and write a ``vote_delete`` audit entry (O24).
+        """Delete a meeting-bound vote and write a ``vote_delete`` audit entry.
 
         The ballots cascade through the foreign key. The method deletes only a vote of
         this meeting, and only a ``draft`` or ``cancelled`` vote. An open or closed
         vote is part of the record of the meeting, and a closed result may already
-        have fired a flow branch. The same rule keeps an agenda item with such a vote
-        (O25), so two deletes cannot get around it. The caller cancels an open vote
+        have fired a flow branch. The same rule keeps an agenda item with such a vote,
+        so two deletes cannot get around it. The caller cancels an open vote
         first. The caller (router) checks the authorization and the meeting status:
         only a ``planned`` or ``live`` meeting deletes a vote.
 
@@ -279,7 +279,7 @@ class VotingService:
     ) -> list[UUID]:
         """Delete the draft and cancelled votes of an agenda item, without a commit.
 
-        The agenda-item remove calls this first (F24, O25). The foreign key
+        The agenda-item remove calls this first. The foreign key
         ``vote.agenda_item_id`` no longer cascades, so the remove deletes these votes
         itself, each with a ``vote_delete`` audit entry. An open or closed vote is part
         of the record of the meeting and blocks the remove.
@@ -445,7 +445,7 @@ class VotingService:
         }
         if reason is not None:
             data["reason"] = reason
-        # F2: a deleted runoff no longer blocks a new runoff of its election.
+        # A deleted runoff no longer blocks a new runoff of its election.
         await election_mod.release_runoff_link(self.session, vote)
         await audit_record(
             self.session,
@@ -563,7 +563,7 @@ class VotingService:
         ) or 0
 
     async def _admitted_guest_count(self, vote: Vote) -> int:
-        """Count the admitted guests of the meeting of the vote (#17), or 0 without one."""
+        """Count the admitted guests of the meeting of the vote, or 0 without one."""
         if vote.meeting_id is None:
             return 0
         from app.modules.livevote.models import MeetingGuest
@@ -580,7 +580,7 @@ class VotingService:
         ) or 0
 
     async def _guest_attendance(self, vote: Vote, config: VoteConfig) -> int:
-        """Count the guests of a vote (#17).
+        """Count the guests of a vote.
 
         A members vote counts the admitted guests (display only). A vote with guests
         counts the admitted guests plus the guests who left or were removed after
@@ -673,7 +673,7 @@ class VotingService:
         there is no notion of 'present'. When the tally is hidden, only ``voted`` and
         ``present`` travel.
 
-        A vote with guests (#17) counts the admitted guests as present too: they are
+        A vote with guests counts the admitted guests as present too: they are
         expected ballots. ``presentMembers`` and ``presentGuests`` give the attendance
         of a meeting vote, live while it runs and fixed after the close.
         """
@@ -681,7 +681,7 @@ class VotingService:
         outcome = tally_mod.result(config, counts, eligible)
         quorum_met, lead = outcome.quorum_met, outcome.leading
         if election_mod.is_election(vote):
-            # F2: the election tally counts ballots, not votes, and has no leader.
+            # The election tally counts ballots, not votes, and has no leader.
             ev = await self._election_outcome(vote, eligible)
             counts, voted, quorum_met, lead = ev.display_counts(), ev.ballots, ev.quorum_met, None
         elif poll_mod.is_poll(vote):
@@ -758,7 +758,7 @@ class VotingService:
 
     @staticmethod
     def _check_proposal(application: Application, proposal: DecisionIn | None) -> None:
-        """Check the approved amount of a proposal against the requested amount (F1).
+        """Check the approved amount of a proposal against the requested amount.
 
         Raises:
             ValidationProblem: `approved_amount_invalid` or
@@ -777,7 +777,7 @@ class VotingService:
         )
 
     async def _election_outcome(self, vote: Vote, eligible: int) -> tally_mod.ElectionOutcome:
-        """Tally an election (F2) from its stored ballots."""
+        """Tally an election from its stored ballots."""
         config = election_mod.election_config(vote)
         choices = await self._choices(vote, config.as_vote_config())
         return election_mod.outcome_of(config, choices, eligible, getattr(vote, "round", 1) or 1)
@@ -822,7 +822,7 @@ class VotingService:
         from app.modules.admin.gremium_roles import admin_bypass
 
         if payload.config.guests_vote:
-            # Only a meeting vote of a public meeting has guests (#17).
+            # Only a meeting vote of a public meeting has guests.
             raise ValidationProblem(
                 "Only a vote of a public meeting can include guests.",
                 code="guests_vote_unavailable",
@@ -928,7 +928,7 @@ class VotingService:
         a ``planned`` meeting, for a vote that is prepared before the start. A poll
         writes ``poll_created`` for ``actor``.
 
-        A decision proposal (F1) needs an application, and its amount must fit the
+        A decision proposal needs an application, and its amount must fit the
         requested amount.
 
         Raises:
@@ -1046,7 +1046,7 @@ class VotingService:
         ``eligible_count``, which replaces the count of the create.
 
         A meeting vote opens only in a ``live`` meeting. The method locks the meeting
-        row before the vote row, as the meeting close does (O12).
+        row before the vote row, as the meeting close does.
 
         A vote on an application in a vote state opens only when its Gremium is the
         Gremium that decides that state (``application.vote_gremium_id``). A draft
@@ -1072,7 +1072,7 @@ class VotingService:
             vote.eligible_count = eligible_count
         vote.opens_at = now
         vote.status = "open"
-        # #17: a vote with guests has no quorum; the log keeps that rule.
+        # A vote with guests has no quorum; the log keeps that rule.
         data: dict[str, object] = {**self._audit_refs(vote), "guestsVote": config.guests_vote}
         if poll_mod.is_poll(vote):
             data["kind"] = poll_mod.POLL
@@ -1169,7 +1169,7 @@ class VotingService:
     def _stored_choice(vote: Vote, config: VoteConfig, choice: Choice) -> str:
         """Check a ballot against the vote and return its stored form.
 
-        A motion takes one configured option. An election (F2) and a poll take their
+        A motion takes one configured option. An election and a poll take their
         own ballot shape (``election.stored_choice``, ``poll.stored_choice``).
 
         Raises:
@@ -1194,7 +1194,7 @@ class VotingService:
     async def cast_guest(
         self, vote_id: UUID, guest_id: UUID, choice: Choice, *, now: datetime
     ) -> BallotAccepted:
-        """Cast the ballot of an admitted guest of a public meeting (#17).
+        """Cast the ballot of an admitted guest of a public meeting.
 
         This is the second, separate eligibility path of ``cast``. A guest is not a
         principal: no ``vote.cast``, no gremium role and no delegation. The caller (the
@@ -1202,7 +1202,7 @@ class VotingService:
         guests vote, and that the vote belongs to a public agenda item of the meeting
         of the guest. This method checks the vote itself: open, in its window, and
         ``guestsVote``. The ballot runs under ``guest:<id>``. The same rules as for a
-        member apply: one ballot, never changed after the cast (O11), and a secret
+        member apply: one ballot, never changed after the cast, and a secret
         vote keeps the identity (``voted_marker``) apart from the choice
         (``secret_ballot``). The audit entry ``vote_cast`` names the guest id as the
         actor and carries no choice.
@@ -1308,7 +1308,7 @@ class VotingService:
         """Insert the open ballot. A second cast of the same voter gives 409.
 
         ``ON CONFLICT DO NOTHING`` keeps the first ballot. An empty ``RETURNING``
-        means the voter already voted. A ballot never changes after the cast (O11).
+        means the voter already voted. A ballot never changes after the cast.
         """
         stmt = (
             pg_insert(Ballot)
@@ -1701,7 +1701,7 @@ class VotingService:
         previous = vote.status
         vote.status = "cancelled"
         vote.closed_at = now
-        # F2: a cancelled runoff no longer blocks a new runoff of its election.
+        # A cancelled runoff no longer blocks a new runoff of its election.
         await election_mod.release_runoff_link(self.session, vote)
         await audit_record(
             self.session,
@@ -1721,7 +1721,7 @@ class VotingService:
         left_state_id: UUID | None = None,
         entered_state_id: UUID | None = None,
     ) -> list[Vote]:
-        """Cancel the votes that a state change of the application orphans (F19).
+        """Cancel the votes that a state change of the application orphans.
 
         The flow calls this when the application leaves its state without a vote
         branch: a transition without a branch, a forced status, or an audit revert.
@@ -1834,7 +1834,7 @@ class VotingService:
     ) -> VoteClosed:
         """Close an open vote, compute the tally and the result, then fire the branch.
 
-        One transaction, one commit (F20). The method stages the tally result,
+        One transaction, one commit. The method stages the tally result,
         ``status=closed`` and ``closed_at``, and a ``vote_close`` audit entry. It then
         stages the ``pass`` or ``fail`` transition of the application in a SAVEPOINT.
         The commit writes the close and the transition together.
@@ -1895,7 +1895,7 @@ class VotingService:
         )
         closed_at = now or datetime.now(UTC)
 
-        # #17: fix the attendance of a meeting vote at the close. For a vote with
+        # Fix the attendance of a meeting vote at the close. For a vote with
         # guests the number of eligible voters is the present members plus the admitted
         # guests at this moment: a guest admitted while the vote ran voted too. It is a
         # display value only, because such a vote has no quorum.
@@ -1983,7 +1983,7 @@ class VotingService:
     async def _record_proposal(
         self, vote: Vote, application_id: UUID, principal: Principal
     ) -> ApplicationDecision | None:
-        """Write the proposal of a passed vote as the decision of its application (F1).
+        """Write the proposal of a passed vote as the decision of its application.
 
         A vote without a proposal writes nothing. When the application amount went
         below the approved amount after the vote opened, the decision binds the
@@ -2009,7 +2009,7 @@ class VotingService:
     async def _close_election(
         self, vote: Vote, principal: Principal, *, now: datetime | None
     ) -> VoteClosed:
-        """Close a locked, open election (F2): tally, store the result, no flow branch.
+        """Close a locked, open election: tally, store the result, no flow branch.
 
         The quorum rule is the rule of a motion: a manual close with the quorum missed
         gives 409; the cron close after the window ends stores ``rejected``. The tally
@@ -2033,7 +2033,7 @@ class VotingService:
             )
         closed_at = now or datetime.now(UTC)
         if vote.meeting_id is not None:
-            # #17: fix the attendance at the close, as for a motion.
+            # Fix the attendance at the close, as for a motion.
             members = await self._present_count(vote)
             guests = await self._guest_attendance(vote, config)
             vote.present_members = members
@@ -2167,7 +2167,7 @@ class VotingService:
         meeting of another Gremium. Such a vote also writes no decision.
 
         ``decide`` (a passed vote) writes the proposal of the vote as the decision of
-        the application (F1) before the SAVEPOINT. The guard `budgetFitsApplication`
+        the application before the SAVEPOINT. The guard `budgetFitsApplication`
         of the branch then checks the approved amount, and a blocked branch keeps the
         decision of the vote.
         """

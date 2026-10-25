@@ -4,7 +4,7 @@ The suite covers every branch of `app.modules.auth.bootstrap`. That module is cr
 it needs 100 percent branch coverage. The suite also covers the settings parser properties.
 It uses `fake_session` and needs no database in Docker.
 
-Security (#70 review): the email bootstrap matches only a verified email
+Security: the email bootstrap matches only a verified email
 (`email_verified`). The `sub` claim is the preferred identity because nobody can forge it.
 The startup sweep matches on `sub` only, because a stored email carries no verification
 flag.

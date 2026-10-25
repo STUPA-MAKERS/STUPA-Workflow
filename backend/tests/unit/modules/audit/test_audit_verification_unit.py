@@ -1,4 +1,4 @@
-"""Stored chain checks (Z6/O8): `verify_and_store`, the prune and the latest read.
+"""Stored chain checks: `verify_and_store`, the prune and the latest read.
 
 The suite runs without a database. `stream_scalars` and `execute` read the prepared
 results of `tests._support.audit_fakes` in order.

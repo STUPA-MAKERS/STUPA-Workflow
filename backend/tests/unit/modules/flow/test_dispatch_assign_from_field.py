@@ -1,9 +1,9 @@
-"""F1: the flow action `assignBudgetFromField` really runs.
+"""The flow action `assignBudgetFromField` really runs.
 
 The validation accepts the action, but the worker filter dropped it before this fix,
 so the extras dispatcher never saw it. The action now reaches the dispatcher. A retry
 with the same idempotency key changes nothing and writes no second audit entry.
-F2: `build_worker_dispatcher` chains the notify, webhook and extras dispatchers.
+`build_worker_dispatcher` chains the notify, webhook and extras dispatchers.
 """
 
 from __future__ import annotations

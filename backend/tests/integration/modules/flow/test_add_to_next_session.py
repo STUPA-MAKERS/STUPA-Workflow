@@ -1,4 +1,4 @@
-"""F3: `addToNextSession` picks the next PLANNED meeting (real Postgres).
+"""`addToNextSession` picks the next PLANNED meeting (real Postgres).
 
 Before the fix the query filtered on the status `finalized`, which does not exist. A
 live or closed meeting of today could therefore get the agenda item. The action now

@@ -50,7 +50,7 @@ class EditOps(ApplicationsServiceBase):
         A locked state raises 409, unless ``bypass_state_lock`` is true. The
         caller sets that flag when it holds ``application.edit_any``.
 
-        ``preserve_pii`` is for an editor without the PII right (O21). That editor
+        ``preserve_pii`` is for an editor without the PII right. That editor
         read ``data`` without the ``isPII`` fields, so the patch keeps the stored
         values of these fields and ignores the sent ones. A validation error on an
         ``isPII`` field does not stop that patch, because the editor cannot fix it.
@@ -59,7 +59,7 @@ class EditOps(ApplicationsServiceBase):
         The edit writes an ``application_update`` audit entry with the version
         number and the keys of the changed fields, never the values.
 
-        After a decision (F1) the requested amount must stay at or above the approved
+        After a decision the requested amount must stay at or above the approved
         amount; else 422 ``approved_amount_exceeds_requested``.
         """
         app = await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
@@ -101,7 +101,7 @@ class EditOps(ApplicationsServiceBase):
                 ) from exc
 
         new_amount, new_currency = _amount_currency(fields, clean)
-        # F1: the approved amount of a decision never exceeds the requested amount.
+        # The approved amount of a decision never exceeds the requested amount.
         if app.approved_amount is not None and (
             new_amount is None or new_amount < app.approved_amount
         ):
@@ -176,7 +176,7 @@ class EditOps(ApplicationsServiceBase):
         the same row should not fail, and re-archiving must not overwrite who archived it
         first.
 
-        Archiving also expires every magic link of the application (Z1). A link can
+        Archiving also expires every magic link of the application. A link can
         live without an expiry, so the archive is one of the events that end it.
         Bringing the application back does not revive the links. Archiving ends the
         existing links only, not the access: an archived application stays readable,
@@ -270,10 +270,10 @@ class EditOps(ApplicationsServiceBase):
         """Return the version history, oldest version first.
 
         A full reader gets ``data``, ``diff`` and ``changedKeys``. With
-        ``strip_pii`` the ``isPII`` fields leave all three (O21). The
-        ``applicant_view`` gets the metadata only (A11, O17): number, time and
+        ``strip_pii`` the ``isPII`` fields leave all three. The
+        ``applicant_view`` gets the metadata only: number, time and
         changed keys, no values. Its ``changedBy`` names the Gremium for every edit
-        that the applicant did not do (A12). ``magic_link_view`` marks the
+        that the applicant did not do. ``magic_link_view`` marks the
         magic-link reader; see `_applicant_actors`.
         """
         app = await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)

@@ -1,12 +1,11 @@
-"""Integration test for live voting (T-16) against real Postgres and Redis.
+"""Integration test for live voting against real Postgres and Redis.
 
 The tests run against real infrastructure.
 
 * MeetingService CRUD and meeting control. The schema keeps the FK
   ``vote.meeting_id → meeting.id``.
 * **Cast race**: parallel casts of the same voter pass the lock and a DB ``UNIQUE``
-  constraint. Exactly **one** ballot survives. See api.md section 4, acceptance
-  criterion "parallel casts give 1 ballot".
+  constraint. Exactly **one** ballot survives.
 * **Redis pub/sub fan-out** over **two** broker instances, which are two app instances
   on one Redis. A publish on A reaches the subscriber of B. See the acceptance
   criterion "fan-out over 2 instances".
@@ -92,7 +91,7 @@ async def _member(session: AsyncSession, gremium: Gremium) -> PrincipalRow:
     p = PrincipalRow(sub=f"s-{uuid.uuid4()}", display_name="Max P", email="m@x.de")
     session.add(p)
     await session.flush()
-    # O20: the member can keep the minutes.
+    # The member can keep the minutes.
     role = GremiumRole(
         gremium_id=gremium.id,
         key=f"r-{uuid.uuid4()}",
@@ -287,7 +286,7 @@ async def test_parallel_casts_yield_single_ballot(
     await session.commit()
 
     # A voter needs the gremium `vote.cast` in the GREMIUM of the vote (service.cast,
-    # fail-closed). The right is the namespaced key ``vote:<gremium>`` (AUD-066), which
+    # fail-closed). The right is the namespaced key ``vote:<gremium>``, which
     # only a real vote.cast membership sets. The bare UUID string does not work.
     from app.modules.auth.rbac import vote_group_key
 
@@ -411,7 +410,7 @@ async def test_broker_publisher_roundtrip_over_redis(redis_url: str) -> None:
 async def test_agenda_set_body_renames_freetext_top_only(session: AsyncSession) -> None:
     """``set_body(title=...)`` renames free-text agenda items but never application ones."""
     gremium, application = await _gremium_and_application(session)
-    # The body needs a live meeting (O22). The rename alone also passes when planned.
+    # The body needs a live meeting. The rename alone also passes when planned.
     meeting = Meeting(gremium_id=gremium.id, title="GV", status="live")
     session.add(meeting)
     await session.flush()

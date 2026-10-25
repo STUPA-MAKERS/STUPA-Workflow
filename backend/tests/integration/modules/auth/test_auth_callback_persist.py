@@ -1,12 +1,12 @@
 """Integration: the OIDC callback commits the principal and the auth_session row.
 
-The test reproduces the T-10 bug. Without `await db.commit()` in the callback handler,
+Without `await db.commit()` in the callback handler,
 the DB rolls back the fresh principal and the `auth_session` row when the request
 session closes. A later `GET /auth/me` with the session cookie then returns 401 instead
 of 200.
 
 The test needs real Postgres (`gen_random_uuid`, jsonb groups) and an RS256-signed
-id_token (respx, as in T-10), with the endpoints served from a discovery document the
+id_token (respx), with the endpoints served from a discovery document the
 way authentik shapes it. It also needs the real ASGI request cycle through
 `get_session`, which **never** commits by itself. Only this setup shows the missing
 persistence in the router.

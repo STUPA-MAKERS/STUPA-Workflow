@@ -11,7 +11,7 @@ A comment can mention members (``mentions``, principal ids). Only a caller who r
 the internal comments mentions, only in an internal comment, and only a person of
 `mentionable_people`; else the write is 422 ``mention_not_member``. The create and
 the edit put the mentions that they added into ``added_mentions``, and the router
-mails exactly those after the commit. The applicant view never sees the list (A12, O16).
+mails exactly those after the commit. The applicant view never sees the list.
 """
 
 from __future__ import annotations
@@ -82,7 +82,7 @@ class CommentOps(ApplicationsServiceBase):
         """Return the mentions without duplicates, after the check.
 
         A public comment takes no mention, because the applicant reads its body and
-        the body names the person (A12). Only the mentions that are not in ``before``
+        the body names the person. Only the mentions that are not in ``before``
         must be in `mentionable_people`: an edit keeps a mention of a person who
         lost the access since the create.
 
@@ -235,8 +235,8 @@ class CommentOps(ApplicationsServiceBase):
         magic-link applicant owns every applicant comment of the own application.
 
         In the ``applicant_view`` a comment of a member names the Gremium of the
-        application as its author (A12, O16). A comment of the logged-in creator
-        keeps the own name, unless the creator submitted for another email (F23)
+        application as its author. A comment of the logged-in creator
+        keeps the own name, unless the creator submitted for another email
         and the viewer is the magic-link applicant. The applicant view also gets
         no mentions (an empty list), because they are member names.
         """

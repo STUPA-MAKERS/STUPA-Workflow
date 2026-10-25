@@ -1,4 +1,4 @@
-"""GuestService (#17) without a database: every branch of the guest rules.
+"""GuestService without a database: every branch of the guest rules.
 
 A result-queue fake answers the queries in order. The audit hook runs its own two
 statements (advisory lock, previous hash); the fake answers them apart from the queue.
@@ -631,7 +631,7 @@ async def test_admitted_view_hides_non_public_content(monkeypatch: pytest.Monkey
 async def test_admitted_view_of_an_election_carries_no_account_ids(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """F2: a guest sees the candidate names, never a principal id or the lead's sub."""
+    """A guest sees the candidate names, never a principal id or the lead's sub."""
     item = SimpleNamespace(
         id=uuid4(), application_id=None, title="Wahl", non_public=False, body="", done_at=None
     )

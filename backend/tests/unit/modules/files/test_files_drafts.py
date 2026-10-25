@@ -1,4 +1,4 @@
-"""Unit tests for the draft uploads of the wizard (Z4) without a database.
+"""Unit tests for the draft uploads of the wizard without a database.
 
 A scripted session fake answers the queries of `DraftAttachments`, `check_drafts` and
 `bind_drafts`. The integration tests `test_draft_upload` and

@@ -12,7 +12,7 @@ def test_principal_has_permission() -> None:
 
 
 def test_admin_role_has_all_permissions() -> None:
-    """#15: the admin role grants every permission, even without an explicit grant."""
+    """The admin role grants every permission, even without an explicit grant."""
     p = Principal(sub="root", roles=["admin"], permissions=set())
     assert p.has("admin.config")
     assert p.has("vote.cast")

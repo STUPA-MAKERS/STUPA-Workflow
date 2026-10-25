@@ -1,6 +1,6 @@
 """Add `status_event.vote_id`, the vote whose close fired the event.
 
-A meeting delete now deletes all votes of the meeting (it replaces F21). An
+A meeting delete now deletes all votes of the meeting. An
 application that such a vote decided keeps its status. Its timeline must then show
 "vote deleted (with its meeting)" instead of a link to the vote. The timeline can do
 that only when the status event names its vote.
@@ -14,8 +14,8 @@ The upgrade:
 2. fills the column for the older branch events (note `vote:<result>`). It takes the
    closed vote of the same application whose `result_branch_transition_id` is the
    transition of the event. When more than one vote fits, it takes the vote whose
-   `closed_at` is nearest to the event. An event without such a vote keeps NULL: the
-   meeting delete before F21 deleted its vote.
+   `closed_at` is nearest to the event. An event without such a vote keeps NULL: an
+   older meeting delete deleted its vote.
 
 The downgrade drops the column, with its index and its foreign key.
 

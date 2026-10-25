@@ -187,7 +187,7 @@ def protocol_variant_for(cd_variant: str | None) -> str | None:
 
 @dataclass(slots=True, frozen=True)
 class KeeperLine:
-    """One period of a protocol keeper for the header (Z3).
+    """One period of a protocol keeper for the header.
 
     The times are local `HH:MM` values. The TOP numbers are the 1-based numbers in
     the current agenda order, or `None` when the period has no agenda item there or
@@ -218,12 +218,12 @@ class ProtocolDoc:
     # The legacy single name. It stays as the fallback of a render service that does
     # not know `keepers` yet, and for a meeting without keeper periods.
     protokollant: str | None = None
-    # Z3: every period of a protocol keeper, in time order. The renderer lists them
+    # Every period of a protocol keeper, in time order. The renderer lists them
     # in the header and adds a handover line at the agenda item where a later
     # period starts. Only the internal variant carries them.
     keepers: list[KeeperLine] = field(default_factory=list)
     present: list[str] = field(default_factory=list)
-    # F17: the excused members are their own group.
+    # The excused members are their own group.
     excused: list[str] = field(default_factory=list)
     absent: list[str] = field(default_factory=list)
     # The real start in local time (`YYYY-MM-DD HH:MM`), or the planned start when
@@ -324,7 +324,7 @@ def build_protocol_document(doc: ProtocolDoc) -> str:
 def guest_vote_note(
     present_members: int | None, present_guests: int | None, cast: int
 ) -> str:
-    """Describe the base of a vote with guests (#17), as counts and never as names.
+    """Describe the base of a vote with guests, as counts and never as names.
 
     Such a vote has no quorum; the majority of the cast ballots decides. The line
     names the attendance when the close fixed it.
@@ -351,7 +351,7 @@ def build_vote_snippet(
     values and sets the title in bold. There is no separate result line,
     because the result reads from the tally box. The snippet stays part of the
     editable Markdown as a blockquote callout. `conditions` are the conditions of
-    the decision (F1): one plain body line `Auflage n: text` each.
+    the decision: one plain body line `Auflage n: text` each.
     """
     head = question.strip() if question and question.strip() else title
     lines = [f"> [!abstimmung] **{_md_escape(head)}**"]
@@ -371,7 +371,7 @@ def build_vote_snippet(
 
 @dataclass(frozen=True, slots=True)
 class ElectionLine:
-    """One candidate of an election snippet (F2): name, votes and the outcome."""
+    """One candidate of an election snippet: name, votes and the outcome."""
 
     name: str
     votes: int
@@ -380,7 +380,7 @@ class ElectionLine:
 
 @dataclass(frozen=True, slots=True)
 class ElectionSnippet:
-    """The protocol view of one election (F2), built from its stored result."""
+    """The protocol view of one election, built from its stored result."""
 
     question: str
     seats: int
@@ -398,7 +398,7 @@ class ElectionSnippet:
 
 
 def build_election_snippet(view: ElectionSnippet, *, public: bool = False) -> str:
-    """Render an election as a protocol callout (`> [!abstimmung]`, F2).
+    """Render an election as a protocol callout (`> [!abstimmung]`).
 
     The internal snippet holds the ballot, the seats, the votes per candidate, the
     abstentions, the elected candidates and the notes „durch Los entschieden“ or
@@ -510,7 +510,7 @@ def replace_vote_blocks(body: str, pairs: list[tuple[str, str]]) -> str:
 
     Each pair is (the snippet of the text, the replacement). The public protocol uses
     this to swap an internal election callout that the protokollant put into the text
-    for its public form (F2). Two votes can share a question and so a head line, so
+    for its public form. Two votes can share a question and so a head line, so
     each block goes to one vote only, as in `votes_in_body`: a block whose whole text
     equals a snippet belongs to that vote first, and the other blocks with the head
     go to the remaining votes in the given order. A block runs over `>` lines and

@@ -1,4 +1,4 @@
-"""Unit tests for the flow action dispatch (T-14, flows §9.3 step 4)."""
+"""Unit tests for the flow action dispatch."""
 
 from __future__ import annotations
 
@@ -96,7 +96,7 @@ async def test_null_dispatcher_empty_is_noop(monkeypatch: pytest.MonkeyPatch) ->
     assert spy.messages == []
 
 
-# Implicit auto mails per status change (#4-3).
+# Implicit auto mails per status change.
 def test_implicit_adds_applicant_notify_and_task() -> None:
     app_id, t_id, e_id = uuid4(), uuid4(), uuid4()
     implicit = build_implicit_notifications(

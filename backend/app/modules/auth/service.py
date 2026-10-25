@@ -90,10 +90,10 @@ async def request_magic_link(
 
     The function sends a mail only on a hit. The caller always answers 202.
 
-    Every new link has `scope = 'edit'` and can be used more than once (O3). The
+    Every new link has `scope = 'edit'` and can be used more than once. The
     session it opens has no fixed scope: each action checks the current state, so
-    a locked state still allows a transition with `actorIsApplicant` and an upload
-    (F5, O4). The data lock stays the 409 of the edit service.
+    a locked state still allows a transition with `actorIsApplicant` and an upload.
+    The data lock stays the 409 of the edit service.
 
     The lifetime comes from `guest_application_settings.link_ttl_days`. NULL gives
     a link without an expiry. A request expires no other link. Otherwise anybody
@@ -139,14 +139,14 @@ async def verify_magic_link(
 
     A link without an expiry (`expires_at` NULL) stays valid until a newer link is
     redeemed or the application is archived or anonymized. A single-use token (only
-    rows from before O3) gets `used_at` set.
+    older rows) gets `used_at` set.
 
     The redeem expires every older link of the same application that is still
     valid (`expires_at = now`). An unlimited link therefore does not collect old
     access paths. A newer link that is not yet redeemed stays valid.
 
     The applicant session always has the scope `edit`, also for an old `view`
-    link (O4). Each action checks the current state.
+    link. Each action checks the current state.
 
     The first verify of a guest application confirms its email. The application
     then leaves its rest in the flow: `FlowService.start_confirmed` runs the
@@ -203,7 +203,7 @@ async def verify_magic_link(
             .returning(Application.id)
         )
     ).scalar_one_or_none()
-    # The redeem ends the older links of this application (O4). "Older" includes a
+    # The redeem ends the older links of this application. "Older" includes a
     # link with the same creation time, but never this link itself. The creation
     # time comes from the database, so the compare stays in SQL.
     redeemed = aliased(MagicLink)
@@ -314,7 +314,7 @@ async def oidc_callback(
         client=client,
         now=now,
     )
-    # D3: one LOGIN entry per successful OIDC login, in the same transaction as the
+    # One LOGIN entry per successful OIDC login, in the same transaction as the
     # session. The actor is the principal. ``data`` names only the method: no IP
     # address, no user agent, no e-mail. A magic-link redeem is not a LOGIN: it opens
     # an applicant session for one application, not a principal account.

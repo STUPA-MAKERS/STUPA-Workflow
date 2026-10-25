@@ -1,4 +1,4 @@
-"""Z7 and A2: the start sets ``started_at`` once, and MeetingOut carries the agenda.
+"""The start sets ``started_at`` once, and MeetingOut carries the agenda.
 
 The tests run on a real Postgres. The detail, the list and the timeline all carry
 ``startedAt``, ``agendaItemCount`` and ``currentAgendaItem``.

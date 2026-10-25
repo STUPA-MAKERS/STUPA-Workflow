@@ -2,7 +2,7 @@
 
 The unit suite checks the logic against a fake. This module runs against a real Redis. It
 verifies that the `redis.asyncio` API behaves as expected for the pipeline with a ZSET and
-for SET NX EX. See security.md §8 and §7. See also issues #23 and #24. The tests skip
+for SET NX EX. The tests skip
 without Docker.
 """
 

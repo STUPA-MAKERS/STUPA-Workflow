@@ -1,4 +1,4 @@
-"""#11: capture an application on behalf of an applicant (real Postgres).
+"""Capture an application on behalf of an applicant (real Postgres).
 
 A person with `application.create_on_behalf` enters an application for an account or
 for a guest. The application belongs to the applicant. The capturing person shows only

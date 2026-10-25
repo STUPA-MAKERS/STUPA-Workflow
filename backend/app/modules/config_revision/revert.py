@@ -194,7 +194,7 @@ class RevertService:
         """Revert an application status transition back to the prior state.
 
         The application leaves its current state, so the flow cancels the votes of
-        that state (F22) and the publisher sends ``vote_cancelled``.
+        that state and the publisher sends ``vote_cancelled``.
         """
         from app.modules.applications.decision import DecisionSwap
         from app.modules.flow.service import FlowService
@@ -212,7 +212,7 @@ class RevertService:
                 "This status change is not revertable.", code="not_revertable"
             )
         event_raw = data.get("statusEventId")
-        # F1: a reverted revert that swapped decisions swaps them back (redo).
+        # A reverted revert that swapped decisions swaps them back (redo).
         swap: DecisionSwap | None = None
         if "decisionUndoneId" in data or "decisionRestoredId" in data:
             swap = DecisionSwap(
@@ -225,7 +225,7 @@ class RevertService:
             to_state_id=UUID(to_raw),
             actor=actor,
             reverted_audit_id=entry.id,
-            # F1: the decision that the change wrote gives way to the one before it.
+            # The decision that the change wrote gives way to the one before it.
             reverted_status_event_id=UUID(event_raw) if event_raw else None,
             decision_swap=swap,
         )

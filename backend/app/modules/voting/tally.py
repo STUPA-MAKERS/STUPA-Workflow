@@ -168,7 +168,7 @@ def result(config: VoteConfig, counts: Mapping[str, int], eligible: int) -> Outc
     return Outcome(result=final, quorum_met=True, leading=lead)
 
 
-# ---------------------------------------------------------------- F2: elections
+# -------------------------------------------------------------------- elections
 #
 # An election ballot holds the ids of the chosen candidates as a JSON list (``[]`` =
 # full abstention). Every seat that the ballot leaves free is one abstention vote: a

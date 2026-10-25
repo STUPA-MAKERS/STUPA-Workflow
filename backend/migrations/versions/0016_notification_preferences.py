@@ -1,4 +1,4 @@
-"""Per-user notification switches (#4-2).
+"""Per-user notification switches.
 
 Every notification kind is active by default. `notification_preference` stores
 the exceptions only. A row with `enabled=false` for a principal and a kind turns

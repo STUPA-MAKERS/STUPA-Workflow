@@ -1,4 +1,4 @@
-"""Extra branch and line coverage for `AuditService` (T-23).
+"""Extra branch and line coverage for `AuditService`.
 
 These tests cover the branches that the base unit test misses. They drive
 `query_cursor` with and without filters and at the `has_more` limit. They drive

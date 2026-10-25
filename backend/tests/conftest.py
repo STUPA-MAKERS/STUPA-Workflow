@@ -1,4 +1,4 @@
-"""Pytest fixtures (T-02).
+"""Pytest fixtures.
 
 This module sets the required environment variables before it imports the app. Settings
 fails at import time without them. The module also provides the test clients.
@@ -79,7 +79,7 @@ def error_client() -> TestClient:
     return TestClient(app, raise_server_exceptions=False)
 
 
-# Integration fixtures (testing.md §5). They start real backing services with
+# Integration fixtures. They start real backing services with
 # testcontainers and run only under `-m integration`, which needs Docker. Without Docker
 # the test skips instead of errors. The unit suite (default addopts) never touches them.
 

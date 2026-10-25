@@ -732,7 +732,7 @@ def test_get_invoice(fake: _FakeService) -> None:
     assert resp.json()["number"] == "R-2026-1"
     assert resp.json()["linkedBookings"] == []
     assert fake.calls["get_invoice"] == _IID
-    # budget.view is the full view: the linked bookings carry no gremium filter (A6).
+    # budget.view is the full view: the linked bookings carry no gremium filter.
     assert fake.calls["get_invoice_scope"] is None
 
 
@@ -745,7 +745,7 @@ def test_list_invoices_passes_the_full_view_scope(fake: _FakeService) -> None:
 async def test_booking_scope_without_full_view_uses_the_member_gremien(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A6: a reader without the full view sees only the bookings of member Gremien."""
+    """A reader without the full view sees only the bookings of member Gremien."""
     from app.modules.budget import tree_router
 
     gid = uuid.uuid4()

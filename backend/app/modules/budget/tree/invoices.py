@@ -57,7 +57,7 @@ class InvoiceOps(BudgetTreeServiceBase):
 
     The read paths take ``visible_gremium_ids``. ``None`` means the full budget view
     and shows every linked booking. A set limits ``linkedBookings`` to the cost
-    centres that `visible_budget_ids` opens for those Gremien (A6).
+    centres that `visible_budget_ids` opens for those Gremien.
     """
 
     @staticmethod

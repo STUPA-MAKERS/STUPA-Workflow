@@ -1,4 +1,4 @@
-"""The hourly cron purges expired draft uploads with their objects (Z4, real Postgres).
+"""The hourly cron purges expired draft uploads with their objects (real Postgres).
 
 * An expired draft goes: the row and the MinIO object.
 * A draft that has not expired stays, and so does a bound attachment.

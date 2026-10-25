@@ -1,4 +1,4 @@
-"""Public meeting with a QR code (#17): join requests, guests and their view.
+"""Public meeting with a QR code: join requests, guests and their view.
 
 A person without an account scans the QR code, enters a name and asks to join. The
 meeting lead admits or rejects the request. An admitted guest follows the public
@@ -81,7 +81,7 @@ logger = logging.getLogger("app.livevote.guests")
 # The code alphabet leaves out 0/O, 1/I/L: a person types the code from the beamer.
 CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 CODE_LENGTH = 6
-# A rejected or removed guest may ask again after this time (decision #17).
+# A rejected or removed guest may ask again after this time.
 RETRY_AFTER = timedelta(minutes=3)
 # The own state refreshes `last_seen_at` at most once in this interval.
 _SEEN_INTERVAL = timedelta(seconds=60)
@@ -349,7 +349,7 @@ class GuestService:
         return events
 
     async def purge_on_close(self, meeting: Meeting) -> GuestEvents:
-        """The meeting closes: delete the requests and pseudonymize the guests (#17).
+        """The meeting closes: delete the requests and pseudonymize the guests.
 
         The rows that never got admitted go: the rejected, the withdrawn and the still
         open requests. The names of the admitted guests go too (decision 2026-10-06:
@@ -390,7 +390,7 @@ class GuestService:
         return events
 
     async def pseudonymize(self, meeting_id: UUID) -> int:
-        """Replace every guest name of the meeting with "Gast 1 … n" (#17).
+        """Replace every guest name of the meeting with "Gast 1 … n".
 
         The protocol finalization calls this. The numbers follow the order of the
         admission. The token hashes go too. The caller commits.

@@ -43,7 +43,7 @@ class AnonymizeOps(ApplicationsServiceBase):
 
         The method sets ``email`` and ``name`` to NULL and writes
         ``anonymized_at``. It also blanks every ``data`` field marked ``isPII`` and the
-        free-text intake note of a capture (``capture_intake``, #11).
+        free-text intake note of a capture (``capture_intake``).
         It removes the magic links and the attachments, the files of every comment
         (internal and public) included (GDPR Art. 17).
 
@@ -66,7 +66,7 @@ class AnonymizeOps(ApplicationsServiceBase):
             applicant.email = None
             applicant.name = None
             applicant.anonymized_at = datetime.now(UTC)
-        # The free-text intake note of a capture (#11) can name a person ("per Mail von
+        # The free-text intake note of a capture can name a person ("per Mail von
         # Frau X"), so it goes too. The capture date and the capturing member stay.
         app.capture_intake = None
 
@@ -106,7 +106,7 @@ class AnonymizeOps(ApplicationsServiceBase):
             .values(body="[anonymisiert]")
         )
         # A magic link is a direct access path to the PII through the mail. A link
-        # can live without an expiry, so delete them all (Z1). Deleting is stronger
+        # can live without an expiry, so delete them all. Deleting is stronger
         # than expiring them, and the retention would purge them anyway.
         await self.session.execute(
             delete(MagicLink).where(MagicLink.application_id == application_id)

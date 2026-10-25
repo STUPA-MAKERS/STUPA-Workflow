@@ -1,6 +1,6 @@
 """Integration (real Postgres): anonymization scrubs the comments of the applicant.
 
-DSGVO Art. 17 (AUD-007): `ApplicationsService.anonymize` must also delete the free
+DSGVO Art. 17: `ApplicationsService.anonymize` must also delete the free
 text of comments that the applicant wrote (`author_kind='applicant'`). That text can
 hold personal data. Comments of a principal stay untouched.
 """

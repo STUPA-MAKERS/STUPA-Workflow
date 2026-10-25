@@ -1,4 +1,4 @@
-"""Settings for applications without an account (Z1).
+"""Settings for applications without an account.
 
 One row (`guest_application_settings`, id=1) holds two values:
 

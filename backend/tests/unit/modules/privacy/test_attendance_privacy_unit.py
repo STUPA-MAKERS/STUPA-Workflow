@@ -1,4 +1,4 @@
-"""Unit tests for the attendance note in the GDPR flows (Z2, A7).
+"""Unit tests for the attendance note in the GDPR flows.
 
 The reason of an excuse (`meeting_attendance.note`) is personal data. The Art. 15
 export lists the attendance of the principal with the reason. The Art. 17 erasure

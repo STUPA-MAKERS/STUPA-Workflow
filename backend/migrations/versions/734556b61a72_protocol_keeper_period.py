@@ -1,4 +1,4 @@
-"""Add the periods of the protocol keeper (Z3).
+"""Add the periods of the protocol keeper.
 
 The upgrade creates the table `protocol_keeper_period`. A row is one period in
 which one principal keeps the minutes of a meeting. A period is planned

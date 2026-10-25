@@ -1,4 +1,4 @@
-"""Capture on behalf of an applicant (#11): router, service and mail without a database.
+"""Capture on behalf of an applicant: router, service and mail without a database.
 
 The integration suite (`tests/integration/.../test_on_behalf.py`) covers the real
 database paths. These tests pin the wiring: the permission gate, the body cap, the

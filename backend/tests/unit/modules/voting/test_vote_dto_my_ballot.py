@@ -1,4 +1,4 @@
-"""A5: the vote DTOs carry the rules, the real times and the own ballot of the caller.
+"""The vote DTOs carry the rules, the real times and the own ballot of the caller.
 
 ``VoteOut`` (``GET /votes/{id}``) and ``MeetingVoteOut`` (the meeting payload) add
 ``majorityRule``, ``secret``, ``quorum``, ``openedAt``, ``closedAt``, ``myBallot`` and

@@ -1,4 +1,4 @@
-"""Remove the PII and anonymization feature (backlog #3).
+"""Remove the PII and anonymization feature.
 
 `applicant.anonymized_at` and `form_field.is_pii` are the last parts of an
 anonymization concept that the project dropped long ago. Neither an endpoint nor

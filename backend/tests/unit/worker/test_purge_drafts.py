@@ -1,4 +1,4 @@
-"""Unit tests of the hourly draft purge (Z4) without a database.
+"""Unit tests of the hourly draft purge without a database.
 
 The integration test `tests/integration/worker/test_purge_drafts.py` runs the SQL.
 These tests cover the loop, the storage fallbacks and the error paths.

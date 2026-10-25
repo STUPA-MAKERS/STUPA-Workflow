@@ -895,7 +895,7 @@ async def test_meeting_delegation_mail_info_with_date_and_delegator_name() -> No
 async def test_meeting_delegation_mail_info_picks_the_recipient(
     to_delegator: bool, column: str
 ) -> None:
-    """F3: the access revoke of a delegate mails the delegator."""
+    """The access revoke of a delegate mails the delegator."""
     seen: list[Any] = []
 
     class _Seen:

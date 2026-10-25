@@ -1,4 +1,4 @@
-"""Integration: no application-scoped path sees a draft upload (Z4, real Postgres).
+"""Integration: no application-scoped path sees a draft upload (real Postgres).
 
 A draft of the wizard has no `application_id`. The tests prove that each
 application path ignores it, even for an admin and even when the draft is scanned

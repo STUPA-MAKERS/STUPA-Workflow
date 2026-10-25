@@ -1,10 +1,10 @@
-"""Integration test for the voting service (T-15).
+"""Integration test for the voting service.
 
 The test uses a real Postgres from testcontainers and a real schema. It checks
 data-model section 5.3 and flows section 4.
 
 `UNIQUE(vote,voter)` turns a double vote into a 409 `already_voted`: a ballot never
-changes after the cast (O11). The secret path writes `voted_marker` and
+changes after the cast. The secret path writes `voted_marker` and
 `secret_ballot` without a link to the identity. The percent quorum comes from the
 eligible snapshot. `close` computes the `result` and fires the result branch in the
 same transaction.
@@ -112,7 +112,7 @@ async def _seed(session: AsyncSession) -> tuple[Application, dict[str, State]]:
     }
     session.add_all(list(states.values()))
     await session.flush()
-    # #28: the vote state has two fixed exits, pass and fail. The close fires the branch.
+    # The vote state has two fixed exits, pass and fail. The close fires the branch.
     # A passed vote takes pass to approved. A rejected vote or a tie takes fail to
     # rejected, which is fail-closed.
     session.add_all([
@@ -174,7 +174,7 @@ async def test_double_vote_conflict_409(session: AsyncSession) -> None:
     with pytest.raises(ConflictError) as ei:
         await svc.cast(vote.id, _voter("v1", vote), "no", now=NOW)
     assert ei.value.code == "already_voted"
-    # O11: the first ballot stays as it was.
+    # The first ballot stays as it was.
     rows = (await session.execute(
         select(Ballot.choice).where(Ballot.vote_id == vote.id)
     )).scalars().all()
@@ -331,7 +331,7 @@ async def test_concurrent_cast_same_voter_exactly_one_wins(
     assert count == 1
 
 
-# AUD-027: the lifecycle (create, open, close, cancel) is gremium-scoped, like the
+# The lifecycle (create, open, close, cancel) is gremium-scoped, like the
 # scoped read. An admin and a per-Gremium `vote.manage` or `session.manage` holder may
 # act. No global permission grants the right. A cross-tenant call is fail-closed. A
 # per-Gremium holder may not act on a vote of another Gremium.
@@ -480,7 +480,7 @@ async def test_create_hides_an_unconfirmed_application(session: AsyncSession) ->
 async def test_create_counts_the_roster_and_binds_the_gremium(
     session: AsyncSession,
 ) -> None:
-    """F14 and NEW-1 against the real schema.
+    """The eligible count and the gremium check against the real schema.
 
     The server stores the number of members with `vote.cast` as `eligible_count`. A
     vote of another gremium than the one of the application gives 422.

@@ -1,7 +1,7 @@
 """Pure domain logic of the budget tree. The tests cover every branch (critical, 100 %).
 
-The constraints come from CR #76/#78: path composition, fiscal year disjointness (R7.1f),
-top-down allocation (R7.1b) and roll-up of the bound sum (R7.1c).
+The constraints: path composition, fiscal year disjointness, top-down allocation and
+roll-up of the bound sum.
 """
 
 from __future__ import annotations

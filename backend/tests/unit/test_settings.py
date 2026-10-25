@@ -11,7 +11,7 @@ from app import settings as settings_mod
 from app.settings import Settings, SettingsError, load_settings
 
 REQUIRED = ["DATABASE_URL", "SESSION_SECRET", "MAGIC_LINK_SECRET"]
-# A secret needs 16 characters or more (security.md §10). The test values are that long.
+# A secret needs 16 characters or more. The test values are that long.
 _OK_SECRET = "x" * 16
 
 

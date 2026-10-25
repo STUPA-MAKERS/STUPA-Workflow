@@ -1,12 +1,11 @@
 """Integration test for the GDPR privacy services.
 
-The tests run against a real schema with Postgres in testcontainers (data-model
-section 1, security.md section 4). They cover principal erasure (Art. 17), the erasure
-request queue (open to executed or rejected) and the anonymization, which also clears
-magic links and attachments. They cover the retention cron (``process_retention``),
-which anonymizes due terminal applications and purges expired auth artifacts. The
-budget rows stay untouched. The last part covers the GDPR data export (Art. 15), which
-collects all PII for one email address.
+The tests run against a real schema with Postgres in testcontainers. They cover
+principal erasure (Art. 17), the erasure request queue (open to executed or rejected)
+and the anonymization, which also clears magic links and attachments. They cover the
+retention cron (``process_retention``), which anonymizes due terminal applications and
+purges expired auth artifacts. The budget rows stay untouched. The last part covers the
+GDPR data export (Art. 15), which collects all PII for one email address.
 
 The type and application seed helpers come from the applications service integration
 test, where the ``note`` field is already ``isPII``. This module reuses them instead of
@@ -171,7 +170,7 @@ async def test_erasure_applicant_execute(session: AsyncSession) -> None:
 
 
 async def test_anonymize_revokes_applicant_sessions(session: AsyncSession) -> None:
-    """Kill switch (ISSUE_TOKEN): the anonymization revokes open applicant sessions.
+    """Kill switch: the anonymization revokes open applicant sessions.
 
     A magic-link token that the platform issued before the erasure does not work after
     it.

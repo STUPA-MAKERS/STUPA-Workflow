@@ -1,4 +1,4 @@
-"""AUD-030: ``delete_gremium`` must return 409 (ConflictError), not 500.
+"""``delete_gremium`` must return 409 (ConflictError), not 500.
 
 The conflict applies when an application type of the Gremium still holds applications.
 ``application_type.gremium_id`` cascades, but ``application.type_id`` is RESTRICT.

@@ -1,4 +1,4 @@
-"""FlowService: the decision of a manual transition (F1)."""
+"""FlowService: the decision of a manual transition."""
 
 from __future__ import annotations
 

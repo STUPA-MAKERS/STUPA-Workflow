@@ -141,7 +141,7 @@ PRs go to `development`. Each merge to `development` deploys the dev site. A rel
 | `hotfix/*` | urgent production fix off the running release tag | PR → `main`, then a new patch tag |
 
 **Releases.** Production runs on a **tag**, not on the HEAD of `main`. To make a
-release (D12):
+release:
 
 1. Open a pull request from `development` to `main`.
 2. Make sure that CI is green, then merge the pull request.

@@ -1,4 +1,4 @@
-"""TDD: auth orchestration (security.md §1 and §2)."""
+"""TDD: auth orchestration."""
 
 from __future__ import annotations
 
@@ -81,7 +81,7 @@ async def test_request_magic_link_default_deliver_runs() -> None:
 
 
 async def test_request_magic_link_awaits_async_deliver() -> None:
-    """The service awaits an async deliver callback (T-18 mail enqueue, isawaitable branch)."""
+    """The service awaits an async deliver callback (mail enqueue, isawaitable branch)."""
     settings = _settings()
     db = fake_session(result(_app()))
     sent: list[tuple[str, str]] = []
@@ -148,7 +148,7 @@ async def test_verify_magic_link_single_use_ok(monkeypatch: pytest.MonkeyPatch) 
     db = fake_session(result(row), result("claimed-id"))
     app_id, scope, token = await service.verify_magic_link(db, settings, token="tok")
     assert app_id == "aid-1"
-    assert scope == "edit"  # O4: an old view link opens an edit session too
+    assert scope == "edit"  # an old view link opens an edit session too
     assert token  # a signed applicant token
 
 
@@ -176,7 +176,7 @@ class _FakeFlow:
 async def test_verify_magic_link_first_confirmation_starts_the_flow(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """F18/O14: the verify that confirms the email starts the resting flow."""
+    """The verify that confirms the email starts the resting flow."""
     settings = _settings()
     monkeypatch.setattr(service, "_now", lambda: NOW)
     monkeypatch.setattr(service, "FlowService", _FakeFlow)
@@ -298,7 +298,7 @@ async def test_oidc_callback_happy(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     assert cookie  # a signed sid cookie
     assert row.sub == "s1"
-    # One principal insert, one AuthSession insert and one LOGIN audit entry (D3).
+    # One principal insert, one AuthSession insert and one LOGIN audit entry.
     assert len(db.added) == 3
     entry = db.added[-1]
     assert entry.action == "login"

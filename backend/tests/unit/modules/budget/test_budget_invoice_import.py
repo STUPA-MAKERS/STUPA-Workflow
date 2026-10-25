@@ -1,4 +1,4 @@
-"""ZUGFeRD import (#invoices, #15): mapping, error paths and service wiring.
+"""ZUGFeRD import (#invoices): mapping, error paths and service wiring.
 
 These are pure unit tests without a DB or MinIO. The CII mapping runs through `parse_xml`
 from pycheval. The service path uses a fake storage. The router contract covers the FastAPI

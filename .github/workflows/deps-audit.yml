@@ -1,4 +1,4 @@
-# Dependency scan with pip-audit (security.md §10 / T-41). The scan moved out of the
+# Dependency scan with pip-audit. The scan moved out of the
 # pull-request gate (CI slimming 2026-07). A new advisory appears independently of
 # the content of a pull request. A weekly run plus every main push is therefore
 # enough. A red run means: open an issue or fix it. It no longer blocks unrelated

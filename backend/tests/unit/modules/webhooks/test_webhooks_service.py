@@ -1,4 +1,4 @@
-"""WebhookService (T-19): dispatch_to_webhook dedup and deliver (ok/retry/dead/ssrf)."""
+"""WebhookService: dispatch_to_webhook dedup and deliver (ok/retry/dead/ssrf)."""
 
 from __future__ import annotations
 
@@ -237,7 +237,7 @@ async def test_deliver_dead_after_max_tries() -> None:
 async def test_deliver_caps_oversized_response_body() -> None:
     # A malicious receiver answers 2xx with a huge body of more than 64 KiB. The service
     # streams the body and discards it after the limit. The status code still decides
-    # the outcome. This guards against an out-of-memory crash (security.md §5).
+    # the outcome. This guards against an out-of-memory crash.
     from app.modules.webhooks.service import _MAX_RESPONSE_BYTES
 
     big_body = b"x" * (_MAX_RESPONSE_BYTES * 4)
@@ -291,7 +291,7 @@ class _DripStream(httpx.AsyncByteStream):
     """Stream one byte at a time forever, with a short pause between the bytes.
 
     Every single read is fast, so the per-read timeout of httpx never fires. The
-    total run time stays unbounded (slow drip, AUD-011).
+    total run time stays unbounded (slow drip).
     """
 
     async def __aiter__(self) -> AsyncIterator[bytes]:
@@ -307,7 +307,7 @@ async def test_deliver_slow_drip_response_hits_total_deadline() -> None:
     # A slow-drip receiver answers 2xx and then drips the body forever. Without a total
     # deadline the shared worker slot would hang. The service caps the total time with
     # a call to asyncio.timeout(webhook_timeout_seconds). The TimeoutException counts
-    # as a transport error, so the delivery retries (AUD-011).
+    # as a transport error, so the delivery retries.
     settings = load_settings(webhook_timeout_seconds=0.05)
 
     def _handler(_request: httpx.Request) -> httpx.Response:

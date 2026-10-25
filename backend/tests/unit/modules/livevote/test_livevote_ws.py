@@ -1,4 +1,4 @@
-"""Live-vote WebSocket behavior (T-16, api.md section 4), driven through TestClient.
+"""Live-vote WebSocket behavior, driven through TestClient.
 
 TestClient stands in for httpx-ws. The tests cover the handshake auth and RBAC
 (4401, 4404, not_eligible). They cover the voter lifecycle: connect to meeting_state,

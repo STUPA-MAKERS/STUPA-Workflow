@@ -178,10 +178,10 @@ AREAS: tuple[MergeArea, ...] = (
 SUB_COLUMNS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
     ("applications", Application.created_by),
     ("applications", Application.archived_by),
-    # The person who captured an application on behalf of an applicant (#11).
+    # The person who captured an application on behalf of an applicant.
     ("applications", Application.captured_by),
     ("applications", ApplicationShare.created_by),
-    # The person who fired a manual transition with a decision (F1). NULL for a vote.
+    # The person who fired a manual transition with a decision. NULL for a vote.
     ("applications", ApplicationDecision.decided_by),
     ("versions", SubmissionVersion.changed_by),
     ("timeline", StatusEvent.actor),
@@ -222,7 +222,7 @@ ID_COLUMNS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
     ("delegations", MeetingDelegation.delegate_principal_id),
     ("meetings", Meeting.protokollant_id),
     ("meetings", ProtocolKeeperPeriod.principal_id),
-    # #17: the meeting lead who decided on a join request of a guest.
+    # The meeting lead who decided on a join request of a guest.
     ("meetings", MeetingGuest.decided_by),
     # Never written so far, but it holds a principal id.
     ("config", FormVersion.created_by),
@@ -719,7 +719,7 @@ class PrincipalMergeService:
             ),
             tally,
             apply=apply,
-            # A row from before Z2 can be a self report `absent`. The NOT VALID check
+            # An older row can be a self report `absent`. The NOT VALID check
             # `self_status` refuses such a row on every change, so the moved row
             # becomes a lead entry. The status stays: it matches the protocol PDF.
             extra={

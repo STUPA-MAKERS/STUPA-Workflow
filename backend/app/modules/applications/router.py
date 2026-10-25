@@ -187,11 +187,11 @@ async def create_application(
     A logged-in submission with the account email is confirmed at once, and its
     flow starts in this request. An anonymous submission rests in the flow until
     the magic-link verify. So does a logged-in submission for another email
-    address (F23, compared without case): the account does not prove that the
+    address (compared without case): the account does not prove that the
     person owns that address.
 
     ``attachmentIds`` and ``draftToken`` bind the draft uploads of the wizard
-    (``POST /apply/attachments``, Z4) in the same transaction. A missing,
+    (``POST /apply/attachments``) in the same transaction. A missing,
     expired, foreign or infected draft answers 422 and names the ids. A draft
     whose scan is still pending is allowed; it stays quarantined.
     """
@@ -233,7 +233,7 @@ async def create_application(
     return ApplicationCreated(applicationId=app.id)
 
 
-#: The permission of the capture on behalf of an applicant (#11).
+#: The permission of the capture on behalf of an applicant.
 CREATE_ON_BEHALF_PERMISSION = "application.create_on_behalf"
 
 OnBehalfCapturer = Annotated[Principal, Depends(require_principal(CREATE_ON_BEHALF_PERMISSION))]
@@ -279,7 +279,7 @@ async def create_application_on_behalf(
     send_capture_mail: Annotated[CaptureMailSender, Depends(get_capture_mail_sender)],
     dispatcher: Annotated[ActionDispatcher, Depends(get_action_dispatcher)],
 ) -> ApplicationCreated:
-    """Capture and submit an application on behalf of an applicant (#11).
+    """Capture and submit an application on behalf of an applicant.
 
     The applicant is an account (``applicantPrincipalId``) or a guest
     (``applicantName`` and ``applicantEmail``). The application belongs to the
@@ -326,7 +326,7 @@ async def search_on_behalf_applicants(
     _principal: OnBehalfCapturer,
     q: Annotated[str, Query(max_length=200)] = "",
 ) -> list[ApplicantCandidateOut]:
-    """Search the accounts that the capture dialog offers as the applicant (#11).
+    """Search the accounts that the capture dialog offers as the applicant.
 
     The search matches the name and the e-mail of the active accounts. It needs at
     least two characters and returns at most 20 accounts. The route needs
@@ -365,7 +365,7 @@ async def list_applications(
     service: ServiceDep,
     principal: Annotated[Principal, Depends(require_principal())],
     page: Annotated[PageParams, Depends()],
-    # A4: repeat `state` to keep the applications in any of these states. A single
+    # Repeat `state` to keep the applications in any of these states. A single
     # value works as before.
     state_ids: Annotated[list[UUID] | None, Query(alias="state")] = None,
     gremium_id: Annotated[UUID | None, Query(alias="gremium")] = None,
@@ -395,8 +395,8 @@ async def list_applications(
     boolean, because "only the archived ones" and "both" are different questions and a
     boolean can only answer one of them.
 
-    ``state`` can repeat (A4): ``?state=a&state=b`` lists the applications in state
-    ``a`` or ``b``. Each item carries ``stateSince`` (A9). ``sort=stateSince`` sorts by
+    ``state`` can repeat: ``?state=a&state=b`` lists the applications in state
+    ``a`` or ``b``. Each item carries ``stateSince``. ``sort=stateSince`` sorts by
     that time, so a list that shows the date of the last status change is in the order
     of that date.
     """
@@ -422,7 +422,7 @@ async def list_applications(
         # The committee read scope applies to a restricted principal only.
         # "mine" stays owner-only on purpose.
         committee_sub=principal.sub if restricted else None,
-        # O21: a reader without the PII right must not find an application by the
+        # A reader without the PII right must not find an application by the
         # value of an isPII field. The own applications stay searchable in full.
         hide_pii_in_search=not can_read,
         limit=page.limit,
@@ -437,7 +437,7 @@ async def list_applications(
 async def export_applications_xlsx(
     service: ServiceDep,
     principal: Annotated[Principal, Depends(require_principal("application.export"))],
-    # A4: repeat `state` to keep the applications in any of these states. A single
+    # Repeat `state` to keep the applications in any of these states. A single
     # value works as before.
     state_ids: Annotated[list[UUID] | None, Query(alias="state")] = None,
     gremium_id: Annotated[UUID | None, Query(alias="gremium")] = None,
@@ -475,7 +475,7 @@ async def export_applications_xlsx(
         archived={"false": False, "true": True, "all": None}[archived],
         sort=sort,
         order=order,
-        # O21: an exporter without the PII right must not filter on isPII values.
+        # An exporter without the PII right must not filter on isPII values.
         hide_pii_in_search=not principal_reads_pii(principal),
         # One row over the cap. This detects "more than EXPORT_MAX_ROWS" even
         # when the query does not count ``total``.
@@ -522,7 +522,7 @@ async def get_application(
     Only a principal gets the applicant block and the internal view. A reader
     without the PII right (``application.read``, ``application.read_all``, admin,
     or the own application) gets ``data`` without the ``isPII`` fields and no
-    applicant block (O21). ``stateSince`` is the time of the last status change.
+    applicant block. ``stateSince`` is the time of the last status change.
     """
     principal = access.principal
     pii = await can_read_pii(service.session, access)
@@ -575,7 +575,7 @@ async def patch_application(
 
     A locked state answers 409, unless the caller holds ``application.edit_any``.
 
-    An editor without the PII right cannot see the ``isPII`` fields (O21). The
+    An editor without the PII right cannot see the ``isPII`` fields. The
     patch keeps their stored values, so a form that was read without them does
     not erase them.
     """
@@ -663,7 +663,7 @@ async def unarchive_application(
 async def _principal_reads_pii(
     service: ApplicationsService, application_id: UUID, principal: Principal
 ) -> bool:
-    """Apply the PII rule (O21) to a route that gates on a permission only."""
+    """Apply the PII rule to a route that gates on a permission only."""
     return await can_read_pii(service.session, Access(application_id, principal, None))
 
 
@@ -781,9 +781,9 @@ async def get_timeline(
 ) -> list[TimelineEventOut]:
     """Status timeline of the application.
 
-    Each event carries ``transitionLabel`` (A3). The applicant view (magic link or
+    Each event carries ``transitionLabel``. The applicant view (magic link or
     creator without read permission) shows the Gremium as the actor of every event
-    that the applicant did not do (A12, O16).
+    that the applicant did not do.
     """
     return await service.timeline(
         access.application_id,
@@ -807,11 +807,11 @@ async def get_versions(
     Every identity that reads the application reads its versions:
 
     * The applicant view (magic link, or creator without read permission) gets
-      the metadata only: number, time, changed keys and the editor (A11, O17).
+      the metadata only: number, time, changed keys and the editor.
       The editor is the Gremium for every edit that the applicant did not do.
     * A principal with the PII right gets ``data``, ``diff`` and ``changedKeys``.
     * Any other reader (Gremium read scope) gets them without the ``isPII``
-      fields (O21).
+      fields.
     """
     return await service.versions(
         access.application_id,
@@ -1020,7 +1020,7 @@ async def list_comments(
 
     An applicant sees the ``public`` comments only. So does the logged-in creator
     without a read permission. The applicant view names the Gremium as the author
-    of a member comment (A12, O16).
+    of a member comment.
     """
     return await service.list_comments(
         access.application_id,

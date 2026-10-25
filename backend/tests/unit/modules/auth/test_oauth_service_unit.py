@@ -43,7 +43,7 @@ async def test_exchange_code_atomic_claim_lost_rejected(
     """Reject a code that passes validation but loses the atomic claim.
 
     The atomic `UPDATE ... RETURNING` returns zero rows, because a concurrent request
-    already used the code (AUD-003). The service raises `invalid_grant`.
+    already used the code. The service raises `invalid_grant`.
     """
     monkeypatch.setattr(oauth, "verify_pkce_s256", lambda *_: True)
     row = SimpleNamespace(
@@ -75,7 +75,7 @@ async def test_refresh_tokens_atomic_rotate_lost_rejected() -> None:
     """Reject a refresh token that passes validation but loses the atomic rotation.
 
     The rotation `UPDATE` returns zero rows, because a concurrent request already
-    rotated the token (AUD-020). The service raises `invalid_grant`.
+    rotated the token. The service raises `invalid_grant`.
     """
     row = SimpleNamespace(
         id=uuid4(),

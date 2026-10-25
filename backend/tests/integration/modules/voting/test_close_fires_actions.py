@@ -1,4 +1,4 @@
-"""F2: a vote close runs the actions of the fired branch (real Postgres).
+"""A vote close runs the actions of the fired branch (real Postgres).
 
 Before the fix the REST close `POST /votes/{id}/close` used a local dispatcher
 dependency that `app.main` did not override. The branch then fired without its

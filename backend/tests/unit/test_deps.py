@@ -1,4 +1,4 @@
-"""TDD for the auth dependencies (api.md §1, security.md §1/§2) with real resolution (T-10)."""
+"""TDD for the auth dependencies with real resolution."""
 
 from __future__ import annotations
 
@@ -124,7 +124,7 @@ async def test_get_current_applicant_bearer() -> None:
 
 
 async def test_get_current_applicant_query_param_not_accepted() -> None:
-    # The code rejects `?t=` on purpose. A token in the query string leaks (security.md §1).
+    # The code rejects `?t=` on purpose. A token in the query string leaks.
     req = _request(query=f"t={_cookie()}")
     assert await get_current_applicant(req, fake_session(), _settings()) is None
 
@@ -147,7 +147,7 @@ async def test_get_current_applicant_invalid_token() -> None:
 
 
 async def test_get_current_applicant_forged_secret_no_row() -> None:
-    # Core regression (ISSUE_TOKEN): a correctly signed sid without a database row gives None.
+    # Core regression: a correctly signed sid without a database row gives None.
     req = _request(headers={"Authorization": f"Bearer {_cookie('forged')}"})
     assert await get_current_applicant(req, fake_session(result()), _settings()) is None
 

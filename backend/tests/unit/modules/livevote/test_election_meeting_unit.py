@@ -1,4 +1,4 @@
-"""F2 · Personnel elections in a meeting, without a database.
+"""Personnel elections in a meeting, without a database.
 
 Covers the election form of the vote open route, the open body rules, the candidate
 account check, the reload path of the meeting votes, the WebSocket events of an
@@ -322,7 +322,7 @@ def test_vote_opened_event_carries_the_erasure_marker() -> None:
 
 
 def test_channel_events_carry_no_account_ids() -> None:
-    """F2: the channel reaches the beamer and the guests: no principal id, no sub."""
+    """The channel reaches the beamer and the guests: no principal id, no sub."""
     linked = ElectionConfig.model_validate(
         {
             "seats": 1,

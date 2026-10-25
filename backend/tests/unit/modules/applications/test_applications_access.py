@@ -1,7 +1,4 @@
-"""Unit tests for applicant and principal access resolution on application endpoints.
-
-See T-12 and api.md section 1.
-"""
+"""Unit tests for applicant and principal access resolution on application endpoints."""
 
 from __future__ import annotations
 

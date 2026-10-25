@@ -1,4 +1,4 @@
-"""Public guest routes and the guest WebSocket of #17, without a database.
+"""Public guest routes and the guest WebSocket of a public meeting, without a database.
 
 `dependency_overrides` and a fake GuestService stand in for the service and the
 broker. The tests cover the cookie handling, the route wiring, the WebSocket handshake

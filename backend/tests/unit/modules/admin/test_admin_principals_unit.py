@@ -75,7 +75,7 @@ def test_list_permissions_includes_seeded_keys() -> None:
 
 
 async def test_set_principal_active_blocks_self_deactivation() -> None:
-    """#44: an account must not deactivate itself."""
+    """An account must not deactivate itself."""
     pid = uuid4()
     db = fake_session(gets=[_principal(pid, "me-sub")])
     with pytest.raises(ConflictError):

@@ -13,7 +13,7 @@ from enum import StrEnum
 class AuditAction(StrEnum):
     """Stable ``audit_entry.action`` keys."""
 
-    # A successful OIDC login of a principal (D3). The actor is the principal, the
+    # A successful OIDC login of a principal. The actor is the principal, the
     # target is its ``principal`` row. ``data`` holds only ``{"method": "oidc"}``:
     # never an IP address, a user agent or an e-mail. A refused login writes nothing.
     # A magic-link redeem is not a login: it opens an applicant session for one
@@ -36,12 +36,12 @@ class AuditAction(StrEnum):
     EXPORT = "export"
     # Meeting deleted. To delete a finalized meeting you need ``meeting.delete_finalized``.
     MEETING_DELETE = "meeting_delete"
-    # Meeting and agenda (F12). ``data`` carries id references and planning values
+    # Meeting and agenda. ``data`` carries id references and planning values
     # only. MEETING_UPDATE records a status change and a change of the date, the times
     # or the protokollant, each as ``{"from": ..., "to": ...}``. The current agenda item
     # and the beamer focus change many times in a meeting and are not recorded.
     # AGENDA_ITEM_UPDATE names the changed fields, never the Markdown text: a body
-    # edit is recorded only after the close, as a correction of the minutes (O22).
+    # edit is recorded only after the close, as a correction of the minutes.
     MEETING_CREATE = "meeting_create"
     MEETING_UPDATE = "meeting_update"
     AGENDA_ITEM_ADD = "agenda_item_add"
@@ -52,7 +52,7 @@ class AuditAction(StrEnum):
     # the agenda item id and, for an item of the move to the next item, ``via: next``.
     AGENDA_ITEM_DONE = "agenda_item_done"
     AGENDA_ITEM_REOPENED = "agenda_item_reopened"
-    # Attendance set or reset by the meeting lead (F12, Z2). ``data`` carries the
+    # Attendance set or reset by the meeting lead. ``data`` carries the
     # principal id and the status before and after the change. It never carries the
     # note, because the reason of an excuse is personal data. The own report of a
     # member is not recorded.
@@ -62,18 +62,18 @@ class AuditAction(StrEnum):
     # versions, status events, magic links, comments, budget entries and votes.
     # ``data`` carries only id references and metadata, never raw PII.
     APPLICATION_DELETE = "application_delete"
-    # Application created (F12). ``data`` carries the type, the gremium, the initial
+    # Application created. ``data`` carries the type, the gremium, the initial
     # state and whether the email still needs a confirmation. It never carries the
     # email, the name or a field value.
     APPLICATION_CREATE = "application_create"
-    # Application captured on behalf of an applicant (#11). The actor is the capturing
+    # Application captured on behalf of an applicant. The actor is the capturing
     # person. ``data`` carries the kind of the applicant (``principal`` or ``guest``),
     # the principal id of an account applicant, the received date, whether an intake
     # note exists and whether a guest e-mail matched an active account
     # (``matchedByEmail``). It never carries the email, the name or the note text.
     APPLICATION_CREATE_ON_BEHALF = "application_create_on_behalf"
     # An application without a confirmed email was discarded after
-    # ``guest_application_settings.confirm_ttl_hours`` (Z1). ``data`` carries the
+    # ``guest_application_settings.confirm_ttl_hours``. ``data`` carries the
     # type, the gremium, the attachment count and the window, never PII.
     GUEST_APPLICATION_DISCARD = "guest_application_discard"
     # Application data edited (PATCH). ``data`` carries the new version number and
@@ -90,15 +90,15 @@ class AuditAction(StrEnum):
     # carries the share id and the expiry, never the token.
     APPLICATION_SHARE = "application_share"
     APPLICATION_SHARE_REVOKE = "application_share_revoke"
-    # A decision on an application (F1): approval with deviations from a passed vote
+    # A decision on an application: approval with deviations from a passed vote
     # with a proposal or from a manual transition, or the undo of one by an audit
     # revert of its status change (``reverted: true``). ``data`` carries the requested
     # amount, the old and the new approved amount, the number of conditions and the
     # vote and status-event ids, never the condition texts.
     APPLICATION_DECISION = "application_decision"
     WEBHOOK_CONFIG = "webhook_config"
-    # Attachment uploaded (F12). ``data`` names the application, or carries
-    # ``draft: true`` for a draft upload of the wizard (Z4). It holds whether a field
+    # Attachment uploaded. ``data`` names the application, or carries
+    # ``draft: true`` for a draft upload of the wizard. It holds whether a field
     # key is set, the MIME type and the size, never the file name, because a file name
     # can hold PII. The quarantine and the delete of a draft carry
     # ``draft: true`` the same way.
@@ -114,7 +114,7 @@ class AuditAction(StrEnum):
     # Draft protocol removed. A finalized protocol is a signed record and the
     # route refuses to delete it.
     PROTOCOL_DELETE = "protocol_delete"
-    # Start of the finalization of a protocol (F8, F12). ``data`` carries the meeting
+    # Start of the finalization of a protocol. ``data`` carries the meeting
     # and the gremium. A render that fails sets the protocol back to a draft, and a
     # new finalization writes a new entry.
     PROTOCOL_FINALIZE = "protocol_finalize"
@@ -122,14 +122,14 @@ class AuditAction(StrEnum):
     # ``data`` carries the meeting, the gremium and the old and the new value of
     # ``publicWithheld``.
     PROTOCOL_PUBLICATION = "protocol_publication"
-    # Handover of the minutes during a live meeting (Z3, F12). ``data`` carries the
+    # Handover of the minutes during a live meeting. ``data`` carries the
     # ``mode`` (``now``, ``next_item``, ``activate`` when a move of the agenda item
     # starts the planned period, ``cancel`` when the planned handover goes away),
     # the principal ids ``from`` and ``to``, and the current agenda item.
     PROTOKOLLANT_HANDOVER = "protokollant_handover"
     # Vote removed before it ever opened. A vote with ballots is not deletable.
     VOTE_DELETE = "vote_delete"
-    # Vote lifecycle (F12). ``data`` carries id references and aggregates only, never
+    # Vote lifecycle. ``data`` carries id references and aggregates only, never
     # a voter: VOTE_CLOSE holds the result and the counts per option. VOTE_CANCEL
     # holds the reason (a person cancelled, or the application left the vote state).
     # VOTE_BRANCH_BLOCKED records a close whose pass or fail transition did not fire
@@ -139,7 +139,7 @@ class AuditAction(StrEnum):
     VOTE_CLOSE = "vote_close"
     VOTE_CANCEL = "vote_cancel"
     VOTE_BRANCH_BLOCKED = "vote_branch_blocked"
-    # F2: the platform drew the lot of an election tie. ``data`` carries the
+    # The platform drew the lot of an election tie. ``data`` carries the
     # candidate ids of the draw (``among``, ``seats``, ``drawn``), never a voter.
     VOTE_LOT_DRAWN = "vote_lot_drawn"
     # Polls ("Umfrage"): a poll was created (a meeting poll or a poll of a Gremium),
@@ -148,7 +148,7 @@ class AuditAction(StrEnum):
     # cancel of a poll write VOTE_OPEN, VOTE_CLOSE and VOTE_CANCEL with ``kind: poll``.
     POLL_CREATED = "poll_created"
     POLL_UPDATED = "poll_updated"
-    # Public meeting with a QR code (#17). The meeting lead is the actor. ``data``
+    # Public meeting with a QR code. The meeting lead is the actor. ``data``
     # carries id references and counts only, NEVER the name of a guest: the chain is
     # append-only, so a name in it could never be deleted. A guest ballot writes
     # VOTE_CAST with the actor ``guest:<meeting_guest.id>`` and no choice.

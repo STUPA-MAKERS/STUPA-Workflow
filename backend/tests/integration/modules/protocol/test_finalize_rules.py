@@ -1,4 +1,4 @@
-"""F8, O13, O2, F12: the protocol is finalized once, after the close, with an audit.
+"""The protocol is finalized once, after the close, with an audit.
 
 * A live meeting gives 409 `meeting_not_closed`, and the protocol stays a draft.
 * A closed meeting finalizes. The start writes `protocol_finalize`.

@@ -1,4 +1,4 @@
-"""Z3, O1, O20, A13: the periods of the protocol keeper through the real API.
+"""The periods of the protocol keeper through the real API.
 
 * The start opens the first period, the close ends it.
 * A handover `now` ends the running period and opens the next one. The rights that
@@ -7,7 +7,7 @@
 * A handover `next_item` waits for the next forward move of the current agenda item.
   A new plan replaces the old one, the last agenda item has no next item, and a
   DELETE discards the plan.
-* The new keeper needs `protocol.write` in the gremium (O20, 422). The start of a
+* The new keeper needs `protocol.write` in the gremium (422). The start of a
   planned period checks this again and drops the plan when the check fails.
 * Each handover writes `protokollant_handover` and sends `meeting_state`.
 """
@@ -248,7 +248,7 @@ async def test_next_item_starts_on_a_forward_move(
 async def test_planned_keeper_is_checked_again_on_the_move(
     maker: async_sessionmaker[AsyncSession], api: FastAPI, loss: str
 ) -> None:
-    """O20: the start of a planned period checks the new keeper again."""
+    """The start of a planned period checks the new keeper again."""
     s = await seed(maker, status="live", items=2)
     anna_sub, anna = await _member(maker, s.gremium_id, "Anna", ["protocol.write"])
     _, bert = await _member(maker, s.gremium_id, "Bert", ["protocol.write"])
@@ -357,7 +357,7 @@ async def test_handover_only_while_live(
 
 
 async def test_target_rules(maker: async_sessionmaker[AsyncSession], api: FastAPI) -> None:
-    """O20: the new keeper is an active member with protocol.write."""
+    """The new keeper is an active member with protocol.write."""
     s = await seed(maker, status="live", items=1)
     _, anna = await _member(maker, s.gremium_id, "Anna", ["protocol.write"])
     _, voter = await _member(maker, s.gremium_id, "Vera", ["vote.cast"])
@@ -427,7 +427,7 @@ async def test_patch_protokollant_while_live_is_a_handover(
 async def test_assign_needs_protocol_write_but_an_old_keeper_can_start(
     maker: async_sessionmaker[AsyncSession], api: FastAPI
 ) -> None:
-    """O20 validates a new assignment only."""
+    """The `protocol.write` check validates a new assignment only."""
     s = await seed(maker, status="planned", items=1)
     _, vera = await _member(maker, s.gremium_id, "Vera", ["vote.cast"])
     url = f"/api/meetings/{s.meeting_id}"
@@ -458,7 +458,7 @@ async def test_members_and_roster_mark_the_possible_keepers(
         flags: dict[str, Any] = {r["principalId"]: r["canKeepProtocol"] for r in resp.json()}
         assert flags == {str(anna): True, str(vera): False}
     # The roster also marks the members with an own vote: only they can be
-    # substituted by the lead (O6).
+    # substituted by the lead.
     votes: dict[str, Any] = {r["principalId"]: r["canVote"] for r in roster.json()}
     assert votes == {str(anna): False, str(vera): True}
 

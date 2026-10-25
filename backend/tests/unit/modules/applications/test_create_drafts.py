@@ -1,4 +1,4 @@
-"""Unit tests: the create checks and binds the draft uploads of the wizard (Z4).
+"""Unit tests: the create checks and binds the draft uploads of the wizard.
 
 The result-queue fake of `test_applications_service_cov` drives the create. The draft
 helpers `check_drafts` and `bind_drafts` are faked here; the integration test

@@ -81,7 +81,7 @@ def _role_group(role_key: str) -> str:
 # The Gremium role that a member without a role mapping gets.
 DEFAULT_GREMIUM_ROLE = "member"
 
-# Custom Gremium roles that the seed creates in each Gremium that uses them (D4). The
+# Custom Gremium roles that the seed creates in each Gremium that uses them. The
 # forced roles (vorstand, manager, member) exist already. `protokoll` is the
 # minute-taker: it can be assigned as keeper and write the minutes. The membership itself
 # gives the read access to the meetings of the Gremium, so the role needs no read key.
@@ -96,7 +96,7 @@ SEED_GREMIUM_ROLES: dict[str, tuple[dict[str, str], list[str]]] = {
     ),
 }
 
-# Gremium roles IN ADDITION to the role in `PEOPLE` (sub -> [(gremium, role)]). D4:
+# Gremium roles IN ADDITION to the role in `PEOPLE` (sub -> [(gremium, role)]).
 # qa-protocol stays a `member` of the StuPa and also gets the group of `protokoll`.
 EXTRA_GREMIUM_ROLES: dict[str, list[tuple[str, str]]] = {
     "qa-protocol": [("stupa", "protokoll")],
