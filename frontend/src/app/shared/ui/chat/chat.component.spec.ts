@@ -689,6 +689,52 @@ describe('ChatComponent', () => {
       });
     });
 
+    it('makes a public message internal at a typed "@" where public ones do not mention', async () => {
+      const { cmp, input, send, view } = await setup({
+        mentionables: people,
+        publicMentions: false,
+        visibilityOptions: ['public', 'internal'],
+      });
+      expect(cmp.visibility()).toBe('public');
+      type(input(), 'Hallo @');
+      view.fixture.detectChanges();
+      expect(cmp.visibility()).toBe('internal');
+      expect(list()).not.toBeNull();
+      // Set back to public, the next letters keep it public.
+      cmp.setVisibility('public');
+      type(input(), 'Hallo @J');
+      view.fixture.detectChanges();
+      expect(cmp.visibility()).toBe('public');
+      expect(list()).toBeNull();
+      cmp.setVisibility('internal');
+      type(input(), 'Hallo @Jonas Weber!');
+      fireEvent.keyDown(input(), { key: 'Enter' });
+      expect(send).toHaveBeenLastCalledWith({
+        body: 'Hallo @Jonas Weber!',
+        visibility: 'internal',
+        mentions: ['p-1'],
+      });
+    });
+
+    it('keeps a public message public at "@" without people to mention', async () => {
+      const { cmp, input } = await setup({
+        publicMentions: false,
+        visibilityOptions: ['public', 'internal'],
+      });
+      type(input(), '@');
+      expect(cmp.visibility()).toBe('public');
+    });
+
+    it('keeps a public message public at "@" without an internal choice', async () => {
+      const { cmp, input } = await setup({
+        mentionables: people,
+        publicMentions: false,
+        visibilityOptions: ['public'],
+      });
+      type(input(), '@');
+      expect(cmp.visibility()).toBe('public');
+    });
+
     it('mentions only in an internal message where the other side reads the public ones', async () => {
       const own = [
         msg('pub', today(9), { own: true, body: 'Alt', visibility: 'public' }),
