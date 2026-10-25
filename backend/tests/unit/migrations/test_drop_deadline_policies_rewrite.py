@@ -33,44 +33,43 @@ ROLE = {"roleIs": "admin"}
 
 
 @pytest.mark.parametrize(
-    ("guard", "expected", "manual"),
+    ("guard", "expected"),
     [
-        # Leaves alone: both polarities fold to always-true (NULL).
-        ({"deadlinePassed": True}, None, True),
-        ({"deadlinePassed": False}, None, False),
-        ({"not": {"deadlinePassed": True}}, None, False),
-        ({"not": {"deadlinePassed": False}}, None, True),
-        ({"not": {"not": {"deadlinePassed": True}}}, None, True),
+        # Leaves alone: both polarities fold to always-true (NULL), and either one
+        # makes the transition manual.
+        ({"deadlinePassed": True}, None),
+        ({"deadlinePassed": False}, None),
+        ({"not": {"deadlinePassed": True}}, None),
+        ({"not": {"deadlinePassed": False}}, None),
+        ({"not": {"not": {"deadlinePassed": True}}}, None),
         # `and`: the leaf drops out, a single rest is unwrapped.
-        ({"and": [{"deadlinePassed": True}, FIELD]}, FIELD, True),
-        ({"and": [{"deadlinePassed": False}, FIELD, ROLE]}, {"and": [FIELD, ROLE]}, False),
+        ({"and": [{"deadlinePassed": True}, FIELD]}, FIELD),
+        ({"and": [{"deadlinePassed": False}, FIELD, ROLE]}, {"and": [FIELD, ROLE]}),
         # `or`: a satisfied leaf makes the whole `or` true.
-        ({"or": [{"deadlinePassed": True}, FIELD]}, None, True),
-        ({"or": [{"deadlinePassed": False}, FIELD]}, None, False),
+        ({"or": [{"deadlinePassed": True}, FIELD]}, None),
+        ({"or": [{"deadlinePassed": False}, FIELD]}, None),
         # Under `not`, the polarity flips and `and`/`or` fold accordingly.
-        ({"not": {"and": [{"deadlinePassed": True}, FIELD]}}, None, False),
-        ({"not": {"and": [{"deadlinePassed": False}, FIELD]}}, None, True),
-        ({"not": {"or": [{"deadlinePassed": False}, FIELD]}}, {"not": FIELD}, True),
-        ({"not": {"or": [{"deadlinePassed": True}, FIELD]}}, {"not": FIELD}, False),
+        ({"not": {"and": [{"deadlinePassed": True}, FIELD]}}, None),
+        ({"not": {"and": [{"deadlinePassed": False}, FIELD]}}, None),
+        ({"not": {"or": [{"deadlinePassed": False}, FIELD]}}, {"not": FIELD}),
+        ({"not": {"or": [{"deadlinePassed": True}, FIELD]}}, {"not": FIELD}),
         # Nested mix.
         (
             {"and": [ROLE, {"or": [FIELD, {"not": {"deadlinePassed": True}}]}]},
             ROLE,
-            False,
         ),
         (
             {"and": [ROLE, {"not": {"or": [FIELD, {"deadlinePassed": True}]}}]},
             {"and": [ROLE, {"not": FIELD}]},
-            False,
         ),
         # A single non-list child is accepted like the evaluator does.
-        ({"and": {"deadlinePassed": True}}, None, True),
+        ({"and": {"deadlinePassed": True}}, None),
     ],
 )
-def test_rewrite_guard(guard: dict[str, Any], expected: Any, manual: bool) -> None:  # noqa: ANN401
-    new_guard, requires_passed = MIG.rewrite_guard(guard)
+def test_rewrite_guard(guard: dict[str, Any], expected: Any) -> None:  # noqa: ANN401
+    new_guard, touched = MIG.rewrite_guard(guard)
     assert new_guard == expected
-    assert requires_passed is manual
+    assert touched is True
     validate_guard(new_guard)
 
 
@@ -79,14 +78,21 @@ def test_guard_without_operator_is_unchanged(guard: Any) -> None:  # noqa: ANN40
     assert MIG.rewrite_guard(guard) == (guard, False)
 
 
-def test_rewrite_transition_sets_manual() -> None:
+def test_rewrite_transition_makes_every_touched_transition_manual() -> None:
     passed = {"from": "a", "to": "b", "automatic": True, "guard": {"deadlinePassed": True}}
     before = {"from": "a", "to": "c", "automatic": True, "guard": {"deadlinePassed": False}}
     plain = {"from": "a", "to": "d", "automatic": True, "guard": FIELD}
 
     assert MIG.rewrite_transition(passed) == {**passed, "guard": None, "automatic": False}
-    assert MIG.rewrite_transition(before) == {**before, "guard": None}
+    # A "not passed" guard on an automatic transition must not start to fire.
+    assert MIG.rewrite_transition(before) == {**before, "guard": None, "automatic": False}
     assert MIG.rewrite_transition(plain) == plain
+
+
+def test_rewrite_transition_adds_no_guard_key() -> None:
+    bare = {"from": "a", "to": "b", "automatic": True}
+    assert MIG.rewrite_transition(bare) == bare
+    assert "guard" not in MIG.rewrite_flow_snapshot({"transitions": [bare]})["transitions"][0]
 
 
 def test_rewrite_flow_snapshot() -> None:

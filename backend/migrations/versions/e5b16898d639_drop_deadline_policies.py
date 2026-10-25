@@ -6,18 +6,24 @@ revision removes what the database still holds of them.
 1. Stored flow definitions (``transition`` rows and the ``flow`` snapshots in
    ``config_revision``) lose the ``deadlinePassed`` guard operator:
 
-   * A leaf that, counting the ``not`` above it, requires the deadline to have
-     passed is treated as satisfied, and its transition becomes manual
-     (``automatic = false``). Such a transition ("Frist abgelaufen") no longer
-     fires by itself, so a member moves the application by hand.
-   * A leaf that requires the deadline not to have passed is treated as satisfied.
+   * Every leaf is treated as satisfied, counting the ``not`` above it: a leaf
+     that requires the deadline to have passed and a leaf that requires it not
+     to have passed both fold to true.
+   * Every transition whose guard held the operator, in any polarity, becomes
+     manual (``automatic = false``). A transition such as "Frist abgelaufen" then
+     no longer fires by itself, and a member moves the application by hand. A
+     folded "not passed" guard on an automatic transition would otherwise
+     advance every waiting application at the first cron run after the deploy.
    * ``and``, ``or`` and ``not`` fold around the constants. A guard that folds to
-     always-true becomes NULL. A guard without ``deadlinePassed`` stays as it is.
+     always-true becomes NULL. A transition without ``deadlinePassed`` stays as
+     it is.
 
 2. ``state.config`` and the snapshot states lose ``deadlinePolicyKey``.
 3. ``webhook.events`` loses ``deadline_approaching`` and ``deadline_passed``.
-4. The ``mail_template`` rows with key ``deadline_approaching`` and the
-   ``notification_preference`` rows of kind ``deadline`` are deleted.
+4. The ``notification_preference`` rows of kind ``deadline`` are deleted. The
+   ``mail_template`` row ``deadline_approaching`` is deleted only when no
+   ``transition.actions`` names it as ``templateKey``, because a flow can send a
+   template that exists only in the database.
 5. The tables ``deadline`` and ``deadline_policy`` are dropped.
 
 ``config_revision`` is append-only through a trigger. The upgrade disables the
@@ -54,13 +60,6 @@ _POLICY_KEY = "deadlinePolicyKey"
 _COMBINATORS = frozenset({"and", "or", "not"})
 
 
-class _Rewrite:
-    """The state of one guard rewrite: whether a leaf required a passed deadline."""
-
-    def __init__(self) -> None:
-        self.requires_passed = False
-
-
 def _has_op(node: Any) -> bool:
     if isinstance(node, dict):
         return _OP in node or any(_has_op(v) for v in node.values())
@@ -69,14 +68,12 @@ def _has_op(node: Any) -> bool:
     return False
 
 
-def _fold(node: Any, negated: bool, rw: _Rewrite) -> Any:
+def _fold(node: Any, negated: bool) -> Any:
     """Return the folded node: a guard dict, or the constant True or False."""
     if not isinstance(node, dict) or len(node) != 1 or not _has_op(node):
         return node
     op_name, value = next(iter(node.items()))
     if op_name == _OP:
-        if bool(value) != negated:
-            rw.requires_passed = True
         # The constant that makes the leaf's effective condition hold.
         return not negated
     if op_name not in _COMBINATORS:
@@ -85,14 +82,14 @@ def _fold(node: Any, negated: bool, rw: _Rewrite) -> Any:
     if op_name == "not":
         if len(children) != 1:
             return node
-        child = _fold(children[0], not negated, rw)
+        child = _fold(children[0], not negated)
         if isinstance(child, bool):
             return not child
         return {"not": child}
     absorbing = op_name == "or"
     kept: list[Any] = []
     for c in children:
-        folded = _fold(c, negated, rw)
+        folded = _fold(c, negated)
         if folded is absorbing:
             return absorbing
         if folded is not (not absorbing):
@@ -107,29 +104,30 @@ def _fold(node: Any, negated: bool, rw: _Rewrite) -> Any:
 def rewrite_guard(guard: Any) -> tuple[Any, bool]:
     """Remove ``deadlinePassed`` from a guard.
 
-    Returns the new guard (None for always-true) and whether a leaf required the
-    deadline to have passed, which makes the transition manual. A guard without the
-    operator comes back unchanged.
+    Returns the new guard (None for always-true) and whether the guard held the
+    operator, which makes the transition manual. A guard without the operator comes
+    back unchanged.
     """
     if not _has_op(guard):
         return guard, False
-    rw = _Rewrite()
-    folded = _fold(guard, False, rw)
+    folded = _fold(guard, False)
     if folded is True:
-        return None, rw.requires_passed
+        return None, True
     if folded is False:  # pragma: no cover - every leaf folds to its satisfied value
         msg = f"guard folds to never-true: {guard!r}"
         raise ValueError(msg)
-    return folded, rw.requires_passed
+    return folded, True
 
 
 def rewrite_transition(tr: dict[str, Any]) -> dict[str, Any]:
-    """Return a snapshot transition without ``deadlinePassed`` in its guard."""
-    guard, manual = rewrite_guard(tr.get("guard"))
-    out = {**tr, "guard": guard}
-    if manual:
-        out["automatic"] = False
-    return out
+    """Return a snapshot transition without ``deadlinePassed`` in its guard.
+
+    A transition without the operator comes back unchanged.
+    """
+    guard, touched = rewrite_guard(tr.get("guard"))
+    if not touched:
+        return tr
+    return {**tr, "guard": guard, "automatic": False}
 
 
 def rewrite_flow_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
@@ -154,23 +152,19 @@ def rewrite_flow_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
 def _rewrite_transitions(conn: sa.Connection) -> None:
     rows = conn.execute(
         sa.text(
-            "SELECT id, guard, automatic FROM transition "
+            "SELECT id, guard FROM transition "
             "WHERE strpos(guard::text, :op) > 0"
         ),
         {"op": _OP},
     ).fetchall()
-    for tid, guard, automatic in rows:
-        new_guard, manual = rewrite_guard(guard)
+    for tid, guard in rows:
+        new_guard, _ = rewrite_guard(guard)
         conn.execute(
             sa.text(
-                "UPDATE transition SET guard = CAST(:g AS jsonb), automatic = :a "
+                "UPDATE transition SET guard = CAST(:g AS jsonb), automatic = false "
                 "WHERE id = :id"
             ),
-            {
-                "g": None if new_guard is None else json.dumps(new_guard),
-                "a": False if manual else automatic,
-                "id": tid,
-            },
+            {"g": None if new_guard is None else json.dumps(new_guard), "id": tid},
         )
 
 
@@ -209,7 +203,9 @@ _UPGRADE: tuple[str, ...] = (
     "UPDATE webhook SET events = array_remove(array_remove(events, "
     "'deadline_approaching'), 'deadline_passed') "
     "WHERE events && ARRAY['deadline_approaching', 'deadline_passed']::text[]",
-    "DELETE FROM mail_template WHERE key = 'deadline_approaching'",
+    "DELETE FROM mail_template WHERE key = 'deadline_approaching' AND NOT EXISTS "
+    "(SELECT 1 FROM transition WHERE actions @> "
+    "'[{\"templateKey\": \"deadline_approaching\"}]'::jsonb)",
     "DELETE FROM notification_preference WHERE kind = 'deadline'",
     "DROP TABLE IF EXISTS deadline",
     "DROP TABLE IF EXISTS deadline_policy",

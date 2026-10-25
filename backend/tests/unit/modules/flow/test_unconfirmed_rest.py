@@ -161,6 +161,19 @@ async def test_start_confirmed_commits_advances_and_announces(
     assert action.idempotency_key == f"{app.id}:{event_id}:auto:task"
 
 
+async def test_start_confirmed_without_status_event_announces_nothing(
+    steps: dict[str, Any],
+) -> None:
+    app = _app(confirmed=True, state_id=uuid4())
+    db = fake_session(result(app))
+    recorder = _Recorder()
+    await FlowService(db, recorder).start_confirmed(app.id)
+    assert db.committed == 1
+    assert len(steps["advanced"]) == 1
+    # No status event: the announcement has no key and sends nothing.
+    assert recorder.batches == []
+
+
 async def test_start_confirmed_fired_transition_sends_no_extra_mail(
     steps: dict[str, Any],
 ) -> None:
