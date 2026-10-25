@@ -62,7 +62,10 @@ class _Session:
 
 
 def test_window_counts_back_from_the_local_start() -> None:
-    # 18:00 in Berlin in October (CEST) is 16:00 UTC.
+    """Count the window back from the local start.
+
+    18:00 in Berlin in October (CEST) is 16:00 UTC.
+    """
     window = open_window(_meeting(), _settings(), TZ)
     assert window == OpenWindow(
         opens_at=datetime(2026, 10, 20, 15, 0, tzinfo=UTC),

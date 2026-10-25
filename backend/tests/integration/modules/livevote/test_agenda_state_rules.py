@@ -87,6 +87,10 @@ async def test_remove_item_deletes_draft_and_cancelled_votes_with_audit(
 async def test_agenda_changes_are_audited(
     maker: async_sessionmaker[AsyncSession], api: FastAPI, status: str
 ) -> None:
+    """Audit the agenda changes.
+
+    No entry carries a text of the agenda.
+    """
     s = await seed(maker, status=status, items=2)
     base = f"/api/meetings/{s.meeting_id}/agenda"
     with TestClient(api) as client:
@@ -108,7 +112,6 @@ async def test_agenda_changes_are_audited(
     assert entries[0].data["nonPublic"] is True
     assert entries[1].data["itemIds"] == order
     assert entries[2].data["fields"] == ["title"]
-    # No entry carries a text of the agenda.
     assert "Verschiedenes" not in str([e.data for e in entries])
 
 
@@ -129,8 +132,11 @@ async def test_body_on_planned_meeting_is_saved(
 async def test_live_minutes_are_not_audited(
     maker: async_sessionmaker[AsyncSession], api: FastAPI
 ) -> None:
+    """Leave the live minutes out of the audit log.
+
+    In a live meeting only the protokollant writes the minutes.
+    """
     s = await seed(maker, status="live", protocol="draft")
-    # In a live meeting only the protokollant writes the minutes.
     async with maker() as session:
         sub = await session.scalar(
             select(PrincipalRow.sub)
@@ -209,6 +215,8 @@ async def test_protocol_writer_cannot_remove_an_item_with_votes(
 
     A cancelled vote can hold ballots. Without this gate the agenda right alone would
     delete the vote and its ballots, past the gate of the vote delete route.
+
+    The same member removes an item without votes.
     """
     s = await seed(maker, status="live", items=2, votes=("cancelled",))
     async with maker() as session:
@@ -219,7 +227,6 @@ async def test_protocol_writer_cannot_remove_an_item_with_votes(
     base = f"/api/meetings/{s.meeting_id}/agenda"
     with TestClient(api) as client:
         refused = client.delete(f"{base}/{s.item_ids[0]}")
-        # The same member removes an item without votes.
         allowed = client.delete(f"{base}/{s.item_ids[1]}")
     assert refused.status_code == 403, refused.text
     assert allowed.status_code == 200, allowed.text

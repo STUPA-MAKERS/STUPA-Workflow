@@ -53,11 +53,16 @@ async def _count(session: AsyncSession, model: type, vote_ids: list[uuid.UUID]) 
 async def test_meeting_delete_deletes_every_vote_with_its_ballots(
     maker: async_sessionmaker[AsyncSession], api: FastAPI, protocol: str
 ) -> None:
+    """Delete every vote of a meeting with its ballots.
+
+    The seed holds a closed secret vote, whose identity and choice live in two tables, and a
+    guest ballot of the public meeting. No audit entry of the delete names a choice, a voter
+    or a guest.
+    """
     s = await seed(
         maker, status="closed", votes=("draft", "cancelled", "closed"), protocol=protocol
     )
     async with maker() as session:
-        # A closed secret vote: identity and choice live in two tables.
         secret = Vote(
             meeting_id=s.meeting_id,
             agenda_item_id=s.item_ids[0],
@@ -73,7 +78,6 @@ async def test_meeting_delete_deletes_every_vote_with_its_ballots(
         closed_id = s.vote_ids["closed"]
         session.add(Ballot(vote_id=closed_id, voter_sub="s1", choice="yes"))
         session.add(Ballot(vote_id=closed_id, voter_sub="s2", choice="no"))
-        # A guest ballot of the public meeting.
         session.add(Ballot(vote_id=closed_id, voter_sub=guest_voter_sub(guest.id), choice="yes"))
         session.add(VotedMarker(vote_id=secret.id, voter_sub="s1"))
         session.add(SecretBallot(vote_id=secret.id, choice="no"))
@@ -105,7 +109,6 @@ async def test_meeting_delete_deletes_every_vote_with_its_ballots(
         [deleted] = await audit_actions(maker, target_id=vote_id)
         assert deleted.action == "vote_delete"
         assert deleted.data["reason"] == "meeting_deleted"
-        # No choice, no voter, no guest in any audit entry of the delete.
         for text in ("yes", "s1", "s2", "guest:"):
             assert text not in str(deleted.data)
             assert text not in str(entry.data)
@@ -148,7 +151,11 @@ async def test_meeting_delete_with_open_vote_is_refused(
 async def test_application_decided_by_a_deleted_vote_keeps_its_status(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
-    """The application stays approved; its timeline names the vote as deleted."""
+    """The application stays approved; its timeline names the vote as deleted.
+
+    The vote belongs to the meeting, so the meeting delete takes it along. The applicant
+    view has no link to the vote. Only the branch event names a vote.
+    """
     async with maker() as session:
         flow = await seed_vote_flow(session)
         meeting_id = await add_meeting(session, flow.gremium_id)
@@ -159,7 +166,6 @@ async def test_application_decided_by_a_deleted_vote_keeps_its_status(
             await svc.cast(vote_id, voter(sub, flow), "yes", now=NOW)
         closed = await svc.close(vote_id, manager(), now=NOW)
         assert closed.branch_fired is True
-        # The vote belongs to the meeting: the meeting delete takes it along.
         row = await session.get(Vote, vote_id)
         assert row is not None
         row.meeting_id = meeting_id
@@ -170,7 +176,6 @@ async def test_application_decided_by_a_deleted_vote_keeps_its_status(
         [branch] = [e for e in before if e.note == "vote:passed"]
         assert branch.vote_id == vote_id
         assert branch.vote_deleted is False
-        # The applicant cannot open the vote: no link in that view.
         applicant = await apps.timeline(flow.app_id, applicant_view=True)
         assert [e.vote_id for e in applicant if e.note == "vote:passed"] == [None]
 
@@ -192,5 +197,4 @@ async def test_application_decided_by_a_deleted_vote_keeps_its_status(
         [branch] = [e for e in after if e.note == "vote:passed"]
         assert branch.vote_id is None
         assert branch.vote_deleted is True
-        # Only the branch event names a vote.
         assert [e.vote_deleted for e in after].count(True) == 1

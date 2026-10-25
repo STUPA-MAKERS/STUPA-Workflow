@@ -93,6 +93,10 @@ def _election_body(**over: Any) -> dict[str, Any]:
 
 
 def test_open_election_builds_the_election_config(setup: Any) -> None:
+    """Build the election config on the open.
+
+    Guests vote in an election only when the lead switches them on.
+    """
     client, meetings, agenda, voting = setup
     meetings._meeting_out = _meeting(True, "vote")
     agenda.item_row = SimpleNamespace(id=uuid4(), application_id=None, non_public=False)
@@ -105,7 +109,6 @@ def test_open_election_builds_the_election_config(setup: Any) -> None:
     assert config.candidates[0].name == "Anna"
     assert [c.erased for c in config.candidates] == [False, False]
     assert config.secret is True
-    # Guests vote in an election only when the lead switches them on.
     assert config.guests_vote is False
     assert voting.last_payload.eligible_count == 23
     assert meetings.checked == [[UUID(body["candidates"][1]["principalId"])]]
@@ -144,11 +147,9 @@ def test_open_election_on_an_application_item_422(setup: Any) -> None:
             ]
         },
         {"candidates": [{"name": " "}]},
-        # The client never sets the erasure marker nor the id of a candidate.
         {"candidates": [{"name": "A", "erased": True}, {"name": "B"}]},
         {"candidates": [{"name": "A", "erased": False}, {"name": "B"}]},
         {"candidates": [{"name": "A", "id": "c9"}, {"name": "B"}]},
-        # A name without an account repeats another name (case and spaces ignored).
         {"candidates": [{"name": "Mara Schulz"}, {"name": " mara  SCHULZ "}]},
         {
             "candidates": [
@@ -159,11 +160,20 @@ def test_open_election_on_an_application_item_422(setup: Any) -> None:
     ],
 )
 def test_open_body_rejects_a_bad_election(over: dict[str, Any]) -> None:
+    """Reject a bad election body.
+
+    The client never sets the erasure marker or the id of a candidate. A name without an
+    account must not repeat another name; the check ignores the case and the spaces.
+    """
     with pytest.raises(ValidationError):
         MeetingVoteOpenBody.model_validate(_election_body(**over))
 
 
 def test_open_body_lets_two_accounts_share_a_name() -> None:
+    """Let two accounts share a name.
+
+    The check lower-cases like the dialog, so "Straße" and "STRASSE" are two names.
+    """
     body = MeetingVoteOpenBody.model_validate(
         _election_body(
             candidates=[
@@ -173,7 +183,6 @@ def test_open_body_lets_two_accounts_share_a_name() -> None:
         )
     )
     assert [c["name"] for c in body.election_candidates()] == ["Anna Weber", "Anna Weber"]
-    # The check lower-cases like the dialog: "Straße" and "STRASSE" are two names.
     body = MeetingVoteOpenBody.model_validate(
         _election_body(candidates=[{"name": "Straße"}, {"name": "STRASSE"}])
     )
@@ -214,6 +223,11 @@ def _election_row(**over: Any) -> Any:
 
 
 async def test_votes_for_reads_an_election() -> None:
+    """Read an election in the meeting votes.
+
+    The fake session returns, in order: the votes, the open and the secret ballots of the
+    motion tally, the open and the secret ballots of the election, and the present members.
+    """
     mid = uuid4()
     stored = ElectionResultOut(counts={"c1": 2, "c2": 1}, ballots=3, elected=["c1"])
     row = _election_row(
@@ -223,16 +237,16 @@ async def test_votes_for_reads_an_election() -> None:
     )
     sess = _QueueSession(
         executes=[
-            res(row),  # votes
-            res(),  # open ballots of the motion tally
-            res(),  # secret ballots of the motion tally
-            res(),  # election: open ballots
-            res(  # election: secret ballots
+            res(row),
+            res(),
+            res(),
+            res(),
+            res(
                 (row.id, encode_election_choice(["c1"])),
                 (row.id, encode_election_choice(["c1"])),
                 (row.id, encode_election_choice(["c2"])),
             ),
-            res((mid, 3)),  # present members
+            res((mid, 3)),
         ]
     )
     out = await MeetingService(sess)._votes_for([mid])  # type: ignore[arg-type]
@@ -273,7 +287,6 @@ async def test_ballots_of_decodes_an_election_ballot() -> None:
     assert own[row.id].choices == ["c2"]
 
 
-# ---------------------------------------------------------------- events
 
 
 def _vote_out(**over: Any) -> VoteOut:
@@ -322,7 +335,10 @@ def test_vote_opened_event_carries_the_erasure_marker() -> None:
 
 
 def test_channel_events_carry_no_account_ids() -> None:
-    """The channel reaches the beamer and the guests: no principal id, no sub."""
+    """The channel reaches the beamer and the guests: no principal id, no sub.
+
+    A config without links stays as it is.
+    """
     linked = ElectionConfig.model_validate(
         {
             "seats": 1,
@@ -334,7 +350,6 @@ def test_channel_events_carry_no_account_ids() -> None:
     )
     event: dict[str, Any] = VoteOpenedEvent.from_vote(_vote_out(election=linked)).dump()
     assert [c.get("principalId") for c in event["election"]["candidates"]] == [None, None]
-    # A config without links stays as it is.
     assert _ELECTION.public() is _ELECTION
     result = ElectionResultOut(counts={}, lot=ElectionLotOut(among=["c1"], by="sub", byName="L"))
     lot = result.public().lot
@@ -351,6 +366,11 @@ def test_cast_message_takes_a_list() -> None:
 
 
 async def test_publisher_sends_the_election_close_and_the_lot() -> None:
+    """Send the close and the lot of an election.
+
+    Without a meeting or a result nothing goes out. No `sub` of the lead reaches the beamer
+    or a guest.
+    """
     broker = InMemoryBroker()
     vote = _vote_out(
         status="closed",
@@ -375,7 +395,6 @@ async def test_publisher_sends_the_election_close_and_the_lot() -> None:
     async with broker.subscribe(f"meeting:{vote.meeting_id}") as sub:
         await pub.vote_closed(closed)
         await pub.vote_lot_drawn(vote)
-        # No meeting, or no result: nothing to send.
         await pub.vote_lot_drawn(vote.model_copy(update={"meeting_id": None}))
         await pub.vote_lot_drawn(vote.model_copy(update={"election_result": None}))
         first: dict[str, Any] = await anext(aiter(sub))
@@ -384,7 +403,6 @@ async def test_publisher_sends_the_election_close_and_the_lot() -> None:
     assert first["result"] == "tie"
     assert second["type"] == "vote_lot_drawn"
     assert second["electionResult"]["lot"]["drawn"] == ["c2"]
-    # No `sub` of the lead reaches the beamer or a guest.
     assert first["electionResult"]["lot"]["by"] is None
     assert second["electionResult"]["lot"]["by"] is None
     assert VoteClosedEvent.model_validate(first).election_result is not None

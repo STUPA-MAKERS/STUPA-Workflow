@@ -48,11 +48,11 @@ async def test_inmemory_isolates_channels() -> None:
 
 @pytest.mark.asyncio
 async def test_unsubscribe_cleans_up_hub() -> None:
+    """Drop the channel from the hub when the context exits, so no subscription leaks."""
     hub = _Hub()
     broker = InMemoryBroker(hub)
     async with broker.subscribe("meeting:1"):
         pass
-    # The hub drops the channel when the context exits, so no subscription leaks.
     assert "meeting:1" not in hub._channels
 
 
@@ -66,7 +66,7 @@ class _FakePubSub:
         self.subscribed.append(channel)
 
     async def listen(self):
-        # A realistic stream: first a subscribe ack that the broker drops, then messages.
+        """Yield a realistic stream: a subscribe ack that the broker drops, then the messages."""
         yield {"type": "subscribe", "data": 1}
         for raw in self._messages:
             yield {"type": "message", "data": json.dumps(raw).encode("utf-8")}

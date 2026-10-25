@@ -172,7 +172,7 @@ async def test_meeting_not_found_raises() -> None:
 
 
 async def test_membership_vote_cast_handles_none_perms() -> None:
-    # A role without permissions (None) must not crash and does not count.
+    """Ignore a role without permissions (None) without a crash."""
     db = fake_session(result(None, ["other"]))
     assert await _membership_with_vote_cast(db, uuid4(), GREMIUM_ID, NOW) is False
 
@@ -183,23 +183,27 @@ async def test_membership_vote_cast_true() -> None:
 
 
 async def test_eligible_via_membership_vote_cast() -> None:
-    db = fake_session(result(["vote.cast"]))  # membership is enough, no further query
+    """Accept a membership with `vote.cast` without a further query."""
+    db = fake_session(result(["vote.cast"]))
     assert await _independently_eligible(db, uuid4(), GREMIUM_ID, NOW) is True
 
 
 async def test_eligible_needs_a_vote_cast_membership() -> None:
-    # A global role, a raw OIDC group or a global group mapping never gives the voting
-    # right in a Gremium. Only the membership query runs.
+    """Give the voting right only through a membership with `vote.cast`.
+
+    A global role, a raw OIDC group or a global group mapping never gives the voting right
+    in a Gremium. Only the membership query runs.
+    """
     db = fake_session(result(), result(SimpleNamespace(id=uuid4())), result(([str(GREMIUM_ID)],)))
     assert await _independently_eligible(db, uuid4(), GREMIUM_ID, NOW) is False
     assert len(db.statements) == 1
 
 
 async def test_names_empty_set_returns_empty_dict() -> None:
+    """Return an empty dict for an empty set without a query."""
     db = fake_session()
     svc = _svc(db)
     assert await svc._names(set()) == {}
-    # No query runs for an empty set.
     assert db.statements == []
 
 
@@ -238,16 +242,22 @@ def _create_db(
     member_ids: list[Any],
     existing: list[tuple[Any, Any, bool]],
 ) -> Any:
+    """Script the fake session for a create.
+
+    The results, in order: the caller row, the delegate row, the eligibility (membership),
+    the pool, the members, the create advisory lock (per meeting), the existing rows, the
+    audit lock and the audit predecessor.
+    """
     db = fake_session(
-        result(me),  # _principal_row(sub)
-        result(delegate),  # _principal_row(pid)
-        result(["vote.cast"]),  # eligibility: membership
-        result(*pool_ids),  # pool
-        result(*member_ids),  # members
-        result(),  # create advisory lock (pg_advisory_xact_lock per meeting)
-        result(*existing),  # existing rows
-        result(),  # audit lock
-        result(),  # audit prev
+        result(me),
+        result(delegate),
+        result(["vote.cast"]),
+        result(*pool_ids),
+        result(*member_ids),
+        result(),
+        result(*existing),
+        result(),
+        result(),
         _names((me.id, "Me", None), (delegate.id, "Other", None)),
     )
     db.get_results = [meeting, gremium]
@@ -255,7 +265,7 @@ def _create_db(
 
 
 async def test_create_undated_meeting_skips_deadline() -> None:
-    # Meeting without a date (start None), branch 409->420: no deadline block.
+    """Skip the deadline check for a meeting without a date (start None)."""
     me, delegate = _me(), _me("other")
     db = _create_db(
         meeting=_meeting(dated=False),
@@ -275,8 +285,8 @@ async def test_create_undated_meeting_skips_deadline() -> None:
 
 
 async def test_create_me_principal_missing_403() -> None:
-    # me is None (line 385): the principal row lookup for the sub returns nothing.
-    db = fake_session(result())  # me lookup empty
+    """Refuse a caller without a principal row with 403."""
+    db = fake_session(result())
     db.get_results = [_meeting(), _gremium()]
     with pytest.raises(ForbiddenError, match="Delegator principal not found"):
         await _svc(db).create(
@@ -285,10 +295,13 @@ async def test_create_me_principal_missing_403() -> None:
 
 
 async def test_create_nonvoting_existing_to_same_recipient_does_not_conflict() -> None:
-    # Branch 442->429: an existing non-voting row to the same person gives no 409.
-    # The loop continues and the service creates the new non-voting delegation.
+    """Allow a non-voting delegation next to another non-voting row to the same person.
+
+    The existing row of another delegator gives no 409. The loop continues and the service
+    creates the new non-voting delegation.
+    """
     me, delegate = _me(), _me("other")
-    existing_row = (uuid4(), delegate.id, False)  # other delegator, same delegate, no vote
+    existing_row = (uuid4(), delegate.id, False)
     db = _create_db(
         meeting=_meeting(),
         gremium=_gremium(),
@@ -306,10 +319,13 @@ async def test_create_nonvoting_existing_to_same_recipient_does_not_conflict() -
 
 
 async def test_create_voting_existing_other_recipient_no_conflict() -> None:
-    # payload.delegate_voting is True and a voting row exists, but for another person.
-    # Condition 442 is false (delegate_id != delegate.id), so there is no 409.
+    """Allow a voting delegation while another voting row goes to somebody else.
+
+    `payload.delegate_voting` is True and a voting row exists, but for another person, so
+    there is no 409.
+    """
     me, delegate = _me(), _me("other")
-    existing_row = (uuid4(), uuid4(), True)  # voting delegation to somebody else
+    existing_row = (uuid4(), uuid4(), True)
     db = _create_db(
         meeting=_meeting(),
         gremium=_gremium(),
@@ -344,12 +360,17 @@ def _joined_row(
 
 
 async def test_list_admin_sees_all_with_meeting_filter() -> None:
-    # Admin without a me filter, plus the meeting_id filter (line 483, branch 484->493).
+    """Let an admin list all delegations with the meeting filter.
+
+    The admin has no own-rows filter. The fake session returns the caller, who is still
+    resolved for the direction, and the joined row. The caller is not involved, so the
+    direction is None.
+    """
     foreign = uuid4()
     row = _joined_row(foreign, outgoing=True)
     db = fake_session(
-        result(_me()),  # me lookup (admin still resolved for direction)
-        result(row),  # joined
+        result(_me()),
+        result(row),
         _names(
             (row[0].delegator_principal_id, "X", None),
             (row[0].delegate_principal_id, "Y", None),
@@ -357,16 +378,18 @@ async def test_list_admin_sees_all_with_meeting_filter() -> None:
     )
     out = await _svc(db).list(_actor(perms={"admin.delegations"}), meeting_id=MEETING_ID)
     assert len(out) == 1
-    # The caller is not involved, so direction is None.
     assert out[0].direction is None
 
 
 async def test_list_admin_without_principal_row_still_lists() -> None:
-    # Admin but no PrincipalRow, so me is None. The list still returns rows.
+    """Let an admin without a principal row still list the rows.
+
+    The fake session returns no caller and the joined row.
+    """
     row = _joined_row(uuid4(), outgoing=True)
     db = fake_session(
-        result(),  # me lookup empty
-        result(row),  # joined
+        result(),
+        result(row),
         _names(),
     )
     out = await _svc(db).list(_actor(perms={"admin.delegations"}))
@@ -375,10 +398,15 @@ async def test_list_admin_without_principal_row_still_lists() -> None:
 
 
 async def test_meeting_context_no_principal_row() -> None:
-    # me is None, so can_delegate is False and there are no recipients or delegations.
+    """Build the meeting context for a caller without a principal row.
+
+    Without the row `can_delegate` is False, and there are no recipients or delegations. The
+    fake session returns the membership of the view check and no caller. The meeting has a
+    date, so the deadline is set.
+    """
     db = fake_session(
-        _membership(),  # _assert_can_view_gremium: member
-        result(),  # me lookup empty
+        _membership(),
+        result(),
     )
     db.get_results = [_meeting(), _gremium()]
     ctx = await _svc(db, voting=True).meeting_context(MEETING_ID, _actor())
@@ -387,16 +415,22 @@ async def test_meeting_context_no_principal_row() -> None:
     assert ctx.my_delegation is None
     assert ctx.incoming == []
     assert ctx.recipients == []
-    assert ctx.deadline is not None  # the meeting has a date
+    assert ctx.deadline is not None
     assert ctx.meeting_started is False
     assert ctx.voting_delegation_enabled is True
 
 
 async def test_meeting_context_full_with_outgoing_incoming_and_recipients() -> None:
+    """Build the full meeting context with an outgoing and an incoming delegation.
+
+    The fake session returns, in order: the membership of the view check, the caller, the
+    eligibility (so `can_delegate` is True), the joined rows, the names of both rows, the
+    member ids, the pool ids and the recipient names. The recipients list the pool first,
+    with both names resolved.
+    """
     me = _me()
     member_a = uuid4()
     pool_b = uuid4()
-    # One outgoing and one incoming delegation of the caller.
     out_row = SimpleNamespace(
         id=uuid4(),
         meeting_id=MEETING_ID,
@@ -418,18 +452,18 @@ async def test_meeting_context_full_with_outgoing_incoming_and_recipients() -> N
         created_at=NOW,
     )
     db = fake_session(
-        _membership(),  # _assert_can_view_gremium: member
-        result(me),  # me lookup
-        result(["vote.cast"]),  # eligibility membership → can_delegate True
-        result((out_row, _meeting(), _gremium()), (in_row, _meeting(), _gremium())),  # joined
-        _names(  # names for _out (delegator/delegate ids of both rows)
+        _membership(),
+        result(me),
+        result(["vote.cast"]),
+        result((out_row, _meeting(), _gremium()), (in_row, _meeting(), _gremium())),
+        _names(
             (me.id, "Me", None),
             (member_a, "Alice", None),
             (pool_b, "Bob", None),
         ),
-        result(member_a),  # member_ids
-        result(pool_b),  # pool_ids
-        _names((member_a, "Alice", None), (pool_b, "Bob", None)),  # recipient names
+        result(member_a),
+        result(pool_b),
+        _names((member_a, "Alice", None), (pool_b, "Bob", None)),
     )
     db.get_results = [_meeting(), _gremium()]
     ctx = await _svc(db).meeting_context(MEETING_ID, _actor())
@@ -438,50 +472,61 @@ async def test_meeting_context_full_with_outgoing_incoming_and_recipients() -> N
     assert ctx.my_delegation.delegate_id == member_a
     assert len(ctx.incoming) == 1
     assert ctx.incoming[0].delegator_id == pool_b
-    # Recipients: pool first (sort key not via_pool), both names resolved.
     assert [r.principal_id for r in ctx.recipients] == [pool_b, member_a]
     assert ctx.recipients[0].via_pool is True
     assert ctx.recipients[1].is_member is True
 
 
 async def test_meeting_context_undated_meeting_deadline_none() -> None:
+    """Give a meeting without a date no deadline.
+
+    The fake session returns the membership of the view check and the caller, then empty
+    results: no eligibility, no joined rows, no names, no members and no pool. The caller
+    cannot delegate, although the gremium allows it.
+    """
     me = _me()
     db = fake_session(
-        _membership(),  # _assert_can_view_gremium: member
-        result(me),  # me lookup
-        result(),  # eligibility membership empty → not eligible
-        result(),  # joined empty
-        _names(),  # _out names (empty)
-        result(),  # member_ids empty
-        result(),  # pool_ids empty
-        _names(),  # recipient names
+        _membership(),
+        result(me),
+        result(),
+        result(),
+        _names(),
+        result(),
+        result(),
+        _names(),
     )
     db.get_results = [_meeting(dated=False), _gremium()]
     ctx = await _svc(db).meeting_context(MEETING_ID, _actor())
     assert ctx.deadline is None
     assert ctx.deadline_passed is False
-    assert ctx.can_delegate is False  # eligible False even though allow True
+    assert ctx.can_delegate is False
 
 
 async def test_recipients_no_principal_row_empty() -> None:
+    """Return no recipients for a caller without a principal row."""
     db = fake_session(
-        _membership(),  # _assert_can_view_gremium: member
-        result(),  # me lookup empty
+        _membership(),
+        result(),
     )
     db.get_results = [_meeting(), _gremium()]
     assert await _svc(db).recipients(MEETING_ID, "x", _actor()) == []
 
 
 async def test_recipients_filters_by_needle_and_excludes_self() -> None:
+    """Filter the recipients by the needle and leave out the caller.
+
+    The fake session returns, in order: the membership of the view check, the caller, the
+    members (the caller drops out), an empty pool and the names.
+    """
     me = _me()
     alice = uuid4()
     bob = uuid4()
     db = fake_session(
-        _membership(),  # _assert_can_view_gremium: member
-        result(me),  # me lookup
-        result(alice, bob, me.id),  # members (me.id drops out via - {me.id})
-        result(),  # pool empty
-        _names((alice, "Alice", None), (bob, "Bob", None)),  # names
+        _membership(),
+        result(me),
+        result(alice, bob, me.id),
+        result(),
+        _names((alice, "Alice", None), (bob, "Bob", None)),
     )
     db.get_results = [_meeting(), _gremium(external=False)]
     out = await _svc(db).recipients(MEETING_ID, "ali", _actor())
@@ -490,17 +535,23 @@ async def test_recipients_filters_by_needle_and_excludes_self() -> None:
 
 
 async def test_recipients_external_search_dedups_and_sorts() -> None:
+    """Deduplicate and sort the external search results.
+
+    The fake session returns, in order: the membership of the view check, the caller, the
+    members, the pool and the names. The external search finds the member again
+    (deduplicated), a new external person and the caller, who drops out. The order is the
+    pool first, then the members, then the external people.
+    """
     me = _me()
     member = uuid4()
     pool = uuid4()
     extern_new = uuid4()
     db = fake_session(
-        _membership(),  # _assert_can_view_gremium: member
-        result(me),  # me lookup
-        result(member),  # members
-        result(pool),  # pool
-        _names((member, "Member Mary", None), (pool, "Pool Pete", None)),  # names
-        # external search: member is already present (dedup), extern_new is new, me drops
+        _membership(),
+        result(me),
+        result(member),
+        result(pool),
+        _names((member, "Member Mary", None), (pool, "Pool Pete", None)),
         result(
             (member, "Member Mary", "m@x"),
             (extern_new, "Extern Erik", "e@x"),
@@ -514,7 +565,6 @@ async def test_recipients_external_search_dedups_and_sorts() -> None:
     assert pool in pids
     assert extern_new in pids
     assert me.id not in pids
-    # Order: pool first (not via_pool False), then members, then external people.
     assert out[0].principal_id == pool
     extern_entry = next(r for r in out if r.principal_id == extern_new)
     assert extern_entry.via_pool is False
@@ -523,18 +573,21 @@ async def test_recipients_external_search_dedups_and_sorts() -> None:
 
 
 async def test_recipients_external_flag_but_empty_needle_skips_search() -> None:
+    """Skip the external search for an empty needle.
+
+    The needle is empty after the strip, so only the member stays.
+    """
     me = _me()
     member = uuid4()
     db = fake_session(
-        _membership(),  # _assert_can_view_gremium: member
-        result(me),  # me lookup
-        result(member),  # members
-        result(),  # pool
-        _names((member, "Member", None)),  # names
+        _membership(),
+        result(me),
+        result(member),
+        result(),
+        _names((member, "Member", None)),
     )
     db.get_results = [_meeting(), _gremium(external=True)]
-    out = await _svc(db).recipients(MEETING_ID, "   ", _actor())  # needle empty after strip
-    # No external search runs for an empty needle, so only member stays.
+    out = await _svc(db).recipients(MEETING_ID, "   ", _actor())
     assert [r.principal_id for r in out] == [member]
 
 
@@ -563,14 +616,16 @@ async def test_vote_status_no_meeting_is_empty() -> None:
 
 
 async def test_vote_status_no_principal_row_is_empty() -> None:
-    db = fake_session(result())  # me lookup empty
+    """Return an empty vote status without a principal row."""
+    db = fake_session(result())
     db.get_results = [_vote()]
     status = await _svc(db).vote_status(VOTE_ID, _actor())
     assert status.blocked is False
 
 
 async def test_vote_status_non_uuid_group_is_empty() -> None:
-    db = fake_session(result(_me()))  # me lookup ok
+    """Return an empty vote status for a group that is not a UUID."""
+    db = fake_session(result(_me()))
     db.get_results = [_vote(eligible_group="not-a-uuid")]
     status = await _svc(db).vote_status(VOTE_ID, _actor())
     assert status.blocked is False
@@ -578,6 +633,10 @@ async def test_vote_status_non_uuid_group_is_empty() -> None:
 
 
 async def test_vote_status_blocked_and_exercising() -> None:
+    """Report a blocked own vote and an exercised delegated vote.
+
+    The fake session returns the caller, the delegations and the names.
+    """
     me = _me()
     to_id = uuid4()
     by_id = uuid4()
@@ -590,9 +649,9 @@ async def test_vote_status_blocked_and_exercising() -> None:
         delegate_principal_id=me.id,
     )
     db = fake_session(
-        result(me),  # me lookup
-        result(outgoing, incoming),  # delegations
-        _names((to_id, "Vertreter", None), (by_id, "Vertretener", None)),  # names
+        result(me),
+        result(outgoing, incoming),
+        _names((to_id, "Vertreter", None), (by_id, "Vertretener", None)),
     )
     db.get_results = [_vote()]
     status = await _svc(db).vote_status(VOTE_ID, _actor())
@@ -603,11 +662,15 @@ async def test_vote_status_blocked_and_exercising() -> None:
 
 
 async def test_vote_status_no_rows_empty_names() -> None:
+    """Return an empty vote status without delegations.
+
+    The fake session returns the caller, no delegations and no names.
+    """
     me = _me()
     db = fake_session(
-        result(me),  # me lookup
-        result(),  # no delegations
-        _names(),  # names (empty set)
+        result(me),
+        result(),
+        _names(),
     )
     db.get_results = [_vote()]
     status = await _svc(db).vote_status(VOTE_ID, _actor())
@@ -618,20 +681,21 @@ async def test_vote_status_no_rows_empty_names() -> None:
 
 
 async def test_require_pool_manage_admin_short_circuits() -> None:
-    db = fake_session()  # no query needed
+    """Let an admin manage the pool without a query."""
+    db = fake_session()
     await _svc(db)._require_pool_manage(GREMIUM_ID, _actor(perms={"admin.delegations"}))
     assert db.statements == []
 
 
 async def test_require_pool_manage_via_gremium_session_manage() -> None:
-    # active_gremium_roles returns (gremium, role with session.manage), so access passes.
+    """Let a holder of the gremium role `session.manage` manage the pool."""
     role = SimpleNamespace(permissions=["session.manage"])
     db = fake_session(result((GREMIUM_ID, role)))
-    await _svc(db)._require_pool_manage(GREMIUM_ID, _actor())  # no raise
+    await _svc(db)._require_pool_manage(GREMIUM_ID, _actor())
 
 
 async def test_require_pool_manage_other_gremium_denied() -> None:
-    # session.manage only in another Gremium, so 403.
+    """Refuse `session.manage` of another Gremium with 403."""
     role = SimpleNamespace(permissions=["session.manage"])
     db = fake_session(result((uuid4(), role)))
     with pytest.raises(ForbiddenError, match="session.manage"):
@@ -639,11 +703,12 @@ async def test_require_pool_manage_other_gremium_denied() -> None:
 
 
 async def test_substitute_create_member_not_found_404() -> None:
+    """Answer 404 for an unknown member of a pool entry."""
     sub = _me("sub")
     member_id = uuid4()
     db = fake_session(
-        result(sub),  # substitute principal
-        result(),  # member principal lookup empty → 404
+        result(sub),
+        result(),
     )
     db.get_results = [_gremium()]
     with pytest.raises(NotFoundError, match="principal"):
@@ -654,7 +719,8 @@ async def test_substitute_create_member_not_found_404() -> None:
 
 
 async def test_substitute_create_substitute_not_found_404() -> None:
-    db = fake_session(result())  # substitute lookup empty
+    """Answer 404 for an unknown substitute of a pool entry."""
+    db = fake_session(result())
     db.get_results = [_gremium()]
     with pytest.raises(NotFoundError, match="principal"):
         await _svc(db).substitute_create(
@@ -664,16 +730,21 @@ async def test_substitute_create_substitute_not_found_404() -> None:
 
 
 async def test_substitute_create_with_member_persists() -> None:
-    # Member and substitute differ and no duplicate exists, so the service creates the row.
+    """Persist a member-bound pool entry.
+
+    The member and the substitute differ and no duplicate exists, so the service creates the
+    row. The fake session returns, in order: the substitute, the member, no duplicate, the
+    audit lock, the audit predecessor and the names.
+    """
     sub = _me("sub")
     member = _me("member")
     db = fake_session(
-        result(sub),  # substitute principal
-        result(member),  # member principal
-        result(),  # duplicate probe empty (member-specific branch)
-        result(),  # audit lock
-        result(),  # audit prev
-        _names((sub.id, "Sub", None), (member.id, "Member", None)),  # final names
+        result(sub),
+        result(member),
+        result(),
+        result(),
+        result(),
+        _names((sub.id, "Sub", None), (member.id, "Member", None)),
     )
     db.get_results = [_gremium()]
     out = await _svc(db).substitute_create(
@@ -688,11 +759,15 @@ async def test_substitute_create_with_member_persists() -> None:
 
 
 async def test_substitute_create_no_member_dup_409() -> None:
-    # member_id is None, so the duplicate query takes the is_(None) branch. A hit gives 409.
+    """Refuse a duplicate gremium-wide entry with 409.
+
+    `member_id` is None, so the duplicate query takes the `is_(None)` branch, and a hit
+    gives 409.
+    """
     sub = _me("sub")
     db = fake_session(
-        result(sub),  # substitute principal
-        result(SimpleNamespace(id=uuid4())),  # dup found
+        result(sub),
+        result(SimpleNamespace(id=uuid4())),
     )
     db.get_results = [_gremium()]
     with pytest.raises(ConflictError):
@@ -703,8 +778,12 @@ async def test_substitute_create_no_member_dup_409() -> None:
 
 
 async def test_substitute_delete_success_audits() -> None:
+    """Delete a pool entry and audit it.
+
+    The fake session returns the audit lock and the audit predecessor.
+    """
     row = SimpleNamespace(id=uuid4(), gremium_id=GREMIUM_ID)
-    db = fake_session(result(), result())  # audit lock + prev
+    db = fake_session(result(), result())
     db.get_results = [row]
     await _svc(db).substitute_delete(row.id, _actor(perms={"admin.delegations"}))
     assert db.deleted == [row]
@@ -720,6 +799,10 @@ async def test_substitute_delete_not_found() -> None:
 
 
 async def test_substitutes_list_with_member_resolves_both_names() -> None:
+    """Resolve the member name and the substitute name of a pool entry.
+
+    The fake session returns the membership of the view check and the substitutes.
+    """
     member_id = uuid4()
     row = SimpleNamespace(
         id=uuid4(),
@@ -729,8 +812,8 @@ async def test_substitutes_list_with_member_resolves_both_names() -> None:
         created_at=NOW,
     )
     db = fake_session(
-        _membership(),  # _assert_can_view_gremium: member
-        result(row),  # substitutes
+        _membership(),
+        result(row),
         _names((member_id, "Member", None), (row.substitute_principal_id, "Sub", None)),
     )
     db.get_results = [_gremium()]
@@ -748,6 +831,7 @@ async def test_substitutes_list_gremium_not_found() -> None:
 
 
 async def test_out_created_at_falls_back_to_now() -> None:
+    """Use the current time for a freshly inserted row without `created_at`."""
     me = _me()
     d = SimpleNamespace(
         id=uuid4(),
@@ -757,7 +841,7 @@ async def test_out_created_at_falls_back_to_now() -> None:
         delegate_principal_id=uuid4(),
         delegate_voting=False,
         via_pool=False,
-        created_at=None,  # freshly inserted, so it falls back to now
+        created_at=None,
     )
     db = fake_session(_names((me.id, "Me", None), (d.delegate_principal_id, "Other", None)))
     rows: list[Any] = [(d, _meeting(), _gremium())]
@@ -817,27 +901,33 @@ async def test_create_meeting_already_started_validation() -> None:
 
 
 async def test_create_delegate_not_found() -> None:
-    db = fake_session(result(_me()), result())  # me ok, delegate missing
+    """Answer 404 for an unknown delegate."""
+    db = fake_session(result(_me()), result())
     db.get_results = [_meeting(), _gremium()]
     with pytest.raises(NotFoundError, match="principal"):
         await _svc(db).create(DelegationCreate(meetingId=MEETING_ID, delegateId=uuid4()), _actor())
 
 
 async def test_create_self_delegation_validation() -> None:
+    """Refuse a delegation to oneself."""
     me = _me()
-    db = fake_session(result(me), result(me))  # delegate == me
+    db = fake_session(result(me), result(me))
     db.get_results = [_meeting(), _gremium()]
     with pytest.raises(ValidationProblem, match="yourself"):
         await _svc(db).create(DelegationCreate(meetingId=MEETING_ID, delegateId=me.id), _actor())
 
 
 async def test_create_not_eligible_forbidden() -> None:
+    """Refuse a caller without an own vote.
+
+    The membership, the direct grant and the OIDC groups are empty.
+    """
     db = fake_session(
         result(_me()),
         result(_me("other")),
-        result(),  # membership empty
-        result(),  # direct empty
-        result((None,)),  # oidc None
+        result(),
+        result(),
+        result((None,)),
     )
     db.get_results = [_meeting(), _gremium()]
     with pytest.raises(ForbiddenError, match="voting members"):
@@ -845,13 +935,17 @@ async def test_create_not_eligible_forbidden() -> None:
 
 
 async def test_create_external_recipient_forbidden() -> None:
+    """Refuse an external recipient.
+
+    The pool and the members are empty, so the recipient is external.
+    """
     delegate = _me("other")
     db = fake_session(
         result(_me()),
         result(delegate),
         result(["vote.cast"]),
-        result(),  # pool empty
-        result(),  # members empty, so the recipient is external
+        result(),
+        result(),
     )
     db.get_results = [_meeting(), _gremium(external=False)]
     with pytest.raises(ForbiddenError, match="substitute"):
@@ -861,15 +955,20 @@ async def test_create_external_recipient_forbidden() -> None:
 
 
 async def test_create_after_lead_deadline_validation() -> None:
+    """Refuse a create after the lead-time deadline.
+
+    The recipient is a member, not in the pool, and the lead time is longer than the gap to
+    the meeting.
+    """
     delegate = _me("other")
     db = fake_session(
         result(_me()),
         result(delegate),
         result(["vote.cast"]),
-        result(),  # pool empty
-        result(delegate.id),  # member
+        result(),
+        result(delegate.id),
     )
-    db.get_results = [_meeting(), _gremium(lead=60 * 24 * 31)]  # lead > gap to meeting
+    db.get_results = [_meeting(), _gremium(lead=60 * 24 * 31)]
     with pytest.raises(ValidationProblem, match="deadline"):
         await _svc(db).create(
             DelegationCreate(meetingId=MEETING_ID, delegateId=delegate.id), _actor()
@@ -877,6 +976,7 @@ async def test_create_after_lead_deadline_validation() -> None:
 
 
 async def test_create_double_outgoing_conflict() -> None:
+    """Refuse a second outgoing delegation, because the own row exists."""
     me, delegate = _me(), _me("other")
     db = _create_db(
         meeting=_meeting(),
@@ -885,7 +985,7 @@ async def test_create_double_outgoing_conflict() -> None:
         delegate=delegate,
         pool_ids=[],
         member_ids=[delegate.id],
-        existing=[(me.id, uuid4(), False)],  # own row exists
+        existing=[(me.id, uuid4(), False)],
     )
     with pytest.raises(ConflictError, match="already delegated"):
         await _svc(db).create(
@@ -894,6 +994,7 @@ async def test_create_double_outgoing_conflict() -> None:
 
 
 async def test_create_chain_actor_is_recipient_validation() -> None:
+    """Refuse a chain when somebody delegates to the caller."""
     me, delegate = _me(), _me("other")
     db = _create_db(
         meeting=_meeting(),
@@ -902,7 +1003,7 @@ async def test_create_chain_actor_is_recipient_validation() -> None:
         delegate=delegate,
         pool_ids=[],
         member_ids=[delegate.id],
-        existing=[(uuid4(), me.id, False)],  # somebody delegates to me
+        existing=[(uuid4(), me.id, False)],
     )
     with pytest.raises(ValidationProblem, match="delegate on"):
         await _svc(db).create(
@@ -911,6 +1012,7 @@ async def test_create_chain_actor_is_recipient_validation() -> None:
 
 
 async def test_create_chain_recipient_delegated_away_validation() -> None:
+    """Refuse a chain when the recipient delegated as well."""
     me, delegate = _me(), _me("other")
     db = _create_db(
         meeting=_meeting(),
@@ -919,7 +1021,7 @@ async def test_create_chain_recipient_delegated_away_validation() -> None:
         delegate=delegate,
         pool_ids=[],
         member_ids=[delegate.id],
-        existing=[(delegate.id, uuid4(), False)],  # the recipient delegated as well
+        existing=[(delegate.id, uuid4(), False)],
     )
     with pytest.raises(ValidationProblem, match="delegated their own"):
         await _svc(db).create(
@@ -928,6 +1030,7 @@ async def test_create_chain_recipient_delegated_away_validation() -> None:
 
 
 async def test_create_second_voting_delegation_conflict() -> None:
+    """Refuse a second voting delegation, because the recipient carries a voting right."""
     me, delegate = _me(), _me("other")
     db = _create_db(
         meeting=_meeting(),
@@ -936,7 +1039,7 @@ async def test_create_second_voting_delegation_conflict() -> None:
         delegate=delegate,
         pool_ids=[],
         member_ids=[delegate.id],
-        existing=[(uuid4(), delegate.id, True)],  # the recipient carries a voting right
+        existing=[(uuid4(), delegate.id, True)],
     )
     with pytest.raises(ConflictError, match="carries"):
         await _svc(db, voting=True).create(
@@ -946,17 +1049,18 @@ async def test_create_second_voting_delegation_conflict() -> None:
 
 
 async def test_list_non_admin_without_principal_is_empty() -> None:
-    db = fake_session(result())  # me lookup empty and not an admin
+    """Return an empty list for a non-admin without a principal row."""
+    db = fake_session(result())
     assert await _svc(db).list(_actor()) == []
 
 
 async def test_list_non_admin_with_principal_filters_self() -> None:
-    # Non-admin with a PrincipalRow, so the service adds the own-rows OR filter (line 487).
+    """Filter the list to the own rows for a non-admin with a principal row."""
     me = _me()
     row = _joined_row(me.id, outgoing=True)
     db = fake_session(
-        result(me),  # me lookup
-        result(row),  # joined
+        result(me),
+        result(row),
         _names(
             (row[0].delegator_principal_id, "Me", None),
             (row[0].delegate_principal_id, "Other", None),
@@ -975,43 +1079,60 @@ async def test_revoke_not_found() -> None:
 
 
 async def test_revoke_foreign_non_admin_forbidden() -> None:
+    """Refuse the revoke of a foreign delegation for a non-admin.
+
+    The caller is not the delegator, and the meeting is planned, so the lead path does not
+    apply.
+    """
     row = SimpleNamespace(id=uuid4(), meeting_id=MEETING_ID, delegator_principal_id=uuid4())
-    db = fake_session(result(_me()))  # me is not the delegator
-    db.get_results = [row, _meeting()]  # planned: no lead path
+    db = fake_session(result(_me()))
+    db.get_results = [row, _meeting()]
     with pytest.raises(ForbiddenError, match="delegator"):
         await _svc(db).revoke(row.id, _actor())
 
 
 async def test_revoke_owner_after_start_validation() -> None:
+    """Refuse the revoke of the owner after the start.
+
+    The caller has no `session.manage` role, and the meeting is live, so the row is not
+    revocable.
+    """
     me = _me()
     row = SimpleNamespace(id=uuid4(), meeting_id=MEETING_ID, delegator_principal_id=me.id)
-    db = fake_session(result(), result(me))  # no session.manage role, then me
-    db.get_results = [row, _meeting(status="live")]  # live meeting: _revocable False
+    db = fake_session(result(), result(me))
+    db.get_results = [row, _meeting(status="live")]
     with pytest.raises(ValidationProblem, match="started"):
         await _svc(db).revoke(row.id, _actor())
 
 
 async def test_revoke_owner_before_start_ok() -> None:
+    """Let the owner revoke before the start.
+
+    The meeting is planned and in the future, so the row is revocable. The fake session
+    returns the caller, the audit lock and the audit predecessor.
+    """
     me = _me()
     row = SimpleNamespace(id=uuid4(), meeting_id=MEETING_ID, delegator_principal_id=me.id)
-    db = fake_session(result(me), result(), result())  # audit lock + prev
-    db.get_results = [row, _meeting()]  # planned and in the future, so revocable
+    db = fake_session(result(me), result(), result())
+    db.get_results = [row, _meeting()]
     await _svc(db).revoke(row.id, _actor())
     assert db.deleted == [row]
     assert db.committed == 1
 
 
 async def test_revoke_admin_skips_meeting_lookup() -> None:
+    """Let an admin revoke without a meeting lookup."""
     row = SimpleNamespace(id=uuid4(), meeting_id=MEETING_ID, delegator_principal_id=uuid4())
     db = fake_session(result(_me()), result(), result())
-    db.get_results = [row]  # no meeting lookup needed (admin)
+    db.get_results = [row]
     await _svc(db).revoke(row.id, _actor(perms={"admin.delegations"}))
     assert db.deleted == [row]
 
 
 async def test_substitute_create_member_equals_substitute_validation() -> None:
+    """Refuse a pool entry whose member and substitute are one person."""
     sub = _me("sub")
-    db = fake_session(result(sub), result(sub))  # substitute and member are one person
+    db = fake_session(result(sub), result(sub))
     db.get_results = [_gremium()]
     with pytest.raises(ValidationProblem, match="differ"):
         await _svc(db).substitute_create(
@@ -1021,15 +1142,16 @@ async def test_substitute_create_member_equals_substitute_validation() -> None:
 
 
 async def test_substitutes_list_row_without_member() -> None:
+    """List a gremium-wide pool entry without a member name."""
     row = SimpleNamespace(
         id=uuid4(),
         gremium_id=GREMIUM_ID,
-        member_principal_id=None,  # no member, so branch 731 is skipped
+        member_principal_id=None,
         substitute_principal_id=uuid4(),
         created_at=NOW,
     )
     db = fake_session(
-        _membership(),  # _assert_can_view_gremium: member
+        _membership(),
         result(row),
         _names((row.substitute_principal_id, "Sub", None)),
     )
@@ -1040,15 +1162,17 @@ async def test_substitutes_list_row_without_member() -> None:
     assert out[0].substitute_name == "Sub"
 
 
-# #sec-audit: _assert_can_view_gremium locks down the cross-tenant read.
 async def test_substitutes_list_non_member_403() -> None:
-    # No admin or manage right, no membership, no pool and no session.manage.
-    # All three view queries stay empty, so the call gives 403.
-    # Before the fix, every logged-in user could read this PII.
+    """Refuse the roster to a non-member with 403.
+
+    The caller has no admin or manage right, no membership, no pool place and no
+    `session.manage`. All three view queries stay empty, so the roster with personal data
+    does not leak to every logged-in user.
+    """
     db = fake_session(
-        result(),  # gremium_member_ids empty
-        result(),  # _pool_member_gremium_ids empty
-        result(),  # gremium_ids_with_permission for session.manage empty
+        result(),
+        result(),
+        result(),
     )
     db.get_results = [_gremium()]
     with pytest.raises(ForbiddenError, match="roster"):
@@ -1056,7 +1180,7 @@ async def test_substitutes_list_non_member_403() -> None:
 
 
 async def test_substitutes_list_admin_role_bypasses_view_check() -> None:
-    # The admin role needs no view query, so the call runs straight through.
+    """Let the admin role read the roster without a view query."""
     row = SimpleNamespace(
         id=uuid4(),
         gremium_id=GREMIUM_ID,
@@ -1072,7 +1196,11 @@ async def test_substitutes_list_admin_role_bypasses_view_check() -> None:
 
 
 async def test_substitutes_list_pool_member_sees_roster() -> None:
-    # In the substitute pool of the Gremium but not a member, so the second query hits.
+    """Let a pool member read the roster.
+
+    The caller is in the substitute pool of the Gremium but not a member, so the second view
+    query hits.
+    """
     row = SimpleNamespace(
         id=uuid4(),
         gremium_id=GREMIUM_ID,
@@ -1081,8 +1209,8 @@ async def test_substitutes_list_pool_member_sees_roster() -> None:
         created_at=NOW,
     )
     db = fake_session(
-        result(),  # gremium_member_ids empty
-        result(GREMIUM_ID),  # _pool_member_gremium_ids: in the pool
+        result(),
+        result(GREMIUM_ID),
         result(row),
         _names((row.substitute_principal_id, "Sub", None)),
     )
@@ -1092,7 +1220,10 @@ async def test_substitutes_list_pool_member_sees_roster() -> None:
 
 
 async def test_substitutes_list_session_manage_sees_roster() -> None:
-    # Holder of the Gremium role session.manage, so the third query hits.
+    """Let a holder of the gremium role `session.manage` read the roster.
+
+    The first two view queries stay empty, and the third one hits.
+    """
     row = SimpleNamespace(
         id=uuid4(),
         gremium_id=GREMIUM_ID,
@@ -1101,9 +1232,9 @@ async def test_substitutes_list_session_manage_sees_roster() -> None:
         created_at=NOW,
     )
     db = fake_session(
-        result(),  # gremium_member_ids empty
-        result(),  # _pool_member_gremium_ids empty
-        result((GREMIUM_ID, SimpleNamespace(permissions=["session.manage"]))),  # has right
+        result(),
+        result(),
+        result((GREMIUM_ID, SimpleNamespace(permissions=["session.manage"]))),
         result(row),
         _names((row.substitute_principal_id, "Sub", None)),
     )
@@ -1113,10 +1244,14 @@ async def test_substitutes_list_session_manage_sees_roster() -> None:
 
 
 async def test_meeting_context_non_member_403() -> None:
+    """Refuse the meeting context to a non-member with 403.
+
+    The membership, the pool and the `session.manage` queries stay empty.
+    """
     db = fake_session(
-        result(),  # gremium_member_ids empty
-        result(),  # pool empty
-        result(),  # session.manage empty
+        result(),
+        result(),
+        result(),
     )
     db.get_results = [_meeting(), _gremium()]
     with pytest.raises(ForbiddenError, match="roster"):
@@ -1124,10 +1259,14 @@ async def test_meeting_context_non_member_403() -> None:
 
 
 async def test_recipients_non_member_403() -> None:
+    """Refuse the recipients to a non-member with 403.
+
+    The membership, the pool and the `session.manage` queries stay empty.
+    """
     db = fake_session(
-        result(),  # gremium_member_ids empty
-        result(),  # pool empty
-        result(),  # session.manage empty
+        result(),
+        result(),
+        result(),
     )
     db.get_results = [_meeting(), _gremium()]
     with pytest.raises(ForbiddenError, match="roster"):
@@ -1135,9 +1274,12 @@ async def test_recipients_non_member_403() -> None:
 
 
 async def test_meeting_view_all_perm_bypasses_view_check() -> None:
-    # meeting.view_all is a global read permission, so no view query runs.
+    """Skip the view check for the global read permission `meeting.view_all`.
+
+    An empty caller lookup is enough for `can_delegate` False.
+    """
     db = fake_session(
-        result(),  # me lookup empty (enough for can_delegate False)
+        result(),
     )
     db.get_results = [_meeting(), _gremium()]
     viewer = Principal(sub="v", roles=["member"], permissions={"meeting.view_all"})
@@ -1145,7 +1287,6 @@ async def test_meeting_view_all_perm_bypasses_view_check() -> None:
     assert ctx.can_delegate is False
 
 
-# #sec: LIKE escape in the external recipient typeahead.
 def test_escape_like_neutralises_wildcards() -> None:
     from app.modules.delegations.service import _escape_like
 
@@ -1154,8 +1295,12 @@ def test_escape_like_neutralises_wildcards() -> None:
     assert _escape_like("plain") == "plain"
 
 
-# #race: create serializes per meeting with pg_advisory_xact_lock.
 async def test_create_acquires_meeting_advisory_lock() -> None:
+    """Serialize the create per meeting with `pg_advisory_xact_lock`.
+
+    At least one advisory-lock statement runs before the insert, for the delegation and for
+    the audit.
+    """
     from sqlalchemy.sql.elements import TextClause
 
     me, delegate = _me(), _me("other")
@@ -1171,19 +1316,24 @@ async def test_create_acquires_meeting_advisory_lock() -> None:
     await _svc(db).create(
         DelegationCreate(meetingId=MEETING_ID, delegateId=delegate.id), _actor()
     )
-    # At least one advisory-lock statement runs before the insert (delegation and audit).
     locks = [s for s in db.statements if isinstance(s, TextClause)]
     assert any("pg_advisory_xact_lock" in str(s) for s in locks)
 
 
-# This test keeps the RecipientOut import in use.
 def test_recipient_out_is_camel_model() -> None:
+    """Build a `RecipientOut` with camelCase aliases.
+
+    The test also keeps the `RecipientOut` import in use.
+    """
     r = RecipientOut(principal_id=uuid4(), via_pool=False, is_member=True)
     assert isinstance(r.principal_id, UUID)
 
 
 async def test_view_gremium_admin_with_read_scope_passes() -> None:
-    # The `read` scope carries `meeting.view_all`, so the admin passes without a query.
+    """Let an admin with the `read` scope pass without a query.
+
+    The `read` scope carries `meeting.view_all`.
+    """
     admin = Principal(
         sub="admin",
         roles=["admin"],
@@ -1196,9 +1346,12 @@ async def test_view_gremium_admin_with_read_scope_passes() -> None:
 
 
 async def test_view_gremium_admin_token_without_read_scope_denied() -> None:
-    # A `budget:write` token of an admin holds neither `meeting.view_all` nor
-    # `admin.delegations`. Without a membership or a pool place it cannot read the
-    # roster of a foreign gremium, which carries names and email addresses.
+    """Refuse an admin token without the `read` scope.
+
+    A `budget:write` token of an admin holds neither `meeting.view_all` nor
+    `admin.delegations`. Without a membership or a pool place it cannot read the roster of a
+    foreign gremium, which carries names and email addresses.
+    """
     admin = Principal(
         sub="admin",
         roles=["admin"],
@@ -1206,8 +1359,8 @@ async def test_view_gremium_admin_token_without_read_scope_denied() -> None:
         scope_permissions=frozenset({"budget.structure", "budget.book"}),
     )
     db = fake_session(
-        result(),  # gremium_member_ids: no membership
-        result(),  # _pool_member_gremium_ids: no pool place
+        result(),
+        result(),
     )
     with pytest.raises(ForbiddenError):
         await _svc(db)._assert_can_view_gremium(GREMIUM_ID, admin)

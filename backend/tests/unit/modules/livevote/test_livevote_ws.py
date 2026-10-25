@@ -7,6 +7,12 @@ cast errors (lock, conflict, eligibility, invalid) and the read-only beamer stre
 `dependency_overrides` replaces the services, the principal, the broker and the lock, so
 the tests need no database and no Redis. The integration test covers the real race and
 the real fan-out.
+
+The handshake tests run the real auth path from the cookie to the session to the RBAC
+principal. They do not override `get_ws_principal`, so the real `resolve_ws_principal`
+unseals the cookie, loads the `auth_session` and the `principal` and resolves RBAC. Only
+`get_session` returns a queued fake, so the tests need no Postgres. They cover a logged-in
+user with the permission and a time-validated role assignment.
 """
 
 from __future__ import annotations
@@ -75,7 +81,7 @@ class _FakeSession:
         return None
 
     async def scalar(self, _stmt: object) -> int:
-        # The cast re-reads the account (active, not merged): one live row.
+        """Return one live account row, because the cast reads the account again."""
         return 1
 
 
@@ -95,20 +101,23 @@ class _FakeMeetingService:
         return self._open_vote
 
     async def is_member(self, gremium_id: UUID, principal: Principal) -> bool:
-        # Live read access needs an active Gremium membership. The fake mirrors it
-        # through the group.
+        """Mirror the active Gremium membership through the group.
+
+        The live read access needs an active membership.
+        """
         return "admin" in principal.roles or principal.in_group(str(gremium_id))
 
     async def can_manage(self, gremium_id: UUID, principal: Principal) -> bool:
-        # `session.manage` in the gremium. The fake mirrors it through the group
-        # `manage:<gremium id>`.
+        """Mirror `session.manage` in the gremium through the group `manage:<gremium id>`."""
         return "admin" in principal.roles or principal.in_group(f"manage:{gremium_id}")
 
     async def is_participant(
         self, _meeting_id: UUID, gremium_id: UUID, principal: Principal
     ) -> bool:
-        # #delegation-rework: a member OR a delegation receiver passes. The fake knows
-        # no delegations, so membership is enough here.
+        """Pass a member or a delegation receiver.
+
+        The fake knows no delegations, so the membership is enough here.
+        """
         return await self.is_member(gremium_id, principal)
 
 
@@ -167,11 +176,13 @@ def _voter(groups: set[str] | None = None) -> Principal:
     return Principal(sub="p", permissions={"vote.cast"}, groups=members)
 
 
-def _recv(ws) -> dict:  # Starlette-Test-WS
+def _recv(ws) -> dict:
     """Return the next event and skip the presence frames.
 
     The `viewers` broadcast fires asynchronously on a connect or a disconnect. It can
     arrive between two expected events.
+
+    The socket is the WebSocket session of the Starlette test client.
     """
     msg = ws.receive_json()
     while isinstance(msg, dict) and msg.get("type") == "viewers":
@@ -183,7 +194,6 @@ def _url(meeting: MeetingOut) -> str:
     return f"/api/ws/meetings/{meeting.id}"
 
 
-# Handshake and RBAC
 def test_unauthenticated_is_closed_before_accept() -> None:
     meeting = _meeting()
     app, _, _ = _build(meeting=meeting, principal=None)
@@ -209,11 +219,13 @@ def test_not_in_group_gets_not_eligible_error() -> None:
         assert _recv(ws) == {"type": "error", "code": "not_eligible"}
 
 
-# Voter lifecycle
 def test_connect_sends_meeting_state() -> None:
+    """Send the meeting state on connect.
+
+    The initial state carries the item the room handles now, so a follower who connects late
+    lands on the right item.
+    """
     meeting = _meeting()
-    # The initial state carries the item the room handles now, so a follower who
-    # connects late lands on the right item.
     meeting.current_agenda_item_id = uuid4()
     app, _, _ = _build(meeting=meeting, principal=_voter())
     client = TestClient(app)
@@ -225,6 +237,10 @@ def test_connect_sends_meeting_state() -> None:
 
 
 def test_subscribe_resends_state_with_open_vote() -> None:
+    """Send the state again with the open vote on a subscribe.
+
+    The connect already delivers the full state, including the open vote.
+    """
     meeting = _meeting()
     vote_out = _vote_out(meeting.id)
     open_vote = types.SimpleNamespace(id=vote_out.id)
@@ -233,7 +249,6 @@ def test_subscribe_resends_state_with_open_vote() -> None:
     )
     client = TestClient(app)
     with client.websocket_connect(_url(meeting)) as ws:
-        # The connect already delivers the full state, including the open vote.
         assert _recv(ws)["type"] == "meeting_state"
         assert _recv(ws)["type"] == "vote_opened"
         assert _recv(ws)["type"] == "vote_tally"
@@ -288,12 +303,13 @@ def test_cast_when_locked_reports_locked() -> None:
 
 
 def test_invalid_cast_message_reports_invalid() -> None:
+    """Answer `invalid_message` to a cast without `voteId` and `choice`."""
     meeting = _meeting()
     app, _, _ = _build(meeting=meeting, principal=_voter())
     client = TestClient(app)
     with client.websocket_connect(_url(meeting)) as ws:
         assert _recv(ws)["type"] == "meeting_state"
-        ws.send_json({"type": "cast"})  # voteId and choice are missing
+        ws.send_json({"type": "cast"})
         assert _recv(ws) == {"type": "error", "code": "invalid_message"}
 
 
@@ -308,19 +324,22 @@ def test_unknown_message_type_reports_error() -> None:
 
 
 def test_malformed_json_frame_does_not_crash_connection() -> None:
+    """Keep the connection alive after a malformed JSON frame.
+
+    A broken frame gives an error, not a crash, and the server serves the next valid
+    message.
+    """
     meeting = _meeting()
     app, _, _ = _build(meeting=meeting, principal=_voter())
     client = TestClient(app)
     with client.websocket_connect(_url(meeting)) as ws:
         assert _recv(ws)["type"] == "meeting_state"
-        ws.send_text("not-json{")  # a broken frame gives an error, not a crash
+        ws.send_text("not-json{")
         assert _recv(ws) == {"type": "error", "code": "invalid_message"}
-        # The connection stays alive. The server serves the next valid message.
         ws.send_json({"type": "subscribe"})
         assert _recv(ws)["type"] == "meeting_state"
 
 
-# Beamer stream: read only, needs session.manage in the gremium of the meeting
 def _beamer() -> Principal:
     return Principal(sub="chair", groups={str(_GREMIUM), f"manage:{_GREMIUM}"})
 
@@ -363,13 +382,6 @@ def test_beamer_receives_state_but_cannot_cast() -> None:
     assert voting.casts == []
 
 
-# Real handshake auth path: cookie to session to RBAC principal.
-#
-# These tests do not override `get_ws_principal`. The real `resolve_ws_principal` runs.
-# It unseals the cookie, loads the `auth_session`, loads the `principal` and resolves
-# RBAC. Only `get_session` returns a queued fake, so the tests need no Postgres. This
-# closes the gap that masked the meeting WS 403: a logged-in user with the permission
-# and a time-validated RoleAssignment.
 from tests._support.auth_fakes import fake_session, result  # noqa: E402
 
 _SID = "ws-handshake-sid"
@@ -381,11 +393,14 @@ def _signed_cookie() -> tuple[str, str]:
 
 
 def _auth_db(*, naive: bool):
-    """Build a fake session for the real handshake: AuthSession, Principal, then RBAC."""
+    """Build a fake session for the real handshake: AuthSession, Principal, then RBAC.
+
+    A naive value is how a `timestamp` column without a time zone comes from the database.
+    """
     pid = uuid4()
     now = datetime.now(UTC)
     vf, vu = now - timedelta(days=1), now + timedelta(days=1)
-    if naive:  # this is how a `timestamp` column without a time zone comes from the DB
+    if naive:
         vf, vu = vf.replace(tzinfo=None), vu.replace(tzinfo=None)
     auth_session = AuthSession(
         sid=_SID, principal_id=pid, expires_at=now + timedelta(hours=1),
@@ -401,13 +416,18 @@ def _auth_db(*, naive: bool):
     )
 
     def factory():
+        """Return the scripted session.
+
+        The results, in order: the auth session, the principal row, the role assignment in
+        the meeting Gremium, no group mapping, the role permission and the role key.
+        """
         return fake_session(
-            result(auth_session),     # load_principal_session → AuthSession
-            result(principal_row),    # PrincipalRow
-            result(assignment),       # RoleAssignment (in the meeting Gremium)
-            result(),                 # GroupMapping (none)
-            result("vote.cast"),      # RolePermission
-            result("member"),         # Role.key
+            result(auth_session),
+            result(principal_row),
+            result(assignment),
+            result(),
+            result("vote.cast"),
+            result("member"),
         )
 
     async def _override():
@@ -466,7 +486,7 @@ def test_handshake_without_cookie_is_rejected() -> None:
 
 
 def test_handshake_foreign_origin_is_rejected() -> None:
-    """FIX 4 (CSWSH): a foreign `Origin` closes the handshake with 4403.
+    """A foreign `Origin` closes the handshake with 4403.
 
     The check runs before the cookie path and before the RBAC path. The second close of
     the router passes silently.
@@ -526,11 +546,15 @@ def test_real_flow_dispatcher_override_opens_the_socket_with_a_cookie() -> None:
         assert _recv(ws)["type"] == "meeting_state"
 
 
-# FIX 5: connection cap per meeting and principal
 from app.modules.livevote import router as lv_router  # noqa: E402
 
 
 def test_connection_slot_acquire_release_cap() -> None:
+    """Acquire and release the connection slots up to the cap.
+
+    A full release drops the counter entry, so there is no memory leak. A release without a
+    held slot is idempotent: no KeyError and no negative counter.
+    """
     mid = uuid4()
     sub = "p"
     lv_router._connection_counts.clear()
@@ -540,20 +564,21 @@ def test_connection_slot_acquire_release_cap() -> None:
     assert lv_router._try_acquire_slot(mid, sub) is False
     lv_router._release_slot(mid, sub)
     assert lv_router._try_acquire_slot(mid, sub) is True
-    # A full release drops the counter entry, so there is no memory leak.
     for _ in range(cap):
         lv_router._release_slot(mid, sub)
     assert (mid, sub) not in lv_router._connection_counts
-    # A release without a held slot is idempotent: no KeyError and no negative counter.
     lv_router._release_slot(mid, sub)
     assert (mid, sub) not in lv_router._connection_counts
 
 
 def test_too_many_connections_rejected_over_ws() -> None:
+    """Reject a connect over the cap.
+
+    The test fills the slots up to the limit, so the server refuses the next connect.
+    """
     meeting = _meeting()
     app, _, _ = _build(meeting=meeting, principal=_voter())
     lv_router._connection_counts.clear()
-    # Fill the slots up to the limit, so the server refuses the next connect.
     key = (meeting.id, "p")
     lv_router._connection_counts[key] = lv_router._MAX_CONNECTIONS_PER_PRINCIPAL
     client = TestClient(app)

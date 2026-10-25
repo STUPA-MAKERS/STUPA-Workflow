@@ -6,6 +6,9 @@ attendance and agenda item path. They also cover the REST router: fail-closed au
 problem+json, the background mail, and the vote and agenda control. The WS paths stay
 in the existing WS suite. This file covers only the ``_authorize`` and ``_serve``
 branches through slim WS doubles.
+
+pytest-asyncio runs in `auto` mode (pyproject), so an async test needs no explicit marker. A
+sync TestClient test stays unmarked.
 """
 
 from __future__ import annotations
@@ -66,11 +69,7 @@ from app.shared.errors import (
     ValidationProblem,
 )
 
-# pytest-asyncio runs in ``auto`` mode (pyproject). An async test needs no explicit
-# marker. A sync TestClient test stays unmarked.
 
-
-# Fakes
 class _Scalars:
     def __init__(self, rows: list[Any]) -> None:
         self._rows = rows
@@ -223,7 +222,6 @@ def _meeting(*, status: str = "planned", gremium_id: UUID | None = None) -> Meet
     return m
 
 
-# service.py: cursor helpers
 def test_encode_decode_cursor_roundtrip() -> None:
     ts = datetime(2026, 6, 16, 18, 30)
     mid = uuid4()
@@ -251,7 +249,8 @@ def test_decode_offset_empty_is_zero() -> None:
 
 
 def test_decode_offset_wrong_tag_raises() -> None:
-    bad = _encode_cursor(datetime(2026, 6, 16), uuid4())  # carries no "o|" tag
+    """Reject an offset cursor without the `o|` tag."""
+    bad = _encode_cursor(datetime(2026, 6, 16), uuid4())
     with pytest.raises(BadRequestError):
         _decode_offset(bad)
 
@@ -269,7 +268,6 @@ def test_decode_offset_garbage_raises() -> None:
         _decode_offset("###not-base64###")
 
 
-# service.py: _to_out defaults with votes None
 def test_to_out_defaults_votes_none() -> None:
     m = _meeting()
     out = MeetingService._to_out(m)
@@ -278,12 +276,14 @@ def test_to_out_defaults_votes_none() -> None:
     assert out.can_control is False
 
 
-# service.py: RBAC helpers
 async def test_can_manage_admin_bypass_and_scope_cap() -> None:
+    """Apply the admin bypass of `can_manage` within the scope cap.
+
+    An admin token without `session.manage` in its scope gets no bypass, and the capped
+    gremium lookup answers the empty set without a query.
+    """
     svc = MeetingService(_QueueSession())  # type: ignore[arg-type]
     assert await svc.can_manage(uuid4(), _admin()) is True
-    # An admin token without `session.manage` in its scope gets no bypass, and the
-    # capped gremium lookup answers the empty set without a query.
     read_admin = Principal(
         sub="a", roles=["admin"], scope_permissions=frozenset({"application.read"})
     )
@@ -303,11 +303,14 @@ async def test_can_manage_via_gremium_permission(monkeypatch: pytest.MonkeyPatch
 
 
 async def test_is_protokollant_none_and_match() -> None:
+    """Report the protokollant.
+
+    A `protokollant_id` of None gives False without a database query. A set id matches
+    `_principal_id`.
+    """
     m = _meeting()
-    # A protokollant_id of None gives False without a DB query.
     svc = MeetingService(_QueueSession())  # type: ignore[arg-type]
     assert await svc._is_protokollant(m, _principal()) is False
-    # The id is set and _principal_id matches it.
     pid = uuid4()
     m.protokollant_id = pid
     svc2 = MeetingService(_QueueSession(executes=[res(pid)]))  # type: ignore[arg-type]
@@ -323,12 +326,16 @@ async def test_can_write_meeting_loads_the_meeting() -> None:
 
 
 async def test_can_write_paths(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Grant the write access on three paths.
+
+    The paths: `can_manage` as an admin without a query; no manage permission, but the
+    principal is the protokollant; no manage permission and no protokollant, but a
+    `protocol.write` role.
+    """
     m = _meeting()
-    # 1) can_manage as an admin gives True without a query.
     svc = MeetingService(_QueueSession())  # type: ignore[arg-type]
     assert await svc.can_write(m, _admin()) is True
 
-    # 2) No manage permission, but the principal is the protokollant.
     async def _no_perm(_s, _sub, _perm, now=None):
         return set()
 
@@ -337,7 +344,6 @@ async def test_can_write_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     svc2 = MeetingService(_QueueSession(executes=[res(m.protokollant_id)]))  # type: ignore[arg-type]
     assert await svc2.can_write(m, _principal()) is True
 
-    # 3) No manage permission and no protokollant, but a protocol.write role.
     gid = m.gremium_id
 
     async def _write(_s, _sub, perm, now=None):
@@ -350,6 +356,7 @@ async def test_can_write_paths(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 async def test_can_manage_votes_paths(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Grant the vote management through the protokollant and through the `vote.manage` role."""
     m = _meeting()
     svc = MeetingService(_QueueSession())  # type: ignore[arg-type]
     assert await svc.can_manage_votes(m, _admin()) is True
@@ -358,12 +365,10 @@ async def test_can_manage_votes_paths(monkeypatch: pytest.MonkeyPatch) -> None:
         return set()
 
     _patch_gids(monkeypatch, _none)
-    # The protokollant branch.
     m.protokollant_id = uuid4()
     svc2 = MeetingService(_QueueSession(executes=[res(m.protokollant_id)]))  # type: ignore[arg-type]
     assert await svc2.can_manage_votes(m, _principal()) is True
 
-    # The vote.manage role branch.
     gid = m.gremium_id
 
     async def _vm(_s, _sub, perm, now=None):
@@ -413,13 +418,16 @@ async def test_can_vote_via_role(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 async def test_can_vote_via_delegation(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Grant the vote through a voting delegation.
+
+    `_delegated_meeting_ids(voting_only=True)` returns the meeting.
+    """
     m = _meeting()
 
     async def _none(_s, _sub, _perm, now=None):
         return set()
 
     _patch_gids(monkeypatch, _none)
-    # The call _delegated_meeting_ids(voting_only=True) returns the meeting.
     svc = MeetingService(_QueueSession(executes=[res(m.id)]))  # type: ignore[arg-type]
     assert await svc.can_vote(m, _principal()) is True
 
@@ -471,13 +479,17 @@ async def test_is_participant_view_all() -> None:
 
 
 async def test_is_participant_delegation(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Admit a delegation recipient as a participant.
+
+    `is_member` is False and `meeting.view_all` is absent, so `_delegated_meeting_ids`
+    decides.
+    """
     mid = uuid4()
 
     async def _none(_s, _sub, now=None):
         return set()
 
     monkeypatch.setattr(permissions_mod, "gremium_member_ids", _none)
-    # is_member is False and view_all is absent, so _delegated_meeting_ids returns mid.
     svc = MeetingService(_QueueSession(executes=[res(mid)]))  # type: ignore[arg-type]
     assert await svc.is_participant(mid, uuid4(), _principal()) is True
 
@@ -489,10 +501,13 @@ async def test_delegated_meeting_ids_voting_only_branch() -> None:
 
 
 async def test_visible_gremium_ids_admin_none() -> None:
+    """Return None for an admin.
+
+    An admin token scoped to `read` keeps the view through `meeting.view_all`.
+    """
     svc = MeetingService(_QueueSession())  # type: ignore[arg-type]
     assert await svc._visible_gremium_ids(_principal(roles=["admin"])) is None
     assert await svc._visible_gremium_ids(_principal("meeting.view_all")) is None
-    # An admin token scoped to `read` keeps the view through `meeting.view_all`.
     read_admin = Principal(
         sub="a", roles=["admin"], scope_permissions=frozenset({"meeting.view_all"})
     )
@@ -502,13 +517,16 @@ async def test_visible_gremium_ids_admin_none() -> None:
 async def test_visible_gremium_ids_member_union_pool(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Join the member gremien and the pool gremien.
+
+    `_substitute_pool_gremium_ids` returns the pool gremium.
+    """
     mg, pg = uuid4(), uuid4()
 
     async def _members(_s, _sub, now=None):
         return {mg}
 
     monkeypatch.setattr(permissions_mod, "gremium_member_ids", _members)
-    # The call _substitute_pool_gremium_ids returns pg.
     svc = MeetingService(_QueueSession(executes=[res(pg)]))  # type: ignore[arg-type]
     assert await svc._visible_gremium_ids(_principal()) == {mg, pg}
 
@@ -526,17 +544,19 @@ async def test_protocol_id_returns_value() -> None:
 
 
 async def test_name_for_none_and_value() -> None:
+    """Resolve a name.
+
+    A `display_name` of None falls back to the email. A row of None gives None.
+    """
     assert await MeetingService._name_for(_QueueSession(), None) is None  # type: ignore[arg-type]
     from types import SimpleNamespace
 
     row = SimpleNamespace(display_name="Alice", email="a@x")
     sess = _QueueSession(get_q=[row])
     assert await MeetingService._name_for(sess, uuid4()) == "Alice"  # type: ignore[arg-type]
-    # A display_name of None falls back to the email.
     row2 = SimpleNamespace(display_name=None, email="b@x")
     sess2 = _QueueSession(get_q=[row2])
     assert await MeetingService._name_for(sess2, uuid4()) == "b@x"  # type: ignore[arg-type]
-    # A row of None gives None.
     assert await MeetingService._name_for(_QueueSession(), uuid4()) is None  # type: ignore[arg-type]
 
 
@@ -559,7 +579,6 @@ async def test_emit_without_principal() -> None:
     assert out.gremium_id == m.gremium_id
 
 
-# service.py: _votes_for, _present_by_meeting and _vote_tallies
 def _vote_row(
     *,
     meeting_id: UUID | None,
@@ -603,8 +622,7 @@ async def test_absent_delegated_by_meeting_empty() -> None:
 
 
 async def test_absent_delegated_by_meeting_groups_rows() -> None:
-    # FIX 2: returns {(meeting, str(gremium)): count} for the active vote delegations
-    # of absent delegators.
+    """Count the active vote delegations of absent delegators per meeting and gremium."""
     mid, gid = uuid4(), uuid4()
     sess = _QueueSession(executes=[res((mid, gid, 2))])
     svc = MeetingService(sess)  # type: ignore[arg-type]
@@ -618,17 +636,21 @@ async def test_vote_tallies_empty() -> None:
 
 
 async def test_votes_for_closed_revealed() -> None:
+    """Reveal a closed vote.
+
+    The execute order: `_votes_for` selects the votes with `scalars().all()`.
+    `_vote_tallies` then reads the open and the secret ballots, each with one
+    `execute().all()`. `_present_by_meeting` comes last. The fake session returns, in order:
+    the votes, the open ballots, no secret ballots and the present count.
+    """
     mid = uuid4()
     vrow = _vote_row(meeting_id=mid, status="closed", result="passed", eligible=2)
-    # The execute() order is: _votes_for selects the votes with scalars().all(). Then
-    # _vote_tallies reads the open ballots and the secret ballots, each through one
-    # call of execute().all(). Last comes _present_by_meeting with execute().all().
     sess = _QueueSession(
         executes=[
-            res(vrow),  # votes
-            res((vrow.id, "yes"), (vrow.id, "no")),  # open ballots
-            res(),  # secret ballots
-            res((mid, 2)),  # present_by_meeting
+            res(vrow),
+            res((vrow.id, "yes"), (vrow.id, "no")),
+            res(),
+            res((mid, 2)),
         ]
     )
     svc = MeetingService(sess)  # type: ignore[arg-type]
@@ -642,34 +664,44 @@ async def test_votes_for_closed_revealed() -> None:
 
 
 async def test_votes_for_secret_open_hidden() -> None:
+    """Hide the tally of an open secret vote.
+
+    The fake session returns, in order: the votes, no open ballots (the vote is secret), the
+    secret ballots and the present count.
+    """
     mid = uuid4()
     vrow = _vote_row(meeting_id=mid, status="open", secret=True, eligible=3)
     sess = _QueueSession(
         executes=[
-            res(vrow),  # votes
-            res(),  # open ballots, empty because the vote is secret
-            res((vrow.id, "yes")),  # secret ballots
-            res((mid, 3)),  # present
+            res(vrow),
+            res(),
+            res((vrow.id, "yes")),
+            res((mid, 3)),
         ]
     )
     svc = MeetingService(sess)  # type: ignore[arg-type]
     out = await svc._votes_for([mid])
     item = out[mid][0]
-    assert item.revealed is False  # secret and open, so the tally stays hidden
+    assert item.revealed is False
     assert item.counts == {}
     assert item.leading is None
     assert item.voted == 1
 
 
 async def test_votes_for_open_all_voted_revealed() -> None:
+    """Reveal an open vote when every present member voted.
+
+    The fake session returns, in order: the votes, two open ballots, no secret ballots and
+    two present members.
+    """
     mid = uuid4()
     vrow = _vote_row(meeting_id=mid, status="open", secret=False, eligible=2)
     sess = _QueueSession(
         executes=[
-            res(vrow),  # votes
-            res((vrow.id, "yes"), (vrow.id, "yes")),  # open ballots
-            res(),  # secret ballots
-            res((mid, 2)),  # present=2, voted=2 → revealed
+            res(vrow),
+            res((vrow.id, "yes"), (vrow.id, "yes")),
+            res(),
+            res((mid, 2)),
         ]
     )
     svc = MeetingService(sess)  # type: ignore[arg-type]
@@ -680,39 +712,49 @@ async def test_votes_for_open_all_voted_revealed() -> None:
 
 
 async def test_votes_for_open_proxy_denominator_hides_until_proxy_votes() -> None:
-    # FIX 2: two present members plus one vote delegation of an absent member give
-    # an expected count of 3. The two votes of the present members leave the proxy
-    # vote open, so the tally stays hidden.
+    """Hide the tally until the proxy vote is in.
+
+    Two present members plus one vote delegation of an absent member give an expected count
+    of 3. The two votes of the present members leave the proxy vote open, so the tally stays
+    hidden. The fake session returns, in order: the votes, two open ballots, no secret
+    ballots, two present members, no admitted guests and one proxy vote of an absent
+    delegator.
+    """
     mid = uuid4()
     gid = uuid4()
     vrow = _vote_row(meeting_id=mid, status="open", secret=False, eligible=5)
     vrow.eligible_group = str(gid)
     sess = _QueueSession(
         executes=[
-            res(vrow),  # votes
-            res((vrow.id, "yes"), (vrow.id, "yes")),  # open ballots: 2
-            res(),  # secret ballots
-            res((mid, 2)),  # present=2
-            res(),  # admitted guests: none
-            res((mid, gid, 1)),  # one proxy vote of an absent delegator, so expected=3
+            res(vrow),
+            res((vrow.id, "yes"), (vrow.id, "yes")),
+            res(),
+            res((mid, 2)),
+            res(),
+            res((mid, gid, 1)),
         ]
     )
     svc = MeetingService(sess)  # type: ignore[arg-type]
     out = await svc._votes_for([mid])
     item = out[mid][0]
-    assert item.revealed is False  # 2 is below the expected 3, so the tally stays hidden
+    assert item.revealed is False
     assert item.counts == {}
 
 
 async def test_votes_for_open_not_all_voted_hidden() -> None:
+    """Hide the tally of an open vote while not every present member voted.
+
+    The fake session returns, in order: the votes, one open ballot, no secret ballots and
+    three present members.
+    """
     mid = uuid4()
     vrow = _vote_row(meeting_id=mid, status="open", secret=False, eligible=5)
     sess = _QueueSession(
         executes=[
-            res(vrow),  # votes
-            res((vrow.id, "yes")),  # open ballots: 1
-            res(),  # secret ballots
-            res((mid, 3)),  # present=3 > voted=1 → hidden
+            res(vrow),
+            res((vrow.id, "yes")),
+            res(),
+            res((mid, 3)),
         ]
     )
     svc = MeetingService(sess)  # type: ignore[arg-type]
@@ -723,27 +765,33 @@ async def test_votes_for_open_not_all_voted_hidden() -> None:
 
 
 async def test_votes_for_skips_unbound_vote() -> None:
-    # A vote with meeting_id None hits the continue branch of _votes_for.
+    """Skip a vote without a meeting.
+
+    The vote with `meeting_id` None hits the `continue` branch of `_votes_for`. The call
+    passes the id on to `_present_by_meeting`, but the loop skips the vote.
+    """
     vrow = _vote_row(meeting_id=None)
     sess = _QueueSession(
         executes=[
-            res(vrow),  # votes
-            res(),  # open ballots
-            res(),  # secret ballots
-            res(),  # present
+            res(vrow),
+            res(),
+            res(),
+            res(),
         ]
     )
     svc = MeetingService(sess)  # type: ignore[arg-type]
-    # The call passes the id on to present_by_meeting. The vote itself carries
-    # meeting_id None, so the loop skips it.
     out = await svc._votes_for([uuid4()])
     assert out == {}
 
 
 async def test_votes_for_config_not_dict() -> None:
-    # A v.config that is no dict, here a VoteConfig instance, takes the ``else {}``
-    # branch in _votes_for. opts stays empty and secret stays False. _vote_tallies
-    # still validates the config.
+    """Read a config that is no dict.
+
+    A `VoteConfig` instance takes the `else {}` branch in `_votes_for`, so `opts` stays
+    empty and `secret` stays False. `_vote_tallies` still validates the config, because
+    `VoteConfig.from_stored` accepts an instance as it is. Without a principal (a broadcast)
+    the vote carries no own ballot.
+    """
     from app.shared.config_schemas import VoteConfig
 
     mid = uuid4()
@@ -753,30 +801,28 @@ async def test_votes_for_config_not_dict() -> None:
     )
     sess = _QueueSession(
         executes=[
-            res(vrow),  # votes
-            res(),  # open ballots
-            res(),  # secret ballots
-            res((mid, 0)),  # present
+            res(vrow),
+            res(),
+            res(),
+            res((mid, 0)),
         ]
     )
     svc = MeetingService(sess)  # type: ignore[arg-type]
     out = await svc._votes_for([mid])
     item = out[mid][0]
-    # `VoteConfig.from_stored` accepts a VoteConfig instance as it is.
     assert item.options == ["yes", "no"]
     assert item.majority_rule == "simple"
-    # Without a principal (a broadcast) the vote carries no own ballot.
     assert item.my_ballot is None
 
 
 async def test_vote_tallies_failed_reason_set() -> None:
-    # A closed status with a result makes the service compute failed_reason.
+    """Compute `failed_reason` for a closed vote with a result."""
     mid = uuid4()
     vrow = _vote_row(meeting_id=mid, status="closed", result="rejected", eligible=10)
     sess = _QueueSession(
         executes=[
-            res((vrow.id, "no"), (vrow.id, "no")),  # open ballots
-            res(),  # secret ballots
+            res((vrow.id, "no"), (vrow.id, "no")),
+            res(),
         ]
     )
     svc = MeetingService(sess)  # type: ignore[arg-type]
@@ -786,15 +832,19 @@ async def test_vote_tallies_failed_reason_set() -> None:
     assert reason in ("quorum", "majority")
 
 
-# service.py: list, list_filter_gremien, list_timeline and _search_timeline
 async def test_list_admin_no_filter() -> None:
+    """List the meetings of an admin without a filter.
+
+    The fake session returns, in order: the meetings, no protocol rows, the gremium names
+    and no votes.
+    """
     m = _meeting()
     sess = _QueueSession(
         executes=[
-            res(m),  # select(Meeting) list
-            res(),  # _decorate: proto rows
-            res((m.gremium_id, "StuPa")),  # gremium names
-            res(),  # _votes_for: votes
+            res(m),
+            res(),
+            res((m.gremium_id, "StuPa")),
+            res(),
         ]
     )
     svc = MeetingService(sess)  # type: ignore[arg-type]
@@ -806,6 +856,13 @@ async def test_list_admin_no_filter() -> None:
 async def test_list_with_gremium_filter_and_visibility(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """List with a gremium filter and the visibility of a non-admin.
+
+    The fake session returns, in order: the pool gremium (in `_visible`), no delegated
+    meetings, the meetings, no protocol rows, the gremium names, the empty permission
+    queries of `_decorate` (`session.manage`, `protocol.write`, `vote.manage`,
+    `protocol.finalize`), the principal id, no `vote.cast` and no votes.
+    """
     m = _meeting()
 
     async def _members(_s, _sub, now=None):
@@ -814,19 +871,18 @@ async def test_list_with_gremium_filter_and_visibility(
     monkeypatch.setattr(permissions_mod, "gremium_member_ids", _members)
     sess = _QueueSession(
         executes=[
-            res(m.gremium_id),  # _substitute_pool_gremium_ids (in _visible)
-            res(),  # _delegated_meeting_ids
-            res(m),  # select(Meeting)
-            res(),  # proto rows
-            res((m.gremium_id, "G")),  # gremium names
-            # _decorate non-admin perms:
-            res(),  # session.manage
-            res(),  # protocol.write
-            res(),  # vote.manage
-            res(),  # protocol.finalize
-            res(uuid4()),  # _principal_id
-            res(),  # vote.cast
-            res(),  # _votes_for: votes
+            res(m.gremium_id),
+            res(),
+            res(m),
+            res(),
+            res((m.gremium_id, "G")),
+            res(),
+            res(),
+            res(),
+            res(),
+            res(uuid4()),
+            res(),
+            res(),
         ]
     )
     svc = MeetingService(sess)  # type: ignore[arg-type]
@@ -835,13 +891,18 @@ async def test_list_with_gremium_filter_and_visibility(
 
 
 async def test_list_with_date_range() -> None:
+    """List with a date range.
+
+    The fake session returns, in order: the meetings, no protocol rows, the gremium names
+    and no votes.
+    """
     m = _meeting()
     sess = _QueueSession(
         executes=[
-            res(m),  # select(Meeting) list
-            res(),  # _decorate: proto rows
-            res((m.gremium_id, "StuPa")),  # gremium names
-            res(),  # _votes_for: votes
+            res(m),
+            res(),
+            res((m.gremium_id, "StuPa")),
+            res(),
         ]
     )
     svc = MeetingService(sess)  # type: ignore[arg-type]
@@ -857,6 +918,14 @@ async def test_decorate_empty() -> None:
 async def test_decorate_non_admin_protokollant_flag(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Set the write flag of a non-admin protokollant.
+
+    The four permission queries run through the mocked `gremium_ids_with_permission` and
+    consume no execute result. The fake session returns, in order: no protocol rows, the
+    gremium names, the protokollant names, the principal id that matches the protokollant,
+    and no votes. The write flag then comes from the protokollant. The test also keeps
+    `SimpleNamespace` in use.
+    """
     m = _meeting()
     my = uuid4()
     m.protokollant_id = my
@@ -866,24 +935,21 @@ async def test_decorate_non_admin_protokollant_flag(
         return set()
 
     _patch_gids(monkeypatch, _none)
-    # The four permission queries run through the mocked ``gremium_ids_with_permission``
-    # and consume NO execute() result. The remaining execute() order is: proto rows,
-    # gremium names, protokollant names, _principal_id, and the votes of _votes_for.
     sess = _QueueSession(
         executes=[
-            res(),  # proto rows
-            res((m.gremium_id, "G")),  # gremium names
-            res((my, "Bob", "bob@x")),  # protokollant names
-            res(my),  # _principal_id matches the protokollant
-            res(),  # _votes_for: votes
+            res(),
+            res((m.gremium_id, "G")),
+            res((my, "Bob", "bob@x")),
+            res(my),
+            res(),
         ]
     )
     svc = MeetingService(sess)  # type: ignore[arg-type]
     out = await svc._decorate([m], _principal())
     assert out[0].protokollant_name == "Bob"
-    assert out[0].can_write is True  # via is_prot
+    assert out[0].can_write is True
     assert out[0].can_manage_votes is True
-    _ = SimpleNamespace  # keep import tidy
+    _ = SimpleNamespace
 
 
 async def test_list_filter_gremien_admin_sorted() -> None:
@@ -897,6 +963,11 @@ async def test_list_filter_gremien_admin_sorted() -> None:
 async def test_list_filter_gremien_non_admin_visibility(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """List the filter gremien of a non-admin.
+
+    The fake session returns, in order: no pool gremien, no delegated meetings and the
+    gremium rows.
+    """
     g1 = uuid4()
 
     async def _members(_s, _sub, now=None):
@@ -905,9 +976,9 @@ async def test_list_filter_gremien_non_admin_visibility(
     monkeypatch.setattr(permissions_mod, "gremium_member_ids", _members)
     sess = _QueueSession(
         executes=[
-            res(),  # _substitute_pool
-            res(),  # _delegated
-            res((g1, "Beta")),  # rows
+            res(),
+            res(),
+            res((g1, "Beta")),
         ]
     )
     svc = MeetingService(sess)  # type: ignore[arg-type]
@@ -916,16 +987,21 @@ async def test_list_filter_gremien_non_admin_visibility(
 
 
 async def test_list_timeline_upcoming_pagination() -> None:
+    """Page the upcoming timeline.
+
+    A limit of 1 loads 2 rows, so `has_more` turns True and the page returns 1 row. The fake
+    session returns, in order: the timeline rows, no protocol rows, the gremium names and no
+    votes.
+    """
     m1, m2 = _meeting(status="live"), _meeting(status="planned")
     ts1 = datetime(2026, 6, 16, 9, 0)
     ts2 = datetime(2026, 6, 17, 9, 0)
-    # A limit of 1 loads 2 rows, so has_more turns True and the page returns 1 row.
     sess = _QueueSession(
         executes=[
-            res((m1, ts1), (m2, ts2)),  # timeline rows (limit+1)
-            res(),  # _decorate proto
-            res((m1.gremium_id, "G")),  # gremium names
-            res(),  # _votes_for
+            res((m1, ts1), (m2, ts2)),
+            res(),
+            res((m1.gremium_id, "G")),
+            res(),
         ]
     )
     svc = MeetingService(sess)  # type: ignore[arg-type]
@@ -937,6 +1013,12 @@ async def test_list_timeline_upcoming_pagination() -> None:
 async def test_list_timeline_past_with_cursor_and_gremium(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Page the past timeline with a cursor and a gremium.
+
+    The fake session returns, in order: the pool gremium (in `_visible`), no delegated
+    meetings, one row (within the limit, so no next page), no protocol rows, the names, the
+    empty permission queries, the principal id, no `vote.cast` and no votes.
+    """
     m = _meeting(status="closed")
     ts = datetime(2026, 6, 10, 9, 0)
     cursor = _encode_cursor(datetime(2026, 6, 16, 9, 0), uuid4())
@@ -947,18 +1029,18 @@ async def test_list_timeline_past_with_cursor_and_gremium(
     monkeypatch.setattr(permissions_mod, "gremium_member_ids", _members)
     sess = _QueueSession(
         executes=[
-            res(m.gremium_id),  # _substitute_pool (in _visible)
-            res(),  # _delegated
-            res((m, ts)),  # rows (1 ≤ limit → no more)
-            res(),  # proto
-            res((m.gremium_id, "G")),  # names
-            res(),  # session.manage
-            res(),  # protocol.write
-            res(),  # vote.manage
-            res(),  # protocol.finalize
-            res(uuid4()),  # principal_id
-            res(),  # vote.cast
-            res(),  # votes
+            res(m.gremium_id),
+            res(),
+            res((m, ts)),
+            res(),
+            res((m.gremium_id, "G")),
+            res(),
+            res(),
+            res(),
+            res(),
+            res(uuid4()),
+            res(),
+            res(),
         ]
     )
     svc = MeetingService(sess)  # type: ignore[arg-type]
@@ -974,7 +1056,8 @@ async def test_list_timeline_past_with_cursor_and_gremium(
 
 
 async def test_list_timeline_empty_rows_no_cursor() -> None:
-    sess = _QueueSession(executes=[res()])  # no rows
+    """Return no cursor for an empty timeline."""
+    sess = _QueueSession(executes=[res()])
     svc = MeetingService(sess)  # type: ignore[arg-type]
     page = await svc.list_timeline(_admin(), direction="upcoming")
     assert page.items == []
@@ -982,16 +1065,18 @@ async def test_list_timeline_empty_rows_no_cursor() -> None:
 
 
 async def test_list_timeline_past_without_cursor() -> None:
-    # The past direction without a cursor takes the False branch of
-    # ``if cur is not None`` (650->653).
+    """Page the past timeline without a cursor.
+
+    The fake session returns, in order: the rows, no protocol rows, the names and no votes.
+    """
     m = _meeting(status="closed")
     ts = datetime(2026, 6, 10, 9, 0)
     sess = _QueueSession(
         executes=[
-            res((m, ts)),  # rows
-            res(),  # proto
-            res((m.gremium_id, "G")),  # names
-            res(),  # votes
+            res((m, ts)),
+            res(),
+            res((m.gremium_id, "G")),
+            res(),
         ]
     )
     svc = MeetingService(sess)  # type: ignore[arg-type]
@@ -1000,13 +1085,18 @@ async def test_list_timeline_past_without_cursor() -> None:
 
 
 async def test_list_timeline_search_branch() -> None:
+    """Search the timeline.
+
+    The fake session returns, in order: the search rows (`scalars().all()`), no protocol
+    rows, the names and no votes.
+    """
     m = _meeting()
     sess = _QueueSession(
         executes=[
-            res(m),  # search rows (scalars().all())
-            res(),  # proto
-            res((m.gremium_id, "G")),  # names
-            res(),  # votes
+            res(m),
+            res(),
+            res((m.gremium_id, "G")),
+            res(),
         ],
         bind=True,
     )
@@ -1018,6 +1108,12 @@ async def test_list_timeline_search_branch() -> None:
 async def test_search_timeline_pagination_and_gremium(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Page the search with a gremium.
+
+    The fake session returns, in order: the pool gremium, no delegated meetings, the search
+    rows (one past the limit, so `has_more`), no protocol rows, the names, the empty
+    permission queries, the principal id, no `vote.cast` and no votes.
+    """
     m1, m2 = _meeting(), _meeting(gremium_id=None)
     m2.gremium_id = m1.gremium_id
 
@@ -1027,18 +1123,18 @@ async def test_search_timeline_pagination_and_gremium(
     monkeypatch.setattr(permissions_mod, "gremium_member_ids", _members)
     sess = _QueueSession(
         executes=[
-            res(m1.gremium_id),  # _substitute_pool
-            res(),  # _delegated
-            res(m1, m2),  # search rows (limit+1 → has_more)
-            res(),  # proto
-            res((m1.gremium_id, "G")),  # names
-            res(),  # session.manage
-            res(),  # protocol.write
-            res(),  # vote.manage
-            res(),  # protocol.finalize
-            res(uuid4()),  # principal_id
-            res(),  # vote.cast
-            res(),  # votes
+            res(m1.gremium_id),
+            res(),
+            res(m1, m2),
+            res(),
+            res((m1.gremium_id, "G")),
+            res(),
+            res(),
+            res(),
+            res(),
+            res(uuid4()),
+            res(),
+            res(),
         ],
         bind=True,
     )
@@ -1050,7 +1146,6 @@ async def test_search_timeline_pagination_and_gremium(
     assert page.next_cursor is not None
 
 
-# service.py: create and _resolve_protokollant
 async def test_create_forbidden(monkeypatch: pytest.MonkeyPatch) -> None:
     async def _none(_s, _sub, _perm, now=None):
         return set()
@@ -1145,7 +1240,6 @@ async def test_resolve_protokollant_ok(monkeypatch: pytest.MonkeyPatch) -> None:
     assert await svc._resolve_protokollant(gid, pid) == pid
 
 
-# service.py: patch with all its branches
 async def test_patch_wants_manage_forbidden(monkeypatch: pytest.MonkeyPatch) -> None:
     m = _meeting()
 
@@ -1161,6 +1255,12 @@ async def test_patch_wants_manage_forbidden(monkeypatch: pytest.MonkeyPatch) -> 
 
 
 async def test_patch_wants_write_forbidden(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Refuse a write patch without the write access.
+
+    The order is `_get`, then `can_write`. `can_manage` finds no permission,
+    `_is_protokollant` runs no query because `protokollant_id` is None, and the
+    `protocol.write` permission is absent too.
+    """
     m = _meeting()
 
     async def _none(_s, _sub, _perm, now=None):
@@ -1173,9 +1273,6 @@ async def test_patch_wants_write_forbidden(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setattr(permissions_mod, "gremium_member_ids", _nomember)
     from app.modules.livevote.schemas import MeetingPatch
 
-    # The order is _get(meeting), then can_write. can_manage finds no permission.
-    # _is_protokollant runs no query because protokollant_id is None. The
-    # protocol.write permission is absent too.
     svc = MeetingService(_QueueSession(executes=[res(m)]))  # type: ignore[arg-type]
     with pytest.raises(ForbiddenError):
         await svc.patch(m.id, MeetingPatch(status="closed"), _principal())
@@ -1229,6 +1326,12 @@ async def test_patch_protokollant_finalized_conflict(
 
 
 async def test_patch_protokollant_resolved(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Resolve a new protokollant on a patch.
+
+    The order is `_get`, then the get of `_resolve_protokollant` gives the row, then `_emit`
+    reads the name, the gremium and the flags over the admin shortcut. `_votes_for` stays
+    empty.
+    """
     from types import SimpleNamespace
 
     m = _meeting()
@@ -1248,9 +1351,6 @@ async def test_patch_protokollant_resolved(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setattr(handover_mod, "keeper_principal_ids", _keepers)
     from app.modules.livevote.schemas import MeetingPatch
 
-    # The order is _get, then the get of _resolve_protokollant gives the row, then
-    # _emit reads name, gremium and the can_* flags over the admin shortcut.
-    # _votes_for stays empty.
     sess = _QueueSession(
         executes=[res(m)],
         get_q=[SimpleNamespace(sub="x")],
@@ -1272,6 +1372,11 @@ async def test_patch_going_live_without_protokollant_conflict() -> None:
 
 
 async def test_patch_going_live_ok_with_publisher() -> None:
+    """Start a meeting with a publisher.
+
+    The order is `_get`, then `_emit`, where the name get and the gremium get both give
+    None. `_votes_for` stays empty.
+    """
     m = _meeting()
     m.protokollant_id = uuid4()
     from app.modules.livevote.schemas import MeetingPatch
@@ -1284,8 +1389,6 @@ async def test_patch_going_live_ok_with_publisher() -> None:
             self.states.append(out)
 
     pub = _Pub()
-    # The order is _get, then _emit where the name get and the gremium get both give
-    # None. _votes_for stays empty.
     sess = _QueueSession(executes=[res(m)])
     svc = MeetingService(sess, pub)  # type: ignore[arg-type]
     out = await svc.patch(m.id, MeetingPatch(status="live", activeApplicationId=uuid4()), _admin())
@@ -1294,10 +1397,13 @@ async def test_patch_going_live_ok_with_publisher() -> None:
 
 
 async def test_patch_close_stamps_closed_at() -> None:
+    """Stamp `closed_at` on the close.
+
+    After `_get` the open-vote check and the draft cancel find nothing.
+    """
     m = _meeting(status="live")
     from app.modules.livevote.schemas import MeetingPatch
 
-    # _get, then the open-vote check and the draft cancel find nothing.
     svc = MeetingService(_QueueSession(executes=[res(m)]))  # type: ignore[arg-type]
     out = await svc.patch(m.id, MeetingPatch(status="closed"), _admin())
     assert out.status == "closed"
@@ -1318,7 +1424,7 @@ async def test_patch_set_times_and_end() -> None:
 
 
 async def test_patch_set_date() -> None:
-    # A date patch on a planned meeting. It covers line 866 of the service.
+    """Patch the date of a planned meeting."""
     m = _meeting()
     from app.modules.livevote.schemas import MeetingPatch
 
@@ -1328,7 +1434,6 @@ async def test_patch_set_date() -> None:
     assert out.date == date(2026, 7, 1)
 
 
-# service.py: patch of the current agenda item ("Jetzt")
 def _keeper(monkeypatch: pytest.MonkeyPatch, *, scope: set[str] | None = None) -> Principal:
     """Act as the protokollant of every meeting: the sub `keeper`."""
 
@@ -1345,6 +1450,11 @@ async def test_patch_current_item_forbidden_without_the_minutes(
     who: str,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Refuse the move of the current item to everybody but the protokollant.
+
+    Not a gremium role, not the session lead or the admin, and not a token of the
+    protokollant without `protocol.write` moves the room.
+    """
     m = _meeting(status="live")
 
     async def _none(_s, _sub, _perm, now=None):
@@ -1353,8 +1463,6 @@ async def test_patch_current_item_forbidden_without_the_minutes(
     _patch_gids(monkeypatch, _none)
     from app.modules.livevote.schemas import MeetingPatch
 
-    # Only the protokollant moves the room: not a gremium role, not the session lead
-    # or the admin, and not a token of the protokollant without `protocol.write`.
     principal = {
         "role": _principal(),
         "admin": _admin(),
@@ -1377,10 +1485,13 @@ async def test_patch_current_item_closed_conflict(monkeypatch: pytest.MonkeyPatc
 async def test_patch_current_item_of_other_meeting_not_found(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Answer 404 for a current item of another meeting.
+
+    The item lookup answers with a foreign meeting id.
+    """
     m = _meeting(status="live")
     from app.modules.livevote.schemas import MeetingPatch
 
-    # The item lookup answers with a foreign meeting id.
     svc = MeetingService(_QueueSession(executes=[res(m)], scalar_q=[uuid4()]))  # type: ignore[arg-type]
     with pytest.raises(NotFoundError):
         await svc.patch(m.id, MeetingPatch(currentAgendaItemId=uuid4()), _keeper(monkeypatch))
@@ -1407,18 +1518,20 @@ async def test_patch_current_item_set_and_broadcast(monkeypatch: pytest.MonkeyPa
 
 
 async def test_patch_current_item_clear(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Clear the current item.
+
+    `null` clears the item and skips the ownership lookup.
+    """
     m = _meeting(status="live")
     m.current_agenda_item_id = uuid4()
     from app.modules.livevote.schemas import MeetingPatch
 
-    # ``null`` clears the item and skips the ownership lookup.
     svc = MeetingService(_QueueSession(executes=[res(m)]))  # type: ignore[arg-type]
     out = await svc.patch(m.id, MeetingPatch(currentAgendaItemId=None), _keeper(monkeypatch))
     assert m.current_agenda_item_id is None
     assert out.current_agenda_item_id is None
 
 
-# service.py: broadcast_state, open_vote, agenda_item_has_vote and other helpers
 async def test_broadcast_state_with_publisher() -> None:
     m = _meeting()
 
@@ -1437,10 +1550,11 @@ async def test_broadcast_state_with_publisher() -> None:
 
 
 async def test_broadcast_state_no_publisher() -> None:
+    """Broadcast nothing and raise no error without a publisher."""
     m = _meeting()
     sess = _QueueSession(executes=[res(m)])
     svc = MeetingService(sess)  # type: ignore[arg-type]
-    await svc.broadcast_state(m.id, _admin())  # no error and no broadcast
+    await svc.broadcast_state(m.id, _admin())
 
 
 async def test_protocol_final_true_false() -> None:
@@ -1466,9 +1580,11 @@ async def test_agenda_item_has_vote() -> None:
 
 
 async def test_agenda_item_has_vote_excludes_cancelled() -> None:
-    # FIX 1: the guard statement MUST hide cancelled votes with
-    # status != 'cancelled'. Without that filter one cancelled application vote
-    # blocks the reopen forever.
+    """Leave the cancelled votes out of the vote guard.
+
+    The guard statement must filter on `status != 'cancelled'`, because without that filter
+    one cancelled application vote blocks the reopen forever.
+    """
     sess = _QueueSession(executes=[res()])
     svc = MeetingService(sess)  # type: ignore[arg-type]
     await svc.agenda_item_has_vote(uuid4())
@@ -1491,32 +1607,39 @@ async def test_gremium_quorum_percent() -> None:
 
 
 async def test_vote_eligible_count() -> None:
+    """Count the vote-eligible members.
+
+    A duplicate member counts once. A member whose permissions are None has no `vote.cast`
+    and does not count.
+    """
     p1, p2 = uuid4(), uuid4()
     rows = res(
         (p1, ["vote.cast"]),
         (p2, ["vote.cast"]),
-        (p1, ["vote.cast"]),  # a duplicate that the set drops
-        (uuid4(), None),  # no vote.cast because perms is None, so it does not count
+        (p1, ["vote.cast"]),
+        (uuid4(), None),
     )
     svc = MeetingService(_QueueSession(executes=[rows]))  # type: ignore[arg-type]
     assert await svc.vote_eligible_count(uuid4()) == 2
 
 
 async def test_assert_can_read_delegation_branch(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Allow the read through a delegation.
+
+    `_get` gives the meeting. The pool is empty, so no gremium is visible.
+    `_delegated_meeting_ids` gives the meeting id, which allows the read.
+    """
     m = _meeting()
 
     async def _none(_s, _sub, now=None):
         return set()
 
     monkeypatch.setattr(permissions_mod, "gremium_member_ids", _none)
-    # _get gives m. _substitute_pool is empty, so visible holds no gremium.
-    # _delegated_meeting_ids gives m.id, which allows the read.
     sess = _QueueSession(executes=[res(m), res(), res(m.id)])
     svc = MeetingService(sess)  # type: ignore[arg-type]
-    await svc.assert_can_read(m.id, _principal())  # no error
+    await svc.assert_can_read(m.id, _principal())
 
 
-# agenda_service.py
 def test_title_of_variants() -> None:
     assert title_of(None) is None
     assert title_of({}) is None
@@ -1608,6 +1731,11 @@ async def test_agenda_list_empty() -> None:
 
 
 async def test_agenda_list_with_application_and_freetext() -> None:
+    """List an application item and a free-text item.
+
+    The fake session returns, in order: the meeting, the agenda items, the applications and
+    the states.
+    """
     m = _meeting()
     gid = m.gremium_id
     state = _state_row(gremium_id=gid)
@@ -1615,11 +1743,11 @@ async def test_agenda_list_with_application_and_freetext() -> None:
     item_app = _agenda_item(application_id=app.id, position=0)
     item_free = _agenda_item(title="Freitext-TOP", position=1, body="Notiz")
     sess = _QueueSession(
-        executes=[res(m)],  # _meeting
+        executes=[res(m)],
         scalars_q=[
-            [item_app, item_free],  # agenda items
-            [app],  # apps
-            [state],  # states
+            [item_app, item_free],
+            [app],
+            [state],
         ],
     )
     svc = AgendaService(sess)  # type: ignore[arg-type]
@@ -1631,15 +1759,19 @@ async def test_agenda_list_with_application_and_freetext() -> None:
 
 
 async def test_agenda_list_app_without_state() -> None:
+    """List an application without a state.
+
+    The session returns the items and the applications. No state ids remain, so the states
+    stay empty without a scalars call.
+    """
     m = _meeting()
     app = _app_row(state_id=None, title="Antrag")
     item = _agenda_item(application_id=app.id)
     sess = _QueueSession(
         executes=[res(m)],
         scalars_q=[
-            [item],  # items
-            [app],  # apps
-            # state_ids empty → states={} (no scalars call)
+            [item],
+            [app],
         ],
     )
     svc = AgendaService(sess)  # type: ignore[arg-type]
@@ -1649,19 +1781,23 @@ async def test_agenda_list_app_without_state() -> None:
 
 
 async def test_agenda_list_app_missing() -> None:
-    # The item references an application_id, but the apps dict is empty, so app is None.
+    """List an item whose application is missing.
+
+    The item references an application id, but no application comes back, so the title falls
+    back to the title of the row.
+    """
     m = _meeting()
     item = _agenda_item(application_id=uuid4())
     sess = _QueueSession(
         executes=[res(m)],
         scalars_q=[
-            [item],  # items
-            [],  # apps empty
+            [item],
+            [],
         ],
     )
     svc = AgendaService(sess)  # type: ignore[arg-type]
     out = await svc.list(m.id)
-    assert out[0].title is None  # app is None, so the title falls back to r.title
+    assert out[0].title is None
 
 
 async def test_set_body_meeting_not_found() -> None:
@@ -1678,12 +1814,16 @@ async def test_set_body_item_not_found() -> None:
 
 
 async def test_set_body_updates_all_fields(audit_calls: list[dict[str, Any]]) -> None:
+    """Update the body, the title and the flag of an item.
+
+    The session answers `_meeting`, the item lookup and the `_meeting` of `list()`, then no
+    agenda items. The live minutes are not audited, the rename and the flag are.
+    """
     m = _meeting(status="live")
     item = _agenda_item(application_id=None, title="old")
     sess = _QueueSession(
-        # _meeting, the item lookup, then list()._meeting
         executes=[res(m), res(item), res(m)],
-        scalars_q=[[]],  # list() agenda items empty
+        scalars_q=[[]],
     )
     svc = AgendaService(sess)  # type: ignore[arg-type]
     await svc.set_body(
@@ -1693,7 +1833,6 @@ async def test_set_body_updates_all_fields(audit_calls: list[dict[str, Any]]) ->
     assert item.title == "new"
     assert item.non_public is True
     assert sess.committed == 1
-    # The live minutes are not audited, the rename and the flag are.
     [entry] = audit_calls
     assert entry["action"].value == "agenda_item_update"
     assert entry["actor"] == "mgr"
@@ -1715,6 +1854,10 @@ async def test_set_body_without_change_writes_no_audit(
 
 
 async def test_set_body_title_ignored_for_application_top() -> None:
+    """Ignore the title for an application item.
+
+    An application item inherits the title of the application.
+    """
     m = _meeting()
     item = _agenda_item(application_id=uuid4(), title="orig")
     sess = _QueueSession(
@@ -1723,18 +1866,20 @@ async def test_set_body_title_ignored_for_application_top() -> None:
     )
     svc = AgendaService(sess)  # type: ignore[arg-type]
     await svc.set_body(m.id, item.id, title="ignored")
-    assert item.title == "orig"  # an application agenda item inherits its title
+    assert item.title == "orig"
 
 
 async def test_set_body_on_planned_meeting_ok(audit_calls: list[dict[str, Any]]) -> None:
-    """The minutes of an item can be written before the meeting starts."""
+    """The minutes of an item can be written before the meeting starts.
+
+    The preparation is not a correction of the minutes, so it writes no audit entry.
+    """
     m = _meeting(status="planned")
     item = _agenda_item()
     sess = _QueueSession(executes=[res(m), res(item), res(m)], scalars_q=[[]])
     await AgendaService(sess).set_body(m.id, item.id, body="x")  # type: ignore[arg-type]
     assert item.body == "x"
     assert sess.committed == 1
-    # The preparation is not a correction of the minutes: no audit entry.
     assert audit_calls == []
 
 
@@ -1750,7 +1895,10 @@ async def test_set_non_public_on_planned_meeting_ok() -> None:
 async def test_set_body_after_close_with_draft_protocol_is_audited(
     audit_calls: list[dict[str, Any]],
 ) -> None:
-    """The minutes stay open after the close while the protocol is a draft."""
+    """The minutes stay open after the close while the protocol is a draft.
+
+    A correction after the close goes into the audit log, without the text.
+    """
     m = _meeting(status="closed")
     item = _agenda_item(body="old")
     sess = _QueueSession(
@@ -1758,7 +1906,6 @@ async def test_set_body_after_close_with_draft_protocol_is_audited(
     )
     await AgendaService(sess).set_body(m.id, item.id, body="fixed", actor="mgr")  # type: ignore[arg-type]
     assert item.body == "fixed"
-    # A correction after the close goes into the audit log, without the text.
     [entry] = audit_calls
     assert entry["data"]["fields"] == ["body"]
     assert "fixed" not in str(entry["data"])
@@ -1791,18 +1938,22 @@ async def test_rename_after_close_conflicts() -> None:
 
 
 async def test_reorder(audit_calls: list[dict[str, Any]]) -> None:
+    """Reorder the agenda items.
+
+    The session answers `_meeting` twice, the rows to reorder and no items for `list()`. The
+    new order is b, then a, then an unknown id for the None branch.
+    """
     m = _meeting()
     a = _agenda_item(position=5)
     b = _agenda_item(position=9)
     sess = _QueueSession(
-        executes=[res(m), res(m)],  # _meeting, list()._meeting
+        executes=[res(m), res(m)],
         scalars_q=[
-            [a, b],  # reorder rows
-            [],  # list() items
+            [a, b],
+            [],
         ],
     )
     svc = AgendaService(sess)  # type: ignore[arg-type]
-    # First b, then a, then an unknown id for the None branch.
     await svc.reorder(m.id, [b.id, a.id, uuid4()], actor="mgr")
     assert b.position == 0
     assert a.position == 1
@@ -1821,14 +1972,19 @@ async def test_reorder_after_close_conflicts() -> None:
 
 
 async def test_assignable_no_vote_states() -> None:
+    """Return no candidates without vote states; nothing is on the agenda."""
     m = _meeting()
-    sess = _QueueSession(executes=[res(m)], scalars_q=[[], []])  # nothing on the agenda
+    sess = _QueueSession(executes=[res(m)], scalars_q=[[], []])
     svc = AgendaService(sess)  # type: ignore[arg-type]
     assert await svc.assignable(m.id) == []
 
 
 async def test_assignable_filters_existing_and_maps() -> None:
-    """The candidates come from `vote_gremium_id` (the snapshot), not from the states."""
+    """The candidates come from `vote_gremium_id` (the snapshot), not from the states.
+
+    The session answers `_meeting` and the labels, the application ids on the agenda and the
+    applications that the Gremium decides. An application on the agenda drops out.
+    """
     m = _meeting()
     gid = m.gremium_id
     state = _state_row(gremium_id=gid)
@@ -1836,16 +1992,16 @@ async def test_assignable_filters_existing_and_maps() -> None:
     app_existing = _app_row(state_id=state.id, title="Schon dran", vote_gremium_id=gid)
     app_nostate = _app_row(state_id=None, title="Keiner", vote_gremium_id=gid)
     sess = _QueueSession(
-        executes=[res(m), _Result([(state.id, state.label_i18n)])],  # _meeting, labels
+        executes=[res(m), _Result([(state.id, state.label_i18n)])],
         scalars_q=[
-            [app_existing.id],  # existing application_ids
-            [app_in, app_existing, app_nostate],  # apps decided by the Gremium
+            [app_existing.id],
+            [app_in, app_existing, app_nostate],
         ],
     )
     out = await AgendaService(sess).assignable(m.id)  # type: ignore[arg-type]
     by_title = {o.title: o for o in out}
     assert by_title["Neu"].state_label == state.label_i18n
-    assert "Schon dran" not in by_title  # already on the agenda
+    assert "Schon dran" not in by_title
     assert by_title["Keiner"].state_label is None
 
 
@@ -1857,14 +2013,19 @@ async def test_next_position_empty_and_existing() -> None:
 
 
 async def test_add_freetext(audit_calls: list[dict[str, Any]]) -> None:
+    """Add a free-text item.
+
+    The fake session returns, in order: the meeting, no maximum position (so the item gets
+    0), the meeting of `list()` and no items.
+    """
     m = _meeting()
     sess = _QueueSession(
         executes=[
-            res(m),  # _meeting
-            res(None),  # _next_position max → 0
-            res(m),  # list()._meeting
+            res(m),
+            res(None),
+            res(m),
         ],
-        scalars_q=[[]],  # list() items
+        scalars_q=[[]],
     )
     svc = AgendaService(sess)  # type: ignore[arg-type]
     await svc.add(m.id, title="  Begrüßung  ", actor="mgr")
@@ -1895,8 +2056,11 @@ async def test_add_application_not_found() -> None:
 
 
 async def test_add_application_not_in_vote_state() -> None:
+    """Refuse an application outside the vote state.
+
+    The snapshot names another Gremium or none, so the add conflicts.
+    """
     m = _meeting()
-    # The snapshot names another Gremium (or none), so it conflicts.
     app = _app_row(state_id=uuid4(), vote_gremium_id=uuid4())
     sess = _QueueSession(executes=[res(m)], get_q=[app])
     svc = AgendaService(sess)  # type: ignore[arg-type]
@@ -1905,19 +2069,24 @@ async def test_add_application_not_in_vote_state() -> None:
 
 
 async def test_add_application_new(audit_calls: list[dict[str, Any]]) -> None:
+    """Add a new application item.
+
+    The fake session returns, in order: the meeting, no existing item, no maximum position,
+    the meeting of `list()` and no items. A system add without an actor is audited too.
+    """
     m = _meeting()
     gid = m.gremium_id
     state = _state_row(gremium_id=gid)
     app = _app_row(state_id=state.id, vote_gremium_id=gid)
     sess = _QueueSession(
         executes=[
-            res(m),  # _meeting
-            res(),  # the existing lookup gives None
-            res(None),  # _next_position
-            res(m),  # list()._meeting
+            res(m),
+            res(),
+            res(None),
+            res(m),
         ],
         scalars_q=[
-            [],  # list() items
+            [],
         ],
         get_q=[app],
     )
@@ -1925,41 +2094,49 @@ async def test_add_application_new(audit_calls: list[dict[str, Any]]) -> None:
     await svc.add(m.id, application_id=app.id)
     assert sess.added and sess.added[0].application_id == app.id
     assert sess.committed == 1
-    # A system add (no actor) is audited too.
     [entry] = audit_calls
     assert entry["actor"] is None
     assert entry["data"]["applicationId"] == str(app.id)
 
 
 async def test_add_application_already_present() -> None:
+    """Add nothing for an application already on the agenda.
+
+    The fake session returns, in order: the meeting, the existing item, the meeting of
+    `list()` and no items.
+    """
     m = _meeting()
     gid = m.gremium_id
     state = _state_row(gremium_id=gid)
     app = _app_row(state_id=state.id, vote_gremium_id=gid)
     sess = _QueueSession(
         executes=[
-            res(m),  # _meeting
-            res(uuid4()),  # the existing lookup finds the item, so no add follows
-            res(m),  # list()._meeting
+            res(m),
+            res(uuid4()),
+            res(m),
         ],
         scalars_q=[
-            [],  # list() items
+            [],
         ],
         get_q=[app],
     )
     svc = AgendaService(sess)  # type: ignore[arg-type]
     await svc.add(m.id, application_id=app.id)
-    assert sess.added == []  # nothing added
+    assert sess.added == []
     assert sess.committed == 0
 
 
 async def test_remove_existing_and_missing(audit_calls: list[dict[str, Any]]) -> None:
+    """Remove an existing item and ignore a missing one.
+
+    The session answers `_meeting`, the item lookup, the votes of the item (none), the
+    `_meeting` of `list()` and no items. A missing item causes no delete and no commit.
+    """
     m = _meeting()
     item = _agenda_item()
     sess = _QueueSession(
-        # _meeting, the item lookup, the votes of the item (none), list()._meeting
         executes=[res(m), res(item), res(), res(m)],
-        scalars_q=[[]],  # list() items
+        scalars_q=[[]],
     )
     svc = AgendaService(sess)  # type: ignore[arg-type]
     await svc.remove(m.id, item.id, actor="mgr", may_delete_votes=True)
@@ -1969,7 +2146,6 @@ async def test_remove_existing_and_missing(audit_calls: list[dict[str, Any]]) ->
     assert entry["action"].value == "agenda_item_remove"
     assert entry["data"]["deletedVoteIds"] == []
 
-    # A missing item causes no delete and no commit.
     sess2 = _QueueSession(
         executes=[res(m), res(), res(m)],
         scalars_q=[[]],
@@ -2023,7 +2199,6 @@ async def test_remove_after_close_conflicts() -> None:
     assert ei.value.code == "meeting_closed"
 
 
-# attendance_service.py
 def _member(*, sub: str = "sub-1", display_name: str = "Alice") -> Any:
     from types import SimpleNamespace
 
@@ -2048,6 +2223,11 @@ async def test_attendance_members() -> None:
 
 
 async def test_roster_maps_records_and_self() -> None:
+    """Map the records and the own row on the roster.
+
+    The fake session returns, in order: the meeting, the current members and the attendance
+    records. A member without a record has no status.
+    """
     from types import SimpleNamespace
 
     meeting = _meeting()
@@ -2056,9 +2236,9 @@ async def test_roster_maps_records_and_self() -> None:
     rec = SimpleNamespace(principal_id=member.id, status="present", source="self", note=None)
     sess = _QueueSession(
         executes=[
-            res(meeting),  # _meeting
-            res(member, other),  # _current_members
-            res(rec),  # attendance records
+            res(meeting),
+            res(member, other),
+            res(rec),
         ]
     )
     svc = AttendanceService(sess)  # type: ignore[arg-type]
@@ -2066,17 +2246,22 @@ async def test_roster_maps_records_and_self() -> None:
     by_pid = {o.principal_id: o for o in out}
     assert by_pid[member.id].status == "present"
     assert by_pid[member.id].is_self is True
-    assert by_pid[other.id].status is None  # no attendance record exists
+    assert by_pid[other.id].status is None
     assert by_pid[other.id].is_self is False
 
 
 async def test_set_self_not_member_forbidden() -> None:
+    """Refuse an own report of a non-member.
+
+    The fake session returns, in order: the meeting and the current members, without the
+    requester.
+    """
     meeting = _meeting(status="live")
     member = _member(sub="someone-else")
     sess = _QueueSession(
         executes=[
-            res(meeting),  # _meeting
-            res(member),  # _current_members (requester not among them)
+            res(meeting),
+            res(member),
         ]
     )
     svc = AttendanceService(sess)  # type: ignore[arg-type]
@@ -2085,17 +2270,23 @@ async def test_set_self_not_member_forbidden() -> None:
 
 
 async def test_set_self_inserts_new() -> None:
+    """Insert a new own report.
+
+    The fake session returns, in order: the meeting, the current members, no existing row
+    (so the upsert inserts), no delegation of the member, and the meeting, the members and
+    the records of the roster.
+    """
     meeting = _meeting(status="live")
     member = _member(sub="me")
     sess = _QueueSession(
         executes=[
-            res(meeting),  # _meeting
-            res(member),  # _current_members (set_self)
-            res(),  # _upsert finds no existing row, so it inserts
-            res(),  # no delegation of the member
-            res(meeting),  # roster _meeting
-            res(member),  # roster _current_members
-            res(),  # roster records
+            res(meeting),
+            res(member),
+            res(),
+            res(),
+            res(meeting),
+            res(member),
+            res(),
         ]
     )
     svc = AttendanceService(sess)  # type: ignore[arg-type]
@@ -2106,24 +2297,29 @@ async def test_set_self_inserts_new() -> None:
 
 
 async def test_set_self_updates_existing() -> None:
+    """Update an existing own report.
+
+    An older own report with "absent" moves to an allowed status. The fake session returns,
+    in order: the meeting, the current members, the existing row, no delegation of the
+    member, and the meeting, the members and the records of the roster. The existing row
+    gets a principal id, so the roster mapping works.
+    """
     from types import SimpleNamespace
 
     meeting = _meeting(status="live")
     member = _member(sub="me")
-    # An older self report with "absent" moves to an allowed status.
     existing = SimpleNamespace(status="absent", source="self", note=None)
     sess = _QueueSession(
         executes=[
-            res(meeting),  # _meeting
-            res(member),  # _current_members
-            res(existing),  # _upsert existing
-            res(),  # no delegation of the member
-            res(meeting),  # roster _meeting
-            res(member),  # roster members
-            res(existing),  # roster records, used only for the mapping
+            res(meeting),
+            res(member),
+            res(existing),
+            res(),
+            res(meeting),
+            res(member),
+            res(existing),
         ]
     )
-    # existing carries no principal_id. Add one so the roster mapping works.
     existing.principal_id = member.id
     svc = AttendanceService(sess)  # type: ignore[arg-type]
     await svc.set_self(meeting.id, "present", "me")
@@ -2133,12 +2329,16 @@ async def test_set_self_updates_existing() -> None:
 
 
 async def test_set_for_not_member_not_found() -> None:
+    """Answer 404 for a lead report on a non-member.
+
+    The fake session returns, in order: the meeting and the current members.
+    """
     meeting = _meeting(status="live")
     member = _member()
     sess = _QueueSession(
         executes=[
-            res(meeting),  # _meeting
-            res(member),  # _current_members
+            res(meeting),
+            res(member),
         ]
     )
     svc = AttendanceService(sess)  # type: ignore[arg-type]
@@ -2147,16 +2347,21 @@ async def test_set_for_not_member_not_found() -> None:
 
 
 async def test_set_for_ok() -> None:
+    """Store a lead report.
+
+    The fake session returns, in order: the meeting, the current members, no existing row
+    (so the upsert inserts), and the meeting, the members and the records of the roster.
+    """
     meeting = _meeting(status="live")
     member = _member(sub="target")
     sess = _QueueSession(
         executes=[
-            res(meeting),  # _meeting
-            res(member),  # _current_members
-            res(),  # _upsert finds no existing row, so it inserts
-            res(meeting),  # roster _meeting
-            res(member),  # roster members
-            res(),  # roster records
+            res(meeting),
+            res(member),
+            res(),
+            res(meeting),
+            res(member),
+            res(),
         ]
     )
     svc = AttendanceService(sess)  # type: ignore[arg-type]
@@ -2166,20 +2371,23 @@ async def test_set_for_ok() -> None:
     assert out[0].principal_id == member.id
 
 
-# router.py: the DI factories
 def test_router_di_factories() -> None:
+    """Build the router dependencies.
+
+    Without a broker or a locker on the app state the factories fall back to the router
+    singletons. With a broker on the state the factory returns exactly that broker. Both
+    voting factories take the flow dispatcher, so the override in `app.main` reaches the
+    live-vote routes too.
+    """
     from types import SimpleNamespace
 
     fake_app = SimpleNamespace(state=SimpleNamespace())
     req = SimpleNamespace(app=fake_app)
     ws = SimpleNamespace(app=fake_app)
-    # Without a broker or a locker on state, the factories fall back to the router
-    # singletons.
     assert get_broker_rest(req) is router_mod._FALLBACK_BROKER  # type: ignore[arg-type]
     assert get_broker_ws(ws) is router_mod._FALLBACK_BROKER  # type: ignore[arg-type]
     assert get_locker_ws(ws) is router_mod._FALLBACK_LOCKER  # type: ignore[arg-type]
 
-    # With a broker on state, the factory returns exactly that broker.
     broker = InMemoryBroker()
     locker = InMemoryLocker()
     fake_app2 = SimpleNamespace(state=SimpleNamespace(broker=broker, locker=locker))
@@ -2194,8 +2402,6 @@ def test_router_di_factories() -> None:
     assert isinstance(get_meeting_service_ws(sess, broker), MeetingService)  # type: ignore[arg-type]
     assert isinstance(get_attendance_service(sess), AttendanceService)  # type: ignore[arg-type]
     assert isinstance(get_agenda_service(sess), AgendaService)  # type: ignore[arg-type]
-    # Both voting factories take the flow dispatcher, so the override in
-    # `app.main` reaches the live-vote routes too.
     flow_dispatcher = NullActionDispatcher()
     rest_voting = get_voting_service(sess, flow_dispatcher)  # type: ignore[arg-type]
     ws_voting = get_voting_service_ws(sess, flow_dispatcher)  # type: ignore[arg-type]
@@ -2203,7 +2409,6 @@ def test_router_di_factories() -> None:
     assert ws_voting.dispatcher is flow_dispatcher
 
 
-# router.py: REST through TestClient with service fakes in dependency_overrides
 def _meeting_out(
     *,
     status: str = "live",
@@ -2291,7 +2496,7 @@ class _FakeMeetingService:
         return "vote"
 
     async def application_vote_gremium(self, application_id: UUID) -> UUID | None:
-        # The snapshot names the Gremium of the meeting unless a test overrides it.
+        """Return the Gremium of the meeting as the snapshot, unless a test overrides it."""
         return self._meeting_out.gremium_id
 
     async def gremium_quorum_percent(self, gremium_id: UUID) -> int | None:
@@ -2543,8 +2748,11 @@ def test_delete_meeting_ok(app: FastAPI, client: TestClient, fakes) -> None:
 
 
 def test_patch_meeting_non_live(app: FastAPI, client: TestClient, fakes) -> None:
-    # patch returns the status "live" by default. A non-live status skips the protocol
-    # branch.
+    """Patch a meeting that does not go live.
+
+    The fake patch returns `live` by default; a status that is not live skips the protocol
+    branch.
+    """
     fakes["meeting"]._meeting_out = _meeting_out(status="planned")
     _login(app)
     r = client.patch(f"/api/meetings/{uuid4()}", json={"status": "planned"})
@@ -2555,7 +2763,11 @@ def test_patch_meeting_non_live(app: FastAPI, client: TestClient, fakes) -> None
 def test_patch_meeting_going_live_creates_protocol(
     app: FastAPI, client: TestClient, fakes, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # patch returns live. The router then creates the protocol and re-reads it.
+    """Create the protocol when the meeting goes live.
+
+    The fake patch returns `live`, so the router creates the protocol and reads the meeting
+    again.
+    """
     fakes["meeting"]._meeting_out = _meeting_out(status="live")
 
     class _FakeProtocolService:
@@ -2737,6 +2949,10 @@ def test_remove_agenda_item_forbidden(app: FastAPI, client: TestClient, fakes) -
 def test_remove_agenda_item_ok(
     app: FastAPI, client: TestClient, fakes, can_manage_votes: bool
 ) -> None:
+    """Remove an agenda item.
+
+    The vote right decides whether the remove may delete the votes of the item.
+    """
     fakes["meeting"]._meeting_out = _meeting_out(
         can_write=True, can_manage_votes=can_manage_votes
     )
@@ -2744,7 +2960,6 @@ def test_remove_agenda_item_ok(
     r = client.delete(f"/api/meetings/{uuid4()}/agenda/{uuid4()}")
     assert r.status_code == 200
     assert "remove" in fakes["agenda"].calls
-    # The vote right decides whether the remove may delete the votes of the item.
     assert fakes["agenda"].may_delete_votes is can_manage_votes
 
 
@@ -2777,8 +2992,11 @@ def test_set_agenda_body_forbidden(app: FastAPI, client: TestClient, fakes) -> N
 def test_set_agenda_body_passes_the_state_rules_to_the_service(
     app: FastAPI, client: TestClient, fakes
 ) -> None:
-    # The service owns the state rules: a planned meeting reaches it, and the
-    # service decides on the 409.
+    """Pass the state rules of the agenda text to the service.
+
+    The service owns the state rules: a planned meeting reaches it, and the service decides
+    on the 409.
+    """
     fakes["meeting"]._meeting_out = _meeting_out(status="planned", can_write=True)
 
     async def _refuse(*_a: Any, **_kw: Any) -> list[Any]:
@@ -2824,7 +3042,10 @@ def test_set_agenda_body_live_only_the_protokollant_writes(
     body: dict[str, str],
     code: int,
 ) -> None:
-    # A live meeting with a protokollant: the lead keeps the agenda but not the text.
+    """Let only the protokollant write the text of a live meeting.
+
+    In a live meeting with a protokollant the lead keeps the agenda but not the text.
+    """
     out = _meeting_out(status=status, can_write=True, is_protokollant=is_keeper)
     fakes["meeting"]._meeting_out = out.model_copy(
         update={"protokollant_id": uuid4() if keeper else None}
@@ -2857,7 +3078,10 @@ def test_open_vote_not_live_conflict(app: FastAPI, client: TestClient, fakes) ->
 
 
 def test_open_vote_freetext_top_ok(app: FastAPI, client: TestClient, fakes) -> None:
-    # An item.application_id of None marks free text and skips the application branches.
+    """Open a vote on a free-text item.
+
+    An `application_id` of None marks free text and skips the application branches.
+    """
     fakes["meeting"]._meeting_out = _meeting_out(status="live", can_manage_votes=True)
     _login(app)
     r = client.post(
@@ -2913,11 +3137,14 @@ async def test_can_run_votes_is_the_protokollant_with_vote_manage(
 def test_open_vote_application_top_with_quorum_and_eligible(
     app: FastAPI, client: TestClient, fakes
 ) -> None:
+    """Open a vote on an application item with a quorum and the server roster.
+
+    The item has an explicit `quorum_percent`. The router must ignore a client
+    `eligibleCount`, because the quorum denominator always comes from the real roster. The
+    fake `vote_eligible_count` returns 7, and the body tries 9.
+    """
     from types import SimpleNamespace
 
-    # An application agenda item with an explicit quorum_percent. The router
-    # MUST ignore a client-supplied ``eligibleCount``. The quorum denominator always
-    # comes from the real roster. The fake vote_eligible_count returns 7.
     fakes["agenda"].item_row = SimpleNamespace(id=uuid4(), application_id=uuid4())
     fakes["meeting"]._meeting_out = _meeting_out(status="live", can_manage_votes=True)
     _login(app)
@@ -2926,11 +3153,10 @@ def test_open_vote_application_top_with_quorum_and_eligible(
         json={
             "agendaItemId": str(uuid4()),
             "quorumPercent": 50,
-            "eligibleCount": 9,  # attacker override, the router must ignore it
+            "eligibleCount": 9,
         },
     )
     assert r.status_code == 200
-    # Server-derived roster size wins over the request body.
     assert fakes["voting"].last_payload.eligible_count == 7
 
 
@@ -3081,12 +3307,12 @@ def _with_vote(
 
 
 def test_open_prepared_vote_recounts_the_roster(app: FastAPI, client: TestClient, fakes) -> None:
+    """Count the roster at the open of a prepared vote, not the roster at the create."""
     out, vote_id = _with_vote(application_id=uuid4())
     fakes["meeting"]._meeting_out = out
     _login(app)
     r = client.post(f"/api/meetings/{out.id}/votes/{vote_id}/open")
     assert r.status_code == 200, r.text
-    # The roster at the open counts, not the roster at the create.
     assert fakes["voting"].opened_eligible == 7
 
 
@@ -3218,13 +3444,16 @@ def test_delete_meeting_vote_forbidden(app: FastAPI, client: TestClient, fakes) 
 def test_delete_meeting_vote_ok(
     app: FastAPI, client: TestClient, fakes, status: str
 ) -> None:
+    """Delete a meeting vote.
+
+    The service writes `vote_delete` for this actor.
+    """
     fakes["meeting"]._meeting_out = _meeting_out(status=status, can_manage_votes=True)
     _login(app)
     vid = uuid4()
     r = client.delete(f"/api/meetings/{uuid4()}/votes/{vid}")
     assert r.status_code == 200
     assert fakes["voting"].deleted and fakes["voting"].deleted[0][0] == vid
-    # The service writes `vote_delete` for this actor.
     assert fakes["voting"].deleted[0][2] == "p"
 
 
@@ -3240,7 +3469,6 @@ def test_delete_meeting_vote_closed_meeting_conflict(
     assert fakes["voting"].deleted == []
 
 
-# router.py: WebSocket _authorize and _serve without a real WS connection
 class _FakeWS:
     def __init__(self) -> None:
         self.closed_code: int | None = None
@@ -3311,13 +3539,16 @@ async def test_authorize_beamer_needs_manage() -> None:
 
 
 async def test_authorize_beamer_ok() -> None:
+    """Authorize the beamer.
+
+    The gate asks for `session.manage` in the gremium of the meeting.
+    """
     ws = _FakeWS()
     meetings = _AuthMeetings(manager=True)
     out = await _authorize(
         ws, uuid4(), _principal(), meetings, beamer=True  # type: ignore[arg-type]
     )
     assert out is not None
-    # The gate asks for `session.manage` in the gremium of the meeting.
     assert meetings.manage_asked == [meetings.last.gremium_id]
 
 
@@ -3353,8 +3584,11 @@ class _HandshakeSession:
 
 
 async def test_serve_returns_early_on_unauthorized() -> None:
-    # _authorize returns None for an unauthenticated client, so _serve returns before
-    # it calls accept().
+    """Return early from `_serve` on an unauthorized client.
+
+    `_authorize` returns None for an unauthenticated client, so `_serve` returns before it
+    calls `accept()`.
+    """
     ws = _FakeWS()
     session = _HandshakeSession()
     await _serve(
@@ -3372,6 +3606,10 @@ async def test_serve_returns_early_on_unauthorized() -> None:
 
 
 async def test_serve_accepts_and_runs(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Accept and run the connection.
+
+    The reads of the handshake end their transaction before the socket opens.
+    """
     ws = _FakeWS()
 
     class _FakeConn:
@@ -3394,11 +3632,9 @@ async def test_serve_accepts_and_runs(monkeypatch: pytest.MonkeyPatch) -> None:
         beamer=True,
     )
     assert ws.accepted is True
-    # The handshake reads end their transaction before the socket opens.
     assert session.rollbacks == 1
 
 
-# router.py: get_ws_principal and the WS routes meeting_socket and beamer_socket
 async def test_get_ws_principal_delegates(monkeypatch: pytest.MonkeyPatch) -> None:
     from app.modules.livevote.router import get_ws_principal
 
@@ -3432,8 +3668,6 @@ async def test_meeting_and_beamer_socket_call_serve(
     assert calls == [False, True]
 
 
-# service.py, remaining coverage: publisher, channel, assert_can_read, get,
-# timeline cursor and delete
 def _capture_broker() -> Any:
     class _Cap:
         def __init__(self) -> None:
@@ -3529,44 +3763,56 @@ async def test_broker_publisher_skips_unbound_votes() -> None:
 
 
 async def test_assert_can_read_visible_returns() -> None:
-    # _visible_gremium_ids gives None for an admin, so the method returns early and
-    # runs no delegation query.
+    """Return early for a visible meeting.
+
+    `_visible_gremium_ids` gives None for an admin, so the method returns early and runs no
+    delegation query.
+    """
     m = _meeting()
     svc = MeetingService(_QueueSession(executes=[res(m)]))  # type: ignore[arg-type]
     await svc.assert_can_read(m.id, _admin())
 
 
 async def test_assert_can_read_forbidden(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Refuse the read with 403.
+
+    `_get` gives the meeting. The pool and the delegated meetings are empty, so nothing is
+    visible.
+    """
     m = _meeting()
 
     async def _none(_s, _sub, now=None):
         return set()
 
     monkeypatch.setattr(permissions_mod, "gremium_member_ids", _none)
-    # _get gives m. _substitute_pool is empty, so visible is empty too. _delegated is
-    # empty as well, so the call raises 403.
     svc = MeetingService(_QueueSession(executes=[res(m), res(), res()]))  # type: ignore[arg-type]
     with pytest.raises(ForbiddenError):
         await svc.assert_can_read(m.id, _principal())
 
 
 async def test_get_with_votes_and_protocol() -> None:
+    """Read a meeting with its votes and its protocol.
+
+    The fake session returns, in order: the meeting, the votes, the open ballots, no secret
+    ballots, the present count, no admitted guests, no voting delegations of the caller, no
+    own open ballots, no own voted markers and the protocol id.
+    """
     mid = uuid4()
     m = _meeting()
     m.id = mid
     vrow = _vote_row(meeting_id=mid, status="closed", result="passed", eligible=1)
     sess = _QueueSession(
         executes=[
-            res(m),  # _get
-            res(vrow),  # _votes_for: votes
-            res((vrow.id, "yes")),  # open ballots
-            res(),  # secret ballots
-            res((mid, 1)),  # present
-            res(),  # admitted guests: none
-            res(),  # _ballots_of: voting delegations of the caller
-            res(),  # _ballots_of: own open ballots
-            res(),  # _ballots_of: own voted markers
-            res(uuid4()),  # _protocol_id
+            res(m),
+            res(vrow),
+            res((vrow.id, "yes")),
+            res(),
+            res((mid, 1)),
+            res(),
+            res(),
+            res(),
+            res(),
+            res(uuid4()),
         ]
     )
     svc = MeetingService(sess)  # type: ignore[arg-type]
@@ -3578,15 +3824,20 @@ async def test_get_with_votes_and_protocol() -> None:
 
 
 async def test_list_timeline_upcoming_with_cursor() -> None:
+    """Page the upcoming timeline with a cursor.
+
+    The fake session returns, in order: one row (within the limit), no protocol rows, the
+    names and no votes.
+    """
     m = _meeting(status="planned")
     ts = datetime(2026, 6, 20, 9, 0)
     cursor = _encode_cursor(datetime(2026, 6, 18, 9, 0), uuid4())
     sess = _QueueSession(
         executes=[
-            res((m, ts)),  # rows (1 ≤ limit)
-            res(),  # proto
-            res((m.gremium_id, "G")),  # names
-            res(),  # votes
+            res((m, ts)),
+            res(),
+            res((m.gremium_id, "G")),
+            res(),
         ]
     )
     svc = MeetingService(sess)  # type: ignore[arg-type]
@@ -3612,6 +3863,13 @@ async def test_delete_forbidden(monkeypatch: pytest.MonkeyPatch) -> None:
 async def test_delete_finalized_requires_permission(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Refuse the delete of a finalized meeting without the permission.
+
+    The admin may manage the meeting, because the `meetings:write` scope lets
+    `session.manage` through. A finalized protocol still needs `meeting.delete_finalized`,
+    which no scope carries. The refusal has a stable code, so a client tells it from a
+    missing right.
+    """
     m = _meeting(status="closed")
 
     async def _final(self, _mid):
@@ -3619,9 +3877,6 @@ async def test_delete_finalized_requires_permission(
 
     monkeypatch.setattr(MeetingService, "_protocol_final", _final)
     svc = MeetingService(_QueueSession(executes=[res(m)]))  # type: ignore[arg-type]
-    # The admin may manage the meeting: the `meetings:write` scope lets
-    # `session.manage` through. A finalized protocol still needs the
-    # meeting.delete_finalized permission, and no scope carries it.
     admin_token = Principal(
         sub="mgr",
         roles=["admin"],
@@ -3630,7 +3885,6 @@ async def test_delete_finalized_requires_permission(
     )
     with pytest.raises(ForbiddenError, match="delete_finalized") as err:
         await svc.delete(m.id, admin_token)
-    # A stable code, so a client tells this refusal from a missing right.
     assert err.value.code == "meeting_finalized"
 
 
@@ -3747,12 +4001,11 @@ async def test_delete_forbidden_deletes_no_vote(monkeypatch: pytest.MonkeyPatch)
     assert sess.deleted == []
 
 
-# attendance_service.py: the raise branch of _ensure_not_closed
 async def test_attendance_ensure_not_closed_raises() -> None:
+    """Raise for a closed meeting only; an open meeting raises no error."""
     closed = _meeting(status="closed")
     with pytest.raises(ConflictError):
         AttendanceService._ensure_not_closed(closed)
-    # An open meeting raises no error.
     AttendanceService._ensure_not_closed(_meeting(status="live"))
 
 
@@ -3789,11 +4042,13 @@ async def test_check_draft_open_reads_the_meeting_and_runs_the_checks(
     assert seen == [(out, vid)]
 
 
-# The done mark of an agenda item ("TOP abhaken")
 async def test_set_done_marks_the_item(audit_calls: list[dict[str, Any]]) -> None:
+    """Set the done mark of an item.
+
+    The session answers `_meeting`, the item lookup and the `_meeting` of `list()`.
+    """
     m = _meeting(status="live")
     item = _agenda_item()
-    # _meeting, the item lookup, then list()._meeting
     sess = _QueueSession(executes=[res(m), res(item), res(m)], scalars_q=[[]])
     await AgendaService(sess).set_done(m.id, item.id, done=True, actor="keeper")  # type: ignore[arg-type]
     assert item.done_at is not None
@@ -3824,6 +4079,10 @@ async def test_set_done_false_reopens_the_item(audit_calls: list[dict[str, Any]]
 async def test_set_done_without_change_writes_nothing(
     done: bool, audit_calls: list[dict[str, Any]]
 ) -> None:
+    """Write nothing when the done mark does not change.
+
+    A second tick keeps the time and the person of the first one.
+    """
     m = _meeting(status="live")
     item = _agenda_item()
     first = datetime(2026, 6, 8, tzinfo=UTC) if done else None
@@ -3831,7 +4090,6 @@ async def test_set_done_without_change_writes_nothing(
     item.done_by = "first" if done else None
     sess = _QueueSession(executes=[res(m), res(item), res(m)], scalars_q=[[]])
     await AgendaService(sess).set_done(m.id, item.id, done=done, actor="other")  # type: ignore[arg-type]
-    # A second tick keeps the time and the person of the first one.
     assert item.done_at == first
     assert item.done_by == ("first" if done else None)
     assert audit_calls == []

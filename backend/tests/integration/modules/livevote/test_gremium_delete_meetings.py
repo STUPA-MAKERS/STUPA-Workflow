@@ -118,7 +118,10 @@ async def test_gremium_delete_with_an_open_vote_is_refused(
 async def test_gremium_delete_with_a_final_protocol_needs_the_permission(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
-    """``admin.gremien`` alone does not delete a final protocol."""
+    """``admin.gremien`` alone does not delete a final protocol.
+
+    A draft protocol needs no further right.
+    """
     s = await seed(maker, status="closed", votes=("closed",), protocol="final")
     gremien_admin = Principal(sub="gremien-admin", permissions={"admin.gremien"})
     async with maker() as session:
@@ -132,7 +135,6 @@ async def test_gremium_delete_with_a_final_protocol_needs_the_permission(
         assert await session.get(Vote, s.vote_ids["closed"]) is not None
     assert await audit_actions(maker, target_id=s.meeting_id) == []
 
-    # A draft protocol needs no further right.
     draft = await seed(maker, status="closed", votes=("closed",), protocol="draft")
     async with maker() as session:
         await ConfigService(session).delete_gremium(draft.gremium_id, gremien_admin)
