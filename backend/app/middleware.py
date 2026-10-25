@@ -6,11 +6,11 @@
   CSP. The TLS-terminating proxy sets HSTS.
 - `CsrfMiddleware`: double-submit token for cookie-authenticated write requests.
   A request with a principal access token (`Bearer apat_…`) stays exempt, because
-  that token then authenticates and the cookie does not. A request without an auth
-  cookie stays exempt too. Any other bearer header does not exempt a request that
-  carries an auth cookie, because the cookie can still authenticate it. The token is
-  a non-HttpOnly cookie that the frontend mirrors into the header that
-  `Settings.csrf_header_name` names.
+  a cross-site page cannot set `Authorization` without a CORS preflight and the
+  app registers no CORS. A request without an auth cookie stays exempt too. Any
+  other bearer header does not exempt a request that carries an auth cookie: that
+  request still needs the CSRF token. The token is a non-HttpOnly cookie that the
+  frontend mirrors into the header that `Settings.csrf_header_name` names.
 
 The app registers no CORSMiddleware on purpose. Cross-origin access stays off.
 """
@@ -98,9 +98,10 @@ def _has_auth_cookie(request: Request, settings: Settings) -> bool:
 def _has_principal_bearer(request: Request) -> bool:
     """Return True when `Authorization` carries a principal access token (`apat_…`).
 
-    `get_current_principal` then reads the token and never the session cookie, so
-    the request is not CSRF-able. Any other bearer value can sit next to a cookie
-    that authenticates, so it gives no exemption.
+    Such a request is not CSRF-able: a cross-site page cannot set `Authorization`
+    without a CORS preflight, and the app registers no CORS. The exemption stays
+    limited to this prefix, so a request with any other bearer value and an auth
+    cookie still needs the CSRF token.
     """
     auth = request.headers.get("authorization", "")
     return auth.startswith("Bearer ") and oauth.is_access_token(auth[7:])
