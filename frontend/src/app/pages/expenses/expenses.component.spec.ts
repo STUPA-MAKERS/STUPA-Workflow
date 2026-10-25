@@ -3294,6 +3294,10 @@ describe('ExpensesComponent (closed fiscal year)', () => {
     expect(cmp.fyLabel('fy-active')).toBe('2026');
     expect(cmp.canChange('fy-closed')).toBe(false);
     expect(cmp.canChange('fy-active')).toBe(cmp.canManage());
+    // No write action in the row menu of a frozen booking.
+    const ids = cmp.rowMenu(booking).flatMap((sec) => sec.items.map((i) => i.id));
+    expect(ids).not.toContain('edit');
+    expect(ids).not.toContain('delete');
   });
 
   it('a reopened year drops out of the closed set on the next load', () => {

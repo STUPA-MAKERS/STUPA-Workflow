@@ -589,6 +589,14 @@ export class ExpensesComponent implements OnDestroy {
         if (id) this.loadFyLabels(id, tree);
       });
     });
+    // The row menus of a booker hide the write actions of a closed fiscal year, so the
+    // years of every top cost centre load once the tree is there.
+    effect(() => {
+      const tree = this.budgetTree();
+      untracked(() => {
+        if (this.canManage()) for (const top of tree) this.loadFyLabels(top.id, tree);
+      });
+    });
 
     effect(() => this.frame.fill.set(this.split()));
 
@@ -949,10 +957,11 @@ export class ExpensesComponent implements OnDestroy {
     this.dialogs.openInvoiceFile(inv);
   }
 
-  /** The row menu of a booking. */
+  /** The row menu of a booking. A booking of a closed fiscal year has no write action. */
   rowMenu(e: Expense): RowMenuSection[] {
     const main: RowMenuItem[] = [];
-    if (this.canManage()) {
+    const canChange = this.canChange(e.fiscalYearId);
+    if (canChange) {
       main.push({ id: 'edit', label: this.i18n.translate('action.edit'), icon: 'edit' });
       main.push({ id: 'sub', label: this.i18n.translate('expenses.sub.add'), icon: 'plus' });
     }
@@ -964,7 +973,7 @@ export class ExpensesComponent implements OnDestroy {
       });
     }
     const sections: RowMenuSection[] = main.length ? [{ items: main }] : [];
-    if (this.canManage()) {
+    if (canChange) {
       sections.push({
         items: [{ id: 'delete', label: this.i18n.translate('action.delete'), icon: 'trash', danger: true }],
       });
