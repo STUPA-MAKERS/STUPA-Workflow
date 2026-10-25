@@ -66,13 +66,6 @@
   min-width: 0;
 }
 
-/* Below the bar of a one-view page the title is for screen readers only. The row then
-   holds only the meta and the heading slot, and a status text with an icon has no text
-   baseline to share, so the row centres its items. */
-.ph__heading:has(> .ph__title.sr-only) {
-  align-items: center;
-}
-
 /* A short fact about the page, such as "8 offen". It is part of the title block, not a
    control, so it does not go into the actions slot. */
 .ph__meta {

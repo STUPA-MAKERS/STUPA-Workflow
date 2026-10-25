@@ -4,14 +4,15 @@ import { render, screen } from '@testing-library/angular';
 import { ListDetailBarComponent, ListDetailNav } from '@stupa-makers/ui-kit';
 import { PageHeaderComponent } from './page-header.component';
 
-/** An admin page below wide: the frame shows the bar, the page has its header. */
+/** An admin page on a phone: the frame shows the bar, the page has its header. */
 @Component({
   standalone: true,
   imports: [ListDetailBarComponent, PageHeaderComponent],
   providers: [ListDetailNav],
   template: `
     <app-list-detail-bar />
-    <app-page-header title="Flow-Editor">
+    <app-page-header title="Flow-Editor" meta="Version 24 aktiv">
+      <span heading class="st">Gültig</span>
       <button actions type="button">Mehr</button>
     </app-page-header>
   `,
@@ -126,5 +127,15 @@ describe('PageHeaderComponent', () => {
     // The bar shows the title; the header keeps it for screen readers only.
     expect(screen.getByRole('heading', { level: 1, name: 'Flow-Editor' })).toHaveClass('sr-only');
     expect(view.fixture.componentInstance.nav.title()).toBe('Flow-Editor');
+  });
+
+  it('below the bar of a one-view page puts the meta and the heading slot on the second line of the bar', async () => {
+    const view = await render(OneViewPageComponent, { providers: [provideRouter([])] });
+    view.fixture.detectChanges();
+    const sub = view.container.querySelector('.ld__barText .ld__barSub');
+    expect(sub?.querySelector('.ph__meta')?.textContent).toBe('Version 24 aktiv');
+    expect(sub?.querySelector('.st')?.textContent).toBe('Gültig');
+    expect(view.container.querySelector('.ph__heading .ph__meta')).toBeNull();
+    expect(view.container.querySelector('.ph__heading .st')).toBeNull();
   });
 });
