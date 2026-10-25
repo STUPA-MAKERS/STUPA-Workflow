@@ -195,6 +195,11 @@ function outDotYFor(
   return dotY(branches.length + (i < 0 ? groups.length - 1 : i), total, h);
 }
 
+/**
+ * A vote state gets one labeled dot per branch (pass/fail) plus the guard dots of the manual exits.
+ * A normal state gets one dot per distinct guard and a default dot to draw a new edge without a
+ * guard. The lines of the focus paint last, so they lie on top of the faint ones.
+ */
 export function createFlowCanvasView(deps: FlowCanvasViewDeps): FlowCanvasView {
   const positions = computed(() => deps.graph().layout?.positions ?? {});
   const groups = computed(() => deps.graph().layout?.groups ?? []);
@@ -240,7 +245,6 @@ export function createFlowCanvasView(deps: FlowCanvasViewDeps): FlowCanvasView {
         if (pts.length === 0) return null;
         const outCount = ends.filter((e) => e?.src.type === 'group' && e.src.id === g.id).length;
         const h = Math.max(GROUP_H, 2 * DOT_PAD + Math.max(0, outCount - 1) * DOT_GAP);
-        // Without a layout the box centres on the stored places of its members.
         const cx = (Math.min(...pts.map((p) => p.x)) + Math.max(...pts.map((p) => p.x)) + NODE_W) / 2;
         const cy = (Math.min(...pts.map((p) => p.y)) + Math.max(...pts.map((p) => p.y)) + NODE_H) / 2;
         return { g, dk, outCount, h, fx: cx - GROUP_W / 2, fy: cy - h / 2 };
@@ -253,9 +257,6 @@ export function createFlowCanvasView(deps: FlowCanvasViewDeps): FlowCanvasView {
     const pos = positions();
     const transitions = deps.graph().transitions ?? [];
     return visibleStates().map((s) => {
-      // A vote state gets one labeled dot per branch (pass/fail) PLUS the guard
-      // dots of the manual exits. A normal state gets one dot per distinct guard.
-      // It also gets a default dot to draw a new edge that has no guard.
       const branches = sortedBranchDots(s.key, s.kind, transitions, pos);
       const guardGroups = outDots(s.key, transitions);
       const total = branches.length + guardGroups.length;
@@ -271,7 +272,6 @@ export function createFlowCanvasView(deps: FlowCanvasViewDeps): FlowCanvasView {
         ...guardGroups.map((gp, i) => ({
           id: gp.sig || 'out',
           branch: null as string | null,
-          // A drag from a guard dot gives the new transition the same guard.
           guard: gp.guard ?? null,
           cy: dotY(branches.length + i, total, h),
           label: gp.sig ? deps.guardDotLabel(gp) : '',
@@ -477,7 +477,6 @@ export function createFlowCanvasView(deps: FlowCanvasViewDeps): FlowCanvasView {
   const proxies = computed<{ left: ProxyBox[]; right: ProxyBox[] }>(() => {
     const { left: leftIds, right: rightIds } = proxyIds();
     if (!leftIds.length && !rightIds.length) return { left: [], right: [] };
-    // Without a layout the columns sit left and right of the nodes and group boxes.
     const xs: number[] = [];
     const ys: number[] = [];
     for (const n of nodes()) {
@@ -537,7 +536,6 @@ export function createFlowCanvasView(deps: FlowCanvasViewDeps): FlowCanvasView {
           my: route.label?.y ?? 0,
           label: text,
           labeled: !!route.label,
-          // A bundle draws the bolt only when all of its members run automatically.
           automatic: bundle.length > 1 ? bundle.every((i) => !!deps.graph().transitions[i]?.automatic) : base.automatic,
           color: bundle.length > 1 ? null : base.color,
         };
@@ -558,7 +556,6 @@ export function createFlowCanvasView(deps: FlowCanvasViewDeps): FlowCanvasView {
         labeled: !!label || base.automatic,
       };
     });
-    // The lines of the focus paint last, so they lie on top of the faint ones.
     return [...out.filter((e) => e.dim), ...out.filter((e) => !e.dim)];
   });
 

@@ -69,9 +69,6 @@
             </div>
           </div>
 
-          <!-- Delivery diagnosis. The backend keeps one condensed record per webhook: the
-               state of the newest attempt, its failure class, the HTTP code and the
-               attempt count. -->
           @if (statusDetail()?.id === h.id) {
             <section class="wh__status" [id]="'wh-status-' + h.id" [attr.aria-label]="'admin.webhook.delivery.title' | t">
               <h3 class="section-title">{{ 'admin.webhook.delivery.title' | t }}</h3>

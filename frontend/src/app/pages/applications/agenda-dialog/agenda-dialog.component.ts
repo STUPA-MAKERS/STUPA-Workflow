@@ -217,8 +217,6 @@ export class AgendaDialogComponent {
         error: (err: { status?: number; error?: ProblemDetail | null }) => {
           this.saving.set(false);
           if (err.status === 422 && err.error?.code === 'agenda_meeting_invalid') {
-            // The meeting started, closed or went away meanwhile: show it here and
-            // offer the meetings that are still planned.
             this.refusal.set('applications.agenda.meetingInvalid');
             this.load(transition);
             return;

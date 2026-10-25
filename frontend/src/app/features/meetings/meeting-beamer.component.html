@@ -82,7 +82,6 @@
         }
       </div>
       @if (join(); as j) {
-        <!-- The code stays as a corner badge, so late guests can still join. -->
         <div class="bm__badge">
           <app-qr-code class="bm__badgeQr" [qr]="j.qr" [label]="qrLabel(j)" />
           <span class="bm__badgeText">

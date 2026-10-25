@@ -95,10 +95,12 @@ export class ParticipantVoteService {
   readonly caster: BallotCaster = (choice, asDelegation) =>
     this.api.castBallot(this.loaded()?.id ?? '', choice, asDelegation);
 
+  /**
+   * The result is part of the key, because the lot of a tied election changes it after the close.
+   */
   constructor() {
     effect(() => {
       const row = this.row();
-      // The result is in the key: the lot of a tied election (F2) changes it after the close.
       const key = row ? `${row.id}:${row.status}:${row.result ?? ''}` : null;
       untracked(() => {
         if (!row) {
@@ -122,11 +124,13 @@ export class ParticipantVoteService {
     this.reload();
   }
 
+  /**
+   * `canCast` can stay true when the voting right moved after the read, so the refused row hides
+   * and the vote and the delegation state load again.
+   */
   onCastFailed(failure: BallotFailure): void {
     const { error } = failure;
     if (error.status === 403) {
-      // `canCast` can stay true when the voting right moved after the read: hide the
-      // refused row, then read the vote and the delegation state again.
       if (failure.asDelegation) this.proxyRefused.set(true);
       else this.notEligible.set(true);
       this.toast.error(this.i18n.translate('voting.cast.notEligible'));
@@ -145,10 +149,10 @@ export class ParticipantVoteService {
     this.toast.error(error.error?.detail ?? this.i18n.translate('voting.cast.toast.failed'));
   }
 
+  /** A read can arrive after the read of a newer vote, so only the vote of the row is kept. */
   private load(id: string): void {
     this.api.getVote(id, { quiet: true }).subscribe({
       next: (vote) => {
-        // A read can arrive after the read of a newer vote: keep only the vote of the row.
         if (vote.id !== this.row()?.id) return;
         const isNew = vote.id !== this.loaded()?.id;
         this.loaded.set(vote);

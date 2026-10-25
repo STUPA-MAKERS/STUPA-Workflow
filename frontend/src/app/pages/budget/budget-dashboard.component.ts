@@ -137,6 +137,11 @@ export const APPS_SHOWN = 5;
  * phone from the bottom. The query params hold the
  * selection, so the view is shareable as a link. A reader with a
  * gremium scope (`viewGremiumId`) gets only the subtrees of the server response.
+ *
+ * The page never shows the empty state while it loads, because "there are no cost centres" is false
+ * during every load. The content is not a `<main>`, because the shell already wraps the routed page
+ * in one. Each bar has the colour of its cost centre, so a shared legend cannot match it; the bar
+ * is only 6px high, so the whole row carries the tooltip.
  */
 @Component({
   selector: 'app-budget-dashboard',
@@ -342,8 +347,6 @@ export class BudgetDashboardComponent {
       n.name.toLowerCase().includes(q) ||
       n.key.toLowerCase().includes(q) ||
       n.pathKey.toLowerCase().includes(q);
-    // With a search: a node shows when it or a node below it matches, and every node on
-    // the way to a match is open.
     const hits = new Set<string>();
     const mark = (n: BudgetTreeNode): boolean => {
       let any = matches(n);
@@ -586,6 +589,11 @@ export class BudgetDashboardComponent {
   /** Outstanding fiscal-year requests. See `resolveSelection` and `emptyReason`. */
   private readonly pendingFiscalYears = signal(0);
 
+  /**
+   * The query param map is subscribed, because the router keeps this component alive for a
+   * query-string-only change; otherwise the URL named one cost centre and the page went on showing
+   * another.
+   */
   constructor() {
     this.appsKey
       .pipe(
@@ -604,9 +612,6 @@ export class BudgetDashboardComponent {
 
     this.load();
 
-    // The palette can send us here while we are already here. The router keeps this
-    // component alive for a query-string-only change, so without this the URL named one
-    // cost centre and the page went on showing another.
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((qp) => {
       this.urlParams = qp;
       this.applyUrlSelection();
@@ -622,6 +627,10 @@ export class BudgetDashboardComponent {
     return formatMoney(value, this.i18n.formatLocale(), { currency, whole: true });
   }
 
+  /**
+   * The fiscal years of every root load in parallel, so one failure does not stop the others. The
+   * counter tells "this root has no years" from "its years have not arrived yet".
+   */
   protected load(): void {
     this.loading.set(true);
     this.error.set(false);
@@ -629,11 +638,7 @@ export class BudgetDashboardComponent {
       next: (tree) => {
         this.tree.set(tree);
         this.loading.set(false);
-        // Forest roots. They can be sub cost centres. A hidden root is not selectable.
         const tops = tree.filter((n) => !n.hiddenInBudget);
-        // The fiscal years of every root load in parallel; one failure does not stop the
-        // others. The counter tells "this root has no years" from "its years have not
-        // arrived yet".
         this.pendingFiscalYears.set(tops.length);
         for (const top of tops) {
           this.api.listFiscalYears(top.id as Uuid).subscribe({
@@ -663,7 +668,7 @@ export class BudgetDashboardComponent {
   private restoreOrDefault(tops: BudgetTreeNode[]): void {
     if (this.restored || !tops.length) return;
     const next = this.resolveSelection(tops);
-    if (next === null) return; // not loaded yet, try again later
+    if (next === null) return;
     this.restored = true;
     this.setSelection(next.budgetId, next.ksId, next.fyId);
   }
@@ -680,7 +685,7 @@ export class BudgetDashboardComponent {
   private applyUrlSelection(): void {
     const tops = this.tree().filter((n) => !n.hiddenInBudget);
     const next = this.resolveSelection(tops);
-    if (next === null) return; // nothing loaded yet; the restore will pick it up
+    if (next === null) return;
     if (
       next.budgetId === this.selectedBudgetId() &&
       next.ksId === this.selectedKsId() &&
@@ -697,25 +702,25 @@ export class BudgetDashboardComponent {
    *
    * One resolver for both entry points, so a deep link cannot mean one thing on arrival
    * and another when it is followed later.
+   *
+   * A search hit is `?ks=…` alone, so the root comes from the cost centre itself when the URL does
+   * not name one. A URL that names a root whose years have not landed yet waits rather than settle
+   * for the first ready root, because the choice is latched.
    */
   private resolveSelection(
     tops: BudgetTreeNode[],
   ): { budgetId: string; ksId: string; fyId: string } | null {
     if (!tops.length) return null;
     const withFy = tops.filter((t) => (this.fiscalYearsByBudget()[t.id]?.length ?? 0) > 0);
-    if (!withFy.length) return null; // no fiscal year loaded yet, try again later
+    if (!withFy.length) return null;
     const qp = this.urlParams;
     const selectable = (id: string | null): boolean =>
       !!id && !!this.nodeById().get(id) && (this.fiscalYearsByBudget()[id]?.length ?? 0) > 0;
 
     const ks = qp.get('ks');
     const qpBudget = qp.get('budget');
-    // A search hit is `?ks=…` alone, so the root comes from the cost centre itself when
-    // the URL does not name one.
     const derived = ks && this.nodeById().get(ks) ? this.rootOf(ks) : null;
     const wanted = selectable(qpBudget) ? qpBudget : selectable(derived) ? derived : null;
-    // A URL that names a root whose years have not landed yet must WAIT rather than
-    // settle for the first root that happens to be ready: the choice is latched.
     if (wanted === null && (ks || qpBudget) && this.pendingFiscalYears() > 0) return null;
     const budgetId = wanted ?? withFy[0].id;
 

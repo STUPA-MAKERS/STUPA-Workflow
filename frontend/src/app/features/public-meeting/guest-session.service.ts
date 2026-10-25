@@ -85,7 +85,13 @@ export class GuestSessionService implements OnDestroy {
   private attempts = 0;
   private closed = false;
 
-  /** Open the page for a code: the head, then the own request of this device. */
+  /**
+   * Open the page for a code: the head, then the own request of this device.
+   *
+   * The head answers 404 `join_code_unknown` also for a closed meeting and a meeting without public
+   * participation, so nobody can probe. A device with a request still learns from `/me` that the
+   * meeting is no longer public.
+   */
   load(code: string): void {
     this.code.set(code);
     this.endedByServer.set(false);
@@ -97,9 +103,6 @@ export class GuestSessionService implements OnDestroy {
         this.refresh(true);
       },
       error: (err: unknown) => {
-        // The head answers 404 `join_code_unknown` also for a closed meeting and a
-        // meeting without public participation (no probing). A device with a request
-        // still learns from `/me` that the meeting is no longer public.
         if (problemCode(err) === 'join_code_unknown') {
           this.api.guestMe(code).subscribe({
             next: (me) => {
@@ -247,8 +250,8 @@ export class GuestSessionService implements OnDestroy {
     }, GUEST_REFRESH_MS);
   }
 
+  /** The mock API has no socket server. */
   private connect(): void {
-    // The mock API (dev, screenshots) has no socket server.
     if (this.channel || this.useMock || this.closed) return;
     const ch = this.ws.connectGuest(this.code());
     this.channel = ch;
@@ -266,7 +269,6 @@ export class GuestSessionService implements OnDestroy {
     if (msg.type === 'guest_status' && msg.reason === 'public_off') {
       this.failure.set('notPublic');
     }
-    // The meeting closed while the request waited: the server purges it and closes.
     if (msg.type === 'guest_status' && msg.reason === 'meeting_closed') {
       this.endedByServer.set(true);
       this.disconnect();
@@ -275,9 +277,13 @@ export class GuestSessionService implements OnDestroy {
     this.scheduleRefresh();
   }
 
-  /** The socket ended: reconnect while the request or the participation still runs. */
+  /**
+   * The socket ended: reconnect while the request or the participation still runs.
+   *
+   * A channel that the page dropped on purpose (or replaced) does not come back. The state may have
+   * changed while the socket was gone.
+   */
   private onClosed(ch: MeetingChannel): void {
-    // A channel that the page dropped on purpose (or replaced) does not come back.
     if (ch !== this.channel) return;
     this.channel = null;
     const status = this.me()?.status;
@@ -286,7 +292,6 @@ export class GuestSessionService implements OnDestroy {
     if (this.attempts > MAX_ATTEMPTS) return;
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
-      // The state may have changed while the socket was gone.
       this.refresh();
       this.connect();
     }, RECONNECT_MS * this.attempts);

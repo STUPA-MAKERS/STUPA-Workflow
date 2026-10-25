@@ -138,7 +138,6 @@ export class BrandingEditorComponent {
 
   constructor() {
     this.loadConfig();
-    // An accent that was not saved leaves with the page.
     inject(DestroyRef).onDestroy(() => this.brand.previewAccent(undefined));
   }
 

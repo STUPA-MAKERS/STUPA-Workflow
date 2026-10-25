@@ -104,7 +104,6 @@ export class PublicProtocolDetailComponent {
       },
       error: (err: unknown) => {
         this.loading.set(false);
-        // A missing, withheld or non-public protocol is a 404; anything else is an error.
         if (err instanceof HttpErrorResponse && err.status !== 404) {
           this.error.set(true);
         } else {

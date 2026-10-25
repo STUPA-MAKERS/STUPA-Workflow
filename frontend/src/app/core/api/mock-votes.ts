@@ -100,7 +100,6 @@ export function demoVote(id: string, own: MyBallot | null): Vote | undefined {
   if (!found) return undefined;
   if (!own?.cast) return found;
   const extra = found.myBallot?.cast ? 0 : 1;
-  // A secret vote never ties the choice to the voter.
   const myBallot = found.secret ? { cast: true, choice: null } : own;
   return { ...found, myBallot, tally: { ...found.tally, voted: Number(found.tally.voted) + extra } };
 }
@@ -130,7 +129,6 @@ function row(
     agendaPosition: meeting ? meeting.position : null,
     gremiumId: gremium.id,
     gremiumName: gremium.name,
-    // A draft never opened: it was made two days ago.
     createdAt: closedAt ?? openedAt ?? at(-2),
     openedAt,
     closedAt,

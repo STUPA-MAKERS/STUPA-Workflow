@@ -221,7 +221,6 @@
   padding: var(--space-3);
   border: 2px solid var(--color-accent);
   border-radius: var(--radius-lg);
-  /* The fill of a tile (todo-card-tile): the new card sits among the cards. */
   background: var(--color-surface-1);
 }
 :host-context([data-theme='dark']) .bv__quick {

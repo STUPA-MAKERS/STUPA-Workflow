@@ -153,7 +153,6 @@ export class BudgetTreeComponent {
   /** The amounts a narrow page leaves out; lines under "Verfügbar" show them. */
   readonly hidden = computed<ReadonlySet<'expended' | 'income'>>(() => {
     const w = this.width();
-    // A phone shows cards: they stack the amounts and have room for all five.
     if (this.phone() || w === 0 || w >= FULL_TABLE_MIN) return new Set();
     return w >= MID_TABLE_MIN ? new Set(['income']) : new Set(['expended', 'income']);
   });
@@ -306,14 +305,14 @@ export class BudgetTreeComponent {
     return id ? (this.findNode(id) ?? null) : null;
   });
 
+  /**
+   * The name column keeps a minimum width, so a narrow sheet scrolls the table sideways instead of
+   * squeezing the names and keys.
+   */
   readonly columns = computed<ColumnDef[]>(() => {
     const t = (k: TranslationKey): string => this.i18n.translate(k);
-    // The amounts get a fixed width, so the name column takes the free width.
     const money = (key: string, label: TranslationKey): ColumnDef => ({ key, label: t(label), align: 'end', width: AMOUNT_WIDTH });
     const cols: ColumnDef[] = [
-      // D6: the admin navigation stays beside the table at every width. The name column
-      // keeps a minimum width, so a narrow sheet scrolls the table sideways instead of
-      // squeezing the names and keys to a few characters.
       { key: 'node', label: t('budget.tree.col.node'), card: 'title', width: '13rem' },
       money('allocated', 'budget.tree.col.allocated'),
       money('bound', 'budget.tree.col.bound'),
@@ -324,7 +323,6 @@ export class BudgetTreeComponent {
     cols.push(
       money('available', 'budget.tree.col.available'),
       { key: 'color', label: t('budget.tree.col.color'), width: '4rem' },
-      // Only the ⋮ menu: the row itself opens the edit.
       { key: 'actions', label: t('budget.tree.col.actions'), align: 'end', width: '3.5rem', card: 'actions', sticky: 'end' },
     );
     return cols;
@@ -352,20 +350,17 @@ export class BudgetTreeComponent {
   });
   readonly fyRowId = (r: unknown): string => (r as FiscalYear).id;
 
+  /** The page is measured, because beside the admin navigation it is narrower than the viewport. */
   constructor() {
     this.reload();
-    // Measure the page: beside the admin navigation it is narrower than the viewport.
     observeElementSize(
       () => this.host.nativeElement,
       (size) => this.width.set(size.width),
     );
-    // Gremien for the visibility select in the edit dialog.
     this.adminApi.listGremienOptions().subscribe({
       next: (list) => this.gremiumOptions.set(list.map((g) => ({ value: g.id, label: g.name }))),
       error: () => this.gremiumOptions.set([]),
     });
-    // The global flow gives the state keys for the accepted/denied config. An error
-    // stays silent.
     this.adminApi.getGlobalFlow().subscribe({
       next: (graph) =>
         this.stateOptions.set(
@@ -606,7 +601,7 @@ export class BudgetTreeComponent {
       target.delete(key);
     } else {
       target.add(key);
-      other.delete(key); // A state is never accepted and denied at the same time.
+      other.delete(key);
     }
     this.api
       .updateNode(top.id, { acceptedStateKeys: [...accepted], deniedStateKeys: [...denied] })
@@ -685,8 +680,11 @@ export class BudgetTreeComponent {
   }
 
   // The inline row for a sub cost centre.
+  /**
+   * The focus moves to the key field of the new row, because the row can stand far below the button
+   * and the focus scrolls it into view inside the pane.
+   */
   startAddChild(node: BudgetTreeNode): void {
-    // The row stands at the end of the subtree, so the subtree must be open.
     this.collapsed.update((set) => {
       const next = new Set(set);
       next.delete(node.id);
@@ -694,8 +692,6 @@ export class BudgetTreeComponent {
     });
     this.addingChildOf.set(node.id);
     this.childDraft.set({ key: '', name: '' });
-    // The row can stand far below the button, after a large subtree. Move the focus to
-    // its key field: the focus also scrolls the row into view inside the pane.
     afterNextRender(() => this.focusChildKey(), { injector: this.injector });
   }
 
@@ -752,7 +748,6 @@ export class BudgetTreeComponent {
         this.reload();
       },
       error: (err: { status?: number }) => {
-        // 409: the node still has sub cost centres or allocations. The dialog says so.
         if (err?.status === 409) {
           this.nodeDeleteBlocked.set(true);
           return;
@@ -819,6 +814,7 @@ export class BudgetTreeComponent {
     this.editColor.set('');
   }
 
+  /** The deciding gremium goes out only on a change, because each sent field is audited. */
   saveEditNode(): void {
     const node = this.editNode();
     if (!node) return;
@@ -829,12 +825,10 @@ export class BudgetTreeComponent {
       .updateNode(node.id, {
         key,
         name,
-        // '' clears the own colour; the node then takes the colour of its parent.
         color: this.editColor(),
         active: this.editActive(),
         hiddenInBudget: this.editHidden(),
         viewGremiumId: this.editViewGremium() || null,
-        // Send the deciding gremium only on a change: each sent field is audited.
         ...(this.editDecisionGremium() !== (node.decisionGremiumId ?? '')
           ? { decisionGremiumId: this.editDecisionGremium() || null }
           : {}),
@@ -951,7 +945,6 @@ export class BudgetTreeComponent {
           this.closeFyEdit();
           this.loadFiscalYears(top);
         },
-        // 422 means the year already exists in this budget. Name that reason.
         error: (err: { status?: number }) =>
           this.toast.error(
             this.i18n.translate(
@@ -1014,7 +1007,6 @@ export class BudgetTreeComponent {
         this.loadFiscalYears(top);
       },
       error: (err: { status?: number; error?: { detail?: string } }) => {
-        // 409 keeps the dialog open and names the rows that still hang on the year.
         if (err?.status === 409) {
           const msg = this.i18n.translate(this.fyBlockerKey(err.error?.detail));
           this.fyDeleteBlocked.set(msg);

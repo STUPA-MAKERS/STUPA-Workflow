@@ -195,12 +195,10 @@
   overflow: hidden;
   border-radius: var(--radius-2xl);
   background: var(--color-surface-1);
-  /* A sticky search bar of the page covers the rows with the colour of the sheet. */
   --stb-bg: var(--color-surface-1);
 }
 .af--split .af__pageBody {
   --af-fade: var(--space-6);
-  /* The containing block of an absolute child (`.sr-only`), see `.ld__detail`. */
   position: relative;
   display: flex;
   flex: 1 1 0;

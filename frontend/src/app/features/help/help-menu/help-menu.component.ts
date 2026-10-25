@@ -83,8 +83,10 @@ export class HelpMenuComponent {
     else this.show();
   }
 
+  /**
+   * The panel renders in this change detection, so its first control gets the focus right after.
+   */
   show(): void {
-    // Only the popover variants have a trigger, and only the trigger calls this.
     const trigger = this.trigger()!.nativeElement;
     const rect = trigger.getBoundingClientRect();
     if (this.variant() === 'header') {
@@ -95,7 +97,6 @@ export class HelpMenuComponent {
         bottom: null,
       });
     } else {
-      // Beside the navigation that holds the trigger, bottom-aligned with it.
       const edge = trigger.closest('nav')?.getBoundingClientRect().right ?? rect.right;
       this.position.set({
         left: edge + GAP,
@@ -105,7 +106,6 @@ export class HelpMenuComponent {
       });
     }
     this.open.set(true);
-    // The panel renders in this change detection; focus its first control right after.
     setTimeout(() => this.panel()?.nativeElement.querySelector<HTMLElement>('a, button')?.focus());
   }
 

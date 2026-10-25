@@ -259,17 +259,12 @@
 .ad__mail {
   display: inline;
   color: inherit;
-  /* An e-mail address is never cut: it wraps and stays selectable. */
   overflow-wrap: anywhere;
 }
 
 /* ------------------------------------------------------------------ edit */
 .ad--edit {
-  /* The height of the edit bar. A field that scrolls into view (an error, the focus)
-     stops below the bar, not under it. */
   --ad-edit-bar: 60px;
-  /* The side padding of the page (`.page-shell`): one pane at a time, the bar reaches
-     over it to the edges of the page. */
   --ad-gutter: var(--layout-gutter);
 }
 /* The bar of the edit mode takes the place of the header (board Anträge-Bearbeiten).
@@ -413,7 +408,6 @@
   .ad:not(.ad--split) .ad__tabs {
     --tab-pager-bleed: var(--space-4);
   }
-  /* The busy sheet draws the bar alone. */
   .ad:not(.ad--split) app-tabs.ad__tabs {
     margin-inline: calc(-1 * var(--space-4));
   }

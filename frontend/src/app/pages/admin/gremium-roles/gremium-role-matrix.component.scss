@@ -167,9 +167,9 @@
 /* A narrow container: no header; the role and its actions on the first line, the rights
    as chips with their names below (board Schmal-Verwaltung-Gremien). The matrix is about
    49rem wide at a 960px viewport and about 54rem at 1440px, so 51rem puts the first in
-   the chip layout and keeps the table for the second. */
+   the chip layout and keeps the table for the second.
+   The header rule is more specific than `.rm__row`, so the header stays hidden. */
 @container (max-width: 51rem) {
-  /* More specific than `.rm__row` below, so the header stays hidden. */
   .rm__row.rm__row--head {
     display: none;
   }
@@ -177,8 +177,6 @@
     border-top-left-radius: var(--radius-lg);
     border-top-right-radius: var(--radius-lg);
   }
-  /* The chips are as small as on the board, so the five rights fit on one line at the
-     960px board width. */
   .rm__row {
     display: flex;
     flex-wrap: wrap;

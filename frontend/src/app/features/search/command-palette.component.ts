@@ -173,7 +173,6 @@ export class CommandPaletteComponent {
       subtitle: h.subtitle,
       icon: KIND_ICON[h.kind],
       url: h.url,
-      // The server sends the state label as the subtitle of an application.
       status: h.kind === 'application',
       archived: h.archived,
     })),
@@ -205,10 +204,8 @@ export class CommandPaletteComponent {
   readonly showTruncated = computed(() => this.truncated() && this.rows().length > 0);
 
   constructor() {
-    // Every opening starts from a clean field, whoever opened it.
     this.palette.opened$.pipe(takeUntilDestroyed()).subscribe(() => this.reset());
 
-    // Focus the field once the overlay is in the DOM.
     effect(() => {
       if (this.open()) queueMicrotask(() => this.field()?.nativeElement.focus());
     });
@@ -232,6 +229,10 @@ export class CommandPaletteComponent {
     this.search.set(value);
   }
 
+  /**
+   * The row keys belong to the field, but on the close button Enter must press the button. The rows
+   * can shrink under a kept index, so the last row is then the nearest.
+   */
   @HostListener('document:keydown', ['$event'])
   onDocumentKey(event: KeyboardEvent): void {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
@@ -250,7 +251,6 @@ export class CommandPaletteComponent {
       this.trapTab(event);
       return;
     }
-    // The row keys belong to the field. On the close button, Enter must press the button.
     if (event.target !== this.field()?.nativeElement) return;
     const rows = this.rows();
     if (!rows.length) return;
@@ -262,17 +262,14 @@ export class CommandPaletteComponent {
       this.moveTo(rows, (this.active() - 1 + rows.length) % rows.length);
     } else if (event.key === 'Enter') {
       event.preventDefault();
-      // The rows can shrink under a kept index; the last row is then the nearest.
       this.go(rows[Math.min(this.active(), rows.length - 1)]);
     }
   }
 
+  /** The URL can carry a query string, which `navigateByUrl` parses and `navigate` would not. */
   go(row: PaletteRow): void {
-    // No focus return: the reader goes somewhere else.
     this.returnFocus = null;
     this.close();
-    // The url can carry a query string (`/budget?ks=…`), which `navigateByUrl` parses
-    // and `navigate` would not.
     void this.router.navigateByUrl(row.url);
   }
 
@@ -323,7 +320,6 @@ export class CommandPaletteComponent {
   private moveTo(rows: PaletteRow[], index: number): void {
     this.active.set(index);
     const id = this.optionId(rows[index]);
-    // After the render that moves the highlight.
     queueMicrotask(() => document.getElementById(id)?.scrollIntoView({ block: 'nearest' }));
   }
 }

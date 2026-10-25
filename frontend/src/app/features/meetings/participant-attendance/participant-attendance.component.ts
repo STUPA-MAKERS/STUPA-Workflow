@@ -69,9 +69,11 @@ export class ParticipantAttendanceComponent {
   /** The stored reason, as a value: a new roster object with the same reason is no change. */
   private readonly storedNote = computed(() => this.member().note ?? '');
 
+  /**
+   * The stored reason is taken over only when it changes, because a live update of the roster must
+   * not drop what the member types.
+   */
   constructor() {
-    // Take over the stored reason only when it changes. A live update of the roster
-    // must not drop what the member types.
     effect(() => this.draft.set(this.storedNote()));
   }
 

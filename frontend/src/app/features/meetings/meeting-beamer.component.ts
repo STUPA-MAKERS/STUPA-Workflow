@@ -166,18 +166,14 @@ export class MeetingBeamerComponent {
     const majority = majorityLabel(v.majorityRule, guests, t);
     const q = v.quorum;
     const quorum = q ? quorumLabel(q, t) : '';
-    // Every result that is not `passed` is a rejection, also a tie (O18).
     const passed = v.result === 'passed';
     const quorumOpen = v.status === 'open' && !!q && !v.quorumMet;
 
-    // "Einfache Mehrheit · offene Abstimmung", plus the quorum while it is reached.
     const rules = voteRulesParts(
       { majorityRule: v.majorityRule, secret: v.secret, quorum: quorumOpen ? null : q, guestsVote: guests },
       t,
     );
 
-    // "Einfache Mehrheit · Quorum erreicht · 20 Stimmen". A closed vote missed its
-    // quorum exactly when the server names it as the reason.
     const missedQuorum = v.failedReason === 'quorum';
     const outcome = [passed || missedQuorum ? majority : t('beamer.majorityMissed', { rule: majority })];
     if (q) outcome.push(t(missedQuorum ? 'beamer.quorumMissed' : 'beamer.quorumMet'));
@@ -185,14 +181,12 @@ export class MeetingBeamerComponent {
     const composition = guests ? guestComposition(v.presentMembers, v.presentGuests, t) : null;
 
     return {
-      // Counts show after the close, or while open once the server revealed them.
       bars: v.counts !== null && (v.status === 'closed' || !v.secret),
       turnout: t('meetings.vote.progress', { voted: v.voted, present: v.present }),
       hiddenKey: v.secret ? 'meetings.vote.hiddenSecret' : 'meetings.vote.progressHidden',
       rules: rules.join(' · '),
       quorumWarning: quorumOpen ? t('beamer.quorumPending', { quorum }) : null,
       passed,
-      // A vote with guests: "Abgegeben 24 · Mehrheit der abgegebenen Stimmen" (#17).
       outcome: guests
         ? [t('guests.vote.castN', { n: v.voted }), t('guests.vote.majorityOfCast')].join(' · ')
         : outcome.join(' · '),

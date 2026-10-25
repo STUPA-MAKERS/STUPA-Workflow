@@ -96,7 +96,6 @@
   display: flex;
   align-items: flex-end;
   gap: var(--space-2);
-  // The button takes the height of the labelled field beside it, so both end on one line.
   --button-height: var(--field-height);
 }
 .vod__freeInput {

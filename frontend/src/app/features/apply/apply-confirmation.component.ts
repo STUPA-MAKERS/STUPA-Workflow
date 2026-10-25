@@ -36,6 +36,9 @@ import { shortRef } from './apply.util';
  * Einreichen", `freetexts.submittedInternal` and `freetexts.submittedExternal`) as
  * Markdown in the language of the page. An empty text gives the built-in text.
  * `renderMarkdown` escapes all HTML first, and Angular sanitizes the `innerHTML`.
+ *
+ * The upload limit shows only after the config loaded, because before that "unbegrenzt" can be
+ * wrong.
  */
 @Component({
   selector: 'app-apply-confirmation',

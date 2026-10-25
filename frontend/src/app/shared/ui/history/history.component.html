@@ -45,8 +45,6 @@
                         @let key = day.key + ':' + ei + ':' + ci;
                         @let open = isOpen(key);
                         @let valuesId = id + '-v-' + day.key + '-' + ei + '-' + ci;
-                        <!-- The values are not in the DOM while closed, so the button
-                             points at them only when open. -->
                         <button
                           type="button"
                           class="hist__more"

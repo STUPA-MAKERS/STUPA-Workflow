@@ -77,7 +77,6 @@
   width: 40px;
   height: 40px;
   border-radius: var(--radius-md);
-  /* A neutral tile that shows on the row and on the selected row alike. */
   background: color-mix(in srgb, var(--color-text) 8%, transparent);
   color: var(--color-text-muted);
 }

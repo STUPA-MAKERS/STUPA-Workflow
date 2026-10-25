@@ -87,7 +87,6 @@
 /* ------------------------------------------------------------------ rows */
 .apps__scroll {
   @include lp.scroll(--apps-fade);
-  /* The FAB covers the end of the list: room to scroll the last row above it. */
   padding-bottom: calc(56px + var(--space-6));
 }
 .apps--split .apps__scroll {
@@ -193,7 +192,6 @@
 
 /* ------------------------------------------------------------------ sheets */
 .apps__moreForm {
-  /* The fields sit on the sheet (surface 2): one step up, so they stand out from it. */
   @include sc.raised-fields($muted-label: false);
   display: flex;
   flex-direction: column;
@@ -223,7 +221,6 @@
 }
 
 @include bp.phone {
-  /* One row of chips that scrolls sideways; an end fades while more chips lie past it. */
   .apps__chips {
     @include lp.phone-chips;
   }

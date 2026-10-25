@@ -146,7 +146,6 @@
 /* The bar has the same edges as the form below it; on a phone it spans the gutters. */
 .sp__editBar {
   position: sticky;
-  /* Below the status bar of an installed iOS app (0 in a browser tab). */
   top: var(--app-top-safe-area, 0px);
   z-index: 3;
   display: flex;
@@ -190,9 +189,7 @@
   min-height: 0;
   --chat-log-min: 14rem;
   --chat-composer-bottom: 0px;
-  /* The sheet is surface 2: the messages of the Gremium take the next step. */
   --chat-bubble: var(--color-surface-3);
-  /* The composer bar lies on the sheet, from edge to edge of it, under a hairline. */
   --chat-composer-surface: transparent;
   --chat-composer-bleed: var(--space-4);
 }

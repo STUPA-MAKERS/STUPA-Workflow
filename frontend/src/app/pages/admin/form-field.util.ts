@@ -66,7 +66,7 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 
 /** Structural JsonLogic check: each node is exactly one known operator. */
 export function validateJsonLogic(expr: unknown): boolean {
-  if (!isRecord(expr)) return true; // a literal is always valid
+  if (!isRecord(expr)) return true;
   const keys = Object.keys(expr);
   if (keys.length !== 1) return false;
   const op = keys[0];
@@ -135,7 +135,12 @@ export function fundingProblem(
   return null;
 }
 
-/** Canonical form: drop empty optionals. This is the stored definition. */
+/**
+ * Canonical form: drop empty optionals. This is the stored definition.
+ *
+ * Only a numeric field may carry `isPromoted`, because the backend sends 422 for other types. A
+ * `positions` or `funding` field promotes into `amount` automatically, without a flag.
+ */
 export function normalizeFormField(field: FormFieldDef): FormFieldDef {
   const out: FormFieldDef = { key: field.key, type: field.type, label: field.label };
   if (field.help && Object.keys(field.help).length > 0) out.help = field.help;
@@ -147,8 +152,6 @@ export function normalizeFormField(field: FormFieldDef): FormFieldDef {
   if (field.visibleIf) out.visibleIf = field.visibleIf;
   if (field.compute) out.compute = field.compute;
   if (field.isPII) out.isPII = true;
-  // Only a numeric field may carry `isPromoted`. The backend sends 422 for other types.
-  // A `positions` or `funding` field promotes into `amount` automatically, without a flag.
   if (field.isPromoted && (field.type === 'number' || field.type === 'currency')) {
     out.isPromoted = true;
     if (field.promoteTarget) out.promoteTarget = field.promoteTarget;
@@ -197,8 +200,6 @@ export function groupsFromFields(fields: FormFieldDef[]): QuestionGroup[] {
   let opened = false;
   for (const f of fields) {
     if (f.type === 'section') {
-      // A marker closes the running group when that group has content or a marker
-      // already. The marker then opens a new group with its own title.
       if (opened || current.fields.length > 0) {
         groups.push(current);
       }
@@ -230,7 +231,6 @@ export function groupsToFields(groups: QuestionGroup[]): FormFieldDef[] {
   let n = 0;
   groups.forEach((g, gi) => {
     const hasTitle = !!(g.titleDe || g.titleEn);
-    // A first group without a title gets no marker. It is the implicit main section.
     const needsMarker = gi > 0 || hasTitle;
     if (needsMarker) {
       n += 1;

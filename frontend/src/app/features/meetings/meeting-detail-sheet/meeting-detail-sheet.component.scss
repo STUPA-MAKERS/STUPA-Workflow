@@ -83,7 +83,6 @@
   flex-direction: column;
   gap: var(--space-6);
   min-width: 0;
-  /* The counts follow the width of this column, not of the sheet. */
   container-type: inline-size;
 }
 

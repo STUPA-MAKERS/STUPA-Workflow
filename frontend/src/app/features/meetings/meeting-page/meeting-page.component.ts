@@ -75,6 +75,10 @@ type SessionAction = 'settings' | 'attendance' | 'beamer' | 'qr' | 'close' | 'de
  * Wide (>= 1200px): three columns. Below that the agenda moves into a sheet from the
  * start edge, and the vote cards go above the item. On a phone the agenda sheet, the
  * attendance and the minute-taker open as bottom sheets.
+ *
+ * The reason for a disabled action is visible text, not only a tooltip, because a disabled button
+ * takes no focus and no touch. The agenda sheet stays outside the body, because the scroll fade of
+ * the body is a mask, and a mask clips the fixed sheet and its scrim to the box of the body.
  */
 @Component({
   selector: 'app-meeting-page',
@@ -199,7 +203,6 @@ export class MeetingPageComponent {
   protected readonly revision = signal(0);
 
   constructor() {
-    // The page keeps room below its content for the dock.
     observeElementSize(
       () => this.dock().nativeElement,
       (size) => this.dockHeight.set(size.height),
@@ -294,6 +297,8 @@ export class MeetingPageComponent {
    * The session menu: settings, attendance and delete. Below the wide layout the beamer
    * of a planned or live meeting goes in here too; on a phone the header keeps only the title, so the close moves in
    * as well (the opening is on the preparation page, the finalize in the protocol bar).
+   *
+   * The beamer route and its stream need session.manage in the gremium.
    */
   protected readonly menu = computed<RowMenuSection[]>(() => {
     const m = this.meeting();
@@ -301,12 +306,9 @@ export class MeetingPageComponent {
     const main: RowMenuItem[] = [];
     if (m.canManage) main.push({ id: 'settings', label: t('meetings.settings.title'), icon: 'edit' });
     main.push({ id: 'attendance', label: t('meetings.page.recordAttendance'), icon: 'users' });
-    // The beamer follows a running meeting; a closed meeting has nothing to show there.
-    // The beamer route and its stream need session.manage in the gremium (`canManage`).
     if (!this.wide() && m.status !== 'closed' && m.canManage) {
       main.push({ id: 'beamer', label: t('meetings.beamer.enter'), icon: 'monitor' });
     }
-    // A phone has no header button for the QR code of a public meeting.
     if (this.phone() && m.publicJoin && m.status !== 'closed' && m.canManage) {
       main.push({ id: 'qr', label: t('guests.qr.title'), icon: 'grid' });
     }
@@ -440,12 +442,15 @@ export class MeetingPageComponent {
     this.agendaOpen.set(false);
   }
 
-  /** Append the result of a closed vote to the text of the open item. */
+  /**
+   * Append the result of a closed vote to the text of the open item.
+   *
+   * A phone keyboard often ends the text with a hard break, which Markdown keeps as a trailing
+   * backslash. Left in place, it becomes an empty line before the block.
+   */
   insertResult(vote: MeetingVote): void {
     const t = this.top();
     if (!t) return;
-    // A phone keyboard often ends the text with a hard break, which Markdown keeps as a
-    // trailing backslash. Left in place it becomes an empty line before the block.
     const body = (t.body ?? '').replace(/[\s\\]+$/, '');
     const snippet = voteSnippet(vote);
     this.bodyChange.emit({ itemId: t.id, body: body ? `${body}\n\n${snippet}` : snippet });

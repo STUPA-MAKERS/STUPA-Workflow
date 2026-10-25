@@ -84,6 +84,7 @@ export class AnswerViewComponent {
   /** The surface of the rows; see `app-field-group`. */
   readonly surface = input<1 | 2 | 3>(2);
 
+  /** Answers without a field come from an older form version and show last, as plain text. */
   readonly blocks = computed<AnswerBlock[]>(() => {
     const lang = this.i18n.locale();
     const data = this.data();
@@ -117,7 +118,6 @@ export class AnswerViewComponent {
       }
     }
 
-    // Answers without a field: an older form version had them. Plain text, last.
     const other = new ChunkBuilder();
     for (const [key, value] of Object.entries(data)) {
       if (known.has(key) || skip.has(key) || isEmptyAnswer(value)) continue;
@@ -161,7 +161,6 @@ export class AnswerViewComponent {
     try {
       return evalJsonLogic(f.compute, ctx);
     } catch {
-      // A rule the engine cannot run gives no value, as in the form.
       return null;
     }
   }

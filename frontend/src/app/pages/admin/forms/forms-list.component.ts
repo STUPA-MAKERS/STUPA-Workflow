@@ -110,11 +110,12 @@ export class FormsListComponent {
   protected readonly saving = signal(false);
   protected readonly form = signal<NewForm>(emptyForm());
 
+  /**
+   * The dropdown source is the authenticated /gremien, not admin/gremien, so a form manager with
+   * form.configure fills the Gremium column without the admin.gremien permission.
+   */
   constructor() {
     this.reload();
-    // Read the dropdown source from the authenticated /gremien, and not from admin/gremien.
-    // A form manager with form.configure then fills the Gremium column and the selector
-    // without the admin.gremien permission.
     this.api.listGremienOptions().subscribe({
       next: (g) => this.gremien.set(g),
       error: () => this.gremien.set([]),
@@ -202,7 +203,6 @@ export class FormsListComponent {
       },
       error: () => {
         this.deleting.set(false);
-        // A 409 means applications of this type still exist. Other errors stay generic.
         this.toast.error(this.i18n.translate('admin.forms.deleteFailed'));
       },
     });

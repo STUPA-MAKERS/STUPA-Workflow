@@ -526,6 +526,10 @@ export class AuditLogComponent {
     this.load(true);
   }
 
+  /**
+   * Day boundaries are local: since starts at 00:00 and until ends at 23:59:59, sent as an aware
+   * UTC time.
+   */
   private load(reset: boolean): void {
     if (this.loading()) return;
     this.loading.set(true);
@@ -536,8 +540,6 @@ export class AuditLogComponent {
         before: reset ? undefined : (this.cursor() ?? undefined),
         action: this.action() || undefined,
         actor: this.actor() || undefined,
-        // Day boundaries: since starts at 00:00 and until ends at 23:59:59, in local
-        // time, sent as an aware UTC time.
         since: this.since() ? localDayBound(this.since(), false) : undefined,
         until: this.until() ? localDayBound(this.until(), true) : undefined,
       })

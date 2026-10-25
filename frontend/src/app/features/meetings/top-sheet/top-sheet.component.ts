@@ -216,17 +216,17 @@ export class TopSheetComponent {
     },
   );
 
+  /**
+   * Only a rename end after the start counts, because the agenda names the item only after the
+   * click.
+   */
   constructor() {
-    // The field takes the focus when it opens, with the whole title selected.
     effect(() => {
       const el = this.titleInput()?.nativeElement;
       if (!el) return;
       el.focus();
       el.select();
     });
-    // A rename that ends elsewhere (a save or a cancel in the agenda pane) closes the
-    // field of the heading too. The agenda names the item only after the click, so only
-    // an end after that start counts.
     let started = false;
     effect(() => {
       const id = this.renamingTopId();

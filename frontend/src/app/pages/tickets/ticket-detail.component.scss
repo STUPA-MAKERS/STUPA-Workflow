@@ -226,7 +226,6 @@
 /* The open to-dos: plain lines under the label of the checkbox. */
 .td__closeList {
   margin: 0;
-  /* The lines start where the label starts: the box of the checkbox and its gap. */
   padding-inline-start: calc(18px + var(--space-2));
   list-style: none;
   color: var(--color-text-muted);
@@ -288,8 +287,6 @@
   .td:not(.td--split) {
     min-height: 0;
   }
-  /* The pages of the tabs (`app-tab-pager`, fill) start at the line of the tabs and run
-     down to the bottom navigation; each page scrolls by itself. */
   .td:not(.td--split) app-tab-pager.td__tabs {
     --tab-pager-page-top: 0px;
     margin-bottom: calc(-1 * var(--main-pad-bottom, 0px));
@@ -303,8 +300,6 @@
     flex: 1 1 0;
     min-height: 0;
   }
-  /* The log scrolls right up to the line of the tabs, and keeps the first message where
-     the gap below the tabs puts it. The line ends the log, so it does not fade. */
   .td__panel--log .td__chat {
     --chat-log-inset-top: calc(4px + var(--space-5));
     --chat-log-fade-top: 0px;
@@ -315,7 +310,6 @@
   .td__pair {
     grid-template-columns: minmax(0, 1fr);
   }
-  /* Header = title + one action row; the two main actions share the width. */
   .td__actions app-button {
     flex: 1 1 0;
   }
@@ -377,7 +371,6 @@
   .td:not(.td--split) app-tab-pager.td__tabs {
     --tab-pager-bleed: var(--space-4);
   }
-  /* The tabs of the skeleton. */
   .td:not(.td--split) app-tabs.td__tabs {
     margin-inline: calc(-1 * var(--space-4));
   }

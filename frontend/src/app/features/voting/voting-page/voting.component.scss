@@ -100,7 +100,7 @@
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  font-size: 0.75rem; /* 12px */
+  font-size: 0.75rem;
   font-weight: var(--fw-semibold);
   white-space: nowrap;
 }
@@ -112,7 +112,7 @@
 }
 .vl__when {
   color: var(--color-text-muted);
-  font-size: 0.75rem; /* 12px */
+  font-size: 0.75rem;
   white-space: nowrap;
 }
 /* The note starts at the edge of the filters and the rows. */
@@ -140,14 +140,12 @@
 }
 
 @include bp.phone {
-  /* One row of chips that scrolls sideways; an end fades while more chips lie past it. */
   .vl__chips {
     @include lp.phone-chips;
   }
   .vl__month {
     padding-inline: var(--space-1);
   }
-  /* The whole row is the target; the title needs the room more than the chevron. */
   .vl__chev {
     display: none;
   }

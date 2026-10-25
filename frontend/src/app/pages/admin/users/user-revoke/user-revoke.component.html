@@ -15,7 +15,6 @@
         <span>{{ 'admin.users.revoke.loadFailed' | t }}</span>
       </app-note>
     } @else {
-      <!-- The person and the last login. -->
       <div class="ur__who">
         <app-avatar size="sm" [name]="name(p.principal)" [principalId]="p.principal.id" [decorative]="true" />
         <span class="ur__whoText">

@@ -113,7 +113,6 @@ export function handoverPreview(
   const pos = currentPosition(m, agenda);
   const nowIso = now.toISOString();
   const started = m.keeperPeriods.filter((p) => p.fromAt !== null);
-  // A meeting from before the periods existed: the current minute-taker since the start.
   const periods: KeeperPeriod[] = started.length
     ? started.map((p) => ({ ...p }))
     : m.protokollantId

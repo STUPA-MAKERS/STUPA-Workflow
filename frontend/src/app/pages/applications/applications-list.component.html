@@ -4,14 +4,12 @@
       <app-page-header [pane]="true" titleId="apps-title" [title]="'applications.list.title' | t">
         <ng-container ngProjectAs="[actions]">
           @if (phone()) {
-            <!-- Phone: the title and one menu. The sort orders and the export sit in it. -->
             <app-row-menu
               [label]="'applications.list.menu' | t"
               [sections]="phoneMenuSections()"
               (selected)="onHeaderMenu($event)"
             />
           } @else {
-            <!-- #11: capture an application on behalf of another person. -->
             @if (canCapture()) {
               <app-button
                 variant="tonal"
@@ -25,8 +23,6 @@
                 >
               </app-button>
             }
-            <!-- The export has no `mine` filter: hide it while `mine` is set, so that it
-                 never exports more rows than the list shows. -->
             @if (exportShown()) {
               <app-button
                 variant="text"
@@ -48,8 +44,6 @@
         </ng-container>
       </app-page-header>
 
-      <!-- The search and the chips never scroll away: one pane at a time they stick to the
-           top of the viewport; side by side only the rows below them scroll. -->
       <app-sticky-bar class="ld-pane__filters">
         <app-search-pill
           [placeholder]="searchPlaceholder()"
@@ -57,7 +51,6 @@
           [value]="searchText()"
           (valueChange)="onSearch($event)"
         >
-          <!-- "Weitere Filter": amount and submission date. -->
           <button
             trail
             type="button"
@@ -81,7 +74,6 @@
           [attr.aria-label]="'applications.list.filter.group' | t"
         >
           @if (mine()) {
-            <!-- `mine` has no control of its own: this chip shows it and removes it. -->
             <button
               type="button"
               class="chip on"
@@ -143,8 +135,6 @@
           }
         </div>
         @if (reloading()) {
-          <!-- A filter, the search or the sort changed: the rows stay until the new ones
-               arrive; after 300ms a bar under the chips says that the list is on its way. -->
           <span class="skel-progress apps__progress" aria-hidden="true"></span>
         }
       </app-sticky-bar>
@@ -162,9 +152,6 @@
             {{ 'applications.list.error' | t }}
           </app-note>
         } @else if (loading()) {
-          <!-- The shape of the loaded list: a month heading and rows in the geometry of
-               `app-list-item`, as many as fill the pane, so nothing moves when they arrive.
-               It shows only after 300ms (`skel-in`). -->
           <div class="apps__skel skel-in">
             <h2 class="sec apps__month" aria-hidden="true">
               <span class="skel-text skel-text--accent apps__skelMonth"></span>
@@ -225,7 +212,6 @@
                         }
                       </span>
                       <span trail class="apps__trail">
-                        <!-- F1: the approved amount, the requested one struck through below. -->
                         <app-amount [amount]="row.amount" [approved]="row.approved" layout="stack" />
                         <span class="apps__menuSlot">
                           @if (!split()) {
@@ -265,8 +251,6 @@
       <app-fab [label]="'fab.application' | t" link="/apply" [contained]="split()" />
     </section>
 
-    <!-- While "Antrag erfassen" is open, the form replaces the routed detail (side by
-         side and one pane at a time); on a phone it opens as a bottom sheet. -->
     <div detail class="apps__detail" [class.apps__detail--capture]="captureInPane()">
       @if (captureInPane()) {
         <app-application-capture
@@ -300,8 +284,6 @@
   </app-side-sheet>
 }
 
-<!-- Amount and submission date: typed values, so the sheet edits a draft and only
-     "Anwenden" applies it. Another close of the sheet leaves the filters as they were. -->
 <app-side-sheet
   [side]="sheetSide()"
   [heading]="'applications.list.filter.more' | t"

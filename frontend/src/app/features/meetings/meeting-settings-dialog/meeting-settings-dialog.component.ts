@@ -162,7 +162,6 @@ export class MeetingSettingsDialogComponent {
     this.api.listAttendance(m.id, { quiet: true }).subscribe({
       next: (rows) => {
         this.roster.set(rows);
-        // Set the choice again once its option exists, so the field shows the name.
         this.keeper.set(m.protokollantId ?? '');
       },
       error: () => this.roster.set([]),
@@ -230,7 +229,12 @@ export class MeetingSettingsDialogComponent {
     this.closed.emit();
   }
 
-  /** Save the title, the minute-taker, the date and the times in one PATCH. */
+  /**
+   * Save the title, the minute-taker, the date and the times in one PATCH.
+   *
+   * Only a new title goes out, because the same title again costs an audit read. A final protocol
+   * locks the minute-taker, so the field stays out of the request; the server would answer 409.
+   */
   save(): void {
     const m = this.meeting();
     if (!m || this.saving() || this.locked()) return;
@@ -251,15 +255,11 @@ export class MeetingSettingsDialogComponent {
     this.saving.set(true);
     this.api
       .patchMeeting(m.id, {
-        // Only a new title goes out: the same title again would only cost an audit read.
         ...(title !== m.title ? { title } : {}),
-        // A final protocol locks the minute-taker: leave the field out, the server
-        // would answer 409.
         ...(this.keeperLocked() ? {} : { protokollantId: this.keeper() || null }),
         date: this.date().trim(),
         startTime: this.time().trim(),
         endTime: end || null,
-        // Only the meeting lead changes the public participation; send it only on a change.
         ...this.publicChanges(m),
       })
       .subscribe({

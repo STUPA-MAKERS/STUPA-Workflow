@@ -65,6 +65,10 @@ export class CloseMeetingDialogComponent {
   /** The meeting has planned votes, which the close cancels. */
   readonly hasDrafts = computed(() => this.meeting().votes.some((v) => v.status === 'draft'));
 
+  /**
+   * A refusal is true only until the page learns more, so a new meeting state without an open vote
+   * allows the close again.
+   */
   constructor() {
     effect(() => {
       if (this.open()) {
@@ -74,9 +78,6 @@ export class CloseMeetingDialogComponent {
         });
       }
     });
-    // A refusal is only true until the page learns more. When a new state of the
-    // meeting (for example a `meeting_state` push after the other tab closed the vote)
-    // shows no open vote, the close is possible again.
     effect(() => {
       const anyOpen = this.meeting().votes.some((v) => v.status === 'open');
       if (!anyOpen) untracked(() => this.refused.set(false));
@@ -100,7 +101,6 @@ export class CloseMeetingDialogComponent {
       error: (err: unknown) => {
         this.closing.set(false);
         if (problemCode(err) === 'open_vote') {
-          // The vote opened in another tab after this page loaded.
           this.refused.set(true);
           return;
         }

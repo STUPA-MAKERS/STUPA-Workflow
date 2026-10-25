@@ -121,7 +121,6 @@ export function liveOpenedVote(
     counts: null,
     leading: null,
     closesAt: msg.closesAt,
-    // The event carries the secrecy, so the card shows the right hint before the next read.
     secret: msg.secret,
     openedAt: new Date().toISOString(),
     voted: 0,
@@ -231,7 +230,6 @@ export function voteRulesParts(vote: VoteRules, t: Translate, options: VoteRules
  * shows only its secrecy and the time.
  */
 export function voteMetaLine(vote: MeetingVote, translate: Translate, i18nLocale: string): string {
-  // A poll has no majority and no quorum: only the secrecy applies.
   const parts =
     vote.kind === 'poll'
       ? voteRulesParts({ secret: vote.secret }, translate)

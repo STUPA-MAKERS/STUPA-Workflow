@@ -201,28 +201,22 @@
 .td__drawer > app-todo-card-detail {
   flex: 1 1 auto;
 }
-/* Phone: the drawer is the page and ends on the bottom bar, which stays visible. */
+/* Phone: the drawer is the page and ends on the bottom bar, which stays visible.
+   The drawer has no top padding, because the drawer is the scroll container and a sticky element
+   sticks below the top padding of its scroll container. */
 @include bp.phone {
   .td__scrim,
   .td__drawer {
     bottom: var(--app-bottom-inset, 0px);
   }
   .td__drawer {
-    /* The bar of the card (`app-list-detail-bar`) reaches over the side padding, as it
-       does on a list/detail page. The drawer has no top padding, because the drawer is the
-       scroll container and a sticky element sticks below the top padding of its scroll
-       container: the bar would stop that far below the top edge, and the card would show
-       above it. */
     --main-pad-top: 0px;
     --layout-gutter: var(--space-4);
     width: 100vw;
     padding: 0 var(--space-4);
     border-radius: 0;
-    /* The bottom bar lies over the drawer, as over any page: no shadow falls on it. */
     box-shadow: none;
   }
-  /* The bar takes the colour of the drawer, not of the page (`--color-bg`), so it does not
-     stand out from the card below it. */
   .td__drawer > app-list-detail-bar {
     background: var(--color-surface);
   }

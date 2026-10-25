@@ -98,6 +98,8 @@ export class AccountNotificationsComponent {
   /**
    * Send the current state. While a PUT runs, only mark the state as dirty; the running
    * PUT then sends it when it ends.
+   *
+   * A switch flipped during the PUT stays on screen and is sent now.
    */
   private save(): void {
     if (this.saving) {
@@ -110,7 +112,6 @@ export class AccountNotificationsComponent {
       next: (saved) => {
         this.saving = false;
         this.confirmed = saved;
-        // A switch flipped during the PUT: keep it on screen and send it now.
         if (this.dirty) this.save();
         else this.prefs.set(saved);
       },

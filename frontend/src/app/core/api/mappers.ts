@@ -215,6 +215,7 @@ export function mapDiff(wire: DataDiffWire | null | undefined): DataDiff | null 
   };
 }
 
+/** `scanned=true` only means "scan finished"; the download decides clean or finding. */
 export function mapAttachment(wire: AttachmentOutWire): Attachment {
   return {
     id: wire.id,
@@ -222,7 +223,6 @@ export function mapAttachment(wire: AttachmentOutWire): Attachment {
     mime: wire.mime,
     size: wire.size,
     scanned: wire.scanned,
-    // `scanned=true` only means "scan finished". The download decides clean or finding.
     scanState: wire.scanned ? 'clean' : 'scanning',
   };
 }
@@ -356,7 +356,12 @@ export function mapProtocol(wire: ProtocolOutWire): Protocol {
   };
 }
 
-/** FE input → camelCase request body for `POST /applications`. */
+/**
+ * FE input → camelCase request body for `POST /applications`.
+ *
+ * The draft fields go out only with draft uploads: the server reads an empty list without a token
+ * as "no drafts", but a token without ids is still valid.
+ */
 export function toApplicationCreateBody(input: NewApplication): ApplicationCreateBody {
   return {
     typeId: input.typeId,
@@ -365,8 +370,6 @@ export function toApplicationCreateBody(input: NewApplication): ApplicationCreat
     applicantName: input.applicantName ?? null,
     lang: input.lang,
     altcha: input.altcha ?? null,
-    // Only with draft uploads: the server reads an empty list without a token as "no
-    // drafts", but a token without ids is still valid, so both stay out then.
     ...(input.attachmentIds?.length && input.draftToken
       ? { attachmentIds: input.attachmentIds, draftToken: input.draftToken }
       : {}),

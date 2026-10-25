@@ -112,7 +112,6 @@ export function electionSnippet(vote: MeetingVote): string {
   if (!election || !result) return lines.join('\n');
   const names = new Map(election.candidates.map((c) => [c.id, c.name]));
   const yesNo = typeof result.yes === 'number' && typeof result.no === 'number';
-  // Best first, as the backend writes them; the single candidate keeps its place.
   const rows = election.candidates.map((c) => ({
     name: c.name,
     votes: result.counts[c.id] ?? 0,

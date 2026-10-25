@@ -299,7 +299,6 @@ export class VoteOpenDialogComponent {
     if (value !== 'motion' && !this.electionAllowed()) return;
     this.kind.set(value);
     const it = this.item();
-    // Guests vote in an election only when the lead switches them on.
     this.guestsVote.set(value === 'motion' && this.guestsAllowed() && !it?.nonPublic);
   }
 
@@ -362,8 +361,6 @@ export class VoteOpenDialogComponent {
   setDraft(draft: DecisionDraft): void {
     this.draft.set(draft);
     const it = this.item();
-    // An invalid amount shows its error at the field; the question keeps the last
-    // valid proposal instead of echoing it.
     if (it?.applicationId && !this.questionEdited && draftError(draft, it.amount ?? null) === null) {
       this.question.set(this.prefill(it));
     }
@@ -387,7 +384,6 @@ export class VoteOpenDialogComponent {
     this.preparing.set(prepare);
     const proposal = it.applicationId ? toProposal(this.draft(), it.amount ?? null) : null;
     this.submitting.set(true);
-    // Only a meeting that lets guests vote carries the switch; else the server decides.
     const guests = this.guestsAllowed()
       ? { guestsVote: this.guestsVote() && !this.guestsLocked() }
       : {};
@@ -420,9 +416,7 @@ export class VoteOpenDialogComponent {
           secret: this.secret(),
           majorityRule: this.majorityRule(),
           ...guests,
-          // F1: the decision proposal, only when it deviates.
           ...(proposal ? { proposal } : {}),
-          // No quorum: the server takes the Gremium default.
         };
     this.api
       .openMeetingVote(this.meeting().id, prepare ? { ...body, draft: true } : body)

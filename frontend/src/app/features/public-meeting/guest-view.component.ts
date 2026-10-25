@@ -109,10 +109,6 @@ export class GuestViewComponent {
   protected readonly rows = computed<AgendaRow[]>(() =>
     this.ordered().map((item) => {
       const now = item.position === this.currentPos();
-      // D5: the general agenda rule. Only an application item has a subtitle ("Antrag");
-      // a free-text item has none. The badge shows the number and the row colour shows
-      // the current item. A non-public item says why it shows no content, because the
-      // lock icon alone has no text.
       let sub = '';
       if (item.nonPublic) sub = this.i18n.translate('guests.view.membersOnly');
       else if (item.kind === 'application') sub = this.i18n.translate('guests.view.application');
@@ -189,7 +185,6 @@ export class GuestViewComponent {
   });
 
   constructor() {
-    // A vote that the guest can cast opens its page once by itself.
     effect(() => {
       const v = this.focusVote();
       untracked(() => {

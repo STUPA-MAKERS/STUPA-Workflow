@@ -22,7 +22,6 @@
         </ng-container>
       </app-page-header>
 
-      <!-- The search and the chip never scroll away. -->
       <app-sticky-bar class="ld-pane__filters">
         <app-search-pill
           [size]="phone() ? 'md' : 'lg'"
@@ -57,8 +56,6 @@
         appScrollFade="y"
       >
         @if (store.loading()) {
-          <!-- The shape of the loaded list (a group heading, rows with the logo in the
-               geometry of `app-list-item`), shown after 300ms. -->
           <div class="grl__skel skel-in">
             <h2 class="sec grl__head" aria-hidden="true">
               <span class="skel-text skel-text--accent grl__skelHead"></span>

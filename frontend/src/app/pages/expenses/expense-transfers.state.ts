@@ -149,6 +149,9 @@ export class ExpenseTransfersState {
    * The body carries no cost centre. The pair is immutable, and a different
    * pair answers 409. The bookings list refreshes too, because both legs of the
    * transfer are rows there.
+   *
+   * A 409 means the cost-centre pair changed meanwhile, so the message names the reason and the row
+   * reloads.
    */
   saveEdit(event: Event): void {
     event.preventDefault();
@@ -174,8 +177,6 @@ export class ExpenseTransfersState {
       },
       error: (err: { status?: number }) => {
         this.saving.set(false);
-        // 409 = the cost-centre pair changed under us. Name the reason instead
-        // of a generic failure, and reload so the row shows the server truth.
         if (err.status === 409 && problemCode(err) !== FISCAL_YEAR_CLOSED) {
           this.toast.error(this.i18n.translate('expenses.transfers.immutablePair'));
           this.reload();

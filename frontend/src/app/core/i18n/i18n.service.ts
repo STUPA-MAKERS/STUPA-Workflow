@@ -62,9 +62,11 @@ export class I18nService {
     return CATALOG[this._locale()];
   });
 
+  /**
+   * `<html lang>` follows the resolved locale from the first paint (a11y and SEO), not only after
+   * the first manual language switch.
+   */
   constructor() {
-    // Sync `<html lang>` with the resolved locale from the first paint (a11y and
-    // SEO), not only at the first manual language switch.
     if (typeof document !== 'undefined') {
       document.documentElement.lang = this._locale();
     }

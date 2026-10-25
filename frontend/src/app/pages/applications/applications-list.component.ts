@@ -149,6 +149,9 @@ type FilterSheet = 'more' | null;
  *
  * Every filter and the sort live in the query params, so a filtered list is shareable as
  * a link and the back button works. Opening a row keeps them.
+ *
+ * The export hides while `mine` is set, because the export has no `mine` filter and would export
+ * more rows than the list shows.
  */
 @Component({
   selector: 'app-applications-list',
@@ -486,22 +489,21 @@ export class ApplicationsListComponent implements OnDestroy {
   /** A row action in flight (archive, transition). */
   readonly busyRow = signal<Uuid | null>(null);
 
+  /**
+   * The filter and sort values live in the query params; the offset is not in the URL (infinite
+   * scroll).
+   */
   constructor() {
-    // The shown rows read their detail ahead, so a click shows it at once.
     prefetchDetails({ items: this.items, key: (a) => a.id, reads: (a) => applicationReads(a.id) });
     this.api.applicationTypes({ quiet: true }).subscribe({
       next: (types) => this.types.set(types),
       error: () => this.types.set([]),
     });
-    // Cost centres hidden in the budget tab (`hiddenInBudget`) do not appear in the
-    // filter either.
     this.budgetApi.tree().subscribe({
       next: (tree) => this.budgetTree.set(pruneHidden(tree)),
       error: () => this.budgetTree.set([]),
     });
 
-    // The filter and sort values live in the query params. Every change resets the list
-    // and reloads page 0. The offset is not in the URL (infinite scroll).
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((pm) => {
       this.readFilters(pm);
       this.sortField.set(pm.get('sort') === 'amount' ? 'amount' : 'createdAt');
@@ -509,7 +511,6 @@ export class ApplicationsListComponent implements OnDestroy {
       this.reload();
     });
 
-    // The open application comes from the child route (`/applications/:id`).
     this.readSelection();
     this.router.events
       .pipe(
@@ -518,15 +519,11 @@ export class ApplicationsListComponent implements OnDestroy {
       )
       .subscribe(() => this.readSelection());
 
-    // A change in the detail pane (a transition, an edit, an archive, a delete) shows in
-    // the list. The loaded rows and the scroll position stay.
     this.page.changes$.pipe(takeUntilDestroyed()).subscribe((change) => {
       if (change.source !== 'list') this.apply(change.id, change.kind);
     });
 
     effect(() => this.page.split.set(this.split()));
-    // Side by side the page fills the viewport: the frame drops the footer below it, so
-    // only the panes scroll.
     effect(() => this.frame.fill.set(this.split()));
 
   }
@@ -731,13 +728,11 @@ export class ApplicationsListComponent implements OnDestroy {
         this.toggleArchived(item);
         return;
       case 'transition':
-        // A transition onto the agenda needs the meeting: the dialog asks for it.
         if (action.transition.addsToAgenda) {
           this.agendaFor.set({ item, transition: action.transition });
           this.agendaOpen.set(true);
           return;
         }
-        // F1: a transition into an accepted state can approve with deviations.
         if (action.transition.allowsDecision) {
           this.decisionFor.set({ item, transition: action.transition });
           this.decisionOpen.set(true);
@@ -981,7 +976,6 @@ export class ApplicationsListComponent implements OnDestroy {
    * (`aria-current`) and the scroll position. A failure keeps the current rows.
    */
   protected refresh(): void {
-    // Nothing shown yet: a plain reload, with its placeholder and its error.
     if (this.loading() || this.items().length === 0) {
       this.reload();
       return;
@@ -1015,11 +1009,12 @@ export class ApplicationsListComponent implements OnDestroy {
    * - `initial`: the page replaces the list, and a failure shows the full error.
    * - `refresh`: as `initial`, but a failure keeps the rows and shows no error.
    * - `more`: the page appends, and a failure stays silent.
+   *
+   * A refresh starts at 0 but leaves `nextOffset` alone until its answer arrives, so a failed
+   * refresh does not load the first page a second time on the next scroll.
    */
   private fetch(mode: 'initial' | 'refresh' | 'more', limit = this.limit): void {
     const seq = ++this.fetchSeq;
-    // A refresh starts at 0 but leaves `nextOffset` alone until its answer arrives, so a
-    // failed refresh does not load the first page a second time on the next scroll.
     const offset = mode === 'refresh' ? 0 : this.nextOffset;
     this.api.listApplications(this.buildQuery(offset, limit)).subscribe({
       next: (page) => {

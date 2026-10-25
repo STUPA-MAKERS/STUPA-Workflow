@@ -101,6 +101,10 @@ export function normalizeQuestion(text: string): string {
  * The resolver of the editor: find the closed vote of a card by its question. The
  * question of the snippet is the question of the vote, else its title, with the round
  * of a runoff (see `voteSnippetQuestion`). A card of another meeting or a deleted vote stays plain.
+ *
+ * A runoff names its round in the head, so the two rounds of an election keep apart. Two votes can
+ * share a question, so a poll or election card names its kind in its first line and the vote of
+ * that kind wins.
  */
 export function voteResultResolver(
   votes: readonly MeetingVote[],
@@ -111,15 +115,11 @@ export function voteResultResolver(
   for (const v of votes) {
     if (v.status !== 'closed') continue;
     if (v.kind !== 'election' && v.kind !== 'poll' && !(v.question?.trim() || v.title?.trim())) continue;
-    // A runoff names its round in the head, so the two rounds of an election
-    // keep apart (see `voteSnippetQuestion`).
     const key = normalizeQuestion(voteSnippetQuestion(v));
     byQuestion.set(key, [...(byQuestion.get(key) ?? []), v]);
   }
   return (question, lines) => {
     const found = byQuestion.get(normalizeQuestion(question)) ?? [];
-    // Two votes can share a question. A poll or election card names its kind in its
-    // first line, so the vote of that kind wins; otherwise the last vote wins.
     const kind = lines?.[0]?.trim();
     const last = [...found].reverse();
     const vote = last.find((v) => kind != null && kindLine(v) === kind) ?? last[0];

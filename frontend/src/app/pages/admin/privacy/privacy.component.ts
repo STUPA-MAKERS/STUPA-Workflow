@@ -153,8 +153,6 @@ export class PrivacyComponent {
   constructor() {
     this.reload();
     this.api.getPrivacySettings().subscribe((s) => this.applyRetention(s.defaultRetentionMonths));
-    // `?person=<sub>` comes from the row action in Verwaltung → Benutzer. The search
-    // matches the `sub` too; only an exact match is taken.
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((qp) => {
       const sub = qp.get('person');
       if (!sub) return;

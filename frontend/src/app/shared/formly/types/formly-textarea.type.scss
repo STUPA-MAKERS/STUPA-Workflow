@@ -10,7 +10,6 @@
 .field__box {
   @include f.box;
   @include f.box-labelled;
-  // The text area grows downwards, so the label stays at the top of the box.
   & {
     align-items: stretch;
   }

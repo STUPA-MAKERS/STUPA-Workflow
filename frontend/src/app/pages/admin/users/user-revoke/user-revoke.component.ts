@@ -176,7 +176,6 @@ export class UserRevokeComponent {
   private sub?: Subscription;
 
   constructor() {
-    // A new person starts the dialog again.
     effect(() => {
       const src = this.source();
       untracked(() => this.reset(src));
@@ -305,7 +304,6 @@ export class UserRevokeComponent {
       });
     } else detail = this.i18n.translate('admin.users.revoke.grantedBy', { name: a.grantedBy ?? '—' });
     if (a.returnsAutomatically) {
-      // The bootstrap grants the role again: the revoke does not last.
       detail = `${detail}. ${this.i18n.translate('admin.users.revoke.returnsAutomatically')}`;
     }
     return { text: this.i18n.translate('admin.users.revoke.assignment', { role }), detail };

@@ -33,7 +33,6 @@
 
 .pv__card {
   @include sc.card;
-  /* The person search of the account erasure sits on surface 2 as well. */
   --sp-bg: var(--color-surface-3);
 }
 .pv__form {

@@ -135,6 +135,9 @@ const sheetScroll = new Map<number, number>();
  * tiles. Wide, `/account` shows an empty sheet beside the navigation. Below wide,
  * `/account` shows the navigation alone, and on a phone an account page has the same bar
  * as an admin page.
+ *
+ * The tiles hide during a search through a class and are not destroyed, so a cleared search does
+ * not load them again.
  */
 @Component({
   selector: 'app-admin-frame',
@@ -298,8 +301,6 @@ export class AdminFrameComponent {
         this.navMode.set(navMode(this.router.routerState.snapshot.root));
         this.paneRoute.set(paneRoute(this.router.routerState.snapshot.root));
         this.parentPath.set(parentOf(this.router.routerState.snapshot.root));
-        // A swipe back that led to another page in the frame: the sheet goes back to its
-        // place with the new page.
         this.swipe()?.done();
         const top = this.restoreId === null ? 0 : (sheetScroll.get(this.restoreId) ?? 0);
         afterNextRender(
@@ -314,12 +315,9 @@ export class AdminFrameComponent {
     afterNextRender(() => this.revealActive());
     effect(() => this.nav.active.set(this.showBar()));
 
-    // Beside the navigation the frame is a pane page: it fills the window, without the
-    // bottom padding of a page that scrolls.
     effect(() => this.pageFrame.fill.set(this.split() || this.fullPane()));
     inject(DestroyRef).onDestroy(() => this.pageFrame.fill.set(false));
 
-    // The navigation shows "Verwaltung" beside the page, so the breadcrumbs leave it out.
     effect(() =>
       this.pageFrame.crumbRoot.set(this.split() ? this.mode().home.replace(/^\//, '') : null),
     );

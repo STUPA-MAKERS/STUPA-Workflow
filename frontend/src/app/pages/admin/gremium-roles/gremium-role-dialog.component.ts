@@ -114,7 +114,6 @@ export class GremiumRoleDialogComponent {
   );
 
   constructor() {
-    // Each opening starts from the role (or an empty draft), never from the last edit.
     effect(() => {
       if (!this.open()) return;
       const role = this.role();

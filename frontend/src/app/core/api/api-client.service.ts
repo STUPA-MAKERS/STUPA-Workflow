@@ -566,7 +566,6 @@ export class ApiClient {
 
   /** GET /applications/{id}/attachments — existing attachments (panel hydration). */
   listAttachments(id: Uuid): Observable<Attachment[]> {
-    // Kept for the read ahead of a list; an upload or a delete under the same path drops it.
     return this.http
       .get<AttachmentOutWire[]>(`${this.base}/applications/${id}/attachments`, {
         context: readContext({ quiet: true, detail: true }),
@@ -722,11 +721,12 @@ export class ApiClient {
    * The list holds every Gremium with at least ONE meeting the user may read.
    * It is not the list of member Gremien. The response is already camelCase
    * (`id`/`name`) and needs no wire mapping.
+   *
+   * It uses `skipLoading` like the timeline beside it, because it fills a filter dropdown while the
+   * list loads its own rows, and without it the page showed its own placeholder and the global
+   * overlay at the same time.
    */
   listMeetingFilterGremien(): Observable<{ id: Uuid; name: string }[]> {
-    // `skipLoading` like the timeline beside it. This fills a filter dropdown while the
-    // list loads its own rows, so without it the page showed its own placeholder AND the
-    // global overlay at the same time — two answers to one question.
     return this.http.get<{ id: Uuid; name: string }[]>(`${this.base}/meetings/gremien`, {
       context: skipLoading(),
     });

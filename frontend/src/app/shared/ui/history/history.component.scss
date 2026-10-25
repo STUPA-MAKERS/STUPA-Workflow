@@ -169,7 +169,6 @@
 }
 .hist__line {
   display: block;
-  /* An empty line is a paragraph break: it keeps the height of a line. */
   min-height: 1lh;
   white-space: pre-wrap;
 }

@@ -30,7 +30,11 @@ export class AltchaService {
   }
 }
 
-/** Solve the proof of work: find `number` with `SHA-256(salt+number) == challenge`. */
+/**
+ * Solve the proof of work: find `number` with `SHA-256(salt+number) == challenge`.
+ *
+ * Standard base64 (btoa) is safe here, because the payload holds only ASCII.
+ */
 export async function solveChallenge(c: AltchaChallenge): Promise<string> {
   for (let number = 0; number <= c.maxnumber; number++) {
     if ((await sha256Hex(`${c.salt}${number}`)) === c.challenge) {
@@ -41,7 +45,6 @@ export async function solveChallenge(c: AltchaChallenge): Promise<string> {
         salt: c.salt,
         signature: c.signature,
       };
-      // Standard base64 (btoa) is safe here: the payload holds only ASCII.
       return btoa(JSON.stringify(payload));
     }
   }

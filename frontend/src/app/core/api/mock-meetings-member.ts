@@ -135,7 +135,6 @@ function context(
   const started = !planned && meetingId !== 'd0000000-0000-0000-0000-000000000002';
   const mine = delegations.filter((d) => d.meetingId === meetingId);
   const incoming = mine.filter((d) => d.delegateId === 'me' || d.delegateId === DEMO_SUB);
-  // In the live meeting the demo user represents Erika Beispiel (see the vote status).
   if (meetingId === LIVE_MEETING_ID || meetingId === MEMBER_LIVE_ID) {
     incoming.push({
       id: 'f0000000-0000-0000-0000-000000000010',
@@ -161,7 +160,6 @@ function context(
     allowVoteDelegation: true,
     votingDelegationEnabled: true,
     delegationAllowExternal: false,
-    // The gremium wants 60 minutes of lead time before the start (17:30).
     deadline: planned ? at(3, 16, 30) : null,
     deadlinePassed: false,
     meetingStarted: started,

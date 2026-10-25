@@ -158,7 +158,6 @@
   </div>
 </ng-template>
 
-<!-- Desktop: the popover in the top layer, so no pane or scrolling container clips it. -->
 @if (popoverOpen()) {
   <div
     #menu
@@ -177,8 +176,6 @@
   </div>
 }
 
-<!-- Phone: the shared bottom sheet, in the top layer too. The layer stays until the sheet
-     has slid out (`sheetMounted`). -->
 @if (sheetMounted()) {
   <div #layer class="ccs__layer" popover="manual">
     <app-side-sheet

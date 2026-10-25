@@ -74,8 +74,8 @@ export class PositionsViewComponent {
   /** The positions the reader opened or closed against the start state. */
   private readonly toggled = signal<ReadonlySet<number>>(new Set());
 
+  /** The texts follow a language switch, because `translate` and `money` read the locale signal. */
   protected readonly rows = computed<PositionRow[]>(() => {
-    // The texts follow a language switch: `translate` and `money` read the locale signal.
     return normalizePositions(this.value()).map((p) => ({
       ...p,
       offers: p.offers.map((o) => ({ ...o, href: offerHref(o.label) })),

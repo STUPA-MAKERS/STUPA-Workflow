@@ -176,7 +176,6 @@ export class PublicMeetingComponent {
       this.renaming.set(false);
       this.guest.load(code);
     });
-    // The rename form starts with the current name.
     effect(() => {
       const me = this.guest.me();
       untracked(() => {

@@ -44,6 +44,9 @@ let nextUid = 0;
  *
  * `props.serverErrors` (index → text) holds the 422 messages of the last save; the
  * position shows its message and opens. The next change clears them.
+ *
+ * The legend must be the first child of the fieldset, so the legend and the sum float and the sum
+ * sits at the end of the legend line.
  */
 @Component({
   selector: 'app-formly-positions',
@@ -60,13 +63,14 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
   /** The open positions, by index. */
   private readonly open = signal<ReadonlySet<number>>(new Set());
 
+  /**
+   * Validity is mirrored at once, because a field below `minPositions` is invalid even when the
+   * applicant never touches it, and otherwise it passes the required check of the wizard.
+   */
   ngOnInit(): void {
-    // A complete position starts collapsed; a new or an incomplete one starts open.
     this.open.set(
       new Set(this.positions.flatMap((p, i) => (this.positionComplete(p) ? [] : [i]))),
     );
-    // Mirror validity at once. A field below `minPositions` is invalid even when the
-    // applicant never touches it. Otherwise it passes the required check of the wizard.
     queueMicrotask(() => this.revalidate(this.positions));
   }
 
@@ -82,8 +86,6 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
       else next.add(pi);
       return next;
     });
-    // An open position with a server error closes only after its error is gone. The
-    // errors of the other positions stay.
     if (this.serverError(pi)) this.dropServerError(pi);
   }
 
@@ -260,7 +262,6 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
   removePosition(pi: number): void {
     this.remapRaw((i, k) => (i === pi ? null : [i > pi ? i - 1 : i, k]));
     this.commit(this.positions.filter((_, i) => i !== pi));
-    // The positions after the removed one move up by one.
     this.open.update(
       (cur) => new Set([...cur].filter((i) => i !== pi).map((i) => (i > pi ? i - 1 : i))),
     );
@@ -403,14 +404,11 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
       this.positions.map((p, i) => {
         if (i !== pi) return p;
         if (checked) {
-          // An offer with text in its amount cell is not blank, even when the text is
-          // not a valid amount.
           const kept = p.offers.flatMap((o, k) =>
             o.label.trim() || o.value !== null || this.rawValues().has(this.cellKey(pi, k))
               ? [k]
               : [],
           );
-          // Every offer with an entry is kept, so each entry has a new index.
           this.remapRaw((ri, rk) => (ri !== pi ? [ri, rk] : [ri, kept.indexOf(rk)]));
           let offers = kept.map((k) => p.offers[k]);
           if (!offers.length) offers = [this.blankOffer(true)];

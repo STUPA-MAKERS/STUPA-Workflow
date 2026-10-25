@@ -182,14 +182,16 @@ export class BrandingService {
     () => this._configuredName().trim() || this.i18n.translate('home.heading'),
   );
 
+  /**
+   * index.html links the built-in icons; an upload replaces each of them, and an empty slot puts
+   * the built-in href back.
+   */
   constructor() {
     effect(() => this.title.setTitle(this.appName()));
     effect(() => {
       const preview = this._accentPreview();
       applyAccent(preview === undefined ? this._accent() : preview);
     });
-    // index.html links the built-in icons; an upload replaces each of them, and an
-    // empty slot puts the built-in href back.
     const builtIn = new Map<HTMLLinkElement, string>();
     effect(() => {
       const upload = this._logos().favicon;

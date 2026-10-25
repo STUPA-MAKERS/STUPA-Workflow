@@ -90,7 +90,6 @@ export class HandoverDialogComponent {
         });
       }
     });
-    // The server said the current TOP is the last one: only "now" is left.
     effect(() => {
       if (this.refusal() === 'no_next_item') untracked(() => this.mode.set('now'));
     });

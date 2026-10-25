@@ -118,7 +118,6 @@ export class LeadSubstituteDialogComponent {
   );
 
   constructor() {
-    // Each opening starts empty and loads the pool of that member.
     effect(() => {
       const m = this.member();
       const meetingId = this.meetingId();
@@ -133,6 +132,10 @@ export class LeadSubstituteDialogComponent {
     if (m) this.load(this.meetingId(), m.principalId);
   }
 
+  /**
+   * A late answer for a member of an earlier opening must not reach the dialog that is now open for
+   * another member.
+   */
   private load(meetingId: Uuid, memberId: Uuid): void {
     this.pool.set(null);
     this.failed.set(false);
@@ -149,8 +152,6 @@ export class LeadSubstituteDialogComponent {
         this.failed.set(true);
       },
     });
-    // A late answer for a member of an earlier opening must not reach the dialog that is
-    // now open for another member.
     this.api.meetingContext(meetingId, { quiet: true }).subscribe({
       next: (c) => {
         if (this.member()?.principalId === memberId) this.context.set(c);
@@ -165,6 +166,7 @@ export class LeadSubstituteDialogComponent {
     return r.displayName || this.i18n.translate('common.unnamed');
   }
 
+  /** The toast keeps the language of the UI, because the detail of the server is English. */
   protected submit(): void {
     const m = this.member();
     if (!m || !this.canSubmit()) return;
@@ -182,7 +184,6 @@ export class LeadSubstituteDialogComponent {
           this.toast.success(this.i18n.translate('meetings.leadSubstitute.created'));
           this.created.emit(d);
         },
-        // The detail of the server is English; the toast keeps the language of the UI.
         error: () => {
           this.busy.set(false);
           this.toast.error(this.i18n.translate('meetings.leadSubstitute.failed'));

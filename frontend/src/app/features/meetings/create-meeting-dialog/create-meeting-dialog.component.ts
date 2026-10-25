@@ -44,6 +44,9 @@ import { personLabel } from '@shared/person-label.util';
  *
  * The Gremium list holds every Gremium for an admin and the Gremien with
  * `session.manage` for everybody else. The server refuses every other Gremium.
+ *
+ * The time fields are always 24 h, because the native type="time" follows the browser locale
+ * (AM/PM). One pair of buttons serves both steps, because a slot projects only direct children.
  */
 
 @Component({
@@ -191,11 +194,11 @@ export class CreateMeetingDialogComponent {
     });
   }
 
+  /** A late answer for a Gremium that the user changed since then is stale. */
   private loadMembers(gremiumId: string): void {
     this.loadDefaults(gremiumId);
     this.api.listMeetingMembers(gremiumId).subscribe({
       next: (rows) => {
-        // A late answer for a Gremium that the user changed since then is stale.
         if (this.gremium() === gremiumId) this.members.set(rows);
       },
       error: () => this.members.set([]),
@@ -244,7 +247,6 @@ export class CreateMeetingDialogComponent {
         startTime: this.time().trim(),
         endTime: this.endTime().trim() || null,
         protokollantId: this.keeper() || null,
-        // #17: only a public meeting sends the switch and its guest mode.
         ...(this.publicJoin() ? { publicJoin: true, guestsMode: this.guestsMode() } : {}),
       })
       .subscribe({
@@ -252,7 +254,6 @@ export class CreateMeetingDialogComponent {
           this.creating.set(false);
           this.toast.success(this.i18n.translate('meetings.toast.created'));
           this.closed.emit();
-          // Open the new meeting, so the lead can prepare it right away.
           void this.router.navigate(['/meetings', m.id]);
         },
         error: (err: unknown) => {

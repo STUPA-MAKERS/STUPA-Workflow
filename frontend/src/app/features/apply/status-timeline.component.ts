@@ -102,6 +102,9 @@ type Phase = 'loading' | 'expired' | 'error' | 'ready';
  *
  * The comments run in `app-chat`, the same chat as on the internal detail page. The
  * applicant writes public comments only, and edits or deletes an own comment.
+ *
+ * The edit form has no form element, so Enter in a field does not save the whole application. The
+ * upload limit shows only after the config loaded, because before that "unbegrenzt" can be wrong.
  */
 @Component({
   selector: 'app-status-timeline',
@@ -284,7 +287,6 @@ export class StatusTimelineComponent {
   readonly historyEntries = computed<HistoryEntry[]>(() => {
     const t = (key: TranslationKey, params?: Record<string, string | number>) =>
       this.i18n.translate(key, params);
-    // The own entries read "Du"; the server sends the Gremium for the others (A12).
     const actor = (info: ActorInfo | null | undefined, legacy: string | null): string | null =>
       actorLabel(info, legacy, t, { applicantKey: 'status.history.you' });
     const events = [...this.timeline()].sort((a, b) => a.at.localeCompare(b.at));
@@ -294,7 +296,6 @@ export class StatusTimelineComponent {
         lines.push(t('applications.history.transition', { label: e.transitionLabel }));
       }
       if (e.note) lines.push(this.noteText(e.note));
-      // F1: the status change carried a decision with deviations.
       if (e.decision) {
         const line = decisionHistoryLine(
           e.decision,
@@ -315,7 +316,6 @@ export class StatusTimelineComponent {
       };
     });
     for (const v of this.versions()) {
-      // Version 1 is the submission, which the first status event already shows.
       if (v.version === 1 && events.length) continue;
       const changed = (v.changedKeys ?? []).map((k) => this.labels().get(k) ?? k);
       entries.push({
@@ -331,8 +331,11 @@ export class StatusTimelineComponent {
     return entries;
   });
 
+  /**
+   * The magic-link target is /antrag/{id}#t={token}: the token is in the fragment, so it does not
+   * leak through Referer or logs. The query form (?t=&app=) stays as a fallback.
+   */
   constructor() {
-    // A drop on the page opens the sheet "Anhänge"; its panel uploads the files.
     effect(() => {
       const panel = this.filesPanel();
       const files = this.droppedFiles();
@@ -342,32 +345,25 @@ export class StatusTimelineComponent {
     });
     const snap = this.route.snapshot;
     const query = snap.queryParamMap;
-    // Magic-link target is /antrag/{id}#t={token}: the token is in the fragment
-    // (no Referer/log leak), the app id in the path. The query form (?t=&app=)
-    // stays as a fallback.
     const fragmentParams = new URLSearchParams(snap.fragment ?? '');
     const token = fragmentParams.get('t') ?? query.get('t');
     const appId = snap.paramMap.get('id') ?? query.get('app') ?? query.get('id');
 
     if (token) {
-      // Exchange the magic-link token for the HttpOnly applicant cookie.
       this.verifyAndLoad(token, appId);
     } else if (appId) {
-      // No token in the URL (e.g. reload after token strip): use the existing
-      // cookie session — the interceptor sends it via withCredentials.
       this.load(appId);
     } else {
       this.phase.set('error');
     }
   }
 
+  /** The token is stripped from the URL, so it does not leak through the history or the Referer. */
   private verifyAndLoad(token: string, fallbackAppId: string | null): void {
     this.api.verifyMagicLink(token).subscribe({
       next: (res) => {
         this.editScope.set(res.scope === 'edit');
         const appId = res.application_id ?? fallbackAppId ?? '';
-        // Strip the token from the URL (avoid History/Referer leak) and keep the
-        // app id for a later reload.
         this.stripTokenFromUrl(appId);
         this.load(appId);
       },
@@ -389,11 +385,9 @@ export class StatusTimelineComponent {
       const url = new URL(this.location.href);
       const frag = new URLSearchParams(url.hash.replace(/^#/, ''));
       if (!url.searchParams.has('t') && !frag.has('t')) return;
-      url.searchParams.delete('t'); // query form
-      frag.delete('t'); // fragment form (/antrag/:id#t=…)
+      url.searchParams.delete('t');
+      frag.delete('t');
       url.hash = frag.toString() ? `#${frag.toString()}` : '';
-      // Keep the app id for a reload. The path /antrag/:id already carries it.
-      // Add it only for the ?app= form.
       if (appId && !url.pathname.includes(appId) && !url.searchParams.has('app')) {
         url.searchParams.set('app', appId);
       }
@@ -427,7 +421,6 @@ export class StatusTimelineComponent {
       application: this.api.getApplication(appId),
       timeline: this.api.timeline(appId),
       comments: this.api.comments(appId),
-      // Optional parts: an error must not break the status page.
       actions: this.api.applicantTransitions(appId).pipe(catchError(() => of([]))),
       versions: this.api.versions(appId).pipe(catchError(() => of([]))),
     }).subscribe({
@@ -460,7 +453,6 @@ export class StatusTimelineComponent {
         this.effForm.set(eff);
         this.phase.set('ready');
       },
-      // The form definition is optional. Status and timeline stay usable without it.
       error: () => this.phase.set('ready'),
     });
   }
@@ -514,7 +506,7 @@ export class StatusTimelineComponent {
     this.api.fireApplicantTransition(app.id, { transitionId: t.id }).subscribe({
       next: () => {
         this.firing.set(null);
-        this.load(app.id); // reload so status, history and actions show the new state
+        this.load(app.id);
       },
       error: () => {
         this.firing.set(null);
@@ -529,19 +521,21 @@ export class StatusTimelineComponent {
 
   // --- edit ----------------------------------------------------------------------
 
+  /**
+   * The server keeps the values of the fields it held back and of the file fields, so the form
+   * leaves them out. The answers are JSON, so a JSON copy is a deep copy; jsdom has no
+   * structuredClone.
+   */
   startEdit(): void {
     const app = this.application();
     const eff = this.effForm();
     if (!app || !eff || !this.canEdit()) return;
-    // The server keeps the values of the fields it held back (O21) and of the file
-    // fields (their references are no text to edit), so the form leaves them out.
     const files = eff.sections.flatMap((s) => s.fields).filter((f) => f.type === 'file');
     this.editFields.set(
       toFormlySections(eff.sections, this.i18n.locale(), { has_budget: eff.hasBudget }, {
         omitKeys: [...(app.hiddenKeys ?? []), ...files.map((f) => f.key)],
       }),
     );
-    // The answers are JSON, so a JSON copy is a deep copy (jsdom has no structuredClone).
     this.editModel = JSON.parse(JSON.stringify(app.data)) as Record<string, unknown>;
     this.editForm = new FormGroup({});
     this.editDirty.set(false);

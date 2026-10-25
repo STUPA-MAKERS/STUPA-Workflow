@@ -48,6 +48,9 @@ import {
  *
  * The meeting card, the vote page and the beamer use it. The beamer never gets the
  * actions (`canManage` stays off).
+ *
+ * One button serves both steps, so the focus stays on it and the second click of a double click
+ * does not confirm.
  */
 @Component({
   selector: 'app-election-result',
@@ -166,7 +169,11 @@ export class ElectionResultComponent {
     return total > 0 ? Math.round((bar.count / total) * 100) : 0;
   }
 
-  /** "Los ziehen": the server draws among the tied candidates. */
+  /**
+   * "Los ziehen": the server draws among the tied candidates.
+   *
+   * The second click of a double click is no confirmation.
+   */
   drawLot(event?: MouseEvent): void {
     const id = this.voteId();
     if (!id || this.busy()) return;
@@ -174,7 +181,6 @@ export class ElectionResultComponent {
       this.lotArmed.set(true);
       return;
     }
-    // The second click of a double click is no confirmation.
     if (event && event.detail > 1) return;
     this.lotArmed.set(false);
     this.busy.set('lot');

@@ -135,6 +135,11 @@ type Inline = (text: string) => string;
  * Apply the inline markup to text that is already escaped. Code spans, images and links
  * become placeholders first. The emphasis rules then cannot touch a code span or an
  * attribute value.
+ *
+ * A fragment can hold the placeholder of an earlier fragment, so the fill happens when the fragment
+ * is stashed and the final restore is one pass. The alt text and the source are escaped again,
+ * because the source is the output of a consumer function and must never break out of the
+ * attribute.
  */
 function inlineRenderer(imageSrc: ((id: string) => string) | null): Inline {
   return (text: string): string => {
@@ -142,9 +147,6 @@ function inlineRenderer(imageSrc: ((id: string) => string) | null): Inline {
     const texts: string[] = [];
     // eslint-disable-next-line no-control-regex -- NUL sentinel (the source has no control characters)
     const sentinel = /\u0000(\d+)\u0000/g;
-    // A fragment can hold the placeholder of an earlier fragment (a code span in a link
-    // label). The fill happens when the fragment is stashed, so the final restore is one
-    // pass and never scans a restored fragment again.
     const fill = (s: string, plain = false): string =>
       s.replace(sentinel, (_m, i: string) => (plain ? texts : parts)[Number(i)] ?? '');
     const stash = (html: string, plain = html): string => {
@@ -162,18 +164,12 @@ function inlineRenderer(imageSrc: ((id: string) => string) | null): Inline {
     let out = text.replace(/`([^`]+)`/g, (_m, code: string) =>
       stash(`<code>${code}</code>`, code),
     );
-    // A backslash at the end of a line is a hard line break, which the line join makes
-    // already. A backslash escape (`\*`, `\[`) shows the character itself, so it starts
-    // no emphasis, link or list. The text is escaped already, so `\<` arrives as `\&lt;`.
     out = out
       .replace(/\\$/, '')
       .replace(/\\(&amp;|&lt;|&gt;|&quot;|&#39;|[!-/:-@[-`{-~])/g, (_m, c: string) => stash(c));
     out = replaceRefs(out, true, (alt, dest) => {
       const id = IMAGE_PATH_RE.exec(dest)?.[1];
       if (!id || !imageSrc) return alt ? stash(alt) : '';
-      // The alt text is escaped text and takes the plain text of a stashed fragment, so
-      // no tag gets into the attribute. The source is escaped again: it is the output of
-      // a consumer function and must never break out of the attribute.
       const src = escapeHtml(imageSrc(id));
       const plain = fill(alt, true);
       return stash(`<img src="${src}" alt="${plain}" loading="lazy" decoding="async">`, plain);
@@ -216,7 +212,6 @@ function renderTable(head: string[], align: string[], rows: string[][], inline: 
     const cls = align[col] ? ` class="mdv__al--${align[col]}"` : '';
     return `<${tag}${cls}>${inline(text)}</${tag}>`;
   };
-  // GFM: every row has the column count of the header. Short rows get empty cells.
   const row = (cells: string[], tag: 'th' | 'td'): string =>
     `<tr>${align.map((_a, i) => cell(tag, cells[i] ?? '', i)).join('')}</tr>`;
   const body = rows.map((r) => row(r, 'td')).join('');
@@ -257,11 +252,13 @@ function renderItem(text: string, inline: Inline): string {
   );
 }
 
+/**
+ * Control characters are removed first, because the NUL character is the placeholder sentinel of
+ * the inline renderer and a source that holds one could forge a placeholder.
+ */
 export function markdownToSafeHtml(src: string, opts: MarkdownOptions = {}): string {
   const offset = opts.headingOffset ?? 3;
   const inline = inlineRenderer(opts.imageSrc === undefined ? defaultImageSrc : opts.imageSrc);
-  // A control character has no meaning in Markdown. The NUL character is the placeholder
-  // sentinel of the inline renderer, so a source that holds one could forge a placeholder.
   const clean = src.replace(/\r\n?/g, '\n').replace(CONTROL_RE, '');
   return linkify(renderBlocks(escapeHtml(clean).split('\n'), offset, inline));
 }
@@ -365,7 +362,6 @@ function renderBlocks(lines: string[], offset: number, inline: Inline): string {
       pushItem('ol', ol[1]);
       continue;
     }
-    // The escape step already replaced the '>' character with its HTML entity.
     const q = /^&gt;\s?(.*)$/.exec(t);
     if (q) {
       flushPara();

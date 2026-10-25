@@ -181,7 +181,6 @@ export class MeetingsComponent {
         this.timeline.loadList();
       }
     });
-    // A link to an agenda item (`?item=`) opens that item, not the first one.
     this.route.queryParamMap
       .pipe(takeUntilDestroyed())
       .subscribe((qp) => this.agendaSvc.requestTop(qp.get('item')));
@@ -374,7 +373,6 @@ export class MeetingsComponent {
     const m = this.meeting();
     if (!m || !this.canEditProtocol()) return;
     this.agendaSvc.onTopBodyChange(m.id, itemId, body);
-    // The viewers see the text before the autosave (protokollant of a live meeting only).
     this.session.sendBodyDraft(itemId, body);
   }
 

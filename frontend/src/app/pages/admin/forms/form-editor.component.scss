@@ -612,7 +612,6 @@
   .fe__card {
     padding: var(--space-4);
   }
-  /* The type and the key each take a line; the required box follows. */
   .fe__base {
     grid-template-columns: minmax(0, 1fr);
     align-items: start;
@@ -623,7 +622,6 @@
   .fe__pair {
     grid-template-columns: minmax(0, 1fr);
   }
-  /* An option: the value over the full width, DE and EN beside the remove button. */
   .fe__opt {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
     padding-bottom: var(--space-2);

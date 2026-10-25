@@ -302,7 +302,6 @@ export class BallotComponent {
   protected readonly barHeight = signal(0);
 
   constructor() {
-    // A new vote starts with no pick and no local lock.
     effect(() => {
       this.voteId();
       untracked(() => {
@@ -444,7 +443,6 @@ export class BallotComponent {
       .pipe(take(1), takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
-          // The ballot is in: a short double pulse on a phone with a vibration motor.
           haptic('success');
           this.lock(row, this.secret() ? null : choice);
           this.pending.set(null);

@@ -96,7 +96,6 @@ export class KanbanKeyDrag<T extends KeyDragPosition> {
       case 'Escape':
       case 'Tab':
         this.held.set(null);
-        // Tab leaves the card the native way; only Escape keeps the focus on it.
         if (event.key === 'Escape') event.preventDefault();
         return { kind: 'cancel', refocus: event.key === 'Escape' };
       default:

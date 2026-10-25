@@ -66,8 +66,6 @@ export function toFormlyFields(
   lang: Lang | string,
   extraContext: Record<string, unknown> = {},
 ): FormlyFieldConfig[] {
-  // Render section and group markers as headings instead of discarding them. Question
-  // groups then also appear grouped in the inline editor.
   const costKeys = positionsKeys(fields);
   return fields.map((f) =>
     f.type === 'section'
@@ -124,8 +122,6 @@ export function toFormlySections(
     });
     for (const f of fields) {
       const mapped = mapField(f, lang, extraContext, costKeys);
-      // The edit form shows several choices as a dropdown (board Anträge-Bearbeiten), not
-      // as the checkbox list of the wizard.
       if (f.type === 'multiselect') mapped.type = 'multiselect';
       group.push({ ...mapped, className: FULL_WIDTH_TYPES.has(f.type) ? 'fe-full' : 'fe-half' });
     }
@@ -137,7 +133,6 @@ export function toFormlySections(
 function sectionHeading(f: FormFieldDef, lang: Lang | string): FormlyFieldConfig {
   const label = resolveI18n(f.label, lang);
   const props: Record<string, unknown> = { heading: true, label };
-  // A help text that only repeats the heading would show the same words twice.
   const help = ownHelp(f, label, lang);
   if (help) props['description'] = help;
   return { type: 'display', props };
@@ -172,6 +167,8 @@ function totalText(key: TranslationKey, lang: Lang | string, total: number): str
 /**
  * The requested funding: the hint shows the cost total, and a value above the total is
  * an error with its own text. The server checks the same rule (`_check_funding_total`).
+ *
+ * The cap is checked again when any answer changes, because the cost positions are other controls.
  */
 function applyFunding(
   config: FormlyFieldConfig,
@@ -189,7 +186,6 @@ function applyFunding(
     ...config.validators,
     fundingMax: { expression: (_control: unknown, field: FormlyFieldConfig) => !over(field) },
   };
-  // The cost positions are other controls: re-check the cap when any answer changes.
   config.hooks = {
     onInit: (field) =>
       field.form?.valueChanges.pipe(
@@ -214,7 +210,6 @@ function mapField(
   costKeys: readonly string[] = [],
 ): FormlyFieldConfig {
   const label = resolveI18n(f.label, lang);
-  // An info text whose help repeats its label counts as an info text without help.
   const help = f.type === 'markdown' ? ownHelp(f, label, lang) : f.help ? resolveI18n(f.help, lang) : undefined;
   const isDisplay = f.type === 'markdown' || f.type === 'computed' || f.type === 'table';
 
@@ -238,13 +233,10 @@ function mapField(
 
   if (f.type === 'markdown') {
     props['text'] = help ?? label;
-    // An info text without help has its text in the label. Show it once, not as a
-    // bold label over the same text.
     if (!help) delete props['label'];
   }
   if (f.type === 'computed') props['computed'] = true;
   if (f.type === 'table') {
-    // The UI catalogue, not a fixed German text: an English page shows English.
     props['text'] = CATALOG[lang as Locale]?.['forms.table.pending'] ?? de['forms.table.pending'];
   }
   if (f.type === 'positions') {

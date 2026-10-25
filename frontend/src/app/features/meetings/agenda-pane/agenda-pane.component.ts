@@ -77,6 +77,8 @@ export interface AgendaMove {
  * "To-Do anlegen" (frame 5) is in the menu of every item for a person with `todo.write`
  * in the gremium of the meeting, also on a closed meeting: it opens "Neues To-Do" on the
  * gremium board, linked to the TOP and to its application.
+ *
+ * Both dialogs live in the body, because the scroll fade of the agenda would clip them.
  */
 @Component({
   selector: 'app-agenda-pane',
@@ -272,7 +274,6 @@ export class AgendaPaneComponent {
     if (!this.canChangeAgenda()) return [{ items: [nonPublic] }];
 
     const edit: RowMenuItem[] = [];
-    // An application item carries the title of the application.
     if (!item.applicationId) {
       edit.push({ id: 'rename', label: t('meetings.agenda.rename'), icon: 'edit' });
     }

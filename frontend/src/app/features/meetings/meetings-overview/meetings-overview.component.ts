@@ -63,7 +63,6 @@ export class MeetingsOverviewComponent implements OnDestroy {
   );
 
   constructor() {
-    // A pane view drops the footer of the frame below it, so only the panes scroll.
     effect(() => this.frame.fill.set(this.pane()));
   }
 

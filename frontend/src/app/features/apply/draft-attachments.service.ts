@@ -154,6 +154,8 @@ export class DraftAttachmentsService {
    * gets the token and every later one has to send it: two uploads without a token get
    * two drafts, and the submit binds only one. The files of the call join `pending` at
    * once, so a count against `pending` sees the whole queue.
+   *
+   * `runUploads` catches every refusal and never rejects, so the queue never stalls.
    */
   upload(
     files: readonly File[],
@@ -167,7 +169,6 @@ export class DraftAttachmentsService {
     }));
     if (queued.length) this.pending.update((list) => [...list, ...queued.map((q) => q.pending)]);
     const run = this.queue.then(() => this.runUploads(queued, fieldKey, generation));
-    // `runUploads` catches every refusal and never rejects, so the queue never stalls.
     this.queue = run;
     return run;
   }
@@ -193,7 +194,6 @@ export class DraftAttachmentsService {
           const draft = await this.send(file, fieldKey, generation);
           if (!draft) continue;
           if (!this.inScope(draft)) {
-            // The type changed during the upload: the new form has no such field.
             void this.deleteQuietly([draft.id]);
             continue;
           }
@@ -207,7 +207,6 @@ export class DraftAttachmentsService {
         }
       }
     } finally {
-      // A discard stops the loop: the files still waiting in this call never go up.
       const left = new Set(queued.map((q) => q.pending.key));
       this.pending.update((list) => list.filter((p) => !left.has(p.key)));
     }
@@ -218,6 +217,8 @@ export class DraftAttachmentsService {
    * Remove a file. It leaves the list (and the submit) at once; a refused delete puts it
    * back where it was. A failed file only leaves the list; the server no longer has it. A
    * 404 means the same. Resolves false when the server refused for another reason.
+   *
+   * A send or a discard since then ended the draft, so the file does not come back.
    */
   async remove(id: Uuid): Promise<boolean> {
     const at = this.files().findIndex((f) => f.id === id);
@@ -231,7 +232,6 @@ export class DraftAttachmentsService {
         await firstValueFrom(this.api.deleteDraftAttachment(id, token));
       } catch (err) {
         if (err instanceof HttpErrorResponse && err.status === 404) return true;
-        // A send or a discard since then ended the draft: the file does not come back.
         if (this._token() === token) {
           this.files.update((list) => [...list.slice(0, at), file, ...list.slice(at)]);
           this.store();
@@ -403,7 +403,6 @@ export class DraftAttachmentsService {
     try {
       const draft = JSON.parse(raw) as Partial<StoredDraft>;
       if (typeof draft.token !== 'string' || !draft.token) return;
-      // An expired draft is gone on the server: start a new one.
       if (draft.expiresAt && Date.parse(draft.expiresAt) <= Date.now()) {
         sessionStorage.removeItem(this.storageKey);
         return;

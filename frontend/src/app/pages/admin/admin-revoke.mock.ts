@@ -220,7 +220,6 @@ function targets(store: RevokeMockStore, p: AdminPrincipal, t: Ties): Map<string
   for (const [g, gid] of t.membershipMaps) entry(g)[0].add(gid);
   for (const [g, gid] of t.roleMaps) if (tied.has(gid)) entry(g)[0].add(gid);
   for (const [g, rid] of t.groupMaps) if (roleKey(store, rid) !== IMPLICIT_ROLE) entry(g)[1].add(rid);
-  // In the order of the person's group list.
   return new Map(groupsOf(p).filter((g) => out.has(g)).map((g) => [g, out.get(g)!]));
 }
 

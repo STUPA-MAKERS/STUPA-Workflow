@@ -6,7 +6,6 @@
   (closed)="close()"
 >
   @if (confirmPublic()) {
-    <!-- The question before the switch to "public" is saved, in the same dialog. -->
     <div class="gd gd--confirm" aria-live="polite">
       @if (previewLoading()) {
         <app-skeleton variant="lines" [count]="2" [label]="'admin.gremien.publicConfirm.loading' | t" />
@@ -72,7 +71,6 @@
           (ngModelChange)="patch('allowVoteDelegation', $event)"
           >{{ 'admin.gremien.delegation' | t }}</app-switch
         >
-        <!-- The delegation settings apply only while the delegation is allowed. -->
         @if (form().allowVoteDelegation) {
           <div class="gd__nested">
             <app-input
@@ -94,8 +92,6 @@
       </div>
     </div>
 
-    <!-- Extra protocol recipients. They get the finalized protocol, together with the
-         active members. -->
     <div class="gd__field">
       <label class="gd__mail">
         <span class="gd__mailLabel">{{ 'admin.gremien.mailRecipients' | t }}</span>
@@ -112,8 +108,6 @@
       </label>
     </div>
 
-    <!-- The public protocol page. Independent of the public participation (QR) of a
-         meeting: that one is set per meeting and makes nothing visible. -->
     <div class="gd__public">
       <app-switch
         class="gd__switch"

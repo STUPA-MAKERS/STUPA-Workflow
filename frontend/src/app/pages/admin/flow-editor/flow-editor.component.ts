@@ -267,16 +267,22 @@ export class FlowEditorComponent {
     view: this.view,
   });
 
+  /**
+   * The canvas box is measured, so a small flow shows at its real size instead of blown up to the
+   * full box. The level is laid out again whenever its structure changes. Only the answer to the
+   * newest input counts; an older one that answers late is dropped. The drill-down context must
+   * never point at a deleted group, because undo, redo or a dissolve from another path can delete
+   * it; it then falls back to the top level. Only structural graph changes (states and transitions,
+   * not positions) are undo steps, so node moves do not flood the history.
+   */
   constructor() {
     inject(DestroyRef).onDestroy(() => this.stopHold());
-    // Load the active global flow. Keep the empty graph when there is none.
     this.api
       .getGlobalFlow()
       .pipe(takeUntilDestroyed())
       .subscribe({
         next: (graph) => {
           if (graph && graph.states?.length) {
-            // The initial load is not an undo step.
             this.applyingHistory = true;
             this.graph.set(autoLayout(normalizeFlowGraph(graph)));
           }
@@ -284,23 +290,17 @@ export class FlowEditorComponent {
           this.loaded.set(true);
           this.loading.set(false);
         },
-        // Core editor data: surface the failure instead of an empty canvas. The
-        // validation stays hidden: there is no flow to have findings about.
         error: () => {
           this.loading.set(false);
           this.toast.error(this.i18n.translate('admin.flow.loadFailed'));
         },
       });
 
-    // Measure the canvas box, so a small flow shows at its real size instead of
-    // blown up to the full box.
     observeElementSize(
       () => this.canvasWrap()?.nativeElement,
       ({ width, height }) => this.canvasSize.set({ w: Math.round(width), h: Math.round(height) }),
     );
 
-    // Lay the level out again whenever its structure changes. Only the answer to the
-    // newest input counts; an older one that answers late is dropped.
     effect(() => {
       const input = this.vm.layoutInput();
       const key = this.layoutKey();
@@ -315,15 +315,11 @@ export class FlowEditorComponent {
       );
     });
 
-    // The drill-down context must never point at a deleted group. Undo, redo or a
-    // dissolve from another path can delete it. Fall back to the top level.
     effect(() => {
       const id = this.currentGroupId();
       if (id && !this.vm.groupById().has(id)) this.currentGroupId.set(null);
     });
 
-    // Record structural graph changes as undo steps. Structural means states and
-    // transitions, not positions. Node moves must not flood the history.
     effect(() => {
       const g = this.graph();
       if (this.applyingHistory) {
@@ -333,7 +329,7 @@ export class FlowEditorComponent {
       }
       if (g === this.lastGraph) return;
       if (structuralKey(g) !== structuralKey(this.lastGraph)) this.history.record(this.lastGraph);
-      this.lastGraph = g; // Follow layout-only changes too.
+      this.lastGraph = g;
     });
   }
 

@@ -25,8 +25,6 @@ export function loadVoteContext(
   agendaItemId: Uuid | null | undefined,
 ): Observable<VoteContext> {
   if (!meetingId) return of(NO_CONTEXT);
-  // Kept for the read ahead of the vote list; `combineLatest` paints the kept answers at
-  // once and again when a newer one arrives.
   const meeting = api.getMeeting(meetingId, { quiet: true, detail: true }).pipe(catchError(() => of(null)));
   const agenda = agendaItemId
     ? api.listAgenda(meetingId, { quiet: true, detail: true }).pipe(catchError(() => of([])))

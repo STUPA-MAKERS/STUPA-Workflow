@@ -124,6 +124,9 @@ const SELF_CHOICES: readonly { value: Choice; label: TranslationKey }[] = [
  *
  * Below the members: the delegations of the meeting (the lead revokes one while the
  * meeting is live, O6), the own delegation card and the people who have the meeting open.
+ *
+ * The delegation picker sits outside the side sheet, so that Escape in the picker does not close
+ * the sheet.
  */
 @Component({
   selector: 'app-attendance-sheet',
@@ -200,8 +203,6 @@ export class AttendanceSheetComponent {
   private readonly ownCard = viewChild(MeetingDelegationCardComponent);
 
   constructor() {
-    // Load the delegations when the sheet opens, and again when the server reports a
-    // delegation that this page did not know (409 `delegation_active`).
     effect(() => {
       const open = this.open();
       const id = this.meeting().id;

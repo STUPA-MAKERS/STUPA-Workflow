@@ -146,14 +146,12 @@ export class VotePanelComponent {
     const t: Translate = (key, params) => this.i18n.translate(key, params);
     const poll = this.poll();
     if (poll) {
-      // "Umfrage · Mehrfachwahl, höchstens 2 · geheime Abstimmung".
       const parts = [pollCaption(poll, t)];
       if (this.secret()) parts.push(secrecyLabel(true, t));
       return parts.join(' · ');
     }
     const election = this.election();
     if (election) {
-      // "Wahl · 2 Posten · geheime Abstimmung".
       const parts = [electionCaption(election, v.round, t)];
       if (this.secret()) parts.push(secrecyLabel(true, t));
       return parts.join(' · ');
@@ -214,12 +212,10 @@ export class VotePanelComponent {
    */
   protected readonly closedSummary = computed<string | null>(() => {
     const v = this.vote();
-    // A poll counts its answers in its own footer.
     if (v.status !== 'closed' || this.poll()) return null;
     const t = v.tally;
     const cast = t.voted ?? Object.values(t.counts).reduce((sum, n) => sum + n, 0);
     if (this.guestsVote()) {
-      // "Abgegeben 24 · Mehrheit der abgegebenen Stimmen", then the room (#17).
       const parts = [
         this.i18n.translate('guests.vote.castN', { n: cast }),
         this.i18n.translate('guests.vote.majorityOfCast'),

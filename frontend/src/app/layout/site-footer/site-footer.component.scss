@@ -4,7 +4,6 @@
 }
 
 .ft {
-  /* The width between two parts of the line. The separator dot sits in its centre. */
   --ft-sep: var(--space-5);
 
   container: ft / inline-size;
@@ -21,13 +20,13 @@
 /* Separated list. Every part has a dot in the --ft-sep strip before it. The list starts
    --ft-sep before the edge of its clip, so the strip of each part that starts a line
    (also the first part) is outside the clip. A wrapped line thus never starts with a dot,
-   and no line ends with one. */
+   and no line ends with one.
+   Only the start side clips, so the other sides stay open for the focus ring. */
 .ft__clip {
   display: flex;
   justify-content: center;
   min-width: 0;
   max-width: 100%;
-  /* Clip the start side only. The other sides stay open for the focus ring. */
   clip-path: inset(-8px -8px -8px -4px);
 }
 .ft__clip:dir(rtl) {

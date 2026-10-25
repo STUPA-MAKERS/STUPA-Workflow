@@ -1,6 +1,5 @@
 @switch (phase()) {
   @case ('loading') {
-    <!-- The shape of the page: the head lines, then the body. -->
     <div class="sp">
       <app-skeleton variant="lines" [count]="3" />
       <app-skeleton variant="panel" [label]="'status.loading' | t" />
@@ -33,16 +32,13 @@
   @case ('ready') {
     @if (application(); as app) {
       @if (editing()) {
-        <!-- Edit mode: the bar stays at the top while the form scrolls. -->
         <article class="sp sp--edit" aria-labelledby="sp-edit-title">
           <header class="sp__editBar">
             <p class="sp__editText">
-              <!-- The title takes the focus when the edit mode opens. -->
               <strong id="sp-edit-title" tabindex="-1" #editTitle>{{ 'status.edit.title' | t }}</strong>
             </p>
             <app-button variant="text" (click)="cancelEdit()">{{ 'action.cancel' | t }}</app-button>
           </header>
-          <!-- No form element: Enter in a field must not save the whole application. -->
           <div class="sp__edit fe-form">
             <formly-form [form]="editForm" [fields]="editFields()" [model]="editModel" (modelChange)="editDirty.set(true)" />
           </div>
@@ -51,7 +47,6 @@
           }
         </article>
       } @else {
-        <!-- A file dropped anywhere on the page becomes an attachment. -->
         <article
           class="sp"
           aria-labelledby="sp-title"
@@ -100,7 +95,6 @@
           <div class="sp__grid">
             <div class="sp__main">
               @if (app.decision) {
-                <!-- F1: the decision, without the vote, with a note on the funded amount. -->
                 <app-decision-section
                   headingId="sp-decision"
                   [decision]="app.decision"
@@ -150,7 +144,6 @@
                   </button>
                 </li>
               </ul>
-              <!-- Only after the config loaded: before, "unbegrenzt" can be wrong. -->
               @if (linkTtlLoaded() && linkTtlDays() === null) {
                 <p class="sp__link">{{ 'status.linkUnlimited' | t }}</p>
               }
@@ -186,8 +179,6 @@
         [side]="phone() ? 'bottom' : 'end'"
       >
         @if (filesOpen()) {
-          <!-- The applicant uploads in locked states too (receipts after the decision);
-               a delete is a data change and follows the state lock. -->
           <app-attachments-panel
             [applicationId]="app.id"
             [canUpload]="canUploadAttachments()"

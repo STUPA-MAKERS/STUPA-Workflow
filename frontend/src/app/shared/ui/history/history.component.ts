@@ -78,6 +78,9 @@ let nextId = 0;
  * the actor and the time. Each day is a list, named by its date.
  * Entries with a missing or invalid `at` go into a last group, "Ohne Datum", without a
  * time.
+ *
+ * The disclosure button points at the values only while open, because the values are not in the DOM
+ * while closed.
  */
 @Component({
   selector: 'app-history',
@@ -134,13 +137,13 @@ export class HistoryComponent {
     return value !== null && value !== undefined;
   }
 
+  /** `new Date(null)` is 1970, so a missing value counts as invalid before the parse. */
   protected readonly days = computed<HistoryDay[]>(() => {
     const locale = this.i18n.formatLocale();
     const thisYear = new Date().getFullYear();
     const dated: { e: HistoryEntry; d: Date }[] = [];
     const undated: HistoryEntry[] = [];
     for (const e of this.entries()) {
-      // `new Date(null)` is 1970, so a missing value counts as invalid before the parse.
       const d = e.at ? new Date(e.at) : new Date(NaN);
       if (Number.isNaN(d.getTime())) undated.push(e);
       else dated.push({ e, d });

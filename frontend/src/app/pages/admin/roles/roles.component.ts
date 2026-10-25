@@ -311,7 +311,6 @@ export class AdminRolesComponent {
       },
       error: (err: { status?: number }) => {
         this.creating.set(false);
-        // A wrong or taken key is an answer about the field, so it shows there.
         if (err?.status === 422) {
           this.serverKeyError.set(this.i18n.translate('admin.common.roleKeyInvalid'));
         } else if (err?.status === 409) {

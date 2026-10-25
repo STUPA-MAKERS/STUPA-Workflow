@@ -118,6 +118,7 @@ export class PullRefreshDirective {
     this.track = { x: t.clientX, y: t.clientY, lock: null, pull: 0, armed: false };
   }
 
+  /** An undecided move down must not start the pull-to-refresh of the browser before the lock. */
   private onMove(e: TouchEvent): void {
     const track = this.track;
     if (!track) return;
@@ -130,7 +131,6 @@ export class PullRefreshDirective {
     const dy = t.clientY - track.y;
     if (track.lock === null) {
       if (Math.abs(dx) <= GESTURE_SLOP && Math.abs(dy) <= GESTURE_SLOP) {
-        // Undecided: a move down must not start the pull of the browser before the lock.
         if (dy > 0 && dy >= Math.abs(dx) && e.cancelable) e.preventDefault();
         return;
       }
@@ -172,9 +172,9 @@ export class PullRefreshDirective {
     ring.paint(this.el.offsetTop, pull, pull / PULL_THRESHOLD, ms);
   }
 
+  /** The ring is a sibling after the host, so it does not move with the rows. */
   private ensureRing(): PullRefreshRingComponent {
     if (!this.ring) {
-      // A sibling after the host, so it does not move with the rows.
       this.ring = this.vcr.createComponent(PullRefreshRingComponent);
       this.ring.changeDetectorRef.detectChanges();
     }

@@ -219,7 +219,6 @@ export class MeetingGuestsService {
   private failed(err: unknown): void {
     this.busy.set(null);
     this.report(err);
-    // The request may have changed in the meantime (another lead, a withdrawal).
     this.reload();
   }
 

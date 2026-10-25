@@ -15,7 +15,7 @@
   position: sticky;
   top: calc(var(--space-5) + var(--app-top-safe-area, 0px));
   display: flex;
-  flex: 0 0 18.125rem; // 290px
+  flex: 0 0 18.125rem;
   flex-direction: column;
   gap: 18px;
   min-width: 0;
@@ -43,7 +43,7 @@
 /* The sheet: surface 1 with the large radius; the bar of the actions at its foot. */
 .wz__sheet {
   display: flex;
-  flex: 0 1 47.5rem; // 760px
+  flex: 0 1 47.5rem;
   flex-direction: column;
   min-width: 0;
   border-radius: var(--radius-2xl);

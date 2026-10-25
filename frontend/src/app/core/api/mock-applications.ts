@@ -556,7 +556,6 @@ function positionsFor(amount: number): Record<string, unknown>[] {
       label: 'Verpflegung',
       offers: [
         { label: 'Mensa-Catering', value: b, preferred: true },
-        // A supplier named by the URL of its offer: the view links it and wraps it.
         { label: 'https://www.baeckerei-am-campus.example/catering/angebote/sommerfest-2026',
           value: Math.round(b * 109) / 100, preferred: false },
       ],
@@ -606,8 +605,6 @@ function versionsOf(d: DemoApp): VersionOutWire[] {
       version: 2,
       data: answers(d),
       diff: { added: {}, removed: {}, changed: { participants: { old: 100, new: 120 } } },
-      // Every other demo: the edit came from an account that no longer exists. The
-      // server sends no name and no sub; the UI shows "Ehemaliges Konto".
       ...(d.n % 2
         ? { changedBy: null, changedByInfo: { kind: 'deleted' as const } }
         : { changedBy: 'applicant', changedByInfo: { kind: 'applicant' as const } }),

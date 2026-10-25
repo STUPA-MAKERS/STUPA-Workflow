@@ -467,7 +467,6 @@ export class ExpensesComponent implements OnDestroy {
         : field === 'createdAt'
           ? e.createdAt
           : (e.paymentDate ?? e.createdAt);
-    // Sorted by amount, the months would interleave: one group without a heading.
     if (field === 'amount') {
       return shown.length ? [{ key: 'all', label: '', items: shown }] : [];
     }
@@ -480,8 +479,15 @@ export class ExpensesComponent implements OnDestroy {
     }),
   );
 
+  /**
+   * The URL is applied first, then data loads exactly once, because a second, unfiltered request
+   * could resolve last and overwrite the filtered list. The query param map is subscribed, because
+   * the palette can send a hit here while the component is active. The filter write-back replaces
+   * the create-link navigation instead of merging, because a merge would carry `new=booking` on and
+   * open the form of a new booking again after its save. The rows are tracked too, because a
+   * refresh can move the open booking out of the filter; it then loads by its id.
+   */
   constructor() {
-    // The shown bookings read their linked records ahead, so a click shows them at once.
     prefetchDetails({
       items: this.items,
       key: (e) => e.id,
@@ -497,26 +503,14 @@ export class ExpensesComponent implements OnDestroy {
       },
       when: () => this.tab() === 'bookings',
     });
-    // Apply the URL first, then load data exactly once. The URL keeps the view shareable,
-    // survives a reload, and is the target of links from the budget page, the invoices
-    // page and the global search. A second, unfiltered request could resolve last and
-    // overwrite the filtered list.
     this.applyQueryParams(this.route.snapshot.queryParamMap);
     this.list.reload();
 
-    // The palette can send us here while we are already here: a hit on another booking
-    // changes only the query string, and the router keeps this component alive. The
-    // stream also emits the current parameters once, which opens the form of a create
-    // link.
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((qp) => {
       if (this.applyQueryParams(qp)) this.list.reload();
       this.adoptCreateLink(qp);
     });
 
-    // Write the filters back, so the URL always states what the list shows. The write
-    // also drops the create link: it runs after `adoptCreateLink` and replaces its
-    // navigation, and a merge would carry `new=booking` on to the next navigation, so the
-    // form of a new booking opened again after its save.
     effect(() => {
       const queryParams = {
         budget: this.budgetId() || null,
@@ -536,17 +530,13 @@ export class ExpensesComponent implements OnDestroy {
       );
     });
 
-    // A new booking opens in the detail; a deleted one leaves it, with its form.
     this.dialogs.onCreated = (created) => this.openBooking(created.id);
-    // A saved booking that is open but not among the rows: keep its detail current.
     this.dialogs.onSaved = (saved) => {
       if (saved.id === this.selectedId() && !this.items().some((e) => e.id === saved.id)) {
         this.fetchedExpense.set(saved);
       }
     };
     this.dialogs.onDeleted = (gone) => {
-      // Close the form only when it shows the deleted booking (or a sub-booking of it).
-      // A sub-booking deleted from the form of its parent keeps that form and its edits.
       const edited = this.dialogs.editing();
       if (edited && (edited.id === gone.id || edited.parentExpenseId === gone.id)) {
         this.dialogs.closeForms();
@@ -558,8 +548,6 @@ export class ExpensesComponent implements OnDestroy {
       if (gone.transferId === this.selectedTransferId()) this.closeDetail();
     };
 
-    // Remove selected ids for rows that no longer exist after a refresh, reload,
-    // or delete.
     effect(() => {
       const ids = new Set(this.items().map((e) => e.id));
       this.selected.update((cur) =>
@@ -567,10 +555,6 @@ export class ExpensesComponent implements OnDestroy {
       );
     });
 
-    // The open booking: load what is not among the rows, its invoice, its application,
-    // its sub-bookings and the label of its fiscal year.
-    // The rows are tracked too: a refresh after an edit or a bulk "Umbuchen" can move the
-    // open booking out of the filter. It then loads by its id.
     effect(() => {
       const id = this.selectedId();
       const loading = this.loading();
@@ -581,7 +565,6 @@ export class ExpensesComponent implements OnDestroy {
       const e = this.selectedExpense();
       untracked(() => this.loadLinked(e));
     });
-    // The fiscal-year label of the open row needs the tree, which can come later.
     effect(() => {
       const id = this.selectedTransfer()?.fromBudgetId ?? this.selectedExpense()?.budgetId;
       const tree = this.budgetTree();
@@ -589,8 +572,6 @@ export class ExpensesComponent implements OnDestroy {
         if (id) this.loadFyLabels(id, tree);
       });
     });
-    // The row menus of a booker hide the write actions of a closed fiscal year, so the
-    // years of every top cost centre load once the tree is there.
     effect(() => {
       const tree = this.budgetTree();
       untracked(() => {
@@ -605,6 +586,10 @@ export class ExpensesComponent implements OnDestroy {
   /**
    * Read the filters, the view and the open row from the URL. Return true if a filter of
    * the list changed (the caller then reloads it).
+   *
+   * Absence clears: each of these is written back into the URL, so a parameter that is gone was
+   * taken away, not merely omitted. A click on another row while a form is open replaces the form,
+   * so the highlighted row and the detail always agree.
    */
   private applyQueryParams(qp: ParamMap): boolean {
     const raw = qp.get('kind');
@@ -612,8 +597,6 @@ export class ExpensesComponent implements OnDestroy {
     const budgetId = qp.get('budget') ?? '';
     const q = qp.get('q') ?? '';
     let changed = false;
-    // Absence clears. Each of these is written back into the URL by the effect in the
-    // constructor, so a parameter that is gone was taken away, not merely omitted.
     if (budgetId !== this.budgetId()) {
       this.budgetId.set(budgetId);
       changed = true;
@@ -634,8 +617,6 @@ export class ExpensesComponent implements OnDestroy {
     } else if (changed && view === 'transfers') {
       this.transfers.reload();
     }
-    // A click on another row while a form is open: the row replaces the form, so the
-    // highlighted row and the detail always agree.
     const id = qp.get('id') ?? '';
     if (id !== this.selectedId()) {
       if (id) this.dialogs.closeForms();
@@ -696,7 +677,12 @@ export class ExpensesComponent implements OnDestroy {
     });
   }
 
-  /** The linked records of the open booking. Each request runs once per booking. */
+  /**
+   * The linked records of the open booking. Each request runs once per booking.
+   *
+   * A budget reader may lack the right to read the application; the card then shows only the title
+   * the booking carries.
+   */
   private loadLinked(e: Expense | null): void {
     const invoiceId = e?.invoiceId ?? null;
     if (this.linkedInvoice()?.id !== invoiceId) this.linkedInvoice.set(null);
@@ -714,8 +700,6 @@ export class ExpensesComponent implements OnDestroy {
     const appId = e?.applicationId ?? null;
     if (this.linkedApplication()?.id !== appId) this.linkedApplication.set(null);
     if (appId && this.linkedApplication()?.id !== appId) {
-      // A budget reader may lack the right to read the application: the card then shows
-      // only the title the booking carries.
       this.apps.getApplication(appId, { quiet: true, detail: true }).subscribe({
         next: (app) => {
           if (this.selectedExpense()?.applicationId === app.id) this.linkedApplication.set(app);
@@ -767,9 +751,8 @@ export class ExpensesComponent implements OnDestroy {
     return signedEur(e.kind, e.amount, this.i18n.formatLocale());
   }
 
+  /** Only the date part counts, because a `createdAt` keeps the day the server wrote. */
   day(iso: string | null): string {
-    // Only the date part counts (a `createdAt` keeps the day the server wrote), as in the
-    // month groups.
     return dayMonth(iso?.slice(0, 10), this.i18n.formatLocale());
   }
 
@@ -1070,9 +1053,9 @@ export class ExpensesComponent implements OnDestroy {
     this.bulkConfirm.set('delete');
   }
 
+  /** The disabled button is an affordance, not a control, so the cap is checked here too. */
   runBulkDelete(): void {
     const ids = [...this.selected()];
-    // The disabled button is an affordance, not a control: check the cap here too.
     if (!ids.length || this.bulkBusy() || this.bulkDeleteBlocked()) return;
     this.bulkBusy.set(true);
     let done = 0;
@@ -1125,8 +1108,6 @@ export class ExpensesComponent implements OnDestroy {
           const e = byId.get(id);
           const patch: ExpenseUpdate = {};
           if (category) patch.category = category;
-          // Set the cost center only for a standalone booking. A bound booking and a
-          // sub-booking inherit it.
           if (budgetId && e && !e.applicationId && !e.parentExpenseId) {
             patch.budgetId = budgetId as Uuid;
           }
@@ -1148,7 +1129,7 @@ export class ExpensesComponent implements OnDestroy {
     this.bulkReassignOpen.set(false);
     this.bulkBudgetId.set('');
     this.bulkCategory.set('');
-    this.list.refresh(); // Get server truth, e.g. transfer legs. Prune effect fixes the selection.
+    this.list.refresh();
     if (failed) {
       const key = kind === 'delete' ? 'expenses.bulk.deleteError' : 'expenses.bulk.reassignError';
       this.toast.error(this.i18n.translate(key));

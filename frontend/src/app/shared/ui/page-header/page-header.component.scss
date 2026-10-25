@@ -124,7 +124,6 @@
   flex-wrap: wrap;
   min-height: var(--control-height);
   margin-top: calc((var(--ph-title-lh) - var(--control-height)) / 2);
-  /* Chrome, not content: a long press on an action selects no label and opens no callout. */
   @include press.chrome-text;
 }
 

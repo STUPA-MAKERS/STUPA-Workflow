@@ -314,7 +314,6 @@ export class ApplicationCaptureComponent {
         this.emailMatch.set(match);
         this.mode.set('account');
       },
-      // A failed lookup leaves the new person; the server matches again.
       error: () => undefined,
     });
   }, APPLICANT_SEARCH_DELAY_MS);

@@ -8,7 +8,6 @@
   }
 
   <div class="bk__cards">
-    <!-- Create -->
     <section class="bk__card" aria-labelledby="bk-create">
       <h2 class="section-title" id="bk-create">{{ 'admin.backups.createTitle' | t }}</h2>
       <form class="bk__createForm" (submit)="$event.preventDefault(); create()">
@@ -27,12 +26,8 @@
       </form>
     </section>
 
-    <!-- Import -->
     <section class="bk__card" aria-labelledby="bk-import">
       <h2 class="section-title" id="bk-import">{{ 'admin.backups.importTitle' | t }}</h2>
-      <!-- A dead control with no reason beside it reads as a broken page. An import has
-           to decrypt the archive to verify it, so it needs the private key the API
-           does not have here. -->
       @if (!restoreEnabled()) {
         <p class="bk__disabledHint" role="note">{{ 'admin.backups.noIdentity' | t }}</p>
       }
@@ -54,7 +49,6 @@
     </section>
   </div>
 
-  <!-- Catalogue -->
   <section class="bk__list" aria-labelledby="bk-list">
     <app-section-header class="bk__listHead" headingId="bk-list" [heading]="'admin.backups.listTitle' | t" />
     @if (loading() || rows().length) {
@@ -118,7 +112,6 @@
   </section>
 </section>
 
-<!-- Restore confirmation. Destructive, so it asks for the word rather than a click. -->
 @if (confirmRestore(); as target) {
   <app-dialog
     [open]="true"
@@ -155,7 +148,6 @@
   </app-dialog>
 }
 
-<!-- Delete confirmation -->
 @if (confirmDelete(); as target) {
   <app-confirm-dialog
     [open]="true"

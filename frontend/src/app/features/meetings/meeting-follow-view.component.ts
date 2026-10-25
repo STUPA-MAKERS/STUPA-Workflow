@@ -165,7 +165,6 @@ export class MeetingFollowViewComponent {
     const m = this.meeting();
     if (m.status === 'live') return this.nowIndex();
     if (m.status === 'planned' || !this.agenda().length) return -1;
-    // A closed meeting opens on its last item, else on the first one.
     return Math.max(0, this.agenda().findIndex((a) => a.id === m.currentAgendaItemId));
   });
   protected readonly shownTop = computed<AgendaItem | null>(

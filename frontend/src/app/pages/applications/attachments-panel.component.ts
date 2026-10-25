@@ -151,7 +151,6 @@ export class AttachmentsPanelComponent {
   private readonly loaded = signal(false);
 
   constructor() {
-    // Load existing attachments once the applicationId is set (hydration after reload).
     effect(() => {
       const id = this.applicationId();
       if (!id) return;
@@ -162,12 +161,10 @@ export class AttachmentsPanelComponent {
           this.loaded.set(true);
         },
         error: () => {
-          /* On an error keep the list empty. Uploads of this session still show. */
           this.loaded.set(true);
         },
       });
     });
-    // The tab "Anhänge" of the detail shows the count.
     effect(() => {
       const count = this.attachments().length;
       if (this.loaded()) this.countChange.emit(count);
@@ -178,10 +175,10 @@ export class AttachmentsPanelComponent {
     return formatBytes(att.size, this.i18n.locale());
   }
 
+  /** The input resets, so the same file can be picked again; `change` would not fire otherwise. */
   onFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     this.upload(Array.from(input.files ?? []));
-    // Reset so the same file can be picked again (change would not fire otherwise).
     input.value = '';
   }
 
@@ -267,7 +264,6 @@ export class AttachmentsPanelComponent {
         this.selected.update((cur) => new Set([...cur].filter((x) => remaining.has(x))));
       },
       error: () => {
-        // Without a fresh list, remove the requested ids locally.
         const removed = new Set(attempted);
         this.attachments.update((list) => list.filter((a) => !removed.has(a.id)));
         this.selected.update((cur) => new Set([...cur].filter((x) => !removed.has(x))));
@@ -310,7 +306,11 @@ export class AttachmentsPanelComponent {
   }
 
   /** Open the viewer at this file. The URL request comes first, so a quarantined or
-   *  removed file shows its toast instead of the viewer. */
+   *  removed file shows its toast instead of the viewer.
+   *
+   * Mobile browsers such as Android Chrome cannot render a PDF in an iframe, so the PDF goes to the
+   * system viewer instead.
+   */
   openPreview(att: Attachment): void {
     if (this.previewLoadingId()) return;
     const pdfInViewer = !this.coarsePointer();
@@ -319,8 +319,6 @@ export class AttachmentsPanelComponent {
       next: (signed) => {
         this.previewLoadingId.set(null);
         const url = inlineUrl(signed.url);
-        // Mobile browsers such as Android Chrome cannot render a PDF in an iframe.
-        // Hand the PDF to the system viewer instead.
         if (att.mime === 'application/pdf' && !pdfInViewer) {
           this.openUrl(url);
           return;

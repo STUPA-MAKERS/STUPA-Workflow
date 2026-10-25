@@ -153,7 +153,6 @@ export class MarkdownImageUploadDirective {
     const at = value.indexOf(mark);
     if (at < 0) return;
     let end = at + mark.length;
-    // A removed placeholder takes its line break with it.
     if (!text && value[end] === '\n') end++;
     this.write(value.slice(0, at) + text + value.slice(end), at + text.length);
   }

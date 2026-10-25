@@ -35,8 +35,6 @@
     [ngModel]="!!transition().automatic"
     (ngModelChange)="automaticChange.emit($event)"
   >{{ 'admin.flow.automatic' | t }}</app-switch>
-  <!-- "Requires action" applies only to manual transitions. The worker fires an
-       automatic transition and never creates a task for it. -->
   @if (!transition().automatic) {
     <app-switch
       [ngModel]="transition().requiresAction !== false"
@@ -45,7 +43,6 @@
   }
 </div>
 
-<!-- Show the result branch only for vote source states (pass or fail). -->
 @if (branchOptions().length) {
   <app-select
     [label]="'admin.flow.branch' | t"

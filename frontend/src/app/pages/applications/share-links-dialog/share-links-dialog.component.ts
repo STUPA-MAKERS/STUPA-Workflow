@@ -36,6 +36,8 @@ import {
  *
  * The list and the detail both open it. `open` is two-way; the links load each time it
  * opens, and the fresh token is gone when it closes.
+ *
+ * The new link shows once, because the server keeps only a hash.
  */
 @Component({
   selector: 'app-share-links-dialog',
@@ -147,6 +149,7 @@ export class ShareLinksDialogComponent {
       });
   }
 
+  /** A link that was just revoked must not stay on screen as something to copy. */
   revoke(shareId: Uuid): void {
     const id = this.applicationId();
     if (!id || this.revoking()) return;
@@ -155,7 +158,6 @@ export class ShareLinksDialogComponent {
       next: (updated) => {
         this.shares.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
         this.revoking.set(null);
-        // A link that was just revoked must not stay on screen as something to copy.
         if (updated.id === this.fresh()?.id) this.fresh.set(null);
         this.toast.success(this.i18n.translate('applications.share.revoked'));
       },

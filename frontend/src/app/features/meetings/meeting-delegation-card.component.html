@@ -1,6 +1,5 @@
 @if (visible() && hasRows()) {
   @if (variant() === 'inline') {
-    <!-- The dock of the participant view on a narrow screen: only the persons. -->
     @if (ctx(); as c) {
       @if (c.myDelegation || c.incoming.length) {
         <div class="dc dc--inline" role="group" [attr.aria-label]="'delegation.card.title' | t">
@@ -14,7 +13,6 @@
       }
     }
   } @else if (variant() === 'box') {
-    <!-- The participant view: a box of the side column. -->
     <section class="dc dc--box" [attr.aria-label]="'delegation.card.title' | t">
       <h2 class="dc__cap cap">{{ 'delegation.card.title' | t }}</h2>
       @if (ctx(); as c) {
@@ -41,7 +39,6 @@
       }
     </section>
   } @else {
-    <!-- The attendance sheet: a section with a caption on surface 2. -->
     <section class="dc" [attr.aria-label]="'delegation.card.title' | t">
       <h3 class="dc__cap cap">{{ 'delegation.card.title' | t }}</h3>
       @if (ctx(); as c) {

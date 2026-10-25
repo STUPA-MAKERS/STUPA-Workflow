@@ -38,6 +38,8 @@ import { localToday } from '@shared/date-format';
  * "Stellvertretungen": the substitute pool of one gremium (`app-substitute-pool`); the
  * gremium chip picks the gremium. A member creates the own delegation on the meeting
  * page; the gremium must allow it.
+ *
+ * The disclosure is a native button, because it needs aria-expanded on the button itself.
  */
 @Component({
   selector: 'app-delegations',
@@ -120,7 +122,6 @@ export class DelegationsComponent {
   constructor() {
     this.reload();
     this.admin.listGremienOptions().subscribe({
-      // The server order; the first gremium opens.
       next: (list) => {
         this.gremien.set(list);
         if (!this.gremiumId() && list.length) this.gremiumId.set(list[0].id);

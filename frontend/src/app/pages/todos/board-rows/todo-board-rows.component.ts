@@ -142,7 +142,6 @@ export function boardRows(
     let rowFilter = filter;
     if (byName && filter.labels.length) {
       const ids = board.labels.filter((l) => wanted.has(l.name.toLowerCase())).map((l) => l.id);
-      // No label of that name on this board: '' matches no card.
       rowFilter = { ...filter, labels: ids.length ? ids : [''] };
     }
     const columns = sortedColumns(board.columns);
@@ -372,7 +371,6 @@ export class TodoBoardRowsComponent implements OnInit {
       const rows = this.rows();
       if (this.ready()) this.matches.emit(rows.reduce((n, r) => n + r.count, 0));
     });
-    // Keep the rows for a return, my changes too.
     effect(() => {
       const boards = this.boards();
       if (untracked(this.ready)) untracked(() => this.cache?.putRows(this.source(), boards, this.etag));
@@ -394,8 +392,6 @@ export class TodoBoardRowsComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    // The first read waits for the inputs: `source` picks the route. Rows read ahead
-    // show at once, and the read behind them keeps them on a 304.
     const held = this.cache?.rows(this.source());
     if (held) {
       this.boards.set(held.boards);
@@ -418,7 +414,6 @@ export class TodoBoardRowsComponent implements OnInit {
         this.etag = res.etag;
         this.ready.set(true);
       },
-      // The rows are an extra: a failed read keeps what is on screen.
       error: () => this.ready.set(true),
     });
   }
@@ -575,7 +570,6 @@ export class TodoBoardRowsComponent implements OnInit {
       this.refresh();
       return;
     }
-    // A card the rows do not show leaves every row; any other leaves the rows of other boards.
     this.removeCard(tile.id, this.keeps(tile) ? tile.boardId : null);
     if (!this.keeps(tile)) return;
     if (!this.update(tile.boardId, (b) => placeTile(b, tile))) this.refresh();
@@ -659,7 +653,6 @@ export class TodoBoardRowsComponent implements OnInit {
   }
 
   onDragStart(col: TodoColumn): void {
-    // The card lifts (after the long press on a touch screen): a short pulse says so.
     haptic('lift');
     this.kb.set(null);
     this.ptr.set({ from: col.id, over: col.id });
@@ -702,6 +695,7 @@ export class TodoBoardRowsComponent implements OnInit {
 
   // ------------------------------------------------------------------ moves
 
+  /** The rollback applies only when nothing else changed the row meanwhile. */
   private move(boardId: Uuid, cardId: Uuid, move: TodoCardMove): void {
     const before = this.boards().find((b) => b.id === boardId);
     if (!before?.canWrite) return;
@@ -716,7 +710,6 @@ export class TodoBoardRowsComponent implements OnInit {
       },
       error: (err: unknown) => {
         this.toast.error(this.i18n.translate(moveErrorText(err, 'todos.error.move')));
-        // Roll back when nothing else changed the row meanwhile, then read the rows again.
         if (this.boards().find((b) => b.id === boardId) === optimistic) this.update(boardId, () => before);
         this.refresh();
       },
@@ -765,7 +758,6 @@ export class TodoBoardRowsComponent implements OnInit {
     const from = this.boards().find((b) => b.cards.some((c) => c.id === cardId));
     const held = from?.cards.find((c) => c.id === cardId);
     if (!from || !held) {
-      // A card of the personal board above the rows: the page moves it over.
       this.dropIn.emit({ boardId: row.board.id, cardId, move: dropMove(target, event.currentIndex, toCol) });
       return;
     }
