@@ -2,7 +2,8 @@ import { inject, signal } from '@angular/core';
 import { I18nService } from '@core/i18n/i18n.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import type { Uuid } from '@core/api/models';
-import { BudgetTreeApi, type Expense } from '../budget/budget-tree.api';
+import { BudgetTreeApi, FISCAL_YEAR_CLOSED, type Expense } from '../budget/budget-tree.api';
+import { problemCode } from '@core/api/problem';
 import type { ExpensesListState } from './expenses-list.state';
 
 /**
@@ -92,9 +93,10 @@ export class ExpenseSubBookingsState {
           this.toast.success(this.i18n.translate('expenses.sub.added'));
           this.list.refresh();
         },
-        error: () => {
+        error: (err: unknown) => {
           this.list.saving.set(false);
-          this.toast.error(this.i18n.translate('expenses.toast.failed'));
+          const closed = problemCode(err) === FISCAL_YEAR_CLOSED;
+          this.toast.error(this.i18n.translate(closed ? 'budget.fy.closedError' : 'expenses.toast.failed'));
         },
       });
   }

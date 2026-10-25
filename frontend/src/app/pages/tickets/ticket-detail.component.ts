@@ -74,6 +74,8 @@ import {
   SkeletonComponent,
   StatusTextComponent,
   type TabItem,
+  TabPageDirective,
+  TabPagerComponent,
   TabsComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
@@ -205,6 +207,8 @@ export function fromMine(m: MyTicketDetail, reporter: TicketReporter): TicketDet
     SheetBarTitleDirective,
     SkeletonComponent,
     StatusTextComponent,
+    TabPageDirective,
+    TabPagerComponent,
     TabsComponent,
     TodoNewDialogComponent,
     TodoLinkedListComponent,

@@ -11,7 +11,6 @@ from app.modules.applications.models import Application, MagicLink
 from app.modules.auth import service, tokens
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.oidc import OidcClaims
-from app.modules.flow.models import State
 from app.settings import Settings, load_settings
 from app.shared.errors import ForbiddenError, GoneError
 from tests._support.auth_fakes import fake_session, result
@@ -223,13 +222,9 @@ async def test_verify_magic_link_survives_a_failed_flow_start(
     settings = _settings()
     monkeypatch.setattr(service, "_now", lambda: NOW)
 
-    async def _schedule(_self: object, _app: object, _state: object) -> None:
-        return None
-
     async def _advance(_self: object, _application_id: object, _principal: object) -> None:
         return None
 
-    monkeypatch.setattr(FlowService, "schedule_state_deadline", _schedule)
     monkeypatch.setattr(FlowService, "auto_advance", _advance)
     row = _link("tok", settings, scope="view", single_use=True)
     app = _app(state_id="s1")
@@ -240,7 +235,6 @@ async def test_verify_magic_link_survives_a_failed_flow_start(
         result("aid-1"),  # the confirmation UPDATE
         result(),  # the UPDATE that expires the older links
         result(app),  # FlowService._load_app
-        result(State()),  # FlowService._load_state
         result("event-1"),  # the latest status event of the task mail
     )
     app_id, scope, token = await service.verify_magic_link(

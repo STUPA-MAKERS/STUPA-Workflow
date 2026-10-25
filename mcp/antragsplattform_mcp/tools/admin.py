@@ -1,7 +1,7 @@
 """Admin tools.
 
-This group covers Gremien, RBAC, application types, webhooks, deadline policies,
-notifications, site config, and the audit log.
+This group covers Gremien, RBAC, application types, webhooks,
+guest and meeting settings, notifications, site config, and the audit log.
 """
 
 from __future__ import annotations
@@ -402,47 +402,6 @@ async def update_webhook(webhook_id: str, patch: S.WebhookUpdate) -> dict:
 async def delete_webhook(webhook_id: str) -> dict:
     """Delete a webhook and its delivery history. Requires webhook.manage."""
     return await api().delete(f"/admin/webhooks/{webhook_id}")
-
-
-@group.tool
-async def list_deadline_policies() -> dict:
-    """List the named deadline policies.
-
-    A flow state refers to a policy through `config.deadlinePolicyKey`.
-    """
-    return await api().get("/admin/deadline-policies")
-
-
-@group.tool
-async def create_deadline_policy(policy: S.DeadlinePolicyCreate) -> dict:
-    """Create a deadline policy with an absolute date or a relative offset.
-
-    Entry into a flow state that refers to the key of the policy creates a deadline.
-    Requires admin.types.
-    """
-    return await api().post("/admin/deadline-policies", json=dump_create(policy))
-
-
-@group.tool
-async def update_deadline_policy(policy_id: str, patch: S.DeadlinePolicyUpdate) -> dict:
-    """Patch a deadline policy.
-
-    Use this to move the absolute date each semester. A new flow version is not needed.
-    Requires admin.types.
-    """
-    return await api().patch(
-        f"/admin/deadline-policies/{policy_id}", json=dump_patch(patch)
-    )
-
-
-@group.tool
-async def delete_deadline_policy(policy_id: str) -> dict:
-    """Delete a deadline policy.
-
-    A state that refers to the policy then holds without a deadline.
-    Requires admin.types.
-    """
-    return await api().delete(f"/admin/deadline-policies/{policy_id}")
 
 
 @group.tool

@@ -92,7 +92,7 @@ class FakeSession:
         return None
 
     async def scalar(self, _stmt: Any) -> Any:
-        """Stand-in for `session.scalar`, used for example by `_deadline_passed`.
+        """Stand-in for `session.scalar`, used for example by the task mail.
 
         This method reads its own queue and defaults to `None`. The `execute` order of
         the tests stays unchanged.
@@ -122,8 +122,8 @@ class FakeSession:
     async def refresh(self, _obj: Any) -> None:
         """Stand-in for `session.refresh` that does nothing.
 
-        After the commit the service reloads the application. It then materializes the
-        deadline of the new state.
+        A service can reload an object after a commit. The fake keeps the object as it
+        is.
         """
 
 

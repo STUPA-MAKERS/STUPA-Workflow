@@ -142,7 +142,7 @@
 @include bp.phone {
   /* One row of chips that scrolls sideways; an end fades while more chips lie past it. */
   .vl__chips {
-    @include lp.phone-chips(--vl-chip-fade);
+    @include lp.phone-chips;
   }
   .vl__month {
     padding-inline: var(--space-1);

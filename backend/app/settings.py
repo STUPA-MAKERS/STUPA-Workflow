@@ -305,10 +305,6 @@ class Settings(BaseSettings):
     # this zone is the basis of the delegation deadline.
     local_timezone: str = "Europe/Berlin"
 
-    # Deadlines/cron. Lead time for the `deadline_approaching` reminder. The app sends
-    # it once `due_at - lead <= now < due_at` holds (default 24 h).
-    deadline_reminder_lead_minutes: int = 1440
-
     @property
     def storage_enabled(self) -> bool:
         """Object storage is active only when a MinIO endpoint is set."""

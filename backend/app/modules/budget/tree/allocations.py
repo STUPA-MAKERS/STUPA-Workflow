@@ -80,6 +80,7 @@ class AllocationOps(BudgetTreeServiceBase):
                 "Fiscal year does not belong to this budget's top-level.",
                 errors=[{"field": "fiscalYearId", "msg": "wrong top-level budget"}],
             )
+        self._refuse_closed(fy)
 
         # Lock BEFORE read, validate and write to stay race-free. The own row
         # guards the downward constraint against the own children. The parent row

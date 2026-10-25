@@ -136,33 +136,27 @@
         </div>
       </div>
     } @else {
-      <app-tabs
-        #tabBar
+      <app-tab-pager
         class="td__tabs"
         idPrefix="td"
         [ariaLabel]="ticket.title"
         [tabs]="tabs()"
         [active]="tab()"
+        [paged]="phone()"
+        [fill]="phone()"
         (activeChange)="selectTab($event)"
-      />
-      <section
-        class="td__panel td__panel--log"
-        role="tabpanel"
-        [id]="tabBar.panelId('log')"
-        [attr.aria-labelledby]="tabBar.tabId('log')"
-        [hidden]="tab() !== 'log'"
       >
-        <ng-container *ngTemplateOutlet="log" />
-      </section>
-      <section
-        class="td__panel td__panel--details"
-        role="tabpanel"
-        [id]="tabBar.panelId('details')"
-        [attr.aria-labelledby]="tabBar.tabId('details')"
-        [hidden]="tab() !== 'details'"
-      >
-        <ng-container *ngTemplateOutlet="details; context: { $implicit: ticket }" />
-      </section>
+        <ng-template appTabPage="log">
+          <section class="td__panel td__panel--log">
+            <ng-container *ngTemplateOutlet="log" />
+          </section>
+        </ng-template>
+        <ng-template appTabPage="details">
+          <section class="td__panel td__panel--details">
+            <ng-container *ngTemplateOutlet="details; context: { $implicit: ticket }" />
+          </section>
+        </ng-template>
+      </app-tab-pager>
     }
   </article>
 }

@@ -66,8 +66,7 @@ class StateDef(WireModel):
         "{gremiumId: '<uuid>'} (fixed Gremium) or {gremiumSource: 'budget'} (the "
         "deciding Gremium of the cost center, taken when the application enters the "
         "state; the transition is refused with 409 no_vote_gremium when the cost center "
-        "has none). Any state may set {deadlinePolicyKey} to materialise a deadline on "
-        "entry.",
+        "has none).",
     )
 
     @model_validator(mode="after")
@@ -107,7 +106,7 @@ class TransitionDef(WireModel):
     color: str | None = None
     guard: dict[str, Any] | None = Field(
         default=None,
-        description="Guard tree. Leaf operators: deadlinePassed, applicantRoleIs, "
+        description="Guard tree. Leaf operators: applicantRoleIs, "
         "applicantCommitteeIs, applicationTypeIs (application type key, e.g. 'qsm'/'vsm'), "
         "attachmentPresent (bool — >=1 attachment), budgetIs, budgetFitsApplication, "
         "budgetHasDecisionGremium (bool — the cost center has an own or inherited "
@@ -348,7 +347,7 @@ class GroupMappingUpdate(WireModel):
     roleId: str | None = None
 
 
-# Admin: application types, webhooks and deadline policies.
+# Admin: application types and webhooks.
 class ApplicationTypeCreate(WireModel):
     key: str
     nameI18n: I18nMap
@@ -376,21 +375,6 @@ class WebhookUpdate(WireModel):
     url: str | None = None
     events: list[str] | None = None
     active: bool | None = None
-
-
-class DeadlinePolicyCreate(WireModel):
-    key: str
-    label: I18nMap
-    kind: Literal["absolute", "relative_submitted", "relative_changed"]
-    absoluteAt: str | None = Field(default=None, description="ISO datetime — for kind 'absolute'")
-    offsetDays: int | None = Field(default=None, description="For the relative kinds")
-
-
-class DeadlinePolicyUpdate(WireModel):
-    label: I18nMap | None = None
-    kind: Literal["absolute", "relative_submitted", "relative_changed"] | None = None
-    absoluteAt: str | None = None
-    offsetDays: int | None = None
 
 
 # Budget tree, bookings and transfers.

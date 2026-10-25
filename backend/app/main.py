@@ -40,7 +40,6 @@ from app.modules.backup.router import router as backup_router
 from app.modules.budget.tree_router import router as budget_tree_router
 from app.modules.calendar.router import router as calendar_router
 from app.modules.config_revision.router import router as config_revision_router
-from app.modules.deadlines.router import router as deadline_policies_router
 from app.modules.delegations.router import router as delegations_router
 from app.modules.files.router import router as files_router
 from app.modules.files.storage import build_object_storage
@@ -116,7 +115,6 @@ api_router.include_router(public_media_router)
 api_router.include_router(audit_router)
 api_router.include_router(config_revision_router)
 api_router.include_router(admin_router)
-api_router.include_router(deadline_policies_router)
 api_router.include_router(delegations_router)
 api_router.include_router(privacy_router)
 api_router.include_router(backup_router)

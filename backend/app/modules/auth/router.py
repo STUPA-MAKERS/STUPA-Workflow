@@ -492,8 +492,8 @@ async def verify_magic_link(
     The server sets the session only as an HttpOnly cookie. It never returns the token
     in the body, so JavaScript cannot read it.
 
-    The first verify of a guest application starts its flow (deadline, automatic
-    transitions, task mail) through the flow action dispatcher.
+    The first verify of a guest application starts its flow (automatic transitions,
+    task mail) through the flow action dispatcher.
     """
     app_id, scope, token = await service.verify_magic_link(
         db, settings, token=body.token, dispatcher=dispatcher

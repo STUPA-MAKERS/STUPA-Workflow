@@ -779,6 +779,25 @@ describe('BudgetDashboardComponent', () => {
   // ------------------------------------------------------------------ year + roots
 
   describe('fiscal year and roots', () => {
+    it('selects the newest fiscal year by default', async () => {
+      const view = await setup({ fys: [FY, FY2] });
+      const c = view.fixture.componentInstance as unknown as Inst;
+      expect(c.selectedFyId()).toBe('fy-2');
+      view.http.match(() => true);
+    });
+
+    it('marks a closed fiscal year in the year chip', async () => {
+      const view = await setup({ fys: [FY, { ...FY2, closedAt: '2026-03-01T00:00:00Z' }] });
+      (view.container.querySelector('.bd__pane app-filter-select button') as HTMLElement).click();
+      view.fixture.detectChanges();
+      const list = screen.getByRole('listbox', { name: 'Haushaltsjahr' });
+      expect(within(list).getAllByRole('option').map((o) => o.textContent?.trim())).toEqual([
+        'HHJ 2026',
+        'HHJ 2027 · abgeschlossen',
+      ]);
+      view.http.match(() => true);
+    });
+
     it('switches the fiscal year from the chip and reloads the applications for it', async () => {
       const view = await setup({ fys: [FY, FY2] });
       const c = view.fixture.componentInstance as unknown as Inst;
@@ -790,15 +809,15 @@ describe('BudgetDashboardComponent', () => {
         'HHJ 2026',
         'HHJ 2027',
       ]);
-      within(list).getByRole('option', { name: 'HHJ 2027' }).click();
+      within(list).getByRole('option', { name: 'HHJ 2026' }).click();
       view.fixture.detectChanges();
-      expect(c.selectedFyId()).toBe('fy-2');
+      expect(c.selectedFyId()).toBe('fy-1');
       expect(nav).toHaveBeenCalled();
       const req = view.http.expectOne((r) => r.url.endsWith('/budgets/b-vs/applications'));
-      expect(req.request.params.get('fiscalYear')).toBe('fy-2');
+      expect(req.request.params.get('fiscalYear')).toBe('fy-1');
       req.flush([]);
       // The same year again changes nothing.
-      c.selectYear('fy-2');
+      c.selectYear('fy-1');
       view.http.expectNone((r) => r.url.endsWith('/applications'));
     });
 
@@ -949,12 +968,12 @@ describe('BudgetDashboardComponent', () => {
       const c = view.fixture.componentInstance as unknown as Inst;
       jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
       const chips = view.container.querySelector('.bd__top .bd__chips') as HTMLElement;
-      within(chips).getByRole('button', { name: 'Haushaltsjahr: HHJ 2026' }).click();
+      within(chips).getByRole('button', { name: 'Haushaltsjahr: HHJ 2027' }).click();
       view.fixture.detectChanges();
       const sheet = screen.getByRole('dialog', { name: 'Haushaltsjahr' });
-      within(sheet).getByRole('option', { name: 'HHJ 2027' }).click();
+      within(sheet).getByRole('option', { name: 'HHJ 2026' }).click();
       view.fixture.detectChanges();
-      expect(c.selectedFyId()).toBe('fy-2');
+      expect(c.selectedFyId()).toBe('fy-1');
       expect(screen.queryByRole('dialog', { name: 'Haushaltsjahr' })).toBeNull();
       view.http.match(() => true);
     });

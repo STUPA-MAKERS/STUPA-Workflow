@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
@@ -26,11 +27,12 @@ def _fy_out(f: FiscalYear, start_month: int, start_day: int) -> FiscalYearOut:
         startDate=f.start_date,
         endDate=f.end_date,
         active=f.active,
+        closedAt=f.closed_at,
     )
 
 
 class FiscalYearOps(BudgetTreeServiceBase):
-    """List, create and update fiscal years (unique per top-level budget)."""
+    """List, create, update, close and reopen fiscal years (unique per top-level budget)."""
 
     async def _require_top_level(self, budget_id: UUID) -> Budget:
         node = await self._get_node(budget_id)
@@ -102,10 +104,20 @@ class FiscalYearOps(BudgetTreeServiceBase):
     async def update_fiscal_year(
         self, budget_id: UUID, fiscal_year_id: UUID, payload: FiscalYearUpdate
     ) -> FiscalYearOut:
-        """Update the year or the active flag. A year stays unique per top budget."""
+        """Update the year or the active flag. A year stays unique per top budget.
+
+        The year of a closed fiscal year is fixed, because a new year moves its
+        dates. The active flag stays free: it only picks the default year.
+
+        Raises:
+            ConflictError: `fiscal_year_closed` (409) for a year change on a
+                closed fiscal year.
+        """
         top = await self._require_top_level(budget_id)
         fy = await self._get_fiscal_year(fiscal_year_id)
         provided = payload.model_dump(exclude_unset=True)
+        if provided.get("year", fy.year) != fy.year:
+            self._refuse_closed(fy)
         new_year = provided.get("year", fy.year)
         if new_year != fy.year and any(
             f.year == new_year and f.id != fiscal_year_id
@@ -153,14 +165,12 @@ class FiscalYearOps(BudgetTreeServiceBase):
             NotFoundError: The budget or the fiscal year does not exist, or the
                 fiscal year belongs to another top-level budget (404).
             ValidationProblem: `budget_id` is not a top-level budget (422).
-            ConflictError: Money rows still reference the fiscal year (409).
+            ConflictError: Money rows still reference the fiscal year, or the
+                fiscal year is closed (409).
         """
         top = await self._require_top_level(budget_id)
-        fy = await self._get_fiscal_year(fiscal_year_id)
-        if fy.budget_id != top.id:
-            raise NotFoundError(
-                f"fiscal year {fiscal_year_id} does not belong to budget {budget_id}"
-            )
+        fy = await self._own_fiscal_year(top, fiscal_year_id)
+        self._refuse_closed(fy)
         blocker = tree_rules.fiscal_year_delete_blocker(
             await self._uses_fiscal_year(
                 BudgetExpense.id, BudgetExpense.fiscal_year_id, fiscal_year_id
@@ -184,3 +194,48 @@ class FiscalYearOps(BudgetTreeServiceBase):
         )
         await self.session.delete(fy)
         await self.session.commit()
+
+    async def _own_fiscal_year(self, top: Budget, fiscal_year_id: UUID) -> FiscalYear:
+        """Load a fiscal year and make sure that it belongs to the top-level budget.
+
+        Raises:
+            NotFoundError: The fiscal year does not exist or belongs to another
+                top-level budget (404).
+        """
+        fy = await self._get_fiscal_year(fiscal_year_id)
+        if fy.budget_id != top.id:
+            raise NotFoundError(
+                f"fiscal year {fiscal_year_id} does not belong to budget {top.id}"
+            )
+        return fy
+
+    async def set_fiscal_year_closed(
+        self, budget_id: UUID, fiscal_year_id: UUID, *, closed: bool, actor: str
+    ) -> FiscalYearOut:
+        """Close or reopen a fiscal year.
+
+        A closed year is frozen: every money mutation on it answers 409
+        `fiscal_year_closed`. Reading and the export stay. A reopen lifts the
+        freeze. Both directions write an audit entry. A call that asks for the
+        current state changes nothing and writes no entry.
+
+        Raises:
+            NotFoundError: The budget or the fiscal year does not exist, or the
+                fiscal year belongs to another top-level budget (404).
+            ValidationProblem: `budget_id` is not a top-level budget (422).
+        """
+        top = await self._require_top_level(budget_id)
+        fy = await self._own_fiscal_year(top, fiscal_year_id)
+        if closed != (fy.closed_at is not None):
+            fy.closed_at = datetime.now(UTC) if closed else None
+            fy.closed_by = actor if closed else None
+            await self._audit(
+                AuditAction.BUDGET_FISCAL_YEAR_CLOSE
+                if closed
+                else AuditAction.BUDGET_FISCAL_YEAR_REOPEN,
+                target_type="fiscal_year",
+                target_id=str(fy.id),
+                data={"budgetId": str(top.id), "year": fy.year},
+            )
+            await self.session.commit()
+        return _fy_out(fy, top.fiscal_start_month, top.fiscal_start_day)

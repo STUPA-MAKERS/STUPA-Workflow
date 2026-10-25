@@ -97,7 +97,7 @@ export class MailTemplatesComponent {
   });
 
   /**
-   * Localize a template key: `deadline_approaching` becomes "Deadline reminder".
+   * Localize a template key: `task_reminder` becomes "Task reminder".
    *
    * An unknown key returns the raw key.
    */

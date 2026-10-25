@@ -998,10 +998,11 @@ describe('ApplicationsDetailComponent', () => {
   });
 
   it.each([
-    [422, 'Zuordnung nicht möglich — Kostenstelle/Haushaltsjahr prüfen.'],
-    [403, 'Du darfst diesen Übergang nicht ausführen.'],
-    [500, 'Statuswechsel fehlgeschlagen.'],
-  ])('maps a failed budget assignment %s to its toast', async (status, message) => {
+    [422, '', 'Zuordnung nicht möglich — Kostenstelle/Haushaltsjahr prüfen.'],
+    [403, '', 'Du darfst diesen Übergang nicht ausführen.'],
+    [500, '', 'Statuswechsel fehlgeschlagen.'],
+    [409, 'fiscal_year_closed', 'Das Haushaltsjahr ist abgeschlossen.'],
+  ])('maps a failed budget assignment %s %s to its toast', async (status, code, message) => {
     const { http, detectChanges, cmp, toast } = await setup();
     http.expectOne(url('')).flush(appWire());
     http.expectOne(url('/versions')).flush(VERSIONS);
@@ -1016,7 +1017,7 @@ describe('ApplicationsDetailComponent', () => {
     cmp.assignBudget();
     http
       .expectOne((r) => r.url === '/api/applications/app-1/assign-budget')
-      .flush({ title: 'e' }, { status, statusText: 'x' });
+      .flush({ title: 'e', code }, { status, statusText: 'x' });
     expect(error).toHaveBeenCalledWith(message);
     expect(cmp.assigningBudget()).toBe(false);
     http.verify();

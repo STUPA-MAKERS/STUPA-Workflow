@@ -150,8 +150,6 @@ EventName = Literal[
     "budget_reserved",
     "budget_booked",
     "protocol_finalized",
-    "deadline_approaching",
-    "deadline_passed",
 ]
 
 

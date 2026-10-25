@@ -441,18 +441,11 @@ async def test_actionable_excludes_admin_without_firable_guard(
     # mail. The admin with an unsatisfied guard drops out.
     captured: dict[str, Any] = {}
 
-    async def fake_base(
-        _s: Any, app: Any, *, manual: bool, deadline_passed: bool = False
-    ) -> GuardContext:
-        captured["base"] = (app, manual, deadline_passed)
+    async def fake_base(_s: Any, app: Any, *, manual: bool) -> GuardContext:
+        captured["base"] = (app, manual)
         return GuardContext(manual=True)
 
-    async def fake_deadline(_s: Any, application_id: Any) -> bool:
-        captured["deadline_app"] = application_id
-        return True
-
     monkeypatch.setattr(recipients_mod, "build_base_context", fake_base)
-    monkeypatch.setattr(recipients_mod, "flow_deadline_passed", fake_deadline)
 
     app = _app_ns(gremium_id=uuid.uuid4())
     pid1, pid2 = uuid.uuid4(), uuid.uuid4()
@@ -471,8 +464,7 @@ async def test_actionable_excludes_admin_without_firable_guard(
         state=State(kind="normal", config={}),
     )
     assert out == ["chair@x.de"]
-    assert captured["base"] == (app, True, True)
-    assert captured["deadline_app"] == app.id
+    assert captured["base"] == (app, True)
 
 
 async def test_actionable_seeds_with_app_gremium_and_dedups(
@@ -480,13 +472,8 @@ async def test_actionable_seeds_with_app_gremium_and_dedups(
 ) -> None:
     seen: dict[str, Any] = {}
 
-    async def fake_base(
-        _s: Any, _app: Any, *, manual: bool, deadline_passed: bool = False
-    ) -> GuardContext:
+    async def fake_base(_s: Any, _app: Any, *, manual: bool) -> GuardContext:
         return GuardContext(manual=True)
-
-    async def fake_deadline(_s: Any, _application_id: Any) -> bool:
-        return False
 
     async def fake_candidates(
         _s: Any, _now: Any, *, gremium_id: Any
@@ -499,7 +486,6 @@ async def test_actionable_seeds_with_app_gremium_and_dedups(
         ]
 
     monkeypatch.setattr(recipients_mod, "build_base_context", fake_base)
-    monkeypatch.setattr(recipients_mod, "flow_deadline_passed", fake_deadline)
     monkeypatch.setattr(
         recipients_mod, "_candidates_with_transition_permission", fake_candidates
     )

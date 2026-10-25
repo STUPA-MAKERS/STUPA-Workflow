@@ -311,6 +311,7 @@ class TransferOps(ExpenseOps):
                 (409).
         """
         out, income = await self._legs(transfer_id)
+        await self._require_open_fiscal_year(out.fiscal_year_id)
         if tree_rules.transfer_pair_changed(
             out.budget_id, income.budget_id, payload.from_budget_id, payload.to_budget_id
         ):
@@ -354,6 +355,7 @@ class TransferOps(ExpenseOps):
             NotFoundError: No transfer has this id (404).
         """
         out, income = await self._legs(transfer_id)
+        await self._require_open_fiscal_year(out.fiscal_year_id)
         await self._audit(
             AuditAction.BUDGET_EXPENSE_DELETE,
             target_type="budget_transfer",

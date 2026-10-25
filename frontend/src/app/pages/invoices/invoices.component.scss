@@ -169,7 +169,7 @@
   }
   /* One row of chips that scrolls sideways; an end fades while more chips lie past it. */
   .inv__chips {
-    @include lp.phone-chips(--inv-chip-fade);
+    @include lp.phone-chips;
   }
   .inv__month {
     padding-inline: var(--space-1);

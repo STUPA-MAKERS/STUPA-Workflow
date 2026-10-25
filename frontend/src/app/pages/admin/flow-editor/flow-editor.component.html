@@ -237,7 +237,6 @@
             [state]="s"
             [kindOptions]="kindOptionsSel"
             [gremiumOptions]="gremiumOptions()"
-            [deadlinePolicyOptions]="deadlinePolicyOptions()"
             [guardGroups]="guardGroupRows(s.key)"
             (keyChange)="setStateKey(s.key, $event)"
             (labelChange)="setStateLabel(s.key, $event.lang, $event.value)"
@@ -248,7 +247,6 @@
             (kindChange)="setStateKind(s.key, $event)"
             (gremiumChange)="setStateGremium(s.key, $event)"
             (gremiumSourceChange)="setStateGremiumSource(s.key, $event)"
-            (deadlinePolicyChange)="setStateDeadlinePolicy(s.key, $event)"
             (guardMove)="moveGuard(s.key, $event)"
             (remove)="removeSelectedState()"
           />

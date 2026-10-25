@@ -28,7 +28,7 @@ describe('validateGuard (mirror of backend validate_guard)', () => {
 
   it('accepts whitelist condition + actor operators', () => {
     expect(() => validateGuard({ roleIs: 'stupa' })).not.toThrow();
-    expect(() => validateGuard({ deadlinePassed: true })).not.toThrow();
+    expect(() => validateGuard({ budgetHasDecisionGremium: true })).not.toThrow();
     expect(() => validateGuard({ hasField: 'iban' })).not.toThrow();
     expect(() =>
       validateGuard({ compare: { field: 'amount', op: '>', value: 100 } }),
@@ -50,7 +50,7 @@ describe('validateGuard (mirror of backend validate_guard)', () => {
   });
 
   it('requires exactly one operator', () => {
-    expect(reason(() => validateGuard({ roleIs: 'a', deadlinePassed: true })).key).toBe(
+    expect(reason(() => validateGuard({ roleIs: 'a', budgetHasDecisionGremium: true })).key).toBe(
       'admin.flow.err.guardOneOperator',
     );
   });
@@ -64,7 +64,7 @@ describe('validateGuard (mirror of backend validate_guard)', () => {
       'admin.flow.err.guardActorManualOnly',
     );
     // Conditions are allowed on automatic transitions.
-    expect(() => validateGuard({ deadlinePassed: true }, false)).not.toThrow();
+    expect(() => validateGuard({ budgetHasDecisionGremium: true }, false)).not.toThrow();
   });
 
   it('validates the compare structure', () => {
@@ -97,7 +97,7 @@ describe('validateGuard (mirror of backend validate_guard)', () => {
     );
     // condition op nested under or is fine even on automatic transitions
     expect(() =>
-      validateGuard({ or: [{ deadlinePassed: true }, { hasField: 'iban' }] }, false),
+      validateGuard({ or: [{ budgetHasDecisionGremium: true }, { hasField: 'iban' }] }, false),
     ).not.toThrow();
     // A guard with no operator at all names the empty operator list rather than leaving a gap.
     expect(reason(() => validateGuard({}))).toEqual({
@@ -119,9 +119,9 @@ describe('validateGuard (mirror of backend validate_guard)', () => {
 
   it('checks combinator arity and children', () => {
     expect(
-      reason(() => validateGuard({ not: [{ deadlinePassed: true }, { roleIs: 'x' }] })).key,
+      reason(() => validateGuard({ not: [{ budgetHasDecisionGremium: true }, { roleIs: 'x' }] })).key,
     ).toBe('admin.flow.err.guardNotOneChild');
-    expect(() => validateGuard({ not: { deadlinePassed: true } })).not.toThrow();
+    expect(() => validateGuard({ not: { budgetHasDecisionGremium: true } })).not.toThrow();
     expect(reason(() => validateGuard({ and: [] }))).toEqual({
       key: 'admin.flow.err.guardNeedsChild',
       params: { op: 'and' },
@@ -215,7 +215,7 @@ describe('flow variant B (gremium from the cost center)', () => {
       key: 'admin.flow.err.guardNeedsBool',
       params: { op: 'isInVoteGremium' },
     });
-    expect(reason(() => validateGuard({ deadlinePassed: 1 })).key).toBe(
+    expect(reason(() => validateGuard({ budgetHasDecisionGremium: 1 })).key).toBe(
       'admin.flow.err.guardNeedsBool',
     );
   });

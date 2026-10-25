@@ -70,15 +70,19 @@ import {
   SideSheetComponent,
   StatusTextComponent,
   type TabItem,
+  TabPageDirective,
+  TabPagerComponent,
   TabsComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import {
   BudgetTreeApi,
+  FISCAL_YEAR_CLOSED,
   type BudgetTreeNode,
   type FiscalYear,
   flattenBudgetOptions,
 } from '../budget/budget-tree.api';
+import { problemCode } from '@core/api/problem';
 import { CostCentreSelectComponent } from '../budget/cost-centre-select/cost-centre-select.component';
 import { AttachmentsPanelComponent } from './attachments-panel.component';
 import { applicationTitle, transitionLooks } from './applications.util';
@@ -167,6 +171,8 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
     DialogComponent,
     IconComponent,
     SelectFieldComponent,
+    TabPageDirective,
+    TabPagerComponent,
     TabsComponent,
     CostCentreSelectComponent,
     AttachmentsPanelComponent,
@@ -332,16 +338,21 @@ export class ApplicationsDetailComponent {
   protected fiscalLabel(id: string | null | undefined): string {
     return (id && this.fiscalLabels().get(id)) || '';
   }
-  /** Dropdown options: "automatic" plus every fiscal year of the top budget.
-   *  An inactive year carries a mark. */
+  /** Dropdown options: "automatic" plus every open fiscal year of the top budget.
+   *  An inactive year carries a mark. A closed year takes no assignment, so it shows
+   *  only while it is the current year of the application. */
   protected readonly fiscalOptions = computed<SelectOption[]>(() => [
     { value: '', label: this.i18n.translate('applications.budget.fiscalAuto') },
-    ...this.fiscalYears().map((y) => ({
+    ...this.fiscalYears()
+      .filter((y) => !y.closedAt || y.id === this.app()?.fiscalYearId)
+      .map((y) => ({
       value: y.id,
-      label: y.active
-        ? y.display
-        : `${y.display} (${this.i18n.translate('applications.budget.fiscalInactive')})`,
-    })),
+        label: y.closedAt
+          ? this.i18n.translate('budget.fy.closedLabel', { year: y.display })
+          : y.active
+            ? y.display
+            : `${y.display} (${this.i18n.translate('applications.budget.fiscalInactive')})`,
+      })),
   ]);
   /** Find the top budget (root) whose subtree contains the cost centre. */
   private topLevelIdOf(budgetId: string): string | null {
@@ -1061,11 +1072,13 @@ export class ApplicationsDetailComponent {
         error: (err: { status?: number }) => {
           this.assigningBudget.set(false);
           const key =
-            err.status === 422
-              ? 'applications.budget.invalid'
-              : err.status === 403
-                ? 'applications.transitions.forbidden'
-                : 'applications.actions.error';
+            problemCode(err) === FISCAL_YEAR_CLOSED
+              ? 'budget.fy.closedError'
+              : err.status === 422
+                ? 'applications.budget.invalid'
+                : err.status === 403
+                  ? 'applications.transitions.forbidden'
+                  : 'applications.actions.error';
           this.toast.error(this.i18n.translate(key));
         },
       });

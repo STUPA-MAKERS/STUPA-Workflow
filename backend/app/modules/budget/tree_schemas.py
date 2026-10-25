@@ -176,7 +176,8 @@ class FiscalYearUpdate(_CamelModel):
 class FiscalYearOut(_CamelModel):
     """Fiscal-year base data.
 
-    `display` is `YYYY` for a Jan 1 cutoff, else `YYYY/YY`.
+    `display` is `YYYY` for a Jan 1 cutoff, else `YYYY/YY`. `closedAt` set means
+    the year is closed and its money data is frozen.
     """
 
     id: UUID
@@ -186,6 +187,7 @@ class FiscalYearOut(_CamelModel):
     start_date: date = Field(alias="startDate")
     end_date: date = Field(alias="endDate")
     active: bool
+    closed_at: datetime | None = Field(default=None, alias="closedAt")
 
 
 class AllocationSet(_CamelModel):

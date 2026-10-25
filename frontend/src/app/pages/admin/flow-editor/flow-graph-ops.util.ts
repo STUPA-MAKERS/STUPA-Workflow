@@ -137,12 +137,10 @@ export function setStateTerminal(g: FlowGraph, key: string, on: boolean): FlowGr
   return patchState(g, key, { isTerminal: on });
 }
 
-/** Change the state kind. This resets the kind-specific config but keeps the deadline policy. */
+/** Change the state kind. This resets the kind-specific config. */
 export function setStateKind(g: FlowGraph, key: string, kind: string): FlowGraph {
   const k = (kind || 'normal') as StateKind;
-  const policy = g.states.find((s) => s.key === key)?.config?.deadlinePolicyKey;
-  const config: StateConfig = policy ? { deadlinePolicyKey: policy } : {};
-  return patchState(g, key, { kind: k === 'normal' ? null : k, config });
+  return patchState(g, key, { kind: k === 'normal' ? null : k, config: {} });
 }
 
 function patchConfig(g: FlowGraph, key: string, patch: Partial<StateConfig>): FlowGraph {
@@ -183,10 +181,6 @@ export function setStateGremiumSource(
       return { ...s, config };
     }),
   };
-}
-
-export function setStateDeadlinePolicy(g: FlowGraph, key: string, policyKey: string): FlowGraph {
-  return patchConfig(g, key, { deadlinePolicyKey: policyKey || undefined });
 }
 
 

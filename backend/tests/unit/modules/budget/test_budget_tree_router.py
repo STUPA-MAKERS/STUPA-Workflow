@@ -154,6 +154,12 @@ class _FakeService:
     ) -> None:
         self.calls["delete_fy"] = (budget_id, fiscal_year_id)
 
+    async def set_fiscal_year_closed(
+        self, budget_id: uuid.UUID, fiscal_year_id: uuid.UUID, *, closed: bool, actor: str
+    ) -> FiscalYearOut:
+        self.calls["close_fy"] = (budget_id, fiscal_year_id, closed, actor)
+        return _fy_out()
+
     async def list_transfers_paged(self, **kwargs: Any) -> Page[TransferRowOut]:
         self.calls["list_transfers_paged"] = kwargs
         return Page(items=[_transfer_row()], total=1, limit=50, offset=0)
@@ -557,6 +563,24 @@ def test_delete_fiscal_year_requires_auth(fake: _FakeService) -> None:
     app.dependency_overrides[get_budget_tree_service] = lambda: fake
     resp = TestClient(app).delete(f"/api/budgets/{_BID}/fiscal-years/{_FYID}")
     assert resp.status_code == 401
+
+
+@pytest.mark.parametrize(("action", "closed"), [("close", True), ("reopen", False)])
+def test_close_and_reopen_fiscal_year(
+    client: TestClient, fake: _FakeService, action: str, closed: bool
+) -> None:
+    resp = client.post(f"/api/budgets/{_BID}/fiscal-years/{_FYID}/{action}")
+    assert resp.status_code == 200
+    assert fake.calls["close_fy"] == (_BID, _FYID, closed, "admin")
+
+
+@pytest.mark.parametrize("action", ["close", "reopen"])
+def test_close_and_reopen_require_structure(fake: _FakeService, action: str) -> None:
+    resp = _app_as(fake, {"budget.book"}).post(
+        f"/api/budgets/{_BID}/fiscal-years/{_FYID}/{action}"
+    )
+    assert resp.status_code == 403
+    assert "close_fy" not in fake.calls
 
 
 def test_list_transfers_passes_filters(client: TestClient, fake: _FakeService) -> None:

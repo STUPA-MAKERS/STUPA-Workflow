@@ -12,7 +12,7 @@ persisted, see ``tree_rules.rollup_committed``. The only currency is EUR
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import (
@@ -20,6 +20,7 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     Date,
+    DateTime,
     ForeignKey,
     Index,
     Integer,
@@ -114,6 +115,11 @@ class FiscalYear(UUIDPkMixin, CreatedAtMixin, Base):
     (``start = cutoff(year)``, ``end = cutoff(year+1) - 1 day``). Both stay
     persisted for the disjointness check and for filtering. The UI shows
     ``YYYY`` for a Jan-1 cutoff and ``YYYY/YY`` for any other cutoff.
+
+    ``closed_at`` set means the year is closed ("abgeschlossen"). A closed year
+    is frozen: no booking, transfer, allocation or application assignment that
+    touches it can change until a ``budget.structure`` holder reopens it.
+    ``closed_by`` holds the subject of the principal who closed it.
     """
 
     __tablename__ = "fiscal_year"
@@ -125,6 +131,8 @@ class FiscalYear(UUIDPkMixin, CreatedAtMixin, Base):
     start_date: Mapped[date] = mapped_column(Date)
     end_date: Mapped[date] = mapped_column(Date)
     active: Mapped[bool] = mapped_column(Boolean, server_default="true")
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    closed_by: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
         UniqueConstraint("budget_id", "year", name="uq_fiscal_year_budget_year"),

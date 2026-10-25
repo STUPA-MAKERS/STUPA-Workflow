@@ -1705,7 +1705,7 @@ describe('TodosComponent', () => {
         // pages reach the bottom bar; a page does not fade, the tab line and the bottom bar
         // cut it.
         expect(document.querySelector('app-todos')).toHaveClass('pane-page');
-        expect(harness.routeNativeElement!.querySelector('.bv__page')).not.toHaveAttribute('appScrollFade');
+        expect(harness.routeNativeElement!.querySelector('.tp__page')).not.toHaveAttribute('appScrollFade');
         TestBed.resetTestingModule();
         const list = await start('/todos/b-0?view=list', { board: personal() });
         expect(list.cmp.phoneList()).toBe(false);

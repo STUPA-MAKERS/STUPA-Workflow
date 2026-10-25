@@ -26,7 +26,6 @@ app/
     livevote/        meetings, agenda, attendance, live vote over WebSocket
     protocol/        meeting protocol (Markdown → PDF), vote snippets, finalize
     delegations/     meeting-bound delegations + substitute pool
-    deadlines/       named deadline policies (the flow references them)
     budget/          cost center tree, fiscal years, allocation, bookings, invoices (ZUGFeRD)
     files/           upload, wizard drafts, MIME sniff, ClamAV scan, MinIO/S3, download route
     pdf/             HTTP client of the typst render service (protocol PDFs)
@@ -43,8 +42,8 @@ app/
     admin/           config CRUD (Gremien, roles, application types, branding, …),
                      one permission per /admin/ page
 migrations/          Alembic (0001–0048, then hash revision ids; one head)
-worker/              arq WorkerSettings: mail/PDF/scan/webhook tasks and the crons (deadlines,
-                     reminders, budget rollup, retention, draft purge, backup, audit check)
+worker/              arq WorkerSettings: mail/PDF/scan/webhook tasks and the crons (vote close,
+                     automatic transitions, reminders, budget rollup, retention, draft purge, backup, audit check)
 tests/
 ```
 

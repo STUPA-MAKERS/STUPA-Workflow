@@ -397,6 +397,9 @@ export interface BudgetNode {
   fiscalStartDay?: number;
 }
 
+/** The problem code of a money mutation on a closed fiscal year (409). */
+export const FISCAL_YEAR_CLOSED = 'fiscal_year_closed';
+
 export interface FiscalYear {
   id: Uuid;
   budgetId: Uuid;
@@ -407,6 +410,9 @@ export interface FiscalYear {
   startDate: string;
   endDate: string;
   active: boolean;
+  /** Set while the year is closed ("abgeschlossen"): its money data is frozen, and
+   *  every booking, transfer, limit or assignment on it answers 409. */
+  closedAt?: string | null;
 }
 
 export interface BudgetNodeCreate {
@@ -524,6 +530,12 @@ export class BudgetTreeApi {
    *  bookings, allocations or applications still reference the year. */
   deleteFiscalYear(topId: Uuid, fyId: Uuid): Observable<void> {
     return this.http.delete<void>(`${this.base}/budgets/${topId}/fiscal-years/${fyId}`);
+  }
+
+  /** Close a fiscal year, or reopen it. Needs P(`budget.structure`). */
+  setFiscalYearClosed(topId: Uuid, fyId: Uuid, closed: boolean): Observable<FiscalYear> {
+    const action = closed ? 'close' : 'reopen';
+    return this.http.post<FiscalYear>(`${this.base}/budgets/${topId}/fiscal-years/${fyId}/${action}`, {});
   }
 
   setAllocation(id: Uuid, fiscalYearId: Uuid, allocated: string): Observable<unknown> {

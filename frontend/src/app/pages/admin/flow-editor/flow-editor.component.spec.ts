@@ -17,8 +17,6 @@ interface Overrides {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   listWebhooks?: any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  listDeadlinePolicies?: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   listGremienOptions?: any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tree?: any;
@@ -82,11 +80,6 @@ async function setup(over: Overrides = {}) {
   const listRoles =
     over.listRoles ??
     jest.fn(() => of([{ id: 'r1', key: 'finance', label: { de: 'Finanzen' }, permissions: [] }]));
-  const listDeadlinePolicies =
-    over.listDeadlinePolicies ??
-    jest.fn(() =>
-      of([{ id: 'dp1', key: 'semester', label: { de: 'Semesterfrist' }, kind: 'absolute' }]),
-    );
   const listWebhooks =
     over.listWebhooks ??
     jest.fn(() =>
@@ -100,7 +93,6 @@ async function setup(over: Overrides = {}) {
     listGremienOptions,
     listGremiumRoles,
     listRoles,
-    listDeadlinePolicies,
     listWebhooks,
     listConfigRevisions,
   };
@@ -497,12 +489,11 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(document.querySelector('.fe__canvasSkel')).toBeNull();
   });
 
-  it('swallows errors from option/role/webhook/policy/budget loads', async () => {
+  it('swallows errors from option/role/webhook/budget loads', async () => {
     const err = jest.fn(() => throwError(() => new Error('x')));
     const { fixture } = await setup({
       listRoles: err,
       listWebhooks: err,
-      listDeadlinePolicies: err,
       listGremienOptions: err,
       tree: err,
     });
@@ -511,7 +502,6 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(c.gremiumOptions()).toEqual([]);
     expect(c.globalRoleOptions()).toEqual([]);
     expect(c.webhookOptions()).toEqual([]);
-    expect(c.deadlinePolicyOptions()).toEqual([]);
   });
 
   it('populates option lists and resolves a budget tree (id → "name (key)")', async () => {
@@ -520,7 +510,6 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     const c = fixture.componentInstance as any;
     expect(c.globalRoleOptions()).toEqual([{ value: 'finance', label: 'Finanzen (finance)' }]);
     expect(c.webhookOptions()).toEqual([{ value: 'w1', label: 'Buchhaltung' }]);
-    expect(c.deadlinePolicyOptions()[0].label).toContain('Semesterfrist');
     // The budget guard label resolves the nested id to its name.
     expect(
       c.guardGroupLabel({
@@ -664,17 +653,15 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     const c = fixture.componentInstance as any;
     c.addState();
     const key = c.graph().states[0].key;
-    c.setStateDeadlinePolicy(key, 'semester');
+    c.setStateGremium(key, 'g1');
     c.setStateKind(key, 'vote');
-    // The kind switch keeps the deadline policy and resets the gremium.
+    // The kind switch resets the kind-specific config.
     expect(c.graph().states[0].kind).toBe('vote');
-    expect(c.graph().states[0].config.deadlinePolicyKey).toBe('semester');
+    expect(c.graph().states[0].config).toEqual({});
     c.setStateGremium(key, 'g1');
     expect(c.graph().states[0].config.gremiumId).toBe('g1');
     c.setStateGremium(key, ''); // clearing → undefined
     expect(c.graph().states[0].config.gremiumId).toBeUndefined();
-    c.setStateDeadlinePolicy(key, '');
-    expect(c.graph().states[0].config.deadlinePolicyKey).toBeUndefined();
     c.setStateKind(key, ''); // back to normal → kind null, config emptied
     expect(c.graph().states[0].kind).toBeNull();
     expect(c.graph().states[0].config).toEqual({});
@@ -692,10 +679,9 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     const [a, v] = c.graph().states.map((s: { key: string }) => s.key);
     c.setStateKind(v, 'vote');
     c.setStateGremium(v, 'g1');
-    c.setStateDeadlinePolicy(v, 'semester');
-    // "from the cost center" drops the fixed gremium and keeps the other config.
+    // "from the cost center" drops the fixed gremium.
     c.setStateGremiumSource(v, 'budget');
-    expect(c.graph().states[1].config).toEqual({ deadlinePolicyKey: 'semester', gremiumSource: 'budget' });
+    expect(c.graph().states[1].config).toEqual({ gremiumSource: 'budget' });
     expect(c.targetIsBudgetVote(v)).toBe(true);
     expect(c.targetIsBudgetVote(a)).toBe(false);
     expect(c.targetIsBudgetVote('nope')).toBe(false);
@@ -712,7 +698,7 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(fixture.nativeElement.textContent).toContain('Gremium: aus Kostenstelle');
     // Back to a fixed gremium: the source goes, no gremium is set yet.
     c.setStateGremiumSource(v, 'fixed');
-    expect(c.graph().states[1].config).toEqual({ deadlinePolicyKey: 'semester' });
+    expect(c.graph().states[1].config).toEqual({});
     c.setStateGremium(v, 'g1');
     c.setStateGremiumSource(v, 'fixed');
     expect(c.graph().states[1].config.gremiumId).toBe('g1');
@@ -772,10 +758,10 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     const c = fixture.componentInstance as any;
     buildValid(c);
     // boolean op
-    c.setGuardOp(0, 'deadlinePassed');
+    c.setGuardOp(0, 'attachmentPresent');
     expect(c.guardBool(c.graph().transitions[0])).toBe(true);
     c.setGuardBool(0, false);
-    expect(c.graph().transitions[0].guard).toEqual({ deadlinePassed: false });
+    expect(c.graph().transitions[0].guard).toEqual({ attachmentPresent: false });
     // setGuardBool/Value are no-ops when there is no operator
     c.setGuardOp(0, '');
     c.setGuardBool(0, true);
@@ -801,7 +787,7 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
     expect(c.guardValueKind('')).toBe('none');
-    expect(c.guardValueKind('deadlinePassed')).toBe('none');
+    expect(c.guardValueKind('attachmentPresent')).toBe('none');
     expect(c.guardValueKind('budgetFitsApplication')).toBe('none');
     expect(c.guardValueKind('roleIs')).toBe('role');
     expect(c.guardValueKind('applicantRoleIs')).toBe('role');
@@ -1580,16 +1566,11 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
       listWebhooks: jest.fn(() =>
         of([{ id: 'w1', name: '', url: 'https://h.test', events: [], active: true }]),
       ),
-      // deadline policy without a `de` label → falls back to its key
-      listDeadlinePolicies: jest.fn(() =>
-        of([{ id: 'dp1', key: 'semester', label: {}, kind: 'absolute' }]),
-      ),
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
     expect(c.globalRoleOptions()).toEqual([{ value: 'finance', label: 'finance (finance)' }]);
     expect(c.webhookOptions()).toEqual([{ value: 'w1', label: 'https://h.test' }]);
-    expect(c.deadlinePolicyOptions()[0].label).toBe('semester (semester)');
   });
 
   // A graph with no `transitions` array and no `layout` reaches the `?? []` and
@@ -1666,8 +1647,6 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     c.setStateKind('a', 'vote');
     bare(c);
     c.setStateGremium('a', 'g1');
-    bare(c);
-    c.setStateDeadlinePolicy('a', 'semester');
     expect(c.graph().states).toHaveLength(2);
   });
 

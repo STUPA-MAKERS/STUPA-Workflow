@@ -39,7 +39,7 @@
           [value]="q()"
           (valueChange)="onSearch($event)"
         />
-        <div class="inv__chips" role="group" appScrollFade="x" [attr.aria-label]="'invoices.filter.group' | t">
+        <div class="inv__chips" role="group" [attr.aria-label]="'invoices.filter.group' | t">
           <app-range-chip
             kind="date"
             [label]="'invoices.filter.issueRange' | t"

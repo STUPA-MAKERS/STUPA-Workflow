@@ -441,7 +441,6 @@ class _FakeForms:
 
 
 class _FakeFlow:
-    scheduled: list[tuple[Any, Any]] = []
     # The `start_confirmed` calls as (application id, dispatcher).
     started: list[tuple[Any, Any]] = []
     available: list[Any] = []
@@ -453,21 +452,17 @@ class _FakeFlow:
         self.session = session
         self.dispatcher = dispatcher
 
-    async def schedule_state_deadline(self, app: Any, state: Any) -> None:
-        _FakeFlow.scheduled.append((app, state))
-
     async def start_confirmed(self, application_id: Any) -> None:
         _FakeFlow.started.append((application_id, self.dispatcher))
 
     async def available_transitions(
-        self, _app_id: Any, _principal: Any, *, deadline_passed: Any = None
+        self, _app_id: Any, _principal: Any
     ) -> list[Any]:
         return _FakeFlow.available
 
 
 @pytest.fixture(autouse=True)
 def _reset_flow() -> None:
-    _FakeFlow.scheduled = []
     _FakeFlow.started = []
     _FakeFlow.available = []
     _FakeForms.effective = None
@@ -569,8 +564,7 @@ async def test_create_anonymous_ok(
     kinds = {type(o).__name__ for o in session.added}
     assert {"Application", "Applicant", "SubmissionVersion", "StatusEvent"} <= kinds
     # O14: a guest application rests in the flow until the magic-link verify. The
-    # create schedules no deadline and starts nothing.
-    assert _FakeFlow.scheduled == []
+    # create starts nothing.
     assert _FakeFlow.started == []
 
 
@@ -1746,30 +1740,6 @@ async def test_delete_comment_unknown_404() -> None:
             viewer_is_applicant=False,
             can_manage=True,
         )
-
-
-async def test_patch_moves_a_relative_changed_deadline(
-    monkeypatch: pytest.MonkeyPatch, _patch_flow: type[_FakeFlow]
-) -> None:
-    """F7: a state whose policy follows edits gets its deadline re-created."""
-    from app.modules.applications.service import edits as edits_mod
-
-    app = _app(data={"title": "old"})
-    state = _state(edit_allowed=True, config={"deadlinePolicyKey": "k"})
-    app_type = _Obj(id=app.type_id, has_budget=False)
-    _patch_pinned(monkeypatch, [_ff("title", required=True)])
-
-    async def _follows(_session: Any, config: Any) -> bool:
-        return config == {"deadlinePolicyKey": "k"}
-
-    monkeypatch.setattr(edits_mod, "state_deadline_follows_edits", _follows)
-    session = _Session(
-        get_results=[app, state, app_type, state],
-        execute_results=[[("draft", "#z")]],
-        scalar_results=[1, None],
-    )
-    await ApplicationsService(session).patch(app.id, {"title": "new"}, changed_by="u")  # type: ignore[arg-type]
-    assert _FakeFlow.scheduled == [(app, state)]
 
 
 async def test_add_comment_checks_and_binds_its_files(monkeypatch: pytest.MonkeyPatch) -> None:

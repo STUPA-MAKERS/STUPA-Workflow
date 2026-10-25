@@ -12,7 +12,7 @@
           (valueChange)="search.set($event)"
           (commit)="search.flush()"
         />
-        <div class="tk__chips" role="group" appScrollFade="x" [attr.aria-label]="'tickets.list.filter.group' | t">
+        <div class="tk__chips" role="group" [attr.aria-label]="'tickets.list.filter.group' | t">
           <app-filter-select
             class="tk__chip"
             [label]="'tickets.list.filter.status' | t"

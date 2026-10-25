@@ -61,7 +61,6 @@ import {
   type GremiumMembershipMappingBody,
   type GremiumRoleMapping,
   type GremiumRoleMappingBody,
-  type DeadlinePolicy,
   type ErasureRequest,
   type ErasureStatus,
   type PrivacySettings,
@@ -97,7 +96,6 @@ import {
   MOCK_BACKUPS,
   MOCK_BRANDING,
   MOCK_CD_VARIANTS,
-  MOCK_DEADLINE_POLICIES,
   MOCK_ERASURES,
   MOCK_FLOW,
   MOCK_FORM_DRAFTS,
@@ -165,7 +163,6 @@ export class AdminApiService {
     membershipMappings: structuredCopy(MOCK_GREMIUM_MEMBERSHIP_MAPPINGS),
     roleMappings: structuredCopy(MOCK_GREMIUM_ROLE_MAPPINGS),
     mailRecipients: structuredCopy(MOCK_GREMIUM_MAIL_RECIPIENTS),
-    deadlinePolicies: structuredCopy(MOCK_DEADLINE_POLICIES) as DeadlinePolicy[],
     guestSettings: structuredCopy(MOCK_GUEST_SETTINGS) as GuestSettings,
     meetingSettings: structuredCopy(MOCK_MEETING_SETTINGS) as MeetingSettings,
     loginSettings: structuredCopy(MOCK_LOGIN_SETTINGS) as LoginSettings,
@@ -1004,37 +1001,6 @@ export class AdminApiService {
       return of(void 0);
     }
     return this.http.delete<void>(`${this.base}/admin/gremium-roles/${id}`);
-  }
-
-  listDeadlinePolicies(): Observable<DeadlinePolicy[]> {
-    if (this.mock) return of(structuredCopy(this.store.deadlinePolicies));
-    return this.http.get<DeadlinePolicy[]>(`${this.base}/admin/deadline-policies`);
-  }
-
-  createDeadlinePolicy(body: Omit<DeadlinePolicy, 'id'>): Observable<DeadlinePolicy> {
-    if (this.mock) {
-      const row = { id: `dp-${this.store.deadlinePolicies.length + 1}`, ...body };
-      this.store.deadlinePolicies = [...this.store.deadlinePolicies, row];
-      return of(structuredCopy(row));
-    }
-    return this.http.post<DeadlinePolicy>(`${this.base}/admin/deadline-policies`, body);
-  }
-
-  updateDeadlinePolicy(id: Uuid, body: Partial<Omit<DeadlinePolicy, 'id' | 'key'>>): Observable<DeadlinePolicy> {
-    if (this.mock) {
-      const row = this.store.deadlinePolicies.find((r) => r.id === id);
-      if (row) Object.assign(row, body);
-      return of(structuredCopy(row ?? ({ id, key: '', label: {}, kind: 'absolute' } as DeadlinePolicy)));
-    }
-    return this.http.patch<DeadlinePolicy>(`${this.base}/admin/deadline-policies/${id}`, body);
-  }
-
-  deleteDeadlinePolicy(id: Uuid): Observable<void> {
-    if (this.mock) {
-      this.store.deadlinePolicies = this.store.deadlinePolicies.filter((r) => r.id !== id);
-      return of(void 0);
-    }
-    return this.http.delete<void>(`${this.base}/admin/deadline-policies/${id}`);
   }
 
   /** Memberships of one gremium (read-only). The OIDC group sync writes them. */

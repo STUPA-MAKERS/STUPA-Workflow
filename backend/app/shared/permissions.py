@@ -105,7 +105,7 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "admin.cd_variants",
     # /admin/delegations: manage the delegations and the substitute pool platform-wide.
     "admin.delegations",
-    # /admin/deadlines: deadline policies.
+    # /admin/deadlines: the meeting open window and the guest confirmation settings.
     "admin.deadlines",
     # Platform notification config: reminder thresholds and mail templates.
     "admin.notifications",

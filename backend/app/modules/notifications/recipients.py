@@ -40,7 +40,6 @@ from app.modules.auth.models import (
     RolePermission,
 )
 from app.modules.budget.decision import effective_decision_gremium
-from app.modules.deadlines.service import flow_deadline_passed
 from app.modules.flow.context import build_base_context, with_actor
 from app.modules.flow.models import State, Transition
 from app.shared.guards import GuardContext, GuardError, eval_guard
@@ -443,10 +442,7 @@ async def actionable_principal_emails(
     if not transitions:
         return []
 
-    deadline_passed = await flow_deadline_passed(session, application_id)
-    base_ctx = await build_base_context(
-        session, app, manual=True, deadline_passed=deadline_passed
-    )
+    base_ctx = await build_base_context(session, app, manual=True)
     candidates = await _candidates_with_transition_permission(
         session, datetime.now(UTC), gremium_id=app.gremium_id
     )

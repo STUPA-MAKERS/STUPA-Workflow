@@ -24,8 +24,8 @@ export interface GuardPriorityRow {
 
 /**
  * Inspector panel for the selected state. It edits key, labels, colour, the flags
- * (start, editing allowed, terminal), the kind with its gremium, the deadline and the
- * guard priority of the exits.
+ * (start, editing allowed, terminal), the kind with its gremium and the guard priority
+ * of the exits.
  */
 @Component({
   selector: 'app-state-inspector',
@@ -53,7 +53,6 @@ export class StateInspectorComponent {
   readonly state = input.required<StateDef>();
   readonly kindOptions = input.required<SelectOption[]>();
   readonly gremiumOptions = input.required<SelectOption[]>();
-  readonly deadlinePolicyOptions = input.required<SelectOption[]>();
   /** Guard priority rows. The stack appears for normal states with two or more groups. */
   readonly guardGroups = input.required<GuardPriorityRow[]>();
 
@@ -78,7 +77,6 @@ export class StateInspectorComponent {
       { value: 'budget', label: this.i18n.translate('admin.flow.cfgGremiumSourceBudget') },
     ];
   }
-  readonly deadlinePolicyChange = output<string>();
   readonly guardMove = output<{ sig: string; dir: -1 | 1 }>();
   readonly remove = output<void>();
 }

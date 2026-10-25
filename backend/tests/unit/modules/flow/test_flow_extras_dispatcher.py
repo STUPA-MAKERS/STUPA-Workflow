@@ -7,6 +7,7 @@ The suite covers the branches without a DB. It uses an in-memory session fake
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any
 from uuid import UUID, uuid4
@@ -283,6 +284,46 @@ async def test_assign_budget_node_missing_no_commit(monkeypatch: pytest.MonkeyPa
     )
     assert app.budget_id is None
     assert session.committed == 0
+
+
+async def test_assign_budget_skips_application_in_closed_fiscal_year(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A closed fiscal year is frozen: the manual route answers 409, the flow skips.
+    calls = _stub_audit(monkeypatch)
+    app_id, node_id, fy_id, old_budget = uuid4(), uuid4(), uuid4(), uuid4()
+    app = SimpleNamespace(id=app_id, budget_id=old_budget, fiscal_year_id=fy_id,
+        current_state_id=None)
+    node = SimpleNamespace(id=node_id, parent_id=None)
+    closed = SimpleNamespace(id=fy_id, closed_at=datetime(2026, 3, 1, tzinfo=UTC))
+    session = _Session(store={app_id: app, node_id: node, fy_id: closed})
+    await FlowExtrasActionDispatcher(_maker(session)).dispatch(
+        [_action("assignBudget", budgetId=str(node_id), application_id=app_id)]
+    )
+    assert app.budget_id == old_budget and app.fiscal_year_id == fy_id
+    assert calls == []
+    assert session.committed == 0
+
+
+@pytest.mark.parametrize("stored", [True, False])
+async def test_assign_budget_moves_application_out_of_open_fiscal_year(
+    monkeypatch: pytest.MonkeyPatch, stored: bool
+) -> None:
+    # An open current year, or one that is gone, does not block the assignment.
+    _stub_audit(monkeypatch)
+    app_id, node_id, fy_id, new_fy = uuid4(), uuid4(), uuid4(), uuid4()
+    app = SimpleNamespace(id=app_id, budget_id=uuid4(), fiscal_year_id=fy_id,
+        current_state_id=None)
+    node = SimpleNamespace(id=node_id, parent_id=None)
+    store: dict[UUID, Any] = {app_id: app, node_id: node}
+    if stored:
+        store[fy_id] = SimpleNamespace(id=fy_id, closed_at=None)
+    session = _Session(store=store, active_fy=(new_fy,))
+    await FlowExtrasActionDispatcher(_maker(session)).dispatch(
+        [_action("assignBudget", budgetId=str(node_id), application_id=app_id)]
+    )
+    assert app.budget_id == node_id and app.fiscal_year_id == new_fy
+    assert session.committed == 1
 
 
 async def test_assign_from_field_without_field_skipped() -> None:

@@ -67,16 +67,6 @@
   }
 }
 
-<!-- The server creates the deadline from the named policy when the application
-     enters the state. The deadlinePassed transition fires when the deadline lapses. -->
-<app-select
-  [label]="'admin.flow.cfgDeadline' | t"
-  [placeholder]="'admin.flow.cfgDeadlinePh' | t"
-  [options]="deadlinePolicyOptions()"
-  [ngModel]="state().config?.deadlinePolicyKey ?? ''"
-  (ngModelChange)="deadlinePolicyChange.emit($event)"
-/>
-
 <!-- The stack order is the evaluation order. The first guard that matches wins. -->
 @if ((state().kind ?? 'normal') === 'normal' && guardGroups().length > 1) {
   <section class="si__prio" [attr.aria-label]="'admin.flow.guardPriority' | t">

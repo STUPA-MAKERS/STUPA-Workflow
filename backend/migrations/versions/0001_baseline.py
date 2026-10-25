@@ -111,6 +111,10 @@ def downgrade() -> None:
     # Drop the materialized views first, because they depend on the tables. Then drop
     # the schema, then the function and the extensions.
     op.execute("DROP MATERIALIZED VIEW IF EXISTS mv_status_distribution")
+    # Revision e5b16898d639 removed the models of these tables, and its downgrade
+    # recreates them. They reference `application`, so they must go before drop_all.
+    op.execute("DROP TABLE IF EXISTS deadline")
+    op.execute("DROP TABLE IF EXISTS deadline_policy")
     Base.metadata.drop_all(bind=bind)
     op.execute("DROP FUNCTION IF EXISTS audit_entry_append_only()")
     op.execute("DROP EXTENSION IF EXISTS btree_gist")
