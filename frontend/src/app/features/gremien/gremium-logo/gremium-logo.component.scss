@@ -1,4 +1,3 @@
-/* A square with round corners: the logo edge to edge, or the initials on the accent tint. */
 :host {
   display: inline-grid;
   flex: none;
@@ -20,8 +19,6 @@
   border-radius: 14px;
   font-size: 0.9375rem;
 }
-/* A logo fills the whole square, with no ground and no frame: the square logo is
-   made for this slot, and the round corners clip it. */
 :host(.glo--img) {
   background: none;
 }

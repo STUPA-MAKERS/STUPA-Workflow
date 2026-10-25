@@ -51,7 +51,7 @@ export interface BoardMove {
 
 /** The keyboard drag: the held card and its place now. */
 /**
- * The columns of a board (frames 0, 1, 11, 34).
+ * The columns of a board.
  *
  * Desktop: the columns side by side, each a drop list of `@angular/cdk/drag-drop`. A
  * tile lifts with a shadow, the place it would land is a dashed box. The keyboard does
@@ -263,8 +263,6 @@ export class TodoBoardViewComponent {
     else if (item.id === 'archive') this.archive.emit();
   }
 
-  // ------------------------------------------------------------------ quick add
-
   startAdd(col: TodoColumn): void {
     this.draft.set('');
     this.adding.set(col.id);
@@ -288,8 +286,6 @@ export class TodoBoardViewComponent {
     }
   }
 
-  // ------------------------------------------------------------------ pointer drag
-
   drop(event: CdkDragDrop<Uuid>): void {
     const cardId = event.item.data as Uuid;
     const toCol = event.container.data;
@@ -305,8 +301,6 @@ export class TodoBoardViewComponent {
     target.splice(event.currentIndex, 0, held);
     this.moveCard.emit({ cardId, move: moveRequest(target, event.currentIndex, toCol) });
   }
-
-  // ------------------------------------------------------------------ keyboard drag
 
   onTileKeyUp(event: KeyboardEvent): void {
     this.keyDrag.keyUp(event);

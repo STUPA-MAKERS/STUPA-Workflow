@@ -1,8 +1,7 @@
 @use '../../budget/finance-sheet';
 
-/* The two legs of the transfer, with an arrow between them. The box is the query
-   container of the stack rule below. It is not .fd__col: on a phone that column has
-   `display: contents`, and an element without a box cannot be a container. */
+// Not `.fd__col`: on a phone that column has `display: contents`, and an element without a box
+// cannot be a query container.
 .td__legsBox {
   container-type: inline-size;
   min-width: 0;

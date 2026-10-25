@@ -1,5 +1,5 @@
-/* The beamer (board Beamer, 1440 × 900): the type scales with the width of the screen,
-   so a 1280 × 720 projector and a 1920 × 1080 screen show the same layout. */
+// The type scales with the screen width, so a 1280 × 720 projector and a 1920 × 1080 screen
+// show the same layout as the 1440 × 900 design.
 :host {
   display: flex;
   flex: 1 1 auto;
@@ -55,7 +55,6 @@
   overflow-wrap: anywhere;
 }
 
-/* The open vote: the number of ballots in large type. */
 .bm__turnout {
   display: flex;
   flex-direction: column;
@@ -84,7 +83,6 @@
   color: var(--color-text-muted);
 }
 
-/* The foot sits at the bottom of the screen. */
 .bm__fill {
   flex: 1 1 auto;
 }
@@ -131,7 +129,6 @@
   color: var(--color-text-muted);
 }
 
-/* No vote: the current agenda item in the middle of the screen. */
 .bm__idle {
   display: flex;
   flex: 1 1 auto;
@@ -161,7 +158,6 @@
   color: var(--color-text-muted);
 }
 
-/* The foot of a vote shares its line with the join badge at the end. */
 .bm__bottom {
   display: flex;
   align-items: flex-end;
@@ -183,7 +179,7 @@
   font-size: clamp(1rem, 1.18vw, 1.5rem);
   color: var(--color-text-muted);
 }
-/* The QR code stays black on white in both themes: a scanner needs the contrast. */
+// Black on white in both themes, because a scanner needs the contrast.
 .bm__badge {
   display: flex;
   flex: none;

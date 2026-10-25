@@ -97,8 +97,8 @@ const NOT_CAST: MyBallot = { cast: false, choice: null };
  * - A 409 `already_voted` (another tab, the meeting page) locks the row as well.
  * - `compact` gives the small ballot of a side column: buttons in one row.
  * - `columns` puts the rows side by side (the strip of a narrow screen).
- * - `layout="phone"` pins the button bar to the bottom of the screen (board
- *   Telefon-Abstimmen) and always names the rows.
+ * - `layout="phone"` pins the button bar to the bottom of the screen and always names
+ *   the rows.
  * - `election` turns the options into the candidates: one seat gives a radio list
  *   with a separate "Enthaltung" row; several seats give check boxes with the counter
  *   "1 von 2 Stimmen vergeben", the further boxes stay off when all votes are given, and
@@ -150,7 +150,7 @@ export class BallotComponent {
    */
   readonly compact = input(false);
   /**
-   * The ballot of a narrow strip (board Schmal-Teilnahme): the own row and the
+   * The ballot of a narrow strip: the own row and the
    * represented row side by side, the confirm bar in one line below them.
    */
   readonly columns = input(false);
@@ -281,7 +281,7 @@ export class BallotComponent {
 
   /**
    * The confirm bar shows while a row is open. The strip (`columns`) shows it only once
-   * the person picked an option, so the strip stays low (board Schmal-Teilnahme).
+   * the person picked an option, so the strip stays low.
    */
   protected readonly showBar = computed(() => {
     const row = this.target();

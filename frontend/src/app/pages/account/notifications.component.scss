@@ -16,7 +16,6 @@
   list-style: none;
 }
 
-/* One row per kind: the text on the left, the switch on the right, centred on one axis. */
 .nt__row {
   display: flex;
   align-items: center;
@@ -30,7 +29,6 @@
 .nt__label {
   font-weight: var(--fw-medium);
 }
-/* No kind to switch: one muted line under the header. */
 @include bp.phone {
   .nt__row {
     padding-inline: var(--space-4) var(--space-3);

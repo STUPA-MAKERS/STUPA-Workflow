@@ -74,7 +74,7 @@ import { FabComponent } from '@shared/ui/fab/fab.component';
 type Phase = 'loading' | 'expired' | 'error' | 'ready';
 
 /**
- * Status page of the applicant (board Telefon-Status; the same page on the desktop).
+ * Status page of the applicant (the same page on the desktop).
  * Routes `/status` and `/antrag/:id` (the magic link `#t=<token>`).
  *
  * The page verifies the token, strips it from the URL and loads the application with
@@ -105,6 +105,9 @@ type Phase = 'loading' | 'expired' | 'error' | 'ready';
  *
  * The edit form has no form element, so Enter in a field does not save the whole application. The
  * upload limit shows only after the config loaded, because before that "unbegrenzt" can be wrong.
+ *
+ * The component provides the field types of the form (`provideFormly`), so Formly is not
+ * part of the initial bundle.
  */
 @Component({
   selector: 'app-status-timeline',
@@ -134,8 +137,6 @@ type Phase = 'loading' | 'expired' | 'error' | 'ready';
     TranslatePipe,
     DecisionSectionComponent,
   ],
-  // The field types of the form (`provideFormly`) come with the component, so Formly is not
-  // part of the initial bundle.
   providers: [provideFormly()],
   templateUrl: './status-timeline.component.html',
   styleUrl: './status-timeline.component.scss',
@@ -519,8 +520,6 @@ export class StatusTimelineComponent {
     if (item.id === 'erase') this.confirmErase.set(true);
   }
 
-  // --- edit ----------------------------------------------------------------------
-
   /**
    * The server keeps the values of the fields it held back and of the file fields, so the form
    * leaves them out. The answers are JSON, so a JSON copy is a deep copy; jsdom has no
@@ -603,8 +602,6 @@ export class StatusTimelineComponent {
       },
     });
   }
-
-  // --- erasure and comments ------------------------------------------------------
 
   /** GDPR Art. 17: request anonymization of one's own application data. */
   doRequestErasure(): void {

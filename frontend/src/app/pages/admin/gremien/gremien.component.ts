@@ -54,8 +54,7 @@ interface Setting {
 }
 
 /**
- * Gremien administration (`/admin/gremien`, boards Verwaltung-Gremium-Dialog and
- * Verwaltung-Gremiumrolle-Dialog).
+ * Gremien administration (`/admin/gremien`).
  *
  * One row per gremium: name, slug, "n Mitglieder · n Rollen", the link to the members,
  * edit, delete and the toggle. An open row shows the settings (gaps N38) and the role
@@ -305,7 +304,7 @@ export class AdminGremienComponent {
     });
   }
 
-  /** `first`: the first load opens the first row, as on the board. */
+  /** `first`: the first load opens the first row. */
   protected reload(first: boolean): void {
     if (first) this.loading.set(true);
     this.loadError.set(false);

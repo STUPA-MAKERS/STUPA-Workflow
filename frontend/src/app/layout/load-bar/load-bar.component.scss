@@ -1,5 +1,3 @@
-/* The bar of `.skel-progress`, fixed at the top edge of the window, over its full width
-   (also over the rail). */
 .lb {
   position: fixed;
   top: env(safe-area-inset-top, 0);

@@ -76,10 +76,11 @@ export interface GremiumRow {
  * - One pane at a time (narrow, phone): the list, then the gremium with a way back.
  *
  * The search filters the loaded list in the browser: the list is short and complete.
+ *
+ * Side by side it is a pane page (`styles.scss`): the panes fill the free height.
  */
 @Component({
   selector: 'app-gremien',
-  // A pane page (styles.scss): side by side the panes fill the free height.
   host: { '[class.pane-page]': 'split()' },
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,

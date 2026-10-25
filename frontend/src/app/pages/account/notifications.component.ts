@@ -25,7 +25,7 @@ const TEAM_KINDS: ReadonlyMap<string, string> = new Map([
 ]);
 
 /**
- * Account page "Benachrichtigungen" (board Konto-Benachrichtigungen).
+ * Account page "Benachrichtigungen".
  *
  * One row per kind of the server catalogue: the label, one line that says when the mail
  * goes out, and a switch. Every kind is on by default; a switch is an opt-out. The

@@ -35,8 +35,7 @@ interface PositionRow extends CostPosition {
 let nextId = 0;
 
 /**
- * "Kostenaufstellung": the cost positions of an answer, read-only (the boards Anträge
- * and Schmal-Anträge-Detail).
+ * "Kostenaufstellung": the cost positions of an answer, read-only.
  *
  * A position shows collapsed: its name, "n Angebote · bevorzugt: <supplier>" and its
  * amount. The whole row is the button that opens it. Open, it lists every offer; the

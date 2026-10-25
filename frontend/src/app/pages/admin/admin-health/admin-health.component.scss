@@ -18,7 +18,6 @@
   list-style: none;
 }
 
-/* The whole row is the link. */
 .ah__tile {
   display: flex;
   align-items: center;
@@ -34,7 +33,6 @@
     background: var(--color-surface-3);
   }
 }
-/* The page of the tile is open (beside an admin page the tiles stay in the column). */
 .ah__tile.ah__tile--on {
   background: var(--color-selected);
 }
@@ -75,8 +73,7 @@
   font-weight: var(--fw-semibold);
 }
 
-/* The secondary line of the board (12.5 px), so the audit line fits on one line in the
-   home navigation column. */
+// 12.5px, so the audit line fits on one line in the home navigation column.
 .ah__sub {
   font-size: var(--fs-small);
   line-height: var(--lh-small);

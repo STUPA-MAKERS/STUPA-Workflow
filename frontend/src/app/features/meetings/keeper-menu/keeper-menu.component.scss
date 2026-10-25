@@ -56,8 +56,6 @@
   }
 }
 
-/* A bottom sheet sits on surface 2: the field and the hover take surface 3. The sheet
-   pads its body, so the rows drop their own inset. */
 @media (hover: hover) {
   :host(.km--sheet) .km__person:hover {
     background: var(--color-surface-3);

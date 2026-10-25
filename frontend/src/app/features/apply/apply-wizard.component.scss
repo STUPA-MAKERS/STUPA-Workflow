@@ -4,7 +4,6 @@
   display: block;
 }
 
-/* Board Antrag-stellen: the column with the stepper beside the sheet, centred. */
 .wz {
   display: flex;
   justify-content: center;
@@ -40,7 +39,6 @@
   font-size: 0.8125rem;
 }
 
-/* The sheet: surface 1 with the large radius; the bar of the actions at its foot. */
 .wz__sheet {
   display: flex;
   flex: 0 1 47.5rem;
@@ -76,7 +74,6 @@
   display: none;
 }
 
-/* Step 1: the types as a group of radio rows. */
 .wz__types {
   display: flex;
   flex-direction: column;
@@ -145,7 +142,6 @@
   padding: 0 var(--space-1);
 }
 
-/* A heading over its row group, spaced like the sections of the answer view. */
 .wz__block {
   display: flex;
   flex-direction: column;
@@ -175,8 +171,6 @@
   white-space: nowrap;
 }
 
-/* The actions stay at the foot of the window while the sheet scrolls. Fixed chrome:
-   surface 3 with a top border. */
 .wz__nav {
   position: sticky;
   bottom: var(--app-bottom-inset, 0px);
@@ -194,8 +188,8 @@
 .wz__navGap {
   flex: 1 1 auto;
 }
-/* A focused field never hides under the bar (WCAG 2.4.11): the focus scroll keeps the
-   height of the bar and a gap free above the bottom edge. */
+// WCAG 2.4.11: the focus scroll keeps the bar and a gap free, so a focused field never hides under
+// it.
 .wz__body ::ng-deep * {
   scroll-margin-bottom: calc(var(--app-bottom-inset, 0px) + var(--wz-nav-clearance));
 }
@@ -205,7 +199,6 @@
 .wz__discardPhone {
   display: none;
 }
-/* Narrow: a slimmer column. */
 @include bp.narrow {
   .wz {
     gap: var(--space-5);
@@ -221,8 +214,6 @@
   }
 }
 
-/* Phone: the title above the sheet; the sheet header names the step. The bar of the
-   actions sits on its own raised surface above the bottom bar. */
 @include bp.phone {
   .wz {
     flex-direction: column;

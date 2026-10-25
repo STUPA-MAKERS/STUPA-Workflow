@@ -21,7 +21,6 @@
   padding: var(--space-2) var(--space-3) var(--space-2) var(--space-2);
 }
 
-/* The toggle takes the free width, so a click anywhere on the name opens the row. */
 .ar__toggle {
   display: flex;
   flex: 1 1 auto;
@@ -76,7 +75,6 @@
   font-size: var(--fs-sm);
 }
 
-/* The menu slot keeps its width, so the counts of all rows line up. */
 .ar__del {
   display: flex;
   flex: none;
@@ -105,7 +103,7 @@
   padding: 0;
   border: 0;
 }
-/* A legend takes no part in the gap of the fieldset, so it keeps its own space. */
+// A legend takes no part in the gap of the fieldset, so it keeps its own space.
 .ar__secTitle {
   margin-bottom: var(--space-3);
   padding: 0;
@@ -121,8 +119,7 @@
   grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
   gap: var(--space-2) var(--space-4);
 }
-/* A key breaks only after a "." or a "_" (the <wbr> in the template), never inside a
-   word. Only a single part wider than the column breaks inside itself. */
+// A key breaks only at the <wbr> after a "." or a "_" in the template.
 .ar__perm {
   font-size: var(--fs-sm);
   overflow-wrap: break-word;

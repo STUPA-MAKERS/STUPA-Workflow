@@ -16,7 +16,7 @@ import { TodoAssigneesComponent } from '../card-facts/todo-assignees.component';
 const TILE_LABELS = 2;
 
 /**
- * One card on the board (frames 0, 1, 11, 34): the labels, the title, the first link,
+ * One card on the board: the labels, the title, the first link,
  * the due date, the checklist, the comments and the people, and in a list of the phone
  * the column tag. A card in the done column
  * shows the done mark and the day it was done instead of the due date.

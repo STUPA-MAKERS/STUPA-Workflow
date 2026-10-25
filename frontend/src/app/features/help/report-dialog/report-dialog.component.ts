@@ -69,8 +69,7 @@ const KIND_LABEL: Record<TicketKind, TranslationKey> = {
 };
 
 /**
- * The dialog "Problem melden" (frame 17; on a phone the kit dialog is a bottom sheet,
- * frames 27 and 28).
+ * The dialog "Problem melden" (on a phone the kit dialog is a bottom sheet).
  *
  * The kind (Fehler / Frage / Idee), a short title, the description, files, and the
  * technical context that goes along (page, browser, window, language). Without a session

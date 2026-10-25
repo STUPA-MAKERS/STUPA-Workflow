@@ -1,6 +1,5 @@
 @use '../../budget/finance-sheet';
 
-/* The receipt: the file to open. */
 .id__file {
   display: flex;
   align-items: center;
@@ -44,7 +43,6 @@
   grid-column: 1 / -1;
 }
 
-/* Net, VAT and gross: label left, amount right; gross in bold below a line. */
 .id__amounts {
   display: flex;
   flex-direction: column;
@@ -75,8 +73,6 @@
   font-weight: var(--fw-bold, 700);
 }
 
-/* The order on a phone (board Fin-Tel-Rechnung): Beleg, Buchungen, Beträge, Angaben.
-   Side by side the two columns keep the desktop order. */
 .id__secFile {
   --fd-phone-order: 1;
 }
@@ -89,7 +85,7 @@
 .id__secData {
   --fd-phone-order: 4;
 }
-/* The linked to-dos come last; the list is not a `.fd__sec`, so it sets the order itself. */
+// The list is not a `.fd__sec`, so it sets the order itself.
 .id__todos {
   --fd-phone-order: 5;
   order: var(--fd-phone-order);

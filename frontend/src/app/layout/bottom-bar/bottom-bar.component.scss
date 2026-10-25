@@ -1,16 +1,11 @@
 @use 'press';
 
-/* Fixed to the bottom edge. The bar has its own surface (surface 3) and a top border, so
-   it stands out from the page and from the cards on it (surface 1 and 2) in both themes.
-   The entries fill the bar height, so each one is a 64px high touch target. The
-   safe-area padding keeps the entries above the gesture bar of an installed app
-   (viewport-fit=cover). The shell sets --bottom-bar-height and keeps the page clear of
-   the bar with it. */
+// The safe-area padding keeps the entries above the gesture bar of an installed app
+// (viewport-fit=cover).
 :host {
   display: block;
 }
 
-/* Chrome, not content: a long press on an entry selects no label and opens no callout. */
 .bb {
   position: fixed;
   inset: auto 0 0 0;
@@ -67,12 +62,11 @@
   color: var(--color-text);
   font-weight: var(--fw-semibold);
 }
-/* The selected token is too close to surface 3 in both themes. The pill mixes the accent
-   into the bar surface instead. */
+// The selected token is too close to surface 3 in both themes, so the pill mixes the accent
+// into the bar surface.
 .bb__item.is-active .bb__ind {
   color: var(--color-accent-text);
 }
-/* The pill grows from the middle when its entry becomes active. */
 .bb__ind::before {
   content: '';
   position: absolute;
@@ -92,8 +86,7 @@
 .bb__ind > app-icon {
   position: relative;
 }
-/* The press: the pill takes the press tint of the kit over its fill, as the indicator of
-   a native tab bar does. A layer above the fill, so the active entry shows it too. */
+// A layer above the fill, so the active entry shows the press tint too.
 .bb__ind::after {
   content: '';
   position: absolute;
@@ -104,7 +97,6 @@
 .bb__item:active .bb__ind::after {
   background: var(--press-tint);
 }
-/* The pill shrinks like a button while it is pressed; the entry itself keeps its size. */
 .bb__item:active .bb__ind {
   @include press.press-scale;
 }
@@ -116,7 +108,6 @@
   outline-offset: 2px;
 }
 
-/* The "Mehr" sheet: the remaining areas, the search and the account menu. */
 .more {
   display: flex;
   flex-direction: column;
@@ -156,7 +147,6 @@
     background: var(--color-surface-3);
   }
 }
-/* The label takes the room; a count sits at the end of the row. */
 .more__label {
   flex: 1 1 auto;
   min-width: 0;

@@ -190,12 +190,14 @@ export interface GremiumDecisionQuery {
   since?: string | null;
 }
 
+/**
+ * The API calls of the tab "Gremien". Every view of the tab has its own skeleton, so no call
+ * shows the global overlay.
+ */
 @Injectable({ providedIn: 'root' })
 export class GremienApiService {
   private readonly http = inject(HttpClient);
   private readonly base = inject(API_BASE_URL);
-
-  // Every view of the tab has its own skeleton, so no call shows the global overlay.
 
   overview(): Observable<GremiumOverview[]> {
     return this.http.get<GremiumOverview[]>(`${this.base}/gremien/overview`, {

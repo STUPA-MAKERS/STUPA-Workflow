@@ -148,8 +148,6 @@ export function mockLeadGuests(method: string, p: string, body: unknown): MockRe
   return null;
 }
 
-// --- The guest side ---------------------------------------------------------------
-
 const TITLE = '7. Sitzung der Fachschaft Informatik';
 const GREMIUM = 'Fachschaft Informatik';
 

@@ -15,8 +15,8 @@
   background: var(--color-accent);
   color: var(--color-on-accent);
 }
-/* A border, not an inset shadow: the browser snaps a border to whole device pixels on
-   every side, while a fractional shadow is anti-aliased per side and looks uneven. */
+// A border, not an inset shadow: the browser snaps a border to whole device pixels, while a
+// fractional shadow is anti-aliased per side and looks uneven.
 :host(.tb--done) {
   background: transparent;
   color: var(--color-accent-text);

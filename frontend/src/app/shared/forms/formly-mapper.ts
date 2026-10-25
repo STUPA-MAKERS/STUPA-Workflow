@@ -8,18 +8,23 @@ import { toFormatLocale } from '@core/i18n/i18n.service';
 import { formatMoney } from '@shared/format-money';
 import { normalizePositions, positionsTotal } from './positions';
 
-/** HTML `type` for the `input` variant (text/number/currency/date/file). */
+/**
+ * HTML `type` for the `input` variant (text/number/currency/date/file).
+ *
+ * `currency` takes its own branch in `FormlyInputType` (`app-currency-input` with the €
+ * format). `funding` is an amount in euro like `currency`, checked against the cost total.
+ * `file` is an attachment reference in a text field. `iban` is free text, because the
+ * backend checks the format (mod-97).
+ */
 const INPUT_HTML_TYPE: Partial<Record<FieldType, string>> = {
   text: 'text',
   number: 'number',
-  // 'currency' takes its own branch in FormlyInputType (app-currency-input with € format).
   currency: 'currency',
   date: 'date',
-  file: 'text', // file upload (attachment reference). The full upload lands later.
-  // 'funding' is an amount in euro like 'currency', checked against the cost total.
+  file: 'text',
   funding: 'currency',
   email: 'email',
-  iban: 'text', // the backend checks the format (mod-97), so this is a free text field.
+  iban: 'text',
 };
 
 /** Form field type → registered Formly type (`@shared/formly/formly.providers`). */
@@ -33,8 +38,10 @@ const FORMLY_TYPE: Record<FieldType, string> = {
   textarea: 'textarea',
   select: 'select',
   multiselect: 'multicheckbox',
-  // Dynamic pickers render as a normal select. The server supplies the options in the
-  // effective form, so nobody maintains them by hand.
+  /**
+   * Dynamic pickers render as a normal select. The server supplies the options in the
+   * effective form, so nobody maintains them by hand.
+   */
   gremium_select: 'select',
   budget_select: 'select',
   email: 'input',
@@ -45,8 +52,10 @@ const FORMLY_TYPE: Record<FieldType, string> = {
   computed: 'display',
   table: 'display',
   positions: 'positions',
-  // Section markers are structural. `toFormlyFields` handles them apart from this map,
-  // so this entry never applies. The backend strips them from the effective form.
+  /**
+   * Section markers are structural. `toFormlyFields` handles them apart from this map, so
+   * this entry never applies. The backend strips them from the effective form.
+   */
   section: 'display',
 };
 
@@ -92,7 +101,7 @@ export interface FormlySectionOptions {
 
 /**
  * Translate the sections of an effective form into one Formly group for the edit
- * form of the detail (board Anträge-Bearbeiten).
+ * form of the detail.
  *
  * The `title` field comes first over the full width. Each section then starts with its
  * heading; short fields take half a row (class `fe-half`), long ones the full row

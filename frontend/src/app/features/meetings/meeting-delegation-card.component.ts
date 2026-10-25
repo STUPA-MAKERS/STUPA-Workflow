@@ -28,11 +28,10 @@ export type DelegationCardChange = { kind: 'created' } | { kind: 'revoked'; dele
  * The own delegations of a meeting ("Vertretung").
  *
  * - `variant="section"`: a section of the attendance sheet, rows on surface 3.
- * - `variant="box"`: a box of the side column of the participant view (boards
- *   Teilnahme-Vorher and Teilnahme-Live).
- * - `variant="inline"`: only the own delegation and the delegations directed at me, in
- *   one line, for the dock of the participant view on a narrow screen (board
- *   Schmal-Teilnahme). It shows nothing when no delegation exists.
+ * - `variant="box"`: a box of the side column of the participant view.
+ * - `variant="inline"`: only the own delegation and the delegations directed at me, in one line,
+ *   for the dock of the participant view on a narrow screen. It shows nothing when no delegation
+ *   exists.
  *
  * It shows the own outgoing delegation, which stays revocable until the meeting starts,
  * the setup with its deadline ("Einrichtbar bis Di., 13.10.2026, 17:00"), and the

@@ -61,7 +61,10 @@ const STATES = {
 
 type StateKey = keyof typeof STATES;
 
-/** The manual transitions out of each state, as the flow of the demo defines them. */
+/**
+ * The manual transitions out of each state, as the flow of the demo defines them. A
+ * transition into an accepted state takes a decision (approval with deviations).
+ */
 const FLOW: Record<
   StateKey,
   { id: string; to: StateKey; de: string; en: string; color?: string; agenda?: boolean; decision?: boolean }[]
@@ -73,7 +76,6 @@ const FLOW: Record<
   review: [
     { id: '77777777-7777-7777-7777-777777777783', to: 'agenda', de: 'Auf Tagesordnung setzen', en: 'Put on the agenda', color: '#72a384', agenda: true },
     { id: '77777777-7777-7777-7777-777777777784', to: 'submitted', de: 'Nachforderung stellen', en: 'Ask for more', color: '#e8a33d' },
-    // A transition into an accepted state takes a decision (approval with deviations).
     { id: '77777777-7777-7777-7777-777777777786', to: 'approved', de: 'Bewilligen', en: 'Approve', color: '#3f8f5a', decision: true },
     { id: '77777777-7777-7777-7777-777777777785', to: 'rejected', de: 'Ablehnen', en: 'Reject', color: '#c0392b' },
   ],
@@ -468,15 +470,16 @@ function problem422(errors: { field: string; msg: string }[]): ProblemDetail {
   };
 }
 
-// --------------------------------------------------------------------- the form
-
 const OPTIONS_CATEGORY = [
   { value: 'event', label: { de: 'Veranstaltung', en: 'Event' } },
   { value: 'firstyear', label: { de: 'Erstsemester', en: 'First year' } },
   { value: 'culture', label: { de: 'Kultur', en: 'Culture' } },
 ];
 
-/** The form of the demo applications: three sections, as on the boards. */
+/**
+ * The form of the demo applications: three sections. The room question
+ * sits mid-section, so a hidden room shows whether the next field moves up into its cell.
+ */
 const DEMO_FORM: EffectiveForm = {
   applicationTypeId: TYPE_FUND,
   formVersionId: 'f0000000-0000-0000-0000-0000000000f1',
@@ -490,8 +493,6 @@ const DEMO_FORM: EffectiveForm = {
         { key: 'description', type: 'textarea', label: { de: 'Beschreibung', en: 'Description' }, required: true },
         { key: 'event_date', type: 'date', label: { de: 'Veranstaltungsdatum', en: 'Event date' } },
         { key: 'participants', type: 'number', label: { de: 'Erwartete Teilnehmende', en: 'Expected participants' } },
-        // The room question sits mid-section, so a hidden room shows whether the next
-        // field moves up into its cell.
         { key: 'needs_room', type: 'checkbox', label: { de: 'Raum der Hochschule nötig', en: 'Needs a university room' } },
         {
           key: 'room',
@@ -682,8 +683,6 @@ function positionErrors(raw: unknown): { field: string; msg: string }[] {
       : [],
   );
 }
-
-// --------------------------------------------------------------------- meetings
 
 /** A local `YYYY-MM-DD`, `days` away from today. */
 function dayFromToday(days: number): string {

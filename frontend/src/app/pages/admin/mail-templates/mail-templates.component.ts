@@ -37,7 +37,7 @@ function sameTexts(a: Record<string, string>, b: Record<string, string>): boolea
 }
 
 /**
- * Mail-template editor at `/admin/mail-templates` (board Admin-Mail-Vorlagen). Needs the
+ * Mail-template editor at `/admin/mail-templates`. Needs the
  * `admin.notifications` permission.
  *
  * The page shows the template list on the left ("angepasst" marks an override; on a
@@ -78,7 +78,7 @@ export class MailTemplatesComponent {
   readonly phone = mediaQuery(MEDIA.phone);
   private readonly templates_ = signal<MailTemplate[]>([]);
   readonly templates = this.templates_.asReadonly();
-  // Select by key, not by ID. A builtin template has no database ID.
+  /** The selected template, by key and not by ID, because a builtin template has no database ID. */
   readonly selectedKey = signal<string | null>(null);
   readonly draft = signal<MailTemplate | null>(null);
   /** The list has not arrived yet. */

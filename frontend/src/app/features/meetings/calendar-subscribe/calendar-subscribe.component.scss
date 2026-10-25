@@ -12,17 +12,14 @@
   color: var(--color-text);
 }
 
-/* Desktop: a popover in the top layer, under its anchor. */
 .cs--pop {
   width: min(26rem, calc(100vw - 16px));
   max-height: min(32rem, calc(100vh - 16px));
   @include om.menu($padding: var(--space-4) var(--space-5) var(--space-5), $radius: var(--radius-xl));
 }
-/* The popover shows only once it is placed (the frame adds `cs--placed` right after it
-   wrote the place), so no frame paints it at the corner of the viewport. Outside the top
-   layer it does not render at all: `.cs` sets a display, which would else override the
-   hidden state of a closed popover. Browsers without the popover API drop the second
-   rule (unknown selector). */
+// Hidden until the frame writes the place, so no frame paints it at the viewport corner. `.cs` sets
+// a display that would override a closed popover. Browsers without the popover API drop the second
+// rule.
 .cs--pop:not(.cs--placed) {
   visibility: hidden;
 }
@@ -30,7 +27,6 @@
   display: none;
 }
 
-/* Phone: the top-layer box of the bottom sheet has no box of its own. */
 .cs__layer {
   @include om.layer;
 }
@@ -55,7 +51,6 @@
   font-size: 0.75rem;
   font-weight: var(--fw-semibold);
 }
-/* A URL is never cut: it wraps anywhere and stays selectable as a whole. */
 .cs__url {
   display: block;
   padding: var(--space-2) var(--space-3);

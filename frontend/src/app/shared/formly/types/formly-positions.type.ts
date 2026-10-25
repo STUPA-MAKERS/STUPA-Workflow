@@ -30,7 +30,7 @@ let nextUid = 0;
  * total of all positions into `amount`. The component mirrors validity onto the
  * FormControl: minimum positions and offers, one preferred offer, and values above 0.
  *
- * Look (board Anträge-Bearbeiten): one card per position. A complete position starts
+ * Look: one card per position. A complete position starts
  * collapsed (name, "n Angebote · bevorzugt: …", amount); a new or an incomplete one
  * starts open. Open, it shows the name, the switch "keine Vergleichsangebote möglich",
  * the offers with the radio for the preferred one, and "Angebot hinzufügen". A position
@@ -184,7 +184,7 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
     return this.t('apply.positions.invalid');
   }
 
-  // Inline per-field validation marks the affected field red and shows the message in place.
+  /** Inline per-field validation marks the affected field red and shows the message in place. */
   protected titleInvalid(p: Position): boolean {
     return this.showError && !p.label.trim();
   }

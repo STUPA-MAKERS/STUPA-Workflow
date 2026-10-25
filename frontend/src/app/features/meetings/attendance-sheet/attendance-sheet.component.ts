@@ -96,7 +96,7 @@ const SELF_CHOICES: readonly { value: Choice; label: TranslationKey }[] = [
 ];
 
 /**
- * The attendance sheet of a meeting (board Sitzung-Anwesenheit).
+ * The attendance sheet of a meeting.
  *
  * A side sheet from the end edge (a bottom sheet on a phone) with the counts, a member
  * search and one row per member: avatar, name, a sub line (the reason, "durch

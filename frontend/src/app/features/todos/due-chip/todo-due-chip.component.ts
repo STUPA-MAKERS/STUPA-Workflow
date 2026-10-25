@@ -14,7 +14,7 @@ import { IconComponent } from '@stupa-makers/ui-kit';
 import { weekdayDate } from '@shared/date-format';
 
 /**
- * The due date of a card as a chip ("Di, 03.11.2026 ⌄", frame 2). The chip opens the
+ * The due date of a card as a chip ("Di, 03.11.2026 ⌄"). The chip opens the
  * date picker of the browser; a set date has a remove button beside it.
  */
 @Component({

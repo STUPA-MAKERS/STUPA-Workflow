@@ -91,7 +91,7 @@ const STEP_LABEL: Record<StepKey, TranslationKey> = {
 };
 
 /**
- * Public application wizard (board Antrag-stellen).
+ * Public application wizard.
  *
  * Layout: at the start a column with the title, the purpose, the vertical stepper (done
  * steps take a click back) and the autosave note; beside it the sheet "Schritt n von N ·
@@ -125,6 +125,9 @@ const STEP_LABEL: Record<StepKey, TranslationKey> = {
  * reference that the new form does not know.
  *
  * Every form step stays in the page, so the submit checks all fields.
+ *
+ * The component provides the field types of the form (`provideFormly`), so Formly is not
+ * part of the initial bundle.
  */
 @Component({
   selector: 'app-apply-wizard',
@@ -149,8 +152,6 @@ const STEP_LABEL: Record<StepKey, TranslationKey> = {
     ListDetailNavDirective,
     TranslatePipe,
   ],
-  // The field types of the form (`provideFormly`) come with the component, so Formly is not
-  // part of the initial bundle.
   providers: [DraftAttachmentsService, provideFormly()],
   templateUrl: './apply-wizard.component.html',
   styleUrl: './apply-wizard.component.scss',
@@ -619,8 +620,6 @@ export class ApplyWizardComponent {
     await this.drafts.discard();
   }
 
-  // --- autosave ------------------------------------------------------------------
-
   private draftKey(): string | null {
     const id = this.typeId();
     return id ? `${DRAFT_PREFIX}${id}` : null;
@@ -722,8 +721,6 @@ export class ApplyWizardComponent {
       /* storage blocked: nothing to clear */
     }
   }
-
-  // --- helpers -------------------------------------------------------------------
 
   /** The second line of a step in the stepper. */
   private stepHint(key: StepKey): string {

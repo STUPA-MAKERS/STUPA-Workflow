@@ -94,7 +94,7 @@ function paneRoute(root: ActivatedRouteSnapshot): boolean {
 const sheetScroll = new Map<number, number>();
 
 /**
- * The frame of the admin area (board Verwaltung): the admin navigation beside every
+ * The frame of the admin area: the admin navigation beside every
  * admin page. The account area (`/account/*`) uses the same frame in its own mode, see
  * "Account mode" below.
  *

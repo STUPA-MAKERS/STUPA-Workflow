@@ -31,13 +31,13 @@ import {
 } from '@stupa-makers/ui-kit';
 
 /**
- * One vote as a card (board Arbeit-Abstimmungen) or as the phone page body (board
- * Telefon-Abstimmen): the status, "<Sitzung> · TOP 3 · Einfache Mehrheit", the question,
- * the ballot, the turnout and, once the server shows them, the counts with the result.
+ * One vote as a card or as the phone page body: the status, "<Sitzung> · TOP 3 · Einfache
+ * Mehrheit", the question, the ballot, the turnout and, once the server shows them, the counts with
+ * the result.
  *
- * The vote page, the live page and the participant view of a meeting (`layout="card"`)
- * use it; they load the data and send the ballots. A vote without a meeting shows a link to its application instead of the
- * meeting line, and counts its turnout against the eligible voters.
+ * The vote page, the live page and the participant view of a meeting (`layout="card"`) use it; they
+ * load the data and send the ballots. A vote without a meeting shows a link to its application
+ * instead of the meeting line, and counts its turnout against the eligible voters.
  */
 @Component({
   selector: 'app-vote-panel',
@@ -77,7 +77,7 @@ export class VotePanelComponent {
   readonly caster = input.required<BallotCaster>();
   /**
    * `card`: the small card of a side column (the participant view of a meeting).
-   * `strip`: the card above the text on a narrow screen (board Schmal-Teilnahme): the
+   * `strip`: the card above the text on a narrow screen: the
    * caption with the TOP and the turnout "14 von 19", the rows side by side.
    */
   readonly layout = input<'page' | 'phone' | 'card' | 'strip'>('page');

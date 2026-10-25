@@ -1,7 +1,6 @@
 @use 'scroll-fade' as fade;
 @use '../../../shared/ui/dialog-form' as df;
 
-/* The host adds no box; a closed dialog takes no gap in a flex column of the page. */
 @include df.host;
 
 .agd {
@@ -27,8 +26,6 @@
   font-size: 0.8125rem;
 }
 
-/* One row per meeting on surface 3, the chosen one selected. The whole row is the label
-   of the radio, so a click anywhere on it chooses the meeting. */
 .agd__list {
   display: flex;
   flex-direction: column;
@@ -106,7 +103,6 @@
   font-weight: var(--fw-medium);
 }
 
-/* The note: a filled field with the label inside, as in the ui-kit. */
 .agd__note {
   display: flex;
   flex-direction: column;
@@ -147,7 +143,6 @@
   opacity: 1;
 }
 
-/* The shared top and bottom fade: an end fades only while more content lies past it. */
 .agd__list {
   @include fade.fade-y(var(--space-5));
 }

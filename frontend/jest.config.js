@@ -2,7 +2,7 @@ module.exports = {
   preset: 'jest-preset-angular',
   setupFilesAfterEnv: ['<rootDir>/setup-jest.ts'],
   testEnvironment: 'jsdom',
-  // Jest 30 and jsdom 26 need much more RAM per worker (#jest30). Without a cap, the full
+  // Jest 30 and jsdom 26 need much more RAM per worker. Without a cap, the full
   // suite exhausts the memory on machines with many cores (OOM). Use half of the cores and
   // restart a worker above 1 GB of idle RSS.
   maxWorkers: '50%',
@@ -38,7 +38,6 @@ module.exports = {
   // The specs cover nearly all application code. The thresholds sit just below
   // the actual values. A real regression breaks the build, but a small variation
   // does not. Keep or raise them.
-  //
   coverageThreshold: {
     global: { statements: 98, branches: 96, functions: 98, lines: 99 },
   },

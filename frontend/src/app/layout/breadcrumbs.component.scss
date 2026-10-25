@@ -1,6 +1,3 @@
-/* The host must be a block, so the bar takes the full width of the page header that
-   holds it. `app-page-header` owns the width and the outer spacing. This component only
-   draws the crumb row: small text, the parents as accent links, the page itself muted. */
 :host {
   display: block;
 }

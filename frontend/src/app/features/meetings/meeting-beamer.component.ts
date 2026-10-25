@@ -90,8 +90,7 @@ interface BeamerText {
 }
 
 /**
- * The beamer screen (boards Beamer, Beamer-Laeuft, Beamer-Leerlauf, Beamer-Quorum,
- * Beamer-Gleichstand): large type for a projector, no controls.
+ * The beamer screen: large type for a projector, no controls.
  *
  * - No vote: "Jetzt", the agenda item that the room handles, "Zurzeit keine aktive
  *   Abstimmung."

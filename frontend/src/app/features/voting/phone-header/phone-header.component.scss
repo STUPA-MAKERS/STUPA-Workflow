@@ -1,4 +1,3 @@
-/* A 64px header with the way back; it pulls into the page padding like the board. */
 :host {
   display: flex;
   align-items: center;
@@ -43,7 +42,6 @@
   line-height: 1.125rem;
   color: var(--color-text-muted);
 }
-/* The line as a link: to the meeting or to the application of the vote. */
 .ph__sub--link {
   color: var(--color-accent-text);
   font-weight: var(--fw-semibold);

@@ -89,7 +89,6 @@ interface DateRange {
       .dr__req {
         color: var(--color-danger);
       }
-      /* Two boxes side by side; on a narrow column they stack. */
       .dr__row {
         display: flex;
         flex-wrap: wrap;

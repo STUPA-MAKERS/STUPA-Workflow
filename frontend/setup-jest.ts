@@ -6,8 +6,6 @@ import { en } from './src/app/core/i18n/translations.en';
 
 setupZoneTestEnv();
 
-// Register the a11y matcher for the whole project. Every spec can then call
-// `toHaveNoViolations()`.
 expect.extend(toHaveNoViolations);
 
 // jsdom reports `en-US`. The reference locale of the app is German. Pin the locale to keep

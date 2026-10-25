@@ -65,7 +65,7 @@ export function linkKey(kind: TodoLinkKind, id: Uuid): string {
 }
 
 /**
- * "Verknüpfen" (frame 3): search what a card can link. The server lists per kind only
+ * "Verknüpfen": search what a card can link. The server lists per kind only
  * what the person may read. The chips narrow the kind; the hits come in groups (Anträge,
  * Sitzungen und TOPs, Abstimmungen, Gremien, Rechnungen, Buchungen, Tickets, To-Dos), a
  * linked target carries a check mark. A pick of a linked target takes the link off again.

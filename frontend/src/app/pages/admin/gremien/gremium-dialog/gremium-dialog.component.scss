@@ -9,7 +9,6 @@
   container-type: inline-size;
 }
 
-/* Two columns: the master data at the start, the delegation at the end. */
 .gd__cols {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -39,7 +38,6 @@
   overflow-wrap: anywhere;
 }
 
-/* The label of a switch takes the free width, so the switch sits at the end. */
 .gd__switch {
   display: block;
 }
@@ -53,7 +51,6 @@
   font-weight: var(--fw-semibold);
 }
 
-/* The delegation settings hang under their switch. */
 .gd__nested {
   display: flex;
   flex-direction: column;
@@ -63,7 +60,6 @@
   border-inline-start: 2px solid var(--color-border);
 }
 
-/* The recipients: a filled field like the ui-kit input, one address per line. */
 .gd__mail {
   display: flex;
   flex-direction: column;
@@ -102,7 +98,6 @@
   }
 }
 
-/* The public protocol page: the switch, what it means, and the note on the QR. */
 .gd__public {
   display: flex;
   flex-direction: column;

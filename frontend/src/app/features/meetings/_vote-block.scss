@@ -1,5 +1,4 @@
-/* Shared vote-block styles. Emulated encapsulation scopes styles per component.
-   Each component that shows vote blocks must @use its own copy. */
+// Emulated encapsulation scopes styles per component, so each component must @use its own copy.
 .mtg__vote {
   padding: var(--space-3);
   border: var(--border-width) solid var(--color-border);

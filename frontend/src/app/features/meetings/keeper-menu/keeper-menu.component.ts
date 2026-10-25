@@ -30,7 +30,7 @@ interface Candidate {
 }
 
 /**
- * The minute-taker menu of the dock (board Sitzung-Menues-B).
+ * The minute-taker menu of the dock.
  *
  * A live meeting: the planned handover on top ("Uli Übernahme übernimmt ab TOP 4",
  * "Verwerfen"), then "Protokollführung übergeben an" with a member search and the

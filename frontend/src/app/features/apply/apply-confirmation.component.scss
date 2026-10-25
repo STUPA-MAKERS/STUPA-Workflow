@@ -1,6 +1,5 @@
 @use 'breakpoints' as bp;
 
-/* Centred in the free space of the page (the shell main is a flex column). */
 :host {
   display: flex;
   flex: 1 0 auto;
@@ -10,8 +9,6 @@
 .done {
   width: min(40rem, 100%);
 }
-/* One card on surface 1, as on the boards: icon, status, heading, text, note, meta,
-   actions. */
 .done__card {
   display: flex;
   flex-direction: column;
@@ -39,15 +36,14 @@
   margin: var(--space-1) 0 0;
   line-height: 1.55;
 }
-/* The text is Markdown from the site config: no outer gap, links in the accent colour. */
 .done__text ::ng-deep :first-child {
   margin-top: 0;
 }
 .done__text ::ng-deep :last-child {
   margin-bottom: 0;
 }
-/* Space between Markdown blocks (paragraphs, lists). The HTML comes from
-   `innerHTML`, so it has no view-encapsulation attribute: `::ng-deep` reaches it. */
+// The HTML comes from `innerHTML` without the encapsulation attribute, so only `::ng-deep` reaches
+// it.
 .done__text ::ng-deep > * + * {
   margin-top: var(--space-2);
 }
@@ -76,7 +72,6 @@ app-note {
   margin-top: var(--space-3);
 }
 
-/* Links in the look of the kit buttons: a link navigates, a button acts. */
 @include bp.phone {
   .done__card {
     padding: var(--space-5);

@@ -1,6 +1,5 @@
 @use './inspector';
 
-/* Transparent wrapper. The blocks join the flex column of the panel directly. */
 :host {
   display: contents;
 }

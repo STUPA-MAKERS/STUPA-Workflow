@@ -35,7 +35,7 @@
   gap: var(--space-2);
   text-align: center;
 }
-/* Black on white in both themes: a scanner needs the contrast. */
+// Black on white in both themes, because a scanner needs the contrast.
 .jq__card {
   width: min(100%, 17rem);
   padding: var(--space-3);

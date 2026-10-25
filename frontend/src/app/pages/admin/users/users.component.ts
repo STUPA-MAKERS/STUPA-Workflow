@@ -61,7 +61,7 @@ export function principalFilters(
 }
 
 /**
- * Users (board Admin-Benutzer): a search and one row per principal.
+ * Users: a search and one row per principal.
  *
  * A row shows the person, the global roles, the OIDC groups and the last login, and
  * "Deaktivieren" or "Aktivieren". The roles are read-only. They come from the OIDC

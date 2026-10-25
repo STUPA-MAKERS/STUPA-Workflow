@@ -20,10 +20,11 @@ import { HttpCacheService } from '@core/cache/http-cache.service';
  */
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  // Resolve `ApiClient`, and with it `HttpClient`, lazily and not in the field
-  // initializer. Otherwise the root `AuthService` pulls `HttpClient` into every
-  // component that injects it only for `can()` or `roles()`. Their specs then fail
-  // with NG0201.
+  /**
+   * Resolves `ApiClient`, and with it `HttpClient`, lazily and not in the field initializer,
+   * because otherwise the root `AuthService` pulls `HttpClient` into every component that
+   * injects it only for `can()` or `roles()`, and their specs fail with NG0201.
+   */
   private readonly injector = inject(Injector);
   private readonly location = inject(LOCATION);
   private readonly isInstalledApp = inject(IS_INSTALLED_APP);

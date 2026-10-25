@@ -6,8 +6,6 @@
 :host {
   @include lp.stack;
 }
-/* One pane at a time the host takes at least the free height of the shell main. Side by
-   side it is a pane page (`.pane-page`), which sets its own flex. */
 :host(:not(.pane-page)) {
   flex: 1 0 auto;
 }
@@ -25,17 +23,12 @@
   @include lp.split-column;
 }
 
-/* ------------------------------------------------------------------ list pane */
-/* The column, its header and the search bar are the shared list geometry: `.ld-pane`
-   (styles.scss) and `app-page-header` with `pane`. */
-
 .exp__chips {
   @include lp.chips;
 }
 .exp__chip {
   max-width: 100%;
 }
-/* The whole chip is the button: the icons never take the click. */
 .exp__chip app-icon,
 .exp__chip .exp__swatch {
   pointer-events: none;
@@ -44,13 +37,11 @@
   @include swatch.mark(9px);
 }
 
-/* The row check box sits above the stretched title, so it takes its own click. */
 .exp__rowCheck {
   position: relative;
   z-index: 1;
 }
 
-/* ------------------------------------------------------------------ rows */
 .exp__scroll {
   @include lp.scroll(--exp-fade);
   padding-bottom: calc(56px + var(--space-6));
@@ -61,7 +52,6 @@
 .exp--split .exp__scroll > * {
   flex: none;
 }
-/* An end fades only while more rows lie past it (`appScrollFade` sets the classes). */
 .exp__scroll {
   @include fade.fade-y(var(--exp-fade));
 }
@@ -76,7 +66,6 @@
 .exp__skel .exp__month {
   padding-top: var(--space-2);
 }
-/* The loading shape: a bar about as wide as "September 2026". */
 .exp__skelMonth {
   width: 7rem;
 }
@@ -92,9 +81,6 @@
   margin-inline: 6px;
   color: var(--color-text-subtle);
 }
-/* The sub line is a flex row: only the cost-centre name shortens, with an ellipsis. The
-   kind, the dots, the date, the arrow and the receipt icon keep their width, so a long
-   name never pushes them out of the row. */
 .exp__sub {
   display: flex;
   align-items: center;
@@ -138,9 +124,6 @@
   color: var(--color-accent-text);
 }
 
-/* With a pointer, the row menu shows on hover, on focus and while it is open. It keeps
-   its place, so nothing shifts. One pane at a time a chevron sits in that place while
-   the menu is hidden. Without hover (touch), the menu always shows. */
 @include lp.hover-menu(exp);
 
 .exp__sentinel {
@@ -150,7 +133,6 @@
   @include lp.more;
 }
 
-/* ------------------------------------------------------------------ detail pane */
 .exp__detail {
   display: flex;
   flex: 1 1 auto;
@@ -158,7 +140,6 @@
   min-width: 0;
   min-height: 0;
 }
-/* The empty sheet: the same surface the open booking sits on, so nothing jumps. */
 
 @include bp.phone {
   .exp__chips {

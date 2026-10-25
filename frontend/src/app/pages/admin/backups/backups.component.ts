@@ -45,7 +45,7 @@ const POLL_MS = 3000;
 const POLL_TIMEOUT_MS = 30 * 60 * 1000;
 
 /**
- * Backups (boards Admin-Backups, Admin-Backup-Zuruecksetzen; permission `backup.manage`).
+ * Backups (permission `backup.manage`).
  *
  * The page creates an archive (with an optional note), imports a `.tar.age` file, and
  * lists every archive with its kind, status, size, contents and note. A row downloads,
@@ -117,7 +117,7 @@ export class BackupsComponent implements OnDestroy {
 
   /**
    * The columns. The note stands under the kind and a failure under the status, so the
-   * seven values of the board fit the width of the admin sheet without a sideways scroll.
+   * seven values fit the width of the admin sheet without a sideways scroll.
    * Every column but the kind has a width floor; the kind takes the slack.
    */
   protected readonly columns = computed<ColumnDef[]>(() => [

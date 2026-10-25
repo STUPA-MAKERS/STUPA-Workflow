@@ -15,8 +15,6 @@ import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { ThemeService } from '@core/theme/theme.service';
-// By path, not through the `@shared/ui` barrel: the shell is in the initial bundle, and
-// the barrel would pull every shared block a lazy page uses into it.
 import { AvatarComponent, IconComponent, SwitchComponent, TruncatedDirective } from '@stupa-makers/ui-kit';
 import { LanguageSelectComponent } from '../language-select/language-select.component';
 

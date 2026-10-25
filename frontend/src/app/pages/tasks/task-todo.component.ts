@@ -6,7 +6,7 @@ import { TodoCardDetailComponent } from '../../features/todos/card-detail/todo-c
 import { TasksComponent } from './tasks.component';
 
 /**
- * The right pane of `/tasks/todo/:cardId`: the card detail of the boards (frame 10), with
+ * The right pane of `/tasks/todo/:cardId`: the card detail of the boards, with
  * "Im Board öffnen" (on a phone in its ⋮ menu). Side by side it is a sheet; one pane at a
  * time it lies on the page. A change or an archive reads the group "To-Dos" of the page again; an
  * archived card closes the pane.

@@ -42,7 +42,8 @@ function draftOf(s: MeetingSettings): Draft {
  *   is never larger than `openLeadMinutes` (the server answers 422 otherwise).
  *
  * The section shows nothing without `admin.deadlines` and nothing after a 403, like the
- * guest settings below it.
+ * guest settings below it. It shares the section layout (the stylesheet) of the guest
+ * settings on this page.
  */
 @Component({
   selector: 'app-meeting-window-settings',
@@ -50,7 +51,6 @@ function draftOf(s: MeetingSettings): Draft {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [SectionHeaderComponent, FormsModule, TranslatePipe, InputComponent, LoadStateComponent],
   templateUrl: './meeting-window.component.html',
-  // The same section layout as the guest settings on this page.
   styleUrl: '../guest-settings/guest-settings.component.scss',
 })
 export class MeetingWindowSettingsComponent {

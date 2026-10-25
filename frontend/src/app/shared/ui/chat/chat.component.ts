@@ -577,8 +577,6 @@ export class ChatComponent {
     return (msg.canEdit ?? msg.own) && !isPending(msg);
   }
 
-  // --- scrolling -------------------------------------------------------------------
-
   /** Keep the newest message in view while the log is at its end. */
   private follow(): void {
     if (!this.stick) return;
@@ -606,8 +604,6 @@ export class ChatComponent {
     this.seenAt.set(newest);
     writeStore(SEEN_PREFIX + this.draftKey(), newest);
   }
-
-  // --- composer --------------------------------------------------------------------
 
   protected onDraft(value: string): void {
     this.draft.set(value);
@@ -657,8 +653,6 @@ export class ChatComponent {
     this.onDraft('');
     this.scrollToEnd();
   }
-
-  // --- files -----------------------------------------------------------------------
 
   protected pickFiles(): void {
     this.fileInput()?.nativeElement.click();
@@ -788,8 +782,6 @@ export class ChatComponent {
     return (msg.attachments ?? []).every((f) => f.lost);
   }
 
-  // --- mentions --------------------------------------------------------------------
-
   private mayMention(visibility: ChatVisibility | null | undefined): boolean {
     return this.publicMentions() || visibility === 'internal';
   }
@@ -839,8 +831,6 @@ export class ChatComponent {
     box.setSelectionRange(next.caret, next.caret);
   }
 
-  // --- failed messages -------------------------------------------------------------
-
   /**
    * "Bearbeiten" on a failed message: its text goes back into the composer, ahead of a
    * draft typed since, and the failed message leaves the thread.
@@ -864,8 +854,6 @@ export class ChatComponent {
       { injector: this.injector },
     );
   }
-
-  // --- edit, delete, phone menu ----------------------------------------------------
 
   /**
    * The Edit button that had the focus leaves the DOM with the edit, so the focus goes

@@ -39,7 +39,7 @@ import { dayMonth } from '@shared/date-format';
 import { formatMoney } from '@shared/format-money';
 
 /**
- * The detail of a booking (boards Fin-Buchungen, Fin-Schmal-Buchung, Fin-Tel-Buchung):
+ * The detail of a booking:
  * "Buchung · HHJ 2026", the description, "Art · Kostenstelle · Betrag" and the sections
  * Zahlung, Details, Unterbuchungen, Verknüpft (application and invoice) and Kostenstelle.
  *
