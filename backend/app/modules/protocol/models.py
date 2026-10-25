@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import (
     Boolean,
@@ -70,7 +71,7 @@ class Protocol(UUIDPkMixin, TimestampMixin, Base):
     #: plain text of the public TOPs for the search. `public_pdf_size` is the byte
     #: size of the public PDF.
     public_withheld: Mapped[bool] = mapped_column(Boolean, server_default="false")
-    public_content: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    public_content: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     public_search_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     public_pdf_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
     #: Permanent failures of the public build. The hourly heal job skips a protocol

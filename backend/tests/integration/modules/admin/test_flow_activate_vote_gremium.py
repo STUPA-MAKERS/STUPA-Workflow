@@ -44,7 +44,9 @@ async def session(
     await eng.dispose()
 
 
-def _graph(vote_config: dict[str, Any], actions: list[dict[str, Any]] | None = None) -> dict:
+def _graph(
+    vote_config: dict[str, Any], actions: list[dict[str, Any]] | None = None
+) -> dict[str, Any]:
     return {
         "states": [
             {"key": "review", "label": {"de": "P"}, "isInitial": True},

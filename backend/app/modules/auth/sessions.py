@@ -15,8 +15,9 @@ maps `None` to 401 or 410.
 from __future__ import annotations
 
 import secrets
-from typing import Any
+from datetime import datetime
 from urllib.parse import urlsplit
+from uuid import UUID
 
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from sqlalchemy import delete, select, update
@@ -57,9 +58,9 @@ async def create_applicant_session(
     db: AsyncSession,
     *,
     secret: str,
-    application_id: Any,
+    application_id: UUID,
     scope: str,
-    expires_at: Any,
+    expires_at: datetime,
 ) -> str:
     """Create an `applicant_session` row and return the signed `sid` cookie.
 
@@ -80,7 +81,7 @@ async def create_applicant_session(
 
 
 async def load_applicant_session(
-    db: AsyncSession, *, secret: str, cookie_value: str, now: Any, max_age: int
+    db: AsyncSession, *, secret: str, cookie_value: str, now: datetime, max_age: int
 ) -> ApplicantSession | None:
     """Resolve a cookie to its `applicant_session` row.
 
@@ -122,7 +123,7 @@ async def delete_applicant_session(
 
 
 async def revoke_applicant_sessions(
-    db: AsyncSession, application_id: Any, *, now: Any
+    db: AsyncSession, application_id: UUID, *, now: datetime
 ) -> None:
     """Revoke all active applicant sessions of an application.
 
@@ -268,12 +269,12 @@ async def create_principal_session(
     db: AsyncSession,
     *,
     secret: str,
-    principal_id: Any,
-    expires_at: Any,
+    principal_id: UUID,
+    expires_at: datetime,
     refresh_token: str | None,
     id_token: str | None,
     client: str = SESSION_CLIENT_WEB,
-    now: Any = None,
+    now: datetime | None = None,
 ) -> str:
     """Create an `auth_session` row and return the signed `sid` cookie.
 
@@ -297,7 +298,7 @@ async def create_principal_session(
 
 
 async def load_principal_session(
-    db: AsyncSession, *, secret: str, cookie_value: str, now: Any, max_age: int
+    db: AsyncSession, *, secret: str, cookie_value: str, now: datetime, max_age: int
 ) -> AuthSession | None:
     """Resolve a cookie to its `auth_session` row.
 
@@ -315,7 +316,7 @@ async def load_principal_session(
     return row
 
 
-async def end_principal_sessions(db: AsyncSession, principal_id: Any) -> None:
+async def end_principal_sessions(db: AsyncSession, principal_id: UUID) -> None:
     """Delete every session of a principal. The caller commits.
 
     A session lives for months and renews itself at the IdP. So a deactivation or a

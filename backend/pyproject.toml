@@ -100,22 +100,37 @@ target-version = "py313"
 line-length = 100
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM", "RUF100", "D"]
+select = ["E", "F", "I", "UP", "B", "SIM", "ANN", "RUF100", "D"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["D100", "D101", "D102", "D103", "D104", "D105", "D106", "D107"]
+# Tests type fixtures and fakes loosely. Migrations use the dynamic alembic op API.
+"tests/**" = ["ANN", "D100", "D101", "D102", "D103", "D104", "D105", "D106", "D107"]
+"migrations/**" = ["ANN"]
 
 [tool.basedpyright]
 pythonVersion = "3.13"
 typeCheckingMode = "standard"
 reportMissingTypeStubs = false
 reportUnnecessaryTypeIgnoreComment = "error"
+reportDeprecated = "error"
+reportUnnecessaryCast = "error"
+reportUnusedVariable = "error"
+reportConstantRedefinition = "error"
+reportMissingTypeArgument = "error"
+reportMissingParameterType = "error"
 # Alembic migrations use the dynamic op and context API, so the strict type check skips
 # them. The check still covers the models and the logic. env.py stays typed on its own.
 exclude = ["migrations/versions", ".venv"]
+
+# Tests take pytest fixtures and fakes as parameters without a type. The default
+# environment covers app, worker, scripts and migrations/env.py.
+[[tool.basedpyright.executionEnvironments]]
+root = "tests"
+extraPaths = ["."]
+reportMissingParameterType = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

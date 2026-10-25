@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from app.shared.guards import (
@@ -78,7 +80,7 @@ def test_assign_from_applicant_gremium_parent_is_optional() -> None:
         ({"type": "assignBudgetFromMap", "field": "f", "map": {"a": 1}}, "map"),
     ],
 )
-def test_assign_from_map_shape(action: dict, match: str) -> None:
+def test_assign_from_map_shape(action: dict[str, Any], match: str) -> None:
     with pytest.raises(GuardError, match=match):
         validate_action(action)
 

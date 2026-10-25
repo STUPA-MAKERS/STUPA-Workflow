@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import (
     CheckConstraint,
@@ -76,10 +77,10 @@ class Vote(UUIDPkMixin, CreatedAtMixin, Base):
     eligible_group: Mapped[str] = mapped_column(Text)
     #: The vote question that the protocol snippet shows. NULL means no explicit question.
     question: Mapped[str | None] = mapped_column(Text, nullable=True)
-    config: Mapped[dict] = mapped_column(JSONB)
+    config: Mapped[dict[str, Any]] = mapped_column(JSONB)
     #: The decision proposal of an application vote: `{approvedAmount, conditions}`.
     #: A passed vote writes it as the decision of the application. NULL = no deviation.
-    proposal: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    proposal: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     #: Authoritative eligible-voter count (roster). It is the denominator of the percent
     #: quorum. A NULL value means unknown, so the percent quorum stays fail-closed and
     #: never counts as met.
@@ -120,12 +121,12 @@ class Vote(UUIDPkMixin, CreatedAtMixin, Base):
         ForeignKey("vote.id", ondelete="SET NULL"), nullable=True
     )
     round: Mapped[int] = mapped_column(Integer, server_default="1", default=1)
-    election_result: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    election_result: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     #: Polls ("Umfrage", ``kind = 'poll'``, ``config`` = PollConfig). A poll only counts:
     #: ``result`` stays NULL, and ``poll_result`` holds the counts of a closed poll. A
     #: poll without a meeting ends at ``closes_at``; ``reminded_at`` records the one
     #: reminder mail 24 h before that end.
-    poll_result: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    poll_result: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     reminded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (

@@ -1164,7 +1164,7 @@ async def test_invoice_file_bytes_defaults_mime_name() -> None:
         async def remove(self, key: str) -> None: ...
 
     svc = BudgetTreeService(sess, storage=cast("Any", _Storage()))
-    data, mime, name = await svc.invoice_file_bytes(inv.id)
+    _data, mime, name = await svc.invoice_file_bytes(inv.id)
     assert mime == "application/pdf" and name == "beleg.pdf"
 
 
@@ -1533,7 +1533,7 @@ async def test_audit_uses_actor() -> None:
 
 
 def _entry(
-    action: AuditAction, target_id: Any, data: dict | None = None, *, eid: int = 1
+    action: AuditAction, target_id: Any, data: dict[str, Any] | None = None, *, eid: int = 1
 ) -> AuditEntry:
     """Build a minimal audit entry: revert_audit reads only action, target_id, data, id."""
     return cast(
@@ -2194,7 +2194,7 @@ async def test_update_transfer_audit_entry_is_not_revertable() -> None:
     assert audit[0].target_type == "budget_transfer"
     assert "before" not in audit[0].data
     assert audit[0].data["prior"]["amount"] == "100.00"
-    flags = await AuditService(cast("Any", sess)).revertable_flags([audit[0]])
+    flags = await AuditService(sess).revertable_flags([audit[0]])
     assert flags[audit[0].id] is False
 
 
@@ -2238,7 +2238,7 @@ async def test_delete_transfer_unknown_404() -> None:
         await svc.delete_transfer(uuid.uuid4())
 
 
-def _booking_row(inv: Invoice, *, budget_id: uuid.UUID, path: str, name: str) -> tuple:
+def _booking_row(inv: Invoice, *, budget_id: uuid.UUID, path: str, name: str) -> tuple[Any, ...]:
     booking = _expense(budget_id=budget_id, invoice_id=inv.id, amount="40.00")
     booking.payment_date = date(2026, 3, 1)
     return (booking, path, name)

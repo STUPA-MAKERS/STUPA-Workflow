@@ -337,7 +337,7 @@ def test_card_routes(env: _Env) -> None:
     assert c.delete(f"/api/todos/cards/{CID}/comments/{XID}").status_code == 204
     files = {"body": "", "attachmentIds": [str(XID)], "draftToken": "tok"}
     assert c.post(f"/api/todos/cards/{CID}/comments", json=files).status_code == 201
-    name, _args, kw = next(call for call in reversed(env.service.calls) if call[0] == "add_comment")
+    _, _args, kw = next(call for call in reversed(env.service.calls) if call[0] == "add_comment")
     assert (kw["attachment_ids"], kw["draft_token"]) == ([XID], "tok")
     assert kw["pepper"]
     assert c.post(f"/api/todos/cards/{CID}/comments", json={"body": " "}).status_code == 422

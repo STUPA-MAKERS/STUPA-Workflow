@@ -11,7 +11,7 @@ import uuid
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import Any
 
 from fastapi.testclient import TestClient
 
@@ -293,6 +293,6 @@ async def test_revoked_grant_no_longer_authenticates() -> None:
 
     lookup = fake_session(result(row))
     resolved = await oauth_service.resolve_access_token(
-        cast(Any, lookup), token="apat_whatever", now=NOW
+        lookup, token="apat_whatever", now=NOW
     )
     assert resolved is None

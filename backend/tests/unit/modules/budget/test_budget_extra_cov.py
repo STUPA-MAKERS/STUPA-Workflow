@@ -19,6 +19,7 @@ from typing import Any, cast
 
 import pytest
 from fastapi.testclient import TestClient
+from pycheval.money import Money
 from pypdf import PdfWriter
 
 from app.deps import get_current_applicant, get_current_principal
@@ -896,7 +897,7 @@ def test_transfer_create_distinct() -> None:
 
 def test_amount_helper() -> None:
     assert _amount(None) is None
-    assert _amount(SimpleNamespace(amount=Decimal("5"))) == Decimal("5")
+    assert _amount(Money(Decimal("5"), "EUR")) == Decimal("5")
 
 
 def test_sane_amount_helper() -> None:

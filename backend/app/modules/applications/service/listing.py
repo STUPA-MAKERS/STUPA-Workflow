@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from sqlalchemy import ARRAY, ColumnElement, Text, and_, case, cast, false, func, or_, select
@@ -20,10 +20,14 @@ from app.modules.applications.service.service_base import (
     _title_of,
     state_since_subquery,
 )
+from app.modules.auth.principal import Principal
 from app.modules.budget.tree_models import Budget
 from app.modules.flow.models import State
 from app.search import dialect_of, trigram_rank
 from app.shared.paging import Page
+
+if TYPE_CHECKING:
+    from app.modules.flow.service import FlowService
 
 
 class ListingOps(ApplicationsServiceBase):
@@ -200,7 +204,7 @@ class ListingOps(ApplicationsServiceBase):
             clauses.extend(await self._committee_read_clauses(committee_sub))
         return or_(*clauses) if clauses else None
 
-    async def read_scope_for(self, principal: Any) -> ColumnElement[bool] | None:
+    async def read_scope_for(self, principal: Principal) -> ColumnElement[bool] | None:
         """Build the read scope of `principal` as one SQL clause, or None for all.
 
         This is the rule of `GET /applications` without `mine`: a principal with
@@ -337,7 +341,7 @@ class ListingOps(ApplicationsServiceBase):
         gremium_names = {gid: name for gid, name in gremium_rows}
         return type_names, gremium_names
 
-    async def list_tasks(self, principal: Any) -> list[ApplicationListItem]:
+    async def list_tasks(self, principal: Principal) -> list[ApplicationListItem]:
         """List the open tasks of the principal.
 
         A task is an application that the principal can read AND act on now. The
@@ -407,7 +411,7 @@ class ListingOps(ApplicationsServiceBase):
         return items
 
     async def _task_filters(
-        self, principal: Any, *, can_transition: bool
+        self, principal: Principal, *, can_transition: bool
     ) -> list[ColumnElement[bool]]:
         """Build the SQL pre-filter of `list_tasks`.
 
@@ -449,7 +453,7 @@ class ListingOps(ApplicationsServiceBase):
         return filters
 
     async def _casts_in_open_vote(
-        self, application_id: UUID, principal: Any, now: datetime
+        self, application_id: UUID, principal: Principal, now: datetime
     ) -> bool:
         """Tell whether an open vote of the application takes a ballot of the principal.
 
@@ -471,7 +475,7 @@ class ListingOps(ApplicationsServiceBase):
 
     @staticmethod
     async def _fires_task_transition(
-        flow: Any, app: Application, principal: Any, *, can_transition: bool
+        flow: FlowService, app: Application, principal: Principal, *, can_transition: bool
     ) -> bool:
         """Tell whether the principal may fire a manual transition with `requiresAction`.
 

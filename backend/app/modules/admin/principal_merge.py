@@ -70,7 +70,7 @@ from sqlalchemy import (
     select,
     update,
 )
-from sqlalchemy.engine import CursorResult
+from sqlalchemy.engine import CursorResult, Result
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute, aliased
@@ -320,7 +320,7 @@ def _table(column: InstrumentedAttribute[Any]) -> type[Base]:
     return cast("type[Base]", column.class_)
 
 
-def _rowcount(result: Any) -> int:
+def _rowcount(result: Result[Any]) -> int:
     return cast(CursorResult[Any], result).rowcount
 
 
@@ -528,7 +528,7 @@ class PrincipalMergeService:
         def meeting_where(*conds: ColumnElement[bool]) -> Select[Any]:
             return select(Meeting.title).where(*conds).order_by(Meeting.date, Meeting.title)
 
-        def deleg(**cols: Any) -> ColumnElement[bool]:
+        def deleg(**cols: object) -> ColumnElement[bool]:
             d = aliased(MeetingDelegation)
             conds: list[ColumnElement[bool]] = [d.meeting_id == Meeting.id]
             for name, value in cols.items():

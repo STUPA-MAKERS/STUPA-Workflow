@@ -5,6 +5,8 @@ The parts are mail, templating, queue, schemas and provider.
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from app.modules.notifications.mail import (
@@ -167,7 +169,7 @@ def test_render_html_autoescape() -> None:
 
 
 async def test_arq_queue_enqueues_with_idempotent_job_id() -> None:
-    calls: list[tuple[str, dict, str | None]] = []
+    calls: list[tuple[str, dict[str, Any], str | None]] = []
 
     class FakePool:
         async def enqueue_job(self, name, payload, *, _job_id=None):

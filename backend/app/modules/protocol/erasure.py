@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Sequence
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
@@ -41,7 +42,7 @@ _Change = tuple[Sequence[str], Sequence[str]]
 _OPENER = re.compile(r"^>\s*\[!")
 
 
-def _callout(vote: Vote, config: dict) -> list[str]:
+def _callout(vote: Vote, config: dict[str, Any]) -> list[str]:
     """Build the lines of the internal callout of ``vote`` with ``config``."""
     stored = vote.election_result
     result = ElectionResultOut.model_validate(stored) if stored else None

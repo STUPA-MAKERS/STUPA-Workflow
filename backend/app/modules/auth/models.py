@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import (
     Boolean,
@@ -50,7 +51,7 @@ class Principal(UUIDPkMixin, Base):
     sub: Mapped[str] = mapped_column(Text, unique=True)
     email: Mapped[str | None] = mapped_column(CITEXT, nullable=True)
     display_name: Mapped[str | None] = mapped_column(Text, nullable=True)
-    oidc_groups: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    oidc_groups: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
     last_login: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
@@ -89,7 +90,7 @@ class Role(UUIDPkMixin, Base):
     __tablename__ = "role"
 
     key: Mapped[str] = mapped_column(Text, unique=True)
-    name_i18n: Mapped[dict] = mapped_column(JSONB, server_default="{}")
+    name_i18n: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
 
 
 class RolePermission(Base):

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import cast
+from typing import Any, cast
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -28,7 +28,7 @@ def _sessionmaker(session: FakeSession) -> async_sessionmaker[AsyncSession]:
     return cast("async_sessionmaker[AsyncSession]", lambda: _CM())
 
 
-def _action(action_type: str, params: dict | None = None) -> DispatchedAction:
+def _action(action_type: str, params: dict[str, Any] | None = None) -> DispatchedAction:
     app_id = uuid.uuid4()
     return DispatchedAction(
         type=action_type,
@@ -233,7 +233,7 @@ def _capture(monkeypatch: pytest.MonkeyPatch) -> dict[str, object]:
     return _CapturingService.captured
 
 
-def _applicant_notify(params: dict) -> DispatchedAction:
+def _applicant_notify(params: dict[str, Any]) -> DispatchedAction:
     return _action("notify", params)
 
 

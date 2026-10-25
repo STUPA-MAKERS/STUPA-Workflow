@@ -42,11 +42,13 @@ from app.shared.errors import NotFoundError
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
+    from app.modules.forms.models import FormField
+
 #: Promoted target that the service synchronizes into the numeric `application.amount`.
 _AMOUNT_TARGET = "amount"
 
 
-def _field_from_row(row: Any) -> FormFieldDef:
+def _field_from_row(row: FormField) -> FormFieldDef:
     """Convert a `form_field` row to a `FormFieldDef`.
 
     The mapping uses camelCase input keys, as `forms.service` does.

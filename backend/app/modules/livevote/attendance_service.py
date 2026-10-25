@@ -30,7 +30,6 @@ The rules:
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
@@ -309,7 +308,7 @@ class AttendanceService:
         actor: str,
         meeting_id: UUID,
         principal_id: UUID,
-        **extra: Any,
+        **extra: object,
     ) -> None:
         """Write one attendance audit entry, never with the note."""
         await audit_record(

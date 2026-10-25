@@ -248,7 +248,7 @@ def _find_key(keys: list[dict[str, Any]], kid: object) -> dict[str, Any] | None:
     return next((k for k in keys if k.get("kid") == kid), None)
 
 
-async def _signing_key(settings: Settings, id_token: str) -> Any:
+async def _signing_key(settings: Settings, id_token: str) -> Any:  # noqa: ANN401
     """Return the TTL-cached JWKS key that matches the `kid` of the `id_token`.
 
     A miss forces one reload, because the cache can be stale after a key rotation.

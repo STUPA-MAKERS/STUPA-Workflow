@@ -93,7 +93,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger("app.flow")
 
 
-def _agenda_action(actions: Any) -> dict[str, Any] | None:
+def _agenda_action(actions: object) -> dict[str, Any] | None:
     """Return the first `addToNextSession` action, or `None`."""
     if not isinstance(actions, list):
         return None
@@ -103,7 +103,7 @@ def _agenda_action(actions: Any) -> dict[str, Any] | None:
     return None
 
 
-def agenda_gremium_id(actions: Any) -> UUID | None:
+def agenda_gremium_id(actions: object) -> UUID | None:
     """Return the explicit `gremiumId` of the first `addToNextSession` action, or `None`.
 
     `None` also comes back when the action has no `gremiumId` (then the Gremium of the

@@ -14,6 +14,7 @@ import re
 from collections.abc import Iterable, Mapping, Sequence
 from datetime import date, timedelta
 from decimal import Decimal
+from typing import Any
 
 #: Path segment: alphanumeric, for example `VS`, `800` or `04`. Path composition
 #: reserves the separator `-`, so a segment must not contain it.
@@ -265,11 +266,11 @@ def resolve_decision_gremium[K, G](
 #: decision_gremium_id.
 NodeTuple = tuple[
     object, object | None, object | None, str, str, str, str, bool,
-    str | None, list, list, int, int, bool, object | None, object | None,
+    str | None, list[Any], list[Any], int, int, bool, object | None, object | None,
 ]
 
 
-def scope_forest(forest: list[dict], gremium_ids: set[object]) -> list[dict]:
+def scope_forest(forest: list[dict[str, Any]], gremium_ids: set[object]) -> list[dict[str, Any]]:
     """Scope the forest to the Gremien that may see it.
 
     The function returns every subtree whose root carries a `view_gremium_id`
@@ -279,9 +280,9 @@ def scope_forest(forest: list[dict], gremium_ids: set[object]) -> list[dict]:
     """
     if not gremium_ids:
         return []
-    out: list[dict] = []
+    out: list[dict[str, Any]] = []
 
-    def walk(node: dict) -> None:
+    def walk(node: dict[str, Any]) -> None:
         if node.get("view_gremium_id") in gremium_ids:
             out.append(node)
             return
@@ -300,7 +301,7 @@ def _views_for_node(
     requested_by_node: dict[tuple[object, object], Decimal],
     expended_by_node: dict[tuple[object, object], Decimal],
     income_by_node: dict[tuple[object, object], Decimal],
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Build the `AllocationView` dicts of a node, one per relevant fiscal year.
 
     `committed` is `bound + expended`, the total consumption. It stays for
@@ -311,7 +312,7 @@ def _views_for_node(
     fys |= {fy for (nid, fy) in requested_by_node if nid == node_id}
     fys |= {fy for (nid, fy) in expended_by_node if nid == node_id}
     fys |= {fy for (nid, fy) in income_by_node if nid == node_id}
-    views: list[dict] = []
+    views: list[dict[str, Any]] = []
     for fy in sorted(fys, key=str):
         allocated = alloc_by_node.get((node_id, fy), _ZERO)
         bound = bound_by_node.get((node_id, fy), _ZERO)
@@ -358,7 +359,7 @@ def build_forest(
     income_rows: Sequence[tuple[object, str, Decimal | None]] = (),
     *,
     gremium_id: object | None = None,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Build the tree for `GET /budgets` as DTO-ready snake_case dicts.
 
     Consumption (bound plus expended) rolls up. The allocation stays at its own
@@ -387,7 +388,7 @@ def build_forest(
     parent_of = {n[0]: n[1] for n in nodes}
     decision_of = {n[0]: n[15] for n in nodes}
 
-    def to_dict(n: NodeTuple) -> dict:
+    def to_dict(n: NodeTuple) -> dict[str, Any]:
         (nid, parent_id, n_gremium, key, path, name, currency, active, color, acc,
          den, fy_month, fy_day, hidden_in_budget, view_gremium_id,
          decision_gremium_id) = n

@@ -40,7 +40,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from sqlalchemy import or_, select, text
+from sqlalchemy import ColumnElement, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
@@ -405,7 +405,9 @@ class DelegationService:
             for d, meeting, gremium in rows
         ]
 
-    async def _joined(self, *where) -> list[tuple[MeetingDelegation, Meeting, Gremium]]:
+    async def _joined(
+        self, *where: ColumnElement[bool]
+    ) -> list[tuple[MeetingDelegation, Meeting, Gremium]]:
         rows = (
             await self.session.execute(
                 select(MeetingDelegation, Meeting, Gremium)

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from types import SimpleNamespace
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -89,7 +90,7 @@ def _transition(
     from_id: object,
     to_id: object,
     guard: object = None,
-    actions: list | None = None,
+    actions: list[Any] | None = None,
     branch: str | None = None,
     requires_action: bool = True,
 ) -> SimpleNamespace:
@@ -327,7 +328,7 @@ async def test_fire_default_dispatcher_when_none() -> None:
     assert res.dispatched_actions == ["notify", "taskNotify"]
 
 
-def _vote_cancel_updates(db) -> list:
+def _vote_cancel_updates(db) -> list[Any]:
     """Return the vote cancel UPDATEs that a fire wrote."""
     return [
         s
@@ -595,7 +596,7 @@ def _target_state(state_id: object, flow_id: object) -> SimpleNamespace:
     return SimpleNamespace(id=state_id, flow_version_id=flow_id, kind="normal", config={})
 
 
-def _vote_cancel_stmts(db) -> list:
+def _vote_cancel_stmts(db) -> list[Any]:
     return _vote_cancel_updates(db)
 
 

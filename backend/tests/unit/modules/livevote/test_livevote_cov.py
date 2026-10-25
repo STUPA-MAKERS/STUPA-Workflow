@@ -822,7 +822,7 @@ async def test_vote_tallies_failed_reason_set() -> None:
     )
     svc = MeetingService(sess)  # type: ignore[arg-type]
     out = await svc._vote_tallies([vrow])
-    counts, leading, reason = out[vrow.id]
+    counts, _leading, reason = out[vrow.id]
     assert counts == {"yes": 0, "no": 2}
     assert reason in ("quorum", "majority")
 

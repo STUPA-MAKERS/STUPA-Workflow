@@ -368,7 +368,7 @@ def _as_applicant(app: FastAPI, application_id: UUID, scope: str = "edit") -> No
     )
 
 
-def _create_body() -> dict:
+def _create_body() -> dict[str, Any]:
     return {
         "typeId": str(uuid4()),
         "data": {"title": "Mein Antrag"},
@@ -843,7 +843,7 @@ def test_applications_export_caps_rows(app: FastAPI, client: TestClient) -> None
                 offset=0,
             )
 
-        async def name_maps(self, locale: str = "de") -> tuple[dict, dict]:
+        async def name_maps(self, locale: str = "de") -> tuple[dict[str, Any], dict[str, Any]]:
             self.name_maps_called = True
             return {}, {}
 
@@ -873,7 +873,7 @@ def test_applications_export_caps_rows_by_item_count(app: FastAPI, client: TestC
             ]
             return Page(items=items, total=0, limit=int(kwargs["limit"]), offset=0)  # type: ignore[call-overload]
 
-        async def name_maps(self, locale: str = "de") -> tuple[dict, dict]:
+        async def name_maps(self, locale: str = "de") -> tuple[dict[str, Any], dict[str, Any]]:
             return {}, {}
 
     app.dependency_overrides[get_applications_service] = lambda: _ManyItemsService()

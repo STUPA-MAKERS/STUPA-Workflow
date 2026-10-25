@@ -15,6 +15,7 @@ import asyncio
 import uuid
 from collections.abc import AsyncIterator, Sequence
 from datetime import UTC, datetime
+from typing import Any
 
 import pytest
 from sqlalchemy import Engine, func, select
@@ -141,8 +142,8 @@ async def _seed(session: AsyncSession) -> tuple[Application, dict[str, State]]:
     return app_row, states
 
 
-def _config(**over: object) -> dict:
-    base: dict = {"options": ["yes", "no", "abstain"], "majorityRule": "simple"}
+def _config(**over: object) -> dict[str, Any]:
+    base: dict[str, Any] = {"options": ["yes", "no", "abstain"], "majorityRule": "simple"}
     base.update(over)
     return VoteConfig.model_validate(base).model_dump(by_alias=True)
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from decimal import Decimal
-from typing import cast
+from typing import Any, cast
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,7 +28,7 @@ def _action() -> DispatchedAction:
     )
 
 
-async def _ctx(row: tuple | None, lang: str = "de") -> dict[str, object]:
+async def _ctx(row: tuple[Any, ...] | None, lang: str = "de") -> dict[str, object]:
     session = FakeSession(executes=[[row] if row is not None else []])
     return await _decision_context(cast("AsyncSession", session), _action(), lang)
 

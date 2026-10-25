@@ -20,11 +20,13 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.modules.applications.models import Application, StatusEvent
 from app.modules.flow.models import State
 from app.modules.notifications.links import task_link
 from app.modules.notifications.models import TaskReminderLog
+from app.modules.notifications.provider import MailQueue
 from app.modules.notifications.recipients import (
     actionable_principal_emails,
     state_actionable,
@@ -50,7 +52,7 @@ def _naive_utc(dt: datetime) -> datetime:
     return dt.astimezone(UTC).replace(tzinfo=None) if dt.tzinfo is not None else dt
 
 
-def _sessionmaker(ctx: dict[str, Any]) -> Any:
+def _sessionmaker(ctx: dict[str, Any]) -> async_sessionmaker[AsyncSession]:
     """Return the DB sessionmaker (tests inject one via `ctx['sessionmaker']`)."""
     maker = ctx.get("sessionmaker")
     if maker is not None:
@@ -60,7 +62,7 @@ def _sessionmaker(ctx: dict[str, Any]) -> Any:
     return get_sessionmaker()
 
 
-def _mail_queue(ctx: dict[str, Any]) -> Any:
+def _mail_queue(ctx: dict[str, Any]) -> MailQueue | None:
     from app.modules.notifications.provider import mail_queue_from_pool
 
     return ctx.get("mail_queue") or mail_queue_from_pool(ctx.get("redis"))
@@ -115,7 +117,7 @@ async def process_task_reminders(
 
 
 async def _due_applications(
-    session: Any,
+    session: AsyncSession,
     *,
     now: datetime,
     after: timedelta,
@@ -155,7 +157,7 @@ async def _due_applications(
     if not rows:
         return []
 
-    states = {
+    states: dict[uuid.UUID | None, State] = {
         s.id: s
         for s in (
             await session.scalars(
@@ -199,7 +201,7 @@ async def _due_applications(
 
 
 async def _remind_one(
-    session: Any,
+    session: AsyncSession,
     service: NotificationService,
     settings: Settings,
     *,

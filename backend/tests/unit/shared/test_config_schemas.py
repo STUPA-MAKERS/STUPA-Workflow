@@ -1,6 +1,7 @@
 """Config schemas, flow-graph validation and JSON-Schema export."""
 
 from decimal import Decimal
+from typing import Any
 
 import pytest
 from pydantic import ValidationError
@@ -111,7 +112,7 @@ def test_form_field_rejects_extra_keys() -> None:
         )
 
 
-def _valid_graph_dict() -> dict:
+def _valid_graph_dict() -> dict[str, Any]:
     return {
         "states": [
             {"key": "draft", "label": {"de": "Entwurf"}, "color": "#4a90d9", "isInitial": True},
@@ -144,7 +145,7 @@ def test_flow_graph_from_alias_parsed() -> None:
     assert graph.transitions[0].from_ == "draft"
 
 
-def _vote_graph_dict() -> dict:
+def _vote_graph_dict() -> dict[str, Any]:
     return {
         "states": [
             {"key": "draft", "label": {"de": "Entwurf"}, "color": "#4a90d9", "isInitial": True},
@@ -485,7 +486,7 @@ def test_vote_state_gremium_source_budget_ok() -> None:
         ({"gremiumId": 5}, "requires config.gremiumId"),
     ],
 )
-def test_vote_state_gremium_exactly_one(config: dict, match: str) -> None:
+def test_vote_state_gremium_exactly_one(config: dict[str, Any], match: str) -> None:
     g = _vote_graph_dict()
     g["states"][1]["config"] = config
     with pytest.raises(FlowValidationError, match=match):
@@ -511,7 +512,7 @@ def test_initial_vote_state_cannot_use_the_budget() -> None:
         {"type": "assignBudgetFromMap", "field": "f", "map": {"a": "b-1"}},
     ],
 )
-def test_assign_budget_into_a_budget_vote_state_rejected(action: dict) -> None:
+def test_assign_budget_into_a_budget_vote_state_rejected(action: dict[str, Any]) -> None:
     """Reject a cost-center action into a budget vote state, but not into a fixed-Gremium one.
 
     Into a vote state with a fixed Gremium the action stays valid.

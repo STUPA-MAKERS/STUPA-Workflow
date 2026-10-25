@@ -9,6 +9,7 @@ the database paths.
 from __future__ import annotations
 
 from datetime import UTC, date, datetime, time
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -203,10 +204,10 @@ def _no_audit_chain(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 class _Scalars:
-    def __init__(self, rows: list) -> None:
+    def __init__(self, rows: list[Any]) -> None:
         self._rows = rows
 
-    def all(self) -> list:
+    def all(self) -> list[Any]:
         return self._rows
 
 
@@ -379,13 +380,13 @@ async def test_service_open_vote_returns_row() -> None:
 
 
 class _ListResult:
-    def __init__(self, rows: list) -> None:
+    def __init__(self, rows: list[Any]) -> None:
         self._rows = rows
 
     def scalars(self) -> _ListResult:
         return self
 
-    def all(self) -> list:
+    def all(self) -> list[Any]:
         return self._rows
 
     def scalar_one_or_none(self) -> object:
@@ -395,7 +396,7 @@ class _ListResult:
 class _ListSession:
     """Return the rows queued for each `execute` call, in FIFO order."""
 
-    def __init__(self, *result_sets: list) -> None:
+    def __init__(self, *result_sets: list[Any]) -> None:
         self._queue = list(result_sets)
 
     async def execute(self, _stmt: object) -> _ListResult:
@@ -511,10 +512,10 @@ class _DeletableSession(_FakeSession):
         self.deleted.append(obj)
 
 
-def _audit_capture(monkeypatch: pytest.MonkeyPatch) -> list[dict]:
+def _audit_capture(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
     import app.modules.livevote.service.lifecycle as livevote_lifecycle_mod
 
-    calls: list[dict] = []
+    calls: list[dict[str, Any]] = []
 
     async def _record(session, **kw):
         calls.append(kw)
