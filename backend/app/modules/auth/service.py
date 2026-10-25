@@ -40,8 +40,8 @@ from app.shared.errors import ForbiddenError, GoneError
 
 logger = logging.getLogger("app.auth")
 
-# Delivery callback `(email, link)`. It can be sync or async. Production uses an async
-# deliver that renders the mail and enqueues it with arq. Legacy tests use sync lambdas.
+#: Delivery callback `(email, link)`. It can be sync or async. Production uses an async
+#: deliver that renders the mail and enqueues it with arq. Legacy tests use sync lambdas.
 Deliver = Callable[[str, str], None | Awaitable[None]]
 
 
@@ -88,7 +88,13 @@ async def request_magic_link(
 ) -> None:
     """Request a magic link.
 
-    The function sends a mail only on a hit. The caller always answers 202.
+    The function sends a mail only on a hit. The caller always answers 202, so the
+    outside learns nothing about the address (anti-enumeration).
+
+    The token goes into the URL fragment (``#``), not into the query, because a
+    fragment does not land in a Referer header, in a server or proxy log, or in the
+    browser history. The frontend reads the fragment and POSTs the token to
+    ``/auth/magic-link/verify``.
 
     Every new link has `scope = 'edit'` and can be used more than once. The
     session it opens has no fixed scope: each action checks the current state, so
@@ -101,7 +107,7 @@ async def request_magic_link(
     """
     app = await resolve_application(db, email=email, application_id=application_id)
     if app is None:
-        return  # anti-enumeration: tell the outside nothing
+        return
 
     link_ttl_days = (await load_guest_settings(db)).link_ttl_days
     expires_at = (
@@ -118,10 +124,6 @@ async def request_magic_link(
         )
     )
     await db.flush()
-    # The token goes into the URL fragment (#), not into the query (?). A fragment does
-    # not land in a Referer header, in a server or proxy log, or in the browser history
-    # query. The frontend reads the fragment and POSTs the token to
-    # /auth/magic-link/verify.
     link = f"{settings.public_base_url.rstrip('/')}/antrag/{app.id}#t={token}"
     result = deliver(email, link)
     if inspect.isawaitable(result):
@@ -139,16 +141,26 @@ async def verify_magic_link(
 
     A link without an expiry (`expires_at` NULL) stays valid until a newer link is
     redeemed or the application is archived or anonymized. A single-use token (only
-    older rows) gets `used_at` set.
+    older rows) gets `used_at` set by an atomic ``UPDATE ... WHERE used_at IS NULL``,
+    so only one concurrent verify wins and a replay gets 410.
 
     The redeem expires every older link of the same application that is still
     valid (`expires_at = now`). An unlimited link therefore does not collect old
-    access paths. A newer link that is not yet redeemed stays valid.
+    access paths. A newer link that is not yet redeemed stays valid. "Older" includes
+    a link with the same creation time, but never this link. The creation time comes
+    from the database, so the compare stays in SQL.
+
+    The applicant session is a server-side row, not a stateless token: the opaque
+    ``sid`` is valid only with an ``applicant_session`` row, so a token forged from
+    ``SESSION_SECRET`` alone does not work.
 
     The applicant session always has the scope `edit`, also for an old `view`
     link. Each action checks the current state.
 
-    The first verify of a guest application confirms its email. The application
+    The first verify of a guest application confirms its email. That makes the
+    submission visible and protects it from the discard after ``confirm_ttl_hours``.
+    The update runs only while the column is NULL, so of two concurrent verifies only
+    one gets the row back. The application
     then leaves its rest in the flow: `FlowService.start_confirmed` runs the
     automatic transitions and sends the task mail. `dispatcher` sends the mails
     and the other flow actions. The start commits the session. A later verify
@@ -175,9 +187,6 @@ async def verify_magic_link(
     if row.expires_at is not None and row.expires_at <= now:
         raise GoneError("Magic-Link expired.")
     if row.single_use:
-        # Atomic redemption: only one concurrent verify wins. This blocks a replay.
-        # `WHERE used_at IS NULL` serializes in the database. Zero rows mean the token
-        # is already used, which gives 410.
         claimed = (
             await db.execute(
                 update(MagicLink)
@@ -188,10 +197,6 @@ async def verify_magic_link(
         ).scalar_one_or_none()
         if claimed is None:
             raise GoneError("Magic-Link already used.")
-    # Email confirmation: the first successful verify makes a guest submission visible
-    # and protects it from the discard after `confirm_ttl_hours`. The update is
-    # idempotent because it runs only while the column is NULL. Of two concurrent
-    # verifies, only one gets the row back.
     confirmed = (
         await db.execute(
             update(Application)
@@ -203,9 +208,6 @@ async def verify_magic_link(
             .returning(Application.id)
         )
     ).scalar_one_or_none()
-    # The redeem ends the older links of this application. "Older" includes a
-    # link with the same creation time, but never this link itself. The creation
-    # time comes from the database, so the compare stays in SQL.
     redeemed = aliased(MagicLink)
     redeemed_at = (
         select(redeemed.created_at).where(redeemed.id == row.id).scalar_subquery()
@@ -222,9 +224,6 @@ async def verify_magic_link(
     )
     scope: ApplicantScope = "edit"
     app_id = str(row.application_id)
-    # Create a server-side session instead of a stateless token. The opaque `sid` is
-    # valid only with an existing `applicant_session` row. A token forged from
-    # `SESSION_SECRET` alone does not work.
     expires_at = now + timedelta(hours=settings.applicant_session_ttl_hours)
     session_token = await sessions.create_applicant_session(
         db,
@@ -280,28 +279,30 @@ async def oidc_callback(
 
     `client` (`web` or `pwa`) selects the session lifetime from `login_settings`.
 
+    A deactivated principal fails closed here, so no session is created. A bootstrap
+    admin gets ``admin`` at the first login, because otherwise a fresh OIDC
+    installation locks itself out; the email bootstrap counts only with a verified
+    mail claim. The gremium memberships follow the OIDC groups that the upsert has
+    just cached. One LOGIN audit entry joins the transaction of the session.
+    The caller commits.
+
     Returns:
         The signed `sid` cookie value and the principal row.
+
+    Raises:
+        ForbiddenError: The principal is deactivated or merged into another one.
     """
     token_set = await oidc.exchange_code(settings, code=code, verifier=verifier)
     claims = await oidc.verify_id_token(
         settings, id_token=token_set["id_token"], nonce=nonce
     )
     row = await upsert_principal(db, claims)
-    # A deactivated principal must not log in. The check fails closed at login, so no
-    # session is created. Request resolution blocks them anyway.
     if row.active is False:
         raise ForbiddenError("Account is deactivated.")
-    # Bootstrap admins: grant admin at the first login, idempotent. Without it a fresh
-    # OIDC installation locks itself out. The email bootstrap counts only with a
-    # verified mail claim. The caller commits.
     await ensure_admin_for_principal(
         db, settings, row, email_verified=claims.email_verified
     )
     await ensure_member_for_principal(db, row)
-    # The gremium memberships come from the OIDC groups only. The upsert above has
-    # just refreshed the group cache, so the memberships follow the IdP from this
-    # login on.
     await sync_principal_memberships(db, row)
     now = _now()
     cookie = await sessions.create_principal_session(
@@ -314,10 +315,6 @@ async def oidc_callback(
         client=client,
         now=now,
     )
-    # One LOGIN entry per successful OIDC login, in the same transaction as the
-    # session. The actor is the principal. ``data`` names only the method: no IP
-    # address, no user agent, no e-mail. A magic-link redeem is not a LOGIN: it opens
-    # an applicant session for one application, not a principal account.
     await audit_record(
         db,
         actor=row.sub,

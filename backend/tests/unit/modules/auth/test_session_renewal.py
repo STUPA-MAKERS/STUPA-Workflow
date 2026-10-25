@@ -115,6 +115,7 @@ async def test_not_due_touches_nothing(idp: dict[str, Any]) -> None:
 
 
 async def test_renews_and_slides(idp: dict[str, Any]) -> None:
+    """Renew the tokens and slide the session: the tokens first, then the check."""
     row = _row()
     db = fake_session(result(row))
     assert await renew_principal_session(
@@ -126,7 +127,7 @@ async def test_renews_and_slides(idp: dict[str, Any]) -> None:
     assert row.revalidated_at == NOW
     assert row.expires_at == NOW + timedelta(days=DEFAULT_WEB_SESSION_DAYS)
     assert idp["synced"] == [idp["upsert"]]
-    assert db.committed == 2  # tokens first, then the check
+    assert db.committed == 2
     assert db.deleted == []
 
 
@@ -267,13 +268,16 @@ async def test_cached_claims_come_from_the_principal(idp: dict[str, Any]) -> Non
 async def test_new_tokens_are_committed_before_the_principal_update(
     idp: dict[str, Any],
 ) -> None:
+    """Commit the new tokens before the principal update.
+
+    One commit is for the tokens and one for the end of the session.
+    """
     idp["upsert"] = ForbiddenError("merged", code="account_merged")
     row = _row()
     db = fake_session(result(row))
     assert not await renew_principal_session(
         db, _settings(), session=row, principal=_principal(), now=NOW
     )
-    # One commit for the tokens, one for the end of the session.
     assert db.committed == 2
     assert row.refresh_token == "rt2"
 
@@ -299,6 +303,10 @@ async def test_deleted_row_does_not_go_on(idp: dict[str, Any]) -> None:
 async def test_outage_backs_off_without_calling_the_idp(
     idp: dict[str, Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Back off in an outage without calling the IdP.
+
+    Past the grace time the backoff does not protect the session.
+    """
     idp["refresh"] = OidcUnavailableError("down")
     row = _row(checked_hours_ago=20)
     assert await renew_principal_session(
@@ -312,7 +320,6 @@ async def test_outage_backs_off_without_calling_the_idp(
     )
     assert "used_token" not in idp
     assert db.committed == 0
-    # Past the grace time the backoff does not protect the session.
     old = _row(checked_hours_ago=80)
     db = fake_session(result(old))
     assert not await renew_principal_session(

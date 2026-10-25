@@ -44,7 +44,7 @@ def _patch(monkeypatch: pytest.MonkeyPatch, principal: Principal) -> None:
 async def test_killswitch_rejects_principal_without_mcp_use(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # The principal does NOT hold `mcp.use`, so the token has no effect.
+    """Reject the token of a principal that does not hold `mcp.use`."""
     _patch(monkeypatch, Principal(sub="agent", permissions={"application.read"}))
     out = await deps._principal_from_access_token(
         _DB(), "apat_x", NOW  # type: ignore[arg-type]
@@ -55,7 +55,11 @@ async def test_killswitch_rejects_principal_without_mcp_use(
 async def test_killswitch_allows_principal_with_mcp_use(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # The principal holds `mcp.use` explicitly. The token stays valid and the scope caps it.
+    """Allow the token of a principal that holds `mcp.use` explicitly.
+
+    The token stays valid and the scope caps it. The recheck runs against the unscoped
+    set, and the scope is set afterwards.
+    """
     _patch(
         monkeypatch,
         Principal(sub="agent", permissions={"mcp.use", "application.read"}),
@@ -64,14 +68,13 @@ async def test_killswitch_allows_principal_with_mcp_use(
         _DB(), "apat_x", NOW  # type: ignore[arg-type]
     )
     assert out is not None
-    # The recheck ran against the UNSCOPED set. The scope is set afterwards.
     assert out.scope_permissions is not None
 
 
 async def test_killswitch_admin_passes_via_bypass(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # The admin holds `mcp.use` through the unscoped admin bypass, so the token is valid.
+    """Allow an admin token, because the unscoped admin bypass holds `mcp.use`."""
     _patch(monkeypatch, Principal(sub="root", roles=["admin"]))
     out = await deps._principal_from_access_token(
         _DB(), "apat_x", NOW  # type: ignore[arg-type]

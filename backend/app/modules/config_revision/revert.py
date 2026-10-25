@@ -33,18 +33,18 @@ from app.shared.errors import ConflictError, ForbiddenError, NotFoundError
 if TYPE_CHECKING:
     from app.modules.livevote.publisher import MeetingPublisher
 
-# Permission per entity that the original config change needed. This is the same gate
-# as the sidebar restore. A revert is an equally strong mutation, so it must require
-# the same granular permission, not only the global ``audit.revert``.
+#: Permission per entity that the original config change needed. This is the same gate
+#: as the sidebar restore. A revert is an equally strong mutation, so it must require
+#: the same granular permission, not only the global ``audit.revert``.
 _CONFIG_REVERT_PERM: dict[str, str] = {
     ENTITY_FORM: "form.configure",
     ENTITY_FLOW: "flow.configure",
     ENTITY_SITE_CONFIG: "admin.site",
 }
 
-# Budget mutations need the same permission as the original mutation. Structure work
-# on nodes and allocations needs ``budget.structure``. Bookings and transfers move
-# money and need ``budget.book``.
+#: Budget mutations need the same permission as the original mutation. Structure work
+#: on nodes and allocations needs ``budget.structure``. Bookings and transfers move
+#: money and need ``budget.book``.
 _BUDGET_REVERT_PERM: dict[AuditAction, str] = {
     AuditAction.BUDGET_NODE_CREATE: "budget.structure",
     AuditAction.BUDGET_NODE_UPDATE: "budget.structure",
@@ -62,19 +62,25 @@ def _uuid_or_none(raw: object) -> UUID | None:
 
 @dataclass(frozen=True, slots=True)
 class RevertResult:
+    """What a revert changed, and the audit entry it reverted."""
+
     entity_type: str
     entity_id: str
     reverted_audit_id: int
 
 
 class RevertService:
-    """Run the audit-log revert, bound to an ``AsyncSession``."""
+    """Run the audit-log revert, bound to an ``AsyncSession``.
+
+    The publisher sends ``vote_cancelled`` when a status revert cancels the votes of a
+    state.
+    """
 
     def __init__(
         self, session: AsyncSession, publisher: MeetingPublisher | None = None
     ) -> None:
+        """Bind the service to a session and the meeting publisher."""
         self.session = session
-        # Sends `vote_cancelled` when a status revert cancels the votes of a state.
         self.publisher = publisher
 
     async def revert(
@@ -194,13 +200,14 @@ class RevertService:
         """Revert an application status transition back to the prior state.
 
         The application leaves its current state, so the flow cancels the votes of
-        that state and the publisher sends ``vote_cancelled``.
+        that state and the publisher sends ``vote_cancelled``. The revert needs
+        ``application.transition``, because a status reset is a state transition like
+        one that a user fires by hand. The decision that the change wrote gives way to
+        the one before it. A reverted revert that swapped decisions swaps them back.
         """
         from app.modules.applications.decision import DecisionSwap
         from app.modules.flow.service import FlowService
 
-        # A status reset is a state transition, so it needs the same permission as a
-        # transition that a user fires by hand.
         self._require(principal, "application.transition", "an application status change")
 
         data = entry.data or {}
@@ -212,7 +219,6 @@ class RevertService:
                 "This status change is not revertable.", code="not_revertable"
             )
         event_raw = data.get("statusEventId")
-        # A reverted revert that swapped decisions swaps them back (redo).
         swap: DecisionSwap | None = None
         if "decisionUndoneId" in data or "decisionRestoredId" in data:
             swap = DecisionSwap(
@@ -225,7 +231,6 @@ class RevertService:
             to_state_id=UUID(to_raw),
             actor=actor,
             reverted_audit_id=entry.id,
-            # The decision that the change wrote gives way to the one before it.
             reverted_status_event_id=UUID(event_raw) if event_raw else None,
             decision_swap=swap,
         )

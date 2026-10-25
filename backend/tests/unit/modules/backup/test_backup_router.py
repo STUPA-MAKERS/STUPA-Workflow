@@ -90,7 +90,8 @@ class _FakeService:
         self.created.append((kind, actor, note))
         return _row(status="pending", kind=kind, created_by=actor, note=note)
 
-    async def export_stream(self, row: Backup):  # AsyncIterator[bytes]
+    async def export_stream(self, row: Backup):
+        """Yield the archive bytes."""
         self.export_calls += 1
         if not row.storage_key:
             raise BackupError("this backup has no stored archive")
@@ -144,9 +145,6 @@ def _principal(app: FastAPI, *perms: str) -> None:
     )
 
 
-# ---------------------------------------------------------------------------- RBAC
-
-
 @pytest.mark.parametrize(
     ("method", "path"),
     [
@@ -159,8 +157,11 @@ def _principal(app: FastAPI, *perms: str) -> None:
     ],
 )
 def test_every_route_requires_authentication(client: TestClient, method: str, path: str) -> None:
-    # `request` rather than `client.get`/`client.delete`, because only it carries a
-    # body on every verb, and the POST routes need one to get past validation.
+    """Require authentication on every route.
+
+    The test uses `request` rather than `client.get` or `client.delete`, because only it
+    carries a body on every verb, and the POST routes need one to get past validation.
+    """
     assert client.request(method.upper(), path, json={}).status_code == 401
 
 
@@ -179,9 +180,6 @@ def test_another_admin_permission_is_not_enough(
     """`backup.manage` is deliberately separate from every admin.* page permission."""
     _principal(app, "admin.site", "privacy.manage")
     assert client.request(method.upper(), path, json={}).status_code == 403
-
-
-# ---------------------------------------------------------------------------- list
 
 
 def test_list_returns_the_catalogue_and_the_capability_flags(
@@ -221,9 +219,6 @@ def test_get_returns_404_for_an_unknown_backup(app: FastAPI, client: TestClient)
     assert client.get(f"/api/admin/backups/{MISSING_ID}").status_code == 404
 
 
-# -------------------------------------------------------------------------- create
-
-
 def test_create_answers_202_with_a_pending_row(
     app: FastAPI, client: TestClient, service: _FakeService
 ) -> None:
@@ -248,16 +243,14 @@ def test_create_rejects_an_over_long_note(app: FastAPI, client: TestClient) -> N
     assert response.status_code == 422
 
 
-# -------------------------------------------------------------------------- export
-
-
 def test_export_streams_the_archive_through_the_api(
     app: FastAPI, client: TestClient
 ) -> None:
-    """Regression: the download must NOT be a presigned MinIO URL.
+    """Stream the archive through the API, not through a presigned MinIO URL.
 
     MinIO sits on the internal Docker network, so a presigned S3 URL binds a host the
-    browser cannot resolve. The bytes therefore come through this route.
+    browser cannot resolve. The bytes therefore come through this route, and nothing in
+    the response may point a client at the object store.
     """
     _principal(app, "backup.manage")
     response = client.get(f"/api/admin/backups/{BACKUP_ID}/export")
@@ -265,7 +258,6 @@ def test_export_streams_the_archive_through_the_api(
     assert response.content == b"cipher"
     assert "attachment; filename=" in response.headers["content-disposition"]
     assert response.headers["x-content-type-options"] == "nosniff"
-    # Nothing in the response may point a client at the object store.
     assert "minio" not in response.text.lower()
 
 
@@ -277,9 +269,6 @@ def test_export_refuses_a_backup_that_is_not_finished(
     response = client.get(f"/api/admin/backups/{BACKUP_ID}/export")
     assert response.status_code == 409
     assert response.json()["code"] == "backup_not_ready"
-
-
-# ------------------------------------------------------------------------- restore
 
 
 def test_restore_needs_the_literal_confirmation(app: FastAPI, client: TestClient) -> None:
@@ -318,9 +307,6 @@ def test_restore_refuses_without_a_job_queue(app: FastAPI, client: TestClient) -
     assert response.status_code == 503
 
 
-# -------------------------------------------------------------------------- delete
-
-
 def test_delete_removes_the_backup(app: FastAPI, client: TestClient, service: _FakeService) -> None:
     _principal(app, "backup.manage")
     assert client.delete(f"/api/admin/backups/{BACKUP_ID}").status_code == 204
@@ -342,9 +328,6 @@ def test_delete_refuses_a_pinned_backup(
 def test_delete_returns_404_for_an_unknown_backup(app: FastAPI, client: TestClient) -> None:
     _principal(app, "backup.manage")
     assert client.delete(f"/api/admin/backups/{MISSING_ID}").status_code == 404
-
-
-# ------------------------------------------------------------- coverage of the wiring
 
 
 class _FakePool:

@@ -71,9 +71,13 @@ def _entry(entry_id: int, *, prev: bytes | None = None) -> AuditEntry:
 
 
 async def test_verify_and_store_valid_chain(log: _Log) -> None:
+    """Verify and store a valid chain.
+
+    The first result answers the lock statement and the second feeds the stream. The
+    lock and the prune run in the same transaction, before the commit.
+    """
     e1 = _entry(1)
     e2 = _entry(2, prev=e1.hash)
-    # The first result answers the lock statement, the second feeds the stream.
     db = fake_session(result(None), result(e1, e2))
 
     row = await AuditService(db).verify_and_store(trigger="manual", triggered_by="admin-1")
@@ -90,7 +94,6 @@ async def test_verify_and_store_valid_chain(log: _Log) -> None:
     assert row.started_at.tzinfo is not None
     assert db.flushed == 1
     assert db.committed == 1
-    # The lock and the prune run in the same transaction, before the commit.
     assert len(db.statements) == 2
     assert "pg_advisory_xact_lock" in str(db.statements[0])
     ((level, line),) = log.lines
@@ -117,6 +120,11 @@ async def test_verify_and_store_broken_chain_logs_an_error(log: _Log) -> None:
 
 
 async def test_prune_deletes_past_the_newest_rows() -> None:
+    """Delete the rows past the newest ones.
+
+    The first failed check of each break stays, but not every failed check. The newest
+    check of each trigger stays.
+    """
     db = fake_session()
     await AuditService(db).prune_verifications(keep=3)
     (stmt,) = db.statements
@@ -127,7 +135,6 @@ async def test_prune_deletes_past_the_newest_rows() -> None:
     assert "NOT IN" in sql
     assert "ORDER BY audit_verification.started_at DESC, audit_verification.id DESC" in sql
     assert "LIMIT 3" in sql
-    # The first failed check of each break stays, not every failed check.
     assert "audit_verification.valid IS true" not in sql
     assert "audit_verification.valid IS false" in sql
     assert "DISTINCT ON (audit_verification.broken_at, audit_verification.reason)" in sql
@@ -135,7 +142,6 @@ async def test_prune_deletes_past_the_newest_rows() -> None:
         "ORDER BY audit_verification.broken_at, audit_verification.reason, "
         "audit_verification.started_at ASC, audit_verification.id ASC" in sql
     )
-    # The newest check of each trigger stays.
     assert "DISTINCT ON (audit_verification.trigger)" in sql
 
 
@@ -221,6 +227,11 @@ async def test_manual_run_refuses_inside_the_cooldown(log: _Log) -> None:
 
 
 async def test_manual_run_stores_a_check_after_the_cooldown(log: _Log) -> None:
+    """Store a manual check after the cooldown.
+
+    The statements are the try-lock, the cooldown read and the prune, with no second,
+    blocking lock.
+    """
     e1 = _entry(1)
     last = datetime.now(UTC) - MANUAL_VERIFICATION_COOLDOWN - timedelta(seconds=1)
     db = fake_session(result(True), result(last), result(e1))
@@ -233,7 +244,6 @@ async def test_manual_run_stores_a_check_after_the_cooldown(log: _Log) -> None:
     assert row.valid is True
     assert db.committed == 1
     assert db.rolled_back == 0
-    # try-lock, the cooldown read and the prune. No second, blocking lock.
     assert len(db.statements) == 3
     assert not any("pg_advisory_xact_lock" in str(st) for st in db.statements)
 

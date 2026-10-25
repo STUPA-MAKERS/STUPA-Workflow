@@ -135,9 +135,6 @@ def _raise_on_flush(db: Any) -> list[int]:
     return rollbacks
 
 
-# ---------------------------------------------------------------- schema
-
-
 @pytest.mark.parametrize(
     ("model", "body"),
     [
@@ -164,9 +161,6 @@ def test_global_mapping_has_no_gremium() -> None:
         {"oidcGroup": "fsr", "roleId": str(uuid4()), "gremiumId": str(uuid4())}
     )
     assert "gremium_id" not in type(payload).model_fields
-
-
-# ---------------------------------------------------------------- membership mappings
 
 
 async def test_list_membership_mappings() -> None:
@@ -266,9 +260,6 @@ async def test_delete_membership_mapping_not_found() -> None:
         )
 
 
-# ---------------------------------------------------------------- role mappings
-
-
 async def test_list_role_mappings_carries_gremium_of_role() -> None:
     gid = uuid4()
     m = _role_mapping(uuid4())
@@ -358,19 +349,18 @@ async def test_delete_role_mapping_not_found() -> None:
 
 
 async def test_delete_gremium_role_in_use_by_mapping_blocked() -> None:
+    """Block the delete of a gremium role that a mapping uses, also without a membership."""
     role = _role(key="custom")
-    db = fake_session(result(), result(uuid4()), gets=[role])  # no membership, a mapping
+    db = fake_session(result(), result(uuid4()), gets=[role])
     with pytest.raises(ConflictError, match="group mapping"):
         await GremiumRoleService(db).delete_role(role.id, "admin")
 
 
-# ---------------------------------------------------------------- sync
-
-
 async def test_sync_without_groups_removes_all(audits: list[dict[str, Any]]) -> None:
+    """Remove all memberships without groups; no mapping query runs for an empty set."""
     row = _principal(None)
     old = _membership(row.id, uuid4(), uuid4())
-    db = fake_session(result(old))  # no mapping query: the group set is empty
+    db = fake_session(result(old))
     assert await membership_sync.sync_principal_memberships(db, row) is True
     assert db.deleted == [old]
     assert [a["target_id"] for a in audits] == [str(old.id)]
@@ -379,11 +369,15 @@ async def test_sync_without_groups_removes_all(audits: list[dict[str, Any]]) -> 
 
 
 async def test_sync_merged_principal_holds_no_membership(audits: list[dict[str, Any]]) -> None:
-    """A merged account is a locked reference: its cached groups give nothing."""
+    """Give a merged principal no membership.
+
+    A merged account is a locked reference, so its cached groups give nothing. The group
+    set counts as empty, so no mapping query runs.
+    """
     row = _principal(["stupa"])
     row.merged_into = uuid4()
     old = _membership(row.id, uuid4(), uuid4())
-    db = fake_session(result(old))  # no mapping query: the group set counts as empty
+    db = fake_session(result(old))
     assert await membership_sync.sync_principal_memberships(db, row) is True
     assert db.deleted == [old]
 
@@ -391,8 +385,9 @@ async def test_sync_merged_principal_holds_no_membership(audits: list[dict[str, 
 async def test_sync_role_group_alone_gives_no_membership(
     audits: list[dict[str, Any]],
 ) -> None:
+    """Give no membership for a role group without a membership mapping."""
     row = _principal(["stupa-board"])
-    db = fake_session(result(), result())  # no membership mapping, no membership
+    db = fake_session(result(), result())
     assert await membership_sync.sync_principal_memberships(db, row) is False
     assert db.added == []
 
@@ -400,14 +395,19 @@ async def test_sync_role_group_alone_gives_no_membership(
 async def test_sync_member_without_role_mapping_gets_member_role(
     audits: list[dict[str, Any]],
 ) -> None:
+    """Give a member without a role mapping the default member role.
+
+    The execute calls read the membership mappings, which give gremien, the role
+    mappings, which give none, the default role and the existing memberships.
+    """
     row = _principal(["stupa"])
     gid = uuid4()
     member = _role(gid, key="member")
     db = fake_session(
-        result(gid),  # membership mappings -> gremien
-        result(),  # role mappings -> none
-        result(member),  # default role lookup
-        result(),  # existing memberships
+        result(gid),
+        result(),
+        result(member),
+        result(),
     )
     _ids_on_flush(db)
     assert await membership_sync.sync_principal_memberships(db, row) is True
@@ -495,11 +495,16 @@ async def test_sync_tie_breaks_on_lower_key(audits: list[dict[str, Any]]) -> Non
 
 
 async def test_sync_all_counts_changed_principals(audits: list[dict[str, Any]]) -> None:
+    """Count only the principals that changed.
+
+    The first principal has one stale row and changes. The second has no row and stays
+    unchanged.
+    """
     changed = _principal(None)
     unchanged = _principal(None)
     db = fake_session(
-        result(changed, unchanged),  # all principals
-        result(_membership(changed.id, uuid4(), uuid4())),  # changed: one stale row
-        result(),  # unchanged: no row
+        result(changed, unchanged),
+        result(_membership(changed.id, uuid4(), uuid4())),
+        result(),
     )
     assert await membership_sync.sync_all_memberships(db) == 1

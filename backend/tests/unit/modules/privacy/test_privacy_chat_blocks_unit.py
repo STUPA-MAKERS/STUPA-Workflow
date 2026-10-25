@@ -88,6 +88,11 @@ async def test_the_applicant_request_deletes_the_block_of_its_address(
 async def test_the_export_names_the_comment_files_and_lists_the_blocks(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Name the comment files and list the blocks in the export.
+
+    The last queued results are the versions, the application attachments and the
+    tickets.
+    """
     asked: list[dict[str, Any]] = []
 
     async def _blocks(_session: object, **kw: Any) -> list[TicketSenderBlock]:
@@ -134,10 +139,10 @@ async def test_the_export_names_the_comment_files_and_lists_the_blocks(
         scalars=[
             result(applicant),
             result(application),
-            result(),  # versions
+            result(),
             result(with_files, plain),
-            result(),  # application attachments
-            result(),  # tickets
+            result(),
+            result(),
         ],
         execute=[
             result((type_id, {"de": "Typ"})),

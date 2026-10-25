@@ -55,9 +55,12 @@ from tests._support.auth_fakes import FakeResult
 PID = uuid.UUID(int=1)
 OTHER = uuid.UUID(int=2)
 THIRD = uuid.UUID(int=3)
-G_FS = uuid.UUID(int=10)  # Fachschaft Informatik
-G_SP = uuid.UUID(int=11)  # Studierendenparlament
-G_TE = uuid.UUID(int=12)  # Fachschaft Technik (role mapping only, no tie)
+#: Fachschaft Informatik.
+G_FS = uuid.UUID(int=10)
+#: Studierendenparlament.
+G_SP = uuid.UUID(int=11)
+#: Fachschaft Technik, with a role mapping only and no tie.
+G_TE = uuid.UUID(int=12)
 R_HHB = RoleInfo(uuid.UUID(int=20), "hhb", {"de": "Haushaltsbeauftragte"})
 R_MEMBER = RoleInfo(uuid.UUID(int=21), "member", {"de": "Mitglied"})
 R_ADMIN = RoleInfo(uuid.UUID(int=22), "admin", {"de": "Administration"})
@@ -128,9 +131,6 @@ def _row(**kw: Any) -> PrincipalRow:
     return row
 
 
-# -- Pure logic --------------------------------------------------------------------------
-
-
 def test_held_roles_skip_member_and_gremium_rows() -> None:
     assert set(held_roles(_snap())) == {R_HHB.id, R_ADMIN.id}
 
@@ -145,6 +145,7 @@ def test_tied_gremien_cover_every_source() -> None:
 
 
 def test_group_targets_ignore_untied_role_maps_member_and_foreign_groups() -> None:
+    """Count a role mapping only for a tied Gremium, and a foreign group never."""
     snap = _snap(membership_maps=[("fs-informatik", G_FS), ("not-mine", G_SP)])
     targets = group_targets(snap)
     assert targets == {
@@ -152,7 +153,6 @@ def test_group_targets_ignore_untied_role_maps_member_and_foreign_groups() -> No
         "fs-informatik-vorsitz": ({G_FS}, set()),
         "haushalt": (set(), {R_HHB.id}),
     }
-    # A role mapping counts only for a tied Gremium, a foreign group never.
     snap = _snap(
         role_maps=[("not-mine", G_FS, GR_VORSITZ.id)], group_maps=[("not-mine", R_HHB)]
     )
@@ -160,11 +160,11 @@ def test_group_targets_ignore_untied_role_maps_member_and_foreign_groups() -> No
 
 
 def test_preview_marks_a_bootstrap_admin_that_comes_back() -> None:
+    """Mark a bootstrap admin that comes back; a gremium assignment is no bootstrap."""
     out = build_preview(_snap(bootstrap_admin=True), _row(), is_self=False)
     admin = next(r for r in out.global_roles if r.role_key == "admin")
     assert admin.assignments[0].returns_automatically is True
     assert admin.model_dump(by_alias=True)["assignments"][0]["returnsAutomatically"] is True
-    # A gremium assignment of the same person is no bootstrap.
     sp = next(g for g in out.gremien if g.gremium_id == G_SP)
     assert sp.assignments[0].returns_automatically is False
 
@@ -198,6 +198,11 @@ def test_bootstrap_admin_by_sub_or_email(subjects: str, emails: str, expected: b
 
 
 def test_build_preview_groups_everything_by_gremium() -> None:
+    """Group the whole preview by gremium.
+
+    The person is a substitute for Jonas Weber and the member that Rana Becker
+    represents. The person is not a configured bootstrap admin, so the role is not shown.
+    """
     out = build_preview(_snap(), _row(), is_self=False)
     assert out.principal.display_name == "Tobias Kern"
     assert out.principal.last_login == "2026-02-12T00:00:00+00:00"
@@ -209,7 +214,6 @@ def test_build_preview_groups_everything_by_gremium() -> None:
     assert fs.membership.groups == ["fs-informatik", "fs-informatik-vorsitz"]
     assert fs.groups == ["fs-informatik", "fs-informatik-vorsitz"]
     assert fs.open_tasks == 2
-    # As substitute for Jonas Weber, and as the member that Rana Becker represents.
     assert [(p.as_substitute, p.member_name, p.substitute_name) for p in fs.pool_entries] == [
         (True, "Jonas Weber", None),
         (False, None, "Rana Becker"),
@@ -227,7 +231,6 @@ def test_build_preview_groups_everything_by_gremium() -> None:
     admin, hhb = out.global_roles
     assert admin.groups == [] and [a.granted_by for a in admin.assignments] == ["bootstrap"]
     assert admin.assignments[0].valid_from == "2025-11-04T00:00:00+00:00"
-    # Not a configured bootstrap admin: the role stays away.
     assert admin.assignments[0].returns_automatically is False
     assert hhb.groups == ["haushalt"] and hhb.assignments == []
     assert [(g.group, g.gremium_ids, g.global_role_ids) for g in out.groups] == [
@@ -265,7 +268,10 @@ def test_plan_refuses_unknown_targets() -> None:
 
 
 def test_plan_refuses_a_half_selection_of_a_shared_group() -> None:
-    # `shared` leads into both Gremien and to the global role.
+    """Refuse a half selection of a shared group.
+
+    The group `shared` leads into both Gremien and to the global role.
+    """
     snap = _snap(
         groups=["shared"],
         membership_maps=[("shared", G_FS), ("shared", G_SP)],
@@ -323,9 +329,6 @@ def test_has_groups_filter_branches() -> None:
     assert "END =" in _sql(has_groups_filter(False))
 
 
-# -- Queue session -----------------------------------------------------------------------
-
-
 class _Session:
     """Pop one queued result per `execute`/`scalars` call and record the statements."""
 
@@ -357,12 +360,12 @@ class _Session:
 
 
 async def test_principals_with_access() -> None:
+    """Count a group only through a mapping into a Gremium or a global role."""
     assert await principals_with_access(_Session(), []) == set()  # type: ignore[arg-type]
     db = _Session([PID, None])
     assert await principals_with_access(db, [PID, OTHER]) == {PID}  # type: ignore[arg-type]
     sql = _sql(db.statements[0])
     assert "UNION" in sql
-    # A group counts only through a mapping into a Gremium or a global role.
     assert "principal.oidc_groups ? gremium_membership_mapping.oidc_group" in sql
     assert "principal.oidc_groups ? group_mapping.oidc_group" in sql
 
@@ -431,7 +434,7 @@ def _full_queue(
     )
     hhb = _Obj(id=R_HHB.id, key="hhb", name_i18n={"de": "HHB"})
     return [
-        [row],  # the principal
+        [row],
         [(membership, grole)],
         [(assignment, role)],
         [pool],
@@ -440,7 +443,7 @@ def _full_queue(
         [("fs-informatik-vorsitz", G_FS, GR_VORSITZ.id)],
         [("haushalt", hhb)],
         [(G_FS, "Fachschaft Informatik"), (G_SP, "Studierendenparlament")],
-        [(str(G_FS), 3), ("unknown", 1)],  # open votes
+        [(str(G_FS), 3), ("unknown", 1)],
     ]
 
 
@@ -466,9 +469,9 @@ async def test_preview_loads_the_snapshot(lookups: list[set[Any]]) -> None:
 
 
 async def test_open_votes_count_only_where_the_role_votes(lookups: list[set[Any]]) -> None:
-    """A gremium role without `vote.cast` has no open votes: no count query."""
+    """Give a gremium role without `vote.cast` no open votes and run no count query."""
     row = _row(groups=["fs-informatik", "fs-informatik-vorsitz", "haushalt"])
-    queue = _full_queue(row, votes=False)[:-1]  # no open-vote query
+    queue = _full_queue(row, votes=False)[:-1]
     db = _Session(*queue)
     out = await PrincipalRevokeService(db).preview(PID, actor="tk")  # type: ignore[arg-type]
     assert out.gremien[0].open_tasks == 0
@@ -478,16 +481,16 @@ async def test_open_votes_count_only_where_the_role_votes(lookups: list[set[Any]
 async def test_snapshot_without_groups_and_ties_skips_the_lookups(
     lookups: list[set[Any]],
 ) -> None:
+    """Skip the lookups without groups and ties.
+
+    The loads read only the principal, memberships, assignments, pool and delegations.
+    """
     row = _row(groups=None)
     db = _Session([row], [], [], [], [])
     out = await PrincipalRevokeService(db).preview(PID, actor="boss")  # type: ignore[arg-type]
     assert out.gremien == [] and out.global_roles == [] and out.groups == []
-    # The principal, memberships, assignments, pool, delegations: nothing else.
     assert len(db.statements) == 5
     assert lookups == [set(), set()]
-
-
-# -- Revoke ------------------------------------------------------------------------------
 
 
 class _Audit:
@@ -544,6 +547,11 @@ async def test_revoke_rolls_back_on_an_invalid_selection(writes: list[str]) -> N
 
 
 async def test_revoke_clears_the_gremium_and_deactivates(writes: list[str]) -> None:
+    """Clear the gremium and deactivate the person.
+
+    The person was the delegate, so the delegator loses the representation and gets the
+    mail.
+    """
     row = _row(groups=["fs-informatik", "fs-informatik-vorsitz", "haushalt"])
     db = _Session(*_full_queue(row))
     out, mails = await PrincipalRevokeService(db).revoke(  # type: ignore[arg-type]
@@ -558,8 +566,6 @@ async def test_revoke_clears_the_gremium_and_deactivates(writes: list[str]) -> N
     assert out.kept_live_delegations == 0 and out.deactivated is True
     assert row.oidc_groups == [] and row.active is False
     assert [m.delegation_id if m else None for m in mails] == [uuid.UUID(int=60)]
-    # The person was the delegate: the delegator loses the representation and gets
-    # the mail.
     assert writes == ["mail:60:delegator", "sync:[]"]
     assert db.committed == 1 and db.rolled_back == 0
     deletes = [_sql(s) for s in db.statements[10:]]
@@ -605,9 +611,6 @@ async def test_revoke_deactivate_only_on_an_inactive_account(writes: list[str]) 
     assert row.oidc_groups is None
     assert [e["action"] for e in _Audit.entries] == [AuditAction.PRINCIPAL_ACCESS_REVOKE]
     assert db.committed == 1
-
-
-# -- Routes ------------------------------------------------------------------------------
 
 
 class _FakeRevoke:
@@ -736,11 +739,15 @@ def test_list_principals_passes_the_filters(monkeypatch: pytest.MonkeyPatch) -> 
 
 
 async def test_set_principal_active_reports_has_access() -> None:
+    """Report has_access after a change of the active flag.
+
+    The execute calls are the audit lock, the audit hash, the assignments and the access
+    query.
+    """
     from app.modules.admin.service import ConfigService
     from tests._support.auth_fakes import fake_session, result
 
     row = _row(groups=None)
-    # The audit lock, the audit hash, the assignments, then the access query.
     db = fake_session(result(), result(), result(), result(PID), gets=[row])
     out = await ConfigService(db).set_principal_active(PID, True, "boss")
     assert out.has_access is True
@@ -758,14 +765,17 @@ def test_revoke_permission_is_in_no_oauth_scope() -> None:
 
 
 async def test_search_principals_filters_and_has_access() -> None:
+    """Filter the principal search and report has_access.
+
+    The access query names PID, which has a mapped group, and THIRD. A group without a
+    mapping ("students") gives no access.
+    """
     from app.modules.admin.service import ConfigService
     from tests._support.auth_fakes import fake_session, result
 
     with_groups, plain, tied = _row(), _row(groups=None), _row(groups=[])
     stray = _row(groups=["students"])
     plain.id, tied.id, stray.id = OTHER, THIRD, uuid.uuid4()
-    # The access query names PID (a mapped group) and THIRD; a group without a
-    # mapping ("students") gives no access.
     db = fake_session(result(with_groups, plain, tied, stray), result(), result(PID, THIRD))
     out = await ConfigService(db).search_principals(
         None, last_login_before=date(2026, 7, 1), include_never=True, has_groups=False

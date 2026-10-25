@@ -1,9 +1,9 @@
-"""Tests for the paths a restore takes: the bucket mirror, the subprocess wrapper, and
-the import route.
+"""Test the paths a restore takes.
 
-These are the parts that only ran live before. The mirror decides what survives a
-restore, the subprocess wrapper decides how a missing `pg_dump` is reported, and the
-import route is the one place a file from outside enters the platform.
+The paths are the bucket mirror, the subprocess wrapper and the import route. The
+mirror decides what survives a restore, the subprocess wrapper decides how a missing
+`pg_dump` is reported, and the import route is the one place a file from outside
+enters the platform.
 """
 
 from __future__ import annotations
@@ -94,9 +94,6 @@ def _tar_bytes(objects: dict[str, bytes]) -> io.BytesIO:
     return target
 
 
-# -------------------------------------------------------------------- bucket mirror
-
-
 @pytest.mark.asyncio
 async def test_mirror_writes_the_archive_objects_and_removes_the_rest() -> None:
     """A restore must leave the bucket matching the archive exactly.
@@ -132,9 +129,6 @@ async def test_apply_archive_refuses_without_storage() -> None:
         await service.apply_archive("/nowhere.age")
 
 
-# ---------------------------------------------------------------------- subprocess
-
-
 @pytest.mark.asyncio
 async def test_a_missing_binary_is_reported_as_a_missing_binary() -> None:
     """The image must not be able to fail silently on a missing pg_dump."""
@@ -162,9 +156,6 @@ async def test_a_run_that_overruns_its_timeout_is_killed() -> None:
     service = _sessionless(backup_subprocess_timeout_seconds=1)
     with pytest.raises(BackupError, match="timed out"):
         await service._run(["sleep", "30"], what="pg_dump")
-
-
-# -------------------------------------------------------------------- import route
 
 
 class _ImportSession:
@@ -268,6 +259,7 @@ def client(import_service: BackupService) -> Iterator[TestClient]:
 def test_import_stores_the_upload_and_reads_its_manifest(
     client: TestClient, identity: x25519.Identity, import_service: BackupService
 ) -> None:
+    """Store the upload byte for byte and read its manifest."""
     payload = _upload_bytes(identity, app_version="4.2.0")
     response = client.post(
         "/api/admin/backups/import",
@@ -280,7 +272,6 @@ def test_import_stores_the_upload_and_reads_its_manifest(
     assert body["sizeBytes"] == len(payload)
     assert body["appVersion"] == "4.2.0"
     assert body["objectCount"] == 1
-    # The archive itself reached the bucket, byte for byte.
     archives: Any = import_service.archives
     assert list(archives.objects.values()) == [payload]
 
@@ -335,9 +326,6 @@ def test_import_requires_the_backup_permission(
         files={"file": ("a.tar.age", _upload_bytes(identity), "application/octet-stream")},
     )
     assert response.status_code == 403
-
-
-# --------------------------------------------------------------------------- patch
 
 
 def test_patch_sets_the_note_and_the_pin(client: TestClient, import_service: BackupService) -> None:

@@ -9,6 +9,28 @@ The cap applies to the gremium permissions too (`session.manage`, `protocol.writ
 `protocol.finalize`, `vote.manage`). A gremium role grants such a permission to a token
 only when the scope of the token contains the key. See `Principal.scope_allows` and
 `app.modules.auth.policy`.
+
+``FORBIDDEN_PERMISSIONS`` go to no agent, whatever the scope or the admin status says.
+Every scope resolution removes them, so ``scope_allows("vote.cast")`` is False for every
+token. A ballot (``vote.cast``) stays strictly human. ``backup.manage`` stays human,
+because a backup holds the whole database in readable form and a restore replaces it.
+``admin.users.merge`` stays human, because a merge rewrites the history of two people and
+cannot be undone. ``admin.users.revoke_groups`` stays human, because it changes the
+identity data of a person (SSO groups, pool, delegations) and is a web-only action.
+
+``SCOPES`` maps a scope key to the allowed permission keys. ``read`` covers every reading
+endpoint, and the ``*:write`` scopes add the mutations. ``votes:write`` covers vote
+management (create, open, close), never ``vote.cast``. ``vote.manage``,
+``session.manage``, ``protocol.write`` and ``protocol.finalize`` are gremium permissions:
+a gremium role grants them, and the scope only lets them through. The meeting lead
+(``session.manage``) includes the votes of the gremium, so a ``meetings:write`` token of a
+lead can manage those votes without ``votes:write``. ``read`` holds the global read keys
+``meeting.view_all``, ``gremium.view_all`` and ``todo.read_all``, so an admin token keeps
+the view over every gremium. ``todos:write`` holds ``todo.all``, the global write key of
+the to-do cards. The to-dos read with any of ``todo.write``, ``todo.all`` and
+``todo.read_all`` in the scope and write with ``todo.write`` or ``todo.all``. Through
+``todo.all`` or ``todo.read_all`` a team board also needs its own permission in the scope,
+so a ``read`` token never opens the board "Plattform" (``ticket.manage``).
 """
 
 from __future__ import annotations
@@ -18,33 +40,10 @@ import hashlib
 import hmac
 import secrets
 
-# Permissions that no agent gets, whatever the scope or the admin status says. To cast a
-# ballot with the gremium permission `vote.cast` stays strictly human. Every scope
-# resolution removes it, so `scope_allows("vote.cast")` is False for every token.
-# `backup.manage` joins it for the same reason: a backup holds the whole database in
-# readable form, and a restore replaces it. Both stay with a human at a browser.
-# `admin.users.merge` joins them: an account merge rewrites the history of two people
-# and cannot be undone. `admin.users.revoke_groups` joins them too: it changes the
-# identity data of a person (SSO groups, pool, delegations) and is a web-only action.
 FORBIDDEN_PERMISSIONS: frozenset[str] = frozenset(
     {"vote.cast", "backup.manage", "admin.users.merge", "admin.users.revoke_groups"}
 )
 
-# Scope key to the allowed permission keys. `read` covers every reading endpoint. The
-# `*:write` scopes add the mutations. `votes:write` covers vote management only, that is
-# create, open and close. It never covers `vote.cast`, because voting stays human.
-# `vote.manage`, `session.manage`, `protocol.write` and `protocol.finalize` are gremium
-# permissions: a gremium role grants them, and the scope only lets them through.
-# The meeting lead (`session.manage`) includes the votes of the gremium, so a
-# `meetings:write` token of a lead can manage those votes also without `votes:write`.
-# `read` holds `meeting.view_all`, a global read-only key, so an admin token keeps the
-# view over the meetings of every gremium. For the same reason `read` holds
-# `gremium.view_all`, the global read key of the tab "Gremien", and `todo.read_all`,
-# the global read key of the to-do boards. `todos:write` holds `todo.all`, the global
-# write key of the to-do cards; the to-dos read with any of `todo.write`, `todo.all`
-# and `todo.read_all` in the scope and write with `todo.write` or `todo.all`. Through
-# `todo.all` or `todo.read_all` a team board also needs its own permission in the
-# scope, so a `read` token never opens the board "Plattform" (`ticket.manage`).
 SCOPES: dict[str, frozenset[str]] = {
     "read": frozenset(
         {
@@ -86,18 +85,18 @@ SCOPES: dict[str, frozenset[str]] = {
     ),
 }
 
-# The full curated range that MCP requests by default. The server caps it to the rights of
-# the logged-in user. A non-admin gets only their own subset.
+#: The full curated range that MCP requests by default. The server caps it to the rights of
+#: the logged-in user. A non-admin gets only their own subset.
 DEFAULT_SCOPE = " ".join(SCOPES.keys())
 
-# Hard cap in seconds for every finite token lifetime. This value bounds even the
-# longest finite selectable lifetime.
+#: Hard cap in seconds for every finite token lifetime. This value bounds even the
+#: longest finite selectable lifetime.
 MAX_LIFETIME_SECONDS = 90 * 24 * 3600
 
-# The selectable token lifetimes of the consent UI, mapped to the access-token TTL in
-# seconds. The order is the display order. `None` ("never") means that the token does
-# not expire: the access and the refresh token stay valid until a revoke on the grants
-# page ends them.
+#: The selectable token lifetimes of the consent UI, mapped to the access-token TTL in
+#: seconds. The order is the display order. `None` ("never") means that the token does
+#: not expire: the access and the refresh token stay valid until a revoke on the grants
+#: page ends them.
 LIFETIMES: dict[str, int | None] = {
     "1h": 3600,
     "8h": 8 * 3600,
@@ -121,7 +120,7 @@ def resolve_lifetime(key: str | None) -> int | None:
     return None if ttl is None else min(ttl, MAX_LIFETIME_SECONDS)
 
 
-# Display order of the scopes in the consent UI. The i18n keys live in the frontend.
+#: Display order of the scopes in the consent UI. The i18n keys live in the frontend.
 SCOPE_ORDER: tuple[str, ...] = (
     "read",
     "applications:write",
@@ -135,8 +134,9 @@ SCOPE_ORDER: tuple[str, ...] = (
     "admin:write",
 )
 
-_ACCESS_PREFIX = "apat_"  # antragsplattform access token
-_REFRESH_PREFIX = "aprt_"  # antragsplattform refresh token
+#: Token prefixes: antragsplattform access token and refresh token.
+_ACCESS_PREFIX = "apat_"
+_REFRESH_PREFIX = "aprt_"
 _TOKEN_BYTES = 32
 
 
@@ -144,6 +144,7 @@ class OAuthError(ValueError):
     """OAuth2 protocol error, mapped to a 400 invalid_request or invalid_grant."""
 
     def __init__(self, error: str, description: str = "") -> None:
+        """Keep the RFC 6749 error code and its description."""
         super().__init__(description or error)
         self.error = error
         self.description = description
@@ -183,14 +184,17 @@ def scope_permissions(scopes: list[str]) -> frozenset[str]:
 
 
 def is_access_token(token: str) -> bool:
+    """Tell whether ``token`` has the access-token prefix."""
     return token.startswith(_ACCESS_PREFIX)
 
 
 def generate_access_token() -> str:
+    """Generate a new opaque access token."""
     return _ACCESS_PREFIX + secrets.token_urlsafe(_TOKEN_BYTES)
 
 
 def generate_refresh_token() -> str:
+    """Generate a new opaque refresh token."""
     return _REFRESH_PREFIX + secrets.token_urlsafe(_TOKEN_BYTES)
 
 

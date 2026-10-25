@@ -17,17 +17,20 @@ NOW = datetime(2026, 6, 5, 12, 0, tzinfo=UTC)
 
 
 async def test_vote_cast_membership_emits_namespaced_group_key() -> None:
+    """Emit a namespaced group key for a vote.cast membership.
+
+    Without assignments, `groups` stays empty, so the code skips the mapping query. An
+    empty `role_ids` also skips the permission and role-key queries. Two queries remain:
+    the assignments, which are empty, and the membership rows (gremium_id, perms). The
+    bare UUID string must not serve as the cast key.
+    """
     row = PrincipalRow(sub="u", email=None, display_name=None, oidc_groups=None)
     row.id = "pid"  # type: ignore[assignment]
     gid = "11111111-1111-1111-1111-111111111111"
-    # Without assignments, `groups` stays empty, so the code skips the mapping query.
-    # An empty `role_ids` also skips the permission and role-key queries. Two queries
-    # remain: (1) assignments, (2) membership.
     db = fake_session(
-        result(),  # no RoleAssignments
-        result((gid, ["vote.cast"])),  # membership: (gremium_id, perms)
+        result(),
+        result((gid, ["vote.cast"])),
     )
     p = await rbac.resolve_principal(db, row, NOW)
     assert rbac.vote_group_key(gid) in p.groups
-    # The bare UUID string must NOT serve as the cast key.
     assert gid not in p.groups

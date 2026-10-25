@@ -46,9 +46,11 @@ class AllGremien:
     __slots__ = ()
 
     def __contains__(self, gremium_id: object) -> bool:
+        """Return True for every gremium id."""
         return True
 
     def __repr__(self) -> str:
+        """Return the name of the sentinel."""
         return "ALL_GREMIEN"
 
 

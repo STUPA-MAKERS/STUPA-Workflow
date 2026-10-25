@@ -88,6 +88,7 @@ class RbacOps(ConfigServiceBase):
     """Roles, role assignments, principals and OIDC group mappings."""
 
     async def list_roles(self) -> list[RoleOut]:
+        """List the global roles with their permissions."""
         roles = (await self.session.scalars(select(Role).order_by(Role.key))).all()
         perms = (await self.session.scalars(select(RolePermission))).all()
         by_role: dict[UUID, list[str]] = {}
@@ -104,6 +105,11 @@ class RbacOps(ConfigServiceBase):
         ]
 
     async def create_role(self, payload: RoleCreate, actor: str) -> RoleOut:
+        """Create a global role.
+
+        Raises:
+            ConflictError: The key exists already.
+        """
         existing = (
             await self.session.scalars(select(Role).where(Role.key == payload.key))
         ).first()
@@ -126,6 +132,11 @@ class RbacOps(ConfigServiceBase):
     async def update_role(
         self, role_id: UUID, payload: RoleUpdate, actor: str
     ) -> RoleOut:
+        """Update a global role.
+
+        Raises:
+            NotFoundError: No role has this id.
+        """
         role = await self.session.get(Role, role_id)
         if role is None:
             raise NotFoundError(f"role {role_id} not found")
@@ -170,6 +181,7 @@ class RbacOps(ConfigServiceBase):
         await self.session.commit()
 
     async def list_role_assignments(self) -> list[RoleAssignmentOut]:
+        """List the role assignments."""
         rows = (await self.session.scalars(select(RoleAssignmentRow))).all()
         return [_assignment_out(r) for r in rows]
 
@@ -197,6 +209,9 @@ class RbacOps(ConfigServiceBase):
             The principals with their role assignments and ``hasAccess``. One
             follow-up query loads the assignments and one the access ties, so there
             is no N+1.
+
+        The search escapes the LIKE metacharacters, because otherwise ``%`` and ``_``
+        act as wildcards and allow wildcard injection or an index bypass.
         """
         stmt = select(Principal)
         for clause in (
@@ -206,9 +221,6 @@ class RbacOps(ConfigServiceBase):
             if clause is not None:
                 stmt = stmt.where(clause)
         if query:
-            # Escape the LIKE metacharacters in user input. Without the escape,
-            # % and _ act as wildcards and allow wildcard injection or an index
-            # bypass.
             like = f"%{escape_like(query)}%"
             stmt = stmt.where(
                 or_(
@@ -256,8 +268,9 @@ class RbacOps(ConfigServiceBase):
 
         Raises:
             NotFoundError: No principal has this id (404).
-            ConflictError: The caller tries to deactivate their own account.
-                This is the self-lockout guard.
+            ConflictError: The caller tries to deactivate their own account (the
+                self-lockout guard), or to activate a merged account, which is a
+                locked reference that never logs in again.
         """
         principal = await self.session.get(Principal, principal_id)
         if principal is None:
@@ -265,7 +278,6 @@ class RbacOps(ConfigServiceBase):
         if not active and principal.sub == actor:
             raise ConflictError("you cannot deactivate your own account")
         if active and principal.merged_into is not None:
-            # A merged account is a locked reference. It never logs in again.
             raise ConflictError(
                 "a merged account cannot be activated", code="principal_merged"
             )
@@ -292,12 +304,18 @@ class RbacOps(ConfigServiceBase):
         return list(PERMISSION_CATALOGUE)
 
     async def list_group_mappings(self) -> list[GroupMappingOut]:
+        """List the group mappings."""
         rows = (await self.session.scalars(select(GroupMapping))).all()
         return [_mapping_out(r) for r in rows]
 
     async def create_group_mapping(
         self, payload: GroupMappingCreate, actor: str
     ) -> GroupMappingOut:
+        """Create a group mapping.
+
+        Raises:
+            NotFoundError: The role does not exist.
+        """
         if await self.session.get(Role, payload.role_id) is None:
             raise NotFoundError(f"role {payload.role_id} not found")
         row = GroupMapping(
@@ -313,6 +331,11 @@ class RbacOps(ConfigServiceBase):
     async def update_group_mapping(
         self, mapping_id: UUID, payload: GroupMappingUpdate, actor: str
     ) -> GroupMappingOut:
+        """Update a group mapping.
+
+        Raises:
+            NotFoundError: The mapping or the new role does not exist.
+        """
         row = await self.session.get(GroupMapping, mapping_id)
         if row is None:
             raise NotFoundError(f"group mapping {mapping_id} not found")
@@ -327,6 +350,11 @@ class RbacOps(ConfigServiceBase):
         return _mapping_out(row)
 
     async def delete_group_mapping(self, mapping_id: UUID, actor: str) -> None:
+        """Delete a group mapping.
+
+        Raises:
+            NotFoundError: No group mapping has this id.
+        """
         row = await self.session.get(GroupMapping, mapping_id)
         if row is None:
             raise NotFoundError(f"group mapping {mapping_id} not found")

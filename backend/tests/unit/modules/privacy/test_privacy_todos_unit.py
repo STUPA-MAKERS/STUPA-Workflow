@@ -39,6 +39,7 @@ def _quiet(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 async def test_the_erasure_removes_the_todo_data(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Remove the to-do data; without a commit the object keys wait for the caller."""
     erased: list[uuid.UUID] = []
 
     async def _erase(_s: Any, principal_id: uuid.UUID, **kw: Any) -> list[str]:
@@ -51,7 +52,6 @@ async def test_the_erasure_removes_the_todo_data(monkeypatch: pytest.MonkeyPatch
     service = PrincipalService(fake_session(gets=[principal]))
     await service.erase(principal.id, actor="admin", commit=False)
     assert erased == [principal.id]
-    # Without a commit the keys wait for the caller.
     assert service.storage_keys == ["k1"]
 
 
@@ -103,6 +103,10 @@ async def test_the_erasure_without_files_removes_no_object(
 async def test_the_request_removes_the_comment_objects_after_its_commit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Remove the comment objects after the commit of the request.
+
+    The erasure itself does not commit. The request commits once, then the objects go.
+    """
     _keys(monkeypatch, ["k1"])
     principal = Principal(id=uuid.uuid4(), sub="kc", email="u@x.org", active=True)
     request = ErasureRequest(
@@ -115,7 +119,6 @@ async def test_the_request_removes_the_comment_objects_after_its_commit(
     db = fake_session(gets=[request, principal])
     files = _Files(db)
     await ErasureRequestService(db).execute(request.id, actor="dpo", files=files)  # type: ignore[arg-type]
-    # The erasure itself does not commit; the request commits once, then the objects go.
     assert files.removed == [(["k1"], 1)]
     assert db.committed == 1
 

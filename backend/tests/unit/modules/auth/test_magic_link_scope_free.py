@@ -62,7 +62,11 @@ class _RecordingSession(FakeSession):
 async def test_request_writes_an_edit_link_with_the_configured_lifetime(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """`link_ttl_days` sets the expiry. A locked state does not change the scope."""
+    """Write an edit link with the configured lifetime.
+
+    `link_ttl_days` sets the expiry, and a locked state does not change the scope. The
+    request reads no state and expires no other link: only the lookup runs.
+    """
     monkeypatch.setattr(service, "_now", lambda: NOW)
     cfg = GuestApplicationSettings(id=1, confirm_ttl_hours=12, link_ttl_days=30)
     db = _session([result(_app())], gets=[cfg])
@@ -72,7 +76,6 @@ async def test_request_writes_an_edit_link_with_the_configured_lifetime(
     assert link.scope == "edit"
     assert link.single_use is False
     assert link.expires_at == NOW + timedelta(days=30)
-    # The request reads no state and expires no other link (only the lookup runs).
     assert len(db.statements) == 1
 
 

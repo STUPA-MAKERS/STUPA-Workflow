@@ -30,19 +30,19 @@ class PrincipalRef:
     id: UUID
     display_name: str | None
     email: str | None
-    # The name of the stored principal itself, before the merge step. A display that
-    # names the account as a target (the audit target label, an id in the audit data)
-    # uses it, so the merge entry names the old account and not the new one.
+    #: The name of the stored principal itself, before the merge step. A display that
+    #: names the account as a target (the audit target label, an id in the audit data)
+    #: uses it, so the merge entry names the old account and not the new one.
     own_name: str | None = None
 
     @property
     def name(self) -> str | None:
-        """The display name, else the email. None for an anonymized account."""
+        """Return the display name, else the email. None for an anonymized account."""
         return self.display_name or self.email
 
     @property
     def label(self) -> str | None:
-        """The own name of the stored account, else the name it was merged into."""
+        """Return the own name of the stored account, else the name it was merged into."""
         return self.own_name or self.name
 
 

@@ -28,8 +28,8 @@ def test_views_all_respects_the_scope_cap() -> None:
 
 
 async def test_require_gremium_for_view_all_reads_no_membership() -> None:
+    """Open the gremium by view_all alone, without a membership read."""
     row = SimpleNamespace(id=GID)
-    # No membership result is queued: the permission alone opens the gremium.
     db = fake_session(gets=[row])
     assert await access.require_gremium(db, Principal(sub="a", roles=["admin"]), GID) is row
 
@@ -41,7 +41,7 @@ async def test_require_gremium_for_a_member() -> None:
 
 
 async def test_require_gremium_hides_a_member_gremium_from_a_capped_token() -> None:
-    # The membership path obeys the scope cap: no membership query runs.
+    """Hide a member gremium from a capped token; no membership query runs."""
     token = Principal(sub="a", scope_permissions=frozenset({"budget.write"}))
     db = fake_session(gets=[SimpleNamespace(id=GID)])
     with pytest.raises(NotFoundError):
@@ -50,7 +50,7 @@ async def test_require_gremium_hides_a_member_gremium_from_a_capped_token() -> N
 
 @pytest.mark.parametrize("exists", [True, False])
 async def test_require_gremium_404(exists: bool) -> None:
-    # Unknown gremium and hidden gremium give the same 404.
+    """Give the same 404 for an unknown gremium and a hidden gremium."""
     gets = [SimpleNamespace(id=GID)] if exists else [None]
     db = fake_session(result((uuid.uuid4(), ROLE)), gets=gets)
     with pytest.raises(NotFoundError) as err:

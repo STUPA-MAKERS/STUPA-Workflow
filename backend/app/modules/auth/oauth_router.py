@@ -34,11 +34,12 @@ from app.shared.errors import BadRequestError, ForbiddenError, NotFoundError, Pr
 router = APIRouter(prefix="/oauth", tags=["oauth"])
 well_known_router = APIRouter(tags=["oauth"])
 
-_TX_MAX_AGE = 600  # 10-minute window from authorize to finish across the OIDC hop
+#: 10-minute window from authorize to finish across the OIDC hop.
+_TX_MAX_AGE = 600
 _LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
 
-# The AppError-based endpoints return problem+json. The token endpoint follows the RFC
-# 6749 OAuth error JSON instead. See below.
+#: The AppError-based endpoints return problem+json. The token endpoint follows the RFC
+#: 6749 OAuth error JSON instead. See below.
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 _REDIRECT = {"description": "Redirect (protocol error back to the loopback redirect_uri)."}
 
@@ -59,8 +60,8 @@ class OAuthError(BaseModel):
     error_description: str | None = None
 
 
-# The token route documents its own 4xx as application/json with OAuthError. The 422 keeps
-# the app-wide problem+json body of the global validation handler.
+#: The token route documents its own 4xx as application/json with OAuthError. The 422 keeps
+#: the app-wide problem+json body of the global validation handler.
 _OAUTH_ERR: dict[str, Any] = {"model": OAuthError}
 _PROBLEM_JSON: dict[str, Any] = {
     "description": "Validation Error",
@@ -117,16 +118,19 @@ def authorize(
     """Validate the authorize request and start the OIDC login.
 
     The signed `ap_oauth_tx` cookie carries the request across the OIDC hop.
+
+    The client_id and the redirect_uri are checked first and answer 400, because a
+    redirect to an invalid redirect_uri is an open redirect. After that check the
+    route reports protocol errors to the redirect_uri. It then starts the OIDC
+    login; with the ``ap_oauth_tx`` cookie present, the callback redirects to
+    ``/api/oauth/finish`` (``auth/router.callback``).
     """
     if not settings.oidc_enabled:
         raise NotFoundError("OAuth is not configured.")
-    # Check the client_id and the redirect_uri first. Never redirect to an invalid
-    # redirect_uri, because that is an open redirect. Answer 400 instead.
     if client_id != settings.oauth_mcp_client_id:
         raise BadRequestError("Unknown client_id.")
     if not _is_loopback_redirect(redirect_uri):
         raise BadRequestError("redirect_uri must be an http loopback URI.")
-    # From here the code trusts the redirect_uri and reports protocol errors to it.
     if response_type != "code":
         return _redirect_error(redirect_uri, error="unsupported_response_type", state=state)
     if code_challenge_method != "S256" or not code_challenge:
@@ -146,8 +150,6 @@ def authorize(
             "state": state,
         },
     )
-    # Start the existing OIDC login. When the ap_oauth_tx cookie is present, the callback
-    # redirects to /api/oauth/finish. See auth/router.callback.
     login_url = settings.public_base_url.rstrip("/") + "/api/auth/login"
     resp = RedirectResponse(login_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
     resp.set_cookie(
@@ -201,6 +203,10 @@ async def token(
     """Exchange an authorization code or a refresh token for a scoped token pair.
 
     The token pair is opaque. The endpoint follows RFC 6749.
+
+    An OAuth error still commits, because the refresh-reuse detection can
+    cascade-revoke a token family before it raises ``invalid_grant``. A pure
+    validation error leaves no pending change, so that commit does nothing.
     """
     if not settings.oidc_enabled:
         return _token_error("invalid_request", "OAuth is not configured.", 404)
@@ -231,9 +237,6 @@ async def token(
         else:
             return _token_error("unsupported_grant_type", f"grant_type={grant_type!r}")
     except oauth.OAuthError as exc:
-        # The refresh-reuse detection can cascade-revoke a token family before it raises
-        # `invalid_grant`. The commit must persist those writes. A pure validation error
-        # leaves no pending change, so the commit does nothing.
         await db.commit()
         return _token_error(exc.error, exc.description)
     await db.commit()
@@ -269,7 +272,10 @@ async def consent_request(
     """Return the pending authorize request for the consent UI.
 
     The response holds the client, the requested scopes and the selectable lifetimes. It
-    also marks the scopes that the user holds.
+    also marks the scopes that the user holds. That mark is a UX hint only, because
+    the server caps the permissions at runtime. An admin holds all of them. A key
+    counts when the user holds it globally OR through a gremium role in any gremium;
+    otherwise a gremium chair would see ``meetings:write`` as not held.
     """
     tx_cookie = request.cookies.get(settings.oauth_tx_cookie_name)
     tx = (
@@ -280,10 +286,6 @@ async def consent_request(
     if tx is None:
         raise BadRequestError("Invalid or expired OAuth transaction.")
     requested = oauth.parse_scope(tx["scope"])
-    # The requested scopes that the user can really exercise. This is a UX hint only,
-    # because the server caps the permissions at runtime. An admin holds all of them.
-    # A key counts when the user holds it globally OR through a gremium role in any
-    # gremium. Otherwise a gremium chair would see `meetings:write` as not held.
     gremium_perms = {
         p
         for _, role in await active_gremium_roles(db, principal.sub)
@@ -328,7 +330,9 @@ async def consent(
     """Process the consent of the user.
 
     On approval the endpoint mints a code with the chosen scope and lifetime. On denial it
-    reports `error=access_denied` to the loopback redirect_uri.
+    reports `error=access_denied` to the loopback redirect_uri. The tx is single-use,
+    so the cookie goes in every case. The chosen scopes must be known and requested,
+    which blocks an escalation past the request of the client.
 
     Returns:
         The redirect URL. The frontend does the redirect.
@@ -342,7 +346,6 @@ async def consent(
     if tx is None:
         raise BadRequestError("Invalid or expired OAuth transaction.")
     state = {"state": tx["state"]} if tx["state"] else {}
-    # The tx is single-use, so delete the cookie in every case.
     response.delete_cookie(settings.oauth_tx_cookie_name, path="/")
 
     if not body.approve:
@@ -355,8 +358,6 @@ async def consent(
     if not principal.has("mcp.use"):
         raise ForbiddenError("Missing permission: mcp.use")
     requested = set(oauth.parse_scope(tx["scope"]))
-    # The chosen scopes must be known and requested. This blocks an escalation past the
-    # request of the client.
     chosen = [s for s in body.scopes if s in requested and s in oauth.SCOPES]
     if not chosen:
         raise BadRequestError("Select at least one valid scope.")
@@ -384,7 +385,10 @@ async def list_grants(
     db: DbSession,
     principal: Annotated[Principal, Depends(require_principal())],
 ) -> list[dict[str, Any]]:
-    """List the OAuth grants of the logged-in user that are not revoked (self-service)."""
+    """List the OAuth grants of the logged-in user that are not revoked (self-service).
+
+    A null expiry means that the token never expires.
+    """
     pid = await _principal_row_id(db, principal)
     if pid is None:
         return []
@@ -401,7 +405,6 @@ async def list_grants(
             "clientId": r.client_id,
             "scope": r.scope,
             "createdAt": r.created_at.isoformat() if r.created_at else None,
-            # None means the token never expires.
             "accessExpiresAt": (
                 r.access_expires_at.isoformat() if r.access_expires_at else None
             ),

@@ -51,7 +51,8 @@ def _entry(
 
 
 async def test_record_genesis_has_no_prev() -> None:
-    db = fake_session(result(), result())  # lock, then an empty prev query
+    """Record the genesis entry without prev: the lock, then an empty prev query."""
+    db = fake_session(result(), result())
     entry = await AuditService(db).record(
         actor="admin-1", action=AuditAction.LOGIN, at=_AT
     )
@@ -131,9 +132,10 @@ async def test_verify_chain_empty_is_valid() -> None:
 
 
 async def test_verify_chain_detects_tampered_field() -> None:
+    """Detect a tampered field: the hash no longer matches the fields."""
     e1 = _entry(1, action="login")
     e2 = _entry(2, action="export", prev=e1.hash)
-    e2.data = {"tampered": True}  # the hash no longer matches the fields
+    e2.data = {"tampered": True}
     db = fake_session(result(e1, e2))
     res = await AuditService(db).verify_chain()
     assert res.valid is False
@@ -143,8 +145,9 @@ async def test_verify_chain_detects_tampered_field() -> None:
 
 
 async def test_verify_chain_detects_broken_link() -> None:
+    """Detect a broken link: a wrong prev_hash leaves a gap in the chain."""
     e1 = _entry(1, action="login")
-    e2 = _entry(2, action="export", prev=b"\x00" * 32)  # wrong prev_hash, a gap in the chain
+    e2 = _entry(2, action="export", prev=b"\x00" * 32)
     db = fake_session(result(e1, e2))
     res = await AuditService(db).verify_chain()
     assert res.valid is False
@@ -153,8 +156,9 @@ async def test_verify_chain_detects_broken_link() -> None:
 
 
 async def test_verify_chain_detects_tampered_genesis() -> None:
+    """Detect a tampered genesis entry: a changed field breaks the hash."""
     e1 = _entry(1, action="login")
-    e1.action = "role_change"  # a changed genesis field breaks the hash
+    e1.action = "role_change"
     db = fake_session(result(e1))
     res = await AuditService(db).verify_chain()
     assert res.valid is False

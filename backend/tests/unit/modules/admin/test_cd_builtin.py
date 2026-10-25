@@ -51,9 +51,6 @@ def _submodule_path(name: str) -> Path:
     return _SUBMODULE / "assets" / "images" / "logos" / f"{name}.svg"
 
 
-# --- 1. bundled files -------------------------------------------------------
-
-
 def test_manifest_covers_every_vendored_name() -> None:
     assert set(BUILTIN_LOGOS) == set(VENDORED_LOGO_NAMES)
     assert {entry.file_name for entry in BUILTIN_LOGOS.values()} == {
@@ -63,10 +60,13 @@ def test_manifest_covers_every_vendored_name() -> None:
 
 @pytest.mark.parametrize("name", VENDORED_LOGO_NAMES)
 def test_bundled_file_matches_its_pinned_hash(name: str) -> None:
+    """Match each bundled file to its pinned hash.
+
+    The conversion stores the bytes as an SVG upload, so the sniff must agree.
+    """
     entry = BUILTIN_LOGOS[name]
     data = (_PACKAGE_DIR / entry.file_name).read_bytes()
     assert hashlib.sha256(data).hexdigest() == entry.sha256
-    # The conversion stores the bytes as an SVG upload, so the sniff must agree.
     assert sniff_cd_logo(data) == BUILTIN_LOGO_MIME
 
 
@@ -77,9 +77,6 @@ def test_bundled_file_equals_the_submodule_copy(name: str) -> None:
     if not source.is_file():
         pytest.skip("typst/vendor/hsrtreport-typst is not checked out")
     assert source.read_bytes() == (_PACKAGE_DIR / BUILTIN_LOGOS[name].file_name).read_bytes()
-
-
-# --- 2. loader --------------------------------------------------------------
 
 
 def test_builtin_logo_bytes_loads_and_checks() -> None:
@@ -97,9 +94,6 @@ def test_builtin_logo_bytes_refuses_a_changed_file(monkeypatch: pytest.MonkeyPat
     monkeypatch.setitem(BUILTIN_LOGOS, "INF", BuiltinLogo("INF.svg", "0" * 64))
     with pytest.raises(BuiltinLogoMismatchError):
         builtin_logo_bytes("INF")
-
-
-# --- 3. conversion ----------------------------------------------------------
 
 
 def _session(
@@ -131,6 +125,7 @@ async def test_conversion_without_work_changes_nothing() -> None:
 
 
 async def test_conversion_turns_vendored_rows_into_uploads() -> None:
+    """Turn vendored rows into uploads; slot and position stay, so the PDF looks the same."""
     stupa = variant_row(key="stupa", name="StuPa")
     makers = variant_row(key="makers", name="MAKERS")
     title = logo_row(variant_id=stupa.id, slot="title", position=0, vendored_name="STUPA")
@@ -151,7 +146,6 @@ async def test_conversion_turns_vendored_rows_into_uploads() -> None:
         assert row.object_key.endswith(f"/{name}.svg")
         stored, mime = storage.objects[row.object_key]
         assert mime == "image/svg+xml" and row.size == len(stored)
-    # Slot and position stay, so the PDF looks the same.
     assert (footer.slot, footer.position) == ("footer", 3)
     assert (icon.slot, icon.position) == ("title", 1)
     assert stupa.name == "STUPA" and makers.name == "MAKERS"

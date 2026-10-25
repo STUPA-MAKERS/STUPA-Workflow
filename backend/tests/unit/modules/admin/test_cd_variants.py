@@ -66,9 +66,6 @@ PDF = b"%PDF-1.7\n1 0 obj\n"
 ICO = b"\x00\x00\x01\x00" + b"\x00" * 32
 
 
-# --- fakes ----------------------------------------------------------------
-
-
 class FakeResult:
     def __init__(self, items: Iterable[Any] = ()) -> None:
         self._items = list(items)
@@ -195,9 +192,6 @@ def logo_row(**kw: Any) -> CdVariantLogo:
     return row
 
 
-# --- 1. upload policy -----------------------------------------------------
-
-
 @pytest.mark.parametrize(
     ("data", "expected"),
     [
@@ -219,14 +213,19 @@ def test_sniff_accepts_the_whole_allowlist(data: bytes, expected: str) -> None:
     "data",
     [
         b"",
-        b"GIF89a" + b"\x00" * 16,  # a real image type, but not on the list
-        ICO,  # branding accepts ICO, the CD logos do not
+        b"GIF89a" + b"\x00" * 16,
+        ICO,
         b"not an image at all",
-        b"<html><body>hi</body></html>",  # opens with '<' but is no SVG
+        b"<html><body>hi</body></html>",
         b"\x00\x01\x02\x03",
     ],
 )
 def test_sniff_rejects_a_mismatched_magic_byte(data: bytes) -> None:
+    """Reject a mismatched magic byte.
+
+    The rows include ICO, a real image type that branding accepts but the CD logos do
+    not, and a file that opens with '<' but is no SVG.
+    """
     assert sniff_cd_logo(data) is None
 
 
@@ -249,16 +248,18 @@ def test_vendored_names_match_the_template_catalog() -> None:
     }
 
 
-# --- 2. asset names -------------------------------------------------------
-
-
 def test_asset_name_is_plain_unique_and_typed_by_the_sniffed_mime() -> None:
+    """Give a plain, unique asset name typed by the sniffed MIME.
+
+    Two uploads of the same name never collide. The extension follows the sniffed type,
+    not the name.
+    """
     first, second = uuid.uuid4(), uuid.uuid4()
     a = asset_file_name(first, "logo.png", "image/svg+xml")
     b = asset_file_name(second, "logo.png", "image/svg+xml")
-    assert a != b  # two uploads of the same name never collide
+    assert a != b
     assert "/" not in a and "\\" not in a
-    assert a.endswith(".svg")  # the extension follows the sniffed type, not the name
+    assert a.endswith(".svg")
 
 
 @pytest.mark.parametrize(
@@ -268,15 +269,13 @@ def test_asset_name_is_plain_unique_and_typed_by_the_sniffed_mime() -> None:
         ("a b/c d.jpeg", "image/jpeg", "-c_d.jpg"),
         (None, "application/pdf", "-logo.pdf"),
         ("...", "image/webp", "-logo.webp"),
-        ("x.png", "image/gif", "-x.bin"),  # unknown type falls back
+        ("x.png", "image/gif", "-x.bin"),
     ],
 )
 def test_asset_name_sanitizes_the_original_name(name: str | None, mime: str, tail: str) -> None:
+    """Sanitize the original name; an unknown type falls back."""
     logo_id = uuid.uuid4()
     assert asset_file_name(logo_id, name, mime) == f"{logo_id.hex}{tail}"
-
-
-# --- 3. model constraints -------------------------------------------------
 
 
 def _checks(model: type[Any]) -> dict[str, str]:
@@ -301,9 +300,6 @@ def test_logo_table_holds_the_exactly_one_of_constraint() -> None:
 def test_variant_table_holds_the_base_variant_constraint() -> None:
     checks = _checks(CdVariant)
     assert checks["ck_cd_variant_base_variant"] == "base_variant IN ('report','protocol')"
-
-
-# --- 4. service: variants -------------------------------------------------
 
 
 async def test_create_variant_persists_and_audits() -> None:
@@ -390,9 +386,6 @@ async def test_list_variant_options_is_slim() -> None:
     s, _ = svc([res(variant_row(key="stupa", name="StuPa"))])
     out = await s.list_variant_options()
     assert [(o.key, o.name) for o in out] == [("stupa", "StuPa")]
-
-
-# --- 5. service: logos ----------------------------------------------------
 
 
 async def test_add_vendored_logo_appends_behind_the_last_position() -> None:
@@ -623,9 +616,6 @@ async def test_reorder_logos_unknown_variant_404() -> None:
         )
 
 
-# --- 6. gremium binding ---------------------------------------------------
-
-
 async def test_create_gremium_rejects_an_unknown_cd_variant() -> None:
     """The id comes from the client, so the server checks it."""
     session = FakeSession([res()])
@@ -692,9 +682,6 @@ async def test_cd_variant_key_without_a_variant_is_none(gremium: Gremium | None)
     assert await cd_variant_key_for_gremium(session, gremium) is None  # type: ignore[arg-type]
 
 
-# --- 7. resolver ----------------------------------------------------------
-
-
 def _resolver_session(
     variant: CdVariant, logos: list[CdVariantLogo]
 ) -> FakeSession:
@@ -719,6 +706,10 @@ async def test_resolve_vendored_only_variant_loads_no_asset() -> None:
 
 
 async def test_resolve_upload_only_variant_returns_names_and_bytes() -> None:
+    """Return the names and bytes of an upload-only variant without a path separator.
+
+    Typst refuses a path separator.
+    """
     variant = variant_row(key="custom", base_variant="report")
     logo = logo_row(
         variant_id=variant.id,
@@ -736,7 +727,7 @@ async def test_resolve_upload_only_variant_returns_names_and_bytes() -> None:
     name = asset_file_name(logo.id, "wappen.svg", "image/svg+xml")
     assert out.title_logos == (name,) and out.footer_logos == ()
     assert out.assets == {name: SVG}
-    assert "/" not in name  # typst refuses a path separator
+    assert "/" not in name
 
 
 async def test_resolve_mixed_variant_keeps_the_slot_order() -> None:

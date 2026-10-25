@@ -62,6 +62,13 @@ class _Row:
 
 @pytest.mark.asyncio
 async def test_delete_gremium_with_in_use_type_raises_conflict() -> None:
+    """Raise Conflict for a gremium whose application type is in use.
+
+    The Gremium row is locked first, so a concurrent meeting insert waits. An application
+    counts through its type and through its own gremium, because a type can move to
+    another gremium while its applications keep this one. A refused delete writes no
+    audit row, deletes nothing and commits nothing.
+    """
     gid = uuid.uuid4()
     gremium = _Row(id=gid)
     session = _FakeSession(gremium=gremium, in_use=uuid.uuid4())
@@ -70,15 +77,11 @@ async def test_delete_gremium_with_in_use_type_raises_conflict() -> None:
     with pytest.raises(ConflictError):
         await svc.delete_gremium(gid, _ADMIN)
 
-    # The Gremium row is locked first, so a concurrent meeting insert waits.
     lock = str(session.statements[0])
     assert "FROM gremium" in lock and "FOR UPDATE" in lock
-    # An application counts through its type and through its own gremium, because a
-    # type can move to another gremium while its applications keep this one.
     in_use = str(session.statements[1])
     assert "application_type.gremium_id = " in in_use
     assert " OR application.gremium_id = " in in_use
-    # A doomed delete writes no audit row, deletes nothing and commits nothing.
     assert session.execute_calls == 0
     assert session.deleted == []
     assert session.committed == 0

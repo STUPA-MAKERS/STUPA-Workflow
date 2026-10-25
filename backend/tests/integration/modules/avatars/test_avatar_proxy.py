@@ -96,6 +96,7 @@ async def test_proxy_hashes_the_stored_email(
     maker: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Hash the stored email in the proxy; `me` reads the own row by sub."""
     row = await _principal(maker, "  Mara.Keller@Example.org")
     fetcher = _Fetcher()
     client = _api(migrated, monkeypatch, fetcher)
@@ -107,7 +108,6 @@ async def test_proxy_hashes_the_stored_email(
     assert fetcher.calls == [(digest, 128)]
     assert digest not in str(dict(resp.headers))
 
-    # `me` reads the own row by sub.
     as_principal(client.app, Principal(sub=row.sub))  # type: ignore[arg-type]
     assert client.get("/api/principals/me/avatar?s=64").status_code == 200
     assert fetcher.calls[-1] == (digest, 64)
@@ -131,6 +131,10 @@ async def test_active_site_config_switches_the_proxy_off(
     maker: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Switch the proxy off by the active site config.
+
+    The public endpoint carries the switch for the frontend.
+    """
     row = await _principal(maker, "m@example.org")
     fetcher = _Fetcher()
     client = _api(migrated, monkeypatch, fetcher)
@@ -151,6 +155,5 @@ async def test_active_site_config_switches_the_proxy_off(
     assert resp.headers["cache-control"] == "private, max-age=300"
     assert len(fetcher.calls) == calls
 
-    # The public endpoint carries the switch for the frontend.
     public_resp = client.get("/api/site-config")
     assert public_resp.json()["branding"]["gravatarEnabled"] is False

@@ -17,6 +17,8 @@ class _CamelModel(BaseModel):
 
 
 class ErasureRequestOut(_CamelModel):
+    """An erasure request."""
+
     id: UUID
     created_at: datetime = Field(alias="createdAt")
     subject_type: SubjectType = Field(alias="subjectType")
@@ -37,10 +39,14 @@ class ErasureRejectBody(_CamelModel):
 
 
 class PrivacySettingsOut(_CamelModel):
+    """The privacy settings."""
+
     default_retention_months: int = Field(alias="defaultRetentionMonths")
 
 
 class PrivacySettingsUpdate(_CamelModel):
+    """New privacy settings."""
+
     default_retention_months: int = Field(alias="defaultRetentionMonths", ge=1)
 
 

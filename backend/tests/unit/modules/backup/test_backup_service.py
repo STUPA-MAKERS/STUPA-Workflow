@@ -154,9 +154,6 @@ def _service(
     )
 
 
-# ------------------------------------------------------------------------- helpers
-
-
 def test_libpq_dsn_strips_the_asyncpg_driver_prefix() -> None:
     """`pg_dump` cannot read the SQLAlchemy driver prefix."""
     assert libpq_dsn("postgresql+asyncpg://u:p@host:5432/db") == "postgresql://u:p@host:5432/db"
@@ -182,9 +179,6 @@ def test_temp_file_removes_the_file_on_the_way_out() -> None:
         handle.write(b"x")
         assert path.exists()
     assert not path.exists()
-
-
-# ----------------------------------------------------------------------- catalogue
 
 
 @pytest.mark.asyncio
@@ -239,9 +233,10 @@ async def test_mark_failed_truncates_the_code_and_never_carries_a_path() -> None
 
 @pytest.mark.asyncio
 async def test_export_streams_the_bytes_rather_than_presigning_a_url() -> None:
-    """Regression: MinIO is internal, so a presigned URL is unreachable from a browser.
+    """Stream the export bytes rather than presign a URL.
 
-    The export therefore reads the object and streams it; nothing hands the client a
+    MinIO is internal, so a presigned URL is unreachable from a browser. The export
+    therefore reads the object and streams it; nothing hands the client a
     URL that points at the object store.
     """
     archives = _FakeStorage({"key": b"cipher-bytes"})
@@ -256,9 +251,6 @@ async def test_export_refuses_a_row_without_an_archive() -> None:
     service = _service(archives=_FakeStorage())
     with pytest.raises(BackupError, match="no stored archive"):
         await service.export_stream(_row(storage_key=None))
-
-
-# ----------------------------------------------------------------------- retention
 
 
 @pytest.mark.asyncio
@@ -300,9 +292,6 @@ async def test_delete_survives_an_object_that_is_already_gone() -> None:
     row = _row(storage_key="missing")
     await service.delete(row)
     assert session.deleted == [row]
-
-
-# --------------------------------------------------------------------------- build
 
 
 @pytest.mark.asyncio
@@ -389,9 +378,6 @@ async def test_schema_revision_is_none_when_alembic_version_is_unreadable() -> N
     assert await service._schema_revision() is None
 
 
-# ------------------------------------------------------------------------- restore
-
-
 @pytest.mark.asyncio
 async def test_verify_archive_reads_the_manifest_of_a_real_archive(
     tmp_path: Path,
@@ -444,9 +430,6 @@ def test_identity_refuses_an_unreadable_key_file() -> None:
     service = _service(backup_age_identity_file="/nonexistent/age.key")
     with pytest.raises(BackupError, match="not readable"):
         service._identity()
-
-
-# -------------------------------------------------------------------------- upload
 
 
 @pytest.mark.asyncio

@@ -107,6 +107,12 @@ class FlowOps(ConfigServiceBase):
         linked audit entry. ``action`` and ``extra_data`` support the restore
         and revert path.
 
+        The active version is deactivated BEFORE the add, because the partial
+        unique index ``uq_flow_version_one_active_global`` allows one active row and
+        ``session.execute`` flushes pending inserts. The remap sets ``updated_at`` to
+        its old value, because a flow edit does not change the application and
+        ``onupdate=func.now()`` would set the activation time.
+
         Raises:
             ValidationProblem: The graph is invalid.
         """
@@ -120,7 +126,6 @@ class FlowOps(ConfigServiceBase):
             ) from exc
         await self._check_budget_refs(payload.graph)
 
-        # The state KEY stays valid across versions, so remember it per application.
         app_keys: dict[UUID, str] = {}
         for app_id, key in (
             await self.session.execute(
@@ -131,10 +136,6 @@ class FlowOps(ConfigServiceBase):
         ).all():
             app_keys[app_id] = key
 
-        # Deactivate the active version FIRST. The partial unique index
-        # uq_flow_version_one_active_global, with its WHERE active clause, allows only
-        # one active row. An insert of the new active row before the update collides.
-        # session.execute flushes pending inserts, so this must run before the add.
         max_version = await self.session.scalar(
             select(FlowVersion.version).order_by(FlowVersion.version.desc()).limit(1)
         )
@@ -188,9 +189,6 @@ class FlowOps(ConfigServiceBase):
                 )
             )
 
-        # The remap keeps `updated_at` unchanged, because a flow edit does not change
-        # the application. Without the explicit value, `onupdate=func.now()` sets the
-        # activation time.
         for app_id, key in app_keys.items():
             await self.session.execute(
                 update(Application)

@@ -13,14 +13,14 @@ from typing import Final
 
 _PNG_SIGNATURE: Final[bytes] = b"\x89PNG\r\n\x1a\n"
 
-# JPEG start-of-frame markers. Each one carries the frame height and width. The
-# markers C4 (DHT), C8 (JPG) and CC (DAC) share the range but are not frames.
+#: JPEG start-of-frame markers. Each one carries the frame height and width. The
+#: markers C4 (DHT), C8 (JPG) and CC (DAC) share the range but are not frames.
 _JPEG_SOF_MARKERS: Final[frozenset[int]] = frozenset(
     {0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF}
 )
-# Markers without a length field: TEM and RST0..RST7.
+#: Markers without a length field: TEM and RST0..RST7.
 _JPEG_STANDALONE: Final[frozenset[int]] = frozenset({0x01, *range(0xD0, 0xD8)})
-# Start of scan and end of image. A frame header must come before them.
+#: Start of scan and end of image. A frame header must come before them.
 _JPEG_SOS: Final[int] = 0xDA
 _JPEG_EOI: Final[int] = 0xD9
 
@@ -36,13 +36,14 @@ def _png_size(data: bytes) -> tuple[int, int] | None:
 
 
 def _jpeg_size(data: bytes) -> tuple[int, int] | None:
+    """Read the size from the SOF marker of a JPEG, skipping fill bytes."""
     pos = 2
     end = len(data)
     while pos + 1 < end:
         if data[pos] != 0xFF:
             return None
         marker = data[pos + 1]
-        if marker == 0xFF:  # fill byte before the marker
+        if marker == 0xFF:
             pos += 1
             continue
         if marker in _JPEG_STANDALONE:

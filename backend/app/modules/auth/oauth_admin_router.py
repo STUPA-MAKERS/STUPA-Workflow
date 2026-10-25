@@ -45,7 +45,7 @@ def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
     return {code: _PROBLEM for code in codes}
 
 
-# The permission gate. It injects the principal, which the audit entry needs as actor.
+#: The permission gate. It injects the principal, which the audit entry needs as actor.
 UsersAdmin = Annotated[Principal, Depends(require_principal("admin.users"))]
 
 
@@ -77,7 +77,7 @@ class OAuthGrantAdminOut(BaseModel):
     client_id: str = Field(alias="clientId")
     scope: str
     created_at: datetime = Field(alias="createdAt")
-    # `null` means that the token never expires. Only a revoke ends it.
+    #: `null` means that the token never expires. Only a revoke ends it.
     access_expires_at: datetime | None = Field(alias="accessExpiresAt")
     refresh_expires_at: datetime | None = Field(alias="refreshExpiresAt")
 
@@ -152,15 +152,16 @@ async def revoke_oauth_grant_admin(
     token and the refresh token die at once: `resolve_access_token` rejects a revoked
     row on the next request. The audit log records the revoke. A repeated call on an
     already revoked grant changes nothing and writes no second entry.
+
+    The entry uses ``role_change``, the action for every access change that
+    ``admin.users`` covers, and the ``event`` key separates it in a query. The payload
+    holds id references and metadata, never a token or an email.
     """
     row = await oauth_service.load_grant(db, grant_id)
     if row is None:
         raise NotFoundError("Grant not found.")
     if not oauth_service.revoke_grant(row, datetime.now(UTC)):
         return
-    # `role_change` is the existing action for every access change that `admin.users`
-    # covers (activation, role assignment). The `event` key separates this one in a
-    # query. The payload holds id references and metadata, never a token or an email.
     await record_audit(
         db,
         actor=admin.sub,

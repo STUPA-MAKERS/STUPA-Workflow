@@ -35,11 +35,11 @@ logger = logging.getLogger("app.avatars")
 
 GRAVATAR_HOST = "gravatar.com"
 
-# The sizes the proxy asks Gravatar for. A request rounds up to the next one, so the
-# cache holds at most three entries per person.
+#: The sizes the proxy asks Gravatar for. A request rounds up to the next one, so the
+#: cache holds at most three entries per person.
 SIZE_BUCKETS: tuple[int, ...] = (64, 128, 256)
 
-# Upper limit of one image. Gravatar sends a few KiB; a larger body is refused.
+#: Upper limit of one image. Gravatar sends a few KiB; a larger body is refused.
 MAX_IMAGE_BYTES = 512 * 1024
 
 AvatarMime = Literal["image/png", "image/jpeg", "image/gif", "image/webp"]
@@ -94,7 +94,7 @@ class AvatarImage:
 
     @property
     def etag(self) -> str:
-        """Strong ETag from the image bytes. It holds no part of the e-mail hash."""
+        """Build a strong ETag from the image bytes. It holds no part of the e-mail hash."""
         return '"' + hashlib.sha256(self.data).hexdigest()[:32] + '"'
 
 
@@ -115,7 +115,11 @@ class FetchResult:
 
 
 class GravatarFetcher(Protocol):
-    async def fetch(self, digest: str, size: int) -> FetchResult: ...
+    """Fetch one Gravatar image by digest and size."""
+
+    async def fetch(self, digest: str, size: int) -> FetchResult:
+        """Fetch the image of ``digest`` at ``size`` pixels."""
+        ...
 
 
 def _prefer_ipv4(ips: list[str]) -> str:
@@ -147,6 +151,7 @@ class HttpGravatarFetcher:
         resolver: Resolver = default_resolver,
         client_factory: Callable[[], httpx.AsyncClient] | None = None,
     ) -> None:
+        """Set the timeout, the DNS resolver and the HTTP client factory."""
         self._timeout = timeout_seconds
         self._resolver = resolver
         self._client_factory = client_factory or (
@@ -156,6 +161,10 @@ class HttpGravatarFetcher:
         )
 
     async def fetch(self, digest: str, size: int) -> FetchResult:
+        """Fetch one Gravatar image through the SSRF guard with a pinned IP.
+
+        A guard block logs no detail, because the detail holds the resolved IP.
+        """
         url = gravatar_url(digest, size)
         try:
             async with asyncio.timeout(self._timeout):
@@ -167,7 +176,6 @@ class HttpGravatarFetcher:
                         resolver=self._resolver,
                     )
                 except SsrfError:
-                    # The detail holds the resolved IP; keep it out of the log.
                     logger.warning("gravatar fetch blocked by the ssrf guard")
                     return FetchResult("failed")
                 ip_url, host_header = pin_url(url, _prefer_ipv4(ips))

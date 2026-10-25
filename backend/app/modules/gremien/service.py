@@ -107,24 +107,24 @@ MEMBER_NOT_FOUND = "member_not_found"
 
 _MAX_CURSOR_OFFSET = 1_000_000
 
-# The forced roles first, the own roles of the gremium between them and "member".
+#: The forced roles first, the own roles of the gremium between them and "member".
 _ROLE_ORDER = {"vorstand": 0, "manager": 1, "member": 3}
 
 Month = tuple[int, int]
 
 
 def logo_url(gremium_id: UUID) -> str:
-    """The API path of the square logo of a gremium."""
+    """Return the API path of the square logo of a gremium."""
     return f"/api/gremien/{gremium_id}/logo"
 
 
 def month_key(month: Month) -> str:
-    """``(2026, 5)`` → ``2026-05``."""
+    """Format a month: ``(2026, 5)`` gives ``2026-05``."""
     return f"{month[0]:04d}-{month[1]:02d}"
 
 
 def parse_month(value: str) -> Month:
-    """``2026-05`` → ``(2026, 5)``. The router checks the pattern before."""
+    """Parse a month: ``2026-05`` gives ``(2026, 5)``. The router checks the pattern before."""
     year, month = value.split("-", 1)
     return int(year), int(month)
 
@@ -136,7 +136,7 @@ def shift_month(month: Month, delta: int) -> Month:
 
 
 def months_between(first: Month, last: Month) -> list[Month]:
-    """Every month from ``first`` to ``last``, both included."""
+    """Return every month from ``first`` to ``last``, both included."""
     count = (last[0] * 12 + last[1]) - (first[0] * 12 + first[1]) + 1
     return [shift_month(first, n) for n in range(count)]
 
@@ -164,7 +164,7 @@ def month_range(from_month: str | None, to_month: str | None, today: _date) -> l
 
 
 def encode_cursor(offset: int) -> str:
-    """Opaque cursor of the decision list (an offset)."""
+    """Encode the opaque cursor of the decision list (an offset)."""
     return base64.urlsafe_b64encode(f"o|{offset}".encode()).decode()
 
 
@@ -204,7 +204,7 @@ def _valid_at(valid_from: datetime | None, valid_until: datetime | None, now: da
 
 
 def _role_rank(key: str) -> int:
-    """The place of a role in the member list: Vorstand, Manager, own roles, Mitglied."""
+    """Return the place of a role in the member list: Vorstand, Manager, own roles, Mitglied."""
     return _ROLE_ORDER.get(key, 2)
 
 
@@ -223,6 +223,7 @@ class GremienService:
     """The reads of the tab "Gremien" on one database session."""
 
     def __init__(self, session: AsyncSession, tz_name: str) -> None:
+        """Bind the service to a session and the local time zone."""
         self.session = session
         self.tz = ZoneInfo(tz_name)
         self.tz_name = tz_name
@@ -231,10 +232,9 @@ class GremienService:
         return now.astimezone(self.tz).date()
 
     def _month_start(self, month: Month) -> datetime:
-        """The first moment of a month in the local time zone, as UTC."""
+        """Return the first moment of a month in the local time zone, as UTC."""
         return datetime(month[0], month[1], 1, tzinfo=self.tz).astimezone(UTC)
 
-    # ------------------------------------------------------------------ overview
     async def overview(self, principal: Principal) -> list[GremiumOverviewOut]:
         """Return the gremien that ``principal`` sees, by name.
 
@@ -296,7 +296,7 @@ class GremienService:
         return {gid: (key, dict(name or {})) for gid, key, name in rows.all()}
 
     async def _member_counts(self, ids: list[UUID], now: datetime) -> dict[UUID, int]:
-        """The active members per gremium: the rule of the member count of the admin page."""
+        """Return the active members per gremium: the rule of the member count of the admin page."""
         rows = await self.session.execute(
             select(
                 GremiumMembership.gremium_id,
@@ -313,7 +313,7 @@ class GremienService:
         return {gid: int(n) for gid, n in rows.all()}
 
     async def _next_meetings(self, ids: list[UUID], today: _date) -> dict[UUID, NextMeetingOut]:
-        """The live meeting of each gremium, else its next planned meeting.
+        """Return the live meeting of each gremium, else its next planned meeting.
 
         A planned meeting with a date before today does not count: it did not take
         place. A planned meeting without a date comes after every dated one.
@@ -356,14 +356,16 @@ class GremienService:
         }
 
     async def _square_logos(self, ids: list[UUID]) -> set[UUID]:
-        """The gremien whose CD variant has a square logo."""
+        """Return the gremien whose CD variant has a stored raster square logo.
+
+        The rule matches the one of the logo route (``_square_ref``).
+        """
         rows = await self.session.scalars(
             select(Gremium.id)
             .join(CdVariantLogo, CdVariantLogo.variant_id == Gremium.cd_variant_id)
             .where(
                 Gremium.id.in_(ids),
                 CdVariantLogo.slot == SQUARE_SLOT,
-                # The rule of the logo route (`_square_ref`): only a stored raster image.
                 CdVariantLogo.object_key.is_not(None),
                 CdVariantLogo.mime.in_(sorted(ALLOWED_SQUARE_LOGO_MIME)),
             )
@@ -371,7 +373,6 @@ class GremienService:
         )
         return set(rows.all())
 
-    # ------------------------------------------------------------------ members
     async def members(
         self, gremium_id: UUID, principal: Principal, *, former: bool
     ) -> list[GremiumMemberOut]:
@@ -418,7 +419,6 @@ class GremienService:
         )
         return out
 
-    # ------------------------------------------------------------------ meetings
     async def meetings(self, gremium_id: UUID) -> list[GremiumMeetingOut]:
         """Return the meetings of a gremium, the newest first.
 
@@ -494,9 +494,8 @@ class GremienService:
             )
         return out
 
-    # ------------------------------------------------------------------ attendance
     def _closed_in(self, gremium_id: UUID, first: _date, end: _date) -> ColumnElement[bool]:
-        """The closed meetings of a gremium with a date in ``[first, end)``."""
+        """Return the closed meetings of a gremium with a date in ``[first, end)``."""
         return and_(
             Meeting.gremium_id == gremium_id,
             Meeting.status == "closed",
@@ -591,7 +590,7 @@ class GremienService:
         )
 
     def _attendance_counts(self, gremium_id: UUID, in_range: ColumnElement[bool]) -> Any:
-        """The one aggregation of the matrix: (principal, month, present, excused, delegated).
+        """Run the one aggregation of the matrix: (principal, month, present, excused, delegated).
 
         The attendance records and the vote transfers go into one ``UNION ALL`` and one
         ``GROUP BY``. A record of a meeting in which the member transferred the vote is
@@ -653,7 +652,7 @@ class GremienService:
         ).group_by(both.c.pid, both.c.month)
 
     async def _terms(self, gremium_id: UUID) -> list[_Term]:
-        """Every membership row of a gremium with its role."""
+        """Return every membership row of a gremium with its role."""
         rows = await self.session.execute(
             select(
                 GremiumMembership.principal_id,
@@ -670,7 +669,7 @@ class GremienService:
         ]
 
     async def _people(self, ids: Iterable[UUID]) -> dict[UUID, tuple[str | None, str]]:
-        """The display name and the ``sub`` of each principal."""
+        """Return the display name and the ``sub`` of each principal."""
         wanted = list(ids)
         if not wanted:
             return {}
@@ -777,7 +776,6 @@ class GremienService:
         )
         return bool(found)
 
-    # ------------------------------------------------------------------ decisions
     async def decisions(
         self,
         gremium_id: UUID,
@@ -793,13 +791,13 @@ class GremienService:
 
         The votes keep the read scope of the vote list (``voting.listing.read_scope``):
         the tab never shows a vote that ``GET /votes`` hides from the caller. A result
-        carries sums only, never a voter.
+        carries sums only, never a voter. A poll does not count, because it is no
+        decision of the Gremium.
         """
         offset = decode_cursor(cursor)
         gremium_of = func.coalesce(sql_cast(Meeting.gremium_id, Text), Vote.eligible_group)
         where: list[ColumnElement[bool]] = [
             Vote.status == "closed",
-            # A poll only counts: it is no decision of the Gremium.
             Vote.kind != "poll",
             gremium_of == str(gremium_id),
             await read_scope(self.session, principal),
@@ -857,7 +855,7 @@ class GremienService:
         )
 
     async def _applications(self, ids: set[UUID]) -> dict[UUID, tuple[str | None, Decimal | None]]:
-        """The title and the requested amount of each application."""
+        """Return the title and the requested amount of each application."""
         if not ids:
             return {}
         rows = await self.session.execute(
@@ -868,7 +866,7 @@ class GremienService:
         return {aid: (title_of(data), amount) for aid, data, amount in rows.all()}
 
     async def _sums(self, votes: Sequence[Vote]) -> dict[UUID, dict[str, int]]:
-        """The sums per option of each motion: ``ballot``, or ``secret_ballot`` when secret.
+        """Return the sums per option of each motion: ``ballot``, or ``secret_ballot`` when secret.
 
         A ``GROUP BY`` per table; no row ever leaves the database with a voter.
         """

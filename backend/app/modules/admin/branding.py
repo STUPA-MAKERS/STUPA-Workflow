@@ -29,8 +29,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from app.shared.i18n import I18nMap
 
-# Image whitelist for the logos and the favicon. image/svg+xml is left out on purpose,
-# because SVG carries an XSS risk.
+#: Image whitelist for the logos and the favicon. image/svg+xml is left out on purpose,
+#: because SVG carries an XSS risk.
 ALLOWED_LOGO_MIME: frozenset[str] = frozenset(
     {
         "image/png",
@@ -40,16 +40,17 @@ ALLOWED_LOGO_MIME: frozenset[str] = frozenset(
         "image/vnd.microsoft.icon",
     }
 )
-MAX_LOGO_BYTES = 2 * 1024 * 1024  # 2 MB (matches frontend LOGO_MAX_SIZE_MB)
+#: 2 MB. It matches ``LOGO_MAX_SIZE_MB`` of the frontend.
+MAX_LOGO_BYTES = 2 * 1024 * 1024
 
-# Length caps for the i18n texts. They guard the auth-free public config against bloat.
+#: Length caps for the i18n texts. They guard the auth-free public config against bloat.
 MAX_FREETEXT_CHARS = 10_000
 MAX_LABEL_CHARS = 500
 MAX_I18N_KEY_CHARS = 16
 
 LogoSlot = Literal["wordmark", "imagemark", "favicon"]
 
-# image/vnd.microsoft.icon is an alias of image/x-icon. Normalize it before a comparison.
+#: image/vnd.microsoft.icon is an alias of image/x-icon. Normalize it before a comparison.
 _MIME_ALIASES = {"image/vnd.microsoft.icon": "image/x-icon"}
 
 
@@ -119,6 +120,11 @@ class BrandingAsset(_CamelModel):
 
     @model_validator(mode="after")
     def _check_url_and_bytes(self) -> BrandingAsset:
+        """Refuse inline SVG and check the URL kind and the size.
+
+        The server does not fetch an external or absolute asset URL, so it checks
+        only the declared values of one.
+        """
         raw = self.url.strip()
         low = raw.lower()
         if "<svg" in low or "image/svg" in low:
@@ -126,8 +132,6 @@ class BrandingAsset(_CamelModel):
         if low.startswith("data:"):
             self._validate_data_url(raw)
             return self
-        # External or absolute asset URL: the server does not fetch it and therefore
-        # checks the declared values only.
         if not low.startswith(("https://", "http://", "/")):
             raise ValueError("logo url must be a data-URL, http(s) URL or absolute path")
         if self.size > MAX_LOGO_BYTES:
@@ -146,7 +150,12 @@ class BrandingAsset(_CamelModel):
         return base64.b64decode(raw.split(",", 1)[1], validate=True)
 
     def _validate_data_url(self, raw: str) -> None:
-        """Decode the data URL and validate the real bytes against the magic type and size."""
+        """Decode the data URL and validate the real bytes against the magic type and size.
+
+        The encoded length is capped before the decode, which bounds the decode work.
+        The real size is checked again after the decode, because the client ``size``
+        field is untrusted.
+        """
         try:
             header, payload = raw.split(",", 1)
         except ValueError as exc:
@@ -159,14 +168,12 @@ class BrandingAsset(_CamelModel):
             raise ValueError(f"data-URL media type not allowed: {mediatype!r}")
         if _norm_mime(mediatype) != _norm_mime(self.mime):
             raise ValueError("data-URL media type does not match declared mime")
-        # Cap the encoded length before the decode. This bounds the decode work.
         if len(payload) > MAX_LOGO_BYTES * 2:
             raise ValueError(f"logo exceeds {MAX_LOGO_BYTES} bytes")
         try:
             decoded = base64.b64decode(payload, validate=True)
         except (binascii.Error, ValueError) as exc:
             raise ValueError("invalid base64 logo payload") from exc
-        # Check the real size against the cap. The client `size` field is untrusted.
         if len(decoded) > MAX_LOGO_BYTES:
             raise ValueError(f"logo exceeds {MAX_LOGO_BYTES} bytes")
         sniffed = sniff_raster_image(decoded)
@@ -177,6 +184,8 @@ class BrandingAsset(_CamelModel):
 
 
 class FooterLink(_CamelModel):
+    """A footer link with an i18n label."""
+
     label: I18nMap = Field(default_factory=dict)
     url: str = Field(max_length=2048)
 
@@ -192,19 +201,22 @@ class FooterLink(_CamelModel):
 
 
 class SiteFreetexts(_CamelModel):
-    """i18n freetexts (login hint, welcome, support, e-mail footer, apply info,
-    texts after the submission)."""
+    """The i18n freetexts of the site.
+
+    They are the login hint, the welcome, the support text, the e-mail footer, the
+    apply info and the texts after the submission.
+    """
 
     login_hint: I18nMap = Field(default_factory=dict, alias="loginHint")
     welcome: I18nMap = Field(default_factory=dict)
     support: I18nMap = Field(default_factory=dict)
     email_footer: I18nMap = Field(default_factory=dict, alias="emailFooter")
-    # Info text below the application-type selection — Markdown, per language.
+    #: Info text below the application-type selection — Markdown, per language.
     apply_info: I18nMap = Field(default_factory=dict, alias="applyInfo")
-    # The text on the page after the submission, Markdown, per language. "Internal" is
-    # for a signed-in applicant (the application is submitted at once), "external" is
-    # for a guest (the e-mail link confirms the application). An empty language falls
-    # back to the built-in text of the frontend.
+    #: The text on the page after the submission, Markdown, per language. "Internal" is
+    #: for a signed-in applicant (the application is submitted at once), "external" is
+    #: for a guest (the e-mail link confirms the application). An empty language falls
+    #: back to the built-in text of the frontend.
     submitted_internal: I18nMap = Field(default_factory=dict, alias="submittedInternal")
     submitted_external: I18nMap = Field(default_factory=dict, alias="submittedExternal")
 
@@ -266,9 +278,9 @@ ACCENT_PATTERN = r"^#[0-9a-fA-F]{6}$"
 class Branding(_CamelModel):
     """Full branding config (active or draft)."""
 
-    # App name from the config, language-neutral. It drives the PWA manifest, the
-    # browser-tab title, the header aria-label and the home H1. An empty value falls
-    # back to the hardcoded defaults and the i18n values.
+    #: App name from the config, language-neutral. It drives the PWA manifest, the
+    #: browser-tab title, the header aria-label and the home H1. An empty value falls
+    #: back to the hardcoded defaults and the i18n values.
     app_name: str = Field(default="", alias="appName", max_length=MAX_LABEL_CHARS)
     app_short_name: str = Field(
         default="", alias="appShortName", max_length=MAX_LABEL_CHARS
@@ -279,25 +291,28 @@ class Branding(_CamelModel):
         default_factory=list, alias="legalLinks", max_length=50
     )
     freetexts: SiteFreetexts = Field(default_factory=SiteFreetexts)
-    # Show the Gravatar image of a person instead of the initials. The API fetches the
-    # image through its own proxy (`GET /principals/{id}/avatar`), so the browser never
-    # contacts gravatar.com. False turns the proxy off: it answers 404 and the frontend
-    # shows the initials. A config from before this field reads as True.
+    #: Show the Gravatar image of a person instead of the initials. The API fetches the
+    #: image through its own proxy (`GET /principals/{id}/avatar`), so the browser never
+    #: contacts gravatar.com. False turns the proxy off: it answers 404 and the frontend
+    #: shows the initials. A config without this field reads as True.
     gravatar_enabled: bool = Field(default=True, alias="gravatarEnabled")
-    # The accent colour of the whole app, as ``#rrggbb``. The frontend derives the
-    # accent tokens of the light and the dark theme from it. None means the built-in
-    # accent of the design system.
+    #: The accent colour of the whole app, as ``#rrggbb``. The frontend derives the
+    #: accent tokens of the light and the dark theme from it. None means the built-in
+    #: accent of the design system.
     accent_color: str | None = Field(default=None, alias="accentColor", pattern=ACCENT_PATTERN)
-    # The help menu and the ticket reports ("Hilfe & Tickets"). A config from before
-    # these fields reads as the defaults.
+    #: The help menu and the ticket reports ("Hilfe & Tickets"). A config without these
+    #: fields reads as the defaults.
     help: HelpSettings = Field(default_factory=HelpSettings)
     tickets: TicketSettings = Field(default_factory=TicketSettings)
 
     @model_validator(mode="before")
     @classmethod
     def _drop_footer_columns(cls, data: object) -> object:
-        # The footer has no link columns. A stored config from before still carries
-        # the key, and `extra="forbid"` would reject that config, so it is dropped.
+        """Drop the footer link columns of an old stored config.
+
+        The footer has no link columns. An old config still carries the key, and
+        ``extra="forbid"`` would reject that config.
+        """
         if isinstance(data, dict):
             return {k: v for k, v in data.items() if k not in ("footerColumns", "footer_columns")}
         return data

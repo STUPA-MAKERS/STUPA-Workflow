@@ -15,7 +15,7 @@ import app.models  # noqa: F401 - registers every model in Base.metadata
 from app.db import Base
 from app.modules.admin import principal_merge as merge
 
-# Text columns that store a principal `sub` by convention.
+#: Text columns that store a principal `sub` by convention.
 _SUB_NAME = re.compile(r"(_by|^actor|^author|^voter_sub|^handed_over_by)$")
 
 
@@ -61,12 +61,12 @@ def test_the_lists_name_real_columns_only() -> None:
 
 
 def test_the_scan_sees_known_columns() -> None:
+    """See the known FK columns, sub columns and the merge reference itself."""
     found = {
         _key(column)
         for table in Base.metadata.tables.values()
         for column in table.columns
         if _references_principal(column)
     }
-    # FK columns, sub columns and the merge reference itself.
     assert {"ballot.voter_sub", "meeting.protokollant_id", "audit_entry.actor"} <= found
     assert "principal.merged_into" in found

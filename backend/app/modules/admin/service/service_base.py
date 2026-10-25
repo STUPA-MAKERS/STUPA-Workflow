@@ -30,6 +30,7 @@ class ConfigServiceBase:
     """Admin config operations bound to one ``AsyncSession`` — shared base."""
 
     def __init__(self, session: AsyncSession, *, storage: ObjectStorage | None = None) -> None:
+        """Bind the service to a session and the optional object storage."""
         self.session = session
         self.storage = storage
 

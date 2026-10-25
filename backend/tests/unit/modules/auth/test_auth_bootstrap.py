@@ -52,8 +52,8 @@ def test_empty_bootstrap_sets() -> None:
 
 
 def test_is_bootstrap_matches_subject_regardless_of_email_verified() -> None:
+    """Match the sub always, even without a verified email."""
     s = _settings(bootstrap_admin_subjects="sub-1")
-    # sub always matches, even without a verified email
     assert bootstrap._is_bootstrap_principal(
         _principal(sub="sub-1"), s, email_verified=False
     )
@@ -88,10 +88,14 @@ def test_is_bootstrap_verified_email_none() -> None:
     )
 
 
-# The login path through `ensure_admin_for_principal`.
 async def test_login_grant_when_subject_matched_and_missing() -> None:
+    """Grant the admin role at login when the subject matches and the role is missing.
+
+    The login path runs through `ensure_admin_for_principal`. The execute calls return
+    the role id, then no assignment.
+    """
     s = _settings(bootstrap_admin_subjects="sub-1")
-    db = fake_session(result(_ROLE_ID), result())  # role id, then no assignment
+    db = fake_session(result(_ROLE_ID), result())
     granted = await bootstrap.ensure_admin_for_principal(
         db, s, _principal(sub="sub-1"), email_verified=False
     )
@@ -102,9 +106,9 @@ async def test_login_grant_when_subject_matched_and_missing() -> None:
 
 
 async def test_login_verified_email_grants_unverified_does_not() -> None:
+    """Grant for a verified email; an unverified email gives no grant and no DB access."""
     s = _settings(bootstrap_admin_emails="admin@x.de")
     p = _principal(sub="kc|x", email="admin@x.de")
-    # unverified: no grant and no database access
     db1 = fake_session()
     assert (
         await bootstrap.ensure_admin_for_principal(db1, s, p, email_verified=False)
@@ -132,8 +136,9 @@ async def test_login_noop_when_not_matched() -> None:
 
 
 async def test_login_noop_when_role_missing() -> None:
+    """Do nothing at login when the role id is None."""
     s = _settings(bootstrap_admin_subjects="sub-1")
-    db = fake_session(result())  # the role id is None
+    db = fake_session(result())
     assert (
         await bootstrap.ensure_admin_for_principal(
             db, s, _principal(sub="sub-1"), email_verified=False
@@ -155,9 +160,12 @@ async def test_login_noop_when_already_assigned() -> None:
     assert db.added == []
 
 
-# The startup sweep through `ensure_bootstrap_admins`, which matches on sub only.
 async def test_sweep_noop_when_no_subjects() -> None:
-    # An email config alone gives 0 and makes no database access.
+    """Do nothing in the sweep when no subjects are configured.
+
+    The startup sweep runs through `ensure_bootstrap_admins`, which matches on sub only.
+    An email config alone gives 0 and makes no database access.
+    """
     db = fake_session()
     assert await bootstrap.ensure_bootstrap_admins(db, _settings()) == 0
     assert await bootstrap.ensure_bootstrap_admins(
@@ -166,20 +174,26 @@ async def test_sweep_noop_when_no_subjects() -> None:
 
 
 async def test_sweep_noop_when_role_missing() -> None:
+    """Do nothing in the sweep when the role id is None."""
     s = _settings(bootstrap_admin_subjects="sub-1")
-    db = fake_session(result())  # the role id is None
+    db = fake_session(result())
     assert await bootstrap.ensure_bootstrap_admins(db, s) == 0
 
 
 async def test_sweep_grants_only_missing() -> None:
+    """Grant only the missing assignments in the sweep.
+
+    The execute calls return the role id and the principals matched by sub. P1 has no
+    assignment, so it gets a grant. P2 is already assigned, so the sweep skips it.
+    """
     s = _settings(bootstrap_admin_subjects="sub-1,sub-2")
     p1, p2 = _principal(sub="sub-1"), _principal(sub="sub-2")
     p2.id = "pid-2"  # type: ignore[assignment]
     db = fake_session(
-        result(_ROLE_ID),  # role id
-        result(p1, p2),  # principals matched by sub
-        result(),  # p1: no existing assignment, so grant
-        result("has-it"),  # p2: already assigned, so skip
+        result(_ROLE_ID),
+        result(p1, p2),
+        result(),
+        result("has-it"),
     )
     granted = await bootstrap.ensure_bootstrap_admins(db, s)
     assert granted == 1
@@ -188,20 +202,25 @@ async def test_sweep_grants_only_missing() -> None:
 
 
 async def test_sweep_no_flush_when_all_present() -> None:
+    """Skip the flush when every principal is already assigned."""
     s = _settings(bootstrap_admin_subjects="sub-1")
     db = fake_session(
         result(_ROLE_ID),
         result(_principal(sub="sub-1")),
-        result("has-it"),  # already assigned
+        result("has-it"),
     )
     assert await bootstrap.ensure_bootstrap_admins(db, s) == 0
     assert db.added == []
     assert db.flushed == 0
 
 
-# The global member base role through `ensure_member_for_principal`.
 async def test_member_grant_when_role_present_and_missing() -> None:
-    db = fake_session(result(_ROLE_ID), result())  # role id, then no assignment
+    """Grant the global member base role when it is missing.
+
+    The grant runs through `ensure_member_for_principal`. The execute calls return the
+    role id, then no assignment.
+    """
+    db = fake_session(result(_ROLE_ID), result())
     assert await bootstrap.ensure_member_for_principal(db, _principal()) is True
     assert len(db.added) == 1
     assert db.flushed == 1
@@ -214,6 +233,7 @@ async def test_member_noop_when_already_assigned() -> None:
 
 
 async def test_member_noop_when_role_missing() -> None:
-    db = fake_session(result())  # the member role is missing, maybe the migrations did not run
+    """Do nothing when the member role is missing, for example before the migrations."""
+    db = fake_session(result())
     assert await bootstrap.ensure_member_for_principal(db, _principal()) is False
     assert db.added == []

@@ -8,11 +8,11 @@ PEPPER = "pepper-secret"
 
 
 def test_generate_token_is_random_and_urlsafe() -> None:
+    """Generate a random, URL-safe token without + or = from standard base64."""
     a = tokens.generate_token()
     b = tokens.generate_token()
     assert a != b
     assert len(a) >= 40
-    # URL-safe: no + or = from standard base64.
     assert set(a) <= set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_")
 
 

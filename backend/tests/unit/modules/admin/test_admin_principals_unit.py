@@ -41,11 +41,12 @@ def _assignment(pid: UUID) -> RoleAssignment:
 
 
 async def test_search_principals_joins_assignments() -> None:
+    """Join the assignments to the matched principals; only pid1 has one."""
     pid1, pid2 = uuid4(), uuid4()
     p1, p2 = _principal(pid1, "sub-1", "a@x.de"), _principal(pid2, "sub-2")
     db = fake_session(
-        result(p1, p2),  # matched principals
-        result(_assignment(pid1)),  # only pid1 has an assignment
+        result(p1, p2),
+        result(_assignment(pid1)),
     )
     out = await ConfigService(db).search_principals("ma")
     assert [p.sub for p in out] == ["sub-1", "sub-2"]
@@ -54,7 +55,8 @@ async def test_search_principals_joins_assignments() -> None:
 
 
 async def test_search_principals_empty_skips_assignment_query() -> None:
-    db = fake_session(result())  # no principals → no second query
+    """Skip the assignment query when no principal matches."""
+    db = fake_session(result())
     assert await ConfigService(db).search_principals(None) == []
 
 
@@ -83,11 +85,13 @@ async def test_set_principal_active_blocks_self_deactivation() -> None:
 
 
 async def test_set_principal_active_allows_self_reactivation() -> None:
-    """An account may reactivate itself. The guard blocks only the deactivation."""
+    """An account may reactivate itself. The guard blocks only the deactivation.
+
+    The get returns the principal. The execute calls are the audit lock, the audit hash
+    and the assignments query.
+    """
     pid = uuid4()
-    # gets: the principal. results: the audit lock, the audit hash, the assignments query.
     db = fake_session(result(), result(), result(), gets=[_principal(pid, "me-sub")])
     out = await ConfigService(db).set_principal_active(pid, True, "me-sub")
     assert out.active is True
-
 

@@ -162,7 +162,10 @@ def test_callback_oidc_error_returns_400(
 def test_callback_merged_account_redirects_to_the_start_page(
     enabled_client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A login with the sub of a merged account lands on the start page with a reason."""
+    """A login with the sub of a merged account lands on the start page with a reason.
+
+    The response sets no session cookie, and the OIDC transaction ends.
+    """
     from app.modules.auth import sessions
     from app.shared.errors import ForbiddenError
 
@@ -175,7 +178,6 @@ def test_callback_merged_account_redirects_to_the_start_page(
     resp = enabled_client.get("/api/auth/callback?code=c&state=st", follow_redirects=False)
     assert resp.status_code == 303
     assert resp.headers["location"].endswith("/?loginError=account_merged")
-    # No session cookie; the OIDC transaction ends.
     assert ENABLED.session_cookie_name not in resp.headers.get("set-cookie", "").split("=")[0]
     assert f"{ENABLED.oidc_tx_cookie_name}=" in resp.headers.get("set-cookie", "")
 
@@ -361,6 +363,11 @@ def test_me_returns_principal() -> None:
 def test_magic_link_always_202(
     enabled_client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Answer 202 for every magic-link request.
+
+    The work runs as a background task, which keeps the response time constant. The test
+    catches the task and makes no real database access.
+    """
     scheduled: list[tuple[object, ...]] = []
 
     async def _capture(
@@ -368,12 +375,10 @@ def test_magic_link_always_202(
     ) -> None:
         scheduled.append((email, application_id))
 
-    # Catch the background task. The test makes no real database access.
     monkeypatch.setattr(router_mod, "_deliver_magic_link", _capture)
     resp = enabled_client.post("/api/auth/magic-link", json={"email": "x@y.de"})
     assert resp.status_code == 202
     assert resp.json() == {"status": "accepted"}
-    # The work runs as a background task, which keeps the response time constant.
     assert scheduled == [("x@y.de", None)]
 
 
@@ -383,8 +388,11 @@ def test_magic_link_invalid_email_422(enabled_client: TestClient) -> None:
 
 
 def test_magic_link_malformed_altcha_422(enabled_client: TestClient) -> None:
-    # A structurally invalid altcha value (control characters) gives 422 before the logic
-    # runs, also with verification off. Contract `negative_data_rejection`.
+    """Reject a malformed altcha value with 422.
+
+    A structurally invalid value with control characters gives 422 before the logic runs,
+    also with verification off. This is the contract `negative_data_rejection`.
+    """
     resp = enabled_client.post(
         "/api/auth/magic-link", json={"email": "x@y.de", "altcha": "ZÈ♯æL¾&"}
     )
@@ -395,7 +403,7 @@ def test_magic_link_malformed_altcha_422(enabled_client: TestClient) -> None:
 def test_magic_link_well_formed_altcha_202(
     enabled_client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # Verification is off, so a structurally valid solution is enough for 202.
+    """Answer 202 for a well-formed altcha value while verification is off."""
     from app.shared.altcha import create_challenge, solve_challenge
 
     async def _noop(settings: object, email: str, application_id: object, pool: object) -> None:
@@ -436,7 +444,10 @@ async def test_deliver_magic_link_opens_session_and_commits(
 async def _deliver_and_capture_lang(
     monkeypatch: pytest.MonkeyPatch, db: object
 ) -> list[str | None]:
-    """Run `_deliver_magic_link` against `db` and return the language of each mail."""
+    """Run `_deliver_magic_link` against `db` and return the language of each mail.
+
+    The helper calls the inner deliver closure, so the mail really goes out.
+    """
 
     class _ACM:
         async def __aenter__(self) -> object:
@@ -460,7 +471,6 @@ async def _deliver_and_capture_lang(
         session: object, settings: object, *, email: str, application_id: object,
         deliver: object,
     ) -> None:
-        # Call the inner deliver closure, so the mail really goes out.
         await deliver("r@x.de", "https://link")  # type: ignore[operator]
 
     monkeypatch.setattr(router_mod, "get_sessionmaker", lambda: _ACM)
@@ -480,8 +490,9 @@ async def test_deliver_magic_link_uses_the_application_language(
     The route can get no application id. The delivery then resolves the same
     application as the service does, so the applicant reads the mail in the language
     they applied in.
+
+    The first result is the application, the second is its (lang, gremium_id) row.
     """
-    # The first result is the application, the second its (lang, gremium_id) row.
     db = fake_session(result(SimpleNamespace(id=uuid.uuid4())), result(("en", None)))
     assert await _deliver_and_capture_lang(monkeypatch, db) == ["en"]
 
@@ -490,7 +501,7 @@ async def test_deliver_magic_link_without_application_keeps_default_language(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """An address without an application keeps the default language."""
-    db = fake_session()  # the application lookup finds nothing
+    db = fake_session()
     assert await _deliver_and_capture_lang(monkeypatch, db) == [
         ENABLED.mail_default_lang
     ]
@@ -524,10 +535,10 @@ def test_magic_link_verify_gone(
     assert resp.status_code == 410
 
 
-# Long sessions: the client of the login and the cookie renewal at /auth/me.
 def test_login_pwa_client_rides_the_tx_cookie(
     enabled_client: TestClient, idp: respx.MockRouter
 ) -> None:
+    """Carry the PWA client in the tx cookie, for the cookie renewal at /auth/me."""
     from app.modules.auth import sessions
 
     resp = enabled_client.get("/api/auth/login?client=pwa")
@@ -603,10 +614,10 @@ def test_me_without_a_valid_session_row_sets_no_cookie() -> None:
     assert ENABLED.session_cookie_name not in resp.headers.get("set-cookie", "")
 
 
-# Return to the page where the login started.
 def test_login_return_to_rides_the_tx_cookie(
     enabled_client: TestClient, idp: respx.MockRouter
 ) -> None:
+    """Carry return_to in the tx cookie, back to the page where the login started."""
     from app.modules.auth import sessions
 
     resp = enabled_client.get(

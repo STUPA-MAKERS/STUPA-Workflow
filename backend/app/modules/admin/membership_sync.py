@@ -45,10 +45,10 @@ from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import AuditService
 from app.modules.auth.models import Principal as PrincipalRow
 
-# The actor of the audit entries that the sync writes.
+#: The actor of the audit entries that the sync writes.
 SYNC_ACTOR = "oidc-sync"
 
-# The forced gremium role that a member without a role mapping gets.
+#: The forced gremium role that a member without a role mapping gets.
 DEFAULT_ROLE_KEY = "member"
 
 
@@ -124,11 +124,13 @@ async def sync_principal_memberships(
     The function does not commit. The caller owns the transaction. Each added, changed
     or removed membership gets an audit entry.
 
+    A merged principal is a locked reference and holds no membership: its group
+    cache stays for the record, but the sync treats it as empty. The deletes flush
+    before the inserts, because the EXCLUDE constraint allows one row per pair only.
+
     Returns:
         True when the function changed at least one membership.
     """
-    # A merged principal is a locked reference: it holds no membership. Its group
-    # cache stays for the record, but the sync treats it as empty.
     groups = (
         set() if row.merged_into is not None else {str(g) for g in (row.oidc_groups or [])}
     )
@@ -151,7 +153,6 @@ async def sync_principal_memberships(
         if membership.gremium_role_id != role_id:
             membership.gremium_role_id = role_id
             changed.append(membership.id)
-    # Flush the deletes first. The EXCLUDE constraint allows one row per pair only.
     if changed:
         await session.flush()
     for gremium_id, role_id in desired.items():

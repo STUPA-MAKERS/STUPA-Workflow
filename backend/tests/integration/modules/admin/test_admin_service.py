@@ -130,6 +130,10 @@ async def test_global_flow_new_version_per_save_app_follows_newest(
     Earlier versions stay. Open applications follow the newest active version by state
     KEY, so they are NOT pinned. A key that the new version drops sends the application
     to the initial state.
+
+    The test creates an application in state "accepted" and saves again without that
+    state. The save makes a new version and keeps the old one. Both versions still exist,
+    and exactly one (g2) is active.
     """
     from app.modules.applications.models import Application
     from app.modules.forms.models import FormVersion
@@ -144,7 +148,6 @@ async def test_global_flow_new_version_per_save_app_follows_newest(
         )
     ).one()
 
-    # Create an application in state "accepted". The new graph drops that state.
     app_type = await _make_type(session)
     fv = FormVersion(application_type_id=app_type.id, version=1)
     session.add(fv)
@@ -156,14 +159,12 @@ async def test_global_flow_new_version_per_save_app_follows_newest(
     session.add(app)
     await session.commit()
 
-    # Save again WITHOUT "accepted". This makes a NEW version and keeps the old one.
     g2 = await svc.create_global_flow_version(
         FlowVersionCreate.model_validate({"graph": _global_graph(with_accepted=False)}),
         _ACTOR,
     )
-    assert g2.id != g1.id  # a new immutable version, no in-place reuse
+    assert g2.id != g1.id
 
-    # Append-only: both versions still exist and exactly one is active (g2).
     n_global = await session.scalar(select(func.count()).select_from(FlowVersion))
     assert n_global == 2
     n_active = await session.scalar(
@@ -173,8 +174,6 @@ async def test_global_flow_new_version_per_save_app_follows_newest(
     )
     assert n_active == 1
 
-    # The application follows the newest version. A dropped state key maps to its
-    # initial state.
     new_initial = (
         await session.scalars(
             select(State).where(
@@ -193,8 +192,10 @@ async def test_global_flow_save_keeps_prior_states_and_timeline(
     """A save that omits a state does NOT delete the old version.
 
     The state rows of the old version stay valid, and so does the `status_event`
-    timeline. No foreign key breaks and no row needs a new target. The old in-place
-    flow needed both.
+    timeline. No foreign key breaks and no row needs a new target.
+
+    A timeline entry points to "accepted", and the new graph omits that state. The
+    timeline stays valid, because "accepted" still exists in g1.
     """
     from app.modules.applications.models import Application, StatusEvent
     from app.modules.forms.models import FormVersion
@@ -219,18 +220,15 @@ async def test_global_flow_save_keeps_prior_states_and_timeline(
     )
     session.add(app)
     await session.flush()
-    # Timeline entry that points to "accepted". The old version keeps that state.
     ev = StatusEvent(application_id=app.id, from_state_id=None, to_state_id=accepted.id)
     session.add(ev)
     await session.commit()
 
-    # Omit "accepted" in the new graph. The old version still holds it.
     await svc.create_global_flow_version(
         FlowVersionCreate.model_validate({"graph": _global_graph(with_accepted=False)}),
         _ACTOR,
     )
 
-    # The timeline stays valid because "accepted" still exists in g1.
     await session.refresh(ev)
     assert ev.to_state_id == accepted.id
     still_there = await session.scalar(
@@ -257,7 +255,8 @@ async def test_gremium_crud_and_slug_conflict(session: AsyncSession) -> None:
 async def test_admin_gremien_list_counts_members_and_roles(session: AsyncSession) -> None:
     """The admin list counts the current members and the roles of each gremium.
 
-    An expired membership and a deactivated principal do not count.
+    An expired membership and a deactivated principal do not count. The forced roles
+    exist in every gremium.
     """
     svc = ConfigService(session)
     full = await svc.create_gremium(
@@ -311,7 +310,6 @@ async def test_admin_gremien_list_counts_members_and_roles(session: AsyncSession
     assert by_id[full.id].member_count == 2
     assert by_id[full.id].role_count == len(roles)
     assert by_id[empty.id].member_count == 0
-    # The forced roles exist in every gremium.
     assert by_id[empty.id].role_count == len(roles)
 
 
@@ -373,6 +371,11 @@ async def test_application_type_list_gives_the_active_form_version(
 
 
 async def test_role_crud_and_listing(session: AsyncSession) -> None:
+    """Create and list roles.
+
+    The list holds the new role and the seeded roles. A role is deletable, except the
+    protected admin and member roles.
+    """
     svc = ConfigService(session)
     key = f"role_{uuid.uuid4().hex[:8]}"
     created = await svc.create_role(
@@ -390,9 +393,8 @@ async def test_role_crud_and_listing(session: AsyncSession) -> None:
     assert updated.permissions == ["budget.structure"]
     listed = await svc.list_roles()
     keys = {r.key for r in listed}
-    assert key in keys and "admin" in keys  # the new role and the seeded roles
+    assert key in keys and "admin" in keys
 
-    # A role is deletable, except the protected admin and member roles.
     await svc.delete_role(created.id, _ACTOR)
     assert key not in {r.key for r in await svc.list_roles()}
     admin = next(r for r in await svc.list_roles() if r.key == "admin")
@@ -423,6 +425,7 @@ async def test_read_only_assignments_and_group_mapping(session: AsyncSession) ->
 
 
 async def test_webhook_crud_secret_not_exposed(session: AsyncSession, engine: Engine) -> None:
+    """Create a webhook whose secret is stored in the DB column but never returned."""
     svc = ConfigService(session)
     created = await svc.create_webhook(
         WebhookCreate.model_validate(
@@ -436,7 +439,6 @@ async def test_webhook_crud_secret_not_exposed(session: AsyncSession, engine: En
     )
     assert created.active is True and "secret" not in created.model_dump()
 
-    # The server creates the secret in the DB column but never returns it.
     row = await session.get(Webhook, created.id)
     assert row is not None and row.secret is not None and len(row.secret) == 32
 
@@ -448,6 +450,11 @@ async def test_webhook_crud_secret_not_exposed(session: AsyncSession, engine: En
 
 
 async def test_site_config_save_cycle(session: AsyncSession) -> None:
+    """Save and activate the site config.
+
+    The partial unique index holds exactly one active version. Every save writes an audit
+    entry.
+    """
     svc = SiteConfigService(session)
     empty = await svc.get()
     assert empty.version == 0
@@ -466,7 +473,6 @@ async def test_site_config_save_cycle(session: AsyncSession) -> None:
     assert pub.version == 2 and pub.branding.copyright == {"de": "© 2027"}
     assert pub.branding.accent_color == "#0075bf"
 
-    # Exactly one active version, held by the partial unique index.
     actives = (
         await session.scalars(
             select(func.count())
@@ -476,7 +482,6 @@ async def test_site_config_save_cycle(session: AsyncSession) -> None:
     ).all()
     assert actives[0] == 1
 
-    # Every save writes an audit entry.
     acts = (
         await session.scalars(
             select(AuditEntry.action).where(AuditEntry.target_type == "site_config")

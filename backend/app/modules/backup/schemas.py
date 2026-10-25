@@ -38,11 +38,11 @@ class BackupListOut(BaseModel):
     """The catalogue plus the capability flags the page needs to enable its buttons."""
 
     items: list[BackupOut]
-    # False when no age recipient is configured. The page then explains why creating
-    # is off instead of offering a button that always fails.
+    #: False when no age recipient is configured. The page then explains why creating
+    #: is off instead of offering a button that always fails.
     enabled: bool
-    # False when no age identity is mounted. Restore and import stay off, because the
-    # platform cannot decrypt its own archives without it.
+    #: False when no age identity is mounted. Restore and import stay off, because the
+    #: platform cannot decrypt its own archives without it.
     restore_enabled: bool = Field(serialization_alias="restoreEnabled")
     retention_count: int = Field(serialization_alias="retentionCount")
 
