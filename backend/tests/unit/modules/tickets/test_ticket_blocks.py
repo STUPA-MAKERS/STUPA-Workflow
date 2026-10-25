@@ -67,9 +67,6 @@ def test_normalize_email() -> None:
     assert normalize_email("  Ab@X.ORG ") == "ab@x.org"
 
 
-# -- the report of a blocked sender -------------------------------------------------
-
-
 async def test_matching_block_with_an_account_matches_the_account_and_its_email() -> None:
     block = uuid.uuid4()
     session = ScriptedSession(scalar=[block])
@@ -96,6 +93,10 @@ async def test_matching_block_without_any_reporter_asks_nothing() -> None:
 async def test_a_blocked_report_takes_a_number_counts_the_hit_and_stores_nothing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Give a blocked report a number and count the hit, but store nothing.
+
+    The drafts are checked like a normal report first.
+    """
     calls: list[str] = []
 
     async def _check(_s: object, **_kw: Any) -> None:
@@ -116,7 +117,6 @@ async def test_a_blocked_report_takes_a_number_counts_the_hit_and_stores_nothing
     out = await _svc(session).create(payload, reporter_id=None, email="a@x", pepper="p")
     assert out == SwallowedReport(number=99)
     assert out.id is None
-    # The drafts were checked like a normal report, then nothing was stored.
     assert calls == ["check"]
     assert session.added == []
     from sqlalchemy.dialects import postgresql
@@ -135,9 +135,6 @@ async def test_a_swallowed_report_without_a_number_counts_zero() -> None:
     assert out.number == 0
 
 
-# -- the target of a block ------------------------------------------------------------
-
-
 def test_the_block_target_of_each_reporter() -> None:
     assert TicketService.block_target(_ticket()) == ("email", "a@example.org")
     assert TicketService.block_target(_ticket(reporter_principal_id=ME, reporter_email=None)) == (
@@ -149,24 +146,20 @@ def test_the_block_target_of_each_reporter() -> None:
 
 
 async def test_sender_blocked_reads_the_target() -> None:
+    """Hold back a sender through a block of the address or of its account, both ways."""
     session = ScriptedSession(scalar=[uuid.uuid4(), None])
     service = _svc(session)
     assert await service._sender_blocked(_ticket()) is True
     by_email = _sql(session.statements[0])
     assert "ticket_sender_block.email = 'a@example.org'" in by_email
-    # A block of an account with that e-mail holds the sender back too.
     assert "ticket_sender_block.principal_id IN" in by_email
     account = _ticket(reporter_principal_id=ME, reporter_email=None)
     assert await service._sender_blocked(account) is False
     by_account = _sql(session.statements[1])
     assert "ticket_sender_block.principal_id =" in by_account
-    # A block of the account e-mail holds the account back too.
     assert "lower(CAST(principal.email AS VARCHAR))" in by_account
     assert await service._sender_blocked(_ticket(anonymized_at=NOW)) is False
     assert len(session.statements) == 2
-
-
-# -- block and unblock ------------------------------------------------------------------
 
 
 async def test_block_of_an_unknown_ticket_is_404() -> None:
@@ -231,6 +224,7 @@ async def test_block_stores_the_target_and_answers_the_detail(
 
 
 async def test_unblock_deletes_the_target_and_answers_the_detail() -> None:
+    """Delete every block that swallows the reports of the sender, the account ones included."""
     ticket = _ticket()
     session = ScriptedSession(scalars=[[], []])
     session.put(ticket)
@@ -239,15 +233,16 @@ async def test_unblock_deletes_the_target_and_answers_the_detail() -> None:
     delete = _sql(session.statements[0])
     assert delete.startswith("DELETE FROM ticket_sender_block")
     assert "'a@example.org'" in delete
-    # Every block that swallows the sender's reports goes, the account ones included.
     assert "ticket_sender_block.principal_id IN" in delete
     assert session.committed == 1
 
 
-# -- the list of the blocks ----------------------------------------------------------------
-
-
 async def test_blocked_senders_map_people_addresses_and_sources() -> None:
+    """Map the people, addresses and source tickets of the blocks.
+
+    A gone source ticket shows no number; a deleted account shows a deleted person and no
+    e-mail.
+    """
     source = uuid.uuid4()
     gone = uuid.uuid4()
     account = TicketSenderBlock(
@@ -295,9 +290,7 @@ async def test_blocked_senders_map_people_addresses_and_sources() -> None:
     assert (first.hit_count, first.last_hit_at) == (3, NOW)
     assert second.kind == "email"
     assert (second.person, second.email, second.blocked_by) == (None, "x@y.org", None)
-    # The source ticket is gone: no number to show.
     assert second.source_ticket is None
-    # A deleted account: a deleted person and no e-mail.
     assert third.person is not None
     assert third.person.principal_id is None
     assert third.email is None
@@ -320,9 +313,6 @@ async def test_delete_block() -> None:
         await _svc(session).delete_block(block)
 
 
-# -- privacy helpers ------------------------------------------------------------------------
-
-
 async def test_erase_sender_blocks() -> None:
     session = ScriptedSession()
     await erase_sender_blocks(session, principal_id=ME, email=" A@X ")  # type: ignore[arg-type]
@@ -342,9 +332,6 @@ async def test_sender_blocks_of() -> None:
     assert "principal_id =" in _sql(session.statements[0])
     assert await sender_blocks_of(session, principal_id=None, email="a@x") == []  # type: ignore[arg-type]
     assert "principal_id" not in _sql(session.statements[1]).split("WHERE")[1]
-
-
-# -- the files of the notes in the detail ---------------------------------------------------
 
 
 async def test_detail_lists_the_files_of_each_note_and_the_block_state() -> None:

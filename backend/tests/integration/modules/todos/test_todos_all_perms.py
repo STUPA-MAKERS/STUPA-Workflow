@@ -122,6 +122,11 @@ async def _world(api: Api, maker: async_sessionmaker[AsyncSession]) -> _World:
 async def test_a_read_all_holder_reads_every_shared_board_but_no_foreign_personal_one(
     api: Api, maker: async_sessionmaker[AsyncSession]
 ) -> None:
+    """Let a ``todo.read_all`` holder read every shared board, but no foreign personal one.
+
+    The holder is no member. The cross-board reads see the shared card too. The personal
+    board of the writer and its card stay 404. Configuration needs ``todo.configure``.
+    """
     w = await _world(api, maker)
     api.login(w.reader)
     with TestClient(api.app) as client:
@@ -137,19 +142,15 @@ async def test_a_read_all_holder_reads_every_shared_board_but_no_foreign_persona
         assert _ok(client.get(f"/api/todos/boards/{w.team}"))["canWrite"] is False
         detail = _ok(client.get(f"/api/todos/cards/{w.card['id']}"))
         assert detail["canWrite"] is False and detail["comments"][0]["body"] == "Los"
-        # The members stay the members: the holder is none of them.
         members = _ok(client.get(f"/api/todos/boards/{w.gboard}/members"))
         assert [m["principalId"] for m in members] == [str(w.writer_id)]
         assert _ok(client.get(f"/api/todos/boards/{w.gboard}/archive"))["total"] == 0
-        # The cross-board reads see the shared card too.
         linked = _ok(client.get(f"/api/todos/linked?kind=ticket&targetId={w.ticket}"))
         assert [c["id"] for c in linked] == [w.card["id"]]
         targets = _ok(client.get("/api/todos/link-targets?q=Plakat&kind=todo"))
         assert [t["targetId"] for t in targets] == [w.card["id"]]
-        # The personal board of the writer stays 404, its card too.
         assert client.get(f"/api/todos/boards/{w.personal}").status_code == 404
         assert _ok(client.get("/api/todos/link-targets?q=Privat&kind=todo")) == []
-        # Configuration needs todo.configure.
         _problem(
             client.patch(f"/api/todos/boards/{w.gboard}", json={"name": "X"}),
             403,
@@ -240,6 +241,10 @@ async def test_a_transfer_needs_write_on_both_boards(
 async def test_agenda_and_ticket_coupling_need_the_write_right(
     api: Api, maker: async_sessionmaker[AsyncSession]
 ) -> None:
+    """Require the write right for the agenda and ticket coupling.
+
+    A ticket manager who only reads the board closes the ticket; the card stays open.
+    """
     w = await _world(api, maker)
     async with maker() as session:
         with pytest.raises(ForbiddenError) as agenda:
@@ -247,7 +252,6 @@ async def test_agenda_and_ticket_coupling_need_the_write_right(
                 uuid.UUID(w.card["id"]), w.gremium_id, w.reader
             )
     assert agenda.value.code == "todo_write_required"
-    # A ticket manager who only reads the board closes the ticket; the card stays open.
     manager = Principal(sub=w.reader.sub, permissions={"todo.read_all", "ticket.manage"})
     api.login(manager)
     with TestClient(api.app) as client:
@@ -261,6 +265,11 @@ async def test_agenda_and_ticket_coupling_need_the_write_right(
 async def test_an_all_holder_writes_every_shared_board_but_configures_none(
     api: Api, maker: async_sessionmaker[AsyncSession]
 ) -> None:
+    """Let a ``todo.all`` holder write every shared board but configure none.
+
+    The holder is no member, so not assignable and not mentionable. Configuration stays
+    ``todo.configure``. The personal board of the writer stays 404.
+    """
     w = await _world(api, maker)
     holder, holder_id = await add_person(maker, "Alma")
     api.login(Principal(sub=holder.sub, permissions={"todo.all"}))
@@ -280,7 +289,6 @@ async def test_an_all_holder_writes_every_shared_board_but_configures_none(
         team_card = _ok(
             client.post("/api/todos/cards", json={"boardId": w.team, "title": "Team"}), 201
         )
-        # No member: not assignable, not mentionable.
         _problem(
             client.post(
                 f"/api/todos/cards/{team_card['id']}/assignees",
@@ -297,7 +305,6 @@ async def test_an_all_holder_writes_every_shared_board_but_configures_none(
             422,
             "mention_not_member",
         )
-        # Configuration stays todo.configure.
         _problem(
             client.post(f"/api/todos/boards/{w.gboard}/labels", json={"name": "N", "color": "red"}),
             403,
@@ -308,13 +315,19 @@ async def test_an_all_holder_writes_every_shared_board_but_configures_none(
             403,
             "todo_configure_required",
         )
-        # The personal board of the writer stays 404.
         assert client.get(f"/api/todos/boards/{w.personal}").status_code == 404
 
 
 async def test_the_token_scope_decides_reads_and_writes(
     api: Api, maker: async_sessionmaker[AsyncSession]
 ) -> None:
+    """Let the token scope decide the reads and writes.
+
+    The personal board needs ``todo.write`` in the scope, the team board "Plattform" its own
+    permission (``ticket.manage`` is not in ``read``). An admin token with ``read`` reads
+    the shared boards and writes none; with ``tickets:write`` beside ``read`` it reads
+    "Plattform" again.
+    """
     w = await _world(api, maker)
     read_token = Principal(
         sub=w.reader.sub,
@@ -324,8 +337,6 @@ async def test_the_token_scope_decides_reads_and_writes(
     api.login(read_token)
     with TestClient(api.app) as client:
         boards = _ok(client.get("/api/todos/boards"))
-        # The personal board needs todo.write in the scope, the team board
-        # "Plattform" its own permission (`ticket.manage` is not in `read`).
         assert {b["id"] for b in boards} == {w.gboard}
         assert all(b["canWrite"] is False for b in boards)
         assert client.get(f"/api/todos/boards/{w.team}").status_code == 404
@@ -345,7 +356,6 @@ async def test_the_token_scope_decides_reads_and_writes(
     with TestClient(api.app) as client:
         assert client.get("/api/todos/boards").status_code == 403
         assert client.get(f"/api/todos/boards/{w.gboard}").status_code == 404
-    # An admin token with `read` reads the shared boards and writes none of them.
     admin, _ = await add_person(maker, "Ada")
     api.login(
         Principal(sub=admin.sub, roles=["admin"], scope_permissions=scope_permissions(["read"]))
@@ -359,7 +369,6 @@ async def test_the_token_scope_decides_reads_and_writes(
             403,
             "todo_write_required",
         )
-    # With `tickets:write` beside `read`, the admin token reads "Plattform" again.
     api.login(
         Principal(
             sub=admin.sub,

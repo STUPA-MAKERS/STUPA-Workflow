@@ -127,30 +127,36 @@ def test_parse_solution_returns_fields() -> None:
 @pytest.mark.parametrize(
     "bad",
     [
-        "ZÈ♯",  # control characters, the exact CI reproduction
-        "garbage!!",  # not valid base64
+        "ZÈ♯",
+        "garbage!!",
         "",
-        base64.b64encode(b"abc").decode(),  # valid base64 but not JSON
-        base64.b64encode(json.dumps([1, 2]).encode()).decode(),  # JSON but not an object
-        base64.b64encode(json.dumps({"algorithm": "SHA-256"}).encode()).decode(),  # fields missing
+        base64.b64encode(b"abc").decode(),
+        base64.b64encode(json.dumps([1, 2]).encode()).decode(),
+        base64.b64encode(json.dumps({"algorithm": "SHA-256"}).encode()).decode(),
     ],
 )
 def test_parse_solution_rejects_malformed(bad: str) -> None:
+    """Reject a malformed solution.
+
+    The cases are control characters, invalid base64, an empty value, non-JSON, a non-object
+    and missing fields.
+    """
     with pytest.raises(AltchaError):
         parse_solution(bad)
 
 
 def test_validate_solution_format_passes_well_formed() -> None:
+    """Return a structurally valid solution unchanged, without a crypto check."""
     challenge = create_challenge(SECRET, number=3, salt="s", max_number=10)
     enc = encode_solution(challenge, 3)
-    # A structurally valid solution comes back unchanged. This call does NOT check
-    # the crypto.
     assert validate_solution_format(enc) == enc
 
 
 def test_validate_solution_format_raises_valueerror_for_pydantic() -> None:
-    # Pydantic maps only ValueError and AssertionError to a 422. Every other exception
-    # becomes a 500, so this path must not raise AltchaError.
+    """Raise ValueError, because Pydantic maps only ValueError and AssertionError to a 422.
+
+    Any other exception becomes a 500, so this path must not raise AltchaError.
+    """
     with pytest.raises(ValueError):
         validate_solution_format("ZÈ")
 
@@ -176,11 +182,12 @@ async def test_null_verifier_passes_everything() -> None:
 
 
 async def test_inmemory_replay_evicts_expired() -> None:
+    """Drop an entry past its TTL."""
     clock = {"t": 0}
     guard = InMemoryReplayGuard(now=lambda: clock["t"])
     assert await guard.seen("k", ttl_seconds=10) is False
     assert await guard.seen("k", ttl_seconds=10) is True
-    clock["t"] = 20  # past the TTL, so the guard drops the entry
+    clock["t"] = 20
     assert await guard.seen("k", ttl_seconds=10) is False
 
 
@@ -205,11 +212,13 @@ async def test_redis_replay_guard_detects_replay() -> None:
 
 
 async def test_redis_replay_guard_falls_back_not_noop() -> None:
+    """Fall back to a process-local guard when Redis fails.
+
+    A no-op would make a solution replayable for 300 seconds; the fallback keeps single use
+    per worker.
+    """
     kv = _FakeKV()
     kv.fail = True
-    # If Redis fails, the guard must NOT become a no-op. A no-op makes a solution
-    # replayable for 300 seconds. The guard falls back to a process-local
-    # guard, so single use still holds per worker.
     guard = RedisReplayGuard(kv, fallback=InMemoryReplayGuard(now=lambda: 0))
     assert await guard.seen("k", ttl_seconds=10) is False
     assert await guard.seen("k", ttl_seconds=10) is True
