@@ -228,7 +228,7 @@ export class AdminFrameComponent {
   readonly navOnly = computed(() => this.home() && !this.split());
 
   /** Below wide a page shows the bar of a one-view page, with the way back. */
-  readonly showBar = computed(() => !this.home() && !this.showNav());
+  readonly showBar = computed(() => !this.home() && !this.showNav() && !this.wide());
 
 
   /**

@@ -376,6 +376,12 @@ describe('AdminFrameComponent', () => {
     expect(home.container.querySelector('app-list-detail-bar')).toBeNull();
   });
 
+  it('has no bar on a wide full-width editor: the header keeps its crumb and title', async () => {
+    const wide = await setup(ALL, '/admin/flow');
+    expect(wide.container.querySelector('app-list-detail-bar')).toBeNull();
+    expect(wide.container.querySelector('.af__pageBody')).not.toHaveClass('ld-under-bar');
+  });
+
   it('has no bar beside the navigation', async () => {
     const wide = await setup(ALL, '/admin/users');
     expect(wide.container.querySelector('app-list-detail-bar')).toBeNull();
