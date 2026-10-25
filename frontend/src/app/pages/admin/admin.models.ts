@@ -775,11 +775,6 @@ export const EVENT_NAMES: readonly EventName[] = [
 
 export type RecipientKind = 'group' | 'role' | 'applicant';
 
-export interface Recipient {
-  kind: RecipientKind;
-  ref?: string | null;
-}
-
 export interface WebhookConfig {
   id: Uuid;
   name: string;

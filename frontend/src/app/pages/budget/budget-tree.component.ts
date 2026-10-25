@@ -1,7 +1,6 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  DestroyRef,
   ElementRef,
   Injector,
   afterNextRender,
@@ -142,7 +141,6 @@ export class BudgetTreeComponent {
   private readonly toast = inject(ToastService);
   private readonly auth = inject(AuthService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
-  private readonly destroyRef = inject(DestroyRef);
   private readonly injector = inject(Injector);
 
   /** Phone: the toolbar actions go into the header menu, the rows into cards. */
