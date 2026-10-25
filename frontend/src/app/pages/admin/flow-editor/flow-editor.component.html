@@ -217,6 +217,31 @@
           <app-skeleton class="fe__canvasSkel" variant="panel" [label]="'common.loading' | t" />
         }
 
+        <!-- The scroll tongues in the middle of each side, as on the wide tables: a press
+             pans one step towards the hidden content, a hold keeps going. Each one is
+             disabled and invisible while its side hides nothing. -->
+        @for (side of panSides; track side) {
+          <button
+            type="button"
+            class="fe__tongue"
+            [attr.data-side]="side"
+            [class.fe__tongue--on]="hiddenBy()[side] > 0 && !loading() && !layoutPending()"
+            [class.fe__tongue--held]="heldSide() === side"
+            [disabled]="!hiddenBy()[side]"
+            [attr.aria-hidden]="hiddenBy()[side] ? null : 'true'"
+            [attr.aria-label]="panLabel[side] | t"
+            (pointerdown)="onTonguePress($event, side)"
+            (pointerup)="stopHold()"
+            (pointerleave)="stopHold()"
+            (pointercancel)="stopHold()"
+            (keydown)="onTongueKey($event, side)"
+          >
+            <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </button>
+        }
+
         <p class="fe__legend">
           <span class="fe__legendItem"><span class="fe__legendDot" aria-hidden="true"></span>{{ 'admin.flow.initial' | t }}</span>
           <span class="fe__legendItem"><span class="fe__legendDash" aria-hidden="true"></span>{{ 'admin.flow.legendAutomatic' | t }}</span>

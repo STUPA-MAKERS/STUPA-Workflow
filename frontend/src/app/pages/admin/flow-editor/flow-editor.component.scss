@@ -2,6 +2,7 @@
 // and the inspector beside it.
 @use 'breakpoints' as bp;
 @use 'scroll-fade' as fade;
+@use 'press';
 
 :host {
   display: flex;
@@ -174,6 +175,105 @@
 }
 .fe__canvas:active {
   cursor: grabbing;
+}
+
+/* The scroll tongues, as on the wide tables (ui-kit data table): flush with the middle
+   of each side, rounded on the inner side only. */
+.fe__tongue {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  cursor: pointer;
+  background: var(--color-surface-3);
+  color: var(--color-text-muted);
+  border: var(--border-width) solid var(--color-border);
+  box-shadow: var(--shadow-elevated);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity var(--motion-base, 200ms) var(--ease-standard, ease),
+    background var(--motion-fast, 120ms) var(--ease-standard, ease),
+    color var(--motion-fast, 120ms) var(--ease-standard, ease),
+    border-color var(--motion-fast, 120ms) var(--ease-standard, ease),
+    scale var(--motion-xs) var(--ease-standard);
+  @include press.press;
+}
+.fe__tongue--on {
+  opacity: 1;
+  pointer-events: auto;
+}
+/* The size stays the same on hover: a repeat-click target that grows moves its own edge
+   away mid-click. The colour carries the hover. */
+.fe__tongue--held {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border-color: var(--color-accent);
+}
+@media (hover: hover) {
+  .fe__tongue:hover {
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+    border-color: var(--color-accent);
+  }
+}
+.fe__tongue:focus-visible {
+  outline: 2px solid var(--color-focus-ring, var(--color-primary));
+  outline-offset: 2px;
+}
+.fe__tongue svg {
+  display: block;
+  width: 13px;
+  height: 13px;
+}
+.fe__tongue[data-side='left'],
+.fe__tongue[data-side='right'] {
+  top: 50%;
+  width: 18px;
+  height: 54px;
+  translate: 0 -50%;
+}
+.fe__tongue[data-side='up'],
+.fe__tongue[data-side='down'] {
+  left: 50%;
+  width: 54px;
+  height: 18px;
+  translate: -50% 0;
+}
+.fe__tongue[data-side='left'] {
+  left: 0;
+  border-left: 0;
+  border-radius: 0 10px 10px 0;
+}
+.fe__tongue[data-side='right'] {
+  right: 0;
+  border-right: 0;
+  border-radius: 10px 0 0 10px;
+}
+.fe__tongue[data-side='right'] svg {
+  rotate: 180deg;
+}
+.fe__tongue[data-side='up'] {
+  top: 0;
+  border-top: 0;
+  border-radius: 0 0 10px 10px;
+}
+.fe__tongue[data-side='up'] svg {
+  rotate: 90deg;
+}
+.fe__tongue[data-side='down'] {
+  bottom: 0;
+  border-bottom: 0;
+  border-radius: 10px 10px 0 0;
+}
+.fe__tongue[data-side='down'] svg {
+  rotate: -90deg;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fe__tongue {
+    transition: none;
+  }
 }
 
 /* The legend at the bottom left of the canvas. */

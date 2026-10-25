@@ -2903,6 +2903,73 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
       expect(min.y).toBeCloseTo(b.y + (b.h - 40) / 2);
     });
 
+    it('shows a scroll tongue on each side that hides content and pans towards it', async () => {
+      const { fixture } = await setup({ getGlobalFlow: jest.fn(() => of(TAGGED)) });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const c = fixture.componentInstance as any;
+      const b = c.contentBounds();
+      const tongue = (side: string): HTMLButtonElement =>
+        fixture.nativeElement.querySelector(`.fe__tongue[data-side="${side}"]`);
+      // Unmeasured, or a box larger than the flow: nothing is hidden.
+      fixture.detectChanges();
+      for (const side of ['left', 'right', 'up', 'down']) expect(tongue(side).disabled).toBe(true);
+      c.canvasSize.set({ w: b.w + 400, h: b.h + 200 });
+      fixture.detectChanges();
+      expect(tongue('right').disabled).toBe(true);
+
+      // A small box: the view starts at the left end at scale 0.75 (40 × 40 in the world).
+      c.canvasSize.set({ w: 30, h: 30 });
+      fixture.detectChanges();
+      const hidden = c.hiddenBy();
+      expect(hidden.left).toBe(0);
+      expect(hidden.right).toBeCloseTo(b.w - 40);
+      expect(hidden.up).toBeCloseTo((b.h - 40) / 2);
+      expect(hidden.down).toBeCloseTo((b.h - 40) / 2);
+      expect(tongue('left').disabled).toBe(true);
+      expect(tongue('left').getAttribute('aria-hidden')).toBe('true');
+      expect(tongue('right').disabled).toBe(false);
+      expect(tongue('right')).toHaveClass('fe__tongue--on');
+      expect(tongue('right')).toHaveAccessibleName('Nach rechts verschieben');
+
+      // The last step stops exactly at the edge of the content.
+      c.pan('down');
+      expect(c.hiddenBy().down).toBe(0);
+      expect(c.view().y + 40).toBeCloseTo(b.y + b.h);
+      c.pan('down');
+      expect(c.view().y + 40).toBeCloseTo(b.y + b.h);
+      c.onTongueKey(new KeyboardEvent('keydown', { key: 'Enter' }), 'up');
+      expect(c.hiddenBy().up).toBe(0);
+      const y = c.view().y;
+      c.onTongueKey(new KeyboardEvent('keydown', { key: 'a' }), 'down');
+      expect(c.view().y).toBe(y);
+
+      // Press steps once, hold repeats, release stops.
+      jest.useFakeTimers();
+      try {
+        const x0 = c.view().x;
+        c.onTonguePress({ button: 2 } as PointerEvent, 'right');
+        expect(c.view().x).toBe(x0);
+        c.onTonguePress({ button: 0 } as PointerEvent, 'right');
+        const x1 = c.view().x;
+        expect(x1).toBeGreaterThan(x0);
+        expect(c.heldSide()).toBe('right');
+        jest.advanceTimersByTime(300 + 90);
+        expect(c.view().x).toBeGreaterThan(x1);
+        c.stopHold();
+        expect(c.heldSide()).toBeNull();
+        const x2 = c.view().x;
+        jest.advanceTimersByTime(1000);
+        expect(c.view().x).toBe(x2);
+        c.onTonguePress({ button: 0 } as PointerEvent, 'left');
+        fixture.destroy();
+        const x3 = c.view().x;
+        jest.advanceTimersByTime(1000);
+        expect(c.view().x).toBe(x3);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
     it('shows the versions in the inspector and names the active version in the header', async () => {
       const { fixture } = await setup({ getGlobalFlow: jest.fn(() => of(TAGGED)) });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

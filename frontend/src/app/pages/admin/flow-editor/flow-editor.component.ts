@@ -5,6 +5,7 @@ import {
   HostListener,
   computed,
   effect,
+  DestroyRef,
   inject,
   signal,
   untracked,
@@ -13,6 +14,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
+import type { TranslationKey } from '@core/i18n/translations';
 import {
   ButtonComponent,
   EmptyStateComponent,
@@ -84,6 +86,18 @@ import { StateInspectorComponent, type GuardPriorityRow } from './state-inspecto
 import { TransitionDetailComponent } from './transition-detail.component';
 import { TransitionInspectorComponent } from './transition-inspector.component';
 import { TransitionListsComponent } from './transition-lists.component';
+
+/** How far one press of a scroll tongue pans the canvas, in screen px. */
+const PAN_STEP = 240;
+/** How long a tongue has to be held before it starts repeating. */
+const HOLD_DELAY_MS = 300;
+/** How often a held tongue pans once it repeats. */
+const HOLD_INTERVAL_MS = 90;
+/** Sub-pixel slack, so rounding at an edge does not read as hidden content. */
+const EDGE_SLACK = 1;
+
+/** A side of the canvas, and the direction its scroll tongue pans to. */
+export type PanSide = 'left' | 'right' | 'up' | 'down';
 
 /** The smallest scale of the start view: below it the labels are too small to read. */
 const MIN_FIT_SCALE = 0.75;
@@ -254,6 +268,7 @@ export class FlowEditorComponent {
   });
 
   constructor() {
+    inject(DestroyRef).onDestroy(() => this.stopHold());
     // Load the active global flow. Keep the empty graph when there is none.
     this.api
       .getGlobalFlow()
@@ -369,6 +384,86 @@ export class FlowEditorComponent {
     const v = this.view();
     return v ? Math.round((this.fitBounds().w / v.w) * 100) : 100;
   });
+
+  /**
+   * How much content each side of the canvas hides, in world units. The visible area is
+   * the viewBox widened to the aspect of the box (`xMidYMid meet`), so a box that is
+   * wider than the view shows more than the view itself.
+   */
+  protected readonly hiddenBy = computed<Record<PanSide, number> & { scale: number }>(() => {
+    const { w, h } = this.canvasSize();
+    const v = this.view() ?? this.fitBounds();
+    if (!w || !h || !v.w || !v.h) return { left: 0, right: 0, up: 0, down: 0, scale: 1 };
+    const scale = Math.min(w / v.w, h / v.h);
+    const vw = w / scale;
+    const vh = h / scale;
+    const x = v.x - (vw - v.w) / 2;
+    const y = v.y - (vh - v.h) / 2;
+    const b = this.contentBounds();
+    const slack = EDGE_SLACK / scale;
+    const past = (n: number): number => (n > slack ? n : 0);
+    return {
+      left: past(x - b.x),
+      right: past(b.x + b.w - (x + vw)),
+      up: past(y - b.y),
+      down: past(b.y + b.h - (y + vh)),
+      scale,
+    };
+  });
+
+  /** The tongue that is held down, for its pressed colour. */
+  protected readonly heldSide = signal<PanSide | null>(null);
+  private holdTimer?: ReturnType<typeof setTimeout>;
+  private holdTick?: ReturnType<typeof setInterval>;
+
+  /** One step towards a side; the last step stops at the edge of the content. */
+  protected pan(side: PanSide): void {
+    const hidden = this.hiddenBy();
+    const d = Math.min(PAN_STEP / hidden.scale, hidden[side]);
+    if (d <= 0) return;
+    if (side === 'left') this.pointer.panBy(-d, 0);
+    else if (side === 'right') this.pointer.panBy(d, 0);
+    else if (side === 'up') this.pointer.panBy(0, -d);
+    else this.pointer.panBy(0, d);
+  }
+
+  /**
+   * Press to step, hold to keep going, as the tongues of the tables do: a wide flow
+   * should not need fifteen clicks.
+   */
+  protected onTonguePress(event: PointerEvent, side: PanSide): void {
+    if (event.button !== 0) return;
+    this.stopHold();
+    this.pan(side);
+    this.heldSide.set(side);
+    this.holdTimer = setTimeout(() => {
+      this.holdTick = setInterval(() => this.pan(side), HOLD_INTERVAL_MS);
+    }, HOLD_DELAY_MS);
+  }
+
+  /** Release, leave or cancel: the repeat stops with the gesture that started it. */
+  protected stopHold(): void {
+    if (this.holdTimer !== undefined) clearTimeout(this.holdTimer);
+    if (this.holdTick !== undefined) clearInterval(this.holdTick);
+    this.holdTimer = undefined;
+    this.holdTick = undefined;
+    this.heldSide.set(null);
+  }
+
+  /** Enter and Space step once; the key repeat of the platform does the rest. */
+  protected onTongueKey(event: KeyboardEvent, side: PanSide): void {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    this.pan(side);
+  }
+
+  protected readonly panSides: readonly PanSide[] = ['left', 'right', 'up', 'down'];
+  protected readonly panLabel: Record<PanSide, TranslationKey> = {
+    left: 'admin.flow.panLeft',
+    right: 'admin.flow.panRight',
+    up: 'admin.flow.panUp',
+    down: 'admin.flow.panDown',
+  };
 
   /** The meta of the header: the active version, once known. */
   protected readonly versionMeta = computed(() => {

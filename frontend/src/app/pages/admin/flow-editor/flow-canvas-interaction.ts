@@ -170,6 +170,12 @@ export class FlowCanvasInteraction {
     this.applyZoom(v, 1.2, { x: v.x + v.w / 2, y: v.y + v.h / 2 });
   }
 
+  /** Move the view by a distance in world units (the scroll tongues). */
+  panBy(dx: number, dy: number): void {
+    const v = this.ensureView();
+    this.host.view.set({ ...v, x: v.x + dx, y: v.y + dy });
+  }
+
   /** Reset the zoom so the view fits the whole content again. */
   resetView(): void {
     this.host.view.set(null);
