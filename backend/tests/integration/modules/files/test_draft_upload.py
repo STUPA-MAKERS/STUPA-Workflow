@@ -133,6 +133,11 @@ async def test_first_upload_issues_a_token_and_later_uploads_extend_it(
     maker: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Issue a token and extend it with each upload.
+
+    The database keeps the HMAC of the token, never the token. Both drafts share one end,
+    because the second upload moved the first one too.
+    """
     settings = guest_settings(migrated[1])
     storage = _MemoryStorage()
     before = datetime.now(UTC)
@@ -152,12 +157,10 @@ async def test_first_upload_issues_a_token_and_later_uploads_extend_it(
         assert row.field_key == "angebote"
         assert row.storage_key is not None
         assert row.storage_key.startswith(f"drafts/{row.id}/")
-        # The database keeps the HMAC of the token, never the token.
         assert row.draft_token_hash is not None
         assert row.draft_token_hash != token.encode()
         assert row.draft_expires_at is not None
         assert row.draft_expires_at > before + timedelta(days=6, hours=23)
-    # Both drafts share one end: the second upload moved the first one too.
     assert rows[0].draft_expires_at == rows[1].draft_expires_at
     assert len(storage.blobs) == 2
 
@@ -210,6 +213,7 @@ async def test_file_and_byte_limits_per_token(
     maker: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Apply the file and byte limits per token; a new token starts with its own limit."""
     settings = guest_settings(migrated[1]).model_copy(
         update={"attachment_draft_max_files": 2}
     )
@@ -223,7 +227,6 @@ async def test_file_and_byte_limits_per_token(
         )
         assert resp.status_code == 413, resp.text
         assert resp.json()["code"] == "draft_quota_exceeded"
-        # A new token starts a new draft with its own limit.
         _upload(client)
 
     settings = guest_settings(migrated[1]).model_copy(
@@ -268,6 +271,11 @@ async def test_delete_needs_the_owning_token(
     maker: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Need the owning token to delete a draft.
+
+    Another token, an unknown id and a bound attachment give 404. A missing header gives
+    422.
+    """
     settings = guest_settings(migrated[1])
     storage = _MemoryStorage()
     seed = await seed_guest_flow(maker)
@@ -290,7 +298,6 @@ async def test_delete_needs_the_owning_token(
         other = _upload(client)
         other_token = str(other["draftToken"])
 
-        # Another token, an unknown id and a bound attachment all give 404.
         for target, header in (
             (mine["id"], other_token),
             (str(uuid.uuid4()), token),
@@ -301,7 +308,6 @@ async def test_delete_needs_the_owning_token(
             )
             assert resp.status_code == 404, resp.text
             assert resp.headers["content-type"].startswith("application/problem+json")
-        # Without the header the route answers 422.
         assert client.delete(f"/api/apply/attachments/{mine['id']}").status_code == 422
 
         resp = client.delete(
@@ -326,6 +332,7 @@ async def test_token_stays_valid_after_the_last_draft_is_deleted(
     maker: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Keep the token valid; the replacement upload needs no new ALTCHA."""
     settings = guest_settings(migrated[1])
     storage = _MemoryStorage()
     with _client(migrated, settings, monkeypatch, storage) as client:
@@ -337,7 +344,6 @@ async def test_token_stays_valid_after_the_last_draft_is_deleted(
         assert resp.status_code == 204, resp.text
         assert await _drafts(maker) == []
 
-        # The replacement upload uses the same token and needs no new ALTCHA.
         second = _upload(client, token, name="ersatz.pdf")
         assert second["draftToken"] == token
 
@@ -355,7 +361,11 @@ async def test_delete_that_races_with_the_bind_keeps_the_bound_file(
     maker: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The create locks and binds the draft. A parallel delete waits, then gives 404."""
+    """The create locks and binds the draft. A parallel delete waits, then gives 404.
+
+    The create locks and binds the draft row without a commit, and the DELETE waits for that
+    row lock.
+    """
     settings = guest_settings(migrated[1])
     storage = _MemoryStorage()
     seed = await seed_guest_flow(maker)
@@ -367,7 +377,6 @@ async def test_delete_that_races_with_the_bind_keeps_the_bound_file(
     pepper = settings.magic_link_secret
 
     async with maker() as create:
-        # The create: lock the draft row and bind it, but do not commit yet.
         await check_drafts(create, attachment_ids=[draft_id], token=token, pepper=pepper)
         await bind_drafts(
             create,
@@ -389,7 +398,6 @@ async def test_delete_that_races_with_the_bind_keeps_the_bound_file(
 
         racing = asyncio.create_task(_delete())
         await asyncio.sleep(0.5)
-        # The DELETE waits for the row lock of the create.
         assert not racing.done()
         await create.commit()
         with pytest.raises(NotFoundError):

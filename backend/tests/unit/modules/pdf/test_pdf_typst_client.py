@@ -4,6 +4,9 @@ The tests cover success (PDF bytes), 4xx (permanent, no retry), 5xx (transient),
 a transport error (transient), and an unexpected content type. They also cover the
 two wire shapes: the raw body without a config and without assets, and the
 multipart form that carries the config object plus the binary assets.
+
+Only a render with a config or assets, such as the uploaded Corporate-Design logos,
+switches the wire shape to multipart.
 """
 
 from __future__ import annotations
@@ -57,6 +60,7 @@ def _pdf_route() -> respx.Route:
 
 @respx.mock
 async def test_render_success_returns_pdf_bytes() -> None:
+    """Send the Markdown as a raw body with the variant, without a shell or form encoding."""
     route = respx.post(f"{BASE}/render").mock(
         return_value=httpx.Response(
             200, content=b"%PDF-1.4 ok", headers={"content-type": "application/pdf"}
@@ -64,8 +68,6 @@ async def test_render_success_returns_pdf_bytes() -> None:
     )
     out = await _client().render_pdf("# doc", variant="protocol-stupa")
     assert out == b"%PDF-1.4 ok"
-    # The client sends the Markdown as a raw body plus the variant. It runs no shell
-    # and applies no form encoding.
     req = route.calls.last.request
     assert req.content == b"# doc"
     assert dict(req.url.params) == {"variant": "protocol-stupa"}
@@ -117,9 +119,6 @@ async def test_render_unexpected_content_type_permanent() -> None:
     assert ei.value.retryable is False
 
 
-# Config + assets channel: the caller pushes uploaded Corporate-Design logos into a
-# render. Only such a call switches the wire shape to multipart.
-
 LOGO = b"\x89PNG\r\n\x1a\nfake-logo"
 CONFIG: dict[str, object] = {"logos": ["stupa.png"], "footer_logos": "asta.png"}
 
@@ -146,6 +145,10 @@ async def test_render_with_empty_config_and_assets_keeps_the_raw_body() -> None:
 
 @respx.mock
 async def test_render_with_assets_and_config_sends_multipart() -> None:
+    """Send a multipart body; the query params still work.
+
+    The service reads the asset name from the file name of the part.
+    """
     route = _pdf_route()
     out = await _client().render_pdf(
         "# doc",
@@ -156,7 +159,6 @@ async def test_render_with_assets_and_config_sends_multipart() -> None:
     assert out == b"%PDF"
     req = route.calls.last.request
     assert req.headers["content-type"].startswith("multipart/form-data")
-    # The query params keep working next to the multipart body.
     assert dict(req.url.params) == {"variant": "protocol-stupa"}
 
     parts = _parts(req)
@@ -165,7 +167,6 @@ async def test_render_with_assets_and_config_sends_multipart() -> None:
     config = [p for p in parts if p[0] == "config"]
     assert len(config) == 1
     assert json.loads(config[0][2]) == CONFIG
-    # The service reads the asset name from the file name of the part.
     assets = {name: data for field, name, data in parts if field == "assets"}
     assert assets == {"stupa.png": LOGO, "asta.png": b"second"}
 

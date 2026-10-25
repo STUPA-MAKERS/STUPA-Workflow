@@ -92,9 +92,9 @@ async def test_create_without_drafts_skips_the_draft_check(
     _patch_forms: type[_FakeForms],  # noqa: F811
     _patch_flow: type[_FakeFlow],  # noqa: F811
 ) -> None:
+    """Skip the draft check; a free value in a file field stays allowed (upload after create)."""
     session, _ = _session_for_create()
     svc = ApplicationsService(session)  # type: ignore[arg-type]
-    # A free value in a file field stays allowed without drafts (upload after create).
     await svc.create(_payload(data={"title": "T", "belege": "text"}))  # type: ignore[arg-type]
     assert _DraftCalls.checked == []
     assert _DraftCalls.bound == []
@@ -105,6 +105,7 @@ async def test_create_with_token_but_no_ids_binds_nothing(
     _patch_flow: type[_FakeFlow],  # noqa: F811
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Bind nothing; without a pepper from the router the create reads the settings."""
     class _Settings:
         magic_link_secret = "from-settings"
 
@@ -113,7 +114,6 @@ async def test_create_with_token_but_no_ids_binds_nothing(
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     await svc.create(_payload(data={"title": "T"}, draft_token="tok"))  # type: ignore[arg-type]
     assert _DraftCalls.checked == []
-    # Without a pepper from the router the create reads it from the settings.
     assert _DraftCalls.bound[0]["pepper"] == "from-settings"
     assert _DraftCalls.bound[0]["attachment_ids"] == []
 

@@ -51,11 +51,11 @@ async def _status(session: AsyncSession, vote_id) -> tuple[str, datetime | None]
 
 
 async def test_manual_exit_cancels_open_and_draft_votes(session: AsyncSession) -> None:
+    """Cancel the open and draft votes; a draft for the entered state stays."""
     flow = await seed_vote_flow(session)
     meeting_id = await add_meeting(session, flow.gremium_id)
     running = await add_vote(session, flow, meeting_id=meeting_id, opens_at=NOW)
     draft = await add_vote(session, flow, status="draft", opens_state="voting")
-    # A draft for the state the application enters stays.
     kept = await add_vote(session, flow, status="draft", opens_state="review")
     closed = await add_vote(session, flow, status="closed")
     publisher = RecordingPublisher()

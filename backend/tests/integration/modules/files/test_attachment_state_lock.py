@@ -100,6 +100,7 @@ def _client(
     storage: _MemoryStorage,
     sid: str,
 ) -> TestClient:
+    """Build a client with a cookie session and the CSRF double-submit pair for writes."""
     api = build_api(migrated[1], settings, monkeypatch)
 
     def _files(session: DbSession, request_settings: SettingsDep) -> FilesService:
@@ -111,7 +112,6 @@ def _client(
     api.dependency_overrides[get_files_service] = _files
     client = TestClient(api)
     client.cookies.set(settings.applicant_cookie_name, sid)
-    # The session is a cookie, so a write needs the CSRF double-submit pair.
     client.cookies.set(settings.csrf_cookie_name, "csrf-test-token")
     client.headers[settings.csrf_header_name] = "csrf-test-token"
     return client

@@ -62,7 +62,11 @@ def _manager() -> Principal:
 
 
 async def _seed(session: AsyncSession) -> tuple[ApplicationType, dict[str, State]]:
-    """Create the type, the active form and the flow (draft→review→voting→approved/rejected)."""
+    """Create the type, the active form and the flow (draft→review→voting→approved/rejected).
+
+    The guard of review → voting needs the role treasurer, which the manager lacks. The pass
+    and fail branches are the vote outcomes that fire_branch fires on vote close.
+    """
     gremium = Gremium(name="G", slug=f"g-{uuid.uuid4()}")
     session.add(gremium)
     await session.flush()
@@ -126,10 +130,9 @@ async def _seed(session: AsyncSession) -> tuple[ApplicationType, dict[str, State
         Transition(
             flow_version_id=flow.id, from_state_id=states["review"].id,
             to_state_id=states["voting"].id, label_i18n={"de": "Zur Abstimmung"},
-            guard={"roleIs": "treasurer"},  # the manager is NOT a treasurer, so this blocks
+            guard={"roleIs": "treasurer"},
             actions=[], order=0,
         ),
-        # Vote outcomes: fire_branch fires the pass and fail branch on vote close.
         Transition(
             flow_version_id=flow.id, from_state_id=states["voting"].id,
             to_state_id=states["approved"].id, label_i18n={"de": "Bewilligen"},
@@ -163,15 +166,21 @@ async def _make_application(
 
 
 async def test_available_transitions_filters_by_guard(session: AsyncSession) -> None:
+    """Offer the one transition of draft, whose guard passes (title set, actor is reviewer)."""
     app_type, states = await _seed(session)
     app = await _make_application(session, app_type)
 
     out = await FlowService(session).available_transitions(app.id, _manager())
-    # draft has exactly one transition and its guard passes: title set, actor is reviewer.
     assert [t.to_state_id for t in out] == [states["review"].id]
 
 
 async def test_fire_moves_state_writes_event_dispatches(session: AsyncSession) -> None:
+    """Move the state, write the event and dispatch the actions.
+
+    Besides the configured `notify` action, the fire dispatches the implicit `taskNotify`
+    mail to the principals who may act on the new state. The timeline holds the create event
+    and the transition event.
+    """
     app_type, states = await _seed(session)
     app = await _make_application(session, app_type)
     transition = (
@@ -185,9 +194,6 @@ async def test_fire_moves_state_writes_event_dispatches(session: AsyncSession) -
         app.id, transition.id, _manager(), note="ok"
     )
     assert res.new_state_id == states["review"].id
-    # The fire() call also dispatches the implicit `taskNotify` mail, besides the
-    # configured `notify` action. The mail goes to the principals who may act on
-    # the new state (build_implicit_notifications).
     assert res.dispatched_actions == ["notify", "taskNotify"]
     assert rec.actions[0].type == "notify"
     assert rec.actions[0].idempotency_key.endswith(":0:notify")
@@ -202,7 +208,6 @@ async def test_fire_moves_state_writes_event_dispatches(session: AsyncSession) -
             select(StatusEvent).where(StatusEvent.application_id == app.id)
         )
     ).scalars().all()
-    # The timeline holds the initial create event plus the transition event.
     fire_event = [e for e in events if e.transition_id == transition.id]
     assert len(fire_event) == 1
     assert fire_event[0].from_state_id == states["draft"].id
@@ -210,12 +215,18 @@ async def test_fire_moves_state_writes_event_dispatches(session: AsyncSession) -
 
 
 async def test_fire_into_locked_state_blocks_t12_patch(session: AsyncSession) -> None:
+    """Block the application patch with 409 after a fire into a locked state.
+
+    review still allows edits, so a patch there passes. The test puts the application into
+    `voting` (no manager path leads there) and moves it into the locked `approved` state
+    with fire_branch, so the lock comes from the transition itself. Only a vote result fires
+    a branch; a manual `fire` blocks with 409.
+    """
     app_type, states = await _seed(session)
     app = await _make_application(session, app_type)
     apps = ApplicationsService(session)
     flow = FlowService(session)
 
-    # review still allows edits, so the application patch passes.
     t_review = (
         await session.execute(
             select(Transition).where(
@@ -227,11 +238,6 @@ async def test_fire_into_locked_state_blocks_t12_patch(session: AsyncSession) ->
     await flow.fire(app.id, t_review.id, _manager())
     await apps.patch(app.id, {"title": "Aktualisiert"}, changed_by="mgr-1")
 
-    # Put the application into `voting` (no manager path leads there), then move into
-    # the locked `approved` state (edit_allowed=False) with fire_branch. The lock then
-    # comes from the transition itself, not from a state that the test sets by hand.
-    # `voting` → `approved` is a `pass` branch. Only a vote result fires
-    # a branch transition, through fire_branch. A manual `fire` blocks with 409 on purpose.
     app_row = await session.get(Application, app.id)
     assert app_row is not None
     app_row.current_state_id = states["voting"].id
@@ -240,17 +246,16 @@ async def test_fire_into_locked_state_blocks_t12_patch(session: AsyncSession) ->
     res = await flow.fire_branch(app.id, "pass", _manager())
     assert res.new_state_id == states["approved"].id
 
-    # The transition now blocks the application patch with 409.
     with pytest.raises(ConflictError):
         await apps.patch(app.id, {"title": "Verboten"}, changed_by="mgr-1")
 
 
 async def test_fire_guard_failed_409(session: AsyncSession) -> None:
+    """Answer 409 when the manager lacks the treasurer role of review → voting."""
     app_type, states = await _seed(session)
     app = await _make_application(session, app_type)
     flow = FlowService(session)
 
-    # review → voting needs roleIs treasurer, which the manager does not have.
     t_review = (
         await session.execute(
             select(Transition).where(
@@ -290,6 +295,7 @@ async def test_fire_branch_routes_to_target(
 
 
 async def test_fire_wrong_from_state_conflict(session: AsyncSession) -> None:
+    """Answer 409 for a second fire of the same transition from the wrong state."""
     app_type, states = await _seed(session)
     app = await _make_application(session, app_type)
     flow = FlowService(session)
@@ -302,7 +308,6 @@ async def test_fire_wrong_from_state_conflict(session: AsyncSession) -> None:
         )
     ).scalar_one()
     await flow.fire(app.id, t_review.id, _manager())
-    # Fire the same transition again: from(draft) != current(review) → 409.
     with pytest.raises(ConflictError) as exc:
         await flow.fire(app.id, t_review.id, _manager())
     assert exc.value.code == "conflict"

@@ -51,7 +51,11 @@ def _forcer() -> Principal:
 
 
 async def _seed(session: AsyncSession) -> tuple[ApplicationType, dict[str, State]]:
-    """Create the type, the active form and the flow (draft→review plus terminal `done`)."""
+    """Create the type, the active form and the flow (draft→review plus terminal `done`).
+
+    draft→review is the only normal transition, and no path leads to `done`. The override
+    must still reach that state.
+    """
     gremium = Gremium(name="G", slug=f"g-{uuid.uuid4()}")
     session.add(gremium)
     await session.flush()
@@ -93,8 +97,6 @@ async def _seed(session: AsyncSession) -> tuple[ApplicationType, dict[str, State
     }
     session.add_all(list(states.values()))
     await session.flush()
-    # draft→review is the only *normal* transition. No path leads to `done` on purpose.
-    # The override must still reach that state. That is the point of force_status.
     session.add(
         Transition(
             flow_version_id=flow.id, from_state_id=states["draft"].id,
@@ -124,6 +126,11 @@ async def _make_application(
 async def test_force_status_moves_state_writes_event_and_audit(
     session: AsyncSession,
 ) -> None:
+    """Move the state silently and write the event and the audit entry.
+
+    The status event has no transition and keeps the reason and the actor. The audit entry
+    is a forced status_change with both state ids, so it is revertable.
+    """
     app_type, states = await _seed(session)
     app = await _make_application(session, app_type)
 
@@ -131,14 +138,13 @@ async def test_force_status_moves_state_writes_event_and_audit(
         app.id, states["done"].id, _forcer(), note="admin override"
     )
     assert res.new_state_id == states["done"].id
-    assert res.dispatched_actions == []  # silent: no notifications and no webhooks
+    assert res.dispatched_actions == []
 
     refreshed = await session.get(Application, app.id)
     assert refreshed is not None
     await session.refresh(refreshed)
     assert refreshed.current_state_id == states["done"].id
 
-    # The status_event on the timeline has no transition. It keeps the reason and actor.
     event = (
         await session.execute(
             select(StatusEvent).where(
@@ -152,7 +158,6 @@ async def test_force_status_moves_state_writes_event_and_audit(
     assert event.actor == "forcer-1"
     assert event.note == "admin override"
 
-    # The audit holds a forced status_change. It is revertable: it has from and to ids.
     audit = (
         await session.execute(
             select(AuditEntry).where(
@@ -184,9 +189,9 @@ async def test_force_status_cancels_open_votes(session: AsyncSession) -> None:
 
 
 async def test_force_status_same_state_conflicts(session: AsyncSession) -> None:
+    """Answer 409 for a force into the current `draft` state."""
     app_type, states = await _seed(session)
     app = await _make_application(session, app_type)
-    # The application starts in the initial `draft` state. Forcing draft is a no-op 409.
     with pytest.raises(ConflictError):
         await FlowService(session).force_status(
             app.id, states["draft"].id, _forcer(), note="noop"
@@ -196,10 +201,13 @@ async def test_force_status_same_state_conflicts(session: AsyncSession) -> None:
 async def test_force_status_foreign_flow_state_not_found(
     session: AsyncSession,
 ) -> None:
+    """Answer 404 for a state of another flow version.
+
+    The service must never write it as the current state, because that is a cross-graph FK
+    inconsistency.
+    """
     app_type, _ = await _seed(session)
     app = await _make_application(session, app_type)
-    # A state of a DIFFERENT flow version gives 404. The service must never write it as
-    # the current state, because that would be a cross-graph FK inconsistency.
     other_flow = FlowVersion(version=2, active=False, editor_layout={})
     session.add(other_flow)
     await session.flush()
@@ -215,9 +223,9 @@ async def test_force_status_foreign_flow_state_not_found(
 
 
 async def test_list_states_returns_flow_states(session: AsyncSession) -> None:
+    """List the states, initial state first, then by key."""
     app_type, _ = await _seed(session)
     app = await _make_application(session, app_type)
     out = await FlowService(session).list_states(app.id)
     assert {s.key for s in out} == {"draft", "review", "done"}
-    # The initial state comes first. The order is is_initial desc, then key.
     assert out[0].key == "draft"

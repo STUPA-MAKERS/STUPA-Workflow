@@ -138,6 +138,11 @@ def _drafts(
 
 
 async def test_first_upload_issues_a_token() -> None:
+    """Issue a token on the first upload.
+
+    The new token needs no validity check, but the advisory lock and the quota run. The
+    upload stores the token on its own and moves its end.
+    """
     session = _Session()
     storage, queue = FakeStorage(), FakeScanQueue()
     out = await _drafts(session, storage=storage, queue=queue).upload(
@@ -153,10 +158,8 @@ async def test_first_upload_issues_a_token() -> None:
     assert storage.put_calls == [row.storage_key]
     assert queue.enqueued == [out.id]
     assert session.committed == 1
-    # The new token needs no validity check, but the advisory lock and the quota run.
     assert any("pg_advisory_xact_lock" in s for s in session.statements)
     assert not any("FROM attachment_draft_token" in s for s in session.statements)
-    # The upload stores the token on its own and moves its end.
     (upsert,) = [s for s in session.statements if "INSERT INTO attachment_draft_token" in s]
     assert "ON CONFLICT (token_hash) DO UPDATE" in upsert
     assert AUDITS[0]["action"] == "attachment_upload"
@@ -196,9 +199,9 @@ async def test_quota_gives_413(quota: tuple[int, int], message: str) -> None:
 
 
 async def test_token_is_valid_reads_the_token_table() -> None:
+    """Read the token table, not the drafts, so a token without drafts is valid."""
     session = _Session(scalar=[b"hash"])
     assert await _drafts(session).token_is_valid("t") is True
-    # The check reads the token table, not the drafts: a token without drafts is valid.
     assert "FROM attachment_draft_token" in session.statements[0]
     assert "FROM attachment " not in session.statements[0]
     assert await _drafts(_Session(scalar=[None])).token_is_valid("t", now=NOW) is False
@@ -226,11 +229,14 @@ def _removed(key: str | None = "drafts/x/d.pdf") -> SimpleNamespace:
 
 
 async def test_delete_removes_row_object_and_audits() -> None:
+    """Delete the row and the object, and audit the delete.
+
+    One DELETE carries every condition, so a parallel bind cannot slip in between.
+    """
     session = _Session(removed=[_removed()])
     storage = FakeStorage()
     att_id = uuid.uuid4()
     await _drafts(session, storage=storage).delete(att_id, token="t", actor="applicant")
-    # One DELETE carries every condition, so a parallel bind cannot slip in between.
     (stmt,) = [s for s in session.statements if s.startswith("DELETE FROM attachment")]
     assert "application_id IS NULL" in stmt
     assert "draft_token_hash" in stmt

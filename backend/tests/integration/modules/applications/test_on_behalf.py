@@ -161,6 +161,7 @@ async def test_guest_capture_belongs_to_the_guest(
     maker: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Give a guest capture to the guest through the magic link, confirmed at once."""
     seed = await seed_guest_flow(maker)
     await _add_principal(maker, "clerk-sub", "clerk@example.org", "Clara Clerk")
     sent: Sent = []
@@ -172,12 +173,10 @@ async def test_guest_capture_belongs_to_the_guest(
     app_id = uuid.UUID(resp.json()["applicationId"])
 
     app = await _get(maker, app_id)
-    # The guest owns it through the magic link: no account owner.
     assert app.created_by is None
     assert app.captured_by == "clerk-sub"
     assert app.capture_intake == "per PDF"
     assert app.received_on == received
-    # Submitted directly into the flow: no confirmation by the guest.
     assert app.email_confirmed_at is not None
     assert app.current_state_id == seed.open_state_id
     assert sent == [("gisela@example.org", app_id, True)]
@@ -218,6 +217,11 @@ async def test_account_capture_belongs_to_the_account(
     maker: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Give an account capture to the account.
+
+    The received date defaults to today. The owner sees the Gremium as the capturer, a
+    reader with the right sees the name, and a normal application carries no capture block.
+    """
     seed = await seed_guest_flow(maker)
     await _add_principal(maker, "clerk-sub", "clerk@example.org", "Clara Clerk")
     owner_id = await _add_principal(maker, "anna-sub", "anna@example.org", "Anna Antrag")
@@ -236,7 +240,6 @@ async def test_account_capture_belongs_to_the_account(
     assert app.created_by == "anna-sub"
     assert app.captured_by == "clerk-sub"
     assert app.capture_intake is None
-    # The default received date is today.
     assert app.received_on is not None
     assert abs((app.received_on - date.today()).days) <= 1
     assert sent == [("anna@example.org", app_id, False)]
@@ -245,7 +248,6 @@ async def test_account_capture_belongs_to_the_account(
     assert behalf.data["applicantPrincipalId"] == str(owner_id)
     assert behalf.data["intake"] is False
 
-    # The applicant reads it as the owner and sees the Gremium as the capturer.
     owner = Principal(sub="anna-sub", roles=["member"], email="anna@example.org")
     with _client(migrated, settings, monkeypatch, owner, sent) as client:
         detail = client.get(f"/api/applications/{app_id}")
@@ -265,7 +267,6 @@ async def test_account_capture_belongs_to_the_account(
         mine = client.get("/api/applications?mine=true").json()
         assert [item["id"] for item in mine["items"]] == [str(app_id)]
 
-    # A reader with the right sees the name of the capturing person.
     with _client(migrated, settings, monkeypatch, _ADMIN, sent) as client:
         out = client.get(f"/api/applications/{app_id}").json()
         captured_by = out["capture"]["capturedBy"]
@@ -273,7 +274,6 @@ async def test_account_capture_belongs_to_the_account(
         assert captured_by["displayName"] == "Clara Clerk"
         assert out["capture"]["receivedOn"] == app.received_on.isoformat()
         assert out["isOwner"] is False
-        # A normal application carries no capture block.
         timeline = client.get(f"/api/applications/{app_id}/timeline").json()
         assert timeline[0]["actorInfo"]["displayName"] == "Clara Clerk"
 
@@ -312,7 +312,11 @@ async def test_guest_email_of_an_active_account_becomes_that_account(
     maker: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # User decision 2026-10-06: the lookup ignores the case; the account owns it.
+    """Give a guest e-mail of an active account to that account, ignoring case.
+
+    An inactive account does not match and stays a guest. The account gets the normal link,
+    the guest the magic link.
+    """
     seed = await seed_guest_flow(maker)
     owner_id = await _add_principal(maker, "mia-sub", "Mia@Example.org", "Mia Muster")
     await _add_principal(maker, "old-sub", "old@example.org", "Old", active=False)
@@ -322,7 +326,6 @@ async def test_guest_email_of_an_active_account_becomes_that_account(
         resp = client.post("/api/applications/on-behalf", json=body)
         assert resp.status_code == 201, resp.text
         app_id = uuid.UUID(resp.json()["applicationId"])
-        # An inactive account does not match: that one stays a guest.
         other = client.post(
             "/api/applications/on-behalf",
             json=_guest_body(seed, applicantEmail="old@example.org"),
@@ -340,7 +343,6 @@ async def test_guest_email_of_an_active_account_becomes_that_account(
     assert behalf.data["applicantKind"] == "principal"
     assert behalf.data["applicantPrincipalId"] == str(owner_id)
     assert behalf.data["matchedByEmail"] is True
-    # The account gets the normal link, the inactive one the magic link.
     assert ("Mia@example.org", app_id, False) in sent
     assert ("old@example.org", other_id, True) in sent
     assert (await _get(maker, other_id)).created_by is None
@@ -352,6 +354,10 @@ async def test_bad_applicant_answers_422(
     maker: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Answer 422 for a bad applicant.
+
+    Both an account and a guest, or a guest without a name, are schema errors.
+    """
     seed = await seed_guest_flow(maker)
     inactive = await _add_principal(maker, "gone-sub", "gone@example.org", "Gone", active=False)
     no_mail = await _add_principal(maker, "nomail-sub", None, "No Mail")
@@ -365,7 +371,6 @@ async def test_bad_applicant_answers_422(
             )
             assert resp.status_code == 422, resp.text
             assert resp.json()["code"] == "applicant_unavailable"
-        # Both an account and a guest, or a guest without a name: schema errors.
         both = {**_guest_body(seed), "applicantPrincipalId": str(inactive)}
         assert client.post("/api/applications/on-behalf", json=both).status_code == 422
         nameless = {**_guest_body(seed), "applicantName": "  "}
@@ -392,6 +397,7 @@ async def test_applicant_search(
     maker: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Search the applicants; a LIKE wildcard is a literal character."""
     await _add_principal(maker, "s-a", "quirin@example.org", "Quirin Quast")
     await _add_principal(maker, "s-b", "bert@example.org", "Bert")
     await _add_principal(maker, "s-c", "quilla@example.org", "Quilla", active=False)
@@ -403,7 +409,6 @@ async def test_applicant_search(
         assert hits[0]["displayName"] == "Quirin Quast"
         assert client.get("/api/applications/on-behalf/applicants?q=q").json() == []
         assert client.get("/api/applications/on-behalf/applicants").json() == []
-        # A LIKE wildcard is a literal character.
         assert client.get("/api/applications/on-behalf/applicants?q=%25%25").json() == []
 
 
@@ -460,6 +465,7 @@ async def test_capture_mail_links(
     monkeypatch: pytest.MonkeyPatch,
     guest: bool,
 ) -> None:
+    """Link the mail to the application; the same application coalesces into one mail."""
     seed = await seed_guest_flow(maker)
     app_id = await _seed_captured(maker, seed, owner=None if guest else "anna-sub")
     monkeypatch.setattr(captured_mod, "get_sessionmaker", lambda: maker)
@@ -487,7 +493,6 @@ async def test_capture_mail_links(
         assert f"/applications/{app_id}\n" in msg.text
         assert "#t=" not in msg.text
         assert links == []
-    # The same application coalesces into one mail.
     again = _Queue()
     await captured_mod.notify_application_captured(
         queue=again,
@@ -504,9 +509,9 @@ async def test_capture_mail_is_best_effort(
     maker: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Send nothing for an unknown application and raise nothing."""
     monkeypatch.setattr(captured_mod, "get_sessionmaker", lambda: maker)
     queue = _Queue()
-    # An unknown application sends nothing.
     await captured_mod.notify_application_captured(
         queue=queue,
         settings=settings,

@@ -183,6 +183,7 @@ async def test_render_assets_respects_the_count_budget() -> None:
 
 
 async def test_render_assets_respects_the_byte_budgets() -> None:
+    """Leave out an image above the asset cap and one above the total; a small one fits."""
     session, storage = MediaSession(), MediaStorage()
     big = add_image(session, storage, b"x" * 9)
     first = add_image(session, storage, b"x" * 6)
@@ -191,14 +192,13 @@ async def test_render_assets_respects_the_byte_budgets() -> None:
     assets = await _service(session, storage).render_assets(
         _md(big, first, second, small), max_bytes=10, max_asset_bytes=8
     )
-    # `big` passes the asset cap, `second` the total; `small` still fits.
     assert list(assets) == [f"img-{first}.png", f"img-{small}.png"]
 
 
 async def test_render_assets_checks_the_real_size_of_the_object() -> None:
+    """Count the real bytes of an object that grew behind its row."""
     session, storage = MediaSession(), MediaStorage()
     a = add_image(session, storage, b"x")
-    # The object grew behind the row: the real bytes count.
     storage.objects[image_storage_key(a)] = (b"x" * 50, "image/png")
     assert await _service(session, storage).render_assets(_md(a), max_asset_bytes=8) == {}
 

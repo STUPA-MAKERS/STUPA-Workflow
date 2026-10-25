@@ -79,12 +79,17 @@ class _Scenario:
 
 
 async def _seed(session: AsyncSession) -> _Scenario:
+    """Seed two Gremien, a flow and applications with closed meeting votes.
+
+    The user is a member of the first Gremium ONLY. The applications stay in the initial
+    state, which is NO vote state, so the read scope comes from the meeting vote ALONE. Each
+    Gremium has one meeting with closed application votes (legacy data).
+    """
     sc = _Scenario()
     tag = uuid.uuid4().hex[:8]
     sc.member_sub = f"member-{tag}"
     sc.other_sub = f"other-{tag}"
 
-    # Two Gremien. The user is a member of the first one ONLY.
     g_member = Gremium(name="Mitglied", slug=f"m-{tag}")
     g_other = Gremium(name="Fremd", slug=f"o-{tag}")
     session.add_all([g_member, g_other])
@@ -118,9 +123,6 @@ async def _seed(session: AsyncSession) -> _Scenario:
         app_type.id, FormVersionCreate(fields=_fields(), activate=True), "tester"
     )
 
-    # A minimal flow with exactly one active global version. The applications stay in the
-    # initial state, which is NO vote state. The read scope here comes from the meeting
-    # vote ALONE.
     flow = FlowVersion(version=1, active=True, editor_layout={})
     session.add(flow)
     await session.flush()
@@ -145,7 +147,6 @@ async def _seed(session: AsyncSession) -> _Scenario:
     app_voted_other, _ = await svc.create(_payload(), actor=sc.other_sub)
     app_unrelated, _ = await svc.create(_payload(), actor=sc.other_sub)
 
-    # One meeting per Gremium plus closed application votes (legacy data).
     meet_member = Meeting(gremium_id=g_member.id, title="Sitzung Mitglied", status="closed")
     meet_other = Meeting(gremium_id=g_other.id, title="Sitzung Fremd", status="closed")
     session.add_all([meet_member, meet_other])
@@ -179,6 +180,10 @@ async def _seed(session: AsyncSession) -> _Scenario:
 
 
 async def test_list_includes_historical_meeting_vote(session: AsyncSession) -> None:
+    """List an application voted on in a meeting of the member Gremium.
+
+    A meeting of another Gremium and an unrelated application stay hidden.
+    """
     sc = await _seed(session)
     svc = ApplicationsService(session)
 
@@ -186,21 +191,18 @@ async def test_list_includes_historical_meeting_vote(session: AsyncSession) -> N
         owner_sub=sc.member_sub, committee_sub=sc.member_sub, limit=50, offset=0
     )
     got = {i.id for i in page.items}
-    # Voted on in a meeting of the member Gremium, so it is visible.
     assert sc.app_voted_member in got
-    # A meeting of another Gremium and an unrelated application stay hidden.
     assert sc.app_voted_other not in got
     assert sc.app_unrelated not in got
 
 
 async def test_detail_and_list_agree_on_meeting_vote(session: AsyncSession) -> None:
+    """Allow the detail of the voted application without application.read, and deny the others."""
     sc = await _seed(session)
-    member = Principal(sub=sc.member_sub, permissions=set())  # NO application.read
+    member = Principal(sub=sc.member_sub, permissions=set())
 
-    # The detail path allows the application voted on in the member meeting.
     access = await require_app_read(sc.app_voted_member, session, member, None)
     assert access.principal is not None and access.actor == sc.member_sub
-    # It denies the foreign meeting and the unrelated application.
     for app_id in (sc.app_voted_other, sc.app_unrelated):
         with pytest.raises(ForbiddenError):
             await require_app_read(app_id, session, member, None)

@@ -3,6 +3,10 @@
 The point of these is the security surface, not the happy path. A share link is the one
 route on the platform that answers without a principal, so what it refuses matters more
 than what it renders.
+
+A cost breakdown is the substance of a funding application: what the money is for, what
+it costs, and which quotes it was compared against. A page that drops it shows the
+reader a title and hides what is asked for.
 """
 
 from __future__ import annotations
@@ -76,8 +80,6 @@ def _share(**over: object) -> ApplicationShare:
     return row
 
 
-# -- tokens -------------------------------------------------------------------
-
 
 def test_a_token_is_long_and_url_safe() -> None:
     """The URL is the only secret, so it carries session-token weight."""
@@ -105,17 +107,17 @@ def test_the_lifetime_is_bounded(asked: int | None, expected: int) -> None:
     assert clamp_ttl(asked) == expected
 
 
-# -- creating -----------------------------------------------------------------
-
 
 async def test_create_stores_only_the_hash() -> None:
-    """A stolen database must yield no working links."""
+    """A stolen database must yield no working links.
+
+    The plaintext is nowhere on the row.
+    """
     svc = _svc()
     app_id = uuid.uuid4()
     row, token = await svc.create(app_id, actor="me", now=NOW)
 
     assert row.token_hash == tokens.hash_token(token, PEPPER)
-    # The plaintext is nowhere on the row.
     assert token.encode() not in bytes(row.token_hash)
     assert row.created_by == "me"
     assert row.expires_at == NOW + timedelta(days=DEFAULT_TTL_DAYS)
@@ -135,8 +137,6 @@ async def test_create_honours_a_requested_lifetime_within_the_bound() -> None:
     row, _ = await _svc().create(uuid.uuid4(), actor="me", ttl_days=3, now=NOW)
     assert row.expires_at == NOW + timedelta(days=3)
 
-
-# -- resolving ----------------------------------------------------------------
 
 
 async def test_resolve_finds_a_live_link() -> None:
@@ -163,7 +163,7 @@ async def test_a_revoked_link_answers_the_same_as_an_unknown_one() -> None:
 
 
 async def test_the_expiry_boundary_is_exclusive() -> None:
-    # At exactly the expiry the link is gone. Erring towards closed is the right side.
+    """Close the link at exactly the expiry; erring towards closed is the right side."""
     row = _share(expires_at=NOW)
     with pytest.raises(NotFoundError):
         await _svc(row).resolve("t", now=NOW)
@@ -177,8 +177,6 @@ async def test_a_wrong_token_does_not_resolve_a_row_that_exists() -> None:
         await svc.resolve("wrong", now=NOW)
     assert row.revoked_at is None
 
-
-# -- revoking -----------------------------------------------------------------
 
 
 async def test_revoke_stamps_the_time() -> None:
@@ -198,8 +196,6 @@ async def test_revoking_an_unknown_share_is_not_found() -> None:
     with pytest.raises(NotFoundError):
         await _svc(None).revoke(uuid.uuid4(), application_id=uuid.uuid4(), now=NOW)
 
-
-# -- the public view ----------------------------------------------------------
 
 
 class _App:
@@ -246,7 +242,7 @@ def test_the_public_view_skips_empty_answers() -> None:
 
 
 def test_an_application_without_a_title_still_has_a_heading() -> None:
-    # A blank <h1> would make the preview a bare URL.
+    """Give a heading without a title, because a blank <h1> makes the preview a bare URL."""
     view = build_public_view(
         _App({}),  # type: ignore[arg-type]
         fields=[],
@@ -257,8 +253,6 @@ def test_an_application_without_a_title_still_has_a_heading() -> None:
     )
     assert view.title
 
-
-# -- the rendered page --------------------------------------------------------
 
 
 def _view(**over: object) -> PublicApplication:
@@ -277,18 +271,20 @@ def _view(**over: object) -> PublicApplication:
 
 
 def test_the_preview_carries_the_title_and_nothing_about_the_application() -> None:
-    """The og: text lands permanently on a chat server we do not control."""
+    """The og: text lands permanently on a chat server we do not control.
+
+    The amount is on the page but must not be in the preview.
+    """
     html = render_share_page(_view(), app_name="STUPA", canonical_url="https://x/s/t")
     head = html.split("</head>")[0]
 
     assert 'property="og:title" content="Anschaffung Beamer — STUPA"' in head
-    # The amount is on the page but must not be in the preview.
     assert "4200" not in head
     assert "Musik" not in head
 
 
 def test_the_page_asks_not_to_be_indexed() -> None:
-    # For whoever holds the URL, not for everyone who searches the applicant's name.
+    """Ask not to be indexed: the page is for whoever holds the URL, not for a name search."""
     html = render_share_page(_view(), app_name="STUPA", canonical_url="https://x/s/t")
     assert 'name="robots" content="noindex, nofollow"' in html
 
@@ -319,8 +315,6 @@ def test_a_missing_optional_leaves_its_row_out_rather_than_printing_none() -> No
     assert "None" not in html
 
 
-# -- flattening one answer ----------------------------------------------------
-
 
 @pytest.mark.parametrize(
     ("answer", "shown"),
@@ -345,8 +339,11 @@ def test_an_answer_is_flattened_to_one_readable_line(answer: object, shown: str)
 
 
 def test_a_structured_answer_is_left_out_rather_than_guessed_at() -> None:
-    """A dict has no sensible one-line form, and guessing one risks printing a key
-    nobody meant to publish. The row goes with it — an empty value is not an answer."""
+    """Leave a structured answer out.
+
+    A dict has no sensible one-line form, and a guess risks printing a key that nobody meant
+    to publish. The row goes with it, because an empty value is not an answer.
+    """
     view = build_public_view(
         _App({"title": "T", "k": {"iban": "DE00"}}),  # type: ignore[arg-type]
         fields=[_field("k")],
@@ -359,8 +356,11 @@ def test_a_structured_answer_is_left_out_rather_than_guessed_at() -> None:
 
 
 def test_a_list_of_structured_rows_does_not_render_as_bare_commas() -> None:
-    """A cost breakdown is a list of dicts. Joining them printed ", , ," — punctuation
-    around values this page deliberately does not show."""
+    """A cost breakdown is a list of dicts.
+
+    Joining them printed ", , ," — punctuation around values this page deliberately does not
+    show.
+    """
     view = build_public_view(
         _App({"title": "T", "k": [{"a": 1}, {"a": 2}, {"a": 3}]}),  # type: ignore[arg-type]
         fields=[_field("k")],
@@ -373,9 +373,11 @@ def test_a_list_of_structured_rows_does_not_render_as_bare_commas() -> None:
 
 
 def test_a_reference_field_does_not_publish_its_raw_id() -> None:
-    """A select pointing at a cost centre holds that cost centre's UUID. On a public page
-    the id names nothing the reader can use, and printing it publishes an internal
-    identifier."""
+    """A select pointing at a cost centre holds that cost centre's UUID.
+
+    On a public page the id names nothing the reader can use, and printing it publishes an
+    internal identifier.
+    """
     view = build_public_view(
         _App({"title": "T", "k": "83d149a5-9939-5d1c-b784-ee413e87f41e"}),  # type: ignore[arg-type]
         fields=[_field("k")],
@@ -387,13 +389,13 @@ def test_a_reference_field_does_not_publish_its_raw_id() -> None:
     assert view.fields == []
 
 
-# -- the content security policy ----------------------------------------------
-
 
 def test_the_policy_hash_matches_the_style_the_page_actually_renders() -> None:
-    """The page shipped unstyled because the API-wide `default-src 'none'` blocked its
-    own <style>. A hash fixes that only while it matches byte for byte, so this recomputes
-    it from the rendered document rather than trusting the constant."""
+    """The page shipped unstyled because the API-wide `default-src 'none'` blocked its own <style>.
+
+    A hash fixes that only while it matches byte for byte, so this recomputes it from the
+    rendered document rather than trusting the constant.
+    """
     import base64
     import hashlib
     import re
@@ -406,24 +408,21 @@ def test_the_policy_hash_matches_the_style_the_page_actually_renders() -> None:
 
 
 def test_the_policy_allows_nothing_but_that_stylesheet() -> None:
-    # No scripts, no images, no framing. The page is text and one stylesheet.
+    """Allow no scripts, no images and no framing: the page is text and one stylesheet."""
     assert SHARE_CSP.startswith("default-src 'none'")
     assert "frame-ancestors 'none'" in SHARE_CSP
     assert "unsafe-inline" not in SHARE_CSP
 
 
 def test_the_page_asks_for_no_favicon() -> None:
-    """A browser requests /favicon.ico for any HTML page, and under this policy that
-    request is refused and logged. An empty data: icon stops it being made."""
+    """Carry an empty data: icon.
+
+    A browser requests /favicon.ico for any HTML page, and under this policy that request is
+    refused and logged. The empty icon stops the request.
+    """
     html = render_share_page(_view(), app_name="STUPA", canonical_url="https://x/s/t")
     assert '<link rel="icon" href="data:,">' in html
 
-
-# -- cost positions -----------------------------------------------------------
-#
-# A cost breakdown is the substance of a funding application: what the money is for, what
-# it costs, and which quotes it was compared against. A public page that drops it shows
-# the reader a title and hides what is being asked for.
 
 
 def _positions_field(key: str = "kosten", *, pii: bool = False) -> FormFieldDef:
@@ -467,8 +466,11 @@ def _positions_view(lang: str = "de") -> PublicApplication:
 
 
 def test_cost_positions_become_a_block_rather_than_one_flattened_line() -> None:
-    """The whole point of the field is the breakdown. Flattening dropped it, so a funding
-    application published its title and hid what it was asking for."""
+    """The whole point of the field is the breakdown.
+
+    Flattening dropped it, so a funding application published its title and hid what it was
+    asking for.
+    """
     view = _positions_view()
 
     assert len(view.positions) == 1
@@ -485,8 +487,11 @@ def test_a_position_is_worth_its_preferred_offer() -> None:
 
 
 def test_every_comparison_offer_is_shown_and_the_preferred_one_is_marked() -> None:
-    # A reader cannot check "we took the cheapest" without seeing what it was compared
-    # against, so the losing quotes are part of the answer rather than noise.
+    """Show every offer and mark the preferred one.
+
+    A reader cannot check "we took the cheapest" without the quotes it was compared against,
+    so the losing quotes are part of the answer.
+    """
     offers = _positions_view().positions[0].positions[0].offers
     assert [(o.label, o.value, o.preferred) for o in offers] == [
         ("Firma A", "1.250,00 €", True),
@@ -495,15 +500,20 @@ def test_every_comparison_offer_is_shown_and_the_preferred_one_is_marked() -> No
 
 
 def test_a_position_without_comparison_offers_carries_its_reason() -> None:
-    """Opting out is allowed, and the reason is the justification for it. The opt-out
-    without its reason reads as a missing comparison rather than an explained one."""
+    """Opting out is allowed, and the reason is the justification for it.
+
+    The opt-out without its reason reads as a missing comparison rather than an explained
+    one.
+    """
     catering = _positions_view().positions[0].positions[1]
     assert catering.no_offers_reason == "einziger Anbieter vor Ort"
 
 
 def test_a_positions_field_marked_pii_never_reaches_the_page() -> None:
-    """`isPII` is one rule for every field type. A structured field must not be the hole
-    in it."""
+    """`isPII` is one rule for every field type.
+
+    A structured field must not be the hole in it.
+    """
     view = build_public_view(
         _App({"title": "Fest", "kosten": POSITIONS}),  # type: ignore[arg-type]
         fields=[_positions_field(pii=True)],
@@ -516,14 +526,16 @@ def test_a_positions_field_marked_pii_never_reaches_the_page() -> None:
 
 
 def test_a_positions_field_does_not_also_appear_as_a_flattened_row() -> None:
-    # It is rendered as a block. A second, empty scalar row for the same field would be
-    # the same field printed twice.
+    """Render a positions field as a block only, never also as an empty scalar row."""
     assert [label for label, _ in _positions_view().fields] == []
 
 
 def test_a_broken_position_is_skipped_rather_than_crashing_the_page() -> None:
-    """The answer is JSONB written by an older form version, so the page cannot assume
-    the current shape. A public route that raises here is a 500 on a valid link."""
+    """Skip a broken position.
+
+    The answer is JSONB written by an older form version, so the page cannot assume the
+    current shape. A public route that raises here is a 500 on a valid link.
+    """
     view = build_public_view(
         _App({"title": "T", "kosten": ["nope", {"offers": "not a list"}]}),  # type: ignore[arg-type]
         fields=[_positions_field()],
@@ -534,8 +546,6 @@ def test_a_broken_position_is_skipped_rather_than_crashing_the_page() -> None:
     )
     assert view.positions == []
 
-
-# -- the remaining field types ------------------------------------------------
 
 
 def _typed(key: str, type_: str, **extra: object) -> FormFieldDef:
@@ -556,8 +566,10 @@ def _one(field: FormFieldDef, value: object, lang: str = "de") -> list[tuple[str
 
 
 def test_a_select_shows_the_option_label_and_not_the_stored_value() -> None:
-    """The stored value is a machine key such as `av`. Printing it publishes the form's
-    internals and tells the reader nothing."""
+    """The stored value is a machine key such as `av`.
+
+    Printing it publishes the form's internals and tells the reader nothing.
+    """
     field = _typed(
         "medium", "select", options=[{"value": "av", "label": {"de": "Audio und Video"}}]
     )
@@ -588,17 +600,17 @@ def test_a_date_range_reads_as_a_span() -> None:
 
 
 def test_a_date_reads_in_the_house_format() -> None:
-    # `%d.%m.%Y`, the format the protocol and the notification mails already use.
+    """Format a date as `%d.%m.%Y`, as the protocol and the mails do."""
     assert _one(_typed("tag", "date"), "2026-07-01") == [("Tag", "01.07.2026")]
 
 
 def test_an_unreadable_date_is_shown_as_stored_rather_than_dropped() -> None:
-    """A date the form never validated is still the applicant's answer. Guessing it away
-    loses information; printing it as stored is honest."""
+    """A date the form never validated is still the applicant's answer.
+
+    Guessing it away loses information; printing it as stored is honest.
+    """
     assert _one(_typed("tag", "date"), "irgendwann") == [("Tag", "irgendwann")]
 
-
-# -- the rendered breakdown, the portal button and the logo -------------------
 
 
 def test_the_page_renders_every_position_with_its_offers() -> None:
@@ -654,8 +666,10 @@ def test_a_position_label_is_escaped_like_every_other_value() -> None:
 
 
 def test_the_page_offers_a_way_into_the_portal() -> None:
-    """A reader who has an account should not have to find the application by hand. The
-    link goes to the record itself, and a reader without an account meets the login."""
+    """A reader who has an account should not have to find the application by hand.
+
+    The link goes to the record itself, and a reader without an account meets the login.
+    """
     html = render_share_page(
         _view(),
         app_name="STUPA",
@@ -682,8 +696,10 @@ def test_the_page_carries_the_instance_logo_when_there_is_one() -> None:
 
 
 def test_a_logo_served_over_plain_http_is_left_off() -> None:
-    """It would be mixed content, and it would tell that host the IP of every reader who
-    opens the link."""
+    """Leave off a logo served over plain http.
+
+    It is mixed content, and it tells that host the IP of every reader who opens the link.
+    """
     html = render_share_page(
         _view(),
         app_name="STUPA",
@@ -695,9 +711,12 @@ def test_a_logo_served_over_plain_http_is_left_off() -> None:
 
 
 def test_the_page_carries_the_platform_wordmark_when_the_instance_set_none() -> None:
-    """The live instance has `logos: {}`, and the mark in the app header is a bundled
-    frontend asset rather than site config. A page that read only the config therefore
-    showed the app NAME as text while every other page showed a logo."""
+    """Carry the platform wordmark when the instance set no logo.
+
+    The live instance has `logos: {}`, and the mark in the app header is a bundled frontend
+    asset rather than site config. A page that reads only the config shows the app NAME as
+    text while every other page shows a logo.
+    """
     html = render_share_page(_view(), app_name="STUPA", canonical_url="https://x/s/t")
 
     assert "/assets/logos/stupa-wordmark-light.svg" in html
@@ -705,22 +724,27 @@ def test_the_page_carries_the_platform_wordmark_when_the_instance_set_none() -> 
 
 
 def test_the_wordmark_follows_a_theme_the_reader_changes_while_reading() -> None:
-    """Both variants are rendered and CSS hides one. A `<picture>` picks its source when
-    the document is parsed and does not re-pick afterwards, so a reader who flipped their
-    system theme kept the black-text mark on the dark header until a reload."""
+    """Render both variants and let CSS hide one.
+
+    A `<picture>` picks its source when the document is parsed and does not re-pick, so the
+    black-text mark stays on the dark header after a theme flip. The mark is named once,
+    because a second alt reads the app name out twice.
+    """
     html = render_share_page(_view(), app_name="STUPA", canonical_url="https://x/s/t")
 
     assert "<picture>" not in html
     assert 'class="brand__logo brand__logo--light"' in html
     assert 'class="brand__logo brand__logo--dark"' in html
-    # The mark is named once. A second alt would read the app name out twice.
     assert html.count('alt="STUPA"') == 1
     assert 'aria-hidden="true"' in html
 
 
 def test_the_wordmark_path_is_absolute() -> None:
-    """The page lives at `/s/{token}`, so a relative `assets/…` would be looked for
-    under `/s/` and 404."""
+    """Use an absolute wordmark path.
+
+    The page lives at `/s/{token}`, so a relative `assets/…` resolves under `/s/` and gives
+    404.
+    """
     html = render_share_page(_view(), app_name="STUPA", canonical_url="https://x/s/t")
     assert 'src="assets/' not in html
     assert 'srcset="assets/' not in html
@@ -742,9 +766,11 @@ def test_a_configured_logo_beats_the_bundled_one() -> None:
 
 
 def test_a_logo_the_platform_serves_itself_is_shown() -> None:
-    """`BrandingAsset.url` allows an absolute path, and that is what an instance which
-    uploaded a logo actually stores. Refusing it rendered the bare app name on a page the
-    deployment had given a mark."""
+    """Show a logo that the platform serves itself.
+
+    `BrandingAsset.url` allows an absolute path, and an instance that uploaded a logo stores
+    one. A refusal renders the bare app name on a page that has a mark.
+    """
     html = render_share_page(
         _view(),
         app_name="STUPA",
@@ -756,8 +782,11 @@ def test_a_logo_the_platform_serves_itself_is_shown() -> None:
 
 
 def test_a_protocol_relative_logo_is_not_mistaken_for_a_path() -> None:
-    """`//host/logo.png` starts with a slash but is a remote host, and it inherits the
-    page scheme rather than naming one."""
+    """Treat a protocol-relative logo as a remote host.
+
+    `//host/logo.png` starts with a slash but is a remote host, and it inherits the page
+    scheme rather than naming one.
+    """
     assert "img-src 'self';" in share_csp("//cdn.example/logo.png")
     html = render_share_page(
         _view(), app_name="STUPA", canonical_url="https://x/s/t", logo_url="//cdn.example/l.png"
@@ -766,9 +795,12 @@ def test_a_protocol_relative_logo_is_not_mistaken_for_a_path() -> None:
 
 
 def test_the_preferred_badge_comes_before_the_label_it_marks() -> None:
-    """An offer label can run to several lines — a product name with a URL in it does.
-    With the badge after the label it wrapped to the bottom of that block, directly above
-    the NEXT offer, and read as marking that one."""
+    """Put the badge between the start of its row and its own label.
+
+    An offer label can run to several lines, for example a product name with a URL. A badge
+    after the label wraps to the bottom of that block, directly above the NEXT offer, and
+    reads as marking that one.
+    """
     view = build_public_view(
         _App(  # type: ignore[arg-type]
             {
@@ -794,19 +826,21 @@ def test_the_preferred_badge_comes_before_the_label_it_marks() -> None:
     badge = html.index("Bevorzugt")
     kingston = html.index("Kingston")
     lexar = html.index("Lexar")
-    # The badge sits between the start of its own row and its own label, never after it.
     assert badge < kingston < lexar
 
 
 def test_the_policy_names_the_logo_source_and_nothing_wider() -> None:
-    """`img-src https:` would allow any host on the internet. The page loads exactly one
-    image, so the policy names exactly where it comes from."""
-    # `'self'` is the floor, not `'none'`: the fallback wordmark is served by this
-    # origin, so every rendering of this page loads one image.
+    """`img-src https:` would allow any host on the internet.
+
+    The page loads exactly one image, so the policy names exactly where it comes from.
+
+    `'self'` is the floor, not `'none'`, because this origin serves the fallback wordmark,
+    so every rendering loads one image. A logo that the page must not load leaves the policy
+    at the floor.
+    """
     assert "img-src 'self'" in share_csp(None)
     assert "img-src 'self' data:" in share_csp("data:image/png;base64,AAAA")
     assert "img-src 'self' https://cdn.example" in share_csp("https://cdn.example/logo.png")
-    # A logo it must not load leaves the policy at the floor.
     assert "img-src 'self';" in share_csp("http://cdn.example/logo.png")
 
 
@@ -818,12 +852,12 @@ def test_the_policy_still_allows_no_script_whatever_the_logo() -> None:
         assert "unsafe-inline" not in policy
 
 
-# -- the edges of the formatting ----------------------------------------------
-
 
 def test_an_english_page_reads_money_the_english_way() -> None:
-    """The route already knows the language of the application. A German number format
-    around English labels would be a choice rather than an oversight."""
+    """The route already knows the language of the application.
+
+    A German number format around English labels would be a choice rather than an oversight.
+    """
     assert _one(_typed("kosten", "currency"), 1250, lang="en") == [
         ("Kosten", "€1,250.00")
     ]
@@ -851,8 +885,11 @@ def test_a_currency_field_that_holds_no_number_falls_back_to_the_plain_rule() ->
 
 
 def test_the_headline_amount_is_written_like_the_breakdown_below_it() -> None:
-    """It was the stored decimal joined to the currency code, so one page showed
-    "4200.00 EUR" above "1.730,00 €" — the same kind of number written two ways."""
+    """Write the headline amount like the breakdown below it.
+
+    The stored decimal with the currency code ("4200.00 EUR") above "1.730,00 €" writes the
+    same kind of number two ways.
+    """
     html = render_share_page(_view(), app_name="STUPA", canonical_url="https://x/s/t")
     assert "4.200,00 €" in html
     assert "4200.00" not in html
@@ -868,8 +905,11 @@ def test_an_amount_that_will_not_parse_is_still_shown() -> None:
 
 
 def test_a_boolean_is_never_read_as_an_amount() -> None:
-    """`Decimal(str(True))` raises, but `True` also equals 1, and an application that
-    quietly claims to cost one euro would be worse than one that reads oddly."""
+    """Never read a boolean as an amount.
+
+    `Decimal(str(True))` raises, but `True` also equals 1, and an application that quietly
+    claims to cost one euro is worse than one that reads oddly.
+    """
     assert _one(_typed("kosten", "currency"), True) == [("Kosten", "Ja")]
 
 
@@ -896,8 +936,11 @@ def test_an_answer_that_matches_no_option_is_not_invented() -> None:
 
 
 def test_an_unreadable_offer_is_skipped_rather_than_shown_as_zero() -> None:
-    """`positions` is JSONB. An offer with no usable value must not become "0,00 €",
-    which would read as a free quote."""
+    """`positions` is JSONB.
+
+    An offer with no usable value must not become "0,00 €", which would read as a free
+    quote.
+    """
     view = build_public_view(
         _App(  # type: ignore[arg-type]
             {
@@ -925,8 +968,13 @@ def test_an_unreadable_offer_is_skipped_rather_than_shown_as_zero() -> None:
 
 
 def test_a_position_with_no_preferred_offer_shows_its_quotes_and_no_value() -> None:
-    """An application still being put together. Showing nothing would hide the quotes it
-    already has; inventing a value would state a decision nobody made."""
+    """An application still being put together.
+
+    Showing nothing would hide the quotes it already has; inventing a value would state a
+    decision nobody made.
+
+    The page prints no total line rather than a total of nothing.
+    """
     view = build_public_view(
         _App(  # type: ignore[arg-type]
             {
@@ -947,7 +995,6 @@ def test_a_position_with_no_preferred_offer_shows_its_quotes_and_no_value() -> N
     assert block.total is None
     assert len(block.positions[0].offers) == 1
 
-    # And the page prints no total line rather than a total of nothing.
     html = render_share_page(view, app_name="STUPA", canonical_url="https://x/s/t")
     assert "Firma A" in html
     assert "Gesamtbetrag" not in html

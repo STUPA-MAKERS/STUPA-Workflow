@@ -88,11 +88,11 @@ def _create_payload(app_type_id: uuid.UUID) -> ApplicationCreate:
 
 
 async def test_anonymize_scrubs_applicant_comment_bodies(session: AsyncSession) -> None:
+    """Scrub the PII in the applicant comments and keep the principal comments."""
     app_type = await _seed_type(session)
     svc = ApplicationsService(session)
     app, _ = await svc.create(_create_payload(app_type.id))
 
-    # The applicant puts PII into the free text of the comment.
     await svc.add_comment(
         app.id,
         author=None,
@@ -100,7 +100,6 @@ async def test_anonymize_scrubs_applicant_comment_bodies(session: AsyncSession) 
         body="Erreichbar unter erika@example.org / 0151-1234567",
         visibility="public",
     )
-    # The comment of a principal may stay.
     await svc.add_comment(
         app.id,
         author="admin",
@@ -113,8 +112,6 @@ async def test_anonymize_scrubs_applicant_comment_bodies(session: AsyncSession) 
 
     comments = await svc.list_comments(app.id, include_internal=True)
     bodies = {c.body for c in comments}
-    # No free text of the applicant is left.
     assert "Erreichbar unter erika@example.org / 0151-1234567" not in bodies
     assert "[anonymisiert]" in bodies
-    # The comment of the principal stays untouched.
     assert "Bearbeitungsnotiz" in bodies

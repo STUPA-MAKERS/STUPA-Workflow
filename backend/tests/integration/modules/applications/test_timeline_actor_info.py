@@ -121,6 +121,7 @@ async def test_member_view_resolves_every_actor(
     maker: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Resolve every actor; only a member carries an id, and the string never holds a sub."""
     seed, app_id, unknown, gone = await _world(maker)
     member_id = await _principal_id(maker, seed.member_sub)
 
@@ -130,7 +131,6 @@ async def test_member_view_resolves_every_actor(
     versions = get_json(api, f"/api/applications/{app_id}/versions")
     assert isinstance(timeline, list) and isinstance(versions, list)
 
-    # Only a member carries an id (for the avatar); no other actor does.
     assert [e["actorInfo"] for e in timeline] == [
         {"kind": "applicant", "key": None, "displayName": None, "principalId": None},
         {
@@ -144,7 +144,6 @@ async def test_member_view_resolves_every_actor(
         {"kind": "deleted", "key": None, "displayName": None, "principalId": None},
         {"kind": "deleted", "key": None, "displayName": None, "principalId": None},
     ]
-    # The legacy string never carries a raw sub.
     assert [e["actor"] for e in timeline] == [
         "applicant",
         MEMBER_NAME,
@@ -165,6 +164,7 @@ async def test_applicant_view_shows_the_gremium_for_all_other_actors(
     maker: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Show the Gremium for every other actor; the applicant view holds no member id."""
     _, app_id, unknown, _ = await _world(maker)
 
     api = build_read_api(migrated[1], monkeypatch)
@@ -173,7 +173,6 @@ async def test_applicant_view_shows_the_gremium_for_all_other_actors(
     versions = get_json(api, f"/api/applications/{app_id}/versions")
     assert isinstance(timeline, list) and isinstance(versions, list)
 
-    # The applicant view holds no member id.
     gremium = {"kind": "gremium", "key": None, "displayName": GREMIUM_NAME, "principalId": None}
     assert [e["actorInfo"] for e in timeline] == [
         {"kind": "applicant", "key": None, "displayName": None, "principalId": None},
@@ -197,6 +196,7 @@ async def test_comment_of_an_unknown_author_shows_no_sub(
     maker: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Show no sub for an unknown author; the member author carries the avatar id."""
     seed = await seed_read_world(maker)
     app_id = await create_app(maker, seed, actor="applicant")
     unknown = str(uuid.uuid4())
@@ -226,7 +226,6 @@ async def test_comment_of_an_unknown_author_shows_no_sub(
         (None, "deleted"),
         (MEMBER_NAME, "principal"),
     ]
-    # The member author carries the id for the avatar, the unknown one none.
     member_id = await _principal_id(maker, seed.member_sub)
     assert [c["authorInfo"]["principalId"] for c in comments] == [None, str(member_id)]
     assert unknown not in str(comments)
@@ -236,8 +235,8 @@ async def test_timeline_reads_the_principal_names_in_one_query(
     engine_async: Any,
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
+    """Read the names in one query that does not grow with more member events."""
     seed, app_id, _, _ = await _world(maker)
-    # More member events: the query count must not grow with them.
     for i in range(5):
         await _add_event(maker, app_id, seed, seed.member_sub, 10 + i)
 

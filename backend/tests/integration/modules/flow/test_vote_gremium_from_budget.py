@@ -5,7 +5,7 @@ The flow has the states `review` (initial), `auto` (an entry with an automatic e
 and `rejected`. The cost center tree is `T > C > L`: `C` names Gremium A as its deciding
 Gremium, `L` inherits it, and the sibling `N` has none.
 
-The tests walk the scenario of R10:
+The tests walk this scenario:
 
 1. The application enters `gvote`; the engine stores Gremium A as the snapshot
    `vote_gremium_id`.
@@ -237,6 +237,17 @@ async def _meeting(session: AsyncSession, gremium: uuid.UUID, days: int) -> uuid
 async def test_dynamic_vote_state_end_to_end(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
+    """Run a vote state with `gremiumSource: "budget"` end to end.
+
+    1. The snapshot is the Gremium that the leaf inherits from its parent, and it is the
+       agenda Gremium of an action without `gremiumId`.
+    2. Only a meeting of Gremium A takes the item; the post-commit action picks the next
+       meeting of A.
+    3. A member of A reads it and has the task; a member of B does neither. Only a member
+       of the vote Gremium sees the escalation. The cost center is locked during the vote.
+    4. Only Gremium A runs the vote. Its close fires the branch and clears the snapshot,
+       and the task is gone.
+    """
     world = await _seed(maker)
     async with maker() as session:
         app_id = await _app(session, world, budget=world.leaf)
@@ -246,20 +257,16 @@ async def test_dynamic_vote_state_end_to_end(
         listed = {
             t.id: t for t in await FlowService(session).available_transitions(app_id, ADMIN)
         }
-        # The agenda Gremium of an action without `gremiumId` is the Gremium of the vote.
         assert listed[world.to_vote].adds_to_agenda is True
         assert listed[world.to_vote].agenda_gremium_id == world.g_a
 
         rec = _Recorder()
         await FlowService(session, rec).fire(app_id, world.to_vote, ADMIN)
-        # 1. The snapshot is the Gremium that the leaf inherits from its parent.
         assert await _snapshot(session, app_id) == world.g_a
 
-        # 2. Assignable only in a meeting of Gremium A.
         agenda = AgendaService(session)
         assert app_id in {a.application_id for a in await agenda.assignable(meeting_a)}
         assert app_id not in {a.application_id for a in await agenda.assignable(meeting_b)}
-        # The post-commit action without `gremiumId` picks the next meeting of A.
         to_session = [a for a in rec.actions if a.type == "addToNextSession"]
         assert len(to_session) == 1
         await FlowExtrasActionDispatcher(maker).dispatch(to_session)
@@ -272,29 +279,24 @@ async def test_dynamic_vote_state_end_to_end(
         ).all()
         assert list(items) == [meeting_a]
 
-        # 3. A member of A reads it and has the task; a member of B does neither.
         await resolve_app_read(session, app_id, world.member_a, None)
         with pytest.raises(ForbiddenError):
             await resolve_app_read(session, app_id, world.member_b, None)
         listing = ApplicationsService(session)
         assert app_id in {t.id for t in await listing.list_tasks(world.member_a)}
         assert app_id not in {t.id for t in await listing.list_tasks(world.member_b)}
-        # The escalation gate: only a member of the vote Gremium sees it.
         assert world.escalate in {
             t.id for t in await FlowService(session).available_transitions(
                 app_id, world.member_a
             )
         }
 
-        # The cost center is locked while the vote runs.
         with pytest.raises(ConflictError) as locked:
             await BudgetTreeService(session).assign_budget(
                 app_id, AssignBudgetRequest.model_validate({"budgetId": str(world.leaf)})
             )
         assert locked.value.code == "budget_locked_by_vote"
 
-        # 4. Only Gremium A can run the vote; its close fires the branch and clears the
-        # snapshot.
         config = VoteConfig.model_validate(
             {"options": ["yes", "no", "abstain"], "majorityRule": "simple"}
         ).model_dump(by_alias=True)
@@ -323,8 +325,6 @@ async def test_dynamic_vote_state_end_to_end(
         )
         assert state == world.states["done"]
         assert await _snapshot(session, app_id) is None
-        # Out of the vote: no committee read through the vote any more is needed for
-        # the task; the task is gone.
         assert app_id not in {t.id for t in await listing.list_tasks(world.member_a)}
 
 
@@ -332,20 +332,22 @@ async def test_dynamic_vote_state_end_to_end(
 async def test_fail_closed_without_a_deciding_gremium(
     maker: async_sessionmaker[AsyncSession], budget_key: str
 ) -> None:
+    """Fail closed without a deciding Gremium.
+
+    The list hides the transition. The manual fire and the force give 409 with a clear code
+    and change nothing. The automatic transition does not fire.
+    """
     world = await _seed(maker)
     budget = None if budget_key == "none" else world.no_gremium
     async with maker() as session:
         app_id = await _app(session, world, budget=budget)
         flow = FlowService(session)
-        # The list hides the transition.
         assert world.to_vote not in {
             t.id for t in await flow.available_transitions(app_id, ADMIN)
         }
-        # The manual fire gives 409 with a clear code and changes nothing.
         with pytest.raises(ConflictError) as fired:
             await flow.fire(app_id, world.to_vote, ADMIN)
         assert fired.value.code == "no_vote_gremium"
-        # The force gives 409 too.
         with pytest.raises(ConflictError) as forced:
             await flow.force_status(app_id, world.states["gvote"], ADMIN, note="x")
         assert forced.value.code == "no_vote_gremium"
@@ -356,7 +358,6 @@ async def test_fail_closed_without_a_deciding_gremium(
         )
         assert state == world.states["review"]
 
-        # The automatic transition does not fire.
         auto_id = await _app(session, world, budget=budget, state="auto")
         assert await flow.auto_advance(auto_id, ADMIN) is None
         assert await session.scalar(
@@ -379,6 +380,11 @@ async def test_automatic_entry_with_a_deciding_gremium(
 async def test_force_and_revert_follow_the_snapshot(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
+    """Clear the snapshot on leaving the vote state and restore it on a revert.
+
+    Without the deciding Gremium the revert back into the vote state refuses the application
+    (409) instead of a vote without a Gremium.
+    """
     world = await _seed(maker)
     async with maker() as session:
         app_id = await _app(session, world, budget=world.leaf)
@@ -386,11 +392,8 @@ async def test_force_and_revert_follow_the_snapshot(
         await flow.force_status(app_id, world.states["gvote"], ADMIN, note="x")
         assert await _snapshot(session, app_id) == world.g_a
         await flow.fire(app_id, world.escalate, world.member_a)
-        # Leaving the vote state clears the snapshot.
         assert await _snapshot(session, app_id) is None
 
-        # The deciding Gremium goes away. The revert back into the vote state must
-        # refuse the application (409) instead of a vote without a Gremium.
         await session.execute(
             update(Budget).where(Budget.id == world.decider).values(decision_gremium_id=None)
         )
@@ -402,7 +405,6 @@ async def test_force_and_revert_follow_the_snapshot(
             )
         assert reverted.value.code == "no_vote_gremium"
 
-        # With the Gremium back, the revert restores the snapshot.
         await session.execute(
             update(Budget).where(Budget.id == world.decider).values(
                 decision_gremium_id=world.g_b
@@ -419,7 +421,10 @@ async def test_force_and_revert_follow_the_snapshot(
 async def test_fixed_gremium_vote_state_still_works(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
-    """Regression: a vote state with a fixed `gremiumId` keeps today's behaviour."""
+    """Keep a vote state with a fixed `gremiumId` working.
+
+    The fixed Gremium needs no cost center, and it does not lock the cost center.
+    """
     world = await _seed(maker)
     async with maker() as session:
         await session.execute(
@@ -428,7 +433,6 @@ async def test_fixed_gremium_vote_state_still_works(
             .values(config={"gremiumId": str(world.g_b)})
         )
         await session.commit()
-        # No cost center at all: the fixed Gremium does not need one.
         app_id = await _app(session, world, budget=None)
         listed = {
             t.id: t for t in await FlowService(session).available_transitions(app_id, ADMIN)
@@ -439,7 +443,6 @@ async def test_fixed_gremium_vote_state_still_works(
         await resolve_app_read(session, app_id, world.member_b, None)
         with pytest.raises(ForbiddenError):
             await resolve_app_read(session, app_id, world.member_a, None)
-        # A fixed vote state does not lock the cost center.
         out = await BudgetTreeService(session).assign_budget(
             app_id, AssignBudgetRequest.model_validate({"budgetId": None})
         )
@@ -449,10 +452,12 @@ async def test_fixed_gremium_vote_state_still_works(
 async def test_a_stale_vote_of_another_gremium_never_decides(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
-    """HIGH 1: the application left the vote of Gremium A and came back for Gremium B.
+    """Never let a stale vote of Gremium A decide the vote of Gremium B.
 
-    The agenda item and a vote of the meeting of Gremium A remain. Neither the open of
-    such a draft nor the close of such an open vote may decide the application.
+    The application leaves the vote of A, the cost center then names B, and a force puts the
+    application back into the vote state for B. The agenda item and a vote of the meeting of
+    A remain. Neither the open of such a draft nor the close of such an open vote may decide
+    the application. The Gremium that decides the running vote cannot be deleted.
     """
     from app.modules.admin.service import ConfigService
     from app.modules.voting.models import Vote
@@ -464,8 +469,6 @@ async def test_a_stale_vote_of_another_gremium_never_decides(
         flow = FlowService(session)
         await flow.fire(app_id, world.to_vote, ADMIN)
         await AgendaService(session).add(meeting_a, application_id=app_id)
-        # The application leaves the vote; the cost center now names Gremium B; a
-        # force puts the application back into the vote state, now for Gremium B.
         await flow.fire(app_id, world.escalate, world.member_a)
         await session.execute(
             update(Budget).where(Budget.id == world.decider).values(
@@ -502,7 +505,6 @@ async def test_a_stale_vote_of_another_gremium_never_decides(
         )
         assert state == world.states["gvote"]
 
-        # MEDIUM 2: the Gremium that decides the running vote cannot be deleted.
         with pytest.raises(ConflictError) as deleted:
             await ConfigService(session).delete_gremium(world.g_b, ADMIN)
         assert deleted.value.code == "gremium_decides_vote"
@@ -511,7 +513,10 @@ async def test_a_stale_vote_of_another_gremium_never_decides(
 async def test_a_vote_state_without_snapshot_takes_the_new_cost_center(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
-    """LOW 3: without a snapshot the cost center stays open and fills the snapshot."""
+    """Keep the cost center open without a snapshot and fill the snapshot.
+
+    Once the snapshot exists, the cost center is locked again.
+    """
     world = await _seed(maker)
     async with maker() as session:
         app_id = await _app(session, world, budget=world.no_gremium, state="gvote")
@@ -520,7 +525,6 @@ async def test_a_vote_state_without_snapshot_takes_the_new_cost_center(
             app_id, AssignBudgetRequest.model_validate({"budgetId": str(world.leaf)})
         )
         assert await _snapshot(session, app_id) == world.g_a
-        # Now the snapshot exists, so the cost center is locked again.
         with pytest.raises(ConflictError) as locked:
             await BudgetTreeService(session).assign_budget(
                 app_id, AssignBudgetRequest.model_validate({"budgetId": None})

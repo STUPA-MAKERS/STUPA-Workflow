@@ -3,6 +3,10 @@
 The suite runs without a DB. `FlowService` reads through a result-queue fake. The tests
 patch the `fields_complete` signal, which keeps its own branch coverage in
 `test_flow_context`. Every engine branch then takes a deterministic path.
+
+The sections cover the vote cancel on a non-branch exit, `branch_transition` and
+`fire_branch`, the audit-log revert (`revert_status`), the privileged override
+(`force_status`) and the agenda pick of a manual transition.
 """
 
 from __future__ import annotations
@@ -122,7 +126,7 @@ async def test_available_filters_by_guard_and_order() -> None:
 
 
 async def test_available_excludes_result_branches() -> None:
-    # A result branch of a vote or an approval never fires by hand.
+    """Hide a result branch; it never fires by hand."""
     flow_id, draft = uuid4(), uuid4()
     app = _app(draft, flow_id)
     passed = _transition(flow_id=flow_id, from_id=draft, to_id=uuid4(), branch="pass")
@@ -133,8 +137,10 @@ async def test_available_excludes_result_branches() -> None:
 
 
 async def test_fire_branch_transition_manually_409() -> None:
-    # A direct POST with the id of a branch transition must not set the vote outcome
-    # behind the back of the vote.
+    """Answer 409 for a manual fire of a branch transition.
+
+    A direct POST must not set the vote outcome behind the back of the vote.
+    """
     app = _app(uuid4(), uuid4())
     transition = _transition(
         flow_id=app.flow_version_id,
@@ -162,6 +168,7 @@ async def test_fire_automatic_transition_manually_409() -> None:
 
 
 async def test_applicant_transitions_only_actor_is_applicant_gated() -> None:
+    """Offer only the transition that actorIsApplicant opens; roleIs fails without a role."""
     flow_id, draft = uuid4(), uuid4()
     app = _app(draft, flow_id)
     t_open = _transition(
@@ -172,28 +179,28 @@ async def test_applicant_transitions_only_actor_is_applicant_gated() -> None:
     )
     db = fake_session(result(app), result(t_open, t_closed))
     out = await FlowService(db).available_applicant_transitions(app.id)
-    # Only the transition that actorIsApplicant opens. roleIs fails without a role.
     assert [t.id for t in out] == [t_open.id]
 
 
 async def test_fire_as_applicant_rejects_unopened_transition() -> None:
+    """Reject a transition that the applicant gate does not open."""
     flow_id, draft = uuid4(), uuid4()
     app = _app(draft, flow_id)
     closed = _transition(
         flow_id=flow_id, from_id=draft, to_id=uuid4(), guard={"roleIs": "chair"}
     )
-    db = fake_session(result(closed))  # only _load_transition runs
+    db = fake_session(result(closed))
     with pytest.raises(ForbiddenError):
         await FlowService(db).fire_as_applicant(app.id, closed.id)
 
 
 async def test_fire_as_applicant_fires_opened_transition() -> None:
+    """Fire a transition that the applicant gate opens."""
     flow_id, draft, accepted = uuid4(), uuid4(), uuid4()
     app = _app(draft, flow_id)
     opened = _transition(
         flow_id=flow_id, from_id=draft, to_id=accepted, guard={"actorIsApplicant": True}
     )
-    # fire_as_applicant: _load_transition (gate check) → fire: _load_app, _load_transition, update.
     db = fake_session(result(opened), result(app), result(opened), result(rowcount=1))
     res = await FlowService(db).fire_as_applicant(app.id, opened.id, note="ok")
     assert res.new_state_id == accepted
@@ -208,12 +215,19 @@ async def test_available_empty_when_no_current_state() -> None:
 
 
 async def test_available_unknown_application_404() -> None:
-    db = fake_session(result())  # no application
+    """Answer 404 for an unknown application."""
+    db = fake_session(result())
     with pytest.raises(NotFoundError):
         await FlowService(db).available_transitions(uuid4(), _principal())
 
 
 async def test_fire_commits_status_event_and_dispatches() -> None:
+    """Commit the status event and dispatch the actions.
+
+    The explicit notify action reaches the applicant, so the implicit applicant mail drops
+    out and only the implicit task mail stays. The status event id comes from the flushed
+    event.
+    """
     flow_id, draft, review = uuid4(), uuid4(), uuid4()
     app = _app(draft, flow_id)
     transition = _transition(
@@ -230,8 +244,6 @@ async def test_fire_commits_status_event_and_dispatches() -> None:
     res = await svc.fire(app.id, transition.id, _principal(), note="los")
 
     assert res.new_state_id == review
-    # The explicit notify action plus the implicit task mail. The implicit
-    # applicant mail drops out, because the explicit action already reaches the applicant.
     assert res.dispatched_actions == ["notify", "taskNotify"]
     assert db.committed == 1
     event = db.added[0]
@@ -240,7 +252,6 @@ async def test_fire_commits_status_event_and_dispatches() -> None:
     assert event.transition_id == transition.id
     assert event.actor == "mgr-1"
     assert event.note == "los"
-    # status_event_id comes from the flushed event.
     assert res.status_event_id == event.id
     assert rec.batches and rec.batches[0][0].type == "notify"
 
@@ -252,17 +263,19 @@ async def test_fire_unknown_application_404() -> None:
 
 
 async def test_fire_unknown_transition_404() -> None:
+    """Answer 404 for a missing transition."""
     app = _app(uuid4(), uuid4())
-    db = fake_session(result(app), result())  # the transition is missing
+    db = fake_session(result(app), result())
     with pytest.raises(NotFoundError):
         await FlowService(db).fire(app.id, uuid4(), _principal())
 
 
 async def test_fire_transition_other_flow_404() -> None:
+    """Answer 404 for a transition of another flow version."""
     app = _app(uuid4(), uuid4())
     transition = _transition(
         flow_id=uuid4(), from_id=app.current_state_id, to_id=uuid4()
-    )  # a different flow_version
+    )
     db = fake_session(result(app), result(transition))
     with pytest.raises(NotFoundError, match="does not belong"):
         await FlowService(db).fire(app.id, transition.id, _principal())
@@ -311,13 +324,11 @@ async def test_fire_default_dispatcher_when_none() -> None:
     db = fake_session(result(app), result(transition), result(rowcount=1))
     res = await flow_service.FlowService(db).fire(app.id, transition.id, _principal())
     assert res.new_state_id == to
-    # Without explicit actions the implicit auto mails stay.
     assert res.dispatched_actions == ["notify", "taskNotify"]
 
 
-# fire cancels the open votes on a non-branch exit.
 def _vote_cancel_updates(db) -> list:
-    """Return the locking `SELECT ... FROM vote` statements that load the votes to cancel."""
+    """Return the vote cancel UPDATEs that a fire wrote."""
     return [
         s
         for s in db.statements
@@ -342,14 +353,15 @@ async def test_fire_manual_exit_cancels_open_votes() -> None:
 
     A manual exit is for example "abort the vote" from a vote state. The service cancels
     the open votes in the same transaction.
+
+    A draft of the left state goes. A draft of the entered state stays, because it belongs
+    to that state.
     """
     flow_id, voting, aborted = uuid4(), uuid4(), uuid4()
     app = _app(voting, flow_id)
     abort = _transition(flow_id=flow_id, from_id=voting, to_id=aborted)
     vote = _open_vote(app.id)
-    # A draft of the state the application leaves goes.
     draft = _open_vote(app.id, status="draft", opens_state_id=voting)
-    # A draft of the state the application enters stays (it belongs to that state).
     kept = _open_vote(app.id, status="draft", opens_state_id=aborted)
     db = fake_session(
         result(app), result(abort), result(rowcount=1), result(vote, draft, kept)
@@ -423,7 +435,7 @@ async def test_fire_branch_exit_does_not_cancel_votes() -> None:
 
 
 async def test_available_transitions_carry_requires_action_flag() -> None:
-    """#requires-action: the flag travels into `TransitionOut` for the tasks-tab filter."""
+    """Carry the `requiresAction` flag into `TransitionOut` for the tasks-tab filter."""
     flow_id, draft = uuid4(), uuid4()
     app = _app(draft, flow_id)
     required = _transition(flow_id=flow_id, from_id=draft, to_id=uuid4())
@@ -439,7 +451,7 @@ async def test_available_transitions_carry_requires_action_flag() -> None:
 
 
 async def test_auto_advance_never_fires_out_of_vote_states() -> None:
-    """#vote-bypass: auto_advance never fires out of a vote state.
+    """Never fire auto_advance out of a vote state.
 
     An old flow can still hold an automatic transition out of a vote state. The vote
     decides the state. Otherwise an application could reach "accepted" without a vote.
@@ -449,7 +461,6 @@ async def test_auto_advance_never_fires_out_of_vote_states() -> None:
     auto_exit = _transition(flow_id=flow_id, from_id=voting, to_id=uuid4())
     auto_exit.automatic = True
     vote_state = SimpleNamespace(id=voting, kind="vote", config={"gremiumId": "g"})
-    # _load_app → _load_state (vote!) → stop before _outgoing.
     db = fake_session(result(app), result(vote_state))
     res = await FlowService(db).auto_advance(app.id, _principal())
     assert res is None
@@ -469,31 +480,33 @@ async def test_auto_advance_none_when_no_current_state() -> None:
 
 
 async def test_auto_advance_no_matching_automatic_returns_none() -> None:
+    """Return None when only a manual transition exists."""
     flow_id, draft = uuid4(), uuid4()
     app = _app(draft, flow_id)
     state = SimpleNamespace(id=draft, kind="normal", config={})
-    manual = _transition(flow_id=flow_id, from_id=draft, to_id=uuid4())  # automatic=False
+    manual = _transition(flow_id=flow_id, from_id=draft, to_id=uuid4())
     db = fake_session(result(app), result(state), result(manual))
     assert await FlowService(db).auto_advance(app.id, _principal()) is None
 
 
 async def test_auto_advance_fires_matching_automatic_transition() -> None:
+    """Fire an automatic transition without a guard."""
     flow_id, draft, done = uuid4(), uuid4(), uuid4()
     app = _app(draft, flow_id)
     state = SimpleNamespace(id=draft, kind="normal", config={})
     auto_t = _transition(flow_id=flow_id, from_id=draft, to_id=done)
-    auto_t.automatic = True  # guard None, so it fires
+    auto_t.automatic = True
     db = fake_session(
-        result(app), result(state), result(auto_t),  # _load_app, _load_state, _outgoing
-        result(app), result(auto_t), result(rowcount=1),  # fire(): load + update
+        result(app), result(state), result(auto_t),
+        result(app), result(auto_t), result(rowcount=1),
     )
     res = await FlowService(db).auto_advance(app.id, _principal())
     assert res is not None
     assert res.new_state_id == done
 
 
-# branch_transition and fire_branch.
 async def test_branch_transition_returns_none_when_absent() -> None:
+    """Return None when the state has no such branch."""
     flow_id, draft = uuid4(), uuid4()
     app = _app(draft, flow_id)
     fail = _transition(flow_id=flow_id, from_id=draft, to_id=uuid4(), branch="fail")
@@ -510,12 +523,13 @@ async def test_branch_transition_finds_matching_branch() -> None:
 
 
 async def test_fire_branch_fires_matching_branch() -> None:
+    """Fire the matching branch."""
     flow_id, draft, done = uuid4(), uuid4(), uuid4()
     app = _app(draft, flow_id)
     passed = _transition(flow_id=flow_id, from_id=draft, to_id=done, branch="pass")
     db = fake_session(
-        result(app), result(passed),  # branch_transition: _load_app, _outgoing
-        result(app), result(passed), result(rowcount=1),  # fire(): load + update
+        result(app), result(passed),
+        result(app), result(passed), result(rowcount=1),
     )
     res = await FlowService(db).fire_branch(app.id, "pass", _principal())
     assert res.new_state_id == done
@@ -530,11 +544,10 @@ async def test_fire_branch_404_when_no_matching_branch() -> None:
         await FlowService(db).fire_branch(app.id, "pass", _principal())
 
 
-# Tests for revert_status (#config-versioning: audit-log revert).
 async def test_revert_status_stale_when_not_in_target_state() -> None:
     """Revert gives 409 stale_revert when the application left the target state."""
     to_id, from_id = uuid4(), uuid4()
-    app = _app(uuid4(), uuid4())  # current_state_id != to_id
+    app = _app(uuid4(), uuid4())
     db = fake_session(result(app))
     with pytest.raises(ConflictError) as ei:
         await FlowService(db).revert_status(
@@ -547,7 +560,7 @@ async def test_revert_status_stale_when_not_in_target_state() -> None:
 async def test_revert_status_conflict_when_update_rowcount_zero() -> None:
     """A concurrent transition between read and UPDATE gives rowcount 0: 409 and rollback."""
     to_id, from_id = uuid4(), uuid4()
-    app = _app(to_id, uuid4())  # current == to_id
+    app = _app(to_id, uuid4())
     db = fake_session(result(app), result(rowcount=0))
     with pytest.raises(ConflictError) as ei:
         await FlowService(db).revert_status(
@@ -577,8 +590,8 @@ async def test_revert_status_moves_back_without_restored_state() -> None:
     assert sid == event.id
 
 
-# Tests for force_status: a privileged direct override.
 def _target_state(state_id: object, flow_id: object) -> SimpleNamespace:
+    """Build a target state of a flow."""
     return SimpleNamespace(id=state_id, flow_version_id=flow_id, kind="normal", config={})
 
 
@@ -600,7 +613,7 @@ async def test_force_status_unknown_target_state_404() -> None:
     """An unknown target state gives 404 and no state change."""
     flow_id = uuid4()
     app = _app(uuid4(), flow_id)
-    db = fake_session(result(app), result())  # _load_state(target) → None
+    db = fake_session(result(app), result())
     with pytest.raises(NotFoundError):
         await FlowService(db).force_status(app.id, uuid4(), _principal(), note="x")
     assert db.committed == 0
@@ -613,7 +626,7 @@ async def test_force_status_foreign_flow_state_404() -> None:
     """
     flow_id, target_id = uuid4(), uuid4()
     app = _app(uuid4(), flow_id)
-    foreign = _target_state(target_id, uuid4())  # a different flow_version
+    foreign = _target_state(target_id, uuid4())
     db = fake_session(result(app), result(foreign))
     with pytest.raises(NotFoundError, match="does not belong"):
         await FlowService(db).force_status(app.id, target_id, _principal(), note="x")
@@ -649,28 +662,29 @@ async def test_force_status_happy_writes_event_audit_and_cancels_votes() -> None
 
     The service writes a StatusEvent without a transition and a forced audit entry. It
     cancels the open votes.
+
+    The override is silent: it dispatches no notification. One locking SELECT loads the
+    votes to cancel.
     """
     flow_id, cur, target_id = uuid4(), uuid4(), uuid4()
     app = _app(cur, flow_id)
     target = _target_state(target_id, flow_id)
     db = fake_session(
-        result(app), result(target), result(rowcount=1),  # _load_app, _load_state, UPDATE
-        result(), result(), result(),  # vote cancel SELECT + audit (lock, prev-hash)
+        result(app), result(target), result(rowcount=1),
+        result(), result(), result(),
     )
     res = await FlowService(db).force_status(
         app.id, target_id, _principal(), note="admin override"
     )
     assert res.new_state_id == target_id
-    assert res.dispatched_actions == []  # silent: no notifications
+    assert res.dispatched_actions == []
     assert db.committed >= 1
-    # An event without a transition, with a reason and an actor.
     event = db.added[0]
     assert event.from_state_id == cur
     assert event.to_state_id == target_id
     assert event.transition_id is None
     assert event.actor == "mgr-1"
     assert event.note == "admin override"
-    # One locking SELECT loads the votes to cancel.
     assert len(_vote_cancel_stmts(db)) == 1
 
 
@@ -693,13 +707,14 @@ async def test_list_states_returns_flow_states() -> None:
 
 
 async def test_list_states_unknown_application_404() -> None:
-    db = fake_session(result())  # no application
+    """Answer 404 for an unknown application."""
+    db = fake_session(result())
     with pytest.raises(NotFoundError):
         await FlowService(db).list_states(uuid4())
 
 
-# The agenda pick on a manual transition.
 def test_agenda_gremium_id_reads_the_first_agenda_action() -> None:
+    """Read the Gremium of the first agenda action."""
     gid = uuid4()
     assert flow_service.agenda_gremium_id(None) is None
     assert flow_service.agenda_gremium_id([{"type": "notify"}]) is None
@@ -712,15 +727,17 @@ def test_agenda_gremium_id_reads_the_first_agenda_action() -> None:
 
 
 async def test_available_flags_the_agenda_only_into_a_vote_state() -> None:
-    # Only a fire into a vote state takes a meeting (`_check_agenda_meeting`). The UI
-    # asks for one only where `addsToAgenda` is set.
+    """Flag `addsToAgenda` only for a fire into a vote state.
+
+    Only such a fire takes a meeting (`_check_agenda_meeting`), so the UI asks for one only
+    there.
+    """
     flow_id, draft, voting, done, gid = uuid4(), uuid4(), uuid4(), uuid4(), uuid4()
     app = _app(draft, flow_id)
     action = [{"type": "addToNextSession", "gremiumId": str(gid)}]
     to_vote = _transition(flow_id=flow_id, from_id=draft, to_id=voting, actions=action)
     to_done = _transition(flow_id=flow_id, from_id=draft, to_id=done, actions=action)
     plain = _transition(flow_id=flow_id, from_id=draft, to_id=voting)
-    # _load_app, _outgoing; the target states come through `get`.
     db = fake_session(result(app), result(to_vote, to_done, plain))
     vote_state = SimpleNamespace(id=voting, kind="vote", config={"gremiumId": str(gid)})
     done_state = SimpleNamespace(id=done, kind="normal", config={})
@@ -735,6 +752,7 @@ async def test_available_flags_the_agenda_only_into_a_vote_state() -> None:
 async def test_fire_with_meeting_adds_in_tx_and_skips_the_action(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Add the agenda item in the transaction and skip the action after the commit."""
     flow_id, draft, voting, gid, meeting_id = uuid4(), uuid4(), uuid4(), uuid4(), uuid4()
     app = _app(draft, flow_id)
     t = _transition(
@@ -756,8 +774,8 @@ async def test_fire_with_meeting_adds_in_tx_and_skips_the_action(
     monkeypatch.setattr(FlowService, "_check_agenda_meeting", _check)
     monkeypatch.setattr(FlowService, "_add_to_agenda_in_tx", _add)
     db = fake_session(
-        result(app), result(t), result(rowcount=1),  # _load_app, _load_transition, UPDATE
-        result(), result(), result(),  # vote cancel SELECT + audit (lock, prev-hash)
+        result(app), result(t), result(rowcount=1),
+        result(), result(), result(),
     )
     rec = _Recorder()
     res = await FlowService(db, rec).fire(
@@ -901,16 +919,19 @@ async def test_stage_branch_race_leaves_the_rollback_to_the_savepoint() -> None:
 
     The vote close stages its branch in a SAVEPOINT. A full rollback here would also
     drop the staged vote close, so `stage_branch` raises without a rollback.
+
+    The fake answers the loads of `branch_transition` and `stage_fire`, then an UPDATE that
+    lost the race.
     """
     flow_id, voting = uuid4(), uuid4()
     app = _app(voting, flow_id)
     passed = _transition(flow_id=flow_id, from_id=voting, to_id=uuid4(), branch="pass")
     db = fake_session(
-        result(app),  # branch_transition: _load_app
-        result(passed),  # branch_transition: the pass exit
-        result(app),  # stage_fire: _load_app
-        result(passed),  # stage_fire: _load_transition
-        result(rowcount=0),  # the optimistic UPDATE lost the race
+        result(app),
+        result(passed),
+        result(app),
+        result(passed),
+        result(rowcount=0),
     )
     with pytest.raises(ConflictError):
         await FlowService(db, _Recorder()).stage_branch(app.id, "pass", _principal())

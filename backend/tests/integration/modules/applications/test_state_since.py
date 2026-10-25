@@ -74,6 +74,11 @@ async def test_state_since_in_list_detail_and_tasks(
     maker: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Carry stateSince in the list, the detail and the tasks.
+
+    The status page of the applicant reads the same detail route. The staff member has the
+    task, because it can fire `approve` from `pruefung`.
+    """
     seed = await seed_read_world(maker)
     moved = await create_app(maker, seed, actor=seed.owner_sub, title="Bewegt")
     fresh = await create_app(maker, seed, actor=seed.owner_sub, title="Neu")
@@ -92,13 +97,11 @@ async def test_state_since_in_list_detail_and_tasks(
     assert isinstance(detail, dict)
     assert _at(detail["stateSince"]) == _REVIEWED
 
-    # The status page of the applicant reads the same detail route.
     as_applicant(api, moved)
     status = get_json(api, f"/api/applications/{moved}")
     assert isinstance(status, dict)
     assert _at(status["stateSince"]) == _REVIEWED
 
-    # Tasks: the staff member can fire `approve` from `pruefung`.
     async with maker() as session:
         tasks = await ApplicationsService(session).list_tasks(staff(seed))
     by_id = {t.id: t.state_since for t in tasks}

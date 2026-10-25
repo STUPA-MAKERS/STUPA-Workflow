@@ -71,6 +71,7 @@ async def test_magic_link_applicant_sees_the_gremium(
     maker: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Show the Gremium to the magic-link applicant and the names to a member."""
     seed = await seed_read_world(maker)
     app_id = await create_app(maker, seed, actor="applicant")
     await fire(maker, app_id, seed.to_review_id, staff(seed))
@@ -89,7 +90,6 @@ async def test_magic_link_applicant_sees_the_gremium(
     ]
     assert MEMBER_NAME not in str(timeline) + str(comments)
 
-    # A member reads the same records with the names.
     as_principal(api, Principal(sub="reader", permissions={"application.read"}))
     timeline = get_json(api, f"/api/applications/{app_id}/timeline")
     comments = get_json(api, f"/api/applications/{app_id}/comments")
@@ -158,9 +158,11 @@ async def test_magic_link_applicant_keeps_the_own_name_as_creator(
     maker: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The creator submitted with the own account email: the magic link is the same person."""
+    """The creator submitted with the own account email: the magic link is the same person.
+
+    The account email differs from the applicant email of `create_app` only in case.
+    """
     seed = await seed_read_world(maker)
-    # The applicant email of `create_app`, with another case.
     await _set_creator_email(maker, seed.owner_sub, "Antrag@Example.org")
     app_id = await create_app(maker, seed, actor=seed.owner_sub)
 
@@ -190,7 +192,11 @@ async def _no_mail(*_args: object) -> None:
 
 
 def _assert_reads_as_member(api: FastAPI, app_id: uuid.UUID, own_name: str) -> None:
-    """Internal comments, member names in the timeline, and the full version data."""
+    """Internal comments, member names in the timeline, and the full version data.
+
+    The creator reads the own isPII values as a member. The comment mail is off, because the
+    test checks the access, not the delivery.
+    """
     comments = get_json(api, f"/api/applications/{app_id}/comments")
     timeline = get_json(api, f"/api/applications/{app_id}/timeline")
     versions = get_json(api, f"/api/applications/{app_id}/versions")
@@ -199,10 +205,8 @@ def _assert_reads_as_member(api: FastAPI, app_id: uuid.UUID, own_name: str) -> N
     assert sorted(c["body"] for c in comments) == ["internal note", "public note"]
     assert [e["actor"] for e in timeline] == [own_name, MEMBER_NAME]
     assert GREMIUM_NAME not in [e["actor"] for e in timeline]
-    # The creator reads the own isPII fields, and as a member the values too.
     assert versions[0]["data"]["iban"] == IBAN
     assert versions[0]["changedBy"] == own_name
-    # No comment mail: the test checks the access, not the delivery.
     api.dependency_overrides[get_comment_mail_sender] = lambda: _no_mail
     with TestClient(api) as client:
         resp = client.post(
@@ -292,6 +296,9 @@ async def test_comment_mail_to_the_applicant_names_the_gremium(
 
     The route gives the display name of the member to the mail sender. The mail to
     the applicant must not show it.
+
+    The team mail may use the member name. The avatar shows the initials of the Gremium, not
+    "MM".
     """
     seed = await seed_read_world(maker)
     app_id = await create_app(maker, seed, actor="applicant")
@@ -315,7 +322,6 @@ async def test_comment_mail_to_the_applicant_names_the_gremium(
     assert resp.status_code == 201, resp.text
     assert len(calls) == 1
     _settings, _app_id, comment_id, author_kind, visibility, body, author_name, _pool = calls[0]
-    # The route still hands over the member name. The team mail may use it.
     assert (author_kind, author_name) == ("principal", MEMBER_NAME)
 
     queue = FakeQueue()
@@ -337,5 +343,4 @@ async def test_comment_mail_to_the_applicant_names_the_gremium(
     assert GREMIUM_NAME in msg.text
     assert GREMIUM_NAME in (msg.html or "")
     assert MEMBER_NAME not in msg.text + (msg.html or "")
-    # The avatar shows the initials of the Gremium, not "MM".
     assert ">MM<" not in (msg.html or "")

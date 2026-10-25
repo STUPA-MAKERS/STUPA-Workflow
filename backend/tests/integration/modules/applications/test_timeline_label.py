@@ -39,6 +39,7 @@ async def test_timeline_events_carry_the_transition_label(
     maker: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Carry the transition label; the creation fires no transition."""
     seed = await seed_read_world(maker)
     app_id = await create_app(maker, seed, actor=seed.owner_sub)
     await fire(maker, app_id, seed.to_review_id, staff(seed))
@@ -49,7 +50,7 @@ async def test_timeline_events_carry_the_transition_label(
     events = get_json(api, f"/api/applications/{app_id}/timeline")
     assert isinstance(events, list)
     assert [e["transitionLabel"] for e in events] == [
-        None,  # the creation fires no transition
+        None,
         {"de": "Zur Prüfung", "en": "To review"},
         {"de": "Genehmigen", "en": "Approve"},
     ]

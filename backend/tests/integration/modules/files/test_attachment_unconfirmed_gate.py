@@ -53,8 +53,11 @@ class _StubStorage:
     async def get_stream(
         self, key: str, *, chunk_size: int = 64 * 1024
     ) -> AsyncIterator[bytes]:
-        # `ObjectStorage.get_stream` is a coroutine that returns an AsyncIterator. It is
-        # not an async generator. Therefore this stub returns an inner generator.
+        """Return an inner generator.
+
+        `ObjectStorage.get_stream` is a coroutine that returns an AsyncIterator, not an async
+        generator.
+        """
         async def _iter() -> AsyncIterator[bytes]:
             yield self._blobs[key]
 
@@ -165,19 +168,21 @@ async def _add_clean_attachment(
 async def test_unconfirmed_guest_attachments_hidden_from_principal_reads(
     session: AsyncSession,
 ) -> None:
+    """Hide the attachments of an unconfirmed guest application from a principal.
+
+    The default actor "applicant" leaves email_confirmed_at NULL. A principal or Gremium
+    read passes `allow_unconfirmed=False` and gets 404: no PII leaks and no existence
+    oracle. The owning applicant comes over a magic link with the default True and reads the
+    attachments.
+    """
     app_type, _ = await _seed_type(session)
     apps = ApplicationsService(session)
-    # The default actor "applicant" leaves email_confirmed_at NULL. The submission stays
-    # unconfirmed and invisible in the lists.
     app, _ = await apps.create(_payload(app_type.id))
     assert app.email_confirmed_at is None
 
     files = FilesService(session, storage=_StubStorage())
     attachment_id = await _add_clean_attachment(files, app.id)
 
-    # For a principal or Gremium read the router passes `allow_unconfirmed=False`. The
-    # attachments of the unconfirmed guest submission give 404. No PII leaks, and the
-    # caller gets no existence oracle.
     with pytest.raises(NotFoundError):
         await files.list_for_application(app.id, allow_unconfirmed=False)
     with pytest.raises(NotFoundError):
@@ -185,8 +190,6 @@ async def test_unconfirmed_guest_attachments_hidden_from_principal_reads(
     with pytest.raises(NotFoundError):
         await files.download_stream(attachment_id, allow_unconfirmed=False)
 
-    # The owning applicant comes over a magic link. There `allow_unconfirmed` defaults to
-    # True, so the attachments of the own unconfirmed application stay readable.
     listed = await files.list_for_application(app.id)
     assert [a.id for a in listed] == [attachment_id]
     url = await files.signed_url(attachment_id)
@@ -199,17 +202,18 @@ async def test_unconfirmed_guest_attachments_hidden_from_principal_reads(
 async def test_confirmed_app_attachments_readable_by_principal(
     session: AsyncSession,
 ) -> None:
+    """Return the attachments of a confirmed application with `allow_unconfirmed=False`.
+
+    An actor other than "applicant" confirms at once, so there is no false 404.
+    """
     app_type, _ = await _seed_type(session)
     apps = ApplicationsService(session)
-    # An actor other than "applicant" confirms at once, so principals read it normally.
     app, _ = await apps.create(_payload(app_type.id), actor="admin")
     assert app.email_confirmed_at is not None
 
     files = FilesService(session, storage=_StubStorage())
     attachment_id = await _add_clean_attachment(files, app.id)
 
-    # A principal read with `allow_unconfirmed=False` returns the attachments of a
-    # confirmed application. There is no false 404.
     listed = await files.list_for_application(app.id, allow_unconfirmed=False)
     assert [a.id for a in listed] == [attachment_id]
     url = await files.signed_url(attachment_id, allow_unconfirmed=False)
