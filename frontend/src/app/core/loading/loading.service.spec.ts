@@ -50,25 +50,30 @@ describe('LoadingService', () => {
     expect(svc.visible()).toBe(true);
   });
 
+  /**
+   * When no request runs, the hide comes after MIN_VISIBLE; the elapsed time is already above the
+   * minimum.
+   */
   it('keeps visible until all requests finish, then hides after min duration', () => {
     svc.inc();
     svc.inc();
     svc.advance(300);
     expect(svc.visible()).toBe(true);
 
-    svc.dec(); // one still running
+    svc.dec();
     svc.advance(500);
     expect(svc.visible()).toBe(true);
 
-    svc.dec(); // none running, hide after MIN_VISIBLE (elapsed is already above the minimum)
+    svc.dec();
     expect(svc.visible()).toBe(false);
   });
 
+  /** A request that finishes right after the show must stay for the minimum window. */
   it('enforces a minimum visible duration to avoid flicker', () => {
     svc.inc();
-    svc.advance(300); // visible now (shownAt = 150)
-    svc.dec(); // finishes immediately after showing
-    expect(svc.visible()).toBe(true); // must stay for the min window
+    svc.advance(300);
+    svc.dec();
+    expect(svc.visible()).toBe(true);
     svc.advance(399);
     expect(svc.visible()).toBe(true);
     svc.advance(1);
@@ -78,9 +83,9 @@ describe('LoadingService', () => {
   it('cancels the pending hide when a new request starts', () => {
     svc.inc();
     svc.advance(300);
-    svc.dec(); // schedule hide
+    svc.dec();
     svc.advance(200);
-    svc.inc(); // new request, cancels the hide
+    svc.inc();
     svc.advance(400);
     expect(svc.visible()).toBe(true);
   });

@@ -13,17 +13,19 @@ const LISTS: TransitionLists = {
 describe('TransitionListsComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
+  /**
+   * Without a label the row names the states, and an automatic row says so. The branch shows
+   * between the states and the guard.
+   */
   it('lists incoming then outgoing transitions with their counts and selects one on click', async () => {
     const view = await render(TransitionListsComponent, { inputs: { lists: LISTS } });
     const picked: number[] = [];
     view.fixture.componentInstance.selectTransition.subscribe((i) => picked.push(i));
     const headings = screen.getAllByRole('heading').map((h) => h.textContent?.trim());
     expect(headings).toEqual(['Eingehend (1)', 'Ausgehend (2)']);
-    // Without a label the row names the states; an automatic row says so.
     screen.getByRole('button', { name: /^Automatisch: b → c/ }).click();
     screen.getByRole('button', { name: /^Ablehnen/ }).click();
     expect(picked).toEqual([1, 2]);
-    // The branch shows between the states and the guard.
     expect(screen.getByRole('button', { name: /^Ablehnen/ }).textContent).toContain('fail');
   });
 

@@ -149,19 +149,20 @@ async function setup(inputs: Record<string, unknown> = {}) {
 }
 
 describe('BookingDetailComponent', () => {
+  /**
+   * The title opens the sheet on the line of the actions; no line stands above it. The cost centre
+   * shows below its root, with its fiscal year, and with its figures in the year of the booking.
+   */
   it('shows the head, the payment, the details and the cost centre with its figures', async () => {
     const { view } = await setup();
-    // The title opens the sheet on the line of the actions; no line stands above it.
     expect(document.querySelector('app-sheet-bar .sheet-bar__title [appSheetBarTitle]')).not.toBeNull();
     expect(document.querySelector('.sheet-bar__kicker')).toBeNull();
     expect(screen.getByRole('heading', { name: 'Lastenrad Anzahlung' })).toBeInTheDocument();
     expect(screen.getByText('Überweisung')).toBeInTheDocument();
     expect(screen.getByText('RE-2026-118')).toBeInTheDocument();
-    // The cost centre below its root, with its fiscal year.
     expect(screen.getByText('Fachschaften › Maschinenbau')).toBeInTheDocument();
     expect(screen.getByText(/Konrad Pfeiffer/)).toBeInTheDocument();
     expect(screen.getByText('Anzahlung')).toBeInTheDocument();
-    // The figures of the cost centre in the year of the booking.
     expect(screen.getByRole('img', { name: /Ausgegeben 4\.200,00/ })).toBeInTheDocument();
     expect(screen.getByText('VS-200-220')).toBeInTheDocument();
     const link = screen.getByRole('link', { name: 'Im Budget ansehen' });
@@ -181,6 +182,7 @@ describe('BookingDetailComponent', () => {
     expect(screen.getByRole('link', { name: 'Beleg nachreichen' })).toBeInTheDocument();
   });
 
+  /** A cost centre outside the tree has no figures, and a reader gets no edit. */
   it('leaves out what it does not know', async () => {
     await setup({
       expense: {
@@ -200,7 +202,6 @@ describe('BookingDetailComponent', () => {
       canManage: false,
     });
     expect(screen.getAllByText('—').length).toBeGreaterThan(4);
-    // No figures for a cost centre outside the tree, no edit for a reader.
     expect(screen.queryByRole('img')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Buchung bearbeiten' })).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Unterbuchungen' })).toBeNull();
@@ -283,6 +284,7 @@ describe('BookingDetailComponent', () => {
     expect(remove).toHaveBeenCalled();
   });
 
+  /** An unknown menu item does nothing; the file item needs a loaded invoice. */
   it('shows a labelled edit on a phone and names a sub-booking', async () => {
     const { view, edit, user } = await setup({
       phone: true,
@@ -294,7 +296,6 @@ describe('BookingDetailComponent', () => {
     expect(edit).toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'Weitere Aktionen' }));
     expect(screen.queryByRole('menuitem', { name: 'Unterbuchung hinzufügen' })).toBeNull();
-    // An unknown menu item does nothing; the file item needs a loaded invoice.
     const cmp = view.fixture.componentInstance;
     cmp.onMenu({ id: 'file', label: '' });
     cmp.onMenu({ id: 'other', label: '' });

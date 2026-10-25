@@ -168,6 +168,10 @@ describe('BudgetTreeApi', () => {
       req.flush({ items: [], total: 0, limit: 0, offset: 0 });
     });
 
+    /**
+     * An amountMin of 0 is not empty, null or undefined, so it stays as a string. The empty q and
+     * the undefined fiscalYear both drop out.
+     */
     it('drops undefined/null/empty values and stringifies the rest', () => {
       api
         .listExpenses({
@@ -181,9 +185,7 @@ describe('BudgetTreeApi', () => {
       const req = http.expectOne((r) => r.url === `${BASE}/expenses`);
       expect(req.request.params.get('budget')).toBe('b-1');
       expect(req.request.params.get('kind')).toBe('expense');
-      // An amountMin of 0 is not empty, null or undefined, so it stays as a string.
       expect(req.request.params.get('amountMin')).toBe('0');
-      // The empty q and the undefined fiscalYear both drop out.
       expect(req.request.params.has('q')).toBe(false);
       expect(req.request.params.has('fiscalYear')).toBe(false);
       req.flush({ items: [], total: 0, limit: 0, offset: 0 });
@@ -397,9 +399,11 @@ describe('BudgetTreeApi', () => {
 });
 
 describe('re-exported simplifyPathKey', () => {
+  /**
+   * `shared/budget-path.spec.ts` owns the behaviour. This test only pins that the re-export points
+   * at the same function.
+   */
   it('is the shared implementation, which now passes the path through', () => {
-    // The collapsing was dropped as too unstable; `shared/budget-path.spec.ts` owns the
-    // behaviour. This only pins that the re-export still points at the same function.
     expect(simplifyPathKey('VSM-8-81-810')).toBe('VSM-8-81-810');
   });
 });

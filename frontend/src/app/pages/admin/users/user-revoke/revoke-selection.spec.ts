@@ -44,29 +44,29 @@ describe('revoke selection', () => {
     expect(allEntries(PREVIEW)).toEqual(['g:g-a', 'g:g-b', 'g:g-c', 'r:r-1']);
   });
 
+  /** A group of one entry is not shared. */
   it('lists the groups an entry shares with other entries', () => {
     expect(sharedGroups(PREVIEW, 'g:g-b')).toEqual([
       { group: 'both', others: ['g:g-a'] },
       { group: 'chain', others: ['r:r-1'] },
     ]);
-    // A group of one entry is not shared.
     expect(sharedGroups(PREVIEW, 'g:g-c')).toEqual([]);
   });
 
+  /** g-c stays alone, g-a now pulls g-b and r-1 in, and a gone entry drops out. */
   it('keeps the choice of the admin on a reload, closed over shared groups', () => {
-    // g-c stays alone; g-a now pulls g-b and r-1 in; a gone entry drops out.
     const kept = keptSelection(PREVIEW, new Set<RevokeEntry>(['g:g-a', 'g:gone']));
     expect([...kept].sort()).toEqual(['g:g-a', 'g:g-b', 'r:r-1']);
     expect([...keptSelection(PREVIEW, new Set<RevokeEntry>(['g:g-c']))]).toEqual(['g:g-c']);
     expect(keptSelection(PREVIEW, new Set()).size).toBe(0);
   });
 
+  /** A lone entry changes alone. */
   it('checks and unchecks the whole connected set', () => {
     const on = toggleEntry(PREVIEW, new Set(), 'g:g-a', true);
     expect([...on].sort()).toEqual(['g:g-a', 'g:g-b', 'r:r-1']);
     const off = toggleEntry(PREVIEW, new Set(allEntries(PREVIEW)), 'r:r-1', false);
     expect([...off]).toEqual(['g:g-c']);
-    // A lone entry changes alone.
     expect([...toggleEntry(PREVIEW, new Set(), 'g:g-c', true)]).toEqual(['g:g-c']);
   });
 

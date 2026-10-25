@@ -76,16 +76,16 @@ function flush(
   }
 }
 
-// The tests click through whole views; a busy runner needs more than the default 5 s.
+/** The tests click through whole views, and a busy runner needs more than the default 5 s. */
 jest.setTimeout(15_000);
 
 describe('MeetingDetailSheetComponent', () => {
+  /** The title opens the sheet on the line of the actions; no line stands above it. */
   it('shows the head of a live meeting: status, date, time and minute-taker, no line above the title', async () => {
     const { http, fixture } = await setup();
     expect(screen.getByRole('status')).toHaveTextContent('Sitzung wird geladen');
     flush(http);
     fixture.detectChanges();
-    // The title opens the sheet on the line of the actions; no line stands above it.
     expect(document.querySelector('app-sheet-bar .sheet-bar__title [appSheetBarTitle]')).not.toBeNull();
     expect(document.querySelector('.sheet-bar__kicker')).toBeNull();
     expect(screen.getByText('Do, 15.10.2026')).toHaveClass('ms__part');
@@ -96,6 +96,7 @@ describe('MeetingDetailSheetComponent', () => {
     expect(fixture.nativeElement.querySelector('.ms')).toHaveClass('ms--split');
   });
 
+  /** A free-text item has no sub line: the number names the TOP, and "Freitext" says nothing. */
   it('marks the ticked and the current agenda items and names the non-public one', async () => {
     const { http, fixture } = await setup();
     flush(http, 'm-1', { agenda: [{ ...AGENDA[0], doneAt: '2026-10-15T16:10:00Z' }, AGENDA[1], AGENDA[2]] });
@@ -108,7 +109,6 @@ describe('MeetingDetailSheetComponent', () => {
     expect(rows[2].querySelector('.ms__topSub')?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
       'Antrag · nicht öffentlich',
     );
-    // A free-text item has no sub line: the number names the TOP, "Freitext" says nothing.
     expect(rows[0].querySelector('.ms__topSub')).toBeNull();
     expect(rows[1].querySelector('.ms__topSub')).toBeNull();
     expect(screen.queryByText(/Freitext/)).toBeNull();
@@ -220,6 +220,7 @@ describe('MeetingDetailSheetComponent', () => {
     expect(on.edit).toHaveBeenCalledWith(planned);
   });
 
+  /** A closed meeting has no "now", and no item has a tick. */
   it('shows a closed meeting with its final protocol and no beamer', async () => {
     const closed = meeting({
       status: 'closed',
@@ -246,7 +247,6 @@ describe('MeetingDetailSheetComponent', () => {
     fixture.detectChanges();
     expect(screen.getByText('18:04–21:40')).toBeInTheDocument();
     expect(screen.getByText('Protokoll: Mara Keller')).toBeInTheDocument();
-    // A closed meeting has no "now", and no item has a tick.
     expect(screen.queryByText('behandelt')).toBeNull();
     expect(screen.queryByText('Jetzt')).toBeNull();
     expect(screen.queryByRole('button', { name: /Beamer-Ansicht/ })).toBeNull();
@@ -269,6 +269,7 @@ describe('MeetingDetailSheetComponent', () => {
     expect(screen.getByText('—')).toBeInTheDocument();
   });
 
+  /** The vote of an item that is not in the failed agenda shows its rule only. */
   it('says which part failed and keeps the others', async () => {
     const { http, fixture } = await setup();
     flush(http, 'm-1', { agenda: null, attendance: null, delegations: null, protocol: null });
@@ -276,13 +277,15 @@ describe('MeetingDetailSheetComponent', () => {
     expect(screen.getByText('Die Tagesordnung konnte nicht geladen werden.')).toBeInTheDocument();
     expect(screen.getByText('Die Anwesenheit konnte nicht geladen werden.')).toBeInTheDocument();
     expect(screen.queryByText('Vertretungen')).toBeNull();
-    // The vote of an item that is not in the (failed) agenda shows its rule only.
     expect(screen.getByText('Einfache Mehrheit')).toBeInTheDocument();
   });
 
+  /**
+   * The same meeting with a new status causes no new read. The open vote has no item and no rule,
+   * so the head shows the status only.
+   */
   it('reads again for another meeting only, and drops a late answer', async () => {
     const { http, fixture } = await setup();
-    // The same meeting with a new status: no new read.
     fixture.componentRef.setInput('meeting', { ...LIVE, title: 'Neu' });
     fixture.detectChanges();
     const late = http.expectOne('/api/meetings/m-1/agenda');
@@ -304,7 +307,6 @@ describe('MeetingDetailSheetComponent', () => {
     expect(screen.getByTitle('Unbenannter TOP')).toBeInTheDocument();
     expect(screen.getByText(/Unbekannt/)).toHaveTextContent('Unbekannt wird vertreten von Unbekannt');
     expect(screen.queryByText('mit Stimmrecht')).toBeNull();
-    // The open vote has no item and no rule: the head shows the status only.
     expect(fixture.nativeElement.querySelector('.ms__voteMeta')).toBeNull();
   });
 
@@ -317,12 +319,12 @@ describe('MeetingDetailSheetComponent', () => {
     expect(screen.queryByRole('button', { name: /Beamer/ })).toBeNull();
   });
 
+  /** The title opens the sheet on the line of the actions; no line stands above it. */
   it('leaves out an empty meta part and the time of a meeting without one', async () => {
     const bare = meeting({ status: 'planned', date: null, gremiumName: null, startTime: null, protocolId: null });
     const { http, fixture } = await setup({ meeting: bare });
     flush(http, 'm-1', { protocol: false });
     fixture.detectChanges();
-    // The title opens the sheet on the line of the actions; no line stands above it.
     expect(document.querySelector('app-sheet-bar .sheet-bar__title [appSheetBarTitle]')).not.toBeNull();
     expect(document.querySelector('.sheet-bar__kicker')).toBeNull();
     expect(fixture.nativeElement.querySelectorAll('.ms__part')).toHaveLength(2);

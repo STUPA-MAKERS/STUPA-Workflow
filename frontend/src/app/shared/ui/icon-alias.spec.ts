@@ -44,8 +44,8 @@ function iconContexts(src: string): string[] {
 describe('icon names in the app', () => {
   const aliases = kitAliases();
 
+  /** This is a sanity check: if the parser breaks, the check below passes for nothing. */
   it('reads the alias table of the kit', () => {
-    // A sanity check: if the parser breaks, the check below passes for nothing.
     expect(aliases.get('add')).toBe('plus');
     expect(aliases.get('chevron-right')).toBe('right');
     expect(aliases.get('paperclip')).toBe('clip');

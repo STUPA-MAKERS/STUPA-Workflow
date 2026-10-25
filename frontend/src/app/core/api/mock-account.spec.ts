@@ -10,6 +10,7 @@ import type { ConsentRequest, McpSetup, NotificationPreference, OAuthGrant } fro
 describe('mockAccount (demo data)', () => {
   afterEach(() => localStorage.removeItem('mockNoMcp'));
 
+  /** A body without preferences keeps every switch. */
   it('serves the switches of the server catalogue and stores a PUT', () => {
     const before = mockAccount('GET', '/api/notifications/preferences', null)!.body as NotificationPreference[];
     expect(before.map((p) => p.kind)).toEqual([
@@ -26,7 +27,6 @@ describe('mockAccount (demo data)', () => {
       preferences: [{ kind: 'protocol', enabled: true }],
     })!.body as NotificationPreference[];
     expect(saved.find((p) => p.kind === 'protocol')?.enabled).toBe(true);
-    // A body without preferences keeps every switch.
     expect(mockAccount('PUT', '/api/notifications/preferences', null)!.body).toEqual(saved);
   });
 

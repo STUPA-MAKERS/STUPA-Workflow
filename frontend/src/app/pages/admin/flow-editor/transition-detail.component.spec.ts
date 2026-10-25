@@ -48,6 +48,10 @@ async function setup(transition: TransitionDef, extra: Record<string, unknown> =
 describe('TransitionDetailComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
+  /**
+   * The label is the card title; the closed add field renders no options. The email recipient
+   * renders a free-text ref input.
+   */
   it('renders every action kind with its param control and recipient rows', async () => {
     const { c } = await setup({
       from: 'a',
@@ -67,7 +71,6 @@ describe('TransitionDetailComponent', () => {
         },
       ],
     });
-    // The label is the card title; the closed add field renders no options.
     expect(screen.getAllByText('Webhook auslösen').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('Zur nächsten Sitzung').length).toBeGreaterThanOrEqual(1);
     expect(c.actionParam({ type: 'assignBudget', budgetId: 'b1' }, 'budgetId')).toBe('b1');
@@ -78,7 +81,6 @@ describe('TransitionDetailComponent', () => {
     expect(c.actionOptions().length).toBeGreaterThan(0);
     expect(c.recipientKindOptions().length).toBeGreaterThan(0);
     expect(c.actionLabel('notify')).toBeTruthy();
-    // The email recipient renders a free-text ref input.
     expect(document.querySelector('input[placeholder="name@beispiel.de"]')).not.toBeNull();
   });
 
@@ -141,6 +143,7 @@ describe('TransitionDetailComponent', () => {
     expect(screen.getByRole('button', { name: 'Entfernen: Benachrichtigen' })).toBeInTheDocument();
   });
 
+  /** The fields show the name, and an unknown id shows no id. */
   it('offers an optional gremium for addToNextSession and the cost-center pickers', async () => {
     await setup(
       {
@@ -154,7 +157,6 @@ describe('TransitionDetailComponent', () => {
       },
       { budgetTree: TREE },
     );
-    // The fields show the name, an unknown id shows no id.
     expect(screen.getAllByText('Studierendenschaft')).toHaveLength(2);
     expect(screen.getByText('Unbekannte Kostenstelle')).toBeInTheDocument();
     expect(screen.queryByText('gone')).toBeNull();
@@ -168,6 +170,7 @@ describe('TransitionDetailComponent', () => {
     expect(values).not.toContain('assignBudgetFromMap');
   });
 
+  /** While a blank row exists, there is no second one. */
   it('edits the value → cost center rows through actionMapChange', async () => {
     const { c } = await setup({ from: 'a', to: 'b', actions: [] });
     const maps: unknown[] = [];
@@ -183,7 +186,6 @@ describe('TransitionDetailComponent', () => {
     c.setMapValue(0, act, 0, 'c');
     c.setMapBudget(0, act, 1, 'b3');
     c.removeMapRow(0, act, 0);
-    // A blank row exists: no second one.
     c.addMapRow(0, { type: 'assignBudgetFromMap', map: { '': '' } });
     expect(maps).toEqual([
       { a: 'b1', b: 'b2', '': '' },

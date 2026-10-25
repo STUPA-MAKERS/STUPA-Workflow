@@ -10,12 +10,12 @@ describe('admin-health.util', () => {
     i18n = TestBed.inject(I18nService);
   });
 
+  /** The default is the current time. */
   it('names today and yesterday, else the date', () => {
     const now = new Date(2026, 8, 29, 18, 0);
     expect(formatWhen(new Date(2026, 8, 29, 4, 30).toISOString(), i18n, now)).toBe('heute, 04:30');
     expect(formatWhen(new Date(2026, 8, 28, 17, 45).toISOString(), i18n, now)).toBe('gestern, 17:45');
     expect(formatWhen(new Date(2026, 8, 20, 9, 5).toISOString(), i18n, now)).toBe('20.09.2026, 09:05');
-    // The default is the current time.
     expect(formatWhen(new Date().toISOString(), i18n)).toMatch(/^heute, /);
   });
 

@@ -67,44 +67,48 @@ describe('fitCrumbs', () => {
     expect(fit({ ...base, widths: [200, 90, 60], available: 392 })).toEqual({ hidden: 0, squeeze: 'none' });
   });
 
+  /**
+   * There are five levels: root 200, two levels between (150, 120), parent 100, current 60, key
+   * 150. Step 1 keeps all at full width: 630 + 4 × 21 + key 150 = 864. Step 2 (root 200+21, …
+   * 28+21, parent 100+21, current 60, key 150 = 601) puts the two levels between into the menu, and
+   * the rest keeps its full width. Step 3 shortens the key to the minimum of 88: 539. Step 4
+   * shortens root and parent too (88 each): 88+21 + 49 + 88+21 + 60 + 88 = 415. Step 5 is "… ›
+   * current" with the full key (49 + 60 + 150 = 259), then the short key (197). Step 6 shortens the
+   * current name.
+   */
   it('goes through the steps in order, at their exact boundaries', () => {
-    // Five levels: root 200, two levels between (150, 120), parent 100, current 60, key 150.
     const m = { ...base, key: 150, widths: [200, 150, 120, 100, 60] };
     const at = (available: number) => fit({ ...m, available });
-    // 1. All at full width: 630 + 4 × 21 + key 150 = 864.
     expect(at(864)).toEqual({ hidden: 0, squeeze: 'none' });
-    // 2. Root 200+21, … 28+21, parent 100+21, current 60, key 150 = 601: the two levels
-    //    between go into the menu, the rest keeps its full width.
     expect(at(863)).toEqual({ hidden: 2, squeeze: 'none' });
     expect(at(601)).toEqual({ hidden: 2, squeeze: 'none' });
-    // 3. The key shortens to the minimum of 88: 539.
     expect(at(600)).toEqual({ hidden: 2, squeeze: 'key' });
     expect(at(539)).toEqual({ hidden: 2, squeeze: 'key' });
-    // 4. Root and parent shorten too (88 each): 88+21 + 49 + 88+21 + 60 + 88 = 415.
     expect(at(538)).toEqual({ hidden: 2, squeeze: 'parents' });
     expect(at(415)).toEqual({ hidden: 2, squeeze: 'parents' });
-    // 5. "… › current" with the full key (49 + 60 + 150 = 259), then the short key (197).
     expect(at(414)).toEqual({ hidden: 4, squeeze: 'none' });
     expect(at(259)).toEqual({ hidden: 4, squeeze: 'none' });
     expect(at(258)).toEqual({ hidden: 4, squeeze: 'key' });
     expect(at(197)).toEqual({ hidden: 4, squeeze: 'key' });
-    // 6. Last, the current name shortens.
     expect(at(196)).toEqual({ hidden: 4, squeeze: 'name' });
   });
 
+  /**
+   * Full width is 200+21 + 100+21 + 60 + 150 = 552, and shortened 88+21 + 88+21 + 60 + 88 = 366.
+   */
   it('has nothing between to hide for root › parent › current', () => {
     const m = { ...base, key: 150, widths: [200, 100, 60] };
-    // 200+21 + 100+21 + 60 + 150 = 552.
     expect(fit({ ...m, available: 552 })).toEqual({ hidden: 0, squeeze: 'none' });
     expect(fit({ ...m, available: 551 })).toEqual({ hidden: 0, squeeze: 'key' });
-    // 88+21 + 88+21 + 60 + 88 = 366.
     expect(fit({ ...m, available: 366 })).toEqual({ hidden: 0, squeeze: 'parents' });
     expect(fit({ ...m, available: 365 })).toEqual({ hidden: 2, squeeze: 'none' });
   });
 
+  /**
+   * Root 50 and key 40 are below the minimum: 50+21 + 300+21 + 60 + 40 = 492, and the shortened
+   * step only shortens the long parent: 50+21 + 88+21 + 60 + 40 = 280.
+   */
   it('keeps a parent or a key that is shorter than the minimum at its own width', () => {
-    // Root 50 and key 40 are below the minimum: 50+21 + 300+21 + 60 + 40 = 492, and the
-    // shortened step only shortens the long parent: 50+21 + 88+21 + 60 + 40 = 280.
     const m = { ...base, key: 40, widths: [50, 300, 60] };
     expect(fit({ ...m, available: 491 })).toEqual({ hidden: 0, squeeze: 'parents' });
     expect(fit({ ...m, available: 280 })).toEqual({ hidden: 0, squeeze: 'parents' });
@@ -119,8 +123,10 @@ describe('fitCrumbs', () => {
 });
 
 describe('fitCrumbs against the drawn trail', () => {
-  // As in the browser: gap 4, key margin 8 and key text 120 (key 132), minimum 72, a
-  // separator 13 + 2 × 4, the "…" 28 with a lead of 8.
+  /**
+   * The widths are those of the browser: gap 4, key margin 8 and key text 120 (key 132), minimum
+   * 72, a separator 13 + 2 × 4, the "…" 28 with a lead of 8.
+   */
   const m: Omit<CrumbMetrics, 'available'> = {
     widths: [216, 96, 344, 72, 72],
     key: 132,
@@ -131,23 +137,23 @@ describe('fitCrumbs against the drawn trail', () => {
     lead: 8,
   };
 
+  /** Step 3 is root 216+21, … 28+21, parent 72+21, current 72, key 4+8+72 = 535. */
   it('counts the short key with the space before it, at the step 3/4 boundary', () => {
-    // Step 3: root 216+21, … 28+21, parent 72+21, current 72, key 4+8+72 = 535.
     expect(fitCrumbs({ ...m, available: 535 })).toEqual({ hidden: 2, squeeze: 'key' });
     expect(drawn({ ...m, available: 535 }, fitCrumbs({ ...m, available: 535 }))).toBe(535);
     expect(fitCrumbs({ ...m, available: 534 })).toEqual({ hidden: 2, squeeze: 'parents' });
   });
 
+  /** "… › current" with the full key is 28+21 − 8 + 72 + 132 = 245. */
   it('gets the lead of the "…" back when it leads the trail', () => {
-    // "… › current" with the full key: 28+21 − 8 + 72 + 132 = 245.
     expect(fitCrumbs({ ...m, available: 245 })).toEqual({ hidden: 4, squeeze: 'none' });
     expect(fitCrumbs({ ...m, available: 244 })).toEqual({ hidden: 4, squeeze: 'key' });
   });
 
+  /** The last step shortens the name as far as it must; the stylesheet does the rest. */
   it('never draws more than the bar holds, from a narrow bar to a wide one', () => {
     for (let available = 190; available <= 1200; available++) {
       const f = fitCrumbs({ ...m, available });
-      // The last step shortens the name as far as it must; the stylesheet does the rest.
       if (f.squeeze === 'name') continue;
       expect(drawn({ ...m, available }, f)).toBeLessThanOrEqual(available);
     }
@@ -169,6 +175,9 @@ describe('BudgetCrumbsComponent', () => {
   const disconnect = jest.fn();
   const original = (globalThis as { ResizeObserver?: unknown }).ResizeObserver;
 
+  /**
+   * The hidden names measure 8px per character; the minimum, the "…" and the key have fixed widths.
+   */
   beforeEach(() => {
     barWidth = 2000;
     observers = [];
@@ -179,7 +188,6 @@ describe('BudgetCrumbsComponent', () => {
       observe(): void {}
       disconnect = disconnect;
     };
-    // 8px per character for the hidden names; fixed widths for the minimum, "…" and the key.
     jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
       let width = 0;
       if (this.hasAttribute('data-crumb')) width = (this.getAttribute('data-text') ?? '').length * 8;
@@ -214,6 +222,10 @@ describe('BudgetCrumbsComponent', () => {
     return { view, picks, nav, resize };
   }
 
+  /**
+   * A parent keeps its natural width as its floor (below the minimum). jsdom drops custom
+   * properties from the style, so the value is read from the source.
+   */
   it('shows the whole path with the key of the current cost centre in a wide bar', async () => {
     const { nav, view } = await setup();
     const trail = within(nav());
@@ -224,8 +236,6 @@ describe('BudgetCrumbsComponent', () => {
     expect(current).not.toHaveClass('bd__crumb--tight');
     expect(trail.getByText('HH-200-230-231-2311')).not.toHaveClass('bd__key--tight');
     expect(trail.queryByRole('button', { name: 'Weitere Ebenen des Pfads' })).toBeNull();
-    // A parent keeps its natural width as its floor (below the minimum).
-    // (jsdom drops custom properties from the style, so the value is read from the source.)
     const c = view.fixture.componentInstance as unknown as { crumbWidth(i: number): string | null };
     expect(c.crumbWidth(3)).toBe('72px');
     expect((view.fixture.componentInstance as unknown as { keyWidth(): string | null }).keyWidth()).toBe('120px');
@@ -239,14 +249,16 @@ describe('BudgetCrumbsComponent', () => {
     expect(picks).toEqual(['fs']);
   });
 
+  /**
+   * The trail is root 216+13, … 28+13, Werkstatt 72+13, current 72, key 120 = 547, so nothing
+   * shortens yet.
+   */
   it('keeps the first level, the parent and the current crumb, with the levels between in a "…" menu', async () => {
     const { nav, picks, resize, view } = await setup();
-    // root 216+13, … 28+13, Werkstatt 72+13, current 72, key 120 = 547.
     await resize(547);
     const trail = within(nav());
     const names = Array.from(nav().querySelectorAll('.bd__crumb, .rm__trigger'), (el) => el.textContent?.trim());
     expect(names).toEqual(['Haushalt Studierendenschaft', '…', 'Werkstatt', 'Siebdruck']);
-    // Nothing shortens yet.
     expect(nav()).not.toHaveClass('bd__crumbs--parents');
     expect(nav().querySelector('.bd__key')).not.toHaveClass('bd__key--tight');
     expect(nav().querySelector('.bd__more')).not.toHaveClass('bd__more--lead');
@@ -263,27 +275,30 @@ describe('BudgetCrumbsComponent', () => {
     expect(await runAxe(view.container)).toHaveNoViolations();
   });
 
+  /**
+   * The key at its minimum of 88 gives 547 − 120 + 88 = 515. Then root and parent shorten too, and
+   * the key stays at its minimum: root 88+13, … 41, Werkstatt (below the minimum) 72+13, current
+   * 72, key 88 = 387. "… › current" with the full key is 41 + 72 + 120 = 233, and the "…" leads the
+   * trail. The short key gives 41 + 72 + 88 = 201. Last, the name shortens, and the short key
+   * stays. When wide again, the whole path is back.
+   */
   it('shortens the key, then the parents, then hides them, and shortens the name last', async () => {
     const { nav, resize } = await setup();
     const names = () => Array.from(nav().querySelectorAll('.bd__crumb, .rm__trigger'), (el) => el.textContent?.trim());
     const key = () => nav().querySelector('.bd__key');
     const current = () => within(nav()).getByText('Siebdruck');
-    // The key at its minimum of 88: 547 − 120 + 88 = 515.
     await resize(546);
     expect(key()).toHaveClass('bd__key--tight');
     expect(nav()).not.toHaveClass('bd__crumbs--parents');
     await resize(515);
     expect(nav()).not.toHaveClass('bd__crumbs--parents');
     expect(key()).not.toHaveClass('bd__key--min');
-    // Root and parent shorten too, and the key stays at its minimum.
     await resize(514);
     expect(nav()).toHaveClass('bd__crumbs--parents');
     expect(key()).toHaveClass('bd__key--min');
     expect(names()).toEqual(['Haushalt Studierendenschaft', '…', 'Werkstatt', 'Siebdruck']);
-    // root 88+13, … 41, Werkstatt (below the minimum) 72+13, current 72, key 88 = 387.
     await resize(387);
     expect(names()).toHaveLength(4);
-    // "… › current" with the full key: 41 + 72 + 120 = 233. The "…" leads the trail.
     await resize(386);
     expect(names()).toEqual(['…', 'Siebdruck']);
     expect(key()).not.toHaveClass('bd__key--min');
@@ -291,23 +306,21 @@ describe('BudgetCrumbsComponent', () => {
     expect(key()).not.toHaveClass('bd__key--tight');
     await resize(233);
     expect(key()).not.toHaveClass('bd__key--tight');
-    // The short key: 41 + 72 + 88 = 201.
     await resize(232);
     expect(key()).toHaveClass('bd__key--tight');
     expect(current()).not.toHaveClass('bd__crumb--tight');
     await resize(201);
     expect(current()).not.toHaveClass('bd__crumb--tight');
-    // Last, the name shortens; the short key stays.
     await resize(200);
     expect(current()).toHaveClass('bd__crumb--tight');
     expect(key()).toHaveClass('bd__key--min');
     expect(key()?.getAttribute('title')).toBe('HH-200-230-231-2311');
-    // Wide again: the whole path is back.
     await resize(2000);
     expect(within(nav()).queryByRole('button', { name: 'Weitere Ebenen des Pfads' })).toBeNull();
     expect(key()).not.toHaveClass('bd__key--tight');
   });
 
+  /** A click on a parent does the same. */
   it('moves the focus to the current crumb of the new path after a pick', async () => {
     const { nav, picks, resize, view } = await setup();
     view.fixture.componentInstance.pick.subscribe((id: string) => {
@@ -322,7 +335,6 @@ describe('BudgetCrumbsComponent', () => {
     expect(picks).toEqual(['gm']);
     await waitFor(() => expect(document.activeElement?.textContent?.trim()).toBe('Fachschaft Gestaltung und angewandte Medien'));
     expect(document.activeElement).toHaveAttribute('aria-current', 'page');
-    // A click on a parent: the same.
     await resize(2000);
     await user.click(within(nav()).getByRole('button', { name: 'Haushalt Studierendenschaft' }));
     view.fixture.detectChanges();

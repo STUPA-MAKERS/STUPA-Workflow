@@ -45,26 +45,28 @@ describe('rounded sheet styles', () => {
     expect(rule(budget, '.bd--wide .bd__sheet')).toMatch(/overflow: hidden;/);
   });
 
+  /**
+   * Below wide the body is the one scroll area: its edges are the card edges, with their radius and
+   * the shared fade (the rule is nested in the below-wide media query). The side column shares its
+   * scroll rule with the agenda; the radius is a rule of its own.
+   */
   it('makes the session page and the participant view pane pages with round card columns', () => {
     for (const css of [meetingPage, followView]) {
       expect(rule(css, ':host')).toMatch(/flex: 1 1 0;/);
       expect(rule(css, ':host')).not.toMatch(/height: 100dvh/);
     }
     expect(rule(meetingPage, '.mp__body--wide .mp__votes')).toMatch(/border-radius: var\(--radius-xl\);/);
-    // Below wide the body is the one scroll area: its edges are the card edges, with their
-    // radius and the shared fade (rule is nested in the below-wide media query).
     expect(meetingPage).toMatch(
       /\.mp__body:not\(\.mp__body--wide\) \{[^}]*margin-inline: var\(--space-3\);[^}]*padding-inline: 0;[^}]*border-radius: var\(--radius-xl\);[^}]*@include fade\.fade-y/,
     );
-    // The side column shares its scroll rule with the agenda; the radius is a rule of its own.
     expect(followView).toMatch(
       /\n\.fv__body--wide \.fv__side \{[^}]*border-radius: var\(--radius-xl\);/,
     );
   });
 
+  /** The top inset of an installed iOS app comes on top (0 in a browser tab). */
   it('gives a pane page the gutter as the gap at the bottom and at the top', () => {
     expect(rule(shell, '.main')).toMatch(/--pane-foot-gap: var\(--layout-gutter\);/);
-    // The top inset of an installed iOS app comes on top (0 in a browser tab).
     expect(rule(shell, '.frame--rail .main')).toMatch(
       /--main-pad-top: calc\(var\(--layout-gutter\) \+ var\(--app-top-safe-area\)\);/,
     );

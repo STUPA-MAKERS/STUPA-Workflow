@@ -17,12 +17,12 @@ function rule(selector: string): string {
 }
 
 describe('chat styles', () => {
+  /** Nothing places the pill outside the box of the bubble. */
   it('puts the actions over the bubble, not beside it', () => {
     const acts = rule('.chat__acts');
     expect(acts).toMatch(/position: absolute;/);
     expect(acts).toMatch(/inset-block-start: -16px;/);
     expect(acts).toMatch(/inset-inline-end: 0;/);
-    // Nothing places the pill outside the bubble's box.
     expect(css).not.toMatch(/(right|left): calc\(100% \+/);
     const other = rule('.chat__row:not(.chat__row--own) .chat__acts');
     expect(other).toMatch(/inset-inline-end: auto;/);

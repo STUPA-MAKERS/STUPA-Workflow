@@ -51,11 +51,11 @@ describe('AdminRolesComponent', () => {
     expect(inst.permissions()).toEqual(['admin.roles', 'application.read', 'flow.configure']);
   });
 
+  /** Without a de label the fallback is the key; the en label is not a fallback. */
   it('roleLabel falls back locale→de→key', async () => {
     const { inst } = await setup();
     expect(inst.roleLabel(ROLES[0])).toBe('administrator');
     expect(inst.roleLabel({ label: { de: 'x' }, key: 'k' })).toBe('x');
-    // Without a de label the fallback is the key. The en label is not a fallback.
     expect(inst.roleLabel({ label: { en: 'y' }, key: 'k' })).toBe('k');
     expect(inst.roleLabel({ label: {}, key: 'k' })).toBe('k');
   });
@@ -72,13 +72,13 @@ describe('AdminRolesComponent', () => {
     expect(inst.isLocked({ key: 'member' })).toBe(false);
   });
 
-  it('marks admin and member as fixed, without a delete menu (N40)', async () => {
+  /** Only the referent row has a ⋮ menu, and delete is its one item. */
+  it('marks admin and member as fixed, without a delete menu', async () => {
     const { inst } = await setup();
     expect(inst.isFixed({ key: 'admin' })).toBe(true);
     expect(inst.isFixed({ key: 'member' })).toBe(true);
     expect(inst.isFixed({ key: 'referent' })).toBe(false);
     expect(screen.getAllByText('fest')).toHaveLength(2);
-    // Only the referent row has a ⋮ menu, and delete is its one item.
     const menus = screen.getAllByRole('button', { name: /^Weitere Aktionen: / });
     expect(menus).toHaveLength(1);
     expect(menus[0]).toHaveAccessibleName('Weitere Aktionen: Referent');
@@ -104,12 +104,12 @@ describe('AdminRolesComponent', () => {
     expect(inst.isOpen(ROLES[2])).toBe(false);
   });
 
+  /** The role still holds a key that the server removed. It never shows and never counts. */
   it('shows the rights of the API catalogue in sections, and only those', async () => {
     const api = makeApi({
       listPermissions: jest.fn(() =>
         of(['application.read', 'budget.view', 'meeting.view_all', 'admin.roles', 'audit.read', 'x.new']),
       ),
-      // The role still holds a key the server removed. It never shows and never counts.
       listRoles: jest.fn(() =>
         of([{ id: 'r-ref', key: 'referent', label: { de: 'Referent' }, permissions: ['budget.view', 'vote.cast'] }]),
       ),
@@ -128,11 +128,11 @@ describe('AdminRolesComponent', () => {
     expect(screen.getByRole('checkbox', { name: 'application.read' })).not.toBeChecked();
   });
 
+  /** ngModel writes the value and the disabled state in a microtask. */
   it('shows the admin role with every right, read-only', async () => {
     const { fixture } = await setup();
     expect(screen.getAllByText('3 / 3').length).toBeGreaterThan(0);
     await userEvent.click(screen.getByRole('button', { name: /^Administrator/ }));
-    // ngModel writes the value and the disabled state in a microtask.
     await fixture.whenStable();
     fixture.detectChanges();
     const boxes = screen.getAllByRole('checkbox');
@@ -157,6 +157,7 @@ describe('AdminRolesComponent', () => {
     expect(inst.expanded.has('r-new')).toBe(true);
   });
 
+  /** A change of the key clears the answer of the server. */
   it('shows a 422 and a 409 of the create under the key field', async () => {
     const api = makeApi({ createRole: jest.fn(() => throwError(() => ({ status: 422 }))) });
     const { inst, toast } = await setup(api);
@@ -165,7 +166,6 @@ describe('AdminRolesComponent', () => {
     inst.createRole();
     expect(inst.keyError()).toContain('Der Schlüssel muss mit einem Kleinbuchstaben beginnen');
     expect(toast.error).not.toHaveBeenCalled();
-    // A change of the key clears the answer of the server.
     inst.patchDraft('key', 'kultur2');
     expect(inst.keyError()).toBe('');
     api.createRole.mockReturnValue(throwError(() => ({ status: 409 })));
@@ -289,11 +289,12 @@ describe('AdminRolesComponent', () => {
     expect(api.createRole).not.toHaveBeenCalled();
   });
 
+  /** A blank key shows no error yet. */
   it('refuses a key that breaks the role-key pattern and shows why', async () => {
     const { inst, api } = await setup();
     inst.openAdd();
     expect(inst.keyValid()).toBe(false);
-    expect(inst.keyError()).toBe(''); // a blank key shows no error yet
+    expect(inst.keyError()).toBe('');
     for (const bad of ['Kasse', 'kasse-x', '1kasse', '_kasse', 'kas se']) {
       inst.patchDraft('key', bad);
       expect(inst.keyValid()).toBe(false);

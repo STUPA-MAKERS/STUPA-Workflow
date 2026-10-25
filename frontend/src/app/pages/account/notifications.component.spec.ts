@@ -68,8 +68,8 @@ describe('AccountNotificationsComponent', () => {
     ]);
   });
 
+  /** The PUT answers later, as over HTTP, so the page renders the new state first. */
   it('turns the switch back and shows an error when the save fails', async () => {
-    // The PUT answers later, as over HTTP: the page renders the new state first.
     const answer = new Subject<NotificationPreference[]>();
     const save = jest.fn(() => answer.asObservable());
     const { fixture } = await setup(PREFS, save);
@@ -82,6 +82,10 @@ describe('AccountNotificationsComponent', () => {
     expect(screen.getAllByRole('switch')[0]).toHaveAttribute('aria-checked', 'true');
   });
 
+  /**
+   * The second switch shows at once, but waits for the first PUT. The answer of the first PUT does
+   * not turn the second switch back.
+   */
   it('runs one PUT at a time and sends the latest state when the running one ends', async () => {
     const answers: Subject<NotificationPreference[]>[] = [];
     const save = jest.fn(() => {
@@ -93,7 +97,6 @@ describe('AccountNotificationsComponent', () => {
     await userEvent.click(screen.getAllByRole('switch')[0]);
     await userEvent.click(screen.getAllByRole('switch')[1]);
     fixture.detectChanges();
-    // The second switch shows at once, but waits for the first PUT.
     expect(save).toHaveBeenCalledTimes(1);
     expect(screen.getAllByRole('switch')[1]).toHaveAttribute('aria-checked', 'true');
     answers[0].next([
@@ -102,7 +105,6 @@ describe('AccountNotificationsComponent', () => {
     ]);
     answers[0].complete();
     fixture.detectChanges();
-    // The answer of the first PUT does not turn the second switch back.
     expect(screen.getAllByRole('switch')[1]).toHaveAttribute('aria-checked', 'true');
     expect(save).toHaveBeenCalledTimes(2);
     expect(save).toHaveBeenLastCalledWith([
@@ -111,6 +113,7 @@ describe('AccountNotificationsComponent', () => {
     ]);
   });
 
+  /** The server holds the first change only, and the page shows the same. */
   it('goes back to the last confirmed state when a later PUT fails', async () => {
     const answers: Subject<NotificationPreference[]>[] = [];
     const save = jest.fn(() => {
@@ -128,7 +131,6 @@ describe('AccountNotificationsComponent', () => {
     answers[0].complete();
     answers[1].error(new Error('boom'));
     fixture.detectChanges();
-    // The server holds the first change only, and the page shows the same.
     expect(screen.getAllByRole('switch').map((s) => s.getAttribute('aria-checked'))).toEqual([
       'false',
       'false',

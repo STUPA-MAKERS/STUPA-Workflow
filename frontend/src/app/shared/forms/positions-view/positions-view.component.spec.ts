@@ -35,18 +35,19 @@ const parts = (el: Element, selector: string) =>
 const ROW = '.pv__name, .pv__sub > *, .pv__amount';
 
 describe('PositionsViewComponent', () => {
+  /** Without comparison offers the row shows the count and the warning instead of the supplier. */
   it('shows each position collapsed: name, offers, preferred supplier and amount', async () => {
     const { container } = await view();
     const buttons = screen.getAllByRole('button');
     expect(buttons).toHaveLength(2);
     expect(buttons[0]).toHaveAttribute('aria-expanded', 'false');
     expect(parts(buttons[0], ROW)).toBe('Raummiete | 3 Angebote | · | bevorzugt: Studierendenwerk | 450,00 €');
-    // Without comparison offers: the count and the warning instead of the supplier.
     expect(parts(buttons[1], ROW)).toBe('Technik | 1 Angebot | · | ohne Vergleichsangebote | 420,00 €');
     expect(container.querySelector('.pv__offers')).toBeNull();
     expect(parts(container.querySelector('.pv__total')!, 'span')).toBe('Gesamtbetrag | 870,00 €');
   });
 
+  /** The preferred offer is marked and stands out; the others are muted. */
   it('opens a position on a click anywhere on its row and closes it again', async () => {
     await view();
     const row = screen.getAllByRole('button')[0];
@@ -55,7 +56,6 @@ describe('PositionsViewComponent', () => {
     const list = screen.getByRole('list', { name: 'Angebote' });
     const items = within(list).getAllByRole('listitem');
     expect(items).toHaveLength(3);
-    // The preferred offer is marked and stands out; the others are muted.
     expect(items[0]).toHaveClass('pv__offer--pref');
     expect(within(items[0]).getByText('bevorzugt')).toBeInTheDocument();
     expect(items[1]).not.toHaveClass('pv__offer--pref');
@@ -97,6 +97,10 @@ describe('PositionsViewComponent', () => {
     expect(parts(container.querySelector('.pv__total')!, 'span')).toBe('Gesamtbetrag | 0,00 €');
   });
 
+  /**
+   * The collapsed row is one button, with no link inside it and no ellipsis. The row controls the
+   * body only while the body is there. Only an http(s) URL is a link.
+   */
   it('links an offer URL and never cuts names, suppliers or offer texts', async () => {
     const url = 'https://www.example.com/shop/produkt/sehr-langer-pfad-zum-angebot?id=12345';
     const { container } = await view([
@@ -110,11 +114,9 @@ describe('PositionsViewComponent', () => {
       },
     ]);
     const row = screen.getByRole('button');
-    // The collapsed row is one button: no link inside it, and no ellipsis.
     expect(row.querySelector('a')).toBeNull();
     expect(row.querySelector('.ell')).toBeNull();
     expect(row.querySelector('.pv__pref')).toHaveTextContent(`bevorzugt: ${url}`);
-    // The row controls the body only while the body is there.
     expect(row).not.toHaveAttribute('aria-controls');
     await userEvent.click(row);
     const link = screen.getByRole('link', { name: url });
@@ -123,7 +125,6 @@ describe('PositionsViewComponent', () => {
     expect(link).toHaveAttribute('rel', 'noopener');
     expect(link).toHaveClass('pv__offerName');
     expect(link).not.toHaveClass('ell');
-    // Only an http(s) URL is a link.
     expect(screen.getAllByRole('link')).toHaveLength(1);
     expect(container.querySelector('.ell')).toBeNull();
   });

@@ -7,6 +7,8 @@ import { PageIndexService } from './page-index.service';
  * The pages half of the palette must never offer somewhere the user cannot go: a row
  * that bounces to /forbidden is worse than no row. The filter mirrors `authGuard`, so
  * these tests pin that mirror, including the three escape hatches it has.
+ *
+ * The fake translates to the key, so a test asserts on routes and not on wording.
  */
 describe('PageIndexService', () => {
   function setup(auth: Partial<Record<string, unknown>>) {
@@ -23,7 +25,6 @@ describe('PageIndexService', () => {
             ...auth,
           },
         },
-        // Translate to the key, so a test asserts on routes and not on wording.
         { provide: I18nService, useValue: { translate: (k: string) => k } },
       ],
     });
@@ -60,27 +61,30 @@ describe('PageIndexService', () => {
     expect(svc.visible().every((e) => !e.path.includes(':'))).toBe(true);
   });
 
+  /**
+   * `/status` without an application id renders "Antrag nicht gefunden", and `/apply/confirmation`
+   * congratulates the reader on a submission that never happened. Either one is a dead end.
+   */
   it('withholds a page that only means something after an action', () => {
-    // `/status` without an application id renders "Antrag nicht gefunden", and
-    // `/apply/confirmation` congratulates the reader on a submission that never
-    // happened. Offering either is offering a dead end.
     const svc = setup({ canAny: () => true });
     const paths = svc.visible().map((e) => e.path);
     expect(paths).not.toContain('/status');
     expect(paths).not.toContain('/apply/confirmation');
   });
 
+  /** The exclusion must not be so broad that it removes the ordinary pages too. */
   it('still offers the pages that stand on their own', () => {
-    // The exclusion must not be so broad that it eats the ordinary pages with it.
     const svc = setup({ canAny: () => true });
     const paths = svc.visible().map((e) => e.path);
     expect(paths).toContain('/dashboard');
     expect(paths).toContain('/apply');
   });
 
+  /**
+   * `/meetings` carries allowCommitteeMember: a member sees the meetings of their gremium without
+   * session.manage. The guard does the same.
+   */
   it('lets a committee member through on a route that allows it', () => {
-    // `/meetings` carries allowCommitteeMember: a member sees the meetings of their
-    // gremium without session.manage. The guard does the same.
     const svc = setup({ gremien: () => [{ id: 'g-1' }] });
     expect(svc.visible().map((e) => e.path)).toContain('/meetings');
   });

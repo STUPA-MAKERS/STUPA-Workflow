@@ -101,6 +101,7 @@ describe('gremien.util', () => {
     expect(cellStrength(0.5)).toBe(45);
   });
 
+  /** A cell without a month counts no meeting. */
   it('sums a row over the months of the membership only', () => {
     const r = row('A', [
       [true, 0],
@@ -109,7 +110,6 @@ describe('gremien.util', () => {
     ]);
     expect(rowTotals(r, MONTHS)).toEqual({ present: 1, held: 2, pct: 50 });
     expect(rowTotals(row('B', [[true, 0], [false, 0], [false, 0]]), MONTHS).pct).toBeNull();
-    // A cell without a month counts no meeting.
     expect(rowTotals(row('C', [[true, 0], [true, 2], [true, 1]]), MONTHS.slice(0, 2)).held).toBe(2);
   });
 
@@ -134,11 +134,11 @@ describe('gremien.util', () => {
     expect(names(sortRows([nameless, half, noneToo], MONTHS, 'name', 'de'))).toEqual(['Ben', null, null]);
   });
 
+  /** A row with more cells than months adds nothing beyond the months. */
   it('averages the present members per meeting', () => {
     const rows = [row('A', [[true, 0], [true, 2], [true, 1]]), row('B', [[true, 0], [true, 1], [true, 0]])];
     expect(monthAverages(rows, MONTHS)).toEqual({ months: [null, 1.5, 1], total: 4 / 3 });
     expect(monthAverages([], [{ month: '2026-08', meetings: 0 }])).toEqual({ months: [null], total: null });
-    // A row with more cells than months adds nothing beyond the months.
     expect(monthAverages(rows, MONTHS.slice(0, 2)).months).toEqual([null, 1.5]);
     expect(oneDecimal(27, 'de')).toBe('27,0');
     expect(oneDecimal(2.25, 'en')).toBe('2.3');

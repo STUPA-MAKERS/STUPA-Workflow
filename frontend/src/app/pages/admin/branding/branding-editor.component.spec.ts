@@ -18,6 +18,7 @@ function route(section: BrandingSection) {
   return { provide: ActivatedRoute, useValue: { snapshot: { data: { section } } } };
 }
 
+/** ngModel writes the branding into the fields after a tick. */
 async function setup(section: BrandingSection = 'texts') {
   const toast = { success: jest.fn(), error: jest.fn() };
   const view = await render(BrandingEditorComponent, {
@@ -29,7 +30,6 @@ async function setup(section: BrandingSection = 'texts') {
       route(section),
     ],
   });
-  // ngModel writes the branding into the fields after a tick.
   await view.fixture.whenStable();
   view.fixture.detectChanges();
   return { ...view, toast };
@@ -56,13 +56,13 @@ function emptyBranding(): Branding {
 
 const STUB_CFG: SiteConfig = { version: 3, branding: emptyBranding() };
 
+/** Each test gets a fresh branding, because the editor changes the object in place. */
 async function setupWithStub(
   api: Partial<Record<keyof AdminApiService, unknown>>,
   section: BrandingSection = 'branding',
 ) {
   const toast = { success: jest.fn(), error: jest.fn() };
   const fullApi = {
-    // A fresh branding per test: the editor changes the object in place.
     getSiteConfig: jest.fn(() => of({ ...STUB_CFG, branding: emptyBranding() })),
     saveSiteConfig: jest.fn((b: Branding) => of({ version: 4, branding: b })),
     listConfigRevisions: jest.fn(() => of([])),
@@ -93,13 +93,13 @@ describe('BrandingEditorComponent', () => {
     expect(container.querySelector('details')).toBeNull();
   });
 
+  /** An empty slot shows the built-in logo and offers the file dialog. */
   it('shows the name, the accent, the switch and the logos on the page "Branding"', async () => {
     await setup('branding');
     expect(screen.getByRole('heading', { level: 1, name: 'Branding' })).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: 'Voller Name (Browser-Tab)' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Akzentfarbe' })).toBeInTheDocument();
     expect(screen.queryByRole('textbox', { name: 'Willkommenstext (DE)' })).toBeNull();
-    // An empty slot shows the built-in logo and offers the file dialog.
     expect(screen.getByRole('button', { name: 'Auswählen: Wortmarke' })).toBeInTheDocument();
     expect(screen.getAllByText('Standard').length).toBeGreaterThanOrEqual(2);
   });
@@ -170,6 +170,7 @@ describe('BrandingEditorComponent', () => {
   });
 
   describe('accent colour', () => {
+    /** "Standard" goes back to the built-in accent. */
     it('previews a picked accent on the whole page and saves it', async () => {
       const { api, fixture } = await setupWithStub({});
       const brand = fixture.debugElement.injector.get(BrandingService);
@@ -183,7 +184,6 @@ describe('BrandingEditorComponent', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
       expect(api.saveSiteConfig).toHaveBeenCalledWith(expect.objectContaining({ accentColor: '#0075bf' }));
       expect(brand.accentColor()).toBe('#0075bf');
-      // "Standard" goes back to the built-in accent.
       await userEvent.click(screen.getByRole('button', { name: 'Standard' }));
       fixture.detectChanges();
       expect(document.documentElement.style.getPropertyValue('--c-accent')).toBe('');
@@ -216,7 +216,8 @@ describe('BrandingEditorComponent', () => {
     });
   });
 
-  it('edits the copyright, the legal links and the mail footer text (gaps N43)', async () => {
+  /** The test types many keys, so the default 5 s is short on a busy runner. */
+  it('edits the copyright, the legal links and the mail footer text', async () => {
     const { fixture, container } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
@@ -240,7 +241,6 @@ describe('BrandingEditorComponent', () => {
     await userEvent.clear(mail);
     await userEvent.type(mail, 'Gruß');
     expect(c.draft().freetexts.emailFooter.de).toBe('Gruß');
-    // Many typed keys: the default 5 s is short on a busy runner.
   }, 15000);
 
   it('gives the legal links the same fields as every other text', async () => {
@@ -258,6 +258,7 @@ describe('BrandingEditorComponent', () => {
     expect(c.draft().legalLinks).toHaveLength(legal - 1);
   });
 
+  /** The German text stays. */
   it('switches the text fields to English', async () => {
     const { fixture } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -270,7 +271,6 @@ describe('BrandingEditorComponent', () => {
     await userEvent.clear(support);
     await userEvent.type(support, 'EN support');
     expect(c.draft().freetexts.support.en).toBe('EN support');
-    // The German text stays.
     expect(c.draft().freetexts.support.de).toBe('Bei Fragen: support@example.org');
     const label = screen.getAllByRole('textbox', { name: 'Bezeichnung (EN)' })[0];
     expect(label).toHaveValue('Imprint');
@@ -307,6 +307,7 @@ describe('BrandingEditorComponent', () => {
     expect(screen.queryByText(/logo\.png ·/)).not.toBeInTheDocument();
   });
 
+  /** A drop without a file changes nothing. */
   it('takes a dropped logo and marks the row while a file is over it', async () => {
     const { fixture } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -320,16 +321,15 @@ describe('BrandingEditorComponent', () => {
     c.onDrop('favicon', { preventDefault: prevented, dataTransfer: { files: [file] } } as unknown as DragEvent);
     await waitFor(() => expect(c.draft().logos.favicon?.filename).toBe('fav.ico'));
     expect(prevented).toHaveBeenCalledTimes(2);
-    // A drop without a file changes nothing.
     c.onDrop('wordmark', { preventDefault: prevented, dataTransfer: null } as unknown as DragEvent);
     expect(c.draft().logos.wordmark).toBeUndefined();
   });
 
+  /** applyAccept is false, so the handler runs and its own guard rejects the type. */
   it('rejects a disallowed logo MIME type', async () => {
     const { toast, container } = await setup('branding');
     const input = container.querySelectorAll<HTMLInputElement>('input[type="file"]')[2];
     const bad = new File(['x'], 'evil.exe', { type: 'application/x-msdownload' });
-    // applyAccept is false, so the handler runs and its own guard rejects the type.
     await userEvent.upload(input, bad, { applyAccept: false });
     expect(toast.error).toHaveBeenCalledWith('Dateityp nicht erlaubt.');
   });
@@ -360,6 +360,10 @@ describe('BrandingEditorComponent', () => {
     );
   });
 
+  /**
+   * A legal link with an empty URL is dropped, and the valid seed stays. An absent slot takes the
+   * safe delete branch.
+   */
   it('exercises footer/legal/logo mutators', async () => {
     const { fixture } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -368,11 +372,11 @@ describe('BrandingEditorComponent', () => {
     c.setText(c.draft().copyright, 'Neu');
     expect(c.draft().copyright.de).toBe('Neu');
 
-    c.addLegalLink(); // adds a legal link with an empty URL
+    c.addLegalLink();
     expect(c.draft().legalLinks.length).toBeGreaterThan(0);
-    c.removeLegalLink(c.draft().legalLinks.length - 1); // drop the empty one, keep the valid seed
+    c.removeLegalLink(c.draft().legalLinks.length - 1);
 
-    c.removeLogo('wordmark'); // an absent slot takes the safe delete branch
+    c.removeLogo('wordmark');
     c.save();
     expect(c.saving()).toBe(false);
   });
@@ -485,9 +489,9 @@ describe('BrandingEditorComponent', () => {
     expect(c.draft()).toBeNull();
   });
 
+  /** A config without the field counts as on. */
   it('switches the Gravatar images off and saves the switch with the draft', async () => {
     const { api } = await setupWithStub({});
-    // A config without the field counts as on.
     const sw = screen.getByRole('switch', { name: /Gravatar-Bilder zeigen/ });
     await waitFor(() => expect(sw).toHaveAttribute('aria-checked', 'true'));
     await userEvent.click(sw);

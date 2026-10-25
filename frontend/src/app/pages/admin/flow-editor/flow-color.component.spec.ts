@@ -11,12 +11,12 @@ async function setup(value: string | null) {
 describe('FlowColorComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
+  /** Without a colour, "Keine Farbe" is the chosen one. */
   it('offers "no colour", every preset and a custom colour as one radio group', async () => {
     await setup(null);
     expect(screen.getByRole('radiogroup', { name: 'Farbe' })).toBeInTheDocument();
     const radios = screen.getAllByRole('radio');
     expect(radios).toHaveLength(FLOW_COLOR_PRESETS.length + 1);
-    // Without a colour, "Keine Farbe" is the chosen one.
     expect(screen.getByRole('radio', { name: 'Keine Farbe' })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByLabelText('Eigene Farbe')).toBeInTheDocument();
   });

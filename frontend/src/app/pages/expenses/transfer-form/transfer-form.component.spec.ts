@@ -144,10 +144,11 @@ async function setup(mode: 'create' | 'edit', layout: 'pane' | 'sheet' = 'pane')
   return { view, http, host, form, user: userEvent.setup() };
 }
 
-// The suite renders the whole transfer form with its two cost-centre trees
-// in jsdom. One test takes 1–3 s alone, and more than the default 5 s while the full
-// run keeps every core busy, so local gates timed out at random (CI passed). The same
-// budget as the other heavy meeting suites.
+/**
+ * The suite renders the whole transfer form with its two cost-centre trees in jsdom. One test takes
+ * 1–3 s alone, and more than the default 5 s while the full run keeps every core busy, so the suite
+ * uses the same budget as the other heavy meeting suites.
+ */
 jest.setTimeout(15_000);
 
 const tick = () => new Promise((r) => setTimeout(r));
@@ -168,6 +169,11 @@ describe('TransferFormComponent', () => {
     TestBed.inject(HttpTestingController).verify();
   });
 
+  /**
+   * Opening the list asks once for the years of the top budgets, for the free amounts. Without an
+   * amount the free amount shows as it is. The same cost centre twice is no pair. Without a
+   * description the main action waits.
+   */
   it('picks the two legs in the cost-centre list and shows the free amount before and after', async () => {
     const { host, http, view, user } = await setup('create');
     expect(screen.getByRole('heading', { name: 'Übertrag buchen' })).toBeInTheDocument();
@@ -175,15 +181,12 @@ describe('TransferFormComponent', () => {
     await user.click(screen.getByRole('button', { name: /^Von Kostenstelle/ }));
     await tick();
     view.fixture.detectChanges();
-    // Opening the list asks once for the years of the top budgets, for the free amounts.
     http.expectOne((r) => r.url.endsWith('/budgets/top/fiscal-years')).flush([FY]);
     await user.click(screen.getByRole('option', { name: /Kultur/ }));
     expect(host.dialogs.tFromId()).toBe('kul');
     http.expectOne((r) => r.url.endsWith('/budgets/top/fiscal-years')).flush([FY]);
     view.fixture.detectChanges();
-    // Without an amount: the free amount as it is.
     expect(text()).toMatch(/Frei danach ?11\.150,00 €/);
-    // The same cost centre twice is no pair.
     host.dialogs.tToId.set('kul');
     view.fixture.detectChanges();
     expect(screen.getByRole('alert').textContent).toContain('andere Kostenstelle');
@@ -197,7 +200,6 @@ describe('TransferFormComponent', () => {
     expect(text()).toMatch(/Frei danach ?11\.150,00 € 10\.650,00 €/);
     expect(text()).toMatch(/Frei danach ?7\.100,00 € 7\.600,00 €/);
     expect(document.querySelectorAll('s')).toHaveLength(2);
-    // No description yet: the main action waits.
     expect(screen.getByRole('button', { name: /^500,00\s€ übertragen$/ })).toBeDisabled();
     host.dialogs.tDescription.set('Zuschuss');
     view.fixture.detectChanges();
@@ -216,6 +218,7 @@ describe('TransferFormComponent', () => {
     expect(host.dialogs.tFiscalYearId()).toBe('fy');
   });
 
+  /** With nothing to swap the action does nothing. */
   it('swaps a single leg: the target becomes the source and its years load', async () => {
     const { host, http, view, user } = await setup('create');
     host.dialogs.tToId.set('sport');
@@ -225,7 +228,6 @@ describe('TransferFormComponent', () => {
     expect(host.dialogs.tToId()).toBe('');
     http.expectOne((r) => r.url.endsWith('/budgets/top/fiscal-years')).flush([FY]);
     expect(host.dialogs.tFiscalYearId()).toBe('fy');
-    // Nothing to swap.
     host.dialogs.tFromId.set('');
     host.dialogs.swapTransfer();
     expect(host.dialogs.tToId()).toBe('');

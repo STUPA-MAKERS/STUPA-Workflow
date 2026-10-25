@@ -118,6 +118,7 @@ describe('chat util', () => {
     expect(kinds(items)).toEqual(['day', 'aHT', 'event', 'bHT']);
   });
 
+  /** When nothing is new there is no separator. */
   it('puts "N neue" before the first new message of another person', () => {
     const list = [
       msg('a', '2026-10-12T10:00:00'),
@@ -128,7 +129,6 @@ describe('chat util', () => {
     const items = buildItems(list, [], opts({ markerAt: at('2026-10-12T10:10:00') }));
     expect(kinds(items)).toEqual(['day', 'aHT', 'ownHT', 'new', 'bH', 'cT']);
     expect(items[3]).toEqual({ kind: 'new', key: 'new', count: 2 });
-    // Nothing is new: no separator.
     expect(kinds(buildItems(list, [], opts({ markerAt: at('2026-10-12T11:00:00') })))).not.toContain('new');
   });
 

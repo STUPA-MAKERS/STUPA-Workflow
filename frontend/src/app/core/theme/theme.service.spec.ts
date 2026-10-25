@@ -38,6 +38,7 @@ describe('ThemeService', () => {
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
   });
 
+  /** An OS change does not override the page default. */
   it('gives a page default to the system mode while the page shows, without persisting it', () => {
     const svc = service();
     svc.init();
@@ -45,7 +46,6 @@ describe('ThemeService', () => {
     expect(svc.resolved()).toBe('dark');
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
     expect(localStorage.getItem('ap.theme')).toBeNull();
-    // An OS change does not override the page default.
     changeHandler?.({ matches: false } as MediaQueryListEvent);
     expect(svc.resolved()).toBe('dark');
     svc.setPageDefault(null);
@@ -87,16 +87,17 @@ describe('ThemeService', () => {
     expect(svc.preference()).toBe('light');
   });
 
+  /**
+   * The OS flips to dark. The preference stays the explicit 'light', so the resolved theme stays
+   * light. The apply step calls setAttribute, and it must not run for this OS change.
+   */
   it('does not re-apply on OS change when an explicit preference is set', () => {
     const svc = service();
     svc.init();
     svc.setPreference('light');
     const applySpy = jest.spyOn(document.documentElement, 'setAttribute');
-    // The OS flips to dark. The preference stays the explicit 'light', so the resolved
-    // theme stays light.
     changeHandler?.({ matches: true } as MediaQueryListEvent);
     expect(svc.resolved()).toBe('light');
-    // The apply step calls setAttribute. It must not run for this OS change.
     expect(applySpy).not.toHaveBeenCalled();
     applySpy.mockRestore();
   });

@@ -11,6 +11,7 @@ describe('GremiumLogoComponent', () => {
     expect(host.classList.contains('glo--lg')).toBe(false);
   });
 
+  /** A new URL gets a new try. */
   it('shows the logo on white and falls back to the initials when it fails', async () => {
     const view = await render(GremiumLogoComponent, {
       inputs: { name: 'Wahlausschuss', logoUrl: '/api/gremien/g-1/logo', size: 'lg' },
@@ -27,7 +28,6 @@ describe('GremiumLogoComponent', () => {
     expect(host.querySelector('img')).toBeNull();
     expect(host.textContent?.trim()).toBe('WA');
 
-    // A new URL gets a new try.
     view.fixture.componentRef.setInput('logoUrl', '/api/gremien/g-2/logo');
     view.fixture.detectChanges();
     expect(host.querySelector('img')?.getAttribute('src')).toBe('/api/gremien/g-2/logo');

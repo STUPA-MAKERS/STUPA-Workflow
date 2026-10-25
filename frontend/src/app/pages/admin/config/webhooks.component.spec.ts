@@ -80,11 +80,14 @@ describe('WebhooksComponent', () => {
     expect(screen.getByText('Keine Webhooks konfiguriert.')).toBeInTheDocument();
   });
 
+  /**
+   * An empty field is not yet wrong, but the save stays off. A valid URL is enough, and the save
+   * works even without a single event.
+   */
   it('validates the URL but allows saving without any event (triggers optional)', async () => {
     const { saveWebhook } = await setup();
     await userEvent.click(screen.getByRole('button', { name: 'Webhook anlegen' }));
 
-    // An empty field is not yet wrong, but the save stays off.
     expect(screen.queryByText('Bitte eine gültige http(s)-URL angeben.')).not.toBeInTheDocument();
     const save = screen.getByRole('button', { name: 'Speichern' });
     expect(save).toBeDisabled();
@@ -92,7 +95,6 @@ describe('WebhooksComponent', () => {
     await userEvent.type(url, 'ftp://x');
     expect(screen.getByText('Bitte eine gültige http(s)-URL angeben.')).toBeInTheDocument();
 
-    // A valid URL is enough. The save works even without a single event.
     await userEvent.clear(url);
     await userEvent.type(url, 'https://hook.test');
 
@@ -102,6 +104,9 @@ describe('WebhooksComponent', () => {
     expect(saveWebhook.mock.calls[0][0].events).toEqual([]);
   });
 
+  /**
+   * The edit leaves the original untouched until the save, and the dialog closes after the save.
+   */
   it('edits an existing webhook via the dialog', async () => {
     const seed = [
       { id: 'wh-1', name: 'A', url: 'https://a', events: ['vote_opened' as const], active: true },
@@ -113,12 +118,11 @@ describe('WebhooksComponent', () => {
     expect(c.draft().events).toEqual([]);
     c.toggleEvent('vote_closed');
     expect(c.draft().events).toEqual(['vote_closed']);
-    // The edit leaves the original untouched until the save.
     expect(c.hooks()[0].events).toEqual(['vote_opened']);
     c.save();
     expect(saveWebhook).toHaveBeenCalledTimes(1);
     expect(c.hooks()[0].events).toEqual(['vote_closed']);
-    expect(c.draft()).toBeNull(); // the dialog closes after the save
+    expect(c.draft()).toBeNull();
   });
 
   it('cancelling the dialog discards the draft', async () => {
@@ -130,9 +134,10 @@ describe('WebhooksComponent', () => {
     expect(saveWebhook).not.toHaveBeenCalled();
   });
 
+  /** The test edits the second hook, so index 0 stays as it is. */
   it('replaces only the edited entry, leaving siblings untouched', async () => {
     const { c, saveWebhook } = await setup(HOOKS);
-    c.openEdit(1); // edit the second hook, so index 0 stays as it is (else branch)
+    c.openEdit(1);
     c.patch('name', 'B2');
     c.save();
     expect(saveWebhook).toHaveBeenCalledTimes(1);
@@ -153,20 +158,21 @@ describe('WebhooksComponent', () => {
     expect(c.draft()).toBeNull();
   });
 
+  /** The draft stays, so the user can try again. */
   it('keeps the dialog open and toasts on a save failure', async () => {
     const { c, toast } = await setup([], { saveError: true });
     c.openAdd();
     c.patch('url', 'https://hook.test');
     c.save();
     expect(toast.error).toHaveBeenCalledWith('Speichern fehlgeschlagen.');
-    // the draft stays, so the user can try again
     expect(c.draft()).not.toBeNull();
   });
 
+  /** The URL is not http or https, so errors() is not empty. */
   it('does not save when the URL is invalid (errors present)', async () => {
     const { c, saveWebhook } = await setup();
     c.openAdd();
-    c.patch('url', 'ftp://nope'); // not http or https, so errors() is not empty
+    c.patch('url', 'ftp://nope');
     expect(c.errors()).toContain('admin.webhook.badUrl');
     c.save();
     expect(saveWebhook).not.toHaveBeenCalled();
@@ -195,8 +201,6 @@ describe('WebhooksComponent', () => {
     const { c } = await setup();
     expect(c.tr('admin.common.actions')).toBe('Aktionen');
   });
-
-  // --- delete ---------------------------------------------------------------
 
   it('deletes a webhook after the confirm dialog and drops its delivery state', async () => {
     const { c, deleteWebhook, toast } = await setup(HOOKS, { status: [SENT, DEAD] });
@@ -232,8 +236,6 @@ describe('WebhooksComponent', () => {
     expect(deleteWebhook).not.toHaveBeenCalled();
   });
 
-  // --- delivery status ------------------------------------------------------
-
   it('loads the delivery status once and shows a badge per row', async () => {
     const { c, listWebhookDeliveryStatus } = await setup(HOOKS, { status: [SENT, DEAD] });
     expect(listWebhookDeliveryStatus).toHaveBeenCalledTimes(1);
@@ -247,6 +249,10 @@ describe('WebhooksComponent', () => {
     expect(c.statusOf('wh-2')).toBeNull();
   });
 
+  /**
+   * Without an HTTP response and a timestamp, both fall back to their placeholders. A dead letter
+   * explains that the retries are used up.
+   */
   it('opens the diagnosis dialog with the failure class, code and attempts', async () => {
     await setup(HOOKS, { status: [SENT, DEAD] });
     const toggle = screen.getAllByRole('button', { name: 'Zustellstatus' })[1];
@@ -255,10 +261,8 @@ describe('WebhooksComponent', () => {
     expect(
       screen.getByText('Das Ziel ist nicht erreichbar oder aus Sicherheitsgründen blockiert.'),
     ).toBeInTheDocument();
-    // No HTTP response and no timestamp: both fall back to their placeholders.
     expect(screen.getByText('keine Antwort')).toBeInTheDocument();
     expect(screen.getByText('5')).toBeInTheDocument();
-    // A dead letter explains that the retries are used up.
     expect(screen.getByText(/Dead-Letter/)).toBeInTheDocument();
   });
 
@@ -269,9 +273,9 @@ describe('WebhooksComponent', () => {
     expect(screen.getByText('Erfolgreich zugestellt.')).toBeInTheDocument();
   });
 
+  /** Without a name the card shows the URL as its title. */
   it('falls back to the hook URL and an empty-state text when no record exists', async () => {
     const { c, fixture } = await setup([{ ...HOOKS[0], name: '' }], { status: [] });
-    // Without a name the card shows the URL as its title.
     expect(screen.getAllByText('https://a')).toHaveLength(2);
     c.toggleStatus(c.hooks()[0]);
     fixture.detectChanges();
@@ -281,10 +285,10 @@ describe('WebhooksComponent', () => {
     expect(c.statusDetail()).toBeNull();
   });
 
+  /** The list itself stays usable, so no error toast fires. */
   it('shows no state when the status request fails', async () => {
     const { c, toast } = await setup(HOOKS, { statusError: true });
     expect(c.statusOf('wh-1')).toBeNull();
-    // The list itself stays usable, so no error toast fires.
     expect(toast.error).not.toHaveBeenCalled();
   });
 
@@ -329,6 +333,7 @@ describe('WebhooksComponent', () => {
     expect(saveWebhook).not.toHaveBeenCalled();
   });
 
+  /** Each switch shows the state that its webhook holds. */
   it('saves a second webhook while the save of the first is pending', async () => {
     const { c, saveWebhook } = await setup(HOOKS);
     const pending = new Subject<WebhookConfig>();
@@ -340,7 +345,6 @@ describe('WebhooksComponent', () => {
     await userEvent.click(b);
     expect(saveWebhook).toHaveBeenCalledTimes(2);
     expect(saveWebhook).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'wh-2', active: false }));
-    // Each switch shows the state that its webhook holds.
     expect(b).toHaveAttribute('aria-checked', String(c.hooks()[1].active));
     expect(b).toHaveAttribute('aria-checked', 'false');
     pending.next({ ...HOOKS[0], active: false });
@@ -368,12 +372,10 @@ describe('WebhooksComponent', () => {
     expect(c.reasonLabel('brand_new_class')).toBe('brand_new_class');
   });
 
-  // --- permission gating ----------------------------------------------------
-
+  /** The diagnosis route needs the permission, so it is never called. */
   it('hides create, edit, delete and the status column without webhook.manage', async () => {
     const { c, listWebhookDeliveryStatus } = await setup(HOOKS, { can: false });
     expect(c.canManage()).toBe(false);
-    // The diagnosis route needs the permission, so it is never called.
     expect(listWebhookDeliveryStatus).not.toHaveBeenCalled();
     expect(screen.queryByRole('button', { name: 'Webhook anlegen' })).toBeNull();
     expect(screen.queryByRole('button', { name: /^Bearbeiten/ })).toBeNull();
@@ -387,8 +389,8 @@ describe('WebhooksComponent', () => {
     expect(screen.getAllByRole('button', { name: 'Zustellstatus' })).toHaveLength(2);
   });
 
+  /** Otherwise the table keeps its skeleton rows and never says that something went wrong. */
   it('stops loading when the list fails, rather than spinning forever', async () => {
-    // Without this the table keeps its skeleton rows and never says anything went wrong.
     const { fixture } = await setup([], { listError: true });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((fixture.componentInstance as any).loading()).toBe(false);

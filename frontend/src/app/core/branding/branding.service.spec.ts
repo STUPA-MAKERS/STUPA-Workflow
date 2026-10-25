@@ -32,10 +32,10 @@ describe('BrandingService', () => {
 
   afterEach(() => http.verify());
 
+  /** The constructor effect already copies the fallback into document.title. */
   it('falls back to the i18n app title before any config is loaded', () => {
     expect(svc.appName()).toBe(i18n.translate('app.title'));
     expect(svc.homeHeading()).toBe(i18n.translate('home.heading'));
-    // The constructor effect already copied the fallback into document.title.
     TestBed.tick();
     expect(title.getTitle()).toBe(i18n.translate('app.title'));
   });
@@ -81,6 +81,7 @@ describe('BrandingService', () => {
     expect(svc.gravatarEnabled()).toBe(true);
   });
 
+  /** A server without the blocks keeps the link and turns the form off. */
   it('reads the handbook link and the public ticket switch', () => {
     expect(svc.wikiUrl()).toBe(BrandingService.DEFAULT_WIKI_URL);
     expect(svc.ticketsPublic()).toBe(false);
@@ -92,7 +93,6 @@ describe('BrandingService', () => {
     });
     expect(svc.wikiUrl()).toBe('https://wiki.example/x');
     expect(svc.ticketsPublic()).toBe(true);
-    // An older server without the blocks keeps the link and turns the form off.
     svc.init();
     http.expectOne('/api/site-config').flush({ version: 2 });
     expect(svc.wikiUrl()).toBe('https://wiki.example/x');
@@ -154,12 +154,12 @@ describe('BrandingService', () => {
     expect(svc.appName()).toBe(i18n.translate('app.title'));
   });
 
+  /** The EN and DE titles differ, so a change proves that the computed value ran again. */
   it('reacts to a locale switch via the i18n fallback', () => {
     const de = svc.appName();
     i18n.setLocale('en');
     const en = svc.appName();
     expect(en).toBe(i18n.translate('app.title'));
-    // The EN and DE titles differ, so a change proves the computed value ran again.
     expect(en).not.toBe(de);
   });
   describe('accent colour and logos', () => {
@@ -221,6 +221,7 @@ describe('BrandingService', () => {
       expect(svc.logoUpload('imagemark')).toBe('/m.png');
     });
 
+    /** A link without an href gets an empty one back. */
     it('puts an uploaded favicon on the icon links and the built-in one back', () => {
       const link = document.createElement('link');
       link.rel = 'icon';
@@ -236,7 +237,6 @@ describe('BrandingService', () => {
       svc.applyBranding({});
       TestBed.tick();
       expect(link.getAttribute('href')).toBe('assets/logos/stupa-mark.svg');
-      // A link without an href gets an empty one back.
       const bare = document.createElement('link');
       bare.rel = 'icon';
       bare.setAttribute('data-test-icon', '');
@@ -287,9 +287,11 @@ describe('BrandingService', () => {
       ]);
     });
 
+    /**
+     * A visitor on the landing page cannot read /admin/site-config, so a footer taken from there
+     * falls back to the defaults for exactly the people who are not signed in.
+     */
     it('reads the PUBLIC endpoint, so a logged-out visitor sees the same footer', () => {
-      // A visitor on the landing page cannot read /admin/site-config, so a footer taken
-      // from there falls back to the defaults for exactly the people who are not signed in.
       svc.init();
       const req = http.expectOne((r) => r.url.endsWith('/site-config'));
       expect(req.request.url).not.toContain('/admin/');

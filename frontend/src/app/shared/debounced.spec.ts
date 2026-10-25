@@ -17,6 +17,7 @@ describe('debounced', () => {
     return runInInjectionContext(injector, () => debounced(fn, ms));
   }
 
+  /** The same call again runs again. */
   it('runs once after the pause, with the arguments of the last call', () => {
     const fn = jest.fn();
     const run = make((q: string) => fn(q));
@@ -27,7 +28,6 @@ describe('debounced', () => {
     jest.advanceTimersByTime(1);
     expect(fn).toHaveBeenCalledTimes(1);
     expect(fn).toHaveBeenCalledWith('ab');
-    // The same call again runs again.
     run('ab');
     jest.advanceTimersByTime(LIVE_SEARCH_DEBOUNCE_MS);
     expect(fn).toHaveBeenCalledTimes(2);

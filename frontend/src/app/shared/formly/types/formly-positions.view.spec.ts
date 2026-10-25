@@ -35,24 +35,29 @@ async function setup(value: unknown, props: Record<string, unknown> = {}) {
 const cards = (container: Element) => [...container.querySelectorAll('.pos__card')] as HTMLElement[];
 
 describe('FormlyPositionsType — view', () => {
+  /**
+   * The body of a collapsed position is not there, so the row controls nothing. Name and supplier
+   * wrap; they are never cut. The sum of the field sits beside its legend.
+   */
   it('starts a complete position collapsed and an incomplete one open', async () => {
     const { container } = await setup([COMPLETE, INCOMPLETE]);
     const [first, second] = cards(container);
     expect(first).not.toHaveClass('pos__card--open');
     const summary = within(first).getByRole('button', { expanded: false });
-    // The body of a collapsed position is not there, so the row controls nothing.
     expect(summary).not.toHaveAttribute('aria-controls');
-    // Name and supplier wrap; they are never cut.
     expect(summary.querySelector('.ell')).toBeNull();
 
     expect(summary.querySelector('.pos__sumSub')?.textContent).toBe('3 Angebote · bevorzugt: Studierendenwerk');
     expect(summary.querySelector('.pos__sumValue')?.textContent?.replace(/\s/g, ' ')).toBe('450,00 €');
     expect(second).toHaveClass('pos__card--open');
     expect(within(second).getByLabelText('Position')).toHaveValue('');
-    // The sum of the field sits beside its legend.
     expect(container.querySelector('.pos__sum')?.textContent?.replace(/\s+/g, ' ').trim()).toBe('Gesamt 450,00 €');
   });
 
+  /**
+   * Each radio names its offer. The chevron points to the body that is there; the collapsed row
+   * points nowhere.
+   */
   it('opens a position on a click on its row and closes it with the chevron', async () => {
     const { container, detectChanges } = await setup([COMPLETE]);
     await userEvent.click(within(cards(container)[0]).getByRole('button', { expanded: false }));
@@ -64,7 +69,6 @@ describe('FormlyPositionsType — view', () => {
       'Stadthalle',
       'Gemeindezentrum',
     ]);
-    // Each radio names its offer.
     const radios = within(card).getAllByRole('radio') as HTMLInputElement[];
     expect(radios.map((r) => r.getAttribute('aria-label'))).toEqual([
       'Bevorzugt: Studierendenwerk',
@@ -72,7 +76,6 @@ describe('FormlyPositionsType — view', () => {
       'Bevorzugt: Gemeindezentrum',
     ]);
     expect(radios[0].checked).toBe(true);
-    // The chevron points to the body that is there; the collapsed row points nowhere.
     const chevron = within(card).getByRole('button', { name: 'Position zuklappen' });
     expect(document.getElementById(chevron.getAttribute('aria-controls') ?? '')).not.toBeNull();
     await userEvent.click(within(card).getByRole('button', { name: 'Position zuklappen' }));
@@ -112,13 +115,13 @@ describe('FormlyPositionsType — view', () => {
     expect(within(cards(container)[0]).queryByRole('switch')).toBeNull();
   });
 
+  /** When the first position goes, the open ones move up with their positions. */
   it('opens a new position and keeps the open state in place when one goes away', async () => {
     const { container, cmp, detectChanges } = await setup([COMPLETE, INCOMPLETE, COMPLETE]);
     expect(cards(container).map((c) => c.classList.contains('pos__card--open'))).toEqual([false, true, false]);
     await userEvent.click(screen.getByRole('button', { name: 'Position hinzufügen' }));
     detectChanges();
     expect(cards(container).map((c) => c.classList.contains('pos__card--open'))).toEqual([false, true, false, true]);
-    // Remove the first position: the open ones move up with their positions.
     cmp.removePosition(0);
     detectChanges();
     expect(cards(container).map((c) => c.classList.contains('pos__card--open'))).toEqual([true, false, true]);
@@ -127,6 +130,10 @@ describe('FormlyPositionsType — view', () => {
     expect(cards(container)).toHaveLength(2);
   });
 
+  /**
+   * The chevron of a position with a server error clears its error first; the message for the field
+   * as a whole stays. A change of the value clears what is left.
+   */
   it('shows a 422 of the server on its position, opens it, and drops it on the next change', async () => {
     const { container, field, cmp, detectChanges } = await setup([COMPLETE, NO_OFFERS], {
       serverErrors: { 1: 'Mehr Angebote nötig.', [-1]: 'Feld abgelehnt.' },
@@ -135,14 +142,11 @@ describe('FormlyPositionsType — view', () => {
     expect(card).toHaveClass('pos__card--open');
     expect(within(card).getByRole('alert')).toHaveTextContent('Mehr Angebote nötig.');
     expect(screen.getByText('Feld abgelehnt.')).toBeInTheDocument();
-    // The chevron of a position with a server error clears its error first; the
-    // message for the field as a whole stays.
     await userEvent.click(within(card).getByRole('button', { name: 'Position zuklappen' }));
     detectChanges();
     expect(field.props['serverErrors']).toEqual({ [-1]: 'Feld abgelehnt.' });
     expect(cards(container)[1]).not.toHaveClass('pos__card--open');
     expect(screen.getByText('Feld abgelehnt.')).toBeInTheDocument();
-    // A change of the value clears what is left.
     field.props['serverErrors'] = { 0: 'x' };
     cmp.setPositionLabel(0, 'Neu');
     expect(field.props['serverErrors']).toBeUndefined();
@@ -153,6 +157,7 @@ describe('FormlyPositionsType — view', () => {
     expect(within(cards(container)[0]).getByRole('radio', { name: 'Bevorzugt: Angebot 1' })).toBeChecked();
   });
 
+  /** When the last message goes, the control is valid by its own checks again. */
   it('keeps the errors of the other positions when one closes', async () => {
     const { container, control, field, detectChanges } = await setup([COMPLETE, NO_OFFERS, COMPLETE], {
       serverErrors: { 0: 'Fehler A', 2: 'Fehler C' },
@@ -165,17 +170,16 @@ describe('FormlyPositionsType — view', () => {
     expect(cards(container).map((c) => c.classList.contains('pos__card--open'))).toEqual([false, false, true]);
     expect(within(cards(container)[2]).getByRole('alert')).toHaveTextContent('Fehler C');
     expect(control.hasError('server')).toBe(true);
-    // The last message goes: the control is valid by its own checks again.
     await userEvent.click(within(cards(container)[2]).getByRole('button', { name: 'Position zuklappen' }));
     detectChanges();
     expect(field.props['serverErrors']).toBeUndefined();
     expect(control.valid).toBe(true);
   });
 
+  /** The position is incomplete, so it starts open; the test shows the errors and closes it. */
   it('shows the collapsed error of an invalid position under its row', async () => {
     const bad = { label: 'Ohne Bevorzugung', offers: [{ label: 'A', value: 1, preferred: false }, { label: 'B', value: 2, preferred: false }, { label: 'C', value: 3, preferred: false }] };
     const { container, cmp, detectChanges } = await setup([bad]);
-    // Incomplete, so it starts open; show the errors and close it.
     cmp.formControl.markAsTouched();
     await userEvent.click(within(cards(container)[0]).getByRole('button', { name: 'Position zuklappen' }));
     detectChanges();

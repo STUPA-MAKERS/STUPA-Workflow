@@ -6,7 +6,7 @@ import { BudgetTreeComponent } from './budget-tree.component';
 import { BudgetTreeApi, type BudgetTreeNode, type FiscalYear } from './budget-tree.api';
 
 /**
- * Regression test for the reload() fan-out. The fan-out calls listFiscalYears once
+ * Tests for the reload() fan-out, which calls listFiscalYears once
  * per top budget. A response of an earlier reload() or loadFiscalYears() must not
  * resolve after a newer one. Such a late response would overwrite fiscalYears and
  * selectedFyId with stale data. The component raises a reloadSeq and drops late
@@ -72,7 +72,7 @@ class FakeApi {
     return s;
   }
 
-  // Unused by these tests but part of the surface the component may touch.
+  /** The tests do not use it, but it is part of the surface that the component may touch. */
   updateNode = () => throwError(() => new Error('unused'));
 }
 
@@ -105,56 +105,62 @@ async function setup<A extends FakeApi = FakeApi>(api: A = new FakeApi() as A) {
 describe('BudgetTreeComponent reload race guard', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
+  /**
+   * The constructor reload() leaves one pending listFiscalYears for b-vs. A second reload() fires
+   * before the first fan-out resolves, which bumps reloadSeq. The newer response lands first and
+   * sets the selection. The stale response resolves late, and the component must ignore it and keep
+   * the state.
+   */
   it('drops a stale reload fan-out response that resolves after a newer reload', async () => {
     const { c, api } = await setup();
-    // Constructor already ran reload() → one pending listFiscalYears for b-vs.
     expect(api.fyCalls).toHaveLength(1);
     const stale = api.fyCalls[0];
 
-    // A second reload() fires before the first fan-out resolves (bumps reloadSeq).
     c.reload();
     expect(api.fyCalls).toHaveLength(2);
     const fresh = api.fyCalls[1];
 
-    // The newer response lands first and sets the selection.
     fresh.next([fy('fy-fresh')]);
     expect(c.selectedFyId()).toBe('fy-fresh');
     expect(c.fiscalYears().map((f: FiscalYear) => f.id)).toEqual(['fy-fresh']);
 
-    // The stale response resolves late. The component must ignore it and keep the state.
     stale.next([fy('fy-stale')]);
     expect(c.selectedFyId()).toBe('fy-fresh');
     expect(c.fiscalYears().map((f: FiscalYear) => f.id)).toEqual(['fy-fresh']);
   });
 
+  /**
+   * The user selects a top, so loadFiscalYears() bumps reloadSeq with its own request. The earlier
+   * reload fan-out response arrives late, and the component must drop it.
+   */
   it('lets loadFiscalYears (selectTop) win over an in-flight reload fan-out', async () => {
     const { c, api } = await setup();
     const reloadFy = api.fyCalls[0];
 
-    // User selects a top → loadFiscalYears() bumps reloadSeq with its own request.
     c.selectTop('b-vs');
     const selectFy = api.fyCalls[1];
 
     selectFy.next([fy('fy-selected')]);
     expect(c.selectedFyId()).toBe('fy-selected');
 
-    // The earlier reload fan-out response arrives late. The component must drop it.
     reloadFy.next([fy('fy-old')]);
     expect(c.selectedFyId()).toBe('fy-selected');
     expect(c.fiscalYears().map((f: FiscalYear) => f.id)).toEqual(['fy-selected']);
   });
 
+  /**
+   * The constructor reload() leaves one pending request for the years of b-vs. The user picks a
+   * year of the segmented control before the list arrives. The list holds the picked year, so the
+   * pick stays.
+   */
   it('keeps a fiscal year that the user picked while the year list loads', async () => {
     const { c, api } = await setup();
-    // Constructor reload() left one pending request for the years of b-vs.
     expect(api.fyCalls).toHaveLength(1);
     const pending = api.fyCalls[0];
 
-    // The user picks a year of the segmented control before the list arrives.
     c.selectFy('fy-picked');
     expect(c.selectedFyId()).toBe('fy-picked');
 
-    // The list holds the picked year, so the pick stays.
     pending.next([fy('fy-other'), fy('fy-picked')]);
     expect(c.selectedFyId()).toBe('fy-picked');
     expect(c.fiscalYears().map((f: FiscalYear) => f.id)).toEqual(['fy-other', 'fy-picked']);

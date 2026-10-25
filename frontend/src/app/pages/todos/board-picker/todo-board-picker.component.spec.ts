@@ -40,6 +40,7 @@ describe('TodoBoardPickerComponent', () => {
     expect(BOARD_ICON.team).toBe('ticket');
   });
 
+  /** "Alle" counts the open cards of every board: 1 + 2 + 4 + 6. */
   it('lists the meta-board "Alle" directly under "Meine To-Dos" and picks it', async () => {
     const { picked, flush } = await setup({ allId: 'alle' });
     fireEvent.click(screen.getByRole('button', { name: /Board:/ }));
@@ -47,7 +48,6 @@ describe('TodoBoardPickerComponent', () => {
     const rows = Array.from(document.querySelectorAll<HTMLElement>('.bp__row'));
     expect(rows[0].textContent).toContain('Meine To-Dos');
     expect(rows[1]).toBe(screen.getByTestId('bp-all'));
-    // The open cards of every board: 1 + 2 + 4 + 6.
     expect(rows[1].textContent).toContain('Alle');
     expect(rows[1].textContent).toContain('13 offen');
     expect(rows[1].textContent).not.toContain('alle Boards');
@@ -57,6 +57,7 @@ describe('TodoBoardPickerComponent', () => {
     expect(ALL_ICON).toBe('grid');
   });
 
+  /** Without an id the meta-board is not offered. */
   it('names "Alle" in the chip when it is the current one, also without a personal board', async () => {
     const { picked, flush, fixture } = await setup({ allId: 'alle', current: 'alle', boards: BOARDS.slice(1) });
     const chip = screen.getByRole('button', { name: 'Board: Alle' });
@@ -70,7 +71,6 @@ describe('TodoBoardPickerComponent', () => {
     fixture.componentRef.setInput('compact', true);
     await flush();
     expect(screen.getByRole('button', { name: 'Alle' })).toBeInTheDocument();
-    // Without an id the meta-board is not offered.
     fixture.componentRef.setInput('allId', null);
     fixture.componentInstance.pickAll();
     expect(picked).not.toHaveBeenCalled();
@@ -89,6 +89,7 @@ describe('TodoBoardPickerComponent', () => {
     expect(picked).toHaveBeenCalledWith('b-2');
   });
 
+  /** When closed, Escape and the arrows do nothing. */
   it('moves with the arrows and closes with Escape and a click outside', async () => {
     const { cmp, flush, fixture } = await setup();
     const chip = screen.getByRole('button', { name: /Board:/ });
@@ -109,7 +110,6 @@ describe('TodoBoardPickerComponent', () => {
     fireEvent.keyDown(rows[0], { key: 'Escape' });
     expect(cmp.open()).toBe(false);
     expect(document.activeElement).toBe(chip);
-    // Closed, Escape and the arrows do nothing.
     fireEvent.keyDown(chip, { key: 'Escape' });
     fireEvent.keyDown(chip, { key: 'ArrowDown' });
     expect(cmp.open()).toBe(false);
@@ -148,6 +148,7 @@ describe('TodoBoardPickerComponent', () => {
     expect(cmp.sections()).toEqual([]);
   });
 
+  /** A tap outside does not close the sheet; the sheet closes itself. */
   it('uses the bottom sheet on the phone', async () => {
     asPhone(MEDIA.phone);
     const { cmp, picked, fixture } = await setup();
@@ -155,7 +156,6 @@ describe('TodoBoardPickerComponent', () => {
     fixture.detectChanges();
     expect(screen.getByRole('dialog', { name: 'Board wählen' })).toBeInTheDocument();
     expect(document.querySelector('.bp__pop')).toBeNull();
-    // A tap outside does not close the sheet; the sheet closes itself.
     fireEvent.pointerDown(document.body);
     expect(cmp.open()).toBe(true);
     fireEvent.click(screen.getByRole('button', { name: /^Fachschaft Informatik/ }));

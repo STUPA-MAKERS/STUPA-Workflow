@@ -40,13 +40,13 @@ describe('BudgetPieComponent', () => {
     );
   });
 
+  /** A name that shows in full gets no tooltip. */
   it('lists every slice in the legend with its name, amount and colour', async () => {
     const view = await setup();
     const items = view.container.querySelectorAll('button.pie__item');
     expect(items).toHaveLength(2);
     expect(items[0].textContent).toContain('Alpha');
     expect(items[0].textContent).toContain('60');
-    // A name that shows in full gets no tooltip.
     expect(items[0].querySelector('.pie__name')?.getAttribute('title')).toBeNull();
     expect((items[0].querySelector('.pie__swatch') as HTMLElement).style.background).toBeTruthy();
   });
@@ -66,10 +66,13 @@ describe('BudgetPieComponent', () => {
     expect(emit).toHaveBeenCalledWith('child');
   });
 
+  /**
+   * The chart keeps its size, so the layout does not jump. A neutral skeleton stands in place of
+   * the legend, never a "no data" text.
+   */
   it('draws one neutral ring with 0 in the hole when total is 0', async () => {
     const view = await setup({ slices: [] });
     const svg = view.container.querySelector('svg.pie__svg');
-    // The chart keeps its size, so the layout does not jump.
     expect(svg).toBeTruthy();
     expect(svg?.querySelectorAll('path.pie__ring').length).toBe(1);
     expect(svg?.querySelectorAll('path.pie__slice').length).toBe(0);
@@ -78,7 +81,6 @@ describe('BudgetPieComponent', () => {
     expect(view.container.querySelector('.pie__total')?.textContent).toMatch(/^0\s€$/);
     expect(view.container.querySelector('.pie__total--empty')).toBeTruthy();
     expect(view.container.querySelector('.pie__legend')).toBeNull();
-    // A neutral skeleton in place of the legend, and never a "no data" text.
     expect(view.container.querySelectorAll('.pie__empty .pie__skel').length).toBe(3);
     expect(view.container.querySelector('.pie__empty')?.getAttribute('aria-hidden')).toBe('true');
     expect(view.container.textContent).not.toContain('Keine Daten');
@@ -91,6 +93,7 @@ describe('BudgetPieComponent', () => {
     );
   });
 
+  /** total() is max(0,-10) + max(0,0) = 0, which takes the empty branch. */
   it('treats slices with non-positive values as empty (total clamps negatives to 0)', async () => {
     const view = await setup({
       slices: [
@@ -98,7 +101,6 @@ describe('BudgetPieComponent', () => {
         { label: 'Zero', value: 0, color: '#444' },
       ],
     });
-    // Here total() is max(0,-10) + max(0,0) = 0, which takes the empty branch.
     expect(view.fixture.componentInstance as unknown as PieInternals).toBeTruthy();
     expect(view.container.querySelector('.pie__empty')).toBeTruthy();
   });
@@ -113,6 +115,9 @@ describe('BudgetPieComponent', () => {
     expect(c.total()).toBe(30);
   });
 
+  /**
+   * Only the two positive slices become arcs, and the mid coordinates are unit-circle components.
+   */
   it('arcs() computes percent and skips zero/negative fractions', async () => {
     const { c } = await setup({
       slices: [
@@ -123,11 +128,9 @@ describe('BudgetPieComponent', () => {
       ],
     });
     const arcs = c.arcs();
-    // Only the two positive slices become arcs.
     expect(arcs.length).toBe(2);
     expect(arcs[0].percent).toBe(75);
     expect(arcs[1].percent).toBe(25);
-    // mid coordinates are unit-circle components.
     expect(typeof arcs[0].midX).toBe('number');
     expect(typeof arcs[0].midY).toBe('number');
     expect(arcs[0].d).toContain('M ');
@@ -138,6 +141,7 @@ describe('BudgetPieComponent', () => {
     expect(c.arcs()).toEqual([]);
   });
 
+  /** A full circle path uses two "Z"-closed sub-paths (outer and inner hole). */
   it('renders a full-ring path for a single 100% slice', async () => {
     const { c, container } = await setup({
       slices: [{ label: 'All', value: 100, color: '#abc', id: 'all' }],
@@ -145,11 +149,11 @@ describe('BudgetPieComponent', () => {
     const arcs = c.arcs();
     expect(arcs.length).toBe(1);
     expect(arcs[0].percent).toBe(100);
-    // Full circle path uses two "Z"-closed sub-paths (outer + inner hole).
     const d = container.querySelector('path.pie__slice')?.getAttribute('d') ?? '';
     expect((d.match(/Z/g) ?? []).length).toBe(2);
   });
 
+  /** donutArc embeds the large-arc flag in the "A R R 0 <large> 1" command. */
   it('produces a large-arc flag for slices spanning more than half the circle', async () => {
     const { c } = await setup({
       slices: [
@@ -158,21 +162,21 @@ describe('BudgetPieComponent', () => {
       ],
     });
     const arcs = c.arcs();
-    // donutArc embeds the large-arc flag in the "A R R 0 <large> 1" command.
     expect(arcs[0].d).toMatch(/A 87 87 0 1 1/);
     expect(arcs[1].d).toMatch(/A 87 87 0 0 1/);
   });
 
+  /** An out-of-range hover index falls back to null. */
   it('active() is null with no hover and the chosen arc when hovered', async () => {
     const { c } = await setup();
     expect(c.active()).toBeNull();
     c.hovered.set(0);
     expect(c.active()?.label).toBe('Alpha');
-    // Out-of-range hover index falls back to null via ?? .
     c.hovered.set(99);
     expect(c.active()).toBeNull();
   });
 
+  /** Focus on an entry does the same, so the keyboard sees what the pointer sees. */
   it('shows the hovered slice in the hole and marks its legend entry', async () => {
     const view = await setup();
     const c = view.fixture.componentInstance as unknown as PieInternals;
@@ -180,7 +184,6 @@ describe('BudgetPieComponent', () => {
     view.fixture.detectChanges();
     expect(view.container.querySelector('.pie__cap')?.textContent).toContain('60 %');
     expect(view.container.querySelector('.pie__item--on')?.textContent).toContain('Alpha');
-    // Focus on an entry does the same, so the keyboard sees what the pointer sees.
     const beta = view.container.querySelectorAll<HTMLButtonElement>('button.pie__item')[1];
     beta.dispatchEvent(new FocusEvent('focus'));
     view.fixture.detectChanges();
@@ -209,12 +212,12 @@ describe('BudgetPieComponent', () => {
     expect(c.sliceTransform(arc, 3)).toBe('none');
   });
 
+  /** maximumFractionDigits:0 gives no decimal part. */
   it('writes the total as whole euros in the active locale', async () => {
     const view = await setup({ slices: [{ label: 'A', value: 1234, color: '#111', id: 'a' }] });
     const out = view.container.querySelector('.pie__total')?.textContent ?? '';
     expect(out).toContain('1.234');
     expect(out).toContain('€');
-    // maximumFractionDigits:0 → no decimal part.
     expect(out).not.toMatch(/,\d\d/);
   });
 

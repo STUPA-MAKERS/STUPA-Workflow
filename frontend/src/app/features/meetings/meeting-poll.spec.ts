@@ -108,12 +108,12 @@ describe('poll snippet (same text as the backend build_poll_snippet)', () => {
 });
 
 describe('poll in the meeting', () => {
+  /** The resolver finds a poll by its question. */
   it('the protocol card has a caption and no result', () => {
     const info = voteResultInfo(poll(), t, 'de');
     expect(info.caption).toMatch(/^Umfrage · Einzelwahl · \d\d:52$/);
     expect(info.result).toBeNull();
     expect(voteResultInfo(poll({ poll: null, closedAt: null }), t, 'de').caption).toBe('Umfrage');
-    // The resolver finds a poll by its question.
     expect(voteResultResolver([poll()], t, 'de')('Wohin?')?.result).toBeNull();
   });
 

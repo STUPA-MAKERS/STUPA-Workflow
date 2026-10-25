@@ -94,6 +94,7 @@ describe('PullRefreshDirective', () => {
     expect(Number(arc().style.strokeDashoffset)).toBeCloseTo(RING_LENGTH * (1 - (pull / PULL_THRESHOLD) * 0.8), 3);
   });
 
+  /** The cached page is not served, so the answer waits for the network. */
   it('reloads past the threshold: holds the rows, turns the ring, skips the cache, then springs back', async () => {
     const { rows, ring, host, http, cache } = await setup();
     cache.set('/api/applications', { items: ['old'] });
@@ -103,7 +104,6 @@ describe('PullRefreshDirective', () => {
     expect(rows.style.transform).toBe(`translateY(${PULL_HOLD}px)`);
     expect(rows.style.transition).toContain('280ms');
     expect(ring()).toHaveClass('ptr--spin');
-    // The cached page is not served: the answer waits for the network.
     expect(host.answer).toBeNull();
     jest.advanceTimersByTime(1000);
     expect(rows.style.transform).toBe(`translateY(${PULL_HOLD}px)`);

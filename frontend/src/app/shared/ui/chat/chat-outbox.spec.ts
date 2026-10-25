@@ -71,12 +71,12 @@ describe('ChatOutbox', () => {
     expect(delivered).toEqual([]);
   });
 
+  /** A failure marks only its own message. */
   it('gives every message its own id', () => {
     outbox.send({ body: 'a' });
     outbox.send({ body: 'b' });
     const [a, b] = outbox.messages();
     expect(a.id).not.toBe(b.id);
-    // A failure marks only its own message.
     calls[1].answer.error(new Error('x'));
     expect(outbox.messages().map((m) => m.state)).toEqual(['sending', 'failed']);
   });
@@ -88,13 +88,13 @@ describe('ChatOutbox', () => {
     expect(failures).toEqual([err]);
   });
 
+  /** A discarded message cannot be sent again. */
   it('discards a failed message, and a late error of a cleared one stays quiet', () => {
     outbox.send({ body: 'x' });
     calls[0].answer.error(new Error('offline'));
     const id = outbox.messages()[0].id;
     outbox.discard(id);
     expect(outbox.messages()).toEqual([]);
-    // A discarded message cannot be sent again.
     outbox.retry(id);
     expect(calls).toHaveLength(1);
     outbox.discard('nope');
@@ -173,12 +173,12 @@ describe('ChatOutbox', () => {
     expect(calls[1].req.draftToken).toBe('tok');
   });
 
+  /** The other pending message keeps its files. */
   it('marks lost files of a message without files without a change', () => {
     outbox.send({ body: 'x' });
     outbox.send({ body: 'y', attachmentIds: ['b'], draftToken: 't', files: [FILE_B] });
     calls[0].answer.error(missing('a'));
     expect(outbox.messages()[0].attachments).toBeUndefined();
-    // The other pending message keeps its files.
     expect(outbox.messages()[1].attachments).toEqual([FILE_B]);
     outbox.retry(outbox.messages()[0].id);
     expect(calls[2].req.attachmentIds).toEqual([]);
@@ -213,6 +213,7 @@ describe('ChatOutbox', () => {
     expect(del).toHaveBeenCalledWith('bad', 'tok');
   });
 
+  /** The retry sends the text alone. Without files or without a token there is nothing to drop. */
   it('marks every file lost when an anonymized thread refuses them, and drops their drafts', () => {
     const drop = jest.fn();
     const sent: ChatSend[] = [];
@@ -237,11 +238,9 @@ describe('ChatOutbox', () => {
     expect(msg.attachments).toEqual([{ ...FILE_A, lost: true }, { ...FILE_B, lost: true }]);
     expect(drop).toHaveBeenCalledWith(['a', 'b'], 'tok');
     expect(sendErrorKey(errors[0], 'chat.failed')).toBe('chat.error.filesRefused');
-    // The retry sends the text alone.
     box.retry(msg.id);
     expect(sent[1].attachmentIds).toEqual([]);
 
-    // Nothing to drop: no files, or no token.
     box.send({ body: 'ohne' });
     answers[2].error({ status: 422, error: { code: 'ticket_anonymized' } });
     box.send({ body: '', attachmentIds: ['c'], draftToken: null });

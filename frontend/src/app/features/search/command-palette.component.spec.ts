@@ -76,8 +76,8 @@ async function answer(http: HttpTestingController, body: SearchResults = HITS) {
   return req;
 }
 
+/** jsdom has no layout, so no scrollIntoView. The arrow keys call it for the active row. */
 describe('CommandPaletteComponent', () => {
-  // jsdom has no layout, so no scrollIntoView. The arrow keys call it for the active row.
   const scrollIntoView = jest.fn();
   beforeAll(() => (Element.prototype.scrollIntoView = scrollIntoView));
   beforeEach(() => {
@@ -110,8 +110,8 @@ describe('CommandPaletteComponent', () => {
     expect(cmp.open()).toBe(true);
   });
 
+  /** The palette runs on every keystroke, and the first one is not a mistake. */
   it('asks the server nothing for a query below the floor', async () => {
-    // The palette runs on every keystroke, and the first one is not a mistake.
     const { cmp, http } = await setup();
     cmp.show();
     cmp.onQuery('a');
@@ -120,21 +120,23 @@ describe('CommandPaletteComponent', () => {
     expect(cmp.loading()).toBe(false);
   });
 
+  /** The page row is already there, before any response arrives. */
   it('matches pages without a round trip', async () => {
     const { cmp, fixture, http } = await setup();
     cmp.show();
     cmp.onQuery('Rollen');
     fixture.detectChanges();
 
-    // The page row is already there, before any response arrives.
     expect(screen.getByText('Rollen')).toBeInTheDocument();
     expect(screen.getByText('Verwaltung')).toBeInTheDocument();
     await answer(http, { hits: [], truncated: false, failed: [] });
   });
 
+  /**
+   * A gear on every page row would say "setting" about pages that are not one. It stays on the
+   * admin pages, where it is true.
+   */
   it('gives a page row the icon of its section, not a gear for everything', async () => {
-    // A gear on every page row said "setting" about pages that are not one. It stays on
-    // the admin pages, where it is true.
     const { cmp } = await setup([
       { path: '/dashboard', label: 'Seite Dashboard', parentLabel: null },
       { path: '/admin/roles', label: 'Seite Rollen', parentLabel: 'Verwaltung' },
@@ -167,9 +169,11 @@ describe('CommandPaletteComponent', () => {
     expect(screen.getByText('Anträge')).toBeInTheDocument();
   });
 
+  /**
+   * With a slow connection the answer to "ab" must never overwrite the answer to "abcd".
+   * `switchMap` cancels the earlier request instead of racing it.
+   */
   it('drops a stale answer when the query has moved on', async () => {
-    // With a slow connection the answer to "ab" must never overwrite the answer to
-    // "abcd". `switchMap` cancels the earlier request rather than racing it.
     const { cmp, http } = await setup([]);
     cmp.show();
     cmp.onQuery('abc');
@@ -185,9 +189,11 @@ describe('CommandPaletteComponent', () => {
     second.flush(HITS);
   });
 
+  /**
+   * Otherwise the reader deletes characters and keeps seeing results for a query that is no longer
+   * on screen.
+   */
   it('clears the previous answer as soon as the query drops below the floor', async () => {
-    // Otherwise the reader deletes characters and keeps seeing results for a query
-    // that is no longer on screen.
     const { cmp, fixture, http } = await setup([]);
     cmp.show();
     cmp.onQuery('Beamer');
@@ -200,6 +206,7 @@ describe('CommandPaletteComponent', () => {
     expect(rowTitle('Anschaffung Beamer')).toBeNull();
   });
 
+  /** One page matches "Re" (Rechnungen), so the list wraps back to itself. */
   it('moves the highlight with the arrow keys and opens the row on Enter', async () => {
     const { cmp, fixture, http, router } = await setup();
     const nav = jest.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
@@ -211,7 +218,6 @@ describe('CommandPaletteComponent', () => {
     expect(cmp.active()).toBe(0);
     pressInField('ArrowDown');
     fixture.detectChanges();
-    // One page matches "Re" (Rechnungen), so the list wraps back to itself.
     expect(cmp.active()).toBe(0);
 
     pressInField('Enter');
@@ -219,8 +225,8 @@ describe('CommandPaletteComponent', () => {
     expect(cmp.open()).toBe(false);
   });
 
+  /** A cost-centre hit is `/budget?ks=…`, which `navigate` does not parse. */
   it('navigates by URL, so a hit can carry a query string', async () => {
-    // A cost-centre hit is `/budget?ks=…`, which `navigate` would not parse.
     const { cmp, fixture, http, router } = await setup([]);
     const nav = jest.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
     cmp.show();
@@ -310,6 +316,7 @@ describe('CommandPaletteComponent', () => {
     expect(marks[0].textContent.trim()).toBe('Archiviert');
   });
 
+  /** The state of an application is status text; other subtitles are plain. */
   it('groups the records by kind and gives each kind the icon of its area', async () => {
     const { cmp, fixture, http, container } = await setup([]);
     cmp.show();
@@ -328,7 +335,6 @@ describe('CommandPaletteComponent', () => {
     expect(cmp.groups().map((g) => g.label)).toEqual(['Anträge', 'Rechnungen', 'Buchungen', 'Personen']);
     expect(cmp.rows().map((r) => r.icon)).toEqual(['file', 'receipt', 'swap', 'user']);
     expect(screen.getByRole('group', { name: 'Rechnungen' })).toBeInTheDocument();
-    // The state of an application is status text; other subtitles are plain.
     const status = container.querySelector('app-status-text.pal__rowSub');
     expect(status).toHaveTextContent('Auf Tagesordnung');
   });
@@ -438,6 +444,7 @@ describe('CommandPaletteComponent', () => {
     expect(await runAxe(container)).toHaveNoViolations();
   });
 
+  /** Without rows the arrows and other keys do nothing. */
   it('toggles on Ctrl+K and ignores other keys while closed or without rows', async () => {
     const { cmp, fixture } = await setup([]);
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
@@ -448,7 +455,6 @@ describe('CommandPaletteComponent', () => {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }));
     fixture.detectChanges();
     expect(cmp.open()).toBe(true);
-    // No rows yet: the arrows and other keys do nothing.
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'a' }));
     expect(cmp.active()).toBe(0);
@@ -479,6 +485,10 @@ describe('CommandPaletteComponent', () => {
     expect(cmp.open()).toBe(true);
   });
 
+  /**
+   * The document listener must leave the key to the button, and the browser turns Enter on a button
+   * into a click.
+   */
   it('closes on Enter on the close button and does not open the active row', async () => {
     const { cmp, fixture, http, router } = await setup();
     const nav = jest.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
@@ -490,17 +500,20 @@ describe('CommandPaletteComponent', () => {
 
     const close = screen.getByRole('button', { name: 'Suche schließen' });
     close.focus();
-    // The document listener must leave the key to the button.
     const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
     close.dispatchEvent(event);
     expect(event.defaultPrevented).toBe(false);
     expect(nav).not.toHaveBeenCalled();
-    // The browser turns Enter on a button into a click.
     close.click();
     expect(cmp.open()).toBe(false);
     expect(nav).not.toHaveBeenCalled();
   });
 
+  /**
+   * Tab goes from the last stop forward to the first and Shift+Tab from the first stop backward to
+   * the last. Inside the dialog the browser moves the focus itself. Focus outside the dialog comes
+   * back to the field.
+   */
   it('keeps Tab inside the dialog', async () => {
     const { cmp, fixture } = await setup([]);
     cmp.show();
@@ -508,24 +521,20 @@ describe('CommandPaletteComponent', () => {
     const field = screen.getByRole('combobox', { name: 'Suche' });
     const close = screen.getByRole('button', { name: 'Suche schließen' });
 
-    // From the last stop forward to the first.
     close.focus();
     let event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
     close.dispatchEvent(event);
     expect(event.defaultPrevented).toBe(true);
     expect(field).toHaveFocus();
 
-    // From the first stop backward to the last.
     event = pressInField('Tab', { shiftKey: true });
     expect(event.defaultPrevented).toBe(true);
     expect(close).toHaveFocus();
 
-    // Inside the dialog the browser moves the focus itself.
     field.focus();
     event = pressInField('Tab');
     expect(event.defaultPrevented).toBe(false);
 
-    // Focus outside the dialog comes back to the field.
     const outside = document.createElement('button');
     document.body.appendChild(outside);
     outside.focus();

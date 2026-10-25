@@ -197,18 +197,20 @@ describe('BookingFormComponent', () => {
     TestBed.inject(HttpTestingController).verify();
   });
 
+  /**
+   * The sections follow the board, with no subtitle. Income has no application search. Opening the
+   * list asks for the years of the top budgets, for the free amounts.
+   */
   it(
     'builds a new booking: kind, cost centre from the list, fiscal year and payment method',
     async () => {
       const { dialogs, http, user, view } = await setup('create');
       expect(screen.getByRole('heading', { name: 'Buchung hinzufügen' })).toBeInTheDocument();
-      // The sections of the board, no subtitle.
       for (const name of ['Zuordnung', 'Beleg', 'Zahlung'])
         expect(screen.getByRole('group', { name })).toBeInTheDocument();
       expect(view.container.querySelector('.ff__subtitle, .mf__subtitle')).toBeNull();
       await user.click(screen.getByRole('radio', { name: 'Einnahme' }));
       expect(dialogs.newKind()).toBe('income');
-      // Income has no application search.
       expect(screen.queryByRole('combobox', { name: 'Antrag' })).toBeNull();
       await user.click(screen.getByRole('radio', { name: 'Ausgabe' }));
       expect(dialogs.newKind()).toBe('expense');
@@ -219,7 +221,6 @@ describe('BookingFormComponent', () => {
       await tick();
       view.fixture.detectChanges();
       expect(pick.getAttribute('aria-expanded')).toBe('true');
-      // Opening the list asks for the years of the top budgets, for the free amounts.
       http.expectOne((r) => r.url.endsWith('/budgets/top/fiscal-years')).flush([]);
       await user.click(screen.getByRole('option', { name: /Maschinenbau/ }));
       expect(dialogs.newBudgetId()).toBe('mb');
@@ -247,6 +248,10 @@ describe('BookingFormComponent', () => {
     SLOW,
   );
 
+  /**
+   * A field taken from the invoice shows the selection surface of the kit locked field. The payment
+   * date stays a field. Without the invoice the fields are fields again, with the values kept.
+   */
   it('locks the fields a picked invoice filled, and a linked application gives the cost centre', async () => {
     const { dialogs, view } = await setup('create');
     dialogs.invoices.set([INVOICE]);
@@ -258,12 +263,9 @@ describe('BookingFormComponent', () => {
       'Belegnummer RE-2026-0412',
       'Rechnungsdatum 12.09.2026',
     ]);
-    // Taken from the invoice: the selection surface of the kit locked field.
     expect(view.container.querySelectorAll('.lfld--filled')).toHaveLength(3);
     expect(screen.queryByRole('textbox', { name: 'Belegnummer' })).toBeNull();
-    // The payment date stays a field.
     expect(screen.getByText('Zahldatum')).toBeInTheDocument();
-    // Without the invoice the fields are fields again, with the values kept.
     dialogs.onPickInvoice('');
     view.fixture.detectChanges();
     expect(view.container.querySelectorAll('app-locked-field')).toHaveLength(0);
@@ -315,6 +317,7 @@ describe('BookingFormComponent', () => {
     expect(dialogs.createOpen()).toBe(false);
   });
 
+  /** There is no subtitle, and the kind is fixed. */
   it('locks the fixed values of a bound booking and shows its sub-bookings in the edit', async () => {
     const sub: Expense = {
       ...EXPENSE,
@@ -329,9 +332,7 @@ describe('BookingFormComponent', () => {
       subRows: [sub],
     });
     expect(screen.getByRole('heading', { name: 'Buchung bearbeiten' })).toBeInTheDocument();
-    // No subtitle.
     expect(screen.queryByText(/erfasst von Konrad Pfeiffer/)).toBeNull();
-    // The kind is fixed.
     expect(screen.getByRole('radio', { name: 'Ausgabe' })).toBeDisabled();
     const locked = lockedTexts(view.container);
     expect(locked).toEqual([
@@ -353,6 +354,7 @@ describe('BookingFormComponent', () => {
     expect(remove).toHaveBeenCalled();
   });
 
+  /** A pick without an id changes nothing. */
   it('moves a standalone booking to another cost centre in the edit', async () => {
     const { dialogs, user, form, view, http } = await setup('edit', {
       expense: { ...EXPENSE, actorName: null },
@@ -365,7 +367,6 @@ describe('BookingFormComponent', () => {
     expect(dialogs.editBudgetId()).toBe('top');
     await user.click(screen.getByRole('radio', { name: 'Karte' }));
     expect(dialogs.editPaymentMethod()).toBe('karte');
-    // A pick without an id changes nothing.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (form as any).pickCostCentre('');
     expect(dialogs.editBudgetId()).toBe('top');

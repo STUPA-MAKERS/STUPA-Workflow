@@ -121,6 +121,7 @@ describe('toFormlyFields', () => {
     expect(callExpr(total, 'model.total', { amount: 100, cofunding: 50 })).toBe(150);
   });
 
+  /** A missing cofunding gives a null var, the arithmetic throws, and the catch gives null. */
   it('returns null from a computed expression when evaluation errors', () => {
     const fields: FormFieldDef[] = [
       {
@@ -131,7 +132,6 @@ describe('toFormlyFields', () => {
       },
     ];
     const [total] = toFormlyFields(fields, 'de');
-    // A missing cofunding gives a null var, the arithmetic throws, and the catch gives null.
     expect(callExpr(total, 'model.total', { amount: 100 })).toBeNull();
   });
 
@@ -163,6 +163,7 @@ describe('toFormlyFields', () => {
     expect(callExpr(cfg, 'hide', { needs: false })).toBe(true);
   });
 
+  /** The field carries no model, so extraContext supplies has_budget. */
   it('hide expression reads extraContext (non-field variables)', () => {
     const fields: FormFieldDef[] = [
       {
@@ -173,7 +174,6 @@ describe('toFormlyFields', () => {
       },
     ];
     const [cfg] = toFormlyFields(fields, 'de', { has_budget: true });
-    // The field carries no model, so extraContext supplies has_budget.
     const hide = cfg.expressions?.['hide'] as (f: FormlyFieldConfig) => unknown;
     expect(hide({} as FormlyFieldConfig)).toBe(false);
   });
@@ -210,14 +210,16 @@ describe('toFormlyFields', () => {
     expect(cfg.props?.['description']).toBeUndefined();
   });
 
+  /**
+   * The text shows once, with no bold label over the same text. Display fields never carry
+   * required, even when the definition sets it.
+   */
   it('maps a markdown field without help, falling back to label as text', () => {
     const fields: FormFieldDef[] = [{ key: 'note', type: 'markdown', label: { de: 'Nur Label' } }];
     const [cfg] = toFormlyFields(fields, 'de');
     expect(cfg.type).toBe('display');
     expect(cfg.props?.['text']).toBe('Nur Label');
-    // The text shows once: no bold label over the same text.
     expect(cfg.props?.['label']).toBeUndefined();
-    // Display fields never carry required, even when the definition sets it.
     expect(cfg.props?.['required']).toBeUndefined();
   });
 
@@ -231,10 +233,10 @@ describe('toFormlyFields', () => {
     expect(cfg.props?.['required']).toBeUndefined();
   });
 
+  /** An unknown language falls back to the German reference text. */
   it('shows the note of a table field in the page language', () => {
     const fields: FormFieldDef[] = [{ key: 'tbl', type: 'table', label: { de: 'Tabelle', en: 'Table' } }];
     expect(toFormlyFields(fields, 'en')[0].props?.['text']).toContain('table input');
-    // An unknown language falls back to the German reference text.
     expect(toFormlyFields(fields, 'fr')[0].props?.['text']).toContain('Tabellen-Eingabe');
   });
 
@@ -288,8 +290,8 @@ describe('toFormlyFields', () => {
     expect(cfg.expressions).toBeUndefined();
   });
 
+  /** compute is a proxy whose ownKeys trap throws a TypeError inside evalJsonLogic. */
   it('rethrows non-JsonLogicError from a computed expression', () => {
-    // compute is a proxy. Its ownKeys trap throws a TypeError inside evalJsonLogic.
     const boom = new Proxy(
       {},
       {
@@ -415,6 +417,10 @@ describe('toFormlySections', () => {
     { key: 'hidden', label: { de: 'Kontakt' }, fields: [{ key: 'iban', type: 'iban', label: { de: 'IBAN' } }] },
   ];
 
+  /**
+   * The section without a field left (the omitted PII field) has no heading. The context reaches
+   * visibleIf.
+   */
   it('puts the title first, then a heading per section, in a grid group', () => {
     const [group] = toFormlySections(sections, 'de', { has_budget: false }, { omitKeys: ['iban'] });
     expect(group.fieldGroupClassName).toBe('fe-grid');
@@ -428,9 +434,7 @@ describe('toFormlySections', () => {
       ['Kosten', 'fe-full fe-heading'],
       ['costs', 'fe-full'],
     ]);
-    // The section without a field left (the omitted PII field) has no heading.
     expect(rows.some(([label]) => label === 'Kontakt')).toBe(false);
-    // The context reaches visibleIf.
     const room = group.fieldGroup?.find((f) => f.key === 'room') as FormlyFieldConfig;
     expect(callExpr(room, 'hide', {})).toBe(true);
   });

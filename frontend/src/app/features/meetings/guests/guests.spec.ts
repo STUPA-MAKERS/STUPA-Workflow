@@ -105,6 +105,7 @@ describe('guests in the attendance sheet (variant A)', () => {
     expect(api.decideMeetingGuest).toHaveBeenCalledWith('m-1', 'g-1', 'reject');
   });
 
+  /** The search filters the guests too. */
   it('lists the guests in their own tab, renames and removes one', async () => {
     const { api } = await setup();
     await userEvent.click(within(sheet()).getByRole('radio', { name: /Gäste 1/ }));
@@ -113,7 +114,6 @@ describe('guests in the attendance sheet (variant A)', () => {
     expect(within(sheet()).getByText('Gast 4')).toBeInTheDocument();
     expect(within(sheet()).getByText('Hat verlassen')).toBeInTheDocument();
     expect(within(sheet()).getByText('Entfernt')).toBeInTheDocument();
-    // The search filters the guests too.
     await userEvent.type(within(sheet()).getByRole('searchbox'), 'zzz');
     expect(within(sheet()).getByText('Kein Mitglied gefunden.')).toBeInTheDocument();
     await userEvent.clear(within(sheet()).getByRole('searchbox'));
@@ -167,6 +167,7 @@ describe('guests in the attendance sheet (variant A)', () => {
     expect(within(sheet()).queryByRole('radio', { name: /Gäste/ })).toBeNull();
   });
 
+  /** An admitted guest whose name is gone (pseudonymized) keeps only "Gast entfernen". */
   it('guards the dialogs and names a pseudonymized guest', async () => {
     const view = await setup();
     const list = view.fixture.debugElement.query((d) => d.name === 'app-guest-list');
@@ -180,7 +181,6 @@ describe('guests in the attendance sheet (variant A)', () => {
     cmp['renameDraft'].set('X');
     cmp.saveRename();
     expect(view.api.renameMeetingGuest).not.toHaveBeenCalled();
-    // An admitted guest whose name is gone (pseudonymized) keeps only "Gast entfernen".
     view.guests.apply(guestRow({ id: 'g-6', displayName: null, number: 6, status: 'admitted', admittedAt: null, decidedAt: '2026-10-05T16:00:00Z' }));
     view.fixture.detectChanges();
     expect(within(sheet()).getByText('Gast 6')).toBeInTheDocument();

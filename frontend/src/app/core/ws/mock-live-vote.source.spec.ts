@@ -13,13 +13,13 @@ describe('MockLiveVoteSource', () => {
     source = new MockLiveVoteSource();
   });
 
+  /** Like the server, the replay marks the vote as one that was already open. */
   it('replays meeting/vote/tally on subscribe (resync contract)', () => {
     const ch = source.connectMeeting('m-1');
     const { sink, push } = collect();
     ch.messages$.subscribe(push);
     ch.send({ type: 'subscribe' });
     expect(sink.map((m) => m.type)).toEqual(['meeting_state', 'vote_opened', 'vote_tally']);
-    // Like the server, the replay marks the vote as one that was already open.
     expect(sink[1]).toEqual(expect.objectContaining({ voteId: 'vote-demo', replay: true }));
     ch.close();
   });
@@ -30,7 +30,7 @@ describe('MockLiveVoteSource', () => {
     ch.messages$.subscribe(push);
     ch.send({ type: 'cast', voteId: 'vote-demo', choice: 'no' });
     const tally = sink.find((m) => m.type === 'vote_tally') as VoteTallyMsg;
-    expect(tally.cast).toBe(9); // 8 → 9
+    expect(tally.cast).toBe(9);
     expect(tally.present).toBe(12);
     expect(tally.revealed).toBe(false);
     expect(tally.counts).toEqual({});
@@ -67,7 +67,7 @@ describe('MockLiveVoteSource', () => {
     ch.messages$.subscribe(push);
     for (let i = 0; i < 6; i++) ch.send({ type: 'cast', voteId: 'vote-demo', choice: 'yes' });
     const tallies = sink.filter((m) => m.type === 'vote_tally') as VoteTallyMsg[];
-    expect(tallies).toHaveLength(4); // 8 → 12, then capped
+    expect(tallies).toHaveLength(4);
     const last = tallies[tallies.length - 1];
     expect(last.revealed).toBe(true);
     expect(last.counts).toEqual({ yes: 9, no: 2, abstain: 1 });
@@ -92,14 +92,18 @@ describe('MockLiveVoteSource', () => {
     ch.messages$.subscribe((m) => {
       if (m.type === 'vote_tally') tallies.push(m);
     });
-    jest.advanceTimersByTime(200); // well beyond the 12 eligible voters
+    jest.advanceTimersByTime(200);
     const last = tallies[tallies.length - 1];
     const cast = Object.values(last.counts).reduce((a, b) => a + b, 0);
-    expect(cast).toBe(12); // capped at eligible
+    expect(cast).toBe(12);
     ch.close();
     jest.useRealTimers();
   });
 
+  /**
+   * 8 + 4 = 12 ballots: every present member voted, so the counts show. The leading option is no,
+   * because 2 + 4 = 6 is more than yes with 5.
+   */
   it('recomputes leading and quorum as votes arrive', () => {
     const ch = source.connectMeeting('m-1');
     const { sink, push } = collect();
@@ -109,10 +113,9 @@ describe('MockLiveVoteSource', () => {
     ch.send({ type: 'cast', voteId: 'vote-demo', choice: 'no' });
     ch.send({ type: 'cast', voteId: 'vote-demo', choice: 'no' });
     const tally = sink.filter((m) => m.type === 'vote_tally').pop() as VoteTallyMsg;
-    // 8 + 4 = 12 ballots: every present member voted, so the counts show.
     expect(tally.revealed).toBe(true);
     expect(tally.counts['no']).toBe(6);
-    expect(tally.leading).toBe('no'); // 2+4 = 6 > yes 5
+    expect(tally.leading).toBe('no');
     ch.close();
   });
 

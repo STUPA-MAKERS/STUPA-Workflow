@@ -26,11 +26,11 @@ describe('mockApiInterceptor', () => {
     return { api: TestBed.inject(ApiClient), http: TestBed.inject(HttpTestingController) };
   }
 
+  /** The mapper turns the wire Page into the view shape with hasBudget. */
   it('short-circuits known GET endpoints with canned, mapped data', (done) => {
     const { api, http } = setup(true);
     api.applicationTypes().subscribe((types) => {
       expect(types.length).toBeGreaterThan(0);
-      // The mapper turned the wire Page into the view shape with hasBudget.
       expect(typeof types[0].hasBudget).toBe('boolean');
       done();
     });
@@ -54,10 +54,10 @@ describe('mockApiInterceptor', () => {
     http.verify();
   });
 
+  /** No branch matches OPTIONS, so the request falls through to next(). */
   it('passes through unmatched /api/ methods/paths (final next)', () => {
     const { http } = setup(true);
     const client = TestBed.inject(HttpClient);
-    // No branch matches OPTIONS → the request falls through to next().
     client.request('OPTIONS', '/api/unknown').subscribe();
     http.expectOne('/api/unknown').flush(null);
     http.verify();
@@ -80,6 +80,7 @@ describe('mockApiInterceptor', () => {
     expect(form.sections[2].fields.some((f) => f.isPII)).toBe(true);
   });
 
+  /** Every other request keeps the demo data. */
   it('plays a new person without gremium, tasks, applications, votes and meetings', async () => {
     const { api } = setup(true);
     localStorage.setItem('mockNewUser', '1');
@@ -92,13 +93,13 @@ describe('mockApiInterceptor', () => {
       const timeline = await firstValueFrom(api.listMeetingsTimeline({ direction: 'upcoming' }));
       expect(timeline.items).toEqual([]);
       expect(await firstValueFrom(TestBed.inject(HttpClient).get('/api/delegations'))).toEqual([]);
-      // Every other request keeps the demo data.
       expect((await firstValueFrom(api.applicationTypes())).length).toBeGreaterThan(0);
     } finally {
       localStorage.removeItem('mockNewUser');
     }
   });
 
+  /** A storage that throws plays the signed-in user. */
   it('plays a visitor without a session when mockAnonymous is set', async () => {
     const { api } = setup(true);
     localStorage.setItem('mockAnonymous', '1');
@@ -108,7 +109,6 @@ describe('mockApiInterceptor', () => {
       localStorage.removeItem('mockAnonymous');
     }
     await expect(firstValueFrom(api.me())).resolves.toBeTruthy();
-    // A storage that throws plays the signed-in user.
     const spy = jest.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
       throw new Error('blocked');
     });
@@ -191,11 +191,11 @@ describe('mockApiInterceptor', () => {
     });
   });
 
+  /** The mapper resolves the i18n label (de by default). */
   it('serves a single application, its timeline and comments, and accepts a PATCH', (done) => {
     const { api } = setup(true);
     api.getApplication('33333333-3333-3333-3333-333333333333').subscribe((app) => {
       expect(app.state?.editAllowed).toBe(true);
-      // The mapper resolved the i18n label (de default).
       expect(app.state?.label).toBe('Eingereicht');
       api.timeline(app.id).subscribe((t) => {
         expect(t.length).toBeGreaterThan(0);
@@ -288,6 +288,7 @@ describe('mockApiInterceptor', () => {
       expect(s.expiresIn).toBe(120);
     });
 
+    /** A cost centre filters its whole subtree: "Fachschaften" holds 210, 220 and 231. */
     it('GET /expenses → the demo bookings, filtered and paged', async () => {
       type E = { id: string; kind: string; budgetId: string; childCount: number };
       const all = await get<{ items: E[]; total: number }>('/api/expenses');
@@ -301,7 +302,6 @@ describe('mockApiInterceptor', () => {
       );
       expect(income.items.every((e) => e.kind === 'income')).toBe(true);
 
-      // A cost centre filters its whole subtree: "Fachschaften" holds 210, 220 and 231.
       const sub = await get<{ items: E[] }>(
         '/api/expenses',
         new HttpParams().set('budget', 'b1000000-0000-0000-0000-000000000020'),
@@ -350,6 +350,7 @@ describe('mockApiInterceptor', () => {
       expect(q.items).toHaveLength(1);
     });
 
+    /** The counts ignore the segment itself. */
     it('GET /invoices → the segments and their counts', async () => {
       type I = { status: string; linkedBookings: unknown[] };
       type P = { items: I[]; counts: { all: number; inbox: number; booked: number; paid: number } };
@@ -370,7 +371,6 @@ describe('mockApiInterceptor', () => {
         new HttpParams().set('status', 'open').set('booked', 'true'),
       );
       expect(booked.items.every((i) => i.linkedBookings.length > 0)).toBe(true);
-      // The counts ignore the segment itself.
       expect(booked.counts).toEqual(c);
     });
 
@@ -388,18 +388,19 @@ describe('mockApiInterceptor', () => {
       expect(bare.fileName).toBe('rechnung.pdf');
     });
 
+    /**
+     * Path keys join with "-", like the server. Available is allocated minus committed plus income.
+     * One node inherits its colour: it has none of its own under a coloured parent.
+     */
     it('GET /budgets → the demo tree with consistent rollups', async () => {
       type N = { id: string; pathKey: string; color: string | null; children: N[];
         byFiscalYear: { allocated: string; committed: string; income: string; available: string }[] };
       const tree = await get<N[]>('/api/budgets');
       expect(tree).toHaveLength(1);
       const root = tree[0];
-      // Path keys join with "-", like the server.
       expect(root.children[1].children[0].pathKey).toBe('HH-200-210');
-      // available = allocated - committed + income.
       const a = root.byFiscalYear[0];
       expect(Number(a.available)).toBe(Number(a.allocated) - Number(a.committed) + Number(a.income));
-      // One node inherits its colour: it has none of its own under a coloured parent.
       const gestaltung = root.children[1].children[2];
       expect(gestaltung.color).toMatch(/^#/);
       expect(gestaltung.children[0].color).toBeNull();
@@ -426,10 +427,10 @@ describe('mockApiInterceptor', () => {
       expect(await get<A[]>('/api/budgets/unknown/applications')).toEqual([]);
     });
 
+    /** One task carries stateSince, one shows the updatedAt fallback. */
     it('GET /applications/tasks → task list', async () => {
       const tasks = await get<{ stateSince?: string }[]>('/api/applications/tasks');
       expect(tasks.length).toBe(2);
-      // One task carries stateSince, one shows the updatedAt fallback.
       expect(tasks[0].stateSince).toBeTruthy();
       expect(tasks[1].stateSince).toBeUndefined();
     });
@@ -479,6 +480,7 @@ describe('mockApiInterceptor', () => {
         expect((await get<{ total: number }>('/api/applications', params)).total).toBe(16);
       });
 
+      /** An own submission carries no capture; the demo row 2 was captured per PDF. */
       it('Searches the accounts and captures a new row on top', async () => {
         let params = new HttpParams().set('q', 'AN');
         const hits = await get<{ displayName: string }[]>('/api/applications/on-behalf/applicants', params);
@@ -516,7 +518,6 @@ describe('mockApiInterceptor', () => {
           `/api/applications/${bare.applicationId}`,
         );
         expect(plain.capture).toMatchObject({ receivedOn: null, intake: null });
-        // An own submission carries no capture; the demo row 2 was captured per PDF.
         expect((await get<{ capture: unknown }>(`/api/applications/${first}`)).capture).toBeNull();
         expect((await get<{ capture: { intake: string } }>(`/api/applications/${second}`)).capture.intake).toBe(
           'per PDF',
@@ -553,6 +554,7 @@ describe('mockApiInterceptor', () => {
         expect((await get<unknown[]>(`/api/applications/${first}/flow-states`)).length).toBe(5);
       });
 
+      /** An approved row without a decision has none. */
       it('Serves the decision of a decided row in the detail and the timeline', async () => {
         const decided = 'a1000000-0000-0000-0000-000000000016';
         const app = await get<{ decision: Record<string, unknown> }>(`/api/applications/${decided}`);
@@ -577,11 +579,14 @@ describe('mockApiInterceptor', () => {
           amountDeviates: true,
           conditionCount: 2,
         });
-        // An approved row without a decision has none.
         const plain = await get<{ decision: unknown }>('/api/applications/a1000000-0000-0000-0000-000000000013');
         expect(plain.decision).toBeNull();
       });
 
+      /**
+       * A row without an amount deviates with any approved amount. The approval without a decision
+       * stores none. A transition without a body changes nothing.
+       */
       it('The approval stores the decision, as requested or with another amount', async () => {
         const approve = '77777777-7777-7777-7777-777777777786';
         type Detail = { state: { key: string }; decision: Record<string, unknown> | null };
@@ -613,7 +618,6 @@ describe('mockApiInterceptor', () => {
           decision: { approvedAmount: null, amountDeviates: false, conditionCount: 1 },
         });
 
-        // A row without an amount: any approved amount deviates.
         const noAmount = 'a1000000-0000-0000-0000-000000000015';
         const toReview = (await get<{ id: string }[]>(`/api/applications/${noAmount}/transitions`))[0];
         await firstValueFrom(http.post(`/api/applications/${noAmount}/transition`, { transitionId: toReview.id }));
@@ -629,13 +633,11 @@ describe('mockApiInterceptor', () => {
           amountDeviates: true,
         });
 
-        // The approval without a decision stores none.
         const without = 'a1000000-0000-0000-0000-000000000014';
         await firstValueFrom(http.post(`/api/applications/${without}/transition`, { transitionId: approve }));
         expect((await get<Detail>(`/api/applications/${without}`)).decision).toBeNull();
         const last = (await get<Event[]>(`/api/applications/${without}/timeline`)).pop();
         expect(last?.decision).toBeNull();
-        // A transition without a body changes nothing.
         await firstValueFrom(http.post(`/api/applications/${second}/transition`, null));
         expect((await get<Row>(`/api/applications/${second}`)).state.key).toBe('submitted');
       });
@@ -646,11 +648,14 @@ describe('mockApiInterceptor', () => {
         });
       });
 
+      /**
+       * An unknown transition keeps the state. The edit stores the answers as sent and makes a new
+       * version. A blank title keeps the row title of the list.
+       */
       it('fires a transition, archives, forces a state, edits and deletes a demo row', async () => {
         const start = (await get<{ id: string }[]>(`/api/applications/${second}/transitions`))[0];
         await firstValueFrom(http.post(`/api/applications/${second}/transition`, { transitionId: start.id }));
         expect((await get<Row>(`/api/applications/${second}`)).state.key).toBe('review');
-        // An unknown transition keeps the state.
         await firstValueFrom(http.post(`/api/applications/${second}/transition`, { transitionId: 'x' }));
         expect((await get<Row>(`/api/applications/${second}`)).state.key).toBe('review');
 
@@ -671,12 +676,10 @@ describe('mockApiInterceptor', () => {
             data: { title: ' Neuer Titel ' },
           }),
         );
-        // The edit stores the answers as sent and makes a new version.
         expect(edited.data.title).toBe(' Neuer Titel ');
         expect(edited.version).toBe(3);
         await firstValueFrom(http.patch(`/api/applications/${second}`, { data: { title: '  ' } }));
         const list = await get<{ items: Row[] }>('/api/applications', new HttpParams().set('archived', 'all'));
-        // A blank title keeps the row title of the list.
         expect(list.items.find((r) => r.id === second)?.title).toBe('Neuer Titel');
         const versions = await get<{ version: number; diff: { changed: Record<string, unknown> } }[]>(
           `/api/applications/${second}/versions`,
@@ -688,6 +691,11 @@ describe('mockApiInterceptor', () => {
         await expect(get(`/api/applications/${second}`)).rejects.toMatchObject({ status: 404 });
       });
 
+      /**
+       * Row 1 stands "Auf Tagesordnung": submitted, review, agenda. Every third row has one version
+       * only, and an approved row went through "Bewilligen". A row without an amount has no cost
+       * positions.
+       */
       it('serves the form, the history and the versions of a demo row', async () => {
         const form = await get<{ sections: { key: string }[] }>(`/api/applications/${first}/form`);
         expect(form.sections.map((s) => s.key)).toEqual(['plan', 'costs_section', 'contact']);
@@ -696,20 +704,17 @@ describe('mockApiInterceptor', () => {
         );
         expect(app.data.costs).toHaveLength(3);
         expect(app.data.costs[2].noOffers).toBe(true);
-        // Row 1 stands "Auf Tagesordnung": submitted, review, agenda.
         const timeline = await get<{ toState: { key: string }; transitionLabel: unknown }[]>(
           `/api/applications/${first}/timeline`,
         );
         expect(timeline.map((e) => e.toState.key)).toEqual(['submitted', 'review', 'agenda']);
         expect(timeline[0].transitionLabel).toBeNull();
         expect(await get<unknown[]>(`/api/applications/${first}/versions`)).toHaveLength(2);
-        // Every third row has one version only; an approved row went through "Bewilligen".
         expect(await get<unknown[]>('/api/applications/a1000000-0000-0000-0000-000000000003/versions')).toHaveLength(1);
         const approved = await get<{ transitionLabel: { de: string } | null }[]>(
           '/api/applications/a1000000-0000-0000-0000-000000000010/timeline',
         );
         expect(approved.at(-1)?.transitionLabel?.de).toBe('Bewilligen');
-        // A row without an amount has no cost positions.
         const noAmount = await get<{ data: Record<string, unknown> }>(
           '/api/applications/a1000000-0000-0000-0000-000000000015',
         );
@@ -724,6 +729,7 @@ describe('mockApiInterceptor', () => {
         });
       });
 
+      /** A transition without meeting or note records no note. */
       it('puts a row on the agenda of a planned demo meeting and refuses another meeting', async () => {
         const review = 'a1000000-0000-0000-0000-000000000004';
         const meetings = await get<{ id: string; status: string; title: string }[]>(
@@ -749,7 +755,6 @@ describe('mockApiInterceptor', () => {
         );
         expect(timeline.map((e) => e.toState.key)).toEqual(['submitted', 'review', 'agenda']);
         expect(timeline.at(-1)?.note).toBe(`${meetings[0].title} · Bitte vorziehen`);
-        // A transition without meeting or note records no note.
         const second2 = 'a1000000-0000-0000-0000-000000000002';
         const [start] = await get<{ id: string }[]>(`/api/applications/${second2}/transitions`);
         await firstValueFrom(http.post(`/api/applications/${second2}/transition`, { transitionId: start.id }));
@@ -818,9 +823,9 @@ describe('mockApiInterceptor', () => {
       type VotePage = { items: Row[]; total: number; limit: number; offset: number };
       const list = (params = new HttpParams()) => get<VotePage>('/api/votes', params);
 
+      /** The ended votes follow by the time they ended, the newest first. */
       it('GET /votes → the open votes first, without the drafts', async () => {
         const page = await list();
-        // The ended votes follow by the time they ended, the newest first.
         expect(page.items.map((r) => r.status)).toEqual(['open', 'open', 'closed', 'cancelled', 'closed']);
         expect(page.items.find((r) => r.id === 'vote-demo')?.meetingTitle).toBe('STUPA-Sitzung 12.06.');
         expect(page.total).toBe(5);
@@ -853,12 +858,12 @@ describe('mockApiInterceptor', () => {
         expect(row?.myBallot).toEqual({ cast: true, choice: 'no' });
       });
 
+      /** The detail already has a cast ballot, so the turnout stays. */
       it('keeps the choice of a secret vote out of the row', async () => {
         const id = 'b0000000-0000-0000-0000-000000000003';
         await firstValueFrom(http.post(`/api/votes/${id}/ballot`, { choice: 'yes' }));
         const row = (await list(new HttpParams().append('status', 'closed'))).items.find((r) => r.id === id);
         expect(row?.myBallot).toEqual({ cast: true, choice: null });
-        // The detail already had a cast ballot: the turnout stays.
         const detail = await get<{ tally: { voted: number } }>(`/api/votes/${id}`);
         expect(detail.tally.voted).toBe(4);
       });
@@ -960,6 +965,7 @@ describe('mockApiInterceptor', () => {
       expect(list[0].agendaItemCount).toBe(6);
     });
 
+    /** The live meeting runs today. */
     it('GET /meetings?dateFrom&dateTo → the meetings of the calendar month, with the agenda count', async () => {
       const day = (offset: number): string => {
         const d = new Date();
@@ -978,7 +984,6 @@ describe('mockApiInterceptor', () => {
         '35. Sitzung des Studierendenparlaments',
         'STUPA-Sitzung 12.06.',
       ]);
-      // The live meeting runs today.
       expect(rows.find((m) => m.status === 'live')?.date).toBe(day(0));
       expect(rows.find((m) => m.title.startsWith('33.'))?.agendaItemCount).toBe(9);
       const ha = await get<{ title: string }[]>(
@@ -988,9 +993,9 @@ describe('mockApiInterceptor', () => {
       expect(ha.map((m) => m.title)).toEqual(['12. Sitzung des Haushaltsausschusses']);
     });
 
+    /** The result holds the own delegation and three rows that the admin overview shows. */
     it('GET /delegations → the own delegations, filtered by meetingId', async () => {
       const all = await get<{ meetingId: string; direction: string | null }[]>('/api/delegations');
-      // The own one and three rows that the admin overview shows.
       expect(all.map((d) => d.direction)).toEqual(['incoming', null, null, null]);
       const none = await get<unknown[]>(
         '/api/delegations',
@@ -1087,6 +1092,7 @@ describe('mockApiInterceptor', () => {
       expect(reordered[0].position).toBe(0);
     });
 
+    /** "Nächster TOP" ticks the item that the room leaves. */
     it('PUT …/agenda/{id}/done ticks an item, keeps the first time and removes the tick', async () => {
       type Row = { id: string; doneAt?: string | null };
       const agenda = await firstValueFrom(http.get<Row[]>('/api/meetings/m1/agenda'));
@@ -1097,7 +1103,6 @@ describe('mockApiInterceptor', () => {
       expect(first).toBeTruthy();
       expect((await put(true)).find((a) => a.id === id)?.doneAt).toBe(first);
       expect((await put(false)).find((a) => a.id === id)?.doneAt).toBeNull();
-      // "Nächster TOP": the move ticks the item that the room leaves.
       await firstValueFrom(
         http.patch('/api/meetings/m1', { currentAgendaItemId: agenda[0].id, completeAgendaItemId: id }),
       );
@@ -1382,16 +1387,16 @@ describe('mockApiInterceptor', () => {
       expect(v?.result).toBeTruthy();
     });
 
+    /** Vote a2 has leading=null, so the result must become 'accepted'. */
     it('POST /votes/{id}/close on a vote without leading falls back to "accepted"', async () => {
-      // a2 has leading=null, so the result must become 'accepted'.
       await firstValueFrom(http.post('/api/votes/a0000000-0000-0000-0000-0000000000a2/close', {}));
       const m = await get<{ votes: { id: string; result: string | null }[] }>('/api/meetings/m1');
       const v = m.votes.find((x) => x.id === 'a0000000-0000-0000-0000-0000000000a2');
       expect(v?.result).toBe('accepted');
     });
 
+    /** The open branch keeps `v.result` because the new status is not 'closed'. */
     it('POST /votes/{id}/open on a vote keeps its existing result (status branch)', async () => {
-      // The open branch keeps `v.result` because the new status is not 'closed'.
       const res = await firstValueFrom(http.post('/api/votes/a0000000-0000-0000-0000-0000000000a2/open', {}));
       expect(res).toBeNull();
     });
@@ -1500,12 +1505,12 @@ describe('mockApiInterceptor', () => {
       expect(m.protokollantId).toBe('p-2');
     });
 
+    /** activeApplicationId keeps its previous value and never becomes undefined. */
     it('PATCH /meetings/{id} with no body keeps the existing fields', async () => {
       const m = await firstValueFrom(
         http.patch<{ status: string; activeApplicationId: string | null }>('/api/meetings/m1', {}),
       );
       expect(m.status).toBeTruthy();
-      // activeApplicationId keeps its previous value and never becomes undefined.
       expect(m.activeApplicationId !== undefined).toBe(true);
     });
 
@@ -1587,8 +1592,8 @@ describe('mockApiInterceptor', () => {
         recipients: { principalId: string; viaPool: boolean }[];
       };
 
+      /** The status follows the live demo meeting, which other tests may have closed. */
       it('serves the live meeting as a plain member sees it', async () => {
-        // The status follows the live demo meeting, which other tests may have closed.
         const m = await get<{ id: string; canWrite: boolean; canVote: boolean; protokollantName: string }>(
           `/api/meetings/${MEMBER_LIVE}`,
         );
@@ -1616,6 +1621,7 @@ describe('mockApiInterceptor', () => {
         expect(all.length).toBeGreaterThan(2);
       });
 
+      /** The planned demo meeting of the lead has not started either. */
       it('creates an own delegation, which the context then names', async () => {
         const made = await firstValueFrom(
           http.post<{ delegateName: string; viaPool: boolean; direction: string }>('/api/delegations', {
@@ -1636,11 +1642,11 @@ describe('mockApiInterceptor', () => {
         expect(nobody.delegateName).toBeNull();
         const ctx = await get<Ctx>(`/api/delegations/meetings/${MEMBER_PLANNED}/context`);
         expect(ctx.myDelegation).toMatchObject({ delegateId: 'p-10' });
-        // The planned demo meeting of the lead has not started either.
         const lead = await get<Ctx>('/api/delegations/meetings/d0000000-0000-0000-0000-000000000002/context');
         expect(lead.meetingStarted).toBe(false);
       });
 
+      /** The test restores the demo data for the other tests. */
       it('Lists the pool of a missing member and enters the substitute', async () => {
         const LIVE = 'd0000000-0000-0000-0000-000000000001';
         const recipients = `/api/delegations/meetings/${LIVE}/recipients`;
@@ -1663,7 +1669,6 @@ describe('mockApiInterceptor', () => {
           }),
         );
         expect(unknown).toMatchObject({ delegatorName: null, delegateName: null });
-        // Leave the demo data as it was for the other tests.
         await firstValueFrom(http.delete(`/api/delegations/${made.id}`));
         await firstValueFrom(http.delete(`/api/delegations/${unknown.id}`));
       });
@@ -1680,7 +1685,10 @@ describe('mockApiInterceptor', () => {
       const handover = (principalId: string, mode: string) =>
         firstValueFrom(http.post<M>(`/api/meetings/${LIVE}/protokollant-handover`, { principalId, mode }));
 
-      // Other tests change the shared mock meeting: start from the demo keeper on TOP 3.
+      /**
+       * Other tests change the shared mock meeting, so each test starts from the demo keeper on TOP
+       * 3.
+       */
       beforeEach(async () => {
         await firstValueFrom(
           http.patch(`/api/meetings/${LIVE}`, { protokollantId: DEMO, currentAgendaItemId: 'ag-s3' }),
@@ -1698,8 +1706,11 @@ describe('mockApiInterceptor', () => {
         });
       });
 
+      /**
+       * Other tests change the agenda, so the test takes the items it has now. The last item has no
+       * next one. A hand-back now leaves one running period, the one of the demo user.
+       */
       it('plans a handover, discards it, and starts a planned one on a forward move', async () => {
-        // Other tests change the agenda: take the items it has now.
         const agenda = await get<{ id: string }[]>(`/api/meetings/${LIVE}/agenda`);
         expect(agenda.length).toBeGreaterThan(1);
         await firstValueFrom(http.patch(`/api/meetings/${LIVE}`, { currentAgendaItemId: agenda[0].id }));
@@ -1719,7 +1730,6 @@ describe('mockApiInterceptor', () => {
         expect(moved.protokollantId).toBe('p-4');
         expect(moved.plannedHandover).toBeNull();
         expect(moved.keeperPeriods.at(-1)?.principalId).toBe('p-4');
-        // The last item has no next one.
         await firstValueFrom(
           http.patch(`/api/meetings/${LIVE}`, { currentAgendaItemId: agenda[agenda.length - 1].id }),
         );
@@ -1727,7 +1737,6 @@ describe('mockApiInterceptor', () => {
           status: 409,
           error: { code: 'no_next_item' },
         });
-        // Hand back now: one running period, the demo user's.
         const back = await handover(DEMO, 'now');
         expect(back.protokollantId).toBe(DEMO);
         expect(back.keeperPeriods.filter((k) => k.toAt === null)).toEqual([
@@ -1751,6 +1760,10 @@ describe('mockApiInterceptor', () => {
         expect(rows.find((r) => r.principalId === 'p-6')?.status).toBe('present');
       });
 
+      /**
+       * Anything else on a closed meeting is refused. The roster of a closed meeting is the roster
+       * of the gremium.
+       */
       it('serves the closed meetings: draft, edit of the text, finalize, and a final one', async () => {
         const draft = 'd0000000-0000-0000-0000-000000000101';
         const m = await get<{ status: string; keeperPeriods: unknown[]; votes: { status: string }[] }>(`/api/meetings/${draft}`);
@@ -1771,7 +1784,6 @@ describe('mockApiInterceptor', () => {
         );
         expect(final.status).toBe('final');
         expect(final.publicPdfUrl).toBeTruthy();
-        // Anything else on a closed meeting is refused.
         await expect(
           firstValueFrom(http.delete(`/api/meetings/${draft}/agenda/${agenda[0].id}`)),
         ).rejects.toMatchObject({ status: 409 });
@@ -1780,19 +1792,19 @@ describe('mockApiInterceptor', () => {
         );
         expect(other.status).toBe('final');
         expect(other.pdfUrl).toBeTruthy();
-        // The roster of a closed meeting is the roster of the gremium.
         const roster = await get<unknown[]>(`/api/meetings/${draft}/attendance`);
         expect(roster.length).toBe(9);
       });
     });
 
+    /** No agenda regex matches, so the request falls through to the testing backend. */
     it('DELETE on an unmatched /api path falls through to next()', () => {
       http.delete('/api/applications/x').subscribe();
-      // No agenda regex matches → the request falls through to the testing backend.
       ctrl.expectOne('/api/applications/x').flush(null);
     });
   });
 
+  /** Other tests rename the mock meeting, so the test searches for the title it has now. */
   it('answers the global search with the mock records whose title matches', async () => {
     const { api } = setup(true);
     const apps = await firstValueFrom(api.search('förderung'));
@@ -1800,7 +1812,6 @@ describe('mockApiInterceptor', () => {
     expect(apps.hits[0].url).toMatch(/^\/applications\//);
     expect(apps.hits[0].subtitle).toBeTruthy();
 
-    // Other tests rename the mock meeting, so search for the title it has now.
     const [current] = await firstValueFrom(api.listMeetings());
     const meeting = await firstValueFrom(api.search(current.title));
     expect(meeting.hits).toContainEqual(expect.objectContaining({ kind: 'meeting', title: current.title }));

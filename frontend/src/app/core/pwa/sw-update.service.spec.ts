@@ -60,6 +60,7 @@ describe('SwUpdateService', () => {
     expect(svc.updateReady()).toBe(false);
   });
 
+  /** Activation without a reload lets the old JS run against the new cache. */
   it('marks the update as ready on VERSION_READY and does not activate it', () => {
     configure(true);
     svc.init();
@@ -72,11 +73,11 @@ describe('SwUpdateService', () => {
     } as VersionEvent);
 
     expect(svc.updateReady()).toBe(true);
-    // Activation without a reload lets the old JS run against the new cache.
     expect(sw.activateUpdate).not.toHaveBeenCalled();
     expect(reload).not.toHaveBeenCalled();
   });
 
+  /** The polling continues after a failed installation. */
   it('ignores VERSION_DETECTED, NO_NEW_VERSION_DETECTED and VERSION_INSTALLATION_FAILED', async () => {
     configure(true);
     svc.init();
@@ -89,7 +90,6 @@ describe('SwUpdateService', () => {
     expect(svc.updateReady()).toBe(false);
     expect(reload).not.toHaveBeenCalled();
 
-    // The polling continues after a failed installation.
     jest.advanceTimersByTime(1000);
     await flushPromises();
     jest.advanceTimersByTime(FIVE_MINUTES);
@@ -156,6 +156,7 @@ describe('SwUpdateService', () => {
     expect(sw.checkForUpdate).toHaveBeenCalledTimes(3);
   });
 
+  /** One initial check and three polls run, and every rejection is ignored. */
   it('keeps polling after a rejected check (offline)', async () => {
     configure(true);
     sw.checkForUpdate.mockRejectedValue(new Error('offline'));
@@ -170,7 +171,6 @@ describe('SwUpdateService', () => {
     jest.advanceTimersByTime(FIVE_MINUTES);
     await flushPromises();
 
-    // 1 initial check + 3 polls: every rejection is ignored.
     expect(sw.checkForUpdate).toHaveBeenCalledTimes(4);
   });
 

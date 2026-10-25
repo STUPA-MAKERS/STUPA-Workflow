@@ -233,12 +233,12 @@ describe('AuditLogComponent', () => {
     expect(screen.getAllByText('Rollen/Rechte').length).toBe(2);
   });
 
+  /** Without a name the actor is the sub. */
   it('shows the raw key of an unknown action', async () => {
     await setup({
       page: { items: [entry(1, { action: 'mystery_event', actorName: null })], nextCursor: null, hasMore: false },
     });
     expect(screen.getByText('mystery_event')).toBeInTheDocument();
-    // Without a name the actor is the sub.
     expect(screen.getByText('kc|root')).toBeInTheDocument();
   });
 
@@ -338,11 +338,11 @@ describe('AuditLogComponent', () => {
     expect(listAuditLog).toHaveBeenCalledWith(expect.objectContaining({ actor: 'kc|bob' }));
   });
 
+  /** The server wants an aware time, so the local midnight goes out as UTC. */
   it('setRange expands the start day to a start-of-day bound', async () => {
     const { cmp, listAuditLog } = await setup();
     listAuditLog.mockClear();
     cmp.setRange({ from: '2026-06-01', to: '' });
-    // The server wants an aware time: the local midnight goes out as UTC.
     expect(listAuditLog).toHaveBeenCalledWith(
       expect.objectContaining({ since: localDayBound('2026-06-01', false) }),
     );
@@ -422,9 +422,8 @@ describe('AuditLogComponent', () => {
     expect(cmp.hasMore()).toBe(false);
   });
 
+  /** hasMore is true while nextCursor is null, so before falls back to undefined. */
   it('loadMore sends before: undefined when the cursor is null but more remain', async () => {
-    // Defensive branch: hasMore is true while nextCursor is null, so before falls back to
-    // undefined.
     const listAuditLog = jest
       .fn()
       .mockReturnValueOnce(of<AuditPage>({ items: [entry(1)], nextCursor: null, hasMore: true }))
@@ -444,14 +443,16 @@ describe('AuditLogComponent', () => {
     expect(listAuditLog).not.toHaveBeenCalled();
   });
 
+  /**
+   * The first call from the constructor reload hangs, and a filter change must not fire a second. A
+   * filter setter triggers reload and load(true), but the loading guard holds.
+   */
   it('skips concurrent loads while a request is in flight', async () => {
     const subj = new Subject<AuditPage>();
-    // The first call from the constructor reload hangs. A filter change must not fire a second.
     const listAuditLog = jest.fn(() => subj.asObservable());
     const { cmp } = await setup({ listAuditLog });
     expect(cmp.loading()).toBe(true);
     expect(listAuditLog).toHaveBeenCalledTimes(1);
-    // A filter setter triggers reload and load(true), but the loading guard holds.
     cmp.setAction('login');
     expect(listAuditLog).toHaveBeenCalledTimes(1);
     subj.next({ items: [], nextCursor: null, hasMore: false });
@@ -504,6 +505,7 @@ describe('AuditLogComponent', () => {
     expect(cmp.actionLabel('made_up_action')).toBe('made_up_action');
   });
 
+  /** The label never falls back to the raw key. */
   it('mirrors the backend action catalog and labels every action in de and en', async () => {
     expect([...AUDIT_ACTIONS].sort()).toEqual([...BACKEND_AUDIT_ACTIONS].sort());
     for (const locale of ['de', 'en']) {
@@ -511,7 +513,6 @@ describe('AuditLogComponent', () => {
       TestBed.resetTestingModule();
       const { cmp } = await setup();
       for (const action of AUDIT_ACTIONS) {
-        // The label never falls back to the raw key.
         expect(cmp.actionLabel(action)).not.toBe(action);
       }
     }
@@ -538,6 +539,7 @@ describe('AuditLogComponent', () => {
     expect(cmp.targetTypeLabel('made_up_type')).toBe('made_up_type');
   });
 
+  /** The guest settings live on the deadlines admin page. */
   it('targetLink resolves a route per target type', async () => {
     const { cmp } = await setup();
     expect(cmp.targetLink(entry(1, { targetType: 'application', targetId: 'a-9' }))).toEqual([
@@ -557,7 +559,6 @@ describe('AuditLogComponent', () => {
     expect(cmp.targetLink(entry(1, { targetType: 'invoice', targetId: 'i-9' }))).toEqual([
       '/invoices',
     ]);
-    // The guest settings live on the deadlines admin page.
     expect(
       cmp.targetLink(entry(1, { targetType: 'guest_application_settings', targetId: '1' })),
     ).toEqual(['/admin/deadlines']);
@@ -724,8 +725,6 @@ describe('AuditLogComponent', () => {
     expect(cmp.dataRows(entry(1, { data: null as unknown as Record<string, unknown> }))).toEqual([]);
   });
 
-  // --- the chain check --------------------------------------------------------
-
   it('shows the newest stored check: intact, when, trigger and entries', async () => {
     const { cmp, container } = await setup();
     const v = cmp.verifyView();
@@ -803,8 +802,10 @@ describe('AuditLogComponent', () => {
     expect(screen.queryByRole('button', { name: /Jetzt prüfen/ })).toBeNull();
   });
 
-  // --- the filter chips -------------------------------------------------------
-
+  /**
+   * An actor without a name shows its sub. "Zurücksetzen" shows while a filter is set and clears
+   * them all.
+   */
   it('filters through the action and actor chips', async () => {
     const { listAuditLog, cmp } = await setup({ actors: [{ sub: 'kc|a', name: 'Alice' }, { sub: 'kc|b', name: null }] });
     expect(cmp.actionChip()).toBe('Aktion: Alle Aktionen');
@@ -813,20 +814,18 @@ describe('AuditLogComponent', () => {
     expect(listAuditLog).toHaveBeenLastCalledWith(expect.objectContaining({ action: 'status_change' }));
     expect(cmp.actionChip()).toBe('Aktion: Statuswechsel');
     await userEvent.click(screen.getByRole('button', { name: 'Akteur: Alle Akteure' }));
-    // An actor without a name shows its sub.
     expect(screen.getByRole('option', { name: 'kc|b' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('option', { name: 'Alice' }));
     expect(listAuditLog).toHaveBeenLastCalledWith(expect.objectContaining({ actor: 'kc|a' }));
     expect(cmp.actorChip()).toBe('Akteur: Alice');
-    // "Zurücksetzen" shows while a filter is set and clears them all.
     await userEvent.click(screen.getByRole('button', { name: 'Zurücksetzen' }));
     expect(cmp.activeFilterCount()).toBe(0);
     expect(screen.queryByRole('button', { name: 'Zurücksetzen' })).toBeNull();
   });
 
+  /** The page has one "Zeitraum" chip like the finance pages, and no native date inputs. */
   it('filters by a period through the shared range chip', async () => {
     const { listAuditLog, fixture } = await setup();
-    // One "Zeitraum" chip like the finance pages, no native date inputs.
     expect(fixture.nativeElement.querySelector('input[type=date]')).toBeNull();
     expect(screen.getByRole('button', { name: /Zeitraum/ })).toBeInTheDocument();
     const cmp = fixture.componentInstance as Cmp;

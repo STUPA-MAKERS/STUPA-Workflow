@@ -45,12 +45,12 @@ describe('the list pane pages', () => {
     }
   });
 
+  /** The app keeps no copy: `@use 'scroll-fade'` resolves to the kit partial. */
   it('keeps the fades in one partial, for the rows', () => {
     const kitFade = join(APP, '../../vendor/ui-kit/src/styles/_scroll-fade.scss');
     const fade = readFileSync(kitFade, 'utf8');
     expect(fade).toContain('@mixin fade-y($size');
     expect(fade).toContain('@mixin fade-x($size');
-    // The app keeps no copy: `@use 'scroll-fade'` resolves to the kit partial.
     expect(existsSync(join(APP, 'shared/ui/_scroll-fade.scss'))).toBe(false);
     const pane = read('shared/ui/_list-pane.scss');
     expect(pane).toContain("@use 'scroll-fade' as fade;");

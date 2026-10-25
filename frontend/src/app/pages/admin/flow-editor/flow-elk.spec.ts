@@ -46,9 +46,9 @@ const INPUT: LayoutInput = {
 };
 
 describe('flow-elk', () => {
+  /** jsdom has no 2D canvas, so the estimate grows with the length and the size. */
   it('measures a text without a canvas from its length and the font size', () => {
     expect(textWidth('', '12px x')).toBe(0);
-    // jsdom has no 2D canvas: the estimate grows with the length and the size.
     expect(textWidth('abcd', '10px x')).toBeLessThan(textWidth('abcdefgh', '10px x'));
     expect(textWidth('abcd', '10px x')).toBeLessThan(textWidth('abcd', '20px x'));
     expect(textWidth('abcd', 'bold x')).toBeGreaterThan(0);
@@ -83,6 +83,7 @@ describe('flow-elk', () => {
     expect(bundleLabel([link(0, 'a', 'b', 'A'), link(1, 'a', 'b')], many)).toBe('2 Übergänge');
   });
 
+  /** A short leg limits the radius to half its length. */
   it('rounds the corners of a right-angled path and drops repeated points', () => {
     expect(roundedPath([])).toBe('');
     expect(roundedPath([{ x: 0, y: 0 }])).toBe('M 0 0');
@@ -90,12 +91,15 @@ describe('flow-elk', () => {
     expect(roundedPath([{ x: 0, y: 0 }, { x: 40, y: 0 }, { x: 40, y: 40 }])).toBe(
       'M 0 0 L 30 0 Q 40 0, 40 10 L 40 40',
     );
-    // A short leg limits the radius to half its length.
     expect(roundedPath([{ x: 0, y: 0 }, { x: 4, y: 0 }, { x: 4, y: 40 }])).toBe(
       'M 0 0 L 2 0 Q 4 0, 4 2 L 4 40',
     );
   });
 
+  /**
+   * An automatic transition without a name still gets room for its bolt. For a dot that is not
+   * drawn, the line starts at the box itself.
+   */
   it('builds the ELK graph: fixed dots, one label per bundle, proxies in the outer layers', () => {
     const g = elkGraph(
       {
@@ -122,13 +126,12 @@ describe('flow-elk', () => {
     expect(e.get('t2')!.labels![0].text).toBe('3 Übergänge');
     expect(e.get('t1')!.sources).toEqual(['a::g1']);
     expect(e.get('t1')!.targets).toEqual(['b::in']);
-    // An automatic transition without a name still gets room for its bolt.
     expect(e.get('t5')!.labels![0].text).toBe('');
     expect(e.get('t5')!.labels![0].width).toBeGreaterThan(10);
-    // A dot that is not drawn: the line starts at the box itself.
     expect(e.get('t6')!.sources).toEqual(['c']);
   });
 
+  /** A label without a place gives no label. */
   it('reads the places and the lines back; a line without a section is left out', () => {
     const out: ElkNode = {
       id: 'root',
@@ -165,7 +168,6 @@ describe('flow-elk', () => {
     });
     expect(r.routes.get(1)!.label).toBeNull();
     expect(r.routes.get(1)!.d).toContain('Q 50 20');
-    // A label without a place gives no label.
     expect(r.routes.get(2)!.label).toBeNull();
     expect(r.routes.has(3)).toBe(false);
   });

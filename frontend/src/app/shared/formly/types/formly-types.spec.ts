@@ -84,16 +84,21 @@ describe('Formly field types', () => {
     expect(host.model['tags']).toEqual(['y']);
   });
 
+  /** A computed field without a value renders the em-dash placeholder. */
   it('display: shows static markdown text and computed values', async () => {
     await renderFields([
       { key: 'info', type: 'display', props: { label: 'Info', text: 'Bitte beachten.' } },
       { key: 'total', type: 'display', props: { label: 'Summe', computed: true } },
     ]);
     expect(screen.getByText('Bitte beachten.')).toBeInTheDocument();
-    // A computed field without a value renders the em-dash placeholder.
     expect(screen.getByText('—')).toBeInTheDocument();
   });
 
+  /**
+   * The test uses single `input` events, because a full re-render per keystroke loses characters.
+   * It queries again after each event, because the re-render replaces the previous elements. The
+   * first offer is preferred, so the position value is 500 and the total 500.
+   */
   it('positions: builds positions/offers, totals preferred values, validates', async () => {
     localStorage.setItem('ap.locale', 'de');
     const host = await renderFields([
@@ -107,15 +112,12 @@ describe('Formly field types', () => {
     expect(value).toHaveLength(1);
     expect(value[0].offers).toHaveLength(2);
 
-    // Use single `input` events. A full re-render per keystroke would lose characters.
-    // Re-query after each event because the re-render replaces the previous elements.
     fireEvent.input(screen.getByLabelText('Position'), { target: { value: 'Catering' } });
     fireEvent.input(screen.getAllByLabelText('Anbieter')[0], { target: { value: 'Anbieter A' } });
     fireEvent.input(screen.getAllByLabelText('Anbieter')[1], { target: { value: 'Anbieter B' } });
     fireEvent.input(screen.getAllByLabelText(/^Betrag/)[0], { target: { value: '500' } });
     fireEvent.input(screen.getAllByLabelText(/^Betrag/)[1], { target: { value: '600' } });
 
-    // First offer is preferred → position value 500 → total 500.
     expect(form.valid).toBe(true);
     const v = host.model['costs'] as { offers: { value: number; preferred: boolean }[] }[];
     const pref = v[0].offers.find((o) => o.preferred);

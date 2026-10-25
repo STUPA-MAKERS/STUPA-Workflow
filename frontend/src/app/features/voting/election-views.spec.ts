@@ -124,6 +124,7 @@ describe('election views', () => {
     expect(screen.getByText('Gewählt: Anna')).toBeInTheDocument();
   });
 
+  /** The beamer shows no action. */
   it('the beamer: the bars of an election and the status', async () => {
     const beamer: BeamerVote = {
       question: 'Wahl der Sitzungsleitung',
@@ -148,7 +149,6 @@ describe('election views', () => {
     });
     expect(screen.getByText('Los steht aus')).toBeInTheDocument();
     expect(screen.getByText('Gleichstand: das Los steht aus · 9 Stimmen')).toBeInTheDocument();
-    // The beamer shows no action.
     expect(screen.queryByRole('button', { name: 'Los ziehen' })).toBeNull();
     view.fixture.componentRef.setInput('vote', {
       ...beamer,

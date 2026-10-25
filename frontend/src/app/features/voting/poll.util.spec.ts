@@ -64,8 +64,11 @@ describe('poll.util', () => {
     });
   });
 
+  /**
+   * A date shows in the time zone of the meetings, whatever the device: 16:00 UTC is 17:00 in
+   * Berlin.
+   */
   it('labels the options, the captions, the status and the picks', () => {
-    // A date shows in the time zone of the meetings, whatever the device: 16:00 UTC is 17:00 in Berlin.
     expect(dateOptionLabel('2026-11-04T16:00:00Z', null, 'de-DE')).toBe('Mi, 4.11. · 17:00');
     expect(dateOptionLabel('2026-11-04T16:00:00Z', null, 'en')).toBe('Wed, 4.11. · 17:00');
     expect(pollOptionLabel(DATE.options[0]!, 'de-DE')).toMatch(/^Di, 3\.11\. · \d\d:00–\d\d:00$/);
@@ -89,6 +92,7 @@ describe('poll.util', () => {
     expect(answersComplete(DATE, { o1: 'no' })).toBe(true);
   });
 
+  /** An order that misses an option falls back to the counts. */
   it('builds the bars from a stored result, and the top line', () => {
     const bars = pollBars(
       TEXT,
@@ -97,7 +101,6 @@ describe('poll.util', () => {
       'de-DE',
       t,
     );
-    // An order that misses an option falls back to the counts.
     expect(bars.map((b) => [b.id, b.count, b.top])).toEqual([
       ['o1', 2, true],
       ['o2', 0, false],

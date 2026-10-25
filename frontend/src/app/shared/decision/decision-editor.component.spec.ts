@@ -4,12 +4,12 @@ import { runAxe } from '../../../testing/a11y';
 import { DecisionEditorComponent } from './decision-editor.component';
 import type { DecisionDraft } from './decision.util';
 
+/** A model signal is its own output. */
 async function setup(draft: DecisionDraft, requested: string | null = '1250.00') {
   localStorage.setItem('ap.locale', 'de');
   const changes: DecisionDraft[] = [];
   const view = await render(DecisionEditorComponent, { inputs: { draft, requested } });
   const cmp = view.fixture.componentInstance;
-  // A model signal is its own output.
   cmp.draft.subscribe((d) => changes.push(d));
   return { ...view, cmp, changes, last: () => changes[changes.length - 1] };
 }

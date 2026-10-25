@@ -252,11 +252,11 @@ describe('TopSheetComponent', () => {
     expect(screen.getByText(/Pia Protokoll führt das Protokoll/)).toBeInTheDocument();
   });
 
+  /** The foot of a live meeting is gone; the bar says it all. */
   it('carries the state, the finalize and the PDFs of a closed meeting in the protocol bar', async () => {
     const { fixture, finalize, container } = await setup({ meeting: meeting({ status: 'closed' }) });
     const bar = screen.getByRole('status');
     expect(bar).toHaveTextContent('Entwurf · Das Protokoll ist noch nicht versandt.');
-    // The foot of a live meeting is gone; the bar says it all.
     expect(container.querySelector('.ts__foot')).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Finalisieren & versenden' }));
     expect(finalize).toHaveBeenCalled();
@@ -285,6 +285,7 @@ describe('TopSheetComponent', () => {
     expect(screen.queryByRole('status')).toBeNull();
   });
 
+  /** A live meeting names its keeper in the dock, not here. */
   it('names every keeper of a closed meeting below the title', async () => {
     const periods = [
       { principalId: 'pr-1', name: 'Pia Protokoll', fromAt: '2026-10-15T16:04:00Z', toAt: '2026-10-15T16:55:00Z', fromAgendaItemId: 't-1', toAgendaItemId: 't-2', fromPosition: 1, toPosition: 2 },
@@ -292,12 +293,12 @@ describe('TopSheetComponent', () => {
     ];
     const { fixture } = await setup({ meeting: meeting({ status: 'closed', keeperPeriods: periods }) });
     expect(screen.getByText('Protokoll: Pia Protokoll (TOP 1–2), Mika Mitglied (TOP 2–3)')).toBeInTheDocument();
-    // A live meeting names its keeper in the dock, not here.
     fixture.componentRef.setInput('meeting', meeting({ keeperPeriods: periods }));
     fixture.detectChanges();
     expect(screen.queryByText(/^Protokoll: Pia Protokoll \(/)).toBeNull();
   });
 
+  /** A tie is a rejection. */
   it('gives the vote cards of the text the result of the closed votes of the meeting', async () => {
     const closed = {
       id: 'v-1', applicationId: null, agendaItemId: 't-1', title: null, question: 'Frage?', options: ['yes', 'no', 'abstain'],
@@ -312,15 +313,14 @@ describe('TopSheetComponent', () => {
     const card = view.container.querySelector('.mde__vote') as HTMLElement;
     expect(card.dataset['result']).toBe('rejected');
     expect(card.querySelector('.mde__voteKind')?.textContent).toMatch(/^Beschluss · \d\d:52 · Einfache Mehrheit$/);
-    // A tie is a rejection.
     expect(card.querySelector('.mde__voteResult')?.textContent).toBe('Abgelehnt');
   });
 
+  /** A non-public item never goes public, and a reader writes nothing. */
   it('reminds the minute-taker of a public gremium that the text goes public', async () => {
     const notice = 'Dieses Protokoll wird öffentlich. Keine Namen Dritter im Freitext.';
     const view = await setup({ protocol: protocol({ gremiumProtocolsPublic: true }) });
     expect(screen.getByText(notice)).toBeInTheDocument();
-    // A non-public item never goes public, a reader writes nothing.
     view.fixture.componentRef.setInput('top', { ...AGENDA[0], nonPublic: true });
     view.fixture.detectChanges();
     expect(screen.queryByText(notice)).toBeNull();
@@ -347,11 +347,11 @@ describe('TopSheetComponent', () => {
     expect(screen.queryByText(/noch kein Protokoll/)).toBeNull();
   });
 
+  /** Without a protocol there is no notice of the public protocol page and no protocol state. */
   it('prepares the text of an item of a planned meeting without a protocol', async () => {
     await setup({ protocol: null, meeting: meeting({ status: 'planned' }) });
     expect(screen.getByRole('toolbar', { name: 'Format' })).toBeInTheDocument();
     expect(screen.queryByText(/noch kein Protokoll/)).toBeNull();
-    // No protocol yet, so no notice of the public protocol page and no protocol state.
     expect(screen.queryByText('Entwurf')).toBeNull();
   });
 
@@ -364,6 +364,9 @@ describe('TopSheetComponent', () => {
     const member = (over: Partial<Meeting> = {}) =>
       meeting({ canWrite: false, isProtokollant: false, protokollantName: 'Mara Keller', currentAgendaItemId: 't-1', ...over });
 
+    /**
+     * The reader gets no format bar, no save state, no foot and no note about a missing protocol.
+     */
     it('reads the text without a protocol, marks the item of the room and names the keeper', async () => {
       const view = await setup({ follow: true, protocol: null, editable: false, canEdit: false, meeting: member() });
       expect(screen.getByText('Jetzt')).toBeInTheDocument();
@@ -372,7 +375,6 @@ describe('TopSheetComponent', () => {
       expect(editor.disabled()).toBe(true);
       expect(editor.value()).toBe('Eröffnet.');
       expect(editor.placeholder()).toBe('Noch kein Text zu diesem TOP.');
-      // No format bar, no save state, no foot, no note about a missing protocol.
       expect(screen.queryByRole('toolbar')).toBeNull();
       expect(screen.queryByText('Entwurf')).toBeNull();
       expect(screen.queryByText(/Das Protokoll entsteht/)).toBeNull();

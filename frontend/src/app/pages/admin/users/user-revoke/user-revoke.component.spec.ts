@@ -137,6 +137,7 @@ function makeApi(over: Partial<Record<string, jest.Mock>> = {}) {
   };
 }
 
+/** `ngModel` writes its value and its disabled state one microtask later. */
 async function setup(api = makeApi(), source: AdminPrincipal | null = PERSON) {
   const toast = { success: jest.fn(), error: jest.fn() };
   const closed = jest.fn();
@@ -151,7 +152,6 @@ async function setup(api = makeApi(), source: AdminPrincipal | null = PERSON) {
   });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const inst = view.fixture.componentInstance as any;
-  // `ngModel` writes its value and its disabled state one microtask later.
   const settle = async () => {
     await view.fixture.whenStable();
     view.fixture.detectChanges();
@@ -169,6 +169,11 @@ describe('UserRevokeComponent', () => {
     expect(api.previewPrincipalRevoke).not.toHaveBeenCalled();
   });
 
+  /**
+   * A role without a German label falls back to its key; bootstrap has its own text. The shared
+   * group ties StuPa and AStA together. The note names the effects and, without deactivation, the
+   * next login.
+   */
   it('shows the person, the Gremien with their ties and the global roles', async () => {
     const { api } = await setup();
     expect(api.previewPrincipalRevoke).toHaveBeenCalledWith('p-12');
@@ -190,16 +195,13 @@ describe('UserRevokeComponent', () => {
     expect(screen.getByText('Bleibt bis zum Ende der Sitzung bestehen.')).toBeInTheDocument();
     expect(screen.getByText('2 offene Abstimmungen')).toBeInTheDocument();
     expect(screen.getByText('1 offene Abstimmung')).toBeInTheDocument();
-    // A role without a German label falls back to its key; bootstrap has its own text.
     expect(screen.getByText('Rolle vorstand, direkt vergeben')).toBeInTheDocument();
     expect(screen.getByText('beim Einrichten der Plattform vergeben')).toBeInTheDocument();
     expect(screen.getByText(/^vergeben von — am /)).toBeInTheDocument();
     expect(screen.getByText('über die SSO-Gruppe stupa-referate')).toBeInTheDocument();
-    // The shared group ties StuPa and AStA together.
     expect(
       screen.getByText('Die SSO-Gruppe gremien-alle gilt auch für AStA. Beides wird zusammen entzogen.'),
     ).toBeInTheDocument();
-    // The note names the effects and, without deactivation, the next login.
     expect(screen.getByText(/Sofort wirksam: Tobias Kern gehört keinem/)).toHaveTextContent(
       'kommen nur die Gremien und Rollen zurück',
     );
@@ -235,13 +237,13 @@ describe('UserRevokeComponent', () => {
     expect(screen.getByText(/Kommt beim nächsten Start oder bei der nächsten Anmeldung zurück/)).toBeInTheDocument();
   });
 
+  /** AStA shares a group with StuPa, so both go off together. */
   it('starts with everything checked and names the count on the danger button', async () => {
     const { settle } = await setup();
     expect(screen.getByLabelText('StuPa')).toBeChecked();
     expect(screen.getByRole('button', { name: '2 Gremien und 2 Rollen entziehen' })).toBeEnabled();
     await userEvent.click(screen.getByLabelText('AStA'));
     await settle();
-    // AStA shares a group with StuPa: both go off together.
     expect(screen.getByLabelText('StuPa')).not.toBeChecked();
     expect(screen.getByRole('button', { name: '2 Rollen entziehen' })).toBeEnabled();
     await userEvent.click(screen.getByLabelText('Referent'));
@@ -277,19 +279,21 @@ describe('UserRevokeComponent', () => {
     expect(closed).toHaveBeenCalled();
   });
 
+  /**
+   * The admin narrows the choice to the role Referent. The reload keeps the narrowed choice and
+   * does not check everything again.
+   */
   it('a stale selection loads the preview again; other errors keep it', async () => {
     const api = makeApi({
       revokePrincipal: jest.fn(() => throwError(() => ({ error: { code: 'revoke_incomplete' } }))),
     });
     const { toast, inst, settle } = await setup(api);
-    // The admin narrows the choice: only the role Referent goes.
     await userEvent.click(screen.getByRole('button', { name: 'Keine auswählen' }));
     await userEvent.click(screen.getByLabelText('Referent'));
     await settle();
     inst.submit();
     expect(api.previewPrincipalRevoke).toHaveBeenCalledTimes(2);
     await settle();
-    // The reload keeps the narrowed choice and does not check everything again.
     expect(screen.getByLabelText('Referent')).toBeChecked();
     expect(screen.getByLabelText('StuPa')).not.toBeChecked();
     expect(toast.error).toHaveBeenCalledWith(

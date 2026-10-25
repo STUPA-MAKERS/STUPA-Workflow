@@ -81,10 +81,13 @@ describe('ShareLinksDialogComponent', () => {
     expect(screen.getByText('An die Fachschaft')).toBeInTheDocument();
   });
 
+  /**
+   * Before the create there is nothing to copy, because the token exists only in the response to
+   * the create call. The whole link shows as text that wraps; nothing cuts it with an ellipsis.
+   */
   it('shows a freshly minted link once, and nothing before there is one', async () => {
     const { http, detectChanges, cmp, openWith } = await setup();
     openWith([]);
-    // Nothing to copy yet: the token exists only in the response to the create call.
     expect(screen.queryByRole('button', { name: 'Kopieren' })).not.toBeInTheDocument();
     expect(screen.getByText('Es gibt noch keinen Link zu diesem Antrag.')).toBeInTheDocument();
 
@@ -94,7 +97,6 @@ describe('ShareLinksDialogComponent', () => {
       .flush(liveShare({ url: 'https://x.example/s/token-abc' }));
     detectChanges();
 
-    // The whole link shows as text that wraps; nothing cuts it with an ellipsis.
     const link = screen.getByText('https://x.example/s/token-abc');
     expect(link.tagName).toBe('CODE');
     const anchor = link.closest('a');
@@ -104,8 +106,8 @@ describe('ShareLinksDialogComponent', () => {
     expect(anchor?.parentElement).toHaveTextContent('Öffentlicher Link: https://x.example/s/token-abc');
   });
 
+  /** An empty label must not travel as `""`, because the server would store a blank note. */
   it('sends the chosen lifetime and drops an empty note', async () => {
-    // An empty label must not travel as `""`: the server would store a blank note.
     const { http, cmp, openWith } = await setup();
     openWith([]);
     cmp.ttl.set('7');
@@ -272,6 +274,7 @@ describe('ShareLinksDialogComponent', () => {
     http.verify();
   });
 
+  /** A late error of the old listing changes nothing either. */
   it('drops a late listing of an application it no longer shows', async () => {
     const { http, detectChanges, host, cmp } = await setup();
     host.open.set(true);
@@ -284,7 +287,6 @@ describe('ShareLinksDialogComponent', () => {
     expect(cmp.shares()).toEqual([]);
     second.flush([liveShare({ label: 'neu' })]);
     expect(cmp.shares()[0].label).toBe('neu');
-    // A late error of the old listing changes nothing either.
     host.id.set('app-3');
     detectChanges();
     const third = http.expectOne((r) => r.url === '/api/applications/app-3/shares');

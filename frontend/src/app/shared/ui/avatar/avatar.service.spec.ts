@@ -51,6 +51,7 @@ describe('AvatarService', () => {
       expect(svc.url('p1', 40)).toBeNull();
     });
 
+    /** A new failure starts a new period. */
     it('loads the image again when the retry period is over', () => {
       const { svc } = setup();
       svc.markFailed('p1');
@@ -58,7 +59,6 @@ describe('AvatarService', () => {
       jest.advanceTimersByTime(AVATAR_RETRY_MS);
       expect(svc.url('p1', 40)).toBe('/api/principals/p1/avatar?s=80');
       expect(svc.url('p2', 40)).not.toBeNull();
-      // A new failure starts a new period.
       svc.markFailed('p1');
       expect(svc.url('p1', 40)).toBeNull();
     });

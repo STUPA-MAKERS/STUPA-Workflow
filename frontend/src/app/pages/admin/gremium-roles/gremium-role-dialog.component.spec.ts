@@ -33,6 +33,7 @@ function makeApi(over: Partial<Record<string, jest.Mock>> = {}) {
   };
 }
 
+/** NgModel writes its value after a microtask. */
 async function setup(
   role: GremiumRole | null,
   api = makeApi(),
@@ -50,7 +51,6 @@ async function setup(
       ...inputs,
     },
   });
-  // NgModel writes its value after a microtask.
   await view.fixture.whenStable();
   view.fixture.detectChanges();
   const saved = jest.fn();
@@ -65,10 +65,10 @@ async function setup(
 describe('GremiumRoleDialogComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
+  /** NgModel applies `disabled` after a microtask. */
   it('edits a role: the key is fixed, every right of the catalogue shows, the groups link out', async () => {
     const { api, saved } = await setup(OWN);
     expect(screen.getByRole('heading', { name: 'Gremium-Rolle bearbeiten' })).toBeInTheDocument();
-    // NgModel applies `disabled` after a microtask.
     await waitFor(() => expect(screen.getByRole('textbox', { name: 'Schlüssel' })).toBeDisabled());
     expect(screen.getByText('Berechtigungen im Studierendenparlament')).toBeInTheDocument();
     for (const name of [
@@ -111,6 +111,7 @@ describe('GremiumRoleDialogComponent', () => {
     expect(screen.getByText('Mitgliedschaft über')).toBeInTheDocument();
   });
 
+  /** A new role can vote by default. */
   it('creates a role: the key must match the pattern', async () => {
     const { api, saved } = await setup(null);
     const key = screen.getByRole('textbox', { name: /Schlüssel/ });
@@ -122,7 +123,6 @@ describe('GremiumRoleDialogComponent', () => {
     await userEvent.clear(key);
     await userEvent.type(key, 'kasse');
     await userEvent.type(screen.getByRole('textbox', { name: 'Bezeichnung (DE)' }), 'Kasse');
-    // A new role can vote by default.
     expect(screen.getByRole('checkbox', { name: 'Abstimmen' })).toBeChecked();
     await userEvent.click(save);
     expect(api.createGremiumRole).toHaveBeenCalledWith('g-1', {
@@ -133,6 +133,7 @@ describe('GremiumRoleDialogComponent', () => {
     expect(saved).toHaveBeenCalled();
   });
 
+  /** A new key clears the answer of the server. */
   it('shows a 409 and a 422 of the server under the key', async () => {
     const api = makeApi({
       createGremiumRole: jest
@@ -148,7 +149,6 @@ describe('GremiumRoleDialogComponent', () => {
     );
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     expect(screen.getByRole('alert')).toHaveTextContent(/Kleinbuchstaben/);
-    // A new key clears the answer of the server.
     await userEvent.type(screen.getByRole('textbox', { name: /Schlüssel/ }), 'x');
     expect(screen.queryByRole('alert')).toBeNull();
   });
@@ -161,10 +161,13 @@ describe('GremiumRoleDialogComponent', () => {
     expect(saved).not.toHaveBeenCalled();
   });
 
+  /**
+   * The test clicks the text button of the footer, because the close icon of the dialog has the
+   * same name.
+   */
   it('hides the groups without the mappings permission and closes on cancel', async () => {
     const { closed } = await setup(OWN, makeApi(), { showGroups: false });
     expect(screen.queryByText('OIDC-Gruppen')).toBeNull();
-    // The text button of the footer; the close icon of the dialog has the same name.
     await userEvent.click(screen.getByText('Abbrechen'));
     expect(closed).toHaveBeenCalled();
   });
