@@ -445,7 +445,7 @@ class _FakeFlow:
     started: list[tuple[Any, Any]] = []
     available: list[Any] = []
     # The gremien where the principal holds the gremium permission `vote.cast`
-    # (`gremium_ids_for` in `list_tasks`).
+    # (`policy.held_gremium_ids` in `list_tasks`).
     cast_gids: set[Any] = set()
 
     def __init__(self, session: object, dispatcher: object = None) -> None:
