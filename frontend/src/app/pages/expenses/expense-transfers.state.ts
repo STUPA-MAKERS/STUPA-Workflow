@@ -1,8 +1,13 @@
 import { computed, inject, signal } from '@angular/core';
 import { I18nService } from '@core/i18n/i18n.service';
 import { ToastService } from '@stupa-makers/ui-kit';
-import { BudgetTreeApi, type BudgetTransfer, type TransferUpdate } from '../budget/budget-tree.api';
-import { problemDetail } from '@core/api/problem';
+import {
+  BudgetTreeApi,
+  FISCAL_YEAR_CLOSED,
+  type BudgetTransfer,
+  type TransferUpdate,
+} from '../budget/budget-tree.api';
+import { problemCode, problemDetail } from '@core/api/problem';
 import type { ExpensesListState } from './expenses-list.state';
 
 /**
@@ -56,6 +61,7 @@ export class ExpenseTransfersState {
   constructor(private readonly list: ExpensesListState) {}
 
   private failureText(err: unknown): string {
+    if (problemCode(err) === FISCAL_YEAR_CLOSED) return this.i18n.translate('budget.fy.closedError');
     return problemDetail(err) || this.i18n.translate('expenses.toast.failed');
   }
 
@@ -170,7 +176,7 @@ export class ExpenseTransfersState {
         this.saving.set(false);
         // 409 = the cost-centre pair changed under us. Name the reason instead
         // of a generic failure, and reload so the row shows the server truth.
-        if (err.status === 409) {
+        if (err.status === 409 && problemCode(err) !== FISCAL_YEAR_CLOSED) {
           this.toast.error(this.i18n.translate('expenses.transfers.immutablePair'));
           this.reload();
           return;

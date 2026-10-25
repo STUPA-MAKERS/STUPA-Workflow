@@ -289,7 +289,9 @@ export class BudgetDashboardComponent {
   readonly yearOptions = computed(() =>
     this.years().map((fy) => ({
       value: fy.id,
-      label: this.i18n.translate('budget.dash.yearShort', { year: fy.display }),
+      label: this.i18n.translate(fy.closedAt ? 'budget.dash.yearShortClosed' : 'budget.dash.yearShort', {
+        year: fy.display,
+      }),
     })),
   );
   readonly selectedYear = computed<FiscalYear | null>(
@@ -656,7 +658,7 @@ export class BudgetDashboardComponent {
   }
 
   /** Restore the first selection from the query params. Else take the first root and
-   *  its first fiscal year. */
+   *  its newest fiscal year. */
   private restored = false;
   private restoreOrDefault(tops: BudgetTreeNode[]): void {
     if (this.restored || !tops.length) return;
@@ -717,13 +719,12 @@ export class BudgetDashboardComponent {
     if (wanted === null && (ks || qpBudget) && this.pendingFiscalYears() > 0) return null;
     const budgetId = wanted ?? withFy[0].id;
 
-    // Both ways to `budgetId` above require at least one year, so `fys[0]` exists.
     const fys = this.fiscalYearsByBudget()[budgetId];
     const fy = qp.get('fy');
     return {
       budgetId,
       ksId: ks && this.nodeById().get(ks) ? ks : budgetId,
-      fyId: fy && fys.some((f) => f.id === fy) ? fy : fys[0].id,
+      fyId: fy && fys.some((f) => f.id === fy) ? fy : newestFyId(fys),
     };
   }
 
@@ -775,12 +776,12 @@ export class BudgetDashboardComponent {
   }
 
   /** Select a cost centre. A node under another root switches the root and keeps the
-   *  start year where that root has it. */
+   *  start year where that root has it, else takes its newest year. */
   selectKs(id: string): void {
     const root = this.rootOf(id) ?? id;
     if (root !== this.selectedBudgetId()) {
       const fys = this.fiscalYearsByBudget()[root] ?? [];
-      const fy = this.fyIdFor(root) || (fys[0]?.id ?? '');
+      const fy = this.fyIdFor(root) || newestFyId(fys);
       this.setSelection(root, id, fy);
     } else {
       this.setSelection(root, id, this.selectedFyId());
@@ -863,4 +864,11 @@ function toFigures(a: BudgetAllocationView): Figures {
 export function utilisation(f: Figures): number | null {
   const total = f.available + f.committed;
   return total > 0 ? Math.round((f.committed / total) * 100) : null;
+}
+
+/** The id of the newest fiscal year (the highest start year), or `''` without one. */
+function newestFyId(fys: readonly FiscalYear[]): string {
+  let newest: FiscalYear | null = null;
+  for (const f of fys) if (!newest || f.year > newest.year) newest = f;
+  return newest?.id ?? '';
 }

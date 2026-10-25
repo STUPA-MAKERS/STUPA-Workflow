@@ -110,7 +110,7 @@ from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.oauth_models import OAuthAuthorizationCode, OAuthToken
 from app.modules.auth.rbac import resolve_principal
 from app.modules.backup.models import Backup
-from app.modules.budget.tree_models import BudgetExpense, Invoice
+from app.modules.budget.tree_models import BudgetExpense, FiscalYear, Invoice
 from app.modules.delegations.models import (
     DelegationSubstitute,
     MeetingDelegation,
@@ -200,6 +200,7 @@ SUB_COLUMNS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
     ("meetings", Protocol.author),
     ("budget", BudgetExpense.actor),
     ("budget", Invoice.actor),
+    ("budget", FiscalYear.closed_by),
     ("config", SiteConfigVersion.created_by),
     ("config", GuestApplicationSettings.updated_by),
     ("config", MeetingSettings.updated_by),

@@ -60,6 +60,7 @@ class SubBookingOps(ExpenseOps):
         the create the parent amount equals the sum of its children.
         """
         parent = await self._subbooking_parent_or_error(parent_id)
+        await self._require_open_fiscal_year(parent.fiscal_year_id)
         child = BudgetExpense(
             budget_id=parent.budget_id,
             fiscal_year_id=parent.fiscal_year_id,

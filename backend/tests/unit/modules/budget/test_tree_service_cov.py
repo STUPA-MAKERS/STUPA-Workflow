@@ -577,13 +577,13 @@ async def test_update_expense_all_fields_with_app() -> None:
     app = _app(budget_id=node.id, data={"title": "T"})
     inv = _invoice(id=uuid.uuid4())  # open
     expense = _expense(budget_id=node.id, application_id=app.id, actor="u-1")
-    # gets: the BudgetExpense, the Invoice for the existence check, then after the
-    # commit the Application for display.
+    # gets: the BudgetExpense, its fiscal year (missing, so open), the Invoice for the
+    # existence check, then after the commit the Application for display.
     sess = fake_session(
         result(),                         # _child_counts (#subbookings), no children
         result(node),                     # _get_node for expense.budget_id after commit
         result(sub_ref("u-1", None, "bob@x")),   # _actor_names: display_name None gives email
-        gets=[expense, inv, app],
+        gets=[expense, None, inv, app],
     )
     svc = BudgetTreeService(sess)
     payload = ExpenseUpdate(
@@ -1756,7 +1756,7 @@ async def test_create_sub_booking_inherits_parent() -> None:
         result(Decimal("12.00")),   # _recompute_parent_amount
         result(node),               # _get_node
         result(),                   # _actor_names
-        gets=[parent, parent],      # _subbooking_parent_or_error and the recompute get
+        gets=[parent, None, parent],  # parent check, fiscal year (open), recompute get
     )
     svc = BudgetTreeService(sess)
     out = await svc.create_sub_booking(
@@ -1803,7 +1803,7 @@ async def test_delete_expense_child_recomputes_parent() -> None:
     sess = fake_session(
         result(child),               # select the booking to delete
         result(Decimal("30.00")),    # _recompute sums the remaining children
-        gets=[parent],               # the parent for _recompute
+        gets=[None, parent],         # the fiscal year (open), the parent for _recompute
     )
     svc = BudgetTreeService(sess)
     await svc.delete_expense(child.id)
@@ -1838,7 +1838,7 @@ async def test_delete_last_child_keeps_parent_amount() -> None:
     sess = fake_session(
         result(child),        # select
         result(Decimal("0")),  # a sum of 0 keeps the amount
-        gets=[parent],
+        gets=[None, parent],
     )
     svc = BudgetTreeService(sess)
     await svc.delete_expense(child.id)
@@ -1870,7 +1870,7 @@ async def test_update_expense_child_amount_recomputes_parent() -> None:
         result(),                   # _child_counts: the child has no children
         result(Decimal("35.00")),   # _recompute sums for the parent
         result(node),               # _get_node after the commit
-        gets=[child, parent],       # the update get and the recompute get
+        gets=[child, None, parent],  # the update get, fiscal year (open), recompute get
     )
     svc = BudgetTreeService(sess)
     out = await svc.update_expense(child.id, ExpenseUpdate(amount=Decimal("35.00")))

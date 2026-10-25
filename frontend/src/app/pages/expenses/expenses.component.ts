@@ -260,6 +260,8 @@ export class ExpensesComponent implements OnDestroy {
   readonly linkedApplication = signal<Application | null>(null);
   /** The fiscal-year labels ("2026", "2025/26") by id, loaded per top cost centre. */
   readonly fyLabels = signal<ReadonlyMap<string, string>>(new Map());
+  /** The ids of the closed fiscal years among the loaded ones. Their bookings are frozen. */
+  readonly closedFys = signal<ReadonlySet<string>>(new Set());
   private readonly fyRequested = new Set<string>();
 
   // --- selection (bulk) ------------------------------------------------------------
@@ -587,6 +589,14 @@ export class ExpensesComponent implements OnDestroy {
         if (id) this.loadFyLabels(id, tree);
       });
     });
+    // The row menus of a booker hide the write actions of a closed fiscal year, so the
+    // years of every top cost centre load once the tree is there.
+    effect(() => {
+      const tree = this.budgetTree();
+      untracked(() => {
+        if (this.canManage()) for (const top of tree) this.loadFyLabels(top.id, tree);
+      });
+    });
 
     effect(() => this.frame.fill.set(this.split()));
 
@@ -724,12 +734,21 @@ export class ExpensesComponent implements OnDestroy {
     if (!top || this.fyRequested.has(top.id)) return;
     this.fyRequested.add(top.id);
     this.api.listFiscalYears(top.id).subscribe({
-      next: (fys) =>
+      next: (fys) => {
         this.fyLabels.update((m) => {
           const next = new Map(m);
           for (const f of fys) next.set(f.id, f.display);
           return next;
-        }),
+        });
+        this.closedFys.update((c) => {
+          const next = new Set(c);
+          for (const f of fys) {
+            if (f.closedAt) next.add(f.id);
+            else next.delete(f.id);
+          }
+          return next;
+        });
+      },
       error: () => this.fyRequested.delete(top.id),
     });
   }
@@ -758,8 +777,17 @@ export class ExpensesComponent implements OnDestroy {
     return costCentreLabel(this.costCentres(), id, pathKey);
   }
 
+  /** The label of a fiscal year ("2026"); a closed year says so. */
   fyLabel(id: string): string | null {
-    return this.fyLabels().get(id) ?? null;
+    const year = this.fyLabels().get(id);
+    if (!year) return null;
+    return this.closedFys().has(id) ? this.i18n.translate('budget.fy.closedLabel', { year }) : year;
+  }
+
+  /** Whether the reader may change a booking of this fiscal year: `budget.book`, and
+   *  the year is not closed. */
+  canChange(fyId: string): boolean {
+    return this.canManage() && !this.closedFys().has(fyId);
   }
 
   // --- the open row ------------------------------------------------------------------
@@ -929,10 +957,11 @@ export class ExpensesComponent implements OnDestroy {
     this.dialogs.openInvoiceFile(inv);
   }
 
-  /** The row menu of a booking. */
+  /** The row menu of a booking. A booking of a closed fiscal year has no write action. */
   rowMenu(e: Expense): RowMenuSection[] {
     const main: RowMenuItem[] = [];
-    if (this.canManage()) {
+    const canChange = this.canChange(e.fiscalYearId);
+    if (canChange) {
       main.push({ id: 'edit', label: this.i18n.translate('action.edit'), icon: 'edit' });
       main.push({ id: 'sub', label: this.i18n.translate('expenses.sub.add'), icon: 'plus' });
     }
@@ -944,7 +973,7 @@ export class ExpensesComponent implements OnDestroy {
       });
     }
     const sections: RowMenuSection[] = main.length ? [{ items: main }] : [];
-    if (this.canManage()) {
+    if (canChange) {
       sections.push({
         items: [{ id: 'delete', label: this.i18n.translate('action.delete'), icon: 'trash', danger: true }],
       });
