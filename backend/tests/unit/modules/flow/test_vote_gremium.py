@@ -178,14 +178,14 @@ async def test_available_hides_a_budget_vote_without_gremium(
     to_normal = _t(app, normal.id)
     db = fake_session(result(app), result(to_vote, to_normal))
     db.get_results = [gvote, normal]
-    out = await FlowService(db).available_transitions(app.id, _principal(), deadline_passed=False)
+    out = await FlowService(db).available_transitions(app.id, _principal())
     assert [t.id for t in out] == [to_normal.id]
 
     # With a deciding Gremium the transition shows, with that Gremium as agenda Gremium.
     effective["value"] = gid = uuid4()
     db = fake_session(result(app), result(to_vote, to_normal))
     db.get_results = [gvote, normal]
-    out = await FlowService(db).available_transitions(app.id, _principal(), deadline_passed=False)
+    out = await FlowService(db).available_transitions(app.id, _principal())
     by_id = {t.id: t for t in out}
     assert (by_id[to_vote.id].adds_to_agenda, by_id[to_vote.id].agenda_gremium_id) == (True, gid)
     assert by_id[to_normal.id].adds_to_agenda is False
@@ -216,7 +216,7 @@ async def test_fire_into_a_budget_vote_without_gremium_409(
     db = fake_session(result(app), result(t))
     db.get_results = [gvote]
     with pytest.raises(ConflictError) as err:
-        await FlowService(db).fire(app.id, t.id, _principal(), deadline_passed=False)
+        await FlowService(db).fire(app.id, t.id, _principal())
     assert err.value.code == "no_vote_gremium"
     assert db.committed == 0
 
@@ -228,7 +228,7 @@ async def test_fire_stores_the_snapshot(effective: dict[str, UUID | None]) -> No
     t = _t(app, gvote.id)
     db = fake_session(result(app), result(t), result(rowcount=1))
     db.get_results = [gvote]
-    await FlowService(db).fire(app.id, t.id, _principal(), deadline_passed=False)
+    await FlowService(db).fire(app.id, t.id, _principal())
     update = db.statements[2]
     assert update.compile().params["vote_gremium_id"] == gid
 
@@ -243,7 +243,7 @@ async def test_auto_advance_skips_a_budget_vote_without_gremium(
     manual = _t(app, normal.id)
     db = fake_session(result(app), result(current), result(manual, skipped))
     db.get_results = [gvote]
-    assert await FlowService(db).auto_advance(app.id, _principal(), deadline_passed=False) is None
+    assert await FlowService(db).auto_advance(app.id, _principal()) is None
 
 
 async def test_force_status_into_a_budget_vote_without_gremium_409(

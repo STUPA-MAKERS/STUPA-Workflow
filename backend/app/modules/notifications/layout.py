@@ -48,12 +48,6 @@ _REASONS: dict[str, dict[str, str]] = {
         "en": "You are receiving this email because a meeting protocol of "
         "your committee was finalized.",
     },
-    "deadline": {
-        "de": "Sie erhalten diese E-Mail, weil eine Frist zu einem Antrag "
-        "näher rückt, der Sie betrifft.",
-        "en": "You are receiving this email because a deadline on an "
-        "application that concerns you is approaching.",
-    },
     "task": {
         "de": "Sie erhalten diese E-Mail, weil ein Antrag einen Schritt "
         "erreicht hat, in dem Sie handeln können.",

@@ -20,7 +20,6 @@ describe('mockAccount (FE13 demo data)', () => {
       'meeting',
       'delegation',
       'protocol',
-      'deadline',
       'privacy',
     ]);
     const saved = mockAccount('PUT', '/api/notifications/preferences', {
@@ -103,7 +102,7 @@ describe('mockApiInterceptor: account routes', () => {
 
   it('loads the demo data lazily and answers the account pages', async () => {
     const prefs = await firstValueFrom(http.get<NotificationPreference[]>('/api/notifications/preferences'));
-    expect(prefs.length).toBe(9);
+    expect(prefs.length).toBe(8);
     const setup = await firstValueFrom(http.get<McpSetup>('/api/mcp/config'));
     expect(setup.clientId).toBe('antragsplattform-mcp');
   });

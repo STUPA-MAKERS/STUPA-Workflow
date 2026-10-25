@@ -1923,13 +1923,11 @@ class VotingService:
             if decision is not None:
                 # The status event of the branch carries the decision (timeline, revert).
                 decision.status_event_id = staged.status_event_id
-            # The deadline of the new state joins the same commit.
-            await flow.schedule_staged_deadline(staged, commit=False)
         await self.session.commit()
 
         new_state_id: UUID | None = None
         if staged is not None:
-            fired = await flow.after_commit(staged, schedule_deadline=False)
+            fired = await flow.after_commit(staged)
             new_state_id = fired.new_state_id
 
         tally_out = TallyOut(

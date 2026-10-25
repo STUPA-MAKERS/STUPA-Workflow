@@ -23,7 +23,6 @@ from app.modules.applications.service.service_base import (
 )
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
-from app.modules.deadlines.service import state_deadline_follows_edits
 from app.modules.forms.validation import (
     SYSTEM_TITLE_KEY,
     AnswerValidationError,
@@ -58,9 +57,7 @@ class EditOps(ApplicationsServiceBase):
         The response then also holds no ``isPII`` field.
 
         The edit writes an ``application_update`` audit entry with the version
-        number and the keys of the changed fields, never the values. When the
-        deadline policy of the current state is ``relative_changed``, the
-        deadline moves to the new ``updated_at``.
+        number and the keys of the changed fields, never the values.
 
         After a decision (F1) the requested amount must stay at or above the approved
         amount; else 422 ``approved_amount_exceeds_requested``.
@@ -154,13 +151,6 @@ class EditOps(ApplicationsServiceBase):
         # The UPDATE expires ``updated_at``, a server-side onupdate column. Reload
         # it before serializing, to avoid lazy IO outside an await.
         await self.session.refresh(app)
-        if state is not None and await state_deadline_follows_edits(
-            self.session, state.config
-        ):
-            # Local import: the flow engine imports the applications models.
-            from app.modules.flow.service import FlowService
-
-            await FlowService(self.session).schedule_state_deadline(app, state)
         return await self._to_out(app, include_pii=False, strip_pii_fields=preserve_pii)
 
     async def set_archived(

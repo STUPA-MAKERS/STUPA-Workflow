@@ -1,11 +1,8 @@
-"""Deadline table.
+"""ORM models of the old deadline tables `deadline` and `deadline_policy`.
 
-A `Deadline` binds a due time to an application, an application type, or both.
-If `action_on_pass` (`{"transitionId": "<uuid>"}`) is set, the arq cron fires
-that transition at expiry and then sets the field to NULL. The row leaves the
-partial scan index, so a rerun never fires the transition twice. This is the
-idempotency marker. `reminded_at` marks a reminder that went out already. All
-workers together thus send a reminder exactly one time.
+The named deadline policies are removed from the application. No code reads or writes
+these tables any more. The models stay registered in `app.models` only, so the schema
+stays unchanged until a migration drops the tables.
 """
 
 from __future__ import annotations

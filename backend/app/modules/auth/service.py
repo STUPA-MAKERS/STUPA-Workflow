@@ -149,11 +149,11 @@ async def verify_magic_link(
     link (O4). Each action checks the current state.
 
     The first verify of a guest application confirms its email. The application
-    then leaves its rest in the flow: `FlowService.start_confirmed` schedules the
-    deadline of the current state, runs the automatic transitions and sends the
-    task mail. `dispatcher` sends the mails and the other flow actions. The start
-    commits the session. A later verify finds the email confirmed and starts
-    nothing, so a second click sends no second mail.
+    then leaves its rest in the flow: `FlowService.start_confirmed` runs the
+    automatic transitions and sends the task mail. `dispatcher` sends the mails
+    and the other flow actions. The start commits the session. A later verify
+    finds the email confirmed and starts nothing, so a second click sends no
+    second mail.
 
     Returns:
         The application id, the scope (always `edit`) and the applicant session

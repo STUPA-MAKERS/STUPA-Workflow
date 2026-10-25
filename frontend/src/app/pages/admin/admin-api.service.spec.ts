@@ -519,20 +519,6 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(http.expectOne('/api/admin/gremium-roles/gr-9').request.method).toBe('DELETE');
   });
 
-  it('wires deadline-policy CRUD endpoints', () => {
-    s.listDeadlinePolicies().subscribe();
-    http.expectOne('/api/admin/deadline-policies').flush([]);
-
-    s.createDeadlinePolicy({ key: 'k', label: { de: 'L' }, kind: 'absolute' }).subscribe();
-    expect(http.expectOne('/api/admin/deadline-policies').request.method).toBe('POST');
-
-    s.updateDeadlinePolicy('dp-9', { offsetDays: 3 }).subscribe();
-    expect(http.expectOne('/api/admin/deadline-policies/dp-9').request.method).toBe('PATCH');
-
-    s.deleteDeadlinePolicy('dp-9').subscribe();
-    expect(http.expectOne('/api/admin/deadline-policies/dp-9').request.method).toBe('DELETE');
-  });
-
   it('wires the gremium membership and the membership/role mapping endpoints', () => {
     s.listGremiumMemberships('g1').subscribe();
     http.expectOne('/api/admin/gremien/g1/memberships').flush([]);
@@ -1046,21 +1032,6 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     await firstValueFrom(s.deleteGremiumRole('any'));
     // The store re-initializes to an array. Nothing crashes and the list is empty.
     expect(await firstValueFrom(s.listGremiumRoles(MOCK_GREMIUM_STUPA_ID))).toEqual([]);
-  });
-
-  it('CRUDs deadline policies in the mock store', async () => {
-    const s = svc();
-    const seeded = await firstValueFrom(s.listDeadlinePolicies());
-    expect(seeded.map((p) => p.kind)).toEqual(['relative_changed', 'relative_submitted', 'absolute', 'recurring']);
-    const created = await firstValueFrom(s.createDeadlinePolicy({ key: 'sem', label: { de: 'Semester' }, kind: 'absolute' }));
-    expect(created.id).toBe('dp-5');
-    const updated = await firstValueFrom(s.updateDeadlinePolicy(created.id, { offsetDays: 5 }));
-    expect(updated.offsetDays).toBe(5);
-    // An unknown id gives a synthesized fallback.
-    const fallback = await firstValueFrom(s.updateDeadlinePolicy('ghost', { offsetDays: 1 }));
-    expect(fallback.id).toBe('ghost');
-    await firstValueFrom(s.deleteDeadlinePolicy(created.id));
-    expect(await firstValueFrom(s.listDeadlinePolicies())).toEqual(seeded);
   });
 
   it('keeps the guest settings in the mock store', async () => {

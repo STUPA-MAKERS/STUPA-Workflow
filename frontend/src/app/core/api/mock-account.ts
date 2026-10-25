@@ -23,7 +23,6 @@ let prefs: NotificationPreference[] = [
   { kind: 'meeting', enabled: true },
   { kind: 'delegation', enabled: true },
   { kind: 'protocol', enabled: false },
-  { kind: 'deadline', enabled: true },
   { kind: 'privacy', enabled: true },
 ];
 

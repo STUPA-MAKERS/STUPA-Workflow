@@ -516,7 +516,7 @@ class NotificationService:
         """
         specs = _as_specs(action.get("recipients", []))
         # The builtin and status templates reference the title and the status. Not
-        # every caller (deadline worker, legacy flows) supplies them. Default to empty
+        # every caller (legacy flows) supplies them. Default to empty
         # strings so StrictUndefined does not fail the send.
         context = dict(context or {})
         context.setdefault("applicationTitle", "")
@@ -622,7 +622,7 @@ class NotificationService:
             )
             return int(ok)
         # The DB holds no template, so use the builtin fallback. A catalogue key (for
-        # example ``deadline_approaching``) uses its own default. Every other key uses
+        # example ``status_update_team``) uses its own default. Every other key uses
         # status_update.
         rendered = render_mail(
             subject_i18n=spec.subject_i18n if spec else _BUILTIN_NOTIFY_SUBJECT,

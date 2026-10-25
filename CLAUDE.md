@@ -43,7 +43,6 @@ Backend domain modules (`backend/app/modules/<module>`):
 - **be-forms** — versioned form JSON, definition/answer validation, JsonLogic visibleIf/compute
 - **be-flow** — declarative state machine, guard evaluator (no eval), transition actions
   *(critical)*
-- **be-deadlines** — named deadline policies referenced by the flow
 - **be-voting** — quorum/majority/secret ballot, tally, gremium-scoped reads *(critical)*
 - **be-livevote** — meetings, agenda items, attendance, live vote over WebSocket + beamer stream
 - **be-protocol** — meeting protocol (Markdown→PDF), vote snippets, finalize + mail

@@ -4,7 +4,7 @@ A guard decides if a transition can fire. The evaluator is declarative and works
 whitelist. It never calls `eval`.
 
 The catalog splits into conditions and actor gates. Conditions apply to automatic and
-manual transitions: `deadlinePassed`, `applicantRoleIs`, `applicantCommitteeIs`,
+manual transitions: `applicantRoleIs`, `applicantCommitteeIs`,
 `applicationTypeIs` (the application type key), `attachmentPresent` (one attachment or
 more), `budgetIs`, `budgetFitsApplication`, `budgetHasDecisionGremium` (the cost center
 has an effective deciding Gremium), `hasField`. `compare` adds a typed
@@ -34,7 +34,6 @@ from typing import Any
 
 GUARD_CONDITION_OPERATORS: frozenset[str] = frozenset(
     {
-        "deadlinePassed",
         "applicantRoleIs",
         "applicantCommitteeIs",
         "applicationTypeIs",
@@ -83,7 +82,6 @@ _STRING_VALUE_OPERATORS: frozenset[str] = frozenset(
 )
 _BOOL_VALUE_OPERATORS: frozenset[str] = frozenset(
     {
-        "deadlinePassed",
         "budgetFitsApplication",
         "actorIsApplicant",
         "attachmentPresent",
@@ -183,7 +181,6 @@ class GuardContext:
     """
 
     manual: bool = True
-    deadline_passed: bool = False
     actor_is_applicant: bool = False
     roles: frozenset[str] = frozenset()
     actor_committees: frozenset[str] = frozenset()
@@ -335,7 +332,6 @@ _LEAF_EVALUATORS: dict[str, Callable[[Any, GuardContext], bool]] = {
     "budgetIs": lambda value, ctx: ctx.budget_id is not None and str(value) == ctx.budget_id,
     "budgetFitsApplication": lambda value, ctx: ctx.budget_fits == bool(value),
     "attachmentPresent": lambda value, ctx: ctx.has_attachment == bool(value),
-    "deadlinePassed": lambda value, ctx: ctx.deadline_passed == bool(value),
     "isInVoteGremium": lambda value, ctx: (
         ctx.vote_gremium_id is not None and ctx.vote_gremium_id in ctx.actor_committees
     )

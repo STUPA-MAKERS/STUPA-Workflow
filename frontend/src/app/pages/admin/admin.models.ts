@@ -31,11 +31,6 @@ export interface StateConfig {
    * the application enters the state (`decisionGremiumId` of the node or an ancestor).
    */
   gremiumSource?: GremiumSource;
-  /**
-   * Key of a named deadline policy: on entering the state the server creates a
-   * deadline that the state's `deadlinePassed` transition fires.
-   */
-  deadlinePolicyKey?: string;
 }
 
 export interface StateDef {
@@ -107,7 +102,6 @@ export const COMPARE_OPS: readonly CompareOp[] = ['==', '!=', '<', '<=', '>', '>
 
 /** Condition operators (on automatic + manual transitions). */
 export type GuardConditionOp =
-  | 'deadlinePassed'
   | 'applicantRoleIs'
   | 'applicantCommitteeIs'
   | 'applicationTypeIs'
@@ -126,7 +120,6 @@ export type GuardCombinator = 'and' | 'or' | 'not';
 export type Guard = Record<string, unknown>;
 
 export const GUARD_CONDITION_OPERATORS: readonly GuardConditionOp[] = [
-  'deadlinePassed',
   'applicantRoleIs',
   'applicantCommitteeIs',
   'applicationTypeIs',
@@ -182,7 +175,6 @@ export const ASSIGN_BUDGET_ACTIONS: readonly ActionType[] = [
 
 /** Bool-valued guard operators. Mirrors `_BOOL_VALUE_OPERATORS` of the backend. */
 export const GUARD_BOOL_OPERATORS: readonly GuardLeafOperator[] = [
-  'deadlinePassed',
   'budgetFitsApplication',
   'budgetHasDecisionGremium',
   'actorIsApplicant',
@@ -765,9 +757,7 @@ export type EventName =
   | 'comment_added'
   | 'budget_reserved'
   | 'budget_booked'
-  | 'protocol_finalized'
-  | 'deadline_approaching'
-  | 'deadline_passed';
+  | 'protocol_finalized';
 
 export const EVENT_NAMES: readonly EventName[] = [
   'application_created',
@@ -781,8 +771,6 @@ export const EVENT_NAMES: readonly EventName[] = [
   'budget_reserved',
   'budget_booked',
   'protocol_finalized',
-  'deadline_approaching',
-  'deadline_passed',
 ] as const;
 
 export type RecipientKind = 'group' | 'role' | 'applicant';
@@ -867,31 +855,6 @@ export function sortGremiumRoles(roles: readonly GremiumRole[], label: (r: Gremi
     return i < 0 ? FORCED_GREMIUM_ROLE_KEYS.length : i;
   };
   return [...roles].sort((a, b) => rank(a) - rank(b) || label(a).localeCompare(label(b)));
-}
-
-/** Kind of a named deadline policy. */
-export type DeadlineKind =
-  | 'absolute'
-  | 'relative_submitted'
-  | 'relative_changed'
-  | 'recurring';
-
-/** Named deadline policy (registry, referenced by the flow via `key`). */
-export interface DeadlinePolicy {
-  id: Uuid;
-  key: string;
-  label: I18nMap;
-  kind: DeadlineKind;
-  /** Only for `absolute`: a fixed date (editable per semester), ISO string. */
-  absoluteAt?: string | null;
-  /** Only for the relative variants: offset in days. */
-  offsetDays?: number | null;
-  /** Optional wall-clock anchor `"HH:MM"` (local time in `timezone`, DST-correct). */
-  atTime?: string | null;
-  /** IANA timezone for `atTime` (e.g. `Europe/Berlin`). */
-  timezone?: string | null;
-  /** Only for `recurring`: ordered list of `YYYY-MM-DD` dates (rolling window). */
-  dates?: string[] | null;
 }
 
 /**

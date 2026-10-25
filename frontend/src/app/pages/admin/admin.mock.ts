@@ -14,7 +14,6 @@ import type {
   Branding,
   CdVariant,
   ConfigRevision,
-  DeadlinePolicy,
   FlowGraph,
   FormDraft,
   GuestSettings,
@@ -362,7 +361,7 @@ export const MOCK_WEBHOOKS: WebhookConfig[] = [
     events: ['protocol_finalized', 'vote_closed', 'budget_booked'],
     active: true,
   },
-  { id: 'wh-3', name: 'Kalender', url: 'https://calendar.example.org/hook', events: ['deadline_approaching'], active: true },
+  { id: 'wh-3', name: 'Kalender', url: 'https://calendar.example.org/hook', events: ['vote_opened'], active: true },
   { id: 'wh-4', name: 'Test-Endpunkt', url: 'https://test.example.org/hook', events: [], active: false },
 ];
 
@@ -372,14 +371,6 @@ export const MOCK_WEBHOOK_STATUS: WebhookDeliveryStatus[] = [
   { webhookId: 'wh-2', lastState: 'dead', reasonClass: 'target_server_error', responseCode: 502, attempts: 5, lastAt: '2026-10-04T18:12:00Z' },
   { webhookId: 'wh-3', lastState: 'pending', reasonClass: 'in_progress', responseCode: null, attempts: 2, lastAt: '2026-10-05T07:45:00Z' },
   { webhookId: 'wh-4', lastState: 'never', reasonClass: 'no_deliveries', responseCode: null, attempts: 0, lastAt: null },
-];
-
-/** Deadline policies of the mock flow: one of each kind. */
-export const MOCK_DEADLINE_POLICIES: DeadlinePolicy[] = [
-  { id: 'dp-1', key: 'nachforderung_14d', label: { de: 'Nachforderung beantworten', en: 'Answer the request' }, kind: 'relative_changed', offsetDays: 14, atTime: '23:59', timezone: 'Europe/Berlin' },
-  { id: 'dp-2', key: 'pruefung_21d', label: { de: 'Prüfung durch den Finanzausschuss', en: 'Review by the finance committee' }, kind: 'relative_submitted', offsetDays: 21 },
-  { id: 'dp-3', key: 'einreichschluss_ws', label: { de: 'Einreichschluss Wintersemester', en: 'Winter term deadline' }, kind: 'absolute', absoluteAt: '2026-10-15T10:00:00Z', atTime: '12:00', timezone: 'Europe/Berlin' },
-  { id: 'dp-4', key: 'stupa_sitzungen', label: { de: 'Sitzungstermine Studierendenparlament', en: 'Student parliament meetings' }, kind: 'recurring', dates: ['2026-09-29', '2026-10-13', '2026-10-27', '2026-11-10'], atTime: '18:00', timezone: 'Europe/Berlin' },
 ];
 
 /** The guest settings of the mock backend (the server defaults). */
@@ -688,7 +679,7 @@ export const MOCK_FLOW: FlowGraph = {
   states: [
     { key: 'entwurf', label: { de: 'Entwurf', en: 'Draft' }, isInitial: true },
     { key: 'eingereicht', label: { de: 'Eingereicht', en: 'Submitted' } },
-    { key: 'pruefung', label: { de: 'In Prüfung', en: 'In review' }, color: '#f18700', config: { deadlinePolicyKey: 'pruefung_21d' } },
+    { key: 'pruefung', label: { de: 'In Prüfung', en: 'In review' }, color: '#f18700' },
     { key: 'nachforderung', label: { de: 'Nachforderung', en: 'More details' }, color: '#f18700' },
     {
       key: 'tagesordnung',
