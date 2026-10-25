@@ -5,7 +5,10 @@ Every mutation writes an audit entry (`AuditAction.CONFIG_CHANGE`, target type
 services.
 
 The upload path is authoritative about the bytes. It caps the real size, sniffs
-the magic bytes and compares them against the declared type. The allowlist adds
+the magic bytes and compares them against the declared type. ClamAV then scans
+the bytes before the object goes to the bucket (`files.scanner.scan_or_raise`),
+because the stored bytes are the bytes of the client: the upload does not encode
+them again. The allowlist adds
 SVG and PDF, because these bytes only ever reach the LaTeX renderer. The
 download path therefore forces an attachment disposition and never answers with
 ``image/svg+xml`` — see `app.modules.admin.router.get_cd_variant_logo_file`.
@@ -46,7 +49,9 @@ from app.modules.admin.schemas import (
 )
 from app.modules.admin.service.service_base import ConfigServiceBase
 from app.modules.audit.actions import AuditAction
-from app.modules.files.storage import StorageError
+from app.modules.files.scanner import scan_or_raise
+from app.modules.files.storage import ObjectStorage, StorageError
+from app.settings import Settings, get_settings
 from app.shared.errors import (
     ConflictError,
     NotFoundError,
@@ -59,6 +64,8 @@ from app.shared.filenames import sanitize_display_name, sanitize_storage_name
 
 if TYPE_CHECKING:
     from uuid import UUID
+
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 # Prefix of every CD-logo object in the bucket. It keeps the logos apart from the
 # attachments and the invoices.
@@ -153,7 +160,21 @@ def _variant_out(row: CdVariant, logos: list[CdVariantLogo]) -> CdVariantOut:
 
 
 class CdVariantService(ConfigServiceBase):
-    """Corporate-design variants: CRUD, logo upload, vendored logos, ordering."""
+    """Corporate-design variants: CRUD, logo upload, vendored logos, ordering.
+
+    Without explicit settings the logo upload reads ``get_settings()``, so the virus
+    scan never falls back to a skip.
+    """
+
+    def __init__(
+        self,
+        session: AsyncSession,
+        *,
+        storage: ObjectStorage | None = None,
+        settings: Settings | None = None,
+    ) -> None:
+        super().__init__(session, storage=storage)
+        self.settings = settings
 
     # --- variants ---------------------------------------------------------
 
@@ -280,16 +301,17 @@ class CdVariantService(ConfigServiceBase):
             NotFoundError: No variant has this id (404).
             PayloadTooLargeError: The bytes exceed the cap (413).
             UnsupportedMediaTypeError: The magic bytes are not one of the
-                accepted types (415).
+                accepted types, or the virus scan found a signature (415).
             ValidationProblem: A square logo is not square, too small or has an
                 unreadable header (422).
             ServiceUnavailableError: The object storage is off or the write
-                failed (503).
+                failed, or the virus scan is unavailable in production (503).
         """
         await self._get_or_404(variant_id)
         mime = check_square_logo(data) if slot == "square" else _check_render_logo(data)
         if self.storage is None:
             raise ServiceUnavailableError("Object storage unavailable.")
+        await scan_or_raise(data, self.settings or get_settings())
         display_name = sanitize_display_name(filename)
         object_key = f"{CD_LOGO_PREFIX}{uuid.uuid4().hex}/{sanitize_storage_name(display_name)}"
         try:

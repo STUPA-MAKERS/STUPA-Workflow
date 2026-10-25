@@ -51,7 +51,6 @@ from app.modules.budget.tree_schemas import (
     TransferUpdate,
 )
 from app.modules.files.mime import MimeRejected
-from app.modules.files.scanner import ScannerError, ScanVerdict
 from app.modules.files.storage import StorageError
 from app.settings import Settings
 from app.shared.errors import (
@@ -1185,61 +1184,6 @@ async def test_validate_scan_store_not_pdf(monkeypatch: pytest.MonkeyPatch) -> N
     svc = BudgetTreeService(fake_session(), storage=_ok_storage(), settings=_settings())
     with pytest.raises(UnsupportedMediaTypeError):
         await svc._validate_scan_store(b"data", filename="x.png")
-
-
-async def test_scan_skipped_when_no_scanner_dev() -> None:
-    # A build_scanner of None outside production skips the scan and raises nothing.
-    svc = BudgetTreeService(fake_session(), settings=_settings(environment="development"))
-    await svc._scan_or_raise(b"data")  # no exception
-
-
-async def test_scan_no_scanner_production_fails_closed() -> None:
-    svc = BudgetTreeService(fake_session(), settings=_settings(environment="production"))
-    with pytest.raises(ServiceUnavailableError):
-        await svc._scan_or_raise(b"data")
-
-
-async def test_scan_clean(monkeypatch: pytest.MonkeyPatch) -> None:
-    class _Scanner:
-        async def scan(self, data: bytes) -> ScanVerdict:
-            return ScanVerdict(clean=True)
-
-    monkeypatch.setattr(invoices_mod, "build_scanner", lambda s: _Scanner())
-    svc = BudgetTreeService(fake_session(), settings=_settings())
-    await svc._scan_or_raise(b"data")  # a clean verdict raises nothing
-
-
-async def test_scan_error_raises(monkeypatch: pytest.MonkeyPatch) -> None:
-    class _Scanner:
-        async def scan(self, data: bytes) -> ScanVerdict:
-            raise ScannerError("down")
-
-    monkeypatch.setattr(invoices_mod, "build_scanner", lambda s: _Scanner())
-    svc = BudgetTreeService(fake_session(), settings=_settings())
-    with pytest.raises(ServiceUnavailableError):
-        await svc._scan_or_raise(b"data")
-
-
-async def test_scan_infected_raises(monkeypatch: pytest.MonkeyPatch) -> None:
-    class _Scanner:
-        async def scan(self, data: bytes) -> ScanVerdict:
-            return ScanVerdict(clean=False, signature="EICAR")
-
-    monkeypatch.setattr(invoices_mod, "build_scanner", lambda s: _Scanner())
-    svc = BudgetTreeService(fake_session(), settings=_settings())
-    with pytest.raises(UnsupportedMediaTypeError):
-        await svc._scan_or_raise(b"data")
-
-
-async def test_scan_infected_unknown_signature(monkeypatch: pytest.MonkeyPatch) -> None:
-    class _Scanner:
-        async def scan(self, data: bytes) -> ScanVerdict:
-            return ScanVerdict(clean=False, signature=None)
-
-    monkeypatch.setattr(invoices_mod, "build_scanner", lambda s: _Scanner())
-    svc = BudgetTreeService(fake_session(), settings=_settings())
-    with pytest.raises(UnsupportedMediaTypeError):
-        await svc._scan_or_raise(b"data")
 
 
 async def test_store_invoice_file_no_storage() -> None:

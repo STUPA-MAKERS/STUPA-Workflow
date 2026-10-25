@@ -16,7 +16,7 @@ description: Backend attachment storage for applications: multipart upload, libm
 - `mime.py` — libmagic sniff + `ALLOWED_MIME_TYPES` allowlist, `_EXT_TO_MIME` ext↔mime match, `validate_upload`, `MimeRejected`.
 - `../../shared/filenames.py` — the two names of an upload and the download header. `sanitize_display_name` (the stored `filename`, keeps Unicode), `sanitize_storage_name` (the ASCII last segment of the object key), `content_disposition` (the header of every download route). See the gotcha "Two names per upload".
 - `storage.py` — `ObjectStorage` Protocol, `MinioStorage` (sync minio client via `asyncio.to_thread`), `build_object_storage`, `StorageError`.
-- `scanner.py` — `VirusScanner` Protocol, `ClamdScanner` (clamd TCP INSTREAM), `ScanVerdict`, `build_scanner`, `EICAR_TEST_BYTES`, `ScannerError`.
+- `scanner.py` — `VirusScanner` Protocol, `ClamdScanner` (clamd TCP INSTREAM), `ScanVerdict`, `build_scanner`, `EICAR_TEST_BYTES`, `ScannerError`, and `scan_or_raise`: the synchronous in-request scan of every upload that skips the quarantine (invoice PDFs, Markdown images, CD logos). Infected gives 415 with the signature, a missing or failed scanner in production 503, no scanner outside production skips.
 - `queue.py` — `ScanQueue` Protocol, `ArqScanQueue`, `SCAN_TASK_NAME="scan_attachment"`, `scan_queue_from_pool`.
 - `../../../worker/scan.py` — arq task `scan_attachment`: load by id → fetch from MinIO → ClamAV → `finalize_scan`. It scans drafts too. A transient error raises `arq.Retry` with a linear backoff, up to `scan_max_tries`. A row that disappears during the scan gives `"gone"`.
 - `../../../worker/files_drafts.py` — hourly arq cron `purge_draft_attachments`: delete the expired drafts in batches (`FOR UPDATE SKIP LOCKED`), then remove their objects as best effort, then delete the expired draft tokens.
@@ -60,6 +60,6 @@ description: Backend attachment storage for applications: multipart upload, libm
 - The edge nginx gives both upload routes (`/api/applications/{id}/attachments`, `/api/apply/attachments`) the 11m body limit. `enforce_attachment_body_cap` (Content-Length, `attachment_max_bytes` + 64 KiB) and the capped read stay as defense in depth.
 - Tunables in settings: `attachment_max_bytes`, `attachment_url_ttl_seconds`, `attachment_draft_ttl_days`, `attachment_draft_max_files`, `attachment_draft_max_bytes`, `storage_enabled`/`minio_*`, `clamav_*`, `scan_max_tries`, `scan_retry_backoff_seconds`.
 
-- **Markdown images are not attachments.** An image pasted into a Markdown text goes to `POST /api/media/images` (`be-media`): no `attachment` row, no scan, re-encoded by Pillow, object key `media/images/<id>` in the same bucket. The chat and the attachment panel of the SPA show a clean raster attachment as a thumbnail through `/download?inline=1`.
+- **Markdown images are not attachments.** An image pasted into a Markdown text goes to `POST /api/media/images` (`be-media`): no `attachment` row, a synchronous scan (`scan_or_raise`) instead of the quarantine, re-encoded by Pillow, object key `media/images/<id>` in the same bucket. The chat and the attachment panel of the SPA show a clean raster attachment as a thumbnail through `/download?inline=1`.
 
 **Related:** be-applications, be-audit, be-privacy, be-notifications, be-tickets, be-todos, be-media

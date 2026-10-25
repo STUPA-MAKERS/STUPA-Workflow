@@ -26,7 +26,7 @@ from app.modules.budget.tree_schemas import (
     InvoiceUpdate,
 )
 from app.modules.files.mime import MimeRejected, validate_upload
-from app.modules.files.scanner import ScannerError, build_scanner
+from app.modules.files.scanner import scan_or_raise
 from app.modules.files.storage import StorageError
 from app.search import dialect_of, trigram_rank
 from app.shared.errors import (
@@ -339,7 +339,7 @@ class InvoiceOps(BudgetTreeServiceBase):
         if mime != "application/pdf":
             raise UnsupportedMediaTypeError("Invoice import expects a PDF.")
 
-        await self._scan_or_raise(data)
+        await scan_or_raise(data, self.settings)
         storage_key = await self._store_invoice_file(
             data, mime, sanitize_storage_name(display_name)
         )
@@ -379,7 +379,7 @@ class InvoiceOps(BudgetTreeServiceBase):
         if mime != "application/pdf":
             raise UnsupportedMediaTypeError("Invoice import expects a PDF.")
 
-        await self._scan_or_raise(data)
+        await scan_or_raise(data, self.settings)
         # The parser runs synchronously and binds the CPU. Move it to a thread,
         # so it does not block the event loop.
         parsed = await asyncio.to_thread(parse_zugferd_pdf, data)
@@ -434,28 +434,6 @@ class InvoiceOps(BudgetTreeServiceBase):
         except StorageError as exc:
             raise ServiceUnavailableError("Could not read invoice file.") from exc
         return data, inv.file_mime or "application/pdf", inv.file_name or "beleg.pdf"
-
-    async def _scan_or_raise(self, data: bytes) -> None:
-        """Scan the data for viruses and raise on a bad verdict.
-
-        Without ClamAV the scan is skipped, which covers development and
-        contract CI. In `production` the method fails closed. The server never
-        stores an unscanned invoice PDF when the scanner is missing. This
-        matches the quarantine of the files module.
-        """
-        scanner = build_scanner(self.settings)
-        if scanner is None:
-            if self.settings.environment == "production":
-                raise ServiceUnavailableError("Virus scan unavailable.")
-            return
-        try:
-            verdict = await scanner.scan(data)
-        except ScannerError as exc:
-            raise ServiceUnavailableError("Virus scan unavailable.") from exc
-        if not verdict.clean:
-            raise UnsupportedMediaTypeError(
-                f"File rejected by virus scan: {verdict.signature or 'unknown'}"
-            )
 
     async def _store_invoice_file(self, data: bytes, mime: str, key_name: str) -> str:
         if self.storage is None:

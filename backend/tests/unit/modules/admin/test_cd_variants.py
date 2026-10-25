@@ -43,7 +43,10 @@ from app.modules.admin.schemas import (
 )
 from app.modules.admin.service import ConfigService
 from app.modules.admin.service.cd_variants import CD_LOGO_PREFIX, CdVariantService
+from app.modules.files import scanner as scanner_mod
+from app.modules.files.scanner import ScanVerdict
 from app.modules.files.storage import StorageError
+from app.settings import Settings, load_settings
 from app.shared.errors import (
     ConflictError,
     NotFoundError,
@@ -808,3 +811,33 @@ async def test_resolve_storage_error_is_unavailable() -> None:
         await resolve_cd_variant_by_key(
             _resolver_session(variant, [logo]), Failing(), variant.key  # type: ignore[arg-type]
         )
+
+
+async def test_upload_logo_infected_is_refused_before_the_store(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _Infected:
+        async def scan(self, data: bytes) -> ScanVerdict:
+            return ScanVerdict(clean=False, signature="Eicar-Test-Signature")
+
+    def _build(_settings: Settings) -> _Infected:
+        return _Infected()
+
+    monkeypatch.setattr(scanner_mod, "build_scanner", _build)
+    storage = FakeStorage()
+    s, sess = svc(gets=[variant_row()], storage=storage)
+    with pytest.raises(UnsupportedMediaTypeError, match="Eicar-Test-Signature"):
+        await s.upload_logo(uuid.uuid4(), SVG, slot="title", filename="a.svg", actor="a")
+    assert storage.put_calls == []
+    assert sess.committed == 0
+
+
+async def test_upload_logo_without_scanner_in_production_is_unavailable() -> None:
+    session = FakeSession([], gets=[variant_row()])
+    s = CdVariantService(
+        session,  # type: ignore[arg-type]
+        storage=FakeStorage(),
+        settings=load_settings(environment="production"),
+    )
+    with pytest.raises(ServiceUnavailableError, match="Virus scan"):
+        await s.upload_logo(uuid.uuid4(), SVG, slot="title", filename="a.svg", actor="a")

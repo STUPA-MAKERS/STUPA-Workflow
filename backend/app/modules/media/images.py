@@ -6,7 +6,8 @@ chunks, comments; an ICC profile stays, so the colors stay right), scales the lo
 side down to ``MAX_SIDE`` (``MAX_ANIMATION_SIDE`` for an animation) and encodes the
 pixels again in the input format. A
 polyglot file or a payload in a metadata block therefore does not survive the
-upload, and the images skip the ClamAV scan of the attachments.
+upload. The ClamAV scan of the client bytes runs before this decode, in
+``MediaService.upload``.
 
 The guards against a decompression bomb: libmagic must sniff one of the four types,
 Pillow must read the same format, the pixel count of one frame must stay under
