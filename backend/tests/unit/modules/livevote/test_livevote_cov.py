@@ -202,7 +202,7 @@ def _admin() -> Principal:
 def _patch_gids(monkeypatch: pytest.MonkeyPatch, fake: Any) -> None:
     """Patch the sub-based gremium lookup at both call sites.
 
-    `gremium_ids_for` in the gremium roles module calls it for the scope-capped
+    `held_gremium_ids` in `app.modules.auth.policy` calls it for the scope-capped
     paths. The permissions module imports it for the vote.cast roster.
     """
     monkeypatch.setattr(gremium_roles_mod, "gremium_ids_with_permission", fake)

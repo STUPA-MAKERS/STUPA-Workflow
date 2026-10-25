@@ -41,7 +41,7 @@ class Principal:
         """Tell if the principal holds the global `admin` role.
 
         This flag does not apply the scope cap. Use `scope_allows` together with it,
-        or use `app.modules.admin.gremium_roles.admin_bypass`.
+        or use `app.modules.auth.policy.admin_bypass`.
         """
         return "admin" in self.roles
 

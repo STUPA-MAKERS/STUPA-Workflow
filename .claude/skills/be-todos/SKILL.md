@@ -29,6 +29,8 @@ done (`completed_at`).
   `can_write`, `can_configure`, `scope()` → `ReadScope.condition()` for the cross-board
   queries (`all_gremien`, `all_teams` for the global keys), `members()` (the assignable
   and mentionable people); `token_reads` (the token gate), `TODO_ALL`, `TODO_READ_ALL`.
+  The gremium rights come from `auth.policy.gremium_ids_with` (admin bypass + own role,
+  scope-capped).
 - `service.py` — `TodoService`: boards, columns, labels, cards, sub-resources, `mine`,
   `linked`, `search`, `card_for_agenda`, `link_agenda_item`, `complete`. Mails go to
   `outbox` (`TodoMail`); the router sends them after the commit. `mine_boards`: the rows
@@ -40,7 +42,7 @@ done (`completed_at`).
   own module, so a link never shows more than that module's page:
   application `resolve_app_read` (confirmed only); meeting and agenda item
   `meeting_read_scope`; vote `voting.listing.read_scope` (the SQL form of
-  `assert_can_read`); gremium `admin.gremium_roles.gremium_view_scope` (the tab
+  `assert_can_read`); gremium `auth.policy.gremium_view_scope` (the tab
   "Gremien": `gremium.view_all` or an active membership, cached per resolver); invoice and
   expense `budget.access.has_budget_read` (`budget.view`/`.structure`/`.book`, the gate
   of `GET /invoices` and `/expenses`); ticket `ticket.manage`; todo the board rule.

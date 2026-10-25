@@ -77,7 +77,7 @@ def scope(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
         return set(state["manage"].get(perm, set()))
 
     monkeypatch.setattr(MeetingService, "meeting_read_scope", _meeting_scope)
-    monkeypatch.setattr(listing, "gremium_ids_for", _ids_for)
+    monkeypatch.setattr(listing, "held_gremium_ids", _ids_for)
     return state
 
 

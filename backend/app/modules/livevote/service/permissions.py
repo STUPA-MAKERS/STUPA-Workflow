@@ -13,13 +13,9 @@ from uuid import UUID
 
 from sqlalchemy import select
 
-from app.modules.admin.gremium_roles import (
-    admin_bypass,
-    gremium_ids_for,
-    gremium_ids_with_permission,
-    gremium_member_ids,
-)
+from app.modules.admin.gremium_roles import gremium_ids_with_permission, gremium_member_ids
 from app.modules.auth.models import Principal as PrincipalRow
+from app.modules.auth.policy import admin_bypass, has_gremium_permission
 from app.modules.auth.principal import Principal
 from app.modules.delegations.models import MeetingDelegation
 from app.modules.delegations.pool import substitute_gremien_for_sub
@@ -40,9 +36,7 @@ class PermissionOps(MeetingServiceBase):
         The scope cap applies: a token without `session.manage` in its scope cannot
         manage, not even an admin token.
         """
-        if admin_bypass(principal, "session.manage"):
-            return True
-        return gremium_id in await gremium_ids_for(self.session, principal, "session.manage")
+        return await has_gremium_permission(self.session, principal, "session.manage", gremium_id)
 
     async def meeting_gremium_id(self, meeting_id: UUID) -> UUID:
         """Return the gremium of a meeting.
@@ -74,8 +68,8 @@ class PermissionOps(MeetingServiceBase):
             meeting, principal
         ):
             return True
-        return meeting.gremium_id in await gremium_ids_for(
-            self.session, principal, "protocol.write"
+        return await has_gremium_permission(
+            self.session, principal, "protocol.write", meeting.gremium_id
         )
 
     async def can_write_meeting(self, meeting_id: UUID, principal: Principal) -> bool:
@@ -165,10 +159,8 @@ class PermissionOps(MeetingServiceBase):
         """
         if not await self.can_write(meeting, principal):
             return False
-        if admin_bypass(principal, "protocol.finalize"):
-            return True
-        return meeting.gremium_id in await gremium_ids_for(
-            self.session, principal, "protocol.finalize"
+        return await has_gremium_permission(
+            self.session, principal, "protocol.finalize", meeting.gremium_id
         )
 
     async def can_vote(self, meeting: Meeting, principal: Principal) -> bool:

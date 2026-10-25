@@ -8,7 +8,7 @@ intersection of the RBAC permissions of the user and the permission set of the s
 The cap applies to the gremium permissions too (`session.manage`, `protocol.write`,
 `protocol.finalize`, `vote.manage`). A gremium role grants such a permission to a token
 only when the scope of the token contains the key. See `Principal.scope_allows` and
-`app.modules.admin.gremium_roles.gremium_ids_for`.
+`app.modules.auth.policy`.
 """
 
 from __future__ import annotations

@@ -27,7 +27,6 @@ from app.modules.admin.schemas import (
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import AuditService
 from app.modules.auth.models import Principal as PrincipalRow
-from app.modules.auth.principal import Principal as AuthPrincipal
 from app.shared.errors import ConflictError, NotFoundError
 
 # Granular per-gremium-role permissions of the meeting domain. The global
@@ -43,7 +42,7 @@ from app.shared.errors import ConflictError, NotFoundError
 #                     moves, comments, checklists, links)
 #   todo.configure  — edit the name, the columns and the labels of that board
 # An OAuth token caps these permissions through its scope. See
-# ``gremium_ids_for``.
+# ``app.modules.auth.policy``.
 GREMIUM_PERMISSIONS: tuple[str, ...] = (
     "session.manage",
     "vote.manage",
@@ -101,7 +100,11 @@ async def active_gremium_roles(
 async def gremium_ids_with_permission(
     session: AsyncSession, sub: str, perm: str, now: datetime | None = None
 ) -> set[UUID]:
-    """Return gremium ids where the principal's active role grants ``perm``."""
+    """Return gremium ids where the principal's active role grants ``perm``.
+
+    This is the roster read without a request principal. A request path uses
+    ``app.modules.auth.policy``, which adds the OAuth scope cap.
+    """
     return {
         gid
         for gid, role in await active_gremium_roles(session, sub, now)
@@ -109,84 +112,11 @@ async def gremium_ids_with_permission(
     }
 
 
-async def gremium_ids_for(
-    session: AsyncSession,
-    principal: AuthPrincipal,
-    perm: str,
-    now: datetime | None = None,
-) -> set[UUID]:
-    """Return the gremium ids where ``principal`` can use ``perm``, scope-capped.
-
-    Use this function on every path that acts for a logged-in principal. A scoped
-    OAuth token gets the empty set when its scope does not contain ``perm``. Thus a
-    ``read`` token cannot use ``session.manage`` or ``protocol.write``, whatever the
-    gremium roles of its owner are.
-
-    The sub-based ``gremium_ids_with_permission`` stays for the system and roster
-    paths that have no request principal (principal resolution, quorum count,
-    delegation eligibility, mail recipients).
-    """
-    if not principal.scope_allows(perm):
-        return set()
-    return await gremium_ids_with_permission(session, principal.sub, perm, now)
-
-
-def admin_bypass(principal: AuthPrincipal, perm: str) -> bool:
-    """Tell if the admin role lets ``principal`` use ``perm`` in every gremium.
-
-    The bypass applies the scope cap: an admin token without ``perm`` in its scope
-    does not get it.
-    """
-    return principal.is_admin and principal.scope_allows(perm)
-
-
 async def gremium_member_ids(
     session: AsyncSession, sub: str, now: datetime | None = None
 ) -> set[UUID]:
     """Return gremium ids where the principal is currently a member (any role)."""
     return {gid for gid, _ in await active_gremium_roles(session, sub, now)}
-
-
-# Global permission that lets a principal see every Gremium, not only the Gremien
-# it is a member of. The admin role holds it through the admin bypass of `has`.
-GREMIUM_VIEW_ALL = "gremium.view_all"
-
-
-async def can_view_gremium(
-    session: AsyncSession,
-    principal: AuthPrincipal,
-    gremium_id: UUID,
-    now: datetime | None = None,
-) -> bool:
-    """Tell if ``principal`` may see the Gremium ``gremium_id``.
-
-    A principal sees a Gremium when it holds the global permission
-    ``gremium.view_all`` (the admin role included, scope-capped through ``has``),
-    or when it is an active member of the Gremium now. The membership path also
-    obeys the OAuth scope cap, so a token without the ``read`` scope sees no
-    Gremium. A read route that refuses answers 404, not 403, so the answer does
-    not tell that the Gremium exists.
-    """
-    visible = await gremium_view_scope(session, principal, now)
-    return visible is None or gremium_id in visible
-
-
-async def gremium_view_scope(
-    session: AsyncSession,
-    principal: AuthPrincipal,
-    now: datetime | None = None,
-) -> set[UUID] | None:
-    """Return the Gremien that ``principal`` may see: ``None`` for every Gremium.
-
-    The set form of ``can_view_gremium``, for a reader that checks many Gremien at
-    once (the to-do links): ``gremium.view_all`` gives ``None``, a token without the
-    ``read`` scope the empty set, anyone else the active memberships now.
-    """
-    if principal.has(GREMIUM_VIEW_ALL):
-        return None
-    if not principal.scope_allows(GREMIUM_VIEW_ALL):
-        return set()
-    return await gremium_member_ids(session, principal.sub, now)
 
 
 def _sanitize_perms(perms: list[str] | None) -> list[str]:

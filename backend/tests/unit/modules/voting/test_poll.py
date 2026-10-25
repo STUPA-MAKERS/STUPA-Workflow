@@ -15,7 +15,7 @@ from uuid import UUID, uuid4
 import pydantic
 import pytest
 
-from app.modules.admin import gremium_roles
+from app.modules.auth import policy
 from app.modules.auth.principal import Principal
 from app.modules.voting import poll as poll_mod
 from app.modules.voting.election import own_ballot as any_ballot
@@ -424,11 +424,11 @@ def manage(monkeypatch: pytest.MonkeyPatch) -> set[UUID]:
     """Stub the gremium ids where the principal holds ``vote.manage``."""
     ids: set[UUID] = {GID}
 
-    async def _ids_for(_s: Any, _p: Principal, perm: str) -> set[UUID]:
+    async def _ids_for(_s: Any, _p: Principal, perm: str, _now: object = None) -> set[UUID]:
         assert perm == "vote.manage"
         return ids
 
-    monkeypatch.setattr(gremium_roles, "gremium_ids_for", _ids_for)
+    monkeypatch.setattr(policy, "held_gremium_ids", _ids_for)
     return ids
 
 
