@@ -93,7 +93,7 @@ _DATA_TABLES = (
     "form_field",
     "form_version",
     "application_type",
-    # Meeting, vote and deadline domain (#PII-Re-Add test isolation). The `application`
+    # Meeting and vote domain (#PII-Re-Add test isolation). The `application`
     # CASCADE does not reach these tables. Without this list they leak between tests, for
     # example as `uq_flow_version_version`, vote or ballot collisions. CASCADE also clears
     # the children: agenda_item, attendance, protocol, ballot and others.
@@ -101,8 +101,6 @@ _DATA_TABLES = (
     "vote",
     "ballot",
     "protocol",
-    "deadline",
-    "deadline_policy",
     "task_reminder_log",
     # Single-row settings (Z1). After the truncate the code falls back to the
     # defaults, so a test that changes them does not leak into the next one.

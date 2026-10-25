@@ -26,7 +26,6 @@ app/
     livevote/        meetings, agenda, attendance, live vote over WebSocket
     protocol/        meeting protocol (Markdown → PDF), vote snippets, finalize
     delegations/     meeting-bound delegations + substitute pool
-    deadlines/       ORM models of the old deadline tables (no code uses them)
     budget/          cost center tree, fiscal years, allocation, bookings, invoices (ZUGFeRD)
     files/           upload, wizard drafts, MIME sniff, ClamAV scan, MinIO/S3, download route
     pdf/             HTTP client of the typst render service (protocol PDFs)
