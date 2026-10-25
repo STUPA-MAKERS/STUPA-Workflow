@@ -1,6 +1,6 @@
 # CI gate. Flat fan-out: all check jobs start in parallel. The
 # wall-clock time is the slowest single job (~6-7 min) and not a serial chain
-# (~17-20 min). A red pull request blocks (branch protection, see CONTRIBUTING.md).
+# (~17-20 min). A red pull request blocks (branch protection).
 #
 # Deliberate slimming (2026-07):
 # - Schemathesis runs with `--max-examples 10` (before: unlimited, up to 30 min).
