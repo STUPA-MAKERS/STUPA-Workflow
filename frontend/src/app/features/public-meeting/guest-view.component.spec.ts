@@ -149,7 +149,7 @@ describe('GuestViewComponent', () => {
     expect(cmp['own']()).toBeNull();
     expect(cmp['voteNote']()).toBeNull();
     expect(cmp['voteWhere']()).toBe('7. Sitzung');
-    cmp['caster']()('yes');
+    cmp['caster']()('yes', false);
     cmp.setTab('other');
     expect(cmp['tab']()).toBe('agenda');
   });

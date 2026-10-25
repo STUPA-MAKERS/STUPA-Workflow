@@ -45,6 +45,14 @@ function meeting(id: string, over: Partial<Meeting> = {}): Meeting {
     canFinalize: false,
     keeperPeriods: [],
     plannedHandover: null,
+    publicJoin: false,
+    guestsMode: 'vote',
+    joinCode: null,
+    admittedGuests: 0,
+    pendingGuests: 0,
+    publicJoinAllowed: true,
+    opensAt: null,
+    confirmUntil: null,
     ...over,
   };
 }

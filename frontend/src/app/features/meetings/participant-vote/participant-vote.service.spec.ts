@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { Subject, of, throwError } from 'rxjs';
+import { Subject, of, throwError, type Observable } from 'rxjs';
 import { ApiClient } from '@core/api/api-client.service';
 import { DelegationsApiService, type VoteDelegationStatus } from '@core/api/delegations.service';
 import type { Meeting, MeetingVote, Vote } from '@core/api/models';
@@ -60,7 +60,7 @@ const STATUS: VoteDelegationStatus = {
 function setup(opts: { votes?: Vote[]; status?: VoteDelegationStatus | Error } = {}) {
   const queue = [...(opts.votes ?? [vote()])];
   const api = {
-    getVote: jest.fn(() => of(queue.length > 1 ? queue.shift()! : queue[0])),
+    getVote: jest.fn((_id: string, _opts?: { quiet?: boolean }): Observable<Vote> => of(queue.length > 1 ? queue.shift()! : queue[0])),
     castBallot: jest.fn(() => of({ status: 'cast' })),
   };
   const delegations = {

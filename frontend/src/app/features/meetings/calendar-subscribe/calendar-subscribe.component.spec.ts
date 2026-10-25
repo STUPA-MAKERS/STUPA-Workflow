@@ -75,7 +75,7 @@ describe('CalendarSubscribeComponent', () => {
   });
 
   it('forgets "copied" when the clipboard refuses, and when the popover opens again', async () => {
-    const writeText = jest.fn(() => Promise.reject(new Error('denied')));
+    const writeText = jest.fn((): Promise<void> => Promise.reject(new Error('denied')));
     Object.assign(navigator, { clipboard: { writeText } });
     const { openIt, fixture, cmp } = await setup();
     await openIt();

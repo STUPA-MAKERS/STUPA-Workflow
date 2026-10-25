@@ -42,7 +42,7 @@ describe('PaneFormFootComponent', () => {
 
   it('offers a labelled delete, and an icon in a phone sheet', async () => {
     const removed = jest.fn();
-    const view = await render(`<footer appPaneFormFoot deletable [compact]="compact" (removed)="removed()"></footer>`, {
+    const view = await render<{ removed: jest.Mock; compact: boolean }>(`<footer appPaneFormFoot deletable [compact]="compact" (removed)="removed()"></footer>`, {
       imports: [PaneFormFootComponent],
       componentProperties: { removed, compact: false },
     });

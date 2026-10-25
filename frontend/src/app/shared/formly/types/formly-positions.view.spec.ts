@@ -25,7 +25,8 @@ const INCOMPLETE = { label: '', offers: [{ label: '', value: null, preferred: tr
 async function setup(value: unknown, props: Record<string, unknown> = {}) {
   localStorage.setItem('ap.locale', 'de');
   const control = new FormControl(value);
-  const field = { formControl: control, props: { label: 'Kostenaufstellung', ...props }, options: {} };
+  const fieldProps: Record<string, unknown> = { label: 'Kostenaufstellung', ...props };
+  const field = { formControl: control, props: fieldProps, options: {} };
   const view = await render(FormlyPositionsType, { componentInputs: { field: field as never } });
   await new Promise((r) => queueMicrotask(() => r(null)));
   view.detectChanges();

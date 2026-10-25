@@ -23,9 +23,10 @@ function app(editAllowed: boolean, data: Record<string, unknown> = { title: 'Som
   return {
     id: ID,
     typeId: 't1',
-    state: { id: 's1', key: 'agenda', label: 'Auf Tagesordnung', color: '#72a384', editAllowed },
+    state: { id: 's1', key: 'agenda', label: 'Auf Tagesordnung', color: '#72a384', editAllowed, kind: 'normal' },
     gremiumId: null,
-    budgetPotId: null,
+    budgetId: null,
+    fiscalYearId: null,
     amount: null,
     currency: null,
     data,
@@ -35,8 +36,11 @@ function app(editAllowed: boolean, data: Record<string, unknown> = { title: 'Som
     updatedAt: '2026-09-27T10:00:00Z',
     stateSince: '2026-09-28T14:20:00Z',
     applicant: null,
+    canEdit: editAllowed,
+    isOwner: true,
+    archivedAt: null,
     hiddenKeys: [],
-  } as Application;
+  };
 }
 
 const EFF: EffectiveForm = {
@@ -57,15 +61,26 @@ const EFF: EffectiveForm = {
 };
 
 const TIMELINE: TimelineEntry[] = [
-  { toStateId: 's0', toState: null, label: 'Eingereicht', actor: 'applicant', at: '2026-09-26T12:12:00Z', note: null },
+  {
+    toStateId: 's0',
+    toState: null,
+    label: 'Eingereicht',
+    actor: 'applicant',
+    at: '2026-09-26T12:12:00Z',
+    note: null,
+    voteId: null,
+    voteDeleted: false,
+  },
   {
     toStateId: 's1',
-    toState: { id: 's1', key: 'agenda', label: 'Auf Tagesordnung', color: '#72a384', editAllowed: false },
+    toState: { id: 's1', key: 'agenda', label: 'Auf Tagesordnung', color: '#72a384', editAllowed: false, kind: 'normal' },
     label: 'Auf Tagesordnung',
     transitionLabel: 'Auf Tagesordnung setzen',
     actor: 'Studierendenparlament',
     at: '2026-09-28T14:20:00Z',
     note: 'vote:tie',
+    voteId: null,
+    voteDeleted: false,
   },
 ];
 
@@ -92,6 +107,8 @@ const COMMENTS: ApplicationComment[] = [
     isPublic: true,
     isOwn: false,
     at: '2026-09-28T13:00:00Z',
+    attachments: [],
+    mentions: [],
   },
   {
     id: 'c2',
@@ -102,6 +119,8 @@ const COMMENTS: ApplicationComment[] = [
     isPublic: true,
     isOwn: true,
     at: '2026-09-28T14:00:00Z',
+    attachments: [],
+    mentions: [],
   },
 ];
 

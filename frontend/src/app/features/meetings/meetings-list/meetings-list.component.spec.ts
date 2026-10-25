@@ -11,6 +11,7 @@ import { WsService } from '@core/ws/ws.service';
 import { MEDIA } from '@stupa-makers/ui-kit';
 import { matchMediaQueries } from '../../../../testing/meeting-fixtures';
 import { runAxe } from '../../../../testing/a11y';
+import type { CalendarSubscribeComponent } from '../calendar-subscribe/calendar-subscribe.component';
 import { MeetingAgendaService } from '../meeting-agenda.service';
 import { MeetingDialogsService } from '../meeting-dialogs.service';
 import { MeetingSessionService } from '../meeting-session.service';
@@ -529,7 +530,8 @@ describe('MeetingsListComponent', () => {
       expect(liveRow.querySelector('.li')).toHaveClass('li--wrap');
       expect(screen.queryByRole('button', { name: 'Sitzung' })).toBeNull();
       expect(screen.getByRole('searchbox')).toHaveAttribute('placeholder', 'Sitzungen suchen …');
-      view.fixture.componentInstance.onPhoneMenu({ id: 'x', label: 'x' });
+      const abo = { open: jest.fn() } as unknown as CalendarSubscribeComponent;
+      view.fixture.componentInstance.onPhoneMenu({ id: 'x', label: 'x' }, abo);
       expect(view.router.url).toBe('/');
     });
   });

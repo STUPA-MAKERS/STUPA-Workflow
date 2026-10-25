@@ -28,7 +28,7 @@ const INVOICE: Invoice = {
 };
 
 /** A host with plain signals, as the invoices page has them. */
-function host(): InvoiceFormHost & { calls: string[] } {
+function host() {
   const calls: string[] = [];
   const h = {
     calls,
@@ -72,7 +72,7 @@ function host(): InvoiceFormHost & { calls: string[] } {
     canSubmitEdit: signal(true),
     saveEdit: () => calls.push('save'),
     openFile: () => calls.push('file'),
-  };
+  } satisfies InvoiceFormHost & { calls: string[] };
   return h;
 }
 

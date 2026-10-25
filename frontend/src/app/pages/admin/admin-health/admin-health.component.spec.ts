@@ -63,7 +63,7 @@ async function setup(perms: string[], api: Partial<Record<keyof AdminApiService,
   return { view, api: fake };
 }
 
-function tileTexts(container: HTMLElement): string[] {
+function tileTexts(container: Element): string[] {
   return [...container.querySelectorAll('.ah__tile')].map((t) => (t.textContent ?? '').replace(/\s+/g, ' ').trim());
 }
 

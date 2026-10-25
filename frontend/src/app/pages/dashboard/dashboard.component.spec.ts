@@ -132,7 +132,7 @@ function delegation(direction: string | null, extra: Record<string, unknown> = {
   };
 }
 
-type Body = unknown | 'error' | 'pending';
+type Body = Parameters<TestRequest['flush']>[0] | 'error' | 'pending';
 
 interface SetupOpts {
   tasks?: Body;

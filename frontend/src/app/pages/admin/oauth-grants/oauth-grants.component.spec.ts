@@ -11,9 +11,9 @@ import { AdminOAuthGrantsComponent } from './oauth-grants.component';
  * The last principal has neither a name nor an email, so the option falls back to the placeholder.
  */
 const PRINCIPALS: AdminPrincipal[] = [
-  { id: 'p-1', sub: 'kc|alex', email: 'alex@x.de', displayName: 'Alex Admin', assignments: [] },
-  { id: 'p-2', sub: 'kc|sam', email: 'sam@x.de', displayName: null, assignments: [] },
-  { id: 'p-3', sub: 'kc|ghost', email: null, displayName: null, assignments: [] },
+  { id: 'p-1', sub: 'kc|alex', email: 'alex@x.de', displayName: 'Alex Admin', assignments: [], oidcGroups: [] },
+  { id: 'p-2', sub: 'kc|sam', email: 'sam@x.de', displayName: null, assignments: [], oidcGroups: [] },
+  { id: 'p-3', sub: 'kc|ghost', email: null, displayName: null, assignments: [], oidcGroups: [] },
 ];
 
 /** A named owner with both expiry dates set. */

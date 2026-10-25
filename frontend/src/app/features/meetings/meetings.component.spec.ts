@@ -14,7 +14,7 @@ import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
 import type { Meeting, MeetingOutWire, ProtocolOutWire } from '@core/api/models';
 import { WsService, type MeetingChannel } from '@core/ws/ws.service';
-import type { ServerMessage } from '@core/ws/ws-messages';
+import type { MeetingStateMsg, ServerMessage } from '@core/ws/ws-messages';
 import { AGENDA } from '../../../testing/meeting-fixtures';
 import { MeetingAgendaService } from './meeting-agenda.service';
 import { MeetingSessionService } from './meeting-session.service';
@@ -91,6 +91,14 @@ const MEETING_MODEL: Meeting = {
   canFinalize: true,
   keeperPeriods: [],
   plannedHandover: null,
+  publicJoin: false,
+  guestsMode: 'vote',
+  joinCode: null,
+  admittedGuests: 0,
+  pendingGuests: 0,
+  publicJoinAllowed: true,
+  opensAt: null,
+  confirmUntil: null,
   votes: [
     {
       id: 'v-1', applicationId: 'app-1', agendaItemId: null, title: 'Antrag A',
@@ -2062,7 +2070,15 @@ describe('MeetingsComponent — methods', () => {
     /** A meeting_state with a non-final protocol leads to GET /protocol and applyProtocolUpdate. */
     it('toasts a failure when a rendering protocol rolls back to draft', async () => {
       const { cmp, ws, http } = await loaded();
-      cmp.protocol.set({ ...PROTOCOL, status: 'rendering', isFinal: false, isLocked: true });
+      cmp.protocol.set({
+        ...PROTOCOL,
+        pdfUrl: null,
+        publicPdfUrl: null,
+        sentAt: null,
+        status: 'rendering',
+        isFinal: false,
+        isLocked: true,
+      });
       ws.subject.next({ type: 'meeting_state', activeApplicationId: null, status: 'live' });
       http.expectOne('/api/meetings/m-1/agenda').flush([]);
       http.expectOne('/api/meetings/m-1/protocol').flush({ ...PROTOCOL, status: 'draft', isFinal: false, isLocked: false });
@@ -2110,7 +2126,7 @@ describe('MeetingsComponent — methods', () => {
 
     it('patches an existing vote on a live vote_opened', async () => {
       const { cmp, ws } = await loaded();
-      ws.subject.next({ type: 'vote_opened', voteId: 'v-2', closesAt: 'soon' });
+      ws.subject.next({ type: 'vote_opened', voteId: 'v-2', options: [], closesAt: 'soon' });
       expect(cmp.meeting()?.votes.find((v) => v.id === 'v-2')?.status).toBe('open');
     });
 
@@ -2170,7 +2186,8 @@ describe('MeetingsComponent — methods', () => {
     it('keeps the prior status when the meeting_state status is absent', async () => {
       const { cmp, ws, http } = await loaded();
       const before = cmp.meeting()?.status;
-      ws.subject.next({ type: 'meeting_state', activeApplicationId: 'app-2' });
+      const noStatus: Omit<MeetingStateMsg, 'status'> = { type: 'meeting_state', activeApplicationId: 'app-2' };
+      ws.subject.next(noStatus as MeetingStateMsg);
       http.expectOne('/api/meetings/m-1/agenda').flush([]);
       http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
       expect(cmp.meeting()?.status).toBe(before);

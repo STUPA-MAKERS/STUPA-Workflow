@@ -327,7 +327,12 @@ describe('requested funding', () => {
   function build(lang = 'de') {
     const form = new FormGroup({ kosten: new FormControl<unknown>(null), foerderung: new FormControl<unknown>(null) });
     const cfg = toFormlyFields(fields, lang)[1];
-    const field = { ...cfg, form, formControl: form.controls.foerderung, model: {} } as FormlyFieldConfig;
+    const field: Omit<FormlyFieldConfig, 'model'> & { model: Record<string, unknown> } = {
+      ...cfg,
+      form,
+      formControl: form.controls.foerderung,
+      model: {},
+    };
     const valid = (model: Record<string, unknown>) => {
       field.model = model;
       form.controls.foerderung.setValue(model['foerderung'] ?? null, { emitEvent: false });

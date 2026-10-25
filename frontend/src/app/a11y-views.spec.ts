@@ -135,7 +135,7 @@ describe('Kern-Views a11y (axe)', () => {
     const EFF: EffectiveForm = {
       applicationTypeId: 't1',
       formVersionId: 'v1',
-      budgetPotId: 'pot1',
+      hasBudget: true,
       sections: [
         {
           key: 'main',

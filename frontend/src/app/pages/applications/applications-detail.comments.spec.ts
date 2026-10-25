@@ -37,7 +37,7 @@ function appWire(): ApplicationOutWire {
     typeId: 't1',
     state: SUBMITTED,
     gremiumId: null,
-    budgetPotId: null,
+    budgetId: null,
     amount: '250.00',
     currency: 'EUR',
     data: { title: 'Förderung Fest', amount: '250.00' },

@@ -1,3 +1,4 @@
+import type { ActionType } from './admin.models';
 import {
   GuardError,
   validateAction,
@@ -167,11 +168,10 @@ describe('validateAction (mirror of backend validate_action)', () => {
   });
 
   it('rejects unknown action types + non-objects', () => {
-    expect(reason(() => validateAction({ type: 'rmrf' }))).toEqual({
+    expect(reason(() => validateAction({ type: 'rmrf' as string as ActionType }))).toEqual({
       key: 'admin.flow.err.actionUnknownType',
       params: { type: 'rmrf' },
     });
-    // @ts-expect-error not an object
     expect(() => validateAction(null)).toThrow(GuardError);
     // @ts-expect-error array is not a record
     expect(reason(() => validateAction([])).key).toBe('admin.flow.err.actionShape');

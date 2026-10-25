@@ -1,4 +1,4 @@
-import { Subject, of, throwError } from 'rxjs';
+import { Subject, of, throwError, type Observable } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { AuthService } from '@core/auth/auth.service';
@@ -37,8 +37,8 @@ interface Opts {
 
 async function setup(seed: WebhookConfig[] = [], opts: Opts = {}) {
   const saveWebhook = opts.saveError
-    ? jest.fn(() => throwError(() => new Error('boom')))
-    : jest.fn((h: WebhookConfig) => of({ ...h, id: h.id || 'wh-new' }));
+    ? jest.fn((_h: WebhookConfig): Observable<WebhookConfig> => throwError(() => new Error('boom')))
+    : jest.fn((h: WebhookConfig): Observable<WebhookConfig> => of({ ...h, id: h.id || 'wh-new' }));
   const deleteWebhook = opts.deleteError
     ? jest.fn(() => throwError(() => new Error('boom')))
     : jest.fn(() => of(void 0));

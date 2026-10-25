@@ -1,5 +1,5 @@
 import { render } from '@testing-library/angular';
-import { BudgetSunburstComponent } from './budget-sunburst.component';
+import { BudgetSunburstComponent, type SunburstMetric } from './budget-sunburst.component';
 import type { BudgetAllocationView, BudgetTreeNode } from './budget-tree.api';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -50,7 +50,7 @@ async function setup(
   inputs: Partial<{
     root: BudgetTreeNode | null;
     fyId: string;
-    metric: string;
+    metric: SunburstMetric;
     colors: ReadonlyMap<string, string> | null;
   }> = {},
 ) {

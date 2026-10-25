@@ -664,9 +664,9 @@ describe('TodoCardDetailComponent', () => {
   it('links a picked target and takes a linked one off', async () => {
     const { cmp, api } = await setup();
     expect(cmp.linkedKeys().has('application:a-1')).toBe(true);
-    cmp.pickLink({ kind: 'application', targetId: 'a-1', title: 'Lerncafé', detail: null });
+    cmp.pickLink({ kind: 'application', targetId: 'a-1', title: 'Lerncafé', detail: {} });
     expect(api.removeLink).toHaveBeenCalledWith('k-1', 'li-1');
-    cmp.pickLink({ kind: 'ticket', targetId: 't-1', title: 'Login', detail: null });
+    cmp.pickLink({ kind: 'ticket', targetId: 't-1', title: 'Login', detail: {} });
     expect(api.addLink).toHaveBeenCalledWith('k-1', 'ticket', 't-1');
     fireEvent.click(screen.getByRole('button', { name: 'Verknüpfung mit Lerncafé entfernen' }));
     expect(api.removeLink).toHaveBeenCalledTimes(2);
@@ -777,10 +777,10 @@ describe('TodoCardDetailComponent', () => {
     expect(api.card).toHaveBeenCalledTimes(2);
     expect(cmp.busy()).toBe(false);
     api.addLink.mockReturnValueOnce(http(422, 'odd_code'));
-    cmp.pickLink({ kind: 'ticket', targetId: 't-1', title: 'x', detail: null });
+    cmp.pickLink({ kind: 'ticket', targetId: 't-1', title: 'x', detail: {} });
     expect(toast.error).toHaveBeenLastCalledWith('Die Änderung konnte nicht gespeichert werden.');
     api.addLink.mockReturnValueOnce(throwError(() => new Error('net')));
-    cmp.pickLink({ kind: 'ticket', targetId: 't-1', title: 'x', detail: null });
+    cmp.pickLink({ kind: 'ticket', targetId: 't-1', title: 'x', detail: {} });
     expect(toast.error).toHaveBeenLastCalledWith('Die Änderung konnte nicht gespeichert werden.');
     api.moveCard.mockReturnValueOnce(http(404) as never);
     cmp.setColumn('c-2');
@@ -958,7 +958,7 @@ describe('TodoCardDetailComponent', () => {
     cmp.addItem();
     cmp.renameItem({ id: 'i', text: 'x', done: false, position: 0 });
     cmp.deleteItem({ id: 'i', text: 'x', done: false, position: 0 });
-    cmp.pickLink({ kind: 'ticket', targetId: 't', title: 'x', detail: null });
+    cmp.pickLink({ kind: 'ticket', targetId: 't', title: 'x', detail: {} });
     cmp.removeLink(link());
     cmp.archive();
     cmp.restore();
@@ -1168,7 +1168,7 @@ describe('TodoCardDetailComponent', () => {
     const chat = () => fixture.debugElement.query((d) => d.name === 'app-chat');
     const drafts = chat().injector.get(DraftAttachmentsService);
     const old = chat().componentInstance;
-    const file = { id: 'd1', filename: 'a.png', mime: 'image/png', size: 3, scanned: false, scanState: 'scanning' as const };
+    const file = { id: 'd1', filename: 'a.png', mime: 'image/png', size: 3, scanned: false, scanState: 'scanning' as const, fieldKey: null };
     drafts.files.set([file]);
     phone = true;
     for (const fn of [...listeners]) fn({ matches: true } as MediaQueryListEvent);

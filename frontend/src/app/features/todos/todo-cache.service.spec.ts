@@ -57,7 +57,7 @@ describe('TodoCacheService', () => {
    * read goes on with the next.
    */
   it('waits for the page, then runs two reads at once, the shown board first', () => {
-    const reads: Subject<unknown>[] = [];
+    const reads: Pick<Subject<unknown>, 'next' | 'error' | 'complete'>[] = [];
     const { cache, api } = setup((ids) => {
       const s = new Subject<TodoCardDetail[]>();
       reads.push(s);

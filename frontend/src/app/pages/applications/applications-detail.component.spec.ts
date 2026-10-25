@@ -42,7 +42,7 @@ function appWire(): ApplicationOutWire {
     typeId: 't1',
     state: SUBMITTED,
     gremiumId: null,
-    budgetPotId: null,
+    budgetId: null,
     amount: '250.00',
     currency: 'EUR',
     data: { title: 'Förderung Fest', amount: '250.00' },
@@ -796,7 +796,15 @@ describe('ApplicationsDetailComponent', () => {
   /** The guard returns early, so firing stays unchanged. */
   it('ignores a second fire while one is in flight', async () => {
     const { cmp } = await setup();
-    const t: Transition = { id: 'tr-1', fromStateId: 's1', toStateId: 's2', label: 'Go', color: null };
+    const t: Transition = {
+      id: 'tr-1',
+      fromStateId: 's1',
+      toStateId: 's2',
+      label: 'Go',
+      color: null,
+      addsToAgenda: false,
+      agendaGremiumId: null,
+    };
     cmp.firing.set('other');
     cmp.fire(t);
     expect(cmp.firing()).toBe('other');
@@ -897,9 +905,9 @@ describe('ApplicationsDetailComponent', () => {
     http.expectOne((r) => r.url === '/api/budgets/b1/fiscal-years').flush([]);
     flushForm(http);
     detectChanges();
-    expect(cmp.budgetLabel('b1')).toContain('Veranstaltungen');
-    expect(cmp.budgetLabel(null)).toBe('');
-    expect(cmp.budgetLabel('unknown')).toBe('');
+    expect(cmp['budgetLabel']('b1')).toContain('Veranstaltungen');
+    expect(cmp['budgetLabel'](null)).toBe('');
+    expect(cmp['budgetLabel']('unknown')).toBe('');
     expect(screen.getByText(/Veranstaltungen/)).toBeInTheDocument();
     flushAttachments(http);
     http.verify();
@@ -963,7 +971,7 @@ describe('ApplicationsDetailComponent', () => {
       .flush({ title: 'e' }, { status: 500, statusText: 'Server Error' });
     flushForm(http);
     detectChanges();
-    expect(cmp.budgetTree()).toEqual([]);
+    expect(cmp['budgetTree']()).toEqual([]);
     flushAttachments(http);
     http.verify();
   });
@@ -985,19 +993,19 @@ describe('ApplicationsDetailComponent', () => {
     detectChanges();
     const success = jest.spyOn(toast, 'success');
 
-    cmp.openBudgetDialog();
-    expect(cmp.budgetDialogOpen()).toBe(true);
-    expect(cmp.budgetChoice()).toBe('b1');
+    cmp['openBudgetDialog']();
+    expect(cmp['budgetDialogOpen']()).toBe(true);
+    expect(cmp['budgetChoice']()).toBe('b1');
     http.expectOne((r) => r.url === '/api/budgets/b1/fiscal-years').flush([]);
 
-    cmp.budgetChoice.set('');
+    cmp['budgetChoice'].set('');
     cmp.assignBudget();
     const post = http.expectOne((r) => r.url === '/api/applications/app-1/assign-budget');
     expect(post.request.method).toBe('POST');
     expect(post.request.body).toEqual({ budgetId: null, fiscalYearId: null });
     post.flush({ applicationId: 'app-1', budgetId: null, fiscalYearId: null });
-    expect(cmp.assigningBudget()).toBe(false);
-    expect(cmp.budgetDialogOpen()).toBe(false);
+    expect(cmp['assigningBudget']()).toBe(false);
+    expect(cmp['budgetDialogOpen']()).toBe(false);
     expect(success).toHaveBeenCalled();
 
     http.expectOne(url('')).flush(appWire());
@@ -1014,9 +1022,9 @@ describe('ApplicationsDetailComponent', () => {
   /** The value stays true, and no extra request goes out. */
   it('ignores a second assignBudget while one is in flight', async () => {
     const { cmp } = await setup();
-    cmp.assigningBudget.set(true);
+    cmp['assigningBudget'].set(true);
     cmp.assignBudget();
-    expect(cmp.assigningBudget()).toBe(true);
+    expect(cmp['assigningBudget']()).toBe(true);
   });
 
   it.each([
@@ -1035,13 +1043,13 @@ describe('ApplicationsDetailComponent', () => {
     flushAttachments(http);
     const error = jest.spyOn(toast, 'error');
 
-    cmp.budgetChoice.set('b1');
+    cmp['budgetChoice'].set('b1');
     cmp.assignBudget();
     http
       .expectOne((r) => r.url === '/api/applications/app-1/assign-budget')
       .flush({ title: 'e', code }, { status, statusText: 'x' });
     expect(error).toHaveBeenCalledWith(message);
-    expect(cmp.assigningBudget()).toBe(false);
+    expect(cmp['assigningBudget']()).toBe(false);
     http.verify();
   });
 

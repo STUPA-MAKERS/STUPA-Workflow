@@ -1,4 +1,4 @@
-import type { FlowGraph } from './admin.models';
+import type { ActionType, FlowGraph } from './admin.models';
 import {
   type FlowValidationResult,
   autoLayout,
@@ -130,7 +130,7 @@ describe('validateFlowGraph', () => {
     expect(badGuard.valid).toBe(false);
 
     const badAction = validateFlowGraph(
-      graph({ transitions: [{ from: 'draft', to: 'review', actions: [{ type: 'rmrf' }] }] }),
+      graph({ transitions: [{ from: 'draft', to: 'review', actions: [{ type: 'rmrf' as string as ActionType }] }] }),
     );
     expect(badAction.valid).toBe(false);
   });

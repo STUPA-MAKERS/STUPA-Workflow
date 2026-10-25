@@ -212,6 +212,8 @@ jobs:
         # The root tsconfig.json lists no files, so a bare `tsc --noEmit` checks
         # nothing. `typecheck` runs tsc against tsconfig.app.json.
         run: npm run typecheck
+      - name: Typecheck specs
+        run: npm run typecheck:spec
       - name: Jest + Coverage (Gate 80 %)
         # The threshold sits in jest.config (coverageThreshold global 80). A miss
         # breaks the build.

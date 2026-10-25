@@ -28,8 +28,8 @@ const MEMBER: Principal = {
   roles: ['member'],
   permissions: [],
   groups: [],
-  gremien: [{ id: 'g1', name: 'StuPa' }],
-} as Principal;
+  gremien: [{ id: 'g1', name: 'StuPa', slug: 'stupa' }],
+};
 
 const TASKS = '/api/applications/tasks';
 const TIMELINE = '/api/meetings/timeline';

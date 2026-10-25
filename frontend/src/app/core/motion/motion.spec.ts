@@ -169,7 +169,7 @@ describe('onRouteViewTransition', () => {
 });
 
 describe('withViewTransition', () => {
-  const doc = document as Document & { startViewTransition?: unknown };
+  const doc = document as Omit<Document, 'startViewTransition'> & { startViewTransition?: unknown };
   afterEach(() => delete doc.startViewTransition);
 
   it('runs the change at once without the API or matchMedia', () => {

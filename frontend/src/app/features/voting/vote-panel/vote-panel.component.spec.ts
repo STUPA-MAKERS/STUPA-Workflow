@@ -184,14 +184,14 @@ describe('VotePanelComponent', () => {
     /** Without `voted`, the sum of the counts is the number of ballots. */
     it('names a missed quorum of a vote that failed on majority', async () => {
       await setup({
-        vote: closed({ voted: undefined, quorumMet: false, failedReason: 'majority' }, { result: 'failed' }),
+        vote: closed({ voted: undefined, quorumMet: false, failedReason: 'majority' }, { result: 'rejected' }),
       });
       expect(screen.getByText('20 von 20 Stimmen · Quorum: nicht erreicht')).toBeInTheDocument();
     });
 
     it('does not repeat the quorum when the result already names it', async () => {
       await setup({
-        vote: closed({ voted: 5, quorumMet: false, failedReason: 'quorum' }, { result: 'failed' }),
+        vote: closed({ voted: 5, quorumMet: false, failedReason: 'quorum' }, { result: 'rejected' }),
       });
       expect(screen.getByText('5 von 20 Stimmen')).toBeInTheDocument();
       expect(screen.queryByText(/Quorum: /)).not.toBeInTheDocument();

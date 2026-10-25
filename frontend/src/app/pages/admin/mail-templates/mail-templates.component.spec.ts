@@ -1,8 +1,9 @@
 import { provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
-import { NEVER, of, throwError } from 'rxjs';
+import { NEVER, of, throwError, type Observable } from 'rxjs';
 import { AdminApiService } from '../admin-api.service';
+import type { MailPreview, MailPreviewPayload } from '../admin.models';
 import { MEDIA, ToastService } from '@stupa-makers/ui-kit';
 import { matchMediaQueries } from '../../../../testing/meeting-fixtures';
 import { MailTemplatesComponent } from './mail-templates.component';
@@ -22,13 +23,16 @@ function setupApi() {
     listMailTemplates: jest.fn(() => of([TPL])),
     upsertMailTemplate: jest.fn(() => of({ ...TPL, source: 'override' })),
     resetMailTemplate: jest.fn(() => of({ ...TPL, source: 'builtin' })),
-    previewMailPayload: jest.fn(() =>
-      of({ subject: 'Anmeldung', text: 'Hallo Anzeigename', html: null, lang: 'de' }),
+    previewMailPayload: jest.fn(
+      (_body: MailPreviewPayload): Observable<MailPreview> =>
+        of({ subject: 'Anmeldung', text: 'Hallo Anzeigename', html: null, lang: 'de' }),
     ),
   };
 }
 
-async function setup(api = setupApi()) {
+type MailApiMock = Record<keyof ReturnType<typeof setupApi>, jest.Mock>;
+
+async function setup(api: MailApiMock = setupApi()) {
   const toast = { success: jest.fn(), error: jest.fn() };
   const view = await render(MailTemplatesComponent, {
     providers: [
