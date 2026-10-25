@@ -1,4 +1,4 @@
-"""Voting router wiring (T-15): fail-closed auth and the problem+json contract.
+"""Voting router wiring: fail-closed auth and the problem+json contract.
 
 `dependency_overrides` replaces the service. The integration suite covers the DB paths.
 """
@@ -173,7 +173,7 @@ def test_open_ok(app: FastAPI, client: TestClient, fake_service: _FakeService) -
     r = client.post(f"/api/votes/{uuid4()}/open")
     assert r.status_code == 200
     assert r.json()["status"] == "open"
-    # F12: the router passes the caller as the audit actor.
+    # The router passes the caller as the audit actor.
     assert fake_service.open_actor == "p"
 
 
@@ -238,7 +238,7 @@ def test_close_missing_perm_403(app: FastAPI, client: TestClient) -> None:
 
 
 def test_open_missing_perm_403(app: FastAPI, client: TestClient) -> None:
-    # #AUD-027: open is gremium-scoped. A voter without the manage right in the
+    # Open is gremium-scoped. A voter without the manage right in the
     # gremium must NOT open a vote.
     _as_principal(app, groups={f"vote:{GID}"})
     r = client.post(f"/api/votes/{uuid4()}/open")
@@ -247,7 +247,7 @@ def test_open_missing_perm_403(app: FastAPI, client: TestClient) -> None:
 
 
 def test_cancel_missing_perm_403(app: FastAPI, client: TestClient) -> None:
-    # #AUD-027: cancel is gremium-scoped, symmetric to open and close.
+    # Cancel is gremium-scoped, symmetric to open and close.
     _as_principal(app, groups={f"vote:{GID}"})
     assert client.post(f"/api/votes/{uuid4()}/cancel").status_code == 403
 
@@ -356,7 +356,7 @@ def test_create_free_group_key_422(app: FastAPI, client: TestClient) -> None:
 
 
 def test_create_eligible_count_in_body_422(app: FastAPI, client: TestClient) -> None:
-    """F14: the server counts the roster. A client ``eligibleCount`` is refused."""
+    """The server counts the roster. A client ``eligibleCount`` is refused."""
     _as_manager(app)
     r = client.post(
         f"/api/applications/{uuid4()}/votes",

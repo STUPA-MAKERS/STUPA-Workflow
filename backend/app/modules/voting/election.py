@@ -1,4 +1,4 @@
-"""Personnel elections (F2): ballot shape, stored result, lot and runoff.
+"""Personnel elections: ballot shape, stored result, lot and runoff.
 
 An election is a ``vote`` row with ``kind = 'election'``. ``vote.config`` holds an
 ``ElectionConfig`` (seats, candidates, secret, quorum, guests). It shares the life
@@ -145,7 +145,7 @@ def dump_result(result: ElectionResultOut) -> dict[str, Any]:
 
 
 def election_fields(vote: Vote) -> dict[str, Any]:
-    """Return the F2 fields of ``VoteOut`` for a vote row (empty for a motion)."""
+    """Return the election fields of ``VoteOut`` for a vote row (empty for a motion)."""
     if not is_election(vote):
         return {}
     stored = getattr(vote, "election_result", None)

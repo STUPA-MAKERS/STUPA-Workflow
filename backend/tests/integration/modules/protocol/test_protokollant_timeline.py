@@ -39,7 +39,7 @@ async def _member(session: AsyncSession, gremium: Gremium) -> PrincipalRow:
     p = PrincipalRow(sub=f"s-{uuid.uuid4()}", display_name="Max P", email="m@x.de")
     session.add(p)
     await session.flush()
-    # O20: a protokollant needs `protocol.write` in the gremium.
+    # A protokollant needs `protocol.write` in the gremium.
     role = GremiumRole(
         gremium_id=gremium.id,
         key=f"r-{uuid.uuid4()}",

@@ -1,11 +1,10 @@
-"""Integration test for the flow and status engine (real Postgres, testcontainers, T-12).
+"""Integration test for the flow and status engine (real Postgres, testcontainers).
 
-The tests run against a real schema. See flows section 3 and 9, data-model section 1
-and 5.2. `available_transitions` filters by guard. `fire` changes the state atomically,
-writes a `status_event` and dispatches the actions. The edit lock blocks the T-12
-`patch` with 409. A failed guard gives 409. The vote result picks the branch
-(`voteResult` passed, rejected or tie). Optimistic locking turns a concurrent
-transition into 409.
+The tests run against a real schema. `available_transitions` filters by guard. `fire`
+changes the state atomically, writes a `status_event` and dispatches the actions. The
+edit lock blocks the application `patch` with 409. A failed guard gives 409. The vote
+result picks the branch (`voteResult` passed, rejected or tie). Optimistic locking turns
+a concurrent transition into 409.
 """
 
 from __future__ import annotations
@@ -188,7 +187,7 @@ async def test_fire_moves_state_writes_event_dispatches(session: AsyncSession) -
     assert res.new_state_id == states["review"].id
     # The fire() call also dispatches the implicit `taskNotify` mail, besides the
     # configured `notify` action. The mail goes to the principals who may act on
-    # the new state (#4-3, build_implicit_notifications).
+    # the new state (build_implicit_notifications).
     assert res.dispatched_actions == ["notify", "taskNotify"]
     assert rec.actions[0].type == "notify"
     assert rec.actions[0].idempotency_key.endswith(":0:notify")
@@ -216,7 +215,7 @@ async def test_fire_into_locked_state_blocks_t12_patch(session: AsyncSession) ->
     apps = ApplicationsService(session)
     flow = FlowService(session)
 
-    # review still allows edits, so the T-12 patch passes.
+    # review still allows edits, so the application patch passes.
     t_review = (
         await session.execute(
             select(Transition).where(
@@ -241,7 +240,7 @@ async def test_fire_into_locked_state_blocks_t12_patch(session: AsyncSession) ->
     res = await flow.fire_branch(app.id, "pass", _manager())
     assert res.new_state_id == states["approved"].id
 
-    # The transition now blocks the T-12 patch with 409.
+    # The transition now blocks the application patch with 409.
     with pytest.raises(ConflictError):
         await apps.patch(app.id, {"title": "Verboten"}, changed_by="mgr-1")
 

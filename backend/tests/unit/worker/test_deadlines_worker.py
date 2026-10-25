@@ -1,4 +1,4 @@
-"""Cron worker `process_deadlines` (T-44): orchestration without a DB or Redis.
+"""Cron worker `process_deadlines`: orchestration without a DB or Redis.
 
 The tests fake the domain services for flow and voting. They cover the worker logic.
 The worker skips a vote when the row lock misses, because a parallel worker holds that
@@ -144,7 +144,7 @@ async def test_close_due_vote(patched: None) -> None:
 async def test_close_meeting_vote_broadcasts_vote_closed(
     patched: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Send the `vote_closed` broadcast on cron auto-close (AUD-045).
+    """Send the `vote_closed` broadcast on cron auto-close.
 
     Only the REST router fires this broadcast otherwise. Without it, the beamer view and
     the voters stay on "open".
@@ -270,7 +270,7 @@ async def test_close_conflict_skips(patched: None, monkeypatch: pytest.MonkeyPat
 async def test_close_with_blocked_branch_counts_as_closed(
     patched: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """F20: a blocked result branch still closes the vote. The cron does not retry it."""
+    """A blocked result branch still closes the vote. The cron does not retry it."""
     closed = SimpleNamespace(
         id=uuid4(),
         meeting_id=None,
@@ -321,7 +321,7 @@ async def test_close_with_fired_branch_logs_info(
 async def test_close_notfound_propagates(
     patched: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The close no longer raises NotFoundError for a missing branch (F20).
+    """The close no longer raises NotFoundError for a missing branch.
 
     A missing vote after the row lock is a real fault: the cycle logs it.
     """
@@ -367,7 +367,7 @@ async def test_process_deadlines_orchestrates_all(patched: None) -> None:
     sessions = [
         FakeSession([[vote.id]]),      # vote scan
         FakeSession([[vote]]),         # vote lock
-        FakeSession([[]]),             # auto-transition scan (#8/#28) → no applications
+        FakeSession([[]]),             # auto-transition scan → no applications
         FakeSession([[]]),             # discard of unconfirmed guest applications → none
     ]
     out = await wd.process_deadlines(_ctx(sessions))
@@ -449,6 +449,6 @@ async def test_vote_scan_and_lock_read_the_session() -> None:
 
 
 def test_publisher_needs_redis() -> None:
-    """The flow gets a live-vote publisher only with Redis (F19 `vote_cancelled`)."""
+    """The flow gets a live-vote publisher only with Redis (`vote_cancelled`)."""
     assert wd._publisher({}) is None
     assert isinstance(wd._publisher({"redis": object()}), wd.BrokerPublisher)

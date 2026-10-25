@@ -1,4 +1,4 @@
-"""The scan handles draft uploads and rows that disappear during the scan (Z4).
+"""The scan handles draft uploads and rows that disappear during the scan.
 
 * A draft with a finding is quarantined like a bound file. Its audit entry carries
   `draft: true` instead of an application id.

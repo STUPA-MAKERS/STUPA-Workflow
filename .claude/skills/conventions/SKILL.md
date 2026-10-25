@@ -62,7 +62,7 @@ The non-negotiables. Source of truth: `CONTRIBUTING.md`, `.github/pull_request_t
 - Local (BE): `ruff check .` + `basedpyright` (0 errors) + `pytest`. Local (FE): `npm run lint`,
   `npm run typecheck`, `npm test`. CI order: `Lint → Typecheck → BE-Unit → BE-Integration →
   Contract (Schemathesis) → FE-Unit → E2E (Playwright) → Coverage-Gate → Image-Build + Smoke`.
-  The `mcp` job (ruff check + pytest of `mcp/`, D2) and the `typst` job run beside them.
+  The `mcp` job (ruff check + pytest of `mcp/`) and the `typst` job run beside them.
 
 ## Alembic migrations
 

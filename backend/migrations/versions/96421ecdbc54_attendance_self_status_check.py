@@ -1,4 +1,4 @@
-"""Allow only `present` and `excused` for a self-reported attendance (Z2).
+"""Allow only `present` and `excused` for a self-reported attendance.
 
 The upgrade adds the check `ck_meeting_attendance_self_status`:
 `source <> 'self' OR status IN ('present', 'excused')`. A member reports the own

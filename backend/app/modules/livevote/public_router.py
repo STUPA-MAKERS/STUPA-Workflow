@@ -1,4 +1,4 @@
-"""Public routes of a meeting with a QR code (#17).
+"""Public routes of a meeting with a QR code.
 
 A person without an account reaches these routes from the join page `/j/<code>`. No
 session is involved. The device token sits in the HttpOnly cookie `mg_token`

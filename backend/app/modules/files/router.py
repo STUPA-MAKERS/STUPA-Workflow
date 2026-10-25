@@ -114,7 +114,7 @@ ServiceDep = Annotated[FilesService, Depends(get_files_service)]
 
 
 def get_draft_attachments(service: ServiceDep) -> DraftAttachments:
-    """Wire the draft operations (Z4) on top of the files service."""
+    """Wire the draft operations on top of the files service."""
     return DraftAttachments(service)
 
 
@@ -144,7 +144,7 @@ async def _resolve_attachment_read(
 async def _pii_attachment_filter(
     db: AsyncSession, access: Access
 ) -> Callable[[Attachment], bool] | None:
-    """Return a test for the attachments of the ``isPII`` fields (O21).
+    """Return a test for the attachments of the ``isPII`` fields.
 
     The result is ``None`` when the caller reads the ``isPII`` fields (`can_read_pii`).
     Otherwise the test is true for an attachment that belongs to an ``isPII`` field. An
@@ -174,7 +174,7 @@ async def _pii_attachment_filter(
 async def _assert_not_pii_hidden(db: AsyncSession, access: Access, attachment: Attachment) -> None:
     """Answer 404 for an attachment of an ``isPII`` field that the caller may not read.
 
-    A 404 and not a 403, so the route is no existence oracle (O21).
+    A 404 and not a 403, so the route is no existence oracle.
 
     Raises:
         NotFoundError: The attachment belongs to an ``isPII`` field and the caller
@@ -327,7 +327,7 @@ async def list_attachments(
     The frontend uses this route to fill the panel again after a reload. Access is A/P.
 
     A caller without the PII right (`can_read_pii`) does not see the attachments of the
-    ``isPII`` fields (O21).
+    ``isPII`` fields.
 
     An unconfirmed guest submission stays invisible to a principal or a member of the
     Gremium and gives 404. Only the owning magic-link applicant reads it. This mirrors
@@ -486,7 +486,7 @@ async def delete_attachment(
     A delete is a data change, not an upload. An applicant and a creator without
     ``application.manage`` can delete only while the current state has
     ``edit_allowed``. In a locked state they get 409, as for a PATCH. They can still
-    upload in every state (Z1, O4). ``application.manage`` and
+    upload in every state. ``application.manage`` and
     ``application.edit_any`` keep the bypass.
     """
     if principal is None and applicant is None:
@@ -511,7 +511,7 @@ async def delete_attachment(
     await service.delete(attachment_id, actor=access.actor)
 
 
-# Header of the draft token on ``POST`` and ``DELETE /apply/attachments`` (Z4). A header
+# Header of the draft token on ``POST`` and ``DELETE /apply/attachments``. A header
 # keeps the token out of the URL and out of the access log.
 DRAFT_TOKEN_HEADER = "X-Draft-Token"
 
@@ -538,7 +538,7 @@ async def upload_draft_attachment(
         str | None, Header(alias=DRAFT_TOKEN_HEADER, max_length=128)
     ] = None,
 ) -> DraftAttachmentOut:
-    """Upload a file of the wizard before the application exists (Z4).
+    """Upload a file of the wizard before the application exists.
 
     The route is public. The first upload of a draft has no ``X-Draft-Token``
     header. An anonymous caller then sends an ALTCHA solution in the multipart field
@@ -587,7 +587,7 @@ async def delete_draft_attachment(
     principal: Annotated[Principal | None, Depends(get_current_principal)],
     draft_token: Annotated[str, Header(alias=DRAFT_TOKEN_HEADER, max_length=128)],
 ) -> None:
-    """Remove a draft file of the wizard (Z4).
+    """Remove a draft file of the wizard.
 
     The ``X-Draft-Token`` header must name the token that owns the draft. Any other
     case gives 404, so the route is no existence oracle. A bound attachment is out of

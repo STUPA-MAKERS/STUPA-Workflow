@@ -36,7 +36,7 @@ class AttachmentOut(BaseModel):
 
 
 class DraftAttachmentOut(AttachmentOut):
-    """201 response of ``POST /apply/attachments`` (Z4).
+    """201 response of ``POST /apply/attachments``.
 
     ``draftToken`` is the token of the draft. The first upload issues it, every later
     upload echoes it. The wizard sends it with each further upload, with a delete and

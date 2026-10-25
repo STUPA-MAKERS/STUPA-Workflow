@@ -1,4 +1,4 @@
-"""Unit tests for MIME sniffing and the allowlist (T-13, security.md section 6).
+"""Unit tests for MIME sniffing and the allowlist.
 
 A fake `magic` module replaces `libmagic`. The unit run needs no system libmagic.
 """
@@ -79,7 +79,7 @@ def test_validate_xlsx_pptx_zip_sniff_ok(fake_magic: dict[str, str]) -> None:
 
 
 def test_validate_arbitrary_zip_as_docx_rejected(fake_magic: dict[str, str]) -> None:
-    # Any ZIP without OOXML structure, disguised as .docx, is rejected (AUD-021).
+    # Any ZIP without OOXML structure, disguised as .docx, is rejected.
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as zf:
         zf.writestr("evil.sh", "rm -rf /")

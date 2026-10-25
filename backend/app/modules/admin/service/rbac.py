@@ -188,7 +188,7 @@ class RbacOps(ConfigServiceBase):
         CITEXT and therefore case-insensitive anyway. Without ``query`` the
         search returns the first ``limit`` principals.
 
-        The filters of the user list (F3): ``last_login_before`` keeps the people
+        The filters of the user list: ``last_login_before`` keeps the people
         whose last login is before that day, ``include_never`` adds the people who
         never logged in (alone: only those), ``has_groups`` keeps the people with
         (true) or without (false) OIDC groups.

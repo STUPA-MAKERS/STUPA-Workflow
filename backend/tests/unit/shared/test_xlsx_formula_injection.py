@@ -1,4 +1,4 @@
-"""Formula-injection guard for the xlsx workbook builders (AUD-008).
+"""Formula-injection guard for the xlsx workbook builders.
 
 Excel and LibreOffice must not evaluate an attacker-controlled string as an active
 formula. Such a string is the application title, the applicant name, the form data or

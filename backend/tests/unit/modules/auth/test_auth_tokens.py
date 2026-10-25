@@ -1,4 +1,4 @@
-"""TDD: magic-link token primitives (security.md §1)."""
+"""TDD: magic-link token primitives."""
 
 from __future__ import annotations
 

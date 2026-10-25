@@ -186,7 +186,7 @@ def get_guest_service(
     broker: Annotated[MeetingBroker, Depends(get_broker_rest)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> GuestService:
-    """Guest service of the public meeting (#17) with the broker and the base URL."""
+    """Guest service of the public meeting with the broker and the base URL."""
     return GuestService(session, BrokerPublisher(broker), base_url=settings.public_base_url)
 
 
@@ -244,7 +244,7 @@ async def list_meeting_members(
 
     The caller must be able to manage the Gremium (``session.manage`` or admin).
     The list fills the protokollant picker in the create dialog before a roster
-    exists. ``canKeepProtocol`` marks the members with ``protocol.write`` (O20): only
+    exists. ``canKeepProtocol`` marks the members with ``protocol.write``: only
     they can be the protokollant.
     """
     if not await service.can_manage(gremium_id, principal):
@@ -260,7 +260,7 @@ async def list_meeting_members(
 async def get_meeting_defaults(
     gremium_id: UUID, service: ServiceDep, principal: ReaderDep
 ) -> MeetingDefaultsOut:
-    """What a new meeting of the gremium allows (#17).
+    """What a new meeting of the gremium allows.
 
     Public participation needs a gremium without a quorum; the create dialog reads it
     before the meeting exists. The caller must manage the gremium (``session.manage``
@@ -376,8 +376,8 @@ async def patch_meeting(
     The service applies RBAC per field. Status and active application need
     ``canWrite`` (protokollant or manager). Date, time and protokollant need
     ``canManage`` (meeting manager). A new protokollant needs ``protocol.write`` in
-    the Gremium (O20: 422). While the meeting is live, a new protokollant is a
-    handover ``now`` (Z3). On the start transition (planned to live) the
+    the Gremium (422). While the meeting is live, a new protokollant is a
+    handover ``now``. On the start transition (planned to live) the
     router creates the protocol, and that step is idempotent. The protocol is
     created only here, never by hand. The service has already checked that a
     protokollant is set, else it answers 409.
@@ -413,12 +413,12 @@ async def hand_over_protokollant(
     service: ServiceDep,
     principal: ReaderDep,
 ) -> MeetingOut:
-    """Hand the minutes of a live meeting over to another member (Z3, O1).
+    """Hand the minutes of a live meeting over to another member.
 
     ``mode=now`` hands over at once. ``mode=next_item`` plans the handover for the
     next forward move of the current agenda item and replaces an older plan. The
     session lead (``session.manage``) or the current protokollant may call it. The
-    new protokollant is an active member (403) with ``protocol.write`` (O20: 422
+    new protokollant is an active member (403) with ``protocol.write`` (422
     ``protokollant_needs_protocol_write``). 409 ``meeting_not_live`` outside a live
     meeting, 409 ``already_protokollant`` for the current protokollant, 409
     ``no_next_item`` for ``next_item`` on the last agenda item. Writes
@@ -435,7 +435,7 @@ async def hand_over_protokollant(
 async def cancel_protokollant_handover(
     meeting_id: UUID, service: ServiceDep, principal: ReaderDep
 ) -> MeetingOut:
-    """Discard the planned handover of a live meeting (Z3).
+    """Discard the planned handover of a live meeting.
 
     The same callers as for the handover. 404 ``no_planned_handover`` without a
     planned handover. Writes ``protokollant_handover`` (mode ``cancel``) and sends
@@ -480,13 +480,13 @@ async def set_own_attendance(
     service: ServiceDep,
     principal: ReaderDep,
 ) -> list[AttendanceOut]:
-    """Report the attendance of the caller (Gremium members only, Z2).
+    """Report the attendance of the caller (Gremium members only).
 
     The status is `present` or `excused`, else 422. A `note` (the reason) is
     allowed only with `excused`. The meeting must be `planned` or `live`, else
     409. When the meeting lead set the record, the member cannot change it: 409
-    `attendance_set_by_lead` (O15). `present` gives 409 `delegation_active` while
-    the caller has a delegation for this meeting (O23).
+    `attendance_set_by_lead`. `present` gives 409 `delegation_active` while
+    the caller has a delegation for this meeting.
     """
     can_write = await service.can_write_meeting(meeting_id, principal)
     return await attendance.set_self(
@@ -520,9 +520,9 @@ async def set_member_attendance(
 ) -> list[AttendanceOut]:
     """Set the attendance of a member as the meeting lead (`canWrite`).
 
-    The lead's record wins over the own report of the member (O15). `present`
+    The lead's record wins over the own report of the member. `present`
     gives 409 `delegation_active` while the member has a delegation for this
-    meeting (O23). The change writes `attendance_set` without the note.
+    meeting. The change writes `attendance_set` without the note.
     """
     await _require_lead(service, meeting_id, principal)
     return await attendance.set_for(
@@ -608,7 +608,7 @@ async def open_meeting_vote(
     # record the result in. A prepared draft only waits for the start.
     assert_vote_window(meeting, draft=payload.draft)
     item = await agenda.item(meeting_id, payload.agenda_item_id)
-    # #17: the admitted guests vote too when the meeting lets them and the item is
+    # The admitted guests vote too when the meeting lets them and the item is
     # public. Such a vote has no quorum: only the majority of the cast ballots counts.
     guests_allowed = meeting.public_join and meeting.guests_mode == "vote"
     if payload.guests_vote and not guests_allowed:
@@ -625,7 +625,7 @@ async def open_meeting_vote(
         )
     election = payload.kind == "election"
     if election and item.application_id is not None:
-        # F2: an election never has an application and never fires a flow branch.
+        # An election never has an application and never fires a flow branch.
         raise ValidationProblem(
             "An election belongs to a free-text agenda item.",
             code="election_on_application_item",
@@ -638,7 +638,7 @@ async def open_meeting_vote(
             code="poll_on_application_item",
             errors=[{"field": "kind", "msg": "an application agenda item"}],
         )
-    # F2: guests vote in an election only when the lead switches them on.
+    # Guests vote in an election only when the lead switches them on.
     guests_vote = (
         payload.guests_vote
         if payload.guests_vote is not None
@@ -660,7 +660,7 @@ async def open_meeting_vote(
             "options": payload.options,
             "majorityRule": payload.majority_rule,
             "secret": bool(payload.secret),
-            # A meeting vote has no casting vote (O18): a tie is ``rejected``. The
+            # A meeting vote has no casting vote: a tie is ``rejected``. The
             # body has no ``tieBreak``, so the client cannot change this.
             "tieBreak": "rejected",
             "guestsVote": guests_vote,
@@ -771,7 +771,7 @@ async def delete_meeting_vote(
     """Delete a vote and its ballots.
 
     The caller must be the manager, the protokollant, or hold the gremium permission
-    ``vote.manage``. Only a ``planned`` or ``live`` meeting deletes a vote (O24): after
+    ``vote.manage``. Only a ``planned`` or ``live`` meeting deletes a vote: after
     the close the vote is part of the record, and the route answers 409
     ``meeting_closed``. Only a ``draft`` or ``cancelled`` vote can go: an open or
     closed vote gives 409 ``vote_not_deletable``. Every delete writes ``vote_delete``.
@@ -921,8 +921,8 @@ async def set_agenda_body(
 
     The per-item editor calls this route. Only the meeting lead or an admin may
     edit the agenda (``canWrite``). The body needs a planned or live meeting, or a
-    closed meeting whose protocol is still a draft (O22): the minute-taker can write
-    the minutes before the start. A rename needs a planned or live meeting (O25). The
+    closed meeting whose protocol is still a draft: the minute-taker can write
+    the minutes before the start. A rename needs a planned or live meeting. The
     service answers 409 otherwise.
 
     In a live meeting with a protokollant only the protokollant writes the body (403
@@ -998,7 +998,7 @@ def _assert_live_minutes_writer(meeting: MeetingOut) -> None:
         )
 
 
-# Public meeting with a QR code (#17): the routes of the meeting lead.
+# Public meeting with a QR code: the routes of the meeting lead.
 async def _require_manage(service: MeetingService, meeting_id: UUID, principal: Principal) -> None:
     """Allow only the meeting lead with ``session.manage`` in the gremium (or admin)."""
     gremium_id = await service.meeting_gremium_id(meeting_id)
@@ -1014,7 +1014,7 @@ async def _require_manage(service: MeetingService, meeting_id: UUID, principal: 
 async def list_meeting_guests(
     meeting_id: UUID, service: ServiceDep, guests: GuestServiceDep, principal: ReaderDep
 ) -> list[MeetingGuestOut]:
-    """List the join requests and the guests of a public meeting (#17).
+    """List the join requests and the guests of a public meeting.
 
     The open requests come first. Only the meeting lead (``session.manage``) sees the
     names.
@@ -1031,7 +1031,7 @@ async def list_meeting_guests(
 async def admit_all_meeting_guests(
     meeting_id: UUID, service: ServiceDep, guests: GuestServiceDep, principal: ReaderDep
 ) -> list[MeetingGuestOut]:
-    """Admit every waiting guest (#17). Writes ``guest_admit_all`` with the count."""
+    """Admit every waiting guest. Writes ``guest_admit_all`` with the count."""
     await _require_manage(service, meeting_id, principal)
     return await guests.admit_all(meeting_id, actor_sub=principal.sub)
 
@@ -1048,7 +1048,7 @@ async def admit_meeting_guest(
     guests: GuestServiceDep,
     principal: ReaderDep,
 ) -> MeetingGuestOut:
-    """Admit a waiting guest (#17). 409 ``guest_not_pending`` for any other status.
+    """Admit a waiting guest. 409 ``guest_not_pending`` for any other status.
 
     A guest admitted while a vote with guests is open votes in it too.
     """
@@ -1068,7 +1068,7 @@ async def reject_meeting_guest(
     guests: GuestServiceDep,
     principal: ReaderDep,
 ) -> MeetingGuestOut:
-    """Reject a waiting guest (#17). The device may ask again after 3 minutes."""
+    """Reject a waiting guest. The device may ask again after 3 minutes."""
     await _require_manage(service, meeting_id, principal)
     return await guests.reject(meeting_id, guest_id, actor_sub=principal.sub)
 
@@ -1085,7 +1085,7 @@ async def remove_meeting_guest(
     guests: GuestServiceDep,
     principal: ReaderDep,
 ) -> MeetingGuestOut:
-    """Remove an admitted guest (#17). The cast ballots stay counted."""
+    """Remove an admitted guest. The cast ballots stay counted."""
     await _require_manage(service, meeting_id, principal)
     return await guests.remove(meeting_id, guest_id, actor_sub=principal.sub)
 
@@ -1103,7 +1103,7 @@ async def rename_meeting_guest(
     guests: GuestServiceDep,
     principal: ReaderDep,
 ) -> MeetingGuestOut:
-    """Give a guest another name (#17). The audit entry holds the guest id only."""
+    """Give a guest another name. The audit entry holds the guest id only."""
     await _require_manage(service, meeting_id, principal)
     return await guests.rename(
         meeting_id, guest_id, payload.display_name, actor_sub=principal.sub
@@ -1118,7 +1118,7 @@ async def rename_meeting_guest(
 async def get_meeting_join_link(
     meeting_id: UUID, service: ServiceDep, guests: GuestServiceDep, principal: ReaderDep
 ) -> JoinLinkOut:
-    """Return the join link and its QR code (#17); 409 when the meeting is not public."""
+    """Return the join link and its QR code; 409 when the meeting is not public."""
     await _require_manage(service, meeting_id, principal)
     return await guests.join_link(meeting_id)
 
@@ -1131,7 +1131,7 @@ async def get_meeting_join_link(
 async def rotate_meeting_join_code(
     meeting_id: UUID, service: ServiceDep, guests: GuestServiceDep, principal: ReaderDep
 ) -> JoinLinkOut:
-    """Replace the join code (#17). The old link stops working; open requests are void.
+    """Replace the join code. The old link stops working; open requests are void.
 
     The admitted guests stay. Writes ``meeting_join_code_rotated``.
     """
@@ -1151,7 +1151,7 @@ async def _authorize(
     """Check the handshake authentication and the RBAC.
 
     Returns:
-        The principal and its ``canManage`` flag (#17: the guest events with names
+        The principal and its ``canManage`` flag (the guest events with names
         reach only the meeting lead), or ``None`` when the socket is already closed.
     """
     if principal is None:

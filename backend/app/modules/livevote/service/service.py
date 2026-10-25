@@ -5,7 +5,7 @@ and every other caller bind to this class only. The implementation lives in the 
 classes:
 
 * `lifecycle.LifecycleOps` — create, patch, delete, lifecycle rules, broadcast
-* `handover.HandoverOps` — periods of the protocol keeper and the handover (Z3)
+* `handover.HandoverOps` — periods of the protocol keeper and the handover
 * `listing.ListingOps` — detail read, list, gremien filter, timeline and search
 * `permissions.PermissionOps` — RBAC checks, visibility scope, flag serializer
 * `votes.VoteReadOps` — vote tally reload, reveal rule, quorum helpers

@@ -1,4 +1,4 @@
-"""O6: the meeting lead enters a substitution for a missing member while live.
+"""The meeting lead enters a substitution for a missing member while live.
 
 * Only the lead (`session.manage` in the gremium) may send `delegatorId`, and
   only while the meeting is live (not planned, not closed).
@@ -11,7 +11,7 @@
 * The row stores the lead as `created_by` and `via_pool = true`.
 * The lead revokes while live. A ballot that the delegate already cast stays.
 * The lead cannot name themselves as the substitute.
-* The entry waits for a parallel attendance change of the member (O23).
+* The entry waits for a parallel attendance change of the member.
 """
 
 from __future__ import annotations
@@ -389,7 +389,7 @@ async def test_lead_cannot_name_themselves(
 async def test_lead_entry_waits_for_a_parallel_present_report(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
-    """A holds the share lock of the attendance writer and reports present (O23).
+    """A holds the share lock of the attendance writer and reports present.
 
     The lead entry for A must wait for the lock. After the commit it reads the
     present record and refuses. Without the wait both changes would commit.

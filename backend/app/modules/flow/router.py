@@ -232,8 +232,8 @@ async def fire_applicant_transition(
     The caller is the magic-link holder or the logged-in creator. The creator does
     not need `application.manage`. A principal who is not the creator gets 403, also
     with `application.manage` or `application.edit_any`. A transition that
-    `actorIsApplicant` does not open gives 403. The applicant never sets a decision
-    (F1): a `decision` gives 422 `decision_not_allowed`.
+    `actorIsApplicant` does not open gives 403. The applicant never sets a decision:
+    a `decision` gives 422 `decision_not_allowed`.
     """
     if payload.decision is not None:
         raise not_allowed_problem("The applicant cannot set a decision.")

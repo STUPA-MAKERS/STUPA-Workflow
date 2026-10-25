@@ -5,7 +5,7 @@
   gremium that votes, as text.
 * Ballot - one cast vote. ``UNIQUE(vote_id, voter_sub)`` blocks a double vote
   atomically in the DB. A ballot never changes after the cast: a second cast gives
-  409 ``already_voted`` (O11).
+  409 ``already_voted``.
 * VotedMarker / SecretBallot - the secret path (``secret=true``). The identity goes to
   ``voted_marker`` and the choice to ``secret_ballot`` without an identity. Nobody can
   trace ``choice`` back to the voter.
@@ -15,7 +15,7 @@ sets it.
 
 Two time columns are easy to mix up. ``closes_at`` is the planned end of the cast
 window (the deadline that the cron watches). ``closed_at`` is the real moment when the
-vote ended: ``close`` and ``cancel`` set it (Z9).
+vote ended: ``close`` and ``cancel`` set it.
 """
 
 from __future__ import annotations
@@ -62,7 +62,7 @@ class Vote(UUIDPkMixin, CreatedAtMixin, Base):
     )
     # The agenda item that the vote belongs to (live vote). SET NULL, as for
     # ``meeting_id``: the meeting delete deletes the votes before the agenda cascade.
-    # An agenda item with an open or closed vote cannot be removed (O25), and its
+    # An agenda item with an open or closed vote cannot be removed, and its
     # remove deletes the draft and cancelled votes explicitly with a ``vote_delete``
     # audit entry.
     agenda_item_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -72,7 +72,7 @@ class Vote(UUIDPkMixin, CreatedAtMixin, Base):
     # The vote question that the protocol snippet shows. NULL means no explicit question.
     question: Mapped[str | None] = mapped_column(Text, nullable=True)
     config: Mapped[dict] = mapped_column(JSONB)
-    # The decision proposal of an application vote (F1): `{approvedAmount, conditions}`.
+    # The decision proposal of an application vote: `{approvedAmount, conditions}`.
     # A passed vote writes it as the decision of the application. NULL = no deviation.
     proposal: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     # Authoritative eligible-voter count (roster). It is the denominator of the percent
@@ -98,13 +98,13 @@ class Vote(UUIDPkMixin, CreatedAtMixin, Base):
     result_branch_transition_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("transition.id", ondelete="SET NULL"), nullable=True
     )
-    # The attendance when a meeting vote closed (#17): the present members and the
+    # The attendance when a meeting vote closed: the present members and the
     # admitted guests. The close of a meeting vote sets both. NULL for an open vote, a
     # vote without a meeting, and a vote that closed before the columns existed. The
     # protocol and the result cards show them as counts, never as names.
     present_members: Mapped[int | None] = mapped_column(Integer, nullable=True)
     present_guests: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    # F2 · Personnel elections. ``kind`` tells a motion (``config`` = VoteConfig) from
+    # Personnel elections. ``kind`` tells a motion (``config`` = VoteConfig) from
     # an election (``config`` = ElectionConfig). An election never has an application
     # and never fires a flow branch. A runoff points to its parent election
     # (``parent_vote_id``) and counts the rounds (``round``, 1 for the first round).
@@ -129,7 +129,7 @@ class Vote(UUIDPkMixin, CreatedAtMixin, Base):
         CheckConstraint(
             "status IN ('draft','open','closed','cancelled')", name="vote_status"
         ),
-        # ``elected`` and ``runoff`` belong to an election (F2). A motion keeps
+        # ``elected`` and ``runoff`` belong to an election. A motion keeps
         # ``passed``, ``rejected`` and ``tie``.
         CheckConstraint(
             "result IS NULL OR result IN ('passed','rejected','tie','elected','runoff')",

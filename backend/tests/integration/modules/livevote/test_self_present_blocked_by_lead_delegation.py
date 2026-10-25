@@ -1,4 +1,4 @@
-"""O6 with O23: a substitution of the lead blocks the own `present` report.
+"""A substitution of the lead blocks the own `present` report.
 
 The meeting lead enters a substitution for a missing member during a live
 meeting. While it exists, the member gets 409 `delegation_active` for an own

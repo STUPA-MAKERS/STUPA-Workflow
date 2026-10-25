@@ -1,4 +1,4 @@
-"""Votes with guests of a public meeting (#17), without a database.
+"""Votes with guests of a public meeting, without a database.
 
 Covers the second eligibility path `cast_guest`, the guest count in the tally, the
 attendance that the close fixes, and the refusal of `guestsVote` on an application

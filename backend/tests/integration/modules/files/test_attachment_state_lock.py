@@ -1,7 +1,7 @@
 """Integration: a guest can upload in a locked state, but cannot delete (real Postgres).
 
-Every applicant session has the edit scope (O4). Each action checks the current state.
-An upload is allowed in every state, for example a receipt after the decision (Z1).
+Every applicant session has the edit scope. Each action checks the current state.
+An upload is allowed in every state, for example a receipt after the decision.
 A delete is a data change, like a PATCH. In a state with `edit_allowed = false` the
 attachment DELETE route answers 409 for the applicant. In an open state it deletes.
 

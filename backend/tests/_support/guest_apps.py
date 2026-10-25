@@ -1,4 +1,4 @@
-"""Integration helpers for applications without an account (Z1).
+"""Integration helpers for applications without an account.
 
 The helpers seed a gremium, an application type with an active form and an active
 flow `eingang` (edit allowed) -> `gesperrt` (edit locked). They create applications

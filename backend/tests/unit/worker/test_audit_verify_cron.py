@@ -1,4 +1,4 @@
-"""Worker tasks of the stored audit-chain check (Z6/O8).
+"""Worker tasks of the stored audit-chain check.
 
 The tests replace `AuditService.verify_and_store` and drive the tasks with a fake
 sessionmaker. They pin down the cron schedule at 04:30, the trigger of each path,

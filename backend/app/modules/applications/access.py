@@ -12,8 +12,8 @@ logged-in creator who is no member see ``public`` comments only. A creator is a
 member when the creator reads through the Gremium read scope, or holds
 ``application.manage``, ``application.transition`` or ``application.edit_any``.
 
-`Access.via` records the path that granted the access. The applicant view (A11,
-A12) and the PII rule (O21, `can_read_pii`) read it.
+`Access.via` records the path that granted the access. The applicant view and the PII
+rule (`can_read_pii`) read it.
 """
 
 from __future__ import annotations
@@ -73,7 +73,7 @@ class Access:
 
     @property
     def _owner_as_applicant(self) -> bool:
-        """Tell whether the creator reads the own application as the applicant (A12).
+        """Tell whether the creator reads the own application as the applicant.
 
         This holds for ``via="owner"`` when the principal holds none of the member
         rights (`_MEMBER_PERMISSIONS`). A creator with such a right works on
@@ -90,7 +90,7 @@ class Access:
 
         Only a principal does, and only as a member: through a permission, the
         Gremium read scope or a member right. The creator who is no member reads as
-        the applicant (A12), so the internal comments of the Gremium stay hidden.
+        the applicant, so the internal comments of the Gremium stay hidden.
         """
         return self.principal is not None and not self._owner_as_applicant
 
@@ -110,8 +110,7 @@ class Access:
 
         This holds for the magic link and for the logged-in creator who is no
         member (see `can_see_internal`). The applicant view shows the Gremium
-        instead of member names (A12, O16) and the version metadata without values
-        (A11, O17).
+        instead of member names and the version metadata without values.
         """
         return self.applicant is not None or self._owner_as_applicant
 
@@ -316,7 +315,7 @@ async def resolve_app_read(
     ignores the Gremium and the ownership.
 
     The Gremium read scope comes before the creator. A member who submitted for
-    a student (F23) and who also reads through the Gremium reads as a member
+    a student and who also reads through the Gremium reads as a member
     (``via="committee"``), not as the applicant (``via="owner"``).
 
     `require_app_read` and the attachment routes of the files module use this
@@ -413,7 +412,7 @@ def principal_reads_all(principal: Principal) -> bool:
 
 
 def principal_reads_pii(principal: Principal) -> bool:
-    """Tell whether a principal reads the ``isPII`` fields of every application (O21).
+    """Tell whether a principal reads the ``isPII`` fields of every application.
 
     The rights are ``application.read`` and ``application.read_all``. An admin holds
     both through `Principal.has`, which also applies the OAuth scope cap.
@@ -422,7 +421,7 @@ def principal_reads_pii(principal: Principal) -> bool:
 
 
 async def can_read_pii(db: AsyncSession, access: Access) -> bool:
-    """Tell whether the caller reads the ``isPII`` fields of this application (O21).
+    """Tell whether the caller reads the ``isPII`` fields of this application.
 
     The applicant reads the own data: through the magic link and as the logged-in
     creator. A principal reads them with `principal_reads_pii`. A member who reads
@@ -441,7 +440,7 @@ async def can_read_pii(db: AsyncSession, access: Access) -> bool:
 
 
 async def hidden_pii_keys(db: AsyncSession, access: Access) -> set[str]:
-    """Return the ``isPII`` field keys that the caller may not read (O21).
+    """Return the ``isPII`` field keys that the caller may not read.
 
     The set is empty when `can_read_pii` holds. Otherwise it holds the ``isPII``
     keys of every form version of the application type, like the strip of the

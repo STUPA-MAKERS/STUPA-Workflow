@@ -1,4 +1,4 @@
-"""Unit tests of the pure notification parts (T-18), without a database and without Redis.
+"""Unit tests of the pure notification parts, without a database and without Redis.
 
 The parts are mail, templating, queue, schemas and provider.
 """

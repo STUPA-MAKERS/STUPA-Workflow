@@ -35,7 +35,7 @@ from app.shared.permissions import PERMISSION_CATALOGUE
 # changes after the create.
 CD_VARIANT_KEY_PATTERN = r"^[a-z0-9]+(?:-[a-z0-9]+)*$"
 
-# A role key (global role and gremium role, A10) starts with a lowercase letter and
+# A role key (global role and gremium role) starts with a lowercase letter and
 # holds lowercase letters, digits and underscores. The key is the stable handle that
 # seeds, migrations and the forced gremium roles use. A key that breaks the pattern
 # gives 422 on create. The update schemas have no key, because a key never changes.
@@ -465,7 +465,7 @@ class PrincipalOut(_CamelModel):
     merged_into_id: UUID | None = Field(default=None, serialization_alias="mergedIntoId")
     merged_into_name: str | None = Field(default=None, serialization_alias="mergedIntoName")
     merged_at: str | None = Field(default=None, serialization_alias="mergedAt")
-    # Revoke rights (F3): true when the person has something that "Rechte entziehen"
+    # Revoke rights: true when the person has something that "Rechte entziehen"
     # can take away: an OIDC group, a gremium membership, a role assignment other than
     # the implicit `member`, a pool entry or a delegation in a planned or live meeting.
     has_access: bool = Field(default=False, serialization_alias="hasAccess")
@@ -821,7 +821,7 @@ class SiteConfigOut(_CamelModel):
 
 
 class AttachmentLimitsOut(_CamelModel):
-    """Upload limits of the wizard (Z4), for the text below the drop zone.
+    """Upload limits of the wizard, for the text below the drop zone.
 
     ``maxFileBytes`` is the cap of one file. ``maxDraftFiles`` and
     ``maxDraftBytes`` are the caps of all draft files of one draft token. The
@@ -914,7 +914,7 @@ class LoginSettingsUpdate(_CamelModel):
 
 
 class GuestSettingsOut(_CamelModel):
-    """Settings for applications without an account (Z1).
+    """Settings for applications without an account.
 
     ``linkTtlDays`` null means: a new magic link has no expiry.
     """

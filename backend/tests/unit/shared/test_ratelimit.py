@@ -1,4 +1,4 @@
-"""Rate limiting with a sliding window (security.md §8, api.md §7, Issue #24)."""
+"""Rate limiting with a sliding window."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Fuzzy search (#3/#4): the `pg_trgm` extension and GIN trigram indexes.
+"""Fuzzy search: the `pg_trgm` extension and GIN trigram indexes.
 
 The server-side fuzzy search over bookings, applications, invoices and meetings
 uses `pg_trgm` similarity to **filter** and to **rank**. This migration creates
@@ -61,7 +61,7 @@ _UPGRADE: tuple[str, ...] = (
         " )"
         " $$ LANGUAGE sql IMMUTABLE"
     ),
-    # The free-text fields of the booking search (#3).
+    # The free-text fields of the booking search.
     (
         "CREATE INDEX IF NOT EXISTS ix_trgm_budget_expense_description "
         "ON budget_expense USING gin (description gin_trgm_ops)"
@@ -93,7 +93,7 @@ _UPGRADE: tuple[str, ...] = (
     ("CREATE INDEX IF NOT EXISTS ix_trgm_invoice_note ON invoice USING gin (note gin_trgm_ops)"),
     # Account: the booking search joins Account.name.
     ("CREATE INDEX IF NOT EXISTS ix_trgm_account_name ON account USING gin (name gin_trgm_ops)"),
-    # The meeting title, for the timeline search (#4).
+    # The meeting title, for the timeline search.
     ("CREATE INDEX IF NOT EXISTS ix_trgm_meeting_title ON meeting USING gin (title gin_trgm_ops)"),
     # The meeting search joins the Gremium name and the protocol writer name.
     ("CREATE INDEX IF NOT EXISTS ix_trgm_gremium_name ON gremium USING gin (name gin_trgm_ops)"),

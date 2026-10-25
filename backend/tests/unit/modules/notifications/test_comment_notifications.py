@@ -1,4 +1,4 @@
-"""Comment notification tests (#4-1) with a fake service and a fake resolver."""
+"""Comment notification tests with a fake service and a fake resolver."""
 
 from __future__ import annotations
 
@@ -227,7 +227,7 @@ def _capture_context(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
 async def test_principal_comment_mail_names_the_gremium_not_the_member(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A12/O16: the applicant mail shows the Gremium, never the member name."""
+    """The applicant mail shows the Gremium, never the member name."""
     seen = _capture_context(monkeypatch)
     gremium_id = uuid.uuid4()
     # executes: the application row, then the (lang, gremium_id) row for the

@@ -244,7 +244,7 @@ class BudgetApplicationOut(_CamelModel):
     path_key: str | None = Field(default=None, alias="pathKey")
     fiscal_year_id: UUID | None = Field(default=None, alias="fiscalYearId")
     amount: Decimal | None = None
-    # F1: the approved amount of the valid decision, None = as requested.
+    # The approved amount of the valid decision, None = as requested.
     approved_amount: Decimal | None = Field(default=None, alias="approvedAmount")
     currency: str | None = None
     state_id: UUID | None = Field(default=None, alias="stateId")
@@ -463,7 +463,7 @@ class InvoiceUpdate(_CamelModel):
 
 
 class InvoiceBookingOut(_CamelModel):
-    """A booking that references the invoice (A6), as the invoice list shows it."""
+    """A booking that references the invoice, as the invoice list shows it."""
 
     id: UUID
     budget_id: UUID = Field(alias="budgetId")

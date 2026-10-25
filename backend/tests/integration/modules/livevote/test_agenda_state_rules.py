@@ -1,4 +1,4 @@
-"""F24, O25 and O22: the agenda follows the meeting state, and every change is audited.
+"""The agenda follows the meeting state, and every change is audited.
 
 * Add, reorder, rename and remove need a planned or live meeting (409 otherwise).
 * Remove answers 409 while the item has an open or closed vote. It deletes the
@@ -151,7 +151,7 @@ async def test_live_minutes_are_not_audited(
 async def test_body_after_close_with_draft_protocol(
     maker: async_sessionmaker[AsyncSession], api: FastAPI
 ) -> None:
-    """O22: the minutes stay correctable between the close and the finalize."""
+    """The minutes stay correctable between the close and the finalize."""
     s = await seed(maker, status="closed", protocol="draft")
     with TestClient(api) as client:
         resp = client.patch(

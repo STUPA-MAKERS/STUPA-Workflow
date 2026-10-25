@@ -1,4 +1,4 @@
-"""BudgetTreeService (CR #76/#78) without a DB. A fake session covers every branch (100 %).
+"""BudgetTreeService without a DB. A fake session covers every branch (100 %).
 
 The order of the `execute` results mirrors the service flow. Each `execute` pops one entry
 from a FIFO queue. See `tests/auth_fakes.FakeSession`.
@@ -77,7 +77,7 @@ async def test_create_node_invalid_key() -> None:
 
 
 async def test_create_top_level_without_gremium_ok() -> None:
-    # #22: a budget does not belong to a Gremium. A top-level node needs no gremiumId.
+    # A budget does not belong to a Gremium. A top-level node needs no gremiumId.
     sess = fake_session(result())  # only the sibling check, no Gremium lookup
     svc = BudgetTreeService(sess)
     out = await svc.create_node(BudgetNodeCreate(key="VS", name="VS-Mittel"))
@@ -465,7 +465,7 @@ async def test_assign_budget_explicit_fiscal_year() -> None:
 
 async def test_assign_budget_ambiguous_requires_fiscal_year() -> None:
     # Two or more active fiscal years without an explicit fiscalYearId give 422 instead of
-    # a silent NULL (R7.1e).
+    # a silent NULL.
     top = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     node = _budget(id=uuid.uuid4(), path_key="VS-800", key="800")
     fy1 = _fy(id=uuid.uuid4(), budget_id=top.id)
@@ -537,7 +537,7 @@ async def test_get_tree_assembles() -> None:
 
 
 async def test_get_tree_binds_the_approved_amount() -> None:
-    """F1: an accepted application binds its approved amount, not the requested one."""
+    """An accepted application binds its approved amount, not the requested one."""
     fy_id = uuid.uuid4()
     top = _budget(id=uuid.uuid4(), path_key="VS", gremium_id=uuid.uuid4(), key="VS")
     top.accepted_state_keys = ["approved"]
@@ -567,7 +567,7 @@ async def test_get_tree_rolls_up_standalone_expenses() -> None:
         result(top),                            # nodes
         result(alloc),                          # allocations
         result(),                               # application rows (none)
-        result(("VS", fy_id, Decimal("60"), "expense", None)),  # standalone expense (#25)
+        result(("VS", fy_id, Decimal("60"), "expense", None)),  # standalone expense
     )
     svc = BudgetTreeService(sess)
     view = (await svc.get_tree())[0].by_fiscal_year[0]
@@ -653,7 +653,7 @@ async def test_delete_expense_not_found() -> None:
 
 
 def test_expense_out_maps_metadata_fields() -> None:
-    """#1-1, #1-2, #3 and #4: the extra metadata reaches the output DTO in camelCase."""
+    """The extra metadata reaches the output DTO in camelCase."""
     e = BudgetExpense(
         id=uuid.uuid4(),
         budget_id=uuid.uuid4(),

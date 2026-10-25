@@ -232,9 +232,9 @@ async def finalize_protocol(
     in the gremium of the meeting (or the admin role). This is stricter than a
     write to the draft.
 
-    The meeting must be closed (409 `meeting_not_closed`, F8, O13), and the
+    The meeting must be closed (409 `meeting_not_closed`), and the
     protocol must be a draft (409 `protocol_not_draft`): a protocol is finalized
-    once, also when several members kept the minutes (O2). The start writes
+    once, also when several members kept the minutes. The start writes
     `protocol_finalize`. The optional body `{publicWithheld}` holds back the
     protocol from the public protocols page.
 

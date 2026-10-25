@@ -1,6 +1,6 @@
 """Full branch and line coverage for `app.modules.budget.tree`.
 
-The module is critical (testing.md section 1: `budget` needs 100 % branch coverage).
+The module is critical (`budget` needs 100 % branch coverage).
 These tests run without a database. A local `_Session` fake mirrors the support fakes.
 It adds `add_all`, an iterable `scalars()` and the DB defaults that `ExpenseOut` and
 `InvoiceOut` need. It returns prefilled `execute` results FIFO and serves `get` from a
@@ -162,7 +162,7 @@ def result(*items: Any) -> _R:
 
 
 def counts(all_: int = 0, inbox: int = 0, booked: int = 0, paid: int = 0) -> _R:
-    """The row of the segment counts of the invoice list (FE10c), the first query."""
+    """The row of the segment counts of the invoice list, the first query."""
     return _R((all_, inbox, booked, paid))
 
 
@@ -630,8 +630,7 @@ async def test_update_expense_amount_none_skipped() -> None:
 async def test_update_expense_rebooks_within_same_top_level() -> None:
     # Move a standalone booking to another cost center, but only inside the same
     # top-level budget. `budget_id` and the currency follow the new node. The fixed
-    # fiscal year still belongs to the top-level budget (`_resolve_fiscal_year` passes,
-    # #AUD-036).
+    # fiscal year still belongs to the top-level budget (`_resolve_fiscal_year` passes).
     top = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     new = _budget(id=uuid.uuid4(), parent_id=top.id, path_key="VS-2", key="2", currency="CHF")
     fy = _fy(id=uuid.uuid4(), budget_id=top.id)  # fiscal year of the top node, no orphan
@@ -655,7 +654,7 @@ async def test_update_expense_rebooks_within_same_top_level() -> None:
 
 
 async def test_update_expense_rebook_across_top_level_rejected() -> None:
-    # #AUD-036: a move into a foreign top-level cost center would orphan the fiscal year
+    # A move into a foreign top-level cost center would orphan the fiscal year
     # that the booking keeps. That leaves a phantom row. `_resolve_fiscal_year` rejects
     # with a 422 before it writes budget_id or the currency, and before any commit.
     other_top = _budget(id=uuid.uuid4(), path_key="VV", key="VV")
@@ -833,7 +832,7 @@ async def test_list_invoices_paged_all_filters_and_search() -> None:
 
 @pytest.mark.parametrize("booked", [True, False])
 async def test_list_invoices_paged_by_segment(booked: bool) -> None:
-    """FE10c: ``booked`` narrows to invoices with or without a visible booking."""
+    """``booked`` narrows to invoices with or without a visible booking."""
     inv = _invoice()
     sess = _pg_session(counts(1, 0, 1), result(1), result(inv))  # counts, count, rows
     page = await BudgetTreeService(sess).list_invoices_paged(status="open", booked=booked)
@@ -2102,7 +2101,7 @@ async def test_delete_transfer_unknown_404() -> None:
         await svc.delete_transfer(uuid.uuid4())
 
 
-# ------------------------------------------------- A6: linked bookings of an invoice
+# ----------------------------------------------------- linked bookings of an invoice
 
 
 def _booking_row(inv: Invoice, *, budget_id: uuid.UUID, path: str, name: str) -> tuple:

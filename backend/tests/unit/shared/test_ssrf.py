@@ -1,4 +1,4 @@
-"""SSRF guard (T-19, security.md §5): the guard blocks every internal or special IP."""
+"""SSRF guard: the guard blocks every internal or special IP."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""F16: the OAuth scope caps the gremium permissions and the admin bypass.
+"""The OAuth scope caps the gremium permissions and the admin bypass.
 
 A gremium role grants `session.manage`, `protocol.write`, `vote.manage` and
 `protocol.finalize` per gremium. These keys never enter `principal.permissions`, so

@@ -1,4 +1,4 @@
-"""The lead side of a public meeting (#17) without a database.
+"""The lead side of a public meeting without a database.
 
 Covers the lead routes, the `guestsVote` rules of the vote open, the WebSocket filter of
 the member channel, the guest events of the publisher, the public settings of a patch,

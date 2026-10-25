@@ -703,7 +703,7 @@ async def test_exchange_code_success_with_ttl() -> None:
         client_id=CLIENT_ID, redirect_uri=LOOPBACK, code_challenge=_challenge(verifier),
         access_ttl_seconds=3600, principal_id="pid", scope="read",
     )
-    # AUD-003: an atomic `UPDATE ... WHERE used_at IS NULL RETURNING id` redeems the code.
+    # An atomic `UPDATE ... WHERE used_at IS NULL RETURNING id` redeems the code.
     # execute 1 = SELECT (row), execute 2 = claim → one row (id), so the code is claimed.
     db = fake_session(result(row), result(row.id))
     issued = await oauth_service.exchange_code(
@@ -747,7 +747,7 @@ async def test_refresh_tokens_not_found() -> None:
 
 
 async def test_refresh_tokens_revoked() -> None:
-    # AUD-020: a resubmitted rotated token points to a replay. The service revokes the
+    # A resubmitted rotated token points to a replay. The service revokes the
     # whole family (principal_id + client_id) and then returns invalid_grant.
     row = SimpleNamespace(
         id="tok-id", revoked_at=NOW, client_id=CLIENT_ID, refresh_expires_at=None,
@@ -797,7 +797,7 @@ async def test_refresh_tokens_success_rotation() -> None:
         refresh_expires_at=NOW + timedelta(days=30),
         access_ttl_seconds=3600, principal_id="pid", scope="read",
     )
-    # AUD-020: an atomic `UPDATE ... WHERE revoked_at IS NULL RETURNING id` rotates.
+    # An atomic `UPDATE ... WHERE revoked_at IS NULL RETURNING id` rotates.
     # 1 = SELECT (row), 2 = SELECT (active principal), 3 = rotation claim → one row (id).
     db = fake_session(
         result(row), result(SimpleNamespace(active=True)), result(row.id)
@@ -1176,7 +1176,7 @@ async def test_has_scoped_budget_view_branches(monkeypatch: pytest.MonkeyPatch) 
 
 
 async def test_in_substitute_pool_branches() -> None:
-    """The flag is true when the pool helper (Z5) finds at least one gremium."""
+    """The flag is true when the pool helper finds at least one gremium."""
     hit_db = fake_session(result("gremium-id"))
     assert await router_mod._in_substitute_pool(hit_db, "u1") is True
     assert await router_mod._in_substitute_pool(fake_session(result()), "u1") is False
@@ -1337,7 +1337,7 @@ async def test_oidc_callback_email_verified_bootstrap(
 async def test_resolve_principal_membership_grants_vote_group() -> None:
     """An active Gremium role with `vote.cast` adds a namespaced vote key to groups.
 
-    AUD-066: the cast key is `vote:<gremium_id>` (`vote_group_key`), not the bare UUID
+    The cast key is `vote:<gremium_id>` (`vote_group_key`), not the bare UUID
     string. A matching OIDC group claim must never satisfy the Gremium cast permission.
     """
     row = PrincipalRow(sub="u9", email=None, display_name=None, oidc_groups=None)

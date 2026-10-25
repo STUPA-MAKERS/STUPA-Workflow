@@ -1,10 +1,9 @@
-# Antragsplattform — docker-compose skeleton (T-01)
+# Antragsplattform — docker-compose skeleton
 # One VM, plain HTTP inside, behind an external Caddy reverse proxy (the TLS edge).
 # The stack holds no TLS, no certificate and no Keycloak. The only host port is `web`
 # (127.0.0.1:${WEB_PORT:-8080}). Every other service stays internal, so nothing enters from the
 # internet. Egress stays allowed (worker: SMTP/WebDAV/webhooks, api: OIDC). The typst
 # render service has none.
-# Reference: sds/deployment.md §1-§5, sds/overview.md §2.
 
 name: antragsplattform
 
@@ -54,7 +53,7 @@ services:
       start_period: 10s
 
   migrate:
-    # One-shot migrator (issue #38). It runs `alembic upgrade head` against the DB before
+    # One-shot migrator. It runs `alembic upgrade head` against the DB before
     # api and worker start. The run is race-free, because it waits for postgres healthy.
     # It is idempotent, because alembic skips the revisions it already applied. There is
     # no restart loop: the job runs once until exit 0, and api and worker wait for it
@@ -280,7 +279,7 @@ services:
     security_opt:
       - no-new-privileges:true
 
-  # TODO T-04/e2e: add dev profile services here to enable e2e (T-10 auth, captcha and
+  # TODO e2e: add dev profile services here to enable e2e (auth, captcha and
   # Playwright specs). Add MailHog (SMTP sink) and a dev Keycloak mock under
   # `profiles: [dev]`, so the prod stack stays untouched. They are absent on purpose,
   # because no consumer needs them. See the e2e job in .github/workflows/ci.yml.
@@ -300,7 +299,7 @@ networks:
   typst_net:
     # Render path api/worker <-> typst. `internal: true` means NO egress: the typst
     # container cannot send anything to the internet. The image already holds all it
-    # needs. This closes an exfiltration channel (#sec-audit).
+    # needs. This closes an exfiltration channel.
     driver: bridge
     internal: true
   proxy:

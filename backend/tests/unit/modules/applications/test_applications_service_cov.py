@@ -177,7 +177,7 @@ def _app(**over: Any) -> _Obj:
         "budget_id": None,
         "fiscal_year_id": None,
         "amount": None,
-        # No decision (F1).
+        # No decision.
         "approved_amount": None,
         "currency": None,
         "data": {"title": "Antrag"},
@@ -189,7 +189,7 @@ def _app(**over: Any) -> _Obj:
         # Not archived by default, which is the state nearly every test wants.
         "archived_at": None,
         "archived_by": None,
-        # Not captured on behalf of the applicant (#11).
+        # Not captured on behalf of the applicant.
         "captured_by": None,
         "capture_intake": None,
         "received_on": None,
@@ -307,7 +307,7 @@ async def test_get_with_pii_owner_and_applicant() -> None:
 
 
 async def test_get_carries_the_capture_block() -> None:
-    # #11: a captured application names the capturing person, or the Gremium in the
+    # A captured application names the capturing person, or the Gremium in the
     # applicant view.
     state = _state()
     app = _app(
@@ -413,7 +413,7 @@ def _payload(**over: Any) -> SimpleNamespace:
         "applicant_email": "a@b.de",
         "applicant_name": "Alice",
         "lang": "de",
-        # Z4: no draft uploads unless a test sets them.
+        # No draft uploads unless a test sets them.
         "attachment_ids": [],
         "draft_token": None,
     }
@@ -554,7 +554,7 @@ async def test_create_anonymous_ok(
     assert session.committed == 1
     kinds = {type(o).__name__ for o in session.added}
     assert {"Application", "Applicant", "SubmissionVersion", "StatusEvent"} <= kinds
-    # O14: a guest application rests in the flow until the magic-link verify. The
+    # A guest application rests in the flow until the magic-link verify. The
     # create starts nothing.
     assert _FakeFlow.started == []
 
@@ -706,7 +706,7 @@ async def test_patch_app_type_missing_uses_false_context(
 async def test_patch_refuses_an_amount_below_the_approved_amount(
     monkeypatch: pytest.MonkeyPatch, cost: str | None
 ) -> None:
-    """F1: after a decision the requested amount stays at or above the approved one."""
+    """After a decision the requested amount stays at or above the approved one."""
     app = _app(
         data={"title": "x", "cost": "1000"},
         amount=Decimal("1000"),
@@ -881,7 +881,7 @@ async def test_timeline_resolves_actor_names_and_states() -> None:
     session = _Session(
         get_results=[app, to_state, to_state],
         execute_results=[
-            # timeline events with the label of the fired transition (A3)
+            # timeline events with the label of the fired transition
             [(ev1, {"de": "Genehmigen"}), (ev2, None)],
             [sub_ref("sub-1", "Alice", None, AUTHOR_ID)],  # _author_refs
             [("approved", "#0f0")],  # _resolve_state_colors (cached after this call)

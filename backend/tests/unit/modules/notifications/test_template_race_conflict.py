@@ -1,4 +1,4 @@
-"""Regression (AUD-044): two requests create the same mail_template.key at the same time.
+"""Regression: two requests create the same mail_template.key at the same time.
 
 Both requests pass the existing-is-None check for a new key. The second commit then
 violates UNIQUE(mail_template.key). The service must map that to a ConflictError (409)

@@ -260,7 +260,7 @@ class SiteConfigService:
         The response also holds ``confirmTtlHours`` and ``linkTtlDays`` from the
         guest settings, so the wizard can tell a guest how long the confirmation
         waits and how long the link works. ``attachmentLimits`` comes from the
-        settings of the draft upload (Z4).
+        settings of the draft upload.
         """
         active = await self._active()
         guest = await load_guest_settings(self.session)

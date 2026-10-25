@@ -1,4 +1,4 @@
-"""F4 and O7: `protocol.finalize` is an assignable gremium permission.
+"""`protocol.finalize` is an assignable gremium permission.
 
 Before the fix the gremium role catalog did not know the key, so a save stripped it
 from every role, and no gremium role could finalize a protocol. The forced roles
@@ -36,7 +36,7 @@ def test_forced_roles_default_to_finalize_for_the_board_only() -> None:
 
 
 def test_global_catalog_drops_the_superseded_keys() -> None:
-    """The global keys that a gremium permission replaced are gone (F11 included)."""
+    """The global keys that a gremium permission replaced are gone."""
     for key in ("meeting.manage", "protocol.finalize", "application.create"):
         assert key not in PERMISSION_CATALOGUE
     # The global read and delete rights of the meeting domain stay.

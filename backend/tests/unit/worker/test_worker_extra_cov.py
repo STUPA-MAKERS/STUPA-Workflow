@@ -443,7 +443,7 @@ async def test_main_on_startup_calls_all_inits(monkeypatch: pytest.MonkeyPatch) 
     ctx: dict[str, Any] = {"redis": "pool", "settings": "cfg"}
     await wmain._on_startup(ctx)
     assert called == ["mail", "scan", "protocol", "webhook", "deadlines", "backup", "cd_builtin"]
-    # F2: the worker builds the full flow dispatcher once, over the arq pool.
+    # The worker builds the full flow dispatcher once, over the arq pool.
     assert ctx["flow_dispatcher"] is sentinel
     assert built and built[0][0] == "pool" and built[0][2] == "cfg"
 

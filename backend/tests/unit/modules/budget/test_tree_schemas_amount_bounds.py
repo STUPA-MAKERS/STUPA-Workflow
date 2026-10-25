@@ -1,4 +1,4 @@
-"""Amount cap on the booking and transfer schemas (AUD-035).
+"""Amount cap on the booking and transfer schemas.
 
 The DB columns are `numeric(12, 2)`, so the maximum is 9 999 999 999.99. Without the
 `le` bound, Pydantic accepted a larger amount. The INSERT then failed with a numeric

@@ -1,4 +1,4 @@
-"""Baseline: extensions, the full schema through create_all, and raw DDL (T-06, squashed).
+"""Baseline: extensions, the full schema through create_all, and raw DDL (squashed).
 
 Revision ID: 0001_baseline
 Revises:
@@ -12,7 +12,7 @@ plus later ALTER statements produced (duplicate columns).
 
 Single source: `app.db.Base.metadata` (filled through `app.models`) builds the whole
 schema, so the models and the migration always agree. This file adds only what
-`create_all` cannot express (security.md §4 / data-model §3):
+`create_all` cannot express:
 
 * Extensions `pgcrypto` (`gen_random_uuid()`) and `citext` (case-insensitive email).
   They run before `create_all`, because column defaults and types need them.
@@ -74,7 +74,7 @@ def upgrade() -> None:
     op.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto")
     op.execute("CREATE EXTENSION IF NOT EXISTS citext")
     # btree_gist gives the uuid equality operator class for the GIST EXCLUDE constraint
-    # on `gremium_membership` (`ex_gremium_membership_no_overlap`, #AUD-029).
+    # on `gremium_membership` (`ex_gremium_membership_no_overlap`).
     # `create_all` emits that constraint inline from the model. On a fresh database
     # the extension MUST therefore exist before create_all. If it does not, CREATE TABLE
     # fails with "data type uuid has no default operator class for gist".

@@ -45,12 +45,12 @@ pytestmark = pytest.mark.integration
 
 _NON_PUBLIC_PLACEHOLDER = "(nicht-öffentlicher Tagesordnungspunkt)"
 _SECRET_BODY = "Personalentscheidung zu Frau Müller — vertraulich."
-# The title of a non-public agenda item can encode the sensitive subject (AUD-025).
+# The title of a non-public agenda item can encode the sensitive subject.
 # It must not appear in the public variant.
 _SECRET_TITLE = "Personalangelegenheit"
 _NEUTRAL_HEADING = "Nicht-öffentlicher Tagesordnungspunkt"
 # The full attendance list and the minute taker of a meeting are metadata that the
-# `non_public` flag protects (AUD-025). They must not reach the variant that goes to
+# `non_public` flag protects. They must not reach the variant that goes to
 # the mailing list.
 _PRESENT_NAME = "Anna Anwesend"
 _ABSENT_NAME = "Bernd Abwesend"
@@ -121,7 +121,7 @@ async def _seed_meeting(
     The second agenda item is non-public and carries a body. The function also creates a
     minute taker, one present member and one absent member. Their names must appear in
     the internal variant but not in the public one. This makes the header redaction of
-    the public variant testable (AUD-025).
+    the public variant testable.
     """
     gremium = Gremium(name="StuPa", slug=f"g-{uuid.uuid4()}")
     session.add(gremium)
@@ -216,7 +216,7 @@ async def test_assemble_redacts_non_public_keeps_numbering(session: AsyncSession
     assert _SECRET_BODY not in public
     assert _NON_PUBLIC_PLACEHOLDER in public
 
-    # AUD-025: the non-public title stays in the internal variant. The public variant
+    # The non-public title stays in the internal variant. The public variant
     # goes to the mailing list and shows a neutral heading instead.
     assert _SECRET_TITLE in internal
     assert _SECRET_TITLE not in public
@@ -230,7 +230,7 @@ async def test_assemble_redacts_non_public_keeps_numbering(session: AsyncSession
 async def test_build_document_redacts_roster_and_protokollant_in_public(
     session: AsyncSession,
 ) -> None:
-    """Redact the roster and the minute taker in the public document (AUD-025).
+    """Redact the roster and the minute taker in the public document.
 
     `_build_document(public=True)` must not contain the names of the present or absent
     members. It must also not contain the name of the minute taker. These metadata
@@ -330,12 +330,12 @@ async def test_finalize_dual_render(session: AsyncSession) -> None:
     assert _NON_PUBLIC_PLACEHOLDER.encode() in public_bytes
     assert _SECRET_BODY.encode() not in public_bytes
 
-    # AUD-025: the non-public title stays in the internal PDF and is absent from the
+    # The non-public title stays in the internal PDF and is absent from the
     # mailed PDF.
     assert _SECRET_TITLE.encode() in internal_bytes
     assert _SECRET_TITLE.encode() not in public_bytes
 
-    # AUD-025 (roster vector): the attendance names and the minute taker stay in the
+    # The attendance names and the minute taker stay in the
     # internal PDF. They are absent from the public PDF that goes to the mailing list.
     assert _PRESENT_NAME.encode() in internal_bytes
     assert _ABSENT_NAME.encode() in internal_bytes

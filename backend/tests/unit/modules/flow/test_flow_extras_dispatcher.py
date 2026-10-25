@@ -109,7 +109,7 @@ async def test_dispatch_ignores_other_action_types() -> None:
 
 async def test_dispatch_swallows_action_errors() -> None:
     # session.get raises. The dispatcher logs the error and does not propagate it
-    # (flows §9.3).
+    #.
     session = _Session(raise_on_get=True)
     await FlowExtrasActionDispatcher(_maker(session)).dispatch(
         [_action("assignBudget", budgetId=str(uuid4()), application_id=uuid4())]

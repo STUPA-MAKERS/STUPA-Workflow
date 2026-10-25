@@ -1,4 +1,4 @@
-"""TDD: OIDC (security.md §2) — discovery, PKCE, token exchange, id_token verify.
+"""TDD: OIDC — discovery, PKCE, token exchange, id_token verify.
 
 The IdP here is shaped like authentik: the issuer ends in a slash, and the endpoints do
 not sit under the issuer path. A module that builds a URL from the issuer instead of
@@ -177,7 +177,7 @@ async def test_verify_id_token_happy() -> None:
 
 
 async def test_verify_id_token_email_verified_claim() -> None:
-    """`email_verified` counts only when it is strictly True (#70 email bootstrap)."""
+    """`email_verified` counts only when it is strictly True (email bootstrap)."""
     with respx.mock:
         _serve_discovery()
         respx.get(CERTS).mock(return_value=httpx.Response(200, json={"keys": [_jwk()]}))

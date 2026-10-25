@@ -87,7 +87,7 @@ async def test_stale_application_gets_reminder() -> None:
         scalars=[
             [state],  # states
             [],  # existing logs
-            [],  # preference filter (#4-2, no opt-outs)
+            [],  # preference filter (no opt-outs)
             [],  # template lookup (no DB override)
         ],
         scalar=[

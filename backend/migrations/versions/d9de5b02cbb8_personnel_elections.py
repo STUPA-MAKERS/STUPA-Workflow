@@ -1,4 +1,4 @@
-"""Personnel elections (F2): vote kind, runoff link, election result.
+"""Personnel elections: vote kind, runoff link, election result.
 
 The upgrade adds to the table `vote`:
 

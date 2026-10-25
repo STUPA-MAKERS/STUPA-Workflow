@@ -1,4 +1,4 @@
-"""Separate coverage gate for the critical modules (testing.md §1).
+"""Separate coverage gate for the critical modules.
 
 `auth`, `voting`, `flow`, `budget`, `webhooks` and `audit` must reach 100 % branch
 coverage. This gate is stricter than the overall gate. The overall gate uses

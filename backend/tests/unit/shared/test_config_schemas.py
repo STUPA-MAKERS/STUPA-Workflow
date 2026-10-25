@@ -1,4 +1,4 @@
-"""Config schemas, flow-graph validation and JSON-Schema export (data-model §5)."""
+"""Config schemas, flow-graph validation and JSON-Schema export."""
 
 from decimal import Decimal
 
@@ -145,7 +145,7 @@ def test_flow_graph_from_alias_parsed() -> None:
     assert graph.transitions[0].from_ == "draft"
 
 
-# Issue #28: validation of vote, approval and decision states.
+# Validation of vote, approval and decision states.
 def _vote_graph_dict() -> dict:
     return {
         "states": [

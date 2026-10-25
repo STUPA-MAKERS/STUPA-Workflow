@@ -126,7 +126,7 @@ class PrincipalService:
         principal.active = False
         # Without groups the principal holds no gremium membership any more.
         await sync_principal_memberships(self.session, principal)
-        # The reason of an excuse is personal data (Z2). The attendance status stays,
+        # The reason of an excuse is personal data. The attendance status stays,
         # because the protocols carry it. Only the rows with a reason change, so an
         # older (self, absent) row does not meet the self-status check.
         await self.session.execute(
@@ -137,7 +137,7 @@ class PrincipalService:
             )
             .values(note=None)
         )
-        # F2: the name of a candidacy in an election, and its copies in the protocol
+        # The name of a candidacy in an election, and its copies in the protocol
         # text, unless the principal was elected (a documented resolution).
         erased = await erase_candidacies(self.session, principal_id)
         await erase_candidate_names(self.session, erased)
@@ -620,7 +620,7 @@ class AuskunftService:
         )
         attendance: list[dict[str, Any]] = []
         if principal_row is not None:
-            # The attendance of the principal, with the reason of an excuse (Z2).
+            # The attendance of the principal, with the reason of an excuse.
             arows = (
                 await self.session.execute(
                     select(MeetingAttendance, Meeting)

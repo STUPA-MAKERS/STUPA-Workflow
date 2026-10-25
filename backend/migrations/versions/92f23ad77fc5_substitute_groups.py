@@ -1,4 +1,4 @@
-"""Add the faculty substitute groups (Z5).
+"""Add the faculty substitute groups.
 
 The upgrade creates two tables:
 

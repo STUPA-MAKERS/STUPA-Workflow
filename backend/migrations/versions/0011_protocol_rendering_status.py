@@ -1,4 +1,4 @@
-"""Protocol: the `rendering` status (async protocol render, T-22 follow-up).
+"""Protocol: the `rendering` status (async protocol render).
 
 `finalize` no longer blocks the request. The protocol moves to `rendering`. An
 arq worker then renders the PDF, sends the mail and sets `final`. After a

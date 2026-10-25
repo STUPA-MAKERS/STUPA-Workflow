@@ -1,4 +1,4 @@
-"""Unit tests for the scan queue (T-13): arq enqueue and the idempotent job key."""
+"""Unit tests for the scan queue: arq enqueue and the idempotent job key."""
 
 from __future__ import annotations
 

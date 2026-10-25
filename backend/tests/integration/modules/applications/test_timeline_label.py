@@ -1,4 +1,4 @@
-"""A3: every timeline event carries the label of the fired transition (real Postgres).
+"""Every timeline event carries the label of the fired transition (real Postgres).
 
 The creation event and a revert fire no transition, so their label is null.
 """

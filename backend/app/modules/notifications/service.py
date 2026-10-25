@@ -81,7 +81,7 @@ _BUILTIN_NOTIFY_SUBJECT = {
     "de": "Aktualisierung zu Ihrem Antrag",
     "en": "Update on your application",
 }
-# F1: the block that shows an approval with deviations. The dispatcher sets
+# The block that shows an approval with deviations. The dispatcher sets
 # `amountDeviates` and `conditions` for a flow mail. The `is defined` tests keep
 # the block safe under StrictUndefined for a caller without these keys.
 DECISION_BLOCK = {

@@ -1,4 +1,4 @@
-"""Pure guard and action evaluator (flows §9.2, #28 redesign). Branch coverage 100 %."""
+"""Pure guard and action evaluator. Branch coverage 100 %."""
 
 from decimal import Decimal
 

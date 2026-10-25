@@ -1,7 +1,5 @@
 """Integration: refresh-token rotation is atomic and detects reuse.
 
-Regression for AUD-020:
-
 1. CONCURRENT rotation. Two requests with the same refresh token must not both get a
    new pair. `refresh_tokens` rotates atomically with
    `UPDATE ... WHERE id=? AND revoked_at IS NULL RETURNING id`. The loser gets

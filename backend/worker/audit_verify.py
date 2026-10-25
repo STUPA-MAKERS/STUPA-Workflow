@@ -1,4 +1,4 @@
-"""arq worker tasks: the stored audit-chain check (Z6/O8).
+"""arq worker tasks: the stored audit-chain check.
 
 `process_audit_verification` is the nightly cron at 04:30. It does not depend on the
 backup: it runs also when backups are off or when the backup failed. `verify_after_restore`

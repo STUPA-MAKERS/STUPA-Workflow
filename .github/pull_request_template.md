@@ -8,7 +8,7 @@ each point is in docs/CONTRIBUTING.md / CONTRIBUTING.md → "Definition of Done"
 
 ## What and Why
 
-<!-- Short: what changes, which issue or task (T-/#), and why this way. -->
+<!-- Short: what changes and why this way. -->
 
 Closes #
 

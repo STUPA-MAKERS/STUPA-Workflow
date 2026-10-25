@@ -1,6 +1,6 @@
 """Integration: the authorization code stays single use under a CONCURRENT exchange.
 
-Regression for AUD-003. Two token requests with the same code and verifier must not both
+Two token requests with the same code and verifier must not both
 get a token pair. `exchange_code` claims the code row atomically with
 `UPDATE ... WHERE used_at IS NULL RETURNING id`. The loser gets `invalid_grant`.
 

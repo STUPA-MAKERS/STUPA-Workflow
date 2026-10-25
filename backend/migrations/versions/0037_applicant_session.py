@@ -1,4 +1,4 @@
-"""applicant_session: server-side magic-link sessions (security.md §1).
+"""applicant_session: server-side magic-link sessions.
 
 The migration makes the applicant magic-link token **stateful**, like ``auth_session``.
 The browser holds only a signed, opaque ``sid``. The server keeps ``application_id`` and

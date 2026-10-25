@@ -1,4 +1,4 @@
-"""Integration helpers for the application read models (A3, A4, A9, A11, A12, O21).
+"""Integration helpers for the application read models.
 
 The helpers seed one world against a real schema:
 

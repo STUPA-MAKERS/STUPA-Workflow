@@ -68,7 +68,7 @@ async def committee_ids_for_sub(session: AsyncSession, sub: str | None) -> froze
 async def _budget_fits(session: AsyncSession, app: Application) -> bool:
     """Return True when the committed amount fits the free remainder of the cost center.
 
-    The committed amount is the approved amount of the decision (F1: a vote proposal
+    The committed amount is the approved amount of the decision (a vote proposal
     or the decision of a manual transition sets it before the guard runs), else the
     requested amount. The available amount is the node allocation minus expenses plus
     income for the fiscal year. This is the same direction as
@@ -111,7 +111,7 @@ async def _has_attachment(session: AsyncSession, app: Application) -> bool:
     required. Only a file that ClamAV scanned and found clean counts. A file that
     still waits for the scan stays in quarantine and does not count. `storage_key IS
     NULL` marks an attachment that a ClamAV hit removed. Such an attachment does not
-    count either. A draft of the wizard (Z4) has no application and never counts.
+    count either. A draft of the wizard has no application and never counts.
     """
     return bool(
         await session.scalar(

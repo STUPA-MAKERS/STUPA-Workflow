@@ -1,6 +1,6 @@
-"""WS message schema test (T-16 DoD, api.md §4).
+"""WS message schema test.
 
-The tests pin the WS contract that the frontend (T-32, T-33) builds against: camelCase
+The tests pin the WS contract that the frontend builds against: camelCase
 field names and the ``type`` discriminator. The security-critical part: a tally event
 and a closed event carry **only** aggregates (requirements N1a, no voter identity).
 """

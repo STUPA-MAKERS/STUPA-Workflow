@@ -1,11 +1,11 @@
-"""F15, F18, O14: an unconfirmed guest application rests in the flow (real Postgres).
+"""An unconfirmed guest application rests in the flow (real Postgres).
 
 A guest submission starts with `email_confirmed_at IS NULL`. Until the magic-link
 verify confirms it:
 
-* the flow routes answer 404 (F15),
-* the create starts nothing and the cron fires no automatic transition (F18),
-* the notify dispatcher sends no flow mail (O14).
+* the flow routes answer 404,
+* the create starts nothing and the cron fires no automatic transition,
+* the notify dispatcher sends no flow mail.
 
 The first verify starts the flow one time: it runs `auto_advance` and sends the task
 mail of the state. A second verify
@@ -202,7 +202,7 @@ async def _app(maker: async_sessionmaker[AsyncSession], app_id: uuid.UUID) -> Ap
         return app
 
 
-# F15: the flow routes hide an unconfirmed application.
+# The flow routes hide an unconfirmed application.
 @pytest.fixture
 def api(
     migrated: tuple[str, str], settings: Settings, monkeypatch: pytest.MonkeyPatch
@@ -262,7 +262,7 @@ async def test_flow_routes_answer_404_until_the_verify(
         assert client.get(f"{base}/flow-states").status_code == 200
 
 
-# F18 and O14: no automatic transition and no mail before the verify.
+# No automatic transition and no mail before the verify.
 async def test_unconfirmed_application_rests_in_the_cron(
     maker: async_sessionmaker[AsyncSession], settings: Settings
 ) -> None:

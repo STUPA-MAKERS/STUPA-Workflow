@@ -15,14 +15,14 @@ description: Global search behind the command palette. One GET /api/search?q= fa
 - Frontend: `frontend/src/app/features/search/` — `command-palette.component` (groups by `kind`, "Seiten" from `page-index.service`, highlight, archived mark, the truncated note), `command-palette.service`, `shortcut.ts`.
 
 **Sources and their gates:**
-- `application` — `ApplicationsService.list_applications`. With `application.read` or `application.read_all` every application, else the own ones plus the committee read scope. Without a global read, no search over the PII field values of another application (`hide_pii_in_search`, O21). Archived rows are included (`archived=None`) and carry `archived: true`. Subtitle: the state label in `lang`.
+- `application` — `ApplicationsService.list_applications`. With `application.read` or `application.read_all` every application, else the own ones plus the committee read scope. Without a global read, no search over the PII field values of another application (`hide_pii_in_search`). Archived rows are included (`archived=None`) and carry `archived: true`. Subtitle: the state label in `lang`.
 - `meeting` — `MeetingService.list_timeline(direction="past")`, scoped to the visible Gremien. Subtitle: the Gremium name.
 - `invoice`, `expense` — one of `budget.view`/`budget.structure`/`budget.book` (`budget.access.has_budget_read`, the gate of `GET /api/invoices` and `/api/expenses`). Subtitle: the amount and the supplier or correspondent.
 - `budget` — own query on `Budget.name`/`path_key`, without `hidden_in_budget` nodes. Without a budget read permission only the nodes whose `view_gremium_id` is a Gremium of the caller (as `GET /api/budgets`). Subtitle: `path_key`.
-- `gremium` — own query on `Gremium.name`/`slug`, only with `admin.gremien` or `admin.users` (the hit links to the members page, which only an admin can open). Subtitle: the kind only, "Gremium" / "Committee" (D10); the slug is an internal key.
+- `gremium` — own query on `Gremium.name`/`slug`, only with `admin.gremien` or `admin.users` (the hit links to the members page, which only an admin can open). Subtitle: the kind only, "Gremium" / "Committee"; the slug is an internal key.
 - `ticket` — `TicketService.list` (be-tickets), with `ticket.manage`. Title `T-0040 · <title>`; subtitle: the status in the reader's language (`TICKET_STATUS`).
 - `todo` — `TodoService.search` (be-todos), live cards on the boards that the reader reads. Title: the card title; subtitle `<board> · <column>`; url `/todos?card={id}` (`card_url`, the card id only; the page opens the board the card is on now).
-- `principal` — `ConfigService.search_principals`, with `admin.users` or `admin.gremien`. Title: the name, else the e-mail, else "Ohne Namen" / "No name" (`UNNAMED`, D7; never the `sub`); subtitle: the e-mail when a name exists.
+- `principal` — `ConfigService.search_principals`, with `admin.users` or `admin.gremien`. Title: the name, else the e-mail, else "Ohne Namen" / "No name" (`UNNAMED`; never the `sub`); subtitle: the e-mail when a name exists.
 
 **API surface:**
 - `GET /api/search?q=&lang=` — P(any principal). Returns `SearchResults`. A query shorter than 2 characters (after trim) returns an empty result, never an error. The palette calls the route on each key press.

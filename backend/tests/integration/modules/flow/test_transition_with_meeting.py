@@ -1,4 +1,4 @@
-"""A1: a manual transition picks the meeting for its agenda item (real Postgres).
+"""A manual transition picks the meeting for its agenda item (real Postgres).
 
 `GET /applications/{id}/transitions` flags the transitions with `addToNextSession`
 into a vote state (`addsToAgenda`, `agendaGremiumId`). `fire(..., meeting_id=...)`

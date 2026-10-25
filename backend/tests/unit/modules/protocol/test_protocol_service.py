@@ -1,4 +1,4 @@
-"""Unit tests for ProtocolService (T-22): lifecycle, vote embedding and finalize.
+"""Unit tests for ProtocolService: lifecycle, vote embedding and finalize.
 
 The suite runs without a database, typst, MinIO or Redis. `session.get` reads from a
 store and `execute` reads from an ordered result queue, which gives the branch
@@ -567,7 +567,7 @@ async def test_start_finalize_marks_rendering_and_audits(
 
 @pytest.mark.parametrize("status", ["planned", "live"])
 async def test_start_finalize_needs_a_closed_meeting(status: str) -> None:
-    """F8, O13: no finalization while the meeting runs."""
+    """No finalization while the meeting runs."""
     proto = _protocol()
     session = FakeSession(store={MID: _closed_meeting(status)}, results=[result(proto)])
     with pytest.raises(ConflictError) as ei:
@@ -579,7 +579,7 @@ async def test_start_finalize_needs_a_closed_meeting(status: str) -> None:
 
 @pytest.mark.parametrize("status", ["rendering", "final"])
 async def test_start_finalize_only_once(status: str) -> None:
-    """O2: one finalization, also with several keepers."""
+    """One finalization, also with several keepers."""
     proto = _protocol(status=status)
     session = FakeSession(store={MID: _closed_meeting()}, results=[result(proto)])
     with pytest.raises(ConflictError) as ei:

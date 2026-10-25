@@ -408,7 +408,7 @@ async def delete_meeting_vote(meeting_id: str, vote_id: str) -> dict:
     return await api().delete(f"/meetings/{meeting_id}/votes/{vote_id}")
 
 
-# Public meeting with a QR code (#17). The meeting lead (session.manage in the gremium,
+# Public meeting with a QR code. The meeting lead (session.manage in the gremium,
 # or admin) decides on the join requests. Guests vote themselves on their phones; no
 # tool casts a ballot.
 

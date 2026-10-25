@@ -1,13 +1,13 @@
-"""Test data factories (testing.md §5).
+"""Test data factories.
 
 There is one polyfactory builder per domain. This module holds only the cross-cutting
 models of the skeleton (`PageParams`). The domain factories (Gremium, application type,
 form version, flow version, roles) arrive with the follow-up tasks and inherit from
 `BaseFactory`.
 
-`seed_core` is the documented entry point for the seed helper of §5 (Gremium,
+`seed_core` is the documented entry point for the seed helper (Gremium,
 application type, form version, flow version and roles). The signature is final. The
-implementation follows with the data model (T-06).
+implementation follows with the data model.
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ class PageParamsFactory(BaseFactory[PageParams]):
 def seed_core(**overrides: Any) -> dict[str, Any]:  # Platzhalter-Signatur
     """Seed helper stub for the core fixtures (Gremium, type, form, flow, roles).
 
-    The real database seed logic comes with the data model (T-06). The stub exists so
+    The real database seed logic comes with the data model. The stub exists so
     that follow-up tasks can write against a stable signature.
 
     Returns:

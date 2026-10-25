@@ -174,8 +174,8 @@ class FilesService:
     ) -> AttachmentOut:
         """Validate the file, store in MinIO, create the row, enqueue the scan.
 
-        The upload writes an ``attachment_upload`` audit entry in the same transaction
-        (F12). It holds the application, the field key, the MIME type and the size,
+        The upload writes an ``attachment_upload`` audit entry in the same transaction.
+        It holds the application, the field key, the MIME type and the size,
         never the file name, because a file name can hold PII.
         """
         if len(data) > self.max_bytes:
@@ -287,7 +287,7 @@ class FilesService:
         unconfirmed guest submission with a 404. This mirrors the list semantics.
 
         ``hidden`` removes each attachment for which it returns true. The router
-        uses it for the attachments of the ``isPII`` fields (O21).
+        uses it for the attachments of the ``isPII`` fields.
         """
         await self.assert_app_visible(
             application_id, allow_unconfirmed=allow_unconfirmed
@@ -304,7 +304,7 @@ class FilesService:
     async def get_attachment(self, attachment_id: uuid.UUID) -> Attachment:
         """Load a bound attachment for an application path.
 
-        A draft (Z4) has no application and gives 404 here, so no application route
+        A draft has no application and gives 404 here, so no application route
         reads, streams or deletes it. ``application_id_of`` narrows the type of the
         result.
 
@@ -648,7 +648,7 @@ class FilesService:
 
         The router calls this before an applicant or a creator deletes an attachment.
         A delete is a data change, like a PATCH. An upload is not, so the upload route
-        does not call it (Z1, O4). An application without a state passes.
+        does not call it. An application without a state passes.
 
         Raises:
             ConflictError: The current state has ``edit_allowed = false`` (HTTP 409).
@@ -722,7 +722,7 @@ class FilesService:
 
         On a finding the method deletes the object and writes an audit entry
         (quarantine). The entry names the application or the ticket of a bound file.
-        For a draft (Z4) it carries ``draft: true`` instead.
+        For a draft it carries ``draft: true`` instead.
 
         The method loads the row again by id. A row that a delete, a draft purge or
         an anonymization removed during the scan is no error: the method skips it and

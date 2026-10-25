@@ -1,10 +1,10 @@
-"""Integration (real Postgres, testcontainers): admin and config service (T-24).
+"""Integration (real Postgres, testcontainers): admin and config service.
 
 The tests run against a real schema. Flow version creation maps the graph to state and
 transition rows. The version counter grows, and a partial unique index keeps exactly
 one version active. CRUD for Gremium, application type, role and webhook reports a
 conflict on a duplicate key. RBAC delegation runs through `role_assignment` and
-`group_mapping`. Each site-config save (#21) produces a new active
+`group_mapping`. Each site-config save produces a new active
 version. Each of these steps writes an audit entry.
 """
 
@@ -392,7 +392,7 @@ async def test_role_crud_and_listing(session: AsyncSession) -> None:
     keys = {r.key for r in listed}
     assert key in keys and "admin" in keys  # the new role and the seeded roles
 
-    # #38: a role is deletable, except the protected admin and member roles.
+    # A role is deletable, except the protected admin and member roles.
     await svc.delete_role(created.id, _ACTOR)
     assert key not in {r.key for r in await svc.list_roles()}
     admin = next(r for r in await svc.list_roles() if r.key == "admin")

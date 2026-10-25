@@ -1,4 +1,4 @@
-"""Drop the faculty substitute groups (Z5).
+"""Drop the faculty substitute groups.
 
 The faculty groups are not in use (user decision 2026-10-05). The per-gremium
 substitute pool (`delegation_substitute`) is the only substitute mechanism. No

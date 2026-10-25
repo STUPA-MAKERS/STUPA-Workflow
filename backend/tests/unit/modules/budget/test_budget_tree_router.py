@@ -1,4 +1,4 @@
-"""Router tests for the budget tree (CR #76/#78): endpoint wiring without a DB.
+"""Router tests for the budget tree: endpoint wiring without a DB.
 
 The tests replace the auth principal and `BudgetTreeService` through `dependency_overrides`.
 The integration suite covers the real DB paths. This file covers every route and the service
@@ -373,7 +373,7 @@ def _app_as(fake: _FakeService, perms: set[str]) -> TestClient:
 
 
 def test_expense_list_readable_by_booker(fake: _FakeService) -> None:
-    """#5-2: every budget role can read the booking list.
+    """Every budget role can read the booking list.
 
     The roles view, structure and book all get access, not only budget.view. Without that
     rule a pure booker would see an empty page.
@@ -435,7 +435,7 @@ def test_invoices_list_readable_by_view(fake: _FakeService) -> None:
 def test_invoices_list_passes_the_booked_filter(
     fake: _FakeService, raw: str, expected: bool
 ) -> None:
-    """FE10c: the segments "Eingang" and "Verbucht" filter on a linked booking."""
+    """The segments "Eingang" and "Verbucht" filter on a linked booking."""
     r = _app_as(fake, {"budget.view"}).get(f"/api/invoices?status=open&booked={raw}")
     assert r.status_code == 200
     assert fake.calls["list_invoices_paged"]["booked"] is expected

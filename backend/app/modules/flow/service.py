@@ -17,7 +17,7 @@ Operations:
 
 A transition without a branch, a forced status and an audit revert leave the current
 state. They cancel the votes of the application that cannot finish any more
-(`VotingService.cancel_for_application`, F19 and F22). After the commit the engine
+(`VotingService.cancel_for_application`). After the commit the engine
 sends `vote_cancelled` for each cancelled meeting vote through the optional
 `MeetingPublisher`.
 
@@ -124,7 +124,7 @@ def _transition_out(
     """Map a transition to its API shape.
 
     `allows_decision` tells that the target is an accepted state of the top budget of
-    the application: a fire then takes a `decision` (F1).
+    the application: a fire then takes a `decision`.
 
     `gremium_id` is the agenda Gremium (`FlowService._agenda_gremium`). It is set only
     when the transition carries an `addToNextSession` action, its target is a vote
@@ -285,7 +285,7 @@ class FlowService:
 
         A transition into a vote state whose Gremium does not resolve stays hidden
         (fail closed, the fire would give 409 `no_vote_gremium`). A transition into an
-        accepted state of the top budget carries `allowsDecision` (F1).
+        accepted state of the top budget carries `allowsDecision`.
         """
         out: list[TransitionOut] = []
         accepted = await accepted_state_keys(self.session, app.budget_id)
@@ -587,7 +587,7 @@ class FlowService:
 
         The method does not commit. By default it does not roll back either: the voting
         module runs it in a SAVEPOINT (`session.begin_nested()`). On an error only the
-        SAVEPOINT rolls back, and the vote close still commits (F20). After the commit
+        SAVEPOINT rolls back, and the vote close still commits. After the commit
         the caller runs `after_commit`.
 
         Raises:
@@ -681,7 +681,7 @@ class FlowService:
 
         `allow_unconfirmed` works as in `_load_app`.
 
-        `decision` (F1) writes the approved amount and the conditions as the decision
+        `decision` writes the approved amount and the conditions as the decision
         of the application. Only a transition into an accepted state of the top budget
         of the application takes it.
 
@@ -767,7 +767,7 @@ class FlowService:
 
         old_approved: Decimal | None = None
         if decision is not None:
-            # F1: a decision needs an accepted target state and a fitting amount. It
+            # A decision needs an accepted target state and a fitting amount. It
             # applies before the guard, so `budgetFitsApplication` checks the approved
             # amount.
             old_approved = app.approved_amount
@@ -830,7 +830,7 @@ class FlowService:
         status_event_id = event.id
 
         # A non-branch exit from a vote state is a manual vote cancel. It cancels the
-        # open and draft votes of the application in the same transaction (F19).
+        # open and draft votes of the application in the same transaction.
         # Otherwise a vote would stay open and its close() would find no branch in the
         # new state, and a draft could open later outside its vote state. A
         # vote-outcome branch cancels nothing, because close() already closed the vote.
@@ -998,7 +998,7 @@ class FlowService:
         is itself revertable, which gives a redo.
 
         The application leaves `to_state_id`, so the method cancels its votes like a
-        transition without a branch does (F22): the open votes and the draft votes that
+        transition without a branch does: the open votes and the draft votes that
         do not belong to the restored state. Otherwise a vote of an undone vote state
         stays open, and every close gives 409. The method deliberately undoes no other
         side effect of the original change: a cancelled vote stays cancelled, and fired
@@ -1008,7 +1008,7 @@ class FlowService:
         vote state with `gremiumSource: "budget"` and no resolvable Gremium gives 409
         `no_vote_gremium`.
 
-        A decision (F1) that the undone change wrote (`reverted_status_event_id`, the
+        A decision that the undone change wrote (`reverted_status_event_id`, the
         status event of that change) gives way to the decision before it. When the
         undone change was itself a revert that swapped decisions (`decision_swap`, from
         its audit entry), the method swaps them back (redo). The new audit entry records
@@ -1154,7 +1154,7 @@ class FlowService:
         `revert_status`: an optimistic-locked `UPDATE`, a `StatusEvent` without a
         transition, and a `status_change` audit entry marked `forced`. That audit entry
         is itself revertable. The method also cancels the open votes and the draft votes
-        that do not belong to the target state (F19), so a vote state that you leave by
+        that do not belong to the target state, so a vote state that you leave by
         force does not hang open. It then sends `vote_cancelled` for the cancelled
         meeting votes.
         It deliberately sends no applicant notification and no task notification, and it

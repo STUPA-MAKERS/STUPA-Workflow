@@ -49,11 +49,11 @@ MIN_QUERY_LENGTH = 2
 #: reader nothing, so a nameless record reads as "untitled" in the reader's language.
 UNTITLED: Mapping[str, str] = {"de": "Ohne Titel", "en": "Untitled"}
 
-#: The subtitle of a Gremium hit (D10): the kind only, in the reader's language. The
+#: The subtitle of a Gremium hit: the kind only, in the reader's language. The
 #: slug is an internal key and tells the reader nothing.
 GREMIUM_SUBTITLE: Mapping[str, str] = {"de": "Gremium", "en": "Committee"}
 
-#: The title of an account without a name and an e-mail (D7). The `sub` is an internal
+#: The title of an account without a name and an e-mail. The `sub` is an internal
 #: key: the user page shows it only in the tooltip.
 UNNAMED: Mapping[str, str] = {"de": "Ohne Namen", "en": "No name"}
 
@@ -152,7 +152,7 @@ class SearchService:
             q=q,
             owner_sub=None if can_read else principal.sub,
             committee_sub=None if can_read else principal.sub,
-            # O21: no search over the isPII field values of another application.
+            # No search over the isPII field values of another application.
             hide_pii_in_search=not can_read,
             # `None` is both. The list defaults to hiding archived rows, which is right
             # for a working list and wrong for a search: someone searching by name is

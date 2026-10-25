@@ -1,10 +1,10 @@
-# E2E overlay (T-40). Use it ONLY for the Playwright E2E run against the real stack.
+# E2E overlay. Use it ONLY for the Playwright E2E run against the real stack.
 # Do NOT use it for production. Load it together with the base stack:
 #   docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d
 # Driver: scripts/e2e.sh (own COMPOSE_PROJECT_NAME, own .env, down -v).
 #
 # On top of the base stack this overlay adds:
-#  * mailpit — SMTP sink + HTTP API. It catches the magic-link mails (testing.md §3/§5).
+#  * mailpit — SMTP sink + HTTP API. It catches the magic-link mails.
 #              It replaces the "MailHog" named in the SDS and keeps the API compatible.
 #  * seed    — one-shot job on the backend image. It creates the active form version and
 #              the active flow version for the default application type, an admin session
@@ -12,7 +12,7 @@
 #              purpose with `run --rm seed` AFTER api is healthy.
 #  * web     — reuses the host port that the base stack already binds (127.0.0.1:8080).
 #
-# The mock stays OFF (#101): there is no mock Keycloak. OIDC stays unconfigured, so the
+# The mock stays OFF: there is no mock Keycloak. OIDC stays unconfigured, so the
 # login redirect answers 404. The RBAC negative test checks this on purpose. The OIDC,
 # live-vote and PDF paths run in the opt-in "full" tier. See scripts/e2e.sh and
 # .github/workflows/ci.yml.

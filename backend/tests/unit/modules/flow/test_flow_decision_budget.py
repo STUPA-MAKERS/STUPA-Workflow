@@ -1,4 +1,4 @@
-"""The approved amount in the budget guard and the status revert (F1)."""
+"""The approved amount in the budget guard and the status revert."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""TDD: RBAC resolution (security.md §2)."""
+"""TDD: RBAC resolution."""
 
 from __future__ import annotations
 

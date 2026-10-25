@@ -1,4 +1,4 @@
-"""VotingService: the decision proposal of a vote (F1)."""
+"""VotingService: the decision proposal of a vote."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Integration: the magic link stays single use even under concurrency (security.md §1).
+"""Integration: the magic link stays single use even under concurrency.
 
 Two concurrent `verify_magic_link` calls use the same token against a real Postgres.
 Exactly one call wins and gets an applicant session. The other call gets 410, which is

@@ -1,4 +1,4 @@
-"""Shared fixtures of the delegation integration tests (O6).
+"""Shared fixtures of the delegation integration tests.
 
 ``maker`` gives a session factory. ``api`` gives the real app
 wiring with the vote transfer switched on. ``act`` changes the calling principal.

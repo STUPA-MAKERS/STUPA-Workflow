@@ -1,4 +1,4 @@
-"""LiveVoteConnection internals (T-16): the beamer fan-out filter (requirements N1a).
+"""LiveVoteConnection internals: the beamer fan-out filter (requirements N1a).
 
 The beamer stream is read-only. It passes **only** ``meeting_state``, ``vote_opened``,
 ``vote_tally`` and ``vote_closed``. The fan-out drops everything else, for example an
@@ -106,7 +106,7 @@ async def test_beamer_pump_drops_non_whitelisted_events() -> None:
     await conn._pump(_Sub(_STREAM))
     sent = conn.ws.sent  # type: ignore[attr-defined]
     types_sent = [m["type"] for m in sent]
-    # Only the four aggregate event types reach the beamer (api.md §4).
+    # Only the four aggregate event types reach the beamer.
     assert types_sent == ["meeting_state", "vote_opened", "vote_tally", "vote_closed"]
     # N1a ballot secrecy: the fan-out passes no event that carries an identity.
     assert all(ev not in sent for ev in _IDENTITY_EVENTS)
@@ -315,7 +315,7 @@ class _StateMeetings:
         return None
 
 
-# AUD-065: cast binds the vote id to the authorized meeting of the connection.
+# Cast binds the vote id to the authorized meeting of the connection.
 class _MeetingBoundVoting:
     """Fake VotingService for the meeting binding of a cast.
 

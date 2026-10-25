@@ -1,4 +1,4 @@
-"""F2 · Personnel elections: the pure election tally, the ballot codec and the lot.
+"""Personnel elections: the pure election tally, the ballot codec and the lot.
 
 No database and no clock: every branch of `tally_election`, `draw_lot`, the ballot
 codec and the `ElectionConfig` rules runs here.

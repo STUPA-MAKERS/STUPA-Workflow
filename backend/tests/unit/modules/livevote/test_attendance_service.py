@@ -47,7 +47,7 @@ async def test_set_for_conflict_when_closed() -> None:
     assert db.committed == 0
 
 
-# Z2, O15, O23, A7 and F12: the attendance rules.
+# The attendance rules.
 
 
 def _member(sub: str) -> SimpleNamespace:
@@ -71,7 +71,7 @@ def audit_calls(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
 
 
 async def test_set_self_conflict_when_lead_set_it(audit_calls: list[dict[str, Any]]) -> None:
-    """O15: the record of the meeting lead wins over the own report."""
+    """The record of the meeting lead wins over the own report."""
     meeting = _meeting("live")
     me = _member("me")
     row = _row(me.id, status="absent", source="lead")
@@ -118,7 +118,7 @@ async def test_set_self_present_drops_note() -> None:
 
 
 async def test_set_self_present_conflict_with_delegation() -> None:
-    """O23 also holds for the own report: a delegator cannot report "present"."""
+    """The delegation rule also holds for the own report: a delegator cannot report "present"."""
     meeting = _meeting("live")
     me = _member("me")
     db = fake_session(result(meeting), result(me), result(), result(uuid4()))
@@ -170,7 +170,7 @@ async def test_parallel_first_write_gives_conflict(
 async def test_set_for_present_conflict_with_delegation(
     audit_calls: list[dict[str, Any]],
 ) -> None:
-    """O23: no "present" while a delegation of the member exists."""
+    """No "present" while a delegation of the member exists."""
     meeting = _meeting("live")
     member = _member("a")
     db = fake_session(result(meeting), result(member), result(uuid4()))
@@ -273,7 +273,7 @@ async def test_reset_conflict_when_closed() -> None:
 
 
 async def test_roster_note_only_for_self_and_lead() -> None:
-    """A7: the reason of an excuse is personal data."""
+    """The reason of an excuse is personal data."""
     meeting = _meeting("live")
     me, other = _member("me"), _member("other")
     rows = [
@@ -291,7 +291,7 @@ async def test_roster_note_only_for_self_and_lead() -> None:
 
 
 async def test_roster_marks_the_vote_and_the_keeper_right() -> None:
-    """O6 and O20: the flags come from the union of the active gremium roles."""
+    """The flags come from the union of the active gremium roles."""
     meeting = _meeting("live")
     voter, keeper, both, former = _member("v"), _member("k"), _member("b"), _member("f")
     perms = result(

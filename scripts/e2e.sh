@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# E2E driver (T-40). The script starts the FULL stack with compose. The mock is OFF, so
+# E2E driver. The script starts the FULL stack with compose. The mock is OFF, so
 # the stack runs the real backend, frontend, typst, Postgres, Redis and MinIO, plus
 # mailpit as the SMTP sink. The script seeds deterministic fixtures. It then runs
 # Playwright against the real `web` endpoint. It removes everything again (`down -v`).
@@ -7,7 +7,7 @@
 # stack.
 #
 # The script covers the deterministic subset that binds the gate (CI job `e2e`). The
-# open scenarios that are slow or flaky moved to follow-up issues: async voting,
+# scenarios that are slow or flaky stay out of it: async voting,
 # live-vote WebSocket, protocol to PDF and OIDC. See e2e/README.md.
 #
 # Usage: scripts/e2e.sh

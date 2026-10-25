@@ -1,8 +1,7 @@
 """Integration test for the GDPR privacy **HTTP router** (real Postgres).
 
 ``test_privacy`` calls the services directly. This module drives the wired
-``/api/admin/privacy`` router through the real ASGI request cycle. See api.md and
-security.md section 4. The tests cover:
+``/api/admin/privacy`` router through the real ASGI request cycle. The tests cover:
 
 * the ``privacy.manage`` gate. It answers 401 without a session and 403 without the
   permission.

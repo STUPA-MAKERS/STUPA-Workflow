@@ -1,4 +1,4 @@
-"""MeetingService and BrokerPublisher (T-16).
+"""MeetingService and BrokerPublisher.
 
 The publisher tests cover the event translation and the security guard "no meeting, no
 broadcast". A pure async vote must never leak into a live channel. The MeetingService
@@ -225,7 +225,7 @@ class _FakeSession:
         self.added: list[object] = []
 
     async def execute(self, stmt: object) -> _Result:
-        # The meeting has no keeper period (Z3) in these tests.
+        # The meeting has no keeper period in these tests.
         if "protocol_keeper_period" in str(stmt):
             return _Result(None)
         return _Result(self.existing)
@@ -451,7 +451,7 @@ def _meeting(status: str = "planned") -> Meeting:
 
 @pytest.mark.asyncio
 async def test_service_patch_close_sets_closed_at() -> None:
-    """#14: a change to closed stamps `closed_at` once, for the end of the protocol."""
+    """A change to closed stamps `closed_at` once, for the end of the protocol."""
     meeting = _meeting(status="live")
     svc = MeetingService(_FakeSession(existing=meeting))  # type: ignore[arg-type]
     out = await svc.patch(meeting.id, MeetingPatch(status="closed"), _principal())
@@ -467,7 +467,7 @@ async def test_service_patch_close_sets_closed_at() -> None:
 async def test_service_patch_protokollant_locked_after_finalize(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """#15: a final protocol locks the protocol writer and returns 409."""
+    """A final protocol locks the protocol writer and returns 409."""
     meeting = _meeting()
 
     async def _final(self, _mid):
@@ -506,7 +506,7 @@ def _audit_capture(monkeypatch: pytest.MonkeyPatch) -> list[dict]:
 async def test_service_delete_finalized_requires_special_permission(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """#16: only `meeting.delete_finalized` deletes a meeting with a final protocol.
+    """Only `meeting.delete_finalized` deletes a meeting with a final protocol.
 
     Without the permission the service returns 403 and deletes nothing.
     """
@@ -547,7 +547,7 @@ async def test_service_delete_finalized_requires_special_permission(
 async def test_service_delete_unfinalized_is_audited(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """#16: a normal delete also goes into the audit log with finalizedProtocol=False."""
+    """A normal delete also goes into the audit log with finalizedProtocol=False."""
     meeting = _meeting()
 
     async def _final(self, _mid):
@@ -565,7 +565,7 @@ async def test_service_delete_unfinalized_is_audited(
 
 @pytest.mark.asyncio
 async def test_service_patch_closed_session_settings_frozen() -> None:
-    """#15: a closed meeting locks the date, the time and the protocol writer."""
+    """A closed meeting locks the date, the time and the protocol writer."""
     from datetime import date
 
     meeting = _meeting(status="closed")
@@ -584,7 +584,7 @@ async def test_service_patch_closed_session_settings_frozen() -> None:
 async def test_pool_substitute_sees_committee_timeline(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """#7: a member of the substitute pool sees the meeting timeline of its Gremien.
+    """A member of the substitute pool sees the meeting timeline of its Gremien.
 
     The visible set is the union of the member Gremien and the pool Gremien. The user
     needs no own membership.
@@ -609,7 +609,7 @@ async def test_pool_substitute_sees_committee_timeline(
 
 
 async def test_pool_substitute_not_live_participant_without_delegation() -> None:
-    """#7: pool membership gives only the timeline view, never the live channel.
+    """Pool membership gives only the timeline view, never the live channel.
 
     The live channel needs a concrete delegation. `is_participant` checks it.
     """
@@ -627,7 +627,7 @@ async def test_pool_substitute_not_live_participant_without_delegation() -> None
 
 
 async def test_assert_can_read_denies_non_member(monkeypatch: pytest.MonkeyPatch) -> None:
-    """#12 sec-audit: a foreign logged-in user must not read meeting details.
+    """A foreign logged-in user must not read meeting details.
 
     Meeting details include the roster. The user is not a member, not in the pool, not
     a manager and not the receiver of a delegation.

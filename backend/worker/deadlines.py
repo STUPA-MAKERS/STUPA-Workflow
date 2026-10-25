@@ -164,9 +164,9 @@ async def _discard_unconfirmed(
     """Delete the applications that stay unconfirmed past the confirmation window.
 
     The window is `guest_application_settings.confirm_ttl_hours`. The step reads it
-    on every run, so a changed value applies to the waiting applications too (Z1).
+    on every run, so a changed value applies to the waiting applications too.
     The step covers every application with `email_confirmed_at IS NULL`, also one
-    that a logged-in person submitted for another email address (F23).
+    that a logged-in person submitted for another email address.
 
     The order is fixed. The step locks the due rows (`FOR UPDATE SKIP LOCKED`) and
     reads their attachment storage keys. It deletes the rows (the dependent rows

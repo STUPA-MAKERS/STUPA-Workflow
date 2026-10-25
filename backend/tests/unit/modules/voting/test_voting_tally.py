@@ -1,4 +1,4 @@
-"""Pure result() and tally() matrix for the T-15 acceptance criteria.
+"""Pure result() and tally() matrix for the majority rules.
 
 The matrix covers every majority rule against a met quorum, a missed quorum and a
 tie. The tests use no database and no clock, so they stay deterministic.
@@ -80,7 +80,7 @@ def test_leading_none_on_top_tie() -> None:
         ("absolute", {YES: 3, NO: 1, ABSTAIN: 0}, "passed"),  # 6>4
         ("absolute", {YES: 3, NO: 1, ABSTAIN: 2}, "tie"),     # 6==6
         ("absolute", {YES: 3, NO: 1, ABSTAIN: 3}, "rejected"),  # 6<7
-        # Rule two_thirds (≥⅔, R5.1): exactly ⅔ passes. A blocking minority gives a tie.
+        # Rule two_thirds (≥⅔): exactly ⅔ passes. A blocking minority gives a tie.
         ("two_thirds", {YES: 3, NO: 1}, "passed"),   # 9≥8
         ("two_thirds", {YES: 2, NO: 1}, "passed"),   # 6≥6 (exactly ⅔ → passed)
         ("two_thirds", {YES: 1, NO: 2}, "rejected"),  # no reaches ⅔

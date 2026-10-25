@@ -1,4 +1,4 @@
-"""Router tests for application-types (T-25): endpoint wiring without a database.
+"""Router tests for application-types: endpoint wiring without a database.
 
 A `dependency_overrides` entry replaces the database-backed `ApplicationTypesService`
 with a fake. Auth comes from `get_current_principal`. The integration suite covers the
@@ -169,7 +169,7 @@ def test_list_rejects_unknown_query_param_422(app_client: TestClient) -> None:
 def test_list_rejects_invalid_lang_422(app_client: TestClient, lang: str) -> None:
     # An invalid `lang` value, `lang=null` included, must give 422 instead of a silent 200.
     # This closes the be-contract coverage flake. Schemathesis injects junk data and
-    # requires a 4xx answer (PR #63).
+    # requires a 4xx answer.
     r = app_client.get(f"/api/application-types?lang={lang}")
     assert r.status_code == 422
     assert r.headers["content-type"].startswith("application/problem+json")
@@ -194,7 +194,7 @@ def test_openapi_declares_error_responses(app_client: TestClient) -> None:
     spec = app_client.get("/openapi.json").json()
     get_list = spec["paths"]["/api/application-types"]["get"]
     assert "422" in get_list["responses"]
-    # The T-10 hook rewrites a 4xx response to problem+json.
+    # The error hook rewrites a 4xx response to problem+json.
     assert "application/problem+json" in get_list["responses"]["422"]["content"]
     assert "application/json" in get_list["responses"]["200"]["content"]
 

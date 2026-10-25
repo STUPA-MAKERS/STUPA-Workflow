@@ -168,7 +168,7 @@ async def get_current_applicant(
     )
     if row is None or row.scope not in ("edit", "view"):
         return None
-    # An applicant session has no fixed scope (O4, F5). Each action checks the
+    # An applicant session has no fixed scope. Each action checks the
     # current state, and the edit service answers 409 in a locked state. So a
     # `view` session from before that change also acts as `edit`.
     return Applicant(application_id=str(row.application_id), scope="edit")

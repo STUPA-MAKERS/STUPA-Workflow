@@ -1,4 +1,4 @@
-"""E2E seed (T-40): deterministic fixtures against the *real* compose stack.
+"""E2E seed: deterministic fixtures against the *real* compose stack.
 
 The one-shot service ``seed`` runs this module on the backend image. It starts after
 ``migrate`` and as soon as ``api`` is healthy. It writes no production code and no

@@ -1,4 +1,4 @@
-"""One error contract for the whole API (api.md §2).
+"""One error contract for the whole API.
 
 A problem JSON body carries type, title, status, code, detail, errors and traceId.
 The status-to-code map covers 400, 401, 403, 404, 409, 410, 413, 422, 429 and 500.
@@ -71,7 +71,7 @@ def test_unknown_route_yields_problem_json(client: TestClient) -> None:
 
 
 # An unparsable request body gives ONE documented 422 across the whole app. FastAPI
-# alone answers a per-endpoint, undocumented 400 for a broken multipart body (T-13).
+# alone answers a per-endpoint, undocumented 400 for a broken multipart body.
 _MALFORMED_MULTIPART = b"--ff\r\nFalse--ff--\r\n"
 _MULTIPART_HEADERS = {"content-type": "multipart/form-data; boundary=xxx"}
 

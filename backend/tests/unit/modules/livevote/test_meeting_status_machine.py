@@ -1,9 +1,9 @@
-"""Meeting status machine, start and close side effects, and the A2 agenda summary.
+"""Meeting status machine, start and close side effects, and the agenda summary.
 
-F9 and O13: the status runs only planned, live, closed. A repeat of the current status
-is a no-op. Every other change gives 409 ``invalid_status_transition``. O12: the close
-gives 409 ``open_vote`` while a vote is open, and it cancels the draft votes. Z7: the
-start sets ``started_at`` once. F12: create and update write an audit entry.
+The status runs only planned, live, closed. A repeat of the current status
+is a no-op. Every other change gives 409 ``invalid_status_transition``. The close
+gives 409 ``open_vote`` while a vote is open, and it cancels the draft votes. The
+start sets ``started_at`` once. Create and update write an audit entry.
 """
 
 from __future__ import annotations
@@ -364,7 +364,7 @@ async def test_create_is_audited(audit: list[dict[str, Any]]) -> None:
     assert entry["data"]["title"] == "GV"
 
 
-# A2: the agenda summary of MeetingOut
+# The agenda summary of MeetingOut
 async def test_agenda_summary_empty_list() -> None:
     assert await MeetingService(_Session())._agenda_summaries([]) == {}  # type: ignore[arg-type]
 
@@ -429,7 +429,7 @@ async def test_detail_and_list_carry_the_agenda_summary(
         assert dumped["startedAt"] == m.started_at
 
 
-# #17: public participation in the lifecycle
+# Public participation in the lifecycle
 class _Guests:
     calls: list[tuple[str, Any]] = []
 

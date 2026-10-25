@@ -1,4 +1,4 @@
-"""Negative check for the critical coverage gate (acceptance criterion T-04).
+"""Negative check for the critical coverage gate.
 
 The gate lives in `scripts.coverage_critical`. It blocks with exit code 1 when a
 critical module has a branch rate below 100 percent. It passes at 100 percent. It also

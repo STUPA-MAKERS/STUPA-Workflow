@@ -1,4 +1,4 @@
-"""Notification service tests (T-18): template CRUD, the notify action and magic link.
+"""Notification service tests: template CRUD, the notify action and magic link.
 
 `FakeSession` answers the database queries and `FakeQueue` takes the send calls, so the
 tests need no SMTP and no Redis.
@@ -74,7 +74,7 @@ async def test_list_templates() -> None:
     # Builtin defaults come without a database id and with source='builtin'.
     assert by_key["status_update"].source == "builtin"
     assert by_key["status_update"].id is None
-    # The committee-facing notify default (bug #2) is editable via the merge too.
+    # The committee-facing notify default is editable via the merge too.
     assert by_key["status_update_team"].source == "builtin"
     # Existing overrides outside the catalog go to the end with source='override'.
     assert by_key["a"].source == "override" and by_key["b"].source == "override"
@@ -139,7 +139,7 @@ async def test_preview_template_not_found() -> None:
 
 
 async def test_handle_notify_action_inline_mode() -> None:
-    # First scalars call: the preference filter (#4-2, no opt-out). Then the template.
+    # First scalars call: the preference filter (no opt-out). Then the template.
     session = FakeSession(scalars=[[], [_template()]])
     queue = FakeQueue()
     svc = _service(session, queue)
@@ -185,7 +185,7 @@ async def test_handle_notify_action_no_recipients_skips() -> None:
 async def test_handle_notify_action_derives_real_kind_from_catalogue(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """AUD-043: the opt-out filter and the footer use the catalog kind.
+    """The opt-out filter and the footer use the catalog kind.
 
     They do not use a substring heuristic. A `comment_team` template has the catalog
     kind `comment`, so the filter must treat it as `comment`. The old
@@ -244,7 +244,7 @@ async def test_handle_notify_action_unknown_key_defaults_to_status_update(
 
 
 async def test_notify_without_template_key_splits_applicant_and_team() -> None:
-    """Bug #2: without a templateKey the send splits by recipient kind.
+    """Without a templateKey the send splits by recipient kind.
 
     The applicant gets `status_update`. Every other recipient kind gets the
     Gremium-facing `status_update_team` wording.

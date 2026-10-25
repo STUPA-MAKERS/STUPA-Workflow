@@ -1,4 +1,4 @@
-"""Worker task `send_mail` (T-18): send, retry, permanent failure and sender choice."""
+"""Worker task `send_mail`: send, retry, permanent failure and sender choice."""
 
 from __future__ import annotations
 

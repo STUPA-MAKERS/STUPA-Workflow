@@ -1,4 +1,4 @@
-"""TDD: auth endpoints (api.md §3 "auth") — contract and cookie flags."""
+"""TDD: auth endpoints — contract and cookie flags."""
 
 from __future__ import annotations
 
@@ -95,7 +95,7 @@ def enabled_client() -> Iterator[TestClient]:
 def _csrf(client: TestClient, settings: Settings) -> dict[str, str]:
     """Set the CSRF cookie and return the matching header.
 
-    The double-submit rule comes from security.md §10. A request needs the header as
+    The double-submit rule: a request needs the header as
     soon as it carries an auth cookie. One example is a logout with a session cookie.
     """
     token = "csrf-test-token"
@@ -384,7 +384,7 @@ def test_magic_link_invalid_email_422(enabled_client: TestClient) -> None:
 
 def test_magic_link_malformed_altcha_422(enabled_client: TestClient) -> None:
     # A structurally invalid altcha value (control characters) gives 422 before the logic
-    # runs, also with verification off. Contract `negative_data_rejection`, issue #23.
+    # runs, also with verification off. Contract `negative_data_rejection`.
     resp = enabled_client.post(
         "/api/auth/magic-link", json={"email": "x@y.de", "altcha": "ZÈ♯æL¾&"}
     )

@@ -1,4 +1,4 @@
-"""O21: the `isPII` fields reach only a reader with the PII right (real Postgres).
+"""The `isPII` fields reach only a reader with the PII right (real Postgres).
 
 The right is `application.read`, `application.read_all` or admin. The applicant
 (magic link) and the logged-in creator read the own data. A member who reads only
@@ -228,7 +228,7 @@ async def test_idempotent_archive_strips_pii_without_read(
     maker: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The no-op path of archive and unarchive applies O21 too."""
+    """The no-op path of archive and unarchive applies the PII strip too."""
     _, app_id = await _world(maker)
     api = build_read_api(migrated[1], monkeypatch)
     as_principal(api, Principal(sub="archivar", permissions={"application.archive"}))
@@ -254,7 +254,7 @@ async def test_search_finds_no_application_by_a_hidden_pii_value(
     maker: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The search is no oracle for a PII value (O21).
+    """The search is no oracle for a PII value.
 
     A Gremium reader without the PII right finds the application by its title, but
     not by its IBAN. The reader with the right and the creator find it by both.
@@ -279,7 +279,7 @@ async def test_creator_without_read_gets_no_internal_comment(
     maker: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The creator without a read permission reads as the applicant (A12)."""
+    """The creator without a read permission reads as the applicant."""
     seed, app_id = await _world(maker)
     async with maker() as session:
         for visibility in ("internal", "public"):

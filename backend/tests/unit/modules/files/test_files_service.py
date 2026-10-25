@@ -1,4 +1,4 @@
-"""Service tests for files (T-13): upload, quarantine, signed URLs and scan finish.
+"""Service tests for files: upload, quarantine, signed URLs and scan finish.
 
 `FakeSession` stands in for the database. Fakes stand in for storage, queue and scan,
 so no real MinIO, ClamAV or Redis runs. The tests mock MIME sniffing and need no
@@ -85,7 +85,7 @@ async def test_upload_clean_path_stores_and_enqueues() -> None:
     assert len(storage.put_calls) == 1
     assert len(queue.enqueued) == 1
     assert session.committed == 1
-    # F12: the upload writes an audit entry without the file name.
+    # The upload writes an audit entry without the file name.
     assert [a["action"] for a in UPLOAD_AUDITS] == ["attachment_upload"]
     assert UPLOAD_AUDITS[0]["target_id"] == str(out.id)
     assert UPLOAD_AUDITS[0]["data"] == {

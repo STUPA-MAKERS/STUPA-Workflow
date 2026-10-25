@@ -1,4 +1,4 @@
-"""Seed helpers for the agenda tests of the flow engine (A1, F3).
+"""Seed helpers for the agenda tests of the flow engine.
 
 The flow has the states `review` (initial), `voting` (a vote state of the Gremium) and
 `done`. The transition `review → voting` carries `addToNextSession` for the Gremium.

@@ -63,13 +63,13 @@ class ListingOps(ApplicationsServiceBase):
         holds every application. That is the full view for `application.read` and for
         admin.
 
-        `state_ids` keeps the applications in one of these states (A4). None or an
+        `state_ids` keeps the applications in one of these states. None or an
         empty list does not filter.
 
-        Each item carries `stateSince`, the time of the last status change (A9). One
+        Each item carries `stateSince`, the time of the last status change. One
         grouped subquery over `status_event` gives it for the whole page.
 
-        `hide_pii_in_search` is for a caller without the PII right (O21). The search
+        `hide_pii_in_search` is for a caller without the PII right. The search
         `q` then skips the `isPII` field values, except in the own applications
         (`created_by == owner_sub`). Without this rule the search is an oracle: a
         guessed name or IBAN would tell which readable application holds it.
@@ -119,7 +119,7 @@ class ListingOps(ApplicationsServiceBase):
                 filters.append(Application.budget_id.in_(descendants))
         # The fuzzy search reads meaningful text only: the title and the string answer
         # values of the `data` JSONB. It skips ids, enums and numbers. See
-        # `_search_text` for the dialects and for the PII projection (O21).
+        # `_search_text` for the dialects and for the PII projection.
         rank_expr: ColumnElement[Any] | None = None
         if q and q.strip():
             dialect = dialect_of(self.session)
@@ -242,7 +242,7 @@ class ListingOps(ApplicationsServiceBase):
 
         Postgres uses `app_search_text(data)`, the trigram index expression. The
         SQLite fallback of the unit stubs reads the whole `data` blob as text.
-        ``hidden_keys`` leaves these top-level keys out of `data` first (O21). An
+        ``hidden_keys`` leaves these top-level keys out of `data` first. An
         application with ``created_by == owner_sub`` keeps all keys, because the
         creator reads the own PII. The projection cannot use the trigram index;
         the read scope of such a caller is small.
@@ -368,7 +368,7 @@ class ListingOps(ApplicationsServiceBase):
         readable, confirmed applications that have an open vote or a manual exit
         with `requiresAction`.
 
-        Each task carries `stateSince`, the time of the last status change (A9).
+        Each task carries `stateSince`, the time of the last status change.
         """
         from app.modules.flow.service import FlowService
 
@@ -408,7 +408,7 @@ class ListingOps(ApplicationsServiceBase):
                     stateSince=app.created_at,
                 )
             )
-        # One grouped query for the kept tasks only (A9). An application without a
+        # One grouped query for the kept tasks only. An application without a
         # status event keeps its creation time.
         since_by_app = await self._state_since_map(item.id for item in items)
         for item in items:

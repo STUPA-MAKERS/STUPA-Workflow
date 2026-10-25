@@ -1,4 +1,4 @@
-"""Router tests for applications (T-12): endpoint wiring without a database.
+"""Router tests for applications: endpoint wiring without a database.
 
 A `dependency_overrides` entry replaces the auth dependencies for principal and
 applicant and the `ApplicationsService` with fakes. The integration suite covers the
@@ -433,7 +433,7 @@ def test_create_application_logged_in_explicit_email_on_behalf(
     # The explicit value wins over the account derivation (creation for another person).
     assert fake_service.created.applicant_email == "applicant@example.org"  # type: ignore[union-attr]
     assert fake_service.created_actor == "verwalter"
-    # F23: the account does not prove the other address, so it stays unconfirmed.
+    # The account does not prove the other address, so it stays unconfirmed.
     assert fake_service.created_email_confirmed is False
 
 
@@ -484,7 +484,7 @@ def test_get_application_applicant_no_pii(
     r = client.get(f"/api/applications/{app_id}")
     assert r.status_code == 200
     assert fake_service.last_include_pii is False
-    # The applicant reads the own isPII fields (O21).
+    # The applicant reads the own isPII fields.
     assert fake_service.last_strip_pii_fields is False
 
 
@@ -642,7 +642,7 @@ def test_timeline_ap(app: FastAPI, client: TestClient, fake_service: _FakeServic
     r = client.get(f"/api/applications/{app_id}/timeline")
     assert r.status_code == 200
     assert len(r.json()) == 1
-    # A12: the applicant reads the timeline in the applicant view.
+    # The applicant reads the timeline in the applicant view.
     assert fake_service.timeline_applicant_view is True
     assert fake_service.timeline_magic_link_view is True
 
@@ -661,7 +661,7 @@ def test_versions_principal_full(
 def test_versions_applicant_gets_metadata_view(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
-    # A11/O17: the applicant reads the version metadata of the own application.
+    # The applicant reads the version metadata of the own application.
     app_id = uuid4()
     _as_applicant(app, app_id, "edit")
     r = client.get(f"/api/applications/{app_id}/versions")
@@ -692,7 +692,7 @@ def test_list_applications_filters_passed(
     assert fake_service.list_kwargs["limit"] == 10
     # With application.read there is no owner filter. All applications stay visible.
     assert fake_service.list_kwargs["owner_sub"] is None
-    # O21: the reader with the PII right searches the isPII values too.
+    # The reader with the PII right searches the isPII values too.
     assert fake_service.list_kwargs["hide_pii_in_search"] is False
 
 
@@ -704,7 +704,7 @@ def test_list_applications_without_read_scopes_to_own(
     r = client.get("/api/applications")
     assert r.status_code == 200
     assert fake_service.list_kwargs["owner_sub"] == "admin"  # principal.sub of the fake
-    # O21: no search over the isPII values of the committee-scope applications.
+    # No search over the isPII values of the committee-scope applications.
     assert fake_service.list_kwargs["hide_pii_in_search"] is True
 
 

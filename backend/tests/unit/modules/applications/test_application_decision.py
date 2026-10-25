@@ -1,4 +1,4 @@
-"""Tests of the decision module (F1): validation, record, revert and reads."""
+"""Tests of the decision module: validation, record, revert and reads."""
 
 from __future__ import annotations
 

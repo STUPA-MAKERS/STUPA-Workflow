@@ -49,7 +49,7 @@ _SECURITY_HEADERS = {
 }
 
 _SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "TRACE"})
-# The public meeting routes (#17). They apply their own rate limits.
+# The public meeting routes. They apply their own rate limits.
 PUBLIC_MEETING_PREFIX = "/api/public/meetings/"
 
 Dispatch = Callable[[Request], Awaitable[Response]]
@@ -212,7 +212,7 @@ class DefaultWriteRateLimitMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next: Dispatch) -> Response:
         settings = self._settings
-        # The public meeting routes (#17) carry their own limits per IP, per join code
+        # The public meeting routes carry their own limits per IP, per join code
         # and per guest. Many guests often share one IP, and the default limit per IP
         # would stop a meeting in the middle of a vote.
         exempt = str(request.scope.get("path", "")).startswith(PUBLIC_MEETING_PREFIX)

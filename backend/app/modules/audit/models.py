@@ -5,7 +5,7 @@ order equals the chain order. A database trigger also rejects UPDATE and DELETE.
 See migration 0005 and the least-privilege ``audit_writer`` grant. There is no ORM
 path that mutates a row.
 
-``audit_verification`` holds the stored results of the chain check (Z6/O8). The
+``audit_verification`` holds the stored results of the chain check. The
 nightly cron, the restore job and ``POST /admin/audit/verify`` each write one row.
 The table is not part of the chain and is not append-only: the service keeps the
 newest 100 rows and deletes the older rows.
@@ -73,7 +73,7 @@ class AuditEntry(Base):
 
 
 class AuditVerification(UUIDPkMixin, Base):
-    """One stored result of a full chain check (Z6/O8).
+    """One stored result of a full chain check.
 
     ``broken_at`` is the id of the first broken ``audit_entry`` row. It has no
     foreign key on purpose: the row it names is the one that is suspect, and a

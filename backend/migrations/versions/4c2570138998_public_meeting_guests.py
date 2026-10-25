@@ -1,4 +1,4 @@
-"""Public meeting with a QR code (#17).
+"""Public meeting with a QR code.
 
 The upgrade:
 

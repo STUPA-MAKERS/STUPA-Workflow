@@ -1,6 +1,6 @@
-"""Pure form engine T-11 (validate_definition, effective_form, validate_answers).
+"""Pure form engine (validate_definition, effective_form, validate_answers).
 
-Acceptance criteria: every field type passes and fails as expected. Required fields
+The tests prove: every field type passes and fails as expected. Required fields
 apply. A visible visibleIf field becomes mandatory. compute derives the right value.
 An unknown type raises an error. effective_form builds the sections. extract_promoted
 reads the promoted values.
@@ -188,7 +188,7 @@ def test_positions_min_positions() -> None:
 
 
 def test_positions_engine_max_positions_ceiling() -> None:
-    # The engine ceiling applies even without maxPositions (#sec-audit AUD-047).
+    # The engine ceiling applies even without maxPositions.
     field = _positions_field(validation={"minOffers": 1, "maxPositions": 2})
     value = [_position(f"P{i}", ("A", 5, True)) for i in range(3)]
     errors: list[FieldError] = []
@@ -258,7 +258,7 @@ def test_table_default_max_rows_ceiling() -> None:
 
 
 def test_table_explicit_max_rows_zero_rejects_any_row() -> None:
-    # AUD-047 regression: an explicit maxRows=0 is valid (ge=0) and must reject every
+    # An explicit maxRows=0 is valid (ge=0) and must reject every
     # row. A falsy `or` must not fall back to the default cap of 1000.
     f = _field("rows", "table", validation={"maxRows": 0})
     with pytest.raises(AnswerValidationError) as exc:
@@ -430,7 +430,7 @@ def test_text_runtime_bad_pattern_is_422_not_500() -> None:
     assert ei.value.errors[0].msg == "field has an invalid validation pattern"
 
 
-# ReDoS hardening: input length cap plus wall-clock timeout (security.md)
+# ReDoS hardening: input length cap plus wall-clock timeout
 def test_pattern_value_over_length_cap_is_rejected() -> None:
     # A value above _PATTERN_MAX_INPUT_LEN never matches. The engine skips the match.
     from app.modules.forms.validation import _PATTERN_MAX_INPUT_LEN
@@ -663,7 +663,7 @@ def test_visible_if_visible_enforces_required() -> None:
 
 
 def test_visible_if_eval_error_is_conservatively_visible() -> None:
-    # T-05: and/or do not short-circuit. {">": [var y, 0]} raises when y is missing.
+    # And/or do not short-circuit. {">": [var y, 0]} raises when y is missing.
     # The field then counts as visible, so required applies.
     f = _field(
         "x",

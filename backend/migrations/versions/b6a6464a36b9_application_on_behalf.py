@@ -1,4 +1,4 @@
-"""Applications captured on behalf of an applicant (#11).
+"""Applications captured on behalf of an applicant.
 
 The upgrade:
 

@@ -242,7 +242,7 @@ class ListingOps(PermissionOps, VoteReadOps):
             )
         ).all()
         gremium_names: dict[UUID, str] = {row[0]: row[1] for row in gremium_rows}
-        # #17: public participation only in a gremium without a quorum.
+        # Public participation only in a gremium without a quorum.
         quorum_gids = {row[0] for row in gremium_rows if len(row) > 2 and row[2] is not None}
         # One batched query for the protokollant names. Without it the timeline
         # shows no protokollant, because ``protokollantName`` stays null although

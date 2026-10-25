@@ -3,7 +3,7 @@
 A member reads ``actorInfo``, ``changedByInfo`` and ``authorInfo``: the name of a
 member, the applicant, a system key, or ``deleted`` for an unknown or anonymized
 account. No raw ``sub`` leaves the server. The applicant view keeps the Gremium as
-the actor of every action that the applicant did not do (A12, O16). One query
+the actor of every action that the applicant did not do. One query
 reads all principal names (no N+1).
 """
 

@@ -1,6 +1,6 @@
 """Integration tests for the Alembic migrations and DB constraints on a real Postgres 16.
 
-Acceptance T-06: upgrade and downgrade run clean. The partial unique indexes for the
+Upgrade and downgrade run clean. The partial unique indexes for the
 active form version and the initial state hold. The GIN index exists. The seed creates
 the default roles. A deleted application cascades to its applicant rows.
 """
@@ -335,7 +335,7 @@ def test_split_oidc_mappings_converts_gremium_group_mappings(
 
 
 def test_drop_global_meeting_permissions(alembic_cfg: Config, engine: Engine) -> None:
-    """Migration 3a0b9672fcba drops the superseded global meeting keys (O7, F11).
+    """Migration 3a0b9672fcba drops the superseded global meeting keys.
 
     The upgrade gives `protocol.finalize` to the forced gremium roles `vorstand` and
     `manager` only, and deletes the three global keys from every role. The downgrade
@@ -641,7 +641,7 @@ def test_drop_vote_notification_kind(
 def test_vote_closed_at_backfill_and_allow_change_strip(
     alembic_cfg: Config, engine: Engine, capfd: pytest.CaptureFixture[str]
 ) -> None:
-    """Migration 863a6833fea5 adds `vote.closed_at` (Z9, O10, O11, O18).
+    """Migration 863a6833fea5 adds `vote.closed_at`.
 
     The upgrade backfills `closed_at` from the `status_change` audit entry of the result
     branch, at or after the open time, and keeps NULL where the audit log has no such
@@ -790,7 +790,7 @@ def _agenda_fk_rule(conn) -> str:
 def test_meeting_started_at_and_vote_agenda_fk(
     alembic_cfg: Config, engine: Engine, capfd: pytest.CaptureFixture[str]
 ) -> None:
-    """Migration eff772f93d8e adds `meeting.started_at` and keeps agenda votes (Z7, F21).
+    """Migration eff772f93d8e adds `meeting.started_at` and keeps agenda votes.
 
     The upgrade adds the column without a backfill and logs the live and closed
     meetings that stay NULL. It changes the foreign key `vote.agenda_item_id` from
@@ -890,7 +890,7 @@ _SEED_MAGIC_LINK_BODY = {
 def test_guest_application_settings_and_unlimited_links(
     alembic_cfg: Config, engine: Engine
 ) -> None:
-    """Migration d5569d5542c6 (Z1, O3).
+    """Migration d5569d5542c6.
 
     The upgrade creates the settings row (12 hours, no link expiry), makes
     `magic_link.expires_at` nullable and allows NULL only for an edit link. The
@@ -1031,7 +1031,7 @@ def _self_status_check(conn) -> tuple[str, bool] | None:
 def test_attendance_self_status_check_not_valid(
     alembic_cfg: Config, engine: Engine, capfd: pytest.CaptureFixture[str]
 ) -> None:
-    """Migration 96421ecdbc54 adds the self-status check as NOT VALID (Z2).
+    """Migration 96421ecdbc54 adds the self-status check as NOT VALID.
 
     An older (self, absent) row survives the upgrade, and the upgrade logs it. A new
     such row fails. A change of the older row must set an allowed status. The
@@ -1128,7 +1128,7 @@ def _attachment_columns(conn) -> dict[str, str]:
 
 
 def test_attachment_drafts(alembic_cfg: Config, engine: Engine) -> None:
-    """Migration 1ee8a0d3928c (Z4).
+    """Migration 1ee8a0d3928c.
 
     The upgrade makes `attachment.application_id` nullable, adds the two draft
     columns, both checks, the two partial indexes and the `attachment_draft_token`
@@ -1240,7 +1240,7 @@ def test_attachment_drafts(alembic_cfg: Config, engine: Engine) -> None:
 def test_protocol_keeper_period_backfill(
     alembic_cfg: Config, engine: Engine, capfd: pytest.CaptureFixture[str]
 ) -> None:
-    """Migration 734556b61a72 adds the keeper periods and backfills them (Z3).
+    """Migration 734556b61a72 adds the keeper periods and backfills them.
 
     A live or closed meeting with a protokollant gets one period. The start is the
     real start, else the planned start in Europe/Berlin, else the creation time. A
@@ -1357,7 +1357,7 @@ def test_protocol_keeper_period_backfill(
 
 
 def test_substitute_groups(alembic_cfg: Config, engine: Engine) -> None:
-    """Migration 92f23ad77fc5 adds the faculty substitute groups (Z5).
+    """Migration 92f23ad77fc5 adds the faculty substitute groups.
 
     The upgrade creates both tables with the composite foreign key, the CHECK on
     `kind` and the partial unique index for members. The existing pool entries
@@ -1462,7 +1462,7 @@ def test_substitute_groups(alembic_cfg: Config, engine: Engine) -> None:
 
 
 def test_drop_substitute_groups(alembic_cfg: Config, engine: Engine) -> None:
-    """Migration e12bd65b2a79 drops the faculty substitute groups (Z5).
+    """Migration e12bd65b2a79 drops the faculty substitute groups.
 
     The upgrade drops both tables with their rows. The pool entries stay. The
     downgrade is lossy: it creates both tables again, empty, with the composite
@@ -1545,7 +1545,7 @@ def test_drop_substitute_groups(alembic_cfg: Config, engine: Engine) -> None:
 def test_audit_verification_and_role_key_report(
     alembic_cfg: Config, engine: Engine, capfd: pytest.CaptureFixture[str]
 ) -> None:
-    """Migration 373c9fe9cafb (Z6, A10).
+    """Migration 373c9fe9cafb.
 
     The upgrade adds `audit_verification` with its CHECKs and the index on
     `started_at DESC`. It logs every role key that breaks `^[a-z][a-z0-9_]*$` and
@@ -1621,7 +1621,7 @@ def test_audit_verification_and_role_key_report(
 
 
 def test_public_meeting_guests(alembic_cfg: Config, engine: Engine) -> None:
-    """Migration 4c2570138998 (#17): the meeting columns, `meeting_guest`, vote counts.
+    """Migration 4c2570138998: the meeting columns, `meeting_guest`, vote counts.
 
     The downgrade drops them; the upgrade is idempotent on a schema that has them.
     """

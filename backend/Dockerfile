@@ -8,7 +8,7 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 # System libraries:
-# - libmagic1: MIME sniffing for python-magic (T-13).
+# - libmagic1: MIME sniffing for python-magic.
 # - postgresql-client-16: `pg_dump` and `pg_restore` for /admin/backups. The version
 #   MUST match the server major (compose runs postgres:16-alpine). A pg_dump older than
 #   the server refuses to run, so the pin is not cosmetic. The Debian package comes from
@@ -38,7 +38,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     && pip install -r /tmp/requirements.txt \
     && rm /tmp/requirements.txt
 
-# The image also needs the alembic config and the migrations (issue #38). Without them the
+# The image also needs the alembic config and the migrations. Without them the
 # container cannot run `alembic upgrade head` and a fresh database stays empty. The alembic
 # env.py file imports app.models and app.settings, which `pip install .` makes available.
 # The setting `prepend_sys_path=.` resolves to /app.
@@ -49,7 +49,7 @@ COPY migrations ./migrations
 # The dependencies come from the layer above, so install only the package itself.
 RUN --mount=type=cache,target=/root/.cache/pip pip install --no-deps .
 
-# Defense in depth (#sec-audit): do not run as root. At run time the container needs read
+# Defense in depth: do not run as root. At run time the container needs read
 # access to /app only, for the code and the migrations. Multipart uploads spool to /tmp,
 # which is world-writable. This holds for api, worker and the migrate one-shot, because
 # alembic writes to the database only.
@@ -58,6 +58,6 @@ USER appuser
 
 EXPOSE 8000
 
-# Keep forwarded-allow-ips narrow (security.md §3). Never set it to "*". The default is
+# Keep forwarded-allow-ips narrow. Never set it to "*". The default is
 # loopback. Production passes the Caddy network through FORWARDED_ALLOW_IPS.
 CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips \"${FORWARDED_ALLOW_IPS:-127.0.0.1}\""]

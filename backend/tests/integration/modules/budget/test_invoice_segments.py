@@ -1,4 +1,4 @@
-"""Integration (real Postgres): FE10c, the segments of the invoice list.
+"""Integration (real Postgres): the segments of the invoice list.
 
 The invoice list has four segments: all, "Eingang" (open, no booking), "Verbucht"
 (open, with a booking) and "Bezahlt" (paid). ``booked`` filters on a linked booking,

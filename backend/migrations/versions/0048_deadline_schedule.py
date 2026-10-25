@@ -1,6 +1,6 @@
-"""deadline_policy scheduling: time of day, timezone and recurring dates (#90).
+"""deadline_policy scheduling: time of day, timezone and recurring dates.
 
-Phase 1 of the deadline-definition redesign. The change is additive and idempotent.
+The change is additive and idempotent.
 
 * `at_time` (`"HH:MM"`) and `timezone` (IANA zone) snap the resolved due date to a
   wall-clock time. The snap stays correct across DST. If both columns stay NULL, the

@@ -1,4 +1,4 @@
-"""Z2, O15, O23, A7 and F12: the attendance rules through the real API.
+"""The attendance rules through the real API.
 
 * A member reports the own attendance as present or excused only (422 for absent).
 * The record of the meeting lead wins: the member gets 409 until the lead resets it.
@@ -136,7 +136,7 @@ async def test_member_cannot_set_or_reset_others(
 async def test_present_refused_while_delegation_is_active(
     maker: async_sessionmaker[AsyncSession], api: FastAPI
 ) -> None:
-    """O23: the lead first revokes the delegation, then sets the member present."""
+    """The lead first revokes the delegation, then sets the member present."""
     s = await seed(maker, status="live", items=0)
     _, delegator = await _member(maker, s.gremium_id, "Anna")
     _, delegate = await _member(maker, s.gremium_id, "Bert")
@@ -168,7 +168,7 @@ async def test_present_refused_while_delegation_is_active(
 async def test_own_present_refused_while_delegation_is_active(
     maker: async_sessionmaker[AsyncSession], api: FastAPI
 ) -> None:
-    """O23 also holds for the own report. The delegator can still report an excuse."""
+    """The delegation rule holds for the own report. The delegator can still report an excuse."""
     s = await seed(maker, status="live", items=0)
     sub, delegator = await _member(maker, s.gremium_id, "Anna")
     _, delegate = await _member(maker, s.gremium_id, "Bert")

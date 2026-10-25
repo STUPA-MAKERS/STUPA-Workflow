@@ -1317,7 +1317,7 @@ async def test_delete_webhook_not_found() -> None:
         await s.delete_webhook(uuid.uuid4(), "admin")
 
 
-# AUD-062: the advisory SSRF check of the webhook URL at CRUD time.
+# The advisory SSRF check of the webhook URL at CRUD time.
 def test_webhook_url_advisory_blocks_internal_ip_literal() -> None:
     # The link-local metadata IP is not global, so this is a 400 and no silent dead-letter.
     with pytest.raises(BadRequestError):
@@ -1344,7 +1344,7 @@ def test_webhook_url_advisory_dns_failure_is_non_blocking() -> None:
     ConfigService._assert_webhook_url_advisory("https://x.example/h")
 
 
-# AUD-062 (second half): the delivery-status diagnostic read.
+# The delivery-status diagnostic read.
 def delivery_row(**kw: Any) -> Any:
     base = {
         "id": uuid.uuid4(),
@@ -1426,7 +1426,7 @@ async def test_list_webhook_delivery_status_per_hook() -> None:
     assert out[1].last_state == "never"
 
 
-# AUD-053: the role permission whitelist validation.
+# The role permission whitelist validation.
 def test_role_create_rejects_unknown_permission() -> None:
     with pytest.raises(ValueError, match="unknown permission"):
         RoleCreate(key="r", permissions=["application.read", "bogus.key"])

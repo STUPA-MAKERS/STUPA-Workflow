@@ -1,4 +1,4 @@
-"""Approval with deviations (F1): `application_decision`, two new columns.
+"""Approval with deviations: `application_decision`, two new columns.
 
 The upgrade:
 

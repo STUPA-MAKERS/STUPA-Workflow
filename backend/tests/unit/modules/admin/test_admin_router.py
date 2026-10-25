@@ -1,4 +1,4 @@
-"""Router tests for admin and config (T-24): endpoint wiring and RBAC with a faked service.
+"""Router tests for admin and config: endpoint wiring and RBAC with a faked service.
 
 These tests prove four things.
 
@@ -179,7 +179,7 @@ class _FakeConfig:
         ]
 
     async def get_active_global_flow(self):
-        return None  # an empty flow is enough for the gate tests (#5-2)
+        return None  # an empty flow is enough for the gate tests
 
     async def create_global_flow_version(self, payload, actor):
         return FlowVersionOut(id=uuid4(), version=2, active=True)
@@ -317,7 +317,7 @@ class _FakeSite:
 
 
 class _FakeGremiumRoles:
-    """Minimal fake for the Gremium roles and memberships (#5-3 gate tests)."""
+    """Minimal fake for the Gremium roles and memberships (gate tests)."""
 
     async def list_roles(self, gremium_id):
         return [
@@ -499,7 +499,7 @@ def test_gremium_mail_recipients_rejects_implausible_address(
 
 
 def test_gremien_authed_list_without_admin_perm(app: FastAPI, client: TestClient) -> None:
-    """#68: every logged-in principal may read `GET /api/gremien`.
+    """Every logged-in principal may read `GET /api/gremien`.
 
     The endpoint feeds a dropdown, so it also works without ``admin.config``.
     """
@@ -580,7 +580,7 @@ def test_list_principals_needs_admin_roles(app: FastAPI, client: TestClient) -> 
 def test_gremien_admin_can_manage_members_without_admin_roles(
     app: FastAPI, client: TestClient
 ) -> None:
-    """#5-3: the members subpage runs under admin.gremien.
+    """The members subpage runs under admin.gremien.
 
     A principal without admin.roles must still read the memberships, the Gremium roles for
     the role dropdown and the principals for the name typeahead. Without these reads the
@@ -620,7 +620,7 @@ def test_members_endpoints_forbidden_for_unrelated_area(app: FastAPI, client: Te
 def test_flow_editor_can_read_its_sources_without_admin_types(
     app: FastAPI, client: TestClient
 ) -> None:
-    """#5-2: the flow editor runs under flow.configure.
+    """The flow editor runs under flow.configure.
 
     The editor reads the global flow, the roles and the webhooks as option sources. These
     reads must work without admin.types, admin.roles and webhook.manage. Otherwise the
@@ -663,7 +663,7 @@ def test_flow_save_forbidden_without_either(app: FastAPI, client: TestClient) ->
 
 
 def test_global_flow_readable_by_budget_structure(app: FastAPI, client: TestClient) -> None:
-    """#5-2: the budget tree (budget.structure) reads the global flow.
+    """The budget tree (budget.structure) reads the global flow.
 
     The tree needs the flow for the status dropdowns (accepted and denied).
     """
@@ -672,7 +672,7 @@ def test_global_flow_readable_by_budget_structure(app: FastAPI, client: TestClie
 
 
 def test_application_types_readable_by_form_configure(app: FastAPI, client: TestClient) -> None:
-    """#5-2: the form editor (form.configure) reads the application-type list."""
+    """The form editor (form.configure) reads the application-type list."""
     _as(app, {"form.configure"})
     assert client.get("/api/admin/application-types").status_code == 200
 
@@ -707,7 +707,7 @@ def test_role_assignment_delete_is_gone(app: FastAPI, client: TestClient) -> Non
 
 
 def test_group_mapping_delete_204_and_gate(app: FastAPI, client: TestClient) -> None:
-    """#5-4: admin.roles may now delete a group mapping."""
+    """Admin.roles may now delete a group mapping."""
     _as_admin(app)
     assert client.delete(f"/api/admin/group-mappings/{uuid4()}").status_code == 204
     _as(app, {"admin.types"})  # the wrong area permission, so 403
@@ -910,7 +910,7 @@ def test_mutating_endpoints_declare_400(app: FastAPI) -> None:
 def test_privacy_admin_reads_principals_for_the_erasure_picker(
     app: FastAPI, client: TestClient
 ) -> None:
-    """D1: the account erasure on the privacy page picks a person by name or e-mail.
+    """The account erasure on the privacy page picks a person by name or e-mail.
 
     `privacy.manage` alone must read the principal search, and nothing else of the
     user administration.

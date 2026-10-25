@@ -1,4 +1,4 @@
-"""Unit tests for the field diff of two `data` snapshots (T-12, data-model section 1)."""
+"""Unit tests for the field diff of two `data` snapshots (data-model section 1)."""
 
 from __future__ import annotations
 

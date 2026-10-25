@@ -1,4 +1,4 @@
-"""F25: the protocol embeds only the votes of its own meeting.
+"""The protocol embeds only the votes of its own meeting.
 
 A vote of another meeting, maybe of another gremium, or a vote without a meeting
 gives 422 `vote_not_in_meeting`. Nothing is embedded then. A vote of the meeting

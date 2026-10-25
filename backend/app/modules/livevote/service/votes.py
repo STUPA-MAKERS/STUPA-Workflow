@@ -55,13 +55,13 @@ class VoteReadOps(MeetingServiceBase):
         # the ballots. This is the reload path. The live WebSocket path already carries
         # these values. One batched query keeps this free of N+1.
         tallies = await self._vote_tallies(rows)
-        # F2: an election counts ballots and candidates (`tally_election`).
+        # An election counts ballots and candidates (`tally_election`).
         elections = await self._election_tallies([v for v in rows if is_election(v)])
         # A poll only counts (`tally_poll`).
         polls = await self._poll_tallies([v for v in rows if is_poll(v)])
         present_by_meeting = await self._present_by_meeting(meeting_ids)
         guests_by_meeting = await self.admitted_guests_by_meeting(meeting_ids)
-        # #17: a vote with guests counts the guests who voted and left since then too.
+        # A vote with guests counts the guests who voted and left since then too.
         guest_votes = [
             v.id
             for v in rows
@@ -106,7 +106,7 @@ class VoteReadOps(MeetingServiceBase):
             members: int | None
             guests: int | None
             if v.status in ("closed", "cancelled"):
-                # The attendance fixed at the close (#17). A cancelled vote and an
+                # The attendance fixed at the close. A cancelled vote and an
                 # older closed vote have none.
                 members = getattr(v, "present_members", None)
                 guests = getattr(v, "present_guests", None)
@@ -187,7 +187,7 @@ class VoteReadOps(MeetingServiceBase):
     async def _election_tallies(
         self, votes: Sequence[Vote]
     ) -> dict[UUID, ElectionOutcome]:
-        """Tally the elections of the reload path (F2), one query per ballot table."""
+        """Tally the elections of the reload path, one query per ballot table."""
         if not votes:
             return {}
         from app.modules.voting.models import SecretBallot
@@ -212,7 +212,7 @@ class VoteReadOps(MeetingServiceBase):
         }
 
     async def assert_candidates_exist(self, principal_ids: list[UUID]) -> None:
-        """Check that every account of an election candidate exists (F2).
+        """Check that every account of an election candidate exists.
 
         Raises:
             ValidationProblem: An account is unknown (``candidate_unknown``).
@@ -317,7 +317,7 @@ class VoteReadOps(MeetingServiceBase):
         return {mid: n for mid, n in rows}
 
     async def _departed_guest_voters(self, vote_ids: list[UUID]) -> dict[UUID, int]:
-        """Count per vote the guests with a ballot who are no longer admitted (#17)."""
+        """Count per vote the guests with a ballot who are no longer admitted."""
         from app.modules.voting.service import GUEST_VOTER_PREFIX
 
         admitted = {
@@ -346,7 +346,7 @@ class VoteReadOps(MeetingServiceBase):
         return {vid: len(subs - admitted) for vid, subs in voters.items()}
 
     async def admitted_guests_by_meeting(self, meeting_ids: list[UUID]) -> dict[UUID, int]:
-        """Return `{meeting_id: number of admitted guests}` (#17)."""
+        """Return `{meeting_id: number of admitted guests}`."""
         if not meeting_ids:
             return {}
         rows = (
@@ -510,7 +510,7 @@ class VoteReadOps(MeetingServiceBase):
         ).scalar_one_or_none()
 
     async def present_member_count(self, meeting_id: UUID) -> int:
-        """Return the present members of the meeting (#17: the base of a guest vote)."""
+        """Return the present members of the meeting (the base of a guest vote)."""
         return (await self._present_by_meeting([meeting_id])).get(meeting_id, 0)
 
     async def vote_eligible_count(self, gremium_id: UUID) -> int:

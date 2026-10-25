@@ -1,4 +1,4 @@
-"""Worker tests for files (T-13): `scan_attachment` clean, infected and retry, all faked."""
+"""Worker tests for files: `scan_attachment` clean, infected and retry, all faked."""
 
 from __future__ import annotations
 
@@ -156,7 +156,7 @@ async def test_on_startup_populates_ctx_disabled() -> None:
 
 
 async def test_worker_combined_on_startup() -> None:
-    """`worker.main._on_startup` wires the mail deps (T-18) and the scan deps (T-13)."""
+    """`worker.main._on_startup` wires the mail deps and the scan deps."""
     from worker.main import _on_startup
 
     ctx: dict[str, Any] = {}

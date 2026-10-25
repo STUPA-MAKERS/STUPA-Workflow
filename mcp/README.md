@@ -93,10 +93,10 @@ Chat files: `tickets_note`, `todo_comment` and `comment_application` take `file_
 Meetings: `list_meetings`, `get_meeting`, `create_meeting`, `update_meeting`, `delete_meeting`,
 the agenda tools, attendance (`get_attendance`, `set_attendance`, `reset_attendance`) and the
 minute-taker handover (`protokollant_handover`, `cancel_protokollant_handover`).
-Public meeting (#17): `list_meeting_guests`, `admit_meeting_guest`, `admit_all_meeting_guests`,
+Public meeting: `list_meeting_guests`, `admit_meeting_guest`, `admit_all_meeting_guests`,
 `reject_meeting_guest`, `remove_meeting_guest`, `rename_meeting_guest`,
 `get_meeting_join_link`, `rotate_meeting_join_code`. No tool casts a ballot for a guest.
-On behalf (#11): `create_application_on_behalf`, `search_on_behalf_applicants` (needs
+On behalf: `create_application_on_behalf`, `search_on_behalf_applicants` (needs
 `application.create_on_behalf`).
 To-dos: `todo_boards`, `todo_board`, `todo_my_cards` (my cards on the other boards, by
 board), `todo_all_boards` (every readable board with all its cards), `todo_card_get`, `todo_card_create`, `todo_card_update` (needs the card `version`),

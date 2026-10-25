@@ -1,4 +1,4 @@
-"""A11/O17: the applicant reads the version metadata, without values (real Postgres).
+"""The applicant reads the version metadata, without values (real Postgres).
 
 The magic-link applicant and the logged-in creator without a read permission get the
 number, the time, the changed keys and the editor of every version. `data` and `diff`
@@ -69,7 +69,7 @@ async def test_applicant_reads_version_metadata_only(
     assert all(v["data"] is None and v["diff"] is None for v in versions)
     assert all(v["at"] for v in versions)
     assert [v["changedKeys"] for v in versions] == [[], ["note"], ["title"]]
-    # A12: the member edit names the Gremium, the own edits stay the applicant.
+    # The member edit names the Gremium, the own edits stay the applicant.
     assert [v["changedBy"] for v in versions] == ["applicant", GREMIUM_NAME, "applicant"]
 
     as_principal(api, Principal(sub="reader", permissions={"application.read"}))
@@ -96,7 +96,7 @@ async def test_logged_in_creator_reads_version_metadata(
     )
 
     api = build_read_api(migrated[1], monkeypatch)
-    # The creator without any permission: before A11 this route answered 403.
+    # The creator without any permission.
     as_principal(api, Principal(sub=seed.owner_sub, display_name=OWNER_NAME))
     versions = get_json(api, f"/api/applications/{app_id}/versions")
     assert isinstance(versions, list)

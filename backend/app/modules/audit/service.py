@@ -5,7 +5,7 @@ predecessor hash. Concurrent appends therefore serialize and the chain has no
 ``prev_hash`` race. `AuditService.verify_chain` recomputes the chain from genesis.
 It catches both a tampered field and a removed or inserted row.
 `AuditService.verify_and_store` runs the same check and stores the result in
-``audit_verification`` (Z6/O8). The prune keeps the first failed check of each
+``audit_verification``. The prune keeps the first failed check of each
 break and the newest check of each trigger. `AuditService.run_manual_verification` is the
 manual entry point. It refuses a run while another run is in progress, and a second
 manual run inside the cooldown. The module-level `record` hook is the standard entry
@@ -636,7 +636,7 @@ class AuditService:
 
             await fill(
                 "attachment",
-                # A draft (Z4) has no application yet. Its file name stays out of
+                # A draft has no application yet. Its file name stays out of
                 # the log view until the create binds it.
                 select(Attachment.id, Attachment.filename).where(
                     Attachment.id.in_(ids), Attachment.application_id.is_not(None)

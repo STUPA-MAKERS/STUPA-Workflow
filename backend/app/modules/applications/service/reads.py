@@ -53,9 +53,9 @@ class ReadOps(ApplicationsServiceBase):
         """Read one application.
 
         ``include_pii`` adds the applicant block. ``strip_pii_fields`` removes the
-        ``isPII`` form fields from ``data`` for a reader without the PII right (O21).
+        ``isPII`` form fields from ``data`` for a reader without the PII right.
         ``applicant_view`` and ``magic_link_view`` follow `timeline`: the capture
-        block (#11) then names the Gremium instead of the capturing member.
+        block then names the Gremium instead of the capturing member.
         """
         app = await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
         is_owner = requester_sub is not None and app.created_by == requester_sub
@@ -80,12 +80,12 @@ class ReadOps(ApplicationsServiceBase):
     ) -> list[TimelineEventOut]:
         """Return the status timeline, oldest event first.
 
-        Each event carries the label of the fired transition (A3). In the
+        Each event carries the label of the fired transition. In the
         ``applicant_view`` the actor of every event that the applicant did not do is
-        the name of the Gremium of the application (A12, O16). The applicant then
+        the name of the Gremium of the application. The applicant then
         never sees the name of a member. ``magic_link_view`` marks the magic-link
         reader; see `_applicant_actors` for the creator who submitted for another
-        email (F23).
+        email.
         """
         app = await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
         rows = (
@@ -105,7 +105,7 @@ class ReadOps(ApplicationsServiceBase):
             applicant_view=applicant_view,
             magic_link_view=magic_link_view,
         )
-        # F1: the decisions that the status changes carried.
+        # The decisions that the status changes carried.
         decisions = await decisions_by_event(self.session, application_id)
         for ev, label in rows:
             decision = decisions.get(ev.id) if decisions else None

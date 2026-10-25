@@ -1,4 +1,4 @@
-"""Tests of the decision conditions in the protocol (F1)."""
+"""Tests of the decision conditions in the protocol."""
 
 from __future__ import annotations
 

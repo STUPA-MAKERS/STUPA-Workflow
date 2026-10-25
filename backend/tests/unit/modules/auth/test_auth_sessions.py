@@ -1,4 +1,4 @@
-"""TDD: session and token handling (security.md §1 and §2)."""
+"""TDD: session and token handling."""
 
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ def _applicant_row(
     return row
 
 
-# Applicant session, server side, database through FakeSession. Per security.md §1 a
+# Applicant session, server side, database through FakeSession. A
 # revocable session replaces the stateless token. Nobody can forge a session from the
 # secret alone.
 async def test_create_applicant_session_adds_row_and_signs_sid() -> None:
@@ -82,7 +82,7 @@ async def test_load_applicant_session_tampered() -> None:
 
 async def test_load_applicant_session_forged_secret_no_row() -> None:
     # Core regression: a correctly signed sid with no row gives None. An attacker who
-    # knows only the secret cannot invent a row. See security.md §1, issue ISSUE_TOKEN.
+    # knows only the secret cannot invent a row.
     db = fake_session(result())  # an empty result
     cookie = sessions._sign_applicant_sid(SECRET, "forged-sid")
     loaded = await sessions.load_applicant_session(

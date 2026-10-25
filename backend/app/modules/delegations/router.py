@@ -9,7 +9,7 @@ The server is authoritative for RBAC. Every route needs a session. The service
 checks the domain rules: gates, deadline, recipient circle and chains. A holder
 of `admin.delegations` sees and revokes every delegation. During a live meeting
 the meeting lead (`session.manage` in the gremium) enters a substitution for a
-missing member and revokes a delegation (O6). A holder of `admin.delegations`
+missing member and revokes a delegation. A holder of `admin.delegations`
 or of the gremium role with `session.manage` manages the pool. The routes
 report errors as `ProblemDetail`.
 """
@@ -87,7 +87,7 @@ async def create_delegation(
 
     Without `delegatorId` the caller delegates for themselves while the meeting is
     planned. With `delegatorId` the meeting lead enters a substitution for a
-    missing member while the meeting is live (O6).
+    missing member while the meeting is live.
     """
     out = await service.create(payload, principal)
     # Notify the delegate. The mail kind is "delegation" and the user can opt out.
@@ -111,7 +111,7 @@ async def revoke_delegation(
     request: Request,
     mailer: AutoMailerDep,
 ) -> Response:
-    """Revoke a delegation: the delegator before the start, the lead while live (O6)."""
+    """Revoke a delegation: the delegator before the start, the lead while live."""
     # Collect the mail data before the revoke. The row is gone afterwards.
     info = await meeting_delegation_mail_info(getattr(service, "session", None), delegation_id)
     await service.revoke(delegation_id, principal)
@@ -147,7 +147,7 @@ async def recipients(
     """List the recipients for the typeahead: members, pool and maybe external users.
 
     With `delegatorId` the meeting lead gets the pool substitutes of that member
-    for the lead entry during a live meeting (O6).
+    for the lead entry during a live meeting.
     """
     return await service.recipients(meeting_id, q, principal, delegator_id)
 

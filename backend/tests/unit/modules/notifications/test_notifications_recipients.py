@@ -1,4 +1,4 @@
-"""Recipient resolver tests (T-18). `FakeSession` answers every database query."""
+"""Recipient resolver tests. `FakeSession` answers every database query."""
 
 from __future__ import annotations
 
@@ -84,7 +84,7 @@ async def test_resolve_dedup_across_specs() -> None:
     assert out == ["a@x.de", "b@y.de"]
 
 
-# AUD-057: the admin bypass of the recipient lookup is ONE central query with ONE admin
+# The admin bypass of the recipient lookup is ONE central query with ONE admin
 # key. No duplicate `Role.key == "admin"` literal is left.
 
 
@@ -158,7 +158,7 @@ def test_rows_stmt_gremium_scope_optional() -> None:
     assert "gremium_id" not in _rows_sql("application.transition")
 
 
-# firable_candidates: pure guard matrix (task-list parity, #64)
+# firable_candidates: pure guard matrix (task-list parity)
 BASE_CTX = GuardContext(manual=True)
 
 

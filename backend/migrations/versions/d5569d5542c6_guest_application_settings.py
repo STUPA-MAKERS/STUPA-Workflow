@@ -1,4 +1,4 @@
-"""Guest application settings and magic links without an expiry (Z1, O3).
+"""Guest application settings and magic links without an expiry.
 
 The upgrade:
 

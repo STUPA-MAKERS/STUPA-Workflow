@@ -121,7 +121,7 @@ async def test_former_global_meeting_manage_no_longer_manages(
 async def test_read_token_of_protokollant_may_not_close_the_vote(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """F16: the scope cap also stops the protokollant path and the gremium roles."""
+    """The scope cap also stops the protokollant path and the gremium roles."""
     _patch_gremium_perms(monkeypatch, {"vote.manage": {GID}, "session.manage": {GID}})
     principal = Principal(
         sub="protokoll", scope_permissions=frozenset({"application.read"})

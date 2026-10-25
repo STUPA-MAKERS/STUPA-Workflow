@@ -1,6 +1,6 @@
 """Unit tests for the backup paths that the other files do not reach.
 
-be-backup is a critical module (D11): every branch must run in the pure unit suite. The
+be-backup is a critical module: every branch must run in the pure unit suite. The
 tests here drive the catalogue reads, the restore chain (`apply_archive` → `pg_restore`
 → disconnect) and the rare archive faults with fakes and stubbed subprocesses. Nothing
 here dumps or restores a real database.

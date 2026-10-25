@@ -1,4 +1,4 @@
-"""Integration (real Postgres): A6, the bookings that reference an invoice.
+"""Integration (real Postgres): the bookings that reference an invoice.
 
 `InvoiceOut.linkedBookings` lists the bookings with the invoice. The full budget view
 sees all of them. A gremium scope sees only the bookings on cost centres in the subtree

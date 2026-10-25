@@ -1,4 +1,4 @@
-"""Integration test for per-Gremium protocol permissions (AUD-016, real Postgres).
+"""Integration test for per-Gremium protocol permissions (real Postgres).
 
 Regression: the protocol write and read paths were gated on the GLOBAL
 ``meeting.manage``, ``protocol.finalize`` and ``meeting.view_all`` permissions (the
@@ -186,7 +186,7 @@ async def test_admin_writes_and_finalizes_unless_scope_caps(
 
 
 async def test_scope_caps_gremium_finalize(session: AsyncSession) -> None:
-    """F16: a token without ``protocol.finalize`` in its scope cannot finalize."""
+    """A token without ``protocol.finalize`` in its scope cannot finalize."""
     _, _, protocol, member = await _gremium_with_protocol(
         session, role_perms=["protocol.write", "protocol.finalize"]
     )

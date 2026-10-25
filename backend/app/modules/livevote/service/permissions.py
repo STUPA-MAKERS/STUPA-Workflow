@@ -96,7 +96,7 @@ class PermissionOps(MeetingServiceBase):
 
         This is the gate of the agenda-item text (`set_agenda_body`): `can_write`, and
         in a live meeting with a protokollant only the protokollant. The protocol state
-        (O22) is a separate check of the agenda service.
+        is a separate check of the agenda service.
         """
         if not await self.can_write(meeting, principal):
             return False

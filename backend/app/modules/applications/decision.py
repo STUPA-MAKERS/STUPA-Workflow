@@ -1,4 +1,4 @@
-"""Approval with deviations (F1): the decision on an application.
+"""Approval with deviations: the decision on an application.
 
 A decision holds an approved amount (NULL = as requested) and a list of conditions
 (Auflagen). Two paths write it, through the one function `record_decision`:
@@ -245,7 +245,7 @@ async def record_decision(
 
 @dataclass(frozen=True, slots=True)
 class DecisionSwap:
-    """The decision ids that a status revert changed (F1).
+    """The decision ids that a status revert changed.
 
     `undone_id` lost its validity, `restored_id` got it back (None: no decision before).
     The reversed `status_change` audit entry stores both as `decisionUndoneId` and

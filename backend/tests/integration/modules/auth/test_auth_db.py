@@ -1,4 +1,4 @@
-"""Integration: the T-10 tables against a real Postgres 16 (security.md §1/§2).
+"""Integration: the auth tables against a real Postgres 16.
 
 The tests check the schema behavior of the migration: magic_link (scope CHECK, bytea
 hash, FK CASCADE) and auth_session (sid UNIQUE, principal FK CASCADE).

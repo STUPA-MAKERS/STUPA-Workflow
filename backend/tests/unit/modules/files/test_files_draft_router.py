@@ -1,4 +1,4 @@
-"""Router tests for the draft uploads of the wizard (Z4) with faked draft operations.
+"""Router tests for the draft uploads of the wizard with faked draft operations.
 
 They cover the ALTCHA gate of the first anonymous upload, the token header, the actor
 and the body cap. `test_files_drafts` covers the service, the integration test

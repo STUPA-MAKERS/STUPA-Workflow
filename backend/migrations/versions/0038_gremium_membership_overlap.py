@@ -1,4 +1,4 @@
-"""gremium_membership_overlap: database backing for the overlap invariant (#42, AUD-029).
+"""gremium_membership_overlap: database backing for the overlap invariant.
 
 No two term intervals may overlap for the same ``(principal_id, gremium_id)``. Until now
 only the service checked this, which left a TOCTOU gap for two parallel inserts. This

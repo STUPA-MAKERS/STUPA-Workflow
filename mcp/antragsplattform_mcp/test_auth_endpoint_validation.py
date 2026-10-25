@@ -1,4 +1,4 @@
-"""Tests for OAuth discovery-endpoint re-validation (AUD-023).
+"""Tests for OAuth discovery-endpoint re-validation.
 
 Discovery returns `authorization_endpoint` and `token_endpoint`. The browser redirect and
 the POST of the code and the refresh token use them. The code MUST validate both again:

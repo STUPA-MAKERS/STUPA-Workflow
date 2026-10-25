@@ -1,4 +1,4 @@
-"""A9: `stateSince` is the time of the last status change (real Postgres).
+"""`stateSince` is the time of the last status change (real Postgres).
 
 The list, the tasks and the detail (the status page of the applicant) carry it. One
 grouped subquery over `status_event` computes it for the list page.

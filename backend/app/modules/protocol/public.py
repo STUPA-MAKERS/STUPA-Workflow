@@ -52,7 +52,7 @@ class _CamelModel(BaseModel):
 
 
 def passed_conditions(view: object) -> list[str]:
-    """Return the conditions of the decision of a passed vote (F1), else none.
+    """Return the conditions of the decision of a passed vote, else none.
 
     Only a passed vote makes its proposal the decision of the application.
     """
@@ -73,9 +73,9 @@ class PublicDecision(_CamelModel):
     # The vote is already in the TOP text as a callout: the detail page shows the
     # text only, the list keeps the result.
     in_text: bool = Field(default=False, alias="inText")
-    # F1: the conditions of the decision, when the vote passed with a proposal.
+    # The conditions of the decision, when the vote passed with a proposal.
     conditions: list[str] = Field(default_factory=list)
-    # F2 · Personnel elections. The public version names the elected candidates
+    # Personnel elections. The public version names the elected candidates
     # only; the other candidates appear as a count, and no vote count travels.
     kind: Literal["motion", "election"] = "motion"
     seats: int | None = None

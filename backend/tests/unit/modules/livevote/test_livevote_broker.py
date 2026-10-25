@@ -1,4 +1,4 @@
-"""Broker fan-out (T-16, api.md §4): pub/sub over simulated instances.
+"""Broker fan-out: pub/sub over simulated instances.
 
 The in-memory broker with a **shared** hub models several app instances on one Redis.
 A message that instance A publishes must reach every subscriber, also the subscribers

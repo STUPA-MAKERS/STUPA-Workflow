@@ -1,4 +1,4 @@
-"""The protocol keepers, the excused members and the real start (Z3, F17, Z7).
+"""The protocol keepers, the excused members and the real start.
 
 The backend sends `keepers` as a list of records, `entschuldigt` as a list and
 `started_at` as a local `YYYY-MM-DD HH:MM` value. The legacy `protokoll` name

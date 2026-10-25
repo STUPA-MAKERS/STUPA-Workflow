@@ -1,4 +1,4 @@
-"""arq enqueue abstraction (T-19): idempotent job key, dedup and a None pool."""
+"""arq enqueue abstraction: idempotent job key, dedup and a None pool."""
 
 from __future__ import annotations
 

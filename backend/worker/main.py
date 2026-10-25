@@ -169,7 +169,7 @@ class WorkerSettings:
         # Task reminders run hourly. The thresholds are in days. The task_reminder_log
         # table prevents duplicate sends.
         cron(process_task_reminders, minute=10),
-        # Expired draft uploads of the wizard (Z4) go hourly, with their objects.
+        # Expired draft uploads of the wizard go hourly, with their objects.
         cron(purge_draft_attachments, minute=20),
         # Public protocols: build the public versions that a failed or raced backfill
         # left out, so they appear without a new switch of the gremium flag.
@@ -177,7 +177,7 @@ class WorkerSettings:
         # Nightly backup. It runs after the retention job, so the archive holds the
         # already-anonymized state rather than PII that retention is about to drop.
         cron(scheduled_backup, hour=4, minute=0),
-        # Nightly audit-chain check (Z6/O8). It does not depend on the backup and runs
+        # Nightly audit-chain check. It does not depend on the backup and runs
         # also when backups are off or failed. The result goes to `audit_verification`.
         cron(
             process_audit_verification,

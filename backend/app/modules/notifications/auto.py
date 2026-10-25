@@ -100,7 +100,7 @@ async def meeting_delegation_mail_info(
     """Collect the mail data of a meeting delegation (best effort).
 
     The mail goes to the delegate. ``to_delegator`` sends it to the delegator
-    instead: the access revoke (F3) takes the rights of a delegate, and the delegator
+    instead: the access revoke takes the rights of a delegate, and the delegator
     then loses the representation.
     """
     from app.modules.admin.models import Gremium

@@ -1,4 +1,4 @@
-"""DirectMailQueue: the in-memory dedup cache stays bounded (AUD-074)."""
+"""DirectMailQueue: the in-memory dedup cache stays bounded."""
 
 from __future__ import annotations
 

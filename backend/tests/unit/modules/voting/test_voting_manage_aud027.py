@@ -1,4 +1,4 @@
-"""Unit tests for the VotingService write and lifecycle authorization (AUD-027).
+"""Unit tests for the VotingService write and lifecycle authorization.
 
 The suite runs without a database. It covers every branch of `_vote_gremium_id`,
 `assert_can_manage_group`, `assert_can_manage` and `assert_can_manage_vote`, because
@@ -93,7 +93,7 @@ async def test_manage_gremium_role_ok(monkeypatch: pytest.MonkeyPatch) -> None:
 async def test_manage_gremium_role_capped_by_scope(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """F16: a token without `vote.manage` in its scope gets nothing from the role."""
+    """A token without `vote.manage` in its scope gets nothing from the role."""
     gid = uuid4()
     _patch_permitted(monkeypatch, {gid})
     principal = Principal(sub="g", scope_permissions=frozenset({"application.read"}))

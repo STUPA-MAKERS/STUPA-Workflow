@@ -1,4 +1,4 @@
-"""Remaining coverage for files (T-13): model metadata and attachment rate-limit keys."""
+"""Remaining coverage for files: model metadata and attachment rate-limit keys."""
 
 from __future__ import annotations
 

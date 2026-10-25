@@ -1,4 +1,4 @@
-"""Cast lock (T-16, api.md §4: ``vote:{id}:cast:{sub}``).
+"""Cast lock (``vote:{id}:cast:{sub}``).
 
 The in-memory lock serializes concurrent casts of the same voter. The tests check the
 Redis variant against a fake client for ``SET NX PX`` and the release.

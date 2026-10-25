@@ -1,4 +1,4 @@
-"""Applications captured on behalf of an applicant (#11).
+"""Applications captured on behalf of an applicant.
 
 A person with ``application.create_on_behalf`` enters an application that reached the
 Gremium another way, for example as a PDF or a mail. The applicant is an existing
@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 APPLICANT_SEARCH_LIMIT = 20
 #: The shortest search text. A shorter one returns no account.
 APPLICANT_SEARCH_MIN = 2
-#: The oldest allowed received date, in days before today (review of #11): a typo
+#: The oldest allowed received date, in days before today: a typo
 #: such as 2016 instead of 2026 must not move an application years back.
 RECEIVED_ON_MAX_AGE_DAYS = 365
 

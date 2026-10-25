@@ -49,7 +49,7 @@ class Meeting(UUIDPkMixin, CreatedAtMixin, Base):
     # one hour from `start_time`. With it the value must be after `start_time`.
     end_time: Mapped[_time | None] = mapped_column(Time, nullable=True)
     status: Mapped[str] = mapped_column(Text, server_default="planned")
-    # The real start (Z7). The transition from `planned` to `live` sets it once. It
+    # The real start. The transition from `planned` to `live` sets it once. It
     # stays NULL for a meeting that started before the column existed: the audit log
     # holds no start time for it. A reader then falls back to the planned start.
     started_at: Mapped[_datetime | None] = mapped_column(
@@ -74,12 +74,12 @@ class Meeting(UUIDPkMixin, CreatedAtMixin, Base):
     created_by: Mapped[str | None] = mapped_column(Text, nullable=True)
     # The current Protokollant of the meeting. This person leads the live session
     # and writes the protocol. While the meeting is live, it is the principal of the
-    # running `ProtocolKeeperPeriod` (Z3), and a handover changes it. A deleted
+    # running `ProtocolKeeperPeriod`, and a handover changes it. A deleted
     # principal sets the column to NULL.
     protokollant_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("principal.id", ondelete="SET NULL"), nullable=True
     )
-    # Public participation (#17): persons without an account join with the QR code
+    # Public participation: persons without an account join with the QR code
     # and the meeting lead admits them. `guests_mode` tells if admitted guests vote
     # (`vote`) or only follow the meeting (`watch`). It has an effect only while
     # `public_join` is on.
@@ -110,7 +110,7 @@ class MeetingAttendance(UUIDPkMixin, TimestampMixin, Base):
 
     `status` is `present`, `excused` or `absent`. `source` says who set the
     value. `self` is the member and `lead` is the meeting lead. A member reports
-    only `present` or `excused` (Z2). Only the lead records `absent`. Each pair
+    only `present` or `excused`. Only the lead records `absent`. Each pair
     of meeting and principal has exactly one row. The unique constraint drives
     the upsert. `note` is the reason of an excuse. It is personal data.
     """
@@ -133,7 +133,7 @@ class MeetingAttendance(UUIDPkMixin, TimestampMixin, Base):
             "status IN ('present','excused','absent')", name="attendance_status"
         ),
         CheckConstraint("source IN ('self','lead')", name="attendance_source"),
-        # Z2: a self-reported row is `present` or `excused`. Migration 'self status'
+        # A self-reported row is `present` or `excused`. Migration 'self status'
         # adds it NOT VALID, so the older (self, absent) rows stay as they are.
         CheckConstraint(
             "source <> 'self' OR status IN ('present','excused')", name="self_status"
@@ -193,7 +193,7 @@ class MeetingAgendaItem(UUIDPkMixin, CreatedAtMixin, Base):
 
 
 class ProtocolKeeperPeriod(UUIDPkMixin, CreatedAtMixin, Base):
-    """One period in which one principal keeps the minutes of a meeting (Z3).
+    """One period in which one principal keeps the minutes of a meeting.
 
     A period has three states:
 
@@ -261,7 +261,7 @@ class ProtocolKeeperPeriod(UUIDPkMixin, CreatedAtMixin, Base):
 
 
 class MeetingGuest(UUIDPkMixin, CreatedAtMixin, Base):
-    """A person without an account who takes part in a public meeting (#17).
+    """A person without an account who takes part in a public meeting.
 
     A guest is not a principal: no OIDC identity, no role, no membership and no
     delegation. The guest proves the identity with a random token in an HttpOnly

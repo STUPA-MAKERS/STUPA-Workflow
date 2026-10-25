@@ -1,6 +1,6 @@
 """Integration (real Postgres, testcontainers): ApplicationTypesService.
 
-The tests run against a real schema (data-model §1). The public list shows only types
+The tests run against a real schema. The public list shows only types
 with an active form version. Paging counts the total correctly. The admin view
 (`include_inactive` and `admin`) returns inactive types plus the extra fields.
 """

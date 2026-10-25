@@ -1,4 +1,4 @@
-"""F19: a state change out of a vote state cancels the votes of the application.
+"""A state change out of a vote state cancels the votes of the application.
 
 A transition without a branch and a forced status move the open AND the draft votes to
 `cancelled`, set `closed_at` and write `vote_cancel`. Only the drafts of the state that

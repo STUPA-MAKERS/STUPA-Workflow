@@ -1,4 +1,4 @@
-"""F2 · Erasure of a principal from the candidate lists of the elections.
+"""Erasure of a principal from the candidate lists of the elections.
 
 A candidate who was not elected (or whose election is not decided) gets the name
 ``Gelöscht``; an elected candidate keeps the name. The ballots, the candidate ids and

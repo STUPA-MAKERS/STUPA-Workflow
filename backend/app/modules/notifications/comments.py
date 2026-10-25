@@ -15,7 +15,7 @@ voting Gremium. For any other state these are exactly the principals that can
 fire at least one manual `requires_action` transition.
 
 The mail to the applicant names the Gremium of the application as the author, not
-the member (A12, O16). This matches the applicant view of the comment list. Only
+the member. This matches the applicant view of the comment list. Only
 the mail to the team keeps a display name.
 
 Both paths respect the opt-out of the `comment` kind. Both use the DB templates
@@ -216,7 +216,7 @@ async def send_comment_notifications(
         )
 
     # Author label for the chat bubble. The applicant never sees a member name: a
-    # member comment names the Gremium (A12, O16). A comment from the applicant
+    # member comment names the Gremium. A comment from the applicant
     # keeps the display name, or else the localized applicant fallback. This
     # matches the author fallback of the web UI.
     if author_kind == "principal":

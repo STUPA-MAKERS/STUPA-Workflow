@@ -298,7 +298,7 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
         await session.merge(
             LoginSettings(id=1, web_session_days=90, pwa_session_days=180, updated_by=old.sub)
         )
-        # F1: the old account decided on the application by a manual transition.
+        # The old account decided on the application by a manual transition.
         session.add(ApplicationDecision(application_id=app_id, decided_by=old.sub))
 
         # Meetings, the minute-taker, a keeper period, the protocol, attendance.
@@ -319,7 +319,7 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
                     done_at=datetime.now(UTC),
                     done_by=old.sub,
                 ),
-                # #17: the old account decided on a join request of a guest.
+                # The old account decided on a join request of a guest.
                 MeetingGuest(
                     meeting_id=meeting.id,
                     seq=1,
@@ -771,7 +771,7 @@ async def test_legacy_self_absent_attendance_becomes_a_lead_entry(
 ) -> None:
     w = await _seed(maker)
     async with maker() as session:
-        # Write a row from before Z2: the NOT VALID check refuses it today.
+        # Write an older row: the NOT VALID check refuses it today.
         await session.execute(
             text(
                 "ALTER TABLE meeting_attendance "
@@ -1304,7 +1304,7 @@ async def _give_old_admin(maker: async_sessionmaker[AsyncSession], w: World) -> 
 async def test_extra_rights_of_the_source_block_a_merge_by_a_weaker_actor(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
-    """D1: a holder of the merge right cannot take over the admin role of another account."""
+    """A holder of the merge right cannot take over the admin role of another account."""
     w = await _seed(maker)
     actor = await _plain_actor(maker, {"admin.users", "admin.users.merge"})
     # Without the admin role: the gremium right of the membership of the old account.
@@ -1333,7 +1333,7 @@ async def test_extra_rights_of_the_source_block_a_merge_by_a_weaker_actor(
 async def test_an_admin_actor_may_merge_extra_rights_but_no_role_moves(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
-    """D1: the admin may merge; the role assignments of the source never move."""
+    """The admin may merge; the role assignments of the source never move."""
     w = await _seed(maker)
     await _give_old_admin(maker, w)
     async with maker() as session:
@@ -1392,7 +1392,7 @@ async def test_the_own_old_account_merges_when_the_target_holds_its_rights(
 async def test_an_erased_account_cannot_be_merged(
     maker: async_sessionmaker[AsyncSession], mark: str, side: str
 ) -> None:
-    """D2: an executed erasure request or the erasure audit entry blocks the merge."""
+    """An executed erasure request or the erasure audit entry blocks the merge."""
     w = await _seed(maker)
     pid = w.old_id if side == "source" else w.new_id
     async with maker() as session:
@@ -1438,7 +1438,7 @@ async def test_a_deactivated_target_is_refused(maker: async_sessionmaker[AsyncSe
 async def test_auskunft_names_the_live_account_of_a_shared_address(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
-    """D3: an old account that keeps the address never hides the live account."""
+    """An old account that keeps the address never hides the live account."""
     from app.modules.privacy.service import AuskunftService
 
     w = await _seed(maker)

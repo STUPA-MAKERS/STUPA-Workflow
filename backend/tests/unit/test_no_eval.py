@@ -1,4 +1,4 @@
-"""Static check for AC (T-05): the declarative evaluators must not call `eval` or `exec`."""
+"""Static check for AC: the declarative evaluators must not call `eval` or `exec`."""
 
 import ast
 from pathlib import Path

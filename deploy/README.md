@@ -81,7 +81,7 @@ docker compose exec api python -m scripts.drop_application_pdfs --delete  # remo
 
 It walks the `pdf/` prefix and skips `pdf/protocol/`, which protocols still use.
 
-### Least-privilege database roles (security.md §4/§10) — MANUAL production step
+### Least-privilege database roles — MANUAL production step
 
 > ⚠️ **Not automatic.** Compose runs only `alembic upgrade head` (DDL/DML). It creates
 > **no** roles and revokes **no** grants. Without this step the platform works, but
@@ -129,7 +129,7 @@ you set their values. If the values are missing, the platform keeps the matching
 and does not crash. For the full reference see the
 [Configuration wiki](https://github.com/frederikbeimgraben/antragsplattform/wiki/Configuration).
 
-### Bootstrap of the first admins (#70) — mandatory step with real OIDC auth
+### Bootstrap of the first admins — mandatory step with real OIDC auth
 
 Under real OIDC auth (no mock) a fresh schema has **no** admin. Nobody holds `admin.*`, so
 nobody can grant a role in the role and permission UI (`/admin/users`). To keep the platform

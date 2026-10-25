@@ -1,4 +1,4 @@
-"""Tests for the `list_invoices` tool and its segment filter (FE10c).
+"""Tests for the `list_invoices` tool and its segment filter.
 
 `booked` keeps the invoices with (True) or without (False) a booking. False is a
 value and goes on the wire; None stays off it.

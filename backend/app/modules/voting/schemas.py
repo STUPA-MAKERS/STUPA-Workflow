@@ -29,14 +29,14 @@ class _CamelModel(BaseModel):
 
 
 # The result of a closed vote. A motion gives ``passed``/``rejected``/``tie``. An
-# election (F2) gives ``elected``, ``runoff`` (a runoff decides the open seats),
+# election gives ``elected``, ``runoff`` (a runoff decides the open seats),
 # ``tie`` (the lot decides) or ``rejected`` (quorum missed, or nobody elected).
 VoteResultValue = Literal["passed", "rejected", "tie", "elected", "runoff"]
 VoteKind = Literal["motion", "election", "poll"]
 
 
 class ElectionRunoffOut(_CamelModel):
-    """A runoff that a tie at the seat boundary needs (F2).
+    """A runoff that a tie at the seat boundary needs.
 
     ``voteId`` is the runoff vote once ``POST /votes/{id}/runoff`` created it.
     """
@@ -47,7 +47,7 @@ class ElectionRunoffOut(_CamelModel):
 
 
 class ElectionLotOut(_CamelModel):
-    """The lot of a tie (F2). ``drawn`` is None while the lot is pending.
+    """The lot of a tie. ``drawn`` is None while the lot is pending.
 
     ``at`` is the moment of the draw and ``by`` the ``sub`` of the meeting lead who
     triggered it; ``byName`` is the name at that moment. A tie for several open seats
@@ -63,7 +63,7 @@ class ElectionLotOut(_CamelModel):
 
 
 class ElectionResultOut(_CamelModel):
-    """The stored result of a closed election (``vote.election_result``, F2)."""
+    """The stored result of a closed election (``vote.election_result``)."""
 
     counts: dict[str, int]
     abstentions: int = 0
@@ -208,7 +208,7 @@ class VoteCreate(_CamelModel):
     result_branch_transition_id: UUID | None = Field(
         default=None, alias="resultBranchTransitionId"
     )
-    # The decision proposal (F1): approved amount and conditions. Only an application
+    # The decision proposal: approved amount and conditions. Only an application
     # vote takes it. A passed vote writes it as the decision of the application.
     proposal: DecisionIn | None = None
 
@@ -220,12 +220,12 @@ class VoteCreateInternal(_CamelModel):
     gremium. The live-vote route builds it from the meeting. No client sends it.
     """
 
-    # A motion carries a VoteConfig, an election (F2) an ElectionConfig, a poll a
+    # A motion carries a VoteConfig, an election an ElectionConfig, a poll a
     # PollConfig.
     config: VoteConfig | ElectionConfig | PollConfig
     eligible_group: UUID = Field(alias="eligibleGroup")
     question: str | None = None
-    # F2: the election that a runoff continues, and its round.
+    # The election that a runoff continues, and its round.
     parent_vote_id: UUID | None = Field(default=None, alias="parentVoteId")
     round: int = Field(default=1, ge=1)
     # Authoritative eligible-voter count (roster basis) and the denominator of the
@@ -237,7 +237,7 @@ class VoteCreateInternal(_CamelModel):
     result_branch_transition_id: UUID | None = Field(
         default=None, alias="resultBranchTransitionId"
     )
-    # The decision proposal (F1): approved amount and conditions. Only an application
+    # The decision proposal: approved amount and conditions. Only an application
     # vote takes it. A passed vote writes it as the decision of the application.
     proposal: DecisionIn | None = None
 
@@ -260,7 +260,7 @@ class BallotIn(_CamelModel):
     """
 
     # A motion and the single-candidate election take one option. An election with
-    # several candidates takes the list of the chosen candidate ids (F2; ``[]`` = full
+    # several candidates takes the list of the chosen candidate ids (``[]`` = full
     # abstention, at most ``seats`` ids, no id twice). A single or multi poll takes the
     # list of the chosen option ids (``[]`` = abstention), a date poll one answer per
     # option id (``{"o1": "yes", "o2": "maybe"}``).
@@ -299,7 +299,7 @@ class TallyOut(_CamelModel):
     failed_reason: Literal["quorum", "majority"] | None = Field(
         default=None, alias="failedReason"
     )
-    # Attendance of a meeting vote (#17): the present members and the admitted guests.
+    # Attendance of a meeting vote: the present members and the admitted guests.
     # An open vote shows the values of now, a closed vote the values fixed at the
     # close. None for a vote without a meeting and for a vote that closed before the
     # values were stored.
@@ -317,7 +317,7 @@ class MyBallot(_CamelModel):
 
     cast: bool = False
     choice: str | None = None
-    # F2: the chosen candidate ids of an open election ballot, and the chosen option
+    # The chosen candidate ids of an open election ballot, and the chosen option
     # ids of an open single or multi poll. None for a motion and for a secret vote.
     choices: list[str] | None = None
     # The answers of an open date poll ballot. None otherwise.
@@ -344,7 +344,7 @@ class VoteOut(_CamelModel):
     closes_at: datetime | None = Field(default=None, alias="closesAt")
     result: VoteResultValue | None = None
     secret: bool
-    # F2: ``election`` carries the candidates and the seats (``config`` then holds
+    # ``election`` carries the candidates and the seats (``config`` then holds
     # the projection: the candidate ids plus ``abstain`` as options).
     # ``electionResult`` is set once the election closed. A runoff names its parent
     # election and its round.
@@ -368,7 +368,7 @@ class VoteOut(_CamelModel):
     # The real moment when the vote ended (close or cancel). None while it runs.
     closed_at: datetime | None = Field(default=None, alias="closedAt")
     tally: TallyOut
-    # A vote with guests (#17): no quorum, only the majority of the cast ballots. A
+    # A vote with guests: no quorum, only the majority of the cast ballots. A
     # copy of ``config.guestsVote`` for the vote card.
     guests_vote: bool = Field(default=False, alias="guestsVote")
     # The own ballot of the caller. Only ``GET /votes/{id}`` sets it. Other responses
@@ -384,7 +384,7 @@ class VoteOut(_CamelModel):
     # delegated ballot has its own check.
     can_manage: bool = Field(default=False, alias="canManage")
     can_cast: bool = Field(default=False, alias="canCast")
-    # The decision proposal of an application vote (F1), or None.
+    # The decision proposal of an application vote, or None.
     proposal: DecisionIn | None = None
 
 
@@ -427,7 +427,7 @@ class VoteListItem(_CamelModel):
 class BallotAccepted(_CamelModel):
     """Response for an accepted ballot.
 
-    A ballot never changes after the cast (O11). A second cast gives 409
+    A ballot never changes after the cast. A second cast gives 409
     ``already_voted``, so the only status is ``cast``.
     """
 
@@ -451,7 +451,7 @@ class VoteClosed(_CamelModel):
     # None for a poll: a poll only counts.
     result: VoteResultValue | None
     tally: TallyOut
-    # F2: the result of an election (None for a motion).
+    # The result of an election (None for a motion).
     kind: VoteKind = "motion"
     election_result: ElectionResultOut | None = Field(default=None, alias="electionResult")
     poll_result: PollResultOut | None = Field(default=None, alias="pollResult")

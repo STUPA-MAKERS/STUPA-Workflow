@@ -1,4 +1,4 @@
-"""Anti-abuse wiring: dependencies, providers and the challenge endpoint (Issues #23/#24)."""
+"""Anti-abuse wiring: dependencies, providers and the challenge endpoint."""
 
 from __future__ import annotations
 
@@ -148,7 +148,7 @@ def test_rate_limit_mail_blocks() -> None:
 
 
 def test_canonical_mail_key_folds_variants() -> None:
-    # Plus tags, letter case and whitespace fold to the same key (AUD-026).
+    # Plus tags, letter case and whitespace fold to the same key.
     base = canonical_mail_key("victim@gmail.com")
     assert canonical_mail_key("victim+1@gmail.com") == base
     assert canonical_mail_key("victim+anything.else@gmail.com") == base
@@ -272,7 +272,7 @@ def test_challenge_returns_solvable_challenge() -> None:
     verify_solution(solve_challenge(challenge), ALTCHA_SECRET, now=0)
 
 
-# The real routers enforce ALTCHA (Issue #23) before they touch the database or start
+# The real routers enforce ALTCHA before they touch the database or start
 # a background task.
 def test_magic_link_router_rejects_missing_altcha() -> None:
     settings = _settings(altcha_hmac_secret=ALTCHA_SECRET)
@@ -307,7 +307,7 @@ def test_applications_router_rejects_missing_altcha() -> None:
 
 # The format check of the altcha field runs BEFORE the logic and stays active even when
 # the verification switch is off. Contract `negative_data_rejection` requires a 4xx for a
-# malformed payload (Issue #23).
+# malformed payload.
 #
 # Exact CI reproduction: this control-character string negated the `null` variant of the
 # `anyOf[string,null]` schema but still counted as a string, so the endpoint answered 202.
