@@ -54,6 +54,7 @@ def _check(targets: str) -> tuple[str, ...]:
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     for column, table in _NEW:
         op.execute(
             f"ALTER TABLE todo_link ADD COLUMN IF NOT EXISTS {column} uuid "
@@ -73,6 +74,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     present = " OR ".join(f"{column} IS NOT NULL" for column, _ in _NEW)
     op.execute(f"DELETE FROM todo_link WHERE {present}")
     for stmt in _check(_OLD_TARGETS):

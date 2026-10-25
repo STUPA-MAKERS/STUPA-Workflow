@@ -27,6 +27,7 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     op.execute(
         "INSERT INTO role_permission (role_id, permission) "
         "SELECT r.id, p.permission FROM role r "
@@ -37,4 +38,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     op.execute("DELETE FROM role_permission WHERE permission IN ('todo.all', 'todo.read_all')")

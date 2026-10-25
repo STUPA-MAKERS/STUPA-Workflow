@@ -96,10 +96,12 @@ def _report_bad_role_keys() -> None:
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     for statement in _CREATE:
         op.execute(statement)
     _report_bad_role_keys()
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     op.execute(f"DROP TABLE IF EXISTS {_TABLE}")

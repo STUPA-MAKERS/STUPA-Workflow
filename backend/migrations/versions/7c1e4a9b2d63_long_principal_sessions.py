@@ -56,6 +56,7 @@ _CHECK = "ck_auth_session_client"
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     op.execute(_CREATE_TABLE)
     op.execute(_SEED)
     op.execute(
@@ -72,6 +73,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     op.execute(f"ALTER TABLE auth_session DROP CONSTRAINT IF EXISTS {_CHECK}")
     op.execute("ALTER TABLE auth_session DROP COLUMN IF EXISTS revalidated_at")
     op.execute("ALTER TABLE auth_session DROP COLUMN IF EXISTS client")

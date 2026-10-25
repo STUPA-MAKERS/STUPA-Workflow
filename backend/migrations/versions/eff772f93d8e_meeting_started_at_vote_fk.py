@@ -71,6 +71,7 @@ def _replace_agenda_item_fk(on_delete: str) -> None:
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     bind = op.get_bind()
     op.execute("ALTER TABLE meeting ADD COLUMN IF NOT EXISTS started_at timestamptz")
     left = bind.execute(
@@ -88,5 +89,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     _replace_agenda_item_fk("CASCADE")
     op.execute("ALTER TABLE meeting DROP COLUMN IF EXISTS started_at")

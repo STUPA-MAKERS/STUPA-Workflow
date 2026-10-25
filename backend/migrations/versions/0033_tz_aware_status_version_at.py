@@ -26,6 +26,7 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     op.execute(
         "ALTER TABLE status_event ALTER COLUMN at TYPE timestamptz "
         "USING at AT TIME ZONE 'UTC'"
@@ -37,6 +38,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     op.execute(
         "ALTER TABLE status_event ALTER COLUMN at TYPE timestamp "
         "USING at AT TIME ZONE 'UTC'"

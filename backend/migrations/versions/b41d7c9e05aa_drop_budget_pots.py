@@ -1,4 +1,4 @@
-"""drop the budget pot feature
+"""Drop the budget pot feature.
 
 Removes ``budget_entry``, ``budget_field`` and ``budget_pot``, plus
 ``application.budget_pot_id``.
@@ -26,13 +26,16 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    # Both views read budget_entry. mv_budget_usage is pot-only; mv_budget_rollup was
-    # superseded by the live roll-up in tree_rules.rollup_committed, which reads
-    # accepted_state_keys. Neither is read, and nothing replaces them.
+    """Drop the budget views, the pot tables and ``application.budget_pot_id``.
+
+    Both views read budget_entry. mv_budget_usage is pot-only, and the live roll-up in
+    ``tree_rules.rollup_committed`` (which reads accepted_state_keys) supersedes
+    mv_budget_rollup; nothing reads either. budget_entry goes first, because it references
+    budget_pot.
+    """
     op.execute("DROP MATERIALIZED VIEW IF EXISTS mv_budget_usage")
     op.execute("DROP MATERIALIZED VIEW IF EXISTS mv_budget_rollup")
     op.execute("ALTER TABLE application DROP COLUMN IF EXISTS budget_pot_id")
-    # budget_entry first: it references budget_pot.
     op.execute("DROP TABLE IF EXISTS budget_entry")
     op.execute("DROP TABLE IF EXISTS budget_field")
     op.execute("DROP TABLE IF EXISTS budget_pot")

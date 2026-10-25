@@ -20,8 +20,10 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     op.execute("ALTER TABLE meeting ADD COLUMN IF NOT EXISTS end_time time")
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     op.execute("ALTER TABLE meeting DROP COLUMN IF EXISTS end_time")

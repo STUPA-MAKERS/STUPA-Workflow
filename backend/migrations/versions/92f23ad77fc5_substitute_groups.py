@@ -80,10 +80,12 @@ _CREATE: tuple[str, ...] = (
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     for stmt in _CREATE:
         op.execute(stmt)
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     op.execute("DROP TABLE IF EXISTS substitute_group_member")
     op.execute("DROP TABLE IF EXISTS substitute_group")

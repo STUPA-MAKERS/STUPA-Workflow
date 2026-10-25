@@ -39,6 +39,7 @@ _FK = "fk_status_event_vote_id_vote"
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     op.execute("ALTER TABLE status_event ADD COLUMN IF NOT EXISTS vote_id uuid")
     op.execute(
         f"""
@@ -79,6 +80,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     op.execute("DROP INDEX IF EXISTS ix_status_event_vote_id")
     op.execute(f"ALTER TABLE status_event DROP CONSTRAINT IF EXISTS {_FK}")
     op.execute("ALTER TABLE status_event DROP COLUMN IF EXISTS vote_id")

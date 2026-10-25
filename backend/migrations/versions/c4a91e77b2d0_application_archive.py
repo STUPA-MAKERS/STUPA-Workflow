@@ -30,11 +30,10 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
+#: The index serves every listing query, because the default list hides the archived rows.
 _UPGRADE: tuple[str, ...] = (
     "ALTER TABLE application ADD COLUMN IF NOT EXISTS archived_at timestamptz",
     "ALTER TABLE application ADD COLUMN IF NOT EXISTS archived_by text",
-    # Every listing query filters on this column, because the default list hides the
-    # archived rows.
     (
         "CREATE INDEX IF NOT EXISTS ix_application_archived_at "
         "ON application (archived_at)"
@@ -56,10 +55,12 @@ _DOWNGRADE: tuple[str, ...] = (
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     for stmt in _UPGRADE:
         op.execute(stmt)
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     for stmt in _DOWNGRADE:
         op.execute(stmt)

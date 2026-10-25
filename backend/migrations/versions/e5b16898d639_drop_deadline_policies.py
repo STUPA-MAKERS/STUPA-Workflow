@@ -69,12 +69,15 @@ def _has_op(node: Any) -> bool:
 
 
 def _fold(node: Any, negated: bool) -> Any:
-    """Return the folded node: a guard dict, or the constant True or False."""
+    """Return the folded node: a guard dict, or the constant True or False.
+
+    A leaf of the dropped operator folds to the constant that makes its effective condition
+    hold.
+    """
     if not isinstance(node, dict) or len(node) != 1 or not _has_op(node):
         return node
     op_name, value = next(iter(node.items()))
     if op_name == _OP:
-        # The constant that makes the leaf's effective condition hold.
         return not negated
     if op_name not in _COMBINATORS:
         return node
@@ -214,7 +217,7 @@ _UPGRADE: tuple[str, ...] = (
     "DROP TABLE IF EXISTS deadline_policy",
 )
 
-# Structure only: the rows and the rewritten flow data do not come back.
+#: Structure only: the rows and the rewritten flow data do not come back.
 _DOWNGRADE: tuple[str, ...] = (
     """
     CREATE TABLE IF NOT EXISTS deadline_policy (
@@ -261,6 +264,7 @@ _DOWNGRADE: tuple[str, ...] = (
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     conn = op.get_bind()
     _rewrite_transitions(conn)
     _rewrite_snapshots(conn)
@@ -269,5 +273,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     for stmt in _DOWNGRADE:
         op.execute(stmt)

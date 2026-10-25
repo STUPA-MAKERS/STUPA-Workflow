@@ -66,8 +66,8 @@ ON CONFLICT (id) DO NOTHING
 
 _CHECK = "ck_magic_link_magic_link_unlimited_edit_only"
 
-# (old seed sentence, new sentence). The new sentences match the builtin fallback in
-# app/modules/notifications/service.py.
+#: (old seed sentence, new sentence). The new sentences match the builtin fallback in
+#: app/modules/notifications/service.py.
 _MAIL_SENTENCES = (
     (
         "Der Link ist zeitlich begrenzt gültig.",
@@ -93,6 +93,7 @@ def _rewrite_mail(*, forward: bool) -> None:
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     op.execute(_CREATE_TABLE)
     op.execute(_SEED)
     op.execute("ALTER TABLE magic_link ALTER COLUMN expires_at DROP NOT NULL")
@@ -105,6 +106,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     op.execute(
         "UPDATE magic_link SET expires_at = now() + interval '7 days' WHERE expires_at IS NULL"
     )

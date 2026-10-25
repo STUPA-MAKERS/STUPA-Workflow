@@ -36,8 +36,8 @@ _UPGRADE: tuple[str, ...] = (
     ),
 )
 
+#: Symmetric: the constraint stays, under the 0011 name.
 _DOWNGRADE: tuple[str, ...] = (
-    # Symmetric: keep the constraint, but put it back under the 0011 name.
     "ALTER TABLE protocol DROP CONSTRAINT IF EXISTS ck_protocol_protocol_status",
     (
         "ALTER TABLE protocol ADD CONSTRAINT protocol_status "
@@ -47,10 +47,12 @@ _DOWNGRADE: tuple[str, ...] = (
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     for stmt in _UPGRADE:
         op.execute(stmt)
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     for stmt in _DOWNGRADE:
         op.execute(stmt)

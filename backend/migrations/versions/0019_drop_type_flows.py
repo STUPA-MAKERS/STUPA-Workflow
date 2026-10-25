@@ -59,11 +59,11 @@ BEGIN
 END $$;
 """
 
-# The unique constraint on `version` needs distinct version numbers. Per-type
-# flows could give the same number to several rows. The renumber step works in a
-# deterministic order: old number first, then age. It does nothing when there
-# are no duplicates. It runs AFTER the column and constraint drops, so that no
-# old unique constraint breaks in between.
+#: The unique constraint on `version` needs distinct version numbers. Per-type
+#: flows could give the same number to several rows. The renumber step works in a
+#: deterministic order: old number first, then age. It does nothing when there
+#: are no duplicates. It runs AFTER the column and constraint drops, so that no
+#: old unique constraint breaks in between.
 _RENUMBER = """
 DO $$
 BEGIN
@@ -81,20 +81,20 @@ BEGIN
 END $$;
 """
 
+#: Dropping ``application_type_id`` drops its dependent indexes and unique constraints
+#: (the one_active_per_type index and the unique on (type, version)). Both possible
+#: names of the version constraint are dropped and the canonical one is created again,
+#: because an old database carries the Postgres default name and a fresh one the name
+#: of the naming convention.
 _UPGRADE: tuple[str, ...] = (
     _DEDUPE,
     "ALTER TABLE application_type DROP COLUMN IF EXISTS active_flow_version_id",
-    # The dependent indexes and unique constraints drop with the column. This
-    # covers the one_active_per_type index and the unique on (type, version).
     "ALTER TABLE flow_version DROP COLUMN IF EXISTS application_type_id",
     "DROP INDEX IF EXISTS uq_flow_version_one_active_global",
     (
         "CREATE UNIQUE INDEX IF NOT EXISTS uq_flow_version_one_active_global "
         "ON flow_version (active) WHERE active"
     ),
-    # Drop both possible names, then create the canonical one again. An old
-    # database carries the Postgres default name. A fresh database carries the
-    # name from the naming convention of the models.
     "ALTER TABLE flow_version DROP CONSTRAINT IF EXISTS flow_version_version_key",
     "ALTER TABLE flow_version DROP CONSTRAINT IF EXISTS uq_flow_version_version",
     _RENUMBER,
@@ -105,14 +105,16 @@ _UPGRADE: tuple[str, ...] = (
 )
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     for stmt in _UPGRADE:
         op.execute(stmt)
 
 
 def downgrade() -> None:
-    # Not reversible, the same as 0006. The 0006 cutover deleted the per-type
-    # flow data. A restore of the columns would bring back dead structures only.
-    # It would also break the drop_all downgrade of the baseline. The current
-    # models no longer know the foreign key to application_type. This downgrade
-    # does nothing on purpose.
+    """Do nothing: the revision is not reversible, as 0006.
+
+    The 0006 cutover deleted the per-type flow data, so restored columns would be dead
+    structures. They would also break the ``drop_all`` downgrade of the baseline, because
+    the models no longer know the foreign key to application_type.
+    """
     pass

@@ -43,8 +43,8 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
-# (key, display name, base variant, title logos, footer logos). Keep in sync
-# with CD_VARIANTS in 0002_seed.py.
+#: (key, display name, base variant, title logos, footer logos). Keep in sync
+#: with CD_VARIANTS in 0002_seed.py.
 _SEED: tuple[tuple[str, str, str, tuple[str, ...], tuple[str, ...]], ...] = (
     ("stupa", "StuPa", "protocol", ("STUPA",), ("STUPA",)),
     ("asta", "AStA", "protocol", ("ASTA",), ("ASTA",)),
@@ -63,6 +63,9 @@ def _seed_statements() -> tuple[str, ...]:
     All logos of one variant go in ONE statement. The ``NOT EXISTS`` guard would
     otherwise see the row that the previous statement wrote and skip the rest of
     the set.
+
+    A variant gets its logos only when it has none yet, because on a fresh database
+    0002_seed already wrote them.
     """
     stmts: list[str] = [
         "INSERT INTO cd_variant (key, name, base_variant) "
@@ -77,8 +80,6 @@ def _seed_statements() -> tuple[str, ...]:
         ]
         if not rows:  # pragma: no cover - every seeded variant carries a logo
             continue
-        # Seed the logos only for a variant that has none yet. On a fresh database
-        # 0002_seed already wrote them.
         stmts.append(
             'INSERT INTO cd_variant_logo (variant_id, slot, "position", vendored_name) '
             "SELECT v.id, x.slot, x.pos, x.name FROM cd_variant v "
@@ -142,9 +143,9 @@ BEGIN
 END $$;
 """
 
-# Backfill from the free-text column. The DO block guards it, because a fresh
-# database never had that column: create_all builds `gremium` from the current
-# model, and the model no longer holds it.
+#: Backfill from the free-text column. The DO block guards it, because a fresh
+#: database never had that column: create_all builds `gremium` from the current
+#: model, and the model no longer holds it.
 _BACKFILL = """
 DO $$
 BEGIN
@@ -205,10 +206,12 @@ _DOWNGRADE: tuple[str, ...] = (
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     for stmt in _UPGRADE:
         op.execute(stmt)
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     for stmt in _DOWNGRADE:
         op.execute(stmt)

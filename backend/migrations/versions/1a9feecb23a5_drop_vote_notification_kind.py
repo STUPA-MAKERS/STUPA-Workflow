@@ -43,6 +43,7 @@ _DROPPED_TEMPLATES_SQL = "'role_assigned', 'role_revoked'"
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     bind = op.get_bind()
     prefs = bind.execute(
         sa.text(
@@ -68,5 +69,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Nothing to restore: see the module docstring.
+    """Do nothing: there is nothing to restore (see the module docstring)."""
     pass

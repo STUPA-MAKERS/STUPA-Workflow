@@ -50,9 +50,11 @@ ON CONFLICT (id) DO NOTHING
 
 
 def upgrade() -> None:
+    """Upgrade the schema to this revision."""
     op.execute(_CREATE_TABLE)
     op.execute(_SEED)
 
 
 def downgrade() -> None:
+    """Downgrade the schema to the previous revision."""
     op.execute("DROP TABLE IF EXISTS meeting_settings")
