@@ -45,10 +45,9 @@ GUARD_CONDITION_OPERATORS: frozenset[str] = frozenset(
         "budgetHasDecisionGremium",
     }
 )
-# Actor gates apply to manual transitions only. `actorIsApplicant` is true when the
-# actor that triggers the transition is the applicant.
-# `isInVoteGremium` is true when the actor is a member of the Gremium that decides the
-# current vote (`application.vote_gremium_id`).
+#: Actor gates; they apply to manual transitions only. ``actorIsApplicant`` holds when
+#: the acting principal is the applicant, ``isInVoteGremium`` when the actor is a member
+#: of the Gremium that decides the current vote (``application.vote_gremium_id``).
 GUARD_ACTOR_OPERATORS: frozenset[str] = frozenset(
     {"roleIs", "isInCommittee", "actorIsApplicant", "isInVoteGremium"}
 )
@@ -56,19 +55,18 @@ GUARD_LEAF_OPERATORS: frozenset[str] = GUARD_CONDITION_OPERATORS | GUARD_ACTOR_O
 GUARD_COMBINATORS: frozenset[str] = frozenset({"and", "or", "not"})
 GUARD_OPERATORS: frozenset[str] = GUARD_LEAF_OPERATORS | GUARD_COMBINATORS
 
-# Comparison operators of the `compare` guard, per value type.
+#: Comparison operators of the ``compare`` guard for a number (the other types follow).
 _NUMERIC_OPS: frozenset[str] = frozenset({"==", "!=", "<", "<=", ">", ">="})
 _DATE_OPS: frozenset[str] = _NUMERIC_OPS
 _TEXT_OPS: frozenset[str] = frozenset({"==", "!=", "in"})
 _BOOL_OPS: frozenset[str] = frozenset({"=="})
 
-# Value types of a comparable field. They come from the form-field type.
+#: Value types of a comparable field, derived from the form-field type.
 COMPARE_TYPES: frozenset[str] = frozenset({"number", "currency", "date", "text", "bool"})
 
-# Leaf operators with a string value, such as a role, Gremium, budget or field key, or
-# with a bool value. The save gate `validate_guard` checks them. A wrong value type such
-# as a list crashes at runtime as unhashable in `in frozenset` instead of failing
-# cleanly.
+#: Leaf operators with a string value (role, Gremium, budget or field key). The save
+#: gate ``validate_guard`` checks the value type of these and of the bool operators,
+#: because a list crashes at runtime as unhashable in ``in frozenset``.
 _STRING_VALUE_OPERATORS: frozenset[str] = frozenset(
     {
         "roleIs",
@@ -102,10 +100,10 @@ ACTION_TYPES: frozenset[str] = frozenset(
     }
 )
 
-# `config.gremiumSource` of a vote state that takes its Gremium from the cost center.
+#: ``config.gremiumSource`` of a vote state that takes its Gremium from the cost center.
 GREMIUM_SOURCE_BUDGET = "budget"
 
-# The actions that set the cost center of the application.
+#: Actions that set the cost center of the application.
 ASSIGN_BUDGET_ACTION_TYPES: frozenset[str] = frozenset(
     {
         "assignBudget",
@@ -115,29 +113,29 @@ ASSIGN_BUDGET_ACTION_TYPES: frozenset[str] = frozenset(
     }
 )
 
-# Required string field per action type. `notify` and `assignBudgetFromMap` have a
-# separate check. `assignBudgetFromField` reads the cost center id from the named form
-# field.
+#: Required string field per action type. ``notify`` and ``assignBudgetFromMap`` have a
+#: separate check. ``assignBudgetFromField`` reads the cost center id from the named field.
 _ACTION_REQUIRED_FIELD: dict[str, str] = {
     "webhook": "webhookId",
     "assignBudget": "budgetId",
     "assignBudgetFromField": "field",
 }
 
-# Optional string field per action type. When the key is present, it must hold a
-# non-empty string. `addToNextSession` without `gremiumId` takes the Gremium of the
-# vote. `assignBudgetFromApplicantGremium` without `parentId` searches the whole tree.
+#: Optional string field per action type; when present it is a non-empty string.
+#: ``addToNextSession`` without ``gremiumId`` takes the Gremium of the vote, and
+#: ``assignBudgetFromApplicantGremium`` without ``parentId`` searches the whole tree.
 _ACTION_OPTIONAL_FIELD: dict[str, str] = {
     "addToNextSession": "gremiumId",
     "assignBudgetFromApplicantGremium": "parentId",
 }
 
-# `voteGremium` is the Gremium of the current vote (`application.vote_gremium_id`).
-# `budgetGremium` is the effective deciding Gremium of the cost center.
+#: Recipient kinds of ``notify``. ``voteGremium`` is the Gremium of the current vote
+#: (``application.vote_gremium_id``), ``budgetGremium`` the effective deciding Gremium
+#: of the cost center.
 NOTIFY_RECIPIENT_KINDS: frozenset[str] = frozenset(
     {"gremium", "role", "applicant", "email", "voteGremium", "budgetGremium"}
 )
-# Recipient kinds that take no `ref`.
+#: Recipient kinds that take no ``ref``.
 _NOTIFY_KINDS_WITHOUT_REF: frozenset[str] = frozenset(
     {"applicant", "voteGremium", "budgetGremium"}
 )
@@ -246,6 +244,10 @@ def _eval_compare(spec: Any, ctx: GuardContext) -> bool:
     The value type comes from `ctx.field_types[field]` and defaults to `text`. A field
     that is missing from `field_values` gives `False`. That fails closed and implies
     `hasField`.
+
+    An operator that the type does not allow also gives False instead of raising. The type
+    comes from the PINNED form version, which can differ from the stored flow through form
+    drift, and raising would make every transition return a 500.
     """
     if not isinstance(spec, dict):
         raise GuardError("compare requires an object {field, op, value}")
@@ -258,9 +260,6 @@ def _eval_compare(spec: Any, ctx: GuardContext) -> bool:
         raise GuardError("compare.op must be a string")
     value_type = ctx.field_types.get(fld, "text")
     if op not in ops_for_type(value_type):
-        # The runtime type comes from the PINNED form version of the application. It can
-        # differ from the globally stored flow through form drift. A missing field gives
-        # `text`. Fail closed instead of raising, or every transition returns a 500.
         return False
     if fld not in ctx.field_values:
         return False
@@ -280,7 +279,6 @@ def _eval_compare(spec: Any, ctx: GuardContext) -> bool:
         return _apply_ordered(op, l_d, r_d)
     if value_type == "bool":
         return _to_bool(left) == _to_bool(operand)
-    # Fall-through for the text and select types.
     left_s = str(left)
     if op == "==":
         return left_s == str(operand)
@@ -291,9 +289,8 @@ def _eval_compare(spec: Any, ctx: GuardContext) -> bool:
     return False
 
 
-# Map an ordered comparison operator to its `operator` function. An unknown operator
-# gives `False` and fails closed. `validate_guard` rejects an unknown operator at save
-# time anyway.
+#: Ordered comparison operators. An unknown operator gives False (fail closed), and
+#: ``validate_guard`` rejects it at save time anyway.
 _ORDERED_OPS: dict[str, Callable[[Any, Any], bool]] = {
     "==": operator.eq,
     "!=": operator.ne,
@@ -305,6 +302,7 @@ _ORDERED_OPS: dict[str, Callable[[Any, Any], bool]] = {
 
 
 def _apply_ordered(op: str, left: Any, right: Any) -> bool:
+    """Apply an ordered operator; an unknown operator gives False."""
     fn = _ORDERED_OPS.get(op)
     return fn(left, right) if fn is not None else False
 
@@ -318,9 +316,8 @@ def _has_field(value: Any, ctx: GuardContext) -> bool:
     return v is not None and v != "" and v != []
 
 
-# Map a leaf operator to a pure predicate `(value, ctx) -> bool`. Actor gates apply only
-# on manual transitions. An automatic transition has empty `roles` and
-# `actor_committees`. `_eval_compare` compares a `compare` value per type.
+#: Leaf operator to a pure predicate ``(value, ctx) -> bool``. An automatic transition
+#: has empty ``roles`` and ``actor_committees``, so the actor gates fail there.
 _LEAF_EVALUATORS: dict[str, Callable[[Any, GuardContext], bool]] = {
     "roleIs": lambda value, ctx: value in ctx.roles,
     "isInCommittee": lambda value, ctx: str(value) in ctx.actor_committees,

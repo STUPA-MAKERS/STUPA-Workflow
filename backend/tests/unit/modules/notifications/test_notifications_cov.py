@@ -186,11 +186,10 @@ def _sessionmaker_for(session: FakeSession) -> Any:
     return _get_sessionmaker
 
 
-# Tests for service.py
 async def test_create_template_ok() -> None:
     from app.modules.notifications.schemas import MailTemplateCreate
 
-    session = FakeSession(scalars=[[]])  # no collision
+    session = FakeSession(scalars=[[]])
     out = await _svc(session).create_template(
         MailTemplateCreate(
             key="welcome",
@@ -217,15 +216,20 @@ async def test_create_template_conflict() -> None:
 
 
 async def test_list_templates_merges_catalogue_and_overrides() -> None:
-    ta = _tpl("status_update")  # catalog override
+    """Merge the catalog with the database overrides.
+
+    A database override of a catalog key wins. A key outside the catalog goes to the end. A
+    catalog key without an override stays builtin.
+    """
+    ta = _tpl("status_update")
     ta.id = uuid.uuid4()
-    tb = _tpl("custom_flow")  # not in the catalog, so it goes to the end
+    tb = _tpl("custom_flow")
     tb.id = uuid.uuid4()
     session = FakeSession(scalars=[[ta, tb]])
     out = await _svc(session).list_templates()
     by_key = {t.key: t for t in out}
-    assert by_key["status_update"].source == "override"  # the database override wins
-    assert by_key["meeting_created"].source == "builtin"  # builtin only
+    assert by_key["status_update"].source == "override"
+    assert by_key["meeting_created"].source == "builtin"
     assert by_key["custom_flow"].source == "override"
     assert out[-1].key == "custom_flow"
 
@@ -303,7 +307,7 @@ async def test_preview_template_render_error_422() -> None:
 
 
 async def test_upsert_template_unknown_key_422() -> None:
-    session = FakeSession(scalars=[[]])  # no existing row
+    session = FakeSession(scalars=[[]])
     with pytest.raises(ValidationProblem):
         await _svc(session).upsert_template(
             MailTemplateUpsert(
@@ -316,7 +320,7 @@ async def test_upsert_template_unknown_key_422() -> None:
 
 
 async def test_upsert_template_creates_builtin_override() -> None:
-    session = FakeSession(scalars=[[]])  # no override row yet
+    session = FakeSession(scalars=[[]])
     out = await _svc(session).upsert_template(
         MailTemplateUpsert(
             key="status_update",
@@ -328,7 +332,7 @@ async def test_upsert_template_creates_builtin_override() -> None:
     assert out.source == "override"
     assert out.key == "status_update"
     assert session.committed == 1
-    assert session.added  # the service created a new row
+    assert session.added
 
 
 async def test_upsert_template_updates_existing() -> None:
@@ -344,7 +348,7 @@ async def test_upsert_template_updates_existing() -> None:
     )
     assert out.subject_i18n == {"de": "geändert"}
     assert existing.body_html_i18n == {"de": "<i>y</i>"}
-    assert session.added == []  # no new row
+    assert session.added == []
 
 
 async def test_reset_template_not_in_catalogue_404() -> None:
@@ -363,10 +367,10 @@ async def test_reset_template_deletes_override() -> None:
 
 
 async def test_reset_template_no_override_returns_builtin() -> None:
-    session = FakeSession(scalars=[[]])  # no override row
+    session = FakeSession(scalars=[[]])
     out = await _svc(session).reset_template("status_update")
     assert out.source == "builtin"
-    assert session.deleted == []  # nothing to delete
+    assert session.deleted == []
     assert session.committed == 0
 
 
@@ -397,7 +401,7 @@ async def test_preview_payload_render_error_422() -> None:
 
 
 async def test_get_notification_settings_creates_default_row() -> None:
-    session = FakeSession()  # the store is empty, so the row is missing
+    session = FakeSession()
     row = await _svc(session).get_notification_settings()
     assert row.id == 1
     assert session.committed == 1
@@ -408,7 +412,7 @@ async def test_get_notification_settings_creates_default_row() -> None:
 async def test_get_notification_settings_returns_existing() -> None:
     existing = NotificationSettings(id=1)
     session = FakeSession()
-    session.store[1] = existing  # no add call, so no UUID overwrite
+    session.store[1] = existing
     row = await _svc(session).get_notification_settings()
     assert row is existing
     assert session.committed == 0
@@ -450,6 +454,7 @@ async def test_update_notification_settings_partial(
 async def test_update_notification_settings_no_changes_keeps_values(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Keep every value when the call passes no field (each else branch)."""
     async def fake_record(session: Any, **kw: Any) -> None:
         return None
 
@@ -466,30 +471,29 @@ async def test_update_notification_settings_no_changes_keeps_values(
     session = FakeSession()
     session.store[1] = existing
     row = await _svc(session).update_notification_settings(actor="admin")
-    # The call passes no field, so every value stays. This covers each else branch.
     assert row.task_reminder_enabled is True
     assert row.task_reminder_after_days == 5
     assert row.task_reminder_repeat_days == 7
 
 
 async def test_get_preferences_no_principal_all_default() -> None:
-    session = FakeSession(scalar=[None])  # _principal_id → None
+    session = FakeSession(scalar=[None])
     prefs = await _svc(session).get_preferences("ghost")
     assert all(enabled for _, enabled in prefs)
-    assert {k for k, _ in prefs}  # the full catalog
+    assert {k for k, _ in prefs}
 
 
 async def test_get_preferences_merges_stored_disable() -> None:
+    """Merge the stored (kind, enabled) pairs; a kind without a row stays on."""
     pid = uuid.uuid4()
     session = FakeSession(
         scalar=[pid],
-        # The execute call returns the (kind, enabled) pairs of the user.
         executes=[[("comment", False), ("meeting", False)]],
     )
     prefs = dict(await _svc(session).get_preferences("u"))
     assert prefs["comment"] is False
     assert prefs["meeting"] is False
-    assert prefs["status_update"] is True  # not stored, so the default stays on
+    assert prefs["status_update"] is True
 
 
 async def test_set_preferences_unknown_kind_422() -> None:
@@ -498,15 +502,20 @@ async def test_set_preferences_unknown_kind_422() -> None:
 
 
 async def test_set_preferences_principal_not_found_404() -> None:
-    session = FakeSession(scalar=[None])  # _principal_id → None
+    session = FakeSession(scalar=[None])
     with pytest.raises(NotFoundError):
         await _svc(session).set_preferences("ghost", [("comment", False)])
 
 
 async def test_set_preferences_all_branches() -> None:
+    """Cover each branch of the preference upsert.
+
+    'comment' has an opt-out row and is enabled again, so the row goes (delete).
+    'status_update' has no row and stays on (nothing). 'meeting' gets a new opt-out (add).
+    'task' has a row and stays off (update). The final get_preferences finds no stored
+    deviation.
+    """
     pid = uuid.uuid4()
-    # There is an opt-out row for 'comment'. The test enables it again, which deletes
-    # the row. 'meeting' gets a new opt-out (add). 'task' has a row and stays off (update).
     existing_comment = NotificationPreference(
         principal_id=pid, kind="comment", enabled=False
     )
@@ -514,22 +523,19 @@ async def test_set_preferences_all_branches() -> None:
         principal_id=pid, kind="task", enabled=False
     )
     session = FakeSession(
-        # first _principal_id (set), then _principal_id (get_preferences),
         scalar=[pid, pid],
-        # get_preferences at the end: no stored deviation is left.
         executes=[[]],
     )
-    # The store lookup session.get((pid, kind)) returns the matching rows.
     session.store[(pid, "comment")] = existing_comment
     session.store[(pid, "task")] = existing_task
 
     out = await _svc(session).set_preferences(
         "u",
         [
-            ("comment", True),  # row present + enabled → delete
-            ("status_update", True),  # row None + enabled → nothing
-            ("meeting", False),  # row None + disabled → add
-            ("task", False),  # row present + disabled → update
+            ("comment", True),
+            ("status_update", True),
+            ("meeting", False),
+            ("task", False),
         ],
     )
     assert existing_comment in session.deleted
@@ -540,7 +546,7 @@ async def test_set_preferences_all_branches() -> None:
 
 
 async def test_send_kind_mail_no_recipients_returns_false() -> None:
-    # filter_recipients_by_preference returns an empty list, so the service sends nothing.
+    """Send nothing when the preference filter leaves no recipient."""
     session = FakeSession()
     ok = await _svc(session, FakeQueue()).send_kind_mail(
         [],
@@ -555,8 +561,8 @@ async def test_send_kind_mail_no_recipients_returns_false() -> None:
 
 
 async def test_send_kind_mail_db_template_used() -> None:
+    """Use the database template; the scalars feed the preference filter, then the lookup."""
     tpl = _tpl("meeting_created")
-    # 1st scalars: the preference filter with no opt-out. 2nd scalars: the template lookup.
     session = FakeSession(scalars=[[], [tpl]])
     queue = FakeQueue()
     ok = await _svc(session, queue).send_kind_mail(
@@ -574,7 +580,7 @@ async def test_send_kind_mail_db_template_used() -> None:
 
 
 async def test_send_kind_mail_builtin_fallback() -> None:
-    # No database template, so the service renders the builtin and enqueues it.
+    """Render and enqueue the builtin when no database template exists."""
     session = FakeSession(scalars=[[], []])
     queue = FakeQueue()
     ok = await _svc(session, queue).send_kind_mail(
@@ -593,7 +599,7 @@ async def test_send_kind_mail_builtin_fallback() -> None:
 async def test_send_kind_mail_builtin_render_error_returns_false(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    # The builtin uses a missing variable. That raises TemplateRenderError and gives False.
+    """Return False when the builtin uses a missing variable (TemplateRenderError)."""
     session = FakeSession(scalars=[[], []])
     queue = FakeQueue()
     ok = await _svc(session, queue).send_kind_mail(
@@ -610,7 +616,7 @@ async def test_send_kind_mail_builtin_render_error_returns_false(
 
 
 async def test_handle_notify_action_builtin_catalogue_key_fallback() -> None:
-    # A catalog key without a database override uses the spec builtin.
+    """Use the team builtin of a catalog key without a database override."""
     session = FakeSession(scalars=[[], []])
     queue = FakeQueue()
     svc = _svc(session, queue)
@@ -620,13 +626,12 @@ async def test_handle_notify_action_builtin_catalogue_key_fallback() -> None:
         context={"applicationTitle": "Beamer", "status": "Prüfung"},
     )
     assert count == 1
-    # The team builtin, not the applicant default.
     assert "Beamer" in queue.messages[0].text
     assert "Ggf. ist eine Aktion" in queue.messages[0].text
 
 
 async def test_handle_notify_action_template_key_underscore_alias() -> None:
-    # The action has no templateKey but a template_key in snake_case, which the code uses.
+    """Accept the snake_case ``template_key`` when ``templateKey`` is missing."""
     tpl = _tpl("status_update")
     session = FakeSession(scalars=[[], [tpl]])
     queue = FakeQueue()
@@ -640,9 +645,8 @@ async def test_handle_notify_action_template_key_underscore_alias() -> None:
 
 
 async def test_handle_notify_action_filter_removes_all_recipients() -> None:
-    # The resolver returns addresses. The preference filter removes all of them.
+    """Send nothing when the preference filter removes every resolved address."""
     pid = uuid.uuid4()
-    # filter_recipients_by_preference scalars: 'a@x.de' is opted out.
     session = FakeSession(scalars=[["a@x.de"]])
     queue = FakeQueue()
     svc = _svc(session, queue)
@@ -652,7 +656,7 @@ async def test_handle_notify_action_filter_removes_all_recipients() -> None:
     )
     assert count == 0
     assert queue.messages == []
-    assert pid  # silence unused
+    assert pid
 
 
 async def test_send_magic_link_db_template_and_layout() -> None:
@@ -668,14 +672,14 @@ async def test_send_magic_link_db_template_and_layout() -> None:
     await _svc(session, queue).send_magic_link(email="a@x.de", link="https://l/#1")
     msg = queue.messages[0]
     assert "https://l/#1" in msg.text
-    assert msg.html  # the layout rendered and took over the html body
+    assert msg.html
 
 
 async def test_enqueue_none_queue_returns_false(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    session = FakeSession(scalars=[[]])  # magic_link is not in the DB, so builtin runs
-    # With queue=None, _enqueue logs the message and drops it.
+    """Log and drop the builtin magic-link mail when the queue is None."""
+    session = FakeSession(scalars=[[]])
     await _svc(session, None).send_magic_link(email="a@x.de", link="https://l")
 
 
@@ -694,7 +698,7 @@ async def test_filter_recipients_unknown_kind_failopen() -> None:
 
 
 async def test_filter_recipients_blocks_case_insensitive() -> None:
-    # The disabled list ['A@X.de', None] blocks {'a@x.de'}. 'b@y.de' stays.
+    """Block opted-out addresses case-insensitively and ignore a None entry."""
     session = FakeSession(scalars=[["A@X.de", None]])
     out = await filter_recipients_by_preference(
         cast(AsyncSession, session), ["a@x.de", "b@y.de"], "comment"
@@ -702,7 +706,6 @@ async def test_filter_recipients_blocks_case_insensitive() -> None:
     assert out == ["b@y.de"]
 
 
-# Tests for recipients.py
 async def test_resolve_group_emails() -> None:
     session = FakeSession(scalars=[["g@x.de", None]])
     out = await RecipientResolver(cast(AsyncSession, session)).resolve(
@@ -759,7 +762,7 @@ async def test_resolve_permission() -> None:
 
 
 async def test_resolve_permission_then_loop_continues() -> None:
-    # The permission spec is NOT the last element, so the loop continues.
+    """Continue the loop after a permission spec that is not the last one."""
     session = FakeSession(scalars=[["perm@x.de"]])
     out = await RecipientResolver(cast(AsyncSession, session)).resolve(
         [
@@ -771,11 +774,10 @@ async def test_resolve_permission_then_loop_continues() -> None:
 
 
 async def test_resolve_unknown_spec_then_loop_continues() -> None:
-    # An unknown spec (no elif matches, no `ref`) comes before a valid spec. This covers
-    # branch 65->50, where the loop continues after the fall-through.
+    """Continue the loop after a spec that matches no kind and has no ``ref``."""
     out = await RecipientResolver(cast(AsyncSession, FakeSession())).resolve(
         [
-            {"kind": "permission"},  # no ref, so no elif matches
+            {"kind": "permission"},
             {"kind": "email", "ref": "fix@x.de"},
         ]
     )
@@ -790,7 +792,7 @@ async def test_resolve_all_unknown_specs_empty() -> None:
 
 
 async def test_resolve_explicit_now_passed() -> None:
-    # An explicit `now` (the non-None branch) plus the role lookup.
+    """Resolve a role with an explicit ``now``."""
     session = FakeSession(scalars=[["r@x.de"]])
     out = await RecipientResolver(cast(AsyncSession, session)).resolve(
         [{"kind": "role", "ref": "manager"}], now=datetime.now(UTC)
@@ -799,11 +801,11 @@ async def test_resolve_explicit_now_passed() -> None:
 
 
 async def test_actionable_vote_state_with_gremium() -> None:
+    """Resolve the members of the ``vote_gremium_id`` snapshot."""
     from app.modules.flow.models import State
 
     gid = uuid.uuid4()
     state = State(kind="vote", config={"gremiumId": str(gid)})
-    # The snapshot `vote_gremium_id`, then the member mails.
     session = FakeSession(scalar=[gid], scalars=[["v@x.de"]])
     out = await actionable_principal_emails(
         cast(AsyncSession, session), application_id=uuid.uuid4(), state=state
@@ -814,7 +816,7 @@ async def test_actionable_vote_state_with_gremium() -> None:
 async def test_actionable_vote_state_without_gremium_returns_empty() -> None:
     from app.modules.flow.models import State
 
-    state = State(kind="vote", config={})  # no gremiumId
+    state = State(kind="vote", config={})
     out = await actionable_principal_emails(
         cast(AsyncSession, FakeSession()), application_id=uuid.uuid4(), state=state
     )
@@ -822,9 +824,10 @@ async def test_actionable_vote_state_without_gremium_returns_empty() -> None:
 
 
 async def test_actionable_vote_state_config_not_dict() -> None:
+    """Treat a vote state config that is not a dict as empty."""
     from app.modules.flow.models import State
 
-    state = State(kind="vote", config=None)  # config is not a dict, so it becomes {}
+    state = State(kind="vote", config=None)
     out = await actionable_principal_emails(
         cast(AsyncSession, FakeSession()), application_id=uuid.uuid4(), state=state
     )
@@ -849,7 +852,7 @@ async def test_state_actionable_counts_manual_transitions() -> None:
     from app.modules.flow.models import State
 
     state = State(kind="normal", config={}, id=uuid.uuid4())
-    session = FakeSession(scalar=[2])  # count > 0 → True
+    session = FakeSession(scalar=[2])
     assert await state_actionable(cast(AsyncSession, session), state) is True
 
 
@@ -857,11 +860,10 @@ async def test_state_actionable_no_manual_transitions_false() -> None:
     from app.modules.flow.models import State
 
     state = State(kind="normal", config={}, id=uuid.uuid4())
-    session = FakeSession(scalar=[0])  # count == 0 → False
+    session = FakeSession(scalar=[0])
     assert await state_actionable(cast(AsyncSession, session), state) is False
 
 
-# Tests for auto.py
 async def test_meeting_delegation_mail_info_query_fails_returns_none() -> None:
     class BoomSession:
         async def execute(self, _stmt: Any) -> Any:
@@ -878,6 +880,7 @@ async def test_meeting_delegation_mail_info_row_none() -> None:
 
 
 async def test_meeting_delegation_mail_info_with_date_and_delegator_name() -> None:
+    """Prefer the display name of the delegator."""
     did = uuid.uuid4()
     date = datetime(2026, 6, 16, tzinfo=UTC).date()
     mid = uuid.uuid4()
@@ -887,7 +890,7 @@ async def test_meeting_delegation_mail_info_with_date_and_delegator_name() -> No
     assert out is not None
     assert out.meeting_id == mid
     assert out.meeting_date == "16.06.2026"
-    assert out.delegator_name == "Max"  # display_name wins
+    assert out.delegator_name == "Max"
     assert out.voting is True
 
 
@@ -909,7 +912,7 @@ async def test_meeting_delegation_mail_info_picks_the_recipient(
 
 
 async def test_meeting_delegation_mail_info_no_date_falls_back_to_email() -> None:
-    # date None gives meeting_date None. d_name None gives d_email as delegator_name.
+    """Fall back to no date and to the delegator e-mail as the name."""
     row = ("d@x.de", "Sitzung 2", None, None, None, "max@x.de", None, uuid.uuid4())
     session = FakeSession(executes=[[row]])
     out = await meeting_delegation_mail_info(session, uuid.uuid4())
@@ -922,6 +925,11 @@ async def test_meeting_delegation_mail_info_no_date_falls_back_to_email() -> Non
 async def test_auto_mailer_meeting_created_sends(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Send the meeting mail with the builtin template.
+
+    The scalars feed the gremium name, the gremium members, the preference filter (no
+    opt-out) and the template lookup (no database template).
+    """
     from app.modules.livevote.models import Meeting
 
     gid = uuid.uuid4()
@@ -934,14 +942,14 @@ async def test_auto_mailer_meeting_created_sends(
         start_time=datetime(2026, 6, 16, 18, 0, tzinfo=UTC).time(),
     )
     session = FakeSession(
-        scalar=["AStA"],  # gremium_name lookup
+        scalar=["AStA"],
         scalars=[
-            ["m@x.de"],  # RecipientResolver gremium emails
-            [],  # filter_recipients_by_preference (no opt-out)
-            [],  # _get_template_by_key (no database template, so builtin)
+            ["m@x.de"],
+            [],
+            [],
         ],
     )
-    session.store[mid] = meeting  # session.get(Meeting, mid)
+    session.store[mid] = meeting
     monkeypatch.setattr(auto, "get_sessionmaker", _sessionmaker_for(session))
     queue = FakeQueue()
     monkeypatch.setattr(auto, "mail_queue_from_pool", lambda _pool: queue)
@@ -954,10 +962,10 @@ async def test_auto_mailer_meeting_created_sends(
 async def test_auto_mailer_meeting_created_meeting_missing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    session = FakeSession()  # the store is empty, so get(Meeting) returns None
+    """Send nothing and do not crash when the meeting is missing."""
+    session = FakeSession()
     monkeypatch.setattr(auto, "get_sessionmaker", _sessionmaker_for(session))
     monkeypatch.setattr(auto, "mail_queue_from_pool", lambda _pool: FakeQueue())
-    # No crash and no send.
     await AutoMailer().meeting_created(SETTINGS, uuid.uuid4(), pool=object())
 
 
@@ -970,7 +978,7 @@ async def test_auto_mailer_meeting_created_no_date_no_time(
     mid = uuid.uuid4()
     meeting = Meeting(id=mid, gremium_id=gid, title="Plenum", date=None, start_time=None)
     session = FakeSession(
-        scalar=[None],  # no gremium_name, so the '' branch runs
+        scalar=[None],
         scalars=[["m@x.de"], [], []],
     )
     session.store[mid] = meeting
@@ -985,12 +993,12 @@ async def test_auto_mailer_meeting_created_swallows_exception(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    """Log and swallow an exception instead of re-raising it."""
     def boom() -> Any:
         raise RuntimeError("sessionmaker boom")
 
     monkeypatch.setattr(auto, "get_sessionmaker", boom)
     monkeypatch.setattr(auto, "mail_queue_from_pool", lambda _pool: FakeQueue())
-    # The code logs the exception and swallows it. It does not re-raise.
     await AutoMailer().meeting_created(SETTINGS, uuid.uuid4(), pool=object())
 
 
@@ -1082,15 +1090,15 @@ def test_get_auto_mailer_returns_instance() -> None:
     assert isinstance(get_auto_mailer(), AutoMailer)
 
 
-# Tests for privacy.py
 async def test_notify_erasure_requested_with_recipients(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Mail the permission holders with the builtin template."""
     session = FakeSession(
         scalars=[
-            ["dpo@x.de"],  # RecipientResolver permission
-            [],  # filter_recipients_by_preference
-            [],  # _get_template_by_key falls back to the builtin
+            ["dpo@x.de"],
+            [],
+            [],
         ]
     )
     monkeypatch.setattr(privacy, "get_sessionmaker", _sessionmaker_for(session))
@@ -1110,7 +1118,7 @@ async def test_notify_erasure_requested_with_recipients(
 async def test_notify_erasure_requested_no_recipients_skips(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    session = FakeSession(scalars=[[]])  # RecipientResolver returns no address
+    session = FakeSession(scalars=[[]])
     monkeypatch.setattr(privacy, "get_sessionmaker", _sessionmaker_for(session))
     queue = FakeQueue()
     await privacy.notify_erasure_requested(
@@ -1125,7 +1133,7 @@ async def test_notify_erasure_requested_no_recipients_skips(
 async def test_notify_erasure_executed_sends(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    session = FakeSession(scalars=[[], []])  # filter, then no database template
+    session = FakeSession(scalars=[[], []])
     monkeypatch.setattr(privacy, "get_sessionmaker", _sessionmaker_for(session))
     queue = FakeQueue()
     await privacy.notify_erasure_executed(
@@ -1153,7 +1161,7 @@ async def test_notify_erasure_executed_no_email_skips(
         email=None,
         subject_type="applicant",
     )
-    assert called == []  # early return, no sessionmaker
+    assert called == []
 
 
 async def test_notify_erasure_rejected_sends_with_reason(
@@ -1203,7 +1211,7 @@ async def test_notify_erasure_rejected_no_reason(
         settings=SETTINGS,
         request_id=uuid.uuid4(),
         email="user@x.de",
-        reason=None,  # takes the '' branch
+        reason=None,
     )
     assert queue.messages
 
@@ -1225,8 +1233,8 @@ async def test_notify_erasure_rejected_no_email_skips(
     assert called == []
 
 
-# Check that the _idem_parts helper of the service module takes both branches.
 def test_idem_parts_with_and_without_base() -> None:
+    """Cover both branches of ``_idem_parts``."""
     assert service_mod._idem_parts(None, "a", "b") == ("a", "b")
     assert service_mod._idem_parts("base", "a") == ("base", "a")
 
@@ -1236,6 +1244,6 @@ def test_as_specs_filters_non_dicts() -> None:
 
 
 def test_unused_imports_touch() -> None:
-    # Reference timedelta and the recipients module so the lint finds no unused import.
+    """Reference timedelta and the recipients module, so no import is unused."""
     assert timedelta(days=1).days == 1
     assert hasattr(recipients, "RecipientResolver")
