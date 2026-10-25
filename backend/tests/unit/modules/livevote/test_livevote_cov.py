@@ -3469,11 +3469,11 @@ async def test_authorize_unauthenticated() -> None:
 async def test_authorize_not_found() -> None:
     ws = _FakeWS()
     out = await _authorize(
-        ws,
+        ws,  # type: ignore[arg-type]
         uuid4(),
         _principal(),
-        _AuthMeetings(raise_not_found=True),
-        beamer=False,  # type: ignore[arg-type]
+        _AuthMeetings(raise_not_found=True),  # type: ignore[arg-type]
+        beamer=False,
     )
     assert out is None
     assert ws.closed_code == WS_NOT_FOUND
@@ -3482,11 +3482,11 @@ async def test_authorize_not_found() -> None:
 async def test_authorize_beamer_needs_manage() -> None:
     ws = _FakeWS()
     out = await _authorize(
-        ws,
+        ws,  # type: ignore[arg-type]
         uuid4(),
         _principal(),
-        _AuthMeetings(),
-        beamer=True,  # type: ignore[arg-type]
+        _AuthMeetings(),  # type: ignore[arg-type]
+        beamer=True,
     )
     assert out is None
     assert ws.closed_code == WS_FORBIDDEN
@@ -3501,11 +3501,11 @@ async def test_authorize_beamer_ok() -> None:
     ws = _FakeWS()
     meetings = _AuthMeetings(manager=True)
     out = await _authorize(
-        ws,
+        ws,  # type: ignore[arg-type]
         uuid4(),
         _principal(),
-        meetings,
-        beamer=True,  # type: ignore[arg-type]
+        meetings,  # type: ignore[arg-type]
+        beamer=True,
     )
     assert out is not None
     assert meetings.manage_asked == [meetings.last.gremium_id]
@@ -3527,11 +3527,11 @@ async def test_authorize_voter_not_participant() -> None:
 async def test_authorize_voter_ok() -> None:
     ws = _FakeWS()
     out = await _authorize(
-        ws,
+        ws,  # type: ignore[arg-type]
         uuid4(),
         _principal(),
-        _AuthMeetings(participant=True),
-        beamer=False,  # type: ignore[arg-type]
+        _AuthMeetings(participant=True),  # type: ignore[arg-type]
+        beamer=False,
     )
     assert out is not None
 
