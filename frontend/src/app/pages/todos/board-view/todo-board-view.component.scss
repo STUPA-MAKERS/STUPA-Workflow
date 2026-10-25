@@ -58,10 +58,9 @@
   overflow-y: auto;
   overscroll-behavior: contain;
 }
-/* The cards of a column and of a phone page fade at an end only while more cards lie past
-   it (`appScrollFade="y"`). */
-.bv__scroll,
-.bv__page {
+/* The cards of a column fade at an end only while more cards lie past it
+   (`appScrollFade="y"`). A phone page does not fade: a line bounds it at both ends. */
+.bv__scroll {
   @include fade.fade-y(var(--space-5));
 }
 .bv__head {
@@ -248,14 +247,15 @@
    phone too). The pager scrolls sideways, one page per column; each page scrolls down by
    itself, so a vertical swipe moves the cards and a horizontal one the column.
    `--bv-gutter` is the side padding of the page (`.page-shell`), which the tab bar and the
-   pager run over. */
+   pager run over. The pager starts directly at the tab line and ends at the bottom bar, so
+   the cards are cut at these two lines and not by a fade. */
 .bv--phone {
   --bv-gutter: var(--layout-gutter);
   position: relative;
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: 0;
   min-height: 0;
   overflow: visible;
 }
@@ -264,8 +264,8 @@
     --bv-gutter: var(--space-4);
   }
 }
-/* The tab bar runs over the page gutter to the screen edges too, so a long tab scrolls
-   out at the edge; its line stays inside the gutter. The tabs draw no mark of their own
+/* The tab bar and its line run over the page gutter to the screen edges, so a long tab
+   scrolls out at the edge. The tabs draw no mark of their own
    (also not on hover): the ink below moves with the swipe. */
 .bv__tabBar {
   position: relative;
@@ -276,9 +276,9 @@
 .bv__tabBar::after {
   content: '';
   position: absolute;
-  right: var(--bv-gutter);
+  right: 0;
   bottom: 0;
-  left: var(--bv-gutter);
+  left: 0;
   height: var(--border-width);
   background: var(--color-border);
   pointer-events: none;
@@ -324,8 +324,9 @@
   min-width: 0;
   min-height: 0;
   /* The page reaches down to the bottom bar; its last card scrolls clear of the floating
-     "+ To-Do" (56px, --space-4 above the bar). */
-  padding-inline: var(--bv-gutter);
+     "+ To-Do" (56px, --space-4 above the bar). The top padding is the room under the tab
+     line at rest. */
+  padding: var(--space-3) var(--bv-gutter) 0;
   padding-bottom: calc(56px + 2 * var(--space-4));
   overflow-y: auto;
   overscroll-behavior-y: contain;

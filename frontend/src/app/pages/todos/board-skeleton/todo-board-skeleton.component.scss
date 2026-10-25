@@ -59,10 +59,13 @@
   width: 4.5rem;
 }
 
-/* The tab row of `app-tabs` on a phone. */
+/* The tab row of `app-tabs` on a phone. Like the tab bar, its line runs over the page
+   gutter to the screen edges. */
 .bsk__tabs {
   display: flex;
   gap: var(--space-5);
+  margin-inline: calc(-1 * var(--bv-gutter));
+  padding-inline: var(--bv-gutter);
   border-bottom: var(--border-width) solid var(--color-border);
 }
 .bsk__tab {
