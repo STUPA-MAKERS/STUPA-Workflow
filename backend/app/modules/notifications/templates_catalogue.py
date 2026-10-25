@@ -9,8 +9,7 @@ override wins when it exists, otherwise the builtin default applies. The editor 
 real send therefore never drift apart. Nothing copies a seed into the DB.
 
 The module imports the builtins from the sender modules. Only ``task_reminder`` (the
-worker sends it) and ``deadline_approaching`` (it otherwise falls back to
-``status_update``) live here as the single source.
+worker sends it) and ``status_update_team`` live here as the single source.
 """
 
 from __future__ import annotations
@@ -46,20 +45,6 @@ TASK_REMINDER_BODY: dict[str, str] = {
     '{% if applicationTitle %} "{{ applicationTitle }}"{% endif %} has been '
     "waiting for action for {{ daysOpen }} days"
     "{% if status %} (status: {{ status }}){% endif %}.\n",
-}
-# deadline_approaching: ``handle_notify_action`` uses this as the builtin
-# fallback when no DB override exists.
-DEADLINE_APPROACHING_SUBJECT: dict[str, str] = {
-    "de": "Frist-Erinnerung{% if applicationTitle %} — „{{ applicationTitle }}“{% endif %}",
-    "en": 'Deadline reminder{% if applicationTitle %} — "{{ applicationTitle }}"{% endif %}',
-}
-DEADLINE_APPROACHING_BODY: dict[str, str] = {
-    "de": "Hallo,\n\neine Frist"
-    "{% if applicationTitle %} zum Antrag „{{ applicationTitle }}“{% endif %} "
-    "läuft bald ab{% if dueAt %} (fällig: {{ dueAt }}){% endif %}.\n",
-    "en": "Hello,\n\na deadline"
-    '{% if applicationTitle %} for the application "{{ applicationTitle }}"{% endif %} '
-    "is approaching{% if dueAt %} (due: {{ dueAt }}){% endif %}.\n",
 }
 # status_update_team: the team-facing default for a flow `notify` action without an
 # explicit templateKey and with non-applicant recipients. The applicant default
@@ -150,19 +135,6 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
             "status": "Aktueller Status",
             "daysOpen": "Tage ohne Aktion",
             "applicationId": "ID des Antrags",
-        },
-    ),
-    MailTemplateSpec(
-        "deadline_approaching",
-        "deadline",
-        DEADLINE_APPROACHING_SUBJECT,
-        DEADLINE_APPROACHING_BODY,
-        {
-            "link": "Link zum Antrag (ohne den Platzhalter hängt die Mail ihn an)",
-            "applicationTitle": "Titel des Antrags",
-            "dueAt": "Fälligkeitszeitpunkt",
-            "kind": "Art der Frist",
-            "deadlineId": "ID der Frist",
         },
     ),
     MailTemplateSpec(

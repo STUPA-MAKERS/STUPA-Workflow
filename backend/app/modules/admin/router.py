@@ -255,7 +255,7 @@ _PRINCIPAL_READERS = Depends(
 _MEMBERSHIP_READERS = Depends(require_any_permission("admin.gremien", "admin.delegations"))
 # Read gates for pages that need the data of another area only as a selection
 # source or a display source. The writes stay on the strict permission. The flow
-# editor reads the global flow, the roles, the webhooks and the deadlines. The
+# editor reads the global flow, the roles and the webhooks. The
 # budget tree reads the global flow. The form editor reads the application types.
 _FLOW_READABLE = Depends(
     require_any_permission("admin.types", "flow.configure", "budget.structure")

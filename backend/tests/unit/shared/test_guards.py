@@ -82,9 +82,12 @@ def test_budget_is_and_fits() -> None:
     assert eval_guard({"budgetFitsApplication": False}, ctx) is False
 
 
-def test_deadline_passed() -> None:
-    assert eval_guard({"deadlinePassed": True}, GuardContext(deadline_passed=True)) is True
-    assert eval_guard({"deadlinePassed": True}, GuardContext(deadline_passed=False)) is False
+def test_removed_deadline_passed_is_unknown() -> None:
+    # The deadline policies are gone, so `deadlinePassed` is no guard operator any more.
+    with pytest.raises(GuardError, match="unknown guard operator"):
+        validate_guard({"deadlinePassed": True})
+    with pytest.raises(GuardError, match="unknown guard operator"):
+        eval_guard({"deadlinePassed": True}, GuardContext())
 
 
 def test_attachment_present() -> None:
@@ -146,10 +149,11 @@ def test_compare_wrong_op_for_type_fails_closed() -> None:
 
 
 def test_and_or_not_combinators() -> None:
-    ctx = GuardContext(roles=frozenset({"reviewer"}), deadline_passed=True)
-    assert eval_guard({"and": [{"deadlinePassed": True}, {"roleIs": "reviewer"}]}, ctx) is True
-    assert eval_guard({"and": [{"deadlinePassed": True}, {"roleIs": "admin"}]}, ctx) is False
-    assert eval_guard({"or": [{"roleIs": "admin"}, {"deadlinePassed": True}]}, ctx) is True
+    ctx = GuardContext(roles=frozenset({"reviewer"}), budget_fits=True)
+    fits = {"budgetFitsApplication": True}
+    assert eval_guard({"and": [fits, {"roleIs": "reviewer"}]}, ctx) is True
+    assert eval_guard({"and": [fits, {"roleIs": "admin"}]}, ctx) is False
+    assert eval_guard({"or": [{"roleIs": "admin"}, fits]}, ctx) is True
     assert eval_guard({"not": {"roleIs": "admin"}}, ctx) is True
     assert eval_guard({"not": [{"roleIs": "reviewer"}]}, ctx) is False
 
@@ -161,12 +165,12 @@ def test_unknown_guard_operator_raises() -> None:
 
 def test_multi_key_guard_raises() -> None:
     with pytest.raises(GuardError):
-        eval_guard({"roleIs": "x", "deadlinePassed": True}, GuardContext())
+        eval_guard({"roleIs": "x", "budgetFitsApplication": True}, GuardContext())
 
 
 def test_not_arity_and_bad_child() -> None:
     with pytest.raises(GuardError):
-        eval_guard({"not": [{"deadlinePassed": True}, {"deadlinePassed": True}]}, GuardContext())
+        eval_guard({"not": [{"hasField": "a"}, {"hasField": "b"}]}, GuardContext())
     with pytest.raises(GuardError):
         eval_guard({"and": ["notadict"]}, GuardContext())
 
@@ -174,7 +178,7 @@ def test_not_arity_and_bad_child() -> None:
 def test_validate_guard_ok() -> None:
     validate_guard(None)
     validate_guard({})
-    validate_guard({"and": [{"roleIs": "reviewer"}, {"not": {"deadlinePassed": True}}]})
+    validate_guard({"and": [{"roleIs": "reviewer"}, {"not": {"budgetFitsApplication": True}}]})
     validate_guard({"compare": {"field": "amount", "op": ">=", "value": 0}})
 
 
@@ -193,7 +197,7 @@ def test_validate_guard_rejects_unknown_and_bad_structure() -> None:
     with pytest.raises(GuardError):
         validate_guard({"or": []})
     with pytest.raises(GuardError):
-        validate_guard({"not": [{"deadlinePassed": True}, {"deadlinePassed": True}]})
+        validate_guard({"not": [{"hasField": "a"}, {"hasField": "b"}]})
     with pytest.raises(GuardError, match="unknown compare operator"):
         validate_guard({"compare": {"field": "x", "op": "~="}})
     with pytest.raises(GuardError, match="requires a list value"):
@@ -212,7 +216,7 @@ def test_validate_guard_rejects_bad_leaf_value_types() -> None:
     with pytest.raises(GuardError, match="non-empty string"):
         validate_guard({"applicationTypeIs": ""})
     with pytest.raises(GuardError, match="boolean"):
-        validate_guard({"deadlinePassed": "yes"})
+        validate_guard({"budgetFitsApplication": "yes"})
     with pytest.raises(GuardError, match="boolean"):
         validate_guard({"actorIsApplicant": 1})
 
@@ -253,7 +257,7 @@ def test_validate_action_rejects_unknown_and_missing() -> None:
 
 def test_whitelists_exact() -> None:
     assert {
-        "deadlinePassed", "applicantRoleIs", "applicantCommitteeIs", "applicationTypeIs",
+        "applicantRoleIs", "applicantCommitteeIs", "applicationTypeIs",
         "attachmentPresent", "budgetIs", "budgetFitsApplication", "hasField", "compare",
         "roleIs", "isInCommittee", "actorIsApplicant", "and", "or", "not",
         "isInVoteGremium", "budgetHasDecisionGremium",

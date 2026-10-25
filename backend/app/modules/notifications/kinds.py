@@ -27,8 +27,6 @@ NOTIFICATION_KINDS: tuple[str, ...] = (
     "delegation",
     # A meeting protocol was finalized.
     "protocol",
-    # Deadline reminders on applications.
-    "deadline",
     # GDPR erasure requests: received, executed or rejected.
     "privacy",
     # A new ticket was reported (holders of ticket.manage). The confirmation to the

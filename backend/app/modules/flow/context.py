@@ -160,12 +160,11 @@ async def build_base_context(
     app: Application,
     *,
     manual: bool,
-    deadline_passed: bool = False,
 ) -> GuardContext:
     """Build the actor-free part of the guard context from the database and the application.
 
     The context holds every fact that comes from the application alone: applicant,
-    budget, fields and deadline. The actor fields keep their empty defaults. Overlay
+    budget and fields. The actor fields keep their empty defaults. Overlay
     them per actor with `with_actor`.
     """
     raw_roles = app.data.get("_applicantRoles") if isinstance(app.data, dict) else None
@@ -179,7 +178,6 @@ async def build_base_context(
 
     return GuardContext(
         manual=manual,
-        deadline_passed=deadline_passed,
         applicant_roles=applicant_roles,
         applicant_committees=applicant_committees,
         budget_id=str(app.budget_id) if app.budget_id is not None else None,
@@ -230,7 +228,6 @@ async def build_context(
     principal: Principal,
     *,
     manual: bool,
-    deadline_passed: bool = False,
     as_applicant: bool = False,
 ) -> GuardContext:
     """Build the full `GuardContext` from the database and the principal.
@@ -238,9 +235,7 @@ async def build_context(
     `as_applicant=True` marks the magic-link holder as the applicant actor whatever
     `created_by` says. The link holder is the applicant for exactly this application.
     """
-    base = await build_base_context(
-        session, app, manual=manual, deadline_passed=deadline_passed
-    )
+    base = await build_base_context(session, app, manual=manual)
     actor_committees = (
         await committee_ids_for_sub(session, principal.sub) if manual else frozenset()
     )

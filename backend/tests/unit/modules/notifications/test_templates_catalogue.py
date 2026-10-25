@@ -70,7 +70,6 @@ def test_all_sent_keys_are_catalogued() -> None:
         "status_update_team",
         "task_new",
         "task_reminder",
-        "deadline_approaching",
         "comment_applicant",
         "comment_team",
         "meeting_created",

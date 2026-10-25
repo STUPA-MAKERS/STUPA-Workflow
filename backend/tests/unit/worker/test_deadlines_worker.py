@@ -1,15 +1,14 @@
 """Cron worker `process_deadlines` (T-44): orchestration without a DB or Redis.
 
-The tests fake the domain services for flow, voting and notifications. They cover the
-worker logic. The worker skips a deadline when the row lock misses, because a parallel
-worker holds that row. It sets the marker for idempotency. It catches Conflict and
-NotFound. The tests also cover the reminder path and the mail queue choice.
+The tests fake the domain services for flow and voting. They cover the worker logic.
+The worker skips a vote when the row lock misses, because a parallel worker holds that
+row. It catches Conflict and keeps going after a broken unit.
 """
 
 from __future__ import annotations
 
 from collections.abc import Iterator
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any
 from uuid import uuid4
@@ -110,24 +109,10 @@ class _VotingFake:
         return SimpleNamespace(application_id=None, branch_fired=False)
 
 
-class _NotifyFake:
-    events: list[str] = []
-    links: list[Any] = []
-
-    def __init__(self, *_a: Any, **_k: Any) -> None: ...
-
-    async def handle_notify_action(self, action: dict[str, Any], **_kw: Any) -> int:
-        _NotifyFake.events.append(action.get("templateKey", ""))
-        _NotifyFake.links.append(_kw.get("applicant_link"))
-        return 1
-
-
 @pytest.fixture(autouse=True)
 def _reset() -> Iterator[None]:
     _FlowFake.calls = []
     _VotingFake.calls = []
-    _NotifyFake.events = []
-    _NotifyFake.links = []
     yield
 
 
@@ -135,7 +120,6 @@ def _reset() -> Iterator[None]:
 def patched(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(wd, "FlowService", _FlowFake)
     monkeypatch.setattr(wd, "VotingService", _VotingFake)
-    monkeypatch.setattr(wd, "NotificationService", _NotifyFake)
     monkeypatch.setattr(wd, "build_worker_dispatcher", lambda *_a: object())
 
     async def _no_todos(_ctx: dict[str, Any], _now: datetime) -> int:
@@ -146,75 +130,6 @@ def patched(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def _ctx(sessions: list[FakeSession]) -> dict[str, Any]:
     return {"settings": SETTINGS, "deadlines_sessionmaker": _maker(sessions)}
-
-
-@freeze_time(FROZEN)
-async def test_fire_due_deadline_fires_and_consumes(patched: None) -> None:
-    tid = uuid4()
-    deadline = SimpleNamespace(
-        id=uuid4(), kind="requeue", application_id=uuid4(),
-        action_on_pass={"transitionId": str(tid)},
-    )
-    lock = FakeSession([[deadline]])
-    fired = await wd._fire_one(_ctx([lock]), deadline.id, NOW)
-    assert fired is True
-    assert _FlowFake.calls[0][1] == tid
-    assert _FlowFake.calls[0][2]["deadline_passed"] is True
-    assert _FlowFake.calls[0][2]["manual"] is False
-    assert deadline.action_on_pass is None  # consumed
-    assert lock.committed == 1
-
-
-@freeze_time(FROZEN)
-async def test_fire_lock_miss_skips(patched: None) -> None:
-    # The lock returns None because another worker holds the row. Nothing fires.
-    lock = FakeSession([[]])
-    assert await wd._fire_one(_ctx([lock]), uuid4(), NOW) is False
-    assert _FlowFake.calls == []
-
-
-@freeze_time(FROZEN)
-async def test_fire_conflict_still_consumes(patched: None, monkeypatch: pytest.MonkeyPatch) -> None:
-    class _Boom(_FlowFake):
-        async def fire(self, *_a: Any, **_k: Any) -> Any:
-            raise ConflictError("guard", code="conflict")
-
-    monkeypatch.setattr(wd, "FlowService", _Boom)
-    deadline = SimpleNamespace(
-        id=uuid4(), kind="flow", application_id=uuid4(),
-        action_on_pass={"transitionId": str(uuid4())},
-    )
-    lock = FakeSession([[deadline]])
-    assert await wd._fire_one(_ctx([lock]), deadline.id, NOW) is False
-    assert deadline.action_on_pass is None  # consumed even so
-    assert lock.committed == 1
-
-
-@freeze_time(FROZEN)
-async def test_fire_notfound_consumes(patched: None, monkeypatch: pytest.MonkeyPatch) -> None:
-    class _Gone(_FlowFake):
-        async def fire(self, *_a: Any, **_k: Any) -> Any:
-            raise NotFoundError("missing")
-
-    monkeypatch.setattr(wd, "FlowService", _Gone)
-    deadline = SimpleNamespace(
-        id=uuid4(), kind="flow", application_id=uuid4(),
-        action_on_pass={"transitionId": str(uuid4())},
-    )
-    lock = FakeSession([[deadline]])
-    assert await wd._fire_one(_ctx([lock]), deadline.id, NOW) is False
-    assert deadline.action_on_pass is None
-
-
-@freeze_time(FROZEN)
-async def test_fire_bad_action_ref_consumed_without_fire(patched: None) -> None:
-    deadline = SimpleNamespace(
-        id=uuid4(), kind="flow", application_id=None, action_on_pass={"foo": "bar"}
-    )
-    lock = FakeSession([[deadline]])
-    assert await wd._fire_one(_ctx([lock]), deadline.id, NOW) is False
-    assert _FlowFake.calls == []
-    assert deadline.action_on_pass is None
 
 
 @freeze_time(FROZEN)
@@ -422,101 +337,6 @@ async def test_close_notfound_propagates(
 
 
 @freeze_time(FROZEN)
-async def test_remind_with_application_type_lookup(patched: None) -> None:
-    deadline = SimpleNamespace(
-        id=uuid4(), kind="vote", application_id=uuid4(), type_id=None,
-        due_at=NOW + timedelta(hours=1), reminded_at=None,
-    )
-    lock = FakeSession([[deadline]], scalar=uuid4())  # the type_id lookup
-    sent = await wd._remind_one(_ctx([lock]), SETTINGS, deadline.id, NOW, timedelta(hours=24))
-    assert sent is True
-    assert _NotifyFake.events == ["deadline_approaching"]
-    # The scalar fake answers the `created_by` lookup too: an applicant account.
-    base = SETTINGS.public_base_url.rstrip("/")
-    assert _NotifyFake.links[0].url == f"{base}/applications/{deadline.application_id}"
-    assert deadline.reminded_at == NOW
-    assert lock.committed == 1
-
-
-@freeze_time(FROZEN)
-async def test_remind_type_only_deadline_no_lookup(patched: None) -> None:
-    deadline = SimpleNamespace(
-        id=uuid4(), kind="phase", application_id=None, type_id=uuid4(),
-        due_at=NOW + timedelta(hours=1), reminded_at=None,
-    )
-    lock = FakeSession([[deadline]])  # no scalar needed
-    sent = await wd._remind_one(_ctx([lock]), SETTINGS, deadline.id, NOW, timedelta(hours=24))
-    assert sent is True
-    assert _NotifyFake.links == [None]  # no application, no link
-
-
-@freeze_time(FROZEN)
-async def test_remind_lock_miss(patched: None) -> None:
-    lock = FakeSession([[]])
-    assert await wd._remind_one(_ctx([lock]), SETTINGS, uuid4(), NOW, timedelta(hours=24)) is False
-    assert _NotifyFake.events == []
-
-
-def _deadline(**over: Any) -> SimpleNamespace:
-    base: dict[str, Any] = {
-        "id": uuid4(), "kind": "flow", "application_id": uuid4(), "type_id": uuid4(),
-        "action_on_pass": {"transitionId": str(uuid4())},
-        "due_at": NOW + timedelta(hours=1), "reminded_at": None,
-    }
-    base.update(over)
-    return SimpleNamespace(**base)
-
-
-@freeze_time(FROZEN)
-async def test_reminder_failure_does_not_abort_cycle(
-    patched: None, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    calls = {"n": 0}
-
-    class _RaiseOnce(_NotifyFake):
-        async def handle_notify_action(self, action: dict[str, Any], **kw: Any) -> int:
-            calls["n"] += 1
-            if calls["n"] == 1:
-                raise RuntimeError("broken template")
-            return await super().handle_notify_action(action, **kw)
-
-    monkeypatch.setattr(wd, "NotificationService", _RaiseOnce)
-    bad, good = _deadline(), _deadline()
-    sessions = [
-        FakeSession([[bad.id, good.id]]),  # scan
-        FakeSession([[bad]]),              # lock bad → dispatch raises
-        FakeSession([[good]]),             # lock good → ok
-    ]
-    # The worker logs and skips the broken deadline. It still processes the good one.
-    assert await wd._process_reminders(_ctx(sessions), SETTINGS, NOW) == 1
-    assert _NotifyFake.events == ["deadline_approaching"]
-
-
-@freeze_time(FROZEN)
-async def test_action_failure_does_not_abort_cycle(
-    patched: None, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    calls = {"n": 0}
-
-    class _RaiseOnce(_FlowFake):
-        async def fire(self, *a: Any, **k: Any) -> Any:
-            calls["n"] += 1
-            if calls["n"] == 1:
-                raise RuntimeError("boom")
-            return await super().fire(*a, **k)
-
-    monkeypatch.setattr(wd, "FlowService", _RaiseOnce)
-    bad, good = _deadline(), _deadline()
-    sessions = [
-        FakeSession([[bad.id, good.id]]),
-        FakeSession([[bad]]),
-        FakeSession([[good]]),
-    ]
-    assert await wd._process_actions(_ctx(sessions), SETTINGS, NOW) == 1
-    assert len(_FlowFake.calls) == 1  # only the good deadline fires
-
-
-@freeze_time(FROZEN)
 async def test_vote_failure_does_not_abort_cycle(
     patched: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -542,30 +362,16 @@ async def test_vote_failure_does_not_abort_cycle(
 
 @freeze_time(FROZEN)
 async def test_process_deadlines_orchestrates_all(patched: None) -> None:
-    tid = uuid4()
-    deadline = SimpleNamespace(
-        id=uuid4(), kind="flow", application_id=uuid4(), type_id=uuid4(),
-        action_on_pass={"transitionId": str(tid)},
-    )
-    rem = SimpleNamespace(
-        id=uuid4(), kind="vote", application_id=None, type_id=uuid4(),
-        due_at=NOW + timedelta(hours=1), reminded_at=None,
-    )
     vote = SimpleNamespace(id=uuid4())
-    # Call order of the maker: rem-scan, rem-lock, act-scan, act-lock, vote-scan,
-    # vote-lock.
+    # Call order of the maker: vote-scan, vote-lock, auto-transition scan, discard.
     sessions = [
-        FakeSession([[rem.id]]),       # reminder scan
-        FakeSession([[rem]]),          # reminder lock
-        FakeSession([[deadline.id]]),  # action scan
-        FakeSession([[deadline]]),     # action lock
         FakeSession([[vote.id]]),      # vote scan
         FakeSession([[vote]]),         # vote lock
         FakeSession([[]]),             # auto-transition scan (#8/#28) → no applications
         FakeSession([[]]),             # discard of unconfirmed guest applications → none
     ]
     out = await wd.process_deadlines(_ctx(sessions))
-    assert out == "reminders=1 actions=1 votes=1 auto=0 discarded=0 todos=0 polls=0"
+    assert out == "votes=1 auto=0 discarded=0 todos=0 polls=0"
 
 
 async def test_todo_due_step_counts_and_survives_a_failure(
@@ -599,19 +405,6 @@ async def test_poll_reminder_step_counts_and_survives_a_failure(
 
 
 @freeze_time(FROZEN)
-async def test_process_actions_counts_zero_on_lock_miss(patched: None) -> None:
-    # The scan finds an id, but the lock misses because another worker holds the row.
-    sessions = [FakeSession([[uuid4()]]), FakeSession([[]])]
-    assert await wd._process_actions(_ctx(sessions), SETTINGS, NOW) == 0
-
-
-@freeze_time(FROZEN)
-async def test_process_reminders_counts_zero_on_lock_miss(patched: None) -> None:
-    sessions = [FakeSession([[uuid4()]]), FakeSession([[]])]
-    assert await wd._process_reminders(_ctx(sessions), SETTINGS, NOW) == 0
-
-
-@freeze_time(FROZEN)
 async def test_process_votes_counts_zero_on_lock_miss(patched: None) -> None:
     sessions = [FakeSession([[uuid4()]]), FakeSession([[]])]
     assert await wd._process_votes(_ctx(sessions), NOW) == 0
@@ -621,13 +414,6 @@ async def test_on_startup_sets_settings() -> None:
     ctx: dict[str, Any] = {}
     await wd.on_startup(ctx)
     assert "settings" in ctx
-
-
-def test_mail_queue_from_pool_and_injection() -> None:
-    assert wd._mail_queue({}) is None
-    sentinel = object()
-    assert wd._mail_queue({"mail_queue": sentinel}) is sentinel
-    assert wd._mail_queue({"redis": object()}) is not None
 
 
 def test_system_principal_has_manage() -> None:
@@ -653,6 +439,13 @@ def test_flow_dispatcher_prefers_the_ctx_and_falls_back_to_the_full_chain() -> N
     )
     assert isinstance(chain, ChainActionDispatcher)
     assert len(chain.dispatchers) == 3
+
+
+async def test_vote_scan_and_lock_read_the_session() -> None:
+    vote = SimpleNamespace(id=uuid4())
+    assert await wd.due_open_vote_ids(FakeSession([[vote.id]]), NOW) == [vote.id]  # type: ignore[arg-type]
+    assert await wd.lock_open_vote(FakeSession([[vote]]), vote.id, NOW) is vote  # type: ignore[arg-type]
+    assert await wd.lock_open_vote(FakeSession([[]]), vote.id, NOW) is None  # type: ignore[arg-type]
 
 
 def test_publisher_needs_redis() -> None:

@@ -117,8 +117,7 @@ class Application(UUIDPkMixin, TimestampMixin, Base):
     # The free-text intake channel ("Eingang"), for example "per PDF" or "per Mail".
     capture_intake: Mapped[str | None] = mapped_column(Text, nullable=True)
     # The date on which the application reached the Gremium. The capturing person sets
-    # it (default: the day of the capture). It is information only: the flow deadlines
-    # still count from ``created_at``.
+    # it (default: the day of the capture). It is information only.
     received_on: Mapped[date | None] = mapped_column(Date, nullable=True)
 
     __table_args__ = (

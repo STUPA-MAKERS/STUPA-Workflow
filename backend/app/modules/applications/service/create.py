@@ -80,16 +80,16 @@ class CreateOps(ApplicationsServiceBase):
         3. Write the application, the PII row, version 1, the initial state and
            the status event. Bind the drafts to the application.
         4. Start the flow of a confirmed application
-           (``FlowService.start_confirmed``): the deadline of the initial state,
-           the automatic transitions and the task mail. ``dispatcher`` sends the
+           (``FlowService.start_confirmed``): the automatic transitions and the
+           task mail. ``dispatcher`` sends the
            mails and the other flow actions.
 
         ``actor`` names the audit actor. A public submission passes
         ``"applicant"``. A manual creation by a manager passes the ``sub`` of the
         principal.
 
-        A public submission starts unconfirmed and rests in the flow: no deadline,
-        no automatic transition and no mail. The magic-link verify starts the flow
+        A public submission starts unconfirmed and rests in the flow: no automatic
+        transition and no mail. The magic-link verify starts the flow
         (``auth.service.verify_magic_link``).
 
         ``email_confirmed`` tells whether the applicant email is already confirmed.

@@ -116,7 +116,7 @@ export function defaultGuard(op: GuardLeafOperator): Guard {
 /**
  * Value-control kind per guard operator.
  *
- * `none`      → the boolean operators (`deadlinePassed`, `budgetFitsApplication`,
+ * `none`      → the boolean operators (`budgetFitsApplication`,
  *               `budgetHasDecisionGremium`, `isInVoteGremium`, …).
  * `role`      → `roleIs` and `applicantRoleIs`, shown as a global-role dropdown.
  * `committee` → `isInCommittee` and `applicantCommitteeIs`, shown as a Gremium dropdown.

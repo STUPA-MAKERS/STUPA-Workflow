@@ -43,7 +43,6 @@ from app.modules.budget.tree_models import (
     FiscalYear,
 )
 from app.modules.config_revision.models import ConfigRevision
-from app.modules.deadlines.models import Deadline, DeadlinePolicy
 from app.modules.delegations.models import (
     DelegationSubstitute,
     MeetingDelegation,
@@ -101,8 +100,6 @@ __all__ = [
     "ConfigRevision",
     "FiscalYear",
     "Comment",
-    "Deadline",
-    "DeadlinePolicy",
     "DelegationSubstitute",
     "MeetingDelegation",
     "FlowVersion",

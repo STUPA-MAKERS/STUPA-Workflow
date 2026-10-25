@@ -13,8 +13,7 @@ Operations:
   without a commit. The voting module calls it in a SAVEPOINT when it closes a vote,
   and commits the close and the transition once.
 * `FlowService.start_confirmed` — start the flow of an application when its email is
-  confirmed. It schedules the deadline of the current state, runs `auto_advance` and
-  sends the task mail of the state.
+  confirmed. It runs `auto_advance` and sends the task mail of the state.
 
 A transition without a branch, a forced status and an audit revert leave the current
 state. They cancel the votes of the application that cannot finish any more
@@ -23,7 +22,7 @@ sends `vote_cancelled` for each cancelled meeting vote through the optional
 `MeetingPublisher`.
 
 Unconfirmed guest applications (`email_confirmed_at IS NULL`) rest in the flow: they get
-no deadline, no automatic transition and no mail until the magic link confirms them. The
+no automatic transition and no mail until the magic link confirms them. The
 routes pass `allow_unconfirmed=False`, so such an application gives 404 there.
 
 Vote Gremium (flow variant B): every state change stores the Gremium that decides the
@@ -47,7 +46,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, CursorResult, delete, select, update
+from sqlalchemy import ColumnElement, CursorResult, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.applications.decision import (
@@ -65,14 +64,6 @@ from app.modules.applications.schemas import StateOut
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import AuditService
 from app.modules.auth.principal import Principal
-from app.modules.deadlines.models import Deadline
-from app.modules.deadlines.service import (
-    DeadlinePolicyService,
-    DeadlineService,
-    flow_deadline_passed,
-    resolve_due_at,
-    submission_anchor,
-)
 from app.modules.flow import context as flow_context
 from app.modules.flow.dispatch import (
     ActionDispatcher,
@@ -88,43 +79,18 @@ from app.modules.flow.vote_gremium import (
     resolve_vote_gremium,
     snapshot_for_entry,
 )
-from app.settings import get_settings
 from app.shared.errors import (
     ConflictError,
     ForbiddenError,
     NotFoundError,
     ValidationProblem,
 )
-from app.shared.guards import GuardContext, eval_guard, guard_requires_applicant
+from app.shared.guards import eval_guard, guard_requires_applicant
 
 if TYPE_CHECKING:
     from app.modules.livevote.publisher import MeetingPublisher
 
 logger = logging.getLogger("app.flow")
-
-
-def _guard_fires_on_deadline(guard: Any, *, negated: bool = False) -> bool:
-    """Report whether the guard must fire on an expired deadline.
-
-    The check walks `and`, `or` and `not` recursively. The guard qualifies when it needs
-    `deadlinePassed` to be true under the current negation polarity. So
-    `{deadlinePassed: true}` and `not(deadlinePassed: false)` count, but
-    `not(deadlinePassed: true)` does not.
-    """
-    if not isinstance(guard, dict):
-        return False
-    for op, value in guard.items():
-        if op == "deadlinePassed":
-            if bool(value) != negated:
-                return True
-        elif op in ("and", "or") and isinstance(value, list):
-            if any(_guard_fires_on_deadline(g, negated=negated) for g in value):
-                return True
-        elif op == "not":
-            children = value if isinstance(value, list) else [value]
-            if any(_guard_fires_on_deadline(g, negated=not negated) for g in children):
-                return True
-    return False
 
 
 def _agenda_action(actions: Any) -> dict[str, Any] | None:
@@ -190,8 +156,8 @@ def _meeting_problem(msg: str) -> ValidationProblem:
 class StagedFire:
     """A transition that `stage_fire` wrote into the open transaction.
 
-    The caller commits. `after_commit` then materializes the deadline of the new
-    state, publishes the cancelled votes and dispatches the actions.
+    The caller commits. `after_commit` then publishes the cancelled votes and
+    dispatches the actions.
     """
 
     application: Application
@@ -354,143 +320,11 @@ class FlowService:
             .all()
         )
 
-    async def schedule_state_deadline(
-        self,
-        app: Application,
-        state: State,
-        *,
-        commit: bool = True,
-        due_at: datetime | None = None,
-    ) -> Deadline | None:
-        """Materialize the named deadline policy of a state that the application enters.
-
-        A `deadlinePolicyKey` in `state.config` selects the policy. The service resolves
-        it: `absolute` gives a fixed date, `relative_submitted` gives `created_at + X`
-        (`received_on` + X for a captured application, see `submission_anchor`),
-        and `relative_changed` gives `updated_at + X`. It then creates a `Deadline` whose
-        `action_on_pass` points at the `deadlinePassed` transition of this state. The
-        cron fires that transition on expiry. Without such a transition the deadline is a
-        pure marker with `action_on_pass=NULL`. That marker is the basis of
-        `deadlinePassed` on manual transitions (see `_deadline_passed`).
-
-        The service always removes the flow deadlines of the state that the application
-        leaves, even the consumed ones. Deadlines must not stack. A state without a
-        policy must not keep a stale deadline.
-
-        `commit=False` leaves the commit to the caller. The flow activation uses it to
-        move the deadlines of all applications in its own transaction.
-
-        `due_at` keeps a known due time and does not resolve the policy again. The flow
-        activation uses it when the state keeps its `deadlinePolicyKey`. A `recurring`
-        policy resolves to the next date after now, so a second resolve moves an
-        expired deadline to a later date or removes it.
-
-        Returns:
-            The new deadline, or `None` when the state has no resolvable policy.
-        """
-        await self.session.execute(
-            delete(Deadline).where(
-                Deadline.application_id == app.id,
-                Deadline.kind == "flow_deadline",
-            )
-        )
-        deadline = await self._materialize_deadline(app, state, due_at=due_at)
-        if commit:
-            await self.session.commit()
-        return deadline
-
-    async def _materialize_deadline(
-        self, app: Application, state: State, *, due_at: datetime | None = None
-    ) -> Deadline | None:
-        """Create the deadline row of `state` for `app`, without a commit.
-
-        A given `due_at` replaces the due time that the policy resolves to. The policy
-        must still exist.
-        """
-        cfg = state.config if isinstance(state.config, dict) else {}
-        key = cfg.get("deadlinePolicyKey")
-        if not isinstance(key, str) or not key:
-            return None
-        policy = await DeadlinePolicyService(self.session).get_by_key(key)
-        if policy is None:
-            return None
-        if due_at is None:
-            due_at = resolve_due_at(
-                policy,
-                now=datetime.now(UTC),
-                submitted_at=submission_anchor(
-                    app.created_at, app.received_on, get_settings().local_timezone
-                ),
-                changed_at=app.updated_at,
-            )
-        if due_at is None:
-            return None
-        # The target is the outgoing transition of the state that must fire on an expired
-        # deadline, under the `deadlinePassed` polarity including negation. With several
-        # candidates, take the one with the smallest `order` for a deterministic result.
-        transitions = (
-            await self.session.execute(
-                select(Transition)
-                .where(
-                    Transition.flow_version_id == app.flow_version_id,
-                    Transition.from_state_id == state.id,
-                )
-                .order_by(Transition.order)
-            )
-        ).scalars().all()
-        candidates = [t for t in transitions if _guard_fires_on_deadline(t.guard)]
-        target = self._pick_deadline_transition(candidates)
-        return await DeadlineService(self.session).create(
-            kind="flow_deadline",
-            due_at=due_at,
-            application_id=app.id,
-            action_on_pass=(
-                {"transitionId": str(target.id)} if target is not None else None
-            ),
-            commit=False,
-        )
-
-    # Minimal context: only the deadline counts as satisfied. There are no roles, no
-    # budget fit and no field values. A candidate whose full guard is already `True` here
-    # needs nothing but the expired deadline, so it fires on expiry for sure. This stays
-    # evaluable without I/O at schedule time.
-    _DEADLINE_ONLY_CTX = GuardContext(manual=False, deadline_passed=True)
-
-    @classmethod
-    def _pick_deadline_transition(
-        cls, candidates: list[Transition]
-    ) -> Transition | None:
-        """Pick the first `deadlinePassed` candidate that the expired deadline alone opens.
-
-        The candidates come in `order`. A candidate whose guard holds under
-        `_DEADLINE_ONLY_CTX` (only `deadline_passed=True`, everything else empty) fires
-        on expiry for sure. A candidate with an extra AND predicate would not fire. The
-        cron would still consume the deadline (`ConflictError` leads to
-        `action_on_pass=NULL`) and the application would hang without a deadline. If no
-        candidate holds without an extra condition, pin the first one as a pure marker.
-        The deadline then stays visible.
-        """
-        if not candidates:
-            return None
-        for t in candidates:
-            if eval_guard(t.guard, cls._DEADLINE_ONLY_CTX):
-                return t
-        return candidates[0]
-
-    async def _deadline_passed(self, app: Application) -> bool:
-        """Derive the real `deadline_passed` of the current state from the database.
-
-        The work goes to `flow_deadline_passed` in the deadlines service. The task-mail
-        recipient resolution uses the same derivation.
-        """
-        return await flow_deadline_passed(self.session, app.id)
-
     async def available_transitions(
         self,
         application_id: UUID,
         principal: Principal,
         *,
-        deadline_passed: bool | None = None,
         allow_unconfirmed: bool = True,
     ) -> list[TransitionOut]:
         """List the manual transitions the actor may fire, with the guards checked.
@@ -499,17 +333,14 @@ class FlowService:
         user. It also hides result branches, meaning transitions with `branch` set, such
         as the pass and fail exits of a vote or approval state. Only the vote decides
         those through `close_vote`, never a manual action. Actor gates in the guard refine
-        which of the remaining transitions stay visible. `deadline_passed=None` means
-        derive the value from the database. `allow_unconfirmed` works as in
-        `_load_app`.
+        which of the remaining transitions stay visible. `allow_unconfirmed` works as
+        in `_load_app`.
         """
         app = await self._load_app(application_id, allow_unconfirmed=allow_unconfirmed)
         if app.current_state_id is None:
             return []
-        if deadline_passed is None:
-            deadline_passed = await self._deadline_passed(app)
         ctx = await flow_context.build_context(
-            self.session, app, principal, manual=True, deadline_passed=deadline_passed
+            self.session, app, principal, manual=True
         )
         visible = [
             t
@@ -576,14 +407,11 @@ class FlowService:
         self,
         application_id: UUID,
         principal: Principal,
-        *,
-        deadline_passed: bool | None = None,
     ) -> TransitionResult | None:
         """Fire the first automatic transition whose guard holds.
 
         The worker or cron calls this in a cycle with `manual=False`. The optimistic
-        locking in `fire` keeps it idempotent. `deadline_passed=None` means derive the
-        value from the database.
+        locking in `fire` keeps it idempotent.
 
         Returns:
             The result of the fired transition, or `None` when none fired.
@@ -598,10 +426,8 @@ class FlowService:
         state = await self._load_state(app.current_state_id)
         if state is not None and state.kind == "vote":
             return None
-        if deadline_passed is None:
-            deadline_passed = await self._deadline_passed(app)
         ctx = await flow_context.build_context(
-            self.session, app, principal, manual=False, deadline_passed=deadline_passed
+            self.session, app, principal, manual=False
         )
         for t in await self._outgoing(app):
             if not (t.automatic and eval_guard(t.guard, ctx)):
@@ -617,7 +443,6 @@ class FlowService:
                     t.id,
                     principal,
                     note="auto",
-                    deadline_passed=deadline_passed,
                     manual=False,
                 )
         return None
@@ -637,17 +462,17 @@ class FlowService:
         confirmed at once, so the create calls this method directly. The method runs
         three steps:
 
-        1. Schedule the deadline of the current state. This also deletes the stale
-           flow deadlines of the application.
+        1. Commit the confirmation. The dispatchers read in their own sessions, so
+           they must see the application as confirmed.
         2. Run `auto_advance`.
         3. When no transition fired, send the task mail of the current state to the
            people who can act there. A fired transition sends its own mails.
 
-        Step 1 commits the confirmation. After that commit, an error in step 2 or 3
-        must not fail the verify or the create request: the email is confirmed, a
-        single-use link is spent, and a logged-in create already has its
-        application. So, as in the cron, the method catches every error of steps 2
-        and 3, rolls the session back and writes a log line. A `ConflictError` or a
+        After the commit of step 1, an error in step 2 or 3 must not fail the verify
+        or the create request: the email is confirmed, a single-use link is spent,
+        and a logged-in create already has its application. So, as in the cron, the
+        method catches every error of steps 2 and 3, rolls the session back and
+        writes a log line. A `ConflictError` or a
         `NotFoundError` is an expected race and gets an info line. Every other error
         gets a log line with the traceback. The cron tries the automatic transitions
         again.
@@ -661,13 +486,9 @@ class FlowService:
         app = await self._load_app(application_id)
         if app.current_state_id is None:
             return None
-        state = await self._load_state(app.current_state_id)
-        if state is not None:
-            await self.schedule_state_deadline(app, state)
-        else:
-            # The dispatchers read in their own sessions. Commit the confirmation
-            # first, so that they see the application as confirmed.
-            await self.session.commit()
+        # The dispatchers read in their own sessions. Commit the confirmation first, so
+        # that they see the application as confirmed.
+        await self.session.commit()
         try:
             fired = await self.auto_advance(application_id, self._SYSTEM)
             if fired is None:
@@ -842,7 +663,6 @@ class FlowService:
         principal: Principal,
         *,
         note: str | None = None,
-        deadline_passed: bool | None = None,
         manual: bool = True,
         as_applicant: bool = False,
         meeting_id: UUID | None = None,
@@ -851,9 +671,6 @@ class FlowService:
         decision: DecisionIn | None = None,
     ) -> TransitionResult:
         """Fire a transition.
-
-        `deadline_passed=None` means derive the value from the database, as the manual
-        paths do. The deadline worker passes `True` on its own.
 
         `meeting_id` puts the application on the agenda of that meeting. The engine
         checks the meeting before the state change: the principal can read it, it is
@@ -881,7 +698,6 @@ class FlowService:
             transition_id,
             principal,
             note=note,
-            deadline_passed=deadline_passed,
             manual=manual,
             as_applicant=as_applicant,
             meeting_id=meeting_id,
@@ -899,7 +715,6 @@ class FlowService:
         principal: Principal,
         *,
         note: str | None = None,
-        deadline_passed: bool | None = None,
         manual: bool = True,
         as_applicant: bool = False,
         meeting_id: UUID | None = None,
@@ -962,11 +777,8 @@ class FlowService:
             )
             check_approved_amount(app.amount, decision.approved_amount)
             app.approved_amount = decision.approved_amount
-        if deadline_passed is None:
-            deadline_passed = await self._deadline_passed(app)
         ctx = await flow_context.build_context(
-            self.session, app, principal, manual=manual,
-            deadline_passed=deadline_passed, as_applicant=as_applicant,
+            self.session, app, principal, manual=manual, as_applicant=as_applicant
         )
         if not eval_guard(transition.guard, ctx):
             raise ConflictError("Transition guard not satisfied.", code="guard_failed")
@@ -1017,12 +829,11 @@ class FlowService:
         await self.session.flush()
         status_event_id = event.id
 
-        # A non-branch exit is a manual vote cancel or an automatic deadline exit from a
-        # vote state. It cancels the open and draft votes of the application in the
-        # same transaction (F19). Otherwise a vote would stay open and its close()
-        # would find no branch in the new state, and a draft could open later outside
-        # its vote state. A vote-outcome branch cancels nothing, because close()
-        # already closed the vote.
+        # A non-branch exit from a vote state is a manual vote cancel. It cancels the
+        # open and draft votes of the application in the same transaction (F19).
+        # Otherwise a vote would stay open and its close() would find no branch in the
+        # new state, and a draft could open later outside its vote state. A
+        # vote-outcome branch cancels nothing, because close() already closed the vote.
         cancelled: tuple[UUID, ...] = ()
         if transition.branch is None:
             cancelled = await self._cancel_votes(
@@ -1072,31 +883,12 @@ class FlowService:
             cancelled_vote_ids=cancelled,
         )
 
-    async def schedule_staged_deadline(
-        self, staged: StagedFire, *, commit: bool = True
-    ) -> None:
-        """Materialize the deadline of the state that a staged transition enters.
-
-        If the state carries a named deadline policy, this creates a due deadline that
-        the cron fires. `commit=False` keeps it in the open transaction, so the vote
-        close commits it together with the transition.
-        """
-        to_state = await self._load_state(staged.to_state_id)
-        if to_state is not None:
-            await self.session.refresh(staged.application)
-            await self.schedule_state_deadline(staged.application, to_state, commit=commit)
-
-    async def after_commit(
-        self, staged: StagedFire, *, schedule_deadline: bool = True
-    ) -> TransitionResult:
+    async def after_commit(self, staged: StagedFire) -> TransitionResult:
         """Run the work that follows the commit of a staged transition.
 
-        The work is the deadline of the new state (unless the caller already staged
-        it, `schedule_deadline=False`), the `vote_cancelled` events and the worker
-        actions. The actions are idempotent and retryable.
+        The work is the `vote_cancelled` events and the worker actions. The actions
+        are idempotent and retryable.
         """
-        if schedule_deadline:
-            await self.schedule_staged_deadline(staged)
         await self._publish_cancelled(staged.cancelled_vote_ids)
         transition = staged.transition
         app_id = staged.application.id
@@ -1203,8 +995,7 @@ class FlowService:
         check also covers a flow-version switch in between, because a migrated
         application then sits in a different state row. The method writes a reversed
         `StatusEvent` without a transition and a `status_change` audit entry. That entry
-        is itself revertable, which gives a redo. The method also re-materializes the
-        deadline of the restored state.
+        is itself revertable, which gives a redo.
 
         The application leaves `to_state_id`, so the method cancels its votes like a
         transition without a branch does (F22): the open votes and the draft votes that
@@ -1308,11 +1099,6 @@ class FlowService:
             },
         )
         await self.session.commit()
-        # Re-materialize the deadline of the restored state, as fire() does.
-        restored_state = await self._load_state(from_state_id)
-        if restored_state is not None:
-            await self.session.refresh(app)
-            await self.schedule_state_deadline(app, restored_state)
         await self._publish_cancelled(cancelled)
         return status_event_id
 
@@ -1369,8 +1155,8 @@ class FlowService:
         transition, and a `status_change` audit entry marked `forced`. That audit entry
         is itself revertable. The method also cancels the open votes and the draft votes
         that do not belong to the target state (F19), so a vote state that you leave by
-        force does not hang open. It then re-materializes the deadline and sends
-        `vote_cancelled` for the cancelled meeting votes.
+        force does not hang open. It then sends `vote_cancelled` for the cancelled
+        meeting votes.
         It deliberately sends no applicant notification and no task notification, and it
         fires no webhook. A manual override stays silent. `allow_unconfirmed` works as
         in `_load_app`.
@@ -1460,11 +1246,6 @@ class FlowService:
             },
         )
         await self.session.commit()
-        # Materialize the deadline of the new state, as fire() does.
-        to_state = await self._load_state(target_state_id)
-        if to_state is not None:
-            await self.session.refresh(app)
-            await self.schedule_state_deadline(app, to_state)
         await self._publish_cancelled(cancelled)
         return TransitionResult(
             newStateId=target_state_id,

@@ -177,7 +177,7 @@ def build_worker_dispatcher(
     """Build the full flow action dispatcher: notify, webhook and the extras.
 
     The API (`app.main`) and the arq worker use the same chain. So a transition that
-    a vote close, a deadline or an automatic advance fires runs the same actions as a
+    a vote close or an automatic advance fires runs the same actions as a
     manual transition. `redis` is the arq pool. Without a pool the notify and webhook
     dispatchers log the mails and the deliveries and keep them pending.
 

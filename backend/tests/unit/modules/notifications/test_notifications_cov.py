@@ -610,18 +610,19 @@ async def test_send_kind_mail_builtin_render_error_returns_false(
 
 
 async def test_handle_notify_action_builtin_catalogue_key_fallback() -> None:
-    # A catalog key without a database override uses the spec builtin (deadline branch).
+    # A catalog key without a database override uses the spec builtin.
     session = FakeSession(scalars=[[], []])
     queue = FakeQueue()
     svc = _svc(session, queue)
     svc.resolver = cast(Any, FakeResolver(["a@x.de"]))
     count = await svc.handle_notify_action(
-        {"type": "notify", "templateKey": "deadline_approaching"},
-        context={"applicationTitle": "Beamer", "dueAt": "morgen"},
+        {"type": "notify", "templateKey": "status_update_team"},
+        context={"applicationTitle": "Beamer", "status": "Prüfung"},
     )
     assert count == 1
-    # reason == 'deadline' because template_key holds 'deadline'.
+    # The team builtin, not the applicant default.
     assert "Beamer" in queue.messages[0].text
+    assert "Ggf. ist eine Aktion" in queue.messages[0].text
 
 
 async def test_handle_notify_action_template_key_underscore_alias() -> None:

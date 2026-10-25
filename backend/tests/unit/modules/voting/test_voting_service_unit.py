@@ -428,13 +428,12 @@ class _FakeFlow:
     branch_calls: ClassVar[list[str]] = []
     notes: ClassVar[list[str | None]] = []
     vote_ids: ClassVar[list[UUID | None]] = []
-    staged_deadlines: ClassVar[list[bool]] = []
     after: ClassVar[list[bool]] = []
 
     def __init__(self, session: object, dispatcher: object) -> None:
         self._available: list[TransitionOut] = _FakeFlow.available
 
-    async def available_transitions(self, application_id, principal, *, deadline_passed=False):  # noqa: ANN001
+    async def available_transitions(self, application_id, principal):  # noqa: ANN001
         _FakeFlow.calls.append("called")
         return self._available
 
@@ -448,11 +447,8 @@ class _FakeFlow:
             raise NotFoundError(f"no '{branch}' transition")
         return SimpleNamespace(transition=SimpleNamespace(id=_FakeFlow.branch.id))
 
-    async def schedule_staged_deadline(self, staged, *, commit=True):  # noqa: ANN001
-        _FakeFlow.staged_deadlines.append(commit)
-
-    async def after_commit(self, staged, *, schedule_deadline=True):  # noqa: ANN001
-        _FakeFlow.after.append(schedule_deadline)
+    async def after_commit(self, staged):  # noqa: ANN001
+        _FakeFlow.after.append(True)
         return TransitionResult(
             newStateId=_FakeFlow.new_state, statusEventId=uuid4(), dispatchedActions=[]
         )
@@ -468,7 +464,6 @@ def _patch_flow(monkeypatch: pytest.MonkeyPatch) -> type[_FakeFlow]:
     _FakeFlow.branch_calls = []
     _FakeFlow.notes = []
     _FakeFlow.vote_ids = []
-    _FakeFlow.staged_deadlines = []
     _FakeFlow.after = []
     monkeypatch.setattr(voting_service, "FlowService", _FakeFlow)
     return _FakeFlow
@@ -499,13 +494,12 @@ async def test_close_fires_matching_branch(_patch_flow: type[_FakeFlow]) -> None
     assert _patch_flow.notes == ["vote:passed"]
     # The status event of the branch names the vote, for the timeline link.
     assert _patch_flow.vote_ids == [vote.id]
-    # F20: the branch runs in a SAVEPOINT and the close commits ONCE, the deadline of
-    # the new state included. after_commit does not schedule it a second time.
+    # F20: the branch runs in a SAVEPOINT and the close commits ONCE. after_commit runs
+    # after that commit.
     assert db.savepoints == 1
     assert db.savepoint_rollbacks == 0
     assert db.committed == 1
-    assert _patch_flow.staged_deadlines == [False]
-    assert _patch_flow.after == [False]
+    assert _patch_flow.after == [True]
     # F12: a vote_close entry with the result and the counts, never a voter.
     entries = _audits(db)
     assert [e.action for e in entries] == ["vote_close"]
