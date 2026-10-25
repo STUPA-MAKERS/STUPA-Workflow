@@ -121,14 +121,22 @@ class ReadScope:
         return self.all_teams or board.permission in self.team_permissions
 
 
+type _CacheKey = tuple[str, bool, frozenset[str] | None]
+
+
+def _cache_key(principal: Principal) -> _CacheKey:
+    """Return the cache key of a principal: the subject, the admin flag and the scope cap."""
+    return (principal.sub, principal.is_admin, principal.scope_permissions)
+
+
 class BoardAccess:
     """The board rules of one request. It caches the per-principal lookups."""
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
         self._me: dict[str, uuid.UUID | None] = {}
-        self._gremien: dict[tuple[str, str], GremiumScope] = {}
-        self._scopes: dict[str, ReadScope] = {}
+        self._gremien: dict[tuple[_CacheKey, str], GremiumScope] = {}
+        self._scopes: dict[_CacheKey, ReadScope] = {}
 
     async def me(self, principal: Principal) -> uuid.UUID | None:
         """Return the account row id of the principal (None without a row)."""
@@ -139,15 +147,15 @@ class BoardAccess:
         return self._me[principal.sub]
 
     async def _gremium_ids(self, principal: Principal, perm: str) -> GremiumScope:
-        key = (principal.sub, perm)
+        key = (_cache_key(principal), perm)
         if key not in self._gremien:
             self._gremien[key] = await gremium_ids_with(self.session, principal, perm)
         return self._gremien[key]
 
     async def scope(self, principal: Principal) -> ReadScope:
         """Return the read scope of the principal (empty for a token without the scope)."""
-        if principal.sub in self._scopes:
-            return self._scopes[principal.sub]
+        if _cache_key(principal) in self._scopes:
+            return self._scopes[_cache_key(principal)]
         scope = ReadScope()
         everything = reads_all(principal)
         native = principal.scope_allows(TODO_WRITE)
@@ -178,7 +186,7 @@ class BoardAccess:
                 if p
                 and ((native and principal.has(p)) or (everything and principal.scope_allows(p)))
             }
-        self._scopes[principal.sub] = scope
+        self._scopes[_cache_key(principal)] = scope
         return scope
 
     async def _native(self, board: TodoBoard, principal: Principal) -> bool:
