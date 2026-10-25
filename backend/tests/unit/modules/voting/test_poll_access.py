@@ -47,7 +47,6 @@ def rights(monkeypatch: pytest.MonkeyPatch) -> dict[str, set[UUID]]:
     return state
 
 
-# ------------------------------------------------------------------ read
 async def test_application_reader_cannot_read_a_gremium_poll(
     rights: dict[str, set[UUID]],
 ) -> None:
@@ -83,17 +82,16 @@ async def test_scope_capped_admin_token_cannot_read_a_gremium_poll(
         await VotingService(fake_session()).assert_can_read(_poll(), capped)  # pyright: ignore[reportArgumentType]
 
 
-# ------------------------------------------------------------------ manage
 async def test_session_manage_alone_does_not_manage_a_gremium_poll(
     rights: dict[str, set[UUID]],
 ) -> None:
+    """session.manage alone does not manage a Gremium poll, but an application vote."""
     rights["session.manage"] = {GID}
     svc = VotingService(fake_session())
     principal = Principal(sub="s")
     assert await svc.can_manage(_poll(), principal) is False  # pyright: ignore[reportArgumentType]
     with pytest.raises(ForbiddenError):
         await svc.assert_can_manage(_poll(), principal)  # pyright: ignore[reportArgumentType]
-    # The same right still manages an application vote of the Gremium.
     assert await svc.can_manage(_poll(kind="motion"), principal) is True  # pyright: ignore[reportArgumentType]
 
 

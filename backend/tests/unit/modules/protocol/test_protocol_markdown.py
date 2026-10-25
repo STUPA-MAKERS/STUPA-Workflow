@@ -39,13 +39,13 @@ def test_variant_for_other_is_none_autodetect() -> None:
 
 
 def test_document_has_protocol_frontmatter_then_body() -> None:
+    """The editor body stays verbatim and follows the frontmatter."""
     md = build_protocol_document(_doc())
     assert md.startswith("---\n")
     assert 'title: "StuPa-Sitzung"' in md
     assert "typ: protokoll" in md
     assert 'gremium: "StuPa"' in md
     assert 'date: "2026-06-12"' in md
-    # The editor body stays verbatim and follows the frontmatter.
     assert md.rstrip().endswith("# TOP 1\n\nText.")
 
 
@@ -59,19 +59,25 @@ def test_document_without_optional_fields() -> None:
 
 
 def test_frontmatter_injection_is_quoted() -> None:
-    # A title with a colon, a newline or --- must not break the frontmatter open.
+    """A title with a colon, a newline or --- must not break the frontmatter open.
+
+    The document has exactly two `---` delimiters, one open and one close, and the
+    injected key is not inside the frontmatter block.
+    """
     md = build_protocol_document(_doc(title='evil: \n---\ntyp: antrag'))
     lines = md.splitlines()
-    # Exactly two `---` delimiters, one open and one close. No injected third one.
     assert lines.count("---") == 2
     assert "typ: protokoll" in md
-    assert "typ: antrag" not in md.split("---")[1]  # not inside the frontmatter block
+    assert "typ: antrag" not in md.split("---")[1]
 
 
 def test_vote_snippet_renders_abstimmung_callout_with_tally() -> None:
+    """The vote callout carries a bold title and a tally line, but NO `Ergebnis:` line.
+
+    The typst protocol callout renders the built-in vote box from the tally line
+    (yes/no/abstain).
+    """
     snippet = build_vote_snippet("Antrag A", {"yes": 5, "no": 2, "abstain": 1})
-    # The typst protocol callout renders the built-in vote box: a bold title plus a
-    # tally line (yes/no/abstain). It carries NO separate `Ergebnis:` line.
     assert snippet.startswith("> [!abstimmung] **Antrag A**")
     assert "Ergebnis" not in snippet
     assert "> yes: 5, no: 2, abstain: 1" in snippet
@@ -84,29 +90,33 @@ def test_vote_snippet_question_overrides_title_and_omits_empty_tally() -> None:
 
 
 def test_vote_snippet_escapes_newlines() -> None:
+    """The title stays on one line, so the callout marker does not break."""
     snippet = build_vote_snippet("Zeile1\nZeile2", None)
-    # The title stays on one line, so the callout marker does not break.
     assert "> [!abstimmung] **Zeile1 Zeile2**" in snippet
 
 
 def test_votes_in_body_matches_the_marker_line_only() -> None:
+    """A box that the protokollant inserted from the editor matches, also with an older tally.
+
+    Another question, or the question as plain text, is not the box.
+    """
     snippet = build_vote_snippet("Antrag A", {"yes": 5, "no": 2, "abstain": 1})
-    # The protokollant inserted the same box from the editor, with an older tally.
     body = "Aussprache.\n\n> [!abstimmung] **Antrag A**\n> yes: 4, no: 2, abstain: 1\n"
     assert votes_in_body(body, [snippet]) == [True]
-    # Another question, or the question as plain text, is not the box.
     assert votes_in_body("> [!abstimmung] **Antrag B**", [snippet]) == [False]
     assert votes_in_body("Antrag A wurde besprochen.", [snippet]) == [False]
     assert votes_in_body("", [snippet]) == [False]
 
 
 def test_frontmatter_has_signatures_and_quorum_dataline() -> None:
+    """The quorum gets its own frontmatter key.
+
+    The typst wrapper renders it as a data line on the title page.
+    """
     md = build_protocol_document(_doc(quorate=True, datalines=["Ort: R 1"]))
     block = md.split("---")[1]
     assert "unterschriften:" in block
     assert '- "Schriftführung"' in block and '- "Vorstand"' in block
-    # The quorum gets its own frontmatter key. The typst wrapper renders it as a
-    # data line on the title page.
     assert 'beschlussfaehigkeit: "Gegeben"' in block
 
 
@@ -121,6 +131,7 @@ def test_frontmatter_quorum_omitted_when_unknown() -> None:
 
 
 def test_demote_headings_shifts_levels_and_skips_fences() -> None:
+    """Headings move down one level, level 6 stays level 6, and a code fence stays untouched."""
     md = "\n".join(
         [
             "# A",
@@ -137,8 +148,8 @@ def test_demote_headings_shifts_levels_and_skips_fences() -> None:
     )
     out = demote_headings(md)
     assert "## A" in out and "### B" in out
-    assert "# nicht anfassen" in out  # the code fence stays untouched
-    assert "###### F" in out  # level 6 stays level 6
+    assert "# nicht anfassen" in out
+    assert "###### F" in out
     assert "kein # heading" in out
 
 
@@ -166,7 +177,6 @@ def test_frontmatter_end_time_omitted_when_unknown() -> None:
     assert "ende:" not in md
 
 
-# RCE defense in depth (FIX 1b).
 def test_sanitizer_strips_eval_comment_double_quotes() -> None:
     """The sanitizer strips the `[//]: # "EXPR"` typst `eval` escape, so no RCE stays."""
     out = sanitize_user_markdown('# TOP\n[//]: # "__import__(\'os\').system(\'id\')"\nText')
@@ -176,12 +186,13 @@ def test_sanitizer_strips_eval_comment_double_quotes() -> None:
 
 
 def test_sanitizer_strips_eval_comment_single_quotes_and_parens_and_bare() -> None:
+    """Every title form, leading whitespace and a different label are stripped."""
     variants = [
         "[//]: # 'evil'",
         "[//]: # (evil)",
         "[//]: # evil",
-        "   [//]: #  evil",  # leading whitespace
-        "[comment]: # evil",  # a different label
+        "   [//]: #  evil",
+        "[comment]: # evil",
     ]
     for line in variants:
         out = sanitize_user_markdown(f"# TOP\n{line}\nText")
@@ -208,10 +219,11 @@ def test_sanitizer_keeps_normal_markdown_intact() -> None:
 
 
 def test_sanitizer_neutralizes_absolute_image_path() -> None:
+    """An absolute image path becomes a placeholder labelled with the alt text."""
     out = sanitize_user_markdown("![secret](/etc/passwd)")
     assert "/etc/passwd" not in out
     assert "Bild entfernt" in out
-    assert "secret" in out  # the alt text stays as the placeholder label
+    assert "secret" in out
 
 
 def test_sanitizer_neutralizes_traversal_image_path() -> None:
@@ -244,10 +256,6 @@ def test_build_document_applies_sanitizer_to_body() -> None:
     assert "# TOP 1" in md and "Text." in md
 
 
-# Sanitizer bypass regression.
-# The old line-oriented regex let through the multiline, the container-nested and the
-# whitespace-in-label forms of the eval-capable link reference definition. They reached
-# the typst `eval` as `LinkRefDef(label='//', dest='#')` and gave an RCE.
 def test_sanitizer_strips_multiline_eval_comment() -> None:
     r"""Multiline form `[//]:\n#\n"EXPR"` with the target and the title on later lines."""
     out = sanitize_user_markdown('# TOP\n[//]:\n#\n"__import__(\'os\').system(\'id\')"\nText')

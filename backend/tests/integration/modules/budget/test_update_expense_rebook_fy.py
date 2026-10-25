@@ -54,10 +54,14 @@ def _suffix() -> str:
 
 
 async def test_update_expense_rejects_cross_top_level_rebook(session: AsyncSession) -> None:
-    """A rebook to a cost center under a different top budget gives 422."""
+    """A rebook to a cost center under a different top budget gives 422.
+
+    Two independent top budgets each have their own fiscal year. A rebook to a cost
+    center under top B keeps the fiscal year of top A, so it gives 422. The booking
+    stays unchanged, and no partial commit writes the orphan fiscal-year row.
+    """
     svc = BudgetTreeService(session)
     g = await _gremium(session)
-    # Two independent top budgets, each with its own fiscal year.
     top_a = await svc.create_node(
         BudgetNodeCreate(key=f"TA{_suffix()}", name="Top A", gremiumId=g.id)
     )
@@ -80,11 +84,9 @@ async def test_update_expense_rejects_cross_top_level_rebook(session: AsyncSessi
         actor="tester",
     )
 
-    # Rebook to a cost center under top B. The fiscal year of top A stays fixed, so 422.
     with pytest.raises(ValidationProblem):
         await svc.update_expense(booking.id, ExpenseUpdate(budgetId=child_b.id))
 
-    # The booking stays unchanged. No partial commit writes the orphan fiscal-year row.
     await session.rollback()
     row = await session.get(BudgetExpense, booking.id)
     assert row is not None

@@ -451,7 +451,7 @@ async def export_expenses_xlsx(
 ) -> Response:
     """Export the filtered bookings as ``.xlsx``, with the same content as the list.
 
-    The optional ``ids`` (#expenses-ux) restricts the export to the selected
+    The optional ``ids`` restricts the export to the selected
     bookings. The route narrows the filtered page to those IDs, so the
     selection stays a subset of the current filter.
     """

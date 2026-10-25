@@ -33,7 +33,7 @@ from tests._support.flow_fakes import fake_session, result
 
 NOW = datetime(2026, 6, 6, 12, 0, tzinfo=UTC)
 OPTIONS = ["yes", "no", "abstain"]
-# The gremium of the default vote. A vote names a gremium UUID as its eligible group.
+#: The gremium of the default vote. A vote names a gremium UUID as its eligible group.
 GID = UUID("00000000-0000-0000-0000-00000000a1b2")
 
 
@@ -86,11 +86,14 @@ def _create_body(**over: Any) -> VoteCreate:
 
 
 async def test_create_ok() -> None:
-    """The gremium exists and matches the application; the roster sets the count."""
+    """The gremium exists and matches the application; the roster sets the count.
+
+    The scalar is the id of the existing gremium.
+    """
     app = SimpleNamespace(id=uuid4(), current_state_id=None, gremium_id=GID, vote_gremium_id=None)
     roster = [(uuid4(), ["vote.cast"]), (uuid4(), ["vote.cast"]), (uuid4(), ["session.manage"])]
     db = fake_session(result(app), result(*roster))
-    db.scalar_results = [GID]  # the gremium exists
+    db.scalar_results = [GID]
     out = await VotingService(db).create(app.id, _create_body(), Principal(sub="m"))
     assert out.status == "draft"
     assert out.eligible_group == str(GID)
@@ -122,16 +125,20 @@ def test_votecreate_internal_percent_quorum_with_eligible_count_ok() -> None:
 
 
 async def test_create_unknown_application_404() -> None:
+    """An unknown application gives 404, even when the gremium exists."""
     db = fake_session(result())
-    db.scalar_results = [GID]  # the gremium exists
+    db.scalar_results = [GID]
     with pytest.raises(NotFoundError):
         await VotingService(db).create(uuid4(), _create_body(), Principal(sub="m"))
 
 
 async def test_create_reads_only_a_confirmed_application() -> None:
-    """The application query of `create` hides an unconfirmed guest application."""
+    """The application query of `create` hides an unconfirmed guest application.
+
+    The scalar is the id of the existing gremium.
+    """
     db = fake_session(result())
-    db.scalar_results = [GID]  # the gremium exists
+    db.scalar_results = [GID]
     with pytest.raises(NotFoundError):
         await VotingService(db).create(uuid4(), _create_body(), Principal(sub="m"))
     assert "email_confirmed_at IS NOT NULL" in str(db.statements[0])
@@ -147,17 +154,20 @@ async def test_create_internal_unknown_application_404() -> None:
 
 
 async def test_open_sets_window_keeps_roster_eligible() -> None:
-    # The roster sets eligible_count at create time. It never counts logged-in users,
-    # so open() recounts nothing.
+    """The open sets the window and keeps the eligible count of the roster.
+
+    The roster sets eligible_count at create time and never counts logged-in users, so
+    the open reads only the vote and recounts nothing. The open writes a vote_open audit
+    entry with id references only.
+    """
     vote = _vote(status="draft", eligible_count=20)
-    db = fake_session(result(vote))  # only _get_vote, no count query
+    db = fake_session(result(vote))
     out = await VotingService(db).open(vote.id, now=NOW, actor="mgr")
     assert out.status == "open"
     assert out.opens_at == NOW
     assert out.opened_at == NOW
     assert out.closed_at is None
     assert out.tally.eligible == 20
-    # The open writes a vote_open audit entry with id references only.
     entries = [a for a in db.added if type(a).__name__ == "AuditEntry"]
     assert [e.action for e in entries] == ["vote_open"]
     assert entries[0].actor == "mgr"
@@ -179,11 +189,14 @@ async def test_open_unknown_vote_404() -> None:
 
 
 async def test_open_meeting_vote_in_a_closed_meeting_409() -> None:
-    """The open re-reads the meeting status under the meeting row lock."""
+    """The open re-reads the meeting status under the meeting row lock.
+
+    The scalars are the meeting of the vote and its locked status.
+    """
     mid = uuid4()
     vote = _vote(status="draft", meeting_id=mid)
     db = fake_session(result(vote))
-    db.scalar_results = [mid, "closed"]  # the meeting of the vote, its locked status
+    db.scalar_results = [mid, "closed"]
     with pytest.raises(ConflictError) as ei:
         await VotingService(db).open(vote.id, now=NOW)
     assert ei.value.code == "meeting_closed"
@@ -233,8 +246,10 @@ async def test_cast_not_in_group_403() -> None:
 
 
 async def test_cast_blocked_when_voting_right_delegated_403() -> None:
-    # #delegation-rework: an outgoing vote delegation for THIS meeting
-    # (is_delegator=True, delegate_voting=True) forbids an own ballot.
+    """An outgoing vote delegation for THIS meeting forbids an own ballot.
+
+    The delegation has is_delegator=True and delegate_voting=True.
+    """
     gid = uuid4()
     vote = _vote(meeting_id=uuid4(), eligible_group=str(gid))
     db = fake_session(result(vote), result((True, True, _voter().sub)))
@@ -256,38 +271,43 @@ def marks(monkeypatch: pytest.MonkeyPatch) -> mock.AsyncMock:
 
 
 async def test_cast_nonvoting_delegation_does_not_block_member(marks: mock.AsyncMock) -> None:
-    # A non-voting delegation, for example a pure meeting delegation, does not block
-    # the own voting right of a member.
+    """A non-voting delegation does not block the own voting right of a member.
+
+    The outgoing delegation is a pure meeting delegation. The right to vote comes from
+    the namespaced key that a real vote.cast membership sets, not from the bare UUID
+    string. The own ballot of a meeting vote marks the member present.
+    """
     gid = uuid4()
     vote = _vote(meeting_id=uuid4(), eligible_group=str(gid))
     db = fake_session(
         result(vote),
-        result((True, False, _voter().sub)),  # outgoing NON-voting delegation
-        result(SimpleNamespace(inserted=True)),  # ballot insert
+        result((True, False, _voter().sub)),
+        result(SimpleNamespace(inserted=True)),
     )
-    # Gremium vote: the right to vote comes from the namespaced key that a
-    # real vote.cast membership sets, not from the bare UUID string.
     out = await VotingService(db).cast(
         vote.id, _voter(group=vote_group_key(gid)), "yes", now=NOW
     )
     assert out.status == "cast"
     assert db.committed == 1
-    # The own ballot of a meeting vote marks the member present.
     marks.assert_awaited_once_with(vote.meeting_id, _voter().sub)
 
 
 async def test_cast_exercising_delegated_vote_is_audited() -> None:
-    # External substitute: not in eligible_group, but the receiver of a vote delegation
-    # of the meeting. The delegated ballot (as_delegation=True) goes under the sub of
-    # the delegator and writes a DELEGATION_USE audit entry.
+    """A delegated ballot runs under the sub of the delegator and is audited.
+
+    The external substitute is not in eligible_group, but receives a vote delegation of
+    the meeting. The ballot with as_delegation=True writes a DELEGATION_USE audit entry.
+    The fake session serves the incoming delegation, the audit advisory lock, the audit
+    prev-hash and the ballot insert.
+    """
     gid = uuid4()
     vote = _vote(meeting_id=uuid4(), eligible_group=str(gid))
     db = fake_session(
         result(vote),
-        result((False, True, "delegator-1")),  # incoming vote delegation
-        result(),  # audit advisory lock
-        result(),  # audit prev-hash
-        result(SimpleNamespace(inserted=True)),  # ballot insert
+        result((False, True, "delegator-1")),
+        result(),
+        result(),
+        result(SimpleNamespace(inserted=True)),
     )
     out = await VotingService(db).cast(
         vote.id, _voter(group="somewhere-else"), "yes", now=NOW, as_delegation=True
@@ -300,15 +320,17 @@ async def test_cast_exercising_delegated_vote_is_audited() -> None:
 async def test_cast_own_vote_unaffected_by_incoming_delegation(
     marks: mock.AsyncMock,
 ) -> None:
-    # Member WITH an incoming delegation: the own ballot still runs as a separate cast.
-    # Without as_delegation the service writes no audit entry and the ballot uses the
-    # own sub.
+    """A member with an incoming delegation still casts the own ballot separately.
+
+    Without as_delegation the service writes no audit entry, and the ballot uses the own
+    sub.
+    """
     gid = uuid4()
     vote = _vote(meeting_id=uuid4(), eligible_group=str(gid))
     db = fake_session(
         result(vote),
-        result((False, True, "delegator-1")),  # incoming vote delegation
-        result(SimpleNamespace(inserted=True)),  # ballot insert
+        result((False, True, "delegator-1")),
+        result(SimpleNamespace(inserted=True)),
     )
     out = await VotingService(db).cast(
         vote.id, _voter(group=vote_group_key(gid)), "yes", now=NOW
@@ -328,7 +350,8 @@ async def test_cast_as_delegation_without_incoming_403() -> None:
 
 
 async def test_cast_vote_without_meeting_skips_delegation_check() -> None:
-    vote = _vote()  # meeting_id=None, so the service runs no delegation query
+    """A vote without a meeting runs no delegation query."""
+    vote = _vote()
     db = fake_session(result(vote), result(SimpleNamespace(inserted=True)))
     out = await VotingService(db).cast(vote.id, _voter(), "yes", now=NOW)
     assert out.status == "cast"
@@ -342,43 +365,46 @@ async def test_cast_unknown_option_422() -> None:
 
 
 async def test_cast_open_first_vote() -> None:
+    """The first open ballot is inserted. The insert never updates an existing ballot."""
     vote = _vote()
     db = fake_session(result(vote), result(SimpleNamespace(id=uuid4())))
     out = await VotingService(db).cast(vote.id, _voter(), "yes", now=NOW)
     assert out.status == "cast"
     assert db.committed == 1
-    # The insert never updates an existing ballot.
     insert = str(db.statements[-1])
     assert "ON CONFLICT" in insert and "DO NOTHING" in insert
     assert "DO UPDATE" not in insert
 
 
 async def test_cast_open_double_409_already_voted() -> None:
-    """A second cast never changes the ballot. It gives 409 ``already_voted``."""
+    """A second cast never changes the ballot. It gives 409 ``already_voted``.
+
+    An empty RETURNING means a conflict. ON CONFLICT DO NOTHING wrote nothing, so there
+    is no commit, and ``get_session`` rolls the transaction back.
+    """
     vote = _vote()
-    db = fake_session(result(vote), result())  # an empty RETURNING means conflict
+    db = fake_session(result(vote), result())
     with pytest.raises(ConflictError, match="Already voted") as ei:
         await VotingService(db).cast(vote.id, _voter(), "no", now=NOW)
     assert ei.value.code == "already_voted"
-    # ON CONFLICT DO NOTHING wrote nothing, so there is no commit. get_session
-    # rolls the transaction back.
     assert db.committed == 0
 
 
 async def test_cast_secret_first_vote_writes_anonymous() -> None:
+    """The first secret cast adds a secret_ballot without an identity and no ballot."""
     vote = _vote(config=_config(secret=True))
     db = fake_session(result(vote), result(SimpleNamespace(id=uuid4())))
     out = await VotingService(db).cast(vote.id, _voter(), "yes", now=NOW)
     assert out.status == "cast"
-    # The service adds a secret_ballot without an identity and no ballot.
     assert len(db.added) == 1
     assert type(db.added[0]).__name__ == "SecretBallot"
     assert db.committed == 1
 
 
 async def test_cast_secret_double_409() -> None:
+    """A second secret cast finds the voted marker and gives 409."""
     vote = _vote(config=_config(secret=True))
-    db = fake_session(result(vote), result())  # the marker exists, so conflict
+    db = fake_session(result(vote), result())
     with pytest.raises(ConflictError, match="Already voted") as ei:
         await VotingService(db).cast(vote.id, _voter(), "yes", now=NOW)
     assert ei.value.code == "already_voted"
@@ -386,11 +412,12 @@ async def test_cast_secret_double_409() -> None:
 
 
 async def test_get_open_aggregates_tally() -> None:
+    """An open vote aggregates the tally but has no final result yet."""
     vote = _vote()
     db = fake_session(result(vote), result("yes", "yes", "no"))
     out = await VotingService(db).get(vote.id)
     assert out.tally.counts == {"yes": 2, "no": 1, "abstain": 0}
-    assert out.tally.result is None  # still open, so no final result
+    assert out.tally.result is None
 
 
 async def test_get_closed_includes_result() -> None:
@@ -402,14 +429,14 @@ async def test_get_closed_includes_result() -> None:
 
 
 async def test_get_secret_hides_counts_until_close() -> None:
-    # Secret: no choice counts before the close, only participation.
+    """A secret vote shows no choice counts before the close, only the participation."""
     vote = _vote(config=_config(secret=True))
     db = fake_session(result(vote), result("yes", "no", "yes"))
     out = await VotingService(db).get(vote.id)
     assert out.secret is True
     assert out.tally.revealed is False
     assert out.tally.counts == {}
-    assert out.tally.voted == 3  # participation stays visible
+    assert out.tally.voted == 3
 
 
 class _FakeFlow:
@@ -474,6 +501,12 @@ def _audits(db: Any) -> list[Any]:
 
 
 async def test_close_fires_matching_branch(_patch_flow: type[_FakeFlow]) -> None:
+    """The close fires the branch of the result and commits once.
+
+    The branch runs in a SAVEPOINT, and ``after_commit`` runs after the commit. The
+    status event of the branch names the vote, for the timeline link. The vote_close
+    entry holds the result and the counts, never a voter.
+    """
     branch_t = TransitionOut(
         id=uuid4(), fromStateId=uuid4(), toStateId=uuid4(), label={}
     )
@@ -492,15 +525,11 @@ async def test_close_fires_matching_branch(_patch_flow: type[_FakeFlow]) -> None
     assert vote.result_branch_transition_id == branch_t.id
     assert _patch_flow.branch_calls == ["pass"]
     assert _patch_flow.notes == ["vote:passed"]
-    # The status event of the branch names the vote, for the timeline link.
     assert _patch_flow.vote_ids == [vote.id]
-    # The branch runs in a SAVEPOINT and the close commits ONCE. after_commit runs
-    # after that commit.
     assert db.savepoints == 1
     assert db.savepoint_rollbacks == 0
     assert db.committed == 1
     assert _patch_flow.after == [True]
-    # A vote_close entry with the result and the counts, never a voter.
     entries = _audits(db)
     assert [e.action for e in entries] == ["vote_close"]
     assert entries[0].data["result"] == "passed"
@@ -523,6 +552,8 @@ async def test_close_prefers_global_flow_branch(_patch_flow: type[_FakeFlow]) ->
     """Fire the `pass` branch directly from a `vote` state.
 
     The close path never uses the guard-based `available_transitions` path.
+
+    The guard path stays unused.
     """
     branch_t = TransitionOut(id=uuid4(), fromStateId=uuid4(), toStateId=uuid4(), label={})
     _patch_flow.branch = branch_t
@@ -532,7 +563,7 @@ async def test_close_prefers_global_flow_branch(_patch_flow: type[_FakeFlow]) ->
     assert out.result == "passed"
     assert out.fired_transition_id == branch_t.id
     assert _patch_flow.branch_calls == ["pass"]
-    assert _patch_flow.calls == []  # the guard path stays unused
+    assert _patch_flow.calls == []
 
 
 async def test_close_application_vote_without_branch_closes_and_audits(
@@ -542,8 +573,10 @@ async def test_close_application_vote_without_branch_closes_and_audits(
 
     The vote closes, the audit log gets ``vote_branch_blocked`` with the reason
     ``no_branch``, and ``branchFired`` is False. A person moves the application.
+
+    The vote has an application, and the state has no ``fail`` branch.
     """
-    vote = _vote()  # application_id is set, and the state has no `fail` branch
+    vote = _vote()
     db = fake_session(result(vote), result("no", "no", "yes"))
     out = await VotingService(db).close(vote.id, _voter())
     assert out.result == "rejected"
@@ -568,6 +601,8 @@ async def test_close_generic_vote_without_application_just_closes(
     """A generic vote without an application fires NO branch.
 
     The vote only holds the result for the protocol. The close commits itself.
+
+    No branch was due, so nothing is blocked.
     """
     _patch_flow.available = []
     vote = _vote(application_id=None)
@@ -579,7 +614,6 @@ async def test_close_generic_vote_without_application_just_closes(
     assert out.branch_fired is False
     assert db.committed == 1
     assert db.savepoints == 0
-    # No branch was due, so nothing is blocked.
     assert [e.action for e in _audits(db)] == ["vote_close"]
 
 
@@ -633,11 +667,13 @@ async def test_close_blocked_without_quorum(_patch_flow: type[_FakeFlow]) -> Non
     """Return 409 when the quorum fails, instead of a silent "rejected".
 
     The vote stays open. The caller collects more ballots or cancels the vote.
+
+    2 of 10 ballots miss the quorum.
     """
     vote = _vote(
         config=_config(quorum={"type": "percent", "value": 50}), eligible_count=10
     )
-    db = fake_session(result(vote), result("yes", "no"))  # 2/10, so the quorum fails
+    db = fake_session(result(vote), result("yes", "no"))
     with pytest.raises(ConflictError):
         await VotingService(db).close(vote.id, _voter())
     assert db.committed == 0
@@ -650,7 +686,9 @@ async def test_close_expired_unmet_quorum_fires_fail_branch(
     """Close a timed vote for good when the window expired and the quorum failed.
 
     The cron passes `now`. The service fires the `fail` branch and closes the vote,
-    so the vote never stays stuck (#stuck-vote).
+    so the vote never stays stuck.
+
+    2 of 10 ballots miss the quorum.
     """
     branch_t = TransitionOut(id=uuid4(), fromStateId=uuid4(), toStateId=uuid4(), label={})
     _patch_flow.branch = branch_t
@@ -659,7 +697,7 @@ async def test_close_expired_unmet_quorum_fires_fail_branch(
         eligible_count=10,
         closes_at=NOW - timedelta(minutes=1),
     )
-    db = fake_session(result(vote), result("yes", "no"))  # 2/10, so the quorum fails
+    db = fake_session(result(vote), result("yes", "no"))
     out = await VotingService(db).close(vote.id, _voter(), now=NOW)
     assert vote.status == "closed"
     assert out.result == "rejected"
@@ -813,7 +851,10 @@ async def test_cancel_for_application_unbound_draft_of_branch_state() -> None:
 
 
 async def test_cancel_for_application_unbound_draft_of_normal_state_stays() -> None:
-    """A draft without opens_state_id survives a transition out of a normal state."""
+    """A draft without opens_state_id survives a transition out of a normal state.
+
+    The state kind is read once for all drafts, so "vote" stays unread.
+    """
     app_id = uuid4()
     first = _vote(application_id=app_id, status="draft", opens_state_id=None)
     second = _vote(application_id=app_id, status="draft", opens_state_id=None)
@@ -824,7 +865,6 @@ async def test_cancel_for_application_unbound_draft_of_normal_state_stays() -> N
     )
     assert out == []
     assert first.status == second.status == "draft"
-    # The state kind is read once for all drafts, so the "vote" stays unread.
     assert db.scalar_results == ["vote"]
 
 
@@ -859,9 +899,12 @@ async def test_cancel_closed_409() -> None:
 
 
 async def test_create_without_application_skips_lookup() -> None:
-    # With application_id=None the service runs no _get_application query.
+    """A vote without an application runs no ``_get_application`` query.
+
+    The only scalar is the locked status of the meeting.
+    """
     db = fake_session()
-    db.scalar_results = ["live"]  # the locked status read of the meeting
+    db.scalar_results = ["live"]
     payload = VoteCreateInternal.model_validate(
         {"config": _config(), "eligibleGroup": str(GID), "eligibleCount": 4}
     )
@@ -915,14 +958,15 @@ async def test_create_prepared_draft_in_a_closed_meeting_conflicts() -> None:
 
 
 async def test_create_with_a_missing_meeting_or_agenda_item_is_404() -> None:
+    """A missing meeting or a missing agenda item gives 404."""
     payload = VoteCreateInternal.model_validate(
         {"config": _config(), "eligibleGroup": str(GID), "eligibleCount": 4}
     )
-    db = fake_session()  # no meeting status
+    db = fake_session()
     with pytest.raises(NotFoundError):
         await VotingService(db).create_internal(None, payload, meeting_id=uuid4())
     db = fake_session()
-    db.scalar_results = ["live", None]  # the agenda item is gone
+    db.scalar_results = ["live", None]
     with pytest.raises(NotFoundError, match="agenda item"):
         await VotingService(db).create_internal(
             None, payload, meeting_id=uuid4(), agenda_item_id=uuid4()
@@ -950,13 +994,13 @@ async def test_create_on_an_agenda_item_of_the_live_meeting() -> None:
 
 @pytest.mark.parametrize("status", ["draft", "cancelled"])
 async def test_delete_vote_in_meeting_removes_audits_and_commits(status: str) -> None:
+    """Every delete of a meeting vote goes into the audit log."""
     mid, item = uuid4(), uuid4()
     vote = _vote(meeting_id=mid, agenda_item_id=item, status=status)
     db = fake_session(result(vote))
     await VotingService(db).delete(vote.id, meeting_id=mid, actor="mgr")
     assert vote in db.deleted
     assert db.committed == 1
-    # Every delete of a meeting vote goes into the audit log.
     [entry] = _audits(db)
     assert entry.action == "vote_delete"
     assert entry.actor == "mgr"
@@ -989,7 +1033,10 @@ async def test_delete_vote_from_other_meeting_404() -> None:
 
 
 async def test_delete_for_agenda_item_deletes_drafts_and_cancelled() -> None:
-    """The agenda-item remove deletes the draft and cancelled votes with audit."""
+    """The agenda-item remove deletes the draft and cancelled votes with audit.
+
+    The caller commits together with the agenda-item remove.
+    """
     item = uuid4()
     draft = _vote(meeting_id=uuid4(), agenda_item_id=item, status="draft")
     cancelled = _vote(meeting_id=uuid4(), agenda_item_id=item, status="cancelled")
@@ -998,13 +1045,12 @@ async def test_delete_for_agenda_item_deletes_drafts_and_cancelled() -> None:
     assert out == [draft.id, cancelled.id]
     assert db.deleted == [draft, cancelled]
     assert [e.data["status"] for e in _audits(db)] == ["draft", "cancelled"]
-    # The caller commits together with the agenda-item remove.
     assert db.committed == 0
 
 
 async def test_delete_for_agenda_item_without_votes_is_empty() -> None:
+    """Without votes the agenda right alone is enough: nothing is deleted."""
     db = fake_session(result())
-    # Without votes the agenda right alone is enough: nothing is deleted.
     out = await VotingService(db).delete_for_agenda_item(uuid4(), actor="mgr", may_delete=False)
     assert out == []
     assert db.deleted == []
@@ -1036,7 +1082,12 @@ async def test_delete_for_agenda_item_refuses_open_or_closed_vote(blocking: str)
 
 
 async def test_delete_for_meeting_deletes_every_vote_in_order() -> None:
-    """The meeting delete takes every vote along, in any status, without a commit."""
+    """The meeting delete takes every vote along, in any status, without a commit.
+
+    The order is the lock, the protocol references, the secret ballots, the voted
+    markers and the ballots, then the status events lose the vote reference. The audit
+    holds id references and the status only, never a choice or a voter.
+    """
     mid = uuid4()
     votes = [
         _vote(meeting_id=mid, status="draft"),
@@ -1049,8 +1100,6 @@ async def test_delete_for_meeting_deletes_every_vote_in_order() -> None:
     assert out == [v.id for v in votes]
     assert db.deleted == votes
     assert db.committed == 0
-    # The lock, then the protocol references, the secret ballots, the voted markers
-    # and the ballots, then the status events lose the vote reference.
     tables = [
         getattr(getattr(stmt, "table", None), "name", None) for stmt in db.statements[1:6]
     ]
@@ -1066,16 +1115,16 @@ async def test_delete_for_meeting_deletes_every_vote_in_order() -> None:
     assert [e.data["status"] for e in entries] == ["draft", "cancelled", "closed", "closed"]
     assert {e.data["reason"] for e in entries} == {"meeting_deleted"}
     assert entries[1].data["applicationId"] is None
-    # Id references and the status only: never a choice or a voter.
     assert all(set(e.data) == {
         "applicationId", "meetingId", "eligibleGroup", "agendaItemId", "status", "reason"
     } for e in entries)
 
 
 async def test_delete_for_meeting_without_votes_runs_no_delete() -> None:
+    """A meeting without votes runs only the locking select."""
     db = fake_session(result())
     assert await VotingService(db).delete_for_meeting(uuid4(), actor="mgr") == []
-    assert len(db.statements) == 1  # only the locking select
+    assert len(db.statements) == 1
     assert db.deleted == []
     assert _audits(db) == []
 
@@ -1118,6 +1167,10 @@ async def test_lock_for_gremium_delete_refuses_an_open_vote() -> None:
 
 
 async def test_delete_locked_votes_deletes_with_the_reason() -> None:
+    """The delete of locked votes writes the reason and deletes the child rows first.
+
+    It takes no lock, because the caller locked the rows.
+    """
     votes = [
         _vote(status="closed", result="passed"),
         _vote(status="cancelled", config=_config(secret=True)),
@@ -1131,7 +1184,6 @@ async def test_delete_locked_votes_deletes_with_the_reason() -> None:
     assert out == [v.id for v in votes]
     assert db.deleted == votes
     assert db.committed == 0
-    # No lock here: the caller locked the rows. The child rows go first.
     assert getattr(getattr(db.statements[0], "table", None), "name", None) == (
         "protocol_vote_ref"
     )
@@ -1147,21 +1199,21 @@ async def test_delete_locked_votes_without_votes_writes_nothing() -> None:
     assert _audits(db) == []
 
 
-# A meeting vote reveals the counts only when every expected ballot arrived. The
-# denominator comes from the attendance roster.
 async def test_get_meeting_open_reveals_when_all_present_voted() -> None:
-    vote = _vote(meeting_id=uuid4())  # open, not secret
+    """An open meeting vote reveals the tally when both present members voted."""
+    vote = _vote(meeting_id=uuid4())
     db = fake_session(result(vote), result("yes", "yes"))
-    db.scalar_results = [2]  # present=2, voted=2 → revealed
+    db.scalar_results = [2]
     out = await VotingService(db).get(vote.id)
     assert out.tally.revealed is True
     assert out.tally.counts == {"yes": 2, "no": 0, "abstain": 0}
 
 
 async def test_get_meeting_open_hidden_until_all_present_voted() -> None:
+    """3 present and 2 voted keep the tally hidden."""
     vote = _vote(meeting_id=uuid4())
     db = fake_session(result(vote), result("yes", "yes"))
-    db.scalar_results = [3]  # present=3 > voted=2 → hidden
+    db.scalar_results = [3]
     out = await VotingService(db).get(vote.id)
     assert out.tally.revealed is False
     assert out.tally.counts == {}
@@ -1169,15 +1221,16 @@ async def test_get_meeting_open_hidden_until_all_present_voted() -> None:
 
 
 async def test_get_meeting_open_without_attendance_stays_hidden() -> None:
+    """Without present members the tally stays hidden."""
     vote = _vote(meeting_id=uuid4())
     db = fake_session(result(vote), result())
-    db.scalar_results = [0]  # present=0 → present>0 False
+    db.scalar_results = [0]
     out = await VotingService(db).get(vote.id)
     assert out.tally.revealed is False
 
 
 def test_open_tally_revealed_rule() -> None:
-    # present must be above 0 AND voted must reach expected.
+    """Present must be above 0 AND voted must reach expected."""
     assert open_tally_revealed(present=2, voted=2, expected=2) is True
     assert open_tally_revealed(present=2, voted=3, expected=2) is True
     assert open_tally_revealed(present=2, voted=1, expected=2) is False
@@ -1185,13 +1238,14 @@ def test_open_tally_revealed_rule() -> None:
 
 
 async def test_get_meeting_open_hidden_until_proxy_voted() -> None:
-    # #vote-progress: 2 present members plus 1 vote delegation of an ABSENT delegator
-    # give expected=3. Only the 2 own ballots arrived, so the proxy ballot is still
-    # missing and the tally stays hidden.
+    """The tally stays hidden while the proxy ballot of an absent delegator is missing.
+
+    2 present members, no admitted guests and 1 vote delegation of an ABSENT delegator
+    give expected=3. Only the 2 own ballots arrived.
+    """
     gid = uuid4()
     vote = _vote(meeting_id=uuid4(), eligible_group=str(gid))
     db = fake_session(result(vote), result("yes", "yes"))
-    # present=2, admitted guests=0, absent-delegated=1 → expected=3
     db.scalar_results = [2, 0, 1]
     out = await VotingService(db).get(vote.id)
     assert out.tally.revealed is False
@@ -1199,10 +1253,10 @@ async def test_get_meeting_open_hidden_until_proxy_voted() -> None:
 
 
 async def test_get_meeting_open_reveals_when_proxy_also_voted() -> None:
+    """2 present, no guests and 1 proxy give expected=3; voted=3 reveals the tally."""
     gid = uuid4()
     vote = _vote(meeting_id=uuid4(), eligible_group=str(gid))
     db = fake_session(result(vote), result("yes", "yes", "no"))
-    # present=2, no guests, 1 proxy → expected=3, voted=3 → revealed
     db.scalar_results = [2, 0, 1]
     out = await VotingService(db).get(vote.id)
     assert out.tally.revealed is True
@@ -1216,8 +1270,7 @@ async def test_absent_delegated_count_no_meeting_is_zero() -> None:
 
 
 async def test_absent_delegated_count_non_uuid_group_is_zero() -> None:
-    # An eligible_group that is not UUID text, "stupa" for example, runs no delegation
-    # query.
+    """An eligible_group that is not UUID text, "stupa" for example, runs no delegation query."""
     vote = _vote(meeting_id=uuid4(), eligible_group="stupa")
     svc = VotingService(fake_session())
     assert await svc._absent_delegated_count(vote) == 0  # pyright: ignore[reportArgumentType]
@@ -1232,20 +1285,20 @@ async def test_absent_delegated_count_queries_when_uuid_group() -> None:
 
 
 async def test_absent_delegated_count_none_scalar_is_zero() -> None:
+    """A COUNT of None becomes 0 through the or-default."""
     gid = uuid4()
     vote = _vote(meeting_id=uuid4(), eligible_group=str(gid))
     db = fake_session()
-    db.scalar_results = [None]  # COUNT → None → 0 through the or-default
+    db.scalar_results = [None]
     assert await VotingService(db)._absent_delegated_count(vote) == 0  # pyright: ignore[reportArgumentType]
 
 
-# Object-level authorization lives in assert_can_read and get_scoped.
 async def test_assert_can_read_meeting_vote_goes_through_the_meeting_guard() -> None:
     """Even an admin reads a meeting-bound vote through the meeting guard.
 
-    The admin used to return early here on a raw `principal.roles` read, before the
-    meeting check ran. That skipped `Principal.has`, which is where the OAuth scope cap
-    lives, so a narrowly scoped token issued to an admin read as a full admin.
+    An early return on a raw `principal.roles` read would skip `Principal.has`, which is
+    where the OAuth scope cap lives, so a narrowly scoped token issued to an admin would
+    read as a full admin.
     """
     seen: list[UUID] = []
 
@@ -1266,9 +1319,9 @@ async def test_assert_can_read_meeting_vote_goes_through_the_meeting_guard() -> 
 async def test_assert_can_manage_denies_a_scope_capped_admin_token() -> None:
     """A token scoped below `vote.manage` cannot open, close or cancel a vote.
 
-    The guard used to return early on `"admin" in principal.roles`, so an agent token
-    issued to an admin with only the `read` scope managed votes. `Principal.has` applies
-    the cap; the raw role read did not.
+    An early return on `"admin" in principal.roles` would let an agent token issued to an
+    admin with only the `read` scope manage votes. `Principal.has` applies the cap, and a
+    raw role read does not.
     """
     svc = VotingService(fake_session())
     capped = Principal(
@@ -1315,12 +1368,12 @@ async def test_assert_can_read_meeting_delegates_to_meeting_service(
 
 
 async def test_get_scoped_checks_then_returns_tally() -> None:
+    """The scoped read checks access, then returns the tally. The caller holds no ballot."""
     vote = _vote(meeting_id=None)
     db = fake_session(result(vote), result(vote), result("yes"))
     p = Principal(sub="u", permissions={"application.read"})
     out = await VotingService(db).get_scoped(vote.id, p)
     assert out.tally.counts == {"yes": 1, "no": 0, "abstain": 0}
-    # The caller holds no ballot and no delegation.
     assert out.my_ballot is not None
     assert out.my_ballot.cast is False
     assert out.my_ballot.choice is None
@@ -1338,9 +1391,10 @@ async def test_my_ballot_open_vote_returns_the_choice() -> None:
 
 
 async def test_my_ballot_secret_vote_never_returns_a_choice() -> None:
+    """A secret vote never returns the choice, even when the voted marker exists."""
     vote = _vote(config=_config(secret=True))
     db = fake_session()
-    db.scalar_results = [uuid4()]  # the voted marker exists
+    db.scalar_results = [uuid4()]
     mine = await VotingService(db).my_ballot(vote, "v1", secret=True)  # pyright: ignore[reportArgumentType]
     assert mine.cast is True
     assert mine.choice is None
@@ -1350,22 +1404,20 @@ async def test_my_ballot_secret_vote_never_returns_a_choice() -> None:
 
 
 async def test_represented_cast_reads_the_ballot_of_the_delegator() -> None:
+    """The represented flag reads the ballot of the delegator of an incoming delegation."""
     vote = _vote(meeting_id=uuid4())
     db = fake_session(
-        result((False, True, "delegator-1")),  # incoming voting delegation
-        result(SimpleNamespace(choice="yes")),  # the ballot of the delegator
+        result((False, True, "delegator-1")),
+        result(SimpleNamespace(choice="yes")),
     )
     assert await VotingService(db).represented_cast(vote, "proxy", secret=False) is True  # pyright: ignore[reportArgumentType]
 
 
 async def test_represented_cast_without_delegation_is_false() -> None:
+    """Without a delegation row the represented flag is False."""
     vote = _vote(meeting_id=uuid4())
-    db = fake_session(result())  # no delegation row
+    db = fake_session(result())
     assert await VotingService(db).represented_cast(vote, "proxy", secret=False) is False  # pyright: ignore[reportArgumentType]
-
-
-# DELETE /votes/{id}: a standalone draft vote that never ran. Everything further
-# along stays with `cancel`, so the record keeps every vote that ever opened.
 
 
 async def test_delete_standalone_draft_ok() -> None:
@@ -1396,7 +1448,7 @@ async def test_delete_standalone_unknown_404() -> None:
 
 
 async def test_delete_standalone_meeting_bound_409() -> None:
-    # The meeting route owns this vote and applies the meeting-scoped check.
+    """A meeting vote gives 409, because the meeting route owns it with its own check."""
     vote = _vote(meeting_id=uuid4(), status="draft")
     db = fake_session(result(vote))
     with pytest.raises(ConflictError) as ei:
@@ -1415,9 +1467,9 @@ async def test_delete_standalone_open_vote_409() -> None:
 
 
 async def test_delete_standalone_with_ballots_409() -> None:
+    """An open ballot blocks the delete at the first count."""
     vote = _vote(meeting_id=None, status="draft")
     db = fake_session(result(vote))
-    # An open ballot, no secret ballot, no marker: the first count already blocks.
     db.scalar_results = [1, 0, 0]
     with pytest.raises(ConflictError) as ei:
         await VotingService(db).delete_standalone(vote.id, actor="mgr")
@@ -1426,28 +1478,26 @@ async def test_delete_standalone_with_ballots_409() -> None:
 
 
 async def test_delete_standalone_with_secret_marker_409() -> None:
+    """A secret vote leaves only the voted_marker as a trace, and that blocks too."""
     vote = _vote(meeting_id=None, status="draft")
     db = fake_session(result(vote))
-    # A secret vote leaves only the voted_marker as a trace, and that blocks too.
     db.scalar_results = [0, 0, 2]
     with pytest.raises(ConflictError):
         await VotingService(db).delete_standalone(vote.id, actor="mgr")
 
 
-# Flow variant B: the vote must belong to the Gremium of the current vote state.
-
-
 async def test_vote_gremium_mismatch_rules() -> None:
+    """The vote of the snapshot Gremium matches. Another Gremium, or no snapshot, is a mismatch.
+
+    Without an application row, or outside a vote state, there is nothing to compare.
+    """
     svc = VotingService(fake_session())
     assert await svc.vote_gremium_mismatch(_vote(application_id=None)) is False  # type: ignore[arg-type]
-    # No application row, or not in a vote state: nothing to compare.
     assert await VotingService(fake_session(result())).vote_gremium_mismatch(_vote()) is False  # type: ignore[arg-type]
     db = fake_session(result((GID, "normal")))
     assert await VotingService(db).vote_gremium_mismatch(_vote()) is False  # type: ignore[arg-type]
-    # The vote of the snapshot Gremium matches.
     db = fake_session(result((GID, "vote")))
     assert await VotingService(db).vote_gremium_mismatch(_vote()) is False  # type: ignore[arg-type]
-    # Another Gremium, or no snapshot, is a mismatch.
     db = fake_session(result((uuid4(), "vote")))
     assert await VotingService(db).vote_gremium_mismatch(_vote()) is True  # type: ignore[arg-type]
     db = fake_session(result((None, "vote")))
@@ -1466,6 +1516,7 @@ async def test_open_refuses_a_vote_of_another_gremium() -> None:
 async def test_close_blocks_the_branch_of_another_gremium(
     _patch_flow: type[_FakeFlow], monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """A vote of another Gremium closes, but the flow never runs."""
     _patch_flow.branch = TransitionOut(
         id=uuid4(), fromStateId=uuid4(), toStateId=uuid4(), label={}
     )
@@ -1478,6 +1529,6 @@ async def test_close_blocks_the_branch_of_another_gremium(
     db = fake_session(result(vote), result("yes", "yes", "no"))
     out = await VotingService(db).close(vote.id, _voter(), now=NOW)
     assert out.branch_fired is False
-    assert _patch_flow.branch_calls == []  # the flow never ran
+    assert _patch_flow.branch_calls == []
     blocked = [a for a in _audits(db) if a.action == "vote_branch_blocked"]
     assert blocked[0].data["reason"] == "vote_gremium_mismatch"

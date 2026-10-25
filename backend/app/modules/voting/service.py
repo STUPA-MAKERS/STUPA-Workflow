@@ -1270,7 +1270,7 @@ class VotingService:
         denominator from exactly that roster, so both sides use the same rule.
 
         A free group key (not a UUID) is an old row. No global permission grants a
-        vote right any more, so such a vote admits nobody.
+        vote right, so such a vote admits nobody.
         """
         if not VotingService._is_gremium_group(eligible_group):
             return False

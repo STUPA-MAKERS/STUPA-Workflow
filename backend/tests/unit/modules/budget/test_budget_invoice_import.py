@@ -79,10 +79,10 @@ def test_map_rejects_non_eur() -> None:
     assert ei.value.currency == "USD"
 
 
-# Tolerant CII fallback. This is real CII XML in the style of invoice-portal.de. The
-# email carries no `schemeID="EM"` and the `IBANID` stays empty. The strict pycheval parser
-# refuses both, although the file is a valid ZUGFeRD document. The tolerant fallback still
-# reads the header data.
+#: Tolerant CII fallback. This is real CII XML in the style of invoice-portal.de. The
+#: email carries no `schemeID="EM"` and the `IBANID` stays empty. The strict pycheval parser
+#: refuses both, although the file is a valid ZUGFeRD document. The tolerant fallback still
+#: reads the header data.
 _REAL_WORLD_CII = """<?xml version="1.0" encoding="UTF-8"?>
 <rsm:CrossIndustryInvoice
     xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100"
@@ -131,13 +131,15 @@ _REAL_WORLD_CII = """<?xml version="1.0" encoding="UTF-8"?>
 
 
 def test_cii_fallback_reads_header_despite_strict_errors() -> None:
-    # pycheval refuses the XML because of the email schemeID and the empty IBAN.
+    """The tolerant fallback reads the header data that the strict pycheval parser refuses.
+
+    pycheval refuses the XML because of the missing email schemeID and the empty IBAN.
+    """
     from pycheval.exc import FacturXError
 
     with pytest.raises(FacturXError):
         parse_xml(_REAL_WORLD_CII)
 
-    # The tolerant fallback still returns the correct header data.
     parsed = imp._parse_cii_header(_REAL_WORLD_CII)
     assert parsed.number == "2021_10"
     assert parsed.issue_date == dt.date(2021, 9, 24)
@@ -220,9 +222,11 @@ def _pdf_with_xml(name: str, xml: str | bytes) -> bytes:
 
 
 def test_parse_pdf_with_zugferd20_filename() -> None:
-    # ZUGFeRD 2.0 embeds the XML as `zugferd-invoice.xml`. The pycheval function
-    # `extract_facturx_from_pdf` matches only `factur-x.xml` and ran into an endless loop
-    # here, which caused a timeout. Our own extractor reads the file correctly.
+    """ZUGFeRD 2.0 embeds the XML as `zugferd-invoice.xml`, and the own extractor reads it.
+
+    The pycheval function `extract_facturx_from_pdf` matches only `factur-x.xml` and
+    loops forever on another name, which causes a timeout.
+    """
     pdf = _pdf_with_xml("zugferd-invoice.xml", generate_xml(_minimum_invoice()))
     parsed = imp.parse_zugferd_pdf(pdf)
     assert parsed.number == "R-2026-001"
@@ -236,7 +240,7 @@ def test_parse_pdf_with_facturx_filename() -> None:
 
 
 def test_extract_picks_xml_attachment_by_extension() -> None:
-    # The name is unknown, but the `.xml` extension makes the last-resort match work.
+    """An unknown name with the `.xml` extension matches as the last resort."""
     pdf = _pdf_with_xml("rechnung_cii.xml", generate_xml(_minimum_invoice()))
     assert imp.parse_zugferd_pdf(pdf).number == "R-2026-001"
 
@@ -280,13 +284,14 @@ class _FakeSession:
 
 
 def _service(storage: _FakeStorage) -> BudgetTreeService:
-    # parse_invoice_file only runs the duplicate check through the session.
+    """Build the service with a session that only answers the duplicate check."""
     return BudgetTreeService(_FakeSession(), storage=storage, settings=load_settings())  # type: ignore[arg-type]
 
 
 async def test_parse_invoice_file_stores_and_returns(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """The parse stores the original and returns a token with the expected prefix."""
     storage = _FakeStorage()
     parsed = ParsedInvoice(
         number="R-7",
@@ -307,7 +312,6 @@ async def test_parse_invoice_file_stores_and_returns(
     assert isinstance(result, InvoiceParseResult)
     assert result.gross_amount == Decimal("59.50")
     assert result.supplier == "ACME"
-    # The service stored the original. The token uses the expected prefix.
     assert len(storage.put_calls) == 1
     assert result.file_token.startswith("invoices/")
     assert result.file_token == storage.put_calls[0][0]
@@ -322,7 +326,7 @@ async def test_parse_invoice_file_rejects_non_pdf() -> None:
 
 
 async def test_parse_invoice_file_rejects_non_zugferd_pdf() -> None:
-    # A real but empty PDF without Factur-X stores no object, so no orphan stays behind.
+    """A real but empty PDF without Factur-X stores no object, so no orphan stays behind."""
     storage = _FakeStorage()
     with pytest.raises(NotZugferdError):
         await _service(storage).parse_invoice_file(_blank_pdf(), filename="leer.pdf")

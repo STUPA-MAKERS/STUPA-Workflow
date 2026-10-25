@@ -55,7 +55,6 @@ MID = uuid4()
 GID = uuid4()
 
 
-# ProtocolService helpers and fakes.
 def _protocol(**over: Any) -> Protocol:
     proto = Protocol(
         meeting_id=MID,
@@ -209,32 +208,41 @@ async def test_finalize_dual_render_with_non_public_top() -> None:
     """At least one non-public agenda item forces an internal and a public PDF.
 
     The mail carries only the public variant.
+
+    ``_has_non_public`` reads ``session.scalar``, where 1 is truthy. Each
+    ``_build_document`` call, internal and public, then runs ``_assemble_from_agenda``
+    for the items, ``_header_meta`` for the protokollant scalar (the attendance query
+    short-circuits), and ``_quorate`` for the member count. A member count of 0 gives no
+    quorum statement. The mail carries the public PDF as the attachment.
+
+    The fake session serves, in order:
+
+    - execute: ``_get``, the internal items (empty), the public items (empty), the members of
+      ``_recipients`` and its mail list;
+    - scalar: ``_has_non_public`` (1), the internal protokollant, the internal member count,
+      the public protokollant, the public member count, the gremium name for ``_send``.
     """
     proto = _protocol()
     storage = ProtoStorage()
     typst = FakeTypst(pdf=b"%PDF dual")
     mail = FakeMailQueue()
-    # _has_non_public reads session.scalar, where 1 is truthy.
-    # Each _build_document call, internal and public, then runs in this order:
-    #   _assemble_from_agenda for the items, _header_meta for the protokollant scalar
-    #   and the attendance short circuit, _quorate for the member count.
     session = FakeSession(
         store={MID: _meeting(), GID: _gremium()},
         results=[
-            result(proto),  # _get
-            result(),       # internal: _assemble_from_agenda items (empty)
-            result(),       # public: _assemble_from_agenda items (empty)
-            result("m@x.de"),  # _recipients resolves the members (scalars)
-            result(),       # _recipients mail list (execute)
+            result(proto),
+            result(),
+            result(),
+            result("m@x.de"),
+            result(),
         ],
     )
     session.scalar_results = [
-        1,        # _has_non_public is true
-        None,     # _header_meta protokollant, internal
-        0,        # _quorate member count, internal, gives None because there are none
-        None,     # _header_meta protokollant, public
-        0,        # _quorate member count, public
-        "StuPa",  # _send gremium_name
+        1,
+        None,
+        0,
+        None,
+        0,
+        "StuPa",
     ]
     out = await _service(
         session, storage=storage, typst=typst, mail_queue=mail
@@ -246,7 +254,6 @@ async def test_finalize_dual_render_with_non_public_top() -> None:
     assert len(typst.calls) == 2
     keys = {k for k, _len, _ct in storage.puts}
     assert keys == {protocol_storage_key(PID), protocol_public_storage_key(PID)}
-    # The mail carries the public PDF as the attachment.
     assert len(mail.sent) == 1
     assert [a.filename for a in mail.sent[0].attachments] == ["protokoll.pdf"]
 
@@ -256,26 +263,29 @@ async def test_finalize_dual_render_without_storage_skips_uploads() -> None:
 
     `_render_pdf` returns None, so there is no upload and no PDF attachment. The test
     covers the `is None` branches of the dual-render block.
+
+    The fake session serves the same queue as the dual render with a non-public TOP:
+    ``_has_non_public`` is true, so both variants render.
     """
     proto = _protocol()
     mail = FakeMailQueue()
     session = FakeSession(
         store={MID: _meeting(), GID: _gremium()},
         results=[
-            result(proto),  # _get
-            result(),       # internal: _assemble_from_agenda items (empty)
-            result(),       # public: _assemble_from_agenda items (empty)
-            result("m@x.de"),  # _recipients resolves the members
-            result(),       # _recipients mail list
+            result(proto),
+            result(),
+            result(),
+            result("m@x.de"),
+            result(),
         ],
     )
     session.scalar_results = [
-        1,        # _has_non_public is true, so the dual render runs
-        None,     # _header_meta protokollant, internal
-        0,        # _quorate member count, internal
-        None,     # _header_meta protokollant, public
-        0,        # _quorate member count, public
-        "StuPa",  # _send gremium_name
+        1,
+        None,
+        0,
+        None,
+        0,
+        "StuPa",
     ]
     out = await _service(
         session, storage=None, typst=FakeTypst(), mail_queue=mail
@@ -286,7 +296,17 @@ async def test_finalize_dual_render_without_storage_skips_uploads() -> None:
 
 
 async def test_assemble_from_agenda_builds_blocks_with_votes() -> None:
-    """Existing agenda items build the protocol from the bodies and the vote snippets."""
+    """Existing agenda items build the protocol from the bodies and the vote snippets.
+
+    An empty item gets the fallback title "Tagesordnungspunkt".
+
+    The fake session serves, in order:
+
+    - execute: ``_get``, the items, the votes of the first item, ``voting._get_vote``, the
+      ballots for ``voting._aggregate``, the votes of the second item (empty), the members
+      and the mail list of ``_recipients`` (empty);
+    - scalar: ``has_non_public`` (0), the protokollant, the member count.
+    """
     proto = _protocol(markdown="# Fallback (sollte ignoriert werden)")
     item_with_vote = _agenda_item(title="Haushalt", body="Body Haushalt", position=1)
     item_empty = _agenda_item(
@@ -298,17 +318,17 @@ async def test_assemble_from_agenda_builds_blocks_with_votes() -> None:
     session = FakeSession(
         store={MID: _meeting(), GID: _gremium(), vote.id: vote},
         results=[
-            result(proto),                 # _get
-            result(item_with_vote, item_empty),  # _assemble: items
-            result(vote),                  # _assemble: votes of the first item
-            result(vote),                  # voting._get_vote via execute, scalar_one_or_none
-            result("yes", "yes", "no"),    # voting._aggregate over the ballots
-            result(),                      # _assemble: votes of the second item (empty)
-            result(),                      # _recipients resolves the members (empty)
-            result(),                      # _recipients mail list (empty)
+            result(proto),
+            result(item_with_vote, item_empty),
+            result(vote),
+            result(vote),
+            result("yes", "yes", "no"),
+            result(),
+            result(),
+            result(),
         ],
     )
-    session.scalar_results = [0, None, 0]  # has_non_public is 0, protokollant, members
+    session.scalar_results = [0, None, 0]
     out = await _service(
         session, storage=storage, typst=typst, mail_queue=None
     ).finalize(PID, now=NOW)
@@ -316,7 +336,7 @@ async def test_assemble_from_agenda_builds_blocks_with_votes() -> None:
     rendered_md = typst.calls[0][0]
     assert "# Haushalt" in rendered_md
     assert "Body Haushalt" in rendered_md
-    assert "# Tagesordnungspunkt" in rendered_md  # fallback title for an empty item
+    assert "# Tagesordnungspunkt" in rendered_md
     assert "[!abstimmung]" in rendered_md
 
 
@@ -324,6 +344,14 @@ async def test_assemble_public_redacts_non_public_top() -> None:
     """`public=True` replaces the body and the snippets of non-public agenda items.
 
     A placeholder takes their place. The heading stays, so the numbering stays stable.
+
+    A non-public title can encode the subject. The internal variant keeps it. The public
+    variant replaces it with a neutral heading. The single top-level `#` keeps the
+    numbering stable.
+
+    The fake session serves ``_get``, the internal items with the votes of both items,
+    the public items with the votes of the public item only (the non-public item is
+    skipped), then the members and the mail list.
     """
     proto = _protocol()
     np_item = _agenda_item(title="Personalie", body="Geheim", non_public=True)
@@ -333,14 +361,14 @@ async def test_assemble_public_redacts_non_public_top() -> None:
     session = FakeSession(
         store={MID: _meeting(), GID: _gremium()},
         results=[
-            result(proto),                   # _get
-            result(np_item, pub_item),       # internal: items
-            result(),                        # internal: votes of np_item (empty)
-            result(),                        # internal: votes of pub_item (empty)
-            result(np_item, pub_item),       # public: items
-            result(),                        # public: votes of pub_item, np_item skipped
-            result(),                        # _recipients members
-            result(),                        # _recipients mail list
+            result(proto),
+            result(np_item, pub_item),
+            result(),
+            result(),
+            result(np_item, pub_item),
+            result(),
+            result(),
+            result(),
         ],
     )
     session.scalar_results = [1, None, 0, None, 0, "StuPa"]
@@ -352,9 +380,6 @@ async def test_assemble_public_redacts_non_public_top() -> None:
     assert "Geheim" in internal_md
     assert "Geheim" not in public_md
     assert "nicht-öffentlicher Tagesordnungspunkt" in public_md
-    # A non-public title can encode the subject. The internal variant keeps it.
-    # The public variant replaces it with a neutral heading. The single top-level `#`
-    # keeps the numbering stable.
     assert "# Personalie" in internal_md
     assert "# Personalie" not in public_md
     assert "# Nicht-öffentlicher Tagesordnungspunkt" in public_md
@@ -364,6 +389,9 @@ async def test_assemble_skips_cancelled_votes_in_query() -> None:
     """A cancelled vote gives no snippet.
 
     The SELECT filters it out. An empty result covers the branch.
+
+    The fake session serves the items, no votes (all cancelled), the members and the
+    mail list.
     """
     proto = _protocol()
     item = _agenda_item(title="X", body=None)
@@ -373,10 +401,10 @@ async def test_assemble_skips_cancelled_votes_in_query() -> None:
         store={MID: _meeting(), GID: _gremium()},
         results=[
             result(proto),
-            result(item),   # items
-            result(),       # votes (all cancelled, so empty)
-            result(),       # members
-            result(),       # mail list
+            result(item),
+            result(),
+            result(),
+            result(),
         ],
     )
     session.scalar_results = [0, None, 0]
@@ -388,21 +416,23 @@ async def test_assemble_skips_cancelled_votes_in_query() -> None:
 
 
 async def test_quorate_with_explicit_percent_threshold() -> None:
-    """A set gremium.quorum_percent gives the threshold present*100 >= percent*members."""
+    """A set gremium.quorum_percent gives the threshold present*100 >= percent*members.
+
+    10 members, 5 present: 50% of 10 is 5, so 500 >= 500 is true.
+    """
     session = FakeSession()
     svc = _service(session)
-    session.scalar_results = [10]  # 10 members
+    session.scalar_results = [10]
     gremium = _gremium(quorum_percent=50)
-    # 5 present, 50% of 10 is 5, so 500 >= 500 is true.
     assert await svc._quorate(gremium, None, present_count=5) is True
 
 
 async def test_quorate_percent_not_met() -> None:
+    """10 members, 5 present: 60% of 10 is 6, so 500 >= 600 is false."""
     session = FakeSession()
     svc = _service(session)
     session.scalar_results = [10]
     gremium = _gremium(quorum_percent=60)
-    # 5 present, 60% of 10 is 6, so 500 >= 600 is false.
     assert await svc._quorate(gremium, None, present_count=5) is False
 
 
@@ -423,16 +453,19 @@ async def test_quorate_none_without_gremium() -> None:
 
 
 async def test_quorate_none_without_members() -> None:
+    """A gremium without members gives no quorum statement."""
     session = FakeSession()
     svc = _service(session)
-    session.scalar_results = [0]  # no members
+    session.scalar_results = [0]
     assert await svc._quorate(_gremium(), None, present_count=3) is None
 
 
 async def test_quorate_none_when_member_count_query_returns_none() -> None:
-    """`session.scalar` returns None, so `or 0` makes members 0 and the result None."""
+    """`session.scalar` returns None, so `or 0` makes members 0 and the result None.
+
+    An empty ``scalar_results`` makes ``scalar()`` return None, so the ``or 0`` applies.
+    """
     svc = _service(FakeSession())
-    # An empty scalar_results makes scalar() return None, so the `or 0` applies.
     assert await svc._quorate(_gremium(), None, present_count=3) is None
 
 
@@ -445,16 +478,18 @@ async def test_header_meta_returns_empty_without_meeting() -> None:
 
 
 async def test_header_meta_resolves_protokollant_name() -> None:
-    """Without keeper periods, protokollant_id resolves the name through `session.scalar`."""
+    """Without keeper periods, protokollant_id resolves the name through `session.scalar`.
+
+    The guest count comes first (no guests). The FakeSession short-circuits the
+    attendance query, so the attendance stays empty.
+    """
     session = FakeSession()
     svc = _service(session)
-    # The guest count comes first (no guests).
     session.scalar_results = [0, "Frau Schmidt"]
     meeting = _meeting(protokollant_id=uuid4())
     header = await svc._header_meta(cast("Any", meeting))
     assert header.protokollant == "Frau Schmidt"
     assert header.keepers == []
-    # The FakeSession short circuits the attendance query, so it stays empty.
     assert header.present == [] and header.absent == [] and header.present_count == 0
     assert header.datalines == []
 
@@ -463,16 +498,17 @@ async def test_header_meta_public_redacts_names_keeps_counts() -> None:
     """`public=True` drops the protokollant and the name lists.
 
     Only the counters stay, as data lines. The true `present_count` stays correct.
+
+    The guest count comes first (no guests). The fake attendance is empty, so all
+    counters are 0.
     """
     session = FakeSession()
     svc = _service(session)
-    # The guest count comes first (no guests).
     session.scalar_results = [0, "Frau Schmidt"]
     meeting = _meeting(protokollant_id=uuid4())
     header = await svc._header_meta(cast("Any", meeting), public=True)
     assert header.protokollant is None and header.keepers == []
     assert header.present == [] and header.absent == [] and header.excused == []
-    # The fake attendance is empty, so all counters are 0.
     assert header.present_count == 0
     assert header.datalines == ["Anwesend: 0", "Entschuldigt: 0", "Abwesend: 0"]
 
@@ -484,11 +520,12 @@ def test_local_end_time_none_when_not_datetime() -> None:
 
 
 def test_local_end_time_converts_utc_to_local() -> None:
+    """17:30:45 UTC is 19:30 in Berlin summer time, with seconds and microseconds zeroed."""
     svc = _service(FakeSession())
-    closed = datetime(2026, 6, 12, 17, 30, 45, tzinfo=UTC)  # 19:30 in Berlin, summer time
+    closed = datetime(2026, 6, 12, 17, 30, 45, tzinfo=UTC)
     end = svc._local_end_time(closed)
     assert isinstance(end, _time)
-    assert end == _time(19, 30)  # seconds and microseconds zeroed
+    assert end == _time(19, 30)
 
 
 async def test_finalize_uses_meeting_closed_at_end_time() -> None:
@@ -538,7 +575,13 @@ async def test_finalize_storage_error_during_render_503() -> None:
 
 
 async def test_send_subject_and_body_include_gremium_and_date() -> None:
-    """The subject and the body carry the Gremium, the meeting and the date."""
+    """The subject and the body carry the Gremium, the meeting and the date.
+
+    The body names the PDF attachment ("liegt als PDF bei"). The fake session serves the
+    items (empty), the members and the mail list. The scalars are the guest count,
+    ``has_non_public`` (false), the member count and the gremium name for ``_send``.
+    ``_meeting`` sets protokollant_id to None, so no protokollant scalar is read.
+    """
     proto = _protocol()
     meeting = _meeting()
     mail = FakeMailQueue()
@@ -546,14 +589,12 @@ async def test_send_subject_and_body_include_gremium_and_date() -> None:
         store={MID: meeting, GID: _gremium()},
         results=[
             result(proto),
-            result(),                 # _assemble items (empty)
-            result("a@x.de"),         # members
-            result(),                 # mail list
+            result(),
+            result("a@x.de"),
+            result(),
         ],
     )
-    # has_non_public is false, then the quorate member count, then gremium_name for
-    # _send. _meeting sets protokollant_id to None, so no protokollant scalar is read.
-    session.scalar_results = [0, 0, 5, "StuPa"]  # the guest count first
+    session.scalar_results = [0, 0, 5, "StuPa"]
     await _service(
         session, storage=ProtoStorage(), typst=FakeTypst(), mail_queue=mail
     ).finalize(PID, now=NOW)
@@ -563,51 +604,59 @@ async def test_send_subject_and_body_include_gremium_and_date() -> None:
     assert "Sitzung: StuPa-Sitzung" in msg.text
     assert "Gremium: StuPa" in msg.text
     assert "Datum: 12.06.2026" in msg.text
-    assert "liegt als PDF bei" in msg.text  # the PDF attachment hint
+    assert "liegt als PDF bei" in msg.text
 
 
 async def test_send_without_gremium_name_and_meeting() -> None:
-    """No Gremium name and no meeting give a lean subject and body without a PDF hint."""
+    """No Gremium name and no meeting give a lean subject and body without a PDF hint.
+
+    The store holds no meeting, so the meeting is None, the body is the empty Markdown
+    fallback, and no protokollant scalar is read. The scalars are ``has_non_public``
+    (0), the member count and a gremium name of None. Without storage there is no PDF,
+    so the intro drops the hint and no file travels. The subject names neither Gremium
+    nor date.
+    """
     proto = _protocol()
     mail = FakeMailQueue()
-    # The store holds no meeting, so meeting is None and the gremium_name scalar is None.
     session = FakeSession(
         store={GID: _gremium(name=None)},
         results=[
             result(proto),
-            result(),         # _assemble items (no meeting, so empty markdown fallback)
-            result("a@x.de"),  # members
-            result(),         # mail list
+            result(),
+            result("a@x.de"),
+            result(),
         ],
     )
-    # has_non_public is 0, then the quorate member count. Meeting is None, so no
-    # protokollant scalar is read. Then gremium_name is None.
     session.scalar_results = [0, 5, None]
-    # Without storage there is no PDF, so the intro drops the hint and no file travels.
     await _service(
         session, storage=None, typst=FakeTypst(), mail_queue=mail
     ).finalize(PID, now=NOW)
     msg = mail.sent[0]
-    assert msg.subject == "Sitzungsprotokoll"  # neither Gremium nor date
+    assert msg.subject == "Sitzungsprotokoll"
     assert "liegt als PDF bei" not in msg.text
     assert msg.attachments == ()
 
 
 async def test_embed_vote_title_for_application_reference() -> None:
-    """A set application_id makes the snippet title reference the application."""
+    """A set application_id makes the snippet title reference the application.
+
+    With question None, ``build_vote_snippet`` uses the application reference of
+    ``_vote_title``. The fake session serves ``_get``, no existing refs, the id of the
+    ``pg_insert`` RETURNING, ``voting._get_vote`` and the ballots for
+    ``voting._aggregate``.
+    """
     app_id = uuid4()
     vid = uuid4()
     proto = _protocol(markdown="# TOP 1")
-    # With question None, build_vote_snippet uses the _vote_title application reference.
     vote = _vote_row(id=vid, application_id=app_id, question=None)
     session = FakeSession(
         store={vid: vote},
         results=[
-            result(proto),       # _get
-            result(),            # existing refs (none)
-            result(uuid4()),     # pg_insert RETURNING id
-            result(vote),        # voting._get_vote
-            result("yes", "no"),  # voting._aggregate
+            result(proto),
+            result(),
+            result(uuid4()),
+            result(vote),
+            result("yes", "no"),
         ],
     )
     out = await _service(session).embed_votes(PID, [vid])
@@ -623,23 +672,25 @@ def test_vote_title_generic_question_fallbacks() -> None:
 
 
 async def test_build_document_fallback_title_without_meeting() -> None:
+    """Without agenda items the build falls back to ``protocol.markdown``.
+
+    The store holds no meeting and no gremium, so both resolve to None.
+    ``has_non_public`` is false.
+    """
     proto = _protocol(markdown="# Bestehendes Markdown")
     typst = FakeTypst()
-    # The store holds no meeting and no gremium, so both resolve to None.
     session = FakeSession(
         store={},
         results=[result(proto), result(), result(), result()],
     )
-    session.scalar_results = [0]  # has_non_public is false. Without a gremium: None.
+    session.scalar_results = [0]
     out = await _service(
         session, storage=ProtoStorage(), typst=typst, mail_queue=None
     ).finalize(PID, now=NOW)
     assert out.status == "final"
-    # The build falls back to protocol.markdown because there are no agenda items.
     assert "# Bestehendes Markdown" in typst.calls[0][0]
 
 
-# FilesService: list_for_application, delete and delete_for_application.
 @pytest.fixture(autouse=True)
 def _mock_mime(monkeypatch: pytest.MonkeyPatch) -> None:
     """Mock the sniff and validate step to accept a PDF, so libmagic is not needed."""
@@ -736,7 +787,7 @@ async def test_delete_removes_row_storage_and_audits(
     storage.objects["k/doc.pdf"] = (b"x", "application/pdf")
     svc = _files_service(session, storage=storage)
     await svc.delete(att.id, actor="admin")
-    assert att in session.deleted  # the DB row is gone
+    assert att in session.deleted
     assert storage.removed == ["k/doc.pdf"]
     assert session.committed == 1
     assert calls and calls[0]["target_type"] == "attachment"
@@ -746,7 +797,10 @@ async def test_delete_removes_row_storage_and_audits(
 async def test_delete_tolerates_storage_remove_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The delete call swallows a storage remove error as a best effort."""
+    """The delete call swallows a storage remove error as a best effort.
+
+    The delete must NOT raise.
+    """
     async def _record(session: object, **kw: object) -> None:
         return None
 
@@ -754,24 +808,25 @@ async def test_delete_tolerates_storage_remove_error(
     session = _FilesSession()
     att = _attachment(session)
     svc = _files_service(session, storage=FailingStorage())
-    await svc.delete(att.id, actor="admin")  # must NOT raise
+    await svc.delete(att.id, actor="admin")
     assert session.committed == 1
 
 
 async def test_delete_without_storage_or_key_skips_remove(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The delete call tries no remove without a storage or without a storage_key."""
+    """The delete call tries no remove without a storage or without a storage_key.
+
+    Case 1 has no storage. Case 2 has a storage, but storage_key is None.
+    """
     async def _record(session: object, **kw: object) -> None:
         return None
 
     monkeypatch.setattr(files_service, "audit_record", _record)
-    # Case 1: no storage.
     session = _FilesSession()
     att = _attachment(session)
     await _files_service(session, storage=None).delete(att.id, actor="a")
     assert session.committed == 1
-    # Case 2: a storage is there, but storage_key is None.
     session2 = _FilesSession()
     att2 = _attachment(session2, storage_key=None)
     storage = FakeStorage()
@@ -790,7 +845,11 @@ async def test_delete_unknown_attachment_404() -> None:
 async def test_delete_for_application_removes_all_and_audits(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """delete_for_application removes every row and object, audits, and never commits."""
+    """delete_for_application removes every row and object, audits, and never commits.
+
+    Only the attachment with a storage key is removed from storage. Each attachment gets
+    an audit entry, and the method does NOT commit on its own.
+    """
     calls: list[dict[str, object]] = []
 
     async def _record(session: object, **kw: object) -> None:
@@ -799,7 +858,7 @@ async def test_delete_for_application_removes_all_and_audits(
     monkeypatch.setattr(files_service, "audit_record", _record)
     session = _FilesSession()
     a1 = _attachment(session, storage_key="k/1")
-    a2 = _attachment(session, storage_key=None)  # without a storage object
+    a2 = _attachment(session, storage_key=None)
     session._scalars = [[a1, a2]]
     storage = FakeStorage()
     storage.objects["k/1"] = (b"x", "application/pdf")
@@ -807,9 +866,9 @@ async def test_delete_for_application_removes_all_and_audits(
         uuid.uuid4(), actor="dsgvo"
     )
     assert n == 2
-    assert storage.removed == ["k/1"]  # only a1 had a key
-    assert len(calls) == 2  # two audit entries
-    assert session.committed == 0  # does NOT commit on its own
+    assert storage.removed == ["k/1"]
+    assert len(calls) == 2
+    assert session.committed == 0
 
 
 async def test_delete_for_application_tolerates_remove_error(
@@ -854,13 +913,16 @@ def test_max_bytes_clamps_to_model_cap() -> None:
 async def test_upload_with_field_key(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """An upload with field_key sets it on the row."""
+    """An upload with field_key sets it on the row.
+
+    The upload writes an audit entry, which ``NotifSession`` cannot chain, so the test
+    captures it. The audit records only that a field key exists, never the client text.
+    """
     audits: list[dict[str, object]] = []
 
     async def _record(session: object, **kw: object) -> None:
         audits.append(kw)
 
-    # The upload writes an audit entry. `NotifSession` cannot run the hash chain.
     monkeypatch.setattr(files_service, "audit_record", _record)
     session = NotifSession()
     app = Application()
@@ -878,7 +940,6 @@ async def test_upload_with_field_key(
     added = [a for a in session.added if isinstance(a, Attachment)]
     assert added and added[0].field_key == "kostenaufstellung"
     assert len(queue.enqueued) == 1
-    # The audit records only that a field key exists, never the client text.
     assert audits[0]["data"]["hasFieldKey"] is True  # type: ignore[index]
     assert "fieldKey" not in audits[0]["data"]  # type: ignore[operator]
     assert "isComparisonOffer" not in audits[0]["data"]  # type: ignore[operator]

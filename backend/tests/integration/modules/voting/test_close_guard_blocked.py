@@ -59,6 +59,10 @@ class _CommitCounter:
 async def _assert_blocked(
     session: AsyncSession, vote_id, app_id, voting_state, branch: str, reason: str
 ) -> None:
+    """Assert a closed vote whose branch is blocked and audited with the reason.
+
+    The application has no status change, because the branch rolled back.
+    """
     vote = await session.get(Vote, vote_id)
     assert vote is not None
     await session.refresh(vote)
@@ -73,7 +77,6 @@ async def _assert_blocked(
     assert [e.action for e in entries] == ["vote_close", "vote_branch_blocked"]
     assert entries[1].data["branch"] == branch
     assert entries[1].data["reason"] == reason
-    # The application has no status change: the branch rolled back.
     app_actions = [e.action for e in await audit_actions(session, app_id)]
     assert "status_change" not in app_actions
 

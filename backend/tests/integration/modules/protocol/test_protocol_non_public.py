@@ -45,13 +45,13 @@ pytestmark = pytest.mark.integration
 
 _NON_PUBLIC_PLACEHOLDER = "(nicht-öffentlicher Tagesordnungspunkt)"
 _SECRET_BODY = "Personalentscheidung zu Frau Müller — vertraulich."
-# The title of a non-public agenda item can encode the sensitive subject.
-# It must not appear in the public variant.
+#: The title of a non-public agenda item can encode the sensitive subject.
+#: It must not appear in the public variant.
 _SECRET_TITLE = "Personalangelegenheit"
 _NEUTRAL_HEADING = "Nicht-öffentlicher Tagesordnungspunkt"
-# The full attendance list and the minute taker of a meeting are metadata that the
-# `non_public` flag protects. They must not reach the variant that goes to
-# the mailing list.
+#: The full attendance list and the minute taker of a meeting are metadata that the
+#: `non_public` flag protects. They must not reach the variant that goes to
+#: the mailing list.
 _PRESENT_NAME = "Anna Anwesend"
 _ABSENT_NAME = "Bernd Abwesend"
 _PROTOKOLLANT_NAME = "Petra Protokoll"
@@ -100,8 +100,8 @@ class _FakeTypst:
         config: Mapping[str, object] | None = None,
         assets: Mapping[str, bytes] | None = None,
     ) -> bytes:
+        """Record the call and return PDF bytes that differ for each render."""
         self.calls.append(markdown)
-        # The call index makes the bytes different for each render.
         return f"%PDF-{len(self.calls)}::{markdown}".encode()
 
 
@@ -122,6 +122,10 @@ async def _seed_meeting(
     minute taker, one present member and one absent member. Their names must appear in
     the internal variant but not in the public one. This makes the header redaction of
     the public variant testable.
+
+    Both members need a Gremium membership, because the quorum counts present members
+    against active members. Without it ``_quorate`` returns ``None`` and both variants
+    lose the frontmatter line.
     """
     gremium = Gremium(name="StuPa", slug=f"g-{uuid.uuid4()}")
     session.add(gremium)
@@ -131,9 +135,6 @@ async def _seed_meeting(
     absent_member = Principal(sub=f"abs-{uuid.uuid4()}", display_name=_ABSENT_NAME)
     session.add_all([protokollant, present_member, absent_member])
     await session.flush()
-    # Both members need a Gremium membership. Without it the service cannot compute
-    # the quorum, which counts present members against active members. `_quorate`
-    # then returns `None` and both variants lose the front matter line.
     role = GremiumRole(
         gremium_id=gremium.id,
         key=f"r-{uuid.uuid4()}",
@@ -205,6 +206,10 @@ def _count_top_headings(markdown: str) -> int:
 
 
 async def test_assemble_redacts_non_public_keeps_numbering(session: AsyncSession) -> None:
+    """The non-public title stays in the internal variant.
+
+    The public variant goes to the mailing list and shows a neutral heading instead.
+    """
     meeting, _ = await _seed_meeting(session)
     svc = ProtocolService(session)
 
@@ -216,8 +221,6 @@ async def test_assemble_redacts_non_public_keeps_numbering(session: AsyncSession
     assert _SECRET_BODY not in public
     assert _NON_PUBLIC_PLACEHOLDER in public
 
-    # The non-public title stays in the internal variant. The public variant
-    # goes to the mailing list and shows a neutral heading instead.
     assert _SECRET_TITLE in internal
     assert _SECRET_TITLE not in public
     assert _NEUTRAL_HEADING in public
@@ -235,6 +238,8 @@ async def test_build_document_redacts_roster_and_protokollant_in_public(
     `_build_document(public=True)` must not contain the names of the present or absent
     members. It must also not contain the name of the minute taker. These metadata
     otherwise go verbatim to the external mailing list. The internal document keeps them.
+
+    The quorum line counts members, so it stays meaningful in both variants.
     """
     meeting, gremium = await _seed_meeting(session)
     protocol = Protocol(
@@ -260,7 +265,6 @@ async def test_build_document_redacts_roster_and_protokollant_in_public(
     assert "Anwesend: 1" in public
     assert "Abwesend: 1" in public
 
-    # The quorum line counts members, so it stays meaningful in both variants.
     assert "beschlussfaehigkeit" in internal
     assert "beschlussfaehigkeit" in public
 
@@ -284,9 +288,14 @@ async def test_has_non_public_false_without_secret_top(session: AsyncSession) ->
 
 
 async def test_finalize_dual_render(session: AsyncSession) -> None:
+    """The finalization mails only the redacted public PDF.
+
+    The mailing list makes the service enqueue the mail. The non-public title, the
+    attendance names and the minute taker stay in the internal PDF and are absent from
+    the public PDF. Exactly one mail goes out, and its attachment is the public variant,
+    never the internal PDF.
+    """
     meeting, gremium = await _seed_meeting(session)
-    # The mailing list makes the service enqueue the mail. Without it the recipient
-    # list is empty.
     session.add(
         MailList(
             gremium_id=gremium.id,
@@ -330,13 +339,9 @@ async def test_finalize_dual_render(session: AsyncSession) -> None:
     assert _NON_PUBLIC_PLACEHOLDER.encode() in public_bytes
     assert _SECRET_BODY.encode() not in public_bytes
 
-    # The non-public title stays in the internal PDF and is absent from the
-    # mailed PDF.
     assert _SECRET_TITLE.encode() in internal_bytes
     assert _SECRET_TITLE.encode() not in public_bytes
 
-    # The attendance names and the minute taker stay in the
-    # internal PDF. They are absent from the public PDF that goes to the mailing list.
     assert _PRESENT_NAME.encode() in internal_bytes
     assert _ABSENT_NAME.encode() in internal_bytes
     assert _PROTOKOLLANT_NAME.encode() in internal_bytes
@@ -344,8 +349,6 @@ async def test_finalize_dual_render(session: AsyncSession) -> None:
     assert _ABSENT_NAME.encode() not in public_bytes
     assert _PROTOKOLLANT_NAME.encode() not in public_bytes
 
-    # Exactly one mail goes out. Its attachment is the public variant, never the
-    # internal PDF.
     assert len(mail_queue.sent) == 1
     msg = mail_queue.sent[0]
     assert len(msg.attachments) == 1

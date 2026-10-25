@@ -25,9 +25,6 @@ B = uuid.UUID("1b7c6f0e-3a51-4c3e-9b8e-6f1d2a3b4c5d")
 C = uuid.UUID("2b7c6f0e-3a51-4c3e-9b8e-6f1d2a3b4c5d")
 
 
-# -- sanitizer --------------------------------------------------------------
-
-
 def test_sanitizer_keeps_the_canonical_image_path() -> None:
     body = f"![Foto](/api/media/images/{A})"
     assert sanitize_user_markdown(body) == body
@@ -37,9 +34,6 @@ def test_sanitizer_still_neutralizes_other_absolute_paths() -> None:
     out = sanitize_user_markdown(f"![x](/api/media/images/{A}/../../etc/passwd) ![y](/etc/passwd)")
     assert "/etc/passwd" not in out
     assert out.count("(Bild entfernt)") == 2
-
-
-# -- render assets ----------------------------------------------------------
 
 
 class _RenderSession(MediaSession):
@@ -104,9 +98,6 @@ async def test_render_never_fails_for_a_missing_image() -> None:
     pdf = await _service(session, storage, typst)._render_pdf(_protocol(), markdown)
     assert pdf == typst.pdf
     assert typst.assets[-1] is None
-
-
-# -- public image ids -------------------------------------------------------
 
 
 class _Result:

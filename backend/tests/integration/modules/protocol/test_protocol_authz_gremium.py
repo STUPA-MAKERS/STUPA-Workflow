@@ -1,9 +1,7 @@
 """Integration test for per-Gremium protocol permissions (real Postgres).
 
-Regression: the protocol write and read paths were gated on the GLOBAL
-``meeting.manage``, ``protocol.finalize`` and ``meeting.view_all`` permissions (the
-first two are gone now). That
-locked out a protocol writer assigned per Gremium. It also locked out the holder of a
+The protocol write and read paths follow the Gremium roles, not global permissions. A
+global gate would lock out a protocol writer assigned per Gremium and the holder of a
 Gremium role with ``protocol.write``, who may edit the agenda item bodies in the live
 stack. ``resolve_principal`` keeps the Gremium role permissions out of
 ``principal.permissions`` on purpose. The protocol service therefore delegates to
@@ -95,13 +93,16 @@ async def _gremium_with_protocol(
 async def test_gremium_protocol_write_role_can_write_and_read_own(
     session: AsyncSession,
 ) -> None:
+    """A Gremium role with protocol.write writes and reads the OWN protocol.
+
+    The principal holds NO global permissions.
+    """
     _, meeting, protocol, member = await _gremium_with_protocol(
         session, role_perms=["protocol.write"]
     )
     svc = ProtocolService(session)
-    principal = Principal(sub=member.sub)  # NO global permissions
+    principal = Principal(sub=member.sub)
 
-    # Write and read the OWN protocol: allowed through the Gremium.
     await svc.authorize_write_meeting(meeting.id, principal)
     await svc.authorize_write(protocol.id, principal)
     await svc.authorize_read(protocol.id, principal)
@@ -111,10 +112,10 @@ async def test_gremium_protocol_write_role_can_write_and_read_own(
 async def test_gremium_protocol_write_role_forbidden_on_other_gremium(
     session: AsyncSession,
 ) -> None:
+    """The same role is forbidden on the protocol of a second, FOREIGN Gremium."""
     _, _, _, member = await _gremium_with_protocol(
         session, role_perms=["protocol.write"]
     )
-    # A second, FOREIGN Gremium with its own protocol.
     _, other_meeting, other_protocol, _ = await _gremium_with_protocol(
         session, role_perms=["protocol.write"]
     )
@@ -132,7 +133,10 @@ async def test_gremium_protocol_write_role_forbidden_on_other_gremium(
 async def test_finalize_requires_protocol_finalize_permission(
     session: AsyncSession,
 ) -> None:
-    # Only ``protocol.write``: the member may write, but must NOT finalize.
+    """A member with only ``protocol.write`` writes but must NOT finalize.
+
+    A Gremium role with ``protocol.finalize`` plus write may finalize.
+    """
     _, _, write_protocol, write_member = await _gremium_with_protocol(
         session, role_perms=["protocol.write"]
     )
@@ -140,7 +144,6 @@ async def test_finalize_requires_protocol_finalize_permission(
     with pytest.raises(ForbiddenError):
         await svc.authorize_finalize(write_protocol.id, Principal(sub=write_member.sub))
 
-    # A Gremium role with ``protocol.finalize`` plus write may finalize.
     _, _, fin_protocol, fin_member = await _gremium_with_protocol(
         session, role_perms=["protocol.write", "protocol.finalize"]
     )
@@ -151,6 +154,8 @@ async def test_former_global_keys_grant_nothing(session: AsyncSession) -> None:
     """The global ``meeting.manage`` and ``protocol.finalize`` keys are gone.
 
     A stale grant of these keys opens neither the write nor the finalize path.
+
+    The global ``meeting.view_all`` still reads every gremium.
     """
     _, meeting, protocol, _ = await _gremium_with_protocol(session, role_perms=[])
     svc = ProtocolService(session)
@@ -159,7 +164,6 @@ async def test_former_global_keys_grant_nothing(session: AsyncSession) -> None:
         await svc.authorize_write_meeting(meeting.id, stale)
     with pytest.raises(ForbiddenError):
         await svc.authorize_finalize(protocol.id, stale)
-    # Read: the global ``meeting.view_all`` still sees every gremium.
     viewer = Principal(sub="org-view", permissions={"meeting.view_all"})
     await svc.authorize_read(protocol.id, viewer)
 
