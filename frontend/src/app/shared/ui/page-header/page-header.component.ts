@@ -10,7 +10,7 @@ import {
   input,
   viewChild,
 } from '@angular/core';
-import { ListDetailNav, dockInListDetailBar } from '@stupa-makers/ui-kit';
+import { ListDetailNav, MEDIA, dockInListDetailBar, mediaQuery } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 
 /**
@@ -129,6 +129,16 @@ export class PageHeaderComponent {
     titled: () => !this.pane(),
     title: () => this.host.nativeElement.querySelector('.ph__title'),
   });
+
+  private readonly phone = mediaQuery(MEDIA.phone);
+
+  /**
+   * The meta and the heading slot sit in the bar of a one-view page, in front of the
+   * actions. Below the bar they would hang alone under its rule, on the content edge and
+   * not under the small title. A phone keeps them below the bar, because its bar holds
+   * only the ⋮ menu.
+   */
+  protected readonly factsInBar = computed(() => this.docked() && !this.phone());
 
   constructor() {
     // A title that changes after the first render (the name of a gremium that loads)
