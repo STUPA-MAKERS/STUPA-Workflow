@@ -52,20 +52,6 @@ revisions before the application starts.
 `migrate` can also run as its own database user (`DB_MIGRATION_URL`), separate from the
 runtime user of the application.
 
-### Switch from pytex to typst — ONE-OFF manual step
-
-The `typst` service replaces the `pytex` service. After the deploy that carries the
-switch, remove the old container and its cache volume:
-
-```bash
-docker compose up -d --build --remove-orphans
-docker volume rm antragsplattform_pytex_cache
-```
-
-The `PYTEX_*` keys in `.env` have no effect any more. Remove them. The `TYPST_*` defaults
-fit production: the body cap is 32 MiB, the value that production set for pytex. Set
-`TYPST_URL` only when the service runs under a different name.
-
 ### Orphaned application PDFs — ONE-OFF manual step
 
 Applications no longer render a PDF. Migration `a7c3f1e59d84` drops the `render_job` table,

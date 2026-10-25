@@ -106,7 +106,7 @@ SQUARE_LOGO_MAX_PX: Final[int] = 4096
 SQUARE_LOGO_TOLERANCE: Final[float] = 0.01
 
 #: Extension per accepted type. The asset name takes the extension from the
-#: SNIFFED type, never from the uploaded file name. LaTeX picks its image driver
+#: SNIFFED type, never from the uploaded file name. Typst picks the image format
 #: by extension, so a wrong one breaks the render.
 _MIME_EXTENSION: Final[dict[str, str]] = {
     "image/png": ".png",

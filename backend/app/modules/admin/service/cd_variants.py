@@ -9,7 +9,7 @@ the magic bytes and compares them against the declared type. ClamAV then scans
 the bytes before the object goes to the bucket (`files.scanner.scan_or_raise`),
 because the stored bytes are the bytes of the client: the upload does not encode
 them again. The allowlist adds
-SVG and PDF, because these bytes only ever reach the LaTeX renderer. The
+SVG and PDF, because these bytes only ever reach the typst renderer. The
 download path therefore forces an attachment disposition and never answers with
 ``image/svg+xml`` — see `app.modules.admin.router.get_cd_variant_logo_file`.
 

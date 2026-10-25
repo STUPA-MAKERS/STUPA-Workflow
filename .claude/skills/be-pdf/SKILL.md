@@ -25,7 +25,7 @@ MinIO itself.
   query param `variant`. With a `config` or `assets` it switches to `multipart/form-data`
   (`source`, `config`, repeated `assets`). There is no shell call.
 - **No trust levels.** The render service turns the Markdown into data before Typst sees
-  it, so the pytex-era `trust_level` and the eval-trigger gate are gone.
+  it, so no part of the Markdown runs as code and the call carries no trust level.
 - Error discipline: a 4xx is permanent and gets no retry. A 5xx or a transport error is
   transient and retryable — `TypstError.retryable` carries which. `_error_detail` returns
   the scrubbed `{"error": …}` body, truncated.
