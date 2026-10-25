@@ -56,7 +56,7 @@ describe('CloseMeetingDialogComponent', () => {
     expect(screen.getByText(/finalisiert danach, wer das Recht „Protokoll finalisieren“ hat/)).toBeInTheDocument();
   });
 
-  it('blocks the close while a vote is open (O12)', async () => {
+  it('blocks the close while a vote is open', async () => {
     const { http, cmp } = await setup({ ...LIVE, votes: [vote('open')] } as Meeting);
     expect(screen.getByRole('alert')).toHaveTextContent('Eine Abstimmung ist noch offen');
     expect(screen.getByRole('button', { name: 'Sitzung schließen' })).toBeDisabled();
@@ -64,7 +64,7 @@ describe('CloseMeetingDialogComponent', () => {
     http.verify();
   });
 
-  it('closes with one PATCH and never finalizes the protocol (O13)', async () => {
+  it('closes with one PATCH and never finalizes the protocol', async () => {
     const { http, meetingClosed, toasts } = await setup();
     await userEvent.click(screen.getByRole('button', { name: 'Sitzung schließen' }));
     const req = http.expectOne('/api/meetings/m-1');

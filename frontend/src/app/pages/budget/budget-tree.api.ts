@@ -204,8 +204,8 @@ export interface Invoice {
   actor: string | null;
   createdAt: string;
   /**
-   * The bookings that reference this invoice (A6), in booking order. The server sends
-   * only the bookings on cost centres the reader may see. A backend before A6 sends no
+   * The bookings that reference this invoice, in booking order. The server sends
+   * only the bookings on cost centres the reader may see. An older backend sends no
    * field at all: the list then hides its bookings column instead of asking for the
    * bookings of each invoice one by one.
    */
@@ -320,7 +320,7 @@ export interface InvoicePage {
   total: number;
   limit: number;
   offset: number;
-  /** The segment counts. A backend before FE10c sends none. */
+  /** The segment counts. An older backend sends none. */
   counts?: InvoiceSegmentCounts;
 }
 
@@ -483,15 +483,13 @@ export class BudgetTreeApi {
   private readonly http = inject(HttpClient);
   private readonly base = inject(API_BASE_URL);
 
+  /**
+   * The budget and dashboard pages have their own loading indicator; every other call only fills
+   * the nav or a dropdown, so it suppresses the global overlay. It is cached, because five pages
+   * ask for the whole tree and a mutation under `/budgets` drops every entry there.
+   */
   tree(gremiumId?: string): Observable<BudgetTreeNode[]> {
     const params = gremiumId ? { gremium: gremiumId } : undefined;
-    // The budget and dashboard pages have their own loading indicator. Every other
-    // call only hydrates the nav or a dropdown, so suppress the global overlay.
-    //
-    // Cached: the whole tree comes down in one request, five pages ask for it, and it
-    // changes only when someone edits a cost centre — which invalidates it, because a
-    // mutation under `/budgets` drops every entry there. Every caller sets a signal from
-    // `next`, so the second emission simply corrects what is already on screen.
     return this.http.get<BudgetTreeNode[]>(`${this.base}/budgets`, {
       params,
       context: cached(TREE_TTL_MS, skipLoading()),

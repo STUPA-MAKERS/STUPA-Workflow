@@ -99,12 +99,15 @@ export function weekdayName(value: DateValue, locale: string): string {
   return dateFormat(locale, { weekday: 'short' }).format(d).replace(/\.$/, '');
 }
 
-/** Day and month: "14.10." (de, always with the closing dot) or "14/10" (en). */
+/**
+ * Day and month: "14.10." (de, always with the closing dot) or "14/10" (en).
+ *
+ * Some ICU versions write the German day and month without the closing dot.
+ */
 export function dayMonth(value: DateValue, locale: string): string {
   const d = parseDay(value);
   if (!d) return '';
   const text = dateFormat(locale, { day: '2-digit', month: '2-digit' }).format(d);
-  // Some ICU versions write the German "14.10" without the closing dot.
   return locale.startsWith('de') && !text.endsWith('.') ? `${text}.` : text;
 }
 

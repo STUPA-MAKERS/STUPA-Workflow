@@ -254,7 +254,7 @@ describe('AdminFrameComponent', () => {
     expect(api.listBackups).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps the navigation beside the cost centres at every wide size (D6)', async () => {
+  it('keeps the navigation beside the cost centres at every wide size', async () => {
     const view = await setup(ALL, '/admin/cost-centres', true);
     expect(screen.getByRole('navigation', { name: 'Verwaltungsbereiche' })).toBeInTheDocument();
     expect(view.container.querySelector('.af')).toHaveClass('af--split');

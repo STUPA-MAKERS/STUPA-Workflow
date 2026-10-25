@@ -22,10 +22,6 @@ export function applicationTitle(
   return fallback;
 }
 
-// The answer formatters live in `@shared/forms/answer-format`, because the answer view
-// and the apply wizard use them too. The re-export keeps the imports of this page.
-export { formatDateRangeValue, formatFieldValue, formatIsoDate } from '@shared/forms/answer-format';
-
 /**
  * Human-readable bytes in the UI locale ("1,5 MB"), binary base, one decimal from KB up.
  * An invalid size gives "—".

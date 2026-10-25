@@ -111,7 +111,7 @@ describe('GremiumRoleDialogComponent', () => {
     expect(screen.getByText('Mitgliedschaft über')).toBeInTheDocument();
   });
 
-  it('creates a role: the key must match the pattern (A10)', async () => {
+  it('creates a role: the key must match the pattern', async () => {
     const { api, saved } = await setup(null);
     const key = screen.getByRole('textbox', { name: /Schlüssel/ });
     const save = screen.getByRole('button', { name: 'Speichern' });

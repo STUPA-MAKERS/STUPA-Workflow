@@ -311,7 +311,7 @@ describe('Kern-Views a11y (axe)', () => {
     });
   });
 
-  describe('Admin-Views (T-43 AC: Admin/Flow-Editor)', () => {
+  describe('Admin-Views (Admin/Flow-Editor)', () => {
     // The reads come from admin.mock (USE_MOCK_API) or from a fake. The views must
     // render their full structure of headings, tables and forms.
     const adminHttp = [provideHttpClient(), provideHttpClientTesting()];

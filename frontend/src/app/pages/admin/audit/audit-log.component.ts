@@ -78,16 +78,16 @@ export const AUDIT_ACTIONS = [
   'principal_access_revoke',
   'retention_anonymize',
   'webhook_config',
-  // attachment_upload (F12) covers the application upload and the draft upload of the
-  // wizard (Z4).
+  // attachment_upload covers the application upload and the draft upload of the
+  // wizard.
   'attachment_upload',
   'attachment_quarantine',
   'attachment_delete',
   // Content mutations that leave a trace outside the flow: application data, comments,
-  // protocols, votes. application_create (F12) and guest_application_discard (Z1) mark the
+  // protocols, votes. application_create and guest_application_discard mark the
   // start and the discard of an application.
   'application_create',
-  // #11: an application captured on behalf of an applicant.
+  // An application captured on behalf of an applicant.
   'application_create_on_behalf',
   'guest_application_discard',
   'application_update',
@@ -96,7 +96,7 @@ export const AUDIT_ACTIONS = [
   'application_unarchive',
   'application_share',
   'application_share_revoke',
-  // F1: the decision on an application (approval with deviations).
+  // The decision on an application (approval with deviations).
   'application_decision',
   'application_delete',
   'comment_update',
@@ -106,7 +106,7 @@ export const AUDIT_ACTIONS = [
   // A protocol held back from the public protocol page, or published again.
   'protocol_publication',
   'vote_delete',
-  // Vote lifecycle (F12). vote_branch_blocked marks an application that a person must move.
+  // Vote lifecycle. vote_branch_blocked marks an application that a person must move.
   'vote_open',
   'vote_close',
   'vote_cancel',
@@ -115,7 +115,7 @@ export const AUDIT_ACTIONS = [
   // Polls: created and changed. Open, close and cancel reuse the vote actions.
   'poll_created',
   'poll_updated',
-  // Meeting and agenda (F12). They mirror the MEETING_* and AGENDA_* values in actions.py.
+  // Meeting and agenda. They mirror the MEETING_* and AGENDA_* values in actions.py.
   'meeting_create',
   'meeting_update',
   'meeting_delete',
@@ -125,11 +125,11 @@ export const AUDIT_ACTIONS = [
   'agenda_reorder',
   'agenda_item_done',
   'agenda_item_reopened',
-  // Attendance set or reset by the meeting lead (F12). They mirror ATTENDANCE_* in actions.py.
+  // Attendance set or reset by the meeting lead. They mirror ATTENDANCE_* in actions.py.
   'attendance_set',
   'attendance_reset',
   'protokollant_handover',
-  // Public meeting with QR code (#17): only the ids of the guests, never their names.
+  // Public meeting with QR code: only the ids of the guests, never their names.
   'meeting_public_join_changed',
   'meeting_join_code_rotated',
   'guest_admitted',
@@ -526,6 +526,10 @@ export class AuditLogComponent {
     this.load(true);
   }
 
+  /**
+   * Day boundaries are local: since starts at 00:00 and until ends at 23:59:59, sent as an aware
+   * UTC time.
+   */
   private load(reset: boolean): void {
     if (this.loading()) return;
     this.loading.set(true);
@@ -536,8 +540,6 @@ export class AuditLogComponent {
         before: reset ? undefined : (this.cursor() ?? undefined),
         action: this.action() || undefined,
         actor: this.actor() || undefined,
-        // Day boundaries: since starts at 00:00 and until ends at 23:59:59, in local
-        // time, sent as an aware UTC time.
         since: this.since() ? localDayBound(this.since(), false) : undefined,
         until: this.until() ? localDayBound(this.until(), true) : undefined,
       })

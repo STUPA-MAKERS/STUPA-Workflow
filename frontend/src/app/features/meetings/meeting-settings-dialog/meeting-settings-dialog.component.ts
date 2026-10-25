@@ -42,9 +42,9 @@ export const MEETING_TITLE_MAX = 200;
  * the meeting page. The title can change while the meeting is planned or live. A
  * closed meeting locks every field, the title too, because the protocol that goes out
  * names the meeting; a final protocol also locks the minute-taker. The server refuses
- * both with 409. Only a member with `protocol.write` can keep the minutes (O20), so the
+ * both with 409. Only a member with `protocol.write` can keep the minutes, so the
  * list offers those members plus the current minute-taker. While the meeting is live a
- * new minute-taker is a handover "now" (Z3).
+ * new minute-taker is a handover "now".
  */
 @Component({
   selector: 'app-meeting-settings-dialog',
@@ -87,7 +87,7 @@ export class MeetingSettingsDialogComponent {
   readonly time = signal('');
   readonly endTime = signal('');
   readonly saving = signal(false);
-  /** Public participation (#17): the switch, the mode and the join link. */
+  /** Public participation: the switch, the mode and the join link. */
   readonly publicJoin = signal(false);
   readonly guestsMode = signal<GuestsMode>('vote');
   readonly link = signal<JoinLink | null>(null);
@@ -99,7 +99,7 @@ export class MeetingSettingsDialogComponent {
   readonly locked = computed(() => this.meeting()?.status === 'closed');
   readonly keeperLocked = computed(() => this.locked() || this.protocolFinal());
 
-  /** O20: members with `protocol.write`, and the current minute-taker. */
+  /** Members with `protocol.write`, and the current minute-taker. */
   readonly keeperOptions = computed<SelectFieldOption[]>(() => {
     const current = this.meeting()?.protokollantId ?? null;
     const none = this.i18n.translate('meetings.protokollant.none');
@@ -162,7 +162,6 @@ export class MeetingSettingsDialogComponent {
     this.api.listAttendance(m.id, { quiet: true }).subscribe({
       next: (rows) => {
         this.roster.set(rows);
-        // Set the choice again once its option exists, so the field shows the name.
         this.keeper.set(m.protokollantId ?? '');
       },
       error: () => this.roster.set([]),
@@ -230,7 +229,12 @@ export class MeetingSettingsDialogComponent {
     this.closed.emit();
   }
 
-  /** Save the title, the minute-taker, the date and the times in one PATCH. */
+  /**
+   * Save the title, the minute-taker, the date and the times in one PATCH.
+   *
+   * Only a new title goes out, because the same title again costs an audit read. A final protocol
+   * locks the minute-taker, so the field stays out of the request; the server would answer 409.
+   */
   save(): void {
     const m = this.meeting();
     if (!m || this.saving() || this.locked()) return;
@@ -251,15 +255,11 @@ export class MeetingSettingsDialogComponent {
     this.saving.set(true);
     this.api
       .patchMeeting(m.id, {
-        // Only a new title goes out: the same title again would only cost an audit read.
         ...(title !== m.title ? { title } : {}),
-        // A final protocol locks the minute-taker: leave the field out, the server
-        // would answer 409.
         ...(this.keeperLocked() ? {} : { protokollantId: this.keeper() || null }),
         date: this.date().trim(),
         startTime: this.time().trim(),
         endTime: end || null,
-        // Only the meeting lead changes the public participation; send it only on a change.
         ...this.publicChanges(m),
       })
       .subscribe({

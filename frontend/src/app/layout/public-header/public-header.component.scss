@@ -4,12 +4,12 @@
   display: block;
 }
 
+/* The bar reaches under the status bar of an installed iOS app and keeps its content clear of
+   the notch; every inset is 0 in a browser tab. */
 .pub {
   display: flex;
   align-items: center;
   gap: 12px;
-  /* The bar reaches under the status bar of an installed iOS app and keeps its content
-     below it and clear of the notch in landscape. Every inset is 0 in a browser tab. */
   height: calc(72px + var(--app-top-safe-area, 0px));
   padding: var(--app-top-safe-area, 0px) max(28px, var(--app-right-safe-area, 0px)) 0
     max(28px, var(--app-left-safe-area, 0px));

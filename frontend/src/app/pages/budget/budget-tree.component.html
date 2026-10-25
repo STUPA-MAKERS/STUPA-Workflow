@@ -1,8 +1,6 @@
 <section class="bt admin-page">
   <app-page-header [flush]="true" [title]="'budget.tree.title' | t">
     <ng-container ngProjectAs="[actions]">
-      <!-- One main action; the other page actions sit in the ⋮ menu. A phone has only
-           the menu. -->
       @if (!phone()) {
         <app-button variant="tonal" [disabled]="!selectedTopId()" (click)="openFy()">
           <app-icon name="cal" /> {{ 'budget.tree.fyTitle' | t }}
@@ -94,7 +92,6 @@
             [class.bt__neg]="isNegative($any(row).node)"
             >{{ amount($any(row).node, 'available') }}</span
           >
-          <!-- A narrow table leaves out amounts: they stand as lines under "Verfügbar". -->
           @for (line of hiddenAmounts($any(row).node); track $index) {
             <span class="bt__more">{{ line }}</span>
           }
@@ -113,7 +110,6 @@
         </ng-template>
         <ng-template appCell="actions" let-row>
           @let n = $any(row).node;
-          <!-- The row opens the edit; the menu keeps its clicks and keys to itself. -->
           <span class="bt__actions" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()">
             <app-row-menu
               [label]="('budget.tree.rowActions' | t) + ': ' + n.name"
@@ -161,7 +157,6 @@
   <app-fab [label]="'fab.budget' | t" (activate)="openTop()" />
 </section>
 
-<!-- Set the allocation of one cost centre for the selected fiscal year. -->
 <app-dialog
   [open]="!!limitNode()"
   [title]="'budget.tree.limitTitle' | t"
@@ -185,7 +180,6 @@
   </div>
 </app-dialog>
 
-<!-- Every setting of one cost centre. -->
 <app-dialog
   [open]="!!editNode()"
   [title]="'budget.tree.editNode' | t"
@@ -255,8 +249,6 @@
         name="editHidden"
         >{{ 'budget.tree.hiddenInBudget' | t }}</app-checkbox
       >
-      <!-- Visibility Gremium: its members see this subtree in the budget tab as a
-           root. They need no global budget.* permissions. -->
       <app-select
         name="editViewGremium"
         [label]="'budget.tree.viewGremium' | t"
@@ -265,8 +257,6 @@
         [ngModel]="editViewGremium()"
         (ngModelChange)="editViewGremium.set($event)"
       />
-      <!-- Deciding Gremium: a vote state with "Gremium aus der Kostenstelle" takes it
-           when the application enters the state. Empty inherits from an ancestor. -->
       <app-select
         name="editDecisionGremium"
         [label]="'budget.tree.decisionGremium' | t"
@@ -286,7 +276,6 @@
   </div>
 </app-dialog>
 
-<!-- Delete a cost centre. A node with sub cost centres or allocations gives 409. -->
 <app-confirm-dialog
   [open]="!!nodeDelete()"
   [title]="'budget.tree.deleteTitle' | t"
@@ -300,7 +289,6 @@
   }
 </app-confirm-dialog>
 
-<!-- Create a top budget. -->
 <app-dialog [open]="topOpen()" [title]="'budget.tree.createTop' | t" [closeLabel]="'action.close' | t" (closed)="closeTop()">
   <form id="bt-top-form" class="bt__form" (submit)="createTop($event)">
     <div class="bt__pair">
@@ -339,7 +327,6 @@
   </div>
 </app-dialog>
 
-<!-- Create a fiscal year of the selected budget; the list corrects or removes one. -->
 <app-dialog
   [open]="fyOpen()"
   [title]="'budget.tree.fyTitle' | t"
@@ -397,8 +384,6 @@
   </div>
 </app-dialog>
 
-<!-- Correct a fiscal year. Only the year and the active flag change. The server derives
-     the start and the end date again from the budget cutoff. -->
 <app-dialog [open]="!!fyEdit()" [title]="'budget.tree.fyEdit' | t" [subtitle]="selectedTopLabel()" [closeLabel]="'action.close' | t" (closed)="closeFyEdit()">
   @if (fyEdit()) {
     <form id="bt-fy-edit-form" class="bt__form" (submit)="$event.preventDefault(); saveFyEdit()">
@@ -414,8 +399,6 @@
   </div>
 </app-dialog>
 
-<!-- Close a fiscal year, or reopen a closed one. A closed year takes no booking,
-     transfer, limit or application assignment. -->
 <app-confirm-dialog
   [open]="!!fyCloseTarget()"
   [title]="fyCloseTarget() ? ((fyCloseTarget()!.closedAt ? 'budget.tree.fyReopenTitle' : 'budget.tree.fyCloseTitle') | t: { year: fyCloseTarget()!.display }) : ''"
@@ -426,8 +409,6 @@
   (cancel)="closeFyClose()"
 />
 
-<!-- Delete a fiscal year. The server refuses with 409 while bookings, allocations or
-     applications still hang on the year. That reason stays visible in the dialog. -->
 <app-confirm-dialog
   [open]="!!fyDelete()"
   [title]="'budget.tree.fyDeleteTitle' | t"
@@ -441,7 +422,6 @@
   }
 </app-confirm-dialog>
 
-<!-- Set the fiscal-year cutoff of the selected budget. A field saves on change. -->
 <app-dialog
   [open]="stichtagOpen()"
   [title]="'budget.tree.stichtagTitle' | t"
@@ -482,7 +462,6 @@
   </div>
 </app-dialog>
 
-<!-- Accepted and denied flow states of the selected budget. A box saves at once. -->
 <app-dialog
   [open]="stateConfigOpen()"
   [title]="'budget.tree.stateConfig' | t"

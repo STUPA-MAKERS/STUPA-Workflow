@@ -18,6 +18,14 @@ import { AuthService } from './auth.service';
  *
  * RBAC here is only UX. The server stays authoritative. The guard decides after it
  * loads the real principal. It never rejects before it checks the permissions.
+ *
+ * A login that just came back without a session goes home, so the guard does not loop. A gremium
+ * member may see the meetings of that gremium without session.manage or protocol.write; the server
+ * also scopes and authorizes. A member of a gremium with an assigned cost center sees the budget
+ * tab without global budget.* permissions; the server returns only the assigned subtrees. A
+ * delegation recipient can be an external user with no permission and no gremium, so some routes
+ * let any authenticated user through; the server returns the content or a 403. A reporter reads the
+ * own tickets without `ticket.manage`.
  */
 export const authGuard: CanActivateFn = (route, state) => {
   const auth = inject(AuthService);
@@ -28,12 +36,10 @@ export const authGuard: CanActivateFn = (route, state) => {
   return auth.ensureLoaded().pipe(
     map((principal) => {
       if (!principal) {
-        // A login that just came back without a session: go home, do not loop.
         if (auth.loginJustFailed()) {
           toast.error(i18n.translate('auth.loginFailed'));
           return router.createUrlTree(['/']);
         }
-        // Back to the blocked target after the login, not to the page before it.
         auth.login(state?.url);
         return false;
       }
@@ -47,29 +53,19 @@ export const authGuard: CanActivateFn = (route, state) => {
         (required.length > 0 && auth.canAny(...required)) ||
         gremiumRequired.some((p) => auth.canInAnyGremium(p));
       if (gated && !allowed) {
-        // A gremium member may see the meetings of that gremium without
-        // session.manage or protocol.write. The server also scopes and authorizes.
         const allowCommittee = route.data['allowCommitteeMember'] === true;
         if (allowCommittee && auth.gremien().length > 0) {
           return true;
         }
-        // Gremium scope of the budget tab. A member of a gremium with an assigned
-        // cost center sees the tab without global budget.* permissions. The
-        // server returns ONLY the assigned subtrees.
         if (
           route.data['allowScopedBudgetView'] === true &&
           auth.hasScopedBudgetView()
         ) {
           return true;
         }
-        // A delegation recipient can be an external user with no permission and no
-        // gremium. These routes let any authenticated user through. The server
-        // stays authoritative and returns the content or a 403.
         if (route.data['allowAuthenticated'] === true) {
           return true;
         }
-        // A reporter reads the own tickets without `ticket.manage`. The server
-        // answers only the own tickets.
         if (route.data['allowReporter'] === true && auth.hasReportedTickets()) {
           return true;
         }

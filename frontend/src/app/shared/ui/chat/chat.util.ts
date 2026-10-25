@@ -166,7 +166,6 @@ export function buildItems(
       newShown = true;
       prev = null;
     }
-    // A group is one person within the window; a change of visibility does not break it.
     const joins =
       prev !== null &&
       authorKey(prev.msg) === authorKey(msg) &&
@@ -188,5 +187,3 @@ export function buildItems(
   }
   return items;
 }
-
-export { linkify } from '@shared/markdown/linkify';

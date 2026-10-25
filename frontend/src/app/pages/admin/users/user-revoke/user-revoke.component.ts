@@ -84,7 +84,7 @@ const RELOAD_CODES: ReadonlySet<string> = new Set(['revoke_incomplete', 'revoke_
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
- * "Rechte entziehen" (Verwaltung → Benutzer, F3): take the Gremien and the global roles
+ * "Rechte entziehen" (Verwaltung → Benutzer): take the Gremien and the global roles
  * away from a person whom the SSO removed from groups and who no longer logs in.
  *
  * The person header with the last login; "Gremien (n)" with one checkbox per Gremium and
@@ -176,7 +176,6 @@ export class UserRevokeComponent {
   private sub?: Subscription;
 
   constructor() {
-    // A new person starts the dialog again.
     effect(() => {
       const src = this.source();
       untracked(() => this.reset(src));
@@ -305,7 +304,6 @@ export class UserRevokeComponent {
       });
     } else detail = this.i18n.translate('admin.users.revoke.grantedBy', { name: a.grantedBy ?? '—' });
     if (a.returnsAutomatically) {
-      // The bootstrap grants the role again: the revoke does not last.
       detail = `${detail}. ${this.i18n.translate('admin.users.revoke.returnsAutomatically')}`;
     }
     return { text: this.i18n.translate('admin.users.revoke.assignment', { role }), detail };

@@ -1,11 +1,9 @@
-/* The trail fills the kicker of the sheet bar and shortens inside it; it never wraps. */
+/* The trail fills the kicker of the sheet bar and shortens inside it; it never wraps.
+   `--crumb-bleed` is the room where the hover surface and the focus ring of a crumb still show;
+   the trail clips its items only outside it. */
 :host {
-  /* A shortened crumb or key keeps about eight characters; a long parent ends at the
-     maximum. */
   --crumb-min: 4.5rem;
   --crumb-max: 20rem;
-  /* The room around the trail where the hover surface and the focus ring of a crumb
-     still show. The trail clips its items, but only outside this room. */
   --crumb-bleed: var(--space-2);
   display: flex;
   flex: 1 1 auto;

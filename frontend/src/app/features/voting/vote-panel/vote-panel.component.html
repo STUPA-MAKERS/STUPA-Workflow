@@ -24,8 +24,6 @@
   <h3 class="vpn__q vpn__q--card">{{ question() }}</h3>
   <p class="vpn__rules vpn__rules--card">{{ rules() }}</p>
 } @else {
-  <!-- The question opens the page on the line of its actions (`vpnActions`), as the title
-       of every detail sheet does; the meta line follows below it. -->
   <app-sheet-bar class="vpn__bar">
     <h2 appSheetBarTitle class="sheet-title">{{ question() }}</h2>
     <ng-content select="[vpnActions]" />
@@ -34,8 +32,6 @@
     <app-status-text [kind]="s.kind">{{ s.key | t }}</app-status-text>
     <span class="vpn__sep" aria-hidden="true">·</span>
     @if (where(); as w) {
-      <!-- The meeting of the vote, as a link: on a phone the header line does this. The
-           context holds a meeting only when the reader may read it. -->
       <a class="vpn__app vpn__where ell" [routerLink]="['/meetings', context().meeting!.id]" [title]="w">{{ w }}</a>
       <span class="vpn__sep" aria-hidden="true">·</span>
     } @else if (!v.meetingId && v.applicationId) {

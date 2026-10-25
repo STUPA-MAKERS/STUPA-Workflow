@@ -43,6 +43,11 @@ import { AvatarService } from '@shared/ui/avatar/avatar.service';
 import { routes } from './app.routes';
 import { provideServiceWorker } from '@angular/service-worker';
 
+/**
+ * A long press on a row link opens no link menu of the browser (Android). A back gesture that the
+ * browser animated gets no second view transition. English lives in a lazy chunk, so the app waits
+ * for it and the first paint is not German.
+ */
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
@@ -93,17 +98,13 @@ export const appConfig: ApplicationConfig = {
     { provide: UI_KIT_AVATAR_SOURCE, useExisting: AvatarService },
     provideAppInitializer(() => {
       inject(ThemeService).init();
-      const i18n = inject(I18nService); // the constructor default sets document.lang
-      inject(BrandingService).init(); // site-config app name: tab title, header, home
+      const i18n = inject(I18nService);
+      inject(BrandingService).init();
       inject(AuthService).ensureLoaded().subscribe();
       inject(SwUpdateService).init();
-      // A long press on a row link opens no link menu of the browser (Android).
       guardTouchContextMenu(inject(DOCUMENT));
-      // The installed app does not zoom as a whole page; a browser tab keeps the zoom.
       lockInstalledAppZoom(inject(DOCUMENT), inject(IS_INSTALLED_APP)());
-      // A back gesture that the browser animated gets no second transition from us.
       watchUAVisualTransitions();
-      // EN lives in a lazy chunk. Wait for it, so the first paint is not German.
       return i18n.ready();
     }),
     // ngsw-config.json caches the app shell and the assets. It does not cache /api.

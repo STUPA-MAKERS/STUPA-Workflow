@@ -34,7 +34,7 @@ export type DockPanel = 'none' | 'attendance' | 'protokollant';
  *
  * Live: the step through the agenda ("TOP 3 von 8"), the own ballot of the open vote, or
  * the way back to the item that runs now; the attendance, the minute-taker ("Protokoll:
- * Lara Leitung", the handover for the lead and the minute-taker, Z3) and the word count of
+ * Lara Leitung", the handover for the lead and the minute-taker) and the word count of
  * the open item.
  *
  * Closed: "Geschlossen um 21:12 · 8 TOPs", every minute-taker of the meeting (locked: a
@@ -100,7 +100,7 @@ export class SessionDockComponent {
   private readonly guests = inject(MeetingGuestsService, { optional: true });
 
   /**
-   * The guests of a public meeting (#17): "Anwesend 19 + 7 Gäste" on the chip and the
+   * The guests of a public meeting: "Anwesend 19 + 7 Gäste" on the chip and the
    * number of open requests as a badge (the lead only), or `null` without the public
    * participation.
    */

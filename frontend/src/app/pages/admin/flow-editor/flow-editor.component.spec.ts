@@ -2810,7 +2810,7 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(c.guardGroupsFor('a').map((gp: { value: string }) => gp.value)).toEqual(['x', 'y']);
   });
 
-  describe('redesign (FE12b): tags, status, zoom, versions', () => {
+  describe('redesign: tags, status, zoom, versions', () => {
     const TAGGED: FlowGraph = {
       states: [
         { key: 'a', label: { de: 'Entwurf' }, isInitial: true },

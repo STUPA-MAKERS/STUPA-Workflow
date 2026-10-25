@@ -7,19 +7,13 @@
 >
   @if (showNav()) {
     <nav class="ld-pane af__nav" [attr.aria-label]="mode().navLabel | t">
-      <!-- The header of every list column. On the home page the navigation is the page,
-           so its title is the h1. Beside a page the page has its own h1. -->
       <app-page-header
         [pane]="true"
         [title]="mode().title | t"
         [titleTag]="home() ? 'h1' : 'p'"
       />
-      <!-- The search never scrolls away: in one column it sticks to the top of the page;
-           beside the page the column keeps it and only the entries scroll. -->
       @if (mode().search) {
         <app-sticky-bar class="ld-pane__filters af__search">
-          <!-- The large search of every list column beside a sheet; one column keeps the
-               compact field. -->
           <app-search-pill
             [size]="split() ? 'lg' : 'md'"
             [clearable]="true"
@@ -31,10 +25,6 @@
       }
 
       <div #navBody class="af__navBody" appScrollFade="y">
-        <!-- "Zustand" stays in the column on every admin page, not only on the home page.
-             The navigation shows below wide only on the home page, so the one-column
-             layout shows the tiles there only. A class hides the tiles during a search.
-             They are not destroyed, so a cleared search does not load them again. -->
         @if (mode().health) {
           <app-admin-health [class.af__hidden]="!!query()" />
         }
@@ -72,12 +62,6 @@
     </nav>
   }
 
-  <!-- Beside the navigation the page sheet is a window with round corners: the sheet
-       clips, the body in it scrolls, so the corners clip what scrolls. -->
-  <!-- One column on the home page: the navigation is the page, the empty sheet does not
-       show. -->
-  <!-- One column, a phone: a swipe from the left edge leads back like the back arrow of
-       the bar. -->
   <div
     class="af__page"
     [class.af__hidden]="navOnly()"
@@ -89,8 +73,6 @@
     (appSwipeBackEnd)="swiping.set(false)"
   >
     <div #page class="af__pageBody" [class.ld-under-bar]="showBar()" appScrollFade="y">
-      <!-- Below wide: the bar of every one-view page (the detail of a list/detail page),
-           with the way back, the title in small type and the actions of the page header. -->
       @if (showBar()) {
         <app-list-detail-bar [title]="nav.title()" (back)="goBack()" />
       }

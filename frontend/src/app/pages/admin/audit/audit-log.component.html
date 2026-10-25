@@ -1,7 +1,6 @@
 <section class="al admin-page">
   <app-page-header [flush]="true" [title]="'admin.audit.title' | t" />
 
-  <!-- The chain check: the newest stored result and "Jetzt prüfen". -->
   <div class="al__verify" [class]="'al__verify al__verify--' + (verifyView()?.kind ?? 'muted')" role="status">
     <app-icon
       class="al__verifyIcon"

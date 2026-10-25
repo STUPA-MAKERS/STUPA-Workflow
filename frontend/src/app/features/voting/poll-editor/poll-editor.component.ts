@@ -125,7 +125,6 @@ export class PollEditorComponent {
       start: this.newStart(),
       end: this.newEnd(),
     });
-    // The next date often follows at the same time: keep the times.
     this.newDate.set('');
   }
 

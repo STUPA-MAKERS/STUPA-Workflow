@@ -96,7 +96,7 @@ describe('FormlyPositionsType — view', () => {
     );
   });
 
-  it('turns the switch on and keeps one offer (D12)', async () => {
+  it('turns the switch on and keeps one offer', async () => {
     const { container, control, detectChanges } = await setup([COMPLETE]);
     await userEvent.click(within(cards(container)[0]).getByRole('button', { expanded: false }));
     detectChanges();

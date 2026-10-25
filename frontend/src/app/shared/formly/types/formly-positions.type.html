@@ -1,6 +1,4 @@
 <fieldset class="pos">
-  <!-- The legend must be the first child of the fieldset. Legend and sum float, so the
-       sum sits at the end of the legend line. -->
   <legend class="pos__legend">
     {{ props.label }}
     @if (props.required) {
@@ -18,7 +16,6 @@
   @for (p of positions; track $index; let pi = $index) {
     <div class="pos__card" [class.pos__card--open]="isOpen(pi)" [attr.data-index]="pi">
       @if (!isOpen(pi)) {
-        <!-- Collapsed: the whole row opens the position. -->
         <div class="pos__row">
           <button
             type="button"

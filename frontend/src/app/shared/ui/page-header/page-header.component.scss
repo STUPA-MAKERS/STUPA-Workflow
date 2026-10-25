@@ -27,7 +27,7 @@
   margin-inline: auto;
 }
 
-/* D9: the actions sit on the title row, not on the centre of the text block. A long
+/* The actions sit on the title row, not on the centre of the text block. A long
    subtitle therefore never moves them: they have the same y on every page. */
 .ph__bar {
   --ph-title-lh: var(--lh-d2);
@@ -124,7 +124,6 @@
   flex-wrap: wrap;
   min-height: var(--control-height);
   margin-top: calc((var(--ph-title-lh) - var(--control-height)) / 2);
-  /* Chrome, not content: a long press on an action selects no label and opens no callout. */
   @include press.chrome-text;
 }
 

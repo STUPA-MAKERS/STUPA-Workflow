@@ -206,7 +206,6 @@ export class GremiumAttendanceComponent {
     const locale = this.i18n.locale();
     const role = this.role();
     const filtered = data.rows.filter((r) => !role || r.roleKey === role);
-    // The phone cards go by name, as the board shows them.
     const sorted = sortRows(filtered, data.months, this.phone() ? 'name' : this.sort(), locale);
     return sorted.map((row) => {
       const name = personName(row.displayName);

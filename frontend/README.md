@@ -92,11 +92,11 @@ locale. Configurable database texts
 ## API client and mock
 
 `core/api/ApiClient` follows the types of the backend Pydantic schemas (camelCase wire keys).
-`mockApiInterceptor` returns in-memory answers. The default is **`USE_MOCK_API=false`** (#67).
+`mockApiInterceptor` returns in-memory answers. The default is **`USE_MOCK_API=false`**.
 The SPA talks to the **real** backend under `/api`. The `web` nginx routes `/api` to `api`. In
 development, `proxy.conf.json` (`ng serve`) forwards `/api` and the WebSocket. The mock is now
 an **explicit** opt-in for development and tests. Turn it on with `?mock=1`, with
 `localStorage['useMockApi']='1'` or with `window.__USE_MOCK_API__=true` before the bootstrap.
 
 > The WebSocket service (`core/ws`) connects to `ws(s)://…/api/ws/meetings/{id}` for the live
-> vote. The server endpoint exists (T-16). nginx and `proxy.conf.json` pass it through.
+> vote. The server endpoint exists. nginx and `proxy.conf.json` pass it through.

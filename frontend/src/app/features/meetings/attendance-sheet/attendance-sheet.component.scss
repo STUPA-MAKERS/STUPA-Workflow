@@ -182,7 +182,7 @@
   width: var(--control-height);
 }
 
-/* O23: the server refused "present" while a delegation of the member is active. */
+/* The server refused "present" while a delegation of the member is active. */
 .as__conflict {
   display: flex;
   flex: 1 1 100%;
@@ -234,7 +234,6 @@
   .as__opt {
     padding: 0 4px;
   }
-  /* The control spans the row; the gap that aligns the controls beside a row menu goes. */
   .as__menuGap {
     display: none;
   }

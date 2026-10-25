@@ -143,7 +143,7 @@ describe('SessionDockComponent', () => {
     });
   });
 
-  describe('handover during a live meeting (Z3)', () => {
+  describe('handover during a live meeting', () => {
     const chip = (): HTMLElement => screen.getByTitle('Protokollführung übergeben');
 
     it('shows the minute-taker without the handover to a member who neither leads nor keeps the minutes', async () => {
@@ -159,7 +159,7 @@ describe('SessionDockComponent', () => {
       expect(chip()).toHaveTextContent('Protokoll: Pia Protokoll');
     });
 
-    it('passes a pick on to the handover dialog, only for members who can keep the minutes (O20)', async () => {
+    it('passes a pick on to the handover dialog, only for members who can keep the minutes', async () => {
       const { on } = await setup({ attendance: WITH_VOTER });
       await userEvent.click(chip());
       const menu = screen.getByRole('dialog', { name: 'Protokollführung übergeben' });
@@ -253,7 +253,7 @@ describe('SessionDockComponent', () => {
       expect(screen.queryByRole('dialog', { name: 'Protokollführung wählen' })).toBeNull();
     });
 
-    it('offers only the members who can keep the minutes (O20)', async () => {
+    it('offers only the members who can keep the minutes', async () => {
       await setup({ meeting: planned({ protokollantId: null, protokollantName: null }), attendance: WITH_VOTER });
       await userEvent.click(screen.getByRole('button', { name: /Protokollführung fehlt/ }));
       const picker = screen.getByRole('dialog', { name: 'Protokollführung wählen' });
@@ -379,7 +379,7 @@ describe('SessionDockComponent', () => {
     });
   });
 
-  describe('public meeting (#17)', () => {
+  describe('public meeting', () => {
     it('counts the guests on the attendance chip and badges the open requests', async () => {
       const { fixture } = await setup({ meeting: meeting({ publicJoin: true, admittedGuests: 7, pendingGuests: 3 }) });
       const chip = screen.getByRole('button', { name: /Anwesend/ });

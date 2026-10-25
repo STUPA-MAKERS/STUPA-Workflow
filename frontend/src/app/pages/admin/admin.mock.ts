@@ -820,7 +820,6 @@ export function mockMergePreview(
       return { area, rewritten, combined, removed };
     }),
     conflicts,
-    // Sam Neu lacks two rights of the old account; the demo admin holds them.
     extraPermissions:
       targetId === 'p-3'
         ? [{ key: 'vote.cast', gremium: 'STUPA' }, { key: 'budget.view', gremium: null }]

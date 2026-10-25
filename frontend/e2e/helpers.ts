@@ -69,8 +69,8 @@ export async function requestMagicLink(
 /**
  * Pull the newest magic-link token that mailpit holds for `email`. The helper polls
  * until the mail arrives instead of a fixed `sleep`, because the worker delivers the
- * mail asynchronously. The token sits in the link fragment `#t=<token>` (security.md
- * §1: the token never goes to the server).
+ * mail asynchronously. The token sits in the link fragment `#t=<token>`, so the
+ * token never goes to the server.
  */
 export async function fetchMagicLinkToken(
   request: APIRequestContext,

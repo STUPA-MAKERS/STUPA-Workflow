@@ -174,7 +174,6 @@
     }
   </form>
   <app-button dialog-footer variant="text" (click)="cancel()">{{ 'action.cancel' | t }}</app-button>
-  <!-- "Vorbereiten" saves a draft; a planned meeting or another open vote only prepares. -->
   <app-button dialog-footer [variant]="canOpen() ? 'tonal' : 'fill'" [loading]="submitting() && preparing()" [disabled]="!canSubmit() || (submitting() && !preparing())" (click)="submit(true)">
     {{ 'meetings.vote.prepare' | t }}
   </app-button>

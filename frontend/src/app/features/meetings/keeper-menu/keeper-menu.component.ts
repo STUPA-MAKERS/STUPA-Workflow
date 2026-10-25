@@ -38,7 +38,7 @@ interface Candidate {
  * handover takes effect. A planned meeting: "Protokollführung zuweisen"; a pick names the
  * minute-taker at once.
  *
- * O20: only members with the gremium right `protocol.write` ("Protokoll führen") are in
+ * Only members with the gremium right `protocol.write` ("Protokoll führen") are in
  * the list; the server refuses any other with 422.
  */
 @Component({

@@ -12,7 +12,7 @@ const body = <T>(r: MockReply | null): T => (r as { body: T }).body;
 const code = (r: MockReply | null): string => (r as { problem: { code: string } }).problem.code;
 const M = '/api/meetings/m-1';
 
-describe('mock public meeting (#17)', () => {
+describe('mock public meeting', () => {
   it('serves the lead: guests, link, decisions, rename, admit-all and rotation', () => {
     const guests = body<MeetingGuest[]>(mockLeadGuests('GET', `${M}/guests`, null));
     expect(guests).toHaveLength(10);

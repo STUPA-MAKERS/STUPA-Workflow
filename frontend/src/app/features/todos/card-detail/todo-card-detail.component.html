@@ -1,7 +1,4 @@
 @if (loading()) {
-  <!-- The loaded sheet with bars in place of the text: the same head, columns, fields and
-       sections, so nothing moves when the card arrives. The fixed labels and headings are
-       real text; the bars show after 300ms (`skel-in`). The close button works. -->
   <article class="cd cd--busy" aria-busy="true">
     <header class="sheet-head cd__head">
       <app-sheet-bar [bleed]="mode() === 'pane' && split()">
@@ -55,7 +52,6 @@
   <article class="cd" aria-labelledby="cd-title">
     <header class="sheet-head cd__head">
       <app-sheet-bar [bleed]="mode() === 'pane' && split()">
-        <!-- While the title is edited, the form takes its place below the bar. -->
         @if (!editingTitle()) {
           <h2 appSheetBarTitle id="cd-title" class="sheet-title cd__title">{{ card.title }}</h2>
         }
@@ -70,8 +66,6 @@
             <app-icon name="link" />
           </app-button>
         }
-        <!-- Phone: the activity opens in a sheet from the bottom, as the comments of an
-             application do; the count is the number of comments. -->
         @if (phone()) {
           <app-button
             class="cd__activityBtn"
@@ -113,7 +107,6 @@
         </form>
       }
       <p class="sheet-line cd__created">
-        <!-- The dot ends the part before it, so a wrapped line never starts with it. -->
         @for (part of createdParts(); track $index; let last = $last) {
           @if (last) {
             <span class="cd__seg">{{ part }}</span>
@@ -131,9 +124,6 @@
       <section class="cd__panel">
         <ng-container *ngTemplateOutlet="details; context: { $implicit: card }" />
       </section>
-      <!-- "Aktivität": the thread and the composer in the sheet from the bottom that the
-           comments of an application use. The chat exists only while the sheet shows, so a
-           hidden chat does not mark the thread as seen. -->
       <app-side-sheet
         #activitySheet
         [(open)]="activityOpen"
@@ -524,8 +514,6 @@
   </li>
 </ng-template>
 
-<!-- The details while the card loads: the field labels and the section headings are
-     real text, the values are bars. -->
 <ng-template #detailsSkel>
   <dl class="cd__fields">
     <div class="cd__field">

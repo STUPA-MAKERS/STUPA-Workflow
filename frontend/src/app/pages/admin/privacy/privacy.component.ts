@@ -47,7 +47,7 @@ const PERSON_HITS = 6;
  *   is the danger action. Both ask for a confirmation.
  * - Access export (Art. 15): every record of an e-mail address as XLSX.
  * - Account erasure (Art. 17): clears the personal data of one account (danger). The
- *   person comes from a picker (name or e-mail, D1). `?person=<sub>` preselects it; the
+ *   person comes from a picker (name or e-mail). `?person=<sub>` preselects it; the
  *   row action "Konto löschen (DSGVO)" in Verwaltung → Benutzer links here that way.
  * - Retention (Art. 5(1)(e)): months until a closed application is anonymized.
  *
@@ -153,8 +153,6 @@ export class PrivacyComponent {
   constructor() {
     this.reload();
     this.api.getPrivacySettings().subscribe((s) => this.applyRetention(s.defaultRetentionMonths));
-    // `?person=<sub>` comes from the row action in Verwaltung → Benutzer. The search
-    // matches the `sub` too; only an exact match is taken.
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((qp) => {
       const sub = qp.get('person');
       if (!sub) return;
@@ -168,7 +166,7 @@ export class PrivacyComponent {
     });
   }
 
-  /** The name of an account; "Ohne Namen" when it has neither a name nor an e-mail (D7). */
+  /** The name of an account; "Ohne Namen" when it has neither a name nor an e-mail. */
   protected personName(p: AdminPrincipal): string {
     return personLabel(p, this.i18n);
   }

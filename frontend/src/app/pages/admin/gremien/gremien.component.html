@@ -21,7 +21,6 @@
       @for (g of gremien(); track g.id) {
         <li class="grem__item">
           <div class="grem__head">
-            <!-- The accordion pattern: the heading holds the disclosure button. -->
             <h2 class="grem__h">
               <button
                 type="button"
@@ -51,7 +50,6 @@
                 [label]="('ui.rowMenu.trigger' | t) + ': ' + g.name"
                 (selected)="onRowMenu($event, g)"
               />
-              <!-- A native button: the disclosure needs aria-expanded on the button itself. -->
               <button
                 type="button"
                 class="grem__chev"

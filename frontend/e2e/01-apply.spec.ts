@@ -8,10 +8,9 @@ const PDF = Buffer.from(
 );
 
 /**
- * Scenario 1 (part): the public apply wizard against the real stack (testing.md
- * §3.1). The test drives the wizard (board Antrag-stellen) through ALL steps to the
+ * Scenario 1 (part): the public apply wizard against the real stack. The test drives the wizard (board Antrag-stellen) through ALL steps to the
  * review: application type → "Angaben" (the dynamic form of the seeded form version
- * with a draft upload, Z4) → "Kontakt" → "Prüfen & absenden". It then checks that the
+ * with a draft upload) → "Kontakt" → "Prüfen & absenden". It then checks that the
  * review shows the entered values and the uploaded file.
  *
  * The upload goes to `POST /apply/attachments` as a draft. The e2e stack runs without

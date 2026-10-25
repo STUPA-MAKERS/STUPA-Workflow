@@ -4,16 +4,12 @@
       <app-page-header [pane]="true" titleId="mtl-title" [title]="'meetings.title' | t">
         <ng-container ngProjectAs="[actions]">
           @if (phone()) {
-            <!-- Phone: the title and one menu (DECISIONS: phone headers). "Sitzung anlegen"
-                 is the floating button. -->
             <app-row-menu
               [label]="'meetings.overview.menu' | t"
               [sections]="phoneMenu()"
               (selected)="onPhoneMenu($event, abo)"
             />
           } @else {
-            <!-- The switch sits at the end of the header, beside the Abo button, in both
-                 views: the calendar view has the same order. -->
             <app-meetings-view-actions
               view="list"
               [showSwitch]="showSwitch()"
@@ -25,10 +21,7 @@
         </ng-container>
       </app-page-header>
 
-      <!-- The search and the chip never scroll away: one pane at a time they stick to the
-           top of the viewport; side by side only the rows below them scroll. -->
       <app-sticky-bar class="ld-pane__filters">
-        <!-- The large search of every list column; the phone keeps its compact field. -->
         <app-search-pill
           [size]="phone() ? 'md' : 'lg'"
           [placeholder]="(phone() ? 'meetings.overview.searchShort' : 'meetings.list.searchPlaceholder') | t"
@@ -37,7 +30,6 @@
           (valueChange)="timeline.onSearch($event)"
         />
         @if (timeline.showGremiumFilter() || timeline.filterPending()) {
-          <!-- Until the filter Gremien arrive the chip shows "Alle Gremien", inert. -->
           <div class="mtl__chips" [attr.inert]="timeline.showGremiumFilter() ? null : ''">
             <app-filter-select
               class="mtl__chip"
@@ -65,8 +57,6 @@
         [attr.aria-busy]="timeline.reloadingList() || null"
       >
         @if (timeline.loadingList()) {
-          <!-- The shape of the loaded list (a month heading, rows with the date block in the
-               geometry of `app-list-item`), shown after 300ms. -->
           <div class="mtl__skel skel-in">
             <h2 class="sec mtl__month" aria-hidden="true">
               <span class="skel-text skel-text--accent mtl__skelMonth"></span>
@@ -81,7 +71,6 @@
             />
           </div>
         } @else if (timeline.searchActive()) {
-          <!-- Search: one list of hits by relevance, no groups. -->
           @if (timeline.searchItems().length) {
             <section class="mtl__group" [attr.aria-label]="'meetings.overview.hits' | t">
               <div class="mtl__rows" [class.rowgroup]="!split()" role="list">

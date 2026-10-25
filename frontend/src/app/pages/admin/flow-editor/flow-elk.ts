@@ -193,7 +193,6 @@ export function elkGraph(input: LayoutInput, many: (n: number) => string): ElkNo
     ],
   }));
   const ports = new Set(children.flatMap((c) => (c.ports ?? []).map((p) => p.id)));
-  // A line whose dot is not drawn (no dot fits it) starts at the box itself.
   const source = (l: LayoutLink): string => (ports.has(`${l.src}::${l.port}`) ? `${l.src}::${l.port}` : l.src);
   const edges: ElkExtendedEdge[] = bundles(input.links).flatMap((b) => {
     const text = bundleLabel(b, many);

@@ -7,11 +7,11 @@ import type { Vote } from './models';
 import { mockApiInterceptor } from './mock-api.interceptor';
 
 /**
- * F2 personnel elections in mock mode: the demo election with its tie, the lot, the
+ * Personnel elections in mock mode: the demo election with its tie, the lot, the
  * runoff refusals and elections that the demo creates. A file of its own, because the
  * mock meeting is module state and the main spec deletes the demo election.
  */
-describe('mockApiInterceptor — elections (F2)', () => {
+describe('mockApiInterceptor — elections', () => {
   const ELECTION = 'a0000000-0000-0000-0000-0000000000e1';
   const MOTION = 'a0000000-0000-0000-0000-0000000000a1';
   let http: HttpClient;

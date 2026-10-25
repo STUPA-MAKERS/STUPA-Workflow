@@ -141,7 +141,6 @@ export class GuardEditorComponent {
       return;
     }
     if (op === 'and' || op === 'or') {
-      // Keep the children when the guard is already a combinator. If not, wrap the leaf.
       const existing = this.children();
       const seed = existing.length ? existing : this.guard() ? [this.guard() as Guard] : [];
       this.guardChange.emit({ [op]: seed });

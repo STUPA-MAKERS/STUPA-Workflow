@@ -57,7 +57,6 @@
 .bd--wide {
   display: grid;
   flex: 1 1 0;
-  /* The tree column has the one list width of the app (styles.scss). */
   grid-template-columns: var(--ld-list-width) minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
   gap: var(--ld-gap);
@@ -230,7 +229,7 @@
 .tn__name {
   flex: 1 1 0;
   min-width: 0;
-  font-size: 0.90625rem; // 14.5px
+  font-size: 0.90625rem;
   line-height: 1.25rem;
   font-weight: var(--fw-medium);
 }
@@ -261,7 +260,6 @@
   flex-direction: column;
   gap: 22px;
   min-width: 0;
-  // 24px 32px, as on the Budget board: the sheet keeps its width for the charts.
   padding: var(--space-5) var(--space-6);
 }
 .bd--wide .bd__sheetBody {
@@ -541,15 +539,12 @@
   .bd__figValue {
     font-size: 1rem;
   }
-  /* No room for the "Beantragt" column: the amount moves below the name (N28). */
   .bd__c1 {
     display: none;
   }
   .bd__ureq {
     display: block;
   }
-  /* The heading takes the free width and wraps in it, so an action such as
-     "Alle ansehen" stays on the heading row. */
   .bd__h {
     flex: 1 1 0;
     min-width: 0;

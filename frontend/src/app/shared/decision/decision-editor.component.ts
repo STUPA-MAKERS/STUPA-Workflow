@@ -20,7 +20,7 @@ import {
 import { formatMoney } from '../format-money';
 
 /**
- * The decision proposal (F1, approval with deviations): a switch, and when it is on the
+ * The decision proposal (approval with deviations): a switch, and when it is on the
  * approved amount ("Förderbetrag") and the list of conditions ("Auflagen").
  *
  * The vote-open dialog and the decision dialog of a transition use it. The parent owns

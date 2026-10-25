@@ -9,7 +9,7 @@ import {
 } from './helpers';
 
 /**
- * Scenarios 1 and 2 (testing.md §3): magic-link edit, flow run, and read-only in the
+ * Scenarios 1 and 2: magic-link edit, flow run, and read-only in the
  * locked status. The test bundles three core journeys into one deterministic run
  * against the real stack:
  *
@@ -20,11 +20,8 @@ import {
  *     transition (edit_allowed=false).
  *  3. The applicant loads the page again. The application is read-only and locked.
  *
- * NOTE (documented in the PR): the backend mail links to `/antrag/<id>#t=<token>`,
- * but the frontend reads the token on `/status?t=…&app=…`. This route and fragment
- * mismatch is a defect that this work found. The test covers the magic-link
- * *capability* over the path that the frontend supports. A separate bugfix task
- * holds the real link landing. It is not part of T-40.
+ * The test opens the magic link over `/status?t=…&app=…`, with the token pulled from
+ * mailpit.
  */
 test('@gating Magic-Link bearbeiten → Flow-Transition → read-only', async ({ browser, request }) => {
   const art = readArtifacts();

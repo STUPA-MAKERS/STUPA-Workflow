@@ -42,7 +42,6 @@
           <span class="fl__version mono">{{ versionLabel($any(t)) }}</span>
         </ng-template>
         <ng-template appCell="actions" let-t>
-          <!-- The row opens the editor; the menu keeps its clicks and keys to itself. -->
           @if (canDelete()) {
             <span class="fl__actions" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()">
               <app-row-menu
@@ -59,7 +58,6 @@
     }
   }
 
-  <!-- Create posts an application type, so the button needs admin.types. -->
   @if (canCreate()) {
     <app-fab [label]="'fab.form' | t" (activate)="openCreate()" />
   }
@@ -102,7 +100,6 @@
   </div>
 </app-dialog>
 
-<!-- Delete an application type. This action needs the admin.types_delete permission. -->
 <app-confirm-dialog
   [open]="confirmDelete() !== null"
   [title]="'admin.forms.deleteTitle' | t"

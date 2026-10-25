@@ -3,7 +3,7 @@ import { electionFields } from '@core/api/mappers';
 
 /**
  * A vote of the guest view as the `Vote` of the shared vote panel. The panel then shows a
- * guest the same card, turnout, ballot and result as a member (#17). `meetingId` is set,
+ * guest the same card, turnout, ballot and result as a member. `meetingId` is set,
  * so the panel counts the turnout against the people present.
  */
 export function guestVoteToVote(v: GuestVote): Vote {

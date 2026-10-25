@@ -121,9 +121,8 @@ export class MeetingsTimelineService {
     () => this.searchActive() && !this.loadingSearch() && !this.searchItems().length,
   );
 
+  /** This load has no permission gate, because every reader may filter. */
   constructor() {
-    // Filter options: Gremien with at least one READABLE meeting. Every reader
-    // may filter, so this load has no permission gate.
     this.api
       .listMeetingFilterGremien()
       .pipe(takeUntilDestroyed())
@@ -175,7 +174,7 @@ export class MeetingsTimelineService {
 
   private searchPage(q: string): Observable<MeetingPage> {
     return this.api.listMeetingsTimeline({
-      direction: 'upcoming', // no effect in search mode: the backend collapses both
+      direction: 'upcoming',
       cursor: this.searchCursor,
       limit: TIMELINE_PAGE,
       gremiumId: this.gremiumFilter() || undefined,
@@ -229,8 +228,6 @@ export class MeetingsTimelineService {
       .subscribe({
         next: (page) => {
           this.loadingPast.set(false);
-          // The page arrives newest-first. Reverse and prepend it, so the oldest
-          // meeting stays on top.
           this.pastItems.update((cur) => [...[...page.items].reverse(), ...cur]);
           this.pastCursor = page.nextCursor;
           this.pastHasMore.set(page.nextCursor !== null);
@@ -321,7 +318,6 @@ export class MeetingsTimelineService {
         this.upcomingItems.set(upcoming.items);
         this.upcomingCursor = upcoming.nextCursor;
         this.upcomingHasMore.set(upcoming.nextCursor !== null);
-        // "past" arrives newest-first. Reverse it: oldest on top, newest at "now".
         this.pastItems.set([...past.items].reverse());
         this.pastCursor = past.nextCursor;
         this.pastHasMore.set(past.nextCursor !== null);

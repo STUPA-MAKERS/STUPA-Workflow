@@ -116,7 +116,7 @@ describe('mapApplication', () => {
     });
   });
 
-  it('passes the decision and the approved amount through (F1)', () => {
+  it('passes the decision and the approved amount through', () => {
     const decision = {
       requestedAmount: '250.00',
       approvedAmount: '200.00',
@@ -133,7 +133,7 @@ describe('mapApplication', () => {
     expect(view.decision).toEqual(decision);
   });
 
-  it('passes the capture block through (#11)', () => {
+  it('passes the capture block through', () => {
     const capture = {
       capturedBy: { kind: 'gremium' as const, displayName: 'StuPa' },
       capturedAt: '2026-10-05T10:00:00Z',
@@ -143,12 +143,12 @@ describe('mapApplication', () => {
     expect(mapApplication({ ...wire, capture }, 'de').capture).toEqual(capture);
   });
 
-  it('passes hiddenKeys through (O21)', () => {
+  it('passes hiddenKeys through', () => {
     const view = mapApplication({ ...wire, hiddenKeys: ['iban'] }, 'de');
     expect(view.hiddenKeys).toEqual(['iban']);
   });
 
-  it('passes stateSince through (A9)', () => {
+  it('passes stateSince through', () => {
     const view = mapApplication({ ...wire, stateSince: '2026-09-28T14:30:00Z' }, 'de');
     expect(view.stateSince).toBe('2026-09-28T14:30:00Z');
   });
@@ -191,7 +191,7 @@ describe('mapApplicationListItem', () => {
     expect(view.stateSince).toBeNull();
   });
 
-  it('passes stateSince through (A9)', () => {
+  it('passes stateSince through', () => {
     const view = mapApplicationListItem(
       {
         id: 'a1',
@@ -251,7 +251,7 @@ describe('mapTimelineEvent', () => {
     expect(mapTimelineEvent(wire, 'de').actorInfo).toEqual({ kind: 'system', key: 'deadlines' });
   });
 
-  it('resolves the transition label to the locale (A3)', () => {
+  it('resolves the transition label to the locale', () => {
     const wire: TimelineEventOutWire = {
       toStateId: 's1',
       toState: STATE,
@@ -405,7 +405,7 @@ describe('mapTransition', () => {
     });
   });
 
-  it('passes allowsDecision through (F1)', () => {
+  it('passes allowsDecision through', () => {
     const wire: TransitionOutWire = {
       id: 'tr1',
       fromStateId: 's1',
@@ -416,7 +416,7 @@ describe('mapTransition', () => {
     expect(mapTransition(wire, 'de').allowsDecision).toBe(true);
   });
 
-  it('passes the agenda action through (A1)', () => {
+  it('passes the agenda action through', () => {
     const wire: TransitionOutWire = {
       id: 'tr1',
       fromStateId: 's1',
@@ -480,7 +480,7 @@ describe('toApplicationCreateBody', () => {
     expect(body.applicantName).toBeNull();
   });
 
-  it('sends the draft uploads only with ids and a token (Z4)', () => {
+  it('sends the draft uploads only with ids and a token', () => {
     const base: NewApplication = { typeId: 't1', data: {}, lang: 'de' };
     expect(
       toApplicationCreateBody({ ...base, attachmentIds: ['d1'], draftToken: 'tok' }),
@@ -542,7 +542,7 @@ describe('mapVersion', () => {
     expect(v.changedKeys).toEqual([]);
   });
 
-  it('maps the metadata view of the applicant without values (A11)', () => {
+  it('maps the metadata view of the applicant without values', () => {
     const wire: VersionOutWire = {
       version: 2,
       data: null,
@@ -630,7 +630,7 @@ describe('mapMeeting', () => {
     expect(mapMeeting(wire).votes).toEqual([]);
   });
 
-  it('maps the agenda summary and the real start, with defaults (A2, Z7)', () => {
+  it('maps the agenda summary and the real start, with defaults', () => {
     const base = {
       id: 'm-3',
       title: 'Sitzung',
@@ -829,7 +829,7 @@ describe('mapMeeting permission flags', () => {
     expect(m.plannedHandover).toBeNull();
   });
 
-  it('passes the keeper periods and the planned handover through (Z3)', () => {
+  it('passes the keeper periods and the planned handover through', () => {
     const period = {
       principalId: 'p-1',
       name: 'Anna',

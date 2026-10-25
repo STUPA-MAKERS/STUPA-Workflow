@@ -115,7 +115,7 @@ export const ATTENDANCE: Attendance[] = [
   { principalId: 'pr-3', displayName: 'Alina Admin', email: null, status: null, source: null, note: null, isSelf: false, canKeepProtocol: true },
 ];
 
-/** O20: a member without `protocol.write` cannot keep the minutes. */
+/** A member without `protocol.write` cannot keep the minutes. */
 export const WITH_VOTER: Attendance[] = [
   ...ATTENDANCE,
   { principalId: 'pr-4', displayName: 'Vera Votum', email: null, status: 'present', source: 'self', note: null, isSelf: false, canKeepProtocol: false },

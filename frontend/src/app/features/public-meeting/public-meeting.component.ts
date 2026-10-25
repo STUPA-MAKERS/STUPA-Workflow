@@ -43,7 +43,7 @@ export function normalizeJoinCode(raw: string): string {
 }
 
 /**
- * The public join page of a meeting, `/j/:code` (#17, boards Telefon-Beitreten): the
+ * The public join page of a meeting, `/j/:code` (boards Telefon-Beitreten): the
  * QR code of the beamer leads here. One page with every state of the request: the name
  * form, "Warte auf Freigabe", "Anfrage abgelehnt" (a new request after three minutes),
  * "nicht mehr öffentlich", "beendet" and, after the admission, the participant view.
@@ -176,7 +176,6 @@ export class PublicMeetingComponent {
       this.renaming.set(false);
       this.guest.load(code);
     });
-    // The rename form starts with the current name.
     effect(() => {
       const me = this.guest.me();
       untracked(() => {

@@ -177,7 +177,7 @@ export class AdminApiService {
     webhooks: structuredCopy(MOCK_WEBHOOKS),
     roles: structuredCopy(MOCK_ROLES),
     principals: structuredCopy([...MOCK_PRINCIPALS, MOCK_REVOKE_PRINCIPAL]),
-    // "Rechte entziehen" (F3): the Gremien cleared per person, the pool and delegations.
+    // "Rechte entziehen": the Gremien cleared per person, the pool and delegations.
     revoked: {} as Record<Uuid, Uuid[]>,
     revokeExtras: mockRevokeExtras(),
     oauthGrants: structuredCopy(MOCK_OAUTH_GRANTS),
@@ -195,7 +195,6 @@ export class AdminApiService {
   /** `quiet` = the gremien page shows its own loading indicator (no overlay). */
   listGremien(opts: { quiet?: boolean } = {}): Observable<Gremium[]> {
     if (this.mock) {
-      // The admin list counts the members and the roles of each gremium.
       return of(
         structuredCopy(this.store.gremien).map((g) => ({
           ...g,
@@ -227,7 +226,6 @@ export class AdminApiService {
     if (this.mock) {
       const created: Gremium = { id: `g-${this.store.gremien.length + 1}`, allowVoteDelegation: false, ...body };
       this.store.gremien.push(created);
-      // The server creates the forced roles together with the gremium.
       this.store.gremiumRoles = [
         ...this.store.gremiumRoles,
         ...MOCK_GREMIUM_ROLES.filter((r) => r.gremiumId === MOCK_GREMIUM_STUPA_ID && r.forced).map((r) => ({
@@ -483,7 +481,6 @@ export class AdminApiService {
   /** Delete an override → restore the builtin default. */
   resetMailTemplate(key: string): Observable<MailTemplate> {
     if (this.mock) {
-      // The seed stands in for the builtin catalogue.
       const builtin = MOCK_MAIL_TEMPLATES.find((t) => t.key === key) ?? MOCK_MAIL_TEMPLATES[0];
       const reset: MailTemplate = { ...structuredCopy(builtin), id: null, source: 'builtin' };
       this.store.mailTemplates = this.store.mailTemplates.map((t) => (t.key === key ? reset : t));
@@ -496,7 +493,6 @@ export class AdminApiService {
   /** Preview from the editor draft (no id). */
   previewMailPayload(body: MailPreviewPayload): Observable<MailPreview> {
     if (this.mock) {
-      // The mock fills `{{ name }}` from the context; the server renders Jinja2.
       const fill = (text: string | undefined): string =>
         (text ?? '').replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k: string) => String(body.context[k] ?? ''));
       const html = fill(body.bodyHtmlI18n[body.lang]);
@@ -529,12 +525,14 @@ export class AdminApiService {
       .pipe(map((page) => page.items.map((t) => ({ id: t.id, name: t.name }))));
   }
 
-  /** Overview of active forms: name/gremium/status/version. */
+  /**
+   * Overview of active forms: name/gremium/status/version.
+   *
+   * `/admin/application-types` returns `ApplicationTypeOut`, not the FE view, so the rows are
+   * mapped instead of cast; after a raw cast the table shows an empty name and `status.undefined`.
+   */
   listForms(): Observable<FormOverviewItem[]> {
     if (this.mock) return of(structuredCopy(MOCK_FORMS));
-    // `/admin/application-types` returns `ApplicationTypeOut` (nameI18n,
-    // activeFormVersionId …), not the FE view. Map the rows instead of a raw cast.
-    // After a raw cast the table shows an empty name and `status.undefined`.
     return this.http
       .get<ApplicationTypeOutWire[]>(`${this.base}/admin/application-types`)
       .pipe(
@@ -663,7 +661,7 @@ export class AdminApiService {
 
   /**
    * List/search users (OIDC principals) — GET /admin/principals?q=. `filters` adds the
-   * user-list filters of F3 (`lastLoginBefore`, `includeNever`, `hasGroups`).
+   * user-list filters (`lastLoginBefore`, `includeNever`, `hasGroups`).
    */
   listPrincipals(query?: string, filters?: PrincipalFilters): Observable<AdminPrincipal[]> {
     if (this.mock) {
@@ -878,7 +876,6 @@ export class AdminApiService {
   ): Observable<{ id: Uuid }> {
     if (this.mock) {
       const id = `formver-${fields.length}`;
-      // Update draft + type in the store so a reload shows the saved state.
       this.store.formDrafts[typeId] = {
         applicationTypeId: typeId,
         formVersionId: id,
@@ -1006,7 +1003,6 @@ export class AdminApiService {
   /** Memberships of one gremium (read-only). The OIDC group sync writes them. */
   listGremiumMemberships(gremiumId: Uuid): Observable<GremiumMembership[]> {
     if (this.mock) {
-      // The server joins the name and the e-mail of each member.
       const byId = new Map(this.store.principals.map((p) => [p.id, p]));
       return of(
         structuredCopy(MOCK_GREMIUM_MEMBERSHIPS.filter((m) => m.gremiumId === gremiumId)).map((m) => ({
@@ -1156,7 +1152,6 @@ export class AdminApiService {
   /** Field diff of a snapshot against its predecessor (wire → array form). */
   getConfigRevisionDiff(id: Uuid): Observable<ConfigRevisionDiff> {
     if (this.mock) {
-      // The mock flow change of the audit log (revision `rev-12`) has a small diff.
       const diff: ConfigRevisionDiff['diff'] =
         id === 'rev-12'
           ? {
@@ -1219,7 +1214,7 @@ export class AdminApiService {
     );
   }
 
-  // Guest applications (Z1). Both routes need P(admin.deadlines).
+  // Guest applications. Both routes need P(admin.deadlines).
   /** GET /admin/guest-settings — the confirm window and the link lifetime. */
   getGuestSettings(): Observable<GuestSettings> {
     if (this.mock) return of(structuredCopy(this.store.guestSettings));
@@ -1383,14 +1378,17 @@ export class AdminApiService {
     });
   }
 
-  /** GET /admin/backups/{id} — one row. The page polls this while a job runs. */
+  /**
+   * GET /admin/backups/{id} — one row. The page polls this while a job runs.
+   *
+   * The poll runs on a timer, so it must not raise the global loading overlay.
+   */
   getBackup(id: Uuid): Observable<Backup> {
     if (this.mock) {
       const row = this.store.backups.find((b) => b.id === id);
       return of(structuredCopy(row ?? ({ id } as Backup)));
     }
     return this.http.get<Backup>(`${this.base}/admin/backups/${id}`, {
-      // The poll runs on a timer, so it must not raise the global loading overlay.
       context: skipLoading(),
     });
   }

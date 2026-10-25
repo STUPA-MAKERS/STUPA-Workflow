@@ -49,7 +49,7 @@ function election(over: Partial<MeetingVote> = {}): MeetingVote {
 const t = (key: TranslationKey, params?: Record<string, string | number>) =>
   params ? `${key}${JSON.stringify(params)}` : key;
 
-describe('election wiring (F2)', () => {
+describe('election wiring', () => {
   it('writes the protocol callout like the backend', () => {
     expect(voteSnippet(election())).toBe(
       [

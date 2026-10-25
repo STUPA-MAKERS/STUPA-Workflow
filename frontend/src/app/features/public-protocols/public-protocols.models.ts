@@ -7,7 +7,7 @@
  */
 
 /** The result of one decision. */
-/** A personnel election (F2) gives `elected`, `runoff`, `tie` or `rejected`. */
+/** A personnel election gives `elected`, `runoff`, `tie` or `rejected`. */
 export type PublicVoteResult = 'passed' | 'rejected' | 'tie' | 'elected' | 'runoff';
 
 /** A gremium that publishes its protocols (`GET /public/gremien`). */
@@ -59,9 +59,9 @@ export interface PublicDecision {
   secret: boolean;
   /** The vote is already in the TOP text as a callout: the page shows no second box. */
   inText?: boolean;
-  /** F1: the conditions of the decision of a passed vote. An older snapshot has none. */
+  /** The conditions of the decision of a passed vote. An older snapshot has none. */
   conditions?: string[];
-  /** A personnel election (F2): only the names of the elected persons travel; the
+  /** A personnel election: only the names of the elected persons travel; the
    *  other candidates are a count, and an election has no counts. */
   kind?: 'motion' | 'election';
   seats?: number | null;

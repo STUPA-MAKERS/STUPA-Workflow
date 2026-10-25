@@ -88,7 +88,7 @@ describe('HandoverDialogComponent', () => {
     expect(confirm).toHaveBeenCalledWith('next_item');
   });
 
-  it('hands over now, in the current TOP, and previews the head of the protocol (O1, O2)', async () => {
+  it('hands over now, in the current TOP, and previews the head of the protocol', async () => {
     const { on } = await setup();
     const now = within(dialog()).getByRole('radio', { name: /Ab jetzt/ });
     expect(now).toBeChecked();

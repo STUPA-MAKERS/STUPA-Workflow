@@ -212,7 +212,6 @@ export function setTransitionLabel(
 ): FlowGraph {
   return patchTransition(g, index, (t) => {
     const label = { ...(t.label ?? {}), [lang]: value };
-    // Drop empty languages. No language left means no label.
     const cleaned = Object.fromEntries(Object.entries(label).filter(([, v]) => v));
     return { ...t, label: Object.keys(cleaned).length ? cleaned : null };
   });
@@ -292,7 +291,6 @@ export function setCompare(
     const cur = compareSpecOf(t);
     const op = patch.op ?? cur.op;
     let value: unknown = patch.value ?? cur.value;
-    // The `in` operator expects a list. Split the comma-separated input.
     if (op === 'in' && typeof value === 'string') {
       value = value.split(',').map((s) => s.trim()).filter(Boolean);
     }
@@ -344,6 +342,10 @@ export function removeAction(g: FlowGraph, index: number, ai: number): FlowGraph
   }));
 }
 
+/**
+ * An empty value drops the key, so an optional parameter (`gremiumId` of addToNextSession,
+ * `parentId`) is absent, as the backend expects.
+ */
 export function setActionParam(
   g: FlowGraph,
   index: number,
@@ -351,8 +353,6 @@ export function setActionParam(
   key: string,
   value: string,
 ): FlowGraph {
-  // An empty value drops the key: an optional parameter (`gremiumId` of
-  // addToNextSession, `parentId`) is then absent, as the backend expects.
   return patchTransition(g, index, (t) => ({
     ...t,
     actions: (t.actions ?? []).map((a, k) => {

@@ -36,8 +36,6 @@
     </header>
 
     @if (isOpen(row) && phone()) {
-      <!-- Phone: one list of the cards of every column, no drag; a long press opens the
-           "Verschieben" sheet of the page. -->
       @if (row.count) {
         <div class="br__list" role="list" [id]="'br-c-' + row.board.id" [attr.aria-label]="row.board.name">
           @for (col of row.columns; track col.id) {
@@ -68,8 +66,6 @@
         <app-empty-state shape="card" class="br__empty" rows="1" [id]="'br-c-' + row.board.id" [heading]="'todos.board.columnEmpty' | t" />
       }
     } @else if (isOpen(row)) {
-      <!-- cdkScrollable: a drag in the row scrolls it sideways and measures its drop lists anew.
-           The lists of all writable rows connect by id (cdkDropListConnectedTo). -->
       <div class="br__cols" cdkScrollable [id]="'br-c-' + row.board.id">
         @for (col of row.columns; track col.id; let ci = $index) {
           <div class="br__col">

@@ -173,7 +173,6 @@ export class TicketsComponent implements OnDestroy {
 
   readonly searchPlaceholder = computed(() => {
     const n = this.total() + this.closedTotal();
-    // Before the first answer there is no count: "Tickets durchsuchen", not "0 Tickets".
     if (this.loading() && n === 0) return this.i18n.translate('tickets.list.searchLabel');
     return this.i18n.translate('tickets.list.search', { n });
   });
@@ -250,7 +249,6 @@ export class TicketsComponent implements OnDestroy {
   readonly hasMore = computed(() => this.items().length < this.total());
 
   constructor() {
-    // The shown tickets read their detail ahead, so a click shows it at once.
     prefetchDetails({
       items: computed(() => [...this.items(), ...(this.closedItems() ?? [])]),
       key: (t) => t.id,
@@ -279,7 +277,6 @@ export class TicketsComponent implements OnDestroy {
       )
       .subscribe(() => this.readSelection());
 
-    // The detail changed a ticket: the list and the rail count follow.
     this.page.changed$.pipe(takeUntilDestroyed()).subscribe(() => {
       this.reload(true);
       this.rail.refresh();
@@ -335,7 +332,6 @@ export class TicketsComponent implements OnDestroy {
 
   private navigate(queryParams: Record<string, string | null>): void {
     void this.router.navigate([], {
-      // The child route keeps the open ticket; the routes always have one.
       relativeTo: this.route.firstChild!,
       queryParams,
       queryParamsHandling: 'merge',

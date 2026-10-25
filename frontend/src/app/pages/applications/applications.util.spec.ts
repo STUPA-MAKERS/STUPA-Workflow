@@ -1,12 +1,5 @@
-import {
-  applicationTitle,
-  formatBytes,
-  formatDateRangeValue,
-  formatFieldValue,
-  formatIsoDate,
-  isRejection,
-  transitionLooks,
-} from './applications.util';
+import { formatDateRangeValue, formatFieldValue, formatIsoDate } from '@shared/forms/answer-format';
+import { applicationTitle, formatBytes, isRejection, transitionLooks } from './applications.util';
 import type { Transition } from '@core/api/models';
 
 describe('applicationTitle', () => {

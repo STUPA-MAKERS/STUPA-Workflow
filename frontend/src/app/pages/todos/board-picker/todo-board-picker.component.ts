@@ -95,7 +95,6 @@ export class TodoBoardPickerComponent {
       { kind: 'gremium', label: 'todos.board.gremien', boards: of('gremium') },
       { kind: 'team', label: 'todos.board.team', boards: of('team') },
     ];
-    // "Alle" stands in the section "Persönlich", also when it has no board.
     return all.filter((s) => s.boards.length || (s.kind === 'personal' && this.allId() !== null));
   });
 

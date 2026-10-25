@@ -12,7 +12,6 @@
   flex: 1 1 0;
   flex-direction: column;
   min-height: 0;
-  /* The top inset stays: the header starts below the status bar of an installed app. */
   margin-block: calc(var(--app-top-safe-area, 0px) - var(--main-pad-top, var(--space-8)))
     calc(-1 * var(--main-pad-bottom, var(--space-8)));
   margin-inline: calc(-1 * var(--layout-gutter));
@@ -40,7 +39,6 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  /* The height of the buttons beside it (Beamer-Ansicht, QR-Code). */
   height: var(--control-height);
   padding: 0 var(--space-3);
   border: var(--border-width) solid var(--color-border);
@@ -48,7 +46,7 @@
   background: transparent;
   color: var(--color-text-muted);
   font: inherit;
-  font-size: 0.84375rem; /* 13.5px */
+  font-size: 0.84375rem;
   font-weight: var(--fw-medium);
   white-space: nowrap;
   cursor: pointer;
@@ -155,7 +153,6 @@
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  /* The radius of the vote cards: the column is the window they scroll in. */
   border-radius: var(--radius-xl);
   scroll-padding-block: var(--space-4);
 }
@@ -193,7 +190,6 @@
     flex: 1 0 auto;
     min-height: 100dvh;
     margin-inline: calc(-1 * var(--space-4));
-    /* The dock height plus the side gap of the body, so the last card ends clear of it. */
     padding-bottom: calc(var(--fx-dock-h, 0px) + var(--space-3));
   }
   .mp__head {
@@ -203,7 +199,6 @@
     min-height: 0;
     padding: var(--space-2) var(--space-2) var(--space-2) var(--space-1);
   }
-  /* The room state is in the attendance popover of the dock. */
   .mp__presence {
     display: none;
   }

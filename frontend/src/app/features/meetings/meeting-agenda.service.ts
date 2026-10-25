@@ -127,8 +127,8 @@ export class MeetingAgendaService implements OnDestroy {
     this.renameDraft.set('');
   }
 
+  /** A stale call after a cancel or a switch is ignored, which blocks a second save on blur. */
   renameTop(meetingId: Uuid | null, item: AgendaItem): void {
-    // Ignore a stale call after a cancel or a switch. This blocks a second save on blur.
     if (this.renamingTopId() !== item.id) return;
     const title = this.renameDraft().trim();
     if (!meetingId || item.applicationId || !title || title === (item.title ?? '')) {
@@ -192,7 +192,7 @@ export class MeetingAgendaService implements OnDestroy {
     if (!meetingId || from === to || !items[from] || to < 0 || to >= items.length) return;
     const [moved] = items.splice(from, 1);
     items.splice(to, 0, moved);
-    this.agenda.set(items); // optimistic update
+    this.agenda.set(items);
     this.api.reorderAgenda(meetingId, items.map((i) => i.id)).subscribe({
       next: (rows) => this.setRows(rows),
       error: (err: unknown) => {
@@ -287,9 +287,10 @@ export class MeetingAgendaService implements OnDestroy {
    * it runs a pending autosave at once and waits for a running save. Without either,
    * it sends the text of an earlier failed save again. The observable emits `false` when the server still
    * does not hold the text.
+   *
+   * A save that runs now is the try; only an earlier failed save is sent again.
    */
   persistBody(meetingId: Uuid): Observable<boolean> {
-    // A save that runs now is the try. Only an earlier failed save is sent again.
     const busy = this.bodyTimer !== null || this.runningSave !== null;
     return this.settlePendingBody(meetingId).pipe(
       switchMap(() => {
@@ -318,7 +319,6 @@ export class MeetingAgendaService implements OnDestroy {
     this.api.setAgendaBody(meetingId, itemId, body).subscribe({
       next: (rows) => {
         this.savingTop.set(false);
-        // The server holds the newest text now, unless the minute-taker typed again.
         const local = this.localBody;
         if (local?.itemId === itemId && local.body === body) this.localBody = null;
         this.setRows(rows);

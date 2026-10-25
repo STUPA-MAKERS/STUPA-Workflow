@@ -251,14 +251,12 @@ export class TasksComponent implements OnDestroy {
   );
 
   constructor() {
-    // The shown rows read their detail ahead, so a click shows it at once.
     prefetchDetails({
       items: this.rows,
       key: (r) => r.item.id,
       reads: (r) => applicationReads(r.item.id),
       when: this.showApplications,
     });
-    // The people of a board are read once for all its cards.
     const boards = new Set<Uuid>();
     prefetchDetails({
       items: this.todoRows,
@@ -282,7 +280,6 @@ export class TasksComponent implements OnDestroy {
     this.load();
     this.loadTodos();
 
-    // The open application comes from the child route (`/tasks/:id`).
     this.readSelection();
     this.router.events
       .pipe(
@@ -291,8 +288,6 @@ export class TasksComponent implements OnDestroy {
       )
       .subscribe(() => this.readSelection());
 
-    // The detail pane changed an application: load the list again. A deleted application
-    // leaves the list at once; the detail goes back to `/tasks` itself.
     this.page.changes$.pipe(takeUntilDestroyed()).subscribe((change) => {
       if (change.source === 'list') return;
       if (change.kind === 'deleted') {
@@ -303,8 +298,6 @@ export class TasksComponent implements OnDestroy {
     });
 
     effect(() => this.page.split.set(this.split()));
-    // Side by side the page fills the viewport: the frame drops the footer below it, so
-    // only the panes scroll.
     effect(() => this.frame.fill.set(this.split()));
   }
 
@@ -413,7 +406,6 @@ export class TasksComponent implements OnDestroy {
       },
       error: () => {
         if (seq !== this.fetchSeq) return;
-        // A failed reload keeps the rows; only a failed first load shows the error.
         if (!changedId) {
           this.tasks.set([]);
           this.error.set(true);

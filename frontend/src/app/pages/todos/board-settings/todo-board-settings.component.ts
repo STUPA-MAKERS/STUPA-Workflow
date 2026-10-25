@@ -295,6 +295,9 @@ export class TodoBoardSettingsComponent {
     this.labelColor.set(label?.color ?? 'green');
   }
 
+  /**
+   * It uses the board as it is now, because a poll during the request may have brought newer cards.
+   */
   saveLabel(): void {
     const id = this.labelEdit();
     const name = this.labelName().trim();
@@ -307,7 +310,6 @@ export class TodoBoardSettingsComponent {
     req.subscribe({
       next: (label) => {
         this.busy.set(false);
-        // The board as it is now: a poll during the request may have brought newer cards.
         const now = this.board();
         const labels = id ? now.labels.map((l) => (l.id === id ? label : l)) : [...now.labels, label];
         this.changed.emit({ ...now, labels: labels.sort((a, b) => a.name.localeCompare(b.name)) });

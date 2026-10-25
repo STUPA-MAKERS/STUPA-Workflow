@@ -860,7 +860,7 @@ describe('ApplicationsListComponent', () => {
     });
   });
 
-  describe('#11: Antrag erfassen', () => {
+  describe('Antrag erfassen', () => {
     const CAPTURE = [...ALL, 'application.create_on_behalf'];
 
     it('hides the action without the permission', async () => {
@@ -1075,7 +1075,7 @@ describe('ApplicationsListComponent', () => {
       http.expectOne(LIST).flush(page(ROWS));
     });
 
-    it('opens the decision dialog for an accepted state and reloads after it (F1)', async () => {
+    it('opens the decision dialog for an accepted state and reloads after it', async () => {
       const { http, cmp } = await start();
       const transition = {
         ...START,
@@ -1095,7 +1095,7 @@ describe('ApplicationsListComponent', () => {
       cmp.onDecisionDone();
     });
 
-    it('shows the approved amount over the struck requested one (F1)', async () => {
+    it('shows the approved amount over the struck requested one', async () => {
       const { harness } = await start('/applications', {
         rows: [
           row({ amount: '1250.00', approvedAmount: '900.00' }),

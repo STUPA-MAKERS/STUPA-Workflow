@@ -25,6 +25,9 @@ export const LATEST_COUNT = 3;
  *
  * Without a public protocol (or when the list cannot load) the protocol card and the
  * strip stay away, and the page looks as before: two choices.
+ *
+ * The ways in stand side by side and weigh the same, because the page cannot tell which kind of
+ * visitor it has and must not guess with a primary action.
  */
 @Component({
   selector: 'app-home',
@@ -69,7 +72,6 @@ export class HomeComponent {
         this.latest.set(page.items);
         this.protocolTotal.set(page.total);
       },
-      // The landing works without the protocols: the card and the strip stay away.
       error: () => this.protocolTotal.set(0),
     });
   }

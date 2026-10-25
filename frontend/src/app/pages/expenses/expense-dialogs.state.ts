@@ -164,11 +164,13 @@ export class ExpenseDialogsState {
       !!this.tDescription().trim(),
   );
 
+  /**
+   * A standalone booking needs a cost center and a fiscal year, because the server answers 422
+   * without them.
+   */
   readonly canSubmitCreate = computed(() => {
     if (!this.newDescription().trim() || !(Number(this.newAmount()) > 0)) return false;
-    // A bound booking inherits the cost center and the fiscal year from the application.
     if (this.newApplicationId()) return true;
-    // A standalone booking needs both. The server answers 422 without them.
     return !!this.newBudgetId() && !!this.newFiscalYearId();
   });
 
@@ -277,7 +279,6 @@ export class ExpenseDialogsState {
 
   setNewKindIncome(): void {
     this.newKind.set('income');
-    // Income cannot be bound to an application.
     this.clearApp();
   }
 
@@ -314,8 +315,6 @@ export class ExpenseDialogsState {
     this.api.listFiscalYears(top.id).subscribe({
       next: (fys: FiscalYear[]) => {
         this.rememberTopYear(top.id, fys);
-        // Offer every open fiscal year. An inactive one is allowed on purpose; a closed
-        // one takes no booking.
         const open = fys.filter((f) => !f.closedAt);
         this.fiscalYearOptions.set(open.map((f) => ({ value: f.id, label: f.display })));
         const active = open.filter((f) => f.active);
@@ -407,17 +406,18 @@ export class ExpenseDialogsState {
     this.editNote.set(e.note ?? '');
   }
 
+  /**
+   * The amount of a parent is the sum of its children and read-only on the server, so it goes out
+   * only after a change. The single-item response does not carry childCount and parentExpenseId
+   * reliably, so both stay from the known row.
+   */
   saveEdit(event: Event): void {
     event.preventDefault();
     const e = this.editing();
     if (!e || this.list.saving()) return;
     this.list.saving.set(true);
-    // Only a standalone booking can move to another cost center. A bound booking
-    // inherits it from the application. Send the field only after a change.
     const budgetChanged =
       !e.applicationId && !!this.editBudgetId() && this.editBudgetId() !== e.budgetId;
-    // The amount of a parent (childCount > 0) is the sum of its children and
-    // read-only on the server. Send it only after a change.
     const amountChanged = this.editAmount() !== e.amount;
     this.api
       .updateExpense(e.id, {
@@ -438,12 +438,9 @@ export class ExpenseDialogsState {
           this.list.saving.set(false);
           this.editing.set(null);
           if (e.parentExpenseId) {
-            // A sub-booking changed, so refresh the parent panel and the parent amount.
             this.sub.loadSub(e.parentExpenseId);
             this.list.refresh();
           } else {
-            // The single-item response does not carry childCount and parentExpenseId
-            // reliably. Keep both values from the known row.
             const merged = {
               ...updated,
               childCount: e.childCount,
@@ -480,7 +477,6 @@ export class ExpenseDialogsState {
         this.list.saving.set(false);
         done();
         if (e.parentExpenseId) {
-          // A sub-booking is gone, so refresh the parent panel and the parent amount.
           this.sub.loadSub(e.parentExpenseId);
           this.list.refresh();
           this.refreshEditedParent(e.parentExpenseId);
@@ -509,8 +505,6 @@ export class ExpenseDialogsState {
         const fresh = page.items[0];
         const cur = this.editing();
         if (!fresh || cur?.id !== parentId) return;
-        // The amount of a parent is read-only, so it follows the server. When the last
-        // sub-booking went, the amount field shows the amount that the server now has.
         if (this.editAmount() === cur.amount) this.editAmount.set(fresh.amount);
         this.editing.set({ ...cur, amount: fresh.amount, childCount: fresh.childCount });
       },
@@ -582,7 +576,6 @@ export class ExpenseDialogsState {
     this.api.listFiscalYears(top.id).subscribe({
       next: (fys: FiscalYear[]) => {
         this.rememberTopYear(top.id, fys);
-        // A closed fiscal year takes no transfer.
         const open = fys.filter((f) => !f.closedAt);
         this.transferFyOptions.set(open.map((f) => ({ value: f.id, label: f.display })));
         const active = open.filter((f) => f.active);
@@ -592,6 +585,7 @@ export class ExpenseDialogsState {
     });
   }
 
+  /** The transfers tab refreshes if it already loaded, so the two views never disagree. */
   createTransfer(event: Event): void {
     event.preventDefault();
     if (!this.canSubmitTransfer() || this.list.saving()) return;
@@ -610,8 +604,6 @@ export class ExpenseDialogsState {
           this.transferOpen.set(false);
           this.toast.success(this.i18n.translate('expenses.transferToast'));
           this.list.refresh();
-          // The transfers tab holds the new row too. Refresh it if it already
-          // loaded, so the two views never disagree.
           if (this.transfers.loaded()) this.transfers.reload();
         },
         error: (err) => {

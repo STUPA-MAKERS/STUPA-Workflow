@@ -17,7 +17,7 @@
   min-width: 0;
 }
 
-/* The filter chips below the search (F3). */
+/* The filter chips below the search. */
 .au__chips {
   display: flex;
   flex-wrap: wrap;
@@ -97,7 +97,7 @@
 .au__val--muted {
   color: var(--color-text-muted);
 }
-/* A last login older than 90 days: the account may hold rights it should not (F3). */
+/* A last login older than 90 days: the account may hold rights it should not. */
 .au__val--stale,
 .au__staleHint {
   color: var(--color-warning);

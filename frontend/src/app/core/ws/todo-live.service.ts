@@ -162,11 +162,9 @@ export class TodoLiveService {
   }
 
   private onClosed(code: number): void {
-    // A socket that `stop` closed is no longer `channel`, so boards are always there.
     this.channel = null;
     this.lastSent = null;
     this.connected.set(false);
-    // Pings may go missing until the next socket holds the boards again.
     this.resynced = true;
     if (REFUSED.has(code)) {
       this.refused = true;
@@ -175,7 +173,6 @@ export class TodoLiveService {
     this.attempts += 1;
     if (this.attempts > MAX_ATTEMPTS) return;
     const delay = BACKOFF_MS[Math.min(this.attempts, BACKOFF_MS.length) - 1];
-    // `stop` clears the timer when the last board goes, so it always finds boards.
     this.timer = setTimeout(() => {
       this.timer = null;
       this.connect();

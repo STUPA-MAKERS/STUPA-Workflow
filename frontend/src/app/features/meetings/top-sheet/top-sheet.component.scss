@@ -131,8 +131,6 @@
   flex-wrap: wrap;
   gap: var(--space-2);
   min-height: var(--control-height);
-  /* The glyph of the first tool sits on the edge of the text: 28px minus the inset of
-     the glyph in its 40px button. Every control on the right ends on that edge too. */
   padding: 0 28px 10px 14px;
 }
 .ts__tools {
@@ -212,7 +210,7 @@
   padding: 0;
   border: 0;
   background: transparent;
-  font-size: 0.96875rem; /* 15.5px */
+  font-size: 0.96875rem;
 }
 .ts__editor ::ng-deep .mde__host .ProseMirror {
   min-height: 16rem;
@@ -291,7 +289,9 @@
   flex: none;
 }
 
-/* Phone: the title may take two lines, and the gutters shrink. */
+/* Phone: the title may take two lines, and the gutters shrink.
+   The format buttons and the save state take the first row, "Erledigt" and the view switch the
+   second, because the three do not fit in one row of a phone. */
 @include bp.phone {
   .ts__head {
     padding: var(--space-4) var(--space-4) var(--space-2);
@@ -304,7 +304,6 @@
     line-height: 1.375rem;
     white-space: normal;
   }
-  /* An inline button keeps the clamp of the heading to two lines. */
   .ts__titleBtn {
     display: inline;
   }
@@ -316,10 +315,6 @@
     row-gap: 0;
     padding-inline: 0 var(--space-4);
   }
-  /* The format buttons and the save state take the first row. "Erledigt" and the view
-     switch take the second, on the edges of the text: the three do not fit in one row
-     of a phone, and a save state between them pushed the switch to a third row. A
-     line break of full width (the pseudo element) separates the rows. */
   .ts__bar::after {
     content: '';
     flex-basis: 100%;
@@ -376,7 +371,7 @@
   background: transparent;
   color: var(--color-text);
   font-family: var(--font-mono);
-  font-size: 0.90625rem; /* 14.5px */
+  font-size: 0.90625rem;
   line-height: 1.7;
   resize: none;
   outline: none;

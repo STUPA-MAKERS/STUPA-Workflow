@@ -37,7 +37,7 @@ async function setup(item: AgendaItem = FREE_TOP) {
 const submitButton = () =>
   screen.getAllByRole('button', { name: 'Wahl öffnen' }).find((b) => b.closest('.dialog__footer')) as HTMLElement;
 
-describe('VoteOpenDialogComponent · election (F2)', () => {
+describe('VoteOpenDialogComponent · election', () => {
   it('offers no election on an application item', async () => {
     const { cmp } = await setup(APP_TOP);
     expect(screen.queryByRole('radio', { name: 'Wahl' })).toBeNull();

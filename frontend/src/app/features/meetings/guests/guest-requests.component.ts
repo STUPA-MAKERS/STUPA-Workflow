@@ -17,7 +17,7 @@ import { clock } from '@shared/date-format';
 const JUST_NOW_MS = 60_000;
 
 /**
- * "Beitrittsanfragen · 3" in the attendance sheet (variant A, #17): "Alle zulassen" and
+ * "Beitrittsanfragen · 3" in the attendance sheet (variant A): "Alle zulassen" and
  * one row per request with "Ablehnen" and "Zulassen". On a phone "Ablehnen" is an ✕ icon,
  * so the name and both actions fit one line. No request, no block.
  */

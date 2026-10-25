@@ -9,7 +9,6 @@
    `--chat-composer-foot` and out over the side padding of the page with
    `--chat-composer-bleed`; `--chat-composer-surface` is the fill of that bar. `--chat-bubble` is the fill of the messages of others. */
 :host {
-  /* The frame of a file drag (`app-drop-overlay`) covers the whole chat. */
   position: relative;
   display: flex;
   flex-direction: column;
@@ -41,7 +40,6 @@
   min-height: var(--chat-log-min, 10rem);
   max-height: var(--chat-log-max, none);
   padding: 12px var(--space-4) 14px;
-  /* Nothing in a message may scroll the log sideways. */
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -176,7 +174,6 @@
   min-width: 0;
   padding: 9px 14px;
   border-radius: 6px 16px 16px 6px;
-  /* A chat on a surface-2 sheet sets `--chat-bubble` one step up. */
   background: var(--chat-bubble, var(--color-surface-2));
   color: var(--color-text);
 }
@@ -519,7 +516,6 @@
   padding: 12px var(--chat-composer-bleed, 0px);
   border-top: 1px solid var(--color-border);
   background: var(--chat-composer-surface, var(--color-surface));
-  /* A consumer whose chat ends the page carries the surface down to the navigation. */
   box-shadow: 0 var(--chat-composer-foot, 0px) 0 0 var(--chat-composer-surface, var(--color-surface));
 }
 /* One row of the box is as tall as its buttons (`--chat-row`). The buttons sit at the

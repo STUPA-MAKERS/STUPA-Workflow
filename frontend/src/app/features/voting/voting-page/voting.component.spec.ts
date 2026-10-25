@@ -212,14 +212,14 @@ describe('VotingComponent', () => {
       expect(groups).toEqual(['Offen', 'Entwürfe', 'September 2026', 'August 2026']);
       expect(screen.getByText('Entwurf')).toBeInTheDocument();
       expect(screen.getByText('Angenommen')).toBeInTheDocument();
-      // A tie is a rejection (O18).
+      // A tie is a rejection.
       expect(screen.getByText('Abgelehnt')).toBeInTheDocument();
       expect(screen.getByText('Abgebrochen')).toBeInTheDocument();
       expect(screen.getByText('12.09.2026')).toBeInTheDocument();
       expect(screen.getByText('20.09.2026')).toBeInTheDocument();
     });
 
-    it('shows the result of a closed election, not a rejection (F2)', async () => {
+    it('shows the result of a closed election, not a rejection', async () => {
       await start('/voting', {
         pages: [page([item('e1', { status: 'closed', kind: 'election', result: 'elected' })])],
       });

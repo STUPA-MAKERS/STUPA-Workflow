@@ -1,5 +1,5 @@
 /**
- * Mock data of the public meeting with QR code (#17), dev and screenshots only. The
+ * Mock data of the public meeting with QR code, dev and screenshots only. The
  * mock interceptor loads it on first use.
  *
  * Lead side (live meeting `d…0001`): three join requests, seven admitted guests, the
@@ -274,8 +274,6 @@ function initial(code: string): GuestMock {
       return { head: head(code), me: me(code, { status: 'pending' }, null) };
     case 'MOCKREJECT':
       return { head: head(code), me: me(code, { status: 'rejected', displayName: 'Tobias Lang', number: 10, retryAfter: 150 }, null) };
-    // The head says "unknown" for a closed meeting and one without public participation
-    // (no probing); a device with a request learns the switch-off from `/me`.
     case 'MOCKOFF':
       return { head: null, me: null, problem: 'meeting_not_public', headProblem: 'join_code_unknown' };
     case 'MOCKCLOSED':
@@ -325,7 +323,6 @@ export function mockPublicMeeting(method: string, p: string, body: unknown): Moc
     }
     return null;
   }
-  // The ballot of an admitted guest.
   if (method !== 'POST' || !s.me?.view) return problem(403, 'guest_not_admitted');
   const choice = (body as { choice?: string } | null)?.choice ?? '';
   const votes = s.me.view.votes.map((v) =>

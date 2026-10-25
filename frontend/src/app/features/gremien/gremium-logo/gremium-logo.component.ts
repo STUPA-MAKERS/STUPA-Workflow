@@ -35,7 +35,6 @@ export class GremiumLogoComponent {
   readonly showImage = computed(() => !!this.logoUrl() && !this.failed());
 
   constructor() {
-    // A new logo URL gets a new try.
     effect(() => {
       this.logoUrl();
       this.failed.set(false);

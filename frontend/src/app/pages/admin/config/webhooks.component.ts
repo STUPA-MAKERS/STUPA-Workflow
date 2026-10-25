@@ -122,10 +122,13 @@ export class WebhooksComponent {
     if (!d) return [] as string[];
     const errs: string[] = [];
     if (!/^https?:\/\/.+/i.test(d.url)) errs.push('admin.webhook.badUrl');
-    // Triggers are optional. They usually come from the flow graph.
     return errs;
   });
 
+  /**
+   * The diagnosis route needs webhook.manage, so it is requested only once the principal shows the
+   * permission and a user without it never triggers a 403.
+   */
   constructor() {
     this.api.listWebhooks().subscribe({
       next: (h) => {
@@ -134,8 +137,6 @@ export class WebhooksComponent {
       },
       error: () => this.loading.set(false),
     });
-    // The diagnosis route needs webhook.manage. Ask for it only once the principal
-    // shows the permission, so a user without it never triggers a 403.
     effect(() => {
       if (!this.canManage() || this.statusRequested) return;
       this.statusRequested = true;
@@ -143,10 +144,10 @@ export class WebhooksComponent {
     });
   }
 
+  /** A failure of the delivery status must not hide the list itself. */
   private loadDeliveryStatus(): void {
     this.api.listWebhookDeliveryStatus().subscribe({
       next: (list) => this.delivery.set(new Map(list.map((s) => [s.webhookId, s]))),
-      // A failure here must not hide the list itself. The rows then show no state.
       error: () => this.delivery.set(new Map()),
     });
   }
@@ -210,8 +211,6 @@ export class WebhooksComponent {
         this.hooks.update((list) =>
           idx === null ? [...list, saved] : list.map((h, i) => (i === idx ? saved : h)),
         );
-        // A new webhook has no delivery yet. The backend reports it as "never", so show
-        // that state at once instead of waiting for a reload.
         if (idx === null && !this.delivery().has(saved.id)) {
           this.delivery.update((m) =>
             new Map(m).set(saved.id, {

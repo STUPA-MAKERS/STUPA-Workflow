@@ -1,6 +1,3 @@
-<!-- A list column has no breadcrumbs: its page is the root of the area. Below the bar of a
-     one-view page the back arrow of the bar replaces them, and the bar shows the title:
-     the header keeps it for screen readers only. -->
 @if (!pane() && !underBar()) {
   <app-breadcrumbs />
 }
@@ -25,10 +22,7 @@
     <div class="ph__actions"><ng-container *ngTemplateOutlet="actions" /></div>
   }
 </div>
-<!-- The actions render here, or in the bar of a one-view page while it shows. -->
 <ng-template #actions><ng-content select="[actions]" /></ng-template>
-<!-- The meta and the heading slot: beside the title, or the second line of the bar of a
-     one-view page while it shows the title. -->
 <ng-template #facts>
   @if (meta()) {
     <span class="ph__meta">{{ meta() }}</span>

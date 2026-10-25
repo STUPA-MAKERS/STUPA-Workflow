@@ -6,7 +6,7 @@ import { en } from './src/app/core/i18n/translations.en';
 
 setupZoneTestEnv();
 
-// Register the a11y matcher (T-43) for the whole project. Every spec can then call
+// Register the a11y matcher for the whole project. Every spec can then call
 // `toHaveNoViolations()`.
 expect.extend(toHaveNoViolations);
 

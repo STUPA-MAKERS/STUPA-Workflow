@@ -77,7 +77,7 @@ const MOCK_PRINCIPAL: Principal = {
     'application.archive',
     'application.delete',
     'application.force_status',
-    // #11: "Antrag erfassen" on the applications page.
+    // "Antrag erfassen" on the applications page.
     'application.create_on_behalf',
     'admin.site',
     'admin.gremien',
@@ -164,7 +164,7 @@ const MOCK_VOTE: Vote = {
   canCast: true,
 };
 
-/** F2: the demo election (Wahl der Sitzungsleitung), one seat, two candidates. */
+/** The demo election (Wahl der Sitzungsleitung), one seat, two candidates. */
 const MOCK_ELECTION_ID = 'a0000000-0000-0000-0000-0000000000e1';
 const MOCK_ELECTION: ElectionConfig = {
   seats: 1,
@@ -211,7 +211,7 @@ const MOCK_ELECTION_ROW: MeetingVoteOutWire = {
   },
 };
 
-/** GET /votes/{id} of an election row of the demo meeting (F2). */
+/** GET /votes/{id} of an election row of the demo meeting. */
 function mockElectionVote(row: MeetingVoteOutWire): Vote {
   return {
     ...MOCK_VOTE,
@@ -259,7 +259,7 @@ function electionBallot(row: MeetingVoteOutWire): MyBallot {
   return typeof own === 'string' ? { cast: true, choice: own } : { cast: true, choice: null, choices: own };
 }
 
-/** POST /votes/{id}/draw-lot: the mock draws the first tied candidate (F2). */
+/** POST /votes/{id}/draw-lot: the mock draws the first tied candidate. */
 function mockDrawLot(id: string, url: string): Observable<never> | Vote {
   const row = MOCK_MEETING.votes.find((v) => v.id === id);
   const lot = row?.electionResult?.lot;
@@ -280,7 +280,7 @@ function mockDrawLot(id: string, url: string): Observable<never> | Vote {
   return mockElectionVote(updated);
 }
 
-/** POST /votes/{id}/runoff: a draft runoff with the tied candidates (F2). */
+/** POST /votes/{id}/runoff: a draft runoff with the tied candidates. */
 function mockRunoff(id: string, url: string): Observable<never> | Vote {
   const row = MOCK_MEETING.votes.find((v) => v.id === id);
   const runoff = row?.electionResult?.runoff;
@@ -347,7 +347,6 @@ function mockVote(id: string): Vote {
   return {
     ...MOCK_VOTE,
     id,
-    // The demo vote is not secret, so the own ballot keeps its choice.
     myBallot: {
       cast: Boolean(ballots.own),
       choice: typeof ballots.own === 'string' ? ballots.own : null,
@@ -683,7 +682,6 @@ function mockApplication(data: Record<string, unknown> = MOCK_APP_DATA): Applica
     id: MOCK_APP_ID,
     typeId: MOCK_TYPES.items[0].id,
     state: SUBMITTED_STATE,
-    // The last event of MOCK_TIMELINE: the application went back to the applicant.
     stateSince: '2026-06-05T13:00:00Z',
     gremiumId: null,
     amount: null,
@@ -767,7 +765,7 @@ const MOCK_TASKS: ApplicationListItemWire[] = [
     title: 'Hardware für Fachschaftsraum',
     createdAt: '2026-06-06T08:15:00Z',
     updatedAt: '2026-06-07T16:00:00Z',
-    // The time of the last status change (A9): "Wartet seit" counts from here.
+    // The time of the last status change: "Wartet seit" counts from here.
     stateSince: '2026-06-07T16:00:00Z',
   },
   {
@@ -786,14 +784,14 @@ const MOCK_TASKS: ApplicationListItemWire[] = [
     currency: 'EUR',
     title: 'Förderung Sommerfest',
     createdAt: '2026-06-04T11:00:00Z',
-    // No stateSince, as from a server before A9: the page falls back to updatedAt.
+    // No stateSince, as from an older server: the page falls back to updatedAt.
     updatedAt: '2026-06-08T09:30:00Z',
   },
 ];
 
 /**
  * The status history of the demo application. The server names the applicant
- * `applicant` (the status page shows "Du") and a member by the Gremium (A12).
+ * `applicant` (the status page shows "Du") and a member by the Gremium.
  */
 const MOCK_TIMELINE: TimelineEventOutWire[] = [
   {
@@ -925,7 +923,7 @@ let MOCK_MEETING: MeetingOutWire = {
   canFinalize: true,
   // The demo user holds `vote.cast` in the gremium of the meeting.
   canVote: true,
-  // The demo user keeps the minutes since the start (Z3); a handover adds a period.
+  // The demo user keeps the minutes since the start; a handover adds a period.
   keeperPeriods: [
     {
       principalId: MOCK_PRINCIPAL.sub,
@@ -939,13 +937,13 @@ let MOCK_MEETING: MeetingOutWire = {
     },
   ],
   plannedHandover: null,
-  // #17: the meeting is public, guests vote; the lead sees the code and the requests.
+  // The meeting is public, guests vote; the lead sees the code and the requests.
   publicJoin: true,
   guestsMode: 'vote',
   joinCode: '7KQ4MP',
   admittedGuests: 7,
   pendingGuests: 3,
-  // #17: the gremium of the live meeting has no quorum, so it may be public.
+  // The gremium of the live meeting has no quorum, so it may be public.
   publicJoinAllowed: true,
   votes: [
     {
@@ -973,7 +971,7 @@ let MOCK_MEETING: MeetingOutWire = {
       presentGuests: 7,
       openedAt: '2026-06-12T16:48:00Z',
     },
-    // F2: a closed personnel election on the non-public item; a tie waits for the lot.
+    // A closed personnel election on the non-public item; a tie waits for the lot.
     MOCK_ELECTION_ROW,
     {
       id: 'a0000000-0000-0000-0000-0000000000a2',
@@ -1002,7 +1000,7 @@ const MOCK_PLANNED_MEETING: MeetingOutWire = {
   status: 'planned',
   gremiumId: null,
   gremiumName: 'Haushaltsausschuss',
-  // #17: this gremium has a quorum: no public participation (the switch is locked).
+  // This gremium has a quorum: no public participation (the switch is locked).
   publicJoinAllowed: false,
   votes: [],
   createdAt: '2026-06-01T10:00:00Z',
@@ -1127,7 +1125,6 @@ let MOCK_CALENDAR_SEQ = 0;
 /** The answer to `/delegations/substitutes` (GET, POST, DELETE), or null for another path. */
 function mockSubstitutes(req: HttpRequest<unknown>, p: string): Observable<HttpEvent<unknown>> | null {
   const reply = <T>(body: T, status = 200) => of(new HttpResponse({ status, body })).pipe(delay(120));
-  // GET /calendar/me and POST /calendar/me/rotate: the iCal feed of the demo user.
   if (req.method === 'GET' && p.endsWith('/calendar/me')) return reply({ url: MOCK_CALENDAR_URL });
   if (req.method === 'POST' && p.endsWith('/calendar/me/rotate')) {
     MOCK_CALENDAR_SEQ += 1;
@@ -1228,7 +1225,6 @@ function mockTimeline(): { past: MeetingOutWire[]; upcoming: MeetingOutWire[] } 
       agendaItemCount: 6,
     }),
   ];
-  // The live meeting runs today, so the overview and its calendar show it as "Jetzt".
   const live: MeetingOutWire = {
     ...MOCK_MEETING,
     date: mockDay(0),
@@ -1275,9 +1271,9 @@ interface MockAttendance {
   source: 'self' | 'lead' | null;
   note: string | null;
   isSelf: boolean;
-  /** O20: the member holds `protocol.write` and can keep the minutes. */
+  /** The member holds `protocol.write` and can keep the minutes. */
   canKeepProtocol: boolean;
-  /** O6: the member has an own vote (`vote.cast`) and can be substituted. */
+  /** The member has an own vote (`vote.cast`) and can be substituted. */
   canVote: boolean;
 }
 
@@ -1288,7 +1284,7 @@ let MOCK_ATTENDANCE: MockAttendance[] = [
   { principalId: 'p-3', displayName: 'Erika Beispiel', email: 'erika@example.com', status: 'excused', source: 'self', note: 'Prüfung', isSelf: false, canKeepProtocol: false, canVote: true },
   { principalId: 'p-4', displayName: 'Uli Übernahme', email: 'uli@example.com', status: 'present', source: 'self', note: null, isSelf: false, canKeepProtocol: true, canVote: true },
   { principalId: 'p-5', displayName: 'Rolf Redner', email: 'rolf@example.com', status: 'present', source: 'lead', note: null, isSelf: false, canKeepProtocol: true, canVote: true },
-  // O23: Vera Vertretung has a delegation for the live meeting, so "present" gives 409.
+  // Vera Vertretung has a delegation for the live meeting, so "present" gives 409.
   { principalId: 'p-6', displayName: 'Vera Vertretung', email: 'vera@example.com', status: 'excused', source: 'self', note: null, isSelf: false, canKeepProtocol: true, canVote: true },
   { principalId: 'p-7', displayName: 'Sven Stellvertreter', email: 'sven@example.com', status: 'present', source: 'self', note: null, isSelf: false, canKeepProtocol: false, canVote: true },
   { principalId: 'p-8', displayName: 'Fritz Fehlend', email: 'fritz@example.com', status: 'absent', source: 'lead', note: null, isSelf: false, canKeepProtocol: false, canVote: true },
@@ -1306,7 +1302,7 @@ interface MockAgendaItem {
   /** The done mark ("TOP abhaken"), or `null`. */
   doneAt?: string | null;
   stateLabel?: Record<string, string> | null;
-  /** F1: the requested amount of an application item, for the decision proposal. */
+  /** The requested amount of an application item, for the decision proposal. */
   amount?: string | null;
 }
 
@@ -1454,7 +1450,7 @@ function mockProblem(status: number, code: string, url: string): Observable<neve
 }
 
 /**
- * POST /meetings/{id}/protokollant-handover of the live mock meeting (Z3, O1, O20): `now`
+ * POST /meetings/{id}/protokollant-handover of the live mock meeting: `now`
  * ends the running period and starts one for the new keeper; `next_item` plans it.
  */
 function mockHandover(body: { principalId?: string; mode?: string } | null, url: string): Observable<HttpEvent<unknown>> | MeetingOutWire {
@@ -1501,7 +1497,7 @@ function mockHandover(body: { principalId?: string; mode?: string } | null, url:
   return MOCK_MEETING;
 }
 
-/** A forward move of the current item starts the planned handover (A13). */
+/** A forward move of the current item starts the planned handover. */
 function mockStartPlannedHandover(fromItem: string | null | undefined, toItem: string | null | undefined): void {
   const plan = MOCK_MEETING.plannedHandover;
   const from = mockPosition(fromItem) ?? 0;
@@ -1632,7 +1628,7 @@ export function mockMediaImage(body: unknown): MediaImage {
 const MOCK_ACCOUNT_PATH =
   /(^|\/)api\/(notifications\/preferences|oauth\/grants(\/[^/]+)?|oauth\/consent(-request)?|mcp\/(config|package))$/;
 
-/** The routes of the public meeting (#17): the guest side and the lead side. */
+/** The routes of the public meeting: the guest side and the lead side. */
 const PUBLIC_MEETING_PATH =
   /\/public\/meetings\/|\/meetings\/[^/]+\/(guests(\/[^/]+)*|join-link|join-code\/rotate)$/;
 
@@ -1643,11 +1639,16 @@ function path(url: string): string {
   return url.split('?')[0];
 }
 
+/**
+ * Defense in depth: the mock may take effect only in the dev or demo build. In prod `isDevMode()`
+ * returns false, so even if the interceptor reaches the chain there, no attacker-controlled input
+ * (?mock=1, localStorage, __USE_MOCK_API__) can activate it. The demo data loads on first use, so
+ * it stays out of the initial bundle. The meeting timeline matches before the generic `/timeline`
+ * rule, because that rule otherwise captures `/meetings/timeline` and returns application status
+ * events instead of a MeetingPage. The budget routes match before the generic `/applications` rule,
+ * which would otherwise answer `/budgets/{id}/applications`.
+ */
 export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
-  // Security: defense in depth. The mock may take effect only in the dev or
-  // demo build. In prod `isDevMode()` returns false. Even if the interceptor
-  // reaches the chain there, no attacker-controlled input (?mock=1,
-  // localStorage, __USE_MOCK_API__) can activate it.
   if (!isDevMode()) return next(req);
   if (!inject(USE_MOCK_API)) return next(req);
   if (!req.url.includes('/api/')) return next(req);
@@ -1664,7 +1665,6 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
   const substitutes = mockSubstitutes(req, p);
   if (substitutes) return substitutes;
 
-  // #17: the public meeting with QR code, lead and guest side. The data loads on first use.
   if (PUBLIC_MEETING_PATH.test(p)) {
     return from(import('./mock-public-meeting')).pipe(
       mergeMap((m) => {
@@ -1687,7 +1687,6 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     );
   }
 
-  // The public protocols (no login). The data loads on first use.
   if (PUBLIC_PROTOCOLS_PATH.test(p)) {
     return from(import('./mock-public-protocols')).pipe(
       mergeMap((m) => {
@@ -1698,7 +1697,6 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     );
   }
 
-  // The account pages and the consent page. The data loads on first use.
   if (MOCK_ACCOUNT_PATH.test(p)) {
     return from(import('./mock-account')).pipe(
       mergeMap((m) => {
@@ -1709,7 +1707,6 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     );
   }
 
-  // #11: the applicant search and the capture of "Antrag erfassen".
   if (req.method === 'GET' && p.endsWith('/applications/on-behalf/applicants')) {
     return from(import('./mock-applications')).pipe(
       mergeMap((m) => ok(m.mockApplicantSearch(req.params.get('q') ?? ''))),
@@ -1721,8 +1718,6 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     );
   }
 
-  // The demo applications of the list page and their detail paths. The demo data loads
-  // on first use, so it stays out of the initial bundle.
   if (
     (req.method === 'GET' && /(^|\/)api\/applications$/.test(p)) ||
     DEMO_APPLICATION_PATH.test(p)
@@ -1745,7 +1740,6 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       }),
     );
   }
-  // The agenda dialog of a demo application asks for the meetings of its Gremium.
   if (
     req.method === 'GET' &&
     p.endsWith('/meetings') &&
@@ -1754,8 +1748,6 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     return from(import('./mock-applications')).pipe(mergeMap((m) => ok(m.agendaMeetings())));
   }
 
-  // The participant view: two meetings where the demo user is a plain member, and the
-  // delegation context of every meeting. The data loads on first use.
   if (req.method === 'GET' && MEMBER_MOCK_PATH.test(p)) {
     return from(import('./mock-meetings-member')).pipe(
       mergeMap((m) =>
@@ -1772,7 +1764,6 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     );
   }
 
-  // The closed demo meetings (draft and final protocol). The data loads on first use.
   const closedId = closedMockId(p);
   if (closedId && !/\/(attendance|delegations)/.test(p)) {
     return from(import('./mock-meetings-closed')).pipe(
@@ -1787,7 +1778,6 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     );
   }
 
-  // The vote list and the standalone demo votes. The data loads on first use.
   if (req.method === 'GET' && (/(^|\/)api\/votes$/.test(p) || DEMO_VOTE_PATH.test(p))) {
     return from(import('./mock-votes')).pipe(
       mergeMap((m) => {
@@ -1806,8 +1796,6 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
   }
 
   if (req.method === 'GET') {
-    // The public site config: the platform defaults (links without an end, the default
-    // limits), so the pages show what they show after a real load.
     if (/(^|\/)api\/site-config$/.test(p)) {
       const config: PublicSiteConfig = {
         version: 1,
@@ -1818,30 +1806,21 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       };
       return ok(config);
     }
-    // `localStorage['mockAnonymous'] = '1'` plays a visitor without a session: the
-    // public frame, the wizard with the contact step and the ALTCHA.
     if (p.endsWith('/auth/me')) {
       return mockAnonymous()
         ? throwError(() => new HttpErrorResponse({ status: 401, url: req.url }))
         : ok(MOCK_PRINCIPAL);
     }
-    // The wizard of the demo type gets the form of the demo applications.
     if (p.endsWith(`/application-types/${MOCK_TYPES.items[0].id}/form`)) {
       return from(import('./mock-applications')).pipe(mergeMap((m) => ok(m.demoForm())));
     }
-    // ALTCHA is off in mock mode → 404. The widget then reports "unavailable".
     if (p.endsWith('/altcha/challenge')) {
       return throwError(() => new HttpErrorResponse({ status: 404, url: req.url }));
     }
     if (p.endsWith(`/application-types/${MOCK_TYPES.items[2].id}/form`)) return ok(MOCK_QSM_FORM);
     if (/\/application-types\/[^/]+\/form$/.test(p)) return ok(MOCK_EFFECTIVE_FORM);
     if (p.endsWith('/application-types')) return ok(MOCK_TYPES);
-    // Match the meeting timeline BEFORE the generic `/timeline` rule. The
-    // generic rule otherwise captures `/meetings/timeline` and returns
-    // application status events instead of a MeetingPage.
     if (p.endsWith('/meetings/timeline')) {
-      // Keyset paging as an offset in the cursor; `q` collapses both directions into
-      // one list of hits.
       const { past, upcoming } = mockTimeline();
       const q = (req.params.get('q') ?? '').trim().toLowerCase();
       const gremiumId = req.params.get('gremiumId');
@@ -1866,7 +1845,6 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
         { id: 'g0000000-0000-0000-0000-000000000002', name: 'Haushaltsausschuss' },
       ]);
     }
-    // #17: the Studierendenparlament has a quorum of 50 %, every other gremium none.
     const defaults = /\/gremien\/([^/]+)\/meeting-defaults$/.exec(p);
     if (defaults) {
       const quorum = defaults[1] === 'g0000000-0000-0000-0000-000000000001' ? 50 : null;
@@ -1895,27 +1873,20 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       };
       return ok(signed);
     }
-    // The budget tree, its fiscal years and the applications per cost centre. Before the
-    // generic `/applications` rule, which would otherwise answer `/budgets/{id}/applications`.
-    // The demo data loads on first use, so it stays out of the initial bundle.
     if (BUDGET_MOCK_PATH.test(p)) {
       const fiscalYear = req.params.get('fiscalYear');
       return from(import('./mock-budget')).pipe(
         mergeMap((m) => ok(m.mockBudgetGet(p, fiscalYear))),
       );
     }
-    // Bookings, transfers and invoices. The demo data loads on first use, like the
-    // budget tree.
     const bookings = mockBookingsGet(p, new URLSearchParams(req.params.toString()));
     if (bookings) return bookings.pipe(mergeMap((body) => ok(body)));
     if (p.endsWith('/search')) return ok(mockSearch(req.params.get('q') ?? ''));
     if (p.endsWith('/applications/tasks')) return ok([...MOCK_TASKS]);
-    // The demo user represents a member in the demo vote: the ballot shows both rows.
     if (/\/delegations\/votes\/[^/]+\/status$/.test(p)) {
       return ok({ blocked: false, delegatedToName: null, exercising: true, delegatedByName: 'Erika Beispiel' });
     }
     if (/\/votes\/[^/]+$/.test(p)) return ok(mockVote(p.split('/').pop() ?? MOCK_VOTE.id));
-    // The calendar view asks for the meetings of the days of its month grid.
     const dateFrom = req.params.get('dateFrom');
     const dateTo = req.params.get('dateTo');
     if (p.endsWith('/meetings') && dateFrom && dateTo) {
@@ -1967,14 +1938,12 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       const body = (req.body as { status?: string; note?: string | null } | null) ?? {};
       const status = (body.status ?? 'present') as MockAttendance['status'];
       const target = att[1];
-      // O23: a member with a delegation of this meeting cannot be present.
       const meetingId = /\/meetings\/([^/]+)\//.exec(p)?.[1];
       const delegator = target === 'me' ? MOCK_PRINCIPAL.sub : target;
       const delegated = MOCK_DELEGATIONS.some(
         (d) => d.meetingId === meetingId && d.delegatorId === delegator,
       );
       if (status === 'present' && delegated) return mockProblem(409, 'delegation_active', req.url);
-      // Like the server: only an excuse keeps a reason; an omitted note keeps the stored one.
       const noteFor = (a: MockAttendance): string | null =>
         status !== 'excused' ? null : body.note !== undefined ? body.note : a.note;
       MOCK_ATTENDANCE = MOCK_ATTENDANCE.map((a) =>
@@ -1999,9 +1968,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       );
     }
     if (p.endsWith('/auth/logout')) return ok(LOGOUT_OUT);
-    // A draft upload of the wizard (Z4): the file stays in the scan, the token stays.
     if (p.endsWith('/apply/attachments')) return ok(mockDraftUpload(req.body), 201);
-    // A Markdown image: the server re-encodes it and answers with its canonical path.
     if (p.endsWith('/media/images')) return ok(mockMediaImage(req.body), 201);
     if (p.endsWith('/invoices/parse')) {
       const file = req.body instanceof FormData ? req.body.get('file') : null;
@@ -2013,7 +1980,6 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       return 'id' in out ? ok(out) : out;
     }
     if (/\/meetings\/[^/]+\/votes\/[^/]+\/open$/.test(p)) {
-      // A prepared draft opens; the server answers with the meeting.
       setVoteStatus(p.split('/').slice(-2)[0], 'open');
       return ok(MOCK_MEETING);
     }
@@ -2029,7 +1995,6 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
         secret?: boolean;
         candidates?: { name: string; principalId?: string | null }[];
       } | null;
-      // F2: an election gets the ids c1..cn, like the server.
       const candidates = (body?.candidates ?? []).map((c, i) => ({
         id: `c${i + 1}`,
         name: c.name,
@@ -2069,7 +2034,6 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
             guestsVote: !!body?.guestsVote,
             presentMembers: body?.guestsVote ? 5 : null,
             presentGuests: body?.guestsVote ? 7 : null,
-            // A prepared question stays a draft until it opens.
             status: body?.draft ? 'draft' : 'open',
             result: null,
             counts: null,
@@ -2100,8 +2064,6 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       return ok([...MOCK_AGENDA]);
     }
     if (p.endsWith('/auth/magic-link/verify')) {
-      // Cookie model: the real server sets an HttpOnly applicant cookie. The
-      // mock returns only the scope and the application id, no session token.
       const res: MagicLinkVerifyResult = { application_id: MOCK_APP_ID, scope: 'edit' };
       return ok(res);
     }
@@ -2116,14 +2078,13 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
         body,
         visibility: visibility ?? 'public',
         at: '2026-06-05T14:00:00Z',
-        isOwn: true, // the mock viewer created it
+        isOwn: true,
         mentions: MOCK_MENTIONABLE.filter((m) => mentions.includes(m.principalId)),
       };
       MOCK_COMMENTS.push(created);
       return ok(created, 201);
     }
     if (p.endsWith('/attachments')) {
-      // Multipart upload: the real server scans asynchronously → `scanned=false`.
       const created: AttachmentOutWire = {
         id: 'att00000-0000-0000-0000-000000000001',
         filename: 'mock-upload.pdf',
@@ -2177,7 +2138,6 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     if (/\/votes\/[^/]+\/close$/.test(p)) {
       const id = p.split('/').slice(-2)[0];
       setVoteStatus(id, 'closed');
-      // The server answers with the closed vote (VoteClosed), not with an empty body.
       const row = MOCK_MEETING.votes.find((v) => v.id === id);
       const closed: VoteClosed = {
         id,
@@ -2194,7 +2154,6 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     if (p.endsWith('/meetings')) {
       const body = (req.body as { title?: string; date?: string | null; startTime?: string | null } | null) ?? {};
       const title = body.title?.trim();
-      // The backend creates a new meeting with status `planned`.
       MOCK_MEETING = {
         ...MOCK_MEETING,
         title: title || MOCK_MEETING.title,
@@ -2216,7 +2175,6 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     if (body.currentAgendaItemId !== undefined) {
       mockStartPlannedHandover(MOCK_MEETING.currentAgendaItemId, body.currentAgendaItemId);
     }
-    // "Nächster TOP": the item that the room leaves gets its done mark.
     if (body.completeAgendaItemId) mockSetDone(body.completeAgendaItemId, true);
     MOCK_MEETING = {
       ...MOCK_MEETING,
@@ -2253,7 +2211,6 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
   if (req.method === 'PATCH') {
     const item = /\/meetings\/[^/]+\/agenda\/([^/]+)$/.exec(p);
     if (item) {
-      // Like the server: only the sent fields change (text, title of a freetext item, NÖ).
       const patch = (req.body as { body?: string; title?: string; nonPublic?: boolean } | null) ?? {};
       MOCK_AGENDA = MOCK_AGENDA.map((a) => (a.id === item[1] ? { ...a, ...patch } : a));
       return ok([...MOCK_AGENDA]);

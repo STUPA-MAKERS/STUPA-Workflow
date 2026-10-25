@@ -44,7 +44,7 @@ export interface DelegationInput {
   delegateVoting: boolean;
   /**
    * The meeting lead enters a substitute for this missing member while the meeting is
-   * live (O6). Omit it to delegate for yourself.
+   * live. Omit it to delegate for yourself.
    */
   delegatorId?: Uuid;
 }
@@ -106,11 +106,14 @@ export class DelegationsApiService {
   private readonly http = inject(HttpClient);
   private readonly base = inject(API_BASE_URL);
 
-  /** `detail` keeps the answer for the read ahead of the meeting list (`prefetchDetails`). */
+  /**
+   * `detail` keeps the answer for the read ahead of the meeting list (`prefetchDetails`).
+   *
+   * The list has its own loading indicator or runs in the background on the dashboard, so it
+   * suppresses the global overlay.
+   */
   list(meetingId?: Uuid, opts: { detail?: boolean } = {}): Observable<Delegation[]> {
     const params = meetingId ? new HttpParams().set('meetingId', meetingId) : undefined;
-    // The list has its own loading indicator, or it runs in the background on
-    // the dashboard → suppress the global overlay.
     return this.http.get<Delegation[]>(`${this.base}/delegations`, {
       params,
       context: opts.detail ? detailContext() : skipLoading(),
@@ -136,8 +139,8 @@ export class DelegationsApiService {
     );
   }
 
+  /** The debounced typeahead never shows the global overlay. */
   recipients(meetingId: Uuid, q: string): Observable<DelegationRecipient[]> {
-    // Debounced typeahead → never flash the global overlay.
     return this.http.get<DelegationRecipient[]>(
       `${this.base}/delegations/meetings/${meetingId}/recipients`,
       { params: new HttpParams().set('q', q), context: skipLoading() },
@@ -145,7 +148,7 @@ export class DelegationsApiService {
   }
 
   /**
-   * The pool substitutes of one member for the lead entry (O6): the personal entries for
+   * The pool substitutes of one member for the lead entry: the personal entries for
    * the member and the gremium-wide entries. Only the meeting lead may ask (else 403).
    */
   poolSubstitutes(meetingId: Uuid, delegatorId: Uuid): Observable<DelegationRecipient[]> {

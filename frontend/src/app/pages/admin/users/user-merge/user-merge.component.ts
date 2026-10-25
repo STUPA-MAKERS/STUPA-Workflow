@@ -161,7 +161,6 @@ export class UserMergeComponent {
   private previewSub?: Subscription;
 
   constructor() {
-    // A new old account starts the dialog from the first step.
     effect(() => {
       const src = this.source();
       untracked(() => this.reset(src));
@@ -263,6 +262,10 @@ export class UserMergeComponent {
     if (src && target) this.loadPreview(src.id, target.id);
   }
 
+  /**
+   * When the data changed since the preview, the dialog shows the conflicts of the server, or loads
+   * the preview again when the answer lists none (a race on a unique key).
+   */
   protected confirm(): void {
     const p = this.preview();
     if (!p || !this.canMerge()) return;
@@ -278,8 +281,6 @@ export class UserMergeComponent {
       error: (err: { status?: number; error?: ConflictProblem }) => {
         this.merging.set(false);
         if (err?.status === 409 && err.error?.code === 'merge_conflict') {
-          // The data changed since the preview: show the server's conflicts, or load the
-          // preview again when the answer lists none (a race on a unique key).
           const listed = (err.error.errors ?? []).map(
             (e) => ({ kind: e.field, label: e.msg || null }) as MergeConflict,
           );
@@ -294,7 +295,6 @@ export class UserMergeComponent {
         }
         const code = err?.error?.code;
         if (code === 'merge_privileges') {
-          // The rights changed since the preview: load it again, it lists them.
           this.loadPreview(p.source.id, p.target.id);
         }
         this.toast.error(

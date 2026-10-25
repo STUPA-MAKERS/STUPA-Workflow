@@ -1,5 +1,3 @@
-<!-- Phone: the sticky bar of a detail, as in the list/detail pages, with the title always
-     compact in it; the arrow leaves the wizard to the home page. -->
 <div class="wz" [appListDetailNav]="phone()">
   @if (phone()) {
     <app-list-detail-bar [label]="'apply.leave' | t" [title]="'apply.title' | t" (back)="leave()" />
@@ -32,7 +30,6 @@
     </header>
 
     <div class="wz__body">
-      <!-- 1 · Antragsart -->
       <section class="wz__step" [hidden]="currentStep() !== 'type'">
         @if (types().length) {
           <div class="wz__types rowgroup" role="radiogroup" [attr.aria-label]="'apply.type.legend' | t">
@@ -56,14 +53,12 @@
         @if (loadingForm()) {
           <app-skeleton variant="lines" [count]="3" [label]="'apply.form.loading' | t" />
         }
-        <!-- Configured info text: set per language as markdown in /admin/texts. -->
         @if (applyInfoHtml()) {
           <div class="wz__info" [innerHTML]="applyInfoHtml()"></div>
         }
       </section>
 
       @if (effForm()) {
-        <!-- 2 · Angaben. Every form stays in the page, so the submit checks all fields. -->
         <section class="wz__step" [hidden]="currentStep() !== 'details'">
           <div class="fe-form">
             <formly-form [form]="detailsForm" [fields]="detailsFields()" [model]="model" />
@@ -75,7 +70,6 @@
           />
         </section>
 
-        <!-- 3 · Kontakt -->
         @if (stepKeys().includes('contact')) {
           <section class="wz__step" [hidden]="currentStep() !== 'contact'">
             @if (loggedIn()) {
@@ -113,7 +107,6 @@
           </section>
         }
 
-        <!-- 4 · Prüfen & absenden -->
         <section class="wz__step wz__review" [hidden]="currentStep() !== 'review'">
           @if (currentStep() === 'review') {
             <app-answer-view
@@ -190,7 +183,6 @@
     </footer>
   </section>
 
-  <!-- Phone: the bar holds only "Zurück" and "Weiter"; the discard sits below the sheet. -->
   @if (effForm()) {
     <app-button class="wz__discardPhone" variant="danger" (click)="confirmDiscard.set(true)">
       {{ 'apply.nav.discard' | t }}

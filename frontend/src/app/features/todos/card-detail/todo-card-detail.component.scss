@@ -113,19 +113,15 @@
   min-width: 0;
   min-height: 0;
 }
+/* The column is a scroll container and clips what reaches past its edges, so it reaches 10px
+   past the content edge for the end buttons, the scrollbar and the focus ring. The scroll
+   padding keeps a focused field clear of the fade. */
 .cd__col--details {
   gap: var(--space-4);
   overflow-y: auto;
   overscroll-behavior: contain;
-  /* The column is a scroll container, so it clips what reaches past its edges. It
-     reaches 10px past the content edge on both sides: the end buttons below and the
-     scrollbar have room at the end, and the focus ring of a field (the inline editors
-     of the checklist) has room at both ends. */
   margin-inline: -10px;
   padding-inline: 10px;
-  /* An end fades only while more content lies past it (`appScrollFade` sets the
-     classes), so the description never ends in a hard cut through a line or a row. The
-     scroll padding keeps a field that gets the focus clear of the fade. */
   scroll-padding-block: var(--space-5);
   @include fade.fade-y(var(--space-5));
 }
@@ -181,7 +177,6 @@
 /* ------------------------------------------------------------------ fields */
 .cd__fields {
   display: grid;
-  /* The values start on one line, a label column of at least 5.25rem. */
   grid-template-columns: minmax(5.25rem, max-content) minmax(0, 1fr);
   gap: var(--space-3) var(--space-5);
   margin: 0;

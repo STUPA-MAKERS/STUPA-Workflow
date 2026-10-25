@@ -217,14 +217,14 @@ describe('UsersComponent', () => {
     expect(inst.roleLabel('r-ref')).toBe('officer');
   });
 
-  it('userLabel prefers displayName, then email, then "Ohne Namen" (D7)', async () => {
+  it('userLabel prefers displayName, then email, then "Ohne Namen"', async () => {
     const { inst } = await setup();
     expect(inst.userLabel({ displayName: 'Name', email: 'e', sub: 's' })).toBe('Name');
     expect(inst.userLabel({ displayName: '', email: 'e@x', sub: 's' })).toBe('e@x');
     expect(inst.userLabel({ displayName: null, email: null, sub: 'sub-only' })).toBe('Ohne Namen');
   });
 
-  it('a nameless account shows "Ohne Namen" with the sub only in the tooltip (D7)', async () => {
+  it('a nameless account shows "Ohne Namen" with the sub only in the tooltip', async () => {
     const nameless = { ...PRINCIPALS[1], id: 'p-5', sub: 'kc|ghost', displayName: null, email: null };
     const api = makeApi({ listPrincipals: jest.fn(() => of([nameless])) });
     const { inst } = await setup(api);
@@ -395,7 +395,7 @@ describe('UsersComponent', () => {
       expect(inst.mergeSource()).toEqual(PRINCIPALS[1]);
     });
 
-    it('"Konto löschen (DSGVO)" needs privacy.manage and opens the privacy page (D1)', async () => {
+    it('"Konto löschen (DSGVO)" needs privacy.manage and opens the privacy page', async () => {
       const { inst, fixture } = await setup(makeApi(), makeAuth(null, true, false, true));
       expect(screen.getAllByRole('button', { name: /^Weitere Aktionen: / })).toHaveLength(2);
       const items = inst.menuFor(PRINCIPALS[1])[1].items;
@@ -429,7 +429,7 @@ describe('UsersComponent', () => {
     });
   });
 
-  describe('revoke rights (F3)', () => {
+  describe('revoke rights', () => {
     function revokeAuth(sub: string | null = null) {
       return {
         principal: () => (sub === null ? null : { sub }),

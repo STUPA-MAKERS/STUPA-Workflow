@@ -112,13 +112,13 @@ const SUBSTITUTES: DelegationRecipient[] = [
   { principalId: 'p-7', displayName: 'Sven Stellvertreter', viaPool: true, isMember: false },
   { principalId: 'p-10', displayName: 'Emma Vogel', viaPool: true, isMember: false },
 ];
-/** O6: the personal pool entries of the missing members of the live meeting. */
+/** The personal pool entries of the missing members of the live meeting. */
 const PERSONAL: Record<string, DelegationRecipient[]> = {
   'p-8': [{ principalId: 'p-11', displayName: 'Paula Persönlich', viaPool: true, isMember: false }],
   'p-9': [{ principalId: 'p-12', displayName: 'Karl Kern', viaPool: true, isMember: false }],
 };
 
-/** O6: the pool of one member for the lead entry: the personal and the gremium-wide entries. */
+/** The pool of one member for the lead entry: the personal and the gremium-wide entries. */
 function poolOf(delegatorId: string): DelegationRecipient[] {
   return [...(PERSONAL[delegatorId] ?? []), ...SUBSTITUTES].sort((a, b) =>
     (a.displayName ?? '').localeCompare(b.displayName ?? ''),
@@ -135,7 +135,6 @@ function context(
   const started = !planned && meetingId !== 'd0000000-0000-0000-0000-000000000002';
   const mine = delegations.filter((d) => d.meetingId === meetingId);
   const incoming = mine.filter((d) => d.delegateId === 'me' || d.delegateId === DEMO_SUB);
-  // In the live meeting the demo user represents Erika Beispiel (see the vote status).
   if (meetingId === LIVE_MEETING_ID || meetingId === MEMBER_LIVE_ID) {
     incoming.push({
       id: 'f0000000-0000-0000-0000-000000000010',
@@ -161,7 +160,6 @@ function context(
     allowVoteDelegation: true,
     votingDelegationEnabled: true,
     delegationAllowExternal: false,
-    // The gremium wants 60 minutes of lead time before the start (17:30).
     deadline: planned ? at(3, 16, 30) : null,
     deadlinePassed: false,
     meetingStarted: started,
@@ -194,7 +192,7 @@ export function memberMeetingGet(
 
 /**
  * POST /delegations: the demo user hands a meeting over (participant view), or the lead
- * enters a substitute from the pool for a missing member (O6, `delegatorId`).
+ * enters a substitute from the pool for a missing member (`delegatorId`).
  */
 export function memberDelegationCreate(
   body: unknown,

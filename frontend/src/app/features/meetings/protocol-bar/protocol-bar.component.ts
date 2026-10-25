@@ -19,7 +19,7 @@ interface BarState {
  *
  * - Draft: "Entwurf · Das Protokoll ist noch nicht versandt." and "Finalisieren &
  *   versenden" for a holder of `canFinalize` (write access plus the gremium right
- *   `protocol.finalize`, O2). Without the right the bar says what is missing.
+ *   `protocol.finalize`). Without the right the bar says what is missing.
  * - Rendering: the worker renders and sends the PDF.
  * - Final: "Final · Das Protokoll ist final und wurde versandt." and the PDF links
  *   ("PDF intern", "PDF öffentlich" when an item is non-public).
@@ -27,7 +27,7 @@ interface BarState {
  *   and for a holder of `canFinalize` the switch between the two (the protocol is held
  *   back from the public protocol page, or published again).
  *
- * The finalize is a step of its own after the close (O13); a live meeting has no bar.
+ * The finalize is a step of its own after the close; a live meeting has no bar.
  */
 @Component({
   selector: 'app-protocol-bar',
@@ -57,7 +57,7 @@ export class ProtocolBarComponent {
     return p.publicWithheld ? 'withheld' : 'public';
   });
 
-  /** The switch between "public" and "withheld": a holder of `canFinalize` (O2). */
+  /** The switch between "public" and "withheld": a holder of `canFinalize`. */
   protected readonly canPublish = computed(
     () => this.publication() !== null && !!this.meeting().canFinalize && this.session !== null,
   );
@@ -87,7 +87,7 @@ export class ProtocolBarComponent {
     return { icon: 'edit', tone: 'muted', label: 'meetings.protocol.draft', text: 'meetings.protocolBar.draft' };
   });
 
-  /** Finalize: a closed meeting, a draft and the right (O2, O13). */
+  /** Finalize: a closed meeting, a draft and the right. */
   protected readonly canFinalize = computed(() => {
     const m = this.meeting();
     const p = this.protocol();

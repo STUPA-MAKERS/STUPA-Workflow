@@ -59,10 +59,10 @@ export class ThemeService {
     this.apply();
   }
 
+  /** The whole page cross-fades once instead of each surface changing on its own. */
   setPreference(pref: ThemePreference): void {
     this._preference.set(pref);
     this.persist(pref);
-    // The whole page cross-fades once instead of each surface changing on its own.
     withViewTransition(() => this.apply());
   }
 
@@ -87,11 +87,13 @@ export class ThemeService {
     if (this._preference() === 'system') this.apply();
   };
 
+  /**
+   * index.html carries one theme-color tag per OS scheme. An explicit choice in the app overrides
+   * the OS, so both tags take the colour of the theme in effect.
+   */
   private apply(): void {
     const theme = this.resolved();
     document.documentElement.setAttribute('data-theme', theme);
-    // index.html carries one tag per OS scheme. An explicit choice in the app overrides
-    // the OS, so both tags take the colour of the theme in effect.
     document
       .querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')
       .forEach((meta) => meta.setAttribute('content', THEME_COLOR[theme]));

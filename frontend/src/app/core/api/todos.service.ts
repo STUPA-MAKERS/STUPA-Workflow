@@ -607,7 +607,6 @@ export class TodosApiService {
   /** The readable, not archived cards that link the target: open first, then by due date. */
   linked(kind: Exclude<TodoLinkKind, 'todo'>, targetId: Uuid): Observable<TodoLinkedCard[]> {
     const params = new HttpParams().set('kind', kind).set('targetId', targetId);
-    // Kept for the read ahead of the list of the target: its detail shows the cards at once.
     return this.http.get<TodoLinkedCard[]>(`${this.base}/todos/linked`, {
       params,
       context: detailContext(),

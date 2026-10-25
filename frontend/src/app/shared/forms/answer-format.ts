@@ -86,7 +86,7 @@ export function isEmptyAnswer(value: unknown): boolean {
 }
 
 /**
- * One answer as the text a reader sees, by the type of its field (O19, the table
+ * One answer as the text a reader sees, by the type of its field (the table
  * "Darstellung der Formularfelder").
  *
  * - `checkbox`: Ja or Nein.

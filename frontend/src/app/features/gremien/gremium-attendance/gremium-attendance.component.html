@@ -40,7 +40,6 @@
 } @else if (error()) {
   <app-note kind="error" icon="alert" role="alert" retryable (retry)="load()">{{ 'gremien.attendance.error' | t }}</app-note>
 } @else if (noMeetings()) {
-  <!-- The grey grid says it to the eye; the text stays for screen readers only. -->
   <p class="sr-only">{{ 'gremien.attendance.noMeetings' | t }}</p>
   <div class="gat__ghost" aria-hidden="true">
     @for (r of [1, 2, 3, 4]; track r) {

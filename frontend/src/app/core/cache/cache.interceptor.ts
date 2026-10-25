@@ -41,14 +41,14 @@ const CACHE_TTL = new HttpContextToken<number>(() => 0);
  * Opt IN per call site, never by default. A caller has to know two things this
  * interceptor cannot: whether a slightly old answer is acceptable, and whether the code
  * downstream can handle being called twice.
+ *
+ * It takes a base context, because the calls worth caching are exactly the background ones that
+ * already carry `skipLoading()`, and a second `new HttpContext()` would throw the first away.
  */
 export function cached(
   ttlMs: number = DEFAULT_TTL_MS,
   base: HttpContext = new HttpContext(),
 ): HttpContext {
-  // Takes a base context, because the calls worth caching are exactly the background
-  // ones that already carry `skipLoading()`, and a second `new HttpContext()` would
-  // throw the first away.
   return base.set(CACHE_TTL, ttlMs);
 }
 
@@ -107,14 +107,18 @@ export function freshly<T>(start: () => T): T {
  *
  * A non-GET drops every cached entry under the same collection path, so a booking that
  * was just created cannot be missing from the list that follows it.
+ *
+ * Invalidation happens on the way out, not on the response: a request that fails may still have
+ * changed something, and a stale list after a half-failed write is worse than one extra fetch. A
+ * read ahead that is still in flight is joined, so a click right after the list appeared waits for
+ * one answer, not two. The same answer again is no news, so an unchanged detail does not render
+ * twice. The cached body comes first, then the network answer. `concat` keeps the order and does
+ * not start the request until the cached value is delivered.
  */
 export const cacheInterceptor: HttpInterceptorFn = (req, next) => {
   const cache = inject(HttpCacheService);
 
   if (req.method !== 'GET') {
-    // Invalidate on the way OUT, not on the response: a request that fails may still
-    // have changed something, and serving a stale list after a half-failed write is
-    // worse than one extra fetch.
     cache.invalidate(new URL(req.url, 'http://x').pathname);
     return next(req);
   }
@@ -125,8 +129,6 @@ export const cacheInterceptor: HttpInterceptorFn = (req, next) => {
   const key = req.urlWithParams;
   const hit = freshReads > 0 ? undefined : cache.get(key, ttl);
   if (hit === undefined) {
-    // A read ahead that is still in flight: join it rather than ask a second time, so a
-    // click right after the list appeared waits for one answer, not two.
     const flying = freshReads > 0 ? undefined : inflight.get(key);
     if (flying) return flying;
     const fresh = next(req).pipe(
@@ -144,14 +146,9 @@ export const cacheInterceptor: HttpInterceptorFn = (req, next) => {
     tap((event) => {
       if (event instanceof HttpResponse && event.status === 200) cache.set(key, event.body);
     }),
-    // The same answer again is no news: the subscriber is not called a second time, so
-    // an unchanged detail does not render twice.
     filter((event) => !(event instanceof HttpResponse && sameBody(event.body, hit))),
   );
 
-  // The cached body first, then the network answer. `concat` keeps the order and does not
-  // start the request until the cached value is delivered, so the subscriber always sees
-  // something to paint before anything else happens.
   return concat(of(new HttpResponse({ body: hit, status: 200 })), fresh);
 };
 

@@ -82,7 +82,7 @@ export class BudgetPieComponent {
     const total = this.total();
     if (total <= 0) return [];
     const out: Arc[] = [];
-    let angle = -Math.PI / 2; // 12 o'clock
+    let angle = -Math.PI / 2;
     for (const s of this.slices()) {
       const frac = Math.max(0, s.value) / total;
       if (frac <= 0) continue;
@@ -126,10 +126,13 @@ export class BudgetPieComponent {
 
 }
 
-/** SVG path of a donut segment between two angles (radians). */
+/**
+ * SVG path of a donut segment between two angles (radians).
+ *
+ * A full circle (a single 100% slice) has start == end, so one arc draws nothing; it draws the
+ * whole ring instead: outer circle CW, hole CCW.
+ */
 function donutArc(start: number, end: number): string {
-  // Full circle (a single 100% slice): start == end, so one arc draws nothing.
-  // Draw the whole ring instead: outer circle CW, hole CCW.
   if (end - start >= Math.PI * 2 - 1e-6) {
     return [
       `M ${CX - R} ${CY}`,

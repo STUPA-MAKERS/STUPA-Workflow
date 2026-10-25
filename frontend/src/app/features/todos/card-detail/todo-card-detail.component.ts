@@ -125,6 +125,9 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
  * write is in flight, the read waits and runs when that ends. A read that a local change
  * overtook is dropped; a 404 says the card is gone. Nothing goes out: the page takes its
  * own pings.
+ *
+ * The activity chat exists only while its sheet shows, so a hidden chat does not mark the thread as
+ * seen.
  */
 @Component({
   selector: 'app-todo-card-detail',
@@ -274,7 +277,6 @@ export class TodoCardDetailComponent {
       const id = this.cardId();
       untracked(() => this.load(id, true));
     });
-    // Keep the card as it is now for the next opening.
     effect(() => {
       const c = this.card();
       if (c) untracked(() => this.cache?.putCard(c));
@@ -290,7 +292,6 @@ export class TodoCardDetailComponent {
       );
       onCleanup(() => sub.unsubscribe());
     });
-    // The edit ended after a ping: read the card now.
     effect(() => {
       if (this.editing() || !this.stale()) return;
       untracked(() => this.liveRead());
@@ -550,7 +551,6 @@ export class TodoCardDetailComponent {
     this.notFound.set(false);
     this.error.set(false);
     this.today.set(isoDay(new Date()));
-    // A card read ahead shows at once; the read behind it does not replace a field in edit.
     const held = fresh ? this.cache?.card(id) : null;
     if (held) {
       this.card.set(held);
@@ -558,7 +558,6 @@ export class TodoCardDetailComponent {
       this.loadMembers(held.boardId);
     }
     const local = this.localSeq;
-    // `detail`: a list that read the card ahead (the tasks page) paints it at once.
     this.api.card(id, { detail: fresh }).subscribe({
       next: (card) => {
         if (seq !== this.seq) return;
@@ -983,13 +982,14 @@ export class TodoCardDetailComponent {
     this.write(this.api.restoreCard(c.id), undefined, true);
   }
 
+  /**
+   * The link names the card only, so it stays valid when the card moves to another board. On a
+   * phone the share sheet is its own feedback, and a closed sheet is no failure.
+   */
   copyLink(): void {
     const c = this.card();
     if (!c) return;
-    // The card only: the link stays valid when the card moves to another board.
     const url = `${location.origin}/todos?card=${c.id}`;
-    // On a phone the share sheet hands the link on; it is its own feedback, and a closed
-    // sheet is no failure. Elsewhere the link goes on the clipboard.
     void shareOrCopy({ url, title: c.title }).then((outcome) => {
       if (outcome === 'copied') this.toast.success(this.t('todos.card.linkCopied'));
       else if (outcome === 'failed') this.toast.error(this.t('todos.card.linkFailed'));

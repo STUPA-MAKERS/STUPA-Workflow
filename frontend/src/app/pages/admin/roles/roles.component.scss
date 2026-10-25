@@ -85,7 +85,6 @@
 }
 
 .ar__body {
-  /* The row is surface 2, so the fields take surface 3. */
   @include sc.raised-fields;
   display: flex;
   flex-direction: column;

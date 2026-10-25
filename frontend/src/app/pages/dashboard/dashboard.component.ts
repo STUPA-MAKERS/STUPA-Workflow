@@ -212,9 +212,9 @@ export class DashboardComponent {
     { initialValue: [] as ApplicationType[] },
   );
 
+  /** There is no raw id as a fallback, because the types load late or can fail. */
   private readonly typeName = computed(() => {
     const names = new Map(this.types().map((t) => [t.id, t.name]));
-    // No raw id as a fallback: the types load late or can fail.
     return (id: Uuid): string => names.get(id) ?? '';
   });
 

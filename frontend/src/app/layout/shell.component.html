@@ -43,15 +43,12 @@
 <app-toast />
 <app-sw-update-prompt />
 
-<!-- "Problem melden": loaded on its first opening, then kept, so a reopened draft is
-     instant. Every frame with a help menu can open it. -->
 @if (help.reportUsed()) {
   @defer {
     <app-report-dialog />
   }
 }
 
-<!-- Global search. It owns its own overlay, so it sits outside the frame. -->
 @if (frame() === 'rail') {
   <app-command-palette />
 }

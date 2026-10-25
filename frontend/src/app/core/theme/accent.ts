@@ -162,12 +162,13 @@ export function contrast(a: string, b: string): number {
 /**
  * Move the lightness of `hex` (darker on light surfaces, lighter on dark ones) until it
  * has AA contrast on every one of `surfaces`. The hue and the chroma stay.
+ *
+ * At L 0 or 1 the colour is black or white, which passes on every surface of a theme.
  */
 export function ensureContrast(hex: string, surfaces: readonly string[], dark: boolean): string {
   const [L0, C, H] = rgbToOklch(hexToRgb(hex));
   const step = dark ? 0.01 : -0.01;
   let out = hex;
-  // At L 0 or 1 the colour is black or white, which passes on every surface of a theme.
   for (let i = 1; i <= 100 && !surfaces.every((s) => contrast(out, s) >= AA); i++) {
     out = oklchToHex([Math.min(1, Math.max(0, L0 + i * step)), C, H]);
   }
@@ -182,6 +183,8 @@ function hueDelta(from: number, to: number): number {
 /**
  * Every accent primitive for one accent colour, by CSS name. The built-in accent gives
  * the built-in values. A grey (no chroma) gives grey steps.
+ *
+ * A grey has no chroma, so its steps turn grey. The cap keeps a neon pick usable.
  */
 export function accentPalette(accent: string): Record<string, string> {
   const hex = normalizeHex(accent) ?? DEFAULT_ACCENT;
@@ -194,7 +197,6 @@ export function accentPalette(accent: string): Record<string, string> {
   }
   const [, C0, H0] = rgbToOklch(hexToRgb(DEFAULT_ACCENT));
   const [, C, H] = rgbToOklch(hexToRgb(hex));
-  // A grey has no chroma, so its steps turn grey. The cap keeps a neon pick usable.
   const ratio = Math.min(C / C0, 2);
   const turn = hueDelta(H0, H);
   const derive = (value: string): string => {

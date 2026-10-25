@@ -73,10 +73,11 @@ export function shiftMonth(ref: MonthRef, delta: number): MonthRef {
  * The weeks of the month grid, Monday to Sunday. The first week starts on the Monday on
  * or before the first day of the month, the last week ends on the Sunday on or after the
  * last day: 4 to 6 weeks.
+ *
+ * `getDay` returns 0 for Sunday, and Monday is the first column.
  */
 export function monthGrid(ref: MonthRef, today: Date): CalendarDay[][] {
   const first = new Date(ref.year, ref.month, 1);
-  // getDay: 0 = Sunday. Monday is the first column.
   const lead = (first.getDay() + 6) % 7;
   const start = new Date(ref.year, ref.month, 1 - lead);
   const last = new Date(ref.year, ref.month + 1, 0);
@@ -136,9 +137,12 @@ function fold(text: string): string {
     .toLowerCase();
 }
 
-/** The short weekday names, Monday first: "Mo" … "So". `locale` is the format locale. */
+/**
+ * The short weekday names, Monday first: "Mo" … "So". `locale` is the format locale.
+ *
+ * 2024-01-01 is a Monday.
+ */
 export function weekdayNames(locale: string): string[] {
-  // 2024-01-01 is a Monday.
   return Array.from({ length: 7 }, (_, i) => weekdayName(new Date(2024, 0, 1 + i), locale));
 }
 

@@ -122,7 +122,6 @@
 }
 
 .grem__body {
-  /* The row is surface 2: the settings card and the matrix rows take surface 3. */
   @include sc.raised-fields;
   display: flex;
   flex-direction: column;

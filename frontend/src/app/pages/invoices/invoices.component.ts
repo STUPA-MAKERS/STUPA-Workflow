@@ -187,7 +187,7 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
   private readonly PAGE = 20;
   readonly items = signal<Invoice[]>([]);
   readonly total = signal(0);
-  /** The size of each segment under the other filters; null from a backend before FE10c. */
+  /** The size of each segment under the other filters; null from an older backend. */
   readonly counts = signal<InvoiceSegmentCounts | null>(null);
   private nextOffset = 0;
   readonly loading = signal(true);
@@ -422,8 +422,13 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
   /** One pane at a time the detail shows while a row or a form is open. */
   readonly detailOpen = computed(() => (!!this.formMode() && !this.phone()) || !!this.selectedId());
 
+  /**
+   * The query param map is subscribed, because the palette can send a hit here while the component
+   * is active, and the router keeps it alive. The filters go back into the URL with `replaceUrl`,
+   * so filtering does not fill the back button. The rows are tracked too, because a reload can drop
+   * the open invoice from the list; it then loads by its id.
+   */
   constructor() {
-    // The detail shows the row at once; the shown rows read their linked to-dos ahead.
     prefetchDetails({
       items: this.items,
       key: (i) => i.id,
@@ -432,15 +437,10 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
     this.adoptUrl(this.route.snapshot.queryParamMap);
     this.reload();
 
-    // The palette can send us here while we are already here: a hit on another invoice
-    // changes only the query string, and the router keeps this component alive.
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((qp) => {
       if (this.adoptUrl(qp)) this.reload();
     });
 
-    // Write the filters back, so the URL always states what the list is showing.
-    // `replaceUrl`, so filtering does not fill the back button with one entry per
-    // keystroke. The open row is a navigation of its own (see `openInvoice`).
     effect(() => {
       const queryParams: Record<string, string | null> = {
         seg: this.segment() === 'all' ? null : this.segment(),
@@ -459,8 +459,6 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
       );
     });
 
-    // The rows are tracked too: a reload can drop the open invoice from the list (for
-    // example after "Als bezahlt markieren" in "Eingang"). It then loads by its id.
     effect(() => {
       const id = this.selectedId();
       const loading = this.loading();
@@ -479,11 +477,13 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
   /**
    * Adopt the filters, the segment and the open row of the URL. Returns whether a filter
    * of the list changed.
+   *
+   * A click on another row while a form is open replaces the form, so the highlighted row and the
+   * detail always agree.
    */
   private adoptUrl(qp: ParamMap): boolean {
     let changed = false;
     for (const f of this.filterSignals) {
-      // Absence clears: each of these is written back by the effect in the constructor.
       const next = this.sanitizeFilter(f, qp.get(f.key as string) ?? '');
       if (next !== f.signal()) {
         f.signal.set(next);
@@ -498,8 +498,6 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
     }
     const id = qp.get('id') ?? '';
     if (id !== this.selectedId()) {
-      // A click on another row while a form is open: the row replaces the form, so the
-      // highlighted row and the detail always agree.
       if (id) this.closeForms();
       this.selectedId.set(id);
       this.selectedMissing.set(false);
@@ -522,9 +520,8 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
     return formatMoney(amount, this.i18n.formatLocale());
   }
 
+  /** Only the date part counts, because a `createdAt` keeps the day the server wrote. */
   day(iso: string | null): string {
-    // Only the date part counts (a `createdAt` keeps the day the server wrote), as in the
-    // month groups.
     return dayMonth(iso?.slice(0, 10), this.i18n.formatLocale());
   }
 
@@ -676,8 +673,6 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
         this.importing.set(false);
         const code = (err as { error?: { code?: string } } | null)?.error?.code;
         if (code === 'invoice_not_zugferd') {
-          // The PDF embeds no ZUGFeRD data. The user enters the invoice manually.
-          // The dropped PDF still becomes the receipt.
           this.openCreate();
           this.importNotice.set('manual');
           this.attachFile(file);
@@ -704,8 +699,6 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
     this.importFileSize.set(size);
     this.importFileMime = p.fileMime;
     this.importNotice.set('parsed');
-    // The server sets the flag when an invoice with the same number exists. The form
-    // shows it as a warning above the fields (N31).
     this.importDuplicate.set(p.duplicate ? (p.number ?? '') : null);
     this.createOpen.set(true);
   }
@@ -849,7 +842,6 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
           this.editing.set(null);
           this.replaceRow(updated);
           this.toast.success(this.i18n.translate('invoices.toast.saved'));
-          // The status or the amount can move the invoice to another segment.
           if (updated.status !== i.status) this.reload();
         },
         error: (err) => {
@@ -868,7 +860,6 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
         this.markingPaid.set(null);
         this.replaceRow(updated);
         this.toast.success(this.i18n.translate('invoices.toast.paid'));
-        // The invoice leaves "Eingang" and "Verbucht"; the counts change.
         this.reload();
       },
       error: (err) => {
@@ -921,10 +912,11 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
     });
   }
 
+  /**
+   * The API streams the PDF because MinIO is internal. `downloadBlob` opens an object URL in a new
+   * tab, which popup blockers do not stop after an async call.
+   */
   openFile(i: Invoice): void {
-    // The API streams the PDF because MinIO is internal. `downloadBlob` turns the
-    // blob into an object URL and opens it in a new tab. This works for an async
-    // call. Popup blockers do not stop it.
     this.api.invoiceFileBlob(i.id).subscribe({
       next: (blob) => downloadBlob(blob, i.fileName || 'beleg.pdf'),
       error: () => this.toast.error(this.i18n.translate('invoices.toast.failed')),
@@ -961,7 +953,6 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
 
   /** The swipe to the right of a phone: "Als bezahlt markieren" of the row menu. */
   swipeRight(menu: readonly RowMenuSection[]): RowSwipeAction | null {
-    // A paid invoice leaves the segments that show open ones only.
     return swipeFrom(menu, 'paid', this.filterParams().status === 'open');
   }
 
@@ -984,7 +975,6 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
     this.api.updateInvoice(i.id, { status: 'paid' }).subscribe({
       next: (updated) => {
         this.replaceRow(updated);
-        // The invoice leaves "Eingang" and "Verbucht"; the counts change.
         this.reload();
         this.toast.showAction({
           message: this.i18n.translate('invoices.toast.paid'),

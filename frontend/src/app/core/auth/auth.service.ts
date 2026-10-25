@@ -181,6 +181,9 @@ export class AuthService {
    *
    * If the backend supplies an RP-initiated logout URL for the IdP SSO, the
    * browser follows it. Otherwise the browser goes to the home page.
+   *
+   * Cached responses are scoped to whoever asked for them, so the next person at this browser must
+   * not inherit a list they were never allowed to see.
    */
   logout(): void {
     this.api
@@ -189,8 +192,6 @@ export class AuthService {
       .subscribe((res) => {
         this._principal.set(null);
         this.principal$ = undefined;
-        // Cached responses are scoped to whoever asked for them. The next person at this
-        // browser must not inherit a list they were never allowed to see.
         this.cache.clear();
         this.location.assign(res.logout_url ?? '/');
       });

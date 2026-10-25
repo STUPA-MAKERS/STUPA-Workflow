@@ -239,9 +239,8 @@ export class BookingDetailComponent {
     return signedEur(e.kind, e.amount, this.i18n.formatLocale());
   }
 
+  /** Only the date part counts, because a `createdAt` keeps the day the server wrote. */
   day(iso: string | null): string {
-    // Only the date part counts (a `createdAt` keeps the day the server wrote), as in the
-    // month groups.
     return dayMonth(iso?.slice(0, 10), this.i18n.formatLocale());
   }
 

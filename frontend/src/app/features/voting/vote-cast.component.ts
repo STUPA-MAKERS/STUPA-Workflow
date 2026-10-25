@@ -61,7 +61,7 @@ const NOT_CAST: MyBallot = { cast: false, choice: null };
  *   the delete. A 403 on the load or on an own cast marks the person as not eligible.
  *   A 403 on a represented cast removes the row "Als Vertretung für <name>". After a
  *   refused cast the page reads the vote and the delegation state again.
- * - A ballot never changes after the cast (O11). `myBallot` and `representedCast` of
+ * - A ballot never changes after the cast. `myBallot` and `representedCast` of
  *   the server restore the lock on a reload; a 409 `already_voted` locks it too. After a
  *   cast the pane stays on the vote and tells the list, so the row reads "Abgestimmt".
  * - The delegation state explains a voting right that the person handed over, or it
@@ -275,7 +275,6 @@ export class VoteCastComponent implements OnDestroy {
   constructor() {
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((pm) => this.open(pm.get('id')));
     this.followLive();
-    // Tell the list which vote is shown, so that it can follow its meeting.
     effect(() => {
       const vote = this.loaded();
       const shown = vote
@@ -328,25 +327,25 @@ export class VoteCastComponent implements OnDestroy {
   }
 
   /** The ballot says "Danke! Deine Stimme: Ja" itself, so no toast repeats it. */
-  /** The lot of an election was drawn, or its runoff opened (F2): read the vote again. */
+  /** The lot of an election was drawn, or its runoff opened: read the vote again. */
   onElectionChanged(): void {
     this.reload();
   }
 
   onCastDone(): void {
-    // A ballot can close a task; the count in the navigation follows.
     this.railStatus.refresh();
     const id = this.loaded()?.id;
     if (id) this.page?.notify({ id, kind: 'cast' });
     this.reload();
   }
 
+  /**
+   * A refused row hides, so that the person cannot send the same ballot into the same 403, and the
+   * state loads again, because the voting right can have moved after the page loaded.
+   */
   onCastFailed(failure: BallotFailure): void {
     const { error } = failure;
     if (error.status === 403) {
-      // The server refused this row. Hide it, so that the person cannot send the same
-      // ballot into the same 403, and read the state again: the voting right can have
-      // moved after the page loaded.
       if (failure.asDelegation) this.proxyRefused.set(true);
       else this.notEligible.set(true);
       this.toast.error(this.i18n.translate('voting.cast.notEligible'));
@@ -373,6 +372,8 @@ export class VoteCastComponent implements OnDestroy {
    * A 409 is a real state, not a generic failure: the vote opened, it already holds
    * ballots, or it belongs to a meeting. Name the reason and reload, so the page shows
    * the state the server has.
+   *
+   * The vote is gone, so this route answers 404 from now on.
    */
   doDelete(): void {
     const vote = this.loaded();
@@ -383,8 +384,6 @@ export class VoteCastComponent implements OnDestroy {
         this.deleting.set(false);
         this.confirmDelete.set(false);
         this.toast.success(this.i18n.translate('voting.delete.done'));
-        // The vote is gone, so this route 404s from now on. The row leaves the list and
-        // the pane goes back to the list with its filters.
         this.page?.notify({ id: vote.id, kind: 'deleted' });
         void this.router.navigate(['/voting'], { queryParamsHandling: 'preserve' });
       },
@@ -421,8 +420,6 @@ export class VoteCastComponent implements OnDestroy {
       return;
     }
     this.loadDelegation(id, true);
-    // The list read the vote ahead: it shows at once, and a newer answer behind it
-    // replaces it, the voting right too.
     this.api.getVote(id, { detail: true }).subscribe({
       next: (vote) => {
         if (this.currentId !== id) return;
@@ -508,7 +505,6 @@ export class VoteCastComponent implements OnDestroy {
         const was = this.delegation();
         this.delegation.set(status);
         if (status.blocked) this.notEligible.set(true);
-        // A newer answer after the one read ahead can lift the block again.
         else if (was?.blocked && this.loaded()?.canCast === true) this.notEligible.set(false);
       },
       error: () => {},

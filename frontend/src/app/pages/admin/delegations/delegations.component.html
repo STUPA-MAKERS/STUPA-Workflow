@@ -62,7 +62,6 @@
       <ng-container *ngTemplateOutlet="rows; context: { $implicit: active() }" />
 
       @if (past().length) {
-        <!-- A native button: the disclosure needs aria-expanded on the button itself. -->
         <button
           type="button"
           class="dl__more"

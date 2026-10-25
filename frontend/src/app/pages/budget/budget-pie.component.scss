@@ -3,8 +3,6 @@
 :host {
   display: block;
   min-width: 0;
-  /* The legend moves below the ring when the chart itself is narrow, whatever the
-     viewport: the pie sits in a column of the sheet. */
   container-type: inline-size;
 }
 
@@ -62,12 +60,12 @@
   pointer-events: none;
 }
 .pie__cap {
-  font-size: 0.78125rem; // 12.5px
+  font-size: 0.78125rem;
   line-height: 1.125rem;
   color: var(--color-text-muted);
 }
 .pie__total {
-  font-size: 1.0625rem; // 17px
+  font-size: 1.0625rem;
   line-height: 1.5rem;
   font-weight: var(--fw-medium);
   color: var(--color-text);

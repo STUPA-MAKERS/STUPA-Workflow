@@ -78,7 +78,7 @@ const ERROR_TEXTS: Record<string, TranslationKey> = {
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
- * "Antrag erfassen" (#11): capture an application on behalf of an applicant.
+ * "Antrag erfassen": capture an application on behalf of an applicant.
  *
  * The form has the pattern of "Buchung hinzufügen" (`booking-form`): a fixed head with
  * the title and the close button, a body of sections that scrolls with a fade, and a
@@ -314,7 +314,6 @@ export class ApplicationCaptureComponent {
         this.emailMatch.set(match);
         this.mode.set('account');
       },
-      // A failed lookup leaves the new person; the server matches again.
       error: () => undefined,
     });
   }, APPLICANT_SEARCH_DELAY_MS);

@@ -127,7 +127,7 @@ export class MeetingsComponent {
   readonly savingAttendance = this.session.savingAttendance;
   readonly finalizing = this.session.finalizing;
   readonly earlyOpenAsk = this.session.earlyOpenAsk;
-  /** O23: the member whose "present" the server refused (409 `delegation_active`). */
+  /** The member whose "present" the server refused (409 `delegation_active`). */
   readonly attendanceConflict = this.session.attendanceConflict;
   readonly casting = this.session.casting;
   readonly deletingVote = this.session.deletingVote;
@@ -181,7 +181,6 @@ export class MeetingsComponent {
         this.timeline.loadList();
       }
     });
-    // A link to an agenda item (`?item=`) opens that item, not the first one.
     this.route.queryParamMap
       .pipe(takeUntilDestroyed())
       .subscribe((qp) => this.agendaSvc.requestTop(qp.get('item')));
@@ -214,7 +213,7 @@ export class MeetingsComponent {
     this.dialogs.setProtokollant(m, principalId);
   }
 
-  /** A member was picked in the dock: the handover dialog asks when (Z3). */
+  /** A member was picked in the dock: the handover dialog asks when. */
   askHandover(principalId: Uuid): void {
     const member = this.attendance().find((a) => a.principalId === principalId);
     if (member) this.dialogs.askHandover(member);
@@ -227,7 +226,7 @@ export class MeetingsComponent {
   }
 
   /**
-   * Hand the minutes of a live meeting over (Z3). The open text of the item is saved
+   * Hand the minutes of a live meeting over. The open text of the item is saved
    * first, because the write right can move with the handover. The handover request
    * starts only after the response of that save.
    */
@@ -273,7 +272,7 @@ export class MeetingsComponent {
     if (this.routeId) this.session.loadMeeting(this.routeId);
   }
 
-  /** The lot of an election was drawn, or its runoff opened (F2). */
+  /** The lot of an election was drawn, or its runoff opened. */
   reloadMeeting(): void {
     this.session.reloadMeeting();
   }
@@ -322,7 +321,7 @@ export class MeetingsComponent {
     this.session.resetAttendance(member);
   }
 
-  /** O23: the delegation in the way was revoked; the row of the member is no conflict. */
+  /** The delegation in the way was revoked; the row of the member is no conflict. */
   clearAttendanceConflict(principalId: Uuid): void {
     this.session.clearAttendanceConflict(principalId);
   }
@@ -374,7 +373,6 @@ export class MeetingsComponent {
     const m = this.meeting();
     if (!m || !this.canEditProtocol()) return;
     this.agendaSvc.onTopBodyChange(m.id, itemId, body);
-    // The viewers see the text before the autosave (protokollant of a live meeting only).
     this.session.sendBodyDraft(itemId, body);
   }
 

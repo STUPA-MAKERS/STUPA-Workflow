@@ -34,7 +34,6 @@
             }
           </section>
 
-          <!-- The texts after the submission, one per applicant kind. Empty = built-in text. -->
           <section class="br__sec" aria-labelledby="br-submitted">
             <h2 class="section-title br__secTitle" id="br-submitted">{{ 'admin.brand.submitted.group' | t }}</h2>
             @for (kind of submittedKinds; track kind) {
@@ -109,7 +108,6 @@
     } @else {
       <div class="br__cols">
         <div class="br__col">
-          <!-- The app name comes from the config. An empty value falls back to the i18n default. -->
           <section class="br__sec" aria-labelledby="br-name">
             <h2 class="section-title br__secTitle" id="br-name">{{ 'admin.brand.appName.group' | t }}</h2>
             <div class="br__nameRow">
@@ -130,7 +128,6 @@
             </div>
           </section>
 
-          <!-- The accent colour of the whole app. The page shows a change at once. -->
           <section class="br__sec" aria-labelledby="br-accent">
             <h2 class="section-title br__secTitle" id="br-accent">{{ 'admin.brand.accent.group' | t }}</h2>
             <div class="br__accent">
@@ -159,7 +156,6 @@
             </div>
           </section>
 
-          <!-- Gravatar images of the avatars, through the API proxy. Off = initials only. -->
           <section class="br__sec" aria-labelledby="br-avatars">
             <h2 class="section-title br__secTitle" id="br-avatars">{{ 'admin.brand.avatars.group' | t }}</h2>
             <app-switch
@@ -244,6 +240,3 @@
   }
 </section>
 
-<!-- The rows of a link list: the label in the edited language, the URL and "Entfernen". A
-     footer column and the legal links share them. A row of a column has the column in
-     `col`, a legal link has none. -->

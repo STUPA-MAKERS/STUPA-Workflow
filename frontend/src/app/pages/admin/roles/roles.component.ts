@@ -52,7 +52,7 @@ const FIXED_ROLES = new Set(['admin', 'member']);
  * name or the rights of a role differ from the server, the floating button is
  * "Speichern" instead of "Rolle anlegen"; it saves every changed role. The
  * admin role always holds every right and is read-only here; the rights of `member`
- * can change. A dialog creates a role; the key must match `ROLE_KEY_PATTERN` (A10), and
+ * can change. A dialog creates a role; the key must match `ROLE_KEY_PATTERN`, and
  * the server answers 422 for any other key. This page lists global roles only; the
  * gremien pages manage the roles of a gremium.
  */
@@ -311,7 +311,6 @@ export class AdminRolesComponent {
       },
       error: (err: { status?: number }) => {
         this.creating.set(false);
-        // A wrong or taken key is an answer about the field, so it shows there.
         if (err?.status === 422) {
           this.serverKeyError.set(this.i18n.translate('admin.common.roleKeyInvalid'));
         } else if (err?.status === 409) {

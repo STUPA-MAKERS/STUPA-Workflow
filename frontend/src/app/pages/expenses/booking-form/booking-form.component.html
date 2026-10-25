@@ -51,7 +51,6 @@
             />
           } @else {
             @if (parentAmount(); as sum) {
-              <!-- The parent amount is the sum of its sub-bookings and read-only on the server. -->
               <app-locked-field [label]="'expenses.sub.parentAmount' | t"
                 ><span class="mono">{{ sum }}</span></app-locked-field
               >
@@ -79,7 +78,6 @@
           <legend class="sec mf__secTitle">{{ 'expenses.form.assignment' | t }}</legend>
           @if (mode() === 'create') {
             @if (s.newApplicationId()) {
-              <!-- A linked application gives the cost centre and the fiscal year. -->
               <app-locked-field filled [label]="'expenses.field.costCentre' | t">{{
                 'expenses.form.fromApplication' | t
               }}</app-locked-field>

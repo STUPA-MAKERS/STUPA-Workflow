@@ -47,7 +47,7 @@ describe('GuestViewComponent', () => {
     expect(screen.getByText('Jetzt')).toBeInTheDocument();
     expect(screen.getByText('Personal')).toBeInTheDocument();
     expect(screen.getByText('Inhalt nur für Mitglieder')).toBeInTheDocument();
-    // D5: an application item says "Antrag"; a free-text item has no subtitle.
+    // An application item says "Antrag"; a free-text item has no subtitle.
     expect(screen.getByText('Antrag')).toBeInTheDocument();
     expect(screen.queryByText(/^TOP \d/)).toBeNull();
     expect(document.querySelector('.gv__item[aria-current="step"]')?.textContent).toContain('Antrag');

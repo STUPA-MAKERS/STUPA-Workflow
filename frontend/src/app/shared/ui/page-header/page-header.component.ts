@@ -136,9 +136,11 @@ export class PageHeaderComponent {
     subtitle: this.facts,
   });
 
+  /**
+   * A title that changes after the first render reaches the bar at once, not only on the next
+   * scroll.
+   */
   constructor() {
-    // A title that changes after the first render (the name of a gremium that loads)
-    // reaches the bar at once, not only on the next scroll.
     effect(() => {
       const title = this.title();
       if (this.docked()) this.nav?.title.set(title);

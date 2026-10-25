@@ -25,7 +25,6 @@
 </header>
 
 @if (!wide()) {
-  <!-- A phone opens the agenda as a bottom sheet, a narrow screen from the start edge. -->
   <app-side-sheet [side]="phone() ? 'bottom' : 'start'" [heading]="'meetings.agenda.title' | t" [(open)]="agendaOpen">
     @if (agendaOpen()) {
       <ng-container [ngTemplateOutlet]="agendaTpl" [ngTemplateOutletContext]="{ inSheet: true }" />
@@ -34,8 +33,6 @@
 }
 
 @if (phone()) {
-  <!-- Board Teilnahme-Telefon: the item, the vote, the protocol excerpt, then the own
-       attendance and the delegation. -->
   <div class="fv__phone">
     @if (top) {
       <div class="fv__phoneTop">
@@ -103,8 +100,6 @@
     <ng-container [ngTemplateOutlet]="delegationTpl" [ngTemplateOutletContext]="{ variant: 'box' }" />
   </div>
 } @else {
-  <!-- Board Schmal-Teilnahme: below the wide layout the vote card is a strip above the
-       text, outside the scroll area, so it stays in view. -->
   @if (!wide() && votes.vote()) {
     <app-participant-vote class="fv__strip" layout="strip" [position]="votePosition()" />
   }
@@ -155,7 +150,6 @@
         <app-participant-vote />
       }
       <ng-container [ngTemplateOutlet]="votesTpl" />
-      <!-- Below the wide layout the delegation of a running meeting sits in the dock. -->
       @if (wide() || m.status === 'planned') {
         <ng-container [ngTemplateOutlet]="delegationTpl" [ngTemplateOutletContext]="{ variant: 'box' }" />
       }
@@ -187,7 +181,6 @@
 
       <span class="fv__spacer"></span>
 
-      <!-- Below the wide layout the strip above the text shows the ballots. -->
       @if (wide() && ownBallot(); as own) {
         <span class="fv__dockItem" [attr.data-kind]="own.kind">
           <app-icon name="vote" [size]="18" />
@@ -244,7 +237,6 @@
   }
 </ng-template>
 
-<!-- The earlier results of the shown item, and the votes without an agenda item. -->
 <ng-template #votesTpl>
   @if (moreVotes().length) {
     <section class="fv__votes" [attr.aria-label]="'participant.votes.more' | t">
@@ -280,7 +272,6 @@
   <app-calendar-subscribe #abo />
 </ng-template>
 
-<!-- A running meeting before the lead calls an item, or a closed meeting without items. -->
 <ng-template #waitTpl>
   @if (m.status === 'live') {
     <span class="fv__cap cap">{{ 'participant.start.cap' | t }}</span>

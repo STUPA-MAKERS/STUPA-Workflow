@@ -10,6 +10,7 @@
   display: block;
 }
 
+/* Chrome, not content: a long press on an entry selects no label and opens no callout. */
 .bb {
   position: fixed;
   inset: auto 0 0 0;
@@ -19,14 +20,11 @@
   justify-content: space-around;
   box-sizing: border-box;
   height: calc(var(--bottom-bar-height, 64px) + env(safe-area-inset-bottom));
-  /* In landscape the entries also keep clear of the notch and the round corners. */
   padding: 0 max(4px, var(--app-right-safe-area, 0px)) env(safe-area-inset-bottom)
     max(4px, var(--app-left-safe-area, 0px));
   border-top: var(--border-width) solid var(--color-border);
   background: var(--color-surface-3);
-  /* The live dot gets a ring in the colour of the bar. */
   --nav-mark-ring: var(--color-surface-3);
-  /* Chrome, not content: a long press on an entry selects no label and opens no callout. */
   @include press.chrome-text;
 }
 

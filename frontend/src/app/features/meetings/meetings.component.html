@@ -1,6 +1,3 @@
-<!-- The list, the session page and the participant view carry their own header. Without
-     read access the list does not show, and a meeting that does not load has no page:
-     this header titles the notice. -->
 @if (showForbidden() || (detailMode() && !meeting())) {
 <app-page-header [title]="'meetings.title' | t" [rail]="true" [flush]="true" />
 }
@@ -8,9 +5,6 @@
 @if (showForbidden()) {
   <p class="mtg__status" role="alert">{{ 'rbac.forbidden' | t }}</p>
 } @else if (loading()) {
-  <!-- The shape of a meeting page, not a sentence: a bar, a body and a dock. A bare
-       line of text gives a reader nothing to anticipate and makes the layout jump when
-       the real content lands. -->
   <div class="mtg__loadShell" aria-busy="true">
     <span class="skel skel--line"></span>
     <span class="skel skel--panel"></span>
@@ -21,7 +15,6 @@
   <app-note class="mtg__loadError" kind="error" icon="alert" role="alert" retryable (retry)="retryMeeting()">{{ 'meetings.error' | t }}</app-note>
 } @else if (meeting(); as m) {
   @if (isFollower()) {
-    <!-- A member without write or manage right: the participant view. -->
     <app-meeting-follow-view
       [meeting]="m"
       [agenda]="agenda()"
@@ -31,7 +24,6 @@
       (attendanceChange)="setAttendance($event.member, $event.status, $event.note)"
     />
   } @else {
-  <!-- Minute-taker and meeting lead: agenda, sheet, votes and the dock. -->
   <app-meeting-page
     [meeting]="m"
     [protocol]="protocol()"
@@ -84,7 +76,6 @@
     (moveTop)="moveTop($event.from, $event.to)"
   />
 
-  <!-- Meeting votes without a TOP binding (legacy or active): the control card. -->
   @if (looseVotes().length) {
     <app-card [heading]="'meetings.control.title' | t">
       <ul class="mtg__votes">
@@ -162,7 +153,6 @@
     (added)="agendaAdded($event)"
   />
 
-  <!-- Z3: when the minutes of the live meeting change hands. -->
   @if (m.status === 'live') {
     <app-handover-dialog
       [meeting]="m"
@@ -176,7 +166,6 @@
     />
   }
 
-  <!-- Before confirmUntil the open is early and needs this extra question. -->
   <app-early-open-dialog
     [open]="earlyOpenAsk()"
     [meeting]="m"
@@ -184,21 +173,17 @@
     (confirmed)="startMeeting(true)"
   />
 
-  <!-- The close never finalizes the protocol (O13). -->
   <app-close-meeting-dialog
     [open]="dialogs.closeOpen()"
     [meeting]="m"
     (closed)="dialogs.closeOpen.set(false)"
     (meetingClosed)="dialogs.meetingClosed($event)"
   />
-  } <!-- /@if (isFollower()) -->
+  }
 } @else if (!detailMode()) {
-  <!-- The overview (list or calendar). Plain Gremium members also see their meetings,
-       filtered on the server. -->
   <app-meetings-overview />
 }
 
-<!-- Settings and delete open from a list row and from the meeting page. -->
 <app-meeting-settings-dialog
   [meeting]="dialogs.settingsMeeting()"
   [protocolFinal]="!!protocol()?.isFinal && protocol()?.meetingId === dialogs.settingsMeeting()?.id"

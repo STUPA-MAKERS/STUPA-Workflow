@@ -42,7 +42,7 @@ const NOT_SHOWN: ReadonlySet<FieldType> = new Set(['markdown', 'section', 'file'
 const MONO: ReadonlySet<FieldType> = new Set(['iban', 'currency', 'funding']);
 
 /**
- * The answers of an application, read-only (O19, the table "Darstellung der
+ * The answers of an application, read-only (the table "Darstellung der
  * Formularfelder" in the target model). The detail and the review step of the apply
  * wizard use it.
  *
@@ -58,7 +58,7 @@ const MONO: ReadonlySet<FieldType> = new Set(['iban', 'currency', 'funding']);
  * - The cost positions get their own block (`app-positions-view`).
  * - Not shown: display texts (`markdown`), files (block "Anhänge"), empty answers and
  *   fields that `visibleIf` hides. A PII field that the server left out of `data`
- *   (O21) is an empty answer, so it shows nothing.
+ *   is an empty answer, so it shows nothing.
  * - Keys without a field (an answer of an older form version) come last under
  *   "Weitere Angaben" as plain text.
  */
@@ -84,6 +84,7 @@ export class AnswerViewComponent {
   /** The surface of the rows; see `app-field-group`. */
   readonly surface = input<1 | 2 | 3>(2);
 
+  /** Answers without a field come from an older form version and show last, as plain text. */
   readonly blocks = computed<AnswerBlock[]>(() => {
     const lang = this.i18n.locale();
     const data = this.data();
@@ -117,7 +118,6 @@ export class AnswerViewComponent {
       }
     }
 
-    // Answers without a field: an older form version had them. Plain text, last.
     const other = new ChunkBuilder();
     for (const [key, value] of Object.entries(data)) {
       if (known.has(key) || skip.has(key) || isEmptyAnswer(value)) continue;
@@ -161,7 +161,6 @@ export class AnswerViewComponent {
     try {
       return evalJsonLogic(f.compute, ctx);
     } catch {
-      // A rule the engine cannot run gives no value, as in the form.
       return null;
     }
   }
