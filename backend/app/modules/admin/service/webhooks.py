@@ -17,10 +17,10 @@ from app.modules.admin.schemas import (
 )
 from app.modules.admin.service.service_base import ConfigServiceBase, _iso
 from app.modules.audit.actions import AuditAction
-from app.modules.webhooks.ssrf import SsrfError, assert_allowed_url
 from app.settings import get_settings
 from app.shared.config_schemas import EventName
 from app.shared.errors import BadRequestError, NotFoundError
+from app.shared.ssrf import SsrfError, assert_allowed_url
 
 
 def _webhook_out(row: Webhook) -> WebhookOut:
