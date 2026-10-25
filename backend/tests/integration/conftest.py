@@ -36,7 +36,13 @@ def _pg_urls() -> Iterator[tuple[str, str]]:
         pytest.skip("testcontainers nicht installiert")
 
     try:
-        container = PostgresContainer("postgres:16-alpine", driver="psycopg")
+        # The test database is thrown away after the run, so it needs no
+        # durability. Each test truncates the data tables twice, and with fsync on
+        # every TRUNCATE waits for the disk, which makes the suite about four times
+        # slower.
+        container = PostgresContainer("postgres:16-alpine", driver="psycopg").with_command(
+            "postgres -c fsync=off -c synchronous_commit=off -c full_page_writes=off"
+        )
         container.start()
     except Exception as exc:  # pragma: no cover - Umgebung ohne Docker
         pytest.skip(f"keine Docker-Runtime: {exc}")
@@ -61,6 +67,22 @@ def migrated(_pg_urls: tuple[str, str]) -> tuple[str, str]:
     sync_url, async_url = _pg_urls
     command.upgrade(_make_alembic_config(async_url), "head")
     return sync_url, async_url
+
+
+@pytest.fixture(autouse=True)
+def _no_mail_pool(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Skip the arq pool in the app lifespan.
+
+    The test stack has no Redis at the configured URL, so each app start waits for
+    the full open timeout (5 s) before the lifespan falls back to no pool, and every
+    test that opens a `TestClient` waits again. The stub gives the same result, no
+    pool, at once.
+    """
+
+    async def _none(_redis_url: str) -> None:
+        return None
+
+    monkeypatch.setattr("app.main.create_mail_pool", _none)
 
 
 @pytest.fixture
