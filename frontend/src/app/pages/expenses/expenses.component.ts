@@ -51,6 +51,7 @@ import {
   StatusTextComponent,
   StickyBarComponent,
   ToastService,
+  ScrollFadeDirective,
 } from '@stupa-makers/ui-kit';
 import {
   FabComponent,
@@ -132,6 +133,7 @@ const SORTS: readonly { field: ExpenseSortField; order: 'asc' | 'desc'; key: str
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ScrollFadeDirective,
     PullRefreshDirective,
     InfiniteScrollDirective,
     CostCentreLabelComponent,

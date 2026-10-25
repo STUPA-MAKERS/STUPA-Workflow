@@ -40,6 +40,7 @@ import {
   SkeletonComponent,
   StatusTextComponent,
   StickyBarComponent,
+  ScrollFadeDirective,
 } from '@stupa-makers/ui-kit';
 import { CalendarSubscribeComponent } from '../calendar-subscribe/calendar-subscribe.component';
 import {
@@ -82,6 +83,7 @@ import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.direc
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ScrollFadeDirective,
     PullRefreshDirective,
     MeetingsViewActionsComponent,
     RowChevronComponent,

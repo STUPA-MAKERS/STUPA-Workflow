@@ -1,4 +1,5 @@
 @use 'breakpoints' as bp;
+@use 'scroll-fade' as fade;
 
 :host {
   display: flex;
@@ -53,16 +54,13 @@
   min-height: 0;
   padding: 0 var(--space-1) var(--space-2);
 }
-/* The entries start directly under the search, as the rows of a list pane do
-   (`lp.split-scroll`): the body takes back the gap of the column and lies over the bar. */
+/* The entries are cut at a line under the search, as the rows of a list pane are
+   (`lp.split-scroll`): the line shows while entries lie past the end. */
 .af--split .af__navBody {
-  position: relative;
-  z-index: calc(var(--z-sticky) - 1);
-  margin-top: calc(-1 * var(--space-3));
-  padding-top: var(--space-3);
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
+  @include fade.edge-y;
 }
 /* One column: the title, the search, the tiles and the entries start on the content
    edge, the same as the gremien under them. The inset only keeps the focus rings clear

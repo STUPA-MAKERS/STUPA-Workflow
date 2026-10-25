@@ -45,6 +45,7 @@ import {
   SearchPillComponent,
   SkeletonComponent,
   StickyBarComponent,
+  ScrollFadeDirective,
 } from '@stupa-makers/ui-kit';
 import { PageFrameService } from '../../layout/page-frame.service';
 import { RailStatusService } from '../../layout/rail-status.service';
@@ -97,6 +98,7 @@ export interface TicketGroup {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ScrollFadeDirective,
     PullRefreshDirective,
     RowChevronComponent,
     NoteComponent,

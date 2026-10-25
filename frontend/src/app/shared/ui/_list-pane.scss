@@ -1,9 +1,11 @@
+@use 'scroll-fade' as fade;
+
 // The shared rules of a list pane page: the list of applications, bookings, invoices,
 // tasks, votes, tickets, meetings and gremien, with the detail beside it or alone.
 //
 // Each mixin is the body of one rule, so a page keeps its own selectors and their order,
 // and a page that differs in one rule keeps that rule as its own. A scroll area has no
-// fade: it ends at the edge of its box, and the box ends at an edge of the page.
+// fade: it is cut at a visible edge, a line, a bar or an edge of the page.
 //
 // Use:
 //   @use '../../shared/ui/list-pane' as lp;
@@ -46,20 +48,15 @@
   min-width: 0;
 }
 
-/// Side by side only the rows scroll, down to the bottom edge of the pane. The area
-/// starts directly under the filter chips: it takes back the gap of the column
-/// (`.ld-pane`, --space-3) and keeps the first row at its place with the same padding.
-/// It lies over the bar (`app-sticky-bar` reaches --space-2 below the chips), so the rows
-/// are cut at the lower edge of the chips.
+/// Side by side only the rows scroll, down to the bottom edge of the pane. The column
+/// has no line under the filter bar, so the area draws one at each end while rows lie
+/// past it (`appScrollFade="y"` on the box): the rows are cut at that line.
 @mixin split-scroll {
-  position: relative;
-  z-index: calc(var(--z-sticky) - 1);
   flex: 1 1 auto;
   min-height: 0;
-  margin-top: calc(-1 * var(--space-3));
-  padding-top: var(--space-3);
   overflow-y: auto;
   overscroll-behavior: contain;
+  @include fade.edge-y;
 }
 
 /// The heading of a group of rows, such as "Oktober 2026".

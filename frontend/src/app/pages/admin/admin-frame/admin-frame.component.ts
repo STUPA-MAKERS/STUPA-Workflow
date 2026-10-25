@@ -36,6 +36,7 @@ import {
   SearchPillComponent,
   StickyBarComponent,
   SwipeBackDirective,
+  ScrollFadeDirective,
 } from '@stupa-makers/ui-kit';
 import { PageFrameService } from '../../../layout/page-frame.service';
 import { AdminHealthComponent } from '../admin-health/admin-health.component';
@@ -140,6 +141,7 @@ const sheetScroll = new Map<number, number>();
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [ListDetailNav],
   imports: [
+    ScrollFadeDirective,
     EmptyStateComponent,
     ListDetailBarComponent,
     PageHeaderComponent,

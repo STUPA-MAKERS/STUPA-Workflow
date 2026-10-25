@@ -51,6 +51,7 @@
 
       <div
         class="grl__scroll"
+        appScrollFade="y"
         appPullRefresh
         [pullRefreshBusy]="store.loading() || store.refreshing()"
         (appPullRefresh)="store.refresh()"

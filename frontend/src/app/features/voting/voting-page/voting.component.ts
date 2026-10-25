@@ -38,6 +38,7 @@ import {
   SkeletonComponent,
   StatusTextComponent,
   StickyBarComponent,
+  ScrollFadeDirective,
 } from '@stupa-makers/ui-kit';
 // By path, not through the `@shared/ui` barrel, so this lazy chunk takes only the blocks
 // it uses.
@@ -136,6 +137,7 @@ export interface VoteGroup {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ScrollFadeDirective,
     FabComponent,
     NewPollDialogComponent,
     PullRefreshDirective,

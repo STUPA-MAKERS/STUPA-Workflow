@@ -32,6 +32,7 @@ import {
   type StatusKind,
   StatusTextComponent,
   StickyBarComponent,
+  ScrollFadeDirective,
 } from '@stupa-makers/ui-kit';
 // By path, not through the `@shared/ui` barrel, so this lazy chunk takes only the blocks
 // it uses.
@@ -115,6 +116,7 @@ interface TaskRow {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ScrollFadeDirective,
     PullRefreshDirective,
     NoteComponent,
     PageHeaderComponent,

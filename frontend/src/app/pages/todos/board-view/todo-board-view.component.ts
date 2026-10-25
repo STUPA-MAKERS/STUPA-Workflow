@@ -33,6 +33,7 @@ import {
   type RowMenuSection,
   type TabItem,
   TabsComponent,
+  ScrollFadeDirective,
 } from '@stupa-makers/ui-kit';
 import { TodoCardTileComponent } from '../../../features/todos/card-tile/todo-card-tile.component';
 import type { TileMenuRequest } from '../../../features/todos/move-sheet/todo-move-sheet.component';
@@ -91,6 +92,7 @@ export interface BoardMove {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ScrollFadeDirective,
     CdkDrag,
     CdkDropList,
     CdkDropListGroup,

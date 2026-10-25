@@ -94,6 +94,7 @@
       <div
         #scroller
         class="inv__scroll"
+        appScrollFade="y"
         appPullRefresh
         [pullRefreshBusy]="loading() || reloading()"
         (appPullRefresh)="reload()"

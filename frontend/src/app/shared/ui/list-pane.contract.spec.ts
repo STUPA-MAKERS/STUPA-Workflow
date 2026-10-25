@@ -3,7 +3,7 @@
  *
  * The lists of applications, bookings, invoices, tasks, votes, tickets, meetings and
  * gremien each had a copy of the column, the chips, the scroll area, the groups and the
- * row menu. A scroll area is cut at its edges, never faded. jsdom applies no styles, so
+ * row menu. A scroll area is cut at a line, never faded. jsdom applies no styles, so
  * this spec reads the sources.
  */
 import { readFileSync } from 'node:fs';
@@ -44,9 +44,17 @@ describe('the list pane pages', () => {
     }
   });
 
+  it('cuts the rows at a line while rows lie past an end', () => {
+    expect(read('shared/ui/_list-pane.scss')).toMatch(/@mixin split-scroll \{[^}]*@include fade\.edge-y;/);
+    for (const [scss, block] of PAGES) {
+      const html = read(scss.replace(/\.scss$/, '.html'));
+      expect(html).toMatch(new RegExp(`class="${block}__scroll"\\s+appScrollFade="y"`));
+    }
+  });
+
   it('cuts the phone chips at the screen edges, not at the gutter', () => {
     const pane = read('shared/ui/_list-pane.scss');
-    expect(pane).not.toContain('scroll-fade');
+    expect(pane).not.toMatch(/fade\.fade-/);
     expect(pane).toMatch(/@mixin phone-chips \{[^}]*margin-inline: calc\(-1 \* var\(--space-4\)\);/);
   });
 });

@@ -36,6 +36,7 @@ import {
   SearchPillComponent,
   SkeletonComponent,
   StickyBarComponent,
+  ScrollFadeDirective,
 } from '@stupa-makers/ui-kit';
 import { PageFrameService } from '../../../layout/page-frame.service';
 import { CalendarSubscribeComponent } from '../../meetings/calendar-subscribe/calendar-subscribe.component';
@@ -83,6 +84,7 @@ export interface GremiumRow {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ScrollFadeDirective,
     PullRefreshDirective,
     RowChevronComponent,
     NoteComponent,

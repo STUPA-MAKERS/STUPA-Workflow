@@ -57,6 +57,7 @@ import {
   StatusTextComponent,
   StickyBarComponent,
   ToastService,
+  ScrollFadeDirective,
 } from '@stupa-makers/ui-kit';
 import {
   FabComponent,
@@ -156,6 +157,7 @@ type FilterSheet = 'more' | null;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ScrollFadeDirective,
     PullRefreshDirective,
     InfiniteScrollDirective,
     AmountComponent,

@@ -47,6 +47,7 @@ import {
   StatusTextComponent,
   StickyBarComponent,
   ToastService,
+  ScrollFadeDirective,
 } from '@stupa-makers/ui-kit';
 import {
   FabComponent,
@@ -121,6 +122,7 @@ const SEGMENT_QUERY: Record<InvoiceSegment, Pick<InvoiceQuery, 'status' | 'booke
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ScrollFadeDirective,
     PullRefreshDirective,
     InfiniteScrollDirective,
     DetailNoneComponent,

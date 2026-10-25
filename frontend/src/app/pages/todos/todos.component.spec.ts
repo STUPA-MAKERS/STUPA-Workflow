@@ -1720,6 +1720,6 @@ describe('TodosComponent', () => {
     expect(cmp.lead()).toBeNull();
     expect(harness.routeNativeElement!.querySelector('app-todo-board-view')).not.toBeNull();
     expect(harness.routeNativeElement!.querySelector('app-todo-move-sheet')).toBeNull();
-    expect(harness.routeNativeElement!.querySelector('.bv__scroll')).not.toHaveAttribute('appScrollFade');
+    expect(harness.routeNativeElement!.querySelector('.bv__scroll')).toHaveAttribute('appScrollFade', 'y');
   });
 });
