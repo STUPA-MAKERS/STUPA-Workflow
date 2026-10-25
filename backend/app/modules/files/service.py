@@ -108,6 +108,11 @@ class FilesService:
         queue: ScanQueue | None = None,
         settings: Settings | None = None,
     ) -> None:
+        """Bind the service to a session and the optional infrastructure.
+
+        Without ``storage`` an upload gives 503. Without ``queue`` a file stays quarantined.
+        Without ``settings`` the service reads ``get_settings()``.
+        """
         self.session = session
         self.storage = storage
         self.queue = queue
@@ -115,12 +120,16 @@ class FilesService:
 
     @property
     def max_bytes(self) -> int:
+        """Return the upload size cap: the setting, bounded by ``MAX_ATTACHMENT_BYTES``."""
         return min(self.settings.attachment_max_bytes, MAX_ATTACHMENT_BYTES)
 
     def validate(self, filename: str | None, data: bytes) -> tuple[str, str]:
         """Check the size, the content and the storage of an upload.
 
         The application upload and the draft upload share this check.
+
+        The extension check reads the cleaned name, so the stored name always ends in an
+        extension that matches the sniffed type.
 
         Returns:
             The sniffed MIME type and the display name (``sanitize_display_name``: the
@@ -139,8 +148,6 @@ class FilesService:
             )
         if not data:
             raise UnsupportedMediaTypeError("Empty file.")
-        # The extension check reads the cleaned name, so the stored name always ends in
-        # an extension that matches the sniffed type.
         display_name = sanitize_display_name(filename)
         try:
             mime = validate_upload(display_name, data)
@@ -177,6 +184,12 @@ class FilesService:
         The upload writes an ``attachment_upload`` audit entry in the same transaction.
         It holds the application, the field key, the MIME type and the size,
         never the file name, because a file name can hold PII.
+
+        There is no edit lock here, unlike on the PATCH path. A caller may add an attachment
+        even in a locked state such as submitted or approved, for example an invoice or a
+        receipt after the decision. The PATCH lock still protects the form data, and the RBAC
+        and applicant check in the router still guard access. The row gets a client-side id,
+        because the audit entry needs it before the commit.
         """
         if len(data) > self.max_bytes:
             raise PayloadTooLargeError(
@@ -189,11 +202,6 @@ class FilesService:
         if app is None:
             raise NotFoundError(f"application {application_id} not found")
 
-        # There is no edit lock here, unlike on the PATCH path. A caller may add an
-        # attachment even in a locked state such as submitted or approved, for example an
-        # invoice or a receipt after the decision. The PATCH lock still protects the form
-        # data. The RBAC and applicant check in the router still guards access.
-
         mime, display_name = self.validate(filename, data)
         storage_key = (
             f"{application_id}/{uuid.uuid4().hex}/{sanitize_storage_name(display_name)}"
@@ -201,7 +209,6 @@ class FilesService:
         await self.put_object(storage_key, data, mime)
 
         attachment = Attachment(
-            # A client-side id: the audit entry below needs it before the commit.
             id=uuid.uuid4(),
             application_id=application_id,
             field_key=field_key,
@@ -329,13 +336,14 @@ class FilesService:
         return self._ready(await self.get_attachment(attachment_id))
 
     def _ready(self, attachment: Attachment) -> Attachment:
-        """Apply the download gates to a loaded attachment (see ``_ready_attachment``)."""
+        """Apply the download gates to a loaded attachment (see ``_ready_attachment``).
+
+        The scan gate is FAIL CLOSED and must never be inverted or weakened. The method refuses
+        the download with 409 while ``scanned`` is false, so the API NEVER serves an unscanned
+        object.
+        """
         if _is_infected(attachment) or attachment.storage_key is None:
             raise GoneError("Attachment removed (failed virus scan).")
-        # FAIL CLOSED. Do NOT invert this condition. The method refuses the download
-        # with 409 while ``scanned`` is false and the ClamAV scan is not finished. The
-        # API NEVER serves an unscanned object. A weaker or inverted condition would let
-        # a caller download unscanned content.
         if not attachment.scanned:
             raise ConflictError("Attachment is still being scanned.")
         if self.storage is None:
@@ -604,8 +612,11 @@ class FilesService:
     async def _open_stream(
         self, attachment: Attachment
     ) -> tuple[AsyncIterator[bytes], str, str, int]:
-        # _ready guarantees both values, else it raises 410 or 503. The two asserts
-        # only help the type checker.
+        """Open the storage stream of a ready attachment.
+
+        ``_ready`` guarantees the storage key and the storage, else it raises 410 or 503. The
+        two asserts only help the type checker.
+        """
         assert attachment.storage_key is not None
         assert self.storage is not None
         try:
@@ -728,6 +739,9 @@ class FilesService:
         an anonymization removed during the scan is no error: the method skips it and
         returns False.
 
+        When the infected object is already gone, the quarantine still stands, because
+        ``storage_key`` is NULL.
+
         Returns:
             True when the result was stored, False when the row is gone.
         """
@@ -756,8 +770,6 @@ class FilesService:
             try:
                 await self.storage.remove(storage_key)
             except StorageError:
-                # The object may already be gone. The quarantine still stands, because
-                # storage_key is NULL now.
                 logger.warning("could not remove infected object for %s", attachment_id)
         return True
 

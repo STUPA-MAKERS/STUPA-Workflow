@@ -22,7 +22,7 @@ from app.shared.paging import Page
 
 router = APIRouter(tags=["application-types"])
 
-# A principal with this permission sees the inactive types and the admin-only fields.
+#: A principal with this permission sees the inactive types and the admin-only fields.
 _ADMIN_PERMISSION = "form.configure"
 
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
@@ -34,6 +34,7 @@ def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
 
 
 def get_application_types_service(session: DbSession) -> ApplicationTypesService:
+    """Build the application-types service of a request."""
     return ApplicationTypesService(session)
 
 

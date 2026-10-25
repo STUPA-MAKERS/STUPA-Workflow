@@ -148,7 +148,6 @@ async def test_running_application_keeps_pinned_version(session: AsyncSession) -
     session.add(application)
     await session.commit()
 
-    # Create a new active version. The pin must keep the application on the old one.
     v2 = await svc.create_form_version(
         app_type.id, FormVersionCreate(fields=_fields(), activate=True), "tester")
     pinned = await session.get(Application, application.id)
@@ -164,6 +163,7 @@ async def test_create_version_unknown_type_404(session: AsyncSession) -> None:
 
 
 async def test_effective_form_main_only(session: AsyncSession) -> None:
+    """Build the main section; the camelCase round trip keeps the promoted flags."""
     app_type = await _make_type(session)
     svc = FormsService(session)
     await svc.create_form_version(app_type.id, FormVersionCreate(fields=_fields()), "tester")
@@ -171,7 +171,6 @@ async def test_effective_form_main_only(session: AsyncSession) -> None:
     eff = await svc.get_effective_form(app_type.id)
     assert [s.key for s in eff.sections] == ["main"]
     assert {f.key for f in eff.sections[0].fields} == {"title", "amount"}
-    # the camelCase round trip keeps the flags of a promoted field
     amount = next(f for f in eff.sections[0].fields if f.key == "amount")
     assert amount.is_promoted is True and amount.promote_target == "amount"
 

@@ -96,9 +96,6 @@ def _upload(client: TestClient, data: bytes, name: str = "bild.png") -> object:
     return client.post("/api/media/images", files={"file": (name, data, "image/png")})
 
 
-# -- POST /api/media/images -------------------------------------------------
-
-
 @pytest.mark.parametrize(
     ("data", "mime"),
     [
@@ -215,23 +212,21 @@ def test_upload_without_storage_is_503(app: FastAPI, client: TestClient) -> None
 
 
 def test_default_wiring_reads_the_settings_and_the_app_storage() -> None:
+    """Answer 503 with the default wiring when the app state has no object storage."""
     application = create_app()
     application.dependency_overrides[get_session] = _no_session
     application.dependency_overrides[get_current_principal] = lambda: Principal(
         sub="p", permissions=set()
     )
-    # No object storage on the app state: the default wiring answers 503.
     r = TestClient(application).post(
         "/api/media/images", files={"file": ("x.png", encode("PNG"), "image/png")}
     )
     assert r.status_code == 503
 
 
-# -- GET /api/media/images/{id} ---------------------------------------------
-
-
 def _assert_image_headers(headers: object, cache: str) -> None:
-    h = headers  # httpx.Headers
+    """Assert the inline, nosniff and sandbox headers of an image answer."""
+    h = headers
     assert h["content-type"] == "image/png"  # pyright: ignore[reportIndexIssue]
     assert h["content-disposition"] == "inline"  # pyright: ignore[reportIndexIssue]
     assert h["x-content-type-options"] == "nosniff"  # pyright: ignore[reportIndexIssue]
@@ -278,9 +273,6 @@ def test_get_unknown_is_404(app: FastAPI, client: TestClient) -> None:
 def test_get_bad_id_is_422(app: FastAPI, client: TestClient) -> None:
     _as_principal(app)
     assert client.get("/api/media/images/not-a-uuid").status_code == 422
-
-
-# -- GET /api/public/protocols/{id}/images/{image_id} ------------------------
 
 
 def test_public_image_of_a_visible_protocol(

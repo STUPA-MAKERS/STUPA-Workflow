@@ -206,6 +206,7 @@ async def test_a_comment_file_is_no_application_attachment(
     settings: Settings,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Count only the bound attachments in the guard, not the comment file."""
     storage = _MemoryStorage()
     app_id = await _app(maker)
     async with maker() as session:
@@ -229,7 +230,6 @@ async def test_a_comment_file_is_no_application_attachment(
         assert row.id not in {a.id for a in await files.list_for_application(app_id)}
         app = await session.get(Application, app_id)
         assert app is not None
-        # The guard counts the bound attachments only, not the comment file.
         bound = bool(await files.list_for_application(app_id))
         assert (await build_base_context(session, app, manual=True)).has_attachment is bound
     api = build_api(migrated[1], settings, monkeypatch)

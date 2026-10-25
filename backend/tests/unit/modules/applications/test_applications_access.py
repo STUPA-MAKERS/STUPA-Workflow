@@ -40,7 +40,7 @@ class _FakeDb:
     """Minimal session stub.
 
     `scalar` returns the configured `created_by`. `execute` returns an empty result for
-    the Gremium membership fallback (#vote-read).
+    the Gremium membership fallback.
     """
 
     def __init__(self, created_by: str | None = None) -> None:
@@ -76,13 +76,15 @@ def test_read_principal_without_permission_403() -> None:
 
 
 def test_read_creator_without_permission_ok() -> None:
-    """A logged-in creator can read their own application without a permission."""
+    """A logged-in creator can read their own application without a permission.
+
+    The creator reads as the applicant: no internal comments.
+    """
     app_id = uuid4()
     access = asyncio.run(
         require_app_read(app_id, _db(created_by="p"), _principal(sub="p"), None)
     )
     assert access.principal is not None and access.actor == "p"
-    # The creator reads as the applicant: no internal comments.
     assert access.via == "owner"
     assert access.can_see_internal is False
     assert access.is_applicant_view is True
@@ -150,8 +152,8 @@ def test_edit_applicant_edit_scope_ok() -> None:
     assert access.applicant is not None
 
 
-# The applicant-transition access: only the applicant and the creator.
 def test_applicant_access_magic_link_edit_ok() -> None:
+    """Admit the magic-link applicant to the applicant transitions."""
     app_id = uuid4()
     applicant = Applicant(application_id=str(app_id), scope="edit")
     access = asyncio.run(require_app_applicant(app_id, _db(), None, applicant))

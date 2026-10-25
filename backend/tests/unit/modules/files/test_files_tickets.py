@@ -151,13 +151,13 @@ async def test_message_url_and_stream_after_a_clean_scan() -> None:
 async def test_message_download_gates(
     kw: dict[str, Any], storage: object | None, error: type[Exception]
 ) -> None:
+    """Apply the gates; the URL route opens no storage connection, so no read failure shows."""
     att = _att(**kw)
     session = ScriptedSession()
     session.put(att)
     with pytest.raises(error):
         await _svc(session, storage).message_download_stream(att.id)
     if not isinstance(storage, FailingStorage):
-        # The URL route opens no storage connection, so a failing read cannot show.
         with pytest.raises(error):
             await _svc(session, storage).message_url(att.id)
 
@@ -172,6 +172,11 @@ async def test_list_for_ticket() -> None:
 async def test_delete_for_ticket_removes_rows_objects_and_audits(
     audits: list[dict[str, Any]],
 ) -> None:
+    """Delete the rows, the objects and audit the delete.
+
+    The files of the notes of the ticket go in the same query. A storage outage keeps the
+    delete of the rows, and without storage no object goes.
+    """
     keep, gone = _att(storage_key="k1"), _att(storage_key=None)
     storage = FakeStorage()
     session = ScriptedSession(scalars=[[keep, gone]])
@@ -179,9 +184,7 @@ async def test_delete_for_ticket_removes_rows_objects_and_audits(
     assert session.deleted == [keep, gone]
     assert storage.removed == ["k1"]
     assert [a["data"] for a in audits] == [{"ticket_id": str(TICKET)}] * 2
-    # The files of the notes of the ticket go in the same query.
     assert "ticket_note_id IN" in str(session.statements[0])
-    # A storage outage keeps the delete of the rows; without storage no object goes.
     session = ScriptedSession(scalars=[[_att()]])
     assert await _svc(session, FailingStorage()).delete_for_ticket(TICKET, actor="sys") == 1
     session = ScriptedSession(scalars=[[_att()]])

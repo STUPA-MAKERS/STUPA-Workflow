@@ -192,6 +192,7 @@ async def test_plain_download_keeps_deny(
     settings: Settings,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Keep the default headers on a plain download and on any other API route."""
     storage = _MemoryStorage()
     app_id = await _confirmed_app(maker)
     att_id = await _attachment(
@@ -205,7 +206,6 @@ async def test_plain_download_keeps_deny(
         "attachment; filename=\"beleg.pdf\"; filename*=UTF-8''beleg.pdf"
     )
     _assert_deny(resp.headers)
-    # Any other API route keeps the default set too.
     assert other.status_code == 200, other.text
     _assert_deny(other.headers)
 

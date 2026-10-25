@@ -29,8 +29,8 @@ from app.shared.errors import ForbiddenError
 
 class _FakeService:
     def __init__(self) -> None:
+        """Record the `allow_unconfirmed` value of each call; every route passes False."""
         self.fired: dict[str, object] | None = None
-        # The `allow_unconfirmed` value of each call. Every route passes False.
         self.allow_unconfirmed: list[bool] = []
 
     async def available_transitions(
@@ -181,7 +181,8 @@ def test_list_transitions_requires_auth_401(client: TestClient) -> None:
 
 
 def test_list_transitions_missing_perm_403(app: FastAPI, client: TestClient) -> None:
-    _as_principal(app, "application.read")  # not .manage
+    """Answer 403 for a principal with read but not the transition permission."""
+    _as_principal(app, "application.read")
     r = client.get(f"/api/applications/{uuid4()}/transitions")
     assert r.status_code == 403
     assert r.headers["content-type"] == "application/problem+json"
@@ -190,11 +191,11 @@ def test_list_transitions_missing_perm_403(app: FastAPI, client: TestClient) -> 
 def test_list_transitions_ok(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
+    """List the transitions and hide an unconfirmed guest application."""
     _as_principal(app, "application.transition")
     r = client.get(f"/api/applications/{uuid4()}/transitions")
     assert r.status_code == 200
     assert len(r.json()) == 1
-    # The route hides an unconfirmed guest application.
     assert fake_service.allow_unconfirmed == [False]
 
 
@@ -294,10 +295,10 @@ def test_fire_rejects_bad_body_422(app: FastAPI, client: TestClient) -> None:
     assert r.status_code == 422
 
 
-# Applicant transitions: access through a magic link.
 def test_list_applicant_transitions_ok(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
+    """List the applicant transitions through a magic link."""
     app_id = uuid4()
     app.dependency_overrides[require_app_applicant] = lambda: SimpleNamespace(
         application_id=app_id

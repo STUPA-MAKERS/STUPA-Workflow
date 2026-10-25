@@ -42,11 +42,11 @@ from app.shared.errors import NotFoundError
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
-# Promoted target that the service synchronizes into the numeric `application.amount`.
+#: Promoted target that the service synchronizes into the numeric `application.amount`.
 _AMOUNT_TARGET = "amount"
 
 
-def _field_from_row(row: Any) -> FormFieldDef:  # form_field row
+def _field_from_row(row: Any) -> FormFieldDef:
     """Convert a `form_field` row to a `FormFieldDef`.
 
     The mapping uses camelCase input keys, as `forms.service` does.
@@ -78,15 +78,18 @@ def _title_of(data: dict[str, Any] | None) -> str | None:
 
 
 def _state_out(state: State | None, color_override: str | None = None) -> StateOut | None:
+    """Serialize a state.
+
+    An existing application can point at an old state row with color NULL after a re-save of
+    the global flow. So ``color_override`` from the active global flow (same state key)
+    wins, with the stored row as fallback.
+    """
     if state is None:
         return None
     return StateOut(
         id=state.id,
         key=state.key,
         label=state.label_i18n,
-        # After a re-save of the global flow, an existing application points at an old
-        # state row with color=NULL. The color therefore comes from the active global
-        # flow through the same state key, with the stored row as fallback.
         color=color_override if color_override is not None else state.color,
         editAllowed=state.edit_allowed,
         kind=state.kind,
@@ -110,15 +113,15 @@ def state_since_subquery() -> Subquery:
     )
 
 
-# Actor value of a magic-link applicant in `status_event`, `submission_version` and
-# the audit log.
+#: Actor value of a magic-link applicant in `status_event`, `submission_version` and
+#: the audit log.
 APPLICANT_ACTOR = "applicant"
 
-# Actor value of an automatic action. The plain value is ``system``; a source adds a
-# suffix, for example ``system:deadlines``.
+#: Actor value of an automatic action. The plain value is ``system``; a source adds a
+#: suffix, for example ``system:deadlines``.
 SYSTEM_ACTOR = "system"
 _SYSTEM_PREFIX = SYSTEM_ACTOR + ":"
-# The key of the plain ``system`` actor in `ActorOut.key`.
+#: The key of the plain ``system`` actor in `ActorOut.key`.
 SYSTEM_AUTO_KEY = "auto"
 
 
@@ -216,14 +219,21 @@ class ApplicationsServiceBase:
     """Shared base for the DB-backed application operations, bound to one session."""
 
     def __init__(self, session: AsyncSession) -> None:
+        """Bind the service to a database session."""
         self.session = session
 
     async def _get_app(
         self, application_id: UUID, *, allow_unconfirmed: bool = True, lock: bool = False
     ) -> Application:
-        # ``lock`` reads the row FOR NO KEY UPDATE, the lock that serializes a comment
-        # with files against the anonymization. The mode does not block the foreign
-        # key checks of rows that point at the application.
+        """Load an application or raise 404.
+
+        ``lock`` reads the row FOR NO KEY UPDATE, the lock that serializes a comment with files
+        against the anonymization. The mode does not block the foreign key checks of rows that
+        point at the application. An unconfirmed guest submission stays invisible until the
+        magic link confirms it. The principal and Gremium item routes pass
+        ``allow_unconfirmed=False`` and get 404 instead of 403, which prevents an existence
+        oracle. The owning applicant reads with the default.
+        """
         app = (
             await self.session.get(
                 Application,
@@ -236,10 +246,6 @@ class ApplicationsServiceBase:
         )
         if app is None:
             raise NotFoundError(f"application {application_id} not found")
-        # An unconfirmed guest submission stays invisible until the magic link confirms
-        # it. The principal and Gremium item routes pass allow_unconfirmed=False and get
-        # 404 instead of 403, which prevents an existence oracle. The owning applicant
-        # reads through the magic link with the default.
         if not allow_unconfirmed and app.email_confirmed_at is None:
             raise NotFoundError(f"application {application_id} not found")
         return app

@@ -35,7 +35,7 @@ def test_jpeg_loses_exif_and_gps() -> None:
 
 
 def test_exif_orientation_is_applied() -> None:
-    # Orientation 6 rotates by 90 degrees: 60x30 becomes 30x60.
+    """Apply orientation 6, a 90 degree turn: 60x30 becomes 30x60."""
     out = clean_image(jpeg_with_gps(size=(60, 30), orientation=6))
     assert (out.width, out.height) == (30, 60)
 

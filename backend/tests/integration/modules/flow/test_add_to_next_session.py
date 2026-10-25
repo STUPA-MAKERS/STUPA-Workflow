@@ -58,12 +58,15 @@ async def _items(session: AsyncSession, application_id: object) -> list[MeetingA
 async def test_next_planned_meeting_gets_the_item(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
+    """Give the item to the next planned meeting of the Gremium.
+
+    A live and a closed meeting of today, a planned one of yesterday and one of another
+    Gremium may not get it.
+    """
     today = _today().date()
     async with maker() as session:
         flow = await seed_agenda_flow(session)
         app = await make_application(session, flow)
-        # A live and a closed meeting of today, a planned one of yesterday and one of
-        # another Gremium: none of them may get the item.
         await make_meeting(session, flow.gremium, day=today, status="live")
         await make_meeting(session, flow.gremium, day=today, status="closed")
         await make_meeting(session, flow.gremium, day=today - timedelta(days=1))
@@ -99,6 +102,7 @@ async def test_planned_meeting_of_today_counts(
 async def test_no_planned_meeting_skips_the_item(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
+    """Skip the item without a planned meeting; the state change stays and the action logs."""
     today = _today().date()
     async with maker() as session:
         flow = await seed_agenda_flow(session)
@@ -111,6 +115,5 @@ async def test_no_planned_meeting_skips_the_item(
             app.id, flow.to_vote.id, admin()
         )
         items = await _items(session, app.id)
-    # The state change stays; the action only logs.
     assert result.new_state_id == flow.states["voting"].id
     assert items == []

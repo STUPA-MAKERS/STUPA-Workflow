@@ -92,7 +92,7 @@ class _FakeAuditSession:
         self.committed = True
 
     async def scalar(self, _stmt: object) -> None:
-        # `can_read_pii` asks for `created_by`: no creator in the fake.
+        """Return None: `can_read_pii` asks for `created_by`, and the fake has no creator."""
         return None
 
 
@@ -339,7 +339,8 @@ def app(fake_service: _FakeService, sent: list[tuple[str, UUID]]) -> FastAPI:
     async def _no_mail(settings, email, application_id, pool):
         sent.append((email, application_id))
 
-    async def _no_comment_mail(*args):  # background task without a DB
+    async def _no_comment_mail(*args):
+        """Replace the comment-mail background task, which needs a DB."""
         pass
 
     application.dependency_overrides[get_magic_link_sender] = lambda: _no_mail
@@ -379,12 +380,12 @@ def _create_body() -> dict:
 def test_create_application_201_and_enqueues_mail(
     client: TestClient, fake_service: _FakeService, sent: list[tuple[str, UUID]]
 ) -> None:
+    """Create and enqueue the magic-link mail to the applicant address in the background."""
     r = client.post("/api/applications", json=_create_body())
     assert r.status_code == 201
     body = r.json()
     assert UUID(body["applicationId"])
     assert fake_service.created is not None
-    # A background task enqueues the magic-link mail to the applicant address.
     assert sent and sent[0][0] == "a@example.org"
 
 
@@ -408,8 +409,12 @@ def _login(app: FastAPI, **kw: object) -> None:
 def test_create_application_logged_in_skips_altcha_and_derives_identity(
     app: FastAPI, client: TestClient, fake_service: _FakeService, sent: list[tuple[str, UUID]]
 ) -> None:
+    """Let a logged-in user omit applicantEmail and ALTCHA.
+
+    The route hands the flow action dispatcher to the create, which starts the flow, and the
+    account email confirms the submission at once.
+    """
     _login(app, sub="u-7", email="user@example.org", display_name="Userin")
-    # A logged-in user may omit applicantEmail and ALTCHA.
     body = {"typeId": str(uuid4()), "data": {"title": "Mein Antrag"}, "lang": "de"}
     r = client.post("/api/applications", json=body)
     assert r.status_code == 201
@@ -417,23 +422,23 @@ def test_create_application_logged_in_skips_altcha_and_derives_identity(
     assert fake_service.created.applicant_name == "Userin"  # type: ignore[union-attr]
     assert fake_service.created_actor == "u-7"
     assert sent and sent[0][0] == "user@example.org"
-    # The route hands the flow action dispatcher to the create, which starts the flow.
     assert fake_service.created_dispatcher is not None
-    # The account email confirms the submission at once.
     assert fake_service.created_email_confirmed is True
 
 
 def test_create_application_logged_in_explicit_email_on_behalf(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
+    """Let an explicit email win over the account and leave it unconfirmed.
+
+    The account does not prove the other address.
+    """
     _login(app, sub="verwalter", email="staff@example.org", display_name="Staff")
     body = _create_body() | {"applicantEmail": "applicant@example.org"}
     r = client.post("/api/applications", json=body)
     assert r.status_code == 201
-    # The explicit value wins over the account derivation (creation for another person).
     assert fake_service.created.applicant_email == "applicant@example.org"  # type: ignore[union-attr]
     assert fake_service.created_actor == "verwalter"
-    # The account does not prove the other address, so it stays unconfirmed.
     assert fake_service.created_email_confirmed is False
 
 
@@ -458,11 +463,12 @@ def test_create_application_anonymous_is_unconfirmed(
 def test_create_application_oversize_payload_413(
     client: TestClient, fake_service: _FakeService
 ) -> None:
+    """Answer 413 and never pass the payload on to the service."""
     body = _create_body() | {"data": {"blob": "x" * 200_000}}
     r = client.post("/api/applications", json=body)
     assert r.status_code == 413
     assert r.headers["content-type"] == "application/problem+json"
-    assert fake_service.created is None  # never passed on to the service
+    assert fake_service.created is None
 
 
 def test_get_application_principal_sees_pii(
@@ -479,12 +485,12 @@ def test_get_application_principal_sees_pii(
 def test_get_application_applicant_no_pii(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
+    """Let the applicant read the own isPII fields."""
     app_id = uuid4()
     _as_applicant(app, app_id, "view")
     r = client.get(f"/api/applications/{app_id}")
     assert r.status_code == 200
     assert fake_service.last_include_pii is False
-    # The applicant reads the own isPII fields.
     assert fake_service.last_strip_pii_fields is False
 
 
@@ -514,7 +520,7 @@ def test_patch_application_applicant_view_forbidden(app: FastAPI, client: TestCl
 
 
 def test_read_all_reads_any_application(app: FastAPI, client: TestClient) -> None:
-    """#app-read-all: `application.read_all` reads any application without owner or manage."""
+    """Let `application.read_all` read any application without owner or manage."""
     _as_principal(app, "application.read_all")
     r = client.get(f"/api/applications/{uuid4()}")
     assert r.status_code == 200
@@ -523,7 +529,7 @@ def test_read_all_reads_any_application(app: FastAPI, client: TestClient) -> Non
 def test_edit_any_bypasses_state_lock(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
-    """#app-edit-any: `application.edit_any` may write and lifts the state lock."""
+    """Let `application.edit_any` write and lift the state lock."""
     _as_principal(app, "application.edit_any")
     r = client.patch(f"/api/applications/{uuid4()}", json={"data": {"title": "X"}})
     assert r.status_code == 200
@@ -546,7 +552,7 @@ def test_delete_application_admin(
 def test_delete_application_permission_holder(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
-    """#g9: a NON-admin role that holds ``application.delete`` may delete.
+    """A NON-admin role that holds ``application.delete`` may delete.
 
     The route gates on the permission and not on the literal ``admin`` role string,
     so the capability is delegable to any role.
@@ -562,9 +568,10 @@ def test_delete_application_permission_holder(
 
 
 def test_archive_needs_its_own_permission(app: FastAPI, client: TestClient) -> None:
-    """`application.manage` covers editing. Archiving decides what everyone else sees by
-    default, so it needs its own key — and it is not `application.delete` either, because
-    it destroys nothing and is reversible.
+    """`application.manage` covers editing.
+
+    Archiving decides what everyone else sees by default, so it needs its own key — and it
+    is not `application.delete` either, because it destroys nothing and is reversible.
     """
     _as_principal(app, "application.manage")
     r = client.post(f"/api/applications/{uuid4()}/archive")
@@ -589,8 +596,11 @@ def test_archive_and_unarchive_reach_the_service(
 
 
 def test_an_applicant_cannot_archive(app: FastAPI, client: TestClient) -> None:
-    # The applicant token authenticates for one application; archiving is a decision
-    # about the committee's working list and never theirs to make.
+    """Refuse the archive to an applicant.
+
+    The applicant token authenticates for one application, and archiving is a decision about
+    the working list of the committee.
+    """
     app_id = uuid4()
     _as_applicant(app, app_id, "edit")
     assert client.post(f"/api/applications/{app_id}/archive").status_code == 401
@@ -607,8 +617,11 @@ def test_the_list_hides_archived_applications_by_default(
 def test_the_list_can_ask_for_only_archived_or_for_both(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
-    # A tri-state, because "only the archived ones" and "both" are different questions
-    # and a boolean can answer only one of them.
+    """Accept a tri-state archive filter.
+
+    "Only the archived ones" and "both" are different questions, and a boolean answers only
+    one of them.
+    """
     _as_principal(app, "application.read")
     client.get("/api/applications", params={"archived": "true"})
     assert fake_service.list_kwargs["archived"] is True
@@ -618,7 +631,7 @@ def test_the_list_can_ask_for_only_archived_or_for_both(
 
 
 def test_delete_application_manager_forbidden(app: FastAPI, client: TestClient) -> None:
-    """#g9: a principal without ``application.delete`` must NOT delete.
+    """A principal without ``application.delete`` must NOT delete.
 
     ``application.manage`` covers the editing only. The delete needs the own key.
     """
@@ -630,19 +643,20 @@ def test_delete_application_manager_forbidden(app: FastAPI, client: TestClient) 
 
 
 def test_delete_application_applicant_unauthorized(app: FastAPI, client: TestClient) -> None:
+    """Answer 401 without a principal."""
     app_id = uuid4()
     _as_applicant(app, app_id, "edit")
     r = client.delete(f"/api/applications/{app_id}")
-    assert r.status_code == 401  # no principal, so require_principal answers 401
+    assert r.status_code == 401
 
 
 def test_timeline_ap(app: FastAPI, client: TestClient, fake_service: _FakeService) -> None:
+    """Serve the timeline to the applicant in the applicant view."""
     app_id = uuid4()
     _as_applicant(app, app_id, "view")
     r = client.get(f"/api/applications/{app_id}/timeline")
     assert r.status_code == 200
     assert len(r.json()) == 1
-    # The applicant reads the timeline in the applicant view.
     assert fake_service.timeline_applicant_view is True
     assert fake_service.timeline_magic_link_view is True
 
@@ -661,7 +675,7 @@ def test_versions_principal_full(
 def test_versions_applicant_gets_metadata_view(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
-    # The applicant reads the version metadata of the own application.
+    """Serve the version metadata of the own application to the applicant."""
     app_id = uuid4()
     _as_applicant(app, app_id, "edit")
     r = client.get(f"/api/applications/{app_id}/versions")
@@ -680,6 +694,10 @@ def test_versions_foreign_applicant_forbidden(app: FastAPI, client: TestClient) 
 def test_list_applications_filters_passed(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
+    """Pass the filters through.
+
+    With application.read there is no owner filter, and the search covers the PII values.
+    """
     _as_principal(app, "application.read")
     state, gremium = uuid4(), uuid4()
     r = client.get(f"/api/applications?state={state}&gremium={gremium}&q=foo&limit=10")
@@ -690,29 +708,31 @@ def test_list_applications_filters_passed(
     assert fake_service.list_kwargs["gremium_id"] == gremium
     assert fake_service.list_kwargs["q"] == "foo"
     assert fake_service.list_kwargs["limit"] == 10
-    # With application.read there is no owner filter. All applications stay visible.
     assert fake_service.list_kwargs["owner_sub"] is None
-    # The reader with the PII right searches the isPII values too.
     assert fake_service.list_kwargs["hide_pii_in_search"] is False
 
 
 def test_list_applications_without_read_scopes_to_own(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
-    # Without application.read and without admin the list shows only own applications.
-    _as_principal(app)  # authenticated but without any permission
+    """Scope the list to the own applications without application.read and without admin.
+
+    The search skips the isPII values of the committee-scope applications.
+    """
+    _as_principal(app)
     r = client.get("/api/applications")
     assert r.status_code == 200
-    assert fake_service.list_kwargs["owner_sub"] == "admin"  # principal.sub of the fake
-    # No search over the isPII values of the committee-scope applications.
+    assert fake_service.list_kwargs["owner_sub"] == "admin"
     assert fake_service.list_kwargs["hide_pii_in_search"] is True
 
 
 def test_list_applications_mine_forces_owner_filter(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
-    # "My applications" on the dashboard: mine=true forces the owner filter EVEN for a
-    # principal with application.read. Without it a permitted user sees other applications.
+    """Force the owner filter with mine=true, EVEN with application.read.
+
+    Without it a permitted user sees other applications on the dashboard.
+    """
     _as_principal(app, "application.read")
     r = client.get("/api/applications?mine=true")
     assert r.status_code == 200
@@ -767,6 +787,7 @@ def test_applications_export_requires_permission(app: FastAPI, client: TestClien
 def test_applications_export_xlsx(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
+    """Export and audit in one transaction."""
     _as_principal(app, "application.export")
     gremium = uuid4()
     r = client.get(f"/api/applications/export.xlsx?gremium={gremium}&q=foo")
@@ -777,7 +798,6 @@ def test_applications_export_xlsx(
     assert fake_service.list_kwargs["gremium_id"] == gremium
     assert fake_service.list_kwargs["q"] == "foo"
     assert fake_service.name_maps_called is True
-    # The router audits the export. It writes the entry and commits in one transaction.
     (entry,) = fake_service.session.entries
     assert entry.action == "export"
     assert entry.actor == "admin"
@@ -800,7 +820,11 @@ def test_applications_export_archived_filter(
 
 
 def test_applications_export_caps_rows(app: FastAPI, client: TestClient) -> None:
-    """A hit count above EXPORT_MAX_ROWS gives 413, not a huge workbook (anti-DoS, FIX 6)."""
+    """A hit count above EXPORT_MAX_ROWS gives 413, not a huge workbook (anti-DoS).
+
+    A `total` above the cap signals "too large". The router never reaches name_maps or the
+    workbook build.
+    """
     from app.modules.applications.router import EXPORT_MAX_ROWS
 
     class _BigService:
@@ -808,7 +832,7 @@ def test_applications_export_caps_rows(app: FastAPI, client: TestClient) -> None
             self.name_maps_called = False
 
         async def list_applications(self, **kwargs: object) -> Page[ApplicationListItem]:
-            # A `total` above the cap signals "too large".
+            """Return one item with a total above the cap."""
             item = ApplicationListItem(
                 id=uuid4(), typeId=uuid4(), state=_state(), createdAt=_NOW, updatedAt=_NOW
             )
@@ -828,12 +852,11 @@ def test_applications_export_caps_rows(app: FastAPI, client: TestClient) -> None
     _as_principal(app, "application.export")
     r = client.get("/api/applications/export.xlsx")
     assert r.status_code == 413
-    # The router never reaches name_maps or the workbook build.
     assert big.name_maps_called is False
 
 
 def test_applications_export_caps_rows_by_item_count(app: FastAPI, client: TestClient) -> None:
-    """Even when `total` does not count: more rows than the cap gives 413 (FIX 6)."""
+    """Even when `total` does not count: more rows than the cap gives 413."""
     from app.modules.applications.router import EXPORT_MAX_ROWS
 
     class _ManyItemsService:
@@ -955,7 +978,7 @@ def test_list_comments_principal_all(
 
 
 def test_comment_body_too_long_422(app: FastAPI, client: TestClient) -> None:
-    """Free-text cap (FIX 5): a body above 10 000 characters gives 422."""
+    """Free-text cap: a body above 10 000 characters gives 422."""
     _as_principal(app, "application.read")
     r = client.post(
         f"/api/applications/{uuid4()}/comments",
@@ -967,7 +990,7 @@ def test_comment_body_too_long_422(app: FastAPI, client: TestClient) -> None:
 def test_comment_body_at_cap_ok(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
-    """A body exactly at the cap of 10 000 characters stays valid (FIX 5)."""
+    """A body exactly at the cap of 10 000 characters stays valid."""
     _as_principal(app, "application.read")
     r = client.post(
         f"/api/applications/{uuid4()}/comments",
@@ -977,7 +1000,7 @@ def test_comment_body_at_cap_ok(
 
 
 def test_create_application_long_name_rejected_422(client: TestClient) -> None:
-    """Cap on `applicantName` (FIX 5): more than 256 characters gives 422."""
+    """Cap on `applicantName`: more than 256 characters gives 422."""
     body = _create_body() | {"applicantName": "n" * 257}
     r = client.post("/api/applications", json=body)
     assert r.status_code == 422
@@ -994,18 +1017,18 @@ def test_openapi_declares_error_responses(client: TestClient) -> None:
     assert {"400", "401", "403", "404", "422"} <= set(comments["responses"])
 
 
-# PATCH/DELETE on one comment: the author or a principal with application.manage.
-
 
 def test_patch_comment_passes_session_identity(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
-    """The author and the manage flag come from the session, never from the body."""
+    """The author and the manage flag come from the session, never from the body.
+
+    The body carries a foreign author on purpose. The server ignores it.
+    """
     _as_principal(app, "application.read")
     cid = uuid4()
     r = client.patch(
         f"/api/applications/{uuid4()}/comments/{cid}",
-        # The body carries a foreign author on purpose. The server ignores it.
         json={"body": "korrigiert", "author": "someone-else"},
     )
     assert r.status_code == 200

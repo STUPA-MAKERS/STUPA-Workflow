@@ -108,12 +108,11 @@ async def test_dispatch_ignores_other_action_types() -> None:
 
 
 async def test_dispatch_swallows_action_errors() -> None:
-    # session.get raises. The dispatcher logs the error and does not propagate it
-    #.
+    """Log the error of a failing action and do not raise."""
     session = _Session(raise_on_get=True)
     await FlowExtrasActionDispatcher(_maker(session)).dispatch(
         [_action("assignBudget", budgetId=str(uuid4()), application_id=uuid4())]
-    )  # must not raise
+    )
     assert session.committed == 0
 
 
@@ -158,6 +157,7 @@ async def test_add_to_next_session_adds_to_agenda(monkeypatch: pytest.MonkeyPatc
 async def test_add_to_next_session_agenda_conflict_is_logged(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Log a ConflictError of the agenda and do not raise."""
     class _FakeAgenda:
         def __init__(self, _session: Any) -> None: ...
 
@@ -168,7 +168,7 @@ async def test_add_to_next_session_agenda_conflict_is_logged(
     session = _Session(meeting=SimpleNamespace(id=uuid4()))
     await FlowExtrasActionDispatcher(_maker(session)).dispatch(
         [_action("addToNextSession", gremiumId=str(uuid4()))]
-    )  # dispatch catches ConflictError and does not raise
+    )
 
 
 async def test_add_to_next_session_agenda_not_found_is_logged(
@@ -202,7 +202,7 @@ async def test_assign_budget_invalid_budget_id_skipped() -> None:
 
 
 async def test_assign_budget_missing_app_or_node_skipped() -> None:
-    # The store is empty, so get returns None. The dispatcher skips and does not commit.
+    """Skip without a commit when the application or the node is missing."""
     session = _Session(store={})
     await FlowExtrasActionDispatcher(_maker(session)).dispatch(
         [_action("assignBudget", budgetId=str(uuid4()), application_id=uuid4())]
@@ -213,11 +213,12 @@ async def test_assign_budget_missing_app_or_node_skipped() -> None:
 async def test_assign_budget_sets_single_active_fiscal_year(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Set the single active fiscal year of the top-level node."""
     _stub_audit(monkeypatch)
     app_id, node_id, fy_id = uuid4(), uuid4(), uuid4()
     app = SimpleNamespace(id=app_id, budget_id=None, fiscal_year_id=None,
         current_state_id=None)
-    node = SimpleNamespace(id=node_id, parent_id=None)  # top-level node
+    node = SimpleNamespace(id=node_id, parent_id=None)
     session = _Session(store={app_id: app, node_id: node}, active_fy=(fy_id,))
     await FlowExtrasActionDispatcher(_maker(session)).dispatch(
         [_action("assignBudget", budgetId=str(node_id), application_id=app_id)]
@@ -230,6 +231,7 @@ async def test_assign_budget_sets_single_active_fiscal_year(
 async def test_assign_budget_ambiguous_fiscal_year_left_open(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Leave the fiscal year open when it is ambiguous."""
     _stub_audit(monkeypatch)
     app_id, node_id = uuid4(), uuid4()
     app = SimpleNamespace(id=app_id, budget_id=None, fiscal_year_id=None,
@@ -240,7 +242,7 @@ async def test_assign_budget_ambiguous_fiscal_year_left_open(
         [_action("assignBudget", budgetId=str(node_id), application_id=app_id)]
     )
     assert app.budget_id == node_id
-    assert app.fiscal_year_id is None  # ambiguous, so it stays open
+    assert app.fiscal_year_id is None
     assert session.committed == 1
 
 
@@ -273,12 +275,12 @@ async def test_assign_budget_writes_audit_entry(monkeypatch: pytest.MonkeyPatch)
 
 
 async def test_assign_budget_node_missing_no_commit(monkeypatch: pytest.MonkeyPatch) -> None:
-    # The application exists but the node is missing. _assign_node returns False.
+    """Skip without a commit when the node is missing."""
     _stub_audit(monkeypatch)
     app_id, node_id = uuid4(), uuid4()
     app = SimpleNamespace(id=app_id, budget_id=None, fiscal_year_id=None,
         current_state_id=None)
-    session = _Session(store={app_id: app})  # node not in the store
+    session = _Session(store={app_id: app})
     await FlowExtrasActionDispatcher(_maker(session)).dispatch(
         [_action("assignBudget", budgetId=str(node_id), application_id=app_id)]
     )
@@ -289,7 +291,10 @@ async def test_assign_budget_node_missing_no_commit(monkeypatch: pytest.MonkeyPa
 async def test_assign_budget_skips_application_in_closed_fiscal_year(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # A closed fiscal year is frozen: the manual route answers 409, the flow skips.
+    """Skip an application in a closed fiscal year, which is frozen.
+
+    The manual route answers 409 in this case.
+    """
     calls = _stub_audit(monkeypatch)
     app_id, node_id, fy_id, old_budget = uuid4(), uuid4(), uuid4(), uuid4()
     app = SimpleNamespace(id=app_id, budget_id=old_budget, fiscal_year_id=fy_id,
@@ -309,7 +314,7 @@ async def test_assign_budget_skips_application_in_closed_fiscal_year(
 async def test_assign_budget_moves_application_out_of_open_fiscal_year(
     monkeypatch: pytest.MonkeyPatch, stored: bool
 ) -> None:
-    # An open current year, or one that is gone, does not block the assignment.
+    """Assign when the current year is open or gone."""
     _stub_audit(monkeypatch)
     app_id, node_id, fy_id, new_fy = uuid4(), uuid4(), uuid4(), uuid4()
     app = SimpleNamespace(id=app_id, budget_id=uuid4(), fiscal_year_id=fy_id,
@@ -343,8 +348,7 @@ async def test_assign_from_field_app_missing_skipped() -> None:
 
 
 async def test_assign_from_field_value_absent_or_invalid_skipped() -> None:
-    # A missing field gives None. A data value that is not a dict gives None. A garbage
-    # value is not a UUID.
+    """Skip a missing field, non-dict data and a value that is no UUID."""
     app_id = uuid4()
     for data in ({}, "not-a-dict", {"ziel": "garbage"}):
         app = SimpleNamespace(id=app_id, budget_id=None, fiscal_year_id=None,
@@ -376,14 +380,14 @@ async def test_assign_from_field_assigns_from_data(monkeypatch: pytest.MonkeyPat
 
 
 async def test_assign_from_field_node_missing_no_commit(monkeypatch: pytest.MonkeyPatch) -> None:
-    # The field value is a valid UUID but the node is missing. _assign_node returns False.
+    """Skip without a commit when the node of a valid UUID is missing."""
     _stub_audit(monkeypatch)
     app_id, node_id = uuid4(), uuid4()
     app = SimpleNamespace(
         id=app_id, budget_id=None, fiscal_year_id=None,
         current_state_id=None, data={"ziel": str(node_id)}
     )
-    session = _Session(store={app_id: app})  # node not in the store
+    session = _Session(store={app_id: app})
     await FlowExtrasActionDispatcher(_maker(session)).dispatch(
         [_action("assignBudgetFromField", field="ziel", application_id=app_id)]
     )
@@ -392,8 +396,11 @@ async def test_assign_from_field_node_missing_no_commit(monkeypatch: pytest.Monk
 
 
 async def test_assign_from_field_inactive_node_skipped(monkeypatch: pytest.MonkeyPatch) -> None:
-    # The form offers only active cost centers. An applicant who stores the id of an
-    # inactive (closed) cost center through the API gets no assignment (fail closed).
+    """Skip an inactive cost center (fail closed).
+
+    The form offers only active cost centers, but an applicant can store the id of a closed
+    one through the API.
+    """
     calls = _stub_audit(monkeypatch)
     app_id, node_id = uuid4(), uuid4()
     app = SimpleNamespace(
@@ -412,7 +419,7 @@ async def test_assign_from_field_inactive_node_skipped(monkeypatch: pytest.Monke
 
 
 async def test_assign_from_field_keeps_existing_budget(monkeypatch: pytest.MonkeyPatch) -> None:
-    # Staff already set a different cost center. The applicant value does not overwrite it.
+    """Keep a cost center that staff already set."""
     calls = _stub_audit(monkeypatch)
     app_id, node_id, staff_id, fy_id = uuid4(), uuid4(), uuid4(), uuid4()
     app = SimpleNamespace(
@@ -439,17 +446,19 @@ async def test_top_level_walks_parent_chain() -> None:
 
 
 async def test_top_level_breaks_on_missing_parent() -> None:
-    node = SimpleNamespace(id=uuid4(), parent_id=uuid4())  # the parent is missing
+    """Stop the walk at a missing parent."""
+    node = SimpleNamespace(id=uuid4(), parent_id=uuid4())
     session = _Session(store={node.id: node})
     top = await FlowExtrasActionDispatcher._top_level(session, node)  # pyright: ignore[reportArgumentType]
     assert top is node
 
 
 async def test_top_level_stops_on_cycle() -> None:
+    """Stop the walk at a cycle a → b → a."""
     a = SimpleNamespace(id=uuid4())
     b = SimpleNamespace(id=uuid4())
     a.parent_id = b.id
     b.parent_id = a.id
     session = _Session(store={a.id: a, b.id: b})
     top = await FlowExtrasActionDispatcher._top_level(session, a)  # pyright: ignore[reportArgumentType]
-    assert top is b  # a → b → a is already seen, so the walk stops
+    assert top is b

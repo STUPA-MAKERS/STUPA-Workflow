@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger("app.flow.dispatch")
 
-# Action types for the worker. The engine handles every other type inline.
+#: Action types for the worker. The engine handles every other type inline.
 WORKER_ACTION_TYPES: frozenset[str] = frozenset(
     {
         "notify",
@@ -139,13 +139,16 @@ def build_implicit_notifications(
 class ActionDispatcher(Protocol):
     """Worker dispatch interface."""
 
-    async def dispatch(self, actions: Sequence[DispatchedAction]) -> None: ...
+    async def dispatch(self, actions: Sequence[DispatchedAction]) -> None:
+        """Dispatch the actions of a committed transition."""
+        ...
 
 
 class NullActionDispatcher:
     """Default dispatcher: it logs each action without params or secrets, then drops it."""
 
     async def dispatch(self, actions: Sequence[DispatchedAction]) -> None:
+        """Log each action and drop it."""
         for action in actions:
             logger.info(
                 "flow action dispatched (type=%s key=%s)",
@@ -165,6 +168,7 @@ class ChainActionDispatcher:
     dispatchers: Sequence[ActionDispatcher]
 
     async def dispatch(self, actions: Sequence[DispatchedAction]) -> None:
+        """Pass the actions to each dispatcher in order."""
         for dispatcher in self.dispatchers:
             await dispatcher.dispatch(actions)
 

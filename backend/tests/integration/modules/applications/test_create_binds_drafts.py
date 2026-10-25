@@ -103,7 +103,8 @@ async def _draft(
     return out.id, out.draftToken
 
 
-def _storage() -> Any:  # a duck-typed ObjectStorage
+def _storage() -> Any:
+    """Return a duck-typed ObjectStorage."""
     return _MemoryStorage()
 
 
@@ -139,6 +140,10 @@ async def _count_apps(maker: async_sessionmaker[AsyncSession]) -> int:
 async def test_create_binds_the_listed_drafts(
     maker: async_sessionmaker[AsyncSession], settings: Settings
 ) -> None:
+    """Bind the listed drafts and keep their storage keys.
+
+    A draft that the submit does not list stays a draft until the purge.
+    """
     seed = await _seed(maker)
     first, token = await _draft(maker, settings)
     second, _ = await _draft(maker, settings, token)
@@ -166,9 +171,7 @@ async def test_create_binds_the_listed_drafts(
             assert rows[aid].application_id == app_id
             assert rows[aid].draft_token_hash is None
             assert rows[aid].draft_expires_at is None
-            # The storage key stays the same after the bind.
             assert rows[aid].storage_key == keys[aid]
-        # A draft that the submit does not list stays a draft until the purge.
         assert rows[unlisted].application_id is None
         assert rows[unlisted].draft_token_hash is not None
         entry = await session.scalar(

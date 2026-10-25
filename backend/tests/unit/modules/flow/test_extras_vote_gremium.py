@@ -1,9 +1,9 @@
 """Flow variant B in the extras dispatcher.
 
-* `addToNextSession` without `gremiumId` takes the snapshot `vote_gremium_id` (R3).
+* `addToNextSession` without `gremiumId` takes the snapshot `vote_gremium_id`.
 * `assignBudgetFromApplicantGremium` assigns the single node that a Gremium of the
-  applicant decides on (R6): one, zero and many matches.
-* `assignBudgetFromMap` maps a form-field value to a cost center (R7).
+  applicant decides on: one, zero and many matches.
+* `assignBudgetFromMap` maps a form-field value to a cost center.
 * No cost-center action changes the cost center during a vote whose Gremium comes
   from the cost center.
 """
@@ -103,12 +103,11 @@ def gremien(monkeypatch: pytest.MonkeyPatch) -> list[str]:
     return box
 
 
-# --- R3 ------------------------------------------------------------------------------
-
 
 async def test_add_to_next_session_falls_back_to_the_snapshot(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Take the snapshot, then the next meeting of that Gremium."""
     calls: list[tuple[UUID, UUID]] = []
 
     class _Agenda:
@@ -120,7 +119,6 @@ async def test_add_to_next_session_falls_back_to_the_snapshot(
     monkeypatch.setattr(extras_mod, "AgendaService", _Agenda)
     meeting = SimpleNamespace(id=uuid4())
     app_id = uuid4()
-    # scalar: the snapshot, then the next meeting.
     session = _Session(scalars=[uuid4(), meeting])
     await FlowExtrasActionDispatcher(_maker(session)).dispatch(
         [_action("addToNextSession", app_id)]
@@ -129,22 +127,22 @@ async def test_add_to_next_session_falls_back_to_the_snapshot(
 
 
 async def test_add_to_next_session_without_snapshot_skips() -> None:
+    """Skip without a snapshot; no meeting lookup follows."""
     session = _Session(scalars=[None])
     await FlowExtrasActionDispatcher(_maker(session)).dispatch(
         [_action("addToNextSession", uuid4())]
     )
-    assert session._scalar == []  # no meeting lookup followed
+    assert session._scalar == []
 
 
 async def test_add_to_next_session_empty_gremium_id_skips() -> None:
+    """Skip for an empty gremiumId; the meeting is never looked up."""
     session = _Session(scalars=[SimpleNamespace(id=uuid4())])
     await FlowExtrasActionDispatcher(_maker(session)).dispatch(
         [_action("addToNextSession", uuid4(), gremiumId="")]
     )
-    assert len(session._scalar) == 1  # the meeting was never looked up
+    assert len(session._scalar) == 1
 
-
-# --- R6 ------------------------------------------------------------------------------
 
 
 async def test_applicant_gremium_one_match_assigns(
@@ -216,8 +214,6 @@ async def test_applicant_gremium_without_gremien_or_app(gremien: list[str]) -> N
     assert app.budget_id is None
 
 
-# --- R7 ------------------------------------------------------------------------------
-
 
 async def test_map_assigns_the_mapped_node(audit: list[dict[str, Any]]) -> None:
     node = SimpleNamespace(id=uuid4(), parent_id=None)
@@ -255,8 +251,6 @@ async def test_map_guards() -> None:
     assert app.budget_id is None
     assert session.committed == 0
 
-
-# --- the cost center is locked during a budget vote -----------------------------------
 
 
 async def test_assign_skipped_in_a_budget_vote_state(audit: list[dict[str, Any]]) -> None:

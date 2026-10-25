@@ -149,8 +149,11 @@ def test_route_caps_the_data(api: FastAPI, service: _FakeService) -> None:
 
 
 def test_route_caps_the_data_after_parsing(api: FastAPI, service: _FakeService) -> None:
-    # The early cap reads the UTF-8 body; the authoritative check measures the escaped
-    # JSON of `data`, where one "€" (3 bytes) takes 6 characters.
+    """Cap the data after parsing.
+
+    The early cap reads the UTF-8 body. The authoritative check measures the escaped JSON of
+    `data`, where one "€" (3 bytes) takes 6 characters.
+    """
     _as(api, _PERM)
     body = _guest(data={"blob": "€" * 15_000})
     resp = TestClient(api).post("/api/applications/on-behalf", json=body)
@@ -169,29 +172,28 @@ def test_search_route(api: FastAPI, service: _FakeService) -> None:
 @pytest.mark.parametrize(
     "body",
     [
-        # An account and a guest at once.
         {"applicantPrincipalId": str(uuid4()), "applicantEmail": "a@example.org"},
-        # No applicant.
         {},
-        # A guest without a name.
         {"applicantEmail": "a@example.org", "applicantName": " "},
-        # A guest without an e-mail.
         {"applicantName": "A"},
     ],
 )
 def test_schema_needs_exactly_one_applicant(body: dict[str, Any]) -> None:
+    """Need exactly one applicant.
+
+    The schema rejects an account and a guest at once, no applicant, and a guest without a
+    name or an e-mail.
+    """
     with pytest.raises(ValidationError):
         OnBehalfCreate.model_validate({"typeId": str(uuid4()), "data": {}, **body})
 
-
-# --- service -------------------------------------------------------------------------
 
 
 class _Row:
     def __init__(self, **kw: Any) -> None:
         self.__dict__.update(kw)
 
-    def __getattr__(self, name: str) -> Any:  # only for a missing attribute
+    def __getattr__(self, name: str) -> Any:
         raise AttributeError(name)
 
 
@@ -251,18 +253,20 @@ async def test_guest_capture_hands_off_to_the_normal_create() -> None:
 
 
 async def test_guest_email_of_an_account_takes_the_account() -> None:
+    """Give the application to the account of a guest e-mail.
+
+    `EmailStr` folds the domain. A matching row without an e-mail leaves the guest a guest.
+    """
     pid = uuid4()
     row = _Row(id=pid, sub="mia-sub", email="Mia@Example.org", display_name="Mia")
     svc = _Recorder(_Session(rows=[row]))  # type: ignore[arg-type]
     await svc.create_on_behalf(_payload(), actor="clerk", today=date(2026, 10, 5))
     payload, kwargs = svc.created
-    # `EmailStr` folds the domain, so the stored address ends in lower case.
     assert payload.applicant_email == "Mia@example.org"
     assert payload.applicant_name == "Mia"
     assert kwargs["capture"].owner_sub == "mia-sub"
     assert kwargs["capture"].applicant_principal_id == pid
     assert kwargs["capture"].matched_by_email is True
-    # A matching row without an e-mail (defensive) leaves the guest a guest.
     empty = _Row(id=pid, sub="x", email=None, display_name="X")
     svc = _Recorder(_Session(rows=[empty]))  # type: ignore[arg-type]
     await svc.create_on_behalf(_payload(), actor="clerk", today=date(2026, 10, 5))
@@ -316,13 +320,13 @@ async def test_future_received_date_answers_422() -> None:
 
 
 async def test_received_date_older_than_a_year_answers_422() -> None:
+    """Answer 422 for a date more than a year back; exactly one year is fine."""
     svc = _Recorder(_Session())  # type: ignore[arg-type]
     with pytest.raises(ValidationProblem) as exc:
         await svc.create_on_behalf(
             _payload(receivedOn="2025-10-04"), actor="clerk", today=date(2026, 10, 5)
         )
     assert exc.value.code == "received_on_too_old"
-    # Exactly one year back is still fine.
     await svc.create_on_behalf(
         _payload(receivedOn="2025-10-05"), actor="clerk", today=date(2026, 10, 5)
     )
@@ -357,8 +361,6 @@ async def test_applicant_search() -> None:
     assert len(session.statements) == 1
 
 
-# --- detail ----------------------------------------------------------------------------
-
 
 def test_application_out_carries_the_capture() -> None:
     out = ApplicationOut.model_validate(
@@ -381,8 +383,6 @@ def test_application_out_carries_the_capture() -> None:
     assert dumped["capture"]["receivedOn"] == "2026-10-01"
     assert dumped["capture"]["capturedBy"]["kind"] == "gremium"
 
-
-# --- mail ------------------------------------------------------------------------------
 
 
 def test_mail_template_is_in_the_catalogue() -> None:

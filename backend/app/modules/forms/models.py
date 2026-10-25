@@ -43,7 +43,7 @@ class FormVersion(UUIDPkMixin, CreatedAtMixin, Base):
     version: Mapped[int] = mapped_column(Integer)
     active: Mapped[bool] = mapped_column(Boolean, server_default="false")
     created_by: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
-    # Multilingual Markdown description of the form.
+    #: Multilingual Markdown description of the form.
     description_i18n: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
     __table_args__ = (

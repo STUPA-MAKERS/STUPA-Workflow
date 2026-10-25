@@ -72,7 +72,8 @@ async def test_scan_error_wrapped(fake_clamd: dict[str, Any]) -> None:
 
 
 async def test_scan_empty_result_raises(fake_clamd: dict[str, Any]) -> None:
-    fake_clamd["result"] = {}  # no "stream" key, so a protocol error
+    """Raise for a result without a "stream" key, a protocol error."""
+    fake_clamd["result"] = {}
     with pytest.raises(ScannerError):
         await ClamdScanner(host="clamav").scan(b"x")
 

@@ -39,7 +39,6 @@ from app.shared.config_schemas import FormFieldDef
 from app.shared.errors import NotFoundError, ValidationProblem
 
 
-# Fakes local to this file. tests/_support stays untouched.
 class _Result:
     """Minimal replacement for `Result` in `scalars` and `scalar`."""
 
@@ -181,14 +180,14 @@ def test_row_to_field_def_roundtrip_with_validation_and_options() -> None:
 
 
 def test_row_to_field_def_empty_validation_becomes_none() -> None:
-    # `row.validation or None`: an empty dict is falsy, so the result is None.
+    """Map an empty validation dict to None, because an empty dict is falsy."""
     row = _form_field_row("t", "text", validation={})
     fd = _row_to_field_def(row)
     assert fd.validation is None
 
 
 def test_field_def_to_row_kwargs_validation_none_branch() -> None:
-    # A FormFieldDef without validation gives kwargs.validation == {} (the None branch).
+    """Map a field without validation to an empty validation dict."""
     field = FormFieldDef.model_validate({"key": "t", "type": "text", "label": {"de": "T"}})
     kw = _field_def_to_row_kwargs(field, 3)
     assert kw["validation"] == {}
@@ -238,6 +237,7 @@ def test_get_effective_form_no_active_version_raises() -> None:
 
 
 def test_get_effective_form_active_version_main_only() -> None:
+    """Prepend the system title and resolve the default section label."""
     ver_id = uuid.uuid4()
     at = _app_type(active_form_version_id=ver_id)
     field_rows = [_form_field_row("desc", "textarea")]
@@ -249,13 +249,12 @@ def test_get_effective_form_active_version_main_only() -> None:
     assert out.form_version_id == ver_id
     assert out.has_budget is False
     assert [s.key for s in out.sections] == ["main"]
-    # The service prepends the system title and resolves the default label.
     assert out.sections[0].label == {"de": "Antrag", "en": "Application"}
     assert out.sections[0].fields[0].key == "title"
 
 
 def test_get_effective_form_pinned_version_overrides_active() -> None:
-    # A pinned form_version_id overrides active_form_version_id.
+    """Let a pinned form_version_id override active_form_version_id."""
     pinned = uuid.uuid4()
     at = _app_type(active_form_version_id=uuid.uuid4())
     svc = FormsService(
@@ -266,8 +265,11 @@ def test_get_effective_form_pinned_version_overrides_active() -> None:
 
 
 def test_get_effective_form_reports_has_budget_of_the_type() -> None:
-    # The client evaluates `visibleIf: has_budget` against this, so it must match what
-    # the server validates against: the type's own flag.
+    """Report the has_budget flag of the type.
+
+    The client evaluates `visibleIf: has_budget` against it, so it must match what the
+    server validates against: the own flag of the type.
+    """
     at = _app_type(has_budget=True, active_form_version_id=uuid.uuid4())
     svc = FormsService(
         _Session(results=[_Result([_form_field_row("a", "text")])], gets=[at])  # type: ignore[arg-type]
@@ -277,9 +279,10 @@ def test_get_effective_form_reports_has_budget_of_the_type() -> None:
 
 
 def test_get_effective_form_injects_dynamic_options() -> None:
-    # The server injects the options of gremium_select and budget_select. The fake
-    # DB has none, so the list stays empty. This covers _inject_dynamic_options,
-    # _gremium_field_options and _budget_field_options.
+    """Inject the options of gremium_select and budget_select.
+
+    The fake DB has none, so the lists stay empty.
+    """
     ver_id = uuid.uuid4()
     at = _app_type(active_form_version_id=ver_id)
     rows = [
@@ -296,7 +299,7 @@ def test_get_effective_form_injects_dynamic_options() -> None:
 
 
 def test_get_effective_form_section_marker_label_preserved() -> None:
-    # A section with its own marker label: s.label is not None, so it passes through.
+    """Pass the own label of a section marker through."""
     ver_id = uuid.uuid4()
     at = _app_type(active_form_version_id=ver_id)
     rows = [
@@ -326,9 +329,15 @@ def test_create_form_version_bad_definition_422() -> None:
 
 
 def test_create_form_version_activate_true() -> None:
+    """Create version max + 1 and activate it.
+
+    The get queue serves `_get_type` after the validation and again for the active set. The
+    service writes one UPDATE deactivation statement. The config_revision record adds three
+    statements: the advisory lock, and the lock and the prev_hash select of the audit
+    append.
+    """
     at = _app_type()
-    # gets: _get_type after the validation, then _get_type again for the active set.
-    sess = _Session(results=[2], gets=[at, at])  # _next_version → max=2
+    sess = _Session(results=[2], gets=[at, at])
     svc = FormsService(sess)  # type: ignore[arg-type]
     payload = FormVersionCreate(
         fields=[FormFieldDef(key="title", type="text", label={"de": "T"})],
@@ -336,13 +345,10 @@ def test_create_form_version_activate_true() -> None:
         description={"de": "Beschreibung"},
     )
     out = _run(svc.create_form_version(at.id, payload, "sub"))
-    assert out.version == 3  # max 2 + 1
+    assert out.version == 3
     assert out.active is True
     assert out.description == {"de": "Beschreibung"}
     assert [f.key for f in out.fields] == ["title"]
-    # With active=True the service writes one UPDATE deactivation statement. The
-    # config_revision record adds three execute statements: the advisory lock plus the
-    # lock and the prev_hash select of the audit append.
     assert len(sess.statements) == 4
     assert at.active_form_version_id is not None
     assert sess.committed == 1
@@ -351,8 +357,13 @@ def test_create_form_version_activate_true() -> None:
 
 
 def test_create_form_version_activate_false_first_version() -> None:
+    """Create version 1 without a deactivation.
+
+    The config_revision record writes three statements: advisory lock, audit lock and
+    prev_hash select.
+    """
     at = _app_type()
-    sess = _Session(results=[None], gets=[at])  # _next_version: no earlier version → 1
+    sess = _Session(results=[None], gets=[at])
     svc = FormsService(sess)  # type: ignore[arg-type]
     payload = FormVersionCreate(
         fields=[FormFieldDef(key="title", type="text", label={"de": "T"})],
@@ -362,18 +373,19 @@ def test_create_form_version_activate_false_first_version() -> None:
     assert out.version == 1
     assert out.active is False
     assert out.description is None
-    # With activate=False there is no deactivation. The config_revision record writes
-    # the three execute statements: advisory lock, audit lock and prev_hash select.
     assert len(sess.statements) == 3
     assert at.active_form_version_id is None
 
 
 def test_set_form_active_true_activates_latest() -> None:
+    """Activate the latest version with one UPDATE deactivation statement.
+
+    The get queue serves both `_get_type` calls. The result queue serves the latest version
+    of the activation, then the version and the fields of the draft.
+    """
     at = _app_type()
     latest = _form_version(version=4, active=False)
     draft_fields = _Result([_form_field_row("a", "text")])
-    # get queue: set_form_active._get_type, get_form_draft._get_type.
-    # results: scalar(latest) [activate], scalar(version) [draft], scalars(fields) [draft]
     sess = _Session(
         results=[latest, latest, draft_fields],
         gets=[at, at],
@@ -384,26 +396,25 @@ def test_set_form_active_true_activates_latest() -> None:
     assert at.active_form_version_id == latest.id
     assert out.application_type_id == at.id
     assert out.version == 4
-    # one UPDATE deactivation statement
     assert len(sess.statements) == 1
     assert sess.committed == 1
 
 
 def test_set_form_active_true_no_version_raises() -> None:
+    """Raise without a version; the commit runs only after a successful activation."""
     at = _app_type()
-    sess = _Session(results=[None], gets=[at])  # scalar(latest) → None
+    sess = _Session(results=[None], gets=[at])
     svc = FormsService(sess)  # type: ignore[arg-type]
     with pytest.raises(ValidationProblem, match="No form version to activate"):
         _run(svc.set_form_active(at.id, True))
-    # The commit runs only after a successful activation, so not here.
     assert sess.committed == 0
 
 
 def test_set_form_active_false_clears_active_version() -> None:
+    """Clear the active version and return the draft."""
     at = _app_type(active_form_version_id=uuid.uuid4())
     version = _form_version(version=2, active=False)
     draft_fields = _Result([])
-    # get queue: set._get_type, draft._get_type. results: scalar(version), scalars(fields)
     sess = _Session(results=[version, draft_fields], gets=[at, at])
     svc = FormsService(sess)  # type: ignore[arg-type]
     out = _run(svc.set_form_active(at.id, False))
@@ -413,8 +424,9 @@ def test_set_form_active_false_clears_active_version() -> None:
 
 
 def test_get_form_draft_no_version_returns_empty() -> None:
+    """Return an empty draft when no version exists."""
     at = _app_type()
-    sess = _Session(results=[None], gets=[at])  # scalar(version) → None
+    sess = _Session(results=[None], gets=[at])
     svc = FormsService(sess)  # type: ignore[arg-type]
     out = _run(svc.get_form_draft(at.id))
     assert out.application_type_id == at.id
@@ -463,22 +475,21 @@ def _fd(key: str, type_: str, **kw: Any) -> FormFieldDef:
 
 
 def test_split_sections_trailing_marker_no_empty_section() -> None:
-    # [a, section X]: after the loop cur_fields is empty and sections is not empty.
-    # The code does not append a final block (174->176, both sides of the condition).
+    """Append no empty section after a trailing marker."""
     out = _split_sections([_fd("a", "text"), _fd("x", "section", label={"de": "X"})])
     assert [s.key for s in out] == ["main"]
     assert [f.key for f in out[0].fields] == ["a"]
 
 
 def test_split_sections_empty_input_yields_one_main() -> None:
-    # Empty input: cur_fields and sections are empty, so `not sections` gives one main.
+    """Give one main section for an empty input."""
     out = _split_sections([])
     assert [s.key for s in out] == ["main"]
     assert out[0].fields == []
 
 
 def test_split_sections_marker_without_label() -> None:
-    # A marker with an empty (falsy) label leaves cur_label as None.
+    """Leave the label None for a marker with an empty label."""
     out = _split_sections(
         [_fd("a", "text"), _fd("step", "section", label={}), _fd("b", "text")]
     )
@@ -487,9 +498,10 @@ def test_split_sections_marker_without_label() -> None:
 
 
 def test_offer_value_none_and_bool_return_none() -> None:
+    """Return None for a missing value and for a bool."""
     assert _offer_value({"value": None}) is None
     assert _offer_value({"value": True}) is None
-    assert _offer_value({}) is None  # missing → None
+    assert _offer_value({}) is None
 
 
 def test_offer_value_unparseable_returns_none() -> None:
@@ -602,8 +614,7 @@ def test_positions_valid_no_errors() -> None:
 
 
 def test_positions_empty_offers_skips_preferred_check() -> None:
-    # An empty offers list skips the preferred check (`if offers and ...`). Only the
-    # min_offers violation remains.
+    """Skip the preferred check for empty offers; only the min_offers error remains."""
     errors: list[FieldError] = []
     value = [{"label": "P", "offers": []}]
     _validate_value(_pos_field(validation={"minOffers": 1}), value, errors)
@@ -626,20 +637,19 @@ def test_positions_total_skips_non_dict_positions() -> None:
 
 
 def test_positions_total_position_without_preferred() -> None:
-    # A position without a preferred offer adds nothing and leaves found as False.
+    """Add nothing for a position without a preferred offer."""
     value = [{"label": "P", "offers": [{"label": "A", "value": 100, "preferred": False}]}]
     assert positions_total(value) is None
 
 
 def test_positions_total_preferred_with_invalid_value_breaks_without_add() -> None:
-    # A preferred offer with an invalid value: num is None, so the loop breaks and
-    # found stays False.
+    """Stop at a preferred offer with an invalid value and add nothing."""
     value = [{"label": "P", "offers": [{"label": "A", "value": "abc", "preferred": True}]}]
     assert positions_total(value) is None
 
 
 def test_positions_total_offers_missing_key() -> None:
-    # A missing "offers" key gives None, so `or []` applies. No position is preferred.
+    """Treat a missing offers key as an empty list."""
     value = [{"label": "P"}]
     assert positions_total(value) is None
 
@@ -655,8 +665,7 @@ def test_positions_total_non_dict_offer_skipped() -> None:
 
 
 def test_extract_promoted_positions_total_none_no_amount() -> None:
-    # A positions field without a preferred position: total is None, so extract_promoted
-    # writes no amount entry (branch 484->486).
+    """Write no amount for a positions field without a preferred position."""
     fields = [_pos_field()]
     data = {
         "positions": [
@@ -667,7 +676,7 @@ def test_extract_promoted_positions_total_none_no_amount() -> None:
 
 
 def test_extract_promoted_positions_multiple_additive() -> None:
-    # Two positions fields add up into amount.
+    """Add two positions fields up into the amount."""
     fields = [_fd("a", "positions"), _fd("b", "positions")]
     data = {
         "a": [{"label": "P", "offers": [{"label": "X", "value": 100, "preferred": True}]}],

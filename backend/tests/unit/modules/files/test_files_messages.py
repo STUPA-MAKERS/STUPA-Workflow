@@ -71,9 +71,6 @@ def audits(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
     return out
 
 
-# -- wire forms --------------------------------------------------------------------
-
-
 @pytest.mark.parametrize(
     ("kw", "state"),
     [
@@ -106,9 +103,6 @@ def test_a_message_needs_a_text_or_a_file() -> None:
                 "attachmentIds": [str(uuid.uuid4()) for _ in range(MAX_MESSAGE_ATTACHMENTS + 1)],
             }
         )
-
-
-# -- check and bind ------------------------------------------------------------------
 
 
 async def test_check_message_drafts_without_files_checks_nothing() -> None:
@@ -171,9 +165,6 @@ async def test_bind_drafts_without_ids_writes_nothing() -> None:
     session = ScriptedSession()
     await bind_drafts(session, attachment_ids=[], token="t", pepper="p", comment_id=NOTE)  # type: ignore[arg-type]
     assert session.statements == []
-
-
-# -- list and remove ---------------------------------------------------------------------
 
 
 async def test_message_attachments_group_by_message_in_one_query() -> None:
@@ -241,6 +232,11 @@ async def test_drop_for_messages_keeps_the_objects_until_remove_objects(
 async def test_the_removal_locks_and_deletes_every_row_before_its_first_audit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Delete and flush both rows before the first audit entry.
+
+    The first audit entry takes the lock of the audit chain, so no row lock follows that
+    lock.
+    """
     first, second = _att(storage_key="k1"), _att(storage_key="k2")
     session = ScriptedSession(scalars=[[first, second]])
     seen: list[tuple[int, int]] = []
@@ -252,8 +248,6 @@ async def test_the_removal_locks_and_deletes_every_row_before_its_first_audit(
     await _svc(session).drop_for_messages("ticket_note", [NOTE], actor="a")
     sql = str(session.statements[0])
     assert "ORDER BY attachment.id" in sql and sql.endswith("FOR UPDATE")
-    # Both rows are deleted and flushed before the first audit entry takes the lock
-    # of the audit chain, so no row lock follows that lock.
     assert seen == [(2, 1), (2, 1)]
 
 
@@ -294,9 +288,6 @@ async def test_delete_for_application_also_removes_the_comment_files(
         {"application_id": str(app_id)},
         {"comment_id": str(comment_id)},
     ]
-
-
-# -- the read rule of the owner ------------------------------------------------------------
 
 
 class _Files:
@@ -393,6 +384,12 @@ class _Access:
 
 
 async def test_a_comment_file_follows_the_comment(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Apply the read rule of the comment to its file.
+
+    An unknown comment and an unreadable application refuse. An internal comment needs
+    can_see_internal. A public comment reaches the magic-link applicant, unconfirmed
+    included.
+    """
     answers: list[object] = []
 
     async def _resolve(_db: object, _app: object, _p: object, _a: object) -> object:
@@ -405,14 +402,11 @@ async def test_a_comment_file_follows_the_comment(monkeypatch: pytest.MonkeyPatc
     public, internal = _comment("public"), _comment("internal")
     db = ScriptedSession()
     db.put(public, internal)
-    # Unknown comment.
     with pytest.raises(NotFoundError):
         await _check(AttachmentOwner(kind="comment", id=uuid.uuid4()), PLAIN, db)
-    # No read access to the application.
     answers.append(ForbiddenError("no"))
     with pytest.raises(NotFoundError):
         await _check(AttachmentOwner(kind="comment", id=public.id), PLAIN, db)
-    # An internal comment needs can_see_internal.
     answers.append(_Access(internal=False, owning=True))
     with pytest.raises(NotFoundError):
         await _check(
@@ -424,7 +418,6 @@ async def test_a_comment_file_follows_the_comment(monkeypatch: pytest.MonkeyPatc
     files = _Files()
     answers.append(_Access(internal=True))
     await _check(AttachmentOwner(kind="comment", id=internal.id), PLAIN, db, files=files)
-    # The public comment reaches the magic-link applicant, unconfirmed included.
     answers.append(_Access(internal=False, owning=True))
     await _check(AttachmentOwner(kind="comment", id=public.id), None, db, files=files)
     assert files.visible == [

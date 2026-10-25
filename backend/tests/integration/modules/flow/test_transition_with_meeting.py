@@ -78,6 +78,7 @@ async def _unchanged(session: AsyncSession, app_id: uuid.UUID, review_id: uuid.U
 
 
 async def test_transitions_flag_the_agenda_action(session: AsyncSession) -> None:
+    """Flag the agenda action only into a vote state; into a normal state it takes no meeting."""
     flow = await seed_agenda_flow(session)
     app = await make_application(session, flow)
     out = {t.id: t for t in await FlowService(session).available_transitions(app.id, admin())}
@@ -85,7 +86,6 @@ async def test_transitions_flag_the_agenda_action(session: AsyncSession) -> None
     assert out[flow.to_vote.id].agenda_gremium_id == flow.gremium.id
     assert out[flow.plain.id].adds_to_agenda is False
     assert out[flow.plain.id].agenda_gremium_id is None
-    # The action into a normal state takes no meeting: the UI fires it without one.
     assert out[flow.to_done.id].adds_to_agenda is False
     assert out[flow.to_done.id].agenda_gremium_id is None
     body = out[flow.to_vote.id].model_dump(by_alias=True)
@@ -94,6 +94,7 @@ async def test_transitions_flag_the_agenda_action(session: AsyncSession) -> None
 
 
 async def test_fire_with_meeting_adds_the_item_atomically(session: AsyncSession) -> None:
+    """Add the item in the transaction; the post-commit action does not run again."""
     flow = await seed_agenda_flow(session)
     app = await make_application(session, flow)
     today = date.today()
@@ -107,7 +108,6 @@ async def test_fire_with_meeting_adds_the_item_atomically(session: AsyncSession)
     )
 
     assert result.new_state_id == flow.states["voting"].id
-    # The post-commit action does not run a second time.
     assert "addToNextSession" not in result.dispatched_actions
     assert all(a.type != "addToNextSession" for a in rec.actions)
     items = (
@@ -135,6 +135,7 @@ async def test_fire_without_meeting_keeps_the_post_commit_action(
     ["live", "closed", "other_gremium", "unknown", "no_action", "normal_target", "hidden"],
 )
 async def test_fire_with_unfit_meeting_is_422(session: AsyncSession, case: str) -> None:
+    """Answer 422 for a meeting that the principal cannot see (no admin, no membership)."""
     flow = await seed_agenda_flow(session)
     app = await make_application(session, flow)
     app_id, review_id = app.id, flow.states["review"].id
@@ -154,7 +155,6 @@ async def test_fire_with_unfit_meeting_is_422(session: AsyncSession, case: str) 
         elif case == "normal_target":
             transition = flow.to_done
         else:
-            # Not an admin, no membership: the meeting is not visible.
             principal = Principal(sub="stranger", permissions={"application.transition"})
 
     with pytest.raises(ValidationProblem) as exc:

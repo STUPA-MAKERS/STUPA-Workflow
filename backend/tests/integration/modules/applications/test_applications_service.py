@@ -117,11 +117,15 @@ def _create_payload(app_type_id: uuid.UUID) -> ApplicationCreate:
 
 
 async def test_create_separates_pii_and_writes_v1(session: AsyncSession) -> None:
+    """Split off the PII and write v1.
+
+    EmailStr lowercases the domain, and the citext match ignores case.
+    """
     app_type, draft, _ = await _seed_type(session)
     svc = ApplicationsService(session)
 
     app, email = await svc.create(_create_payload(app_type.id))
-    assert email == "Antrag@example.org"  # EmailStr lowercases the domain
+    assert email == "Antrag@example.org"
     assert app.current_state_id == draft.id
     assert app.amount == Decimal("100.00")
     assert app.currency == "EUR"
@@ -132,7 +136,6 @@ async def test_create_separates_pii_and_writes_v1(session: AsyncSession) -> None
     ).scalar_one()
     assert applicant.email == "Antrag@example.org"
     assert applicant.name == "Erika"
-    # citext: the match ignores case, even with mixed spelling.
     hit = await session.scalar(select(Applicant).where(Applicant.email == "antrag@EXAMPLE.org"))
     assert hit is not None and hit.id == applicant.id
 
@@ -150,12 +153,13 @@ async def test_create_separates_pii_and_writes_v1(session: AsyncSession) -> None
 
 
 async def test_create_invalid_data_422_before_db(session: AsyncSession) -> None:
+    """Answer 422 for a missing title before any DB write."""
     app_type, _, _ = await _seed_type(session)
     svc = ApplicationsService(session)
     payload = ApplicationCreate.model_validate(
         {
             "typeId": str(app_type.id),
-            "data": {"cost": "5.00"},  # the required title is missing
+            "data": {"cost": "5.00"},
             "applicantEmail": "x@example.org",
         }
     )
@@ -193,8 +197,9 @@ async def test_patch_preserves_system_title_field(session: AsyncSession) -> None
     The runtime puts that system title field in front of the form. `patch()` whitelists
     against the pinned fields, and those do not hold `title`. Without the system field,
     every update would lose `data.title`.
+
+    The form has no explicit `title` field, as on the live instance.
     """
-    # A form without an explicit `title` field, as on the live instance.
     no_title_fields = [
         FormFieldDef.model_validate(
             {
@@ -211,7 +216,7 @@ async def test_patch_preserves_system_title_field(session: AsyncSession) -> None
     ]
     app_type, _, _ = await _seed_type(session, fields=no_title_fields)
     svc = ApplicationsService(session)
-    app, _ = await svc.create(_create_payload(app_type.id))  # title="Mein Antrag"
+    app, _ = await svc.create(_create_payload(app_type.id))
     assert (await svc.get(app.id, include_pii=False)).data["title"] == "Mein Antrag"
 
     out = await svc.patch(
@@ -219,20 +224,21 @@ async def test_patch_preserves_system_title_field(session: AsyncSession) -> None
         {"title": "Mein Antrag", "cost": "120.00", "note": "x"},
         changed_by="applicant",
     )
-    assert out.data["title"] == "Mein Antrag"  # must NOT be dropped
+    assert out.data["title"] == "Mein Antrag"
 
     refreshed = await svc.get(app.id, include_pii=False)
     assert refreshed.data["title"] == "Mein Antrag"
 
 
 async def test_patch_invalid_data_422_no_new_version(session: AsyncSession) -> None:
+    """Answer 422 for a missing title and write no v2."""
     app_type, _, _ = await _seed_type(session)
     svc = ApplicationsService(session)
     app, _ = await svc.create(_create_payload(app_type.id))
     with pytest.raises(ValidationProblem):
-        await svc.patch(app.id, {"cost": "1.00"}, changed_by="applicant")  # title missing
+        await svc.patch(app.id, {"cost": "1.00"}, changed_by="applicant")
     versions = await svc.versions(app.id)
-    assert [v.version for v in versions] == [1]  # no v2 written
+    assert [v.version for v in versions] == [1]
 
 
 async def test_patch_locked_state_409(session: AsyncSession) -> None:
@@ -248,11 +254,13 @@ async def test_patch_locked_state_409(session: AsyncSession) -> None:
 
 
 async def test_list_filters_and_paging(session: AsyncSession) -> None:
+    """Filter and page the list.
+
+    An actor other than "applicant" sets `email_confirmed_at` at once. Without it the
+    unconfirmed guest submissions stay invisible in the list.
+    """
     app_type, draft, _ = await _seed_type(session)
     svc = ApplicationsService(session)
-    # An actor other than "applicant" sets `email_confirmed_at` at once. Without it the
-    # unconfirmed guest submissions stay invisible in the list. See
-    # `test_list_fuzzy_search_…`.
     a1, _ = await svc.create(_create_payload(app_type.id), actor="admin")
     p2 = _create_payload(app_type.id)
     p2.data = {"title": "Solarpanel", "cost": "5.00", "note": "g"}
@@ -299,23 +307,21 @@ async def test_comment_visibility(session: AsyncSession) -> None:
     assert [c.body for c in applicant_view] == ["öffentlich"]
 
 
-# An unconfirmed guest submission stays invisible on the item routes for a
-# principal, which answers 404. Only the owning applicant reads it, through the magic
-# link.
 async def test_unconfirmed_guest_app_hidden_from_principal_item_reads(
     session: AsyncSession,
 ) -> None:
+    """Hide an unconfirmed guest application from the item routes of a principal.
+
+    The actor "applicant" leaves `email_confirmed_at` NULL. For a principal or a Gremium the
+    router passes `allow_unconfirmed=False`, so every item route gives 404, as the list
+    hides it, and leaks no existence oracle. The owning applicant comes through the magic
+    link with the default `allow_unconfirmed=True` and reads the application in full.
+    """
     app_type, _, _ = await _seed_type(session)
     svc = ApplicationsService(session)
-    # The actor "applicant" leaves `email_confirmed_at IS NULL`. The submission stays
-    # unconfirmed and invisible in the list.
     app, _ = await svc.create(_create_payload(app_type.id))
     assert app.email_confirmed_at is None
 
-    # For a principal or a Gremium the router passes `allow_unconfirmed=False`, because
-    # the identity is not the owning magic-link applicant. Every item route then gives
-    # 404. This mirrors the invisible `list_applications` semantics and leaks no
-    # existence oracle.
     with pytest.raises(NotFoundError):
         await svc.get(app.id, include_pii=True, allow_unconfirmed=False)
     with pytest.raises(NotFoundError):
@@ -331,8 +337,6 @@ async def test_unconfirmed_guest_app_hidden_from_principal_item_reads(
             app.id, {"title": "neu"}, changed_by="admin", allow_unconfirmed=False
         )
 
-    # The owning applicant comes through the magic link, so `allow_unconfirmed` keeps
-    # its default of True. That applicant reads the own unconfirmed application in full.
     out = await svc.get(app.id, include_pii=False)
     assert out.id == app.id
     assert (await svc.timeline(app.id)) != []
@@ -344,9 +348,9 @@ async def test_unconfirmed_guest_app_hidden_from_principal_item_reads(
 async def test_confirmed_app_readable_by_principal_item_reads(
     session: AsyncSession,
 ) -> None:
+    """Let a principal read an application that an actor other than "applicant" confirmed."""
     app_type, _, _ = await _seed_type(session)
     svc = ApplicationsService(session)
-    # actor != "applicant" confirms at once, so a principal reads it as usual.
     app, _ = await svc.create(_create_payload(app_type.id), actor="admin")
     assert app.email_confirmed_at is not None
 
@@ -356,8 +360,8 @@ async def test_confirmed_app_readable_by_principal_item_reads(
     assert (await svc.versions(app.id)) != []
 
 
-# The service drops unknown keys and never persists them.
 async def test_create_drops_unknown_keys(session: AsyncSession) -> None:
+    """Drop unknown keys, also from v1."""
     app_type, _, _ = await _seed_type(session)
     svc = ApplicationsService(session)
     payload = ApplicationCreate.model_validate(
@@ -370,7 +374,6 @@ async def test_create_drops_unknown_keys(session: AsyncSession) -> None:
     app, _ = await svc.create(payload)
     out = await svc.get(app.id, include_pii=False)
     assert "junk" not in out.data
-    # not in v1 either
     v1 = (await svc.versions(app.id))[0]
     assert "junk" not in (v1.data or {})
 
@@ -390,10 +393,13 @@ async def test_patch_drops_unknown_keys(session: AsyncSession) -> None:
     assert "evil" not in (v2.diff or {}).get("added", {})
 
 
-# MED: patch takes the has_budget context from the type.
 async def test_patch_has_budget_context_from_type(session: AsyncSession) -> None:
-    # A has_budget type without a pot. A field that the has_budget flag makes visible
-    # and required must stay required on edit. Otherwise a user could drop it freely.
+    """Take the has_budget context of a patch from the type.
+
+    The type has a budget but no pot. A field that the has_budget flag makes visible and
+    required must stay required on edit, else a user could drop it. A patch without `reason`
+    gives 422.
+    """
     cond_fields = [
         FormFieldDef(key="title", type="text", label={"de": "Titel"}, required=True),
         FormFieldDef.model_validate(
@@ -417,22 +423,14 @@ async def test_patch_has_budget_context_from_type(session: AsyncSession) -> None
             }
         )
     )
-    # Omitting `reason` must give 422. The has_budget flag of the type makes that field
-    # visible and required.
     with pytest.raises(ValidationProblem) as ei:
         await svc.patch(app.id, {"title": "T2"}, changed_by="applicant")
     assert ei.value.errors is not None
     assert any(e.field == "reason" for e in ei.value.errors)
 
 
-# Fuzzy search runs against real Postgres with pg_trgm.
 async def _seed_type_for_search(session: AsyncSession) -> ApplicationType:
-    """Seed like `_seed_type`, but without the removed `FlowVersion` type field.
-
-    `_seed_type` passes `FlowVersion(application_type_id=…)`. Migration 0019 removed
-    that column with the type flows, so the helper is already broken on main. This
-    helper is a minimal, correct seed for the search.
-    """
+    """Seed a type for the fuzzy search against real Postgres with pg_trgm."""
     gremium = Gremium(name="G", slug=f"g-{uuid.uuid4()}")
     session.add(gremium)
     await session.flush()
@@ -467,6 +465,9 @@ async def test_list_fuzzy_search_meaningful_text(session: AsyncSession) -> None:
     application through a typo in the title. The same query also finds it through a text
     answer value (`note`). A plain number value (`cost`) does NOT match, because an
     amount gives no text match.
+
+    The applications use an actor other than "applicant", so they are confirmed and the list
+    shows them.
     """
     app_type = await _seed_type_for_search(session)
     svc = ApplicationsService(session)
@@ -481,25 +482,21 @@ async def test_list_fuzzy_search_meaningful_text(session: AsyncSession) -> None:
                 "applicantEmail": "x@example.org",
             }
         )
-        # An actor other than "applicant" sets `email_confirmed_at`, so the list shows it.
         await svc.create(payload, actor="admin")
 
-    # The typo "Solaranlge" in the title still gives a trigram hit.
     by_title = await svc.list_applications(q="Solaranlge", limit=50, offset=0)
     assert by_title.total == 1
     assert by_title.items[0].title == "Solaranlage Dach"
 
-    # The hit comes from the text answer value (`note`), not only from the title.
     by_note = await svc.list_applications(q="Photovoltaik", limit=50, offset=0)
     assert {i.title for i in by_note.items} == {"Solaranlage Dach"}
 
-    # The plain amount (`cost` = 1234.00) is NO text answer value, so it gives no hit.
     by_amount = await svc.list_applications(q="1234", limit=50, offset=0)
     assert by_amount.total == 0
 
 
-# Anonymization follows DSGVO Art. 17.
 async def test_anonymize_clears_pii_keeps_application(session: AsyncSession) -> None:
+    """Empty the PII field, keep the application and its other fields (DSGVO Art. 17)."""
     app_type, _, _ = await _seed_type(session)
     svc = ApplicationsService(session)
     app, _ = await svc.create(_create_payload(app_type.id))
@@ -507,9 +504,9 @@ async def test_anonymize_clears_pii_keeps_application(session: AsyncSession) -> 
     await svc.anonymize(app.id)
 
     out = await svc.get(app.id, include_pii=True)
-    assert out is not None  # the application stays
-    assert out.data.get("note") is None  # the PII field is empty
-    assert out.data["title"] == "Mein Antrag"  # non-PII stays
+    assert out is not None
+    assert out.data.get("note") is None
+    assert out.data["title"] == "Mein Antrag"
     assert out.applicant is not None
     assert out.applicant.email is None
     assert out.applicant.name is None
@@ -517,8 +514,7 @@ async def test_anonymize_clears_pii_keeps_application(session: AsyncSession) -> 
 
 
 async def test_anonymize_clears_the_capture_intake(session: AsyncSession) -> None:
-    # The free-text intake note can name a person, so the anonymization clears it.
-    # The received date and the capturing member stay.
+    """Clear the intake note, which can name a person; keep the date and the member."""
     app_type, _, _ = await _seed_type(session)
     svc = ApplicationsService(session)
     app, _ = await svc.create(_create_payload(app_type.id))
@@ -536,9 +532,10 @@ async def test_anonymize_clears_the_capture_intake(session: AsyncSession) -> Non
 
 
 async def test_anonymize_scrubs_version_history(session: AsyncSession) -> None:
+    """Remove the PII from every stored version."""
     app_type, _, _ = await _seed_type(session)
     svc = ApplicationsService(session)
-    app, _ = await svc.create(_create_payload(app_type.id))  # note="geheim" in v1
+    app, _ = await svc.create(_create_payload(app_type.id))
     await svc.patch(
         app.id, {"title": "T", "cost": "100.00", "note": "geheim2"}, changed_by="applicant"
     )
@@ -548,7 +545,7 @@ async def test_anonymize_scrubs_version_history(session: AsyncSession) -> None:
     versions = await svc.versions(app.id)
     assert len(versions) == 2
     for v in versions:
-        assert "note" not in (v.data or {})  # PII gone from every snapshot
+        assert "note" not in (v.data or {})
         if v.diff is not None:
             for bucket in ("added", "removed", "changed"):
                 assert "note" not in v.diff.get(bucket, {})
@@ -562,12 +559,14 @@ async def test_anonymize_scrubs_field_marked_pii_in_later_version(
     The application stays on its pinned version, where `title` is not PII.
     Anonymization must still union isPII over ALL versions of the type and remove the
     clear text (DSGVO Art. 17).
-    """
-    app_type, _, _ = await _seed_type(session)  # title NOT PII, note PII
-    svc = ApplicationsService(session)
-    app, _ = await svc.create(_create_payload(app_type.id))  # title="Mein Antrag"
 
-    # Mark `title` as PII afterwards. This creates a new, active form version.
+    The seed type has `note` as PII and `title` not. The new active version marks `title` as
+    PII afterwards.
+    """
+    app_type, _, _ = await _seed_type(session)
+    svc = ApplicationsService(session)
+    app, _ = await svc.create(_create_payload(app_type.id))
+
     later_fields = [
         FormFieldDef.model_validate(
             {
@@ -597,12 +596,12 @@ async def test_anonymize_scrubs_field_marked_pii_in_later_version(
     await svc.anonymize(app.id)
 
     out = await svc.get(app.id, include_pii=True)
-    assert out.data.get("note") is None  # PII in the pinned version
-    assert out.data.get("title") is None  # marked PII later, scrubbed anyway
+    assert out.data.get("note") is None
+    assert out.data.get("title") is None
 
 
-# A delete is irreversible and audited. Its metadata holds ids only, no PII.
 async def test_delete_writes_audit_entry_without_pii(session: AsyncSession) -> None:
+    """Delete irreversibly and write exactly one audit entry with ids only, no PII."""
     from app.modules.audit.actions import AuditAction
     from app.modules.audit.models import AuditEntry
 
@@ -616,14 +615,12 @@ async def test_delete_writes_audit_entry_without_pii(session: AsyncSession) -> N
 
     await svc.delete(app_id, actor="admin")
 
-    # The application and its cascade are gone.
     assert await session.get(Applicant, app_id) is None
     versions = await session.scalars(
         select(SubmissionVersion).where(SubmissionVersion.application_id == app_id)
     )
     assert versions.all() == []
 
-    # Exactly one audit entry records the delete.
     entry = (
         await session.scalars(
             select(AuditEntry).where(
@@ -636,7 +633,6 @@ async def test_delete_writes_audit_entry_without_pii(session: AsyncSession) -> N
     assert entry.target_type == "application"
     assert entry.data["typeId"] == str(app_type.id)
     assert entry.data["versionCount"] == 2
-    # No raw PII in the audit `data`.
     serialized = str(entry.data)
     assert "geheim" not in serialized
     assert "Erika" not in serialized

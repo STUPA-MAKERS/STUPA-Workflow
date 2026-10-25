@@ -39,8 +39,8 @@ def _app(*, confirmed: bool, state_id: UUID | None = None) -> SimpleNamespace:
     )
 
 
-# `_load_app` hides an unconfirmed application from the routes.
 async def test_load_app_hides_unconfirmed_from_routes() -> None:
+    """Hide an unconfirmed application from the routes."""
     app = _app(confirmed=False)
     svc = FlowService(fake_session(result(app)))
     with pytest.raises(NotFoundError):
@@ -105,7 +105,6 @@ async def test_route_methods_404_for_unconfirmed(call: str) -> None:
         await calls[call]()
 
 
-# `start_confirmed` starts the flow after the confirmation.
 @pytest.fixture
 def steps(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     """Patch the auto-advance step and record its calls."""
@@ -136,6 +135,12 @@ async def test_start_confirmed_without_state_does_nothing(steps: dict[str, Any])
 async def test_start_confirmed_commits_advances_and_announces(
     steps: dict[str, Any],
 ) -> None:
+    """Commit, advance and announce the task mail of the initial state.
+
+    The start commits the confirmation first, so the dispatchers see it in their own
+    sessions. No transition fired, so the task mail goes out, keyed on the status event: a
+    second start with the same event gives the same key.
+    """
     app = _app(confirmed=True, state_id=uuid4())
     db = fake_session(result(app))
     event_id = uuid4()
@@ -145,14 +150,10 @@ async def test_start_confirmed_commits_advances_and_announces(
     out = await FlowService(db, recorder).start_confirmed(app.id)
 
     assert out is None
-    # The start commits the confirmation first, so the dispatchers see it in their
-    # own sessions.
     assert db.committed >= 1
     (advanced_id, actor), = steps["advanced"]
     assert advanced_id == app.id
     assert actor.sub == "system:confirmation"
-    # No transition fired, so the task mail of the initial state goes out, keyed on the
-    # status event. A second start with the same event gives the same key.
     (batch,) = recorder.batches
     (action,) = batch
     assert action.type == "taskNotify"
@@ -164,13 +165,13 @@ async def test_start_confirmed_commits_advances_and_announces(
 async def test_start_confirmed_without_status_event_announces_nothing(
     steps: dict[str, Any],
 ) -> None:
+    """Send nothing without a status event, because the announcement has no key."""
     app = _app(confirmed=True, state_id=uuid4())
     db = fake_session(result(app))
     recorder = _Recorder()
     await FlowService(db, recorder).start_confirmed(app.id)
     assert db.committed == 1
     assert len(steps["advanced"]) == 1
-    # No status event: the announcement has no key and sends nothing.
     assert recorder.batches == []
 
 

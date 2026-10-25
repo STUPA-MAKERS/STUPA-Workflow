@@ -56,13 +56,13 @@ from app.shared.filenames import sanitize_storage_name
 
 logger = logging.getLogger("app.files")
 
-# The problem code when the token is unknown or expired. The wizard then starts a new
-# draft (with a new ALTCHA solution) and uploads the files again.
+#: The problem code when the token is unknown or expired. The wizard then starts a new
+#: draft (with a new ALTCHA solution) and uploads the files again.
 DRAFT_TOKEN_INVALID = "draft_token_invalid"
-# The problem code of the create when a listed draft is missing, expired, foreign or
-# infected. The errors name each id.
+#: The problem code of the create when a listed draft is missing, expired, foreign or
+#: infected. The errors name each id.
 DRAFT_ATTACHMENTS_MISSING = "draft_attachments_missing"
-# The problem code when a token reaches its file or byte limit.
+#: The problem code when a token reaches its file or byte limit.
 DRAFT_QUOTA_EXCEEDED = "draft_quota_exceeded"
 
 
@@ -110,6 +110,7 @@ class DraftAttachments:
     """Draft upload, delete and bind, on top of ``FilesService``."""
 
     def __init__(self, files: FilesService) -> None:
+        """Bind the draft operations to a files service, its session and its settings."""
         self.files = files
         self.session = files.session
         self.settings = files.settings
@@ -153,6 +154,8 @@ class DraftAttachments:
 
         The method writes an ``attachment_upload`` audit entry with ``draft: true``
         and moves the end of the token and of all its drafts.
+
+        All files of the token share one end, so each upload keeps the whole draft alive.
 
         Raises:
             ValidationProblem: The token is unknown or expired (HTTP 422).
@@ -200,7 +203,6 @@ class DraftAttachments:
                 set_={"expires_at": token_row.excluded.expires_at},
             )
         )
-        # Each upload keeps the whole draft alive: all files of the token share one end.
         await self.session.execute(
             update(Attachment)
             .where(

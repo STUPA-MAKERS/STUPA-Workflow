@@ -15,11 +15,15 @@ from typing import Any, TypedDict
 
 
 class FieldChange(TypedDict):
+    """The old and the new value of one changed field."""
+
     old: Any
     new: Any
 
 
 class DataDiff(TypedDict):
+    """The added, removed and changed fields between two versions of ``data``."""
+
     added: dict[str, Any]
     removed: dict[str, Any]
     changed: dict[str, FieldChange]

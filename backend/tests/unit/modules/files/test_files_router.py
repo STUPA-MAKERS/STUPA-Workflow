@@ -1,4 +1,8 @@
-"""Router tests for files: endpoint wiring and RBAC with a faked service."""
+"""Router tests for files: endpoint wiring and RBAC with a faked service.
+
+The attachment read covers the same paths as require_app_read, not only the global
+application.read: read_all, the creator and Gremium read.
+"""
 
 from __future__ import annotations
 
@@ -24,8 +28,13 @@ ATT_ID = uuid4()
 
 
 class _FakeService:
+    """Fake files service.
+
+    ``mime`` is the sniffed type that `download_stream` reports. An attachment id that
+    starts with "11111111" belongs to a ticket.
+    """
+
     max_bytes = 10 * 1024 * 1024
-    # The sniffed type that `download_stream` reports for the stored file.
     mime = "application/pdf"
 
     def __init__(self) -> None:
@@ -86,7 +95,6 @@ class _FakeService:
     async def delete(self, attachment_id: UUID, *, actor: str) -> None:
         self.deleted = attachment_id
 
-    # The attachment of a ticket: ids that start with "11111111".
     async def owner_of(self, attachment_id: UUID) -> AttachmentOwner | None:
         if str(attachment_id).startswith("11111111"):
             return AttachmentOwner(kind="ticket", id=uuid4())
@@ -153,9 +161,12 @@ async def _fake_session():
 
 @pytest.fixture
 def app(fake_service: _FakeService) -> FastAPI:
+    """Build the app with a session stub without a creator.
+
+    require_app_edit and require_app_read read created_by, so the stub has none.
+    """
     application = create_app()
     application.dependency_overrides[get_files_service] = lambda: fake_service
-    # require_app_edit and require_app_read read created_by, so the stub has no creator.
     application.dependency_overrides[get_session] = _fake_session
     return application
 
@@ -236,8 +247,9 @@ def test_upload_long_field_key_422(
 def test_upload_too_large_413(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
+    """Answer 413 from the capped read of the router, before the service."""
     _as(app, "application.manage")
-    fake_service.max_bytes = 8  # the router caps the read, so 413 comes before the service
+    fake_service.max_bytes = 8
     r = client.post(
         f"/api/applications/{APP_ID}/attachments",
         files={"file": ("doc.pdf", b"x" * 64, "application/pdf")},
@@ -256,18 +268,17 @@ def test_get_url_not_found_404(app: FastAPI, client: TestClient) -> None:
 
 
 def test_get_url_ok(app: FastAPI, client: TestClient) -> None:
+    """Return the app-relative stream path instead of a presigned MinIO URL."""
     _as(app, "application.read")
     r = client.get(f"/api/attachments/{ATT_ID}")
     assert r.status_code == 200
-    # App-relative stream path instead of a presigned MinIO URL.
     assert r.json()["url"] == f"/api/attachments/{ATT_ID}/download"
     assert r.json()["expiresIn"] == 300
 
 
 def test_get_url_cross_tenant_is_404_not_403(app: FastAPI, client: TestClient) -> None:
-    # Authenticated but without read access to the application: 404, not 403.
-    # A 403 would work as an existence oracle.
-    _as(app)  # no permissions
+    """Answer 404, not 403, without read access, because a 403 is an existence oracle."""
+    _as(app)
     r = client.get(f"/api/attachments/{ATT_ID}")
     assert r.status_code == 404
 
@@ -286,8 +297,7 @@ def test_download_streams_bytes_with_disposition(app: FastAPI, client: TestClien
 
 
 def test_download_inline_renders_in_browser(app: FastAPI, client: TestClient) -> None:
-    # ?inline=1 gives Content-Disposition inline for the preview dialog. It applies
-    # only to the non-scriptable allowlist (PDF, PNG, JPEG = the upload allowlist).
+    """Answer `inline` for ?inline=1 and a type of the non-scriptable allowlist."""
     _as(app, "application.read")
     r = client.get(f"/api/attachments/{ATT_ID}/download?inline=1")
     assert r.status_code == 200
@@ -301,7 +311,7 @@ def test_download_inline_renders_in_browser(app: FastAPI, client: TestClient) ->
 def test_download_inline_preview_may_be_framed_by_same_origin(
     app: FastAPI, client: TestClient, fake_service: _FakeService, mime: str
 ) -> None:
-    # The preview dialog frames the file. Only 'self' may frame it, in a sandbox.
+    """Let only 'self' frame the preview, in a sandbox."""
     fake_service.mime = mime
     _as(app, "application.read")
     r = client.get(f"/api/attachments/{ATT_ID}/download?inline=1")
@@ -334,8 +344,7 @@ def test_download_without_inline_keeps_frame_deny(app: FastAPI, client: TestClie
 def test_download_inline_refused_for_unsafe_types(
     app: FastAPI, client: TestClient, fake_service: _FakeService, mime: str
 ) -> None:
-    # Anything outside the PDF and raster-image allowlist stays a forced download that
-    # no page may frame, even with ?inline=1.
+    """Keep a forced download that no page may frame outside the allowlist, even with ?inline=1."""
     fake_service.mime = mime
     _as(app, "application.read")
     r = client.get(f"/api/attachments/{ATT_ID}/download?inline=1")
@@ -347,7 +356,8 @@ def test_download_inline_refused_for_unsafe_types(
 
 
 def test_download_cross_tenant_is_404(app: FastAPI, client: TestClient) -> None:
-    _as(app)  # no permissions, so no read access and 404 (no existence oracle)
+    """Answer 404 without read access (no existence oracle)."""
+    _as(app)
     r = client.get(f"/api/attachments/{ATT_ID}/download")
     assert r.status_code == 404
 
@@ -390,7 +400,7 @@ def test_delete_requires_auth_401(client: TestClient) -> None:
 
 
 def test_delete_forbidden_without_manage_404(app: FastAPI, client: TestClient) -> None:
-    # A principal without application.manage and without creator rights gets 404.
+    """Answer 404 without application.manage and without creator rights."""
     _as(app)
     r = client.delete(f"/api/attachments/{ATT_ID}")
     assert r.status_code == 404
@@ -408,9 +418,12 @@ def test_delete_ok_with_manage(
 def test_delete_ok_with_edit_any(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
-    # application.edit_any is a global write permission. Like the upload path
-    # (require_app_edit), it must also allow delete and must not give 404.
-    # With the no-creator stub and no application.manage, only edit_any can pass.
+    """Allow the delete with application.edit_any.
+
+    edit_any is a global write permission. Like the upload path (require_app_edit), it
+    allows the delete. With the no-creator stub and no application.manage, only edit_any can
+    pass.
+    """
     _as(app, "application.edit_any")
     r = client.delete(f"/api/attachments/{ATT_ID}")
     assert r.status_code == 204
@@ -437,8 +450,10 @@ def test_delete_applicant_open_state_ok(
 def test_delete_applicant_locked_state_409(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
-    # A delete is a data change. In a locked state the applicant can upload, but not
-    # delete.
+    """Answer 409 for an applicant delete in a locked state.
+
+    A delete is a data change: in a locked state the applicant can upload, but not delete.
+    """
     fake_service.locked = True
     _as_applicant(app)
     r = client.delete(f"/api/attachments/{ATT_ID}")
@@ -463,10 +478,8 @@ def test_delete_declares_409(app: FastAPI) -> None:
     assert list(responses["409"]["content"]) == ["application/problem+json"]
 
 
-# Attachment read covers the same paths as require_app_read, not only the global
-# application.read: read_all, the creator and Gremium read.
 def test_get_url_read_all_ok(app: FastAPI, client: TestClient) -> None:
-    # application.read_all grants access without application.read (read_all branch).
+    """Grant access with application.read_all, without application.read."""
     _as(app, "application.read_all")
     r = client.get(f"/api/attachments/{ATT_ID}")
     assert r.status_code == 200
@@ -481,8 +494,7 @@ def test_download_read_all_ok(app: FastAPI, client: TestClient) -> None:
 
 
 def _patch_creator(monkeypatch: pytest.MonkeyPatch, *, is_creator: bool) -> None:
-    # _resolve_with_creator in the access module calls _is_creator. Patch it to
-    # switch the creator branch without a real database.
+    """Patch `_is_creator` of the access module to switch the creator branch without a DB."""
     import app.modules.applications.access as access_mod
 
     async def _fake_is_creator(*_a: object, **_k: object) -> bool:
@@ -492,7 +504,7 @@ def _patch_creator(monkeypatch: pytest.MonkeyPatch, *, is_creator: bool) -> None
 
 
 def _patch_committee(monkeypatch: pytest.MonkeyPatch, *, can_read: bool) -> None:
-    # The files router resolves read access through `access.resolve_app_read`.
+    """Patch `access.resolve_app_read`, which the files router uses for read access."""
     import app.modules.applications.access as access_mod
 
     async def _fake_committee(*_a: object, **_k: object) -> bool:
@@ -504,7 +516,7 @@ def _patch_committee(monkeypatch: pytest.MonkeyPatch, *, can_read: bool) -> None
 def test_get_url_creator_fallback_ok(
     app: FastAPI, client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # No application.read, but the logged-in creator gets 200 by the creator branch.
+    """Answer 200 for the logged-in creator without application.read."""
     _as(app)
     _patch_creator(monkeypatch, is_creator=True)
     r = client.get(f"/api/attachments/{ATT_ID}")
@@ -514,7 +526,7 @@ def test_get_url_creator_fallback_ok(
 def test_get_url_committee_read_fallback_ok(
     app: FastAPI, client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # No permission and no creator, but Gremium read gives 200.
+    """Answer 200 through Gremium read, without a permission and without creator rights."""
     _as(app)
     _patch_creator(monkeypatch, is_creator=False)
     _patch_committee(monkeypatch, can_read=True)
@@ -536,7 +548,7 @@ def test_download_committee_read_fallback_ok(
 def test_get_url_no_access_paths_is_404(
     app: FastAPI, client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # No permission, no creator and no Gremium read, so 404 (no existence oracle).
+    """Answer 404 without any read path (no existence oracle)."""
     _as(app)
     _patch_creator(monkeypatch, is_creator=False)
     _patch_committee(monkeypatch, can_read=False)

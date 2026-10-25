@@ -111,13 +111,21 @@ class CreateOps(ApplicationsServiceBase):
         (``MAGIC_LINK_SECRET``). The router passes the value of its settings.
         ``None`` reads it from ``get_settings``.
 
+        Details of the steps: exactly one global flow is active, and a missing flow answers 404.
+        Only the known field keys are stored; an unknown key goes. The draft check locks the
+        drafts and runs before the first write, so nothing removes them before the bind. A vote
+        state as the initial state has a fixed Gremium (the validator forbids ``gremiumSource``
+        there), so the vote snapshot starts at once. ``created_by`` holds the logged-in creator,
+        None for an anonymous submission, and for a capture the applicant account (None for a
+        guest), never the capturing person. An unconfirmed submission stays invisible until the
+        magic-link verify, and the worker discards it after ``confirm_ttl_hours``.
+
         Returns:
             The application and the applicant email, for the magic-link mail.
         """
         app_type = await self.session.get(ApplicationType, payload.type_id)
         if app_type is None:
             raise NotFoundError(f"application type {payload.type_id} not found")
-        # Exactly one global flow is active. A missing flow answers 404.
         flow_version_id = await self._resolve_flow_version_id(app_type)
 
         forms = FormsService(self.session)
@@ -135,11 +143,8 @@ class CreateOps(ApplicationsServiceBase):
 
         confirmed = actor != "applicant" if email_confirmed is None else email_confirmed
         initial = await self._initial_state(flow_version_id)
-        # Store the known field keys only. The code discards an unknown key.
         clean = _whitelist(fields, payload.data)
         amount, currency = _amount_currency(fields, clean)
-        # Draft uploads of the wizard. The check locks the drafts, so nothing
-        # removes them before the bind below. It runs before the first write.
         pepper = await self._check_drafts(payload, fields, clean, draft_pepper)
 
         app = Application(
@@ -147,17 +152,12 @@ class CreateOps(ApplicationsServiceBase):
             form_version_id=effective.form_version_id,
             flow_version_id=flow_version_id,
             current_state_id=initial.id,
-            # A vote state as the initial state has a fixed Gremium (the validator
-            # forbids `gremiumSource` there), so the snapshot starts at once.
             vote_gremium_id=await resolve_vote_gremium(self.session, initial, None),
             gremium_id=app_type.gremium_id,
             amount=amount,
             currency=currency,
             data=clean,
             lang=payload.lang,
-            # A logged-in submission remembers the creator. An anonymous one
-            # stores None. A capture stores the applicant account (or None for a
-            # guest), never the capturing person.
             created_by=(
                 capture.owner_sub
                 if capture is not None
@@ -166,8 +166,6 @@ class CreateOps(ApplicationsServiceBase):
             captured_by=actor if capture is not None else None,
             capture_intake=capture.intake if capture is not None else None,
             received_on=capture.received_on if capture is not None else None,
-            # An unconfirmed submission stays invisible until the magic-link
-            # verify. The worker discards it after `confirm_ttl_hours`.
             email_confirmed_at=datetime.now(UTC) if confirmed else None,
         )
         self.session.add(app)
@@ -241,9 +239,6 @@ class CreateOps(ApplicationsServiceBase):
         await self.session.commit()
 
         if app.email_confirmed_at is not None:
-            # A logged-in submission with the account email is confirmed at once.
-            # Start its flow now. Any other submission waits for the magic-link
-            # verify.
             from app.modules.flow.service import FlowService
 
             await FlowService(self.session, dispatcher).start_confirmed(app.id)

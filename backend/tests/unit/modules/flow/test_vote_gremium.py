@@ -53,8 +53,6 @@ def _ctx(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(flow_context, "build_context", _bc)
 
 
-# --- vote_gremium module -----------------------------------------------------------
-
 
 def test_gremium_from_budget() -> None:
     assert vg.gremium_from_budget(_state(config=BUDGET)) is True
@@ -75,6 +73,7 @@ def test_fixed_gremium_ref() -> None:
 
 
 async def test_resolve_vote_gremium(effective: dict[str, UUID | None]) -> None:
+    """Resolve the vote Gremium; a fixed Gremium counts only when it exists."""
     gid, budget = uuid4(), uuid4()
     db = fake_session()
     assert await vg.resolve_vote_gremium(db, None, budget) is None
@@ -82,7 +81,6 @@ async def test_resolve_vote_gremium(effective: dict[str, UUID | None]) -> None:
     effective["value"] = gid
     assert await vg.resolve_vote_gremium(db, _state(config=BUDGET), budget) == gid
     assert await vg.resolve_vote_gremium(db, _state(config=BUDGET), None) is None
-    # A fixed Gremium counts only when it exists.
     assert await vg.resolve_vote_gremium(db, _state(config={"gremiumId": "x"}), None) is None
     db.scalar_results = [gid]
     assert (
@@ -95,11 +93,11 @@ async def test_resolve_vote_gremium(effective: dict[str, UUID | None]) -> None:
 
 
 async def test_snapshot_for_entry(effective: dict[str, UUID | None]) -> None:
+    """Snapshot on entry; a fixed Gremium that does not exist gives None."""
     db = fake_session()
     with pytest.raises(ConflictError) as err:
         await vg.snapshot_for_entry(db, _state(config=BUDGET), uuid4())
     assert err.value.code == vg.NO_VOTE_GREMIUM
-    # A fixed vote state without an existing Gremium keeps today's behaviour.
     assert await vg.snapshot_for_entry(db, _state(config={"gremiumId": "x"}), None) is None
     assert await vg.snapshot_for_entry(db, _state(kind="normal"), None) is None
     effective["value"] = gid = uuid4()
@@ -107,13 +105,13 @@ async def test_snapshot_for_entry(effective: dict[str, UUID | None]) -> None:
 
 
 async def test_in_budget_vote_state() -> None:
+    """Report a budget vote; without a snapshot the cost center stays open for a repair."""
     db = fake_session()
 
     def _a(state: object, snap: object) -> Any:
         return cast(Any, SimpleNamespace(current_state_id=state, vote_gremium_id=snap))
 
     assert await vg.in_budget_vote_state(db, _a(None, uuid4())) is False
-    # Without a snapshot the cost center stays open for a repair.
     assert await vg.in_budget_vote_state(db, _a(uuid4(), None)) is False
     db.get_results = [_state(config=BUDGET)]
     assert await vg.in_budget_vote_state(db, _a(uuid4(), uuid4())) is True
@@ -122,6 +120,7 @@ async def test_in_budget_vote_state() -> None:
 
 
 async def test_fill_snapshot(effective: dict[str, UUID | None]) -> None:
+    """Fill a missing snapshot and keep an existing one."""
     effective["value"] = gid = uuid4()
     db = fake_session()
     app = cast(Any, SimpleNamespace(current_state_id=None, vote_gremium_id=None, budget_id=uuid4()))
@@ -134,12 +133,9 @@ async def test_fill_snapshot(effective: dict[str, UUID | None]) -> None:
     db.get_results = [_state(config=BUDGET)]
     await vg.fill_snapshot(db, app)
     assert app.vote_gremium_id == gid
-    # An existing snapshot stays.
     await vg.fill_snapshot(db, app)
     assert app.vote_gremium_id == gid
 
-
-# --- FlowService -------------------------------------------------------------------
 
 
 def _principal() -> Principal:
@@ -171,6 +167,10 @@ def test_agenda_action_helpers() -> None:
 async def test_available_hides_a_budget_vote_without_gremium(
     effective: dict[str, UUID | None],
 ) -> None:
+    """Hide a budget vote without a Gremium.
+
+    With a deciding Gremium the transition shows, with that Gremium as agenda Gremium.
+    """
     app = _app(uuid4(), budget_id=uuid4())
     gvote = _state(config=BUDGET)
     normal = _state(kind="normal")
@@ -181,7 +181,6 @@ async def test_available_hides_a_budget_vote_without_gremium(
     out = await FlowService(db).available_transitions(app.id, _principal())
     assert [t.id for t in out] == [to_normal.id]
 
-    # With a deciding Gremium the transition shows, with that Gremium as agenda Gremium.
     effective["value"] = gid = uuid4()
     db = fake_session(result(app), result(to_vote, to_normal))
     db.get_results = [gvote, normal]
@@ -277,6 +276,7 @@ async def test_revert_into_a_budget_vote_without_gremium_409(
 async def test_check_agenda_meeting_uses_the_vote_gremium(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Check the meeting against the vote Gremium; without one the agenda is refused."""
     import app.modules.livevote.service as livevote_service
     from app.shared.errors import ValidationProblem
 
@@ -296,7 +296,6 @@ async def test_check_agenda_meeting_uses_the_vote_gremium(
     await FlowService(db)._check_agenda_meeting(
         t, uuid4(), _principal(), vote_gremium=gid
     )
-    # Without a vote Gremium the transition does not add to an agenda.
     with pytest.raises(ValidationProblem):
         await FlowService(fake_session())._check_agenda_meeting(
             t, uuid4(), _principal()
@@ -306,13 +305,13 @@ async def test_check_agenda_meeting_uses_the_vote_gremium(
 async def test_entry_snapshot_keeps_it_on_a_move_inside_the_vote_state(
     effective: dict[str, UUID | None],
 ) -> None:
+    """Keep the snapshot inside the vote state; a move from another state resolves again."""
     effective["value"] = uuid4()
     app = _app(uuid4(), budget_id=uuid4())
     app.vote_gremium_id = kept = uuid4()
     gvote = _state(config=BUDGET, state_id=app.current_state_id)
     svc = FlowService(fake_session())
     assert await svc._entry_snapshot(app, gvote.id, gvote) == kept
-    # A move from another state resolves again.
     assert await svc._entry_snapshot(app, uuid4(), gvote) == effective["value"]
 
 

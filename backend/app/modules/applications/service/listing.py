@@ -82,15 +82,19 @@ class ListingOps(ApplicationsServiceBase):
         without every caller remembering to ask. `True` lists only the archived ones and
         `None` lists both. The count follows the same filter, or the total would promise
         rows the page does not contain.
+
+        An unconfirmed guest application stays invisible until the applicant confirms the email.
+        The cost-center filter covers the subtree through the `path_key` prefix; an unknown cost
+        center gives an empty list. The fuzzy search reads meaningful text only: the title and
+        the string answer values of the `data` JSONB, no ids, enums or numbers (see
+        `_search_text` for the dialects and the PII projection). An active search puts the most
+        relevant row first, and the chosen sort acts as a deterministic tiebreak. `created_to`
+        is inclusive, so the filter ends at 00:00 UTC of the next day.
         """
-        # An unconfirmed guest application stays invisible until the applicant confirms
-        # the email. An existing or logged-in application carries `email_confirmed_at`.
         filters: list[ColumnElement[bool]] = [Application.email_confirmed_at.is_not(None)]
         read_scope = await self._read_scope(owner_sub=owner_sub, committee_sub=committee_sub)
         if read_scope is not None:
             filters.append(read_scope)
-        # Archived applications leave the working list by default. `None` asks for both,
-        # which is what a search across everything wants.
         if archived is False:
             filters.append(Application.archived_at.is_(None))
         elif archived is True:
@@ -102,8 +106,6 @@ class ListingOps(ApplicationsServiceBase):
         if type_id is not None:
             filters.append(Application.type_id == type_id)
         if budget_id is not None:
-            # The filter covers the cost center and its whole subtree through the
-            # `path_key` prefix. An unknown cost center gives an empty list.
             node_path = await self.session.scalar(
                 select(Budget.path_key).where(Budget.id == budget_id)
             )
@@ -117,9 +119,6 @@ class ListingOps(ApplicationsServiceBase):
                     )
                 )
                 filters.append(Application.budget_id.in_(descendants))
-        # The fuzzy search reads meaningful text only: the title and the string answer
-        # values of the `data` JSONB. It skips ids, enums and numbers. See
-        # `_search_text` for the dialects and for the PII projection.
         rank_expr: ColumnElement[Any] | None = None
         if q and q.strip():
             dialect = dialect_of(self.session)
@@ -137,12 +136,10 @@ class ListingOps(ApplicationsServiceBase):
         if created_from is not None:
             filters.append(Application.created_at >= datetime.combine(created_from, time.min, UTC))
         if created_to is not None:
-            # `created_to` is inclusive, so the filter ends at 00:00 UTC of the next day.
             end = datetime.combine(created_to + timedelta(days=1), time.min, UTC)
             filters.append(Application.created_at < end)
 
         since_sq = state_since_subquery()
-        # `stateSince` falls back to the creation time, as the items do below.
         sort_col: ColumnElement[Any] | InstrumentedAttribute[Any]
         if sort == "amount":
             sort_col = Application.amount
@@ -151,8 +148,6 @@ class ListingOps(ApplicationsServiceBase):
         else:
             sort_col = Application.created_at
         ordering = (sort_col.asc() if order == "asc" else sort_col.desc()).nulls_last()
-        # An active search puts the most relevant row first. The chosen sort then acts
-        # as a deterministic tiebreak. Without a search the order does not change.
         order_by = (rank_expr.desc(), ordering) if rank_expr is not None else (ordering,)
 
         total = await self.session.scalar(
@@ -284,6 +279,10 @@ class ListingOps(ApplicationsServiceBase):
         Both functions must cover the same paths. A listed application must also be
         openable, and an openable application must also be listed.
 
+        Path (a) first collects the root paths with a matching `view_gremium_id`, then takes
+        every application whose `budget_id` points at such a path or a descendant. Path (b) is a
+        plain filter, because the flow engine keeps the snapshot in sync with the state.
+
         Returns:
             An empty list when the principal holds no active membership. The caller
             then adds no extra scope.
@@ -295,10 +294,6 @@ class ListingOps(ApplicationsServiceBase):
             return []
         clauses: list[ColumnElement[bool]] = []
 
-        # (a) View cost centers of a member Gremium, the node or an ancestor, with the
-        #     whole subtree. First collect the root paths with a matching
-        #     `view_gremium_id`. Then take every application whose `budget_id` points
-        #     at such a path or at a descendant.
         root_paths = (
             await self.session.scalars(
                 select(Budget.path_key).where(Budget.view_gremium_id.in_(member_ids))
@@ -315,13 +310,8 @@ class ListingOps(ApplicationsServiceBase):
             )
             clauses.append(Application.budget_id.in_(scoped))
 
-        # (b) A member Gremium decides the current `vote` state. The flow engine keeps
-        #     the snapshot `vote_gremium_id` in sync with the state, so a plain filter
-        #     suffices.
         clauses.append(Application.vote_gremium_id.in_(member_ids))
 
-        # (c) Legacy: the application has a `Vote` in a meeting of a member Gremium.
-        #     This mirrors `access._committee_can_read` (c).
         from app.modules.livevote.models import Meeting
         from app.modules.voting.models import Vote
 
@@ -369,6 +359,9 @@ class ListingOps(ApplicationsServiceBase):
         with `requiresAction`.
 
         Each task carries `stateSince`, the time of the last status change.
+
+        One grouped query computes `stateSince` for the kept tasks only. An application without
+        a status event keeps its creation time.
         """
         from app.modules.flow.service import FlowService
 
@@ -408,8 +401,6 @@ class ListingOps(ApplicationsServiceBase):
                     stateSince=app.created_at,
                 )
             )
-        # One grouped query for the kept tasks only. An application without a
-        # status event keeps its creation time.
         since_by_app = await self._state_since_map(item.id for item in items)
         for item in items:
             item.state_since = since_by_app.get(item.id, item.state_since)

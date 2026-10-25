@@ -132,8 +132,6 @@ def _row(**kw: Any) -> ApplicationDecision:
     return cast("ApplicationDecision", SimpleNamespace(**base))
 
 
-# --- DecisionIn -------------------------------------------------------------------
-
 
 def test_decision_in_trims_conditions_and_reads_alias() -> None:
     d = DecisionIn.model_validate({"approvedAmount": "800.5", "conditions": ["  A  "]})
@@ -170,8 +168,6 @@ def test_from_stored_tolerates_bad_values() -> None:
     assert stored is not None
     assert stored.approved_amount == Decimal("5")
 
-
-# --- pure amount rules --------------------------------------------------------------
 
 
 def test_check_approved_amount_accepts_none_and_equal() -> None:
@@ -210,8 +206,6 @@ def test_amount_deviates_and_committed_amount() -> None:
     assert committed_amount(Decimal("10"), Decimal("8")) == Decimal("8")
 
 
-# --- accepted states --------------------------------------------------------------
-
 
 async def test_accepted_state_keys_without_budget() -> None:
     assert await accepted_state_keys(_s(_Session()), None) == frozenset()
@@ -241,12 +235,11 @@ async def test_check_decision_target_refuses(target: str | None) -> None:
     assert exc.value.code == CODE_NOT_ALLOWED
 
 
-# --- record ---------------------------------------------------------------------------
-
 
 async def test_record_decision_supersedes_adds_and_audits(
     audits: list[dict[str, Any]],
 ) -> None:
+    """Supersede, add and audit; the statements are the row lock and the supersede UPDATE."""
     session = _Session()
     app = _app(approved_amount=Decimal("900.00"))
     vote_id, event_id = uuid.uuid4(), uuid.uuid4()
@@ -261,7 +254,7 @@ async def test_record_decision_supersedes_adds_and_audits(
         status_event_id=event_id,
         now=NOW,
     )
-    assert len(session.statements) == 2  # the row lock and the supersede UPDATE
+    assert len(session.statements) == 2
     assert session.added == [row]
     assert row.decided_at == NOW
     assert row.conditions == ["A", "B"]
@@ -299,8 +292,6 @@ async def test_record_decision_as_requested_without_links(
     assert data["statusEventId"] is None
 
 
-# --- revert ---------------------------------------------------------------------------
-
 
 async def test_revert_without_event_does_nothing(audits: list[dict[str, Any]]) -> None:
     session = _Session()
@@ -312,11 +303,11 @@ async def test_revert_without_event_does_nothing(audits: list[dict[str, Any]]) -
 async def test_revert_without_valid_decision_does_nothing(
     audits: list[dict[str, Any]],
 ) -> None:
+    """Change nothing without a valid decision; the first statement locks the row."""
     session = _Session(executes=[None, None])
     out = await revert_decision_for_event(_s(session), _app(), uuid.uuid4(), actor=None)
     assert out is None
     assert audits == []
-    # The first statement locks the application row.
     assert "FOR UPDATE" in str(session.statements[0])
 
 
@@ -361,15 +352,16 @@ async def test_revert_of_the_first_decision_clears_the_amount(
     assert data["approvedAmountNew"] is None
 
 
-# --- redo (revert of a revert) --------------------------------------------------------
-
 
 async def test_redo_makes_the_undone_decision_valid_again(
     audits: list[dict[str, Any]],
 ) -> None:
+    """Make the undone decision valid again.
+
+    The revert undid `undone` and restored nothing, so no decision is valid before the redo.
+    """
     app = _app(approved_amount=None)
     undone = _row(application_id=app.id, approved_amount=Decimal("500.00"), superseded_at=NOW)
-    # The revert undid `undone` and restored nothing; no decision is valid now.
     session = _Session(executes=[None, None], objects={("ApplicationDecision", undone.id): undone})
     later = datetime(2026, 6, 1, tzinfo=UTC)
     out = await redo_decision_swap(
@@ -442,7 +434,10 @@ async def test_redo_skips_a_missing_or_foreign_decision(
 async def test_redo_without_any_decision_ids_writes_nothing_valid(
     audits: list[dict[str, Any]],
 ) -> None:
-    # A swap of (None, None) cannot occur from a revert, but stays harmless.
+    """Write nothing valid for a swap of (None, None).
+
+    Such a swap cannot come from a revert, but it stays harmless.
+    """
     app = _app(approved_amount=None)
     session = _Session(executes=[None, None])
     out = await redo_decision_swap(
@@ -462,8 +457,6 @@ async def test_record_decision_locks_the_application_first(
     assert "FOR UPDATE" in str(session.statements[0])
     assert "UPDATE application_decision" in str(session.statements[1])
 
-
-# --- reads ----------------------------------------------------------------------------
 
 
 async def test_valid_decision_returns_the_row() -> None:

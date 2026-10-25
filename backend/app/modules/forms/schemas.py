@@ -37,7 +37,7 @@ class FormVersionCreate(_CamelModel):
 
     fields: list[FormFieldDef] = Field(min_length=1)
     activate: bool = True
-    # Multilingual Markdown description of the form.
+    #: Multilingual Markdown description of the form.
     description: I18nMap | None = None
 
 
@@ -87,11 +87,15 @@ class FormSectionOut(_CamelModel):
 
 
 class EffectiveFormOut(_CamelModel):
-    """Effective form definition for one application type."""
+    """Effective form definition for one application type.
+
+    Attributes:
+        has_budget: The client evaluates ``visibleIf: has_budget`` against this value. It
+            belongs to the type, because a value derived anywhere else disagrees with the
+            validation of the server.
+    """
 
     application_type_id: UUID = Field(alias="applicationTypeId")
     form_version_id: UUID = Field(alias="formVersionId")
-    # The client evaluates ``visibleIf: has_budget`` against this. It belongs to the
-    # type; deriving it anywhere else disagrees with the server's own validation.
     has_budget: bool = Field(default=False, alias="hasBudget")
     sections: list[FormSectionOut]

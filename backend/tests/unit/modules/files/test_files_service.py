@@ -73,6 +73,7 @@ def _service(
 
 
 async def test_upload_clean_path_stores_and_enqueues() -> None:
+    """Store, enqueue and write an audit entry without the file name."""
     session = FakeSession()
     app_id = _app(session)
     storage, queue = FakeStorage(), FakeScanQueue()
@@ -85,7 +86,6 @@ async def test_upload_clean_path_stores_and_enqueues() -> None:
     assert len(storage.put_calls) == 1
     assert len(queue.enqueued) == 1
     assert session.committed == 1
-    # The upload writes an audit entry without the file name.
     assert [a["action"] for a in UPLOAD_AUDITS] == ["attachment_upload"]
     assert UPLOAD_AUDITS[0]["target_id"] == str(out.id)
     assert UPLOAD_AUDITS[0]["data"] == {
@@ -118,7 +118,7 @@ async def test_upload_allowed_in_locked_state() -> None:
 
 
 async def test_upload_state_row_missing_proceeds() -> None:
-    # current_state_id is set but no State row exists, so no lock blocks the upload.
+    """Upload when the current state row is missing, so no lock blocks."""
     session = FakeSession()
     app = Application()
     app.id = uuid.uuid4()
@@ -202,13 +202,13 @@ async def test_upload_storage_failure_503() -> None:
 
 
 async def test_upload_without_queue_stays_quarantined() -> None:
+    """Store the file, but without Redis no scan runs and scanned stays false."""
     session = FakeSession()
     app_id = _app(session)
     storage = FakeStorage()
     out = await _service(session, storage=storage, queue=None).upload(
         app_id, filename="doc.pdf", data=PDF, by="p"
     )
-    # The file is stored, but no scan job runs without Redis, so scanned stays false.
     assert out.scanned is False
     assert len(storage.put_calls) == 1
 
@@ -231,15 +231,17 @@ def _attachment(session: FakeSession, **kw: object) -> Attachment:
 
 
 async def test_signed_url_clean_returns_relative_download_path() -> None:
-    # App-relative stream path instead of a presigned MinIO URL. The internal host of
-    # MinIO is unreachable for the browser.
+    """Return the app-relative stream path and presign nothing.
+
+    The internal MinIO host is unreachable for the browser.
+    """
     session = FakeSession()
     att = _attachment(session, scanned=True, scan_result=SCAN_RESULT_CLEAN)
     storage = FakeStorage()
     out = await _service(session, storage=storage).signed_url(att.id)
     assert out.url == f"/api/attachments/{att.id}/download"
     assert out.expiresIn == SETTINGS.attachment_url_ttl_seconds
-    assert storage.signed == []  # no longer presigned
+    assert storage.signed == []
 
 
 async def test_signed_url_still_scanning_409() -> None:
@@ -270,6 +272,7 @@ async def test_signed_url_without_storage_503() -> None:
 
 
 async def test_download_stream_clean_yields_chunks() -> None:
+    """Yield the chunks; the size comes from the stored size (Content-Length)."""
     session = FakeSession()
     att = _attachment(session, scanned=True, scan_result=SCAN_RESULT_CLEAN)
     storage = FakeStorage()
@@ -281,7 +284,7 @@ async def test_download_stream_clean_yields_chunks() -> None:
     assert b"".join(chunks) == b"the-bytes"
     assert filename == "doc.pdf"
     assert mime == "application/pdf"
-    assert size == 10  # from the stored size (Content-Length)
+    assert size == 10
 
 
 async def test_download_stream_storage_failure_503() -> None:
@@ -342,6 +345,7 @@ async def test_finalize_scan_infected_quarantines_and_audits(
 async def test_finalize_scan_infected_tolerates_remove_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Keep the quarantine after a remove error, because storage_key is cleared."""
     async def _record(session: object, **kw: object) -> None:
         return None
 
@@ -351,7 +355,6 @@ async def test_finalize_scan_infected_tolerates_remove_error(
     await _service(session, storage=FailingStorage()).finalize_scan(
         att.id, ScanVerdict(clean=False, signature="x")
     )
-    # Quarantine still applies after a remove error, because storage_key is cleared.
     assert att.storage_key is None
     assert att.scanned is True
 
@@ -359,13 +362,13 @@ async def test_finalize_scan_infected_tolerates_remove_error(
 async def test_finalize_scan_infected_without_storage_still_quarantines(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Quarantine without storage and without a remove call."""
     async def _record(session: object, **kw: object) -> None:
         return None
 
     monkeypatch.setattr(files_service, "audit_record", _record)
     session = FakeSession()
     att = _attachment(session)
-    # Without storage there is no remove call, but the quarantine still applies.
     await _service(session, storage=None).finalize_scan(
         att.id, ScanVerdict(clean=False, signature="x")
     )
@@ -374,8 +377,8 @@ async def test_finalize_scan_infected_without_storage_still_quarantines(
 
 
 async def test_finalize_scan_unknown_attachment_skips() -> None:
+    """Skip an unknown attachment without a commit and without an error."""
     session = FakeSession()
-    # no commit and no error
     await _service(session, storage=FakeStorage()).finalize_scan(
         uuid.uuid4(), ScanVerdict(clean=True)
     )

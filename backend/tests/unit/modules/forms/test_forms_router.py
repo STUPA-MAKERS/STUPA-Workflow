@@ -169,12 +169,14 @@ def test_create_form_version_rejects_empty_fields(
     assert r.status_code == 422
 
 
-# OpenAPI contract: the spec declares the error statuses for Schemathesis conformance.
 def test_openapi_declares_error_responses(app_client: TestClient) -> None:
+    """Declare the error statuses in the OpenAPI spec for Schemathesis.
+
+    The error hook rewrites a 4xx to problem+json.
+    """
     spec = app_client.get("/openapi.json").json()
     get_form = spec["paths"]["/api/application-types/{type_id}/form"]["get"]
     assert "404" in get_form["responses"]
     post = spec["paths"]["/api/admin/application-types/{type_id}/form-versions"]["post"]
     assert {"400", "401", "403", "404", "422"} <= set(post["responses"])
-    # The error hook rewrites 4xx to problem+json.
     assert "application/problem+json" in get_form["responses"]["404"]["content"]

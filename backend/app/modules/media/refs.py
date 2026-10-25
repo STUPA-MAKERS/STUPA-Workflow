@@ -17,9 +17,9 @@ _UUID: Final = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
 #: The whole canonical path, for one image destination.
 IMAGE_PATH_RE: Final[re.Pattern[str]] = re.compile(rf"^/api/media/images/({_UUID})$")
 
-# The destination of a Markdown image or link: exactly `](/api/media/images/<id>)`. The
-# renderers (the SPA, the typst service) show only this plain form, so a form with a
-# title, white space or angle brackets is no reference here either.
+#: The destination of a Markdown image or link: exactly `](/api/media/images/<id>)`. The
+#: renderers show only this plain form, so a form with a title, white space or angle
+#: brackets is no reference here either.
 _REF_RE: Final[re.Pattern[str]] = re.compile(rf"\]\(/api/media/images/({_UUID})\)")
 
 

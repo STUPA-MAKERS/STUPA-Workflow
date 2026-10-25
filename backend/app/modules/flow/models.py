@@ -45,7 +45,15 @@ class FlowVersion(UUIDPkMixin, CreatedAtMixin, Base):
 
 
 class State(UUIDPkMixin, Base):
-    """A flow state. Exactly one state per flow_version has `is_initial` (partial unique)."""
+    """A flow state. Exactly one state per flow_version has `is_initial` (partial unique).
+
+    Attributes:
+        is_terminal: Terminal state for GDPR retention. The platform may anonymize an
+            application in a terminal state.
+        kind: `normal` has guarded manual or automatic transitions. `vote` means that a
+            Gremium votes, with `config={gremiumId,...}` and two branch exits, pass and
+            fail.
+    """
 
     __tablename__ = "state"
 
@@ -57,10 +65,7 @@ class State(UUIDPkMixin, Base):
     color: Mapped[str | None] = mapped_column(Text, nullable=True)
     edit_allowed: Mapped[bool] = mapped_column(Boolean, server_default="true")
     is_initial: Mapped[bool] = mapped_column(Boolean, server_default="false")
-    # Terminal state (GDPR retention): the platform may anonymize a terminal application.
     is_terminal: Mapped[bool] = mapped_column(Boolean, server_default="false")
-    # Two kinds. `normal` has guarded manual or automatic transitions. `vote` means that
-    # a Gremium votes, with `config={gremiumId,...}` and two branch exits, pass and fail.
     kind: Mapped[str] = mapped_column(Text, server_default="normal")
     config: Mapped[dict] = mapped_column(JSONB, server_default="{}")
 
@@ -77,6 +82,18 @@ class State(UUIDPkMixin, Base):
 
 
 class Transition(UUIDPkMixin, Base):
+    """A directed edge between two states of a flow version.
+
+    Attributes:
+        color: Optional color. It tints the editor arrow and the decision button on the
+            application.
+        automatic: The transition fires without a user action once the guard holds. The
+            worker evaluates it periodically with `manual=False`.
+        branch: Result branch of a vote-state exit, `pass` or `fail`. NULL otherwise.
+        requires_action: The firable transition counts as an open task. False marks an
+            optional action.
+    """
+
     __tablename__ = "transition"
 
     flow_version_id: Mapped[uuid.UUID] = mapped_column(
@@ -89,17 +106,12 @@ class Transition(UUIDPkMixin, Base):
         ForeignKey("state.id", ondelete="CASCADE")
     )
     label_i18n: Mapped[dict] = mapped_column(JSONB, server_default="{}")
-    # Optional color. It tints the editor arrow and the decision button on the application.
     color: Mapped[str | None] = mapped_column(Text, nullable=True)
     guard: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     actions: Mapped[list] = mapped_column(JSONB, server_default="[]")
     order: Mapped[int] = mapped_column("order", Integer, server_default="0")
-    # Automatic transition: it fires without a user action once the guard holds. The
-    # worker evaluates it periodically with `manual=False`.
     automatic: Mapped[bool] = mapped_column(Boolean, server_default="false")
-    # Result branch for the two vote-state exits: `pass` or `fail`. NULL otherwise.
     branch: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Does the firable transition count as an open task? False marks an optional action.
     requires_action: Mapped[bool] = mapped_column(Boolean, server_default="true")
 
     __table_args__ = (Index("ix_transition_flow_version_id_from_state_id",

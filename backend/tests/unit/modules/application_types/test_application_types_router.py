@@ -101,9 +101,10 @@ def test_list_public_ok_camel_case(app_client: TestClient, fake_service: _FakeSe
 def test_list_default_paging_passed_through(
     app_client: TestClient, fake_service: _FakeService
 ) -> None:
+    """Pass the default paging (`paging.DEFAULT_LIMIT`) through."""
     app_client.get("/api/application-types")
     call = fake_service.calls[0]
-    assert call["limit"] == 50  # paging.DEFAULT_LIMIT
+    assert call["limit"] == 50
     assert call["offset"] == 0
     assert call["lang"] == "de"
 
@@ -153,23 +154,23 @@ def test_list_rejects_negative_offset_422(app_client: TestClient) -> None:
 
 
 def test_list_rejects_overflow_offset_422(app_client: TestClient) -> None:
-    # An offset above int4 overflows the database OFFSET. Reject it with 422, not 500.
+    """Answer 422, not 500, for an offset above int4."""
     r = app_client.get("/api/application-types?offset=10000000000000000000")
     assert r.status_code == 422
 
 
 def test_list_rejects_unknown_query_param_422(app_client: TestClient) -> None:
-    # The extra="forbid" config turns an unknown query parameter into 422
-    # (negative_data_rejection).
+    """Answer 422 for an unknown query parameter (extra="forbid")."""
     r = app_client.get("/api/application-types?bogus=1")
     assert r.status_code == 422
 
 
 @pytest.mark.parametrize("lang", ["null", "xx", "EN", "de-DE", ""])
 def test_list_rejects_invalid_lang_422(app_client: TestClient, lang: str) -> None:
-    # An invalid `lang` value, `lang=null` included, must give 422 instead of a silent 200.
-    # This closes the be-contract coverage flake. Schemathesis injects junk data and
-    # requires a 4xx answer.
+    """Answer 422 for an invalid `lang`, `lang=null` included, not a silent 200.
+
+    Schemathesis injects junk data and requires a 4xx answer.
+    """
     r = app_client.get(f"/api/application-types?lang={lang}")
     assert r.status_code == 422
     assert r.headers["content-type"].startswith("application/problem+json")
@@ -191,10 +192,10 @@ def test_list_default_lang_is_de(app_client: TestClient, fake_service: _FakeServ
 
 
 def test_openapi_declares_error_responses(app_client: TestClient) -> None:
+    """Declare the error statuses; the error hook rewrites a 4xx to problem+json."""
     spec = app_client.get("/openapi.json").json()
     get_list = spec["paths"]["/api/application-types"]["get"]
     assert "422" in get_list["responses"]
-    # The error hook rewrites a 4xx response to problem+json.
     assert "application/problem+json" in get_list["responses"]["422"]["content"]
     assert "application/json" in get_list["responses"]["200"]["content"]
 

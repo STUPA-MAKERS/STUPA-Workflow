@@ -135,9 +135,11 @@ class _ColorSession:
 
 
 def test_resolve_state_colors_overrides_stored_color() -> None:
-    """Bug fix: a state row with `color=None` takes the color of the active global flow."""
+    """A state row with `color=None` takes the color of the active global flow.
+
+    The stored state row comes from an old FlowVersion and carries no color.
+    """
     svc = ApplicationsService(_ColorSession([("approved", "#2ecc71")]))  # type: ignore[arg-type]
-    # The stored state row comes from an old FlowVersion and carries no color.
     stored = _Obj(
         id=uuid4(),
         key="approved",

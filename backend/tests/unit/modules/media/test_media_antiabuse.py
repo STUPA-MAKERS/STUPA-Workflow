@@ -34,13 +34,13 @@ def test_body_cap() -> None:
 
 
 async def test_upload_limit_per_principal() -> None:
+    """Limit per principal; another person has an own budget."""
     settings = get_settings().model_copy(update={"rl_media_images_per_hour": 1})
     limiter = InMemoryRateLimiter()
     alice = Principal(sub="alice", permissions=set())
     await antiabuse.rate_limit_media_images(settings, limiter, alice)
     with pytest.raises(RateLimitedError):
         await antiabuse.rate_limit_media_images(settings, limiter, alice)
-    # Another person has an own budget; an anonymous caller gets the 401 of the route.
     await antiabuse.rate_limit_media_images(
         settings, limiter, Principal(sub="bob", permissions=set())
     )
@@ -48,13 +48,13 @@ async def test_upload_limit_per_principal() -> None:
 
 
 async def test_upload_limit_applies_to_the_logged_in_mcp() -> None:
+    """Share the budget of the person with the token."""
     settings = get_settings().model_copy(update={"rl_media_images_per_hour": 1})
     limiter = InMemoryRateLimiter()
     mcp = Principal(sub="mcp", permissions=set(), scope_permissions=frozenset({"todo.write"}))
     await antiabuse.rate_limit_media_images(settings, limiter, mcp)
     with pytest.raises(RateLimitedError):
         await antiabuse.rate_limit_media_images(settings, limiter, mcp)
-    # The token shares the budget of the person behind it.
     with pytest.raises(RateLimitedError):
         await antiabuse.rate_limit_media_images(
             settings, limiter, Principal(sub="mcp", permissions=set())

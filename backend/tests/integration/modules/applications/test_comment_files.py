@@ -83,6 +83,12 @@ async def test_comment_files_follow_the_read_rule_of_their_comment(
     maker: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Apply the read rule of the comment to its files.
+
+    A comment file is no application attachment. The applicant reads the public file only.
+    The applicant of another application and a principal without a read right do not see it.
+    Deleting the comment removes its file and the object.
+    """
     pepper = guest_settings(migrated[1]).magic_link_secret
     seed = await seed_read_world(maker)
     app_id = await create_app(maker, seed, actor="applicant")
@@ -119,12 +125,10 @@ async def test_comment_files_follow_the_read_rule_of_their_comment(
         ]
         for draft in (internal, public):
             assert client.get(f"/api/attachments/{draft}/download").status_code == 200
-        # A comment file is no application attachment.
         files = client.get(f"/api/applications/{app_id}/attachments")
         assert files.status_code == 200, files.text
         assert {a["id"] for a in files.json()}.isdisjoint({str(internal), str(public)})
 
-        # The applicant reads the public file only.
         as_applicant(api, app_id)
         down = client.get(f"/api/attachments/{public}/download")
         assert down.status_code == 200 and down.content == b"data"
@@ -145,14 +149,11 @@ async def test_comment_files_follow_the_read_rule_of_their_comment(
         assert own.status_code == 201, own.text
         assert client.post(url, json={"body": "", "visibility": "public"}).status_code == 422
 
-        # The applicant of another application does not see the file.
         as_applicant(api, other_app)
         assert client.get(f"/api/attachments/{public}/download").status_code == 404
-        # A principal without a read right on the application neither.
         as_principal(api, Principal(sub="nobody"))
         assert client.get(f"/api/attachments/{public}/download").status_code == 404
 
-        # Deleting the comment removes its file and the object.
         as_principal(api, _MANAGER)
         deleted = client.delete(f"{url}/{posted[1]['id']}")
         assert deleted.status_code == 204, deleted.text
@@ -167,6 +168,12 @@ async def test_comment_files_follow_the_read_rule_of_their_comment(
 async def test_a_comment_with_files_and_the_anonymization_take_the_same_lock(
     migrated: tuple[str, str], maker: async_sessionmaker[AsyncSession]
 ) -> None:
+    """Serialize a comment with files against the anonymization.
+
+    The open anonymization holds the row, so the comment waits instead of binding files that
+    the anonymization does not see. After the wait it sees the anonymization and refuses its
+    files.
+    """
     from sqlalchemy import text
     from sqlalchemy.exc import DBAPIError
 
@@ -196,15 +203,12 @@ async def test_a_comment_with_files_and_the_anonymization_take_the_same_lock(
         await ApplicationsService(anonymizing).anonymize(
             app_id, files=FilesService(anonymizing, storage=storage), commit=False
         )
-        # The open anonymization holds the row, so the comment with files waits for
-        # it instead of binding files that the anonymization does not see.
         await commenting.execute(text("SET lock_timeout = '200ms'"))
         with pytest.raises(DBAPIError, match="lock timeout"):
             await _comment(commenting)
         await commenting.rollback()
         await anonymizing.commit()
 
-    # After the wait the comment sees the anonymization and refuses its files.
     async with maker() as session:
         with pytest.raises(ValidationProblem) as exc:
             await _comment(session)

@@ -28,7 +28,7 @@ from app.modules.files.models import Attachment
 from app.modules.forms.models import FormField
 from app.shared.guards import GuardContext
 
-# Form field type to `compare` value type (guards.COMPARE_TYPES).
+#: Form field type to `compare` value type (`guards.COMPARE_TYPES`).
 _FIELD_TYPE_MAP: dict[str, str] = {
     "number": "number",
     "currency": "currency",
@@ -112,6 +112,8 @@ async def _has_attachment(session: AsyncSession, app: Application) -> bool:
     still waits for the scan stays in quarantine and does not count. `storage_key IS
     NULL` marks an attachment that a ClamAV hit removed. Such an attachment does not
     count either. A draft of the wizard has no application and never counts.
+
+    The clean check compares with `SCAN_RESULT_CLEAN` of the files service.
     """
     return bool(
         await session.scalar(
@@ -121,7 +123,6 @@ async def _has_attachment(session: AsyncSession, app: Application) -> bool:
                     Attachment.application_id == app.id,
                     Attachment.storage_key.is_not(None),
                     Attachment.scanned.is_(True),
-                    # `SCAN_RESULT_CLEAN` of the files service.
                     Attachment.scan_result == "clean",
                 )
             )

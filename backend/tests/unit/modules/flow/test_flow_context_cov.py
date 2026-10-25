@@ -34,8 +34,8 @@ from tests._support.flow_fakes import fake_session, result
         ("date", "date"),
         ("checkbox", "bool"),
         ("boolean", "bool"),
-        ("text", "text"),  # default
-        ("freitext-unknown", "text"),  # unknown maps to the default
+        ("text", "text"),
+        ("freitext-unknown", "text"),
     ],
 )
 def test_compare_type_mapping(field_type: str, expected: str) -> None:
@@ -43,11 +43,11 @@ def test_compare_type_mapping(field_type: str, expected: str) -> None:
 
 
 async def testcommittee_ids_for_sub_empty_sub_short_circuits() -> None:
-    # A falsy sub returns frozenset() without a DB read.
+    """Return an empty set for a falsy sub without a DB read."""
     session = fake_session()
     assert await committee_ids_for_sub(session, None) == frozenset()
     assert await committee_ids_for_sub(session, "") == frozenset()
-    assert session.statements == []  # no execute
+    assert session.statements == []
 
 
 async def testcommittee_ids_for_sub_maps_rows_to_str() -> None:
@@ -80,31 +80,33 @@ async def test_budget_fits_fail_closed_when_amount_missing() -> None:
 
 
 async def test_budget_fits_true_when_amount_within_available() -> None:
+    """Fit an amount within the available 80 (allocated 100, flow -20)."""
     session = fake_session()
-    # scalar queue: the allocated sum, then the flow sum.
-    session.scalar_results = [Decimal("100"), Decimal("-20")]  # available = 80
+    session.scalar_results = [Decimal("100"), Decimal("-20")]
     app = _app_for_budget(budget_id=uuid4(), fiscal=uuid4(), amount=Decimal("80"))
     assert await _budget_fits(session, cast("Any", app)) is True
 
 
 async def test_budget_fits_false_when_amount_exceeds_available() -> None:
+    """Refuse an amount above the available 80."""
     session = fake_session()
-    session.scalar_results = [Decimal("100"), Decimal("-20")]  # available = 80
+    session.scalar_results = [Decimal("100"), Decimal("-20")]
     app = _app_for_budget(budget_id=uuid4(), fiscal=uuid4(), amount=Decimal("80.01"))
     assert await _budget_fits(session, cast("Any", app)) is False
 
 
 async def test_budget_fits_handles_none_allocated_and_flow() -> None:
-    # An allocated of None and a flow of None both become Decimal("0"), so available is 0.
-    session = fake_session()  # empty scalar_results, so both are None
+    """Treat a None allocation and a None flow as 0, so 0 fits and 0.01 does not."""
+    session = fake_session()
     app = _app_for_budget(budget_id=uuid4(), fiscal=uuid4(), amount=Decimal("0"))
-    assert await _budget_fits(session, cast("Any", app)) is True  # 0 <= 0
+    assert await _budget_fits(session, cast("Any", app)) is True
     session2 = fake_session()
     app2 = _app_for_budget(budget_id=uuid4(), fiscal=uuid4(), amount=Decimal("0.01"))
-    assert await _budget_fits(session2, cast("Any", app2)) is False  # 0.01 <= 0 → False
+    assert await _budget_fits(session2, cast("Any", app2)) is False
 
 
 async def test_field_types_maps_and_adds_amount() -> None:
+    """Map the field types and always add the built-in `amount`."""
     rows = [("betrag", "currency"), ("titel", "text"), ("anzahl", "number"), ("ok", "checkbox")]
     session = fake_session(result(*rows))
     app = SimpleNamespace(form_version_id=uuid4())
@@ -114,7 +116,7 @@ async def test_field_types_maps_and_adds_amount() -> None:
         "titel": "text",
         "anzahl": "number",
         "ok": "bool",
-        "amount": "currency",  # the built-in is always added
+        "amount": "currency",
     }
 
 
@@ -191,8 +193,7 @@ def _budget_no_fit(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.mark.usefixtures("_no_committees", "_no_field_types", "_budget_no_fit")
 async def test_build_context_manual_actor_is_creator() -> None:
-    # With manual=True and created_by == principal.sub, actor_is_applicant is True. The
-    # roles come from the principal.
+    """Mark the creator as applicant on a manual fire; the roles come from the principal."""
     app = _ctx_app(
         data={"_applicantRoles": ["member"], "feld": 1},
         created_by="actor-1",
@@ -214,7 +215,7 @@ async def test_build_context_manual_actor_is_creator() -> None:
 
 @pytest.mark.usefixtures("_no_committees", "_no_field_types", "_budget_no_fit")
 async def test_build_context_manual_as_applicant_magic_link() -> None:
-    # With as_applicant=True and created_by != sub, the magic link sets actor_is_applicant.
+    """Mark the magic-link applicant as applicant when the creator differs."""
     app = _ctx_app(data={}, created_by="someone-else")
     ctx = await build_context(
         fake_session(), cast("Any", app), _principal(), manual=True, as_applicant=True
@@ -224,7 +225,7 @@ async def test_build_context_manual_as_applicant_magic_link() -> None:
 
 @pytest.mark.usefixtures("_no_committees", "_no_field_types", "_budget_no_fit")
 async def test_build_context_manual_not_applicant() -> None:
-    # With manual=True, no magic link and created_by != sub, actor_is_applicant is False.
+    """Do not mark a foreign actor without a magic link."""
     app = _ctx_app(data={}, created_by="someone-else")
     ctx = await build_context(
         fake_session(), cast("Any", app), _principal(), manual=True
@@ -234,7 +235,7 @@ async def test_build_context_manual_not_applicant() -> None:
 
 @pytest.mark.usefixtures("_no_committees", "_no_field_types", "_budget_no_fit")
 async def test_build_context_manual_created_by_none() -> None:
-    # created_by None makes the created_by clause False, so actor_is_applicant is False.
+    """Do not mark the actor when the application has no creator."""
     app = _ctx_app(data={}, created_by=None)
     ctx = await build_context(
         fake_session(), cast("Any", app), _principal(), manual=True
@@ -244,8 +245,10 @@ async def test_build_context_manual_created_by_none() -> None:
 
 @pytest.mark.usefixtures("_no_committees", "_no_field_types", "_budget_no_fit")
 async def test_build_context_automatic_strips_actor_signals() -> None:
-    # With manual=False the roles and actor_committees stay empty. The manual gate also
-    # makes actor_is_applicant False.
+    """Leave the roles and the actor committees empty on an automatic fire.
+
+    The manual gate also blocks actor_is_applicant. A budget_id of None stays None.
+    """
     app = _ctx_app(data={"_applicantRoles": ["x"]}, created_by="actor-1", budget_id=None)
     ctx = await build_context(
         fake_session(), cast("Any", app), _principal(), manual=False, as_applicant=True
@@ -253,14 +256,13 @@ async def test_build_context_automatic_strips_actor_signals() -> None:
     assert ctx.manual is False
     assert ctx.roles == frozenset()
     assert ctx.actor_committees == frozenset()
-    assert ctx.actor_is_applicant is False  # the manual gate blocks it
-    assert ctx.budget_id is None  # budget_id None stays None
+    assert ctx.actor_is_applicant is False
+    assert ctx.budget_id is None
 
 
 @pytest.mark.usefixtures("_no_committees", "_no_field_types", "_budget_no_fit")
 async def test_build_context_data_not_dict_and_roles_not_list() -> None:
-    # app.data is not a dict, so field_values starts empty. A raw_roles of None leaves
-    # applicant_roles empty.
+    """Start with empty field values for non-dict data and empty roles for None."""
     app = _ctx_app(data=None, created_by="actor-1")
     ctx = await build_context(
         fake_session(), cast("Any", app), _principal(), manual=True
@@ -271,8 +273,7 @@ async def test_build_context_data_not_dict_and_roles_not_list() -> None:
 
 @pytest.mark.usefixtures("_no_committees", "_no_field_types", "_budget_no_fit")
 async def test_build_context_applicant_roles_present_but_not_list() -> None:
-    # _applicantRoles is present but is not a list, so applicant_roles stays empty. This
-    # is the isinstance False branch.
+    """Leave the applicant roles empty when `_applicantRoles` is not a list."""
     app = _ctx_app(data={"_applicantRoles": "not-a-list"}, created_by="actor-1")
     ctx = await build_context(
         fake_session(), cast("Any", app), _principal(), manual=True

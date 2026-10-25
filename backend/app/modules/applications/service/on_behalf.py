@@ -64,6 +64,10 @@ class OnBehalfOps(CreateOps):
         becomes an applicant account: the application belongs to that account. The
         caller reads the outcome from ``created_by`` of the result.
 
+        The account rule ensures that the account owns the application through ``created_by``
+        and reads it with the normal login, so no second access path (a guest magic link) exists
+        for the same person. The schema guarantees name and e-mail for a guest.
+
         Raises:
             ValidationProblem: the account is unknown, inactive or has no e-mail, or
                 ``receivedOn`` lies in the future or more than a year back. Form
@@ -91,13 +95,8 @@ class OnBehalfOps(CreateOps):
         if principal_id is not None:
             owner_sub, email, name = await self._applicant_account(principal_id)
         else:
-            # The schema guarantees both values for a guest.
             email = str(payload.applicant_email)
             name = (payload.applicant_name or "").strip()
-            # User decision 2026-10-06: an e-mail of an active account makes the
-            # application an account application of that account. The account then
-            # owns it through `created_by` and reads it with the normal login, and no
-            # second access path (a guest magic link) exists for the same person.
             match = await self._active_account_by_email(email)
             if match is not None:
                 principal_id, owner_sub, email, name = match

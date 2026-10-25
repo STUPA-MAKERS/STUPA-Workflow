@@ -202,13 +202,14 @@ async def _app(maker: async_sessionmaker[AsyncSession], app_id: uuid.UUID) -> Ap
         return app
 
 
-# The flow routes hide an unconfirmed application.
 @pytest.fixture
 def api(
     migrated: tuple[str, str], settings: Settings, monkeypatch: pytest.MonkeyPatch
 ) -> Iterator[FastAPI]:
-    # The TestClient runs the app on its own event loop. It gets its own engine
-    # without a pool, so no connection crosses the loops.
+    """Serve the app on its own event loop with its own engine without a pool.
+
+    No connection crosses the loops.
+    """
     maker = async_sessionmaker(
         create_async_engine(migrated[1], poolclass=NullPool), expire_on_commit=False
     )
@@ -233,6 +234,7 @@ def api(
 async def test_flow_routes_answer_404_until_the_verify(
     maker: async_sessionmaker[AsyncSession], settings: Settings, api: FastAPI
 ) -> None:
+    """Answer 404 on the flow routes until the verify; nothing moves."""
     seed = await _seed(maker, automatic=False)
     app_id = await _guest_create(maker, seed, _Recorder())
     base = f"/api/applications/{app_id}"
@@ -250,7 +252,6 @@ async def test_flow_routes_answer_404_until_the_verify(
         )
         assert force.status_code == 404, force.text
 
-    # Nothing moved.
     assert (await _app(maker, app_id)).current_state_id == seed.states["eingang"].id
 
     await _verify(maker, settings, await _magic_token(maker, settings, app_id), _Recorder())
@@ -262,15 +263,14 @@ async def test_flow_routes_answer_404_until_the_verify(
         assert client.get(f"{base}/flow-states").status_code == 200
 
 
-# No automatic transition and no mail before the verify.
 async def test_unconfirmed_application_rests_in_the_cron(
     maker: async_sessionmaker[AsyncSession], settings: Settings
 ) -> None:
+    """Fire no automatic transition and send no mail before the verify."""
     seed = await _seed(maker, automatic=True)
     recorder = _Recorder()
     app_id = await _guest_create(maker, seed, recorder)
 
-    # The create starts nothing.
     assert recorder.actions == []
 
     ctx: dict[str, Any] = {
@@ -290,6 +290,7 @@ async def test_unconfirmed_application_rests_in_the_cron(
 async def test_notify_dispatcher_holds_back_flow_mails(
     maker: async_sessionmaker[AsyncSession], settings: Settings
 ) -> None:
+    """Hold back the flow mails until the email is confirmed."""
     seed = await _seed(maker, automatic=False)
     app_id = await _guest_create(maker, seed, _Recorder())
     queue = _ListQueue()
@@ -310,7 +311,6 @@ async def test_notify_dispatcher_holds_back_flow_mails(
     await dispatcher.dispatch([action])
     assert queue.messages == []
 
-    # The same action goes out once the email is confirmed.
     async with maker() as session:
         app = await session.get(Application, app_id)
         assert app is not None
@@ -320,10 +320,13 @@ async def test_notify_dispatcher_holds_back_flow_mails(
     assert [m.to for m in queue.messages] == [("gast@example.org",)]
 
 
-# Item 3 of the plan: the verify starts the flow, one time.
 async def test_verify_announces_once(
     maker: async_sessionmaker[AsyncSession], settings: Settings
 ) -> None:
+    """Start the flow at the first verify only.
+
+    The edit link is not single-use, so a second click comes, and it starts nothing.
+    """
     seed = await _seed(maker, automatic=False)
     app_id = await _guest_create(maker, seed, _Recorder())
     token = await _magic_token(maker, settings, app_id)
@@ -338,7 +341,6 @@ async def test_verify_announces_once(
     assert action.type == "taskNotify"
     assert action.transition_id is None
 
-    # The edit link is not single-use. A second click starts nothing again.
     second = _Recorder()
     await _verify(maker, settings, token, second)
     assert second.actions == []
@@ -347,6 +349,7 @@ async def test_verify_announces_once(
 async def test_verify_runs_the_automatic_transition(
     maker: async_sessionmaker[AsyncSession], settings: Settings
 ) -> None:
+    """Run the automatic transition; its own mails replace the task mail of `eingang`."""
     seed = await _seed(maker, automatic=True)
     app_id = await _guest_create(maker, seed, _Recorder())
 
@@ -364,7 +367,6 @@ async def test_verify_runs_the_automatic_transition(
             )
         ).all()
     assert [e.actor for e in events] == ["applicant", "system:confirmation"]
-    # The fired transition sends its own mails. No extra task mail of `eingang`.
     assert {a.type for a in recorder.actions} == {"notify", "taskNotify"}
     assert all(a.status_event_id == events[-1].id for a in recorder.actions)
 
