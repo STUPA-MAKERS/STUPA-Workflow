@@ -184,6 +184,8 @@ class AuditAction(StrEnum):
     BUDGET_NODE_UPDATE = "budget_node_update"
     BUDGET_NODE_DELETE = "budget_node_delete"
     BUDGET_FISCAL_YEAR_DELETE = "budget_fiscal_year_delete"
+    BUDGET_FISCAL_YEAR_CLOSE = "budget_fiscal_year_close"
+    BUDGET_FISCAL_YEAR_REOPEN = "budget_fiscal_year_reopen"
     BUDGET_ALLOCATION_SET = "budget_allocation_set"
     BUDGET_EXPENSE_CREATE = "budget_expense_create"
     BUDGET_EXPENSE_UPDATE = "budget_expense_update"

@@ -10,7 +10,8 @@ Permission scope:
 
 A constraint violation gives 422. The checked constraints are children <=
 parent and fiscal-year disjointness. A delete of a node that still has children
-or allocations gives 409.
+or allocations gives 409. A money mutation on a closed fiscal year gives 409
+``fiscal_year_closed``.
 """
 
 from __future__ import annotations
@@ -297,7 +298,7 @@ async def list_budget_expenses(
     "/budgets/{budget_id}/expenses",
     response_model=ExpenseOut,
     status_code=status.HTTP_201_CREATED,
-    responses=_errors(400, 401, 403, 404, 422),
+    responses=_errors(400, 401, 403, 404, 409, 422),
 )
 async def create_budget_expense(
     budget_id: UUID,
@@ -313,7 +314,7 @@ async def create_budget_expense(
     "/budget-expenses/{expense_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     dependencies=[Depends(require_principal("budget.book"))],
-    responses=_errors(401, 403, 404),
+    responses=_errors(401, 403, 404, 409),
 )
 async def delete_budget_expense(expense_id: UUID, service: ServiceDep) -> None:
     """Delete a booked expense or income."""
@@ -337,7 +338,7 @@ async def list_sub_bookings(expense_id: UUID, service: ServiceDep) -> list[Expen
     "/budget-expenses/{expense_id}/sub-bookings",
     response_model=ExpenseOut,
     status_code=status.HTTP_201_CREATED,
-    responses=_errors(401, 403, 404, 422),
+    responses=_errors(401, 403, 404, 409, 422),
 )
 async def create_sub_booking(
     expense_id: UUID,
@@ -358,7 +359,7 @@ async def create_sub_booking(
     "/expenses",
     response_model=ExpenseOut,
     status_code=status.HTTP_201_CREATED,
-    responses=_errors(400, 401, 403, 404, 422),
+    responses=_errors(400, 401, 403, 404, 409, 422),
 )
 async def book_expense(
     payload: ExpenseCreate,
@@ -490,7 +491,7 @@ async def export_expenses_xlsx(
 @router.patch(
     "/budget-expenses/{expense_id}",
     response_model=ExpenseOut,
-    responses=_errors(400, 401, 403, 404, 422),
+    responses=_errors(400, 401, 403, 404, 409, 422),
 )
 async def update_budget_expense(
     expense_id: UUID,
@@ -506,7 +507,7 @@ async def update_budget_expense(
     "/budget-transfers",
     response_model=TransferOut,
     status_code=status.HTTP_201_CREATED,
-    responses=_errors(400, 401, 403, 404, 422),
+    responses=_errors(400, 401, 403, 404, 409, 422),
 )
 async def create_transfer(
     payload: TransferCreate,
@@ -588,7 +589,7 @@ async def update_transfer(
     "/budget-transfers/{transfer_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     dependencies=[Depends(require_principal("budget.book"))],
-    responses=_errors(401, 403, 404),
+    responses=_errors(401, 403, 404, 409),
 )
 async def delete_transfer(transfer_id: UUID, service: ServiceDep) -> None:
     """Delete a transfer, that is both of its bookings.
@@ -826,7 +827,7 @@ async def create_fiscal_year(
     "/budgets/{budget_id}/fiscal-years/{fiscal_year_id}",
     response_model=FiscalYearOut,
     dependencies=[Depends(require_principal("budget.structure"))],
-    responses=_errors(400, 401, 403, 404, 422),
+    responses=_errors(400, 401, 403, 404, 409, 422),
 )
 async def update_fiscal_year(
     budget_id: UUID,
@@ -836,6 +837,45 @@ async def update_fiscal_year(
 ) -> FiscalYearOut:
     """Update a fiscal year. The route checks the disjointness again."""
     return await service.update_fiscal_year(budget_id, fiscal_year_id, payload)
+
+
+@router.post(
+    "/budgets/{budget_id}/fiscal-years/{fiscal_year_id}/close",
+    response_model=FiscalYearOut,
+    responses=_errors(401, 403, 404, 422),
+)
+async def close_fiscal_year(
+    budget_id: UUID,
+    fiscal_year_id: UUID,
+    service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_principal("budget.structure"))],
+) -> FiscalYearOut:
+    """Close a fiscal year ("abschließen").
+
+    The year is then frozen: bookings, transfers, allocations and application
+    assignments on it answer 409 `fiscal_year_closed`. A closed year stays
+    closed on a second call.
+    """
+    return await service.set_fiscal_year_closed(
+        budget_id, fiscal_year_id, closed=True, actor=principal.sub
+    )
+
+
+@router.post(
+    "/budgets/{budget_id}/fiscal-years/{fiscal_year_id}/reopen",
+    response_model=FiscalYearOut,
+    responses=_errors(401, 403, 404, 422),
+)
+async def reopen_fiscal_year(
+    budget_id: UUID,
+    fiscal_year_id: UUID,
+    service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_principal("budget.structure"))],
+) -> FiscalYearOut:
+    """Reopen a closed fiscal year. Its money data can change again."""
+    return await service.set_fiscal_year_closed(
+        budget_id, fiscal_year_id, closed=False, actor=principal.sub
+    )
 
 
 @router.delete(
@@ -860,7 +900,7 @@ async def delete_fiscal_year(
     "/budgets/{budget_id}/allocations/{fiscal_year_id}",
     response_model=AllocationOut,
     dependencies=[Depends(require_principal("budget.structure"))],
-    responses=_errors(400, 401, 403, 404, 422),
+    responses=_errors(400, 401, 403, 404, 409, 422),
 )
 async def set_allocation(
     budget_id: UUID,
@@ -876,7 +916,7 @@ async def set_allocation(
     "/applications/{application_id}/assign-budget",
     response_model=AssignBudgetOut,
     dependencies=[Depends(require_principal("application.manage"))],
-    responses=_errors(400, 401, 403, 404, 422),
+    responses=_errors(400, 401, 403, 404, 409, 422),
 )
 async def assign_budget(
     application_id: UUID, payload: AssignBudgetRequest, service: ServiceDep
@@ -892,7 +932,7 @@ async def assign_budget(
     "/applications/{application_id}/move-fiscal-year",
     response_model=AssignBudgetOut,
     dependencies=[Depends(require_principal("application.manage"))],
-    responses=_errors(400, 401, 403, 404, 422),
+    responses=_errors(400, 401, 403, 404, 409, 422),
 )
 async def move_fiscal_year(
     application_id: UUID, payload: MoveFiscalYearRequest, service: ServiceDep

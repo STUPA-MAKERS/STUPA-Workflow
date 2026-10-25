@@ -21,7 +21,7 @@ from app.modules.budget import tree_rules
 from app.modules.budget.tree_models import Budget, FiscalYear
 from app.modules.budget.tree_rules import _SEP
 from app.settings import Settings, get_settings
-from app.shared.errors import NotFoundError, ValidationProblem
+from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -134,6 +134,36 @@ class BudgetTreeServiceBase:
             raise NotFoundError(f"fiscal year {fiscal_year_id} not found")
         return fy
 
+    @staticmethod
+    def _refuse_closed(fy: FiscalYear) -> None:
+        """Refuse a money mutation on a closed fiscal year.
+
+        Raises:
+            ConflictError: `fiscal_year_closed` (409). The year must be reopened
+                first.
+        """
+        if fy.closed_at is not None:
+            raise ConflictError(
+                "The fiscal year is closed. Reopen it to change its money data.",
+                code="fiscal_year_closed",
+            )
+
+    async def _require_open_fiscal_year(self, fiscal_year_id: UUID | None) -> None:
+        """Refuse a money mutation when the fiscal year is closed.
+
+        `None` passes: an application without a fiscal year touches no year. A
+        missing row passes too, because the foreign keys of bookings and
+        applications keep the year in place, so there is nothing to freeze.
+
+        Raises:
+            ConflictError: `fiscal_year_closed` (409).
+        """
+        if fiscal_year_id is None:
+            return
+        fy = await self.session.get(FiscalYear, fiscal_year_id)
+        if fy is not None:
+            self._refuse_closed(fy)
+
     async def _top_level(self, node: Budget) -> Budget:
         """Return the top-level budget of a node.
 
@@ -186,12 +216,14 @@ class BudgetTreeServiceBase:
 
         A booking, a transfer and an assignment all use this. An explicit fiscal
         year must belong to the top-level budget. Without one the method takes
-        the single active fiscal year of the top-level budget. The result is
-        never `None`.
+        the single active open fiscal year of the top-level budget. A closed
+        year never counts as that default. The result is never `None`.
 
         Raises:
             ValidationProblem: The fiscal year belongs to another top-level
-                budget, or no single active fiscal year exists (422).
+                budget, or no single active open fiscal year exists (422).
+            ConflictError: `fiscal_year_closed` (409) for an explicit closed
+                fiscal year.
         """
         top = await self._top_level(node)
         if fiscal_year_id is not None:
@@ -201,8 +233,11 @@ class BudgetTreeServiceBase:
                     "Fiscal year does not belong to this budget's top-level.",
                     errors=[{"field": "fiscalYearId", "msg": "wrong top-level budget"}],
                 )
+            self._refuse_closed(fy)
             return fy.id
-        active_ids = [f.id for f in await self._fiscal_years_of(top.id) if f.active]
+        active_ids = [
+            f.id for f in await self._fiscal_years_of(top.id) if f.active and f.closed_at is None
+        ]
         picked = tree_rules.pick_fiscal_year(active_ids)
         if picked is None:
             raise ValidationProblem(
