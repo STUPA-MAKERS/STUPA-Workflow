@@ -120,7 +120,7 @@ async def holds_gremium_vote_role(
     """Tell whether a gremium role gives ``vote.manage`` or ``session.manage`` here.
 
     Both go through ``policy.holds_gremium_permission``, so the OAuth scope cap
-    applies (F16). The read rule of a vote without a meeting
+    applies. The read rule of a vote without a meeting
     (``VotingService.assert_can_read``) uses this part alone, because that rule
     checks the admin role before, with a read right instead of ``vote.manage``.
     """

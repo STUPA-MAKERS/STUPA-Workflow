@@ -15,8 +15,9 @@ every path, the admin bypass included:
 
 The sub-based ``gremium_roles.gremium_ids_with_permission`` stays for the system
 and roster paths that have no request principal (principal resolution, quorum
-count, delegation eligibility, mail recipients). Bug F16: a ``read`` token of a
-chair or of the minute-taker could manage the meeting and write the minutes.
+count, delegation eligibility, mail recipients). Without the scope cap, a
+``read`` token of a chair or of the minute-taker could manage the meeting and write the
+minutes.
 """
 
 from __future__ import annotations
