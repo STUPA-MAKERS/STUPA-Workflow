@@ -61,7 +61,7 @@ function pathOf(url: string): string {
  * - `false`: the page needs the full width at every size (the flow editor, the form
  *   editor), so the frame leaves out the navigation column.
  * - anything else: the navigation column shows on a wide viewport. A wide page (the cost
- *   centres) scrolls inside its sheet instead of dropping the navigation (D6).
+ *   centres) scrolls inside its sheet instead of dropping the navigation.
  */
 type AdminNavMode = 'always' | 'never';
 
@@ -121,7 +121,7 @@ const sheetScroll = new Map<number, number>();
  *   actions of the page header. The page header then has no breadcrumbs.
  * - A route with `data: { adminNav: false }` (the flow editor, the form editor) fills
  *   the width at every size, the same as the narrow mode. Every other admin page,
- *   the cost centres too, keeps the navigation at every wide size (D6).
+ *   the cost centres too, keeps the navigation at every wide size.
  * - A full-width route with `data: { adminPane: true }` (the two editors) is a pane
  *   page from wide on: the frame fills the window and the page gets the free height,
  *   so its columns scroll inside themselves.

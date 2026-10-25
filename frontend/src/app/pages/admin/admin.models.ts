@@ -467,14 +467,14 @@ export interface AdminPrincipal {
   mergedIntoName?: string | null;
   mergedAt?: string | null;
   /**
-   * Revoke rights (F3): the person still has something that "Rechte entziehen" can take
+   * Revoke rights: the person still has something that "Rechte entziehen" can take
    * away (an OIDC group, a membership, a role, a pool entry or a delegation).
    */
   hasAccess?: boolean;
 }
 
 /**
- * The filters of `GET /admin/principals` (F3). `lastLoginBefore` (ISO date) keeps the
+ * The filters of `GET /admin/principals`. `lastLoginBefore` (ISO date) keeps the
  * people whose last login is before that day; `includeNever` adds the people who never
  * logged in (alone: only those); `hasGroups` keeps the people with or without OIDC groups.
  */
@@ -818,7 +818,7 @@ export interface GremiumRole {
 }
 
 /**
- * The fixed catalogue of gremium permissions (O7), in display order. It mirrors
+ * The fixed catalogue of gremium permissions, in display order. It mirrors
  * `GREMIUM_PERMISSIONS` in `backend/app/modules/admin/gremium_roles.py`. The catalogue
  * is not configurable, so this list is the source of the role matrix and the role
  * dialog.
@@ -1071,7 +1071,7 @@ export interface NotificationSettings {
 }
 
 /**
- * Settings for applications without an account (Z1, P admin.deadlines):
+ * Settings for applications without an account (P admin.deadlines):
  * `GET/PUT /admin/guest-settings`.
  */
 export interface GuestSettings {

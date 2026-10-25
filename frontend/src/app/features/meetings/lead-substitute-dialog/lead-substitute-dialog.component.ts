@@ -37,7 +37,7 @@ import { personLabel } from '@shared/person-label.util';
 const SEARCH_ABOVE = 5;
 
 /**
- * "Vertretung eintragen" (O6): during a live meeting the meeting lead names a substitute
+ * "Vertretung eintragen": during a live meeting the meeting lead names a substitute
  * for a missing member.
  *
  * The list has the substitutes from the pool of the gremium that apply to the member: the

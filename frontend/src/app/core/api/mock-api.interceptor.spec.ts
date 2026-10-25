@@ -350,7 +350,7 @@ describe('mockApiInterceptor', () => {
       expect(q.items).toHaveLength(1);
     });
 
-    it('GET /invoices → the segments and their counts (FE10c)', async () => {
+    it('GET /invoices → the segments and their counts', async () => {
       type I = { status: string; linkedBookings: unknown[] };
       type P = { items: I[]; counts: { all: number; inbox: number; booked: number; paid: number } };
       const all = await get<P>('/api/invoices');
@@ -429,7 +429,7 @@ describe('mockApiInterceptor', () => {
     it('GET /applications/tasks → task list', async () => {
       const tasks = await get<{ stateSince?: string }[]>('/api/applications/tasks');
       expect(tasks.length).toBe(2);
-      // One task carries stateSince (A9), one shows the updatedAt fallback.
+      // One task carries stateSince, one shows the updatedAt fallback.
       expect(tasks[0].stateSince).toBeTruthy();
       expect(tasks[1].stateSince).toBeUndefined();
     });
@@ -479,7 +479,7 @@ describe('mockApiInterceptor', () => {
         expect((await get<{ total: number }>('/api/applications', params)).total).toBe(16);
       });
 
-      it('#11: searches the accounts and captures a new row on top', async () => {
+      it('Searches the accounts and captures a new row on top', async () => {
         let params = new HttpParams().set('q', 'AN');
         const hits = await get<{ displayName: string }[]>('/api/applications/on-behalf/applicants', params);
         expect(hits.map((h) => h.displayName)).toEqual(['Anna Antrag', 'Anton Albers']);
@@ -553,7 +553,7 @@ describe('mockApiInterceptor', () => {
         expect((await get<unknown[]>(`/api/applications/${first}/flow-states`)).length).toBe(5);
       });
 
-      it('F1: serves the decision of a decided row in the detail and the timeline', async () => {
+      it('Serves the decision of a decided row in the detail and the timeline', async () => {
         const decided = 'a1000000-0000-0000-0000-000000000016';
         const app = await get<{ decision: Record<string, unknown> }>(`/api/applications/${decided}`);
         expect(app.decision).toEqual({
@@ -582,7 +582,7 @@ describe('mockApiInterceptor', () => {
         expect(plain.decision).toBeNull();
       });
 
-      it('F1: the approval stores the decision, as requested or with another amount', async () => {
+      it('The approval stores the decision, as requested or with another amount', async () => {
         const approve = '77777777-7777-7777-7777-777777777786';
         type Detail = { state: { key: string }; decision: Record<string, unknown> | null };
         type Event = { note: string | null; decision: Record<string, unknown> | null };
@@ -716,7 +716,7 @@ describe('mockApiInterceptor', () => {
         expect('costs' in noAmount.data).toBe(false);
       });
 
-      it('answers 422 for a cost position without any offer (D12)', async () => {
+      it('answers 422 for a cost position without any offer', async () => {
         const data = { title: 'x', costs: [{ label: 'A', noOffers: true, noOffersReason: 'r', offers: [] }, { label: 'B' }] };
         await expect(firstValueFrom(http.patch(`/api/applications/${second}`, { data }))).rejects.toMatchObject({
           status: 422,
@@ -1576,7 +1576,7 @@ describe('mockApiInterceptor', () => {
       expect(after.some((a) => a.id === id)).toBe(false);
     });
 
-    describe('FE9: the participant view and the delegation setup', () => {
+    describe('The participant view and the delegation setup', () => {
       const MEMBER_LIVE = 'd0000000-0000-0000-0000-000000000003';
       const MEMBER_PLANNED = 'd0000000-0000-0000-0000-000000000105';
       type Ctx = {
@@ -1641,7 +1641,7 @@ describe('mockApiInterceptor', () => {
         expect(lead.meetingStarted).toBe(false);
       });
 
-      it('O6: lists the pool of a missing member and enters the substitute', async () => {
+      it('Lists the pool of a missing member and enters the substitute', async () => {
         const LIVE = 'd0000000-0000-0000-0000-000000000001';
         const recipients = `/api/delegations/meetings/${LIVE}/recipients`;
         const fritz = await get<{ displayName: string }[]>(recipients, new HttpParams().set('delegatorId', 'p-8'));
@@ -1669,7 +1669,7 @@ describe('mockApiInterceptor', () => {
       });
     });
 
-    describe('FE7: keepers, attendance with delegations, closed meetings', () => {
+    describe('Keepers, attendance with delegations, closed meetings', () => {
       const LIVE = 'd0000000-0000-0000-0000-000000000001';
       const DEMO = '00000000-0000-0000-0000-000000000001';
       type M = {
@@ -1687,7 +1687,7 @@ describe('mockApiInterceptor', () => {
         );
       });
 
-      it('refuses a handover to a member without protocol.write and to the keeper (O20)', async () => {
+      it('refuses a handover to a member without protocol.write and to the keeper', async () => {
         await expect(handover('p-3', 'now')).rejects.toMatchObject({
           status: 422,
           error: { code: 'protokollant_needs_protocol_write' },
@@ -1698,7 +1698,7 @@ describe('mockApiInterceptor', () => {
         });
       });
 
-      it('plans a handover, discards it, and starts a planned one on a forward move (Z3)', async () => {
+      it('plans a handover, discards it, and starts a planned one on a forward move', async () => {
         // Other tests change the agenda: take the items it has now.
         const agenda = await get<{ id: string }[]>(`/api/meetings/${LIVE}/agenda`);
         expect(agenda.length).toBeGreaterThan(1);
@@ -1735,7 +1735,7 @@ describe('mockApiInterceptor', () => {
         ]);
       });
 
-      it('refuses "present" while the member has a delegation of the meeting, until it is revoked (O23)', async () => {
+      it('refuses "present" while the member has a delegation of the meeting, until it is revoked', async () => {
         await expect(
           firstValueFrom(http.put(`/api/meetings/${LIVE}/attendance/p-6`, { status: 'present' })),
         ).rejects.toMatchObject({ status: 409, error: { code: 'delegation_active' } });
@@ -1835,7 +1835,7 @@ describe('mockApiInterceptor', () => {
     });
   });
 
-  describe('public meeting (#17)', () => {
+  describe('public meeting', () => {
     it('serves the lead and the guest routes from the lazy mock, with problems as errors', async () => {
       const { api } = setup(true);
       const http = TestBed.inject(HttpClient);

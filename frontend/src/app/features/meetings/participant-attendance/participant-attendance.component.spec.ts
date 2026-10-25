@@ -34,7 +34,7 @@ async function setup(
 }
 
 describe('ParticipantAttendanceComponent', () => {
-  it('reports "Anwesend" as present and "Abwesend" as an excuse (Z2)', async () => {
+  it('reports "Anwesend" as present and "Abwesend" as an excuse', async () => {
     const { change } = await setup(me());
     expect(screen.getByRole('heading', { name: 'Deine Anwesenheit' })).toBeInTheDocument();
     const group = screen.getByRole('radiogroup', { name: 'Deine Anwesenheit' });
@@ -104,7 +104,7 @@ describe('ParticipantAttendanceComponent', () => {
     expect(change).toHaveBeenCalledWith({ status: 'excused', note: null });
   });
 
-  it('shows the record of the lead as text, which the member cannot change (O15)', async () => {
+  it('shows the record of the lead as text, which the member cannot change', async () => {
     await setup(me({ status: 'excused', source: 'lead', note: 'Urlaub' }));
     expect(screen.queryByRole('radiogroup')).toBeNull();
     expect(screen.getByText('Abwesend')).toBeInTheDocument();
@@ -122,7 +122,7 @@ describe('ParticipantAttendanceComponent', () => {
     expect(screen.getByText('Offen')).toBeInTheDocument();
   });
 
-  it('turns "Anwesend" off while the member hands the meeting over (O23)', async () => {
+  it('turns "Anwesend" off while the member hands the meeting over', async () => {
     const { change } = await setup(me({ status: 'excused', source: 'self' }), { delegated: true });
     expect(screen.getByRole('radio', { name: 'Anwesend' })).toBeDisabled();
     expect(screen.getByText(/Widerrufe die Vertretung, um dich anwesend zu melden/)).toBeInTheDocument();

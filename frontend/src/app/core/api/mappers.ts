@@ -274,7 +274,7 @@ export function mapMeetingVote(wire: MeetingVoteOutWire): MeetingVote {
 }
 
 /**
- * The election fields of a vote (F2), or the poll fields of a poll. A motion gets
+ * The election fields of a vote, or the poll fields of a poll. A motion gets
  * none, so a motion keeps its former shape.
  */
 export function electionFields(wire: ElectionFields): ElectionFields {

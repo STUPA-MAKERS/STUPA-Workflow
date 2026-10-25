@@ -40,7 +40,7 @@
   flex-direction: column;
   gap: var(--space-3);
 }
-/* The picked account and the hits of the picker (D1). */
+/* The picked account and the hits of the picker. */
 .pv__person {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;

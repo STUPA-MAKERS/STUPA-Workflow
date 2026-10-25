@@ -88,7 +88,7 @@ export function parseRecipients(raw: string): string[] {
  * protocol recipients (`PUT /admin/gremien/{id}/mail-recipients`, after the base data).
  * If the dialog cannot read the recipients, the field stays locked and a save sends only
  * the base data: the PUT replaces the list, so an empty field would delete it.
- * There is no switch for changing a ballot after casting: a ballot never changes (O11).
+ * There is no switch for changing a ballot after casting: a ballot never changes.
  *
  * The switch "Öffentlich" puts the final protocols on the public protocol page. Turning
  * it on for a gremium that has it off asks first ("Protokolle veröffentlichen?", in the

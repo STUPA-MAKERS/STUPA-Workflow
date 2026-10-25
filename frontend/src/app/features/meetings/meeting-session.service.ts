@@ -57,7 +57,7 @@ export class MeetingSessionService implements OnDestroy {
   private readonly destroyRef = inject(DestroyRef);
   private readonly useMock = inject(USE_MOCK_API);
   private readonly agendaSvc = inject(MeetingAgendaService);
-  /** The join requests and the guests (#17); provided beside this service. */
+  /** The join requests and the guests; provided beside this service. */
   private readonly guests = inject(MeetingGuestsService, { optional: true });
 
   constructor() {
@@ -77,7 +77,7 @@ export class MeetingSessionService implements OnDestroy {
   readonly viewers = signal<string[]>([]);
   readonly savingAttendance = signal(false);
   /**
-   * O23: the member whose "present" the server refused with 409 `delegation_active`. The
+   * The member whose "present" the server refused with 409 `delegation_active`. The
    * attendance sheet marks the row and offers the revoke of the delegation.
    */
   readonly attendanceConflict = signal<Uuid | null>(null);
@@ -151,7 +151,7 @@ export class MeetingSessionService implements OnDestroy {
    *
    * Before the start and after the close there is no live keeper to protect. Every
    * writer prepares the text of a planned meeting, and every writer edits the draft of
-   * a closed one (O22): the session lead, the finalizer and an earlier keeper, not only
+   * a closed one: the session lead, the finalizer and an earlier keeper, not only
    * the last one. A final protocol stays locked through `Protocol.isLocked`.
    */
   readonly canEditProtocol = computed(() => {
@@ -243,7 +243,7 @@ export class MeetingSessionService implements OnDestroy {
    * its 409 `early_open_unconfirmed` opens the dialog too.
    *
    * The close is a dialog of its own (`CloseMeetingDialogComponent`), and a planned
-   * meeting that does not take place is deleted, not closed (O13).
+   * meeting that does not take place is deleted, not closed.
    *
    * The window may have moved (settings, a date change in another tab), so the start reads it
    * again.
@@ -311,7 +311,7 @@ export class MeetingSessionService implements OnDestroy {
     this.reloadMeeting();
   }
 
-  /** Read the meeting again (quiet): the lot of an election or its runoff (F2). */
+  /** Read the meeting again (quiet): the lot of an election or its runoff. */
   reloadMeeting(): void {
     const m = this.meeting();
     if (!m) return;
@@ -593,7 +593,7 @@ export class MeetingSessionService implements OnDestroy {
   /**
    * Change an attendance record. The meeting lead (`canControl`) sets any status of any
    * member through the lead endpoint. A member reports only the own record, only as
-   * present or excused (Z2), and only while the lead did not set it (O15). `note` is
+   * present or excused, and only while the lead did not set it. `note` is
    * the reason of an excuse: leave it out to keep the stored reason.
    */
   setAttendance(member: Attendance, status: AttendanceStatus, note?: string | null): void {
@@ -609,7 +609,7 @@ export class MeetingSessionService implements OnDestroy {
     this.saveAttendance(m.id, member.principalId, req, asLead);
   }
 
-  /** O23: the delegation of the member was revoked, so the refusal no longer applies. */
+  /** The delegation of the member was revoked, so the refusal no longer applies. */
   clearAttendanceConflict(principalId: Uuid): void {
     if (this.attendanceConflict() === principalId) this.attendanceConflict.set(null);
   }
@@ -646,9 +646,9 @@ export class MeetingSessionService implements OnDestroy {
   }
 
   /**
-   * Explain a refused attendance change. O23: a member with a delegation cannot be set or
+   * Explain a refused attendance change. A member with a delegation cannot be set or
    * report present; for the lead the attendance sheet marks the row and offers the
-   * revoke. O15: the lead set the record of the member. Both reload the roster, because
+   * revoke. The lead set the record of the member. Both reload the roster, because
    * it changed in another tab or by the lead.
    */
   private attendanceFailed(

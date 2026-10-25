@@ -260,7 +260,7 @@ describe('VotePanelComponent', () => {
     expect(screen.getByText('Abgebrochen')).toBeInTheDocument();
   });
 
-  describe('a vote with guests (#17)', () => {
+  describe('a vote with guests', () => {
     it('names the majority of the cast votes and sums the closed result up without a quorum', async () => {
       await setup({
         vote: vote({

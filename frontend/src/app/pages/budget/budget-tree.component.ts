@@ -95,7 +95,7 @@ const MAX_CUTOFF_DAY = 28;
  * The table is the cost-centre tree of the picked budget: a node with children folds, the
  * name stands over its key path, the five amounts of the year follow (Zugeteilt, Gebunden,
  * Ausgegeben, Einnahmen, Verfügbar), then the colour: a node shows its own colour, the
- * colour of the nearest coloured parent in a muted look (O19), or an empty box. Each row
+ * colour of the nearest coloured parent in a muted look, or an empty box. Each row
  * edits its node, sets its allocation for the year, adds a sub cost centre (an inline row
  * at the end of its subtree) and deletes it after a confirmation.
  *

@@ -10,7 +10,7 @@ import { MeetingWindowSettingsComponent } from './meeting-window/meeting-window.
  *
  * `app-meeting-window-settings` holds the open window of meetings (the earliest open and
  * the early open that asks first). `app-guest-settings` holds the settings for
- * applications without an account (Z1): the discard window and the lifetime of the
+ * applications without an account: the discard window and the lifetime of the
  * personal link. While one of the two sections has changes, the floating button
  * "Speichern" saves them.
  */

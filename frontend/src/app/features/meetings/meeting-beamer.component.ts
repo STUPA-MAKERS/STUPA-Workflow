@@ -44,12 +44,12 @@ export interface BeamerVote {
   counts: Readonly<Record<string, number>> | null;
   result: VoteResult | null;
   failedReason: 'quorum' | 'majority' | null;
-  /** Admitted guests vote too (#17): no quorum, the majority of the cast votes. */
+  /** Admitted guests vote too: no quorum, the majority of the cast votes. */
   guestsVote?: boolean;
   /** The present members and the admitted guests, for "19 Mitglieder + 7 Gäste anwesend". */
   presentMembers?: number | null;
   presentGuests?: number | null;
-  /** A personnel election (F2): the candidates, the stored result and the round. */
+  /** A personnel election: the candidates, the stored result and the round. */
   election?: ElectionConfig | null;
   electionResult?: ElectionResult | null;
   round?: number;
@@ -58,7 +58,7 @@ export interface BeamerVote {
   pollResult?: PollResult | null;
 }
 
-/** The join code of a public meeting on the screen (#17): never a name, only the code. */
+/** The join code of a public meeting on the screen: never a name, only the code. */
 export interface BeamerJoin {
   code: string;
   url: string;
@@ -102,7 +102,7 @@ interface BeamerText {
  *   is not reached yet shows in the warning colour.
  * - A closed vote: the bars, then "Angenommen" (accent) or "Abgelehnt" (error) with the
  *   rule, the quorum and the number of ballots. A tie is "Abgelehnt" with "Einfache
- *   Mehrheit nicht erreicht" (O18).
+ *   Mehrheit nicht erreicht".
  *
  * The page (`voting/beamer`) reads the server and passes the data in.
  */
@@ -131,7 +131,7 @@ export class MeetingBeamerComponent {
   readonly topLine = input<string | null>(null);
   readonly vote = input<BeamerVote | null>(null);
   readonly logoSrc = input.required<string>();
-  /** The join code of a public meeting (#17): a large card while idle, a corner badge in a vote. */
+  /** The join code of a public meeting: a large card while idle, a corner badge in a vote. */
   readonly join = input<BeamerJoin | null>(null);
   /** The people in the room, while the meeting is public. */
   readonly presence = input<BeamerPresence | null>(null);
@@ -147,7 +147,7 @@ export class MeetingBeamerComponent {
     return this.i18n.translate('guests.qr.label', { url: j.url });
   }
 
-  /** The status of a closed election (F2): "Gewählt", "Stichwahl" and so on. */
+  /** The status of a closed election: "Gewählt", "Stichwahl" and so on. */
   protected electionKey(result: VoteResult | null): TranslationKey {
     return electionStatus(result).key;
   }
@@ -209,7 +209,7 @@ export class MeetingBeamerComponent {
     };
   }
 
-  /** An election (F2): "Wahl · 2 Posten · geheime Abstimmung", then "Gewählt: Anna". */
+  /** An election: "Wahl · 2 Posten · geheime Abstimmung", then "Gewählt: Anna". */
   private describeElection(
     v: BeamerVote,
     election: ElectionConfig,

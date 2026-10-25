@@ -57,7 +57,7 @@ describe('MeetingSettingsDialogComponent', () => {
     http.verify();
   });
 
-  it('names the gremium and offers the members who can keep the minutes plus the current one (O20)', async () => {
+  it('names the gremium and offers the members who can keep the minutes plus the current one', async () => {
     const { http, fixture } = await setup();
     flushRoster(http, fixture);
     const dialog = screen.getByRole('dialog', { name: 'Sitzung bearbeiten' });
@@ -173,7 +173,7 @@ describe('MeetingSettingsDialogComponent', () => {
     http.verify();
   });
 
-  it('explains a minute-taker without the protocol right (O20) and another refusal', async () => {
+  it('explains a minute-taker without the protocol right and another refusal', async () => {
     const { http, fixture, cmp, saved, toasts } = await setup();
     flushRoster(http, fixture);
     cmp.save();
@@ -215,7 +215,7 @@ describe('MeetingSettingsDialogComponent', () => {
     http.verify();
   });
 
-  describe('public participation (#17)', () => {
+  describe('public participation', () => {
     const LINK = { joinCode: '7KQ4MP', joinUrl: 'https://x.example/j/7KQ4MP', qr: { size: 1, rows: ['1'] } };
     const LIVE = {
       ...MEETING,

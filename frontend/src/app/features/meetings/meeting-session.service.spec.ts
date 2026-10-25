@@ -109,7 +109,7 @@ describe('MeetingSessionService', () => {
     expect(toasts().some((t) => t.includes('too early'))).toBe(false);
   });
 
-  it('finalizes only a closed meeting, and the close is no part of it (O13)', () => {
+  it('finalizes only a closed meeting, and the close is no part of it', () => {
     const { http, session } = setup();
     session.meeting.set(M({ status: 'live' }));
     session.protocol.set(PROTOCOL);
@@ -160,7 +160,7 @@ describe('MeetingSessionService', () => {
     expect(toasts().some((t) => t.startsWith('Aktion fehlgeschlagen.'))).toBe(true);
   });
 
-  it('passes the lead events to the guest list and takes the guest counts (#17)', () => {
+  it('passes the lead events to the guest list and takes the guest counts', () => {
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
@@ -208,7 +208,7 @@ describe('MeetingSessionService', () => {
     expect(session.meeting()?.votes[0]).toEqual(expect.objectContaining({ presentMembers: 19, presentGuests: 7 }));
     http.match(() => true).forEach((r) => r.flush([]));
   });
-  it('reloads the meeting quietly for a lot or a runoff, and only the open one (F2)', () => {
+  it('reloads the meeting quietly for a lot or a runoff, and only the open one', () => {
     const { http, session } = setup();
     session.reloadMeeting(); // no meeting
     http.verify();
@@ -226,7 +226,7 @@ describe('MeetingSessionService', () => {
     expect(session.meeting()?.title).toBe('Andere');
   });
 
-  it('takes the election of an opened vote, its result and the drawn lot from the live channel (F2)', () => {
+  it('takes the election of an opened vote, its result and the drawn lot from the live channel', () => {
     const { session } = setup();
     const election = { seats: 1, candidates: [{ id: 'c1', name: 'Ada', principalId: null }], secret: true };
     session.meeting.set(

@@ -32,13 +32,13 @@ export interface OwnAttendanceChange {
 
 /**
  * "Deine Anwesenheit" of a member (board Teilnahme-Vorher): "Anwesend" or "Abwesend"
- * (Z2; "Abwesend" sends an excuse, `excused`) and an optional reason, which only the
+ * ("Abwesend" sends an excuse, `excused`) and an optional reason, which only the
  * member and the meeting lead read.
  *
  * The member reports only while the meeting is planned or live, and only while the lead
- * did not set the record (O15). The record of the lead, and every record of a closed
+ * did not set the record. The record of the lead, and every record of a closed
  * meeting, shows as text. A member with an active delegation of the meeting cannot
- * report "Anwesend" (O23): the option is off and the reason stands below it.
+ * report "Anwesend": the option is off and the reason stands below it.
  *
  * Projected content goes at the end of the box.
  */
@@ -58,7 +58,7 @@ export class ParticipantAttendanceComponent {
   readonly member = input.required<Attendance>();
   readonly meetingStatus = input.required<MeetingStatus>();
   readonly saving = input(false);
-  /** The member handed the meeting over to a substitute (O23). */
+  /** The member handed the meeting over to a substitute. */
   readonly delegated = input(false);
 
   readonly change = output<OwnAttendanceChange>();
@@ -77,12 +77,12 @@ export class ParticipantAttendanceComponent {
     effect(() => this.draft.set(this.storedNote()));
   }
 
-  /** The lead set the record (O15), or the meeting is over: text only. */
+  /** The lead set the record, or the meeting is over: text only. */
   protected readonly locked = computed(
     () => this.member().source === 'lead' || this.meetingStatus() === 'closed',
   );
 
-  /** "Abwesend" covers an excuse and an absence (Z2). */
+  /** "Abwesend" covers an excuse and an absence. */
   protected readonly value = computed<SelfAttendanceStatus | null>(() => {
     const status = this.member().status;
     if (status === 'present') return 'present';

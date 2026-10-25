@@ -68,9 +68,9 @@ type SessionAction = 'settings' | 'attendance' | 'beamer' | 'qr' | 'close' | 'de
  * text and the votes can be prepared before the start. The dock at the foot steps
  * through the agenda and holds the attendance and the minute-taker.
  *
- * A closed meeting finalizes its protocol from the protocol bar of the sheet (O13). The
+ * A closed meeting finalizes its protocol from the protocol bar of the sheet. The
  * attendance opens as a side sheet. A minute-taker picked in the dock of a live meeting
- * goes to the handover dialog of `MeetingsComponent` (Z3).
+ * goes to the handover dialog of `MeetingsComponent`.
  *
  * Wide (>= 1200px): three columns. Below that the agenda moves into a sheet from the
  * start edge, and the vote cards go above the item. On a phone the agenda sheet, the
@@ -144,7 +144,7 @@ export class MeetingPageComponent {
   readonly savingAgenda = input.required<boolean>();
   readonly renamingTopId = input.required<Uuid | null>();
   readonly renameDraft = model<string>('');
-  /** O23: the member whose "present" the server refused (409 `delegation_active`). */
+  /** The member whose "present" the server refused (409 `delegation_active`). */
   readonly attendanceConflict = input<Uuid | null>(null);
 
   /** Leave the session page for the meeting list. */
@@ -156,7 +156,7 @@ export class MeetingPageComponent {
   readonly castVote = output<{ voteId: Uuid; choice: string }>();
   readonly voteOpen = output<Uuid>();
   readonly voteClose = output<Uuid>();
-  /** The lot of an election was drawn, or its runoff opened (F2). */
+  /** The lot of an election was drawn, or its runoff opened. */
   readonly electionChanged = output<void>();
   readonly voteCancel = output<Uuid>();
   readonly voteDelete = output<Uuid>();
@@ -169,7 +169,7 @@ export class MeetingPageComponent {
   readonly toggleBeamer = output<void>();
   readonly attendanceChange = output<AttendanceChange>();
   readonly attendanceReset = output<Attendance>();
-  /** O23: the delegation of the refused member was revoked in the attendance sheet. */
+  /** The delegation of the refused member was revoked in the attendance sheet. */
   readonly attendanceConflictResolved = output<Uuid>();
   /** Open "TOP hinzufügen". */
   readonly addTop = output<void>();
@@ -183,14 +183,14 @@ export class MeetingPageComponent {
   readonly moveTop = output<AgendaMove>();
   /** Name the minute-taker of a planned meeting. */
   readonly setProtokollant = output<Uuid>();
-  /** A member was picked in the dock to take the minutes of a live meeting over (Z3). */
+  /** A member was picked in the dock to take the minutes of a live meeting over. */
   readonly pickHandover = output<Uuid>();
   /** Discard the planned handover. */
   readonly cancelHandover = output<void>();
 
   /** The dock panel that is open: a popover above the dock, a bottom sheet on a phone. */
   readonly panel = signal<DockPanel>('none');
-  /** The large QR code of a public meeting (#17): the header popover or the phone sheet. */
+  /** The large QR code of a public meeting: the header popover or the phone sheet. */
   readonly qrOpen = signal(false);
   /** The agenda sheet below the wide layout. */
   readonly agendaOpen = signal(false);
@@ -272,7 +272,7 @@ export class MeetingPageComponent {
 
   /**
    * The main action of the header: open a planned meeting or close a live one. A closed
-   * meeting finalizes its protocol in the protocol bar of the sheet (O13). `null` when the
+   * meeting finalizes its protocol in the protocol bar of the sheet. `null` when the
    * viewer has none.
    */
   private readonly now = openWindowClock();

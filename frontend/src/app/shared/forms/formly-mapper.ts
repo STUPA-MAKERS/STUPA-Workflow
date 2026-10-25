@@ -86,7 +86,7 @@ const FULL_WIDTH_TYPES: ReadonlySet<FieldType> = new Set<FieldType>([
 
 /** Options of `toFormlySections`. */
 export interface FormlySectionOptions {
-  /** Keys the form leaves out, for example the PII fields the server held back (O21). */
+  /** Keys the form leaves out, for example the PII fields the server held back. */
   omitKeys?: readonly string[];
 }
 

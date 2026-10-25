@@ -29,7 +29,7 @@ describe('invoice figures', () => {
     expect(bookedOn({ ...INV, linkedBookings: bookings })).toEqual({ booked: 150, gross: 250, open: 100 });
     // Never a negative rest.
     expect(bookedOn({ ...INV, linkedBookings: [B({ amount: '300.00' })] })?.open).toBe(0);
-    // A backend without A6 sends no bookings.
+    // An older backend sends no bookings.
     expect(bookedOn(INV)).toBeNull();
   });
 });

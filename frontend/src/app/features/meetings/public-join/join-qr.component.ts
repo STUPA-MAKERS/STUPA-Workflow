@@ -24,7 +24,7 @@ import { MeetingGuestsService } from '../meeting-guests.service';
 import { JOIN_COPIED_MS } from './join-link.component';
 
 /**
- * "QR-Code" in the header of the session page (#17, variant A): a popover with the large
+ * "QR-Code" in the header of the session page (variant A): a popover with the large
  * code, the link, "Link kopieren" and "Auf dem Beamer zeigen". For a room without a
  * beamer the lead shows the laptop or the phone around. A phone shows the same content
  * as a bottom sheet; the page opens it from its menu and from the attendance sheet

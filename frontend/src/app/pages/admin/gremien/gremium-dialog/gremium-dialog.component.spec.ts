@@ -85,7 +85,7 @@ describe('GremiumDialogComponent', () => {
     expect(api.getGremiumMailRecipients).toHaveBeenCalledWith('g-1');
   });
 
-  it('has no switch to change a ballot after casting (O11)', async () => {
+  it('has no switch to change a ballot after casting', async () => {
     await setup(STUPA);
     expect(screen.queryByText(/Stimme nach Abgabe/)).toBeNull();
     // Delegation, delegation to externals, and the public protocol page.

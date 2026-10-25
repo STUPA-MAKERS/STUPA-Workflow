@@ -21,7 +21,7 @@ function svc(mock: boolean): AdminApiService {
   return TestBed.inject(AdminApiService);
 }
 
-describe('Rechte entziehen (F3) — real mode (contract)', () => {
+describe('Rechte entziehen — real mode (contract)', () => {
   it('wires the list filters, the preview and the revoke', () => {
     const s = svc(false);
     const http = TestBed.inject(HttpTestingController);
@@ -47,7 +47,7 @@ describe('Rechte entziehen (F3) — real mode (contract)', () => {
   });
 });
 
-describe('Rechte entziehen (F3) — mock mode', () => {
+describe('Rechte entziehen — mock mode', () => {
   it('lists the demo person with access and filters by last login and groups', async () => {
     const s = svc(true);
     const all = await firstValueFrom(s.listPrincipals());
@@ -134,7 +134,7 @@ describe('Rechte entziehen (F3) — mock mode', () => {
   });
 });
 
-describe('Rechte entziehen (F3) — mock store edge cases', () => {
+describe('Rechte entziehen — mock store edge cases', () => {
   /** A store full of loose ends: unnamed people, unknown roles and Gremien, no role mapping. */
   function store(): RevokeMockStore {
     return {

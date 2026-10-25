@@ -126,7 +126,7 @@ export const APPS_SHOWN = 5;
  *
  * The pane holds the fiscal year, the overview (sunburst), a search and the tree. Each
  * tree node shows its allocation and a bar of its utilisation, in its own colour or the
- * colour it inherits (O19). The sheet shows the path, the six figures (Zuteilung,
+ * colour it inherits. The sheet shows the path, the six figures (Zuteilung,
  * Beantragt, Gebunden, Ausgegeben, Einnahmen, Verfügbar; N28), the distribution over the
  * sub cost centres, the utilisation per sub cost centre and the applications on it.
  *
@@ -276,10 +276,10 @@ export class BudgetDashboardComponent {
     return out;
   });
 
-  /** Own or inherited colour of every visible node, `null` when it has none (O19). */
+  /** Own or inherited colour of every visible node, `null` when it has none. */
   private readonly setColors = computed(() => resolveNodeColors(this.visibleTree()));
   /** Display colour of every visible node. The tree, the bars and the charts all use it,
-   *  so a cost centre has one colour on the page (gaps D6). */
+   *  so a cost centre has one colour on the page. */
   readonly colors = computed(() => nodeColors(this.visibleTree()));
 
   private readonly selectedKs = computed(() => this.nodeById().get(this.selectedKsId()) ?? null);

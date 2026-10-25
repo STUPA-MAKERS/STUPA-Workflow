@@ -1,5 +1,5 @@
 /**
- * Mock data of the public meeting with QR code (#17), dev and screenshots only. The
+ * Mock data of the public meeting with QR code, dev and screenshots only. The
  * mock interceptor loads it on first use.
  *
  * Lead side (live meeting `d…0001`): three join requests, seven admitted guests, the

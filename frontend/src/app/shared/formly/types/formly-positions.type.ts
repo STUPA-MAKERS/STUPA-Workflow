@@ -35,7 +35,7 @@ let nextUid = 0;
  * starts open. Open, it shows the name, the switch "keine Vergleichsangebote möglich",
  * the offers with the radio for the preferred one, and "Angebot hinzufügen". A position
  * without comparison offers keeps exactly one offer (supplier and amount) and needs a
- * reason (D12); without the offer the server answers 422.
+ * reason; without the offer the server answers 422.
  *
  * An amount cell keeps the text of the user while it has focus and parses it with
  * `parseMoney` of the ui-kit (locale-aware, at most 2 decimals). Text that is not an

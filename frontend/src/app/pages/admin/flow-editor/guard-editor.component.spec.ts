@@ -300,7 +300,7 @@ describe('GuardEditorComponent', () => {
     });
   });
 
-  describe('layout (FE12b)', () => {
+  describe('layout', () => {
     it('describes a combinator beside its operator and offers "+ Bedingung" except for NOT', async () => {
       const { c, setGuard, container } = await setup({ guard: { and: [{ budgetHasDecisionGremium: true }] } });
       expect(c.combinatorText()).toBe('alle Bedingungen erfüllt');

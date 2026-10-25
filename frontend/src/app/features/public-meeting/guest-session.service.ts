@@ -33,7 +33,7 @@ const RECONNECT_MS = 2000;
 const MAX_ATTEMPTS = 5;
 
 /**
- * The join page of a public meeting (`/j/:code`, #17): the head of the meeting, the own
+ * The join page of a public meeting (`/j/:code`): the head of the meeting, the own
  * request of this device and the participant view after the admission.
  *
  * The device cookie (HttpOnly) carries the participation; the page never holds a token.

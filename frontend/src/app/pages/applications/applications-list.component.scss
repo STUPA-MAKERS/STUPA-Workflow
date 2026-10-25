@@ -174,7 +174,7 @@
 .apps__detail {
   @include lp.detail;
 }
-/* "Antrag erfassen" (#11) fills the pane; the routed detail waits behind it. */
+/* "Antrag erfassen" fills the pane; the routed detail waits behind it. */
 .apps__detail--capture {
   min-height: 0;
 }

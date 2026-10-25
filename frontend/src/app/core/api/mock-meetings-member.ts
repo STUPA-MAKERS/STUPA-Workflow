@@ -112,13 +112,13 @@ const SUBSTITUTES: DelegationRecipient[] = [
   { principalId: 'p-7', displayName: 'Sven Stellvertreter', viaPool: true, isMember: false },
   { principalId: 'p-10', displayName: 'Emma Vogel', viaPool: true, isMember: false },
 ];
-/** O6: the personal pool entries of the missing members of the live meeting. */
+/** The personal pool entries of the missing members of the live meeting. */
 const PERSONAL: Record<string, DelegationRecipient[]> = {
   'p-8': [{ principalId: 'p-11', displayName: 'Paula Persönlich', viaPool: true, isMember: false }],
   'p-9': [{ principalId: 'p-12', displayName: 'Karl Kern', viaPool: true, isMember: false }],
 };
 
-/** O6: the pool of one member for the lead entry: the personal and the gremium-wide entries. */
+/** The pool of one member for the lead entry: the personal and the gremium-wide entries. */
 function poolOf(delegatorId: string): DelegationRecipient[] {
   return [...(PERSONAL[delegatorId] ?? []), ...SUBSTITUTES].sort((a, b) =>
     (a.displayName ?? '').localeCompare(b.displayName ?? ''),
@@ -192,7 +192,7 @@ export function memberMeetingGet(
 
 /**
  * POST /delegations: the demo user hands a meeting over (participant view), or the lead
- * enters a substitute from the pool for a missing member (O6, `delegatorId`).
+ * enters a substitute from the pool for a missing member (`delegatorId`).
  */
 export function memberDelegationCreate(
   body: unknown,

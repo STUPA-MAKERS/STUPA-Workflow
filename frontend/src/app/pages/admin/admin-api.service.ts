@@ -177,7 +177,7 @@ export class AdminApiService {
     webhooks: structuredCopy(MOCK_WEBHOOKS),
     roles: structuredCopy(MOCK_ROLES),
     principals: structuredCopy([...MOCK_PRINCIPALS, MOCK_REVOKE_PRINCIPAL]),
-    // "Rechte entziehen" (F3): the Gremien cleared per person, the pool and delegations.
+    // "Rechte entziehen": the Gremien cleared per person, the pool and delegations.
     revoked: {} as Record<Uuid, Uuid[]>,
     revokeExtras: mockRevokeExtras(),
     oauthGrants: structuredCopy(MOCK_OAUTH_GRANTS),
@@ -661,7 +661,7 @@ export class AdminApiService {
 
   /**
    * List/search users (OIDC principals) — GET /admin/principals?q=. `filters` adds the
-   * user-list filters of F3 (`lastLoginBefore`, `includeNever`, `hasGroups`).
+   * user-list filters (`lastLoginBefore`, `includeNever`, `hasGroups`).
    */
   listPrincipals(query?: string, filters?: PrincipalFilters): Observable<AdminPrincipal[]> {
     if (this.mock) {
@@ -1214,7 +1214,7 @@ export class AdminApiService {
     );
   }
 
-  // Guest applications (Z1). Both routes need P(admin.deadlines).
+  // Guest applications. Both routes need P(admin.deadlines).
   /** GET /admin/guest-settings — the confirm window and the link lifetime. */
   getGuestSettings(): Observable<GuestSettings> {
     if (this.mock) return of(structuredCopy(this.store.guestSettings));

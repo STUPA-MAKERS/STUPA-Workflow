@@ -37,7 +37,7 @@ import {
 } from '../election.util';
 
 /**
- * The result of a personnel election (F2): one bar per candidate (best first) with the
+ * The result of a personnel election: one bar per candidate (best first) with the
  * tag "gewählt" or "Gleichstand", then the abstentions.
  *
  * - A tie at the seat boundary of a multi-seat election shows the runoff banner; the

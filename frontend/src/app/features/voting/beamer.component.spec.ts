@@ -237,7 +237,7 @@ describe('BeamerComponent', () => {
     expect(screen.getByText('Einfache Mehrheit · Quorum nicht erreicht · 1 Stimme')).toBeInTheDocument();
   });
 
-  it('shows an election: the result of the close frame, then a runoff round from the read (F2)', async () => {
+  it('shows an election: the result of the close frame, then a runoff round from the read', async () => {
     const election = { seats: 1, candidates: [{ id: 'c1', name: 'Anna' }, { id: 'c2', name: 'Ben' }], secret: true };
     const open = vote({ kind: 'election', election, config: { options: ['c1', 'c2', 'abstain'], majorityRule: 'simple' }, secret: true });
     const { push, fixture } = await setup({ votes: [open, open] });
@@ -414,7 +414,7 @@ describe('BeamerComponent', () => {
     });
   });
 
-  describe('public meeting (#17)', () => {
+  describe('public meeting', () => {
     it('shows the join code while idle with the room in numbers, and follows the stream', async () => {
       const { api, push, fixture } = await setup({
         meeting: meeting({ publicJoin: true, admittedGuests: 7, status: 'live' }),

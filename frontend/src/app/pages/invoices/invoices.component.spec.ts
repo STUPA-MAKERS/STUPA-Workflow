@@ -1301,7 +1301,7 @@ describe('InvoicesComponent filter declaration', () => {
   });
 });
 
-// --- list/detail (FE10c) ---------------------------------------------------
+// --- list/detail ---------------------------------------------------
 
 /** Let `matchMedia` match the queries that contain one of the given parts. */
 function setViewport(...parts: string[]): void {

@@ -103,7 +103,7 @@ const STEP_LABEL: Record<StepKey, TranslationKey> = {
  * 1. Antragsart: the active types; the configured info text below.
  * 2. Angaben: every section of the effective form in one grid (`toFormlySections`),
  *    without the PII fields. A `file` field uploads its files as drafts; the block
- *    "Anhänge" below takes any other file (Z4, `DraftAttachmentsService`).
+ *    "Anhänge" below takes any other file (`DraftAttachmentsService`).
  * 3. Kontakt: e-mail and name of a guest, plus the PII fields of the form (for example
  *    the IBAN). A signed-in user sees the account instead; without PII fields the step
  *    drops out.

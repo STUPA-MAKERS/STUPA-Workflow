@@ -38,7 +38,7 @@ interface MeetingChoice {
 
 /**
  * "Auf Tagesordnung setzen" (board Anträge-Tagesordnung): fire a transition with
- * `addsToAgenda` and choose the meeting whose agenda gets the application (A1).
+ * `addsToAgenda` and choose the meeting whose agenda gets the application.
  *
  * The dialog offers only the planned meetings of `agendaGremiumId`; the server takes no
  * other meeting (422 `agenda_meeting_invalid`). The first planned meeting from today on
@@ -50,7 +50,7 @@ interface MeetingChoice {
  * is visible (the reader is not in the agenda gremium, the gremium has no planned
  * meeting, or the load failed), the dialog still fires the transition, but without a
  * meeting: the action of the server then picks the next planned meeting after the
- * commit, as before A1. "Nicht öffentlich" has no effect then, so the dialog hides it.
+ * commit. "Nicht öffentlich" has no effect then, so the dialog hides it.
  *
  * The list page (row menu) and the detail (header) both open it; `done` fires after the
  * transition, and also after a 409, so the caller loads the application again.

@@ -84,7 +84,7 @@ const RELOAD_CODES: ReadonlySet<string> = new Set(['revoke_incomplete', 'revoke_
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
- * "Rechte entziehen" (Verwaltung → Benutzer, F3): take the Gremien and the global roles
+ * "Rechte entziehen" (Verwaltung → Benutzer): take the Gremien and the global roles
  * away from a person whom the SSO removed from groups and who no longer logs in.
  *
  * The person header with the last login; "Gremien (n)" with one checkbox per Gremium and

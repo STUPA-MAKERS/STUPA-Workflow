@@ -1109,7 +1109,7 @@ describe('ApplicationsDetailComponent', () => {
     expect(cmp.amount(app('10', null))).toContain('10,00');
   });
 
-  it('#11: notes a capture in the history only, not in the status line', async () => {
+  it('Notes a capture in the history only, not in the status line', async () => {
     const { http, detectChanges, cmp } = await setup();
     http.expectOne(url('')).flush({
       ...appWire(),
@@ -1145,7 +1145,7 @@ describe('ApplicationsDetailComponent', () => {
     http.verify();
   });
 
-  it('builds the history from the status changes and the versions (A3)', async () => {
+  it('builds the history from the status changes and the versions', async () => {
     const { http, detectChanges, cmp, container } = await setup();
     http.expectOne(url('')).flush(appWire());
     http.expectOne(url('/versions')).flush(VERSIONS);
@@ -1200,7 +1200,7 @@ describe('ApplicationsDetailComponent', () => {
     http.verify();
   });
 
-  it('F1: notes the deviations of a decision in the history', async () => {
+  it('Notes the deviations of a decision in the history', async () => {
     const { http, detectChanges, cmp } = await setup();
     http.expectOne(url('')).flush(appWire());
     http.expectOne(url('/versions')).flush([]);
@@ -1496,7 +1496,7 @@ describe('ApplicationsDetailComponent', () => {
   const editKeysOf = (fields: KeyedField[]): unknown[] =>
     fields.flatMap((f) => [f.key, ...editKeysOf((f.fieldGroup ?? []) as KeyedField[])]);
 
-  it('leaves a stripped PII field out of the edit form (O21)', async () => {
+  it('leaves a stripped PII field out of the edit form', async () => {
     // A reader without the PII right gets `data` without the isPII fields, and the
     // server names them in `hiddenKeys`.
     const { http, cmp } = await setupWithFields(
@@ -1514,7 +1514,7 @@ describe('ApplicationsDetailComponent', () => {
     expect(screen.queryByText('IBAN')).not.toBeInTheDocument();
   });
 
-  it('keeps an unanswered PII field editable for a reader with the PII right (O21)', async () => {
+  it('keeps an unanswered PII field editable for a reader with the PII right', async () => {
     // The optional `mail` was never answered, so its key is missing from `data`. The
     // server hid nothing, so the reader can still fill the field.
     const { http, cmp } = await setupWithFields(PII_FIELDS, {
@@ -1529,7 +1529,7 @@ describe('ApplicationsDetailComponent', () => {
     expect(editKeys).toContain('mail');
   });
 
-  it('lists the changed keys of a version without values (A11 metadata view)', async () => {
+  it('lists the changed keys of a version without values (metadata view)', async () => {
     const { http, detectChanges } = await setup();
     http.expectOne(url('')).flush(appWire());
     http.expectOne(url('/versions')).flush([
@@ -1764,7 +1764,7 @@ describe('ApplicationsDetailComponent', () => {
     http.verify();
   });
 
-  it('shows a 422 of the server on the cost position it names (D12)', async () => {
+  it('shows a 422 of the server on the cost position it names', async () => {
     const fields: FormFieldDef[] = [
       { key: 'title', type: 'text', label: { de: 'Titel' } },
       { key: 'kosten', type: 'positions', label: { de: 'Kostenaufstellung' } },
@@ -1831,7 +1831,7 @@ describe('ApplicationsDetailComponent', () => {
     http.verify();
   });
 
-  it('shows the decision and opens the decision dialog for an accepted state (F1)', async () => {
+  it('shows the decision and opens the decision dialog for an accepted state', async () => {
     const { http, detectChanges, cmp, container } = await setup([
       'application.read',
       'application.transition',
@@ -1878,7 +1878,7 @@ describe('ApplicationsDetailComponent', () => {
     expect(cmp.decisionTransition()?.id).toBe('tr-ok');
   });
 
-  it('names no approved amount when it equals the requested one (F1)', async () => {
+  it('names no approved amount when it equals the requested one', async () => {
     const { cmp } = await setup(['application.read']);
     const base = { ...appWire(), amount: '250.00', currency: 'EUR' } as unknown as Parameters<
       typeof cmp.approvedAmount
@@ -1888,7 +1888,7 @@ describe('ApplicationsDetailComponent', () => {
     expect(cmp.approvedAmount({ ...base, approvedAmount: '200.00' }).replace(/\u00a0/g, ' ')).toBe('200,00 €');
   });
 
-  it('opens the agenda dialog for a transition onto the agenda (A1)', async () => {
+  it('opens the agenda dialog for a transition onto the agenda', async () => {
     const { http, detectChanges, cmp } = await setup([
       'application.read',
       'application.transition',

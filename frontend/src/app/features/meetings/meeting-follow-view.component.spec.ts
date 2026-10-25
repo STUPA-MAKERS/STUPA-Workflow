@@ -153,7 +153,7 @@ describe('MeetingFollowViewComponent', () => {
       expect(attendanceChange).toHaveBeenLastCalledWith({ member: ME, status: 'present' });
     });
 
-    it('keeps the record of the lead (O15)', async () => {
+    it('keeps the record of the lead', async () => {
       const { context } = await setup({
         meeting: planned(),
         attendance: [{ ...ME, status: 'excused', source: 'lead' }],
@@ -168,7 +168,7 @@ describe('MeetingFollowViewComponent', () => {
       context({ allowVoteDelegation: true, canDelegate: true, meetingStarted: false, deadline: '2026-10-15T15:00:00Z' });
       expect(screen.getByText(/^Einrichtbar bis Do, 15\.10\.2026/)).toBeInTheDocument();
       expect(screen.getByRole('radio', { name: 'Anwesend' })).toBeEnabled();
-      // The card reports an own delegation: the member cannot report "Anwesend" (O23).
+      // The card reports an own delegation: the member cannot report "Anwesend".
       const card = fixture.debugElement.query((el) => el.name === 'app-meeting-delegation-card');
       (card.componentInstance as { reload(): void }).reload();
       context({
@@ -351,7 +351,7 @@ describe('MeetingFollowViewComponent', () => {
       const rows = within(roster).getAllByRole('listitem');
       expect(rows[1]).toHaveTextContent('Mara Keller');
       expect(rows[1]).toHaveTextContent('Protokollführung');
-      // A member sees an absence as "Abwesend" (Z2), never a reason.
+      // A member sees an absence as "Abwesend", never a reason.
       expect(rows[2]).toHaveTextContent('Abwesend');
     });
 

@@ -149,7 +149,7 @@ export class BrandingService {
   /** True after the public config loaded. A failed load keeps it false. */
   readonly loaded = this._loaded.asReadonly();
 
-  /** The upload limits of the wizard (Z4). The backend defaults until the config loads. */
+  /** The upload limits of the wizard. The backend defaults until the config loads. */
   readonly attachmentLimits = this._attachmentLimits.asReadonly();
 
   /** The free texts of the branding (Freitexte), per locale. Empty until loaded. */

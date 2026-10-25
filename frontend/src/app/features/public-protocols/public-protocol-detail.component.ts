@@ -124,7 +124,7 @@ export class PublicProtocolDetailComponent {
     return d.result ? (`vote.result.${d.result}` as TranslationKey) : null;
   }
 
-  /** "Wahl · 2 Posten · geheime Abstimmung" for a personnel election (F2). */
+  /** "Wahl · 2 Posten · geheime Abstimmung" for a personnel election. */
   protected electionLine(d: PublicDecision): string {
     const t: Translate = (key, params) => this.i18n.translate(key, params);
     return [

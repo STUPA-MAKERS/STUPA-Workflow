@@ -132,7 +132,7 @@ describe('MeetingBeamerComponent', () => {
     expect(screen.getByText('Einfache Mehrheit · Quorum erreicht · 20 Stimmen')).toBeInTheDocument();
   });
 
-  it('shows a tie as rejected: the simple majority is not reached (O18)', async () => {
+  it('shows a tie as rejected: the simple majority is not reached', async () => {
     const { container } = await setup({
       vote: vote({ status: 'closed', result: 'tie', counts: { yes: 9, no: 9, abstain: 2 }, voted: 20 }),
     });
@@ -172,7 +172,7 @@ describe('MeetingBeamerComponent', () => {
     expect(screen.getByText('Zweidrittelmehrheit nicht erreicht · 9 Stimmen')).toBeInTheDocument();
   });
 
-  describe('public meeting (#17)', () => {
+  describe('public meeting', () => {
     const JOIN = { code: '7KQ4MP', url: 'https://workflow.example/j/7KQ4MP', qr: { size: 1, rows: ['1'] } };
 
     it('shares the idle screen with a large QR card and counts the room, never names', async () => {

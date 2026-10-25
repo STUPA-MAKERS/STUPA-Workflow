@@ -312,7 +312,7 @@ describe('MeetingsComponent', () => {
     req.flush({ ...MEETING, activeApplicationId: 'app-2' });
   });
 
-  it('closes without a finalize, then finalizes as a step of its own (O13)', async () => {
+  it('closes without a finalize, then finalizes as a step of its own', async () => {
     const { http } = await setup();
     const idle: MeetingOutWire = { ...MEETING, votes: [] };
     http.expectOne('/api/meetings/m-1').flush(idle);
@@ -496,7 +496,7 @@ describe('MeetingsComponent', () => {
     flushDelegationContext(http);
   };
 
-  it('lets every writer edit the draft of a closed meeting, not only the last keeper (O22)', async () => {
+  it('lets every writer edit the draft of a closed meeting, not only the last keeper', async () => {
     const { http, fixture } = await setup();
     flushClosed(http, 'draft');
     fixture.detectChanges();
@@ -786,7 +786,7 @@ function services(fixture: { debugElement: { injector: { get<T>(t: new (...a: ne
 }
 
 /** Set up a loaded detail meeting and return the instance. */
-/** Members who can take the minutes over (O20). */
+/** Members who can take the minutes over. */
 const PR9 = { principalId: 'pr-9', displayName: 'Neu', email: null, status: 'present' as const, source: 'self' as const, note: null, isSelf: false, canKeepProtocol: true };
 const PR2 = { ...PR9, principalId: 'pr-2', displayName: 'B' };
 
@@ -1225,7 +1225,7 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.savingAttendance()).toBe(false);
     });
 
-    it('never sends absent, another row or a lead record as a member (Z2, O15)', async () => {
+    it('never sends absent, another row or a lead record as a member', async () => {
       const { cmp, http } = await asMember();
       cmp.setAttendance(SELF as never, 'absent');
       cmp.setAttendance(OTHER as never, 'present');
@@ -1280,7 +1280,7 @@ describe('MeetingsComponent — methods', () => {
       expect(spy).toHaveBeenLastCalledWith('Aktion fehlgeschlagen.');
     });
 
-    it('marks the row of an active delegation (O23) and reloads the roster', async () => {
+    it('marks the row of an active delegation and reloads the roster', async () => {
       const { cmp, http, fixture } = await loaded();
       const spy = jest.spyOn(fixture.debugElement.injector.get(ToastService), 'error');
       cmp.setAttendance(OTHER as never, 'present');
@@ -1308,7 +1308,7 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.attendanceConflict()).toBeNull();
     });
 
-    it('explains the own delegation (O23) to a member and reloads the roster', async () => {
+    it('explains the own delegation to a member and reloads the roster', async () => {
       const { cmp, http, fixture } = await asMember();
       const spy = jest.spyOn(fixture.debugElement.injector.get(ToastService), 'error');
       cmp.setAttendance(SELF as never, 'present');
@@ -1319,7 +1319,7 @@ describe('MeetingsComponent — methods', () => {
       http.expectOne('/api/meetings/m-1/attendance').flush([]);
     });
 
-    it('explains a record that the lead set (O15) and reloads the roster', async () => {
+    it('explains a record that the lead set and reloads the roster', async () => {
       const { cmp, http, fixture } = await asMember();
       const spy = jest.spyOn(fixture.debugElement.injector.get(ToastService), 'error');
       cmp.setAttendance(SELF as never, 'present');
@@ -1583,7 +1583,7 @@ describe('MeetingsComponent — methods', () => {
         AGENDA_ITEM({ id: 't-1', applicationId: 'app-1', title: 'Antrag', body: 'Text' }),
         AGENDA_ITEM({ id: 't-2', applicationId: null, title: '', body: '' }),
       ] as never);
-      cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' }); // F8: finalize after the close
+      cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' }); // finalize after the close
       cmp.finalize();
       const saveReq = http.expectOne('/api/protocols/p-1');
       expect(saveReq.request.body.markdown).toContain('# Antrag');
@@ -1605,7 +1605,7 @@ describe('MeetingsComponent — methods', () => {
 
     it('reports a save error before finalize', async () => {
       const { cmp, http } = await loaded();
-      cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' }); // F8: finalize after the close
+      cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' }); // finalize after the close
       cmp.finalize();
       http.expectOne('/api/protocols/p-1').flush(null, { status: 500, statusText: 'e' });
       expect(cmp.finalizing()).toBe(false);
@@ -1613,7 +1613,7 @@ describe('MeetingsComponent — methods', () => {
 
     it('reports a finalize error with the server detail', async () => {
       const { cmp, http } = await loaded();
-      cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' }); // F8: finalize after the close
+      cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' }); // finalize after the close
       cmp.finalize();
       http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
       http
@@ -1624,7 +1624,7 @@ describe('MeetingsComponent — methods', () => {
 
     it('reports a finalize error without a detail', async () => {
       const { cmp, http } = await loaded();
-      cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' }); // F8: finalize after the close
+      cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' }); // finalize after the close
       cmp.finalize();
       http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
       http.expectOne('/api/protocols/p-1/finalize').flush(null, { status: 500, statusText: 'e' });
@@ -1638,7 +1638,7 @@ describe('MeetingsComponent — methods', () => {
       cmp.protocol.set({ ...PROTOCOL, isFinal: false, isLocked: true } as never);
       cmp.finalize(); // isLocked → return
       cmp.protocol.set({ ...PROTOCOL, isFinal: false, isLocked: false } as never);
-      cmp.finalize(); // F8: the meeting is still live → return
+      cmp.finalize(); // the meeting is still live → return
       http.verify();
     });
 
@@ -1712,7 +1712,7 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.meeting()!.protokollantId).toBe(before);
     });
 
-    it('hands the minutes over now and plans the next-item handover (Z3)', async () => {
+    it('hands the minutes over now and plans the next-item handover', async () => {
       const { cmp, http, fixture } = await loaded();
       const toast = fixture.debugElement.injector.get(ToastService);
       const success = jest.spyOn(toast, 'success');
@@ -1744,7 +1744,7 @@ describe('MeetingsComponent — methods', () => {
       expect(success).toHaveBeenLastCalledWith('Übergabe mit dem nächsten TOP geplant.');
     });
 
-    it('reads the meeting again on meeting_state, so a handover reaches the new keeper (Z3)', async () => {
+    it('reads the meeting again on meeting_state, so a handover reaches the new keeper', async () => {
       // Viewer B: a member with protocol.write in the gremium, not the keeper yet.
       const { http, ws, fixture } = await setup({ perms: ['protocol.write'] });
       const cmp = fixture.componentInstance as Cmp;
@@ -1827,7 +1827,7 @@ describe('MeetingsComponent — methods', () => {
       expect(error.mock.lastCall?.[0]).toBe('Aktion fehlgeschlagen.');
     });
 
-    it('keeps the handover dialog open on a pick of "with the next TOP" and sends it (Z3, O1)', async () => {
+    it('keeps the handover dialog open on a pick of "with the next TOP" and sends it', async () => {
       const { cmp, http, fixture } = await loaded();
       services(fixture).agenda.agenda.set(AGENDA);
       cmp.attendance.set([PR9]);
@@ -2033,7 +2033,7 @@ describe('MeetingsComponent — methods', () => {
       jest.useFakeTimers();
       try {
         const { cmp, http } = await loaded();
-        cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' }); // F8: finalize after the close
+        cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' }); // finalize after the close
         cmp.finalize();
         http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
         http.expectOne('/api/protocols/p-1/finalize').flush({ ...PROTOCOL, status: 'rendering', isFinal: false, isLocked: true });
@@ -2239,7 +2239,7 @@ describe('MeetingsComponent — methods', () => {
       try {
         const { cmp, fixture, http } = await loaded();
         // renderPollTimer: protocol rendering → watchRendering schedules a poll.
-        cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' }); // F8: finalize after the close
+        cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' }); // finalize after the close
         cmp.finalize();
         http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
         http.expectOne('/api/protocols/p-1/finalize').flush({ ...PROTOCOL, status: 'rendering', isFinal: false, isLocked: true });
@@ -2295,7 +2295,7 @@ describe('MeetingsComponent — methods', () => {
         const { cmp, ws, http } = await loaded();
         // Finalize turns the protocol to rendering, so watchRendering schedules
         // the renderPollTimer.
-        cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' }); // F8: finalize after the close
+        cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' }); // finalize after the close
         cmp.finalize();
         http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
         http.expectOne('/api/protocols/p-1/finalize').flush({ ...PROTOCOL, status: 'rendering', isFinal: false, isLocked: true });
@@ -2318,7 +2318,7 @@ describe('MeetingsComponent — methods', () => {
       jest.useFakeTimers();
       try {
         const { cmp, http } = await loaded();
-        cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' }); // F8: finalize after the close
+        cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' }); // finalize after the close
         cmp.finalize();
         http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
         http.expectOne('/api/protocols/p-1/finalize').flush({ ...PROTOCOL, status: 'rendering', isFinal: false, isLocked: true });

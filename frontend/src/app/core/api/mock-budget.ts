@@ -10,7 +10,7 @@ import type {
  *
  * One top budget with two fiscal years. Three sub cost centres carry their own colour,
  * one sub cost centre inherits it, and the rest have none, so the page shows every
- * colour case (O19). The rollups are consistent: a parent sums its children plus what it
+ * colour case. The rollups are consistent: a parent sums its children plus what it
  * keeps for itself.
  */
 

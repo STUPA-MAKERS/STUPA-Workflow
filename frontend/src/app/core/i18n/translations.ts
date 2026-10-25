@@ -759,7 +759,7 @@ export const de = {
   'applications.edit.title': 'Antrag bearbeiten',
   'applications.edit.saved': 'Gespeichert. Version {version} angelegt.',
   'applications.edit.invalid': 'Prüfe die markierten Felder.',
-  // Agenda dialog (board Anträge-Tagesordnung, A1).
+  // Agenda dialog (board Anträge-Tagesordnung).
   'applications.agenda.title': 'Auf Tagesordnung setzen',
   'applications.agenda.pick': 'Sitzung wählen',
   'applications.agenda.suggested': 'Vorschlag',
@@ -772,7 +772,7 @@ export const de = {
   'applications.agenda.added': 'Auf die Tagesordnung von „{meeting}“ gesetzt.',
   'applications.agenda.itemsOne': '1 TOP',
   'applications.agenda.itemsOther': '{count} TOPs',
-  // Answers of a form, read-only (@shared/forms/answer-view, O19).
+  // Answers of a form, read-only (@shared/forms/answer-view).
   'forms.answers.other': 'Weitere Angaben',
   'forms.answers.computed': 'berechnet',
   // Cost positions (@shared/forms/positions-view and the positions editor).
@@ -1051,7 +1051,7 @@ export const de = {
   'meetings.vote.question': 'Beschlussfrage',
   'meetings.vote.questionPlaceholder': 'Worüber wird abgestimmt?',
   'meetings.vote.questionPrefill': 'Soll der Antrag „{name}“ wie beschrieben gefördert werden?',
-  // F1: the prefill of the question follows the decision proposal.
+  // The prefill of the question follows the decision proposal.
   'meetings.vote.questionPrefillDecision':
     'Soll der Antrag „{name}“ mit {approved} (beantragt {requested}) und {conditions} gefördert werden?',
   'meetings.vote.questionPrefillAmount':
@@ -1059,7 +1059,7 @@ export const de = {
   'meetings.vote.questionPrefillConditions':
     'Soll der Antrag „{name}“ mit {conditions} gefördert werden?',
 
-  // F1: approval with deviations (decision proposal, decision section, decision dialog).
+  // Approval with deviations (decision proposal, decision section, decision dialog).
   'decision.section': 'Beschlussvorschlag',
   'decision.switch': 'Mit Abweichungen genehmigen',
   'decision.amount': 'Förderbetrag',
@@ -1105,7 +1105,7 @@ export const de = {
   'meetings.vote.openBlocked': 'Erst die offene Abstimmung schließen oder abbrechen.',
   'meetings.vote.close': 'Abstimmung schließen',
   'meetings.vote.cancel': 'Abstimmung abbrechen',
-  // F2: personnel elections.
+  // Personnel elections.
   'meetings.vote.kind.label': 'Art der Abstimmung',
   'meetings.vote.kind.motion': 'Beschluss',
   'meetings.vote.kind.election': 'Wahl',
@@ -2215,7 +2215,7 @@ export const de = {
   'admin.flow.actionDesc.openVote':
     'Öffnet eine Abstimmung für den Antrag in der laufenden Sitzung.',
   'admin.flow.actionDesc.requeue': 'Legt den Antrag zur erneuten Bearbeitung/Wiedervorlage zurück.',
-  // Flow editor (FE12b): header, toolbar, legend, colours, guard builder, versions.
+  // Flow editor: header, toolbar, legend, colours, guard builder, versions.
   'admin.flow.versions': 'Versionen',
   'admin.flow.versionsClose': 'Zurück zur Bearbeitung',
   'admin.flow.versionActive': 'Version {n} aktiv',
@@ -2685,7 +2685,7 @@ export const de = {
   'delegation.toast.revoked': 'Vertretung widerrufen.',
   'delegation.toast.revokeFailed': 'Widerruf fehlgeschlagen.',
 
-  // Participant view of a meeting and the beamer (FE9).
+  // Participant view of a meeting and the beamer.
   'participant.attendance.title': 'Deine Anwesenheit',
   'participant.attendance.delegated':
     'Du lässt dich in dieser Sitzung vertreten. Widerrufe die Vertretung, um dich anwesend zu melden.',
@@ -2812,7 +2812,7 @@ export const de = {
   'admin.form.moveGroupUp': 'Gruppe nach oben',
   'admin.form.moveGroupDown': 'Gruppe nach unten',
   'admin.form.dragGroup': 'Gruppe zum Umsortieren ziehen',
-  // Form editor (FE12b): outline, type menu, settings card.
+  // Form editor: outline, type menu, settings card.
   'admin.form.outline': 'Fragen des Formulars',
   'admin.form.groupMenu': 'Aktionen für Abschnitt {n}',
   'admin.form.typeMenu': 'Fragetyp wählen',
@@ -3300,7 +3300,7 @@ export const de = {
   'invoices.toast.paid': 'Rechnung als bezahlt markiert.',
   'invoices.untitled': 'Rechnung ohne Lieferant',
   'invoices.detail.noBookings': 'Noch keine Buchung.',
-  // Public meeting with QR code (#17).
+  // Public meeting with QR code.
   'vote.majorityCast.simple': 'Einfache Mehrheit der abgegebenen Stimmen',
   'vote.majorityCast.absolute': 'Absolute Mehrheit der abgegebenen Stimmen',
   'vote.majorityCast.two_thirds': 'Zwei-Drittel-Mehrheit der abgegebenen Stimmen',

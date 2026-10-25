@@ -221,7 +221,7 @@ export class ExpensesComponent implements OnDestroy {
   readonly refreshing = this.list.refreshing;
   readonly reloading = this.list.reloading;
 
-  /** The display label of every cost centre: name, path and swatch colour (O19). */
+  /** The display label of every cost centre: name, path and swatch colour. */
   readonly costCentres = computed(() => costCentreIndex(this.budgetTree()));
 
   // --- the open row ------------------------------------------------------------------

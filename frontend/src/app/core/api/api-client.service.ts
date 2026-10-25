@@ -109,7 +109,7 @@ import type {
 } from './models';
 
 /**
- * Header of the draft token of the wizard uploads (Z4). A header keeps the token out of
+ * Header of the draft token of the wizard uploads. A header keeps the token out of
  * the URL and out of the access log.
  */
 export const DRAFT_TOKEN_HEADER = 'X-Draft-Token';
@@ -282,8 +282,8 @@ export class ApiClient {
   }
 
   /**
-   * POST /applications/on-behalf — capture and submit an application for an applicant
-   * (#11). Needs `application.create_on_behalf`. The response is `{ applicationId }`.
+   * POST /applications/on-behalf — capture and submit an application for an applicant.
+   * Needs `application.create_on_behalf`. The response is `{ applicationId }`.
    */
   createApplicationOnBehalf(input: OnBehalfApplication): Observable<ApplicationCreated> {
     return this.http
@@ -293,7 +293,7 @@ export class ApiClient {
 
   /**
    * GET /applications/on-behalf/applicants — the accounts that match `q` by name or
-   * e-mail (#11). The server answers at most 20 and needs two characters.
+   * e-mail. The server answers at most 20 and needs two characters.
    */
   searchOnBehalfApplicants(q: string): Observable<ApplicantCandidate[]> {
     return this.http.get<ApplicantCandidate[]>(`${this.base}/applications/on-behalf/applicants`, {
@@ -525,7 +525,7 @@ export class ApiClient {
   }
 
   /**
-   * POST /apply/attachments — a file of the wizard before the application exists (Z4).
+   * POST /apply/attachments — a file of the wizard before the application exists.
    *
    * The first upload of a draft has no token: an anonymous caller then sends an ALTCHA
    * solution (`altcha`), a logged-in caller none. The response carries the token; every
@@ -557,7 +557,7 @@ export class ApiClient {
       );
   }
 
-  /** DELETE /apply/attachments/{id} — remove a draft file; the token must own it (Z4). */
+  /** DELETE /apply/attachments/{id} — remove a draft file; the token must own it. */
   deleteDraftAttachment(attachmentId: Uuid, token: string): Observable<void> {
     return this.http.delete<void>(`${this.base}/apply/attachments/${attachmentId}`, {
       headers: new HttpHeaders({ [DRAFT_TOKEN_HEADER]: token }),
@@ -751,7 +751,7 @@ export class ApiClient {
 
   /**
    * POST /meetings/{id}/protokollant-handover — hand the minutes of a live meeting
-   * over (Z3). `now` at once, `next_item` with the next agenda item.
+   * over. `now` at once, `next_item` with the next agenda item.
    */
   handOverProtokollant(id: Uuid, principalId: Uuid, mode: HandoverMode): Observable<Meeting> {
     return this.http
@@ -924,9 +924,9 @@ export class ApiClient {
       quorumPercent?: number | null;
       /** Admitted guests vote too (no quorum). `undefined` lets the server choose. */
       guestsVote?: boolean | null;
-      /** F1: the decision proposal of an application item. */
+      /** The decision proposal of an application item. */
       proposal?: DecisionProposal | null;
-      /** `election` opens a personnel election (F2) on a free-text item. */
+      /** `election` opens a personnel election on a free-text item. */
       kind?: VoteKind;
       seats?: number;
       candidates?: { name: string; principalId?: Uuid | null }[];
@@ -1070,12 +1070,12 @@ export class ApiClient {
     return this.http.post<VoteClosed>(`${this.base}/votes/${voteId}/close`, {});
   }
 
-  /** POST /votes/{id}/draw-lot — draw the lot of a tied election (F2, vote manager). */
+  /** POST /votes/{id}/draw-lot — draw the lot of a tied election (vote manager). */
   drawElectionLot(voteId: Uuid): Observable<Vote> {
     return this.http.post<Vote>(`${this.base}/votes/${voteId}/draw-lot`, {});
   }
 
-  /** POST /votes/{id}/runoff — create the draft runoff of an election (F2). The
+  /** POST /votes/{id}/runoff — create the draft runoff of an election. The
    *  answer is the new vote; open it with `openVote`. */
   createElectionRunoff(voteId: Uuid): Observable<Vote> {
     return this.http.post<Vote>(`${this.base}/votes/${voteId}/runoff`, {});
@@ -1227,7 +1227,7 @@ function attendanceBody(
 /**
  * The query of the application list and of its XLSX export as HTTP params.
  *
- * An array value repeats its key once per entry (`?state=a&state=b`, A4). An empty
+ * An array value repeats its key once per entry (`?state=a&state=b`). An empty
  * array, `undefined` and `null` add nothing. The export (`forExport`) leaves out the
  * paging keys, because the file holds every matching row.
  */

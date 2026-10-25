@@ -77,7 +77,7 @@ const MOCK_PRINCIPAL: Principal = {
     'application.archive',
     'application.delete',
     'application.force_status',
-    // #11: "Antrag erfassen" on the applications page.
+    // "Antrag erfassen" on the applications page.
     'application.create_on_behalf',
     'admin.site',
     'admin.gremien',
@@ -164,7 +164,7 @@ const MOCK_VOTE: Vote = {
   canCast: true,
 };
 
-/** F2: the demo election (Wahl der Sitzungsleitung), one seat, two candidates. */
+/** The demo election (Wahl der Sitzungsleitung), one seat, two candidates. */
 const MOCK_ELECTION_ID = 'a0000000-0000-0000-0000-0000000000e1';
 const MOCK_ELECTION: ElectionConfig = {
   seats: 1,
@@ -211,7 +211,7 @@ const MOCK_ELECTION_ROW: MeetingVoteOutWire = {
   },
 };
 
-/** GET /votes/{id} of an election row of the demo meeting (F2). */
+/** GET /votes/{id} of an election row of the demo meeting. */
 function mockElectionVote(row: MeetingVoteOutWire): Vote {
   return {
     ...MOCK_VOTE,
@@ -259,7 +259,7 @@ function electionBallot(row: MeetingVoteOutWire): MyBallot {
   return typeof own === 'string' ? { cast: true, choice: own } : { cast: true, choice: null, choices: own };
 }
 
-/** POST /votes/{id}/draw-lot: the mock draws the first tied candidate (F2). */
+/** POST /votes/{id}/draw-lot: the mock draws the first tied candidate. */
 function mockDrawLot(id: string, url: string): Observable<never> | Vote {
   const row = MOCK_MEETING.votes.find((v) => v.id === id);
   const lot = row?.electionResult?.lot;
@@ -280,7 +280,7 @@ function mockDrawLot(id: string, url: string): Observable<never> | Vote {
   return mockElectionVote(updated);
 }
 
-/** POST /votes/{id}/runoff: a draft runoff with the tied candidates (F2). */
+/** POST /votes/{id}/runoff: a draft runoff with the tied candidates. */
 function mockRunoff(id: string, url: string): Observable<never> | Vote {
   const row = MOCK_MEETING.votes.find((v) => v.id === id);
   const runoff = row?.electionResult?.runoff;
@@ -765,7 +765,7 @@ const MOCK_TASKS: ApplicationListItemWire[] = [
     title: 'Hardware für Fachschaftsraum',
     createdAt: '2026-06-06T08:15:00Z',
     updatedAt: '2026-06-07T16:00:00Z',
-    // The time of the last status change (A9): "Wartet seit" counts from here.
+    // The time of the last status change: "Wartet seit" counts from here.
     stateSince: '2026-06-07T16:00:00Z',
   },
   {
@@ -784,14 +784,14 @@ const MOCK_TASKS: ApplicationListItemWire[] = [
     currency: 'EUR',
     title: 'Förderung Sommerfest',
     createdAt: '2026-06-04T11:00:00Z',
-    // No stateSince, as from a server before A9: the page falls back to updatedAt.
+    // No stateSince, as from an older server: the page falls back to updatedAt.
     updatedAt: '2026-06-08T09:30:00Z',
   },
 ];
 
 /**
  * The status history of the demo application. The server names the applicant
- * `applicant` (the status page shows "Du") and a member by the Gremium (A12).
+ * `applicant` (the status page shows "Du") and a member by the Gremium.
  */
 const MOCK_TIMELINE: TimelineEventOutWire[] = [
   {
@@ -923,7 +923,7 @@ let MOCK_MEETING: MeetingOutWire = {
   canFinalize: true,
   // The demo user holds `vote.cast` in the gremium of the meeting.
   canVote: true,
-  // The demo user keeps the minutes since the start (Z3); a handover adds a period.
+  // The demo user keeps the minutes since the start; a handover adds a period.
   keeperPeriods: [
     {
       principalId: MOCK_PRINCIPAL.sub,
@@ -937,13 +937,13 @@ let MOCK_MEETING: MeetingOutWire = {
     },
   ],
   plannedHandover: null,
-  // #17: the meeting is public, guests vote; the lead sees the code and the requests.
+  // The meeting is public, guests vote; the lead sees the code and the requests.
   publicJoin: true,
   guestsMode: 'vote',
   joinCode: '7KQ4MP',
   admittedGuests: 7,
   pendingGuests: 3,
-  // #17: the gremium of the live meeting has no quorum, so it may be public.
+  // The gremium of the live meeting has no quorum, so it may be public.
   publicJoinAllowed: true,
   votes: [
     {
@@ -971,7 +971,7 @@ let MOCK_MEETING: MeetingOutWire = {
       presentGuests: 7,
       openedAt: '2026-06-12T16:48:00Z',
     },
-    // F2: a closed personnel election on the non-public item; a tie waits for the lot.
+    // A closed personnel election on the non-public item; a tie waits for the lot.
     MOCK_ELECTION_ROW,
     {
       id: 'a0000000-0000-0000-0000-0000000000a2',
@@ -1000,7 +1000,7 @@ const MOCK_PLANNED_MEETING: MeetingOutWire = {
   status: 'planned',
   gremiumId: null,
   gremiumName: 'Haushaltsausschuss',
-  // #17: this gremium has a quorum: no public participation (the switch is locked).
+  // This gremium has a quorum: no public participation (the switch is locked).
   publicJoinAllowed: false,
   votes: [],
   createdAt: '2026-06-01T10:00:00Z',
@@ -1271,9 +1271,9 @@ interface MockAttendance {
   source: 'self' | 'lead' | null;
   note: string | null;
   isSelf: boolean;
-  /** O20: the member holds `protocol.write` and can keep the minutes. */
+  /** The member holds `protocol.write` and can keep the minutes. */
   canKeepProtocol: boolean;
-  /** O6: the member has an own vote (`vote.cast`) and can be substituted. */
+  /** The member has an own vote (`vote.cast`) and can be substituted. */
   canVote: boolean;
 }
 
@@ -1284,7 +1284,7 @@ let MOCK_ATTENDANCE: MockAttendance[] = [
   { principalId: 'p-3', displayName: 'Erika Beispiel', email: 'erika@example.com', status: 'excused', source: 'self', note: 'Prüfung', isSelf: false, canKeepProtocol: false, canVote: true },
   { principalId: 'p-4', displayName: 'Uli Übernahme', email: 'uli@example.com', status: 'present', source: 'self', note: null, isSelf: false, canKeepProtocol: true, canVote: true },
   { principalId: 'p-5', displayName: 'Rolf Redner', email: 'rolf@example.com', status: 'present', source: 'lead', note: null, isSelf: false, canKeepProtocol: true, canVote: true },
-  // O23: Vera Vertretung has a delegation for the live meeting, so "present" gives 409.
+  // Vera Vertretung has a delegation for the live meeting, so "present" gives 409.
   { principalId: 'p-6', displayName: 'Vera Vertretung', email: 'vera@example.com', status: 'excused', source: 'self', note: null, isSelf: false, canKeepProtocol: true, canVote: true },
   { principalId: 'p-7', displayName: 'Sven Stellvertreter', email: 'sven@example.com', status: 'present', source: 'self', note: null, isSelf: false, canKeepProtocol: false, canVote: true },
   { principalId: 'p-8', displayName: 'Fritz Fehlend', email: 'fritz@example.com', status: 'absent', source: 'lead', note: null, isSelf: false, canKeepProtocol: false, canVote: true },
@@ -1302,7 +1302,7 @@ interface MockAgendaItem {
   /** The done mark ("TOP abhaken"), or `null`. */
   doneAt?: string | null;
   stateLabel?: Record<string, string> | null;
-  /** F1: the requested amount of an application item, for the decision proposal. */
+  /** The requested amount of an application item, for the decision proposal. */
   amount?: string | null;
 }
 
@@ -1450,7 +1450,7 @@ function mockProblem(status: number, code: string, url: string): Observable<neve
 }
 
 /**
- * POST /meetings/{id}/protokollant-handover of the live mock meeting (Z3, O1, O20): `now`
+ * POST /meetings/{id}/protokollant-handover of the live mock meeting: `now`
  * ends the running period and starts one for the new keeper; `next_item` plans it.
  */
 function mockHandover(body: { principalId?: string; mode?: string } | null, url: string): Observable<HttpEvent<unknown>> | MeetingOutWire {
@@ -1497,7 +1497,7 @@ function mockHandover(body: { principalId?: string; mode?: string } | null, url:
   return MOCK_MEETING;
 }
 
-/** A forward move of the current item starts the planned handover (A13). */
+/** A forward move of the current item starts the planned handover. */
 function mockStartPlannedHandover(fromItem: string | null | undefined, toItem: string | null | undefined): void {
   const plan = MOCK_MEETING.plannedHandover;
   const from = mockPosition(fromItem) ?? 0;
@@ -1628,7 +1628,7 @@ export function mockMediaImage(body: unknown): MediaImage {
 const MOCK_ACCOUNT_PATH =
   /(^|\/)api\/(notifications\/preferences|oauth\/grants(\/[^/]+)?|oauth\/consent(-request)?|mcp\/(config|package))$/;
 
-/** The routes of the public meeting (#17): the guest side and the lead side. */
+/** The routes of the public meeting: the guest side and the lead side. */
 const PUBLIC_MEETING_PATH =
   /\/public\/meetings\/|\/meetings\/[^/]+\/(guests(\/[^/]+)*|join-link|join-code\/rotate)$/;
 

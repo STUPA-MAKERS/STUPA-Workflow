@@ -8,7 +8,7 @@
  * - a member: the name;
  * - the applicant: "Antragsteller:in" (or "Du" on the own status page);
  * - an automatic action: "System · Fristen", "System · Automatisch", …;
- * - the Gremium (applicant view, A12/O16): the Gremium name;
+ * - the Gremium (applicant view): the Gremium name;
  * - an unknown or anonymized account: "Ehemaliges Konto".
  *
  * Without `ActorInfo` (an older server) the function reads the legacy string with the

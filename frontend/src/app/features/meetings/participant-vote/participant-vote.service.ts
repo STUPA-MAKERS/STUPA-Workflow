@@ -22,7 +22,7 @@ const NOT_CAST: MyBallot = { cast: false, choice: null };
  *
  * The rules are the ones of the vote page: the own row needs `canCast`, the meeting flag
  * `canVote` and no handed-over voting right; a 403 on a cast hides the refused row. A
- * ballot never changes (O11).
+ * ballot never changes.
  */
 @Injectable()
 export class ParticipantVoteService {
@@ -114,7 +114,7 @@ export class ParticipantVoteService {
     });
   }
 
-  /** The lot of an election was drawn, or its runoff opened (F2): read the vote again. */
+  /** The lot of an election was drawn, or its runoff opened: read the vote again. */
   onElectionChanged(): void {
     this.reload();
   }

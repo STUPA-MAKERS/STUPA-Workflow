@@ -48,7 +48,7 @@ async function setup(
 
 const confirmButton = () => screen.getByRole('button', { name: /abgeben/ });
 
-describe('BallotComponent · election (F2)', () => {
+describe('BallotComponent · election', () => {
   it('labels an erased candidate in the language of the viewer', async () => {
     const candidates = CANDIDATES.map((c) =>
       c.id === 'c2' ? { ...c, name: 'Gelöscht', erased: true } : c,

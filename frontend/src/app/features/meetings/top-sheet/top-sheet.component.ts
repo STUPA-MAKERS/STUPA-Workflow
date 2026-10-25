@@ -93,7 +93,7 @@ function altOf(file: File): string {
  * A closed meeting (boards Sitzung-Protokoll-Entwurf, Sitzung-Geschlossen): the protocol
  * bar on top (draft and "Finalisieren & versenden", or final and the PDF links) and the
  * keeper line below the title, "Protokoll: Lara Leitung (TOP 1–3), Uli Übernahme (ab TOP 3,
- * 18:55)". The text stays editable for every writer while the protocol is a draft (O22).
+ * 18:55)". The text stays editable for every writer while the protocol is a draft.
  *
  * A writer of the minutes (`editable`) ticks the open item with "Erledigt" right of the
  * title, a toggle that also removes the tick ("TOP abhaken").
@@ -107,7 +107,7 @@ function altOf(file: File): string {
  * uploads it to the media store and inserts the image (`MediaApiService`).
  *
  * A vote result in the text shows as a card with "Beschluss · 18:52 · Einfache Mehrheit",
- * the counts and the result (a tie is "Abgelehnt", O18), from the votes of this meeting.
+ * the counts and the result (a tie is "Abgelehnt"), from the votes of this meeting.
  */
 @Component({
   selector: 'app-top-sheet',

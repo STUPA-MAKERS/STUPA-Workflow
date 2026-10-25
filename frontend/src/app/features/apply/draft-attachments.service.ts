@@ -41,7 +41,7 @@ export const DRAFT_FILES_KEY = 'ap.draftFiles';
 
 /**
  * The `sessionStorage` key of one draft. The wizard keeps the default; the capture
- * dialog of the applications page (#11) provides its own key, so the two drafts of one
+ * dialog of the applications page provides its own key, so the two drafts of one
  * tab never mix.
  */
 export const DRAFT_FILES_STORAGE_KEY = new InjectionToken<string>('DRAFT_FILES_STORAGE_KEY', {
@@ -66,7 +66,7 @@ const MISSING = 'draft_attachments_missing';
 let nextKey = 0;
 
 /**
- * The draft uploads of the apply wizard (Z4), provided by the wizard.
+ * The draft uploads of the apply wizard, provided by the wizard.
  *
  * - The first upload has no token. An anonymous applicant then solves an ALTCHA
  *   challenge in the background (`AltchaService`); a signed-in one needs none. The

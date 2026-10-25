@@ -32,7 +32,7 @@ interface ModeOption {
 }
 
 /**
- * "Protokollführung übergeben" (board Sitzung-Protokoll-Uebergabe, Z3, O1).
+ * "Protokollführung übergeben" (board Sitzung-Protokoll-Uebergabe).
  *
  * The dialog shows the current and the new minute-taker ("Bisher" → "Neu", "Ändern" goes
  * back to the picker), the time of the handover and the keeper line of the protocol head
@@ -43,7 +43,7 @@ interface ModeOption {
  *   takes effect with the next TOP. The last TOP has no next one (409 `no_next_item`).
  *
  * The server refuses a member without `protocol.write` (422
- * `protokollant_needs_protocol_write`, O20). The dialog shows a refusal in its body.
+ * `protokollant_needs_protocol_write`). The dialog shows a refusal in its body.
  *
  * The dialog asks only. `MeetingDialogsService.handOver` saves the open text first and
  * sends the handover; it reports `saving` and the `refusal` code back.

@@ -65,15 +65,15 @@ export interface CandidateDraft {
  * The lead sets the decision question, the majority rule and whether the vote is
  * secret. Everything else comes from the Gremium: the quorum and the eligible voters
  * (the server counts them from the roster). A meeting vote has no tie break, a tie is
- * a rejection (O18), and a ballot never changes after the cast (O11). The options are
+ * a rejection, and a ballot never changes after the cast. The options are
  * always yes, no and abstain, so the result can fire the pass or fail branch.
  *
- * An application item also takes a decision proposal ("Beschlussvorschlag", F1): an
+ * An application item also takes a decision proposal ("Beschlussvorschlag"): an
  * approved amount and conditions that apply when the vote passes. The question follows
  * the proposal until the lead edits it by hand.
  *
  * On a free-text item the lead can open a personnel election instead ("Beschluss |
- * Wahl", F2): the name of the round, the seats to fill and the candidates (a member of
+ * Wahl"): the name of the round, the seats to fill and the candidates (a member of
  * the roster or a free name, in a list the lead can reorder). An election is secret by
  * default, and guests vote only when the lead switches them on. The dialog cannot
  * submit while there are fewer candidates than seats.
@@ -143,12 +143,12 @@ export class VoteOpenDialogComponent {
   readonly question = signal('');
   readonly majorityRule = signal<MajorityRule>('simple');
   readonly secret = signal(false);
-  /** Admitted guests vote too (#17): no quorum, the majority of the cast votes. */
+  /** Admitted guests vote too: no quorum, the majority of the cast votes. */
   readonly guestsVote = signal(false);
   readonly submitting = signal(false);
   /** The running submit only prepares the question: its button shows the spinner. */
   readonly preparing = signal(false);
-  /** F1: the decision proposal of an application item. */
+  /** The decision proposal of an application item. */
   readonly draft = signal<DecisionDraft>(emptyDraft(null));
   /** The lead edited the question by hand: the proposal no longer rewrites it. */
   private questionEdited = false;
@@ -161,7 +161,7 @@ export class VoteOpenDialogComponent {
     () => this.forApplication() && draftError(this.draft(), this.requested()) !== null,
   );
 
-  /** `motion`: a decision. `election`: a personnel election (F2). */
+  /** `motion`: a decision. `election`: a personnel election. */
   readonly kind = signal<VoteKind>('motion');
   readonly seats = signal(1);
   readonly candidates = signal<CandidateDraft[]>([]);
@@ -195,7 +195,7 @@ export class VoteOpenDialogComponent {
 
   /**
    * The election needs a name and at least as many candidates as seats. A motion on
-   * an application item needs a valid decision proposal (F1).
+   * an application item needs a valid decision proposal.
    */
   readonly tooFew = computed(() => this.candidates().length < this.seats());
   /** The typed free name is already on the list (case and spacing ignored). */
@@ -340,7 +340,7 @@ export class VoteOpenDialogComponent {
     this.candidates.update((list) => list.filter((c) => c.key !== key));
   }
 
-  /** The question of an application item, from the proposal (F1). */
+  /** The question of an application item, from the proposal. */
   private prefill(it: AgendaItem): string {
     return decisionQuestion(
       it.title ?? '',

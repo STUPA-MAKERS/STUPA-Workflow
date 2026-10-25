@@ -27,7 +27,7 @@ function valueOf(label: string): string | null {
 }
 
 describe('AnswerViewComponent', () => {
-  // One row per field type: the value as the reader sees it (O19).
+  // One row per field type: the value as the reader sees it.
   it.each<[string, FormFieldDef, unknown, string]>([
     ['text', { key: 'f', type: 'text', label: { de: 'Feld' } }, 'Hallo', 'Hallo'],
     ['email', { key: 'f', type: 'email', label: { de: 'Feld' } }, 'a@b.de', 'a@b.de'],
@@ -122,7 +122,7 @@ describe('AnswerViewComponent', () => {
     expect(valueOf('Sichtbar')).toBe('ja');
   });
 
-  it('shows nothing for a PII field the server left out (O21)', async () => {
+  it('shows nothing for a PII field the server left out', async () => {
     await view(
       one([
         { key: 'name', type: 'text', label: { de: 'Name' } },

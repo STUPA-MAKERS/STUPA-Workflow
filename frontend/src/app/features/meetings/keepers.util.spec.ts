@@ -31,7 +31,7 @@ describe('keeperLine', () => {
     expect(keeperLine([period({})], t, 'de')).toBe('Lara Leitung');
   });
 
-  it('writes every period with its TOPs and the time of a running handover (Z3, O2)', () => {
+  it('writes every period with its TOPs and the time of a running handover', () => {
     expect(keeperLine([MARA, LEA], t, 'de')).toMatch(
       /^Lara Leitung \(TOP 1–3\), Uli Übernahme \(ab TOP 3, \d\d:55\)$/,
     );

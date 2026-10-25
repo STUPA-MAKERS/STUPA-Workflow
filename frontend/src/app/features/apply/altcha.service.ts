@@ -12,7 +12,7 @@ import type { AltchaChallenge } from '@core/api/models';
  * guard), so every request that needs one calls `solve` again.
  *
  * The widget (`app-altcha`) uses it for the submit; the draft uploads of the wizard
- * use it without a widget for the first anonymous upload (Z4).
+ * use it without a widget for the first anonymous upload.
  */
 @Injectable({ providedIn: 'root' })
 export class AltchaService {

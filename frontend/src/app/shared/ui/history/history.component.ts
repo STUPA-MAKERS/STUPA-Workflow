@@ -48,7 +48,7 @@ export interface HistoryEntry {
   title: string;
   /** The colour of a status title. Leave it out for an event that is not a status. */
   kind?: StatusKind | null;
-  /** Who did it: a person, or the gremium for the applicant (O16). */
+  /** Who did it: a person, or the gremium for the applicant. */
   actor?: string | null;
   /** One more line, for example the transition ("Übergang „Prüfung beginnen“"). A line
    *  break in the text starts a new line. */

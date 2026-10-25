@@ -17,7 +17,7 @@ export function findTopBudgetNode(
 export interface CostCentreLabel {
   name: string;
   path: string;
-  /** The display colour of the budget page (O19). `null` for an unknown cost centre. */
+  /** The display colour of the budget page. `null` for an unknown cost centre. */
   color: string | null;
 }
 

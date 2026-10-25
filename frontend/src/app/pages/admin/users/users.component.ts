@@ -30,7 +30,7 @@ import { UserMergeComponent } from './user-merge/user-merge.component';
 import { UserRevokeComponent } from './user-revoke/user-revoke.component';
 import { personLabel } from '@shared/person-label.util';
 
-/** The choices of the chip "Letzte Anmeldung" (F3): older than n days, or never. */
+/** The choices of the chip "Letzte Anmeldung": older than n days, or never. */
 export const LAST_LOGIN_FILTERS = ['', '90', '180', '365', 'never'] as const;
 export type LastLoginFilter = (typeof LAST_LOGIN_FILTERS)[number];
 /** The choices of the chip "Hat SSO-Gruppen". */
@@ -134,9 +134,9 @@ export class UsersComponent {
 
   /** "Mit anderem Konto zusammenführen" needs its own permission (admin only by default). */
   protected readonly canMerge = computed(() => this.auth.can('admin.users.merge'));
-  /** "Konto löschen (DSGVO)" leads to the privacy page and needs its permission (D1). */
+  /** "Konto löschen (DSGVO)" leads to the privacy page and needs its permission. */
   protected readonly canErase = computed(() => this.auth.can('privacy.manage'));
-  /** "Rechte entziehen …" needs its own permission (admin only by default, F3). */
+  /** "Rechte entziehen …" needs its own permission (admin only by default). */
   protected readonly canRevoke = computed(() => this.auth.can('admin.users.revoke_groups'));
   /** A row has a ⋮ menu when at least one of its actions is allowed. */
   /** The old account of the open merge dialog. Null: the dialog is closed. */
@@ -248,12 +248,12 @@ export class UsersComponent {
       .join(', ');
   }
 
-  /** The name of an account. Without a name and an e-mail: "Ohne Namen" (D7), never the `sub`. */
+  /** The name of an account. Without a name and an e-mail: "Ohne Namen", never the `sub`. */
   protected userLabel(p: AdminPrincipal): string {
     return personLabel(p, this.i18n);
   }
 
-  /** The tooltip of the name: the `sub` of a nameless account, for the admin detail (D7). */
+  /** The tooltip of the name: the `sub` of a nameless account, for the admin detail. */
   protected userTitle(p: AdminPrincipal): string {
     return p.displayName || p.email ? this.userLabel(p) : p.sub;
   }

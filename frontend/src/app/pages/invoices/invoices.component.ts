@@ -187,7 +187,7 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
   private readonly PAGE = 20;
   readonly items = signal<Invoice[]>([]);
   readonly total = signal(0);
-  /** The size of each segment under the other filters; null from a backend before FE10c. */
+  /** The size of each segment under the other filters; null from an older backend. */
   readonly counts = signal<InvoiceSegmentCounts | null>(null);
   private nextOffset = 0;
   readonly loading = signal(true);

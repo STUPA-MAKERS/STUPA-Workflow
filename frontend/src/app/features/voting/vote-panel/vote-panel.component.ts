@@ -93,10 +93,10 @@ export class VotePanelComponent {
 
   readonly castDone = output<BallotCast>();
   readonly castFailed = output<BallotFailure>();
-  /** The lot of an election was drawn, or its runoff opened (F2): read the vote again. */
+  /** The lot of an election was drawn, or its runoff opened: read the vote again. */
   readonly changed = output<Vote>();
 
-  /** The personnel election of the vote (F2), or `null` for a motion. */
+  /** The personnel election of the vote, or `null` for a motion. */
   protected readonly election = computed(() => electionOf(this.vote()));
 
   /** The poll of the vote, or `null`. */
@@ -168,7 +168,7 @@ export class VotePanelComponent {
     ).join(' · ');
   });
 
-  /** Admitted guests vote too (public meeting, #17). */
+  /** Admitted guests vote too (public meeting). */
   protected readonly guestsVote = computed(
     () => !!this.vote().guestsVote || !!this.vote().config.guestsVote,
   );

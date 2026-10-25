@@ -70,7 +70,7 @@ async function setup(over: Partial<Meeting> = {}, media: string[] = []) {
 
 const sheet = () => screen.getByRole('dialog', { name: 'Anwesenheit' });
 
-describe('guests in the attendance sheet (#17, variant A)', () => {
+describe('guests in the attendance sheet (variant A)', () => {
   it('sums up the room, shows the link and the open requests', async () => {
     const { showQr } = await setup();
     expect(sheet().querySelector('.as__total')?.textContent?.replace(/\s+/g, ' ').trim()).toBe(

@@ -128,7 +128,7 @@ interface ListRow {
   stateLabel: string | null;
   stateKind: StatusKind;
   amount: string | null;
-  /** F1: the approved amount when it deviates; the row then strikes `amount` through. */
+  /** The approved amount when it deviates; the row then strikes `amount` through. */
   approved: string | null;
   /** The swipe of a phone: "Status setzen" to the right, archive to the left. */
   swipeRight: RowSwipeAction | null;
@@ -267,7 +267,7 @@ export class ApplicationsListComponent implements OnDestroy {
   /** The search writes the URL after a pause (about 250 ms, like /expenses). */
   private readonly applySearch = debounced(() => this.navigate({ q: this.searchText().trim() || null }));
   readonly typeId = signal('');
-  /** The chosen flow states. `state` repeats in the URL and in the request (A4). */
+  /** The chosen flow states. `state` repeats in the URL and in the request. */
   readonly states = signal<readonly string[]>([]);
   /**
    * Which rows to show. Archived applications leave the working list by default.
@@ -479,7 +479,7 @@ export class ApplicationsListComponent implements OnDestroy {
   readonly forceOpen = signal(false);
   /** The row and the transition of the agenda dialog ("Auf Tagesordnung setzen"). */
   readonly agendaFor = signal<{ item: ApplicationListItem; transition: Transition } | null>(null);
-  /** F1: the row and the transition of the decision dialog. */
+  /** The row and the transition of the decision dialog. */
   readonly decisionFor = signal<{ item: ApplicationListItem; transition: Transition } | null>(null);
   readonly decisionOpen = signal(false);
   readonly agendaOpen = signal(false);
@@ -538,7 +538,7 @@ export class ApplicationsListComponent implements OnDestroy {
   }
 
   /** The amount in the currency of the row, or null without an amount. */
-  /** F1: the approved amount as money when it deviates from the requested one, else null. */
+  /** The approved amount as money when it deviates from the requested one, else null. */
   private approvedMoney(item: ApplicationListItem): string | null {
     const approved = item.approvedAmount;
     if (approved === null || approved === undefined || item.amount === null) return null;
@@ -558,7 +558,7 @@ export class ApplicationsListComponent implements OnDestroy {
     void this.router.navigate(['/applications', id], { queryParamsHandling: 'preserve' });
   }
 
-  // --- capture on behalf (#11) -------------------------------------------------
+  // --- capture on behalf -------------------------------------------------
 
   openCapture(): void {
     this.capturing.set(true);

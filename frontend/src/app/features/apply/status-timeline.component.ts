@@ -81,15 +81,15 @@ type Phase = 'loading' | 'expired' | 'error' | 'ready';
  * the session cookie. It shows:
  *
  * - The header: "Vorgang 3F9A2C71", the title, the status as coloured text "· seit
- *   <stateSince>" (A9), the transitions the applicant may fire, and a menu with
+ *   <stateSince>", the transitions the applicant may fire, and a menu with
  *   "Anonymisierung beantragen" (Art. 17).
  * - Rows: "Angaben bearbeiten" (disabled with "Im aktuellen Status gesperrt" while
  *   `state.editAllowed` is false), "Anhänge (n)" and "Kommentare (n)". The last two
  *   open a side sheet (a bottom sheet on a phone).
  * - "Angaben": the answers (`app-answer-view`).
  * - "Verlauf" (`app-history`): the status changes with the transition, the versions as
- *   metadata only ("Version 2 gespeichert", "Geändert: …", A11/O17). The server names
- *   the Gremium as actor for everything the applicant did not do (A12/O16); the
+ *   metadata only ("Version 2 gespeichert", "Geändert: …"). The server names
+ *   the Gremium as actor for everything the applicant did not do; the
  *   applicant's own entries read "Du".
  *
  * "Angaben bearbeiten" turns the page into the edit form with a bar "Speichern legt
@@ -280,9 +280,9 @@ export class StatusTimelineComponent {
 
   /**
    * "Verlauf": the status changes and the versions, by day. A status change shows the
-   * new state in its colour, the transition (A3) and the note. A version shows only
-   * its number and the names of the changed fields (A11). The applicant's own entries
-   * read "Du"; the server names the Gremium for the others (A12).
+   * new state in its colour, the transition and the note. A version shows only
+   * its number and the names of the changed fields. The applicant's own entries
+   * read "Du"; the server names the Gremium for the others.
    */
   readonly historyEntries = computed<HistoryEntry[]>(() => {
     const t = (key: TranslationKey, params?: Record<string, string | number>) =>
@@ -457,7 +457,7 @@ export class StatusTimelineComponent {
     });
   }
 
-  /** Make the machine note of a vote readable; a tie is a rejection (O18). */
+  /** Make the machine note of a vote readable; a tie is a rejection. */
   noteText(note: string): string {
     const resultKeys = {
       'vote:passed': 'vote.result.passed',

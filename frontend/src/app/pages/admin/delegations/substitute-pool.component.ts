@@ -219,7 +219,7 @@ export class SubstitutePoolComponent {
     this.search.set(q);
   }
 
-  /** Without a name and an e-mail: "Ohne Namen" (D7), never the `sub`. */
+  /** Without a name and an e-mail: "Ohne Namen", never the `sub`. */
   protected label(p: AdminPrincipal): string {
     return personLabel(p, this.i18n);
   }

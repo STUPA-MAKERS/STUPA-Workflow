@@ -11,7 +11,7 @@ const LANGUAGE_NAME: Record<string, TranslationKey> = {
 };
 
 /**
- * The language switch (D8): the app-styled list of `app-filter-select`, never the native
+ * The language switch: the app-styled list of `app-filter-select`, never the native
  * list of the browser. Desktop: a popover under the chip. Phone: the shared bottom sheet.
  *
  * - `display="code"`: the chip shows "DE" with a globe (public top bar, guest page).

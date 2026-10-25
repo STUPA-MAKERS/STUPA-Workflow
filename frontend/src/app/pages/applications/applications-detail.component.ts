@@ -318,7 +318,7 @@ export class ApplicationsDetailComponent {
   /** The transition of the agenda dialog. */
   readonly agendaTransition = signal<Transition | null>(null);
   readonly agendaOpen = signal(false);
-  /** F1: the transition of the decision dialog (into an accepted state). */
+  /** The transition of the decision dialog (into an accepted state). */
   readonly decisionTransition = signal<Transition | null>(null);
   readonly decisionOpen = signal(false);
   readonly canTransition = computed(() => this.auth.can('application.transition'));
@@ -626,7 +626,7 @@ export class ApplicationsDetailComponent {
    * "Verlauf": the status changes and the versions, by day (`app-history`).
    *
    * A status change shows the new state in its colour, the transition ("Übergang
-   * „Prüfung beginnen“", A3) and the note. The first status event is the submission and
+   * „Prüfung beginnen“") and the note. The first status event is the submission and
    * carries "Version 1". Every later version shows its changed fields with the old and
    * the new value.
    *
@@ -1088,7 +1088,7 @@ export class ApplicationsDetailComponent {
   }
 
   /**
-   * F1: the approved amount when it deviates from the requested one, else `''`. The
+   * The approved amount when it deviates from the requested one, else `''`. The
    * header and the cost centre then name it next to the struck requested amount.
    */
   approvedAmount(app: Application): string {
@@ -1121,7 +1121,7 @@ export class ApplicationsDetailComponent {
   /**
    * Save the edit as a new version (PATCH). An invalid form shows its errors and sends
    * nothing. A 422 of the server shows on the fields it names (for example a cost
-   * position without an offer, D12); a 409 means the state no longer allows an edit.
+   * position without an offer); a 409 means the state no longer allows an edit.
    */
   saveEdit(): void {
     if (this.savingEdit()) return;

@@ -51,7 +51,7 @@ export function flowColorKind(hex: string | null | undefined): StatusKind {
 /**
  * The result of a closed vote.
  *
- * A tie is a rejection (O18): the motion did not get a majority. The UI never says
+ * A tie is a rejection: the motion did not get a majority. The UI never says
  * "Stimmengleichheit", so a tie shows the label of `rejected`.
  */
 export function voteResultStatus(result: VoteResult): StatusView {

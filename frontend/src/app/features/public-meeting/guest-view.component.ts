@@ -41,14 +41,14 @@ interface AgendaRow {
 }
 
 /**
- * The participant view of an admitted guest (#17, boards Telefon-Teilnahme): the own
+ * The participant view of an admitted guest (boards Telefon-Teilnahme): the own
  * status ("Du bist zugelassen" or "Du schaust zu"), the item that runs now, the open
  * vote (or "Keine offene Abstimmung"), and the tabs "Tagesordnung" and "Protokoll".
  *
  * A non-public item shows with its title and a lock, never with its text or its votes
  * (the server sends neither). The protocol tab shows the draft texts of the public items
  * as the minute-taker writes them. A vote opens on its own page in the view, with the
- * shared vote panel: the guest votes like a member (one ballot, no change, O11), or
+ * shared vote panel: the guest votes like a member (one ballot, no change), or
  * reads it when the meeting lets guests only watch or the vote is for members only.
  */
 @Component({

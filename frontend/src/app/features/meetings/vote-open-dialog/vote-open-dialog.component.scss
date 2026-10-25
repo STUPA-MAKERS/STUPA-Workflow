@@ -10,7 +10,7 @@
   @include df.switch-label;
 }
 
-/* F1: the heading of the decision proposal and the rule below it. */
+/* The heading of the decision proposal and the rule below it. */
 .vod__section {
   color: var(--color-accent-text);
 }
@@ -46,7 +46,7 @@
   color: var(--color-text-muted);
 }
 
-/* Personnel election (F2): the seats stepper and the candidate list. */
+/* Personnel election: the seats stepper and the candidate list. */
 .vod__stepper {
   display: flex;
   align-items: center;

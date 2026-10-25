@@ -26,7 +26,7 @@ function byAdmitted(a: MeetingGuest, b: MeetingGuest): number {
 
 /**
  * The join requests and the guests of the open meeting, for the meeting lead
- * (public meeting with QR code, #17). Provided by `MeetingsComponent`.
+ * (public meeting with QR code). Provided by `MeetingsComponent`.
  *
  * The service loads only for `canManage` on a public meeting that is not closed; the
  * server refuses everybody else (403). The lead events of the live channel

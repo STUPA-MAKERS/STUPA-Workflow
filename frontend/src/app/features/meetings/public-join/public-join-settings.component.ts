@@ -11,7 +11,7 @@ import {
 import { JoinLinkComponent } from './join-link.component';
 
 /**
- * The public participation of a meeting (#17), for "Sitzung anlegen" (step 2) and
+ * The public participation of a meeting, for "Sitzung anlegen" (step 2) and
  * "Sitzung bearbeiten": the switch "Öffentliche Teilnahme (QR)", then the choice
  * "Gäste dürfen abstimmen" / "Gäste schauen nur zu" (two equal segments with one line
  * each), then the join link with its QR code, or, before the create, where it will be.

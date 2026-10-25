@@ -44,7 +44,7 @@ export interface DelegationInput {
   delegateVoting: boolean;
   /**
    * The meeting lead enters a substitute for this missing member while the meeting is
-   * live (O6). Omit it to delegate for yourself.
+   * live. Omit it to delegate for yourself.
    */
   delegatorId?: Uuid;
 }
@@ -148,7 +148,7 @@ export class DelegationsApiService {
   }
 
   /**
-   * The pool substitutes of one member for the lead entry (O6): the personal entries for
+   * The pool substitutes of one member for the lead entry: the personal entries for
    * the member and the gremium-wide entries. Only the meeting lead may ask (else 403).
    */
   poolSubstitutes(meetingId: Uuid, delegatorId: Uuid): Observable<DelegationRecipient[]> {

@@ -83,7 +83,7 @@ export class BeamerComponent implements OnDestroy {
   /** The vote on the screen as `GET /votes/{id}` gave it. */
   private readonly loaded = signal<Vote | null>(null);
   private requested: string | null = null;
-  /** The join link of a public meeting (#17) and the present members. */
+  /** The join link of a public meeting and the present members. */
   private readonly link = signal<JoinLink | null>(null);
   private readonly presentMembers = signal(0);
 

@@ -1,5 +1,5 @@
 /**
- * The mock of "Rechte entziehen" (F3) for the admin API in mock mode.
+ * The mock of "Rechte entziehen" for the admin API in mock mode.
  *
  * It mirrors `backend/app/modules/admin/principal_revoke.py` on the in-memory store: the
  * Gremien of a person come from the memberships (static, plus the ones that the OIDC

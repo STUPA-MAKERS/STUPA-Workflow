@@ -78,7 +78,7 @@ interface Row {
   /** The read-only status text. */
   readOnly: { kind: StatusKind; key: TranslationKey };
   menu: RowMenuSection[];
-  /** O23: the server refused "present" for this member; the delegation is in the way. */
+  /** The server refused "present" for this member; the delegation is in the way. */
   conflict: Delegation | 'unknown' | null;
 }
 
@@ -89,7 +89,7 @@ const LEAD_CHOICES: readonly { value: Choice; label: TranslationKey }[] = [
   { value: 'open', label: 'meetings.attendance.unknown' },
 ];
 
-/** A member reports the own record as present or absent (Z2: "Abwesend" means excused). */
+/** A member reports the own record as present or absent ("Abwesend" means excused). */
 const SELF_CHOICES: readonly { value: Choice; label: TranslationKey }[] = [
   { value: 'present', label: 'meetings.attendance.selfPresent' },
   { value: 'excused', label: 'meetings.attendance.selfExcused' },
@@ -103,10 +103,10 @@ const SELF_CHOICES: readonly { value: Choice; label: TranslationKey }[] = [
  * Sitzungsleitung", "vertreten durch …") and the control.
  *
  * - The meeting lead (`canControl`) sets every row to "Anwesend / Entschuldigt /
- *   Unentschuldigt" and resets it to "Offen" (DELETE). The lead's record wins (O15).
- * - A member reports only the own row, as "Anwesend / Abwesend" (Z2), while the lead
+ *   Unentschuldigt" and resets it to "Offen" (DELETE). The lead's record wins.
+ * - A member reports only the own row, as "Anwesend / Abwesend", while the lead
  *   did not set it. Every other row is read-only.
- * - O23: a member with an active delegation cannot be present. The option is disabled
+ * - A member with an active delegation cannot be present. The option is disabled
  *   and says why; a 409 from the server marks the row and offers the revoke. A revoke
  *   of that delegation (here or in the own-delegation card) clears the mark.
  * - The arrow keys move the focus between the options only; Enter, Space or a click
@@ -115,15 +115,15 @@ const SELF_CHOICES: readonly { value: Choice; label: TranslationKey }[] = [
  *   to them only); the row menu edits it.
  * - A closed meeting freezes the attendance: every row is read-only.
  * - The row of the minute-taker says so in the sub line.
- * - O6: while the meeting is live, the meeting lead (`canManage`) enters a substitute
+ * - While the meeting is live, the meeting lead (`canManage`) enters a substitute
  *   from the pool for a missing member (open, excused or absent, without a delegation):
  *   the row menu item "Vertretung eintragen" opens the picker. The row then says
  *   "vertreten durch …".
- * - A member who does not lead reads "abwesend" for an excuse and an absence (Z2), in the
+ * - A member who does not lead reads "abwesend" for an excuse and an absence, in the
  *   rows and in the counts.
  *
  * Below the members: the delegations of the meeting (the lead revokes one while the
- * meeting is live, O6), the own delegation card and the people who have the meeting open.
+ * meeting is live), the own delegation card and the people who have the meeting open.
  *
  * The delegation picker sits outside the side sheet, so that Escape in the picker does not close
  * the sheet.
@@ -168,7 +168,7 @@ export class AttendanceSheetComponent {
   readonly saving = input(false);
   /** Names of the people who have the meeting open (WS presence). */
   readonly viewers = input<string[]>([]);
-  /** O23: the member whose "present" the server refused with 409 `delegation_active`. */
+  /** The member whose "present" the server refused with 409 `delegation_active`. */
   readonly conflictId = input<Uuid | null>(null);
 
   readonly statusChange = output<AttendanceChange>();
@@ -177,9 +177,9 @@ export class AttendanceSheetComponent {
    * form in the sheet would bubble to the host and reach a `(reset)` binding.
    */
   readonly statusReset = output<Attendance>();
-  /** O23: the delegation of this member (the `conflictId`) was revoked; clear the mark. */
+  /** The delegation of this member (the `conflictId`) was revoked; clear the mark. */
   readonly conflictResolved = output<Uuid>();
-  /** "Groß zeigen": the page shows the large QR code (#17). */
+  /** "Groß zeigen": the page shows the large QR code. */
   readonly showQr = output<void>();
 
   /** The join requests and the guests; the lead of a public meeting has them loaded. */
@@ -193,7 +193,7 @@ export class AttendanceSheetComponent {
   /** The row whose reason is being edited. */
   protected readonly editingNote = signal<Uuid | null>(null);
   protected readonly revoking = signal<Uuid | null>(null);
-  /** O6: the missing member for whom the lead picks a substitute, or `null`. */
+  /** The missing member for whom the lead picks a substitute, or `null`. */
   protected readonly substituteFor = signal<Attendance | null>(null);
   /** The option that has the keyboard focus in a row (roving tab stop), or `null`. */
   private readonly focused = signal<{ id: Uuid; value: Choice } | null>(null);
@@ -267,7 +267,7 @@ export class AttendanceSheetComponent {
     if (value === 'members' || value === 'guests') this.tab.set(value);
   }
 
-  /** The counts per state. A member who does not lead reads one "abwesend" count (Z2). */
+  /** The counts per state. A member who does not lead reads one "abwesend" count. */
   protected readonly counts = computed(() => {
     const rows = this.attendance();
     const count = (s: AttendanceStatus | null) => rows.filter((a) => a.status === s).length;
@@ -347,7 +347,7 @@ export class AttendanceSheetComponent {
     };
   }
 
-  /** The status text of a read-only row. A member reads "Abwesend" for an excuse (Z2). */
+  /** The status text of a read-only row. A member reads "Abwesend" for an excuse. */
   private readOnly(status: AttendanceStatus | null): { kind: StatusKind; key: TranslationKey } {
     if (status === 'present') return { kind: 'accent', key: 'meetings.attendance.present' };
     if (status === null) return { kind: 'muted', key: 'meetings.attendance.unknown' };
@@ -358,7 +358,7 @@ export class AttendanceSheetComponent {
   /**
    * The reason is editable on an excused row: by the member on the own row while the
    * lead did not set it; by the lead on a row the lead set and on the own row. A save
-   * from the lead takes the record over (O15), so a member's own reason stays the
+   * from the lead takes the record over, so a member's own reason stays the
    * member's.
    */
   private noteEditable(a: Attendance): boolean {
@@ -368,7 +368,7 @@ export class AttendanceSheetComponent {
   }
 
   /**
-   * O6: the lead enters a substitute for a missing member while the meeting is live. A
+   * The lead enters a substitute for a missing member while the meeting is live. A
    * member who is present, or who already has a delegation, needs none. The server
    * refuses a member without an own vote and a member who already substitutes another
    * member in this meeting (no chains), so the action is not offered for them.
@@ -419,7 +419,7 @@ export class AttendanceSheetComponent {
   /**
    * The arrow keys move the focus to the next option; a blocked option is skipped. They
    * do not set the state: each step would send a change (and a reset on "Offen"), and a
-   * lead's change takes a member's own report over (O15). Enter, Space or a click sets it.
+   * lead's change takes a member's own report over. Enter, Space or a click sets it.
    */
   protected onKey(event: KeyboardEvent, row: Row, index: number): void {
     const options = row.options;
@@ -466,7 +466,7 @@ export class AttendanceSheetComponent {
     else if (item.id === 'substitute') this.substituteFor.set(row.a);
   }
 
-  /** O6: the lead entered a substitute; the row shows "vertreten durch …". */
+  /** The lead entered a substitute; the row shows "vertreten durch …". */
   protected onSubstituted(): void {
     this.substituteFor.set(null);
     this.loadDelegations(this.meeting().id);
@@ -486,7 +486,7 @@ export class AttendanceSheetComponent {
     this.editingNote.set(null);
   }
 
-  /** Revoke a delegation of the meeting (the lead while live, O6, or the delegator). */
+  /** Revoke a delegation of the meeting (the lead while live, or the delegator). */
   protected revoke(d: Delegation): void {
     if (this.revoking()) return;
     this.revoking.set(d.id);
@@ -511,7 +511,7 @@ export class AttendanceSheetComponent {
     if (change.kind === 'revoked') this.resolveConflict(change.delegation.delegatorId);
   }
 
-  /** A revoked delegation of the refused member ends the O23 conflict of the row. */
+  /** A revoked delegation of the refused member ends the delegation conflict of the row. */
   private resolveConflict(delegatorId: Uuid): void {
     if (this.conflictId() === delegatorId) this.conflictResolved.emit(delegatorId);
   }

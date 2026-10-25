@@ -206,7 +206,7 @@ describe('SubstitutePoolComponent', () => {
     // An inactive person is no choice; a person without a name reads "Ohne Namen" and
     // keeps the subject in the tooltip.
     expect(await within(dialog).findByRole('button', { name: /Kim/ })).toBeInTheDocument();
-    // D7: a nameless account reads "Ohne Namen", never its sub.
+    // A nameless account reads "Ohne Namen", never its sub.
     expect(within(dialog).getByRole('button', { name: 'Ohne Namen' })).toBeInTheDocument();
     expect(within(dialog).queryByText('kc|ki')).toBeNull();
     expect(
@@ -343,7 +343,7 @@ describe('SubstitutePoolComponent', () => {
     c.removing.set(new Set(['s-1']));
     c.remove(ENTRIES[0]);
     expect(delegations.removeSubstitute).not.toHaveBeenCalled();
-    // D7: a nameless account reads "Ohne Namen", never its sub.
+    // A nameless account reads "Ohne Namen", never its sub.
     expect(c.label({ ...PEOPLE[1], sub: 'kc|x' })).toBe('Ohne Namen');
     expect(c.label({ ...PEOPLE[1], email: 'e@x.de' })).toBe('e@x.de');
   });

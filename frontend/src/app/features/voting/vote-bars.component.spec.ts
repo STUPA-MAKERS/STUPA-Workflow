@@ -42,7 +42,7 @@ describe('VoteBarsComponent', () => {
     expect(screen.getByText('Angenommen')).toHaveClass('st--accent');
   });
 
-  it('shows a tie as Abgelehnt (O18)', async () => {
+  it('shows a tie as Abgelehnt', async () => {
     await setup({ result: 'tie', counts: { yes: 4, no: 4, abstain: 1 } });
     expect(screen.getByText('Abgelehnt')).toHaveClass('st--error');
     expect(screen.queryByText(/Stimmengleichheit/)).not.toBeInTheDocument();

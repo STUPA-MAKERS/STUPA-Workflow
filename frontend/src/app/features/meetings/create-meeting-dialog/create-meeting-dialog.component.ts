@@ -39,7 +39,7 @@ import { personLabel } from '@shared/person-label.util';
  *
  * Step 1 asks for the Gremium, the date, the start and an optional end. Step 2 asks
  * for the title (prefilled from step 1) and the minute-taker. Only members with
- * `protocol.write` in the Gremium can keep the minutes (O20), so the list offers only
+ * `protocol.write` in the Gremium can keep the minutes, so the list offers only
  * them. The dialog creates the meeting and opens its page.
  *
  * The Gremium list holds every Gremium for an admin and the Gremien with
@@ -92,7 +92,7 @@ export class CreateMeetingDialogComponent {
   readonly title = signal('');
   /** Optional at create time. The meeting needs a minute-taker before it starts. */
   readonly keeper = signal('');
-  /** Public participation over a QR code (#17), with the guest mode. */
+  /** Public participation over a QR code, with the guest mode. */
   readonly publicJoin = signal(false);
   readonly guestsMode = signal<GuestsMode>('vote');
   /** What the chosen gremium allows: public participation only without a quorum. */
@@ -104,7 +104,7 @@ export class CreateMeetingDialogComponent {
   /** The last prefilled title. A title that the user changed stays. */
   private lastPrefill = '';
 
-  /** O20: only a member with `protocol.write` can keep the minutes (422 otherwise). */
+  /** Only a member with `protocol.write` can keep the minutes (422 otherwise). */
   readonly keeperOptions = computed<SelectFieldOption[]>(() => {
     const none = this.i18n.translate('meetings.protokollant.none');
     return [

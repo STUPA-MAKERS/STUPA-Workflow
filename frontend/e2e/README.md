@@ -1,8 +1,8 @@
-# E2E tests (T-40) — Playwright against the real compose stack
+# E2E tests — Playwright against the real compose stack
 
-End-to-end coverage of the core user journeys (testing.md §3) against the **real**
+End-to-end coverage of the core user journeys against the **real**
 stack (FastAPI + Angular + Postgres + Redis + MinIO + typst behind Nginx), **not**
-against the mock API (OFF since #101). Magic-link mails land in the `mailpit` SMTP
+against the mock API (the mock API is off). Magic-link mails land in the `mailpit` SMTP
 sink.
 
 ## Run
@@ -23,7 +23,7 @@ Deterministic. No Keycloak, typst or ClamAV on the gate path:
 
 - **01 apply** — the public apply wizard through ALL steps to the review summary
   (application type → "Angaben" with the dynamic form of the seeded form version and
-  a draft upload of a PDF (Z4) → contact → review). The final submit click is NOT
+  a draft upload of a PDF → contact → review). The final submit click is NOT
   part of the assertion. Test 02 covers the real application *creation* and the
   follow-up journey (scenario 1, part).
 - **02 magic-link-flow** — create the application → magic link (real SMTP over
@@ -35,22 +35,20 @@ Deterministic. No Keycloak, typst or ClamAV on the gate path:
   (the success toast fires only on a 2xx from the server) (scenario 6).
 - **05 budget-pots** — budget pots view plus pot creation.
 
-**T-40 therefore covers 4 of the 7 SDS scenarios green and for real** (1 apply plus
+**The suite therefore covers 4 of the 7 SDS scenarios green and for real** (1 apply plus
 magic link, 2 flow, 6 admin config, 7 RBAC) **plus** budget pots and read-only.
 
-## Left out on purpose — tracked as follow-up issues, not as hollow stubs
+## Left out on purpose
 
 Frederik's rule is "stable before flaky". A full green run of all 7 scenarios against
 the real stack is not reliably deterministic in CI (WebSocket timing, PDF render,
-Keycloak, ClamAV). These scenarios move to clearly named issues. Empty
-`test.fixme()` stubs would only fake coverage.
+Keycloak, ClamAV). These scenarios are not in the suite. Empty `test.fixme()` stubs
+would only fake coverage.
 
-| Scenario (SDS) | Issue |
-|----------------|-------|
-| 3 async voting | #107 |
-| 4 live vote (WebSocket, 2 contexts + beamer) | #108 |
-| 5 protocol → PDF → send (typst) | #109 |
-| OIDC login over a Keycloak test realm | #110 |
+- 3 async voting
+- 4 live vote (WebSocket, 2 contexts + beamer)
+- 5 protocol → PDF → send (typst)
+- OIDC login over a Keycloak test realm
 
 ## Architecture notes
 
@@ -78,11 +76,3 @@ Keycloak, ClamAV). These scenarios move to clearly named issues. Empty
 - **web healthcheck and mounts** (overlay): web uses `127.0.0.1` instead of
   `localhost`, because nginx listens on IPv4 only and the conf mount is read-only. The
   `:z` mounts serve SELinux and podman locally and are a no-op on CI docker.
-
-## Defect found (separate bugfix task, not part of T-40)
-
-The backend mail links to `/antrag/<id>#t=<token>` (a fragment, security.md §1: the
-token never reaches the server). The frontend reads the token on `/status?t=…&app=…`
-and has **no** `/antrag/:id` route. The magic-link landing is therefore broken end to
-end. The gating test covers the magic-link *capability* over the `/status` path that
-the frontend supports, with the token pulled from mailpit.

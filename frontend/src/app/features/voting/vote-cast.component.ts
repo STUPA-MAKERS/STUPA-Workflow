@@ -61,7 +61,7 @@ const NOT_CAST: MyBallot = { cast: false, choice: null };
  *   the delete. A 403 on the load or on an own cast marks the person as not eligible.
  *   A 403 on a represented cast removes the row "Als Vertretung für <name>". After a
  *   refused cast the page reads the vote and the delegation state again.
- * - A ballot never changes after the cast (O11). `myBallot` and `representedCast` of
+ * - A ballot never changes after the cast. `myBallot` and `representedCast` of
  *   the server restore the lock on a reload; a 409 `already_voted` locks it too. After a
  *   cast the pane stays on the vote and tells the list, so the row reads "Abgestimmt".
  * - The delegation state explains a voting right that the person handed over, or it
@@ -327,7 +327,7 @@ export class VoteCastComponent implements OnDestroy {
   }
 
   /** The ballot says "Danke! Deine Stimme: Ja" itself, so no toast repeats it. */
-  /** The lot of an election was drawn, or its runoff opened (F2): read the vote again. */
+  /** The lot of an election was drawn, or its runoff opened: read the vote again. */
   onElectionChanged(): void {
     this.reload();
   }

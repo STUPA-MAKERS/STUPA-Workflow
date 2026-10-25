@@ -40,8 +40,8 @@ const NEW_ROLE_PERMISSIONS = ['vote.cast'];
 /**
  * The dialog that creates or edits one gremium role (board Verwaltung-Gremiumrolle-Dialog).
  *
- * The fields are the key (a new role only; it must match `ROLE_KEY_PATTERN`, A10), the
- * German and English name and the rights of the fixed gremium catalogue (O7). The OIDC
+ * The fields are the key (a new role only; it must match `ROLE_KEY_PATTERN`), the
+ * German and English name and the rights of the fixed gremium catalogue. The OIDC
  * groups of the role are read-only here; they come from the group mappings, and the link
  * opens that page. "Rolle löschen" shows for an own role only, never for a forced role.
  * The dialog saves the role itself, so a 409 or 422 of the server shows under the key.

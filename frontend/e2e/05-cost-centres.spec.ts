@@ -4,7 +4,7 @@ import { ADMIN_STATE } from './global-setup';
 test.use({ storageState: ADMIN_STATE });
 
 /**
- * Budget view (testing.md §3): the admin opens the cost-centre tree and sees real cost
+ * Budget view: the admin opens the cost-centre tree and sees real cost
  * centres, served from the database over the budget API.
  *
  * The page is `/admin/cost-centres`, its heading is "Kostenstellen", and the tree of

@@ -48,7 +48,7 @@ let nextId = 0;
  *
  * One row per role: the name, "Pflichtrolle" for a forced role, the OIDC groups that give
  * the role (from the gremium role mappings; for `member` the membership groups), one box
- * per right of the fixed catalogue (O7, "Protokoll freigeben" included) and the actions.
+ * per right of the fixed catalogue ("Protokoll freigeben" included) and the actions.
  * A box saves at once. In a narrow container the header goes away and the boxes become
  * chips with their names under the role.
  *

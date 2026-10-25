@@ -34,7 +34,7 @@ def icon(svg: bytes, size: int, scale: float) -> Image.Image:
     return bg.convert('RGB')
 ```
 
-**Theme, light and dark (#43):** the theme selects the wordmark. The computed
+**Theme, light and dark:** the theme selects the wordmark. The computed
 `PublicHeaderComponent.logoSrc` (the top bar of the public pages) reads
 `ThemeService.resolved()` and picks either `stupa-wordmark-light.svg` (black text) or
 `stupa-wordmark-dark.svg` (white text). The text keeps a strong contrast in both modes. The

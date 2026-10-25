@@ -26,7 +26,7 @@ import { problemCode, problemDetail } from '@core/api/problem';
  * "Sitzung schließen?": the last step of a live meeting.
  *
  * The close is final and freezes the attendance. The checklist says what the close
- * needs and does (O12, O13):
+ * needs and does:
  *
  * - No vote of the meeting may be open. The server refuses the close with 409
  *   `open_vote` otherwise, and the dialog then shows that reason in the list. The

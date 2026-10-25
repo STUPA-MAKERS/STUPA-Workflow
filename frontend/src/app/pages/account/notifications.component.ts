@@ -9,7 +9,7 @@ import { PageHeaderComponent } from '@shared/ui/page-header/page-header.componen
 import { EmptyStateComponent, NoteComponent, SkeletonComponent, SwitchComponent } from '@stupa-makers/ui-kit';
 
 /**
- * Kinds that the page never shows. No mail goes out for them (F10): "vote" has no sender,
+ * Kinds that the page never shows. No mail goes out for them: "vote" has no sender,
  * and "role_change" has no caller. The server catalogue does not list them any more; the
  * filter keeps an older server from showing a switch that does nothing.
  */

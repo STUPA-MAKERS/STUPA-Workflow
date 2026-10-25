@@ -35,7 +35,7 @@ interface PositionRow extends CostPosition {
 let nextId = 0;
 
 /**
- * "Kostenaufstellung": the cost positions of an answer, read-only (O19, the boards Anträge
+ * "Kostenaufstellung": the cost positions of an answer, read-only (the boards Anträge
  * and Schmal-Anträge-Detail).
  *
  * A position shows collapsed: its name, "n Angebote · bevorzugt: <supplier>" and its
@@ -47,7 +47,7 @@ let nextId = 0;
  * Names, suppliers and offer texts are never cut: they wrap. An offer text that is an
  * http(s) URL is a link in the open position (a link cannot sit in the row button).
  *
- * Comparison offers stay tagged attachments (O5): the offers here have no file.
+ * Comparison offers stay tagged attachments: the offers here have no file.
  */
 @Component({
   selector: 'app-positions-view',

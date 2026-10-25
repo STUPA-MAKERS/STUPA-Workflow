@@ -13,7 +13,7 @@ import { voteResultStatus, type StatusView } from '@shared/status-kind.util';
 export const ELECTION_ABSTAIN = 'abstain';
 
 /**
- * The election of a vote (F2), or `null` for a motion. A single candidate gives a
+ * The election of a vote, or `null` for a motion. A single candidate gives a
  * Ja/Nein/Enthaltung ballot, so the caller checks `isYesNoElection` too.
  */
 export function electionOf(vote: ElectionFields | null | undefined): ElectionConfig | null {
@@ -195,7 +195,7 @@ export function electionCaption(
 
 /** The status of a closed election: "Gewählt", "Stichwahl", "Los steht aus", "Niemand gewählt". */
 /**
- * The status of a closed vote in a list row: an election (F2) reads its result with
+ * The status of a closed vote in a list row: an election reads its result with
  * `electionStatus` ("Gewählt", "Stichwahl", "Los"), a motion with `voteResultStatus`.
  */
 export function closedStatus(kind: VoteKind | null | undefined, result: VoteResult): StatusView {

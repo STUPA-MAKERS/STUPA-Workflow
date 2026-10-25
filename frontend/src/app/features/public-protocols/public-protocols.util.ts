@@ -88,7 +88,7 @@ export type TopPart =
 const CALLOUT_HEAD = /^>\s?\[!abstimmung\]\s*(.*)$/i;
 /** The tally line of a vote callout (`yes: 5, no: 0, abstain: 1`). */
 const TALLY_LINE = /^[\p{L}_\\]+:\s*\d+(\s*,\s*[\p{L}_\\]+:\s*\d+)*$/u;
-/** A condition line of a vote callout (F1); the decision box lists the conditions. */
+/** A condition line of a vote callout; the decision box lists the conditions. */
 const CONDITION_LINE = /^Auflage \d+:/;
 
 /**

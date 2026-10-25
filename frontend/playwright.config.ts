@@ -1,8 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * Playwright E2E tests (T-40) run against the real compose stack. They do not run against
- * `ng serve` or the mock API. The mock API is off since #101. `scripts/e2e.sh` starts the
+ * Playwright E2E tests run against the real compose stack. They do not run against
+ * `ng serve` or the mock API. `scripts/e2e.sh` starts the
  * stack with its own COMPOSE_PROJECT_NAME and a `down -v`. This config starts no web server.
  * It uses the `web` container that already runs.
  *

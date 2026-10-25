@@ -146,7 +146,7 @@ async function loaded() {
   return { ...view, http, cmp };
 }
 
-describe('MeetingsComponent — AUD-012 autosave flush on TOP switch', () => {
+describe('MeetingsComponent — autosave flush on TOP switch', () => {
   it('flushes the pending TOP body save before switching TOPs (no silent loss)', async () => {
     jest.useFakeTimers();
     try {
@@ -178,7 +178,7 @@ describe('MeetingsComponent — AUD-012 autosave flush on TOP switch', () => {
     }
   });
 
-  it('sends the handover only after the pending TOP body is saved (Z3)', async () => {
+  it('sends the handover only after the pending TOP body is saved', async () => {
     jest.useFakeTimers();
     try {
       const { cmp, http } = await loaded();

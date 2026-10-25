@@ -42,9 +42,9 @@ export const MEETING_TITLE_MAX = 200;
  * the meeting page. The title can change while the meeting is planned or live. A
  * closed meeting locks every field, the title too, because the protocol that goes out
  * names the meeting; a final protocol also locks the minute-taker. The server refuses
- * both with 409. Only a member with `protocol.write` can keep the minutes (O20), so the
+ * both with 409. Only a member with `protocol.write` can keep the minutes, so the
  * list offers those members plus the current minute-taker. While the meeting is live a
- * new minute-taker is a handover "now" (Z3).
+ * new minute-taker is a handover "now".
  */
 @Component({
   selector: 'app-meeting-settings-dialog',
@@ -87,7 +87,7 @@ export class MeetingSettingsDialogComponent {
   readonly time = signal('');
   readonly endTime = signal('');
   readonly saving = signal(false);
-  /** Public participation (#17): the switch, the mode and the join link. */
+  /** Public participation: the switch, the mode and the join link. */
   readonly publicJoin = signal(false);
   readonly guestsMode = signal<GuestsMode>('vote');
   readonly link = signal<JoinLink | null>(null);
@@ -99,7 +99,7 @@ export class MeetingSettingsDialogComponent {
   readonly locked = computed(() => this.meeting()?.status === 'closed');
   readonly keeperLocked = computed(() => this.locked() || this.protocolFinal());
 
-  /** O20: members with `protocol.write`, and the current minute-taker. */
+  /** Members with `protocol.write`, and the current minute-taker. */
   readonly keeperOptions = computed<SelectFieldOption[]>(() => {
     const current = this.meeting()?.protokollantId ?? null;
     const none = this.i18n.translate('meetings.protokollant.none');

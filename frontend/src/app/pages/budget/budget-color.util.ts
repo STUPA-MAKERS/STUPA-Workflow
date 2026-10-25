@@ -1,7 +1,7 @@
 import type { BudgetTreeNode } from './budget-tree.api';
 
 /**
- * The display colours of the cost centres (O19, gaps D6).
+ * The display colours of the cost centres.
  *
  * A cost centre can carry its own colour (`BudgetTreeNode.color`), for example the colour
  * of a faculty. {@link nodeColors} gives every node one display colour, and every view of

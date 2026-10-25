@@ -1077,7 +1077,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.vote.openBlocked': 'Close or cancel the open vote first.',
   'meetings.vote.close': 'Close vote',
   'meetings.vote.cancel': 'Cancel vote',
-  // F2: personnel elections.
+  // Personnel elections.
   'meetings.vote.kind.label': 'Kind of vote',
   'meetings.vote.kind.motion': 'Motion',
   'meetings.vote.kind.election': 'Election',
@@ -2166,7 +2166,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.flow.actionDesc.budgetBook': 'Books the amount out of the cost centre for good.',
   'admin.flow.actionDesc.openVote': 'Opens a vote for the application in the running meeting.',
   'admin.flow.actionDesc.requeue': 'Puts the application back for re-processing / requeue.',
-  // Flow editor (FE12b): header, toolbar, legend, colours, guard builder, versions.
+  // Flow editor: header, toolbar, legend, colours, guard builder, versions.
   'admin.flow.versions': 'Versions',
   'admin.flow.versionsClose': 'Back to editing',
   'admin.flow.versionActive': 'version {n} active',
@@ -2629,7 +2629,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'delegation.toast.revoked': 'Proxy revoked.',
   'delegation.toast.revokeFailed': 'Revocation failed.',
 
-  // Participant view of a meeting and the beamer (FE9).
+  // Participant view of a meeting and the beamer.
   'participant.attendance.title': 'Your attendance',
   'participant.attendance.delegated':
     'You have a proxy for this meeting. Revoke the proxy to report as present.',
@@ -2756,7 +2756,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.form.moveGroupUp': 'Move group up',
   'admin.form.moveGroupDown': 'Move group down',
   'admin.form.dragGroup': 'Drag group to reorder',
-  // Form editor (FE12b): outline, type menu, settings card.
+  // Form editor: outline, type menu, settings card.
   'admin.form.outline': 'Questions of the form',
   'admin.form.groupMenu': 'Actions for section {n}',
   'admin.form.typeMenu': 'Choose a question type',
@@ -3231,7 +3231,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'invoices.toast.paid': 'Invoice marked as paid.',
   'invoices.untitled': 'Invoice without supplier',
   'invoices.detail.noBookings': 'No booking yet.',
-  // Public meeting with QR code (#17).
+  // Public meeting with QR code.
   'vote.majorityCast.simple': 'Simple majority of the votes cast',
   'vote.majorityCast.absolute': 'Absolute majority of the votes cast',
   'vote.majorityCast.two_thirds': 'Two-thirds majority of the votes cast',

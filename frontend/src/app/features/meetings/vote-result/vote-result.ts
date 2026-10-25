@@ -17,7 +17,7 @@ import { clock } from '@shared/date-format';
  * tally line). The editor shows it as a card; this module gives the card what the text
  * does not hold: the caption "Beschluss · 18:52 · Einfache Mehrheit" (`closedAt`, the
  * majority rule), the result under the rule of the vote and the labels in the language of
- * the page. A tie is a rejection (O18), so the result is "Angenommen" or "Abgelehnt".
+ * the page. A tie is a rejection, so the result is "Angenommen" or "Abgelehnt".
  */
 export function voteResultInfo(vote: MeetingVote, t: Translate, locale: string): VoteCalloutInfo {
   if (vote.kind === 'election') return electionResultInfo(vote, t, locale);
@@ -45,7 +45,7 @@ export function voteResultInfo(vote: MeetingVote, t: Translate, locale: string):
   };
 }
 
-/** The card of a personnel election (F2): "Wahl · 2 Posten · 18:52" and "Gewählt". */
+/** The card of a personnel election: "Wahl · 2 Posten · 18:52" and "Gewählt". */
 function electionResultInfo(vote: MeetingVote, t: Translate, locale: string): VoteCalloutInfo {
   const parts = [electionCaption(vote.election ?? null, vote.round, t)];
   const time = clock(vote.closedAt, toFormatLocale(locale));
