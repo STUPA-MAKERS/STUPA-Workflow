@@ -147,7 +147,7 @@ async def test_a_report_rejects_unknown_fields_and_long_titles(api: Api) -> None
         assert (
             client.post(
                 "/api/tickets",
-                json={**_REPORT, "email": "a@example.org", "context": {"language": "fr"}},
+                json={**_REPORT, "email": "a@example.org", "context": {"language": "fr_FR"}},
             ).status_code
             == 422
         )
