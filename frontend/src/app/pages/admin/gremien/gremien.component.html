@@ -39,9 +39,9 @@
           @if (isOpen(g)) {
             <div class="grem__body">
               <section class="grem__settings" [attr.aria-labelledby]="'grem-set-' + g.id">
-                <h3 class="section-title" [id]="'grem-set-' + g.id">
+                <h2 class="section-title" [id]="'grem-set-' + g.id">
                   {{ 'admin.gremien.settings' | t }}
-                </h3>
+                </h2>
                 <dl class="kv grem__grid">
                   @for (s of settings(g); track s.label) {
                     <div [class.kv__wide]="s.copyable">
