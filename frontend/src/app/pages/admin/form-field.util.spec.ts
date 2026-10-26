@@ -232,11 +232,11 @@ describe('groupsFromFields / groupsToFields (section round-trip)', () => {
   it('markerless fields collapse to a single untitled group', () => {
     const groups = groupsFromFields([q('a'), q('b')]);
     expect(groups).toHaveLength(1);
-    expect(groups[0]).toEqual({ titleDe: '', titleEn: '', fields: [q('a'), q('b')] });
+    expect(groups[0]).toEqual({ title: { de: '', en: '' }, fields: [q('a'), q('b')] });
   });
 
   it('empty input yields one empty untitled group', () => {
-    expect(groupsFromFields([])).toEqual([{ titleDe: '', titleEn: '', fields: [] }]);
+    expect(groupsFromFields([])).toEqual([{ title: { de: '', en: '' }, fields: [] }]);
   });
 
   it('splits at each section marker, keeping pre-marker fields as the implicit first group', () => {
@@ -249,20 +249,20 @@ describe('groupsFromFields / groupsToFields (section round-trip)', () => {
       q('b2'),
     ]);
     expect(groups).toHaveLength(3);
-    expect(groups[0]).toEqual({ titleDe: '', titleEn: '', fields: [q('intro')] });
-    expect(groups[1]).toEqual({ titleDe: 'Block A', titleEn: 'Block A en', fields: [q('a1')] });
-    expect(groups[2]).toEqual({ titleDe: 'Block B', titleEn: '', fields: [q('b1'), q('b2')] });
+    expect(groups[0]).toEqual({ title: { de: '', en: '' }, fields: [q('intro')] });
+    expect(groups[1]).toEqual({ title: { de: 'Block A', en: 'Block A en' }, fields: [q('a1')] });
+    expect(groups[2]).toEqual({ title: { de: 'Block B', en: '' }, fields: [q('b1'), q('b2')] });
   });
 
   it('a leading section marker opens a titled first group (no empty implicit group)', () => {
     const groups = groupsFromFields([section('section_1', 'First'), q('a')]);
     expect(groups).toHaveLength(1);
-    expect(groups[0]).toEqual({ titleDe: 'First', titleEn: '', fields: [q('a')] });
+    expect(groups[0]).toEqual({ title: { de: 'First', en: '' }, fields: [q('a')] });
   });
 
   it('a section marker with missing label falls back to empty titles', () => {
     const groups = groupsFromFields([{ key: 's', type: 'section' } as FormFieldDef, q('a')]);
-    expect(groups[0]).toEqual({ titleDe: '', titleEn: '', fields: [q('a')] });
+    expect(groups[0]).toEqual({ title: { de: '', en: '' }, fields: [q('a')] });
   });
 
   it('consecutive markers produce an empty group between them', () => {
@@ -272,19 +272,19 @@ describe('groupsFromFields / groupsToFields (section round-trip)', () => {
       q('x'),
     ]);
     expect(groups).toHaveLength(2);
-    expect(groups[0]).toEqual({ titleDe: 'A', titleEn: '', fields: [] });
-    expect(groups[1]).toEqual({ titleDe: 'B', titleEn: '', fields: [q('x')] });
+    expect(groups[0]).toEqual({ title: { de: 'A', en: '' }, fields: [] });
+    expect(groups[1]).toEqual({ title: { de: 'B', en: '' }, fields: [q('x')] });
   });
 
   it('serializes an untitled first group without a marker (implicit main)', () => {
-    const groups: QuestionGroup[] = [{ titleDe: '', titleEn: '', fields: [q('a'), q('b')] }];
+    const groups: QuestionGroup[] = [{ title: { de: '', en: '' }, fields: [q('a'), q('b')] }];
     expect(groupsToFields(groups)).toEqual([q('a'), q('b')]);
   });
 
   it('emits a marker for a titled first group and auto-numbers sections', () => {
     const groups: QuestionGroup[] = [
-      { titleDe: 'One', titleEn: 'Eins', fields: [q('a')] },
-      { titleDe: 'Two', titleEn: '', fields: [q('b')] },
+      { title: { de: 'One', en: 'Eins' }, fields: [q('a')] },
+      { title: { de: 'Two', en: '' }, fields: [q('b')] },
     ];
     const out = groupsToFields(groups);
     expect(out).toEqual([
@@ -297,8 +297,8 @@ describe('groupsFromFields / groupsToFields (section round-trip)', () => {
 
   it('an untitled non-first group still gets a marker', () => {
     const groups: QuestionGroup[] = [
-      { titleDe: '', titleEn: '', fields: [q('a')] },
-      { titleDe: '', titleEn: '', fields: [q('b')] },
+      { title: { de: '', en: '' }, fields: [q('a')] },
+      { title: { de: '', en: '' }, fields: [q('b')] },
     ];
     const out = groupsToFields(groups);
     expect(out[0]).toEqual(q('a'));
@@ -308,8 +308,8 @@ describe('groupsFromFields / groupsToFields (section round-trip)', () => {
 
   it('an empty titled group serializes to just its marker', () => {
     const groups: QuestionGroup[] = [
-      { titleDe: '', titleEn: '', fields: [q('a')] },
-      { titleDe: 'Empty', titleEn: '', fields: [] },
+      { title: { de: '', en: '' }, fields: [q('a')] },
+      { title: { de: 'Empty', en: '' }, fields: [] },
     ];
     const out = groupsToFields(groups);
     expect(out).toEqual([
@@ -331,8 +331,8 @@ describe('groupsFromFields / groupsToFields (section round-trip)', () => {
 describe('moveQuestionTo (drag and drop in the outline of the form editor)', () => {
   const q = (key: string): FormFieldDef => field({ key });
   const groups = (): QuestionGroup[] => [
-    { titleDe: 'A', titleEn: '', fields: [q('a1'), q('a2'), q('a3')] },
-    { titleDe: 'B', titleEn: '', fields: [q('b1')] },
+    { title: { de: 'A', en: '' }, fields: [q('a1'), q('a2'), q('a3')] },
+    { title: { de: 'B', en: '' }, fields: [q('b1')] },
   ];
   const keys = (gs: QuestionGroup[]): string[][] => gs.map((g) => g.fields.map((f) => f.key));
 

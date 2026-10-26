@@ -3,7 +3,8 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { FormsModule } from '@angular/forms';
 import { forkJoin, type Observable, of, switchMap } from 'rxjs';
 import { I18nService } from '@core/i18n/i18n.service';
-import { i18nLabel } from '@shared/forms/i18n-text';
+import type { I18nMap } from '@core/api/models';
+import { i18nLabel, sameI18n, trimI18n } from '@shared/forms/i18n-text';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { FabComponent } from '@shared/ui/fab/fab.component';
 import {
@@ -35,8 +36,7 @@ import { expandSet } from '@shared/expand-set';
 /** Draft for a new global role. */
 interface RoleDraft {
   key: string;
-  labelDe: string;
-  labelEn: string;
+  label: I18nMap;
 }
 
 /** The fixed global roles: the server refuses to delete them (409). */
@@ -96,7 +96,7 @@ export class AdminRolesComponent {
   protected readonly permissions = signal<string[]>([]);
   protected readonly expanded = expandSet<string>();
   protected readonly addOpen = signal(false);
-  protected readonly draft = signal<RoleDraft>({ key: '', labelDe: '', labelEn: '' });
+  protected readonly draft = signal<RoleDraft>({ key: '', label: {} });
   /** The trimmed draft key matches ROLE_KEY_PATTERN. The server refuses other keys with 422. */
   protected readonly keyValid = computed(() => ROLE_KEY_PATTERN.test(this.draft().key.trim()));
   /** The error text under the key input. Empty for a blank key or a valid key. */
@@ -128,7 +128,7 @@ export class AdminRolesComponent {
   }
 
   protected roleLabel(role: Role): string {
-    return i18nLabel(role.label, this.i18n.locale(), role.key);
+    return i18nLabel(role.label, this.i18n.uiLocale(), role.key);
   }
 
   /** The admin role holds every right; its rights are read-only here. */
@@ -196,7 +196,7 @@ export class AdminRolesComponent {
   }
 
   /** The name drafts per role. A rename changes the display name only; the key never changes. */
-  private readonly nameDrafts = signal<Record<string, { de: string; en: string }>>({});
+  private readonly nameDrafts = signal<Record<string, I18nMap>>({});
 
   /** The rights of the role differ from the server. */
   private permsChanged(role: Role): boolean {
@@ -211,7 +211,7 @@ export class AdminRolesComponent {
     const draft = this.nameDrafts()[role.id];
     const saved = this.savedRoles().get(role.id);
     if (!draft || !saved) return false;
-    return draft.de !== (saved.label['de'] ?? '') || draft.en !== (saved.label['en'] ?? '');
+    return !sameI18n(draft, saved.label);
   }
 
   /** The roles with a name or rights that are not saved. */
@@ -244,8 +244,8 @@ export class AdminRolesComponent {
         job$ = this.api.saveRolePermissions(role.id, permissions);
       }
       if (this.nameChanged(role)) {
-        const d = this.nameDraft(role);
-        job$ = job$.pipe(switchMap(() => this.api.renameRole(role.id, { de: d.de, en: d.en })));
+        const label = this.nameDraft(role);
+        job$ = job$.pipe(switchMap(() => this.api.renameRole(role.id, label)));
       }
       return job$;
     });
@@ -270,26 +270,20 @@ export class AdminRolesComponent {
     });
   }
   /** The current name draft. It starts from the current label. */
-  protected nameDraft(role: Role): { de: string; en: string } {
-    return (
-      this.nameDrafts()[role.id] ?? {
-        de: role.label['de'] ?? '',
-        en: role.label['en'] ?? '',
-      }
-    );
+  protected nameDraft(role: Role): I18nMap {
+    return this.nameDrafts()[role.id] ?? { de: '', en: '', ...role.label };
   }
-  protected patchName(role: Role, lang: 'de' | 'en', value: string): void {
-    const cur = this.nameDraft(role);
-    this.nameDrafts.update((m) => ({ ...m, [role.id]: { ...cur, [lang]: value } }));
+  protected patchName(role: Role, label: I18nMap): void {
+    this.nameDrafts.update((m) => ({ ...m, [role.id]: label }));
   }
 
   protected openAdd(): void {
-    this.draft.set({ key: '', labelDe: '', labelEn: '' });
+    this.draft.set({ key: '', label: {} });
     this.serverKeyError.set('');
     this.addOpen.set(true);
   }
 
-  protected patchDraft<K extends keyof RoleDraft>(key: K, value: string): void {
+  protected patchDraft<K extends keyof RoleDraft>(key: K, value: RoleDraft[K]): void {
     this.draft.update((d) => ({ ...d, [key]: value }));
     if (key === 'key') this.serverKeyError.set('');
   }
@@ -298,9 +292,7 @@ export class AdminRolesComponent {
   protected createRole(): void {
     const d = this.draft();
     if (!this.keyValid() || this.creating()) return;
-    const label: Record<string, string> = {};
-    if (d.labelDe.trim()) label['de'] = d.labelDe.trim();
-    if (d.labelEn.trim()) label['en'] = d.labelEn.trim();
+    const label = trimI18n(d.label);
     this.creating.set(true);
     this.api.createRole({ key: d.key.trim(), label, permissions: [] }).subscribe({
       next: (role) => {

@@ -14,9 +14,10 @@
   justify-content: space-between;
   gap: var(--space-3);
 }
+// `--langs`: the number of content languages. Each segment of the switch is 5.5rem wide.
 .br__lang {
   display: flex;
-  width: 11rem;
+  width: calc(5.5rem * var(--langs, 2));
 }
 
 .br__cols {

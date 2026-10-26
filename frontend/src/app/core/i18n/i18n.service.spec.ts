@@ -86,6 +86,7 @@ describe('I18nService', () => {
   it('gives the same mapping as a pure function to code that has no injector', () => {
     expect(toFormatLocale('de')).toBe('de-DE');
     expect(toFormatLocale('en')).toBe('en-GB');
+    expect(toFormatLocale('fr')).toBe('en-GB');
   });
   it('ready() loads the catalog of the active locale', async () => {
     localStorage.setItem('ap.locale', 'en');
@@ -150,6 +151,8 @@ describe('I18nService', () => {
       expect(document.documentElement.lang).toBe('fr');
       expect(i18n.locales()).toEqual(['de', 'en', 'fr']);
       expect(i18n.extraLanguages()).toEqual([{ code: 'fr', name: 'Français' }]);
+      expect(i18n.locales().map((code) => i18n.languageName(code))).toEqual(['Deutsch', 'English', 'Français']);
+      expect(i18n.languageName('pt-BR')).toBe('PT-BR');
       expect(i18n.translate('nav.dashboard')).toBe('Tableau de bord');
       expect(i18n.translate('action.login')).toBe('Log in');
       expect(i18n.translate('nav.tasks')).toBe('Tasks');

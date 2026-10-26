@@ -89,9 +89,12 @@
   gap: var(--space-4);
 }
 
+// The key, then one column per content language.
 .ar__names {
   display: grid;
-  grid-template-columns: minmax(8rem, 0.7fr) 1fr 1fr;
+  grid-template-columns: minmax(8rem, 0.7fr);
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
   gap: var(--space-3);
 }
 
@@ -152,5 +155,6 @@
   }
   .ar__names {
     grid-template-columns: 1fr;
+    grid-auto-flow: row;
   }
 }

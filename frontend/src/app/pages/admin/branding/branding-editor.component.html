@@ -7,7 +7,7 @@
   @if (draft(); as d) {
     @if (section === 'texts') {
       <div class="br__meta">
-        <span class="br__lang">
+        <span class="br__lang" [style.--langs]="i18n.locales().length">
           <app-content-lang-switch [(value)]="lang" width="fill" [ariaLabel]="'admin.brand.textLang' | t" />
         </span>
       </div>

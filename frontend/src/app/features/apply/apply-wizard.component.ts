@@ -276,7 +276,7 @@ export class ApplyWizardComponent {
 
   /** The steps of the stepper: label and the second line. */
   readonly steps = computed<Step[]>(() => {
-    this.i18n.locale();
+    this.i18n.uiLocale();
     return this.stepKeys().map((key) => ({
       label: this.i18n.translate(STEP_LABEL[key]),
       hint: this.stepHint(key),
@@ -311,7 +311,7 @@ export class ApplyWizardComponent {
 
   /** Configured info text below the type selection — markdown, per language. */
   readonly applyInfoHtml = computed(() => {
-    const text = resolveI18n(this.branding.freetexts().applyInfo ?? null, this.i18n.locale()).trim();
+    const text = resolveI18n(this.branding.freetexts().applyInfo ?? null, this.i18n.uiLocale()).trim();
     return text ? renderMarkdown(text) : '';
   });
 
@@ -401,7 +401,7 @@ export class ApplyWizardComponent {
 
   /** Build the fields of "Angaben" and of the PII part of "Kontakt". */
   private buildFields(eff: EffectiveForm): void {
-    const lang = this.i18n.locale();
+    const lang = this.i18n.uiLocale();
     const ctx = this.formContext();
     const contact = this.contactDefs();
     const details = toFormlySections(eff.sections, lang, ctx, {
@@ -527,7 +527,7 @@ export class ApplyWizardComponent {
       data: this.submitData(),
       applicantEmail: this.loggedIn() ? null : this.contactForm.controls.email.value,
       applicantName: this.loggedIn() ? null : this.contactForm.controls.name.value || null,
-      lang: this.i18n.locale(),
+      lang: this.i18n.uiLocale(),
       altcha: this.loggedIn() ? null : altcha,
       attachmentIds: ids,
       draftToken: ids.length ? token : null,
@@ -731,7 +731,7 @@ export class ApplyWizardComponent {
         const contact = new Set(this.contactDefs().map((f) => f.key));
         const labels = (this.effForm()?.sections ?? [])
           .filter((s) => s.fields.some((f) => !contact.has(f.key) && f.type !== 'section'))
-          .map((s) => resolveI18n(s.label, this.i18n.locale()))
+          .map((s) => resolveI18n(s.label, this.i18n.uiLocale()))
           .filter(Boolean);
         return this.list(labels);
       }
@@ -739,7 +739,7 @@ export class ApplyWizardComponent {
         const parts = this.loggedIn()
           ? []
           : [this.i18n.translate('apply.contact.name'), this.i18n.translate('apply.contact.email')];
-        for (const f of this.piiDefs()) parts.push(resolveI18n(f.label, this.i18n.locale()));
+        for (const f of this.piiDefs()) parts.push(resolveI18n(f.label, this.i18n.uiLocale()));
         return this.list(parts);
       }
       default:

@@ -63,7 +63,7 @@ export class HomeComponent {
 
   /** The configured welcome text in the active language, or empty. */
   protected readonly welcome = computed(() =>
-    resolveI18n(this.branding.freetexts().welcome ?? null, this.i18n.locale()).trim(),
+    resolveI18n(this.branding.freetexts().welcome ?? null, this.i18n.uiLocale()).trim(),
   );
 
   constructor() {

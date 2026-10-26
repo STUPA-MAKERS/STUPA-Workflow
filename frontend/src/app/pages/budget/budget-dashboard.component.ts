@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { i18nLabel } from '@shared/forms/i18n-text';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, type ParamMap, Router, RouterLink } from '@angular/router';
 import { NgTemplateOutlet } from '@angular/common';
@@ -526,10 +527,10 @@ export class BudgetDashboardComponent {
     return app.title?.trim() || this.i18n.translate('applications.list.untitled');
   }
 
-  /** Resolve an i18n label map in the active locale. It falls back to de, then en,
-   *  then the first entry. */
+  /** Resolve an i18n label map in the active locale, along its fallback chain, then the
+   *  first entry. */
   private resolveLabel(map: Record<string, string>): string {
-    return map[this.i18n.locale()] || map['de'] || map['en'] || Object.values(map)[0] || '';
+    return i18nLabel(map, this.i18n.uiLocale(), Object.values(map)[0] ?? '');
   }
 
   readonly overviewOpen = signal(false);

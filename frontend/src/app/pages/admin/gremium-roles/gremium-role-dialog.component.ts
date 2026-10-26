@@ -11,7 +11,8 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import type { Uuid } from '@core/api/models';
+import type { I18nMap, Uuid } from '@core/api/models';
+import { trimI18n } from '@shared/forms/i18n-text';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
@@ -29,8 +30,7 @@ import { I18nInputComponent } from '@shared/ui/i18n-input/i18n-input.component';
 /** The form state of the dialog. */
 interface RoleDraft {
   key: string;
-  labelDe: string;
-  labelEn: string;
+  label: I18nMap;
   permissions: string[];
 }
 
@@ -85,8 +85,7 @@ export class GremiumRoleDialogComponent {
   protected readonly permissions = GREMIUM_PERMISSIONS;
   protected readonly draft = signal<RoleDraft>({
     key: '',
-    labelDe: '',
-    labelEn: '',
+    label: {},
     permissions: [],
   });
   protected readonly saving = signal(false);
@@ -125,11 +124,10 @@ export class GremiumRoleDialogComponent {
           role
             ? {
                 key: role.key,
-                labelDe: role.name['de'] ?? '',
-                labelEn: role.name['en'] ?? '',
+                label: { ...role.name },
                 permissions: [...(role.permissions ?? [])],
               }
-            : { key: '', labelDe: '', labelEn: '', permissions: [...NEW_ROLE_PERMISSIONS] },
+            : { key: '', label: {}, permissions: [...NEW_ROLE_PERMISSIONS] },
         );
       });
     });
@@ -143,7 +141,7 @@ export class GremiumRoleDialogComponent {
     return this.draft().permissions.includes(p);
   }
 
-  protected patch(key: 'key' | 'labelDe' | 'labelEn', value: string): void {
+  protected patch<K extends 'key' | 'label'>(key: K, value: RoleDraft[K]): void {
     if (key === 'key') this.serverKeyError.set('');
     this.draft.update((d) => ({ ...d, [key]: value }));
   }
@@ -170,8 +168,9 @@ export class GremiumRoleDialogComponent {
     const d = this.draft();
     if (!this.keyValid() || this.saving()) return;
     const key = d.key.trim();
-    const de = d.labelDe.trim() || key;
-    const name = { de, en: d.labelEn.trim() || de };
+    const label = trimI18n(d.label);
+    const de = label['de'] || key;
+    const name = { ...label, de, en: label['en'] || de };
     const permissions = [...d.permissions];
     const role = this.role();
     const req = role

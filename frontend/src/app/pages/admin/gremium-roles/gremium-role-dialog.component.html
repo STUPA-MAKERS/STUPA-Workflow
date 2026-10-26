@@ -18,12 +18,7 @@
         [disabled]="!isNew()"
         [error]="keyError()"
       />
-      <app-i18n-input
-        [de]="draft().labelDe"
-        (deChange)="patch('labelDe', $event)"
-        [en]="draft().labelEn"
-        (enChange)="patch('labelEn', $event)"
-      />
+      <app-i18n-input [value]="draft().label" (valueChange)="patch('label', $event)" />
     </div>
 
     @if (role()?.forced) {

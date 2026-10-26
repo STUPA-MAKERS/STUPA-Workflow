@@ -34,7 +34,7 @@ const FORMAT_LOCALES: Record<Locale, string> = { de: 'de-DE', en: 'en-GB' };
  * function serves the pure display helpers, which take the UI locale as an argument.
  */
 export function toFormatLocale(locale: string): string {
-  return locale === 'en' ? FORMAT_LOCALES.en : FORMAT_LOCALES.de;
+  return FORMAT_LOCALES[baseLocale(locale)];
 }
 
 /** An active extra UI language: its BCP 47 code and its native name. */
@@ -52,8 +52,8 @@ export interface I18nBundle {
 }
 
 /**
- * The built-in locale whose catalog and whose DB texts (`*_i18n`) a UI locale uses: DE for
- * DE, EN for EN and for every extra language.
+ * The built-in locale whose catalog, server labels and formats a UI locale uses: DE for DE,
+ * EN for EN and for every extra language.
  */
 export function baseLocale(uiLocale: string): Locale {
   return uiLocale === DEFAULT_LOCALE ? DEFAULT_LOCALE : 'en';
@@ -79,9 +79,10 @@ const LOCALE_TAG = /^[a-z]{2,3}(-[A-Z][a-z]{3})?(-([A-Z]{2}|[0-9]{3}))?$/;
  * - `uiLocale` is the language that the reader chose: `de`, `en` or an active extra
  *   language. Source: persisted choice → browser → DEFAULT_LOCALE; `GET /i18n` confirms it,
  *   and an unknown or inactive one becomes DE.
- * - `locale` is its built-in base (`de` / `en`, see {@link baseLocale}). The configurable DB
- *   texts (`*_i18n`), the server labels and the ui-kit strings follow it, because they exist
- *   in DE and EN only.
+ * - `locale` is its built-in base (`de` / `en`, see {@link baseLocale}). The formats and the
+ *   ui-kit strings follow it, because they exist in DE and EN only. The configurable DB
+ *   texts (`*_i18n`) and the `lang` of an API call follow `uiLocale`, because an editor can
+ *   write a text in an extra language.
  * - A text comes from the first locale of {@link fallbackChain} that has it, an override
  *   before the built-in text of the same locale. A key that no locale has shows as itself.
  */
@@ -105,8 +106,8 @@ export class I18nService {
 
   /**
    * The built-in base of the UI locale (`de` / `en`), read-only to the outside. This is the
-   * locale of the DB texts and the server labels. Do NOT give it to `Intl` — use
-   * {@link formatLocale}.
+   * locale of the formats. Do NOT give it to `Intl` — use {@link formatLocale}. A DB text
+   * resolves with {@link uiLocale}.
    */
   readonly locale = computed<Locale>(() => baseLocale(this._uiLocale()));
 
@@ -118,7 +119,10 @@ export class I18nService {
   /** The active extra languages, in the order of the server. */
   readonly extraLanguages = this._languages.asReadonly();
 
-  /** Every selectable UI locale: DE, EN, then the active extra languages. */
+  /**
+   * Every selectable UI locale: DE, EN, then the active extra languages. The content editors
+   * offer the same languages.
+   */
   readonly locales = computed<string[]>(() => [
     ...SUPPORTED_LOCALES,
     ...this._languages().map((l) => l.code),
@@ -192,6 +196,16 @@ export class I18nService {
       () => undefined,
       () => undefined,
     );
+  }
+
+  /**
+   * The native name of a language: "Deutsch", "English", or the name of an extra language.
+   * An unknown code shows as its code in capitals.
+   */
+  languageName(code: string): string {
+    if (code === DEFAULT_LOCALE) return this.translate('shell.lang.de');
+    if (code === 'en') return this.translate('shell.lang.en');
+    return this._languages().find((l) => l.code === code)?.name ?? code.toUpperCase();
   }
 
   /** Translate a key. Fallback chain: see {@link fallbackChain}, then the key itself. */

@@ -1,3 +1,4 @@
+import type { I18nMap } from '@core/api/models';
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -42,7 +43,7 @@ export class TransitionInspectorComponent {
 
   readonly fromChange = output<string>();
   readonly toChange = output<string>();
-  readonly labelChange = output<{ lang: 'de' | 'en'; value: string }>();
+  readonly labelChange = output<I18nMap>();
   readonly colorChange = output<string>();
   readonly automaticChange = output<boolean>();
   readonly requiresActionChange = output<boolean>();

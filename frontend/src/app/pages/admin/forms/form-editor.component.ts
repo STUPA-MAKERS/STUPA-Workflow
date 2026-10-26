@@ -16,7 +16,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { FieldType, FormFieldDef, I18nMap, Uuid } from '@core/api/models';
-import { resolveI18n } from '@shared/forms/i18n-text';
+import { langFieldLabel, resolveI18n, sameI18n, setI18n } from '@shared/forms/i18n-text';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import {
   ButtonComponent,
@@ -129,7 +129,8 @@ export class FormEditorComponent {
   private readonly api = inject(AdminApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly toast = inject(ToastService);
-  private readonly i18n = inject(I18nService);
+  protected readonly i18n = inject(I18nService);
+  protected readonly langFieldLabel = langFieldLabel;
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   /** Wide viewport: three columns that scroll on their own. */
@@ -240,8 +241,7 @@ export class FormEditorComponent {
   private readonly typeChanged = computed(() => {
     const o = this.originalType();
     return (
-      this.title()['de'] !== o.title['de'] ||
-      this.title()['en'] !== o.title['en'] ||
+      !sameI18n(this.title(), o.title) ||
       this.hasBudget() !== o.hasBudget ||
       this.cmpRequired() !== o.cmpRequired ||
       this.cmpMinCount() !== o.cmpMinCount
@@ -303,7 +303,7 @@ export class FormEditorComponent {
       next: (types) => {
         const t = types.find((x) => x.id === id);
         if (t) {
-          this.title.set({ de: t.name['de'] ?? '', en: t.name['en'] ?? '' });
+          this.title.set({ de: '', en: '', ...t.name });
           this.hasBudget.set(t.hasBudget);
           const co = t.comparisonOffers;
           this.cmpRequired.set(co?.required ?? false);
@@ -323,7 +323,7 @@ export class FormEditorComponent {
         this.activeGroup.set(0);
         this.selected.set(this.groups()[0]?.fields.length ? { gi: 0, qi: 0 } : null);
         const d = draft.description ?? {};
-        this.description.set({ de: d['de'] ?? '', en: d['en'] ?? '' });
+        this.description.set({ de: '', en: '', ...d });
         this.active.set(draft.active ?? false);
         this.hasVersion.set(!!draft.formVersionId);
         this.formVersion.set(draft.version ?? null);
@@ -367,7 +367,7 @@ export class FormEditorComponent {
   }
 
   protected resolved(map: I18nMap | undefined): string {
-    return map ? resolveI18n(map, this.i18n.locale()) : '';
+    return map ? resolveI18n(map, this.i18n.uiLocale()) : '';
   }
 
   /**
@@ -380,12 +380,8 @@ export class FormEditorComponent {
     return help && help !== this.resolved(field.label).trim() ? help : '';
   }
 
-  protected setTitle(lang: 'de' | 'en', value: string): void {
-    this.title.update((t) => ({ ...t, [lang]: value }));
-  }
-
-  protected setDescription(lang: 'de' | 'en', value: string): void {
-    this.description.update((d) => ({ ...d, [lang]: value }));
+  protected setDescription(lang: string, value: string): void {
+    this.description.update((d) => setI18n(d, lang, value));
   }
 
   /** Replace one group and poke the signal. */
@@ -400,12 +396,12 @@ export class FormEditorComponent {
     }));
   }
 
-  protected setGroupTitle(gi: number, lang: 'de' | 'en', value: string): void {
-    this.patchGroup(gi, (g) => ({ ...g, [lang === 'de' ? 'titleDe' : 'titleEn']: value }));
+  protected setGroupTitle(gi: number, title: I18nMap): void {
+    this.patchGroup(gi, (g) => ({ ...g, title }));
   }
 
   protected addGroup(): void {
-    this.groups.update((list) => [...list, { titleDe: '', titleEn: '', fields: [] }]);
+    this.groups.update((list) => [...list, { title: { de: '', en: '' }, fields: [] }]);
     this.selectGroup(this.groups().length - 1);
   }
 
@@ -614,7 +610,7 @@ export class FormEditorComponent {
   /** The heading of a group in the outline and on its card: "Abschnitt 2 · Kosten". */
   protected groupHeading(group: QuestionGroup, gi: number): string {
     const step = this.i18n.translate('admin.form.groupStep', { n: gi + 1 });
-    const title = this.resolved({ de: group.titleDe, en: group.titleEn });
+    const title = this.resolved(group.title);
     return title ? `${step} · ${title}` : step;
   }
 

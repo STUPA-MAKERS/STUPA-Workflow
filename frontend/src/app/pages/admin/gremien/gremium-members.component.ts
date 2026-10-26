@@ -183,7 +183,7 @@ export class GremiumMembersComponent {
   }
 
   private roleName(role: GremiumRole): string {
-    return i18nLabel(role.name, this.i18n.locale(), role.key);
+    return i18nLabel(role.name, this.i18n.uiLocale(), role.key);
   }
 
   private rank(role: GremiumRole | undefined): number {

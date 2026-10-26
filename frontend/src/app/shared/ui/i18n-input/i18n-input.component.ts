@@ -1,48 +1,63 @@
-import { ChangeDetectionStrategy, Component, input, model } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, model } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { TranslatePipe } from '@core/i18n/translate.pipe';
+import type { I18nMap } from '@core/api/models';
+import { I18nService } from '@core/i18n/i18n.service';
+import { langFieldLabel, setI18n } from '@shared/forms/i18n-text';
 import { InputComponent } from '@stupa-makers/ui-kit';
 
+/** One field of the component: the language, its label and its accessible name. */
+interface LangField {
+  code: string;
+  label: string;
+  ariaLabel: string;
+}
+
 /**
- * A text in both content languages: the German field, then the English field.
+ * A text in every content language: one field each for DE, EN and the active extra languages.
  *
- * The host has `display: contents`, so the two fields are items of the grid or the flex
- * row of the page (beside a key field, or as a pair of columns). The fields use
- * `ngModel` with `standalone`, so they do not join a form of the page and need no `name`.
+ * The host has `display: contents`, so the fields are items of the grid or the flex row of
+ * the page (beside a key field, or as columns). The fields use `ngModel` with `standalone`,
+ * so they do not join a form of the page and need no `name`.
  *
  * ```html
  * <div class="x__pair">
- *   <app-i18n-input [de]="draft().labelDe" (deChange)="patch('labelDe', $event)"
- *                   [en]="draft().labelEn" (enChange)="patch('labelEn', $event)" />
+ *   <app-i18n-input [value]="draft().label" (valueChange)="patch('label', $event)" />
  * </div>
  * ```
  *
- * The labels default to "Bezeichnung (DE)" and "Bezeichnung (EN)". A short label (for
- * example "DE" in a narrow row) takes the long one as `deAriaLabel` / `enAriaLabel`.
+ * Each field is labelled "<label> (<CODE>)", the label "Bezeichnung" by default. `short`
+ * labels each field with its code alone (in a narrow row) and keeps the long label as the
+ * accessible name. `placeholder` is the placeholder of the German field.
  */
 @Component({
   selector: 'app-i18n-input',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, InputComponent],
+  imports: [FormsModule, InputComponent],
   templateUrl: './i18n-input.component.html',
   styleUrl: './i18n-input.component.scss',
 })
 export class I18nInputComponent {
-  /** The German text. */
-  readonly de = model<string>('');
-  /** The English text. */
-  readonly en = model<string>('');
-  /** The label of the German field. `null`: "Bezeichnung (DE)". */
-  readonly deLabel = input<string | null>(null);
-  /** The label of the English field. `null`: "Bezeichnung (EN)". */
-  readonly enLabel = input<string | null>(null);
-  /** The accessible name of the German field, when its label is short. */
-  readonly deAriaLabel = input('');
-  /** The accessible name of the English field, when its label is short. */
-  readonly enAriaLabel = input('');
+  private readonly i18n = inject(I18nService);
+
+  /** The text per language. */
+  readonly value = model<I18nMap>({});
+  /** The label of the fields without the language. `null`: "Bezeichnung". */
+  readonly label = input<string | null>(null);
+  /** Label each field with its language code alone. */
+  readonly short = input(false);
   /** The placeholder of the German field. */
-  readonly dePlaceholder = input('');
-  /** The placeholder of the English field. */
-  readonly enPlaceholder = input('');
+  readonly placeholder = input('');
+
+  protected readonly fields = computed<LangField[]>(() => {
+    const label = this.label() ?? this.i18n.translate('admin.common.label');
+    return this.i18n.locales().map((code) => {
+      const long = langFieldLabel(label, code);
+      return { code, label: this.short() ? code.toUpperCase() : long, ariaLabel: this.short() ? long : '' };
+    });
+  });
+
+  protected set(code: string, text: string): void {
+    this.value.set(setI18n(this.value(), code, text));
+  }
 }

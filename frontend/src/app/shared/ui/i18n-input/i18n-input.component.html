@@ -1,16 +1,10 @@
-<app-input
-  [label]="deLabel() ?? ('admin.common.labelDe' | t)"
-  [ariaLabel]="deAriaLabel()"
-  [placeholder]="dePlaceholder()"
-  [ngModel]="de()"
-  [ngModelOptions]="{ standalone: true }"
-  (ngModelChange)="de.set($event)"
-/>
-<app-input
-  [label]="enLabel() ?? ('admin.common.labelEn' | t)"
-  [ariaLabel]="enAriaLabel()"
-  [placeholder]="enPlaceholder()"
-  [ngModel]="en()"
-  [ngModelOptions]="{ standalone: true }"
-  (ngModelChange)="en.set($event)"
-/>
+@for (f of fields(); track f.code) {
+  <app-input
+    [label]="f.label"
+    [ariaLabel]="f.ariaLabel"
+    [placeholder]="f.code === 'de' ? placeholder() : ''"
+    [ngModel]="value()[f.code] ?? ''"
+    [ngModelOptions]="{ standalone: true }"
+    (ngModelChange)="set(f.code, $event)"
+  />
+}

@@ -494,7 +494,7 @@ export class ApplicationsDetailComponent {
     if (!field && value !== null && typeof value === 'object') return null;
     const text = field
       ? formatAnswer(field, value, {
-          lang: this.i18n.locale(),
+          lang: this.i18n.uiLocale(),
           yes: this.i18n.translate('common.yes'),
           no: this.i18n.translate('common.no'),
         })
@@ -562,7 +562,7 @@ export class ApplicationsDetailComponent {
   /** The label of a field of the diff, or its key when the form does not define it. */
   private fieldLabel(key: string): string {
     const field = this.fieldByKey().get(key);
-    return field ? resolveI18n(field.label, this.i18n.locale()) : key;
+    return field ? resolveI18n(field.label, this.i18n.uiLocale()) : key;
   }
 
   /**
@@ -1107,7 +1107,7 @@ export class ApplicationsDetailComponent {
    */
   startEdit(app: Application): void {
     this.editFields.set(
-      toFormlySections(this.sections(), this.i18n.locale(), this.formContext(), {
+      toFormlySections(this.sections(), this.i18n.uiLocale(), this.formContext(), {
         omitKeys: app.hiddenKeys ?? [],
       }),
     );

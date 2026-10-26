@@ -35,12 +35,7 @@
                     [disabled]="true"
                     [name]="r.id + '-key'"
                   />
-                  <app-i18n-input
-                    [de]="nameDraft(r).de"
-                    (deChange)="patchName(r, 'de', $event)"
-                    [en]="nameDraft(r).en"
-                    (enChange)="patchName(r, 'en', $event)"
-                  />
+                  <app-i18n-input [value]="nameDraft(r)" (valueChange)="patchName(r, $event)" />
                 </div>
 
                 @if (isLocked(r)) {
@@ -115,12 +110,7 @@
       [required]="true"
       [error]="keyError()"
     />
-    <app-i18n-input
-      [de]="draft().labelDe"
-      (deChange)="patchDraft('labelDe', $event)"
-      [en]="draft().labelEn"
-      (enChange)="patchDraft('labelEn', $event)"
-    />
+    <app-i18n-input [value]="draft().label" (valueChange)="patchDraft('label', $event)" />
     <button type="submit" hidden></button>
   </form>
   <div dialog-footer>

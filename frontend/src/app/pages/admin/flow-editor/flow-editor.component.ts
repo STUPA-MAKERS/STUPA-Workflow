@@ -1,3 +1,4 @@
+import type { I18nMap } from '@core/api/models';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -630,8 +631,8 @@ export class FlowEditorComponent {
     this.selection.set({ kind: 'state', key });
   }
 
-  protected setStateLabel(key: string, lang: 'de' | 'en', value: string): void {
-    this.graph.update((g) => ops.setStateLabel(g, key, lang, value));
+  protected setStateLabel(key: string, label: I18nMap): void {
+    this.graph.update((g) => ops.setStateLabel(g, key, label));
   }
 
   protected setStateColor(key: string, color: string): void {
@@ -679,8 +680,8 @@ export class FlowEditorComponent {
     this.graph.update((g) => ops.setTransitionEndpoint(g, index, end, key));
   }
 
-  protected setTransitionLabel(index: number, lang: 'de' | 'en', value: string): void {
-    this.graph.update((g) => ops.setTransitionLabel(g, index, lang, value));
+  protected setTransitionLabel(index: number, label: I18nMap): void {
+    this.graph.update((g) => ops.setTransitionLabel(g, index, label));
   }
 
   protected setTransitionColor(index: number, color: string): void {

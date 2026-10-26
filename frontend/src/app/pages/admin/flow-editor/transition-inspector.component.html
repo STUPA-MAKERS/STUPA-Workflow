@@ -20,12 +20,7 @@
   />
 </div>
 <div class="ins__pair">
-  <app-i18n-input
-    [de]="transition().label?.['de'] ?? ''"
-    (deChange)="labelChange.emit({ lang: 'de', value: $event })"
-    [en]="transition().label?.['en'] ?? ''"
-    (enChange)="labelChange.emit({ lang: 'en', value: $event })"
-  />
+  <app-i18n-input [value]="transition().label ?? {}" (valueChange)="labelChange.emit($event)" />
 </div>
 
 <app-flow-color [value]="transition().color" (changed)="colorChange.emit($event)" />

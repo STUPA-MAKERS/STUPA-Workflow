@@ -250,7 +250,7 @@ export class UsersComponent {
   protected roleLabel(roleId: string): string {
     const role = this.rolesById().get(roleId);
     if (!role) return roleId;
-    return i18nLabel(role.label, this.i18n.locale(), role.key);
+    return i18nLabel(role.label, this.i18n.uiLocale(), role.key);
   }
 
   /** The global roles of one principal as one line, for example "Administration, Mitglied". */
