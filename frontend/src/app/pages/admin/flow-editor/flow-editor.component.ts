@@ -270,7 +270,9 @@ export class FlowEditorComponent {
   /**
    * The canvas box is measured, so a small flow shows at its real size instead of blown up to the
    * full box. The level is laid out again whenever its structure changes. Only the answer to the
-   * newest input counts; an older one that answers late is dropped. The drill-down context must
+   * newest input counts; an older one that answers late is dropped. The empty graph before the load
+   * is not laid out, because its layout would end the wait and the loaded flow would show with stale
+   * lines until its own layout answers. The drill-down context must
    * never point at a deleted group, because undo, redo or a dissolve from another path can delete
    * it; it then falls back to the top level. Only structural graph changes (states and transitions,
    * not positions) are undo steps, so node moves do not flood the history.
@@ -302,6 +304,7 @@ export class FlowEditorComponent {
     );
 
     effect(() => {
+      if (!this.loaded()) return;
       const input = this.vm.layoutInput();
       const key = this.layoutKey();
       const layouter = this.layouter;

@@ -1,4 +1,4 @@
-import { NEVER, of, throwError } from 'rxjs';
+import { NEVER, Subject, of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { ToastService } from '@stupa-makers/ui-kit';
@@ -3132,7 +3132,7 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
       c.setStateLabel('b', 'de', 'Ein viel längerer Name');
       fixture.detectChanges();
       expect(c.nodes()[1].x).toBe(300);
-      expect(c.edges()[0].d).toMatch(/^M \d+ \d+ C /);
+      expect(c.edges()).toEqual([]);
       release();
       await fixture.whenStable();
       await new Promise((r) => setTimeout(r));
@@ -3178,6 +3178,23 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
       await new Promise((r) => setTimeout(r));
       expect(c.layoutPending()).toBe(false);
       expect(c.edges()[0].d).toMatch(/ C /);
+    });
+
+    it('lays out nothing before the flow has loaded, so the empty layout does not end the wait', async () => {
+      const flow = new Subject<FlowGraph | null>();
+      const layouter = fakeLayouter();
+      const { fixture } = await setup({ layouter, getGlobalFlow: jest.fn(() => flow) });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const c = fixture.componentInstance as any;
+      await fixture.whenStable();
+      expect(layouter).not.toHaveBeenCalled();
+      expect(c.layoutPending()).toBe(true);
+      flow.next(null);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      await new Promise((r) => setTimeout(r));
+      expect(layouter).toHaveBeenCalled();
+      expect(c.layoutPending()).toBe(false);
     });
 
     it('hides the canvas until the first layout answers', async () => {
