@@ -36,6 +36,7 @@ from app.modules.notifications.service import (
     resolve_application_lang,
 )
 from app.settings import Settings
+from app.shared.i18n import resolve_i18n
 
 logger = logging.getLogger("app.notifications")
 
@@ -193,9 +194,8 @@ class NotificationActionDispatcher:
                     select(State.label_i18n).where(State.id == current_state_id)
                 )
                 if isinstance(label_i18n, dict) and label_i18n:
-                    context["status"] = (
-                        label_i18n.get(lang or self.settings.mail_default_lang)
-                        or next(iter(label_i18n.values()))
+                    context["status"] = resolve_i18n(
+                        label_i18n, lang or self.settings.mail_default_lang
                     )
             context.update(
                 await _decision_context(

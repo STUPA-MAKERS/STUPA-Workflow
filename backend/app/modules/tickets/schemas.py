@@ -16,6 +16,7 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, JsonValue, field_va
 from app.modules.files.schemas import AttachmentOut, MessageAttachmentOut, MessageFilesIn
 from app.settings import get_settings
 from app.shared.altcha import AltchaSolutionStr
+from app.shared.i18n import Lang
 from app.shared.mentions import MAX_MENTIONS
 from app.shared.people import PersonRef
 
@@ -81,7 +82,7 @@ class TicketContext(_CamelIn):
     app_version: str | None = Field(default=None, alias="appVersion", max_length=64)
     user_agent: str | None = Field(default=None, alias="userAgent", max_length=512)
     viewport: str | None = Field(default=None, max_length=32)
-    language: Literal["de", "en"] | None = None
+    language: Lang | None = None
     color_scheme: Literal["light", "dark"] | None = Field(default=None, alias="colorScheme")
 
     @field_validator("url")

@@ -7,9 +7,7 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
-#: A BCP 47 tag of a language: `fr`, `pt-BR`, `sr-Latn`, `es-419`. The built-in `de`
-#: and `en` match too; the service refuses them.
-LANGUAGE_CODE_PATTERN = r"^[a-z]{2,3}(-[A-Z][a-z]{3})?(-([A-Z]{2}|[0-9]{3}))?$"
+from app.shared.i18n import LANGUAGE_CODE_PATTERN
 
 #: The longest override. The longest built-in text has under 300 characters.
 MAX_VALUE_LENGTH = 1000
@@ -17,6 +15,8 @@ MAX_VALUE_LENGTH = 1000
 #: The most keys that one save may change. The catalog has about 4000 keys.
 MAX_CHANGES = 5000
 
+#: The code of an extra language. The built-in `de` and `en` match too; the service
+#: refuses them.
 LanguageCode = Annotated[str, StringConstraints(pattern=LANGUAGE_CODE_PATTERN, max_length=16)]
 LanguageName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=64)]
 TextKey = Annotated[str, StringConstraints(min_length=1, max_length=200)]

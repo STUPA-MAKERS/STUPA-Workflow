@@ -26,7 +26,6 @@ from fastapi import APIRouter, Depends, Path, Query, Response, status
 
 from app.deps import DbSession, Principal, require_principal
 from app.modules.translations.schemas import (
-    LANGUAGE_CODE_PATTERN,
     BuiltinTextOut,
     BuiltinTextsOut,
     I18nBundleOut,
@@ -39,6 +38,7 @@ from app.modules.translations.schemas import (
 )
 from app.modules.translations.service import TranslationService
 from app.shared.errors import ProblemDetail
+from app.shared.i18n import LANGUAGE_CODE_PATTERN
 
 router = APIRouter(prefix="/admin/translations", tags=["translations"])
 public_router = APIRouter(tags=["translations"])

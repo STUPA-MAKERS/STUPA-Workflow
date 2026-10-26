@@ -250,7 +250,7 @@ async def notify_ticket_received(
                     "wikiUrl": branding.help.wiki_url,
                 },
                 idempotency_parts=(TICKET_RECEIVED_KEY, str(ticket.id)),
-                lang=language if language in ("de", "en") else "de",
+                lang=language or "de",
                 link=link,
             )
     except Exception:
@@ -381,6 +381,6 @@ async def _mail_reporter(
             "message": message,
         },
         idempotency_parts=(TICKET_ANSWER_KEY, str(note.id)),
-        lang=language if language in ("de", "en") else "de",
+        lang=language or "de",
         link=ticket_link(settings, ticket.id),
     )

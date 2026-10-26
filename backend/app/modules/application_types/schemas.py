@@ -27,7 +27,7 @@ class ApplicationTypeListQuery(PageParams):
     silent ignore. The cap on `offset` is the int4 maximum, so the DB OFFSET
     cannot overflow into a 500.
 
-    The `offset` cap is an overflow guard, not a business page limit. The `Lang` enum
+    The `offset` cap is an overflow guard, not a business page limit. The `Lang` pattern
     rejects an invalid value such as `lang=null` with 422 instead of ignoring it.
     """
 
