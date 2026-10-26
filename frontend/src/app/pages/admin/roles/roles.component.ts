@@ -1,3 +1,4 @@
+import { ExpandRowComponent } from '@shared/ui/expand-row/expand-row.component';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { forkJoin, type Observable, of, switchMap } from 'rxjs';
@@ -61,6 +62,7 @@ const FIXED_ROLES = new Set(['admin', 'member']);
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ExpandRowComponent,
     I18nInputComponent,
     FabComponent,
     ConfirmDialogComponent,

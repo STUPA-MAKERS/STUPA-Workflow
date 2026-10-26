@@ -1,3 +1,5 @@
+import { LoadMoreComponent } from '@shared/ui/load-more/load-more.component';
+import { ListItemComponent } from '@stupa-makers/ui-kit';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
@@ -24,7 +26,7 @@ import {
   type RowMenuSection,
   SearchPillComponent,
   SkeletonComponent,
-  StatusTextComponent,
+  BadgeComponent,
   StickyBarComponent,
   SwitchComponent,
   TextareaComponent,
@@ -85,6 +87,8 @@ interface LanguageDraft {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ListItemComponent,
+    LoadMoreComponent,
     ButtonComponent,
     ConfirmDialogComponent,
     DialogComponent,
@@ -100,7 +104,7 @@ interface LanguageDraft {
     RowMenuComponent,
     SearchPillComponent,
     SkeletonComponent,
-    StatusTextComponent,
+    BadgeComponent,
     StickyBarComponent,
     SwitchComponent,
     TextareaComponent,

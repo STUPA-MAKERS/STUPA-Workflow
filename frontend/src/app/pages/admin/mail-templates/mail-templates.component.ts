@@ -17,7 +17,7 @@ import {
   mediaQuery,
   ScrollFadeDirective,
   SkeletonComponent,
-  StatusTextComponent,
+  BadgeComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
@@ -64,7 +64,7 @@ function sameTexts(a: Record<string, string>, b: Record<string, string>): boolea
     InputComponent,
     PageHeaderComponent,
     ContentLangSwitchComponent,
-    StatusTextComponent,
+    BadgeComponent,
   ],
   templateUrl: './mail-templates.component.html',
   styleUrl: './mail-templates.component.scss',

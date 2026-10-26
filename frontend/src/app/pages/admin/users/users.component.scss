@@ -30,74 +30,16 @@
   list-style: none;
 }
 
-.au__row {
-  display: grid;
-  grid-template-columns: 2rem minmax(11rem, 1.3fr) minmax(7rem, 1fr) minmax(9rem, 1.2fr) 9rem 10rem;
-  grid-template-areas: 'av who roles groups login act';
-  align-items: center;
-  gap: var(--space-2) var(--space-4);
-  padding: var(--space-4) var(--space-5);
-}
-.au__row--off .au__avatar,
-.au__row--off .au__who,
-.au__row--off .au__field {
-  opacity: 0.6;
+.au__off {
+  --li-color: var(--color-text-muted);
 }
 
-.au__avatar {
-  grid-area: av;
-}
-
-.au__who {
-  grid-area: who;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.au__name {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-2);
-  min-width: 0;
-  font-weight: var(--fw-semibold);
-}
-.au__mail {
-  font-size: var(--fs-sm);
-  color: var(--color-text-muted);
-  overflow-wrap: anywhere;
-}
-
-.au__field {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.au__field--roles {
-  grid-area: roles;
-}
-.au__field--groups {
-  grid-area: groups;
-}
-.au__field--login {
-  grid-area: login;
-}
-.au__lbl {
-  font-size: var(--fs-xs);
-  color: var(--color-text-muted);
-}
-.au__val {
-  overflow-wrap: anywhere;
-}
-.au__val--muted {
-  color: var(--color-text-muted);
-}
-.au__val--stale,
+.au__stale,
 .au__staleHint {
   color: var(--color-warning);
 }
 .au__staleHint {
+  display: block;
   font-size: var(--fs-xs);
 }
 
@@ -105,44 +47,4 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-1);
-}
-.au__act {
-  grid-area: act;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--space-2);
-}
-
-.au__mergedTag {
-  font-size: var(--fs-sm);
-  color: var(--color-text-muted);
-  overflow-wrap: anywhere;
-}
-
-@container (max-width: 54rem) {
-  .au__row {
-    grid-template-columns: 2rem minmax(0, 1fr) minmax(0, 1fr) auto;
-    grid-template-areas:
-      'av who who act'
-      '. roles login login'
-      '. groups groups groups';
-  }
-}
-
-@container (max-width: 34rem) {
-  .au__row {
-    grid-template-columns: 2rem minmax(0, 1fr) auto;
-    grid-template-areas:
-      'av who who'
-      '. roles roles'
-      '. login login'
-      '. groups groups'
-      '. act act';
-    padding: var(--space-3) var(--space-4);
-  }
-  .au__act {
-    justify-content: flex-start;
-    padding-top: var(--space-1);
-  }
 }
