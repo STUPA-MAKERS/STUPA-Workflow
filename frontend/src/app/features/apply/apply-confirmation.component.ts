@@ -25,14 +25,14 @@ import { shortRef } from './apply.util';
  *   after the public config loaded: before, or after a failed load, the value is not
  *   known.
  * - Signed in: the backend confirms the address at creation time, from the session.
- *   The application is already submitted ("Eingereicht"), so the page links to the
+ *   The application is already created ("Angelegt"), so the page links to the
  *   record instead of asking for a confirmation that is done.
  *
  * Both show the reference: the first 8 characters of the id (house rule
  * `no-uuids-in-ui` allows only this short form).
  *
  * The main text of each state comes from `/admin/texts` ("Texte nach dem
- * Einreichen", `freetexts.submittedInternal` and `freetexts.submittedExternal`) as
+ * Anlegen", `freetexts.submittedInternal` and `freetexts.submittedExternal`) as
  * Markdown in the language of the page. An empty text gives the built-in text.
  * `renderMarkdown` escapes all HTML first, and Angular sanitizes the `innerHTML`.
  *

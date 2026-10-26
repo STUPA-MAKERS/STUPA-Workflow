@@ -71,8 +71,8 @@ describe('ApplyConfirmationComponent', () => {
    */
   it('tells a signed-in submitter the application is submitted and links to the record', async () => {
     await setup(true);
-    expect(screen.getByText('Antrag eingereicht')).toBeInTheDocument();
-    expect(screen.getByText('Eingereicht')).toBeInTheDocument();
+    expect(screen.getByText('Antrag angelegt')).toBeInTheDocument();
+    expect(screen.getByText('Angelegt')).toBeInTheDocument();
     expect(screen.queryByText(/E\u2011Mail bestätigen/)).not.toBeInTheDocument();
     expect(screen.queryByText(/persönlichen Link/)).not.toBeInTheDocument();
     expect(screen.queryByText(/nach 12 Stunden automatisch verworfen/)).not.toBeInTheDocument();
@@ -94,7 +94,7 @@ describe('ApplyConfirmationComponent', () => {
     expect(screen.getByText(/Fast geschafft — E\u2011Mail bestätigen/)).toBeInTheDocument();
     expect(screen.getByText('Bestätigung ausstehend')).toBeInTheDocument();
     expect(screen.getByText(/nach 12 Stunden automatisch verworfen/)).toBeInTheDocument();
-    expect(screen.queryByText('Antrag eingereicht')).not.toBeInTheDocument();
+    expect(screen.queryByText('Antrag angelegt')).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Antrag öffnen' })).not.toBeInTheDocument();
   });
 

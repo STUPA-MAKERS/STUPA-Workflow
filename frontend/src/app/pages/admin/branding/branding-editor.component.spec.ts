@@ -428,9 +428,9 @@ describe('BrandingEditorComponent', () => {
       const { fixture } = await setupWithStub({}, 'texts');
       await fixture.whenStable();
       fixture.detectChanges();
-      expect(screen.getByRole('heading', { name: 'Texte nach dem Einreichen' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Texte nach dem Anlegen' })).toBeInTheDocument();
       const internal = screen.getByRole('textbox', { name: 'Intern: angemeldet mit Konto (DE)' });
-      expect(internal).toHaveAttribute('placeholder', expect.stringMatching(/^Vielen Dank! Dein Antrag ist eingereicht/));
+      expect(internal).toHaveAttribute('placeholder', expect.stringMatching(/^Vielen Dank! Dein Antrag ist angelegt/));
       expect(screen.getByRole('textbox', { name: 'Extern: Gast mit E-Mail-Bestätigung (DE)' })).toHaveAttribute(
         'placeholder',
         expect.stringMatching(/persönlichen Link/),

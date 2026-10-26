@@ -311,7 +311,7 @@ describe('ApplyWizardComponent', () => {
     s.comp.model['receipt'] = ['d2', 'gone'];
     s.comp.next();
     expect(s.comp.currentStep()).toBe('review');
-    const submit = screen.getByRole('button', { name: 'Antrag absenden' });
+    const submit = screen.getByRole('button', { name: 'Antrag anlegen' });
     expect(submit.closest('app-button')?.querySelector('button')).toBeDisabled();
     s.comp.onAltchaSolved('sol');
     s.fixture.detectChanges();
