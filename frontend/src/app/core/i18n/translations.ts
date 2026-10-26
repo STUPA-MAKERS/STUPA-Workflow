@@ -359,7 +359,7 @@ export const de = {
 
   'home.heading': 'Willkommen',
   'home.choice.apply.title': 'Antrag stellen',
-  'home.choice.apply.desc': 'Kein Konto nötig — in wenigen Minuten eingereicht.',
+  'home.choice.apply.desc': 'Kein Konto nötig — in wenigen Minuten angelegt.',
   'home.choice.login.title': 'Als Gremiumsmitglied anmelden',
   'home.choice.login.desc': 'Anträge bearbeiten, Sitzungen führen, Haushalt verwalten.',
   'home.choice.go': 'Weiter',
@@ -433,7 +433,7 @@ export const de = {
   'apply.leave': 'Zur Startseite',
   'apply.nav.back': 'Zurück',
   'apply.nav.discard': 'Entwurf verwerfen',
-  'apply.nav.submit': 'Antrag absenden',
+  'apply.nav.submit': 'Antrag anlegen',
   'apply.nav.next': 'Weiter',
   'apply.autosave': 'Entwurf in diesem Tab gespeichert',
 
@@ -441,7 +441,7 @@ export const de = {
   'apply.confirm.heading': 'Fast geschafft — E\u2011Mail bestätigen',
   'apply.confirm.badge': 'Bestätigung ausstehend',
   'apply.confirm.body':
-    'Vielen Dank! Wir haben dir eine E-Mail mit einem persönlichen Link gesendet. Bestätige darüber deine Adresse — erst dann wird dein Antrag eingereicht und sichtbar. Über denselben Link verfolgst du jederzeit den Status und bearbeitest deinen Antrag, ohne dich anzumelden.',
+    'Vielen Dank! Wir haben dir eine E-Mail mit einem persönlichen Link gesendet. Bestätige darüber deine Adresse — erst dann wird dein Antrag angelegt. Über denselben Link verfolgst du jederzeit den Status und bearbeitest deinen Antrag, ohne dich anzumelden.',
   'apply.confirm.expiry':
     'Ohne Bestätigung wird dein Antrag nach {hours} Stunden automatisch verworfen.',
   'apply.confirm.ref': 'Vorgangsnummer:',
@@ -450,10 +450,10 @@ export const de = {
   'apply.confirm.home': 'Zur Startseite',
 
   /** For a signed-in submitter: the backend confirms the address at creation time. */
-  'apply.submitted.heading': 'Antrag eingereicht',
-  'apply.submitted.badge': 'Eingereicht',
+  'apply.submitted.heading': 'Antrag angelegt',
+  'apply.submitted.badge': 'Angelegt',
   'apply.submitted.body':
-    'Vielen Dank! Dein Antrag ist eingereicht und sichtbar. Deine E-Mail-Adresse ist über dein Konto bereits bestätigt — du musst nichts weiter tun.',
+    'Vielen Dank! Dein Antrag ist angelegt. Deine E-Mail-Adresse ist über dein Konto bereits bestätigt — du musst sie nicht extra bestätigen.',
   'apply.submitted.link': 'Antrag öffnen',
   'apply.confirm.linkUnlimited': 'Der Link in der E-Mail ist unbegrenzt gültig.',
   'apply.confirm.linkDays': 'Der Link in der E-Mail ist {days} Tage gültig.',
@@ -569,7 +569,7 @@ export const de = {
   'dashboard.empty.tasksBody':
     'Hier erscheinen Anträge, bei denen du etwas tun musst, zum Beispiel Angaben ergänzen.',
   'dashboard.empty.mine': 'Noch keine Anträge',
-  'dashboard.empty.mineBody': 'Nach dem Einreichen siehst du hier den Status deiner Anträge.',
+  'dashboard.empty.mineBody': 'Nach dem Anlegen siehst du hier den Status deiner Anträge.',
   'dashboard.today.title': 'Heute',
   'dashboard.today.liveRegion': 'Laufende Sitzung',
   'dashboard.today.keeper': 'Du führst Protokoll',
@@ -2253,7 +2253,7 @@ export const de = {
   'admin.brand.text.support': 'Support-Hinweis',
   'admin.brand.text.emailFooter': 'E-Mail-Fußzeile',
   'admin.brand.text.applyInfo': 'Info unter der Antrags-Auswahl (Markdown)',
-  'admin.brand.submitted.group': 'Texte nach dem Einreichen',
+  'admin.brand.submitted.group': 'Texte nach dem Anlegen',
   'admin.brand.submitted.internal': 'Intern: angemeldet mit Konto',
   'admin.brand.submitted.external': 'Extern: Gast mit E-Mail-Bestätigung',
   'admin.brand.badUrl': 'Unzulässige Link-URL — nur http(s):// oder mailto: erlaubt.',

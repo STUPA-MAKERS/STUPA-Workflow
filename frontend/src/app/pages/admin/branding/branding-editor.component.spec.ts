@@ -423,14 +423,14 @@ describe('BrandingEditorComponent', () => {
     expect(c.freetext(d, 'welcome')).toBe(d.freetexts.welcome);
   });
 
-  describe('texts after the submission', () => {
+  describe('texts after the creation', () => {
     it('shows both fields with the built-in text as placeholder, as plain fields', async () => {
       const { fixture } = await setupWithStub({}, 'texts');
       await fixture.whenStable();
       fixture.detectChanges();
-      expect(screen.getByRole('heading', { name: 'Texte nach dem Einreichen' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Texte nach dem Anlegen' })).toBeInTheDocument();
       const internal = screen.getByRole('textbox', { name: 'Intern: angemeldet mit Konto (DE)' });
-      expect(internal).toHaveAttribute('placeholder', expect.stringMatching(/^Vielen Dank! Dein Antrag ist eingereicht/));
+      expect(internal).toHaveAttribute('placeholder', expect.stringMatching(/^Vielen Dank! Dein Antrag ist angelegt/));
       expect(screen.getByRole('textbox', { name: 'Extern: Gast mit E-Mail-Bestätigung (DE)' })).toHaveAttribute(
         'placeholder',
         expect.stringMatching(/persönlichen Link/),
@@ -448,7 +448,7 @@ describe('BrandingEditorComponent', () => {
       await userEvent.click(screen.getByRole('radio', { name: 'EN' }));
       const en = screen.getByRole('textbox', { name: 'Intern: angemeldet mit Konto (EN)' });
       expect(en).toHaveValue('');
-      expect(en).toHaveAttribute('placeholder', expect.stringMatching(/^Thank you\. Your application is submitted/));
+      expect(en).toHaveAttribute('placeholder', expect.stringMatching(/^Thank you\. Your application is created/));
       await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
       const saved = api.saveSiteConfig.mock.calls[0][0] as Branding;
       expect(saved.freetexts.submittedInternal).toEqual({ de: 'Danke **sehr** <b>x</b>' });

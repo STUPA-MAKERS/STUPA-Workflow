@@ -96,7 +96,7 @@ const STEP_LABEL: Record<StepKey, TranslationKey> = {
  * Layout: at the start a column with the title, the purpose, the vertical stepper (done
  * steps take a click back) and the autosave note; beside it the sheet "Schritt n von N ·
  * <Typ>" with the step and a bar with "Entwurf verwerfen", "Zurück" and "Weiter" or
- * "Antrag absenden". On a phone the column keeps only the title; the sheet header names
+ * "Antrag anlegen". On a phone the column keeps only the title; the sheet header names
  * the step.
  *
  * Steps:

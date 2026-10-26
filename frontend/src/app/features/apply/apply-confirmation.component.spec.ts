@@ -69,10 +69,10 @@ describe('ApplyConfirmationComponent', () => {
    * The backend confirms the address of a signed-in submitter at creation time, so the "confirm
    * your email / discarded after 12 hours" copy is false for that caller.
    */
-  it('tells a signed-in submitter the application is submitted and links to the record', async () => {
+  it('tells a signed-in submitter the application is created and links to the record', async () => {
     await setup(true);
-    expect(screen.getByText('Antrag eingereicht')).toBeInTheDocument();
-    expect(screen.getByText('Eingereicht')).toBeInTheDocument();
+    expect(screen.getByText('Antrag angelegt')).toBeInTheDocument();
+    expect(screen.getByText('Angelegt')).toBeInTheDocument();
     expect(screen.queryByText(/E\u2011Mail bestätigen/)).not.toBeInTheDocument();
     expect(screen.queryByText(/persönlichen Link/)).not.toBeInTheDocument();
     expect(screen.queryByText(/nach 12 Stunden automatisch verworfen/)).not.toBeInTheDocument();
@@ -83,7 +83,7 @@ describe('ApplyConfirmationComponent', () => {
   it('shows the signed-in state in English too', async () => {
     localStorage.setItem('ap.locale', 'en');
     await setup(true);
-    expect(screen.getByText('Application submitted')).toBeInTheDocument();
+    expect(screen.getByText('Application created')).toBeInTheDocument();
     expect(screen.queryByText(/confirm your email/)).not.toBeInTheDocument();
     expect(screen.queryByText(/discarded after 12 hours/)).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open the application' })).toBeInTheDocument();
@@ -94,7 +94,7 @@ describe('ApplyConfirmationComponent', () => {
     expect(screen.getByText(/Fast geschafft — E\u2011Mail bestätigen/)).toBeInTheDocument();
     expect(screen.getByText('Bestätigung ausstehend')).toBeInTheDocument();
     expect(screen.getByText(/nach 12 Stunden automatisch verworfen/)).toBeInTheDocument();
-    expect(screen.queryByText('Antrag eingereicht')).not.toBeInTheDocument();
+    expect(screen.queryByText('Antrag angelegt')).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Antrag öffnen' })).not.toBeInTheDocument();
   });
 

@@ -345,7 +345,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
 
   'home.heading': 'Welcome',
   'home.choice.apply.title': 'Submit an application',
-  'home.choice.apply.desc': 'No account needed — submitted in minutes.',
+  'home.choice.apply.desc': 'No account needed — created in minutes.',
   'home.choice.login.title': 'Sign in as a committee member',
   'home.choice.login.desc': 'Process applications, run meetings, manage the budget.',
   'home.choice.go': 'Continue',
@@ -417,14 +417,14 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'apply.leave': 'Back to start',
   'apply.nav.back': 'Back',
   'apply.nav.discard': 'Discard draft',
-  'apply.nav.submit': 'Submit application',
+  'apply.nav.submit': 'Create application',
   'apply.nav.next': 'Next',
   'apply.autosave': 'Draft saved in this tab',
 
   'apply.confirm.heading': 'Almost done – confirm your email',
   'apply.confirm.badge': 'Confirmation pending',
   'apply.confirm.body':
-    'Thank you! We have sent you an email with a personal link. Use it to confirm your address — only then is your application submitted and visible. The same link lets you track the status and edit your application anytime, without signing in.',
+    'Thank you! We have sent you an email with a personal link. Use it to confirm your address — only then is your application created. The same link lets you track the status and edit your application anytime, without signing in.',
   'apply.confirm.expiry':
     'Without confirmation, your application is automatically discarded after {hours} hours.',
   'apply.confirm.ref': 'Reference number:',
@@ -433,10 +433,10 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'apply.confirm.home': 'Back to start',
 
   /** For a signed-in submitter: the backend confirms the address at creation time. */
-  'apply.submitted.heading': 'Application submitted',
-  'apply.submitted.badge': 'Submitted',
+  'apply.submitted.heading': 'Application created',
+  'apply.submitted.badge': 'Created',
   'apply.submitted.body':
-    'Thank you. Your application is submitted and visible. Your account confirms your email address already, thus no further step is necessary.',
+    'Thank you. Your application is created. Your account confirms your email address already, thus you do not have to confirm it.',
   'apply.submitted.link': 'Open the application',
   'apply.confirm.linkUnlimited': 'The link in the email does not expire.',
   'apply.confirm.linkDays': 'The link in the email works for {days} days.',
@@ -552,7 +552,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'dashboard.empty.tasksBody':
     'Applications that need an action from you show here, for example missing details.',
   'dashboard.empty.mine': 'No applications yet',
-  'dashboard.empty.mineBody': 'After you submit an application, its status shows here.',
+  'dashboard.empty.mineBody': 'After you create an application, its status shows here.',
   'dashboard.today.title': 'Today',
   'dashboard.today.liveRegion': 'Live meeting',
   'dashboard.today.keeper': 'You keep the minutes',
@@ -2209,7 +2209,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.brand.text.support': 'Support hint',
   'admin.brand.text.emailFooter': 'Email footer',
   'admin.brand.text.applyInfo': 'Info below the application type selection (Markdown)',
-  'admin.brand.submitted.group': 'Texts after the submission',
+  'admin.brand.submitted.group': 'Texts after the creation',
   'admin.brand.submitted.internal': 'Internal – signed in with an account',
   'admin.brand.submitted.external': 'External – guest with email confirmation',
   'admin.brand.badUrl': 'Disallowed link URL — only http(s):// or mailto: are allowed.',
