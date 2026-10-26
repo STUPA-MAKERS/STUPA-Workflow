@@ -12,6 +12,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
+import { ExpandRowComponent } from '@shared/ui/expand-row/expand-row.component';
 import { FabComponent } from '@shared/ui/fab/fab.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { type StatusView, webhookDeliveryStatus } from '@shared/status-kind.util';
@@ -43,13 +44,13 @@ function emptyHook(): WebhookConfig {
 }
 
 /**
- * Webhook config UI at `/admin/webhooks`. One card per webhook:
- * the name with the state of its newest delivery as status text (Zugestellt,
- * Fehlgeschlagen, Läuft, Noch nie), the whole target URL, the real event keys as tags,
- * the "Aktiv" switch (it saves at once), "Zustellstatus" (the diagnosis below the card:
- * state, HTTP code, attempts, last attempt, failure class and the dead-letter note),
- * a click on the card opens the edit, and the ⋮ menu holds delete. An inactive webhook
- * carries "Inaktiv" beside its name.
+ * Webhook config UI at `/admin/webhooks`. One expand row per webhook: the name with the
+ * state of its newest delivery as status text (Zugestellt, Fehlgeschlagen, Läuft, Noch nie),
+ * the whole target URL as the sub line, the "Aktiv" switch (it saves at once) and the ⋮
+ * menu with delete. A press on the row opens the edit. The chevron opens the body: the real
+ * event keys as tags and "Zustellstatus" (state, HTTP code, attempts, last attempt, failure
+ * class and the dead-letter note). An inactive webhook carries "Inaktiv" beside its name.
+ * Without P(`webhook.manage`) a press on the row opens the body, because there is no edit.
  *
  * Create and edit run in a dialog. The client validation asks for a valid http or https
  * URL. The event selection stays optional. Delete runs through a confirm dialog. Every
@@ -60,6 +61,7 @@ function emptyHook(): WebhookConfig {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ExpandRowComponent,
     FabComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,

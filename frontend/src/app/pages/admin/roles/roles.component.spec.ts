@@ -47,7 +47,7 @@ describe('AdminRolesComponent', () => {
   it('lists roles with capitalized labels and loads the permission catalog', async () => {
     const { inst } = await setup();
     expect(screen.getAllByText('Administrator').length).toBeGreaterThan(0);
-    expect(screen.getByText('admin')).toBeInTheDocument();
+    expect(screen.getByText('admin · 3 / 3')).toBeInTheDocument();
     expect(inst.permissions()).toEqual(['admin.roles', 'application.read', 'flow.configure']);
   });
 
@@ -115,7 +115,7 @@ describe('AdminRolesComponent', () => {
       ),
     });
     const { fixture } = await setup(api);
-    expect(screen.getByText('1 / 6')).toBeInTheDocument();
+    expect(screen.getByText('referent · 1 / 6')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /^Referent/ }));
     await fixture.whenStable();
     fixture.detectChanges();
@@ -131,7 +131,7 @@ describe('AdminRolesComponent', () => {
   /** ngModel writes the value and the disabled state in a microtask. */
   it('shows the admin role with every right, read-only', async () => {
     const { fixture } = await setup();
-    expect(screen.getAllByText('3 / 3').length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/ · 3 \/ 3$/).length).toBeGreaterThan(0);
     await userEvent.click(screen.getByRole('button', { name: /^Administrator/ }));
     await fixture.whenStable();
     fixture.detectChanges();

@@ -118,9 +118,8 @@ describe('AdminGremienComponent', () => {
   it('lists the gremien with slug and counts; the first row starts open', async () => {
     const { api } = await setup();
     const first = item('Studierendenparlament');
-    expect(within(first).getByText('stupa')).toBeInTheDocument();
-    expect(within(first).getByText('23 Mitglieder · 4 Rollen')).toBeInTheDocument();
-    expect(within(item('AStA')).getByText('1 Mitglied · 1 Rolle')).toBeInTheDocument();
+    expect(within(first).getByText('stupa · 23 Mitglieder · 4 Rollen')).toBeInTheDocument();
+    expect(within(item('AStA')).getByText('asta · 1 Mitglied · 1 Rolle')).toBeInTheDocument();
     expect(within(item('Ohne Zahlen')).queryByText(/Rolle/)).toBeNull();
     expect(within(first).queryByRole('link')).toBeNull();
     expect(within(first).getByRole('button', { name: 'Weitere Aktionen: Studierendenparlament' })).toBeInTheDocument();
@@ -172,7 +171,7 @@ describe('AdminGremienComponent', () => {
   });
 
   /** Opening again reads the recipients only once. */
-  it('opens and closes a row with its name and with the chevron', async () => {
+  it('opens and closes a row with a press on the row', async () => {
     const { api } = await setup();
     await userEvent.click(screen.getByRole('button', { name: /^AStA/ }));
     const asta = item('AStA');
@@ -183,9 +182,9 @@ describe('AdminGremienComponent', () => {
     expect(value('Quorum')).toBe('Kein Quorum');
     expect(within(asta).queryByText('Vorlauf für Delegationen')).toBeNull();
     expect(value('Zusätzliche Protokoll-Empfänger')).toBe('Keine');
-    await userEvent.click(screen.getByRole('button', { name: 'Zuklappen: AStA' }));
+    await userEvent.click(screen.getByRole('button', { name: /^AStA/ }));
     expect(screen.getByRole('button', { name: /^AStA/ })).toHaveAttribute('aria-expanded', 'false');
-    await userEvent.click(screen.getByRole('button', { name: 'Aufklappen: AStA' }));
+    await userEvent.click(screen.getByRole('button', { name: /^AStA/ }));
     expect(api.getGremiumMailRecipients.mock.calls.filter(([id]) => id === 'g-2')).toHaveLength(1);
   });
 
@@ -364,7 +363,7 @@ describe('AdminGremienComponent', () => {
       'g-1',
       expect.objectContaining({ key: 'kasse' }),
     );
-    expect(within(first).getByText('23 Mitglieder · 2 Rollen')).toBeInTheDocument();
+    expect(within(first).getByText('stupa · 23 Mitglieder · 2 Rollen')).toBeInTheDocument();
   });
 
   it('links to the group mappings only with that permission', async () => {

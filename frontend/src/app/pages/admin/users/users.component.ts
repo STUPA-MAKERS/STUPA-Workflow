@@ -1,3 +1,4 @@
+import { ExpandRowComponent } from '@shared/ui/expand-row/expand-row.component';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -75,6 +76,7 @@ export function principalFilters(
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ExpandRowComponent,
     RouterLink,
     TranslatePipe,
     LocalizedDatePipe,
@@ -95,6 +97,16 @@ export function principalFilters(
   styleUrl: './users.component.scss',
 })
 export class UsersComponent {
+  protected readonly openIds = signal(new Set<string>());
+  protected toggleOpen(id: string): void {
+    this.openIds.update((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  }
+
   private readonly api = inject(AdminApiService);
   private readonly toast = inject(ToastService);
   private readonly i18n = inject(I18nService);

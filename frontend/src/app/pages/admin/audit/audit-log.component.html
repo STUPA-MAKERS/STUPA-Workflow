@@ -25,6 +25,7 @@
     }
   </div>
 
+  <app-sticky-bar>
   <div class="al__filters" role="group" [attr.aria-label]="'admin.audit.filter.label' | t">
     <app-filter-select
       [label]="'admin.audit.filter.action' | t"
@@ -53,6 +54,7 @@
       <button type="button" class="al__reset" (click)="resetFilters()">{{ 'admin.audit.filter.reset' | t }}</button>
     }
   </div>
+  </app-sticky-bar>
 
   @if (loadError()) {
     <app-note kind="error" icon="alert" role="alert" retryable (retry)="retry()">{{ 'admin.audit.error' | t }}</app-note>
@@ -62,19 +64,12 @@
     <ul class="rowgroup al__list">
       @for (e of entries(); track e.id) {
         <li class="al__item">
-          <button
-            type="button"
-            class="al__row"
-            [attr.aria-expanded]="isOpen(e.id)"
-            [attr.aria-controls]="'al-detail-' + e.id"
-            (click)="toggle(e.id)"
+          <app-expand-row
+            [title]="actionLabel(e.action)"
+            [sub]="(e.at | ldate: 'medium') + ' · ' + actorLabel(e) + (targetText(e) ? ' · ' + targetText(e) : '')"
+            [open]="isOpen(e.id)"
+            (openChange)="toggle(e.id)"
           >
-            <time class="al__time mono" [attr.datetime]="e.at">{{ e.at | ldate: 'medium' }}</time>
-            <span class="al__action">{{ actionLabel(e.action) }}</span>
-            <span class="al__actor ell" [title]="actorLabel(e)">{{ actorLabel(e) }}</span>
-            <span class="al__target ell" [title]="targetText(e)">{{ targetText(e) }}</span>
-            <app-icon class="al__chev" [name]="isOpen(e.id) ? 'up' : 'down'" [size]="16" />
-          </button>
           @if (isOpen(e.id)) {
             <div class="al__details" [id]="'al-detail-' + e.id">
               <dl class="al__meta">
@@ -116,6 +111,7 @@
               }
             </div>
           }
+          </app-expand-row>
         </li>
       }
     </ul>
@@ -127,14 +123,10 @@
     </app-empty-state>
   }
 
-  <div class="al__sentinel" appInfiniteScroll (scrolledToEnd)="loadMore()" aria-hidden="true"></div>
-
   @if (loading() && !entries().length) {
     <app-skeleton variant="rows" [count]="6" [label]="'admin.audit.loading' | t" />
   } @else if (hasMore()) {
-    <div class="al__more">
-      <app-button variant="text" size="sm" [loading]="loading()" (click)="loadMore()">{{ 'admin.audit.loadMore' | t }}</app-button>
-    </div>
+    <app-load-more [label]="'admin.audit.loadMore' | t" [loading]="loading()" (more)="loadMore()" />
   }
 </section>
 

@@ -7,38 +7,26 @@
     @if (roles().length) {
       <ul class="rowgroup ar__list">
         @for (r of roles(); track r.id) {
-          <li class="ar__role">
-            <div class="ar__head">
-              <button
-                type="button"
-                class="ar__toggle"
-                [attr.aria-expanded]="isOpen(r)"
-                [attr.aria-controls]="'ar-body-' + r.id"
-                (click)="toggle(r.id)"
-              >
-                <app-icon class="ar__chev" [name]="isOpen(r) ? 'up' : 'down'" [size]="16" />
-                <span class="ar__name ell" [title]="roleLabel(r) | capitalize">{{ roleLabel(r) | capitalize }}</span>
-              </button>
+          <li>
+            <app-expand-row
+              [title]="roleLabel(r) | capitalize"
+              [sub]="r.key + ' · ' + count(r) + ' / ' + permissions().length"
+              [open]="isOpen(r)"
+              (openChange)="toggle(r.id)"
+            >
               @if (isFixed(r)) {
-                <app-status-text kind="muted" [title]="'admin.roles.fixedHint' | t">{{ 'admin.roles.fixed' | t }}</app-status-text>
+                <app-status-text status kind="muted" [title]="'admin.roles.fixedHint' | t">{{ 'admin.roles.fixed' | t }}</app-status-text>
               }
-              <span class="ar__key mono">{{ r.key }}</span>
-              <span class="ar__count mono" [title]="'admin.roles.countLabel' | t: { count: count(r), total: permissions().length }"
-                >{{ count(r) }} / {{ permissions().length }}</span
-              >
-              <span class="ar__del">
-                @if (!isFixed(r)) {
-                  <app-row-menu
-                    [sections]="rowMenu()"
-                    [label]="('ui.rowMenu.trigger' | t) + ': ' + (roleLabel(r) | capitalize)"
-                    (selected)="askDelete(r)"
-                  />
-                }
-              </span>
-            </div>
-
+              @if (!isFixed(r)) {
+                <app-row-menu
+                  trail
+                  [sections]="rowMenu()"
+                  [label]="('ui.rowMenu.trigger' | t) + ': ' + (roleLabel(r) | capitalize)"
+                  (selected)="askDelete(r)"
+                />
+              }
             @if (isOpen(r)) {
-              <div class="ar__body" [id]="'ar-body-' + r.id">
+              <div class="ar__body">
                 <div class="ar__names">
                   <app-input
                     class="ar__keyField"
@@ -81,13 +69,13 @@
                 }
               </div>
             }
+            </app-expand-row>
           </li>
         }
       </ul>
     } @else {
       <app-empty-state [heading]="'admin.roles.empty' | t" />
     }
-    <p class="ar__foot">{{ 'admin.roles.fixedFoot' | t }}</p>
   }
 
   @if (rolesDirty()) {

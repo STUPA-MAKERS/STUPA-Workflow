@@ -7,103 +7,88 @@
     <ul class="rowgroup wh__list" [attr.aria-label]="'admin.webhook.title' | t">
       @for (h of hooks(); track h.id; let i = $index) {
         @let s = statusOf(h.id);
-        <li class="wh__hook">
-          <div class="wh__row" [class.hitrow]="canManage()">
-            <div class="wh__main">
-              <p class="wh__titleLine">
-                @if (canManage()) {
-                  <button
-                    type="button"
-                    class="hitrow__open wh__name"
-                    [attr.aria-label]="('admin.common.edit' | t) + ': ' + (h.name || h.url)"
-                    (click)="openEdit(i)"
-                  >
-                    {{ h.name || h.url }}
-                  </button>
-                } @else {
-                  <strong class="wh__name">{{ h.name || h.url }}</strong>
+        <li>
+          <app-expand-row
+            [title]="h.name || h.url"
+            [toggle]="canManage() ? 'chevron' : 'row'"
+            [toggleLabel]="('admin.webhook.delivery.title' | t) + ': ' + (h.name || h.url)"
+            [open]="statusDetail()?.id === h.id"
+            (openChange)="toggleStatus(h)"
+            (activate)="openEdit(i)"
+          >
+            @if (!h.active) {
+              <app-status-text status kind="muted">{{ 'common.inactive' | t }}</app-status-text>
+            }
+            @if (s) {
+              @let st = deliveryStatus(s.lastState);
+              <app-status-text status [kind]="st.kind">{{ st.key | t }}</app-status-text>
+            }
+            <span sub class="mono">{{ h.url }}</span>
+            <app-switch
+              trail
+              [checked]="h.active"
+              [disabled]="!canManage() || isToggling(h.id)"
+              (checkedChange)="setActive(h, $event)"
+              [ariaLabel]="('admin.webhook.active' | t) + ': ' + (h.name || h.url)"
+              >{{ 'admin.webhook.active' | t }}</app-switch
+            >
+            @if (canManage()) {
+              <app-row-menu
+                trail
+                [sections]="rowMenu()"
+                [label]="('ui.rowMenu.trigger' | t) + ': ' + (h.name || h.url)"
+                (selected)="askDelete(h)"
+              />
+            }
+            @if (h.events.length) {
+              <ul class="wh__events" [attr.aria-label]="'admin.webhook.events' | t">
+                @for (ev of h.events; track ev) {
+                  <li class="code-tag code-tag--outlined wh__event mono">{{ ev }}</li>
                 }
-                @if (!h.active) {
-                  <app-status-text kind="muted">{{ 'common.inactive' | t }}</app-status-text>
-                }
+              </ul>
+            } @else {
+              <p class="wh__noEvents">{{ 'admin.webhook.noEvents' | t }}</p>
+            }
+            @if (canManage()) {
+              <section class="wh__status" [attr.aria-label]="'admin.webhook.delivery.title' | t">
+                <h3 class="section-title">{{ 'admin.webhook.delivery.title' | t }}</h3>
                 @if (s) {
-                  @let st = deliveryStatus(s.lastState);
-                  <app-status-text [kind]="st.kind">{{ st.key | t }}</app-status-text>
-                }
-              </p>
-              <p class="wh__url mono">{{ h.url }}</p>
-              @if (h.events.length) {
-                <ul class="wh__events" [attr.aria-label]="'admin.webhook.events' | t">
-                  @for (ev of h.events; track ev) {
-                    <li class="code-tag code-tag--outlined wh__event mono">{{ ev }}</li>
+                  <dl class="kv wh__grid">
+                    <div>
+                      <dt>{{ 'admin.webhook.delivery.state' | t }}</dt>
+                      @let st = deliveryStatus(s.lastState);
+                      <dd>
+                        <app-status-text [kind]="st.kind">{{ st.key | t }}</app-status-text>
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>{{ 'admin.webhook.delivery.responseCode' | t }}</dt>
+                      <dd class="mono">
+                        {{ s.responseCode ?? ('admin.webhook.delivery.noResponse' | t) }}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>{{ 'admin.webhook.delivery.attempts' | t }}</dt>
+                      <dd class="mono">{{ s.attempts }}</dd>
+                    </div>
+                    <div>
+                      <dt>{{ 'admin.webhook.delivery.lastAt' | t }}</dt>
+                      <dd class="mono">{{ s.lastAt ? (s.lastAt | ldate: 'short') : '—' }}</dd>
+                    </div>
+                    <div class="kv__wide">
+                      <dt>{{ 'admin.webhook.delivery.reason' | t }}</dt>
+                      <dd>{{ reasonLabel(s.reasonClass) }}</dd>
+                    </div>
+                  </dl>
+                  @if (s.lastState === 'dead') {
+                    <p class="wh__dead" role="alert">{{ 'admin.webhook.delivery.deadHint' | t }}</p>
                   }
-                </ul>
-              } @else {
-                <p class="wh__noEvents">{{ 'admin.webhook.noEvents' | t }}</p>
-              }
-            </div>
-            <div class="wh__side hitrow__keep">
-              <app-switch
-                [checked]="h.active"
-                [disabled]="!canManage() || isToggling(h.id)"
-                (checkedChange)="setActive(h, $event)"
-                [ariaLabel]="('admin.webhook.active' | t) + ': ' + (h.name || h.url)"
-                >{{ 'admin.webhook.active' | t }}</app-switch
-              >
-              @if (canManage()) {
-                <app-button
-                  class="wh__toggle"
-                  variant="text"
-                  [ariaExpanded]="statusDetail()?.id === h.id"
-                  [ariaControls]="'wh-status-' + h.id"
-                  (click)="toggleStatus(h)"
-                >
-                  {{ 'admin.webhook.delivery.title' | t }}
-                </app-button>
-                <app-row-menu
-                  [sections]="rowMenu()"
-                  [label]="('ui.rowMenu.trigger' | t) + ': ' + (h.name || h.url)"
-                  (selected)="askDelete(h)"
-                />
-              }
-            </div>
-          </div>
-
-          @if (statusDetail()?.id === h.id) {
-            <section class="wh__status" [id]="'wh-status-' + h.id" [attr.aria-label]="'admin.webhook.delivery.title' | t">
-              <h3 class="section-title">{{ 'admin.webhook.delivery.title' | t }}</h3>
-              @if (s) {
-                <dl class="kv wh__grid">
-                  <div>
-                    <dt>{{ 'admin.webhook.delivery.state' | t }}</dt>
-                    @let st = deliveryStatus(s.lastState);
-                    <dd><app-status-text [kind]="st.kind">{{ st.key | t }}</app-status-text></dd>
-                  </div>
-                  <div>
-                    <dt>{{ 'admin.webhook.delivery.responseCode' | t }}</dt>
-                    <dd class="mono">{{ s.responseCode ?? ('admin.webhook.delivery.noResponse' | t) }}</dd>
-                  </div>
-                  <div>
-                    <dt>{{ 'admin.webhook.delivery.attempts' | t }}</dt>
-                    <dd class="mono">{{ s.attempts }}</dd>
-                  </div>
-                  <div>
-                    <dt>{{ 'admin.webhook.delivery.lastAt' | t }}</dt>
-                    <dd class="mono">{{ s.lastAt ? (s.lastAt | ldate: 'short') : '—' }}</dd>
-                  </div>
-                  <div class="kv__wide">
-                    <dt>{{ 'admin.webhook.delivery.reason' | t }}</dt>
-                    <dd>{{ reasonLabel(s.reasonClass) }}</dd>
-                  </div>
-                </dl>
-                @if (s.lastState === 'dead') {
-                  <p class="wh__dead" role="alert">{{ 'admin.webhook.delivery.deadHint' | t }}</p>
+                } @else {
+                  <app-empty-state rows="2" [heading]="'admin.webhook.delivery.none' | t" />
                 }
-              } @else {
-                <app-empty-state rows="2" [heading]="'admin.webhook.delivery.none' | t" />
-              }
-            </section>
-          }
+              </section>
+            }
+          </app-expand-row>
         </li>
       }
     </ul>
@@ -124,7 +109,12 @@
 >
   @if (draft(); as d) {
     <form class="wh__form" (submit)="$event.preventDefault(); save()">
-      <app-input [label]="'admin.webhook.name' | t" [ngModel]="d.name" (ngModelChange)="patch('name', $event)" name="name" />
+      <app-input
+        [label]="'admin.webhook.name' | t"
+        [ngModel]="d.name"
+        (ngModelChange)="patch('name', $event)"
+        name="name"
+      />
       <app-input
         class="wh__urlField"
         [label]="'admin.webhook.url' | t"
@@ -134,12 +124,18 @@
         name="url"
         placeholder="https://"
       />
-      <app-switch [checked]="d.active" (checkedChange)="patch('active', $event)">{{ 'admin.webhook.active' | t }}</app-switch>
+      <app-switch [checked]="d.active" (checkedChange)="patch('active', $event)">{{
+        'admin.webhook.active' | t
+      }}</app-switch>
       <fieldset class="wh__eventsField">
         <legend class="wh__legend">{{ 'admin.webhook.events' | t }}</legend>
         <div class="wh__eventGrid">
           @for (ev of allEvents; track ev) {
-            <app-checkbox [ngModel]="d.events.includes(ev)" (ngModelChange)="toggleEvent(ev)" [name]="'ev-' + ev">
+            <app-checkbox
+              [ngModel]="d.events.includes(ev)"
+              (ngModelChange)="toggleEvent(ev)"
+              [name]="'ev-' + ev"
+            >
               <span class="mono">{{ ev }}</span>
             </app-checkbox>
           }
@@ -149,14 +145,18 @@
   }
   <div dialog-footer class="wh__foot">
     <app-button variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="fill" [disabled]="errors().length > 0" (click)="save()">{{ 'action.save' | t }}</app-button>
+    <app-button variant="fill" [disabled]="errors().length > 0" (click)="save()">{{
+      'action.save' | t
+    }}</app-button>
   </div>
 </app-dialog>
 
 <app-confirm-dialog
   [open]="confirmDelete() !== null"
   [title]="'admin.webhook.deleteTitle' | t"
-  [body]="'admin.webhook.deleteConfirm' | t: { name: confirmDelete()?.name || confirmDelete()?.url || '' }"
+  [body]="
+    'admin.webhook.deleteConfirm' | t: { name: confirmDelete()?.name || confirmDelete()?.url || '' }
+  "
   (confirm)="doDelete()"
   (cancel)="confirmDelete.set(null)"
 />

@@ -1,0 +1,33 @@
+<app-list-item
+  class="xr__head"
+  [title]="title()"
+  [sub]="sub()"
+  [expanded]="toggle() === 'row' ? open() : null"
+  [controls]="bodyId"
+  (activate)="onHead()"
+>
+  <ng-container ngProjectAs="[lead]"><ng-content select="[lead]" /></ng-container>
+  <ng-container ngProjectAs="[status]"><ng-content select="[status]" /></ng-container>
+  <ng-container ngProjectAs="[sub]"><ng-content select="[sub]" /></ng-container>
+  <span trail class="xr__trail">
+    <ng-content select="[trail]" />
+    @if (toggle() === 'row') {
+      <app-icon class="xr__chev" [name]="open() ? 'up' : 'down'" [size]="20" aria-hidden="true" />
+    } @else {
+      <app-button
+        variant="text"
+        [iconOnly]="true"
+        [ariaLabel]="toggleLabel()"
+        [ariaExpanded]="open()"
+        [ariaControls]="bodyId"
+        (click)="flip()"
+        ><app-icon [name]="open() ? 'up' : 'down'" [size]="20"
+      /></app-button>
+    }
+  </span>
+</app-list-item>
+@if (open()) {
+  <div class="xr__body" [id]="bodyId">
+    <ng-content />
+  </div>
+}

@@ -20,56 +20,24 @@
     <ul class="rowgroup grem__list" [attr.aria-label]="'admin.gremien.title' | t">
       @for (g of gremien(); track g.id) {
         <li class="grem__item">
-          <div class="grem__head">
-            <h2 class="grem__h">
-              <button
-                type="button"
-                class="grem__toggle"
-                [attr.aria-expanded]="isOpen(g)"
-                [attr.aria-controls]="'grem-body-' + g.id"
-                (click)="toggle(g)"
-              >
-                <app-icon class="grem__icon" name="landmark" [size]="20" />
-                <span class="grem__text">
-                  <span class="grem__name">
-                    <span class="grem__label ell" [title]="g.name">{{ g.name }}</span>
-                    <span class="grem__slug mono">{{ g.slug }}</span>
-                    @if (g.protocolsPublic) {
-                      <app-status-text kind="accent">{{ 'admin.gremien.publicTag' | t }}</app-status-text>
-                    }
-                  </span>
-                  @if (counts(g); as c) {
-                    <span class="grem__counts">{{ c }}</span>
-                  }
-                </span>
-              </button>
-            </h2>
-            <span class="grem__actions">
-              <app-row-menu
-                [sections]="rowMenu()"
-                [label]="('ui.rowMenu.trigger' | t) + ': ' + g.name"
-                (selected)="onRowMenu($event, g)"
-              />
-              <button
-                type="button"
-                class="grem__chev"
-                [attr.aria-label]="
-                  ((isOpen(g) ? 'admin.gremien.collapse' : 'admin.gremien.expand') | t) +
-                  ': ' +
-                  g.name
-                "
-                [attr.title]="(isOpen(g) ? 'admin.gremien.collapse' : 'admin.gremien.expand') | t"
-                [attr.aria-expanded]="isOpen(g)"
-                [attr.aria-controls]="'grem-body-' + g.id"
-                (click)="toggle(g)"
-              >
-                <app-icon [name]="isOpen(g) ? 'up' : 'down'" [size]="20" />
-              </button>
-            </span>
-          </div>
-
+          <app-expand-row
+            [title]="g.name"
+            [sub]="g.slug + (counts(g) ? ' · ' + counts(g) : '')"
+            [open]="isOpen(g)"
+            (openChange)="toggle(g)"
+          >
+            <app-icon lead class="grem__icon" name="landmark" [size]="20" />
+            @if (g.protocolsPublic) {
+              <app-status-text status kind="accent">{{ 'admin.gremien.publicTag' | t }}</app-status-text>
+            }
+            <app-row-menu
+              trail
+              [sections]="rowMenu()"
+              [label]="('ui.rowMenu.trigger' | t) + ': ' + g.name"
+              (selected)="onRowMenu($event, g)"
+            />
           @if (isOpen(g)) {
-            <div class="grem__body" [id]="'grem-body-' + g.id">
+            <div class="grem__body">
               <section class="grem__settings" [attr.aria-labelledby]="'grem-set-' + g.id">
                 <h3 class="section-title" [id]="'grem-set-' + g.id">
                   {{ 'admin.gremien.settings' | t }}
@@ -92,6 +60,7 @@
               />
             </div>
           }
+          </app-expand-row>
         </li>
       }
     </ul>
