@@ -42,7 +42,9 @@ async def _discard(ids: list[str], token: str | None) -> None:
             )
 
 
-async def post_message(path: str, payload: dict[str, Any], file_paths: list[str] | None) -> Any:
+async def post_message(
+    path: str, payload: dict[str, Any], file_paths: list[str] | None
+) -> Any:
     """Post a chat message, with its files uploaded as drafts first.
 
     Without `file_paths` this is a plain `POST path` with `payload`.
@@ -71,7 +73,9 @@ async def post_message(path: str, payload: dict[str, Any], file_paths: list[str]
             )
             token = token or out["draftToken"]
             ids.append(str(out["id"]))
-        return await api().post(path, json={**payload, "attachmentIds": ids, "draftToken": token})
+        return await api().post(
+            path, json={**payload, "attachmentIds": ids, "draftToken": token}
+        )
     except ApiError:
         await _discard(ids, token)
         raise

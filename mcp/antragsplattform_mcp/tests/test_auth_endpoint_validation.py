@@ -31,17 +31,23 @@ def test_loopback_http_same_origin_accepted() -> None:
 
 def test_cleartext_attacker_endpoint_rejected() -> None:
     with pytest.raises(AuthError, match="requires https"):
-        _require_secure_endpoint("token_endpoint", "http://attacker.example/token", BASE)
+        _require_secure_endpoint(
+            "token_endpoint", "http://attacker.example/token", BASE
+        )
 
 
 def test_cross_origin_https_endpoint_rejected() -> None:
     with pytest.raises(AuthError, match="not same-origin"):
-        _require_secure_endpoint("token_endpoint", "https://attacker.example/token", BASE)
+        _require_secure_endpoint(
+            "token_endpoint", "https://attacker.example/token", BASE
+        )
 
 
 def test_cross_port_endpoint_rejected() -> None:
     with pytest.raises(AuthError, match="not same-origin"):
-        _require_secure_endpoint("token_endpoint", "https://antrag.uni.de:9999/token", BASE)
+        _require_secure_endpoint(
+            "token_endpoint", "https://antrag.uni.de:9999/token", BASE
+        )
 
 
 def test_subdomain_endpoint_rejected() -> None:

@@ -141,7 +141,9 @@ def test_transition_with_new_guards_and_actions_passes_through(fake_api: _FakeAp
 def test_transition_patch_replaces_actions(fake_api: _FakeApi) -> None:
     patch = S.TransitionDefPatch(actions=[{"type": "addToNextSession"}])
     asyncio.run(flow_forms.flow_update_transition(0, patch))
-    assert _saved_graph(fake_api)["transitions"][0]["actions"] == [{"type": "addToNextSession"}]
+    assert _saved_graph(fake_api)["transitions"][0]["actions"] == [
+        {"type": "addToNextSession"}
+    ]
 
 
 def test_set_global_flow_passes_graph_unchanged(fake_api: _FakeApi) -> None:
@@ -149,7 +151,9 @@ def test_set_global_flow_passes_graph_unchanged(fake_api: _FakeApi) -> None:
     graph["states"][1]["kind"] = "vote"
     graph["states"][1]["config"] = {"gremiumSource": "budget"}
     asyncio.run(flow_forms.set_global_flow(graph))
-    assert fake_api.posts == [("/admin/flow-versions/global", {"graph": graph, "activate": True})]
+    assert fake_api.posts == [
+        ("/admin/flow-versions/global", {"graph": graph, "activate": True})
+    ]
 
 
 def test_update_budget_sets_and_clears_decision_gremium(fake_api: _FakeApi) -> None:

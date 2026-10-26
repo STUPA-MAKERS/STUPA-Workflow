@@ -199,7 +199,11 @@ def test_default_scope_grants_the_upload_right() -> None:
 
 
 def test_upload_through_the_real_router(backend: Any, service: _Service, pdf: Path) -> None:
-    out = asyncio.run(meetings.upload_attachment(str(APP_ID), str(pdf), field_key="offer"))
+    out = asyncio.run(
+        meetings.upload_attachment(
+            str(APP_ID), str(pdf), field_key="offer"
+        )
+    )
     assert out == {
         "id": str(ATT_ID),
         "filename": sanitize_display_name("Angebot 1.pdf"),

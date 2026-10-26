@@ -34,11 +34,15 @@ def fake_api(monkeypatch: pytest.MonkeyPatch) -> _FakeApi:
 
 def test_fire_transition_without_meeting(fake_api: _FakeApi) -> None:
     asyncio.run(applications.fire_transition("a1", "t1", note="ok"))
-    assert fake_api.calls == [("/applications/a1/transition", {"transitionId": "t1", "note": "ok"})]
+    assert fake_api.calls == [
+        ("/applications/a1/transition", {"transitionId": "t1", "note": "ok"})
+    ]
 
 
 def test_fire_transition_with_meeting(fake_api: _FakeApi) -> None:
-    asyncio.run(applications.fire_transition("a1", "t1", meeting_id="m1", non_public=True))
+    asyncio.run(
+        applications.fire_transition("a1", "t1", meeting_id="m1", non_public=True)
+    )
     assert fake_api.calls == [
         (
             "/applications/a1/transition",

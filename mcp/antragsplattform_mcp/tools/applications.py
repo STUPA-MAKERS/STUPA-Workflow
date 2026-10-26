@@ -38,14 +38,8 @@ async def list_applications(
     return await api().get(
         "/applications",
         params=params(
-            state=states or None,
-            gremium=gremium,
-            type=type,
-            q=q,
-            sort=sort,
-            order=order,
-            limit=limit,
-            offset=offset,
+            state=states or None, gremium=gremium, type=type, q=q,
+            sort=sort, order=order, limit=limit, offset=offset,
         ),
     )
 
@@ -114,11 +108,8 @@ async def create_application(
     return await api().post(
         "/applications",
         json=params(
-            typeId=type_id,
-            data=data,
-            applicantEmail=applicant_email,
-            applicantName=applicant_name,
-            lang=lang,
+            typeId=type_id, data=data, applicantEmail=applicant_email,
+            applicantName=applicant_name, lang=lang,
         ),
     )
 
@@ -168,14 +159,9 @@ async def create_application_on_behalf(
     return await api().post(
         "/applications/on-behalf",
         json=params(
-            typeId=type_id,
-            data=data,
-            applicantPrincipalId=applicant_principal_id,
-            applicantName=applicant_name,
-            applicantEmail=applicant_email,
-            receivedOn=received_on,
-            intake=intake,
-            lang=lang,
+            typeId=type_id, data=data, applicantPrincipalId=applicant_principal_id,
+            applicantName=applicant_name, applicantEmail=applicant_email,
+            receivedOn=received_on, intake=intake, lang=lang,
         ),
     )
 

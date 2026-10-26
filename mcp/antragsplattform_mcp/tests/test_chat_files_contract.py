@@ -42,7 +42,9 @@ import pytest
 _BACKEND = Path(__file__).resolve().parents[3] / "backend"
 if _BACKEND.is_dir() and str(_BACKEND) not in sys.path:
     sys.path.append(str(_BACKEND))
-os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://app:pw@localhost/antrag_test")
+os.environ.setdefault(
+    "DATABASE_URL", "postgresql+asyncpg://app:pw@localhost/antrag_test"
+)
 os.environ.setdefault("SESSION_SECRET", "test-session-secret")
 os.environ.setdefault("MAGIC_LINK_SECRET", "test-magic-link-secret")
 os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
@@ -184,7 +186,9 @@ class _Drafts:
             raise ValidationProblem(
                 "Some attachments are missing, expired or infected. Upload them again.",
                 code=DRAFT_ATTACHMENTS_MISSING,
-                errors=[{"field": f"attachmentIds.{i}", "msg": "missing"} for i in missing],
+                errors=[
+                    {"field": f"attachmentIds.{i}", "msg": "missing"} for i in missing
+                ],
             )
         return [
             MessageAttachmentOut(
@@ -241,7 +245,9 @@ class _Tickets:
         self.blocked = True
         return _detail(True)
 
-    async def unblock_sender(self, ticket_id: UUID, principal: Principal) -> TicketDetail:
+    async def unblock_sender(
+        self, ticket_id: UUID, principal: Principal
+    ) -> TicketDetail:
         self.blocked = False
         return _detail(False)
 
@@ -392,7 +398,9 @@ def svc(drafts: _Drafts) -> dict[str, Any]:
 
 
 @pytest.fixture
-def backend(drafts: _Drafts, svc: dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> Iterator[Any]:
+def backend(
+    drafts: _Drafts, svc: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> Iterator[Any]:
     app = backend_main.create_app()
     app.dependency_overrides[get_draft_attachments] = lambda: drafts
     app.dependency_overrides[get_ticket_service] = lambda: svc["tickets"]
@@ -454,7 +462,9 @@ def test_ticket_note_with_files(
     note = svc["tickets"].notes[0]
     assert note.body == ""
     assert note.draft_token == "dt_0"
-    assert [str(i) for i in note.attachment_ids] == [a["id"] for a in out["attachments"]]
+    assert [str(i) for i in note.attachment_ids] == [
+        a["id"] for a in out["attachments"]
+    ]
 
 
 def test_ticket_note_without_files_sends_no_upload(
@@ -489,15 +499,21 @@ def test_mismatched_file_is_415_and_deletes_the_first(
     fake = tmp_path / "fake.pdf"
     fake.write_bytes(PNG)
     with pytest.raises(ApiError) as err:
-        asyncio.run(tickets.tickets_note(str(TICKET_ID), "x", [str(files[0]), str(fake)]))
+        asyncio.run(
+            tickets.tickets_note(str(TICKET_ID), "x", [str(files[0]), str(fake)])
+        )
     assert err.value.status == 415
     assert drafts.rows == {}
     assert len(drafts.deleted) == 1
 
 
-def test_todo_comment_with_files(backend: Any, svc: dict[str, Any], files: list[Path]) -> None:
+def test_todo_comment_with_files(
+    backend: Any, svc: dict[str, Any], files: list[Path]
+) -> None:
     mention = str(uuid4())
-    out = asyncio.run(todos.todo_comment(str(CARD_ID), "@Agent bitte", [mention], [str(files[1])]))
+    out = asyncio.run(
+        todos.todo_comment(str(CARD_ID), "@Agent bitte", [mention], [str(files[1])])
+    )
     assert [a["filename"] for a in out["attachments"]] == ["Foto.png"]
     assert out["attachments"][0]["scanState"] == "scanning"
     assert svc["todos"].calls == [
@@ -509,11 +525,15 @@ def test_application_comment_with_files(
     backend: Any, svc: dict[str, Any], files: list[Path]
 ) -> None:
     out = asyncio.run(
-        applications.comment_application(str(APP_ID), "", "internal", [str(p) for p in files])
+        applications.comment_application(
+            str(APP_ID), "", "internal", [str(p) for p in files]
+        )
     )
     assert out["visibility"] == "internal"
     assert len(out["attachments"]) == 2
-    assert svc["applications"].calls == [{"application_id": APP_ID, "visibility": "internal"}]
+    assert svc["applications"].calls == [
+        {"application_id": APP_ID, "visibility": "internal"}
+    ]
 
 
 def test_block_unblock_and_list(backend: Any, svc: dict[str, Any]) -> None:
@@ -526,15 +546,21 @@ def test_block_unblock_and_list(backend: Any, svc: dict[str, Any]) -> None:
     assert listed[0]["sourceTicket"] == {"id": str(TICKET_ID), "number": "T-0040"}
     unblocked = asyncio.run(tickets.tickets_unblock_sender(str(TICKET_ID)))
     assert unblocked["senderBlocked"] is False
-    assert asyncio.run(tickets.tickets_delete_blocked_sender(str(BLOCK_ID))) == {"status": "ok"}
+    assert asyncio.run(tickets.tickets_delete_blocked_sender(str(BLOCK_ID))) == {
+        "status": "ok"
+    }
     assert svc["tickets"].lifted == [BLOCK_ID]
     with pytest.raises(ApiError) as err:
         asyncio.run(tickets.tickets_delete_blocked_sender(str(uuid4())))
     assert err.value.status == 404
 
 
-def test_download_a_note_file(backend: Any, svc: dict[str, Any], tmp_path: Path) -> None:
-    out = asyncio.run(meetings.download_attachment(str(svc["files"].note_file), str(tmp_path)))
+def test_download_a_note_file(
+    backend: Any, svc: dict[str, Any], tmp_path: Path
+) -> None:
+    out = asyncio.run(
+        meetings.download_attachment(str(svc["files"].note_file), str(tmp_path))
+    )
     assert (tmp_path / "Protokoll.pdf").read_bytes() == PDF
     assert out["mime"] == "application/pdf"
     assert out["size"] == len(PDF)
@@ -561,5 +587,7 @@ def test_without_tickets_write_the_ticket_routes_are_closed(
     assert drafts.rows == {}
     assert len(drafts.deleted) == 1
     with pytest.raises(ApiError) as err:
-        asyncio.run(meetings.download_attachment(str(svc["files"].note_file), str(tmp_path)))
+        asyncio.run(
+            meetings.download_attachment(str(svc["files"].note_file), str(tmp_path))
+        )
     assert err.value.status == 404

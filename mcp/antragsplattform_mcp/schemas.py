@@ -46,8 +46,10 @@ def check_vote_config(config: dict[str, Any]) -> None:
     has_id = isinstance(gremium_id, str) and bool(gremium_id)
     if has_id == (source is not None):
         raise ValueError(
-            "a vote state needs exactly one of config.gremiumId or config.gremiumSource='budget'"
+            "a vote state needs exactly one of config.gremiumId or "
+            "config.gremiumSource='budget'"
         )
+
 
 
 # Flow graph, shared by the flow tools.
@@ -548,7 +550,7 @@ class DecisionProposal(WireModel):
 
     approvedAmount: str | None = Field(
         default=None,
-        description='Approved amount as a decimal string, e.g. "800.00". Greater than 0 '
+        description="Approved amount as a decimal string, e.g. \"800.00\". Greater than 0 "
         "and not above the requested amount (422 `approved_amount_invalid` / "
         "`approved_amount_exceeds_requested`). null means as requested.",
     )

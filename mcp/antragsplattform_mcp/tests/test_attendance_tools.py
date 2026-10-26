@@ -38,7 +38,9 @@ def fake_api(monkeypatch: pytest.MonkeyPatch) -> _FakeApi:
 
 def test_set_attendance_without_note(fake_api: _FakeApi) -> None:
     asyncio.run(meetings.set_attendance("m1", "p1", "absent"))
-    assert fake_api.calls == [("PUT", "/meetings/m1/attendance/p1", {"status": "absent"})]
+    assert fake_api.calls == [
+        ("PUT", "/meetings/m1/attendance/p1", {"status": "absent"})
+    ]
 
 
 def test_set_attendance_with_note(fake_api: _FakeApi) -> None:

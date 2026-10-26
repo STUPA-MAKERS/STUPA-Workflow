@@ -229,13 +229,17 @@ async def create_gremium_role_mapping(mapping: S.GremiumRoleMappingCreate) -> di
 
 
 @group.tool
-async def update_gremium_role_mapping(mapping_id: str, patch: S.GremiumRoleMappingUpdate) -> dict:
+async def update_gremium_role_mapping(
+    mapping_id: str, patch: S.GremiumRoleMappingUpdate
+) -> dict:
     """Patch the group or the Gremium role of a role mapping.
 
     Requires admin.group_mappings. The platform then syncs the memberships of all
     principals.
     """
-    return await api().patch(f"/admin/gremium-role-mappings/{mapping_id}", json=dump_patch(patch))
+    return await api().patch(
+        f"/admin/gremium-role-mappings/{mapping_id}", json=dump_patch(patch)
+    )
 
 
 @group.tool
@@ -324,7 +328,9 @@ async def list_principals(
 @group.tool
 async def update_principal(principal_id: str, active: bool) -> dict:
     """Activate or deactivate a principal. Requires admin.roles."""
-    return await api().patch(f"/admin/principals/{principal_id}", json={"active": active})
+    return await api().patch(
+        f"/admin/principals/{principal_id}", json={"active": active}
+    )
 
 
 @group.tool
@@ -370,7 +376,9 @@ async def create_application_type(type: S.ApplicationTypeCreate) -> dict:
 @group.tool
 async def update_application_type(type_id: str, patch: S.ApplicationTypeUpdate) -> dict:
     """Patch an application type. Requires admin.types."""
-    return await api().patch(f"/admin/application-types/{type_id}", json=dump_patch(patch))
+    return await api().patch(
+        f"/admin/application-types/{type_id}", json=dump_patch(patch)
+    )
 
 
 @group.tool
@@ -480,7 +488,9 @@ async def set_notification_preferences(preferences: list[dict[str, Any]]) -> dic
 
     Use the same shape that `get_notification_preferences` returns.
     """
-    return await api().put("/notifications/preferences", json={"preferences": preferences})
+    return await api().put(
+        "/notifications/preferences", json={"preferences": preferences}
+    )
 
 
 @group.tool
@@ -590,12 +600,8 @@ async def list_audit(
     return await api().get(
         "/admin/audit",
         params=params(
-            action=action,
-            actor=actor,
-            since=since,
-            until=until,
-            before=before,
-            limit=limit,
+            action=action, actor=actor, since=since, until=until,
+            before=before, limit=limit,
         ),
     )
 
