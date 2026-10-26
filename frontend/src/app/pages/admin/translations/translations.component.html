@@ -16,19 +16,25 @@
       <h2 id="tr-langs" class="section-title tr__secTitle">{{ 'admin.translations.languages' | t }}</h2>
       <ul class="rowgroup tr__langs">
         <li class="tr__lang">
-          <span class="tr__langName">{{ 'shell.lang.de' | t }}</span>
-          <span class="tr__langCode mono">de</span>
-          <app-status-text kind="muted">{{ 'admin.translations.builtIn' | t }}</app-status-text>
+          <span class="tr__langMain">
+            <span class="tr__langName">{{ 'shell.lang.de' | t }}</span>
+            <span class="tr__langCode mono">de</span>
+            <app-status-text kind="muted">{{ 'admin.translations.builtIn' | t }}</app-status-text>
+          </span>
         </li>
         <li class="tr__lang">
-          <span class="tr__langName">{{ 'shell.lang.en' | t }}</span>
-          <span class="tr__langCode mono">en</span>
-          <app-status-text kind="muted">{{ 'admin.translations.builtIn' | t }}</app-status-text>
+          <span class="tr__langMain">
+            <span class="tr__langName">{{ 'shell.lang.en' | t }}</span>
+            <span class="tr__langCode mono">en</span>
+            <app-status-text kind="muted">{{ 'admin.translations.builtIn' | t }}</app-status-text>
+          </span>
         </li>
         @for (l of languages(); track l.code) {
           <li class="tr__lang">
-            <span class="tr__langName">{{ l.name }}</span>
-            <span class="tr__langCode mono">{{ l.code }}</span>
+            <span class="tr__langMain">
+              <span class="tr__langName">{{ l.name }}</span>
+              <span class="tr__langCode mono">{{ l.code }}</span>
+            </span>
             <span class="tr__langActions">
               <app-switch
                 [checked]="l.active"
@@ -131,8 +137,9 @@
           }
         </ul>
         @if (hasMore()) {
+          <div class="tr__sentinel" appInfiniteScroll (scrolledToEnd)="more()" aria-hidden="true"></div>
           <div class="tr__more">
-            <app-button variant="tonal" (click)="more()">{{ 'admin.translations.more' | t }}</app-button>
+            <app-button variant="text" size="sm" (click)="more()">{{ 'admin.translations.more' | t }}</app-button>
           </div>
         }
       } @else {
