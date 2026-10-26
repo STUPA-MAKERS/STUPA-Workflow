@@ -80,6 +80,7 @@ SCOPES: dict[str, frozenset[str]] = {
             "admin.cd_variants",
             "admin.delegations",
             "admin.deadlines",
+            "admin.translations",
             "webhook.manage",
         }
     ),

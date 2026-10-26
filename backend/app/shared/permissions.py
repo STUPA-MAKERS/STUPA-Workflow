@@ -53,6 +53,9 @@ Keys that need a note:
   (/admin/roles, /admin/users, /admin/group-mappings, /admin/gremien/:id/roles,
   /admin/cd-variants with the logo upload and download, /admin/delegations with the
   substitute pool, /admin/deadlines with the meeting window and guest confirmation).
+- `admin.translations`: the UI texts of every key in every locale and the extra UI
+  languages (/admin/translations). An override shows to every visitor, the login page
+  and the public pages included.
 - `admin.users.merge`: merge an old account (for example a Keycloak-era `sub`) into a
   new one, rewriting its references and locking it. Admin-only by default. No OAuth
   scope carries it, so an agent token never merges.
@@ -118,6 +121,7 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "admin.cd_variants",
     "admin.delegations",
     "admin.deadlines",
+    "admin.translations",
     "admin.notifications",
     "privacy.manage",
     "backup.manage",

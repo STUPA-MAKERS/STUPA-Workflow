@@ -39,6 +39,7 @@ Groups of ``PUBLIC_ROUTES`` and why each one is public:
 - Calendar: the ICS feed authenticates by the secret token in the path.
 - ALTCHA: the challenge comes before every public write.
 - Site config: the SPA reads branding and the PWA manifest before login.
+- UI texts: the SPA reads the text overrides and the extra languages before login.
 - Apply: the public wizard lists the application types, uploads and removes draft
   files with its draft token (ALTCHA when signed out) and submits the application.
 - Tickets: the one-way public report of the help menu (ALTCHA when signed out).
@@ -126,6 +127,7 @@ PUBLIC_ROUTES: Final[frozenset[tuple[str, str]]] = frozenset(
         ("GET", "/api/calendar/{token}.ics"),
         ("GET", "/api/altcha/challenge"),
         ("GET", "/api/site-config"),
+        ("GET", "/api/i18n"),
         ("GET", "/api/manifest.webmanifest"),
         ("GET", "/api/application-types"),
         ("POST", "/api/applications"),

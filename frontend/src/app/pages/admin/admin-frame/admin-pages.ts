@@ -61,6 +61,7 @@ export const ADMIN_PAGES: readonly AdminPage[] = [
   { link: 'cost-centres', title: 'admin.nav.costCentres', desc: 'admin.nav.costCentresDesc', icon: 'euro', group: 'finance', permissions: ['budget.structure'] },
   { link: 'branding', title: 'admin.nav.branding', desc: 'admin.nav.brandingDesc', icon: 'palette', group: 'appearance', permissions: ['admin.site'] },
   { link: 'texts', title: 'admin.nav.texts', desc: 'admin.nav.textsDesc', icon: 'heading', group: 'appearance', permissions: ['admin.site'] },
+  { link: 'translations', title: 'admin.nav.translations', desc: 'admin.nav.translationsDesc', icon: 'language', group: 'appearance', permissions: ['admin.translations'] },
   { link: 'cd-variants', title: 'admin.nav.cdVariants', desc: 'admin.nav.cdVariantsDesc', icon: 'file', group: 'appearance', permissions: ['admin.cd_variants'] },
   { link: 'notifications', title: 'admin.nav.notifications', desc: 'admin.nav.notificationsDesc', icon: 'bell', group: 'communication', permissions: ['admin.notifications'] },
   { link: 'mail-templates', title: 'admin.nav.mailTemplates', desc: 'admin.nav.mailTemplatesDesc', icon: 'mail', group: 'communication', permissions: ['admin.notifications'] },

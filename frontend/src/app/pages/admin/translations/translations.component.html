@@ -1,0 +1,196 @@
+<section class="tr admin-page">
+  <app-page-header [flush]="true" [title]="'admin.translations.title' | t">
+    @if (dirty()) {
+      <app-button actions variant="text" [disabled]="saving()" (click)="discard()">
+        {{ 'admin.translations.discard' | t }}
+      </app-button>
+    }
+  </app-page-header>
+
+  @if (loading()) {
+    <app-skeleton variant="rows" [count]="6" [label]="'admin.translations.loading' | t" />
+  } @else if (loadError()) {
+    <app-note kind="error" icon="alert" role="alert">{{ 'admin.translations.loadError' | t }}</app-note>
+  } @else {
+    <section class="tr__sec" aria-labelledby="tr-langs">
+      <h2 id="tr-langs" class="section-title tr__secTitle">{{ 'admin.translations.languages' | t }}</h2>
+      <ul class="rowgroup tr__langs">
+        <li class="tr__lang">
+          <span class="tr__langName">{{ 'shell.lang.de' | t }}</span>
+          <span class="tr__langCode mono">de</span>
+          <app-status-text kind="muted">{{ 'admin.translations.builtIn' | t }}</app-status-text>
+        </li>
+        <li class="tr__lang">
+          <span class="tr__langName">{{ 'shell.lang.en' | t }}</span>
+          <span class="tr__langCode mono">en</span>
+          <app-status-text kind="muted">{{ 'admin.translations.builtIn' | t }}</app-status-text>
+        </li>
+        @for (l of languages(); track l.code) {
+          <li class="tr__lang">
+            <span class="tr__langName">{{ l.name }}</span>
+            <span class="tr__langCode mono">{{ l.code }}</span>
+            <span class="tr__langActions">
+              <app-switch
+                [checked]="l.active"
+                [disabled]="toggling() === l.code"
+                (checkedChange)="setActive(l, $event)"
+                >{{ 'admin.translations.active' | t }}</app-switch
+              >
+              <app-row-menu
+                [sections]="languageMenu()"
+                [label]="('ui.rowMenu.trigger' | t) + ': ' + l.name"
+                (selected)="onLanguageMenu($event, l)"
+              />
+            </span>
+          </li>
+        }
+      </ul>
+    </section>
+
+    <section class="tr__sec" aria-labelledby="tr-texts">
+      <h2 id="tr-texts" class="section-title tr__secTitle">{{ 'admin.translations.texts' | t }}</h2>
+      <app-sticky-bar>
+        <div class="tr__search" role="search">
+          <app-search-pill
+            size="md"
+            [clearable]="true"
+            [placeholder]="'admin.translations.searchPlaceholder' | t"
+            [label]="'admin.translations.search' | t"
+            [value]="searchText()"
+            (valueChange)="setSearch($event)"
+            (commit)="flushSearch()"
+          />
+        </div>
+        <div class="tr__chips" role="group" [attr.aria-label]="'admin.translations.filters' | t">
+          <app-filter-select
+            icon="language"
+            [label]="'admin.translations.locale' | t"
+            [text]="localeText()"
+            [active]="true"
+            [options]="localeOptions()"
+            [value]="locale()"
+            (valueChange)="setLocale($event)"
+          />
+          <app-filter-select
+            icon="tag"
+            [label]="'admin.translations.area' | t"
+            [text]="area() || ('admin.translations.allAreas' | t)"
+            [active]="!!area()"
+            [options]="areaOptions()"
+            [value]="area()"
+            (valueChange)="setArea($event)"
+          />
+          <app-filter-select
+            icon="edit"
+            [label]="'admin.translations.changedFilter' | t"
+            [text]="(changedOnly() ? 'admin.translations.changedOnly' : 'admin.translations.allTexts') | t"
+            [active]="changedOnly()"
+            [options]="changedOptions()"
+            [value]="changedOnly() ? 'changed' : ''"
+            (valueChange)="setChanged($event)"
+          />
+        </div>
+      </app-sticky-bar>
+
+      @if (rows().length) {
+        <ul class="rowgroup tr__rows" [attr.aria-label]="'admin.translations.texts' | t">
+          @for (key of rows(); track key) {
+            @let error = placeholderError(key);
+            <li class="tr__row" [class.tr__row--changed]="isChanged(key)">
+              <div class="tr__ref">
+                <span class="tr__key mono">{{ key }}</span>
+                <span class="tr__refText">{{ reference(key) }}</span>
+              </div>
+              <div class="tr__edit">
+                <app-textarea [label]="'admin.translations.override' | t" [invalid]="!!error" [grow]="true">
+                  <textarea
+                    rows="1"
+                    [name]="key"
+                    [attr.aria-invalid]="!!error"
+                    [attr.aria-describedby]="error ? 'tr-err-' + key : null"
+                    [ngModel]="value(key)"
+                    (ngModelChange)="edit(key, $event)"
+                  ></textarea>
+                </app-textarea>
+                @if (error) {
+                  <span class="tr__err" [id]="'tr-err-' + key">{{ error }}</span>
+                }
+              </div>
+              <span class="tr__reset">
+                @if (isChanged(key)) {
+                  <app-button
+                    variant="text"
+                    [iconOnly]="true"
+                    [ariaLabel]="'admin.translations.reset' | t: { key: key }"
+                    (click)="reset(key)"
+                    ><app-icon name="undo"
+                  /></app-button>
+                }
+              </span>
+            </li>
+          }
+        </ul>
+        @if (hasMore()) {
+          <div class="tr__more">
+            <app-button variant="tonal" (click)="more()">{{ 'admin.translations.more' | t }}</app-button>
+          </div>
+        }
+      } @else {
+        <app-empty-state rows="3" [heading]="'admin.translations.noMatch' | t" />
+      }
+    </section>
+  }
+
+  @if (dirty()) {
+    <app-fab icon="check" [label]="'action.save' | t" [loading]="saving()" [disabled]="invalid()" (activate)="save()" />
+  } @else if (!loading() && !loadError()) {
+    <app-fab [label]="'fab.language' | t" (activate)="openDialog(null)" />
+  }
+</section>
+
+<app-confirm-dialog
+  [open]="!!confirmDelete()"
+  [title]="'admin.translations.deleteTitle' | t"
+  [body]="confirmDelete() ? ('admin.translations.deleteConfirm' | t: { name: confirmDelete()!.name }) : ''"
+  (confirm)="deleteLanguage()"
+  (cancel)="confirmDelete.set(null)"
+/>
+
+<app-dialog
+  [open]="!!dialog()"
+  [title]="(dialog()?.code ? 'admin.translations.renameTitle' : 'admin.translations.createTitle') | t"
+  [closeLabel]="'action.close' | t"
+  (closed)="dialog.set(null)"
+>
+  @if (dialog(); as d) {
+    <form class="tr__form" (submit)="$event.preventDefault(); submitDialog()">
+      @if (d.code === null) {
+        <app-input
+          [label]="'admin.translations.code' | t"
+          name="code"
+          [required]="true"
+          [error]="codeError()"
+          [ngModel]="d.newCode"
+          (ngModelChange)="patchDialog({ newCode: $event.trim() })"
+        />
+      }
+      <app-input
+        [label]="'admin.translations.name' | t"
+        name="name"
+        [required]="true"
+        [ngModel]="d.name"
+        (ngModelChange)="patchDialog({ name: $event })"
+      />
+      @if (dialogError(); as err) {
+        <app-note kind="error" icon="alert" role="alert">{{ err | t }}</app-note>
+      }
+      <button type="submit" hidden></button>
+    </form>
+  }
+  <div dialog-footer>
+    <app-button variant="text" (click)="dialog.set(null)">{{ 'action.cancel' | t }}</app-button>
+    <app-button variant="fill" [disabled]="!dialogValid()" [loading]="dialogBusy()" (click)="submitDialog()">
+      {{ (dialog()?.code ? 'action.save' : 'admin.common.create') | t }}
+    </app-button>
+  </div>
+</app-dialog>

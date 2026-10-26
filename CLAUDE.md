@@ -54,6 +54,8 @@ Backend domain modules (`backend/app/modules/<module>`):
 - **be-audit** — append-only sha256 hash chain, DB trigger, chain verification *(critical)*
 - **be-backup** — whole-platform age-encrypted backups + in-app restore, `/admin/backups` *(critical,
   100 % branch gate)*
+- **be-translations** — admin overrides of the UI texts, extra UI languages, public `/i18n` bundle,
+  key catalog copy
 - **be-config-revision** — versioned config + audit + revert
 - **be-files** — MinIO attachments, ClamAV scan, signed URLs
 - **be-media** — Markdown images: upload, Pillow re-encode, canonical `/api/media/images/<id>`,
