@@ -149,7 +149,7 @@ description: Angular 20 standalone SPA for STUPA-Workflow — apply wizard, meet
 - All errors come back as `application/problem+json` (`ProblemDetail`). Show them with a toast.
 - The app registers the mock interceptor **only in dev builds** (`isDevMode()`). Prod talks to the real `/api`. WS goes through nginx/`proxy.conf.json` in dev.
 - **Bundle budgets:** run `npm run build` after component CSS/template changes — jest+tsc miss the per-component style budget that fails the Docker/prod build ([[ng-build-budgets]]). Import `MarkdownEditorComponent` by path, not the ui barrel.
-- Edit i18n in BOTH catalogs: `de` in `core/i18n/translations.ts`, `en` in `core/i18n/translations.en.ts` (a lazy chunk; `loadCatalog` loads it, the app initializer waits for it, `setup-jest.ts` registers it for specs). Configurable DB texts (`*_i18n`) are NOT in I18nService.
+- Edit i18n in BOTH catalogs: `core/i18n/catalog/de.json` and `core/i18n/catalog/en.json`, the only copy of the texts (the backend reads the same files; JSON has no comments, so a note on a key goes in the docstring of `de` in `translations.ts`). `translations.ts` exports `de`, `translations.en.ts` exports `en` (a lazy chunk; `loadCatalog` loads it, the app initializer waits for it, `setup-jest.ts` registers it for specs). Configurable DB texts (`*_i18n`) are NOT in I18nService.
 - Commands: `npm start` (dev :4200), `npm run build` (→ `dist/antragsplattform/browser`), `npm test` (jest), `npm run test:cov` (FE coverage gate), `npm run lint`, `npm run typecheck`, `npm run e2e` (playwright).
 
 **Related:** be-applications, be-flow, be-voting, be-livevote, be-budget, be-auth, be-admin, conventions

@@ -55,7 +55,7 @@ Backend domain modules (`backend/app/modules/<module>`):
 - **be-backup** — whole-platform age-encrypted backups + in-app restore, `/admin/backups` *(critical,
   100 % branch gate)*
 - **be-translations** — admin overrides of the UI texts, extra UI languages, public `/i18n` bundle,
-  key catalog copy
+  the built-in texts from the frontend catalog JSON
 - **be-config-revision** — versioned config + audit + revert
 - **be-files** — MinIO attachments, ClamAV scan, signed URLs
 - **be-media** — Markdown images: upload, Pillow re-encode, canonical `/api/media/images/<id>`,

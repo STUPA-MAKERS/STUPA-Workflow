@@ -1,12 +1,13 @@
-"""The key catalog of the frontend: every UI text key with its built-in texts.
+"""The UI text catalog of the frontend: every key with its built-in DE and EN text.
 
-`catalog.json` is a copy of the DE and the EN catalog of the frontend
-(`frontend/src/app/core/i18n/translations.ts`, `translations.en.ts`). A frontend spec
-fails when the copy is stale and regenerates it with `UPDATE_I18N_CATALOG=1`. The
-server uses it to refuse an override for an unknown key and an override whose
-placeholders differ from the DE text, because a lost `{count}` hides the number and
-an unknown placeholder shows literally. It also serves the built-in texts to an admin
-who translates, because the server has no other copy of them.
+The texts live only in `frontend/src/app/core/i18n/catalog/de.json` and `en.json`.
+The api container mounts that directory read-only at `/opt/ui-catalog` and sets
+`UI_CATALOG_DIR` (`Settings.ui_catalog_dir`, see `deploy/docker-compose.yml`), because
+the image builds from `backend/` only. A checkout without the variable reads them from
+the frontend directory of the repository. The server uses the catalog to
+refuse an override for an unknown key and an override whose placeholders differ from
+the DE text, because a lost `{count}` hides the number and an unknown placeholder
+shows literally. It also serves the built-in texts to an admin who translates.
 """
 
 from __future__ import annotations
@@ -15,9 +16,16 @@ import json
 import re
 from dataclasses import dataclass
 from functools import cache
-from importlib import resources
+from pathlib import Path
+
+from app.settings import get_settings
 
 _PLACEHOLDER = re.compile(r"\{(\w+)\}")
+
+#: The catalog directory in a checkout: `<repo>/frontend/src/app/core/i18n/catalog`.
+_REPO_DIR = (
+    Path(__file__).resolve().parents[4] / "frontend" / "src" / "app" / "core" / "i18n" / "catalog"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,12 +36,23 @@ class BuiltinText:
     en: str | None
 
 
+def catalog_dir() -> Path:
+    """Return the directory that holds `de.json` and `en.json`."""
+    configured = get_settings().ui_catalog_dir
+    return Path(configured) if configured else _REPO_DIR
+
+
+def _read(locale: str) -> dict[str, str]:
+    data: dict[str, str] = json.loads((catalog_dir() / f"{locale}.json").read_text("utf-8"))
+    return data
+
+
 @cache
 def builtin_texts() -> dict[str, BuiltinText]:
     """Return every key with its built-in texts, sorted by key."""
-    raw = resources.files(__package__).joinpath("catalog.json").read_text("utf-8")
-    data: dict[str, dict[str, str]] = json.loads(raw)
-    return {key: BuiltinText(de=entry["de"], en=entry.get("en")) for key, entry in data.items()}
+    de = _read("de")
+    en = _read("en")
+    return {key: BuiltinText(de=de[key], en=en.get(key)) for key in sorted(de)}
 
 
 @cache

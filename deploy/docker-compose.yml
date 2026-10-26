@@ -84,12 +84,18 @@ services:
     # only, so that directory is not in the image. MCP_PACKAGE_DIR points to the mount.
     volumes:
       - ../mcp:/opt/mcp:ro
+      # The built-in UI texts, read-only. They live only in the frontend, and the build
+      # context is ../backend only. The server refuses an override with an unknown key or
+      # other placeholders and serves the texts to a translator. UI_CATALOG_DIR points to
+      # the mount.
+      - ../frontend/src/app/core/i18n/catalog:/opt/ui-catalog:ro
       # The private age key for /admin/backups. Read-only, and absent by default: a
       # stack without it still lists and creates backups, but cannot import or restore
       # one. `:z` relabels for SELinux hosts and is a no-op elsewhere.
       - ./secrets:/secrets:ro,z
     environment:
       MCP_PACKAGE_DIR: /opt/mcp
+      UI_CATALOG_DIR: /opt/ui-catalog
     depends_on:
       migrate:
         condition: service_completed_successfully

@@ -111,6 +111,11 @@ class Settings(BaseSettings):
         `mcp_package_dir` is the source of the MCP self-service download; None means
         `<repo>/mcp`, and a container without a source tree answers 404.
 
+    UI texts:
+        `ui_catalog_dir` holds `de.json` and `en.json`, the built-in UI texts of the
+        frontend. compose mounts them into the api container; None means
+        `<repo>/frontend/src/app/core/i18n/catalog`.
+
     Mail:
         Without `smtp_host` the worker logs each mail and drops it, so DEV and the
         tests run without an MTA. The password never reaches the log.
@@ -295,6 +300,7 @@ class Settings(BaseSettings):
     oauth_access_ttl_seconds: int = 3600
     oauth_refresh_ttl_seconds: int = 60 * 60 * 24 * 30
     mcp_package_dir: str | None = None
+    ui_catalog_dir: str | None = None
 
     smtp_host: str | None = None
     smtp_port: int = 587

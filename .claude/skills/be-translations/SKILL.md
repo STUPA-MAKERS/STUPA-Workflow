@@ -1,6 +1,6 @@
 ---
 name: be-translations
-description: Admin overrides of the UI texts and extra UI languages — ui_translation/ui_language tables, the key catalog copy (catalog.json), the public GET /i18n bundle, /admin/translations (admin.translations), and the frontend I18nService chain (uiLocale vs locale). Use when working on backend/app/modules/translations, the admin page "Übersetzungen", or the i18n service of the frontend.
+description: Admin overrides of the UI texts and extra UI languages — ui_translation/ui_language tables, the built-in texts (frontend catalog/de.json + en.json, read in place), the public GET /i18n bundle, /admin/translations (admin.translations), and the frontend I18nService chain (uiLocale vs locale). Use when working on backend/app/modules/translations, the admin page "Übersetzungen", or the i18n service of the frontend.
 ---
 
 # UI text overrides and extra languages — `backend/app/modules/translations`
@@ -9,7 +9,7 @@ description: Admin overrides of the UI texts and extra UI languages — ui_trans
 
 **Key files:**
 - `models.py` — `UiTranslation` (`locale`, `key`, `value`; PK locale+key; `value` NULL and a missing row both mean the built-in text) and `UiLanguage` (`code` BCP 47, `name`, `active`; DE and EN have no row, a CHECK refuses them).
-- `catalog.py` + `catalog.json` — the copy of the DE and EN catalog (`{key: {de, en?}}`); `builtin_texts()` serves the texts, `catalog()` derives the placeholders from DE. `frontend/src/app/core/i18n/translations.catalog.spec.ts` fails when it is stale; regenerate with `UPDATE_I18N_CATALOG=1 npx jest src/app/core/i18n/translations.catalog.spec.ts`. Every change to the DE or EN catalog needs this.
+- `catalog.py` — reads `frontend/src/app/core/i18n/catalog/de.json` and `en.json`, the only copy of the UI texts (no generated copy). `Settings.ui_catalog_dir` (`UI_CATALOG_DIR`) points to them; compose mounts the directory read-only into api at `/opt/ui-catalog`, because the image builds from `backend/` only. None = the repo path. `builtin_texts()` serves the texts, `catalog()` derives the placeholders from DE.
 - `service.py` — `TranslationService`: languages CRUD, `save` (one transaction, all keys checked first), `bundle`. `fallback_chain`: DE → [de]; EN → [en, de]; extra → [code, en, de].
 - `router.py` — public `GET /i18n?locale=` (no login, `Cache-Control: no-cache`; unknown or inactive locale resolves to `de`), admin `GET|POST /admin/translations/languages`, `PATCH|DELETE .../languages/{code}`, `GET /admin/translations/builtin?prefix=&locale=&untranslated=` (built-in texts by key with the override of `locale`; `untranslated` without `locale` = 422 `locale_required`), `GET|PUT /admin/translations/texts/{locale}` (body `{changes: {key: text|null}}`).
 
