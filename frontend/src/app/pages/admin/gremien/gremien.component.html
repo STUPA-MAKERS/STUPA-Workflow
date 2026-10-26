@@ -22,6 +22,7 @@
         <li class="grem__item">
           <app-expand-row
             [title]="g.name"
+            align="row"
             [sub]="g.slug + (counts(g) ? ' · ' + counts(g) : '')"
             [open]="isOpen(g)"
             (openChange)="toggle(g)"

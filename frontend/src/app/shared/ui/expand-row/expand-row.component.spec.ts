@@ -62,4 +62,11 @@ describe('ExpandRowComponent', () => {
     await rerender({ componentProperties: { open: true, openChange } });
     expect(screen.getByText('Mitglieder')).toBeTruthy();
   });
+
+  it('starts the content at the row inset with align="row"', async () => {
+    const { container } = await setup(`<app-expand-row title="AStA" align="row" [open]="true"><p>Einstellungen</p></app-expand-row>`);
+    const host = container.querySelector('app-expand-row') as HTMLElement;
+    expect(host.style.getPropertyValue('--xr-inset')).toBe('');
+    expect(screen.getByText('Einstellungen')).toBeInTheDocument();
+  });
 });
