@@ -241,26 +241,28 @@ async def test_extra_language_lifecycle(
     ]
 
 
+_ADMIN_CALLS: list[tuple[str, str, dict[str, object] | None]] = [
+    ("GET", "/api/admin/translations/languages", None),
+    ("POST", "/api/admin/translations/languages", {"code": "fr", "name": "F"}),
+    ("PATCH", "/api/admin/translations/languages/fr", {"active": True}),
+    ("DELETE", "/api/admin/translations/languages/fr", None),
+    ("GET", "/api/admin/translations/builtin", None),
+    ("GET", "/api/admin/translations/texts/de", None),
+    ("PUT", "/api/admin/translations/texts/de", {"changes": {}}),
+]
+
+
 def test_routes_need_the_permission(
     migrated: tuple[str, str], settings: Settings, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    with _client(migrated, settings, monkeypatch, _OTHER) as client:
-        assert client.get("/api/admin/translations/languages").status_code == 403
-        assert client.get("/api/admin/translations/texts/de").status_code == 403
-        assert client.get("/api/admin/translations/builtin").status_code == 403
-        assert (
-            client.put("/api/admin/translations/texts/de", json={"changes": {}}).status_code == 403
-        )
-        assert (
-            client.post(
-                "/api/admin/translations/languages", json={"code": "fr", "name": "F"}
-            ).status_code
-            == 403
-        )
-        assert client.get("/api/i18n").status_code == 200
-    with _client(migrated, settings, monkeypatch, None) as client:
-        assert client.get("/api/admin/translations/languages").status_code == 401
-        assert client.get("/api/i18n").json()["locale"] == "de"
+    """Every admin route is 401 without a session and 403 without admin.translations."""
+    for principal, expected in ((None, 401), (_OTHER, 403)):
+        with _client(migrated, settings, monkeypatch, principal) as client:
+            for method, path, body in _ADMIN_CALLS:
+                response = client.request(method, path, json=body)
+                assert response.status_code == expected, (method, path)
+            assert client.get("/api/i18n").status_code == 200
+            assert client.get("/api/i18n").json()["locale"] == "de"
 
 
 async def test_builtin_texts_with_the_own_text(
