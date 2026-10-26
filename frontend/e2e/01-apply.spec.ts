@@ -50,5 +50,5 @@ test('@gating öffentlicher Apply-Wizard: alle Schritte bis Review-Zusammenfassu
   await expect(review.getByText(email)).toBeVisible();
   await expect(review.getByText('E2E Testantrag')).toBeVisible();
   await expect(review.getByText('Angebot.pdf')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Antrag absenden' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Antrag anlegen' })).toBeVisible();
 });
