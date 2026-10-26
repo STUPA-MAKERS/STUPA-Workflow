@@ -137,6 +137,7 @@ from app.modules.todos.models import (
     TodoEvent,
     TodoLink,
 )
+from app.modules.translations.models import UiLanguage, UiTranslation
 from app.modules.voting.models import Ballot, Vote, VotedMarker
 from app.shared.errors import ConflictError, FieldError, NotFoundError, ValidationProblem
 
@@ -201,6 +202,8 @@ SUB_COLUMNS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
     ("config", GuestApplicationSettings.updated_by),
     ("config", MeetingSettings.updated_by),
     ("config", LoginSettings.updated_by),
+    ("config", UiLanguage.updated_by),
+    ("config", UiTranslation.updated_by),
     ("roles", RoleAssignment.granted_by),
     ("roles", RoleAssignment.delegated_by),
     ("privacy", ErasureRequest.requested_by),

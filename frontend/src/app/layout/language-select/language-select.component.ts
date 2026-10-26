@@ -4,7 +4,7 @@ import type { TranslationKey } from '@core/i18n/translations';
 import { LocaleSwitchService } from '../locale-switch.service';
 import { FilterSelectComponent, type FilterSelectOption } from '@stupa-makers/ui-kit';
 
-/** The native name of each language, the same in every locale. */
+/** The native name of each built-in language, the same in every locale. */
 const LANGUAGE_NAME: Record<string, TranslationKey> = {
   de: 'shell.lang.de',
   en: 'shell.lang.en',
@@ -17,7 +17,8 @@ const LANGUAGE_NAME: Record<string, TranslationKey> = {
  * - `display="code"`: the chip shows "DE" with a globe (public top bar, guest page).
  * - `display="name"`: the chip shows "Deutsch" (account menu, beside its own label).
  *
- * The list always shows the native names. A choice goes through `LocaleSwitchService`,
+ * The list always shows the native names: DE, EN, then the active extra languages with the
+ * name from the admin page. A choice goes through `LocaleSwitchService`,
  * which reloads the view.
  */
 @Component({
@@ -29,7 +30,7 @@ const LANGUAGE_NAME: Record<string, TranslationKey> = {
     <app-filter-select
       [label]="label()"
       [options]="options()"
-      [value]="i18n.locale()"
+      [value]="i18n.uiLocale()"
       [text]="chipText()"
       [icon]="display() === 'code' ? 'globe' : null"
       [size]="size()"
@@ -48,11 +49,11 @@ export class LanguageSelectComponent {
   readonly size = input<'sm' | 'md'>('sm');
 
   protected readonly options = computed<FilterSelectOption[]>(() =>
-    this.i18n.locales.map((loc) => ({ value: loc, label: this.nameOf(loc) })),
+    this.i18n.locales().map((loc) => ({ value: loc, label: this.nameOf(loc) })),
   );
 
   protected readonly chipText = computed(() => {
-    const loc = this.i18n.locale();
+    const loc = this.i18n.uiLocale();
     return this.display() === 'code' ? loc.toUpperCase() : this.nameOf(loc);
   });
 
@@ -62,6 +63,7 @@ export class LanguageSelectComponent {
 
   private nameOf(loc: string): string {
     const key = LANGUAGE_NAME[loc];
-    return key ? this.i18n.translate(key) : loc.toUpperCase();
+    if (key) return this.i18n.translate(key);
+    return this.i18n.extraLanguages().find((l) => l.code === loc)?.name ?? loc.toUpperCase();
   }
 }

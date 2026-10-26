@@ -135,6 +135,8 @@ _DATA_TABLES = (
     "ticket",
     "ticket_sender_block",
     "todo_board",
+    "ui_language",
+    "ui_translation",
 )
 
 

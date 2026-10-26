@@ -76,6 +76,8 @@ from app.modules.search.router import router as search_router
 from app.modules.tickets.router import router as tickets_router
 from app.modules.todos.router import router as todos_router
 from app.modules.todos.socket import ws_router as todos_ws_router
+from app.modules.translations.router import public_router as i18n_public_router
+from app.modules.translations.router import router as translations_router
 from app.modules.voting.router import router as voting_router
 from app.settings import Settings, get_settings
 from app.shared.errors import register_exception_handlers, use_problem_json_contract
@@ -126,6 +128,8 @@ api_router.include_router(todos_ws_router)
 api_router.include_router(gremien_authed_router)
 api_router.include_router(gremien_tab_router)
 api_router.include_router(site_config_public_router)
+api_router.include_router(translations_router)
+api_router.include_router(i18n_public_router)
 
 
 async def _bootstrap_admins_on_startup(settings: Settings) -> None:  # pragma: no cover
