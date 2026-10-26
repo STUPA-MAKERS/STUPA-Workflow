@@ -32,6 +32,8 @@ import { ROLE_KEY_PATTERN, type Role } from '../admin.models';
 import { permissionSections } from './permission-sections';
 import { I18nInputComponent } from '@shared/ui/i18n-input/i18n-input.component';
 import { expandSet } from '@shared/expand-set';
+import { ContentLangSwitchComponent } from '@shared/ui/content-lang-switch/content-lang-switch.component';
+import { ContentLangState } from '@shared/ui/content-lang-switch/content-lang.state';
 
 /** Draft for a new global role. */
 interface RoleDraft {
@@ -61,7 +63,9 @@ const FIXED_ROLES = new Set(['admin', 'member']);
   selector: 'app-admin-roles',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  providers: [ContentLangState],
   imports: [
+    ContentLangSwitchComponent,
     ExpandRowComponent,
     I18nInputComponent,
     FabComponent,
@@ -85,6 +89,7 @@ const FIXED_ROLES = new Set(['admin', 'member']);
   styleUrl: './roles.component.scss',
 })
 export class AdminRolesComponent {
+  protected readonly contentLang = inject(ContentLangState);
   private readonly api = inject(AdminApiService);
   private readonly toast = inject(ToastService);
   private readonly i18n = inject(I18nService);

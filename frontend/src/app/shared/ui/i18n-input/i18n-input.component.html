@@ -1,10 +1,8 @@
-@for (f of fields(); track f.code) {
-  <app-input
-    [label]="f.label"
-    [ariaLabel]="f.ariaLabel"
-    [placeholder]="f.code === 'de' ? placeholder() : ''"
-    [ngModel]="value()[f.code] ?? ''"
-    [ngModelOptions]="{ standalone: true }"
-    (ngModelChange)="set(f.code, $event)"
-  />
-}
+<app-input
+  [label]="fieldLabel().label"
+  [ariaLabel]="fieldLabel().ariaLabel"
+  [placeholder]="fallback()"
+  [ngModel]="value()[lang()] ?? ''"
+  [ngModelOptions]="{ standalone: true }"
+  (ngModelChange)="set($event)"
+/>

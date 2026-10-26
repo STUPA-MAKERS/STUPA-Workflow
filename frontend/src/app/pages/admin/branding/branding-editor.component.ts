@@ -98,7 +98,7 @@ export type BrandingSection = 'branding' | 'texts';
 export class BrandingEditorComponent {
   private readonly api = inject(AdminApiService);
   private readonly toast = inject(ToastService);
-  protected readonly i18n = inject(I18nService);
+  private readonly i18n = inject(I18nService);
   private readonly brand = inject(BrandingService);
   private readonly theme = inject(ThemeService);
 

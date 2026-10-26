@@ -1793,6 +1793,7 @@
   "admin.common.key": "Key",
   "admin.common.roleKeyInvalid": "The key must start with a lowercase letter. Use only lowercase letters, digits and _.",
   "admin.common.label": "Label",
+  "admin.common.contentLang": "Content language",
   "admin.common.type": "Type",
   "admin.common.required": "Required",
   "admin.common.saved": "Saved.",

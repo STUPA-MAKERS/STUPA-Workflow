@@ -11,6 +11,7 @@
       </app-status-text>
     }
     <div actions class="fe__headTools">
+      <app-content-lang-switch [(value)]="contentLang.lang" [ariaLabel]="'admin.common.contentLang' | t" />
       @if (phone()) {
         <app-row-menu [sections]="headerMenu()" (selected)="onHeaderMenu($event)" />
       } @else {
@@ -236,8 +237,6 @@
                     [value]="field.label"
                     (valueChange)="field.label = $event; touch()"
                   />
-                </div>
-                <div class="fe__pair">
                   <app-i18n-input
                     [label]="'admin.forms.help' | t"
                     [value]="field.help ?? {}"
@@ -249,7 +248,7 @@
                   <fieldset class="fe__sub">
                     <legend class="cap fe__cap">{{ 'admin.form.options' | t }}</legend>
                     @for (opt of field.options ?? []; track $index; let oi = $index) {
-                      <div class="fe__opt" [style.--langs]="i18n.locales().length">
+                      <div class="fe__opt">
                         <app-input class="fe__mono" [label]="'admin.form.optionValue' | t" [(ngModel)]="opt.value" (ngModelChange)="touch()" />
                         <app-i18n-input [short]="true" [value]="opt.label" (valueChange)="opt.label = $event; touch()" />
                         <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" [title]="'admin.common.remove' | t" (click)="removeOption(pos, oi)"><app-icon name="trash" /></app-button>
@@ -367,18 +366,17 @@
             [value]="title()"
             (valueChange)="title.set($event)"
           />
-          @for (code of i18n.locales(); track code) {
-            <div class="fe__area">
-              <label class="fe__areaLabel" [for]="'fe-desc-' + code">{{ langFieldLabel('admin.forms.desc' | t, code) }}</label>
-              <textarea
-                [id]="'fe-desc-' + code"
-                rows="3"
-                [ngModel]="description()[code] ?? ''"
-                (ngModelChange)="setDescription(code, $event)"
-                [attr.placeholder]="code === 'de' ? ('admin.forms.descPlaceholder' | t) : null"
-              ></textarea>
-            </div>
-          }
+          @let code = contentLang.lang();
+          <div class="fe__area">
+            <label class="fe__areaLabel" for="fe-desc">{{ langFieldLabel('admin.forms.desc' | t, code) }}</label>
+            <textarea
+              id="fe-desc"
+              rows="3"
+              [ngModel]="description()[code] ?? ''"
+              (ngModelChange)="setDescription(code, $event)"
+              [attr.placeholder]="descFallback() || ('admin.forms.descPlaceholder' | t)"
+            ></textarea>
+          </div>
           <app-checkbox
             [ngModel]="hasBudget()"
             (ngModelChange)="hasBudget.set($event)"

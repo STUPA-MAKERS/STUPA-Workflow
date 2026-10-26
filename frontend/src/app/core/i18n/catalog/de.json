@@ -1793,6 +1793,7 @@
   "admin.common.key": "Schlüssel",
   "admin.common.roleKeyInvalid": "Der Schlüssel muss mit einem Kleinbuchstaben beginnen. Erlaubt sind nur Kleinbuchstaben, Ziffern und _.",
   "admin.common.label": "Bezeichnung",
+  "admin.common.contentLang": "Sprache der Inhalte",
   "admin.common.type": "Typ",
   "admin.common.required": "Pflichtfeld",
   "admin.common.saved": "Gespeichert.",

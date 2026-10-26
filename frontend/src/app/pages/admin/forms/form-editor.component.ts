@@ -12,7 +12,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { switchMap } from 'rxjs';
-import { I18nService } from '@core/i18n/i18n.service';
+import { I18nService, fallbackChain } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { FieldType, FormFieldDef, I18nMap, Uuid } from '@core/api/models';
@@ -56,6 +56,8 @@ import {
 } from '../form-field.util';
 import { FabComponent } from '@shared/ui/fab/fab.component';
 import { I18nInputComponent } from '@shared/ui/i18n-input/i18n-input.component';
+import { ContentLangSwitchComponent } from '@shared/ui/content-lang-switch/content-lang-switch.component';
+import { ContentLangState } from '@shared/ui/content-lang-switch/content-lang.state';
 
 /**
  * Visible order of the question types in the "add question" menu. `section` is **not** a
@@ -102,7 +104,9 @@ type QPos = QuestionPos;
   selector: 'app-form-editor',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  providers: [ContentLangState],
   imports: [
+    ContentLangSwitchComponent,
     MoveButtonsComponent,
     I18nInputComponent,
     EmptyStateComponent,
@@ -126,10 +130,11 @@ type QPos = QuestionPos;
   styleUrl: './form-editor.component.scss',
 })
 export class FormEditorComponent {
+  protected readonly contentLang = inject(ContentLangState);
   private readonly api = inject(AdminApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly toast = inject(ToastService);
-  protected readonly i18n = inject(I18nService);
+  private readonly i18n = inject(I18nService);
   protected readonly langFieldLabel = langFieldLabel;
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
@@ -379,6 +384,12 @@ export class FormEditorComponent {
     const help = this.resolved(field.help).trim();
     return help && help !== this.resolved(field.label).trim() ? help : '';
   }
+
+  /** The description that a reader of the content language gets while its field is empty. */
+  protected readonly descFallback = computed(() => {
+    const map = this.description();
+    return fallbackChain(this.contentLang.lang()).slice(1).map((code) => map[code]).find(Boolean) ?? '';
+  });
 
   protected setDescription(lang: string, value: string): void {
     this.description.update((d) => setI18n(d, lang, value));

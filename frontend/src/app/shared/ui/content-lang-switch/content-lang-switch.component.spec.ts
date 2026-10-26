@@ -1,39 +1,46 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { I18nService } from '@core/i18n/i18n.service';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
+import { I18nService } from '@core/i18n/i18n.service';
 import { runAxe } from '../../../../testing/a11y';
 import { type ContentLang, ContentLangSwitchComponent } from './content-lang-switch.component';
+import { ContentLangState } from './content-lang.state';
+
+/** Give the service active extra languages, as the bundle of the server does. */
+function withExtras(): void {
+  const i18n = TestBed.inject(I18nService) as unknown as { _languages: { set(v: unknown): void } };
+  i18n._languages.set([
+    { code: 'fr', name: 'Français' },
+    { code: 'pt-BR', name: 'Português' },
+  ]);
+}
 
 describe('ContentLangSwitchComponent', () => {
-  it('shows DE and EN and binds the language both ways', async () => {
+  beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+  afterEach(() => localStorage.removeItem('ap.locale'));
+
+  it('is a dropdown with the native names and binds the language both ways', async () => {
     const lang = signal<ContentLang>('de');
-    const { container } = await render(
+    const { container, fixture } = await render(
       `<app-content-lang-switch [(value)]="lang" ariaLabel="Sprache der Texte" />`,
       { imports: [ContentLangSwitchComponent], componentProperties: { lang } },
     );
-    expect(screen.getByRole('radiogroup', { name: 'Sprache der Texte' })).toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: 'DE' })).toBeChecked();
-    await userEvent.click(screen.getByRole('radio', { name: 'EN' }));
-    expect(lang()).toBe('en');
-    await userEvent.click(screen.getByRole('radio', { name: 'DE' }));
-    expect(lang()).toBe('de');
-    expect(await runAxe(container)).toHaveNoViolations();
-  });
-
-  it('lists the active extra languages after DE and EN', async () => {
-    const lang = signal<ContentLang>('de');
-    const { fixture } = await render(`<app-content-lang-switch [(value)]="lang" ariaLabel="Sprache" />`, {
-      imports: [ContentLangSwitchComponent],
-      componentProperties: { lang },
-    });
-    const i18n = TestBed.inject(I18nService) as unknown as { _languages: { set(v: unknown): void } };
-    i18n._languages.set([{ code: 'pt-BR', name: 'Português' }]);
+    withExtras();
     fixture.detectChanges();
-    expect(screen.getAllByRole('radio').map((r) => r.textContent?.trim())).toEqual(['DE', 'EN', 'PT-BR']);
-    await userEvent.click(screen.getByRole('radio', { name: 'PT-BR' }));
+    expect(document.querySelector('select')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Sprache der Texte: Deutsch' }));
+    expect(screen.getAllByRole('option').map((o) => o.textContent?.trim())).toEqual([
+      'Deutsch',
+      'English',
+      'Français',
+      'Português',
+    ]);
+    await userEvent.click(screen.getByRole('option', { name: 'Português' }));
     expect(lang()).toBe('pt-BR');
+    fixture.detectChanges();
+    expect(screen.getByRole('button', { name: 'Sprache der Texte: Português' })).toBeInTheDocument();
+    expect(await runAxe(container)).toHaveNoViolations();
   });
 
   it('falls back to German for an empty value', async () => {
@@ -43,5 +50,10 @@ describe('ContentLangSwitchComponent', () => {
     const c = fixture.componentInstance as unknown as { pick(v: string | null): void; value(): ContentLang };
     c.pick(null);
     expect(c.value()).toBe('de');
+  });
+
+  it('the state of an editor starts with the language of the page', () => {
+    TestBed.configureTestingModule({ providers: [ContentLangState] });
+    expect(TestBed.inject(ContentLangState).lang()).toBe('de');
   });
 });

@@ -12,7 +12,8 @@
 
 .rd__names {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: center;
   gap: var(--space-3);
 }
 .rd__key ::ng-deep input {
@@ -93,6 +94,9 @@
 @container (max-width: 34rem) {
   .rd__names {
     grid-template-columns: 1fr;
+  }
+  .rd__names > app-content-lang-switch {
+    justify-self: start;
   }
   .rd__permKey {
     display: none;

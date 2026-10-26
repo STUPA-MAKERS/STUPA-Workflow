@@ -19,9 +19,7 @@
     (ngModelChange)="toChange.emit($event)"
   />
 </div>
-<div class="ins__pair">
-  <app-i18n-input [value]="transition().label ?? {}" (valueChange)="labelChange.emit($event)" />
-</div>
+<app-i18n-input [value]="transition().label ?? {}" (valueChange)="labelChange.emit($event)" />
 
 <app-flow-color [value]="transition().color" (changed)="colorChange.emit($event)" />
 

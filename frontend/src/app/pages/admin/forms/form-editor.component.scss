@@ -321,7 +321,6 @@
   padding-inline: var(--space-2);
 }
 
-// One column per content language.
 .fe__pair {
   display: grid;
   grid-auto-columns: minmax(0, 1fr);
@@ -356,10 +355,9 @@
   margin-bottom: 0;
 }
 
-// `--langs`: the number of content languages, one field each after the value.
 .fe__opt {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) repeat(var(--langs, 2), minmax(0, 1fr)) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-2);
 }
@@ -594,7 +592,7 @@
     grid-auto-flow: row;
   }
   .fe__opt {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     padding-bottom: var(--space-2);
   }
   .fe__opt > :first-child {

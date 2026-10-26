@@ -87,6 +87,8 @@ import { StateInspectorComponent, type GuardPriorityRow } from './state-inspecto
 import { TransitionDetailComponent } from './transition-detail.component';
 import { TransitionInspectorComponent } from './transition-inspector.component';
 import { TransitionListsComponent } from './transition-lists.component';
+import { ContentLangSwitchComponent } from '@shared/ui/content-lang-switch/content-lang-switch.component';
+import { ContentLangState } from '@shared/ui/content-lang-switch/content-lang.state';
 
 /** How far one press of a scroll tongue pans the canvas, in screen px. */
 const PAN_STEP = 240;
@@ -126,8 +128,9 @@ const MIN_FIT_SCALE = 0.75;
   selector: 'app-flow-editor',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  providers: [FlowEditorOptionsService],
+  providers: [ContentLangState, FlowEditorOptionsService],
   imports: [
+    ContentLangSwitchComponent,
     SkeletonComponent,
     EmptyStateComponent,
     FabComponent,
@@ -150,6 +153,7 @@ const MIN_FIT_SCALE = 0.75;
   styleUrl: './flow-editor.component.scss',
 })
 export class FlowEditorComponent {
+  protected readonly contentLang = inject(ContentLangState);
   private readonly api = inject(AdminApiService);
   private readonly toast = inject(ToastService);
   private readonly i18n = inject(I18nService);

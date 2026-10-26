@@ -1,33 +1,28 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, model } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import type { I18nMap } from '@core/api/models';
-import { I18nService } from '@core/i18n/i18n.service';
+import { I18nService, fallbackChain } from '@core/i18n/i18n.service';
 import { langFieldLabel, setI18n } from '@shared/forms/i18n-text';
+import { ContentLangState } from '@shared/ui/content-lang-switch/content-lang.state';
 import { InputComponent } from '@stupa-makers/ui-kit';
 
-/** One field of the component: the language, its label and its accessible name. */
-interface LangField {
-  code: string;
-  label: string;
-  ariaLabel: string;
-}
-
 /**
- * A text in every content language: one field each for DE, EN and the active extra languages.
+ * The text of a `{lang: text}` map in the content language of the editor: one field.
  *
- * The host has `display: contents`, so the fields are items of the grid or the flex row of
- * the page (beside a key field, or as columns). The fields use `ngModel` with `standalone`,
- * so they do not join a form of the page and need no `name`.
+ * The editor provides {@link ContentLangState} and puts `app-content-lang-switch` beside its
+ * fields; the field shows the language picked there. Without a state the field is German.
+ * An empty field shows the text that a reader of its language gets instead (the fallback
+ * chain: an extra language → EN → DE) as its placeholder; the German field shows
+ * `placeholder`.
  *
  * ```html
- * <div class="x__pair">
- *   <app-i18n-input [value]="draft().label" (valueChange)="patch('label', $event)" />
- * </div>
+ * <app-i18n-input [value]="draft().label" (valueChange)="patch('label', $event)" />
  * ```
  *
- * Each field is labelled "<label> (<CODE>)", the label "Bezeichnung" by default. `short`
- * labels each field with its code alone (in a narrow row) and keeps the long label as the
- * accessible name. `placeholder` is the placeholder of the German field.
+ * The field is labelled "<label> (<CODE>)", the label "Bezeichnung" by default. `short`
+ * labels it with the code alone (in a narrow row) and keeps the long label as the accessible
+ * name. The host has `display: contents`, so the field is an item of the grid or the flex row
+ * of the page. It uses `ngModel` with `standalone`, so it does not join a form of the page.
  */
 @Component({
   selector: 'app-i18n-input',
@@ -39,25 +34,35 @@ interface LangField {
 })
 export class I18nInputComponent {
   private readonly i18n = inject(I18nService);
+  private readonly state = inject(ContentLangState, { optional: true });
 
   /** The text per language. */
   readonly value = model<I18nMap>({});
-  /** The label of the fields without the language. `null`: "Bezeichnung". */
+  /** The label of the field without the language. `null`: "Bezeichnung". */
   readonly label = input<string | null>(null);
-  /** Label each field with its language code alone. */
+  /** Label the field with its language code alone. */
   readonly short = input(false);
   /** The placeholder of the German field. */
   readonly placeholder = input('');
 
-  protected readonly fields = computed<LangField[]>(() => {
-    const label = this.label() ?? this.i18n.translate('admin.common.label');
-    return this.i18n.locales().map((code) => {
-      const long = langFieldLabel(label, code);
-      return { code, label: this.short() ? code.toUpperCase() : long, ariaLabel: this.short() ? long : '' };
-    });
+  /** The language of the field. */
+  protected readonly lang = computed(() => this.state?.lang() ?? 'de');
+
+  protected readonly fieldLabel = computed(() => {
+    const long = langFieldLabel(this.label() ?? this.i18n.translate('admin.common.label'), this.lang());
+    return this.short() ? { label: this.lang().toUpperCase(), ariaLabel: long } : { label: long, ariaLabel: '' };
   });
 
-  protected set(code: string, text: string): void {
-    this.value.set(setI18n(this.value(), code, text));
+  /** The text a reader of the language gets while the field is empty. */
+  protected readonly fallback = computed(() => {
+    const map = this.value();
+    for (const code of fallbackChain(this.lang()).slice(1)) {
+      if (map[code]) return map[code];
+    }
+    return this.lang() === 'de' ? this.placeholder() : '';
+  });
+
+  protected set(text: string): void {
+    this.value.set(setI18n(this.value(), this.lang(), text));
   }
 }

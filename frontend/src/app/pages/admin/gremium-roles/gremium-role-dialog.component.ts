@@ -26,6 +26,8 @@ import {
 import { AdminApiService } from '../admin-api.service';
 import { GREMIUM_PERMISSIONS, ROLE_KEY_PATTERN, type GremiumRole } from '../admin.models';
 import { I18nInputComponent } from '@shared/ui/i18n-input/i18n-input.component';
+import { ContentLangSwitchComponent } from '@shared/ui/content-lang-switch/content-lang-switch.component';
+import { ContentLangState } from '@shared/ui/content-lang-switch/content-lang.state';
 
 /** The form state of the dialog. */
 interface RoleDraft {
@@ -50,7 +52,9 @@ const NEW_ROLE_PERMISSIONS = ['vote.cast'];
   selector: 'app-gremium-role-dialog',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  providers: [ContentLangState],
   imports: [
+    ContentLangSwitchComponent,
     I18nInputComponent,
     FormsModule,
     RouterLink,
@@ -65,6 +69,7 @@ const NEW_ROLE_PERMISSIONS = ['vote.cast'];
   styleUrl: './gremium-role-dialog.component.scss',
 })
 export class GremiumRoleDialogComponent {
+  protected readonly contentLang = inject(ContentLangState);
   private readonly api = inject(AdminApiService);
   private readonly i18n = inject(I18nService);
 
