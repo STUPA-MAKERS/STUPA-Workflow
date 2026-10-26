@@ -55,11 +55,7 @@ def pdf(tmp_path: Path) -> Path:
 
 
 def test_upload_sends_file_part_and_form(fake_api: _FakeApi, pdf: Path) -> None:
-    out = asyncio.run(
-        meetings.upload_attachment(
-            APP_ID, str(pdf), field_key="offer"
-        )
-    )
+    out = asyncio.run(meetings.upload_attachment(APP_ID, str(pdf), field_key="offer"))
     assert out == {"id": ATT_ID, "scanned": False}
     assert fake_api.calls == [
         (
@@ -77,9 +73,7 @@ def test_upload_leaves_out_field_key(fake_api: _FakeApi, pdf: Path) -> None:
     assert fake_api.calls[0][1]["data"] == {}
 
 
-def test_upload_filename_override_drops_directories(
-    fake_api: _FakeApi, tmp_path: Path
-) -> None:
+def test_upload_filename_override_drops_directories(fake_api: _FakeApi, tmp_path: Path) -> None:
     p = tmp_path / "tmp-123"
     p.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\0" * 16)
     asyncio.run(meetings.upload_attachment(APP_ID, str(p), filename="../x/Beleg.PNG"))
@@ -200,11 +194,7 @@ def test_upload_wire_format(monkeypatch: pytest.MonkeyPatch, pdf: Path) -> None:
     }
     wire = _Wire(lambda req, n: httpx.Response(201, json=body))
     _client(monkeypatch, wire)
-    out = asyncio.run(
-        meetings.upload_attachment(
-            APP_ID, str(pdf), field_key="offer"
-        )
-    )
+    out = asyncio.run(meetings.upload_attachment(APP_ID, str(pdf), field_key="offer"))
     assert out == body
     (req,) = wire.requests
     assert req.method == "POST"
@@ -269,9 +259,7 @@ def test_download_into_a_directory_uses_the_stored_name(
     assert (tmp_path / "Beleg.pdf").read_bytes() == PDF
 
 
-def test_download_keeps_an_existing_file(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_download_keeps_an_existing_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     wire = _Wire(_download(PDF))
     _client(monkeypatch, wire)
     target = tmp_path / "out.pdf"
@@ -318,9 +306,7 @@ def test_download_while_scanning_raises_and_writes_nothing(
     assert list(tmp_path.iterdir()) == []
 
 
-def test_download_retries_once_after_401(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_download_retries_once_after_401(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     ok = _download(PDF)
     wire = _Wire(lambda req, n: httpx.Response(401) if n == 1 else ok(req, n))
     _client(monkeypatch, wire)
@@ -332,9 +318,7 @@ def test_download_retries_once_after_401(
     assert (tmp_path / "x.pdf").read_bytes() == PDF
 
 
-def test_download_rejects_a_path_in_the_id(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_download_rejects_a_path_in_the_id(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     wire = _Wire(_download(PDF))
     _client(monkeypatch, wire)
     with pytest.raises(ApiError, match="traversal"):
@@ -346,7 +330,7 @@ def test_download_rejects_a_path_in_the_id(
     ("header", "expected"),
     [
         (
-            "attachment; filename=\"Einfuhrung _.pdf\"; "
+            'attachment; filename="Einfuhrung _.pdf"; '
             "filename*=UTF-8''Einf%C3%BChrung%20%E2%82%AC.pdf",
             "Einführung €.pdf",
         ),
@@ -379,7 +363,7 @@ def test_download_rejects_a_path_in_the_id(
         # RFC 5987 names only UTF-8 and ISO-8859-1.
         ("attachment; filename=\"d.pdf\"; filename*=utf-16''%FF%FEa%00", "d.pdf"),
         ("attachment; filename=\"e.pdf\"; filename*=rot13''r.cqs", "e.pdf"),
-        ("attachment; filename=\"f.pdf\"; filename*=noquotes.pdf", "f.pdf"),
+        ('attachment; filename="f.pdf"; filename*=noquotes.pdf', "f.pdf"),
     ],
 )
 def test_disposition_filename(header: str, expected: str) -> None:
@@ -401,7 +385,7 @@ def test_download_into_a_directory_uses_the_utf8_name(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     header = (
-        "attachment; filename=\"Einfuhrung _.pdf\"; "
+        'attachment; filename="Einfuhrung _.pdf"; '
         "filename*=UTF-8''Einf%C3%BChrung%20%E2%82%AC.pdf"
     )
     _client(monkeypatch, _Wire(_download_ext(PDF, header)))

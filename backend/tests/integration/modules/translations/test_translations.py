@@ -3,6 +3,8 @@
 * `admin.translations` gates every admin route; the public bundle needs no login.
 * A save sets and clears overrides, refuses unknown keys and lost placeholders as a
   whole, and writes a `config_change` audit entry with the keys only.
+* The built-in texts come by key with the override of a locale, and `untranslated`
+  keeps the keys without one.
 * An extra language starts inactive and shows in the bundle only while active. Its
   fallback chain is the language, then EN, then DE. A delete removes its overrides.
 """
@@ -245,6 +247,7 @@ def test_routes_need_the_permission(
     with _client(migrated, settings, monkeypatch, _OTHER) as client:
         assert client.get("/api/admin/translations/languages").status_code == 403
         assert client.get("/api/admin/translations/texts/de").status_code == 403
+        assert client.get("/api/admin/translations/builtin").status_code == 403
         assert (
             client.put("/api/admin/translations/texts/de", json={"changes": {}}).status_code == 403
         )
@@ -258,3 +261,59 @@ def test_routes_need_the_permission(
     with _client(migrated, settings, monkeypatch, None) as client:
         assert client.get("/api/admin/translations/languages").status_code == 401
         assert client.get("/api/i18n").json()["locale"] == "de"
+
+
+async def test_builtin_texts_with_the_own_text(
+    migrated: tuple[str, str],
+    settings: Settings,
+    maker: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with _client(migrated, settings, monkeypatch, _ADMIN) as client:
+        everything = client.get("/api/admin/translations/builtin").json()
+        assert everything["locale"] is None
+        assert len(everything["texts"]) > 1000
+        assert all(row["own"] is None for row in everything["texts"])
+        keys = [row["key"] for row in everything["texts"]]
+        assert keys == sorted(keys)
+
+        prefix = "meetings.overview."
+        rows = client.get("/api/admin/translations/builtin", params={"prefix": prefix}).json()
+        assert rows["texts"]
+        assert all(row["key"].startswith(prefix) for row in rows["texts"])
+        open_row = next(row for row in rows["texts"] if row["key"] == "meetings.overview.open")
+        assert open_row == {
+            "key": "meetings.overview.open",
+            "de": "Details",
+            "en": "Details",
+            "own": None,
+        }
+
+        client.post("/api/admin/translations/languages", json={"code": "fr", "name": "Français"})
+        client.put(
+            "/api/admin/translations/texts/fr", json={"changes": {"meetings.overview.open": "Voir"}}
+        )
+        mine = client.get(
+            "/api/admin/translations/builtin", params={"prefix": prefix, "locale": "fr"}
+        ).json()
+        assert mine["locale"] == "fr"
+        assert (
+            next(r for r in mine["texts"] if r["key"] == "meetings.overview.open")["own"] == "Voir"
+        )
+        open_work = client.get(
+            "/api/admin/translations/builtin",
+            params={"prefix": prefix, "locale": "fr", "untranslated": "true"},
+        ).json()
+        assert "meetings.overview.open" not in {row["key"] for row in open_work["texts"]}
+        assert len(open_work["texts"]) == len(mine["texts"]) - 1
+
+        assert (
+            client.get("/api/admin/translations/builtin", params={"untranslated": "true"}).json()[
+                "code"
+            ]
+            == "locale_required"
+        )
+        assert (
+            client.get("/api/admin/translations/builtin", params={"locale": "xx"}).status_code
+            == 404
+        )

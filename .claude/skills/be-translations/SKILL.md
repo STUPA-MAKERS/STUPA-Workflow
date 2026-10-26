@@ -9,9 +9,9 @@ description: Admin overrides of the UI texts and extra UI languages — ui_trans
 
 **Key files:**
 - `models.py` — `UiTranslation` (`locale`, `key`, `value`; PK locale+key; `value` NULL and a missing row both mean the built-in text) and `UiLanguage` (`code` BCP 47, `name`, `active`; DE and EN have no row, a CHECK refuses them).
-- `catalog.py` + `catalog.json` — the copy of the DE key catalog with the placeholders of each key. `frontend/src/app/core/i18n/translations.catalog.spec.ts` fails when it is stale; regenerate with `UPDATE_I18N_CATALOG=1 npx jest src/app/core/i18n/translations.catalog.spec.ts`. Every change to the DE catalog needs this.
+- `catalog.py` + `catalog.json` — the copy of the DE and EN catalog (`{key: {de, en?}}`); `builtin_texts()` serves the texts, `catalog()` derives the placeholders from DE. `frontend/src/app/core/i18n/translations.catalog.spec.ts` fails when it is stale; regenerate with `UPDATE_I18N_CATALOG=1 npx jest src/app/core/i18n/translations.catalog.spec.ts`. Every change to the DE or EN catalog needs this.
 - `service.py` — `TranslationService`: languages CRUD, `save` (one transaction, all keys checked first), `bundle`. `fallback_chain`: DE → [de]; EN → [en, de]; extra → [code, en, de].
-- `router.py` — public `GET /i18n?locale=` (no login, `Cache-Control: no-cache`; unknown or inactive locale resolves to `de`), admin `GET|POST /admin/translations/languages`, `PATCH|DELETE .../languages/{code}`, `GET|PUT /admin/translations/texts/{locale}` (body `{changes: {key: text|null}}`).
+- `router.py` — public `GET /i18n?locale=` (no login, `Cache-Control: no-cache`; unknown or inactive locale resolves to `de`), admin `GET|POST /admin/translations/languages`, `PATCH|DELETE .../languages/{code}`, `GET /admin/translations/builtin?prefix=&locale=&untranslated=` (built-in texts by key with the override of `locale`; `untranslated` without `locale` = 422 `locale_required`), `GET|PUT /admin/translations/texts/{locale}` (body `{changes: {key: text|null}}`).
 
 **Rules:**
 - A save refuses a key outside the catalog (422 `unknown_key`) and a text whose placeholders differ from the built-in text (422 `placeholder_mismatch`). A blank text counts as null and deletes the row.
@@ -23,4 +23,4 @@ description: Admin overrides of the UI texts and extra UI languages — ui_trans
 
 **Scope:** UI catalog only. Mail templates, form labels and branding texts keep their own editors and know DE and EN only; an extra language shows them in EN.
 
-**Related:** be-admin, be-audit, frontend, mcp (tools `*_ui_language`, `get_ui_texts`, `set_ui_texts`)
+**Related:** be-admin, be-audit, frontend, mcp (tools `*_ui_language`, `get_builtin_ui_texts`, `get_ui_texts`, `set_ui_texts`)

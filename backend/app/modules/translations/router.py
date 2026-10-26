@@ -10,6 +10,9 @@ Admin (``admin.translations``):
 
 - ``GET|POST /admin/translations/languages``, ``PATCH|DELETE .../languages/{code}`` —
   the extra languages. A delete removes the overrides of the language too.
+- ``GET /admin/translations/builtin?prefix=&locale=&untranslated=`` — the built-in DE
+  and EN texts by key, each with the override of ``locale``. ``untranslated`` keeps
+  the keys without an override in ``locale``.
 - ``GET|PUT /admin/translations/texts/{locale}`` — the overrides of one locale, inactive
   extra languages included. The PUT applies a set of changes (text, or null for the
   built-in text).
@@ -24,6 +27,8 @@ from fastapi import APIRouter, Depends, Path, Query, Response, status
 from app.deps import DbSession, Principal, require_principal
 from app.modules.translations.schemas import (
     LANGUAGE_CODE_PATTERN,
+    BuiltinTextOut,
+    BuiltinTextsOut,
     I18nBundleOut,
     LanguageCreate,
     LanguageOut,
@@ -129,6 +134,30 @@ async def delete_language(
     """Delete an extra language and all its overrides."""
     await service.delete_language(code, actor=principal.sub)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get(
+    "/builtin",
+    response_model=BuiltinTextsOut,
+    dependencies=[Depends(require_principal("admin.translations"))],
+    responses=_errors(401, 403, 404, 422),
+)
+async def get_builtin_texts(
+    service: ServiceDep,
+    prefix: Annotated[str | None, Query(min_length=1, max_length=200)] = None,
+    locale: Annotated[str | None, Query(pattern=LANGUAGE_CODE_PATTERN, max_length=16)] = None,
+    untranslated: bool = False,
+) -> BuiltinTextsOut:
+    """Return the built-in texts, each with the override of ``locale``.
+
+    ``untranslated`` needs ``locale`` (422 ``locale_required``) and keeps the keys
+    without an override in it.
+    """
+    rows = await service.builtin(prefix=prefix, locale=locale, untranslated=untranslated)
+    return BuiltinTextsOut(
+        locale=locale,
+        texts=[BuiltinTextOut(key=key, de=text.de, en=text.en, own=own) for key, text, own in rows],
+    )
 
 
 @router.get(

@@ -73,9 +73,7 @@ def remove_state(graph: Graph, key: str) -> Graph:
     g = deepcopy(graph)
     _state_index(g, key)  # raises on unknown key
     g["states"] = [s for s in _states(g) if s.get("key") != key]
-    g["transitions"] = [
-        t for t in _transitions(g) if t.get("from") != key and t.get("to") != key
-    ]
+    g["transitions"] = [t for t in _transitions(g) if t.get("from") != key and t.get("to") != key]
     positions = _layout(g).get("positions") or {}
     positions.pop(key, None)
     groups = [
@@ -103,9 +101,7 @@ def add_transition(graph: Graph, transition: dict[str, Any]) -> Graph:
 def _transition_at(graph: Graph, index: int) -> dict[str, Any]:
     transitions = _transitions(graph)
     if not 0 <= index < len(transitions):
-        raise ValueError(
-            f"transition index {index} out of range (0..{len(transitions) - 1})"
-        )
+        raise ValueError(f"transition index {index} out of range (0..{len(transitions) - 1})")
     return transitions[index]
 
 
@@ -211,8 +207,7 @@ def delete_group(graph: Graph, group_id: str) -> Graph:
         if grp.get("id") != group_id
     ]
     remaining = [
-        {k: v for k, v in grp.items() if not (k == "groupIds" and not v)}
-        for grp in remaining
+        {k: v for k, v in grp.items() if not (k == "groupIds" and not v)} for grp in remaining
     ]
     if remaining:
         _layout(g)["groups"] = remaining

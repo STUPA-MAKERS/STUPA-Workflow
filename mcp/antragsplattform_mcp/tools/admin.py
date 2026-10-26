@@ -531,6 +531,26 @@ async def delete_ui_language(code: str) -> dict:
 
 
 @group.tool
+async def get_builtin_ui_texts(
+    prefix: str | None = None,
+    locale: str | None = None,
+    untranslated: bool = False,
+) -> dict:
+    """Get the built-in DE and EN UI texts by key. Requires admin.translations.
+
+    Translate from these texts. Each row is `{key, de, en, own}`: `en` is null where
+    EN shows the DE text, and `own` is the own text of `locale` (null without one).
+    `prefix` keeps the keys that start with it (for example `meetings.`), because the
+    whole catalog has about 4000 keys. `untranslated` needs `locale` and keeps the
+    keys without an own text in it, so it lists the open work of a language.
+    """
+    return await api().get(
+        "/admin/translations/builtin",
+        params=params(prefix=prefix, locale=locale, untranslated=untranslated or None),
+    )
+
+
+@group.tool
 async def get_ui_texts(locale: str) -> dict:
     """Get the own texts of one locale: key to text. Requires admin.translations.
 

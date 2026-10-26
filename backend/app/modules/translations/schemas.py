@@ -76,6 +76,26 @@ class TextsUpdate(_CamelModel):
     changes: dict[TextKey, TextValue | None] = Field(max_length=MAX_CHANGES)
 
 
+class BuiltinTextOut(_CamelModel):
+    """The built-in texts of one key and, for a requested locale, its own text.
+
+    `en` is null where EN shows the DE text. `own` is the override of the requested
+    locale, null without one or without a requested locale.
+    """
+
+    key: str
+    de: str
+    en: str | None
+    own: str | None = None
+
+
+class BuiltinTextsOut(_CamelModel):
+    """The built-in texts that match a request, sorted by key."""
+
+    locale: str | None
+    texts: list[BuiltinTextOut]
+
+
 class I18nBundleOut(_CamelModel):
     """What the app needs before its first paint.
 

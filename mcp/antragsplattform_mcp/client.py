@@ -71,9 +71,7 @@ class ApiClient:
             auth.ensure_access_token, self._config, force_login=force_login
         )
 
-    async def request(
-        self, method: str, path: str, **kwargs: Any
-    ) -> Any:
+    async def request(self, method: str, path: str, **kwargs: Any) -> Any:
         path = _safe_path(path)
         token = await self._token()
         headers = {"Authorization": f"Bearer {token}", **kwargs.pop("headers", {})}
@@ -86,9 +84,7 @@ class ApiClient:
         return self._unwrap(resp)
 
     @asynccontextmanager
-    async def stream(
-        self, method: str, path: str, **kwargs: Any
-    ) -> AsyncIterator[httpx.Response]:
+    async def stream(self, method: str, path: str, **kwargs: Any) -> AsyncIterator[httpx.Response]:
         """Open a streamed response, for a binary download that must not sit in memory.
 
         The path, the bearer token and the one 401 retry work as in `request`. A status

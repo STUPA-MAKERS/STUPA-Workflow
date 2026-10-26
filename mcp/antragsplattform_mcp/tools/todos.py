@@ -168,9 +168,7 @@ async def todo_card_transfer(
     """
     return await api().post(
         f"/todos/cards/{card_id}/transfer",
-        json=params(
-            boardId=board_id, columnId=column_id, beforeId=before_id, afterId=after_id
-        ),
+        json=params(boardId=board_id, columnId=column_id, beforeId=before_id, afterId=after_id),
     )
 
 

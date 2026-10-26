@@ -39,9 +39,7 @@ async def tickets_list(
     """
     return await api().get(
         "/tickets",
-        params=params(
-            status=status, kind=kind, assignee=assignee, q=q, limit=limit, offset=offset
-        ),
+        params=params(status=status, kind=kind, assignee=assignee, q=q, limit=limit, offset=offset),
     )
 
 

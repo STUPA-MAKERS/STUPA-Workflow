@@ -69,9 +69,7 @@ async def _save_flow(graph: dict[str, Any]) -> dict:
 
 
 @group.tool
-async def flow_add_state(
-    state: S.StateDef, x: int | None = None, y: int | None = None
-) -> dict:
+async def flow_add_state(state: S.StateDef, x: int | None = None, y: int | None = None) -> dict:
     """ATOMIC: add one state to the global flow and activate the result.
 
     You can also give an editor position. A vote state takes exactly one of
@@ -230,16 +228,12 @@ async def _save_form(
     body: dict[str, Any] = {"fields": fields, "activate": True}
     if description:
         body["description"] = description
-    result = await api().post(
-        f"/admin/application-types/{type_id}/form-versions", json=body
-    )
+    result = await api().post(f"/admin/application-types/{type_id}/form-versions", json=body)
     return {"saved": True, "fields": len(fields), "formVersion": result}
 
 
 @group.tool
-async def form_add_field(
-    type_id: str, field: S.FormFieldDef, index: int | None = None
-) -> dict:
+async def form_add_field(type_id: str, field: S.FormFieldDef, index: int | None = None) -> dict:
     """ATOMIC: add one field to the form of a type and activate the new version.
 
     The field goes to `index`. The default appends the field. Requires form.configure.

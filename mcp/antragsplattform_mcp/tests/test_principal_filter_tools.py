@@ -36,9 +36,7 @@ def fake_api(monkeypatch: pytest.MonkeyPatch) -> _FakeApi:
 
 def test_list_principals_sends_the_filters(fake_api: _FakeApi) -> None:
     asyncio.run(
-        admin.list_principals(
-            last_login_before="2026-07-01", include_never=True, has_groups=False
-        )
+        admin.list_principals(last_login_before="2026-07-01", include_never=True, has_groups=False)
     )
     assert fake_api.calls == [
         (

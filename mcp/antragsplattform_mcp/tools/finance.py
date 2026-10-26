@@ -55,10 +55,19 @@ async def list_expenses(
     return await api().get(
         "/expenses",
         params=params(
-            budget=budget, fiscalYear=fiscal_year, applicationId=application_id,
-            kind=kind, q=q, amountMin=amount_min, amountMax=amount_max,
-            createdFrom=created_from, createdTo=created_to, sort=sort, order=order,
-            limit=limit, offset=offset,
+            budget=budget,
+            fiscalYear=fiscal_year,
+            applicationId=application_id,
+            kind=kind,
+            q=q,
+            amountMin=amount_min,
+            amountMax=amount_max,
+            createdFrom=created_from,
+            createdTo=created_to,
+            sort=sort,
+            order=order,
+            limit=limit,
+            offset=offset,
         ),
     )
 
@@ -91,9 +100,17 @@ async def list_invoices(
     return await api().get(
         "/invoices",
         params=params(
-            q=q, status=status, booked=booked, grossMin=gross_min, grossMax=gross_max,
-            issueFrom=issue_from, issueTo=issue_to, dueFrom=due_from, dueTo=due_to,
-            limit=limit, offset=offset,
+            q=q,
+            status=status,
+            booked=booked,
+            grossMin=gross_min,
+            grossMax=gross_max,
+            issueFrom=issue_from,
+            issueTo=issue_to,
+            dueFrom=due_from,
+            dueTo=due_to,
+            limit=limit,
+            offset=offset,
         ),
     )
 

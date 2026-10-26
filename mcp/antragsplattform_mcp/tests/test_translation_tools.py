@@ -23,7 +23,7 @@ class _FakeApi:
         self.calls: list[tuple[str, str, Any]] = []
 
     async def _call(self, method: str, path: str, **kw: Any) -> dict[str, Any]:
-        self.calls.append((method, path, kw.get("json")))
+        self.calls.append((method, path, kw.get("json") or kw.get("params")))
         return {"status": "ok"}
 
     async def get(self, path: str, **kw: Any) -> dict[str, Any]:
@@ -58,6 +58,7 @@ def test_translation_tools_are_registered() -> None:
         "create_ui_language",
         "update_ui_language",
         "delete_ui_language",
+        "get_builtin_ui_texts",
         "get_ui_texts",
         "set_ui_texts",
     ):
@@ -88,3 +89,15 @@ def test_text_routes(fake_api: _FakeApi) -> None:
         ("GET", "/admin/translations/texts/en", None),
         ("PUT", "/admin/translations/texts/en", {"changes": {"a.b": "Text", "c.d": None}}),
     ]
+
+
+def test_builtin_route(fake_api: _FakeApi) -> None:
+    asyncio.run(admin.get_builtin_ui_texts())
+    asyncio.run(admin.get_builtin_ui_texts(prefix="nav.", locale="fr", untranslated=True))
+    assert fake_api.calls[0][:2] == ("GET", "/admin/translations/builtin")
+    assert not fake_api.calls[0][2]
+    assert fake_api.calls[1] == (
+        "GET",
+        "/admin/translations/builtin",
+        {"prefix": "nav.", "locale": "fr", "untranslated": True},
+    )

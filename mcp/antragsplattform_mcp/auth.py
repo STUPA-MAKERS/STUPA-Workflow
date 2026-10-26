@@ -165,16 +165,20 @@ def browser_login(config: Config) -> dict:
     port = server.server_address[1]
     redirect_uri = f"http://127.0.0.1:{port}/callback"
 
-    auth_url = meta["authorization_endpoint"] + "?" + urlencode(
-        {
-            "response_type": "code",
-            "client_id": CLIENT_ID,
-            "redirect_uri": redirect_uri,
-            "code_challenge": challenge,
-            "code_challenge_method": "S256",
-            "scope": config.scope,
-            "state": state,
-        }
+    auth_url = (
+        meta["authorization_endpoint"]
+        + "?"
+        + urlencode(
+            {
+                "response_type": "code",
+                "client_id": CLIENT_ID,
+                "redirect_uri": redirect_uri,
+                "code_challenge": challenge,
+                "code_challenge_method": "S256",
+                "scope": config.scope,
+                "state": state,
+            }
+        )
     )
 
     # Serve exactly one request in a background thread. The timeout bounds the wait.

@@ -23,7 +23,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
-from app.modules.translations.catalog import catalog, placeholders_of
+from app.modules.translations.catalog import (
+    BuiltinText,
+    builtin_texts,
+    catalog,
+    placeholders_of,
+)
 from app.modules.translations.models import UiLanguage, UiTranslation
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 
@@ -166,6 +171,36 @@ class TranslationService:
         """
         await self._check_locale(locale)
         return await self.overrides(locale)
+
+    async def builtin(
+        self, *, prefix: str | None, locale: str | None, untranslated: bool
+    ) -> list[tuple[str, BuiltinText, str | None]]:
+        """Return the built-in texts by key, each with the override of `locale`.
+
+        `prefix` keeps the keys that start with it. `untranslated` keeps the keys
+        without an override in `locale`, so a translator finds the open work.
+
+        Raises:
+            NotFoundError: The locale is neither built-in nor an extra language.
+            ValidationProblem: `untranslated` without a locale (`locale_required`).
+        """
+        if untranslated and locale is None:
+            raise ValidationProblem(
+                "untranslated needs a locale",
+                code="locale_required",
+                errors=[{"field": "locale", "msg": "required"}],
+            )
+        own: dict[str, str] = {}
+        if locale is not None:
+            own = await self.admin_overrides(locale)
+        rows: list[tuple[str, BuiltinText, str | None]] = []
+        for key, text in builtin_texts().items():
+            if prefix is not None and not key.startswith(prefix):
+                continue
+            if untranslated and key in own:
+                continue
+            rows.append((key, text, own.get(key)))
+        return rows
 
     async def save(
         self, locale: str, changes: dict[str, str | None], *, actor: str

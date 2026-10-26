@@ -83,9 +83,7 @@ async def create_application_vote(application_id: str, vote: S.VoteCreate) -> di
     `proposal` (approved amount and conditions) becomes the decision of the
     application when the vote passes.
     """
-    return await api().post(
-        f"/applications/{application_id}/votes", json=dump_create(vote)
-    )
+    return await api().post(f"/applications/{application_id}/votes", json=dump_create(vote))
 
 
 @group.tool
@@ -265,9 +263,7 @@ async def set_attendance(
     body: dict[str, str] = {"status": status}
     if note is not None:
         body["note"] = note
-    return await api().put(
-        f"/meetings/{meeting_id}/attendance/{principal_id}", json=body
-    )
+    return await api().put(f"/meetings/{meeting_id}/attendance/{principal_id}", json=body)
 
 
 @group.tool
@@ -347,9 +343,7 @@ async def reorder_agenda(meeting_id: str, item_ids: list[str]) -> dict:
     or protocol.write in its gremium, the assigned minute-taker, or admin. Only a
     planned or live meeting changes its order (409 `meeting_closed` otherwise).
     """
-    return await api().put(
-        f"/meetings/{meeting_id}/agenda/order", json={"itemIds": item_ids}
-    )
+    return await api().put(f"/meetings/{meeting_id}/agenda/order", json={"itemIds": item_ids})
 
 
 @group.tool
@@ -530,9 +524,7 @@ async def embed_protocol_votes(protocol_id: str, vote_ids: list[str]) -> dict:
     or protocol.write in its gremium, the assigned minute-taker, or admin. Only the
     votes of the protocol's own meeting: any other vote gives 422 `vote_not_in_meeting`.
     """
-    return await api().post(
-        f"/protocols/{protocol_id}/votes", json={"voteIds": vote_ids}
-    )
+    return await api().post(f"/protocols/{protocol_id}/votes", json={"voteIds": vote_ids})
 
 
 @group.tool
@@ -717,9 +709,7 @@ def _disposition_filename(header: str) -> str:
     return "" if name in {".", ".."} else _fit_name_max(name)
 
 
-def _attachment_part(
-    file_path: str, filename: str | None
-) -> tuple[str, bytes, str]:
+def _attachment_part(file_path: str, filename: str | None) -> tuple[str, bytes, str]:
     """Read a local file for the upload and pick its name and content type.
 
     Raises:
@@ -736,9 +726,7 @@ def _attachment_part(
     mime = ATTACHMENT_TYPES.get(ext)
     if mime is None:
         allowed = ", ".join(ATTACHMENT_TYPES)
-        raise ApiError(
-            400, f"file type {ext or '(none)'!r} is not allowed; allowed: {allowed}"
-        )
+        raise ApiError(400, f"file type {ext or '(none)'!r} is not allowed; allowed: {allowed}")
     size = p.stat().st_size
     if size == 0:
         raise ApiError(400, f"file is empty: {file_path!r}")

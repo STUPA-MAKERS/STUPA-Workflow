@@ -146,11 +146,19 @@ async def book_expense(
     return await api().post(
         f"/budgets/{budget_id}/expenses",
         json=params(
-            amount=amount, description=description, kind=kind,
-            fiscalYearId=fiscal_year_id, applicationId=application_id,
-            invoiceDate=invoice_date, paymentDate=payment_date,
-            correspondent=correspondent, note=note, referenceNumber=reference_number,
-            paymentMethod=payment_method, category=category, invoiceId=invoice_id,
+            amount=amount,
+            description=description,
+            kind=kind,
+            fiscalYearId=fiscal_year_id,
+            applicationId=application_id,
+            invoiceDate=invoice_date,
+            paymentDate=payment_date,
+            correspondent=correspondent,
+            note=note,
+            referenceNumber=reference_number,
+            paymentMethod=payment_method,
+            category=category,
+            invoiceId=invoice_id,
         ),
     )
 
@@ -183,9 +191,7 @@ async def create_budget_transfer(transfer: S.TransferCreate) -> dict:
 
 
 @group.tool
-async def assign_application_budget(
-    application_id: str, budget_id: str | None
-) -> dict:
+async def assign_application_budget(application_id: str, budget_id: str | None) -> dict:
     """Bind an application to a cost center.
 
     Pass null to remove the binding. The fiscal year comes from the single active year

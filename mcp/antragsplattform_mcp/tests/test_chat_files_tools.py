@@ -77,14 +77,10 @@ def pdfs(tmp_path: Path) -> list[str]:
 
 
 def _uploads(fake: _FakeApi) -> list[dict[str, Any]]:
-    return [
-        kw for m, path, kw in fake.calls if (m, path) == ("POST", "/apply/attachments")
-    ]
+    return [kw for m, path, kw in fake.calls if (m, path) == ("POST", "/apply/attachments")]
 
 
-def test_note_with_files_uploads_then_binds(
-    fake_api: _FakeApi, pdfs: list[str]
-) -> None:
+def test_note_with_files_uploads_then_binds(fake_api: _FakeApi, pdfs: list[str]) -> None:
     asyncio.run(tickets.tickets_note("t1", "", pdfs[:2]))
     ups = _uploads(fake_api)
     assert [u["files"]["file"] for u in ups] == [
@@ -124,9 +120,7 @@ def test_todo_comment_keeps_mentions(fake_api: _FakeApi, pdfs: list[str]) -> Non
     )
 
 
-def test_application_comment_keeps_visibility(
-    fake_api: _FakeApi, pdfs: list[str]
-) -> None:
+def test_application_comment_keeps_visibility(fake_api: _FakeApi, pdfs: list[str]) -> None:
     asyncio.run(applications.comment_application("app1", "x", "internal", pdfs[:1]))
     assert fake_api.calls[-1][2]["json"] == {
         "body": "x",
@@ -164,9 +158,7 @@ def test_application_comment_with_mentions_is_internal_by_default(fake_api: _Fak
     assert [c[2]["json"]["visibility"] for c in fake_api.calls] == ["internal", "public"]
 
 
-def test_more_than_five_files_sends_nothing(
-    fake_api: _FakeApi, pdfs: list[str]
-) -> None:
+def test_more_than_five_files_sends_nothing(fake_api: _FakeApi, pdfs: list[str]) -> None:
     with pytest.raises(ApiError) as err:
         asyncio.run(tickets.tickets_note("t1", "", pdfs))
     assert err.value.status == 400
@@ -174,9 +166,7 @@ def test_more_than_five_files_sends_nothing(
     assert fake_api.calls == []
 
 
-def test_a_bad_file_sends_nothing(
-    fake_api: _FakeApi, pdfs: list[str], tmp_path: Path
-) -> None:
+def test_a_bad_file_sends_nothing(fake_api: _FakeApi, pdfs: list[str], tmp_path: Path) -> None:
     bad = tmp_path / "x.exe"
     bad.write_bytes(b"MZ")
     with pytest.raises(ApiError, match="is not allowed"):
@@ -198,32 +188,24 @@ def test_failed_post_deletes_the_drafts(fake_api: _FakeApi, pdfs: list[str]) -> 
     ]
 
 
-def test_failed_upload_deletes_the_earlier_drafts(
-    fake_api: _FakeApi, pdfs: list[str]
-) -> None:
+def test_failed_upload_deletes_the_earlier_drafts(fake_api: _FakeApi, pdfs: list[str]) -> None:
     fake_api.fail_upload_at = 2
     with pytest.raises(ApiError) as err:
         asyncio.run(tickets.tickets_note("t1", "", pdfs[:3]))
     assert err.value.status == 415
     assert len(_uploads(fake_api)) == 2
-    assert [path for m, path, _ in fake_api.calls if m == "DELETE"] == [
-        "/apply/attachments/a1"
-    ]
+    assert [path for m, path, _ in fake_api.calls if m == "DELETE"] == ["/apply/attachments/a1"]
     assert not any(path == "/tickets/t1/notes" for _, path, _ in fake_api.calls)
 
 
-def test_failed_first_upload_has_no_token_to_clean(
-    fake_api: _FakeApi, pdfs: list[str]
-) -> None:
+def test_failed_first_upload_has_no_token_to_clean(fake_api: _FakeApi, pdfs: list[str]) -> None:
     fake_api.fail_upload_at = 1
     with pytest.raises(ApiError):
         asyncio.run(tickets.tickets_note("t1", "", pdfs[:2]))
     assert [m for m, _, _ in fake_api.calls] == ["POST"]
 
 
-def test_a_failed_cleanup_keeps_the_original_error(
-    fake_api: _FakeApi, pdfs: list[str]
-) -> None:
+def test_a_failed_cleanup_keeps_the_original_error(fake_api: _FakeApi, pdfs: list[str]) -> None:
     fake_api.fail_post = "/tickets/t1/notes"
     fake_api.fail_delete = True
     with pytest.raises(ApiError) as err:

@@ -65,9 +65,10 @@ class Config:
         The path is `~/.config/antragsplattform-mcp/token-<hash>.json`.
         """
         key = hashlib.sha256(self.base_url.encode("utf-8")).hexdigest()[:16]
-        root = Path(
-            os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config"))
-        ) / "antragsplattform-mcp"
+        root = (
+            Path(os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config")))
+            / "antragsplattform-mcp"
+        )
         # Mode 0700: the directory holds per-URL token caches, which are secrets. Keep it
         # owner-only. The mkdir mode applies only at creation and the umask masks it. It
         # does NOT tighten a directory that already exists and may be world-listable. The
