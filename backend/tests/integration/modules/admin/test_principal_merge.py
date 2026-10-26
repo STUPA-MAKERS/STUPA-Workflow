@@ -92,6 +92,7 @@ from app.modules.todos.models import (
     TodoEvent,
     TodoLink,
 )
+from app.modules.translations.models import UiLanguage, UiTranslation
 from app.modules.voting.models import Ballot, SecretBallot, Vote, VotedMarker
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError, ValidationProblem
 from tests._support.guest_apps import build_api, guest_settings
@@ -315,6 +316,26 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
             LoginSettings(id=1, web_session_days=90, pwa_session_days=180, updated_by=old.sub)
         )
         session.add(ApplicationDecision(application_id=app_id, decided_by=old.sub))
+        now = datetime.now(UTC)
+        session.add(
+            UiLanguage(
+                code="fr",
+                name="Français",
+                active=False,
+                created_at=now,
+                updated_at=now,
+                updated_by=old.sub,
+            )
+        )
+        session.add(
+            UiTranslation(
+                locale="de",
+                key="meetings.overview.open",
+                value="Öffnen",
+                updated_at=now,
+                updated_by=old.sub,
+            )
+        )
 
         meeting = await _meeting(session, seed.gremium_id, f"Sitzung A {tag}")
         meeting.created_by = old.sub
@@ -456,9 +477,7 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
         admin_id = await _admin_actor(session)
         session.add_all(
             [
-                SiteConfigVersion(
-                    version=secrets.randbelow(10**8) + 10**6, created_by=old.sub
-                ),
+                SiteConfigVersion(version=secrets.randbelow(10**8) + 10**6, created_by=old.sub),
                 ConfigRevision(
                     entity_type="flow", entity_id=f"merge-{tag}", version=1, created_by=old.sub
                 ),
@@ -545,9 +564,7 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
 
 async def _count(session: AsyncSession, column: Any, value: object) -> int:
     return int(
-        await session.scalar(
-            select(func.count()).select_from(column.class_).where(column == value)
-        )
+        await session.scalar(select(func.count()).select_from(column.class_).where(column == value))
         or 0
     )
 
@@ -591,9 +608,7 @@ async def test_merge_rewrites_every_area(maker: async_sessionmaker[AsyncSession]
         assert old is not None and old.merged_into is None
 
     async with maker() as session:
-        result = await PrincipalMergeService(session).merge(
-            w.old_id, w.new_id, actor=ADMIN_SUB
-        )
+        result = await PrincipalMergeService(session).merge(w.old_id, w.new_id, actor=ADMIN_SUB)
     after = _areas(result)
     assert after == before
     assert after["timeline"]["rewritten"] >= 2
@@ -656,18 +671,26 @@ async def test_secret_ballot_stays_anonymous(maker: async_sessionmaker[AsyncSess
     w = await _seed(maker)
     async with maker() as session:
         before = (
-            await session.execute(
-                text("SELECT * FROM secret_ballot WHERE vote_id = :v"), {"v": w.secret_vote_id}
+            (
+                await session.execute(
+                    text("SELECT * FROM secret_ballot WHERE vote_id = :v"), {"v": w.secret_vote_id}
+                )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
     async with maker() as session:
         await PrincipalMergeService(session).merge(w.old_id, w.new_id, actor=ADMIN_SUB)
     async with maker() as session:
         after = (
-            await session.execute(
-                text("SELECT * FROM secret_ballot WHERE vote_id = :v"), {"v": w.secret_vote_id}
+            (
+                await session.execute(
+                    text("SELECT * FROM secret_ballot WHERE vote_id = :v"), {"v": w.secret_vote_id}
+                )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
         marker = (
             await session.scalars(
                 select(VotedMarker.voter_sub).where(VotedMarker.vote_id == w.secret_vote_id)
@@ -779,10 +802,7 @@ async def test_legacy_self_absent_attendance_becomes_a_lead_entry(
     w = await _seed(maker)
     async with maker() as session:
         await session.execute(
-            text(
-                "ALTER TABLE meeting_attendance "
-                "DROP CONSTRAINT ck_meeting_attendance_self_status"
-            )
+            text("ALTER TABLE meeting_attendance DROP CONSTRAINT ck_meeting_attendance_self_status")
         )
         await session.execute(
             text(
@@ -1150,14 +1170,10 @@ async def test_routes_and_display_follow_the_merge(
             )
         )
         session.add(
-            StatusEvent(
-                application_id=w.app_id, to_state_id=w.seed.pruefung_id, actor=w.old_sub
-            )
+            StatusEvent(application_id=w.app_id, to_state_id=w.seed.pruefung_id, actor=w.old_sub)
         )
         session.add(
-            SubmissionVersion(
-                application_id=w.app_id, version=50, data={}, changed_by=w.old_sub
-            )
+            SubmissionVersion(application_id=w.app_id, version=50, data={}, changed_by=w.old_sub)
         )
         await session.commit()
 
@@ -1184,9 +1200,7 @@ async def test_routes_and_display_follow_the_merge(
         assert {"sub": w.old_sub, "name": NEW_NAME} in actors
 
 
-@pytest.mark.parametrize(
-    "permissions", [set(), {"admin.users"}, {"admin.users", "audit.read"}]
-)
+@pytest.mark.parametrize("permissions", [set(), {"admin.users"}, {"admin.users", "audit.read"}])
 async def test_routes_need_the_merge_permission(
     migrated: tuple[str, str],
     maker: async_sessionmaker[AsyncSession],
@@ -1355,9 +1369,7 @@ async def test_an_admin_actor_may_merge_extra_rights_but_no_role_moves(
     async with maker() as session:
         assert await _count(session, RoleAssignment.principal_id, w.new_id) == 0
         entry = (
-            await session.scalars(
-                select(AuditEntry).where(AuditEntry.action == "principal_merge")
-            )
+            await session.scalars(select(AuditEntry).where(AuditEntry.action == "principal_merge"))
         ).one()
         assert entry.data["counts"]["roles"]["removed"] == 2
         assert "admin" in entry.data["extraPermissions"]
@@ -1393,9 +1405,7 @@ async def test_the_own_old_account_merges_when_the_target_holds_its_rights(
         await session.commit()
         new_sub = new.sub
     async with maker() as session:
-        preview = await PrincipalMergeService(session).preview(
-            w.old_id, w.new_id, actor=new_sub
-        )
+        preview = await PrincipalMergeService(session).preview(w.old_id, w.new_id, actor=new_sub)
     assert preview.extra_permissions == []
     assert preview.can_merge is True
     async with maker() as session:

@@ -1,4 +1,7 @@
-import { Injectable, computed, signal } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Injectable, Injector, computed, inject, signal } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
+import { API_BASE_URL } from '@core/api/api.config';
 import {
   CATALOG,
   DEFAULT_LOCALE,
@@ -34,33 +37,95 @@ export function toFormatLocale(locale: string): string {
   return locale === 'en' ? FORMAT_LOCALES.en : FORMAT_LOCALES.de;
 }
 
+/** An active extra UI language: its BCP 47 code and its native name. */
+export interface UiLanguage {
+  code: string;
+  name: string;
+}
+
+/** `GET /i18n`: the resolved UI locale, the active extra languages and the overrides. */
+export interface I18nBundle {
+  locale: string;
+  languages: UiLanguage[];
+  /** Locale → key → text, for each locale of the fallback chain of `locale`. */
+  overrides: Record<string, Record<string, string>>;
+}
+
 /**
- * UI i18n (DE and EN). Locale source: persisted choice → browser →
- * DEFAULT_LOCALE. A key that the active locale misses falls back to DE. This
- * service does not cover the configurable DB texts (`*_i18n`).
+ * The built-in locale whose catalog and whose DB texts (`*_i18n`) a UI locale uses: DE for
+ * DE, EN for EN and for every extra language.
+ */
+export function baseLocale(uiLocale: string): Locale {
+  return uiLocale === DEFAULT_LOCALE ? DEFAULT_LOCALE : 'en';
+}
+
+/**
+ * The locales whose texts `uiLocale` shows, the first one first: DE alone, EN then DE, an
+ * extra language then EN then DE. The server resolves the same chain.
+ */
+export function fallbackChain(uiLocale: string): string[] {
+  if (uiLocale === DEFAULT_LOCALE) return [DEFAULT_LOCALE];
+  if (uiLocale === 'en') return ['en', DEFAULT_LOCALE];
+  return [uiLocale, 'en', DEFAULT_LOCALE];
+}
+
+/** A stored or requested UI locale: a BCP 47 tag such as `fr` or `pt-BR`. */
+const LOCALE_TAG = /^[a-z]{2,3}(-[A-Z][a-z]{3})?(-([A-Z]{2}|[0-9]{3}))?$/;
+
+/**
+ * UI i18n: the built-in DE and EN catalogs, the overrides of the admin page and the extra
+ * languages.
+ *
+ * - `uiLocale` is the language that the reader chose: `de`, `en` or an active extra
+ *   language. Source: persisted choice → browser → DEFAULT_LOCALE; `GET /i18n` confirms it,
+ *   and an unknown or inactive one becomes DE.
+ * - `locale` is its built-in base (`de` / `en`, see {@link baseLocale}). The configurable DB
+ *   texts (`*_i18n`), the server labels and the ui-kit strings follow it, because they exist
+ *   in DE and EN only.
+ * - A text comes from the first locale of {@link fallbackChain} that has it, an override
+ *   before the built-in text of the same locale. A key that no locale has shows as itself.
  */
 @Injectable({ providedIn: 'root' })
 export class I18nService {
-  private readonly _locale = signal<Locale>(this.resolveInitialLocale());
+  /**
+   * Resolves `HttpClient` in `ready()`, not in a field initializer, because every component
+   * injects this service, and their specs would fail with NG0201 (no HttpClient provider).
+   */
+  private readonly injector = inject(Injector);
+
+  /** The persisted or browser locale, before `GET /i18n` confirms it. */
+  private readonly requested = this.resolveInitialLocale();
+
+  private readonly _uiLocale = signal<string>(
+    SUPPORTED_LOCALES.includes(this.requested as Locale) ? this.requested : DEFAULT_LOCALE,
+  );
+
+  /** The UI language of the reader: `de`, `en` or an extra language. Not for `Intl`. */
+  readonly uiLocale = this._uiLocale.asReadonly();
 
   /**
-   * Active locale, read-only to the outside. This is the translation-key locale
-   * (`de` / `en`). Do NOT give it to `Intl` — use {@link formatLocale}.
+   * The built-in base of the UI locale (`de` / `en`), read-only to the outside. This is the
+   * locale of the DB texts and the server labels. Do NOT give it to `Intl` — use
+   * {@link formatLocale}.
    */
-  readonly locale = this._locale.asReadonly();
-  readonly locales = SUPPORTED_LOCALES;
+  readonly locale = computed<Locale>(() => baseLocale(this._uiLocale()));
 
   /** `Intl` tag of the active locale (`de-DE` / `en-GB`). See {@link toFormatLocale}. */
-  readonly formatLocale = computed(() => FORMAT_LOCALES[this._locale()]);
+  readonly formatLocale = computed(() => FORMAT_LOCALES[this.locale()]);
 
-  /** Counts the catalogs that arrived from their lazy chunk, so a read sees the new strings. */
-  private readonly _loaded = signal(0);
+  private readonly _languages = signal<UiLanguage[]>([]);
 
-  /** Active translation table (for template bindings via the `t` pipe). */
-  readonly dictionary = computed(() => {
-    this._loaded();
-    return CATALOG[this._locale()];
-  });
+  /** The active extra languages, in the order of the server. */
+  readonly extraLanguages = this._languages.asReadonly();
+
+  /** Every selectable UI locale: DE, EN, then the active extra languages. */
+  readonly locales = computed<string[]>(() => [
+    ...SUPPORTED_LOCALES,
+    ...this._languages().map((l) => l.code),
+  ]);
+
+  /** Locale → key → override text. */
+  private readonly _overrides = signal<Record<string, Record<string, string>>>({});
 
   /**
    * `<html lang>` follows the resolved locale from the first paint (a11y and SEO), not only after
@@ -68,37 +133,79 @@ export class I18nService {
    */
   constructor() {
     if (typeof document !== 'undefined') {
-      document.documentElement.lang = this._locale();
+      document.documentElement.lang = this._uiLocale();
     }
   }
 
   /**
-   * Load the catalog of the active locale. The app initializer waits for it, so the first
-   * paint is in the right language. A failed load resolves too: the app then shows DE.
+   * Load the overrides, the extra languages and the catalog of the active locale. The app
+   * initializer waits for it, so the first paint is in the right language. A failed load
+   * resolves too: the app then shows the built-in texts, and DE for an extra language.
    */
-  ready(): Promise<void> {
-    return this.load(this._locale());
+  async ready(): Promise<void> {
+    await Promise.all([this.loadBundle(), this.load(this.locale())]);
+    await this.load(this.locale());
   }
 
-  setLocale(locale: Locale): void {
-    if (!SUPPORTED_LOCALES.includes(locale)) return;
-    this._locale.set(locale);
+  setLocale(locale: string): void {
+    if (!this.locales().includes(locale)) return;
+    this._uiLocale.set(locale);
     this.persist(locale);
     document.documentElement.lang = locale;
-    void this.load(locale);
+    void this.load(this.locale());
+  }
+
+  /**
+   * Put the overrides of `locale` that the admin page just saved in place, so the page and the
+   * app show them without a reload. A locale outside the active chain changes nothing visible.
+   */
+  applyOverrides(locale: string, overrides: Record<string, string>): void {
+    this._overrides.update((all) => ({ ...all, [locale]: overrides }));
+  }
+
+  /** The built-in text of `key` in `locale` (DE or EN), without overrides; `null` if none. */
+  builtIn(key: TranslationKey, locale: Locale): string | null {
+    return CATALOG[locale][key] ?? null;
+  }
+
+  private async loadBundle(): Promise<void> {
+    const http = this.injector.get(HttpClient, null);
+    if (!http) return;
+    const base = this.injector.get(API_BASE_URL);
+    try {
+      const bundle = await firstValueFrom(
+        http.get<I18nBundle>(`${base}/i18n`, { params: { locale: this.requested } }),
+      );
+      this._languages.set(bundle.languages);
+      this._overrides.set(bundle.overrides);
+      if (bundle.locale !== this._uiLocale()) {
+        this._uiLocale.set(bundle.locale);
+        document.documentElement.lang = bundle.locale;
+      }
+    } catch {
+      /* The built-in texts apply. */
+    }
   }
 
   private load(locale: Locale): Promise<void> {
     return loadCatalog(locale).then(
-      () => this._loaded.update((n) => n + 1),
+      () => undefined,
       () => undefined,
     );
   }
 
-  /** Translate a key. Fallback chain: active locale → DE → the key itself. */
+  /** Translate a key. Fallback chain: see {@link fallbackChain}, then the key itself. */
   translate(key: TranslationKey, params?: Record<string, string | number>): string {
-    const active = CATALOG[this._locale()];
-    const raw = active[key] ?? CATALOG[DEFAULT_LOCALE][key] ?? key;
+    const overrides = this._overrides();
+    const catalogs = CATALOG as Record<string, Partial<Record<TranslationKey, string>> | undefined>;
+    let raw: string = key;
+    for (const loc of fallbackChain(this._uiLocale())) {
+      const text = overrides[loc]?.[key] ?? catalogs[loc]?.[key];
+      if (text !== undefined) {
+        raw = text;
+        break;
+      }
+    }
     return params ? this.interpolate(raw, params) : raw;
   }
 
@@ -108,24 +215,24 @@ export class I18nService {
     );
   }
 
-  private resolveInitialLocale(): Locale {
+  private resolveInitialLocale(): string {
     const stored = this.readStored();
     if (stored) return stored;
     const nav =
       typeof navigator !== 'undefined' ? navigator.language.slice(0, 2).toLowerCase() : '';
-    return SUPPORTED_LOCALES.includes(nav as Locale) ? (nav as Locale) : DEFAULT_LOCALE;
+    return LOCALE_TAG.test(nav) ? nav : DEFAULT_LOCALE;
   }
 
-  private readStored(): Locale | null {
+  private readStored(): string | null {
     try {
       const v = localStorage.getItem(STORAGE_KEY);
-      return v && SUPPORTED_LOCALES.includes(v as Locale) ? (v as Locale) : null;
+      return v && LOCALE_TAG.test(v) ? v : null;
     } catch {
       return null;
     }
   }
 
-  private persist(locale: Locale): void {
+  private persist(locale: string): void {
     try {
       localStorage.setItem(STORAGE_KEY, locale);
     } catch {

@@ -167,6 +167,8 @@ const TARGET_ROUTES: Record<string, (id: string) => string[]> = {
   site_config: () => ['/admin/branding'],
   guest_application_settings: () => ['/admin/deadlines'],
   meeting_settings: () => ['/admin/deadlines'],
+  ui_translation: () => ['/admin/translations'],
+  ui_language: () => ['/admin/translations'],
   budget: () => ['/budget'],
   budget_allocation: () => ['/budget'],
   budget_transfer: () => ['/budget'],

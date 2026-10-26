@@ -66,7 +66,7 @@ interface AgendaRow {
  * whether the meeting is ready, without opening it.
  *
  * Header: Gremium and date, the title, status · time · minute-taker (a warning while a
- * planned meeting has none), "Sitzung öffnen", "Beamer-Ansicht" (a live or planned
+ * planned meeting has none), "Details" (opens the meeting), "Beamer-Ansicht" (a live or planned
  * meeting, `canManage`, not on a phone) and "Protokollführung festlegen" (a planned
  * meeting without one). Edit and delete sit only here (`canManage`), not on the rows.
  *
