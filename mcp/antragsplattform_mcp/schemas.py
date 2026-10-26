@@ -367,6 +367,21 @@ class ApplicationTypeUpdate(WireModel):
     comparisonOffers: dict[str, Any] | None = None
 
 
+class UiLanguageCreate(WireModel):
+    """An extra UI language. `code` is a BCP 47 tag such as `fr` or `pt-BR`."""
+
+    code: str
+    name: str
+    active: bool = False
+
+
+class UiLanguageUpdate(WireModel):
+    """A change of the name or of the switch `active`. An absent field stays."""
+
+    name: str | None = None
+    active: bool | None = None
+
+
 class WebhookCreate(WireModel):
     name: str
     url: str

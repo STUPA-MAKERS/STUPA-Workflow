@@ -155,7 +155,7 @@ describe('MeetingDetailSheetComponent', () => {
     const { http, fixture, on, navigate } = await setup();
     flush(http);
     fixture.detectChanges();
-    await userEvent.click(screen.getByRole('button', { name: /Sitzung öffnen/ }));
+    await userEvent.click(screen.getByRole('button', { name: /^Details$/ }));
     expect(navigate).toHaveBeenCalledWith(['/meetings', 'm-1']);
     await userEvent.click(screen.getByRole('button', { name: /Beamer-Ansicht/ }));
     expect(on.beamer).toHaveBeenCalledWith(LIVE);

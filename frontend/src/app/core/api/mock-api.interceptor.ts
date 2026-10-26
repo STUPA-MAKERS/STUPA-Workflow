@@ -105,6 +105,7 @@ const MOCK_PRINCIPAL: Principal = {
     'admin.cd_variants',
     'admin.delegations',
     'admin.deadlines',
+    'admin.translations',
     'audit.read',
     'audit.verify',
     'audit.revert',

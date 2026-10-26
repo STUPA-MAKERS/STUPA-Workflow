@@ -476,6 +476,15 @@ export const routes: Routes = [
               ),
           },
           {
+            path: 'translations',
+            data: { title: 'admin.translations.title', permission: 'admin.translations', parent: ['admin'] },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/translations/translations.component').then(
+                (m) => m.AdminTranslationsComponent,
+              ),
+          },
+          {
             path: 'cd-variants',
             data: { title: 'admin.cdVariants.title', permission: 'admin.cd_variants', parent: ['admin'] },
             canActivate: [authGuard],

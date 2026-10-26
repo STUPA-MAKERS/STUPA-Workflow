@@ -203,7 +203,7 @@ describe('MeetingsCalendarComponent', () => {
     expect(within(card).getByText('38 %')).toBeInTheDocument();
     expect(within(card).getByText('Zuschuss Erstsemester-Party')).toBeInTheDocument();
     expect(within(card).getByText('14 / 19')).toBeInTheDocument();
-    await userEvent.click(within(card).getByRole('button', { name: /Sitzung öffnen/ }));
+    await userEvent.click(within(card).getByRole('button', { name: /^Details$/ }));
     await view.fixture.whenStable();
     expect(view.router.url).toBe('/meetings/m-34');
     const open = jest.spyOn(window, 'open').mockImplementation(() => null);

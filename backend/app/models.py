@@ -80,6 +80,7 @@ from app.modules.todos.models import (
     TodoLabel,
     TodoLink,
 )
+from app.modules.translations.models import UiLanguage, UiTranslation
 from app.modules.voting.models import Ballot, SecretBallot, Vote, VotedMarker
 
 __all__ = [
@@ -152,6 +153,8 @@ __all__ = [
     "TodoLabel",
     "TodoLink",
     "Transition",
+    "UiLanguage",
+    "UiTranslation",
     "Vote",
     "VotedMarker",
     "Webhook",

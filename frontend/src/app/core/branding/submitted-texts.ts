@@ -2,9 +2,9 @@ import type { I18nMap } from '@core/api/models';
 import { CATALOG, DEFAULT_LOCALE, type Locale } from '@core/i18n/translations';
 
 /**
- * The texts on the page after the submission of an application.
+ * The texts on the page after the creation of an application.
  *
- * - `internal`: a signed-in applicant. The application is submitted at once.
+ * - `internal`: a signed-in applicant. The account confirms the address at once.
  * - `external`: a guest. The link in the e-mail confirms the application.
  *
  * `/admin/texts` sets each text per language as Markdown (`freetexts.submittedInternal`

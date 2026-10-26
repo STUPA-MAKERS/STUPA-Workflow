@@ -101,7 +101,7 @@ interface DayCard {
  * month, in the browser only: it never asks the server), the Gremium chip and the
  * calendar subscription. "Today" moves on at midnight while the page stays open.
  *
- * The side panel shows the meetings of the selected day: status, "Sitzung öffnen", the
+ * The side panel shows the meetings of the selected day: status, "Details" (opens the meeting), the
  * beamer (`canManage`), edit and delete in the ⋮ menu (`canManage`), and for a live
  * meeting the current item and the turnout of its open vote. Below it: the upcoming
  * meetings; a click selects their day.

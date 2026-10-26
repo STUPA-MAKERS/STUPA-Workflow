@@ -1,7 +1,8 @@
 """Admin tools.
 
 This group covers Gremien, RBAC, application types, webhooks,
-guest and meeting settings, notifications, site config, and the audit log.
+guest and meeting settings, notifications, site config, UI texts and languages, and
+the audit log.
 """
 
 from __future__ import annotations
@@ -505,6 +506,81 @@ async def set_site_config(branding: dict[str, Any]) -> dict:
     Use the same shape as `branding` in `get_site_config`. Requires admin.site.
     """
     return await api().put("/admin/site-config", json=branding)
+
+
+@group.tool
+async def list_ui_languages() -> dict:
+    """List the extra UI languages, inactive ones included. Requires admin.translations.
+
+    DE and EN are built in and are not in the list. An extra language shows its own
+    text of a key, else the EN text, else the DE text.
+    """
+    return await api().get("/admin/translations/languages")
+
+
+@group.tool
+async def create_ui_language(language: S.UiLanguageCreate) -> dict:
+    """Add an extra UI language. Requires admin.translations.
+
+    It starts inactive unless `active` is true. Only an active language shows in the
+    language switch. 409 `language_builtin` for `de`/`en`, 409 `language_exists`.
+    """
+    return await api().post("/admin/translations/languages", json=dump_create(language))
+
+
+@group.tool
+async def update_ui_language(code: str, patch: S.UiLanguageUpdate) -> dict:
+    """Rename an extra UI language or switch it on or off. Requires admin.translations."""
+    return await api().patch(f"/admin/translations/languages/{code}", json=dump_patch(patch))
+
+
+@group.tool
+async def delete_ui_language(code: str) -> dict:
+    """Delete an extra UI language and all its texts. Requires admin.translations."""
+    return await api().delete(f"/admin/translations/languages/{code}")
+
+
+@group.tool
+async def get_builtin_ui_texts(
+    prefix: str | None = None,
+    locale: str | None = None,
+    untranslated: bool = False,
+) -> dict:
+    """Get the built-in DE and EN UI texts by key. Requires admin.translations.
+
+    Translate from these texts. Each row is `{key, de, en, own}`: `en` is null where
+    EN shows the DE text, and `own` is the own text of `locale` (null without one).
+    `prefix` keeps the keys that start with it (for example `meetings.`), because the
+    whole catalog has about 4000 keys. `untranslated` needs `locale` and keeps the
+    keys without an own text in it, so it lists the open work of a language.
+    """
+    return await api().get(
+        "/admin/translations/builtin",
+        params=params(prefix=prefix, locale=locale, untranslated=untranslated or None),
+    )
+
+
+@group.tool
+async def get_ui_texts(locale: str) -> dict:
+    """Get the own texts of one locale: key to text. Requires admin.translations.
+
+    A key without an own text shows the built-in text and is absent here. `locale` is
+    `de`, `en` or the code of an extra language.
+    """
+    return await api().get(f"/admin/translations/texts/{locale}")
+
+
+@group.tool
+async def set_ui_texts(locale: str, changes: dict[str, str | None]) -> dict:
+    """Change the own texts of one locale. Requires admin.translations.
+
+    `changes` maps a key to the new text, or to null (or a blank text) for the
+    built-in text. A key that `changes` leaves out stays. A text must keep exactly the
+    `{placeholders}` of the built-in text. A key outside the catalog (422
+    `unknown_key`) or a placeholder difference (422 `placeholder_mismatch`) refuses
+    the whole save. The texts apply at the next start of the app.
+    """
+    return await api().put(f"/admin/translations/texts/{locale}", json={"changes": changes})
 
 
 @group.tool

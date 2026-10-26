@@ -30,6 +30,7 @@ export const ADMIN_AREA_PERMISSIONS = [
   'admin.cd_variants',
   'admin.delegations',
   'admin.deadlines',
+  'admin.translations',
   'admin.notifications',
   'privacy.manage',
   'webhook.manage',
