@@ -23,4 +23,4 @@ description: Admin overrides of the UI texts and extra UI languages — ui_trans
 
 **Scope:** UI catalog only. Mail templates, form labels and branding texts keep their own editors and know DE and EN only; an extra language shows them in EN.
 
-**Related:** be-admin, be-audit, frontend
+**Related:** be-admin, be-audit, frontend, mcp (tools `*_ui_language`, `get_ui_texts`, `set_ui_texts`)
