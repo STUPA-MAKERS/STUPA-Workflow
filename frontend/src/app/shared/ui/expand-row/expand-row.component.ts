@@ -1,4 +1,13 @@
-import { ChangeDetectionStrategy, Component, input, model, output } from '@angular/core';
+import {
+  afterRenderEffect,
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  inject,
+  input,
+  model,
+  output,
+} from '@angular/core';
 import { ButtonComponent, IconComponent, ListItemComponent } from '@stupa-makers/ui-kit';
 
 let nextId = 0;
@@ -9,7 +18,10 @@ let nextId = 0;
  *
  * The head is an `app-list-item` (title, `[status]`, `sub` / `[sub]`, `[lead]`, controls in
  * `[trail]`). The content (the default slot) shows below the head on the same surface, so the
- * open row reads as one block in its row group.
+ * open row reads as one block in its row group. The content starts at the left edge of the
+ * title, also when the row has a `[lead]` (an avatar, an icon), so the open row has one text
+ * column. The head and the content have the same horizontal inset (`--space-5`), which
+ * matches the vertical inset of the text in the 64px head.
  *
  * `toggle="row"` (the default): a press anywhere on the head opens or closes the row, and the
  * chevron at the end only shows the state. The title button of the list item carries
@@ -53,6 +65,23 @@ export class ExpandRowComponent {
   readonly activate = output<void>();
 
   protected readonly bodyId = `xr-body-${nextId++}`;
+
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+
+  constructor() {
+    afterRenderEffect({
+      earlyRead: () => {
+        if (!this.open()) return null;
+        const el = this.host.nativeElement;
+        const text = el.querySelector('.li__body');
+        return text ? Math.round(text.getBoundingClientRect().left - el.getBoundingClientRect().left) : null;
+      },
+      write: (inset) => {
+        const x = inset();
+        if (x) this.host.nativeElement.style.setProperty('--xr-inset', `${x}px`);
+      },
+    });
+  }
 
   protected onHead(): void {
     if (this.toggle() === 'row') this.flip();
