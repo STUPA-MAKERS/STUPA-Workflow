@@ -177,6 +177,9 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   scroll-padding-block: var(--af-fade);
+  // A sticky element sticks below the top padding of its scroll box, so a bar with top 0 left
+  // the padding strip open and the rows scrolled through it. The bar sticks at the top edge.
+  --ld-sticky-top: calc(-1 * var(--space-6));
 }
 .af--split .af__pageBody > ::ng-deep * {
   flex-shrink: 0;
