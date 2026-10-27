@@ -27,6 +27,7 @@ from app.shared.errors import NotFoundError
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
+    from app.modules.auth.principal import Principal
     from app.modules.livevote.service.pubsub import BrokerPublisher
 
 #: Per meeting: the number of agenda items and the current item.
@@ -44,6 +45,15 @@ class MeetingServiceBase:
         self.publisher = publisher
 
     @staticmethod
+    def _can_delete(principal: Principal, *, can_manage: bool, final: bool) -> bool:
+        """Mirror the delete gate of `LifecycleOps.check_deletable` for the read model.
+
+        A final protocol is a signed and mailed document, so its meeting needs the
+        global ``meeting.delete_finalized`` on top of ``canManage``.
+        """
+        return can_manage and (not final or principal.has("meeting.delete_finalized"))
+
+    @staticmethod
     def _to_out(
         meeting: Meeting,
         protocol_id: UUID | None = None,
@@ -53,6 +63,7 @@ class MeetingServiceBase:
         can_manage_votes: bool = False,
         can_vote: bool = False,
         can_finalize: bool = False,
+        can_delete: bool = False,
         is_protokollant: bool = False,
         protokollant_name: str | None = None,
         gremium_name: str | None = None,
@@ -98,6 +109,7 @@ class MeetingServiceBase:
             canManageVotes=can_manage_votes,
             canVote=can_vote,
             canFinalize=can_finalize,
+            canDelete=can_delete,
             votes=votes or [],
             keeperPeriods=periods,
             plannedHandover=planned,

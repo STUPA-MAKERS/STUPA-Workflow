@@ -46,6 +46,7 @@ const MEMBER_RIGHTS = {
   canWrite: false,
   canManageVotes: false,
   canFinalize: false,
+  canDelete: false,
   canVote: true,
 } as const;
 

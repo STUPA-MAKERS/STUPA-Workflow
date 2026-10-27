@@ -298,6 +298,50 @@ def test_get_effective_form_injects_dynamic_options() -> None:
     assert by_key["ziel_b"].options == []
 
 
+class _BudgetRowsSession(_Session):
+    """Stub whose `execute` returns the given budget rows."""
+
+    def __init__(self, rows: list[tuple[Any, ...]], gets: Iterable[Any]) -> None:
+        super().__init__(gets=gets)
+        self._rows = rows
+
+    async def execute(self, stmt: Any) -> _Result:
+        self.statements.append(stmt)
+        return _Result(self._rows)
+
+
+def test_budget_field_options_carry_the_tree() -> None:
+    """Give each cost center its parent, key and color; an inactive parent drops out."""
+    top, child, orphan, gone = (uuid.uuid4() for _ in range(4))
+    rows = [
+        (top, "AStA", "VS", None, "VS", "#123456"),
+        (child, "Kultur", "VS-1", top, "1", None),
+        (orphan, "Sport", "VS-2-3", gone, "3", "#abcdef"),
+    ]
+    svc = FormsService(_BudgetRowsSession(rows, gets=[]))  # type: ignore[arg-type]
+    out = _run(svc._budget_field_options())
+    assert [o.model_dump(by_alias=True, exclude_none=True) for o in out] == [
+        {
+            "value": str(top),
+            "label": {"de": "AStA (VS)", "en": "AStA (VS)"},
+            "key": "VS",
+            "color": "#123456",
+        },
+        {
+            "value": str(child),
+            "label": {"de": "Kultur (VS-1)", "en": "Kultur (VS-1)"},
+            "parentId": str(top),
+            "key": "1",
+        },
+        {
+            "value": str(orphan),
+            "label": {"de": "Sport (VS-2-3)", "en": "Sport (VS-2-3)"},
+            "key": "3",
+            "color": "#abcdef",
+        },
+    ]
+
+
 def test_get_effective_form_section_marker_label_preserved() -> None:
     """Pass the own label of a section marker through."""
     ver_id = uuid.uuid4()

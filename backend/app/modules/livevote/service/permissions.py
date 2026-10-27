@@ -23,6 +23,7 @@ from app.modules.livevote.keepers import keeper_summaries
 from app.modules.livevote.models import Meeting
 from app.modules.livevote.schemas import MeetingOut, MeetingVoteOut
 from app.modules.livevote.service.service_base import MeetingServiceBase
+from app.modules.protocol.models import Protocol
 from app.modules.voting.service import manages_votes_in_gremium
 from app.shared.errors import ForbiddenError
 
@@ -328,10 +329,17 @@ class PermissionOps(MeetingServiceBase):
                 public_join_allowed=allowed,
                 window=window,
             )
+        can_manage = await self.can_manage(meeting.gremium_id, principal)
+        final = (
+            await self.session.scalar(
+                select(Protocol.status).where(Protocol.meeting_id == meeting.id)
+            )
+        ) == "final"
         return self._to_out(
             meeting,
             protocol_id,
-            can_manage=await self.can_manage(meeting.gremium_id, principal),
+            can_manage=can_manage,
+            can_delete=self._can_delete(principal, can_manage=can_manage, final=final),
             can_write=await self.can_write(meeting, principal),
             can_manage_votes=await self.can_manage_votes(meeting, principal),
             can_vote=await self.can_vote(meeting, principal),

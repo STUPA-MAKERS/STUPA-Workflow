@@ -56,6 +56,7 @@ export function meeting(over: Partial<Meeting> = {}): Meeting {
     canManageVotes: true,
     canVote: true,
     canFinalize: true,
+    canDelete: true,
     keeperPeriods: [],
     plannedHandover: null,
     publicJoin: false,
