@@ -284,6 +284,14 @@ describe('ApplicationsDetailComponent — header', () => {
     http.verify();
   });
 
+  it('offers edit in a locked state to a holder of application.edit_any', async () => {
+    await setup({
+      perms: ['application.read', 'application.edit_any'],
+      app: { state: { ...SUBMITTED, editAllowed: false }, canEditLocked: true },
+    });
+    expect(screen.getByRole('button', { name: 'Bearbeiten' })).toBeInTheDocument();
+  });
+
   it('opens the share links from the header', async () => {
     const { http, cmp } = await setup();
     await userEvent.click(screen.getByRole('button', { name: 'Öffentliche Links' }));

@@ -166,7 +166,10 @@ class ApplicationOut(_CamelModel):
     Attributes:
         vote_gremium_id: The Gremium that decides the current vote state (snapshot),
             else null.
-        can_edit: The requester may edit or delete: a manager or the creator.
+        can_edit: The requester may edit or delete: a manager, a holder of
+            ``application.edit_any`` or the creator.
+        can_edit_locked: The requester holds ``application.edit_any``, so a state with
+            ``editAllowed`` false does not lock the edit for this requester.
         is_owner: The requester is the creator, that is the applicant. This gates the
             anonymization request (GDPR Art. 17), because only the data subject may
             ask, never the administration.
@@ -203,6 +206,7 @@ class ApplicationOut(_CamelModel):
     updated_at: datetime = Field(alias="updatedAt")
     applicant: ApplicantOut | None = None
     can_edit: bool = Field(default=False, alias="canEdit")
+    can_edit_locked: bool = Field(default=False, alias="canEditLocked")
     is_owner: bool = Field(default=False, alias="isOwner")
     archived_at: datetime | None = Field(default=None, alias="archivedAt")
     state_since: datetime | None = Field(default=None, alias="stateSince")
