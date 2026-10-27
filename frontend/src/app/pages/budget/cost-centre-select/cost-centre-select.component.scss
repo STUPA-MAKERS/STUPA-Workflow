@@ -22,6 +22,9 @@
 .ccs__box--open {
   box-shadow: inset 0 0 0 2px var(--color-focus-ring);
 }
+.ccs__box--invalid {
+  @include f.box-invalid;
+}
 .ccs__label {
   @include f.label;
   right: 2.75rem;

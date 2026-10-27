@@ -100,6 +100,7 @@ export interface CostCentreGroup {
  *   the icon, the label and a chevron; with a pick a check mark and the name of the pick.
  * - The fiscal year of the free amount: `fiscalYearId` where the cost centre has it, else
  *   the year of its top-level budget in `fiscalYears`, else the only year it has.
+ * - `invalid`: the field shows the error state; the caller puts the error text below it.
  * - Keyboard: the search keeps the focus; Arrow Down/Up, Home and End move the active
  *   row (`aria-activedescendant`), Enter picks it, Escape closes and returns to the
  *   field.
@@ -129,6 +130,8 @@ export class CostCentreSelectComponent {
   readonly label = input.required<string>();
   readonly placeholder = input('');
   readonly required = input(false, { transform: booleanAttribute });
+  /** The field shows the error state (a form field with an error below it). */
+  readonly invalid = input(false, { transform: booleanAttribute });
   /** The fiscal year of the form. */
   readonly fiscalYearId = input('');
   /** The fiscal year per top-level budget, for the budgets the form has no year of. */
@@ -427,6 +430,11 @@ export class CostCentreSelectComponent {
     this.reveal();
   }
 
+  /**
+   * Open the list. On desktop the search takes the focus one render after the placing,
+   * because the menu is `visibility: hidden` until `placed` renders and a hidden input
+   * takes no focus.
+   */
   private show(): void {
     this.opened.emit();
     this.query.set('');
@@ -447,8 +455,10 @@ export class CostCentreSelectComponent {
       showInTopLayer(menu);
       this.place(menu);
       this.placed.set(true);
-      menu.querySelector<HTMLInputElement>('input')?.focus();
-      this.reveal();
+      this.afterRender(() => {
+        menu.querySelector<HTMLInputElement>('input')?.focus();
+        this.reveal();
+      });
     });
   }
 
