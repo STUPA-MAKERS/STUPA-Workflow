@@ -301,7 +301,18 @@ export class ApplicationsDetailComponent {
    * Files dropped anywhere on the application become its attachments. Not while another
    * application loads, and not while the comments are open: the chat takes its own drop.
    */
-  readonly takesDrop = computed(() => this.canManage() && !this.switching() && !this.commentsOpen());
+  readonly takesDrop = computed(() => this.canUploadFiles() && !this.switching() && !this.commentsOpen());
+
+  /** Upload attachments: as the server's `require_app_edit`, a manager, a holder of
+   *  `application.edit_any` or the creator, in every state. */
+  readonly canUploadFiles = computed(() => !!this.app()?.canEdit);
+  /** Delete attachments: a manager and a holder of `application.edit_any` in every state,
+   *  the creator only while the state allows the edit (else the server answers 409). */
+  readonly canDeleteFiles = computed(() => {
+    const app = this.app();
+    if (!app?.canEdit) return false;
+    return this.canManage() || app.canEditLocked || !!app.state?.editAllowed;
+  });
 
   /** A drop on the page: the panel uploads it; in tabs, its tab opens to show the upload. */
   onFilesDropped(files: File[]): void {

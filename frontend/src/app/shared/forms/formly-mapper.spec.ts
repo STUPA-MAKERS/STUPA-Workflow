@@ -2,6 +2,7 @@ import { FormControl, FormGroup } from '@angular/forms';
 import type { FormlyFieldConfig } from '@ngx-formly/core';
 import type { Observable } from 'rxjs';
 import type { FormFieldDef, FormSection } from '@core/api/models';
+import type { BudgetTreeNode } from '../../pages/budget/budget-tree.api';
 import { toFormlyFields, toFormlySections } from './formly-mapper';
 
 function callExpr(
@@ -66,7 +67,7 @@ describe('toFormlyFields', () => {
     expect(multi.type).toBe('multicheckbox');
   });
 
-  it('maps dynamic selects (gremium/budget) as selects with injected options', () => {
+  it('maps a gremium select as a select and a budget select as the cost-centre tree', () => {
     const fields: FormFieldDef[] = [
       {
         key: 'g',
@@ -78,14 +79,27 @@ describe('toFormlyFields', () => {
         key: 'b',
         type: 'budget_select',
         label: { de: 'KS' },
-        options: [{ value: 'id-2', label: { de: 'VSM-1 (VSM-1)' } }],
+        options: [
+          { value: 'id-2', label: { de: 'AStA (VSM)' }, key: 'VSM', color: '#123456' },
+          { value: 'id-3', label: { de: 'Kultur (VSM-1)' }, key: '1', parentId: 'id-2' },
+        ],
       },
     ];
     const [g, b] = toFormlyFields(fields, 'de');
     expect(g.type).toBe('select');
     expect(g.props?.['options']).toEqual([{ value: 'id-1', label: 'StuPa' }]);
-    expect(b.type).toBe('select');
-    expect(b.props?.['options']).toEqual([{ value: 'id-2', label: 'VSM-1 (VSM-1)' }]);
+    expect(b.type).toBe('budget_select');
+    expect(b.props?.['options']).toEqual([
+      { value: 'id-2', label: 'AStA (VSM)' },
+      { value: 'id-3', label: 'Kultur (VSM-1)' },
+    ]);
+    const nodes = b.props?.['nodes'] as BudgetTreeNode[];
+    expect(nodes.map((n) => [n.id, n.name, n.pathKey, n.color])).toEqual([
+      ['id-2', 'AStA', 'VSM', '#123456'],
+    ]);
+    expect(nodes[0].children.map((n) => [n.id, n.name, n.key, n.parentId])).toEqual([
+      ['id-3', 'Kultur', '1', 'id-2'],
+    ]);
   });
 
   it('maps email/iban to inputs and daterange to its own type', () => {

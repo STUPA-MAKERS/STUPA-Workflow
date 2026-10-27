@@ -964,9 +964,19 @@ export type FieldType =
   | 'funding'
   | 'section';
 
+/**
+ * One option of a select field. The server sets `parentId`, `key` and `color` on the
+ * options of `budget_select`, so the form shows the cost centres as a tree.
+ */
 export interface FieldOption {
   value: string;
   label: I18nMap;
+  /** The value of the parent cost centre, or null for a top-level one. */
+  parentId?: string | null;
+  /** The path segment of the cost centre. */
+  key?: string | null;
+  /** The own display colour of the cost centre, or null. */
+  color?: string | null;
 }
 
 export interface FieldValidation {
@@ -1476,6 +1486,8 @@ export interface MeetingOutWire {
   /** Finalize and send the protocol: write access plus the gremium permission
    *  `protocol.finalize`. */
   canFinalize?: boolean;
+  /** Delete the meeting: `canManage`, and `meeting.delete_finalized` for a final protocol. */
+  canDelete?: boolean;
   /** The periods of the protocol keepers, running and ended, in time order. */
   keeperPeriods?: KeeperPeriod[];
   /** The handover planned for the next agenda item. */
@@ -1667,6 +1679,9 @@ export interface Meeting {
   /** Finalize and send the protocol: write access plus the gremium permission
    *  `protocol.finalize`. */
   canFinalize: boolean;
+  /** Delete the meeting: `canManage`, and `meeting.delete_finalized` for a final protocol.
+   *  The server sets it, because the client does not know the protocol status. */
+  canDelete: boolean;
   /** The periods of the protocol keepers, running and ended, in time order. */
   keeperPeriods: KeeperPeriod[];
   /** The handover planned for the next agenda item, or `null`. */

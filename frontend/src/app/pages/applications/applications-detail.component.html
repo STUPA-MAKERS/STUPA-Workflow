@@ -355,7 +355,8 @@
 <ng-template #files let-application>
   <app-attachments-panel
     [applicationId]="application.id"
-    [canUpload]="canManage()"
+    [canUpload]="canUploadFiles()"
+    [canDelete]="canDeleteFiles()"
     [dropTarget]="false"
     (countChange)="attachmentCount.set($event)"
   />

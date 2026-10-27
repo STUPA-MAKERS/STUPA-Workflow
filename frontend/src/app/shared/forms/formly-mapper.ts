@@ -7,6 +7,7 @@ import { resolveI18n } from './i18n-text';
 import { baseLocale, toFormatLocale } from '@core/i18n/i18n.service';
 import { formatMoney } from '@shared/format-money';
 import { normalizePositions, positionsTotal } from './positions';
+import { budgetOptionTree } from './budget-options';
 
 /**
  * HTML `type` for the `input` variant (text/number/currency/date/file).
@@ -39,11 +40,12 @@ const FORMLY_TYPE: Record<FieldType, string> = {
   select: 'select',
   multiselect: 'multicheckbox',
   /**
-   * Dynamic pickers render as a normal select. The server supplies the options in the
-   * effective form, so nobody maintains them by hand.
+   * Dynamic pickers. The server supplies the options in the effective form, so nobody
+   * maintains them by hand. A Gremium is a normal select; a cost centre is the tree
+   * picker of the budget forms (`budget_select`, with `props.nodes`).
    */
   gremium_select: 'select',
-  budget_select: 'select',
+  budget_select: 'budget_select',
   email: 'input',
   iban: 'input',
   daterange: 'daterange',
@@ -237,6 +239,7 @@ function mapField(
   ) {
     props['options'] = f.options.map((o) => ({ value: o.value, label: resolveI18n(o.label, lang) }));
   }
+  if (f.type === 'budget_select') props['nodes'] = budgetOptionTree(f.options ?? [], lang);
 
   applyValidation(f, props);
 

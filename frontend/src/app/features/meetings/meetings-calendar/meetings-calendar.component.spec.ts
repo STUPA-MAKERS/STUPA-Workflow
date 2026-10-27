@@ -37,6 +37,7 @@ function wire(id: string, title: string, date: string | null, over: Partial<Meet
     protocolId: null,
     protokollantName: null,
     canManage: true,
+    canDelete: true,
     votes: [],
     createdAt: '2026-09-01T00:00:00Z',
     ...over,

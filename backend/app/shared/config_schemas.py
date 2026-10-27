@@ -158,9 +158,20 @@ class FlowValidationError(Exception):
 
 
 class FieldOption(_CamelModel):
-    """One option of a select field."""
+    """One option of a select field.
+
+    Attributes:
+        parent_id: For ``budget_select``, the value of the option of the parent cost
+            center, or None for a top-level one. Only the server sets it, together with
+            ``key`` and ``color``, so the client can show the options as a tree.
+        key: For ``budget_select``, the path segment of the cost center.
+        color: For ``budget_select``, the own display color of the cost center, or None.
+    """
     value: str
     label: I18nMap
+    parent_id: str | None = Field(default=None, alias="parentId")
+    key: str | None = None
+    color: str | None = None
 
 
 class FieldValidation(_CamelModel):

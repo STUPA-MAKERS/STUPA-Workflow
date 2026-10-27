@@ -243,6 +243,10 @@ class _FakeSession:
         """Return None, because the Gremium name lookup in `_emit` does not matter here."""
         return None
 
+    async def scalar(self, _stmt: object) -> object | None:
+        """Return None, because the meeting has no protocol in these tests."""
+        return None
+
     def add(self, obj: object) -> None:
         if getattr(obj, "id", None) is None:
             obj.id = uuid4()  # type: ignore[attr-defined]
@@ -421,7 +425,7 @@ async def test_service_list_maps_protocol_and_keeps_order() -> None:
     """
     m1, m2 = _meeting_row(), _meeting_row()
     pid = uuid4()
-    session = _ListSession([m1, m2], [(m1.id, pid)])
+    session = _ListSession([m1, m2], [(m1.id, pid, "draft")])
     out = await MeetingService(session).list(_principal())  # type: ignore[arg-type]
     assert [o.id for o in out] == [m1.id, m2.id]
     assert out[0].protocol_id == pid

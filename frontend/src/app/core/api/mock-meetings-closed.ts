@@ -91,6 +91,7 @@ function closedMeeting(
     canManageVotes: true,
     canVote: true,
     canFinalize: true,
+    canDelete: true,
     keeperPeriods: [
       {
         principalId: 'p-4',

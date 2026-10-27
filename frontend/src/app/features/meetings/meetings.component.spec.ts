@@ -39,6 +39,7 @@ const MEETING: MeetingOutWire = {
   canManageVotes: true,
   canVote: false,
   canFinalize: true,
+  canDelete: true,
   votes: [
     {
       id: 'v-1',
@@ -89,6 +90,7 @@ const MEETING_MODEL: Meeting = {
   canManageVotes: true,
   canVote: false,
   canFinalize: true,
+  canDelete: true,
   keeperPeriods: [],
   plannedHandover: null,
   publicJoin: false,

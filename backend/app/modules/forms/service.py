@@ -101,7 +101,7 @@ def _field_def_to_row_kwargs(field: FormFieldDef, order: int) -> dict[str, Any]:
         "visible_if": field.visible_if,
         "compute": field.compute,
         "options": (
-            [o.model_dump(by_alias=True) for o in field.options]
+            [o.model_dump(by_alias=True, exclude_none=True) for o in field.options]
             if field.options is not None
             else None
         ),
@@ -195,18 +195,35 @@ class FormsService:
     async def _budget_field_options(self) -> list[FieldOption]:
         """Return the active cost centers as `select` options for `budget_select`.
 
-        The label is `name (path key)`. The stored answer value is the budget UUID.
+        The label is `name (path key)`. The stored answer value is the budget UUID. Each
+        option also carries the parent, the key and the own color, because the form shows
+        the cost centers as a tree with the colors of the budget page. A parent that is not
+        active has no option, so its active children are top-level options.
         """
         rows = (
             await self.session.execute(
-                select(Budget.id, Budget.name, Budget.path_key)
+                select(
+                    Budget.id,
+                    Budget.name,
+                    Budget.path_key,
+                    Budget.parent_id,
+                    Budget.key,
+                    Budget.color,
+                )
                 .where(Budget.active.is_(True))
                 .order_by(Budget.path_key)
             )
         ).all()
+        active = {bid for bid, *_ in rows}
         return [
-            FieldOption(value=str(bid), label={"de": f"{name} ({path})", "en": f"{name} ({path})"})
-            for bid, name, path in rows
+            FieldOption(
+                value=str(bid),
+                label={"de": f"{name} ({path})", "en": f"{name} ({path})"},
+                parentId=str(parent) if parent in active else None,
+                key=key,
+                color=color,
+            )
+            for bid, name, path, parent, key, color in rows
         ]
 
     async def create_form_version(
