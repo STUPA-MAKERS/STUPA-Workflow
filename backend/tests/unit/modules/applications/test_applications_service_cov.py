@@ -377,8 +377,26 @@ async def test_get_without_pii_and_can_manage() -> None:
     )
     assert out.is_owner is False
     assert out.can_edit is True
+    assert out.can_edit_locked is False
     assert out.applicant is None
     assert out.version == 3
+
+
+async def test_get_edit_any_can_edit_locked() -> None:
+    """Let a holder of `application.edit_any` edit, also in a locked state."""
+    state = _state()
+    app = _app(created_by="someone-else", current_state_id=state.id)
+    session = _Session(
+        get_results=[app, state],
+        execute_results=[[("draft", "#zzz")]],
+        scalar_results=[3],
+    )
+    svc = ApplicationsService(session)  # type: ignore[arg-type]
+    out = await svc.get(
+        app.id, include_pii=False, requester_sub="other", requester_edits_any=True
+    )
+    assert out.can_edit is True
+    assert out.can_edit_locked is True
 
 
 async def test_get_include_pii_but_no_applicant_row() -> None:

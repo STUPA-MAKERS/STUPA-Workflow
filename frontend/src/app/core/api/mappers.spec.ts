@@ -107,6 +107,7 @@ describe('mapApplication', () => {
       updatedAt: '2026-06-06T10:00:00Z',
       applicant: { email: 'a@b.de', name: 'Max', anonymized: false },
       canEdit: false,
+      canEditLocked: false,
       isOwner: false,
       archivedAt: null,
       stateSince: null,
@@ -899,12 +900,14 @@ describe('mapper null/??-branch fills', () => {
         updatedAt: '2026-06-05T10:00:00Z',
         applicant: {} as { anonymized?: boolean },
         canEdit: true,
+        canEditLocked: true,
         isOwner: true,
       } as ApplicationOutWire,
       'de',
     );
     expect(view.applicant).toEqual({ email: null, name: null, anonymized: false });
     expect(view.canEdit).toBe(true);
+    expect(view.canEditLocked).toBe(true);
     expect(view.isOwner).toBe(true);
     expect(view.budgetId).toBeNull();
   });

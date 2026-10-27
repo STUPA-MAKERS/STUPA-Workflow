@@ -45,6 +45,7 @@ class ReadOps(ApplicationsServiceBase):
         include_pii: bool,
         requester_sub: str | None = None,
         requester_can_manage: bool = False,
+        requester_edits_any: bool = False,
         allow_unconfirmed: bool = True,
         strip_pii_fields: bool = False,
         applicant_view: bool = False,
@@ -56,14 +57,17 @@ class ReadOps(ApplicationsServiceBase):
         ``isPII`` form fields from ``data`` for a reader without the PII right.
         ``applicant_view`` and ``magic_link_view`` follow `timeline`: the capture
         block then names the Gremium instead of the capturing member.
+        ``requester_edits_any`` is ``application.edit_any``: it sets ``canEdit`` and
+        ``canEditLocked``, because the PATCH lifts the state lock for that holder.
         """
         app = await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
         is_owner = requester_sub is not None and app.created_by == requester_sub
-        can_edit = requester_can_manage or is_owner
+        can_edit = requester_can_manage or requester_edits_any or is_owner
         return await self._to_out(
             app,
             include_pii=include_pii,
             can_edit=can_edit,
+            can_edit_locked=requester_edits_any,
             is_owner=is_owner,
             strip_pii_fields=strip_pii_fields,
             applicant_view=applicant_view,

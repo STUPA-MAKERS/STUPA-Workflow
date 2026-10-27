@@ -516,7 +516,8 @@ async def get_application(
     applicant block. ``stateSince`` is the time of the last status change.
 
     The applicant block goes to a principal with the PII right, also to the logged-in
-    creator. The magic-link applicant gets none.
+    creator. The magic-link applicant gets none. ``canEditLocked`` is true for a
+    holder of ``application.edit_any``, whose edit the state lock does not stop.
     """
     principal = access.principal
     pii = await can_read_pii(service.session, access)
@@ -527,6 +528,7 @@ async def get_application(
         requester_can_manage=principal.has("application.manage")
         if principal is not None
         else False,
+        requester_edits_any=principal is not None and principal.has(EDIT_ANY_PERMISSION),
         allow_unconfirmed=access.is_owning_applicant,
         strip_pii_fields=not pii,
         applicant_view=access.is_applicant_view,

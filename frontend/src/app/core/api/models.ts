@@ -223,6 +223,7 @@ export interface ApplicationOutWire {
   updatedAt: IsoDateTime;
   applicant?: ApplicantOutWire | null;
   canEdit?: boolean;
+  canEditLocked?: boolean;
   isOwner?: boolean;
   archivedAt?: IsoDateTime | null;
   /** Time of the last status change. */
@@ -671,8 +672,12 @@ export interface Application {
   createdAt: IsoDateTime;
   updatedAt: IsoDateTime;
   applicant: Applicant | null;
-  /** True if the requester may edit or delete. A manager or the creator may. */
+  /** True if the requester may edit or delete. A manager, a holder of
+   *  `application.edit_any` or the creator may. */
   canEdit: boolean;
+  /** True if the requester holds `application.edit_any`: a state with `editAllowed`
+   *  false does not lock the edit for this requester. */
+  canEditLocked: boolean;
   /** True if the requester is the creator, that is the applicant. It gates the
    *  anonymization request under GDPR Art. 17. Only the data subject may ask. */
   isOwner: boolean;

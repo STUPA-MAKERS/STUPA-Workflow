@@ -37,6 +37,7 @@ function app(editAllowed: boolean, data: Record<string, unknown> = { title: 'Som
     stateSince: '2026-09-28T14:20:00Z',
     applicant: null,
     canEdit: editAllowed,
+    canEditLocked: false,
     isOwner: true,
     archivedAt: null,
     hiddenKeys: [],
