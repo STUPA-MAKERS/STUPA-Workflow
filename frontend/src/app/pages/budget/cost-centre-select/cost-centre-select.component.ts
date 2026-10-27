@@ -430,6 +430,11 @@ export class CostCentreSelectComponent {
     this.reveal();
   }
 
+  /**
+   * Open the list. On desktop the search takes the focus one render after the placing,
+   * because the menu is `visibility: hidden` until `placed` renders and a hidden input
+   * takes no focus.
+   */
   private show(): void {
     this.opened.emit();
     this.query.set('');
@@ -450,8 +455,10 @@ export class CostCentreSelectComponent {
       showInTopLayer(menu);
       this.place(menu);
       this.placed.set(true);
-      menu.querySelector<HTMLInputElement>('input')?.focus();
-      this.reveal();
+      this.afterRender(() => {
+        menu.querySelector<HTMLInputElement>('input')?.focus();
+        this.reveal();
+      });
     });
   }
 
