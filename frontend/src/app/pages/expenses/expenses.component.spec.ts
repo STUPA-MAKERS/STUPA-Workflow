@@ -548,6 +548,87 @@ describe('ExpensesComponent (unit)', () => {
     expect(dlg(cmp).newFiscalYearId()).toBe('fy-active');
   });
 
+  /** The dates stay empty; cost centre, year and every other field come from the booking. */
+  it('openDuplicate fills the create form with the values of the booking', () => {
+    const { cmp, http } = build({ tree: ROOT_TREE, invoices: [INVOICE] });
+    const booking: Expense = {
+      ...EXPENSE,
+      budgetId: 'child-1',
+      fiscalYearId: 'fy-old',
+      note: 'Monatlich',
+      invoiceId: 'inv-1',
+      childCount: 2,
+    };
+    cmp.openDuplicate(booking);
+    const d = dlg(cmp);
+    expect(cmp.createOpen()).toBe(true);
+    expect(cmp.editing()).toBeNull();
+    expect(d.newKind()).toBe('expense');
+    expect(d.newAmount()).toBe('120.00');
+    expect(d.newDescription()).toBe('Druckkosten Flyer');
+    expect(d.newBudgetId()).toBe('child-1');
+    expect(d.newInvoiceId()).toBe('inv-1');
+    expect(d.newCorrespondent()).toBe('Copyshop Müller');
+    expect(d.newReferenceNumber()).toBe('R-2026-7');
+    expect(d.newPaymentMethod()).toBe('ueberweisung');
+    expect(d.newCategory()).toBe('Werbung');
+    expect(d.newNote()).toBe('Monatlich');
+    expect(d.newPaymentDate()).toBe('');
+    expect(d.newInvoiceDate()).toBe('');
+    expect(d.newApplicationId()).toBe('');
+    http.expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years')).flush([FY_ACTIVE, FY_OLD]);
+    expect(d.newFiscalYearId()).toBe('fy-old');
+    http.expectNone((r) => r.url.endsWith('/invoices/inv-1'));
+  });
+
+  it('openDuplicate keeps the application, and loads a linked invoice the cache lacks', () => {
+    const { cmp, http } = build({ tree: ROOT_TREE });
+    cmp.openDuplicate({
+      ...EXPENSE,
+      applicationId: 'app-1',
+      applicationTitle: 'Lastenrad',
+      invoiceId: 'inv-9',
+      note: null,
+      referenceNumber: null,
+      correspondent: null,
+      paymentMethod: null,
+      category: null,
+    });
+    const d = dlg(cmp);
+    expect(d.newApplicationId()).toBe('app-1');
+    expect(d.appQuery()).toBe('Lastenrad');
+    expect(d.newBudgetId()).toBe('');
+    expect(d.newCorrespondent()).toBe('');
+    expect(d.newNote()).toBe('');
+    http.expectNone((r) => r.url.includes('/fiscal-years'));
+    http.expectOne((r) => r.url.endsWith('/invoices/inv-9')).flush({ ...INVOICE, id: 'inv-9', status: 'paid' });
+    expect(d.invoiceOptions()[0].value).toBe('inv-9');
+    expect(d.newAmount()).toBe('120.00');
+  });
+
+  it('openDuplicate names an application without a title, keeps an income, and survives a failed invoice load', () => {
+    const { cmp, http } = build({ tree: ROOT_TREE });
+    cmp.openDuplicate({ ...EXPENSE, applicationId: 'app-1', applicationTitle: null, invoiceId: 'inv-x' });
+    expect(dlg(cmp).appQuery()).toBe('Antrag');
+    http.expectOne((r) => r.url.endsWith('/invoices/inv-x')).error(new ProgressEvent('err'));
+    expect(dlg(cmp).newInvoiceId()).toBe('inv-x');
+    cmp.openDuplicate({ ...EXPENSE, kind: 'income', applicationId: 'app-1', budgetId: 'child-1' });
+    expect(dlg(cmp).newKind()).toBe('income');
+    expect(dlg(cmp).newApplicationId()).toBe('');
+    expect(dlg(cmp).newBudgetId()).toBe('child-1');
+    http.expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years')).flush([FY_ACTIVE]);
+  });
+
+  /** A late answer for another cost centre does not replace the years of the picked one. */
+  it('loadFiscalYears drops the answer for a cost centre that is no longer picked', () => {
+    const { cmp, http } = build({ tree: ROOT_TREE });
+    dlg(cmp).onPickBudget('child-1');
+    dlg(cmp).newBudgetId.set('');
+    http.expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years')).flush([FY_ACTIVE]);
+    expect(dlg(cmp).fiscalYearOptions()).toEqual([]);
+    expect(dlg(cmp).newFiscalYearId()).toBe('');
+  });
+
   it('openCreate without a preselected budget skips the fiscal-year load', () => {
     const { cmp, http } = build({ tree: ROOT_TREE });
     cmp.openCreate();
@@ -3078,6 +3159,7 @@ describe('ExpensesComponent (list/detail)', () => {
     const withInvoice = { ...EXPENSE, invoiceId: 'inv-1' };
     expect(cmp.rowMenu(withInvoice).flatMap((s) => s.items.map((i) => i.id))).toEqual([
       'edit',
+      'duplicate',
       'sub',
       'invoice',
       'delete',
@@ -3089,6 +3171,9 @@ describe('ExpensesComponent (list/detail)', () => {
     cmp.onRowMenu({ id: 'invoice', label: '' }, EXPENSE);
     cmp.onRowMenu({ id: 'edit', label: '' }, EXPENSE);
     expect(cmp.editing()).toBe(EXPENSE);
+    cmp.onRowMenu({ id: 'duplicate', label: '' }, EXPENSE);
+    expect(cmp.createOpen()).toBe(true);
+    expect(dlg(cmp).newDescription()).toBe('Druckkosten Flyer');
     cmp.onRowMenu({ id: 'sub', label: '' }, EXPENSE);
     expect(cmp.subParent()).toBe(EXPENSE);
     cmp.onRowMenu({ id: 'delete', label: '' }, EXPENSE);
@@ -3346,6 +3431,17 @@ describe('ExpensesComponent (closed fiscal year)', () => {
     const ids = cmp.rowMenu(booking).flatMap((sec) => sec.items.map((i) => i.id));
     expect(ids).not.toContain('edit');
     expect(ids).not.toContain('delete');
+    expect(ids).toContain('duplicate');
+  });
+
+  it('duplicates a booking of a closed year into the active open year', () => {
+    const booking = { ...EXPENSE, budgetId: 'child-1', fiscalYearId: 'fy-closed' };
+    const { cmp, http } = build({ tree: ROOT_TREE });
+    cmp.openDuplicate(booking);
+    expect(dlg(cmp).newBudgetId()).toBe('child-1');
+    http.expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years')).flush([FY_ACTIVE, CLOSED]);
+    expect(dlg(cmp).fiscalYearOptions()).toEqual([{ value: 'fy-active', label: '2026' }]);
+    expect(dlg(cmp).newFiscalYearId()).toBe('fy-active');
   });
 
   it('a reopened year drops out of the closed set on the next load', () => {

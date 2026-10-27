@@ -130,11 +130,13 @@ class _FakeService:
         include_pii,
         requester_sub=None,
         requester_can_manage=False,
+        requester_edits_any=False,
         allow_unconfirmed=True,
         strip_pii_fields=False,
         applicant_view=False,
         magic_link_view=False,
     ):
+        self.last_requester_edits_any = requester_edits_any
         self.last_applicant_view = applicant_view
         self.last_include_pii = include_pii
         self.last_strip_pii_fields = strip_pii_fields
@@ -534,6 +536,18 @@ def test_edit_any_bypasses_state_lock(
     r = client.patch(f"/api/applications/{uuid4()}", json={"data": {"title": "X"}})
     assert r.status_code == 200
     assert fake_service.last_bypass_state_lock is True
+
+
+def test_get_marks_edit_any_holder(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    """Tell the read that the reader holds `application.edit_any`."""
+    _as_principal(app, "application.read_all", "application.edit_any")
+    assert client.get(f"/api/applications/{uuid4()}").status_code == 200
+    assert fake_service.last_requester_edits_any is True
+    _as_principal(app, "application.read_all")
+    assert client.get(f"/api/applications/{uuid4()}").status_code == 200
+    assert fake_service.last_requester_edits_any is False
 
 
 def test_delete_application_admin(

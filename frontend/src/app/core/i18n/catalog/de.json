@@ -209,6 +209,7 @@
   "expenses.filter.amountRange": "Betrag",
   "expenses.col.application": "Antrag",
   "expenses.col.amount": "Betrag",
+  "expenses.action.duplicate": "Duplizieren",
   "expenses.action.viewInvoice": "Verknüpfte Rechnung anzeigen",
   "expenses.field.description": "Beschreibung",
   "expenses.field.descriptionPlaceholder": "Wofür war die Buchung?",

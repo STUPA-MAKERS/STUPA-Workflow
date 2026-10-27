@@ -132,6 +132,7 @@ async function setup(inputs: Record<string, unknown> = {}) {
   const remove = jest.fn();
   const addSub = jest.fn();
   const openFile = jest.fn();
+  const duplicate = jest.fn();
   const view = await render(BookingDetailComponent, {
     inputs: {
       expense: EXPENSE,
@@ -139,13 +140,14 @@ async function setup(inputs: Record<string, unknown> = {}) {
       costCentres: costCentreIndex(TREE),
       fyLabel: '2026',
       canManage: true,
+      canDuplicate: true,
       split: true,
       ...inputs,
     },
-    on: { edit, remove, addSub, openFile },
+    on: { edit, remove, addSub, openFile, duplicate },
     providers: [provideRouter([]), NO_LINKED_TODOS],
   });
-  return { view, edit, remove, addSub, openFile, user: userEvent.setup() };
+  return { view, edit, remove, addSub, openFile, duplicate, user: userEvent.setup() };
 }
 
 describe('BookingDetailComponent', () => {
@@ -266,13 +268,16 @@ describe('BookingDetailComponent', () => {
   });
 
   it('runs the actions of the head and its menu', async () => {
-    const { edit, remove, addSub, openFile, user } = await setup({
+    const { edit, remove, addSub, openFile, duplicate, user } = await setup({
       expense: { ...EXPENSE, invoiceId: 'inv' },
       invoice: INVOICE,
     });
     await user.click(screen.getByRole('button', { name: 'Buchung bearbeiten' }));
     expect(edit).toHaveBeenCalledWith(expect.objectContaining({ id: 'e-1' }));
     const menu = () => screen.getByRole('button', { name: 'Weitere Aktionen' });
+    await user.click(menu());
+    await user.click(screen.getByRole('menuitem', { name: 'Duplizieren' }));
+    expect(duplicate).toHaveBeenCalledWith(expect.objectContaining({ id: 'e-1' }));
     await user.click(menu());
     await user.click(screen.getByRole('menuitem', { name: 'Unterbuchung hinzufügen' }));
     expect(addSub).toHaveBeenCalled();
@@ -296,9 +301,19 @@ describe('BookingDetailComponent', () => {
     expect(edit).toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'Weitere Aktionen' }));
     expect(screen.queryByRole('menuitem', { name: 'Unterbuchung hinzufügen' })).toBeNull();
+    expect(screen.queryByRole('menuitem', { name: 'Duplizieren' })).toBeNull();
     const cmp = view.fixture.componentInstance;
     cmp.onMenu({ id: 'file', label: '' });
     cmp.onMenu({ id: 'other', label: '' });
+  });
+
+  /** A closed year: no write action, but the copy goes into an open year. */
+  it('offers only "Duplizieren" and the file for a booking of a closed year', async () => {
+    const { user } = await setup({ canManage: false });
+    expect(screen.queryByRole('button', { name: 'Buchung bearbeiten' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Weitere Aktionen' }));
+    expect(screen.getByRole('menuitem', { name: 'Duplizieren' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Löschen' })).toBeNull();
   });
 
   it('shows an overdrawn cost centre in the error tone', async () => {

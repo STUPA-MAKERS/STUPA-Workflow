@@ -719,10 +719,12 @@ export class ApplicationsDetailComponent {
   readonly looks = computed(() => transitionLooks(this.transitions()));
 
   /** The data can change: the edit button and the menu item. The edit form needs the
-   *  fields of the form, so the button waits for them. */
+   *  fields of the form, so the button waits for them. `canEditLocked`
+   *  (`application.edit_any`) lifts the edit lock of the state. */
   readonly canEditData = computed(() => {
     const app = this.app();
-    return !!app?.canEdit && !!app.state?.editAllowed && this.sections().length > 0;
+    const unlocked = !!app?.state?.editAllowed || !!app?.canEditLocked;
+    return !!app?.canEdit && unlocked && this.sections().length > 0;
   });
 
   /** The owner may ask for the anonymization of their data (GDPR Art. 17). */

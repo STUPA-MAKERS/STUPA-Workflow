@@ -262,6 +262,50 @@ export class ExpenseDialogsState {
     if (opts.invoiceId) this.preselectInvoice(opts.invoiceId);
   }
 
+  /**
+   * Open the form for a new booking with the values of `e`. The payment date and the
+   * invoice date stay empty, because a copy is paid on another day. A booking of an
+   * application keeps the application, and the server takes the cost centre and the
+   * fiscal year from it. Else the copy keeps the cost centre and the fiscal year, or
+   * the active open year when the year of `e` is closed. The amount of a parent is the
+   * sum of its sub-bookings, and the copy takes it as a plain amount without children.
+   */
+  openDuplicate(e: Expense): void {
+    this.openCreate();
+    this.newKind.set(e.kind);
+    this.newAmount.set(e.amount);
+    this.newDescription.set(e.description);
+    this.newCorrespondent.set(e.correspondent ?? '');
+    this.newReferenceNumber.set(e.referenceNumber ?? '');
+    this.newPaymentMethod.set(e.paymentMethod ?? '');
+    this.newCategory.set(e.category ?? '');
+    this.newNote.set(e.note ?? '');
+    if (e.applicationId && e.kind === 'expense') {
+      this.newBudgetId.set('');
+      this.fiscalYearOptions.set([]);
+      this.pickApp({
+        id: e.applicationId,
+        title: e.applicationTitle || this.i18n.translate('expenses.col.application'),
+      });
+    } else {
+      this.newBudgetId.set(e.budgetId);
+      this.newFiscalYearId.set('');
+      this.fiscalYearOptions.set([]);
+      this.loadFiscalYears(e.budgetId, e.fiscalYearId);
+    }
+    if (e.invoiceId) this.keepInvoice(e.invoiceId);
+  }
+
+  /** Link an invoice to the new booking without its data; load it when the cache lacks it. */
+  private keepInvoice(id: string): void {
+    this.newInvoiceId.set(id);
+    if (this.invoices().some((i) => i.id === id)) return;
+    this.api.getInvoice(id).subscribe({
+      next: (inv) => this.invoices.update((rows) => [...rows.filter((r) => r.id !== inv.id), inv]),
+      error: () => undefined,
+    });
+  }
+
   /** Pick an invoice for the new booking; load it first when the cache does not hold it. */
   private preselectInvoice(id: string): void {
     if (this.invoices().some((i) => i.id === id)) {
@@ -309,16 +353,19 @@ export class ExpenseDialogsState {
     if (id) this.loadFiscalYears(id);
   }
 
-  private loadFiscalYears(budgetId: string): void {
+  /** `prefer`: the year to pick when it is open, else the only active one is picked. */
+  private loadFiscalYears(budgetId: string, prefer = ''): void {
     const top = findTopBudgetNode(this.list.budgetTree(), budgetId);
     if (!top) return;
     this.api.listFiscalYears(top.id).subscribe({
       next: (fys: FiscalYear[]) => {
         this.rememberTopYear(top.id, fys);
+        if (this.newBudgetId() !== budgetId) return;
         const open = fys.filter((f) => !f.closedAt);
         this.fiscalYearOptions.set(open.map((f) => ({ value: f.id, label: f.display })));
         const active = open.filter((f) => f.active);
-        if (active.length === 1) this.newFiscalYearId.set(active[0].id);
+        if (prefer && open.some((f) => f.id === prefer)) this.newFiscalYearId.set(prefer);
+        else if (active.length === 1) this.newFiscalYearId.set(active[0].id);
       },
       error: () => this.fiscalYearOptions.set([]),
     });
