@@ -237,7 +237,8 @@ describe('toFormlyFields', () => {
   it('shows the note of a table field in the page language', () => {
     const fields: FormFieldDef[] = [{ key: 'tbl', type: 'table', label: { de: 'Tabelle', en: 'Table' } }];
     expect(toFormlyFields(fields, 'en')[0].props?.['text']).toContain('table input');
-    expect(toFormlyFields(fields, 'fr')[0].props?.['text']).toContain('Tabellen-Eingabe');
+    expect(toFormlyFields(fields, 'fr')[0].props?.['text']).toContain('table input');
+    expect(toFormlyFields(fields, 'de')[0].props?.['text']).toContain('Tabellen-Eingabe');
   });
 
   it('maps a file field to a text input', () => {
@@ -307,12 +308,13 @@ describe('toFormlyFields', () => {
     expect(() => callExpr(cfg, 'model.total', {})).toThrow(TypeError);
   });
 
-  it('resolves labels via the requested language with de/first fallbacks', () => {
+  it('resolves labels via the requested language with en/de/first fallbacks', () => {
     const fields: FormFieldDef[] = [
       { key: 'a', type: 'text', label: { de: 'DE', en: 'EN' } },
     ];
     expect(toFormlyFields(fields, 'en')[0].props?.label).toBe('EN');
-    expect(toFormlyFields(fields, 'fr')[0].props?.label).toBe('DE');
+    expect(toFormlyFields(fields, 'fr')[0].props?.label).toBe('EN');
+    expect(toFormlyFields([{ key: 'a', type: 'text', label: { de: 'DE' } }], 'fr')[0].props?.label).toBe('DE');
   });
 });
 

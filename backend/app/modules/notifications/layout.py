@@ -16,6 +16,8 @@ from __future__ import annotations
 import html
 import re
 
+from app.shared.i18n import pick_lang
+
 #: Footer reason per mail kind ("you receive this email because ...").
 _REASONS: dict[str, dict[str, str]] = {
     "magic_link": {
@@ -145,7 +147,7 @@ _FOOTER_STYLE = "padding:16px 16px 0;font-size:12px;line-height:1.5;color:#6b768
 def reason_text(kind: str, lang: str) -> str:
     """Return the footer hint for a mail kind (fallback: generic hint, DE)."""
     table = _REASONS.get(kind, _REASONS["generic"])
-    return table.get(lang, table["de"])
+    return pick_lang(table, lang)
 
 
 #: URL in the escaped text; it ends before whitespace or "<". The linker splits off
@@ -235,7 +237,7 @@ def render_layout(
     esc_reason = html.escape(reason)
     base = html.escape(base_url.rstrip("/"))
     settings_url = f"{base}/account/notifications"
-    hint = html.escape(_SETTINGS_HINT.get(lang, _SETTINGS_HINT["de"]))
+    hint = html.escape(pick_lang(_SETTINGS_HINT, lang))
     if action_url and action_label and html.escape(action_url) not in content_html:
         content_html = content_html + "\n" + _action_button(action_url, action_label)
     table_open = (

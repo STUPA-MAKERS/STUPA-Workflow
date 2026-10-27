@@ -15,21 +15,15 @@
     <section class="tr__sec" aria-labelledby="tr-langs">
       <h2 id="tr-langs" class="section-title tr__secTitle">{{ 'admin.translations.languages' | t }}</h2>
       <ul class="rowgroup tr__langs">
-        <li class="tr__lang">
-          <span class="tr__langName">{{ 'shell.lang.de' | t }}</span>
-          <span class="tr__langCode mono">de</span>
-          <app-status-text kind="muted">{{ 'admin.translations.builtIn' | t }}</app-status-text>
-        </li>
-        <li class="tr__lang">
-          <span class="tr__langName">{{ 'shell.lang.en' | t }}</span>
-          <span class="tr__langCode mono">en</span>
-          <app-status-text kind="muted">{{ 'admin.translations.builtIn' | t }}</app-status-text>
-        </li>
+        <app-list-item [title]="'shell.lang.de' | t" sub="de">
+          <app-badge trail>{{ 'admin.translations.builtIn' | t }}</app-badge>
+        </app-list-item>
+        <app-list-item [title]="'shell.lang.en' | t" sub="en">
+          <app-badge trail>{{ 'admin.translations.builtIn' | t }}</app-badge>
+        </app-list-item>
         @for (l of languages(); track l.code) {
-          <li class="tr__lang">
-            <span class="tr__langName">{{ l.name }}</span>
-            <span class="tr__langCode mono">{{ l.code }}</span>
-            <span class="tr__langActions">
+          <app-list-item [title]="l.name" [sub]="l.code" (activate)="openDialog(l)">
+            <span trail class="tr__langActions">
               <app-switch
                 [checked]="l.active"
                 [disabled]="toggling() === l.code"
@@ -42,7 +36,7 @@
                 (selected)="onLanguageMenu($event, l)"
               />
             </span>
-          </li>
+          </app-list-item>
         }
       </ul>
     </section>
@@ -131,9 +125,7 @@
           }
         </ul>
         @if (hasMore()) {
-          <div class="tr__more">
-            <app-button variant="tonal" (click)="more()">{{ 'admin.translations.more' | t }}</app-button>
-          </div>
+          <app-load-more [label]="'admin.translations.more' | t" (more)="more()" />
         }
       } @else {
         <app-empty-state rows="3" [heading]="'admin.translations.noMatch' | t" />

@@ -127,7 +127,7 @@ export class GremiumDetailComponent {
 
   readonly roleLabel = computed(() => {
     const g = this.gremium();
-    return g?.isMember ? localized(g.roleName, this.i18n.locale(), g.roleKey ?? '') : '';
+    return g?.isMember ? localized(g.roleName, this.i18n.uiLocale(), g.roleKey ?? '') : '';
   });
 
   /** The facts that are true, in display order. */

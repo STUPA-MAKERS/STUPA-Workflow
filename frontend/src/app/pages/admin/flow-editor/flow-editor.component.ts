@@ -1,3 +1,4 @@
+import type { I18nMap } from '@core/api/models';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -86,6 +87,8 @@ import { StateInspectorComponent, type GuardPriorityRow } from './state-inspecto
 import { TransitionDetailComponent } from './transition-detail.component';
 import { TransitionInspectorComponent } from './transition-inspector.component';
 import { TransitionListsComponent } from './transition-lists.component';
+import { ContentLangSwitchComponent } from '@shared/ui/content-lang-switch/content-lang-switch.component';
+import { ContentLangState } from '@shared/ui/content-lang-switch/content-lang.state';
 
 /** How far one press of a scroll tongue pans the canvas, in screen px. */
 const PAN_STEP = 240;
@@ -125,8 +128,9 @@ const MIN_FIT_SCALE = 0.75;
   selector: 'app-flow-editor',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  providers: [FlowEditorOptionsService],
+  providers: [ContentLangState, FlowEditorOptionsService],
   imports: [
+    ContentLangSwitchComponent,
     SkeletonComponent,
     EmptyStateComponent,
     FabComponent,
@@ -149,6 +153,7 @@ const MIN_FIT_SCALE = 0.75;
   styleUrl: './flow-editor.component.scss',
 })
 export class FlowEditorComponent {
+  protected readonly contentLang = inject(ContentLangState);
   private readonly api = inject(AdminApiService);
   private readonly toast = inject(ToastService);
   private readonly i18n = inject(I18nService);
@@ -270,7 +275,9 @@ export class FlowEditorComponent {
   /**
    * The canvas box is measured, so a small flow shows at its real size instead of blown up to the
    * full box. The level is laid out again whenever its structure changes. Only the answer to the
-   * newest input counts; an older one that answers late is dropped. The drill-down context must
+   * newest input counts; an older one that answers late is dropped. The empty graph before the load
+   * is not laid out, because its layout would end the wait and the loaded flow would show with stale
+   * lines until its own layout answers. The drill-down context must
    * never point at a deleted group, because undo, redo or a dissolve from another path can delete
    * it; it then falls back to the top level. Only structural graph changes (states and transitions,
    * not positions) are undo steps, so node moves do not flood the history.
@@ -302,6 +309,7 @@ export class FlowEditorComponent {
     );
 
     effect(() => {
+      if (!this.loaded()) return;
       const input = this.vm.layoutInput();
       const key = this.layoutKey();
       const layouter = this.layouter;
@@ -627,8 +635,8 @@ export class FlowEditorComponent {
     this.selection.set({ kind: 'state', key });
   }
 
-  protected setStateLabel(key: string, lang: 'de' | 'en', value: string): void {
-    this.graph.update((g) => ops.setStateLabel(g, key, lang, value));
+  protected setStateLabel(key: string, label: I18nMap): void {
+    this.graph.update((g) => ops.setStateLabel(g, key, label));
   }
 
   protected setStateColor(key: string, color: string): void {
@@ -676,8 +684,8 @@ export class FlowEditorComponent {
     this.graph.update((g) => ops.setTransitionEndpoint(g, index, end, key));
   }
 
-  protected setTransitionLabel(index: number, lang: 'de' | 'en', value: string): void {
-    this.graph.update((g) => ops.setTransitionLabel(g, index, lang, value));
+  protected setTransitionLabel(index: number, label: I18nMap): void {
+    this.graph.update((g) => ops.setTransitionLabel(g, index, label));
   }
 
   protected setTransitionColor(index: number, color: string): void {

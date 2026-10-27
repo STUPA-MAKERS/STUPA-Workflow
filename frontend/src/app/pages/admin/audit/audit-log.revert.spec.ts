@@ -190,7 +190,7 @@ describe('AuditLogComponent — config diff + revert', () => {
 
   it('shows the diff, "Ziel öffnen" and "Zurücknehmen" in the opened entry, and confirms', async () => {
     const { c, fixture, revertAuditEntry } = await setup({ entryOver: { targetType: 'role', targetId: 'r-1' } });
-    (fixture.nativeElement.querySelector('.al__row') as HTMLElement).click();
+    (fixture.nativeElement.querySelector('.al__item button') as HTMLElement).click();
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('app-config-diff .cfg-diff-code')).not.toBeNull();
     expect(screen.getByRole('link', { name: 'Ziel öffnen' })).toHaveAttribute('href', '/admin/roles');

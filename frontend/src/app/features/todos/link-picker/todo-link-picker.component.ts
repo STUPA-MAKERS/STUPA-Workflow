@@ -242,7 +242,7 @@ export class TodoLinkPickerComponent {
   }
 
   sub(hit: TodoLinkTarget): string {
-    return linkSub(hit, this.i18n.formatLocale(), this.i18n.locale(), this.t);
+    return linkSub(hit, this.i18n.formatLocale(), this.i18n.uiLocale(), this.t);
   }
 
   isLinked(hit: TodoLinkTarget): boolean {

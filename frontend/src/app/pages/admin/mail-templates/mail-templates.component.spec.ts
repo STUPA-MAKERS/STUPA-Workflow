@@ -294,13 +294,15 @@ describe('MailTemplatesComponent', () => {
     await userEvent.click(screen.getByRole('button', { name: /Status-Änderung/ }));
     expect(screen.getAllByText('angepasst')).toHaveLength(2);
     expect(screen.getByRole('button', { name: 'Auf Standard zurücksetzen' })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('radio', { name: 'EN' }));
+    await userEvent.click(screen.getByRole('button', { name: /^Sprache der Vorlage:/ }));
+    await userEvent.click(screen.getByRole('option', { name: 'English' }));
     expect(c.lang()).toBe('en');
     await userEvent.click(screen.getByRole('button', { name: 'Vorschau' }));
     expect(api.previewMailPayload).toHaveBeenCalledWith(expect.objectContaining({ lang: 'en' }));
     expect(screen.getByText('Vorschau (EN)')).toBeInTheDocument();
     expect(view.container.querySelector('.mt__previewHtml')?.innerHTML).toContain('Hi');
-    await userEvent.click(screen.getByRole('radio', { name: 'DE' }));
+    await userEvent.click(screen.getByRole('button', { name: /^Sprache der Vorlage:/ }));
+    await userEvent.click(screen.getByRole('option', { name: 'Deutsch' }));
     expect(c.lang()).toBe('de');
   });
 
@@ -318,7 +320,7 @@ describe('MailTemplatesComponent', () => {
         { value: 'magic_link', label: 'Anmelde-Link' },
         { value: 'task_new', label: 'Neue Aufgabe · angepasst' },
       ]);
-      expect(screen.getByRole('button', { name: /Vorlage/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^Vorlage/ })).toBeInTheDocument();
     });
   });
 });

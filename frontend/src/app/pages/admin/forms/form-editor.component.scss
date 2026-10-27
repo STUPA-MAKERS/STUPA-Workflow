@@ -323,7 +323,8 @@
 
 .fe__pair {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
   gap: var(--space-3);
 }
 
@@ -356,7 +357,7 @@
 
 .fe__opt {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-2);
 }
@@ -588,9 +589,10 @@
   }
   .fe__pair {
     grid-template-columns: minmax(0, 1fr);
+    grid-auto-flow: row;
   }
   .fe__opt {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     padding-bottom: var(--space-2);
   }
   .fe__opt > :first-child {

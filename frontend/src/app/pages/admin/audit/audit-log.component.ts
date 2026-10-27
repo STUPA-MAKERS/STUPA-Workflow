@@ -1,3 +1,6 @@
+import { ExpandRowComponent } from '@shared/ui/expand-row/expand-row.component';
+import { LoadMoreComponent } from '@shared/ui/load-more/load-more.component';
+import { StickyBarComponent as _Sb } from '@stupa-makers/ui-kit';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -235,6 +238,9 @@ type VerifyState =
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ExpandRowComponent,
+    LoadMoreComponent,
+    _Sb,
     InfiniteScrollDirective,
     NoteComponent,
     EmptyStateComponent,

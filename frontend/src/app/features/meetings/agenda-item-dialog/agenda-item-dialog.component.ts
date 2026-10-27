@@ -285,7 +285,7 @@ export class AgendaItemDialogComponent {
    * neither.
    */
   stateOf(a: AssignableApplication): string {
-    return resolveI18n(a.stateLabel, this.i18n.locale());
+    return resolveI18n(a.stateLabel, this.i18n.uiLocale());
   }
 
   /**

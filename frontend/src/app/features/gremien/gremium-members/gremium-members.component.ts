@@ -96,7 +96,7 @@ export class GremiumMembersComponent {
 
   /** The roles of the loaded members, in role order. */
   readonly roleOptions = computed<FilterSelectOption[]>(() => {
-    const locale = this.i18n.locale();
+    const locale = this.i18n.uiLocale();
     const roles = new Map<string, string>();
     for (const m of this.sorted()) {
       if (!roles.has(m.member.roleKey)) roles.set(m.member.roleKey, localized(m.member.roleName, locale, m.member.roleKey));
@@ -143,7 +143,7 @@ export class GremiumMembersComponent {
   });
 
   readonly groups = computed<MemberGroup[]>(() => {
-    const locale = this.i18n.locale();
+    const locale = this.i18n.uiLocale();
     const out: { key: string; label: string; rows: MemberRow[] }[] = [];
     for (const row of this.visible()) {
       const key = row.member.roleKey;
@@ -192,7 +192,7 @@ export class GremiumMembersComponent {
   /** "Als CSV exportieren": the rows that the list shows. */
   exportCsv(): void {
     const t = (k: Parameters<I18nService['translate']>[0]) => this.i18n.translate(k);
-    const locale = this.i18n.locale();
+    const locale = this.i18n.uiLocale();
     const rows = this.visible().map((r) => [
       r.name,
       r.member.email ?? '',

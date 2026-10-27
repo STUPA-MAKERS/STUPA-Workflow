@@ -265,7 +265,7 @@ export class TopSheetComponent {
   protected readonly mode = signal<EditorMode>('formatted');
 
   protected readonly modeOptions = computed<SegmentedOption[]>(() => {
-    this.i18n.locale();
+    this.i18n.uiLocale();
     return [
       { value: 'formatted', label: this.i18n.translate('meetings.editor.modeFormatted') },
       { value: 'raw', label: this.i18n.translate('meetings.editor.modeRaw') },
@@ -381,7 +381,7 @@ export class TopSheetComponent {
 
   /** The state of the application of the item, in the language of the page. */
   protected readonly stateLabel = computed(() =>
-    resolveI18n(this.top()?.stateLabel, this.i18n.locale()),
+    resolveI18n(this.top()?.stateLabel, this.i18n.uiLocale()),
   );
 
   /** The keeper line of a closed meeting: every minute-taker with the TOPs they wrote. */

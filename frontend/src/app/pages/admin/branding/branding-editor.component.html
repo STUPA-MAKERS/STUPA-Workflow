@@ -7,9 +7,7 @@
   @if (draft(); as d) {
     @if (section === 'texts') {
       <div class="br__meta">
-        <span class="br__lang">
-          <app-content-lang-switch [(value)]="lang" width="fill" [ariaLabel]="'admin.brand.textLang' | t" />
-        </span>
+        <app-content-lang-switch [(value)]="lang" [ariaLabel]="'admin.brand.textLang' | t" />
       </div>
 
       @if (linkErrors().length > 0) {

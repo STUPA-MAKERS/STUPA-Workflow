@@ -120,7 +120,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  padding: var(--space-1) var(--space-4) var(--space-5) calc(10.5rem + 2 * var(--space-4));
 }
 .al__meta {
   display: grid;
@@ -186,9 +185,6 @@
   }
   .al__chev {
     grid-area: chev;
-  }
-  .al__details {
-    padding: var(--space-1) var(--space-4) var(--space-4);
   }
   .al__verify {
     display: grid;

@@ -255,7 +255,7 @@ describe('WebhooksComponent', () => {
    */
   it('opens the diagnosis dialog with the failure class, code and attempts', async () => {
     await setup(HOOKS, { status: [SENT, DEAD] });
-    const toggle = screen.getAllByRole('button', { name: 'Zustellstatus' })[1];
+    const toggle = screen.getAllByRole('button', { name: /^Zustellstatus/ })[1];
     await userEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     expect(
@@ -268,7 +268,7 @@ describe('WebhooksComponent', () => {
 
   it('renders the response code and the timestamp of a successful delivery', async () => {
     await setup(HOOKS, { status: [SENT] });
-    await userEvent.click(screen.getAllByRole('button', { name: 'Zustellstatus' })[0]);
+    await userEvent.click(screen.getAllByRole('button', { name: /^Zustellstatus/ })[0]);
     expect(screen.getByText('200')).toBeInTheDocument();
     expect(screen.getByText('Erfolgreich zugestellt.')).toBeInTheDocument();
   });
@@ -305,8 +305,11 @@ describe('WebhooksComponent', () => {
       { id: 'wh-1', name: 'A', url: 'https://a', events: ['status_changed', 'vote_closed'], active: true },
       { id: 'wh-2', name: 'B', url: 'https://b', events: [], active: false },
     ]);
+    const [first, second] = screen.getAllByRole('button', { name: /^Zustellstatus/ });
+    await userEvent.click(first);
     expect(screen.getByText('status_changed')).toBeInTheDocument();
     expect(screen.getByText('vote_closed')).toBeInTheDocument();
+    await userEvent.click(second);
     expect(screen.getByText('Keine festen Ereignisse · Trigger aus dem Flow')).toBeInTheDocument();
   });
 
@@ -380,13 +383,13 @@ describe('WebhooksComponent', () => {
     expect(screen.queryByRole('button', { name: 'Webhook anlegen' })).toBeNull();
     expect(screen.queryByRole('button', { name: /^Bearbeiten/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /^Entfernen/ })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Zustellstatus' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Zustellstatus/ })).toBeNull();
     expect(screen.getByRole('switch', { name: 'Aktiv: A' })).toBeDisabled();
   });
 
   it('offers the delivery status with webhook.manage', async () => {
     await setup(HOOKS);
-    expect(screen.getAllByRole('button', { name: 'Zustellstatus' })).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: /^Zustellstatus/ })).toHaveLength(2);
   });
 
   /** Otherwise the table keeps its skeleton rows and never says that something went wrong. */

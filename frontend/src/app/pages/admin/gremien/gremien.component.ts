@@ -1,3 +1,4 @@
+import { ExpandRowComponent } from '@shared/ui/expand-row/expand-row.component';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import type { Uuid } from '@core/api/models';
@@ -69,6 +70,7 @@ interface Setting {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ExpandRowComponent,
     FabComponent,
     ConfirmDialogComponent,
     RouterLink,
@@ -172,7 +174,7 @@ export class AdminGremienComponent {
       },
       {
         label: t('admin.gremien.defaultLang'),
-        value: t(g.defaultLang === 'en' ? 'admin.gremien.langEn' : 'admin.gremien.langDe'),
+        value: this.i18n.languageName(g.defaultLang),
       },
       {
         label: t('admin.gremien.quorumShort'),

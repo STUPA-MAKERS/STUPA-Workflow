@@ -53,3 +53,26 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.ns__sec {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.ns__secTitle {
+  margin: 0;
+  padding: 0 var(--space-1);
+}
+.ns__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+  border-radius: var(--radius-field);
+}
+.ns__row {
+  min-height: 56px;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface-2);
+  justify-content: center;
+}

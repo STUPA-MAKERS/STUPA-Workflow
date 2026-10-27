@@ -155,7 +155,7 @@ export class FormsListComponent {
   protected readonly keyPreview = computed(() => slugify(this.form().nameDe) || '—');
 
   protected name(t: ApplicationTypeFull): string {
-    return resolveI18n(t.name, this.i18n.locale()) || this.i18n.translate('admin.forms.untitled');
+    return resolveI18n(t.name, this.i18n.uiLocale()) || this.i18n.translate('admin.forms.untitled');
   }
 
   /** "v7" for the active form version, a dash while the type is a draft. */

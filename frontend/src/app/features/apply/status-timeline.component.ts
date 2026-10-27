@@ -271,7 +271,7 @@ export class StatusTimelineComponent {
 
   /** The labels of the form fields, for the changed fields of a version. */
   private readonly labels = computed(() => {
-    const lang = this.i18n.locale();
+    const lang = this.i18n.uiLocale();
     const map = new Map<string, string>();
     for (const s of this.effForm()?.sections ?? []) {
       for (const f of s.fields) map.set(f.key, resolveI18n(f.label, lang));
@@ -531,7 +531,7 @@ export class StatusTimelineComponent {
     if (!app || !eff || !this.canEdit()) return;
     const files = eff.sections.flatMap((s) => s.fields).filter((f) => f.type === 'file');
     this.editFields.set(
-      toFormlySections(eff.sections, this.i18n.locale(), { has_budget: eff.hasBudget }, {
+      toFormlySections(eff.sections, this.i18n.uiLocale(), { has_budget: eff.hasBudget }, {
         omitKeys: [...(app.hiddenKeys ?? []), ...files.map((f) => f.key)],
       }),
     );

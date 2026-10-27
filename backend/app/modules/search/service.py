@@ -30,7 +30,7 @@ from app.modules.applications.access import READ_ALL_PERMISSION, READ_PERMISSION
 from app.modules.budget.access import has_budget_read
 from app.modules.budget.tree_models import Budget
 from app.modules.search.schemas import SearchHit, SearchKind, SearchResults
-from app.shared.i18n import resolve_i18n
+from app.shared.i18n import pick_lang, resolve_i18n
 from app.shared.search import dialect_of, trigram_rank
 
 if TYPE_CHECKING:
@@ -289,7 +289,7 @@ class SearchService:
                 kind="gremium",
                 id=str(g.id),
                 title=g.name,
-                subtitle=GREMIUM_SUBTITLE.get(lang, GREMIUM_SUBTITLE["de"]),
+                subtitle=pick_lang(GREMIUM_SUBTITLE, lang),
                 url=HIT_URL["gremium"].format(id=g.id),
             )
             for g in rows
@@ -309,7 +309,7 @@ class SearchService:
             SearchHit(
                 kind="principal",
                 id=str(p.id),
-                title=p.display_name or p.email or UNNAMED.get(lang, UNNAMED["de"]),
+                title=p.display_name or p.email or pick_lang(UNNAMED, lang),
                 subtitle=p.email if p.display_name else None,
                 url=HIT_URL["principal"].format(id=quote(p.sub)),
             )
@@ -329,7 +329,7 @@ class SearchService:
                 kind="ticket",
                 id=str(t.id),
                 title=f"{t.number} · {t.title}",
-                subtitle=TICKET_STATUS[t.status].get(lang, TICKET_STATUS[t.status]["de"]),
+                subtitle=pick_lang(TICKET_STATUS[t.status], lang),
                 url=HIT_URL["ticket"].format(id=t.id),
             )
             for t in page.items
@@ -355,7 +355,7 @@ class SearchService:
 
 def _untitled(lang: str) -> str:
     """The title of a nameless record, in the reader's language (German as fallback)."""
-    return UNTITLED.get(lang, UNTITLED["de"])
+    return pick_lang(UNTITLED, lang)
 
 
 def _money(amount: Decimal | None, other: str | None) -> str | None:

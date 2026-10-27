@@ -46,7 +46,7 @@ type Cmp = AuditLogComponent & {
 function entryToggle(): HTMLElement {
   const rows = screen
     .getAllByRole('button', { expanded: false })
-    .filter((b) => b.classList.contains('al__row'));
+    .filter((b) => b.closest('.al__item'));
   expect(rows.length).toBeGreaterThan(0);
   return rows[0];
 }
@@ -224,10 +224,11 @@ describe('AuditLogComponent', () => {
       expect.objectContaining({ limit: 50, before: undefined }),
     );
     const row = entryToggle();
-    expect(row.textContent).toContain('07.06.2026');
-    expect(row.textContent).toContain('Rollen/Rechte');
-    expect(row.textContent).toContain('Root Admin');
-    expect(row.textContent).toContain('Benutzer · p-1');
+    const text = row.closest('app-list-item')?.textContent;
+    expect(text).toContain('07.06.2026');
+    expect(text).toContain('Rollen/Rechte');
+    expect(text).toContain('Root Admin');
+    expect(text).toContain('Benutzer · p-1');
     row.click();
     fixture.detectChanges();
     expect(screen.getAllByText('Rollen/Rechte').length).toBe(2);
@@ -239,7 +240,7 @@ describe('AuditLogComponent', () => {
       page: { items: [entry(1, { action: 'mystery_event', actorName: null })], nextCursor: null, hasMore: false },
     });
     expect(screen.getByText('mystery_event')).toBeInTheDocument();
-    expect(screen.getByText('kc|root')).toBeInTheDocument();
+    expect(screen.getByText(/ · kc\|root · /)).toBeInTheDocument();
   });
 
   it('shows the empty state when there are no entries', async () => {
@@ -267,7 +268,7 @@ describe('AuditLogComponent', () => {
         hasMore: false,
       },
     });
-    expect(screen.getByText('Antrag · Beamer kaufen')).toBeInTheDocument();
+    expect(screen.getByText(/ · Antrag · Beamer kaufen$/)).toBeInTheDocument();
     expect(screen.queryByText(/a-1/)).not.toBeInTheDocument();
   });
 
@@ -646,7 +647,7 @@ describe('AuditLogComponent', () => {
         hasMore: false,
       },
     });
-    expect(screen.getByText('Formular · Finanzantrag')).toBeInTheDocument();
+    expect(screen.getByText(/ · Formular · Finanzantrag$/)).toBeInTheDocument();
     expect(screen.queryByText(new RegExp(TYPE_UUID))).not.toBeInTheDocument();
   });
 
@@ -665,7 +666,7 @@ describe('AuditLogComponent', () => {
         hasMore: false,
       },
     });
-    expect(screen.getByText('Formular')).toBeInTheDocument();
+    expect(screen.getByText(/ · Formular$/)).toBeInTheDocument();
     expect(screen.queryByText(new RegExp(TYPE_UUID))).not.toBeInTheDocument();
     entryToggle().click();
     fixture.detectChanges();

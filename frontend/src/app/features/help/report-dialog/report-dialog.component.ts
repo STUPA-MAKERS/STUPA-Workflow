@@ -139,7 +139,7 @@ export class ReportDialogComponent {
   readonly anonymous = computed(() => !this.auth.isAuthenticated());
 
   readonly kindOptions = computed<SegmentedOption[]>(() => {
-    this.i18n.locale();
+    this.i18n.uiLocale();
     return TICKET_KINDS.map((k) => ({ value: k, label: this.i18n.translate(KIND_LABEL[k]) }));
   });
 
@@ -220,7 +220,7 @@ export class ReportDialogComponent {
     this.tried.set(false);
     this.openedAt.set(new Date());
     this.context.set(
-      reportContext(this.env(), this.i18n.locale() === 'en' ? 'en' : 'de', this.theme.resolved()),
+      reportContext(this.env(), this.i18n.uiLocale(), this.theme.resolved()),
     );
   }
 

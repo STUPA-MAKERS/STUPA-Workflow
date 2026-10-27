@@ -1,1 +1,8 @@
-<app-segmented [width]="width()" [options]="options" [value]="value()" (valueChange)="pick($event)" [ariaLabel]="ariaLabel()" />
+<app-filter-select
+  [label]="ariaLabel()"
+  [options]="options()"
+  [value]="value()"
+  [text]="text()"
+  icon="globe"
+  (valueChange)="pick($event)"
+/>

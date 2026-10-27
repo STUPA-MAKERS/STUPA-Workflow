@@ -31,6 +31,7 @@ from app.modules.translations.catalog import (
 )
 from app.modules.translations.models import UiLanguage, UiTranslation
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
+from app.shared.i18n import fallback_chain
 
 #: The locales whose texts the frontend ships. They have no `ui_language` row.
 BUILTIN_LOCALES: tuple[str, ...] = ("de", "en")
@@ -41,19 +42,6 @@ AUDIT_LANGUAGE = "ui_language"
 
 #: The most keys that the audit entry of one save names. The counts stay exact.
 _AUDIT_KEYS = 200
-
-
-def fallback_chain(locale: str) -> list[str]:
-    """Return the locales whose texts `locale` shows, the first one first.
-
-    DE is the reference and has no fallback. EN falls back to DE. An extra language
-    falls back to EN and then to DE.
-    """
-    if locale == DEFAULT_LOCALE:
-        return [DEFAULT_LOCALE]
-    if locale == "en":
-        return ["en", DEFAULT_LOCALE]
-    return [locale, "en", DEFAULT_LOCALE]
 
 
 class TranslationService:

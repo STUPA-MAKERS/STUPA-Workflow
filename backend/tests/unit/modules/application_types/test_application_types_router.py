@@ -17,6 +17,7 @@ from app.deps import Principal, get_current_principal
 from app.main import create_app
 from app.modules.application_types.router import get_application_types_service
 from app.modules.application_types.schemas import ApplicationTypeListItem
+from app.shared.i18n import LANGUAGE_CODE_PATTERN
 from app.shared.paging import Page
 
 
@@ -165,7 +166,7 @@ def test_list_rejects_unknown_query_param_422(app_client: TestClient) -> None:
     assert r.status_code == 422
 
 
-@pytest.mark.parametrize("lang", ["null", "xx", "EN", "de-DE", ""])
+@pytest.mark.parametrize("lang", ["null", "EN", "de_DE", "x", ""])
 def test_list_rejects_invalid_lang_422(app_client: TestClient, lang: str) -> None:
     """Answer 422 for an invalid `lang`, `lang=null` included, not a silent 200.
 
@@ -176,7 +177,7 @@ def test_list_rejects_invalid_lang_422(app_client: TestClient, lang: str) -> Non
     assert r.headers["content-type"].startswith("application/problem+json")
 
 
-@pytest.mark.parametrize("lang", ["de", "en"])
+@pytest.mark.parametrize("lang", ["de", "en", "fr", "pt-BR"])
 def test_list_accepts_valid_lang_200(
     app_client: TestClient, fake_service: _FakeService, lang: str
 ) -> None:
@@ -200,9 +201,9 @@ def test_openapi_declares_error_responses(app_client: TestClient) -> None:
     assert "application/json" in get_list["responses"]["200"]["content"]
 
 
-def test_openapi_lang_param_is_enum(app_client: TestClient) -> None:
+def test_openapi_lang_param_is_a_language_code(app_client: TestClient) -> None:
     spec = app_client.get("/openapi.json").json()
     params = spec["paths"]["/api/application-types"]["get"]["parameters"]
     lang_param = next(p for p in params if p["name"] == "lang")
-    assert lang_param["schema"]["enum"] == ["de", "en"]
+    assert lang_param["schema"]["pattern"] == LANGUAGE_CODE_PATTERN
     assert lang_param["schema"]["default"] == "de"

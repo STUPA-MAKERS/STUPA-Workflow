@@ -131,6 +131,11 @@ async function setup(
   return { ...view, api, toast, inst };
 }
 
+/** Open every user row, so the roles, the groups and the last login show. */
+async function openAll(): Promise<void> {
+  for (const row of screen.getAllByRole('button', { expanded: false })) await userEvent.click(row);
+}
+
 describe('UsersComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
@@ -152,17 +157,19 @@ describe('UsersComponent', () => {
    */
   it('lists principals with the capitalized, read-only roles on one line', async () => {
     await setup();
+    await openAll();
     expect(screen.getByText('Alex Admin')).toBeInTheDocument();
+    expect(screen.getByText('alex@x.de · Administrator, Referent')).toBeInTheDocument();
     expect(screen.getByText('Administrator, Referent')).toBeInTheDocument();
     expect(screen.queryByText(/administrator/)).not.toBeInTheDocument();
     expect(screen.getByText('Keine Rollen zugewiesen.')).toBeInTheDocument();
-    expect(screen.getByText('alex@x.de')).toBeInTheDocument();
-    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+    expect(screen.getAllByRole('listitem').filter((li) => li.parentElement?.classList.contains('au__list'))).toHaveLength(2);
     expect(screen.queryByRole('button', { name: /Entziehen|Zuweisung|Rolle \+/ })).toBeNull();
   });
 
   it('shows the OIDC groups of each user, or a placeholder', async () => {
     await setup();
+    await openAll();
     expect(screen.getAllByText('SSO-Gruppen (letzte Anmeldung)')).toHaveLength(2);
     expect(screen.getByText('stupa-referat')).toBeInTheDocument();
     expect(screen.getByText('unmapped')).toBeInTheDocument();
@@ -237,7 +244,7 @@ describe('UsersComponent', () => {
     const api = makeApi({ listPrincipals: jest.fn(() => of([nameless])) });
     const { inst } = await setup(api);
     const name = screen.getByText('Ohne Namen');
-    expect(name).toHaveAttribute('title', 'kc|ghost');
+    expect(name.closest('app-expand-row')).toHaveAttribute('title', 'kc|ghost');
     expect(screen.queryByText('kc|ghost')).toBeNull();
     expect(inst.userTitle(PRINCIPALS[0])).toBe('Alex Admin');
   });
@@ -339,7 +346,7 @@ describe('UsersComponent', () => {
       listPrincipals: jest.fn(() => of([{ ...PRINCIPALS[1], active: false }])),
     });
     const { container, inst } = await setup(api);
-    expect(container.querySelector('.au__row--off')).not.toBeNull();
+    expect(container.querySelector('.au__off')).not.toBeNull();
     expect(container.querySelector('app-status-text.st--muted')?.textContent?.trim()).toBe('Inaktiv');
     const item = inst.menuFor({ ...PRINCIPALS[1], active: false })[0].items[0];
     expect(item).toMatchObject({ id: 'activate', label: 'Aktivieren' });
@@ -349,6 +356,7 @@ describe('UsersComponent', () => {
 
   it('shows the last login as a date, else "nie"', async () => {
     await setup();
+    await openAll();
     expect(screen.getByText('nie')).toBeInTheDocument();
     expect(screen.getByText(/06\.06\.2026/)).toBeInTheDocument();
   });
@@ -379,7 +387,7 @@ describe('UsersComponent', () => {
       expect(screen.getByText('zusammengeführt in Alex Admin')).toBeInTheDocument();
       expect(screen.getByText('zusammengeführt in Konto ohne Namen')).toBeInTheDocument();
       expect(screen.queryByText('Inaktiv')).toBeNull();
-      expect(container.querySelectorAll('.au__row--off')).toHaveLength(2);
+      expect(container.querySelectorAll('.au__off')).toHaveLength(2);
       expect(screen.queryByRole('button', { name: /Aktivieren|Deaktivieren|Weitere Aktionen/ })).toBeNull();
     });
 

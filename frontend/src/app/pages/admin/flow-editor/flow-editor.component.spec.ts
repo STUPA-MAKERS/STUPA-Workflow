@@ -1,4 +1,4 @@
-import { NEVER, of, throwError } from 'rxjs';
+import { NEVER, Subject, of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { ToastService } from '@stupa-makers/ui-kit';
@@ -251,8 +251,7 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(c.graph().states.filter((s: { isInitial?: boolean }) => s.isInitial)).toHaveLength(1);
     c.setStateColor('a', '#4a90d9');
     c.setStateColor('a', '');
-    c.setStateLabel('a', 'de', 'Entwurf');
-    c.setStateLabel('a', 'en', 'Draft');
+    c.setStateLabel('a', { de: 'Entwurf', en: 'Draft' });
     c.setStateEditAllowed('a', false);
 
     c.selectEdge(0);
@@ -273,7 +272,7 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     c.addAction(0, '');
     expect(c.graph().transitions[0].actions).toHaveLength(1);
     c.removeAction(0, 0);
-    c.setTransitionLabel(0, 'de', 'go');
+    c.setTransitionLabel(0, { de: 'go' });
     c.setTransitionEndpoint(0, 'to', 'b');
 
     c.save();
@@ -880,9 +879,9 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
     buildValid(c);
-    c.setTransitionLabel(0, 'de', 'go');
+    c.setTransitionLabel(0, { de: 'go' });
     expect(c.graph().transitions[0].label).toEqual({ de: 'go' });
-    c.setTransitionLabel(0, 'de', '');
+    c.setTransitionLabel(0, { de: '' });
     expect(c.graph().transitions[0].label).toBeNull();
   });
 
@@ -1606,7 +1605,7 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     bare(c);
     c.setTransitionEndpoint(0, 'to', 'b');
     bare(c);
-    c.setTransitionLabel(0, 'de', 'x');
+    c.setTransitionLabel(0, { de: 'x' });
     bare(c);
     c.setTransitionAutomatic(0, true);
     bare(c);
@@ -1640,7 +1639,7 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     c.setStateKey('a', 'alpha');
     expect(c.graph().states.find((s: { key: string }) => s.key === 'alpha')).toBeDefined();
     bare(c);
-    c.setStateLabel('a', 'de', 'X');
+    c.setStateLabel('a', { de: 'X' });
     bare(c);
     c.setStateColor('a', '#fff');
     bare(c);
@@ -2075,7 +2074,7 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     }));
     c.setTransitionBranch(0, 'pass');
     c.setTransitionEndpoint(0, 'to', 'c');
-    c.setTransitionLabel(0, 'de', 'go');
+    c.setTransitionLabel(0, { de: 'go' });
     c.setTransitionAutomatic(0, true);
     c.setTransitionColor(0, '#111');
     c.setTransitionRequiresAction(0, false);
@@ -3129,10 +3128,10 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
       });
       const { c, fixture } = await laidOut(layouter);
       hold = true;
-      c.setStateLabel('b', 'de', 'Ein viel längerer Name');
+      c.setStateLabel('b', { de: 'Ein viel längerer Name' });
       fixture.detectChanges();
       expect(c.nodes()[1].x).toBe(300);
-      expect(c.edges()[0].d).toMatch(/^M \d+ \d+ C /);
+      expect(c.edges()).toEqual([]);
       release();
       await fixture.whenStable();
       await new Promise((r) => setTimeout(r));
@@ -3178,6 +3177,23 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
       await new Promise((r) => setTimeout(r));
       expect(c.layoutPending()).toBe(false);
       expect(c.edges()[0].d).toMatch(/ C /);
+    });
+
+    it('lays out nothing before the flow has loaded, so the empty layout does not end the wait', async () => {
+      const flow = new Subject<FlowGraph | null>();
+      const layouter = fakeLayouter();
+      const { fixture } = await setup({ layouter, getGlobalFlow: jest.fn(() => flow) });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const c = fixture.componentInstance as any;
+      await fixture.whenStable();
+      expect(layouter).not.toHaveBeenCalled();
+      expect(c.layoutPending()).toBe(true);
+      flow.next(null);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      await new Promise((r) => setTimeout(r));
+      expect(layouter).toHaveBeenCalled();
+      expect(c.layoutPending()).toBe(false);
     });
 
     it('hides the canvas until the first layout answers', async () => {

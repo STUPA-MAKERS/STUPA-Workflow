@@ -9,9 +9,10 @@ import {
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { BrandingService, DEFAULT_LOGOS } from '@core/branding/branding.service';
-import { I18nService } from '@core/i18n/i18n.service';
+import { I18nService, baseLocale } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { CATALOG, type TranslationKey } from '@core/i18n/translations';
+import { langFieldLabel, setI18n } from '@shared/forms/i18n-text';
 import { DEFAULT_ACCENT, normalizeHex } from '@core/theme/accent';
 import { ThemeService } from '@core/theme/theme.service';
 import type { I18nMap } from '@core/api/models';
@@ -124,7 +125,7 @@ export class BrandingEditorComponent {
   protected readonly dropSlot = signal<LogoSlot | null>(null);
 
   /** The language of the text fields. It starts with the language of the page. */
-  protected readonly lang = signal<TextLang>(this.i18n.locale() === 'en' ? 'en' : 'de');
+  protected readonly lang = signal<TextLang>(this.i18n.uiLocale());
 
   /** Disallowed link URLs. Their scheme is not http, https or mailto. They block a save. */
   protected readonly linkErrors = computed(() => brandingLinkErrors(this.draft()));
@@ -166,7 +167,7 @@ export class BrandingEditorComponent {
 
   /** The field label with the language of the text: "Willkommenstext (DE)". */
   protected withLang(label: string): string {
-    return `${label} (${this.lang().toUpperCase()})`;
+    return langFieldLabel(label, this.lang());
   }
 
   protected size(bytes: number): string {
@@ -189,9 +190,12 @@ export class BrandingEditorComponent {
     return this.builtIn('app.title');
   }
 
-  /** A built-in text in the picked language; German while that catalogue is not loaded. */
+  /**
+   * A built-in text in the picked language; German while that catalogue is not loaded. An
+   * extra language has the English one.
+   */
   private builtIn(key: TranslationKey): string {
-    return CATALOG[this.lang()][key] ?? CATALOG.de[key] ?? '';
+    return CATALOG[baseLocale(this.lang())][key] ?? CATALOG.de[key] ?? '';
   }
 
   /** The text map of a free text. `applyInfo` is missing in an older config. */
@@ -222,7 +226,9 @@ export class BrandingEditorComponent {
   /** Write the text of the picked language into a map and refresh the draft. */
   protected setText(map: I18nMap, value: string): void {
     this.patch(() => {
-      map[this.lang()] = value;
+      const next = setI18n(map, this.lang(), value);
+      for (const code of Object.keys(map)) if (!(code in next)) delete map[code];
+      Object.assign(map, next);
     });
   }
 

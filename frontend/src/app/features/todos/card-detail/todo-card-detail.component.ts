@@ -464,7 +464,7 @@ export class TodoCardDetailComponent {
   }
 
   linkSub(link: TodoLink): string {
-    return linkSub(link, this.i18n.formatLocale(), this.i18n.locale(), this.t);
+    return linkSub(link, this.i18n.formatLocale(), this.i18n.uiLocale(), this.t);
   }
 
   /** Read the card again (after a refusal, or from outside). */
