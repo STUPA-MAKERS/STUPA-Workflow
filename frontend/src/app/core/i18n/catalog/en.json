@@ -212,6 +212,7 @@
   "expenses.filter.amountRange": "Amount",
   "expenses.col.application": "Application",
   "expenses.col.amount": "Amount",
+  "expenses.action.duplicate": "Duplicate",
   "expenses.action.viewInvoice": "View linked invoice",
   "expenses.field.description": "Description",
   "expenses.field.descriptionPlaceholder": "What was this booking for?",
