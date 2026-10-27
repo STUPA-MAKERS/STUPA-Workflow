@@ -400,12 +400,16 @@ export class MeetingsCalendarComponent {
           {
             items: [
               { id: 'edit', label: this.i18n.translate('meetings.settings.title'), icon: 'edit' },
-              {
-                id: 'delete',
-                label: this.i18n.translate('meetings.delete.title'),
-                icon: 'trash',
-                danger: true,
-              },
+              ...(m.canDelete
+                ? [
+                    {
+                      id: 'delete',
+                      label: this.i18n.translate('meetings.delete.title'),
+                      icon: 'trash' as const,
+                      danger: true,
+                    },
+                  ]
+                : []),
             ],
           },
         ]

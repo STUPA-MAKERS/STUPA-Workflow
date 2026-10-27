@@ -51,6 +51,7 @@ function appWire(): ApplicationOutWire {
     createdAt: '2026-06-05T10:00:00Z',
     updatedAt: '2026-06-05T11:00:00Z',
     applicant: { email: 'a@stupa', name: 'Mia', anonymized: false },
+    canEdit: true,
   };
 }
 
@@ -167,9 +168,9 @@ function flushDateForm(http: HttpTestingController, id = 'app-1') {
  * runs through the flow, so no further /transitions request follows. A manager also loads the
  * cost-centre tree, and an empty answer is fine.
  */
-function flushAll(http: HttpTestingController, id = 'app-1', form = true) {
+function flushAll(http: HttpTestingController, id = 'app-1', form = true, over: Partial<ApplicationOutWire> = {}) {
   flushTypes(http);
-  http.expectOne(url('', id)).flush({ ...appWire(), id });
+  http.expectOne(url('', id)).flush({ ...appWire(), id, ...over });
   http.expectOne(url('/versions', id)).flush(VERSIONS);
   http.expectOne(url('/comments', id)).flush(COMMENTS);
   for (const req of http.match((r) => r.method === 'GET' && r.url === '/api/budgets')) {
@@ -280,9 +281,9 @@ describe('ApplicationsDetailComponent', () => {
     http.verify();
   });
 
-  it('takes no drop without the right to manage the application', async () => {
+  it('takes no drop without the right to edit the application', async () => {
     const { http, detectChanges, container } = await setup(['application.read']);
-    flushAll(http);
+    flushAll(http, 'app-1', true, { canEdit: false });
     detectChanges();
     flushAttachments(http);
     const page = container.querySelector('article.ad') as HTMLElement;

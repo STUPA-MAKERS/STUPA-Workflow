@@ -292,6 +292,26 @@ describe('ApplicationsDetailComponent — header', () => {
     expect(screen.getByRole('button', { name: 'Bearbeiten' })).toBeInTheDocument();
   });
 
+  it('lets the creator upload, but not delete, attachments in a locked state', async () => {
+    const { cmp } = await setup({ perms: ['application.read'], app: { state: { ...SUBMITTED, editAllowed: false } } });
+    expect(cmp.canUploadFiles()).toBe(true);
+    expect(cmp.canDeleteFiles()).toBe(false);
+  });
+
+  it('lets a holder of application.edit_any delete attachments in a locked state', async () => {
+    const { cmp } = await setup({
+      perms: ['application.read', 'application.edit_any'],
+      app: { state: { ...SUBMITTED, editAllowed: false }, canEditLocked: true },
+    });
+    expect(cmp.canDeleteFiles()).toBe(true);
+  });
+
+  it('offers no attachment upload or delete without canEdit', async () => {
+    const { cmp } = await setup({ perms: ['application.read'], app: { canEdit: false } });
+    expect(cmp.canUploadFiles()).toBe(false);
+    expect(cmp.canDeleteFiles()).toBe(false);
+  });
+
   it('opens the share links from the header', async () => {
     const { http, cmp } = await setup();
     await userEvent.click(screen.getByRole('button', { name: 'Öffentliche Links' }));

@@ -280,6 +280,10 @@ class MeetingOut(_CamelModel):
     #: The principal may finalize and send the protocol: the write access plus the
     #: gremium permission ``protocol.finalize``.
     can_finalize: bool = Field(default=False, alias="canFinalize")
+    #: The principal may delete the meeting: ``canManage``, and for a meeting with a
+    #: final protocol also the global ``meeting.delete_finalized``. An open vote still
+    #: blocks the delete (409), because it can open after this read.
+    can_delete: bool = Field(default=False, alias="canDelete")
     votes: list[MeetingVoteOut] = Field(default_factory=list)
     #: The periods of the protocol keepers in time order (running and ended),
     #: and the planned handover of the next agenda item.

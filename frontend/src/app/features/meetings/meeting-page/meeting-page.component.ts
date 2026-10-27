@@ -323,7 +323,7 @@ export class MeetingPageComponent {
         disabledReason: this.anyOpenVote() ? t('meetings.page.closeBlocked') : null,
       });
     }
-    if (m.canManage) {
+    if (m.canDelete) {
       danger.push({ id: 'delete', label: t('meetings.delete.title'), icon: 'trash', danger: true });
     }
     sections.push({ items: danger });

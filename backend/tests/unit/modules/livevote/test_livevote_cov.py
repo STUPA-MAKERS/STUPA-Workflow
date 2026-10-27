@@ -4249,3 +4249,24 @@ def test_set_agenda_done_needs_a_bool(app: FastAPI, client: TestClient, fakes) -
     _login(app)
     r = client.put(f"/api/meetings/{uuid4()}/agenda/{uuid4()}/done", json={})
     assert r.status_code == 422
+
+
+@pytest.mark.parametrize(
+    ("perms", "can_manage", "final", "expected"),
+    [
+        (set(), True, False, True),
+        (set(), True, True, False),
+        ({"meeting.delete_finalized"}, True, True, True),
+        ({"meeting.delete_finalized"}, False, True, False),
+        (set(), False, False, False),
+    ],
+)
+def test_can_delete_mirrors_the_delete_gate(
+    perms: set[str], can_manage: bool, final: bool, expected: bool
+) -> None:
+    """Report `canDelete` like the delete route: a final protocol needs delete_finalized."""
+    principal = Principal(sub="p", permissions=perms)
+    assert (
+        MeetingService._can_delete(principal, can_manage=can_manage, final=final)
+        is expected
+    )

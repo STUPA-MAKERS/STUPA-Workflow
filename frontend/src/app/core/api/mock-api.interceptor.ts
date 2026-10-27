@@ -930,6 +930,7 @@ let MOCK_MEETING: MeetingOutWire = {
   canWrite: true,
   canManageVotes: true,
   canFinalize: true,
+  canDelete: true,
   /** The demo user holds `vote.cast` in the gremium of the meeting. */
   canVote: true,
   /** The demo user keeps the minutes since the start; a handover adds a period. */

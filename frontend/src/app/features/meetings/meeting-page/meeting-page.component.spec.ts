@@ -218,9 +218,17 @@ describe('MeetingPageComponent', () => {
       flushDelegations();
     });
 
+    /** A final protocol needs `meeting.delete_finalized`: the server then sends no `canDelete`. */
+    it('offers no delete without canDelete', async () => {
+      await setup({ meeting: meeting({ canDelete: false }) });
+      const menu = await openMenu();
+      expect(within(menu).getByRole('menuitem', { name: 'Sitzung bearbeiten' })).toBeInTheDocument();
+      expect(within(menu).queryByRole('menuitem', { name: 'Sitzung löschen' })).toBeNull();
+    });
+
     /** The beamer route needs session.manage, so a minute-taker without it gets no beamer. */
     it('offers only the attendance to a member without the manage right', async () => {
-      await setup({ meeting: meeting({ canManage: false }) });
+      await setup({ meeting: meeting({ canManage: false, canDelete: false }) });
       const menu = await openMenu();
       expect(within(menu).queryByRole('menuitem', { name: 'Sitzung bearbeiten' })).toBeNull();
       expect(within(menu).queryByRole('menuitem', { name: 'Sitzung löschen' })).toBeNull();

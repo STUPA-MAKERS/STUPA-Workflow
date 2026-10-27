@@ -43,6 +43,7 @@ function meeting(id: string, over: Partial<Meeting> = {}): Meeting {
     canManageVotes: false,
     canVote: false,
     canFinalize: false,
+    canDelete: false,
     keeperPeriods: [],
     plannedHandover: null,
     publicJoin: false,
