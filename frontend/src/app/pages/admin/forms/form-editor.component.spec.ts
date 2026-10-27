@@ -88,7 +88,7 @@ describe('FormEditorComponent', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
     expect(c.groups()).toHaveLength(1);
-    expect(c.groups()[0].titleDe).toBe('');
+    expect(c.groups()[0].title['de']).toBe('');
     expect(c.groups()[0].fields).toHaveLength(1);
   });
 
@@ -103,8 +103,8 @@ describe('FormEditorComponent', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
     expect(c.groups()).toHaveLength(2);
-    expect(c.groups()[0].titleDe).toBe('');
-    expect(c.groups()[1].titleDe).toBe('Zweiter Schritt');
+    expect(c.groups()[0].title['de']).toBe('');
+    expect(c.groups()[1].title['de']).toBe('Zweiter Schritt');
     expect(c.groups()[1].fields[0].key).toBe('q2');
   });
 
@@ -127,9 +127,9 @@ describe('FormEditorComponent', () => {
     const c = fixture.componentInstance as any;
     c.addGroup();
     expect(c.groups()).toHaveLength(2);
-    c.setGroupTitle(1, 'de', 'Schritt 2');
+    c.setGroupTitle(1, { ...c.groups()[1].title, de: 'Schritt 2' });
     c.moveGroup(1, -1);
-    expect(c.groups()[0].titleDe).toBe('Schritt 2');
+    expect(c.groups()[0].title['de']).toBe('Schritt 2');
   });
 
   /**
@@ -156,7 +156,7 @@ describe('FormEditorComponent', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
     c.addGroup();
-    c.setGroupTitle(1, 'de', 'Budget');
+    c.setGroupTitle(1, { ...c.groups()[1].title, de: 'Budget' });
     c.addQuestion(1, 'currency');
     c.groups()[1].fields[0].key = 'amount';
     c.groups()[1].fields[0].label.de = 'Betrag';
@@ -378,7 +378,7 @@ describe('FormEditorComponent — title/description/label helpers', () => {
 
   it('sets title and description per language', async () => {
     const { c } = await setup(draft([{ key: 't', type: 'text', label: { de: 'T', en: '' } }]));
-    c.setTitle('en', 'English');
+    c.title.set({ ...c.title(), en: 'English' });
     expect(c.title()).toEqual({ de: 'Förderantrag', en: 'English' });
     c.setDescription('de', 'Hallo');
     c.setDescription('en', 'Hi');
@@ -435,14 +435,14 @@ describe('FormEditorComponent — group & question mutations', () => {
   it('reorder is a no-op at the edges and when from===to', async () => {
     const { c } = await base();
     c.addGroup();
-    c.setGroupTitle(0, 'de', 'First');
+    c.setGroupTitle(0, { ...c.groups()[0].title, de: 'First' });
     c.moveGroup(0, -1);
     expect(c.groups()).toHaveLength(2);
-    expect(c.groups()[0].titleDe).toBe('First');
+    expect(c.groups()[0].title['de']).toBe('First');
     c.moveGroup(1, 1);
     expect(c.groups()).toHaveLength(2);
     c.reorderGroup(0, 0);
-    expect(c.groups()[0].titleDe).toBe('First');
+    expect(c.groups()[0].title['de']).toBe('First');
   });
 
   it('removes a question from a group', async () => {
@@ -615,10 +615,10 @@ describe('FormEditorComponent — drag reorder', () => {
   it('reorders groups by drag start + drop', async () => {
     const { c } = await setup(draft([{ key: 'q', type: 'text', label: { de: 'A', en: '' } }]));
     c.addGroup();
-    c.setGroupTitle(1, 'de', 'Second');
+    c.setGroupTitle(1, { ...c.groups()[1].title, de: 'Second' });
     c.onDragStart(1);
     c.onDrop(0);
-    expect(c.groups()[0].titleDe).toBe('Second');
+    expect(c.groups()[0].title['de']).toBe('Second');
   });
 
   it('onDragOver prevents default', async () => {
@@ -631,12 +631,12 @@ describe('FormEditorComponent — drag reorder', () => {
   it('onDrop is a no-op when dropping onto the same group or with no active drag', async () => {
     const { c } = await setup(draft([{ key: 'q', type: 'text', label: { de: 'A', en: '' } }]));
     c.addGroup();
-    c.setGroupTitle(1, 'de', 'Second');
+    c.setGroupTitle(1, { ...c.groups()[1].title, de: 'Second' });
     c.onDrop(0);
-    expect(c.groups()[1].titleDe).toBe('Second');
+    expect(c.groups()[1].title['de']).toBe('Second');
     c.onDragStart(1);
     c.onDrop(1);
-    expect(c.groups()[1].titleDe).toBe('Second');
+    expect(c.groups()[1].title['de']).toBe('Second');
   });
 });
 
@@ -797,9 +797,9 @@ describe('FormEditorComponent — nullish/branch edges', () => {
 
   it('sets the EN group title (else-branch of the de/en ternary)', async () => {
     const { c } = await setup(draft([{ key: 't', type: 'text', label: { de: 'T', en: '' } }]));
-    c.setGroupTitle(0, 'en', 'Step EN');
-    expect(c.groups()[0].titleEn).toBe('Step EN');
-    expect(c.groups()[0].titleDe).toBe('');
+    c.setGroupTitle(0, { ...c.groups()[0].title, en: 'Step EN' });
+    expect(c.groups()[0].title['en']).toBe('Step EN');
+    expect(c.groups()[0].title['de']).toBe('');
   });
 
   it('only mutates the addressed question, leaving siblings untouched', async () => {
@@ -949,7 +949,7 @@ describe('FormEditorComponent — layout of the redesign', () => {
     c.moveQuestion({ gi: 0, qi: 1 }, -1);
     fixture.detectChanges();
     expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
-    c.setGroupTitle(0, 'de', 'Neu');
+    c.setGroupTitle(0, { ...c.groups()[0].title, de: 'Neu' });
     fixture.detectChanges();
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     expect(createFormVersion).toHaveBeenCalledTimes(1);
@@ -1015,10 +1015,10 @@ describe('FormEditorComponent — layout of the redesign', () => {
     expect(ids(1)).toEqual(['up', 'delete']);
     c.selectGroup(1);
     c.onGroupMenu(1, { id: 'up', label: '' });
-    expect(c.groups()[0].titleDe).toBe('Kosten');
+    expect(c.groups()[0].title['de']).toBe('Kosten');
     expect(c.groupIndex()).toBe(0);
     c.onGroupMenu(0, { id: 'down', label: '' });
-    expect(c.groups()[1].titleDe).toBe('Kosten');
+    expect(c.groups()[1].title['de']).toBe('Kosten');
     expect(c.groupIndex()).toBe(1);
     c.onGroupMenu(1, { id: 'unknown', label: '' });
     expect(c.groups()).toHaveLength(2);
@@ -1204,7 +1204,7 @@ describe('group serialize/deserialize round-trip', () => {
     ];
     const groups = groupsFromFields(flat);
     expect(groups).toHaveLength(1);
-    expect(groups[0].titleDe).toBe('Erster');
+    expect(groups[0].title['de']).toBe('Erster');
     expect(groupsToFields(groups)).toEqual(flat);
   });
 });

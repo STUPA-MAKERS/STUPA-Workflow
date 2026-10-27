@@ -174,7 +174,7 @@ export class AdminGremienComponent {
       },
       {
         label: t('admin.gremien.defaultLang'),
-        value: t(g.defaultLang === 'en' ? 'admin.gremien.langEn' : 'admin.gremien.langDe'),
+        value: this.i18n.languageName(g.defaultLang),
       },
       {
         label: t('admin.gremien.quorumShort'),

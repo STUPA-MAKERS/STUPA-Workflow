@@ -54,7 +54,7 @@ export class AdminOptionsService {
 
   /** Roles as options (key → localized label). It uses the fallback list when empty. */
   roleOptions(): Observable<SelectOption[]> {
-    const lang = this.i18n.locale();
+    const lang = this.i18n.uiLocale();
     return this.api.listRoles().pipe(
       map((list) => (list.length ? list : MOCK_ROLES)),
       map((list) => list.map((r) => ({ value: r.key, label: resolveI18n(r.label, lang) }))),

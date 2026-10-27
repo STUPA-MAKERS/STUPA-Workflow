@@ -237,7 +237,7 @@ export class GremienComponent implements OnDestroy {
   }
 
   private toRow(item: GremiumOverview): GremiumRow {
-    const locale = this.i18n.locale();
+    const locale = this.i18n.uiLocale();
     const count =
       item.memberCount === 1
         ? this.i18n.translate('gremien.list.member1')

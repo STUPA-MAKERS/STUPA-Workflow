@@ -178,7 +178,7 @@ describe('AdminGremienComponent', () => {
     const value = (label: string) =>
       within(asta).getByText(label).nextElementSibling?.textContent?.trim();
     expect(value('CD-Variante')).toBe('Standard des PDF-Renderers');
-    expect(value('Standardsprache')).toBe('Englisch');
+    expect(value('Standardsprache')).toBe('English');
     expect(value('Quorum')).toBe('Kein Quorum');
     expect(within(asta).queryByText('Vorlauf für Delegationen')).toBeNull();
     expect(value('Zusätzliche Protokoll-Empfänger')).toBe('Keine');

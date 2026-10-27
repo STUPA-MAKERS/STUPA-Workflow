@@ -31,6 +31,7 @@ from app.modules.applications.share import (
     format_money,
     to_decimal,
 )
+from app.shared.i18n import pick_lang
 
 #: The preview description. Deliberately says nothing about the application: whatever
 #: goes here is public the moment the link is pasted.
@@ -274,7 +275,7 @@ def render_share_page(
 
     The og:title is the ONE piece of the application that reaches a chat server.
     """
-    text = _TEXT.get(lang, _TEXT["de"])
+    text = pick_lang(_TEXT, lang)
     title = escape(view.title)
     og_title = f"{title} — {escape(app_name)}"
 
@@ -310,7 +311,7 @@ def render_share_page(
 
     logo = _render_logo(logo_url, app_name)
 
-    description = _PREVIEW_DESCRIPTION.get(lang, _PREVIEW_DESCRIPTION["de"])
+    description = pick_lang(_PREVIEW_DESCRIPTION, lang)
 
     return f"""<!doctype html>
 <html lang="{escape(lang)}">

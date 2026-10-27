@@ -28,13 +28,13 @@ export class SiteFooterComponent {
   readonly legalLinks = computed(() =>
     this.branding
       .legalLinks()
-      .map((l) => ({ url: l.url.trim(), label: resolveI18n(l.label, this.i18n.locale()).trim() }))
+      .map((l) => ({ url: l.url.trim(), label: resolveI18n(l.label, this.i18n.uiLocale()).trim() }))
       .filter((l) => l.url && l.label),
   );
 
   /** Copyright line for the active locale. Empty or blank means the built-in
    *  co-branding text. */
   readonly copyright = computed(() =>
-    resolveI18n(this.branding.copyright(), this.i18n.locale()).trim(),
+    resolveI18n(this.branding.copyright(), this.i18n.uiLocale()).trim(),
   );
 }

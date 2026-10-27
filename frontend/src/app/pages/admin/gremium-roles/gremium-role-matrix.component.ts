@@ -148,7 +148,7 @@ export class GremiumRoleMatrixComponent implements OnInit {
   }
 
   protected label(r: GremiumRole): string {
-    return i18nLabel(r.name, this.i18n.locale(), r.key);
+    return i18nLabel(r.name, this.i18n.uiLocale(), r.key);
   }
 
   protected permLabel(p: string): TranslationKey {

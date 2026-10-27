@@ -116,7 +116,8 @@ describe('BrandingEditorComponent', () => {
       'placeholder',
       'Eine Plattform des Studierendenparlaments',
     );
-    await userEvent.click(screen.getByRole('radio', { name: 'EN' }));
+    await userEvent.click(screen.getByRole('button', { name: /^Sprache der Texte:/ }));
+    await userEvent.click(screen.getByRole('option', { name: 'English' }));
     expect(screen.getByRole('textbox', { name: 'Copyright-Zeile (EN)' })).toHaveAttribute('placeholder', expect.stringMatching(/\S/));
   });
 
@@ -224,7 +225,8 @@ describe('BrandingEditorComponent', () => {
     expect(container.querySelector('.br__column')).toBeNull();
     expect(screen.queryByRole('button', { name: /Spalte/ })).toBeNull();
     expect(screen.getByRole('textbox', { name: 'E-Mail-Fußzeile (DE)' })).toHaveValue('Automatische Nachricht – nicht antworten.');
-    await userEvent.click(screen.getByRole('radio', { name: 'EN' }));
+    await userEvent.click(screen.getByRole('button', { name: /^Sprache der Texte:/ }));
+    await userEvent.click(screen.getByRole('option', { name: 'English' }));
     const label = screen.getAllByRole('textbox', { name: 'Bezeichnung (EN)' })[0];
     expect(label).toHaveValue('Imprint');
     await userEvent.clear(label);
@@ -236,7 +238,8 @@ describe('BrandingEditorComponent', () => {
     const urls = screen.getAllByRole('textbox', { name: 'URL' });
     await userEvent.type(urls[before], 'https://k.de');
     expect(c.draft().legalLinks[before].url).toBe('https://k.de');
-    await userEvent.click(screen.getByRole('radio', { name: 'DE' }));
+    await userEvent.click(screen.getByRole('button', { name: /^Sprache der Texte:/ }));
+    await userEvent.click(screen.getByRole('option', { name: 'Deutsch' }));
     const mail = screen.getByRole('textbox', { name: 'E-Mail-Fußzeile (DE)' });
     await userEvent.clear(mail);
     await userEvent.type(mail, 'Gruß');
@@ -263,7 +266,8 @@ describe('BrandingEditorComponent', () => {
     const { fixture } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
-    await userEvent.click(screen.getByRole('radio', { name: 'EN' }));
+    await userEvent.click(screen.getByRole('button', { name: /^Sprache der Texte:/ }));
+    await userEvent.click(screen.getByRole('option', { name: 'English' }));
     await fixture.whenStable();
     fixture.detectChanges();
     expect(screen.getByRole('textbox', { name: 'Copyright-Zeile (EN)' })).toHaveValue('© Student body');
@@ -274,7 +278,8 @@ describe('BrandingEditorComponent', () => {
     expect(c.draft().freetexts.support.de).toBe('Bei Fragen: support@example.org');
     const label = screen.getAllByRole('textbox', { name: 'Bezeichnung (EN)' })[0];
     expect(label).toHaveValue('Imprint');
-    await userEvent.click(screen.getByRole('radio', { name: 'DE' }));
+    await userEvent.click(screen.getByRole('button', { name: /^Sprache der Texte:/ }));
+    await userEvent.click(screen.getByRole('option', { name: 'Deutsch' }));
     expect(c.lang()).toBe('de');
   });
 
@@ -445,7 +450,8 @@ describe('BrandingEditorComponent', () => {
       fixture.detectChanges();
       const internal = screen.getByRole('textbox', { name: 'Intern: angemeldet mit Konto (DE)' });
       await userEvent.type(internal, 'Danke **sehr** <b>x</b>');
-      await userEvent.click(screen.getByRole('radio', { name: 'EN' }));
+      await userEvent.click(screen.getByRole('button', { name: /^Sprache der Texte:/ }));
+    await userEvent.click(screen.getByRole('option', { name: 'English' }));
       const en = screen.getByRole('textbox', { name: 'Intern: angemeldet mit Konto (EN)' });
       expect(en).toHaveValue('');
       expect(en).toHaveAttribute('placeholder', expect.stringMatching(/^Thank you\. Your application is created/));

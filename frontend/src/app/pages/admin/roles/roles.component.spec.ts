@@ -232,16 +232,16 @@ describe('AdminRolesComponent', () => {
     expect(inst.nameDraft(ROLES[1])).toEqual({ de: 'mitglied', en: 'member' });
     expect(inst.nameDraft(ROLES[2])).toEqual({ de: '', en: 'officer' });
     expect(inst.nameDraft({ id: 'r-x', key: 'x', label: {}, permissions: [] })).toEqual({ de: '', en: '' });
-    inst.patchName(ROLES[1], 'de', 'Mitglied!');
+    inst.patchName(ROLES[1], { ...inst.nameDraft(ROLES[1]), de: 'Mitglied!' });
     expect(inst.nameDraft(ROLES[1])).toEqual({ de: 'Mitglied!', en: 'member' });
-    inst.patchName(ROLES[1], 'en', 'Member!');
+    inst.patchName(ROLES[1], { ...inst.nameDraft(ROLES[1]), en: 'Member!' });
     expect(inst.nameDraft(ROLES[1])).toEqual({ de: 'Mitglied!', en: 'Member!' });
   });
 
   it('saves a new name with "Speichern" and updates the role', async () => {
     const { inst, api, toast } = await setup();
-    inst.patchName(ROLES[1], 'de', 'Mitglied');
-    inst.patchName(ROLES[1], 'en', 'Member');
+    inst.patchName(ROLES[1], { ...inst.nameDraft(ROLES[1]), de: 'Mitglied' });
+    inst.patchName(ROLES[1], { ...inst.nameDraft(ROLES[1]), en: 'Member' });
     expect(inst.rolesDirty()).toBe(true);
     inst.saveRoles();
     expect(api.renameRole).toHaveBeenCalledWith('r-member', { de: 'Mitglied', en: 'Member' });
@@ -255,7 +255,7 @@ describe('AdminRolesComponent', () => {
   it('saves the rights before the name of the same role', async () => {
     const { inst, api } = await setup();
     inst.togglePerm(ROLES[1], 'flow.configure', true);
-    inst.patchName(ROLES[1], 'de', 'Mitglied');
+    inst.patchName(ROLES[1], { ...inst.nameDraft(ROLES[1]), de: 'Mitglied' });
     inst.saveRoles();
     expect(api.saveRolePermissions).toHaveBeenCalledWith('r-member', ['application.read', 'flow.configure']);
     expect(api.renameRole).toHaveBeenCalledWith('r-member', { de: 'Mitglied', en: 'member' });
@@ -267,7 +267,7 @@ describe('AdminRolesComponent', () => {
   it('a failed rename shows an error toast', async () => {
     const api = makeApi({ renameRole: jest.fn(() => throwError(() => new Error('x'))) });
     const { inst, toast } = await setup(api);
-    inst.patchName(ROLES[1], 'de', 'Neu');
+    inst.patchName(ROLES[1], { ...inst.nameDraft(ROLES[1]), de: 'Neu' });
     inst.saveRoles();
     expect(toast.error).toHaveBeenCalled();
   });
@@ -276,7 +276,7 @@ describe('AdminRolesComponent', () => {
     const { inst } = await setup();
     inst.openAdd();
     expect(inst.addOpen()).toBe(true);
-    expect(inst.draft()).toEqual({ key: '', labelDe: '', labelEn: '' });
+    expect(inst.draft()).toEqual({ key: '', label: {} });
     inst.patchDraft('key', 'x');
     expect(inst.draft().key).toBe('x');
   });
@@ -311,7 +311,7 @@ describe('AdminRolesComponent', () => {
     const { inst, api, toast } = await setup();
     inst.openAdd();
     inst.patchDraft('key', 'referent');
-    inst.patchDraft('labelDe', 'Referent');
+    inst.patchDraft('label', { de: 'Referent', en: ' ' });
     inst.createRole();
     expect(api.createRole).toHaveBeenCalledWith({ key: 'referent', label: { de: 'Referent' }, permissions: [] });
     expect(inst.roles().some((r: Role) => r.id === 'r-new')).toBe(true);
@@ -323,8 +323,7 @@ describe('AdminRolesComponent', () => {
     const { inst, api } = await setup();
     inst.openAdd();
     inst.patchDraft('key', 'kasse');
-    inst.patchDraft('labelDe', 'Kasse');
-    inst.patchDraft('labelEn', 'Treasury');
+    inst.patchDraft('label', { de: 'Kasse', en: 'Treasury', fr: '' });
     inst.createRole();
     expect(api.createRole).toHaveBeenCalledWith({
       key: 'kasse',

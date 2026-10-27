@@ -200,7 +200,7 @@ async def test_applications_source_includes_archived_and_marks_them(
 
 
 @pytest.mark.parametrize(
-    ("lang", "expected"), [("de", "Ohne Titel"), ("en", "Untitled"), ("fr", "Ohne Titel")]
+    ("lang", "expected"), [("de", "Ohne Titel"), ("en", "Untitled"), ("fr", "Untitled")]
 )
 async def test_a_nameless_record_reads_as_untitled_not_as_its_id(
     monkeypatch: pytest.MonkeyPatch, lang: str, expected: str
@@ -245,7 +245,7 @@ async def test_a_nameless_record_reads_as_untitled_not_as_its_id(
 
 
 @pytest.mark.parametrize(
-    ("lang", "expected"), [("de", "Gremium"), ("en", "Committee"), ("fr", "Gremium")]
+    ("lang", "expected"), [("de", "Gremium"), ("en", "Committee"), ("fr", "Committee")]
 )
 async def test_a_gremium_hit_names_its_kind_not_its_slug(lang: str, expected: str) -> None:
     """The subtitle of a Gremium hit is the kind only. The slug is an internal key."""
@@ -333,8 +333,10 @@ async def test_the_ticket_source_needs_ticket_manage(monkeypatch: pytest.MonkeyP
         "In progress",
         f"/tickets/{tid}",
     )
-    (hit,) = await svc._tickets("drucker", manager, "fr")
+    (hit,) = await svc._tickets("drucker", manager, "de")
     assert hit.subtitle == "In Arbeit"
+    (hit,) = await svc._tickets("drucker", manager, "fr")
+    assert hit.subtitle == "In progress"
 
 
 async def test_the_todo_source_links_the_card_on_its_board(

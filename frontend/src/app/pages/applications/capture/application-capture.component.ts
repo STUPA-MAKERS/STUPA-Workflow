@@ -193,7 +193,7 @@ export class ApplicationCaptureComponent {
   private readonly formTick = signal(0);
 
   protected readonly modeOptions = computed<SegmentedOption[]>(() => {
-    this.i18n.locale();
+    this.i18n.uiLocale();
     return [
       { value: 'account', label: this.i18n.translate('applications.capture.mode.account') },
       { value: 'guest', label: this.i18n.translate('applications.capture.mode.guest') },
@@ -352,7 +352,7 @@ export class ApplicationCaptureComponent {
         .map((f) => f.key),
     );
     void this.drafts.scopeToFields(fileKeys);
-    const sections = toFormlySections(eff.sections, this.i18n.locale(), {
+    const sections = toFormlySections(eff.sections, this.i18n.uiLocale(), {
       has_budget: eff.hasBudget,
     });
     for (const field of sections[0]?.fieldGroup ?? []) {
@@ -397,7 +397,7 @@ export class ApplicationCaptureComponent {
       applicantEmail: picked ? null : this.guestEmail().trim(),
       receivedOn: this.receivedOn(),
       intake: this.intake().trim() || null,
-      lang: this.i18n.locale(),
+      lang: this.i18n.uiLocale(),
       attachmentIds: ids,
       draftToken: ids.length ? this.drafts.token() : null,
     };

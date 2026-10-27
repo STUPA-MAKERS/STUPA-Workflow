@@ -96,7 +96,7 @@ describe('GremiumDialogComponent', () => {
   it('saves every setting and then the recipients', async () => {
     const { api, saved } = await setup(STUPA);
     await pickOption(screen.getByRole('combobox', { name: 'CD-Variante' }), 'AStA');
-    await pickOption(screen.getByRole('combobox', { name: 'Standardsprache' }), 'Englisch');
+    await pickOption(screen.getByRole('combobox', { name: 'Standardsprache' }), 'English');
     const quorum = screen.getByRole('spinbutton', { name: 'Quorum (%)' });
     await userEvent.clear(quorum);
     await userEvent.type(quorum, '150');

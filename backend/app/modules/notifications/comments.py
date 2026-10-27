@@ -49,6 +49,7 @@ from app.modules.notifications.templating import (
     render_mail,
 )
 from app.settings import Settings
+from app.shared.i18n import pick_lang, resolve_i18n
 
 logger = logging.getLogger("app.notifications")
 
@@ -213,9 +214,7 @@ async def send_comment_notifications(
     state = await session.get(State, state_id) if state_id is not None else None
     status_label = ""
     if state is not None and isinstance(state.label_i18n, dict) and state.label_i18n:
-        status_label = state.label_i18n.get(lang) or next(
-            iter(state.label_i18n.values())
-        )
+        status_label = resolve_i18n(state.label_i18n, lang) or ""
 
     if author_kind == "principal":
         author_label = (await gremium_actor_name(session, gremium_id) or "").strip()
@@ -224,7 +223,7 @@ async def send_comment_notifications(
         author_label = (author_name or "").strip()
         fallback = _APPLICANT_AUTHOR_FALLBACK
     if not author_label:
-        author_label = fallback.get(lang, fallback["de"])
+        author_label = pick_lang(fallback, lang)
 
     link = application_link(
         settings,
@@ -232,7 +231,7 @@ async def send_comment_notifications(
         guest=author_kind == "principal" and created_by is None,
         comment_id=comment_id,
     )
-    context = {
+    context: dict[str, object] = {
         "link": link.url,
         "applicationId": str(application_id),
         "applicationTitle": title.strip() if isinstance(title, str) else "",

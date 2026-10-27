@@ -526,7 +526,7 @@ export class AdminApiService {
    */
   listApplicationTypes(): Observable<ApplicationTypeOption[]> {
     if (this.mock) return of(structuredCopy(MOCK_APP_TYPE_OPTIONS));
-    const params = new HttpParams().set('lang', this.i18n.locale());
+    const params = new HttpParams().set('lang', this.i18n.uiLocale());
     return this.http
       .get<{ items: ApplicationTypeOption[] }>(`${this.base}/application-types`, { params })
       .pipe(map((page) => page.items.map((t) => ({ id: t.id, name: t.name }))));

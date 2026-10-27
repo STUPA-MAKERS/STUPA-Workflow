@@ -32,7 +32,7 @@ function cap(text: string, max: number): string {
  */
 export function reportContext(
   env: ReportEnv,
-  language: 'de' | 'en',
+  language: string,
   colorScheme: 'light' | 'dark',
 ): TicketContext {
   const url = env.href.split(/[?#]/)[0];

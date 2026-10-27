@@ -2,9 +2,9 @@ import type { FormlyFieldConfig } from '@ngx-formly/core';
 import { tap } from 'rxjs';
 import type { FieldType, FormFieldDef, FormSection, Lang } from '@core/api/models';
 import { evalJsonLogic, isFieldVisible, JsonLogicError } from './jsonlogic';
-import { CATALOG, de, type Locale, type TranslationKey } from '@core/i18n/translations';
+import { CATALOG, de, type TranslationKey } from '@core/i18n/translations';
 import { resolveI18n } from './i18n-text';
-import { toFormatLocale } from '@core/i18n/i18n.service';
+import { baseLocale, toFormatLocale } from '@core/i18n/i18n.service';
 import { formatMoney } from '@shared/format-money';
 import { normalizePositions, positionsTotal } from './positions';
 
@@ -72,7 +72,7 @@ const FORMLY_TYPE: Record<FieldType, string> = {
  */
 export function toFormlyFields(
   fields: FormFieldDef[],
-  lang: Lang | string,
+  lang: Lang,
   extraContext: Record<string, unknown> = {},
 ): FormlyFieldConfig[] {
   const costKeys = positionsKeys(fields);
@@ -110,7 +110,7 @@ export interface FormlySectionOptions {
  */
 export function toFormlySections(
   sections: readonly FormSection[],
-  lang: Lang | string,
+  lang: Lang,
   extraContext: Record<string, unknown> = {},
   options: FormlySectionOptions = {},
 ): FormlyFieldConfig[] {
@@ -139,7 +139,7 @@ export function toFormlySections(
 }
 
 /** Section marker → non-editable heading (Formly `display`, `heading`). */
-function sectionHeading(f: FormFieldDef, lang: Lang | string): FormlyFieldConfig {
+function sectionHeading(f: FormFieldDef, lang: Lang): FormlyFieldConfig {
   const label = resolveI18n(f.label, lang);
   const props: Record<string, unknown> = { heading: true, label };
   const help = ownHelp(f, label, lang);
@@ -151,7 +151,7 @@ function sectionHeading(f: FormFieldDef, lang: Lang | string): FormlyFieldConfig
  * The help text of a field, or undefined when it has none or when it only repeats the
  * label. A form can hold the same words in both, and the field would then show them twice.
  */
-function ownHelp(f: FormFieldDef, label: string, lang: Lang | string): string | undefined {
+function ownHelp(f: FormFieldDef, label: string, lang: Lang): string | undefined {
   const help = f.help ? resolveI18n(f.help, lang) : '';
   return help.trim() && help.trim() !== label.trim() ? help : undefined;
 }
@@ -168,8 +168,8 @@ function costTotal(field: FormlyFieldConfig, costKeys: readonly string[]): numbe
 }
 
 /** A UI text with `{total}` filled in, in the locale of the form. */
-function totalText(key: TranslationKey, lang: Lang | string, total: number): string {
-  const text = CATALOG[lang as Locale]?.[key] ?? de[key];
+function totalText(key: TranslationKey, lang: Lang, total: number): string {
+  const text = CATALOG[baseLocale(lang)]?.[key] ?? de[key];
   return text.replace('{total}', formatMoney(total, toFormatLocale(String(lang))) || String(total));
 }
 
@@ -182,7 +182,7 @@ function totalText(key: TranslationKey, lang: Lang | string, total: number): str
 function applyFunding(
   config: FormlyFieldConfig,
   help: string | undefined,
-  lang: Lang | string,
+  lang: Lang,
   costKeys: readonly string[],
 ): void {
   const over = (field: FormlyFieldConfig): boolean => {
@@ -214,7 +214,7 @@ function applyFunding(
 
 function mapField(
   f: FormFieldDef,
-  lang: Lang | string,
+  lang: Lang,
   extraContext: Record<string, unknown>,
   costKeys: readonly string[] = [],
 ): FormlyFieldConfig {
@@ -246,7 +246,7 @@ function mapField(
   }
   if (f.type === 'computed') props['computed'] = true;
   if (f.type === 'table') {
-    props['text'] = CATALOG[lang as Locale]?.['forms.table.pending'] ?? de['forms.table.pending'];
+    props['text'] = CATALOG[baseLocale(lang)]?.['forms.table.pending'] ?? de['forms.table.pending'];
   }
   if (f.type === 'positions') {
     if (f.validation?.minOffers !== undefined) props['minOffers'] = f.validation.minOffers;

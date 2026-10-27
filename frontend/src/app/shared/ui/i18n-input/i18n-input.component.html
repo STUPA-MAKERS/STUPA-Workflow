@@ -1,16 +1,8 @@
 <app-input
-  [label]="deLabel() ?? ('admin.common.labelDe' | t)"
-  [ariaLabel]="deAriaLabel()"
-  [placeholder]="dePlaceholder()"
-  [ngModel]="de()"
+  [label]="fieldLabel().label"
+  [ariaLabel]="fieldLabel().ariaLabel"
+  [placeholder]="fallback()"
+  [ngModel]="value()[lang()] ?? ''"
   [ngModelOptions]="{ standalone: true }"
-  (ngModelChange)="de.set($event)"
-/>
-<app-input
-  [label]="enLabel() ?? ('admin.common.labelEn' | t)"
-  [ariaLabel]="enAriaLabel()"
-  [placeholder]="enPlaceholder()"
-  [ngModel]="en()"
-  [ngModelOptions]="{ standalone: true }"
-  (ngModelChange)="en.set($event)"
+  (ngModelChange)="set($event)"
 />
