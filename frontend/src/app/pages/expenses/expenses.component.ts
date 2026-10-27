@@ -874,6 +874,11 @@ export class ExpensesComponent implements OnDestroy {
     this.dialogs.openCreate();
   }
 
+  /** "Duplizieren": the form of a new booking with the values of `e`. */
+  openDuplicate(e: Expense): void {
+    this.dialogs.openDuplicate(e);
+  }
+
   create(event: Event): void {
     this.dialogs.create(event);
   }
@@ -935,12 +940,20 @@ export class ExpensesComponent implements OnDestroy {
     this.dialogs.openInvoiceFile(inv);
   }
 
-  /** The row menu of a booking. A booking of a closed fiscal year has no write action. */
+  /**
+   * The row menu of a booking. A booking of a closed fiscal year has no write action, but
+   * it can be duplicated, because the copy goes into an open year.
+   */
   rowMenu(e: Expense): RowMenuSection[] {
     const main: RowMenuItem[] = [];
     const canChange = this.canChange(e.fiscalYearId);
     if (canChange) {
       main.push({ id: 'edit', label: this.i18n.translate('action.edit'), icon: 'edit' });
+    }
+    if (this.canManage() && !e.parentExpenseId) {
+      main.push({ id: 'duplicate', label: this.i18n.translate('expenses.action.duplicate'), icon: 'copy' });
+    }
+    if (canChange) {
       main.push({ id: 'sub', label: this.i18n.translate('expenses.sub.add'), icon: 'plus' });
     }
     if (e.invoiceId) {
@@ -961,6 +974,7 @@ export class ExpensesComponent implements OnDestroy {
 
   onRowMenu(item: RowMenuItem, e: Expense): void {
     if (item.id === 'edit') this.openEdit(e);
+    else if (item.id === 'duplicate') this.openDuplicate(e);
     else if (item.id === 'sub') this.openCreateSub(e);
     else if (item.id === 'invoice' && e.invoiceId) {
       void this.router.navigate(['/invoices'], { queryParams: { id: e.invoiceId } });

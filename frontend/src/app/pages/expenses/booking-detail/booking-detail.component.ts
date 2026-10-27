@@ -86,11 +86,14 @@ export class BookingDetailComponent {
   readonly subLoading = input(false);
   /** `budget.book`: edit, delete and the sub-bookings. */
   readonly canManage = input(false);
+  /** `budget.book`: "Duplizieren", also for a booking of a closed fiscal year. */
+  readonly canDuplicate = input(false);
   /** Side by side: the sheet look. */
   readonly split = input(false);
   readonly phone = input(false);
 
   readonly edit = output<Expense>();
+  readonly duplicate = output<Expense>();
   readonly remove = output<Expense>();
   readonly addSub = output<void>();
   readonly openFile = output<Invoice>();
@@ -192,6 +195,9 @@ export class BookingDetailComponent {
   protected readonly menu = computed<RowMenuSection[]>(() => {
     const e = this.expense();
     const items: RowMenuItem[] = [];
+    if (this.canDuplicate() && !e.parentExpenseId) {
+      items.push({ id: 'duplicate', label: this.i18n.translate('expenses.action.duplicate'), icon: 'copy' });
+    }
     if (this.canManage() && !e.parentExpenseId) {
       items.push({ id: 'sub', label: this.i18n.translate('expenses.sub.add'), icon: 'plus' });
     }
@@ -211,6 +217,7 @@ export class BookingDetailComponent {
   onMenu(item: RowMenuItem): void {
     const e = this.expense();
     if (item.id === 'sub') this.addSub.emit();
+    else if (item.id === 'duplicate') this.duplicate.emit(e);
     else if (item.id === 'delete') this.remove.emit(e);
     else if (item.id === 'file') {
       const inv = this.invoice();
