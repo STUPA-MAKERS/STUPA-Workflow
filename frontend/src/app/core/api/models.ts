@@ -1486,6 +1486,8 @@ export interface MeetingOutWire {
   /** Finalize and send the protocol: write access plus the gremium permission
    *  `protocol.finalize`. */
   canFinalize?: boolean;
+  /** Delete the meeting: `canManage`, and `meeting.delete_finalized` for a final protocol. */
+  canDelete?: boolean;
   /** The periods of the protocol keepers, running and ended, in time order. */
   keeperPeriods?: KeeperPeriod[];
   /** The handover planned for the next agenda item. */
@@ -1677,6 +1679,9 @@ export interface Meeting {
   /** Finalize and send the protocol: write access plus the gremium permission
    *  `protocol.finalize`. */
   canFinalize: boolean;
+  /** Delete the meeting: `canManage`, and `meeting.delete_finalized` for a final protocol.
+   *  The server sets it, because the client does not know the protocol status. */
+  canDelete: boolean;
   /** The periods of the protocol keepers, running and ended, in time order. */
   keeperPeriods: KeeperPeriod[];
   /** The handover planned for the next agenda item, or `null`. */

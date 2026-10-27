@@ -213,13 +213,15 @@ export class MeetingDetailSheetComponent {
         items.push({ id: 'beamer', label: this.i18n.translate('meetings.beamer.enter'), icon: 'monitor' });
       }
     }
-    items.push({
-      id: 'delete',
-      label: this.i18n.translate('meetings.delete.title'),
-      icon: 'trash',
-      danger: true,
-    });
-    return [{ items }];
+    if (m.canDelete) {
+      items.push({
+        id: 'delete',
+        label: this.i18n.translate('meetings.delete.title'),
+        icon: 'trash',
+        danger: true,
+      });
+    }
+    return items.length ? [{ items }] : [];
   });
 
   constructor() {

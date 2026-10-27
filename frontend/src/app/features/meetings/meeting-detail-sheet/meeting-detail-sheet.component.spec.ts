@@ -196,6 +196,15 @@ describe('MeetingDetailSheetComponent', () => {
     ]);
   });
 
+  it('offers no delete without canDelete', async () => {
+    const { http, fixture } = await setup({ meeting: meeting({ canDelete: false }), phone: true });
+    flush(http);
+    fixture.detectChanges();
+    await userEvent.click(screen.getByRole('button', { name: /Weitere Aktionen/ }));
+    const menu = await screen.findByRole('menu');
+    expect(within(menu).queryByRole('menuitem', { name: 'Sitzung löschen' })).toBeNull();
+  });
+
   it('warns about a planned meeting without a minute-taker and offers to name one', async () => {
     const planned = meeting({
       status: 'planned',

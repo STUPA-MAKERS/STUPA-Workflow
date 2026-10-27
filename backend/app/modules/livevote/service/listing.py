@@ -246,12 +246,13 @@ class ListingOps(PermissionOps, VoteReadOps):
             return []
         proto_rows = (
             await self.session.execute(
-                select(Protocol.meeting_id, Protocol.id).where(
+                select(Protocol.meeting_id, Protocol.id, Protocol.status).where(
                     Protocol.meeting_id.in_([m.id for m in meetings])
                 )
             )
         ).all()
-        proto_by_meeting = {meeting_id: pid for meeting_id, pid in proto_rows}
+        proto_by_meeting = {meeting_id: pid for meeting_id, pid, _ in proto_rows}
+        final_ids = {meeting_id for meeting_id, _, st in proto_rows if st == "final"}
         all_gids = {m.gremium_id for m in meetings}
         gremium_rows = (
             await self.session.execute(
@@ -305,6 +306,11 @@ class ListingOps(PermissionOps, VoteReadOps):
                     m,
                     proto_by_meeting.get(m.id),
                     can_manage=m.gremium_id in manage_ids,
+                    can_delete=self._can_delete(
+                        principal,
+                        can_manage=m.gremium_id in manage_ids,
+                        final=m.id in final_ids,
+                    ),
                     can_write=can_write,
                     can_manage_votes=(m.gremium_id in votes_mgmt_ids) or (is_prot and prot_votes),
                     can_vote=m.gremium_id in vote_ids,
