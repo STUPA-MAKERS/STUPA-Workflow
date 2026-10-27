@@ -21,7 +21,7 @@
     }
   </button>
 } @else {
-  <div class="ccs__box" [class.ccs__box--open]="open()">
+  <div class="ccs__box" [class.ccs__box--open]="open()" [class.ccs__box--invalid]="invalid()">
     <span class="ccs__label" [id]="labelId()"
       >{{ label() }}
       @if (required()) {
@@ -39,6 +39,7 @@
       [attr.aria-controls]="open() ? listId() : null"
       [attr.aria-labelledby]="labelId() + ' ' + id() + '-value'"
       [attr.aria-required]="required() ? 'true' : null"
+      [attr.aria-invalid]="invalid() ? 'true' : null"
       (click)="toggle()"
       (keydown)="onTriggerKey($event)"
     >

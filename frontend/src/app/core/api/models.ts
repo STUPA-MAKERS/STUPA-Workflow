@@ -964,9 +964,19 @@ export type FieldType =
   | 'funding'
   | 'section';
 
+/**
+ * One option of a select field. The server sets `parentId`, `key` and `color` on the
+ * options of `budget_select`, so the form shows the cost centres as a tree.
+ */
 export interface FieldOption {
   value: string;
   label: I18nMap;
+  /** The value of the parent cost centre, or null for a top-level one. */
+  parentId?: string | null;
+  /** The path segment of the cost centre. */
+  key?: string | null;
+  /** The own display colour of the cost centre, or null. */
+  color?: string | null;
 }
 
 export interface FieldValidation {

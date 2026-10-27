@@ -5,6 +5,7 @@ import type { TranslationKey } from '@core/i18n/translations';
 import { FormlyInputType } from './formly-input.type';
 import { FormlyTextareaType } from './types/formly-textarea.type';
 import { FormlySelectType } from './types/formly-select.type';
+import { FormlyBudgetSelectType } from './types/formly-budget-select.type';
 import { FormlyCheckboxType } from './types/formly-checkbox.type';
 import { FormlyMultiCheckboxType } from './types/formly-multicheckbox.type';
 import { FormlyMultiSelectType } from './types/formly-multiselect.type';
@@ -17,9 +18,9 @@ import { FormlyDateRangeType } from './types/formly-daterange.type';
  *
  * This provider registers the UI-kit-bound field types of the form definition. The
  * `input` type covers text, number, currency and date through `props.type`. The other
- * types are textarea, select, checkbox, multicheckbox and multiselect (a dropdown with
- * several choices, for the edit form of the detail), plus a read-only `display`
- * type for `markdown` and `computed`. The mapping lives in `@shared/forms/formly-mapper`.
+ * types are textarea, select, budget_select (the cost-centre tree), checkbox,
+ * multicheckbox and multiselect (a dropdown with several choices, for the edit form of
+ * the detail), plus a read-only `display` type for `markdown` and `computed`. The mapping lives in `@shared/forms/formly-mapper`.
  *
  * The validation messages come from the translation catalog. A second `FORMLY_CONFIG`
  * entry supplies them, because a message must read the active locale at render time. A
@@ -32,6 +33,7 @@ export function provideFormly(): Provider {
         { name: 'input', component: FormlyInputType },
         { name: 'textarea', component: FormlyTextareaType },
         { name: 'select', component: FormlySelectType },
+        { name: 'budget_select', component: FormlyBudgetSelectType },
         { name: 'checkbox', component: FormlyCheckboxType },
         { name: 'multicheckbox', component: FormlyMultiCheckboxType },
         { name: 'multiselect', component: FormlyMultiSelectType },
