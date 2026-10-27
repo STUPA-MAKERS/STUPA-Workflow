@@ -14,10 +14,6 @@
   justify-content: space-between;
   gap: var(--space-3);
 }
-.br__lang {
-  display: flex;
-  width: 11rem;
-}
 
 .br__cols {
   display: grid;
@@ -206,9 +202,6 @@
 }
 
 @container (max-width: 30rem) {
-  .br__lang {
-    width: 100%;
-  }
   .br__nameRow {
     grid-template-columns: minmax(0, 1fr);
   }

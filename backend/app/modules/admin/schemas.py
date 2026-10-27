@@ -28,7 +28,7 @@ from app.modules.applications.models import (
 from app.modules.auth.models import MAX_SESSION_DAYS
 from app.modules.livevote.models import MAX_LEAD_MINUTES
 from app.shared.config_schemas import ComparisonOffers, EventName, FlowGraph
-from app.shared.i18n import I18nMap
+from app.shared.i18n import I18nMap, Lang
 from app.shared.permissions import PERMISSION_CATALOGUE
 
 #: A CD-variant key is a slug. It is the stable handle of the variant and never
@@ -172,7 +172,7 @@ class GremiumCreate(_CamelModel):
     name: str = Field(min_length=1)
     slug: str = Field(min_length=1)
     cd_variant_id: UUID | None = Field(default=None, alias="cdVariantId")
-    default_lang: str = Field(default="de", alias="defaultLang")
+    default_lang: Lang = Field(default="de", alias="defaultLang")
     allow_vote_delegation: bool = Field(default=False, alias="allowVoteDelegation")
     delegation_lead_minutes: int = Field(
         default=0, alias="delegationLeadMinutes", ge=0, le=60 * 24 * 30
@@ -193,7 +193,7 @@ class GremiumUpdate(_CamelModel):
     slug: str | None = None
     #: Clearable to null: `model_fields_set` separates "not sent" from "set to null".
     cd_variant_id: UUID | None = Field(default=None, alias="cdVariantId")
-    default_lang: str | None = Field(default=None, alias="defaultLang")
+    default_lang: Lang | None = Field(default=None, alias="defaultLang")
     allow_vote_delegation: bool | None = Field(default=None, alias="allowVoteDelegation")
     delegation_lead_minutes: int | None = Field(
         default=None, alias="delegationLeadMinutes", ge=0, le=60 * 24 * 30

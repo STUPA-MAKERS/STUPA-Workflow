@@ -1,3 +1,4 @@
+import type { I18nMap } from '@core/api/models';
 import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -57,7 +58,7 @@ export class StateInspectorComponent {
   readonly guardGroups = input.required<GuardPriorityRow[]>();
 
   readonly keyChange = output<string>();
-  readonly labelChange = output<{ lang: 'de' | 'en'; value: string }>();
+  readonly labelChange = output<I18nMap>();
   readonly colorChange = output<string>();
   readonly makeInitial = output<void>();
   readonly editAllowedChange = output<boolean>();

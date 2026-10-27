@@ -7,8 +7,9 @@
  * lookups stay in the component.
  *
  * The places come from the automatic layout of the level (`layoutInput` in,
- * `deps.layout` back, see `flow-elk.ts`). Until it answers, the boxes stand at the
- * stored positions and the lines are plain curves.
+ * `deps.layout` back, see `flow-elk.ts`). Without a layout (no layouter, or it failed),
+ * the boxes stand at the stored positions and the lines are plain curves. While a newer
+ * input waits for its layout, a line without a route is left out, so no curve flashes up.
  */
 import { type Signal, computed } from '@angular/core';
 import type { FlowGraph, FlowGroup, StateDef, TransitionDef } from '../admin.models';
@@ -509,14 +510,16 @@ export function createFlowCanvasView(deps: FlowCanvasViewDeps): FlowCanvasView {
 
   const edges = computed<CanvasEdge[]>(() => {
     const sel = deps.selection();
-    const routes = deps.layout()?.routes;
+    const layout = deps.layout();
+    const routes = layout?.routes;
     const f = focus();
     const boxes = new Map<string, { x: number; y: number; h: number }>();
     for (const n of nodes()) boxes.set(stateBox(n.key), n);
     for (const b of groupBoxes()) boxes.set(groupBox(b.id), b);
     for (const p of proxies().left) boxes.set(proxyBox('l', p.pid), { ...p, h: PROXY_H });
     for (const p of proxies().right) boxes.set(proxyBox('r', p.pid), { ...p, h: PROXY_H });
-    const out = links().map(({ index, t, src, sx, sy, dst }) => {
+    const laidOut = links().filter(({ index }) => !layout || routes!.has(index));
+    const out = laidOut.map(({ index, t, src, sx, sy, dst }) => {
       const route = routes?.get(index);
       const bundle = route?.bundle ?? [index];
       const related = !f || (f.edge !== null ? bundle.includes(f.edge) : src === f.state || dst === f.state);

@@ -3,6 +3,7 @@ import { UpperCasePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
 import type { TranslationKey } from '@core/i18n/translations';
+import { setI18n } from '@shared/forms/i18n-text';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import {
@@ -17,7 +18,7 @@ import {
   mediaQuery,
   ScrollFadeDirective,
   SkeletonComponent,
-  StatusTextComponent,
+  BadgeComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
@@ -64,7 +65,7 @@ function sameTexts(a: Record<string, string>, b: Record<string, string>): boolea
     InputComponent,
     PageHeaderComponent,
     ContentLangSwitchComponent,
-    StatusTextComponent,
+    BadgeComponent,
   ],
   templateUrl: './mail-templates.component.html',
   styleUrl: './mail-templates.component.scss',
@@ -159,7 +160,7 @@ export class MailTemplatesComponent {
   patch(field: 'subjectI18n' | 'bodyI18n' | 'bodyHtmlI18n', value: string): void {
     const d = this.draft();
     if (!d) return;
-    this.draft.set({ ...d, [field]: { ...d[field], [this.lang()]: value } });
+    this.draft.set({ ...d, [field]: setI18n(d[field], this.lang(), value) });
   }
 
   save(): void {

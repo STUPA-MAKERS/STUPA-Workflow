@@ -55,7 +55,7 @@ def test_text_to_html_keeps_trailing_punctuation_outside_link() -> None:
     assert "</a>." in html
 
 
-def test_reason_text_falls_back_to_generic_and_de() -> None:
+def test_reason_text_falls_back_to_generic_and_en() -> None:
     assert reason_text("nope", "de") == reason_text("generic", "de")
-    assert reason_text("magic_link", "fr") == reason_text("magic_link", "de")
+    assert reason_text("magic_link", "fr") == reason_text("magic_link", "en")
     assert reason_text("magic_link", "en") != reason_text("magic_link", "de")

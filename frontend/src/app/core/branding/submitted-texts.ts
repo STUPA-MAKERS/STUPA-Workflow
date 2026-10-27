@@ -1,5 +1,6 @@
 import type { I18nMap } from '@core/api/models';
-import { CATALOG, DEFAULT_LOCALE, type Locale } from '@core/i18n/translations';
+import { baseLocale } from '@core/i18n/i18n.service';
+import { CATALOG, DEFAULT_LOCALE } from '@core/i18n/translations';
 
 /**
  * The texts on the page after the creation of an application.
@@ -26,10 +27,10 @@ const DEFAULT_KEY = {
   external: 'apply.confirm.body',
 } as const satisfies Record<SubmittedKind, string>;
 
-/** The built-in text of a kind in a language. */
-export function defaultSubmittedText(kind: SubmittedKind, lang: Locale): string {
+/** The built-in text of a kind in a language. An extra language gets the English text. */
+export function defaultSubmittedText(kind: SubmittedKind, lang: string): string {
   const key = DEFAULT_KEY[kind];
-  return CATALOG[lang][key] ?? CATALOG[DEFAULT_LOCALE][key] ?? '';
+  return CATALOG[baseLocale(lang)][key] ?? CATALOG[DEFAULT_LOCALE][key] ?? '';
 }
 
 /**
@@ -39,7 +40,7 @@ export function defaultSubmittedText(kind: SubmittedKind, lang: Locale): string 
 export function submittedMarkdown(
   map: I18nMap | null | undefined,
   kind: SubmittedKind,
-  lang: Locale,
+  lang: string,
 ): string {
   const custom = (map?.[lang] ?? '').trim();
   return custom || defaultSubmittedText(kind, lang);

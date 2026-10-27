@@ -175,10 +175,9 @@ export class GremiumDialogComponent {
   protected readonly cdOptions = computed<SelectOption[]>(() =>
     this.cdVariants().map((v) => ({ value: v.id, label: v.name })),
   );
-  protected readonly langOptions = computed<SelectOption[]>(() => [
-    { value: 'de', label: this.i18n.translate('admin.gremien.langDe') },
-    { value: 'en', label: this.i18n.translate('admin.gremien.langEn') },
-  ]);
+  protected readonly langOptions = computed<SelectOption[]>(() =>
+    this.i18n.locales().map((code) => ({ value: code, label: this.i18n.languageName(code) })),
+  );
   protected readonly canSave = computed(() => !!this.form().name.trim() && !this.saving());
 
   constructor() {

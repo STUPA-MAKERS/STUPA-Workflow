@@ -202,10 +202,11 @@ async def test_received_confirms_in_the_language_of_the_report(
 ) -> None:
     """Confirm the report in its own language.
 
-    A report without a session stays one-way, so the mail has no link.
+    An extra language goes to the mail as it is; the mail renderer falls back to English,
+    then German. A report without a session stays one-way, so the mail has no link.
     """
     branding["value"] = Branding(help=HelpSettings(wikiUrl="https://wiki.example.org/b"))
-    for context, lang in (({"language": "en"}, "en"), ({"language": "fr"}, "de"), (None, "de")):
+    for context, lang in (({"language": "en"}, "en"), ({"language": "fr"}, "fr"), (None, "de")):
         ticket = _ticket(context=context)
         session = ScriptedSession()
         session.put(ticket)
@@ -435,7 +436,7 @@ async def test_an_answer_of_a_nameless_or_gone_author_has_no_name(
         session.put(ticket, note, _reporter(), *([row] if row is not None else []))
         assert await _note_mail(session, note.id) is True
         assert sent[-1]["context"]["author"] == ""
-        assert sent[-1]["lang"] == "de"
+        assert sent[-1]["lang"] == "fr"
 
 
 @pytest.mark.parametrize(

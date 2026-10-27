@@ -6,7 +6,6 @@
   @if (heading() || (canEdit() && !fab())) {
     <app-section-header
       class="rm__head"
-      [level]="3"
       [headingId]="uid + '-title'"
       [heading]="heading() ? ('admin.gremiumRoles.matrixTitle' | t) : null"
     >

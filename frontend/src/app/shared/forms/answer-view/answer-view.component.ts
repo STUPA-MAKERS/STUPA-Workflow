@@ -86,7 +86,7 @@ export class AnswerViewComponent {
 
   /** Answers without a field come from an older form version and show last, as plain text. */
   readonly blocks = computed<AnswerBlock[]>(() => {
-    const lang = this.i18n.locale();
+    const lang = this.i18n.uiLocale();
     const data = this.data();
     const ctx = { ...this.context(), ...data };
     const skip = new Set(this.skipKeys());
@@ -136,7 +136,7 @@ export class AnswerViewComponent {
 
   private cell(f: FormFieldDef, label: string, raw: unknown): AnswerCell {
     const value = formatAnswer(f, raw, {
-      lang: this.i18n.locale(),
+      lang: this.i18n.uiLocale(),
       yes: this.i18n.translate('common.yes'),
       no: this.i18n.translate('common.no'),
     });

@@ -129,7 +129,7 @@ describe('GroupMappingsComponent', () => {
     expect(api.listGremiumRoles).toHaveBeenCalledWith('g2', { quiet: true });
   });
 
-  /** The reserved prefix stands once at the foot of the page. */
+  /** The reserved prefix is no footnote; the dialog shows it as the error of the group field. */
   it('shows each section as rows "group → target", a gremium role after its gremium', async () => {
     const { c } = await setup();
     expect(c.sections().map((sec: { kind: string }) => sec.kind)).toEqual(['global', 'membership', 'role']);
@@ -142,7 +142,7 @@ describe('GroupMappingsComponent', () => {
     });
     const role = screen.getByRole('region', { name: 'Gremien-Rollen' });
     expect(within(role).getByText('Präsidium').tagName).toBe('STRONG');
-    expect(screen.getByText('Das Präfix „vote:“ ist reserviert.')).toBeInTheDocument();
+    expect(screen.queryByText('Das Präfix „vote:“ ist reserviert.')).not.toBeInTheDocument();
   });
 
   it('role names follow the locale → de → key fallbacks', async () => {

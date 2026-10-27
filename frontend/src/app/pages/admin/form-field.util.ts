@@ -7,7 +7,7 @@
  * the `visibleIf` and `compute` JsonLogic. The server validates again on save and stays
  * authoritative.
  */
-import type { FieldType, FormFieldDef } from '@core/api/models';
+import type { FieldType, FormFieldDef, I18nMap } from '@core/api/models';
 
 export const KEY_PATTERN = /^[a-z][a-z0-9_]*$/;
 
@@ -181,8 +181,8 @@ export function blankOption(): { value: string; label: { de: string; en: string 
  * pack and unpack steps produce and consume such markers.
  */
 export interface QuestionGroup {
-  titleDe: string;
-  titleEn: string;
+  /** The title per language. */
+  title: I18nMap;
   fields: FormFieldDef[];
 }
 
@@ -196,18 +196,14 @@ export interface QuestionGroup {
  */
 export function groupsFromFields(fields: FormFieldDef[]): QuestionGroup[] {
   const groups: QuestionGroup[] = [];
-  let current: QuestionGroup = { titleDe: '', titleEn: '', fields: [] };
+  let current: QuestionGroup = { title: { de: '', en: '' }, fields: [] };
   let opened = false;
   for (const f of fields) {
     if (f.type === 'section') {
       if (opened || current.fields.length > 0) {
         groups.push(current);
       }
-      current = {
-        titleDe: f.label?.['de'] ?? '',
-        titleEn: f.label?.['en'] ?? '',
-        fields: [],
-      };
+      current = { title: { de: '', en: '', ...f.label }, fields: [] };
       opened = true;
       continue;
     }
@@ -230,14 +226,14 @@ export function groupsToFields(groups: QuestionGroup[]): FormFieldDef[] {
   const out: FormFieldDef[] = [];
   let n = 0;
   groups.forEach((g, gi) => {
-    const hasTitle = !!(g.titleDe || g.titleEn);
+    const hasTitle = Object.values(g.title).some(Boolean);
     const needsMarker = gi > 0 || hasTitle;
     if (needsMarker) {
       n += 1;
       out.push({
         key: `section_${n}`,
         type: 'section',
-        label: { de: g.titleDe, en: g.titleEn },
+        label: { ...g.title },
       });
     }
     out.push(...g.fields);

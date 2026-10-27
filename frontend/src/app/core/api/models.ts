@@ -23,7 +23,11 @@ export interface PersonRef {
   displayName: string | null;
 }
 
-export type Lang = 'de' | 'en';
+/**
+ * A content language: `de`, `en` or the BCP 47 code of an extra language (`fr`, `pt-BR`). A
+ * text falls back along the chain of the language (`fr` → `en` → `de`).
+ */
+export type Lang = string;
 
 /** Configurable multilingual text (`*_i18n` JSONB). */
 export type I18nMap = Record<string, string>;

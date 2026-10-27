@@ -7,6 +7,7 @@
       </app-status-text>
     }
     <div actions class="fe__headTools">
+      <app-content-lang-switch [(value)]="contentLang.lang" [ariaLabel]="'admin.common.contentLang' | t" />
       @if (phone()) {
         <app-row-menu [sections]="headerMenu()" (selected)="onHeaderMenu($event)" />
       } @else {
@@ -258,7 +259,7 @@
             [gremiumOptions]="gremiumOptions()"
             [guardGroups]="guardGroupRows(s.key)"
             (keyChange)="setStateKey(s.key, $event)"
-            (labelChange)="setStateLabel(s.key, $event.lang, $event.value)"
+            (labelChange)="setStateLabel(s.key, $event)"
             (colorChange)="setStateColor(s.key, $event)"
             (makeInitial)="setInitial(s.key)"
             (editAllowedChange)="setStateEditAllowed(s.key, $event)"
@@ -279,7 +280,7 @@
             [branchOptions]="branchOptionsSel(sel.t.from)"
             (fromChange)="setTransitionEndpoint(sel.index, 'from', $event)"
             (toChange)="setTransitionEndpoint(sel.index, 'to', $event)"
-            (labelChange)="setTransitionLabel(sel.index, $event.lang, $event.value)"
+            (labelChange)="setTransitionLabel(sel.index, $event)"
             (colorChange)="setTransitionColor(sel.index, $event)"
             (automaticChange)="setTransitionAutomatic(sel.index, $event)"
             (requiresActionChange)="setTransitionRequiresAction(sel.index, $event)"

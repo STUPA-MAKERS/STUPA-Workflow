@@ -48,8 +48,9 @@ describe('mapState', () => {
     expect(mapState(STATE, 'de')?.label).toBe('Eingereicht');
   });
 
-  it('falls back to de for an unknown language', () => {
-    expect(mapState(STATE, 'fr')?.label).toBe('Eingereicht');
+  it('falls back to en, then de, for an extra language', () => {
+    expect(mapState(STATE, 'fr')?.label).toBe('Submitted');
+    expect(mapState({ ...STATE, label: { de: 'Eingereicht' } }, 'fr')?.label).toBe('Eingereicht');
   });
 
   it('keeps the structural fields (id/key/color/editAllowed)', () => {

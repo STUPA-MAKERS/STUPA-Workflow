@@ -3,6 +3,7 @@ import { of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { I18nService } from '@core/i18n/i18n.service';
+import { loadCatalog } from '@core/i18n/translations';
 import { AdminTranslationsComponent, LANGUAGE_CODE, PAGE_SIZE, areaOf } from './translations.component';
 import { type AdminUiLanguage, TranslationsApiService } from './translations-api.service';
 
@@ -45,6 +46,9 @@ async function setup(api = makeApi(), toast = makeToast()) {
       { provide: ToastService, useValue: toast },
     ],
   });
+  // The page waits for the lazy EN catalog (loaded in `beforeAll`) before it shows the list.
+  await Promise.resolve();
+  view.fixture.detectChanges();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const inst = view.fixture.componentInstance as any;
   const i18n = view.fixture.debugElement.injector.get(I18nService);
@@ -52,6 +56,7 @@ async function setup(api = makeApi(), toast = makeToast()) {
 }
 
 describe('AdminTranslationsComponent', () => {
+  beforeAll(() => loadCatalog('en'));
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('lists the languages and the first page of keys with their overrides', async () => {
@@ -64,6 +69,13 @@ describe('AdminTranslationsComponent', () => {
     expect(inst.hasMore()).toBe(true);
     inst.more();
     expect(inst.rows()).toHaveLength(2 * PAGE_SIZE);
+  });
+
+  it('shows the built-in EN text as the reference of EN while the app runs in DE', async () => {
+    const { inst } = await setup();
+    inst.setLocale('en');
+    expect(inst.reference('nav.dashboard')).toBe('Dashboard');
+    expect(inst.reference('action.save')).toBe('Save');
   });
 
   it('shows a load error', async () => {

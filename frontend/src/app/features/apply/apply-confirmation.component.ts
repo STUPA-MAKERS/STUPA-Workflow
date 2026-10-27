@@ -69,13 +69,13 @@ export class ApplyConfirmationComponent {
   /** The text for a signed-in applicant, as HTML. */
   protected readonly internalHtml = computed(() =>
     renderMarkdown(
-      submittedMarkdown(this.branding.freetexts().submittedInternal, 'internal', this.i18n.locale()),
+      submittedMarkdown(this.branding.freetexts().submittedInternal, 'internal', this.i18n.uiLocale()),
     ),
   );
   /** The text for a guest, as HTML. */
   protected readonly externalHtml = computed(() =>
     renderMarkdown(
-      submittedMarkdown(this.branding.freetexts().submittedExternal, 'external', this.i18n.locale()),
+      submittedMarkdown(this.branding.freetexts().submittedExternal, 'external', this.i18n.uiLocale()),
     ),
   );
 

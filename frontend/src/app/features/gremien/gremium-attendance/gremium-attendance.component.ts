@@ -167,7 +167,7 @@ export class GremiumAttendanceComponent {
   );
 
   readonly roleOptions = computed<FilterSelectOption[]>(() => {
-    const locale = this.i18n.locale();
+    const locale = this.i18n.uiLocale();
     const roles = new Map<string, string>();
     for (const r of this.data()?.rows ?? []) {
       if (r.roleKey && !roles.has(r.roleKey)) roles.set(r.roleKey, localized(r.roleName, locale, r.roleKey));

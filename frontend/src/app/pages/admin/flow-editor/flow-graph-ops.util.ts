@@ -2,6 +2,7 @@
  * Pure flow-graph mutations. Every function returns a new graph and never mutates the
  * input. Signal consumers and the undo history therefore see distinct snapshots.
  */
+import type { I18nMap } from '@core/api/models';
 import type {
   ActionDef,
   ActionType,
@@ -103,18 +104,8 @@ function patchState(g: FlowGraph, key: string, patch: Partial<StateDef>): FlowGr
   return { ...g, states: g.states.map((s) => (s.key === key ? { ...s, ...patch } : s)) };
 }
 
-export function setStateLabel(
-  g: FlowGraph,
-  key: string,
-  lang: 'de' | 'en',
-  value: string,
-): FlowGraph {
-  return {
-    ...g,
-    states: g.states.map((s) =>
-      s.key === key ? { ...s, label: { ...s.label, [lang]: value } } : s,
-    ),
-  };
+export function setStateLabel(g: FlowGraph, key: string, label: I18nMap): FlowGraph {
+  return patchState(g, key, { label });
 }
 
 export function setStateColor(g: FlowGraph, key: string, color: string): FlowGraph {
@@ -204,14 +195,9 @@ export function setTransitionEndpoint(
   return patchTransition(g, index, (t) => ({ ...t, [end]: key }));
 }
 
-export function setTransitionLabel(
-  g: FlowGraph,
-  index: number,
-  lang: 'de' | 'en',
-  value: string,
-): FlowGraph {
+/** An empty text removes its language, and a label without text is `null`. */
+export function setTransitionLabel(g: FlowGraph, index: number, label: I18nMap): FlowGraph {
   return patchTransition(g, index, (t) => {
-    const label = { ...(t.label ?? {}), [lang]: value };
     const cleaned = Object.fromEntries(Object.entries(label).filter(([, v]) => v));
     return { ...t, label: Object.keys(cleaned).length ? cleaned : null };
   });

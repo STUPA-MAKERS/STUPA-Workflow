@@ -29,6 +29,7 @@ from typing import Literal
 from uuid import UUID
 
 from app.settings import Settings
+from app.shared.i18n import pick_lang
 
 #: The element that a link opens. It selects the label of the line and the button.
 LinkTarget = Literal[
@@ -57,7 +58,7 @@ class MailLink:
     def label(self, lang: str) -> str:
         """Return the label of the link in ``lang`` (fallback: German)."""
         table = _LABELS[self.target]
-        return table.get(lang, table["de"])
+        return pick_lang(table, lang)
 
 
 def _base(settings: Settings) -> str:

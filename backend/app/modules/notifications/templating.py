@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from jinja2 import StrictUndefined, TemplateError
 from jinja2.sandbox import SandboxedEnvironment
 
-from app.shared.i18n import I18nMap
+from app.shared.i18n import I18nMap, fallback_chain
 
 _env = SandboxedEnvironment(undefined=StrictUndefined, autoescape=False)
 _env_html = SandboxedEnvironment(undefined=StrictUndefined, autoescape=True)
@@ -34,13 +34,16 @@ class RenderedMail:
 
 
 def _resolve(value: I18nMap | None, lang: str, default_lang: str) -> tuple[str | None, str]:
-    """Return the text and the language that the resolver really used."""
+    """Return the text and the language that the resolver really used.
+
+    The resolver follows the fallback chain of `lang` (an extra language, then EN, then
+    DE), then `default_lang`, then any language present.
+    """
     if not value:
         return None, lang
-    if lang in value:
-        return value[lang], lang
-    if default_lang in value:
-        return value[default_lang], default_lang
+    for code in (*fallback_chain(lang), default_lang):
+        if code in value:
+            return value[code], code
     used = next(iter(value), lang)
     return value[used], used
 

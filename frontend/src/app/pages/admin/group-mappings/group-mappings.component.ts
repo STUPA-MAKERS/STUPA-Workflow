@@ -316,11 +316,11 @@ export class GroupMappingsComponent {
   }
 
   private roleName(role: Role): string {
-    return i18nLabel(role.label, this.i18n.locale(), role.key);
+    return i18nLabel(role.label, this.i18n.uiLocale(), role.key);
   }
 
   private gremiumRoleName(role: GremiumRole): string {
-    return i18nLabel(role.name, this.i18n.locale(), role.key);
+    return i18nLabel(role.name, this.i18n.uiLocale(), role.key);
   }
 
   /** The i18n key of one text of one section, e.g. `admin.groupMappings.role.create`. */

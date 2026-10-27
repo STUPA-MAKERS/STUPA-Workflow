@@ -51,11 +51,11 @@ def test_application_link_points_at_a_comment_except_for_a_guest() -> None:
     )
 
 
-def test_label_follows_the_language_with_a_german_fallback() -> None:
+def test_label_follows_the_language_with_an_english_fallback() -> None:
     link = MailLink("https://x.de/a", "meeting")
     assert link.label("de") == "Sitzung öffnen"
     assert link.label("en") == "Open the meeting"
-    assert link.label("fr") == "Sitzung öffnen"
+    assert link.label("fr") == "Open the meeting"
 
 
 def test_append_link_text_adds_one_line() -> None:

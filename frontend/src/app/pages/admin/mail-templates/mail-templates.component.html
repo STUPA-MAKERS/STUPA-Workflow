@@ -24,7 +24,7 @@
             (activate)="select(tpl.key)"
           >
             @if (tpl.source === 'override') {
-              <app-status-text status kind="accent">{{ 'admin.mailTemplates.customized' | t }}</app-status-text>
+              <app-badge status variant="accent">{{ 'admin.mailTemplates.customized' | t }}</app-badge>
             }
           </app-list-item>
         } @empty {
@@ -41,7 +41,7 @@
           <h2 class="mt__title" id="mt-title">{{ keyLabel(d.key) }}</h2>
           <span class="mt__headEnd">
             @if (d.source === 'override') {
-              <app-status-text kind="accent">{{ 'admin.mailTemplates.customized' | t }}</app-status-text>
+              <app-badge variant="accent">{{ 'admin.mailTemplates.customized' | t }}</app-badge>
             }
             <app-content-lang-switch [(value)]="lang" [ariaLabel]="'admin.mailTemplates.lang' | t" />
           </span>

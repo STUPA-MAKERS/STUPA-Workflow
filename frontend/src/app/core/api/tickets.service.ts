@@ -30,7 +30,7 @@ export interface TicketContext {
   appVersion?: string;
   userAgent?: string;
   viewport?: string;
-  language?: 'de' | 'en';
+  language?: string;
   colorScheme?: 'light' | 'dark';
 }
 

@@ -236,7 +236,7 @@ export class UserRevokeComponent {
   }
 
   protected label(map: I18nMap, key: string): string {
-    return i18nLabel(map, this.i18n.locale(), key);
+    return i18nLabel(map, this.i18n.uiLocale(), key);
   }
 
   protected gEntry(g: RevokeGremium): RevokeEntry {

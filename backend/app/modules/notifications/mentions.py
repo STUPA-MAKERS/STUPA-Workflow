@@ -49,6 +49,7 @@ from app.modules.notifications.service import NotificationService
 from app.modules.tickets.models import Ticket, TicketNote
 from app.modules.tickets.service import format_number
 from app.settings import Settings
+from app.shared.i18n import pick_lang
 from app.shared.mentions import mention_ids
 
 logger = logging.getLogger("app.notifications")
@@ -226,7 +227,7 @@ async def send_comment_mentions(
         author = _name(author_row)
     else:
         lang = settings.mail_default_lang
-        author = _APPLICANT_AUTHOR_FALLBACK.get(lang, _APPLICANT_AUTHOR_FALLBACK["de"])
+        author = pick_lang(_APPLICANT_AUTHOR_FALLBACK, lang)
     author = author or _name(actor)
     context: dict[str, object] = {
         "actor": _name(actor),

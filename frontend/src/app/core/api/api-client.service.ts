@@ -186,7 +186,7 @@ export class ApiClient {
    * `quiet` skips the global overlay for a background type-cache load.
    */
   applicationTypes(opts: { quiet?: boolean } = {}): Observable<ApplicationType[]> {
-    const params = new HttpParams().set('lang', this.i18n.locale());
+    const params = new HttpParams().set('lang', this.i18n.uiLocale());
     return this.http
       .get<Page<ApplicationTypeListItemWire>>(`${this.base}/application-types`, {
         params,
@@ -216,7 +216,7 @@ export class ApiClient {
 
   listApplications(query: ApplicationListQuery = {}): Observable<Page<ApplicationListItem>> {
     const params = listParams(query, false);
-    const lang = this.i18n.locale();
+    const lang = this.i18n.uiLocale();
     return this.http
       .get<Page<ApplicationListItemWire>>(`${this.base}/applications`, {
         params,
@@ -242,7 +242,7 @@ export class ApiClient {
 
   /** GET /applications/tasks — open decisions for the current role. */
   listTasks(): Observable<ApplicationListItem[]> {
-    const lang = this.i18n.locale();
+    const lang = this.i18n.uiLocale();
     return this.http
       .get<ApplicationListItemWire[]>(`${this.base}/applications/tasks`, {
         context: skipLoading(),
@@ -252,7 +252,7 @@ export class ApiClient {
 
   /** `quiet` skips the global overlay for a background reload after a mutation. */
   getApplication(id: Uuid, opts: { quiet?: boolean; detail?: boolean } = {}): Observable<Application> {
-    const lang = this.i18n.locale();
+    const lang = this.i18n.uiLocale();
     return this.http
       .get<ApplicationOutWire>(`${this.base}/applications/${id}`, {
         context: readContext(opts),
@@ -304,7 +304,7 @@ export class ApiClient {
 
   /** PATCH /applications/{id} — update `data` (only when state.editAllowed). */
   updateApplication(id: Uuid, data: Record<string, unknown>): Observable<Application> {
-    const lang = this.i18n.locale();
+    const lang = this.i18n.uiLocale();
     return this.http
       .patch<ApplicationOutWire>(`${this.base}/applications/${id}`, { data })
       .pipe(map((wire) => mapApplication(wire, lang)));
@@ -323,7 +323,7 @@ export class ApiClient {
    */
   setApplicationArchived(id: Uuid, archived: boolean): Observable<Application> {
     const url = `${this.base}/applications/${id}/archive`;
-    const lang = this.i18n.locale();
+    const lang = this.i18n.uiLocale();
     const call = archived
       ? this.http.post<ApplicationOutWire>(url, {})
       : this.http.delete<ApplicationOutWire>(url);
@@ -370,7 +370,7 @@ export class ApiClient {
 
   /** `quiet` skips the global overlay for a refresh after a mutation. */
   timeline(id: Uuid, opts: { quiet?: boolean; detail?: boolean } = {}): Observable<TimelineEntry[]> {
-    const lang = this.i18n.locale();
+    const lang = this.i18n.uiLocale();
     return this.http
       .get<TimelineEventOutWire[]>(`${this.base}/applications/${id}/timeline`, {
         context: readContext(opts),
@@ -456,7 +456,7 @@ export class ApiClient {
   }
 
   transitions(id: Uuid, opts: { detail?: boolean } = {}): Observable<Transition[]> {
-    const lang = this.i18n.locale();
+    const lang = this.i18n.uiLocale();
     return this.http
       .get<TransitionOutWire[]>(`${this.base}/applications/${id}/transitions`, {
         context: readContext({ quiet: true, ...opts }),
@@ -471,7 +471,7 @@ export class ApiClient {
   /** GET /applications/{id}/flow-states — all states of the application flow.
    *  They fill the force-status picker. Needs `application.force_status`. */
   flowStates(id: Uuid): Observable<ApplicationState[]> {
-    const lang = this.i18n.locale();
+    const lang = this.i18n.uiLocale();
     return this.http
       .get<StateOutWire[]>(`${this.base}/applications/${id}/flow-states`, {
         context: skipLoading(),
@@ -491,7 +491,7 @@ export class ApiClient {
 
   /** Transitions the magic-link applicant may fire (actorIsApplicant gate). */
   applicantTransitions(id: Uuid): Observable<Transition[]> {
-    const lang = this.i18n.locale();
+    const lang = this.i18n.uiLocale();
     return this.http
       .get<TransitionOutWire[]>(`${this.base}/applications/${id}/applicant-transitions`)
       .pipe(map((items) => items.map((t) => mapTransition(t, lang))));
@@ -691,7 +691,7 @@ export class ApiClient {
    * shows its own inline state.
    */
   search(q: string): Observable<SearchResults> {
-    const params = new HttpParams().set('q', q.trim()).set('lang', this.i18n.locale());
+    const params = new HttpParams().set('q', q.trim()).set('lang', this.i18n.uiLocale());
     return this.http.get<SearchResults>(`${this.base}/search`, {
       params,
       context: skipLoading(),

@@ -1,11 +1,13 @@
+import { LoadMoreComponent } from '@shared/ui/load-more/load-more.component';
+import { ListItemComponent } from '@stupa-makers/ui-kit';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
-import { forkJoin } from 'rxjs';
+import { forkJoin, from } from 'rxjs';
 import { I18nService } from '@core/i18n/i18n.service';
 import { placeholdersOf, samePlaceholders } from '@core/i18n/placeholders';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { type TranslationKey, de } from '@core/i18n/translations';
+import { type TranslationKey, de, loadCatalog } from '@core/i18n/translations';
 import { PageHeaderComponent } from '@shared/ui';
 import { FabComponent } from '@shared/ui/fab/fab.component';
 import {
@@ -16,6 +18,7 @@ import {
   FilterSelectComponent,
   type FilterSelectOption,
   IconComponent,
+  InfiniteScrollDirective,
   InputComponent,
   NoteComponent,
   RowMenuComponent,
@@ -23,7 +26,7 @@ import {
   type RowMenuSection,
   SearchPillComponent,
   SkeletonComponent,
-  StatusTextComponent,
+  BadgeComponent,
   StickyBarComponent,
   SwitchComponent,
   TextareaComponent,
@@ -34,7 +37,7 @@ import { type AdminUiLanguage, TranslationsApiService } from './translations-api
 /** Every key of the catalog, in catalog order. */
 const ALL_KEYS = Object.keys(de) as TranslationKey[];
 
-/** The rows that the list shows at first and adds with each "Mehr laden". */
+/** The rows that the list shows at first and adds each time the end of the list comes into view. */
 export const PAGE_SIZE = 50;
 
 /** The search waits this long after the last key stroke. */
@@ -64,11 +67,14 @@ interface LanguageDraft {
  *   too). Each row shows the key and the text that applies without an override (the built-in
  *   text; for an extra language the EN text, then DE), and a field for the override. An empty
  *   field restores that text.
+ * - The EN catalog is a lazy chunk that the app loads only in EN. The page loads it before it
+ *   shows the list, so the reference of EN and of an extra language is never the DE text.
  * - An override must hold exactly the placeholders (`{count}`) of the built-in text; the row
  *   names the difference, and "Speichern" stays off until it is fixed. The server checks the
  *   same rule.
  * - Search (key and texts), area chip (first segment of the key), chip "Geändert". The list
- *   shows {@link PAGE_SIZE} rows and "Mehr laden" adds more.
+ *   shows {@link PAGE_SIZE} rows and adds more when its end comes into view (infinite
+ *   scroll, with "Mehr laden" beside the sentinel as the fallback).
  * - "Sprachen": DE and EN are built in. An extra language has the switch "Aktiv" (only an
  *   active language shows in the language switch of the app), rename and delete (with all
  *   its texts) in the ⋮ menu.
@@ -81,6 +87,8 @@ interface LanguageDraft {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ListItemComponent,
+    LoadMoreComponent,
     ButtonComponent,
     ConfirmDialogComponent,
     DialogComponent,
@@ -89,13 +97,14 @@ interface LanguageDraft {
     FilterSelectComponent,
     FormsModule,
     IconComponent,
+    InfiniteScrollDirective,
     InputComponent,
     NoteComponent,
     PageHeaderComponent,
     RowMenuComponent,
     SearchPillComponent,
     SkeletonComponent,
-    StatusTextComponent,
+    BadgeComponent,
     StickyBarComponent,
     SwitchComponent,
     TextareaComponent,
@@ -136,6 +145,7 @@ export class AdminTranslationsComponent {
 
   constructor() {
     forkJoin({
+      catalog: from(loadCatalog('en')),
       languages: this.api.languages(),
       de: this.api.texts('de'),
       en: this.api.texts('en'),
