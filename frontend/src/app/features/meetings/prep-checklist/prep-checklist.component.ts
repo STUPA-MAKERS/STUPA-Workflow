@@ -1,16 +1,15 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import type { AgendaItem, Attendance, Meeting } from '@core/api/models';
+import type { Attendance, Meeting } from '@core/api/models';
 import { ButtonComponent, IconComponent } from '@stupa-makers/ui-kit';
 import { openWindowClock, openWindowState, openWindowWhen } from '../open-window.util';
 
 /**
  * "Sitzung vorbereiten": what a planned meeting needs before it opens.
  *
- * Up to three cards: the agenda ("6 TOPs vorbereitet", "Tagesordnung bearbeiten"; only
- * where the page shows no agenda pane beside it), the minute-taker ("Zuweisen"; the opening needs one, so a missing one is marked) and the
- * attendance ("0 von 23 anwesend", "Erfassen"). Below them "Sitzung eröffnen", disabled
+ * Two cards: the minute-taker ("Zuweisen"; the opening needs one, so a missing one is
+ * marked) and the attendance ("0 von 23 anwesend", "Erfassen"). Below them "Sitzung eröffnen", disabled
  * until a minute-taker is set and until the open window of the meeting opens
  * ("Eröffnen ab 17:00").
  */
@@ -27,13 +26,7 @@ export class PrepChecklistComponent {
   private readonly now = openWindowClock();
 
   readonly meeting = input.required<Meeting>();
-  readonly agenda = input.required<AgendaItem[]>();
   readonly attendance = input.required<Attendance[]>();
-  /** Show the agenda card. A wide page shows the agenda pane, so the card would repeat it. */
-  readonly agendaCard = input(true);
-
-  /** Open the agenda sheet. */
-  readonly editAgenda = output<void>();
   /** Open the picker of the minute-taker. */
   readonly assignKeeper = output<void>();
   readonly recordAttendance = output<void>();
