@@ -168,12 +168,6 @@ describe('AgendaPaneComponent', () => {
     expect(screen.getByRole('button', { name: 'Unbenannter TOP' })).toBeInTheDocument();
   });
 
-  it('puts the focus on its heading', async () => {
-    const { fixture } = await setup();
-    fixture.componentInstance.focus();
-    expect(document.activeElement).toBe(screen.getByRole('heading', { name: /Tagesordnung/ }));
-  });
-
   describe('row menu', () => {
     it('renames a freetext item, moves it and switches NÖ', async () => {
       const { on } = await setup();

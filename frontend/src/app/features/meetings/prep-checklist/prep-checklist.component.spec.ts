@@ -36,6 +36,14 @@ describe('PrepChecklistComponent', () => {
     expect(on.start).toHaveBeenCalled();
   });
 
+  it('leaves the agenda card out where the page shows the agenda pane', async () => {
+    const { rerender } = await setup();
+    await rerender({ inputs: { agendaCard: false }, partialUpdate: true });
+    expect(screen.queryByText('3 TOPs vorbereitet')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Tagesordnung bearbeiten' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Ändern' })).toBeInTheDocument();
+  });
+
   it('marks a missing minute-taker and keeps the opening disabled until one is set', async () => {
     const { container } = await setup({ protokollantId: null, protokollantName: null });
     expect(screen.getByText('Noch nicht zugewiesen — nötig zum Eröffnen')).toBeInTheDocument();

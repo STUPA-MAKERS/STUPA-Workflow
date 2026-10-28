@@ -2,14 +2,12 @@ import { CdkDrag, CdkDragPlaceholder, CdkDropList, type CdkDragDrop } from '@ang
 import {
   ChangeDetectionStrategy,
   Component,
-  type ElementRef,
   computed,
   inject,
   input,
   model,
   output,
   signal,
-  viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '@core/auth/auth.service';
@@ -107,7 +105,6 @@ export class AgendaPaneComponent {
   private readonly i18n = inject(I18nService);
   private readonly auth = inject(AuthService);
   private readonly linkedRefresh = inject(TodoLinkedRefresh);
-  private readonly heading = viewChild.required<ElementRef<HTMLElement>>('heading');
 
   readonly meeting = input.required<Meeting>();
   readonly agenda = input.required<AgendaItem[]>();
@@ -179,11 +176,6 @@ export class AgendaPaneComponent {
     const m = this.meeting();
     return m.status === 'planned' ? null : m.currentAgendaItemId;
   });
-  /** Put the focus on the heading of the pane, for "Tagesordnung bearbeiten". */
-  focus(): void {
-    this.heading().nativeElement.focus();
-  }
-
   /** A row lifts while the agenda may change, is not saving and the row is not in rename. */
   protected canDrag(item: AgendaItem): boolean {
     return this.canChangeAgenda() && !this.savingAgenda() && this.renamingTopId() !== item.id;

@@ -1,5 +1,5 @@
 <div class="ap__head" [class.ap__head--sheet]="inSheet()">
-  <h2 #heading class="ap__title" [class.sr-only]="inSheet()" tabindex="-1">{{ headingText() }}</h2>
+  <h2 class="ap__title" [class.sr-only]="inSheet()">{{ headingText() }}</h2>
   @if (canChangeAgenda() && !inSheet()) {
     <button
       type="button"

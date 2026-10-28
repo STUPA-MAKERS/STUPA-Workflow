@@ -8,9 +8,8 @@ import { openWindowClock, openWindowState, openWindowWhen } from '../open-window
 /**
  * "Sitzung vorbereiten": what a planned meeting needs before it opens.
  *
- * Three cards: the agenda ("6 TOPs vorbereitet", the hint that a picked item opens to
- * prepare its text and votes, "Tagesordnung bearbeiten"), the
- * minute-taker ("Zuweisen"; the opening needs one, so a missing one is marked) and the
+ * Up to three cards: the agenda ("6 TOPs vorbereitet", "Tagesordnung bearbeiten"; only
+ * where the page shows no agenda pane beside it), the minute-taker ("Zuweisen"; the opening needs one, so a missing one is marked) and the
  * attendance ("0 von 23 anwesend", "Erfassen"). Below them "Sitzung eröffnen", disabled
  * until a minute-taker is set and until the open window of the meeting opens
  * ("Eröffnen ab 17:00").
@@ -30,8 +29,10 @@ export class PrepChecklistComponent {
   readonly meeting = input.required<Meeting>();
   readonly agenda = input.required<AgendaItem[]>();
   readonly attendance = input.required<Attendance[]>();
+  /** Show the agenda card. A wide page shows the agenda pane, so the card would repeat it. */
+  readonly agendaCard = input(true);
 
-  /** Show the agenda: the pane on a wide screen, the agenda sheet below it. */
+  /** Open the agenda sheet. */
   readonly editAgenda = output<void>();
   /** Open the picker of the minute-taker. */
   readonly assignKeeper = output<void>();

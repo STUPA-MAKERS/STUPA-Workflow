@@ -346,11 +346,11 @@ describe('MeetingPageComponent', () => {
       flushDelegations();
     });
 
-    it('focuses the agenda pane on a wide screen and marks no row', async () => {
+    it('shows no agenda card beside the agenda pane on a wide screen and marks no row', async () => {
       await setup({ meeting: planned(), protocol: null }, [MEDIA.wide]);
       expect(screen.getByRole('button', { name: 'Begrüßung' })).not.toHaveAttribute('aria-current');
-      await userEvent.click(screen.getByRole('button', { name: 'Tagesordnung bearbeiten' }));
-      expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Tagesordnung · 3 TOPs' }));
+      expect(screen.getByRole('heading', { name: 'Tagesordnung · 3 TOPs' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Tagesordnung bearbeiten' })).toBeNull();
     });
 
     /** The text of the item can be written before the start, without a protocol. */
