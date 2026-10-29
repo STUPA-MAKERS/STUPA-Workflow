@@ -110,7 +110,6 @@ type SessionAction = 'settings' | 'attendance' | 'beamer' | 'qr' | 'close' | 'de
 export class MeetingPageComponent {
   private readonly i18n = inject(I18nService);
   private readonly dock = viewChild.required(SessionDockComponent, { read: ElementRef });
-  private readonly agendaPane = viewChild(AgendaPaneComponent);
 
   /** Three columns from 1200px; below that the agenda is a sheet. */
   protected readonly wide = mediaQuery(MEDIA.wide);
@@ -461,12 +460,6 @@ export class MeetingPageComponent {
   showQr(): void {
     this.panel.set('none');
     this.qrOpen.set(true);
-  }
-
-  /** "Tagesordnung bearbeiten": the pane on a wide screen, else the agenda sheet. */
-  editAgenda(): void {
-    if (this.wide()) this.agendaPane()?.focus();
-    else this.agendaOpen.set(true);
   }
 
   protected onMenu(item: RowMenuItem): void {

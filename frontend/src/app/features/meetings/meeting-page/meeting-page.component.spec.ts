@@ -335,10 +335,7 @@ describe('MeetingPageComponent', () => {
 
     it('opens the matching place from every card', async () => {
       const { flushDelegations } = await setup({ meeting: planned(), protocol: null });
-      await userEvent.click(screen.getByRole('button', { name: 'Tagesordnung bearbeiten' }));
-      const sheet = await screen.findByRole('dialog', { name: 'Tagesordnung' });
-      expect(within(sheet).getByRole('heading', { name: 'Tagesordnung · 3 TOPs' })).toBeInTheDocument();
-      await userEvent.click(within(sheet).getByRole('button', { name: 'Schließen' }));
+      expect(screen.queryByRole('button', { name: 'Tagesordnung bearbeiten' })).toBeNull();
       await userEvent.click(screen.getByRole('button', { name: 'Ändern' }));
       expect(screen.getByRole('dialog', { name: 'Protokollführung wählen' })).toBeInTheDocument();
       await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
@@ -346,11 +343,10 @@ describe('MeetingPageComponent', () => {
       flushDelegations();
     });
 
-    it('focuses the agenda pane on a wide screen and marks no row', async () => {
+    it('shows the agenda pane on a wide screen and marks no row', async () => {
       await setup({ meeting: planned(), protocol: null }, [MEDIA.wide]);
       expect(screen.getByRole('button', { name: 'Begrüßung' })).not.toHaveAttribute('aria-current');
-      await userEvent.click(screen.getByRole('button', { name: 'Tagesordnung bearbeiten' }));
-      expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Tagesordnung · 3 TOPs' }));
+      expect(screen.getByRole('heading', { name: 'Tagesordnung · 3 TOPs' })).toBeInTheDocument();
     });
 
     /** The text of the item can be written before the start, without a protocol. */

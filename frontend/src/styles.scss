@@ -35,6 +35,18 @@
   color: var(--color-text);
 }
 
+// Thin grey scrollbars on every scroll box. Chrome on Linux otherwise draws the wide classic bar
+// with a light track, which shows as a bright stripe in the dark theme. `scrollbar-color` inherits
+// from the root; `scrollbar-width` does not inherit, so it goes on every element. Its specificity
+// is zero, so a component that sets `scrollbar-width: none` still hides its bar.
+:root {
+  scrollbar-color: #5a5a5a transparent;
+}
+
+* {
+  scrollbar-width: thin;
+}
+
 // Global, because the rows are projected content. Loaded here, so they keep their place in the
 // cascade after the utilities.
 @include meta.load-css('rowgroup');
