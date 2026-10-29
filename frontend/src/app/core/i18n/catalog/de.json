@@ -1234,7 +1234,6 @@
   "meetings.handover.noNextItem": "Der aktuelle TOP ist der letzte.",
   "meetings.prep.title": "Sitzung vorbereiten",
   "meetings.prep.lead": "Die Sitzung ist noch nicht eröffnet.",
-  "meetings.prep.editAgenda": "Tagesordnung bearbeiten",
   "meetings.prep.protokollantMissing": "Noch nicht zugewiesen — nötig zum Eröffnen",
   "meetings.prep.assign": "Zuweisen",
   "meetings.prep.change": "Ändern",
