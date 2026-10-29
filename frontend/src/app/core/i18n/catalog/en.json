@@ -1234,7 +1234,6 @@
   "meetings.handover.noNextItem": "The current item is the last one.",
   "meetings.prep.title": "Prepare the meeting",
   "meetings.prep.lead": "The meeting is not open yet.",
-  "meetings.prep.editAgenda": "Edit agenda",
   "meetings.prep.protokollantMissing": "Not assigned yet – needed to open the meeting",
   "meetings.prep.assign": "Assign",
   "meetings.prep.change": "Change",

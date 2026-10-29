@@ -120,9 +120,7 @@
       <div class="mp__prep" appScrollFade="y">
         <app-prep-checklist
           [meeting]="m"
-          [agenda]="agenda()"
           [attendance]="attendance()"
-          (editAgenda)="editAgenda()"
           (assignKeeper)="panel.set('protokollant')"
           (recordAttendance)="panel.set('attendance')"
           (start)="startSession.emit()"

@@ -1,10 +1,10 @@
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import type { Meeting } from '@core/api/models';
-import { AGENDA, ATTENDANCE, meeting } from '../../../../testing/meeting-fixtures';
+import { ATTENDANCE, meeting } from '../../../../testing/meeting-fixtures';
 import { PrepChecklistComponent } from './prep-checklist.component';
 
-const OUTPUTS = ['editAgenda', 'assignKeeper', 'recordAttendance', 'start'] as const;
+const OUTPUTS = ['assignKeeper', 'recordAttendance', 'start'] as const;
 
 async function setup(over: Partial<Meeting> = {}) {
   const on = Object.fromEntries(OUTPUTS.map((name) => [name, jest.fn()])) as Record<
@@ -12,22 +12,19 @@ async function setup(over: Partial<Meeting> = {}) {
     jest.Mock
   >;
   const view = await render(PrepChecklistComponent, {
-    inputs: { meeting: meeting({ status: 'planned', ...over }), agenda: AGENDA, attendance: ATTENDANCE },
+    inputs: { meeting: meeting({ status: 'planned', ...over }), attendance: ATTENDANCE },
     on,
   });
   return { ...view, on };
 }
 
 describe('PrepChecklistComponent', () => {
-  it('lists the agenda, the minute-taker and the attendance and opens each', async () => {
+  it('lists the minute-taker and the attendance and opens each', async () => {
     const { on } = await setup();
     expect(screen.getByRole('heading', { name: 'Sitzung vorbereiten' })).toBeInTheDocument();
     expect(screen.getByText('Die Sitzung ist noch nicht eröffnet.')).toBeInTheDocument();
-    expect(screen.getByText('3 TOPs vorbereitet')).toBeInTheDocument();
     expect(screen.getByText('Pia Protokoll')).toBeInTheDocument();
     expect(screen.getByText('1 von 3 anwesend')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Tagesordnung bearbeiten' }));
-    expect(on.editAgenda).toHaveBeenCalled();
     await userEvent.click(screen.getByRole('button', { name: 'Ändern' }));
     expect(on.assignKeeper).toHaveBeenCalled();
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
