@@ -1,7 +1,6 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  type OnDestroy,
   computed,
   effect,
   inject,
@@ -13,12 +12,10 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import {
   ActivatedRoute,
-  NavigationEnd,
   Router,
   RouterOutlet,
   type ParamMap,
 } from '@angular/router';
-import { filter } from 'rxjs/operators';
 import { ApiClient } from '@core/api/api-client.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -58,14 +55,12 @@ import {
   StatusTextComponent,
   StickyBarComponent,
   ToastService,
-} from '@stupa-makers/ui-kit';
-import {
   FabComponent,
   PageHeaderComponent,
-  flowColorKind,
-} from '@shared/ui';
+} from '@stupa-makers/ui-kit';
+import { FabLinkDirective, injectListDetailPage } from '@stupa-makers/ui-kit/shell';
+import { flowColorKind } from '@shared/ui';
 import { exportDownload } from '@shared/download.util';
-import { PageFrameService } from '../../layout/page-frame.service';
 import { RailStatusService } from '../../layout/rail-status.service';
 import { BudgetTreeApi, type BudgetTreeNode } from '../budget/budget-tree.api';
 import { CostCentreSelectComponent } from '../budget/cost-centre-select/cost-centre-select.component';
@@ -176,6 +171,7 @@ type FilterSheet = 'more' | null;
     DatepickerComponent,
     EmptyStateComponent,
     FabComponent,
+    FabLinkDirective,
     FilterSelectComponent,
     IconComponent,
     ListDetailLayoutComponent,
@@ -199,7 +195,7 @@ type FilterSheet = 'more' | null;
   templateUrl: './applications-list.component.html',
   styleUrl: './applications-list.component.scss',
 })
-export class ApplicationsListComponent implements OnDestroy {
+export class ApplicationsListComponent {
   private readonly api = inject(ApiClient);
   private readonly budgetApi = inject(BudgetTreeApi);
   private readonly i18n = inject(I18nService);
@@ -209,7 +205,6 @@ export class ApplicationsListComponent implements OnDestroy {
   private readonly toast = inject(ToastService);
   private readonly railStatus = inject(RailStatusService);
   private readonly page = inject(ApplicationsPageService);
-  private readonly frame = inject(PageFrameService);
 
   readonly canExport = computed(() => this.auth.can('application.export'));
   /** #11: "Antrag erfassen" for another person. */
@@ -227,11 +222,12 @@ export class ApplicationsListComponent implements OnDestroy {
 
   /** The list-detail layout, for its split state. */
   private readonly layout = viewChild(ListDetailLayoutComponent);
+  private readonly listDetail = injectListDetailPage(this.layout);
   /** The list and the detail sit side by side. */
-  readonly split = computed(() => this.layout()?.collapsed() === false);
+  readonly split = this.listDetail.split;
 
   /** The id of the application in the detail pane, from the child route. */
-  readonly selectedId = signal<Uuid | null>(null);
+  readonly selectedId = this.listDetail.selectedId;
 
   /** Initial load after a filter or sort change. It hides the whole list. */
   readonly loading = signal(true);
@@ -386,7 +382,6 @@ export class ApplicationsListComponent implements OnDestroy {
   /** True while unloaded applications are left. It controls the sentinel and "load more". */
   readonly hasMore = computed(() => this.items().length < this.total());
 
-
   /**
    * The export can carry every filter of the list except `mine`: the endpoint has no
    * such parameter. So the export goes away while `mine` is set. Otherwise the download
@@ -512,25 +507,11 @@ export class ApplicationsListComponent implements OnDestroy {
       this.reload();
     });
 
-    this.readSelection();
-    this.router.events
-      .pipe(
-        filter((e) => e instanceof NavigationEnd),
-        takeUntilDestroyed(),
-      )
-      .subscribe(() => this.readSelection());
-
     this.page.changes$.pipe(takeUntilDestroyed()).subscribe((change) => {
       if (change.source !== 'list') this.apply(change.id, change.kind);
     });
 
     effect(() => this.page.split.set(this.split()));
-    effect(() => this.frame.fill.set(this.split()));
-
-  }
-
-  ngOnDestroy(): void {
-    this.frame.fill.set(false);
   }
 
   /** Application title from the system title field, with the fallback "untitled". */
@@ -581,10 +562,6 @@ export class ApplicationsListComponent implements OnDestroy {
   /** "Zur Liste" (narrow layout): close the detail, keep the filters. */
   closeDetail(): void {
     void this.router.navigate(['/applications'], { queryParamsHandling: 'preserve' });
-  }
-
-  private readSelection(): void {
-    this.selectedId.set(this.route.snapshot.firstChild?.paramMap.get('id') ?? null);
   }
 
   /**

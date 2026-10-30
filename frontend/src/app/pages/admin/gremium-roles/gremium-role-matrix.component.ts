@@ -26,6 +26,7 @@ import {
   SkeletonComponent,
   StatusTextComponent,
   ToastService,
+  FabComponent,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import {
@@ -37,7 +38,6 @@ import {
   sortGremiumRoles,
 } from '../admin.models';
 import { GremiumRoleDialogComponent } from './gremium-role-dialog.component';
-import { FabComponent } from '@shared/ui/fab/fab.component';
 import { SectionHeaderComponent } from '@shared/ui/section-header/section-header.component';
 
 let nextId = 0;

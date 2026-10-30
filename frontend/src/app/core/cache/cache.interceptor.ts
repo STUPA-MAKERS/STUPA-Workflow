@@ -7,7 +7,7 @@ import {
 } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { type Observable, concat, filter, finalize, of, share, tap } from 'rxjs';
-import { skipLoading } from '@core/loading/loading.interceptor';
+import { skipLoading } from '@stupa-makers/ui-kit';
 import { HttpCacheService } from './http-cache.service';
 
 /** How long a cached answer may be served before it is refetched. */

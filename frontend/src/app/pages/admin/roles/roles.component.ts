@@ -6,11 +6,8 @@ import { I18nService } from '@core/i18n/i18n.service';
 import type { I18nMap } from '@core/api/models';
 import { i18nLabel, sameI18n, trimI18n } from '@shared/forms/i18n-text';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { FabComponent } from '@shared/ui/fab/fab.component';
 import {
-  PageHeaderComponent,
-} from '@shared/ui';
-import {
+  FabComponent,
   ButtonComponent,
   CapitalizePipe,
   CheckboxComponent,
@@ -26,7 +23,9 @@ import {
   SkeletonComponent,
   StatusTextComponent,
   ToastService,
+  PageHeaderComponent,
 } from '@stupa-makers/ui-kit';
+import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
 import { ROLE_KEY_PATTERN, type Role } from '../admin.models';
 import { permissionSections } from './permission-sections';
@@ -81,6 +80,7 @@ const FIXED_ROLES = new Set(['admin', 'member']);
     InputComponent,
     NoteComponent,
     PageHeaderComponent,
+    BreadcrumbsComponent,
     RowMenuComponent,
     SkeletonComponent,
     StatusTextComponent,

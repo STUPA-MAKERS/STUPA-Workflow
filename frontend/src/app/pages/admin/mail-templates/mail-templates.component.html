@@ -1,5 +1,7 @@
 <section class="mt admin-page">
-  <app-page-header [flush]="true" [title]="'admin.mailTemplates.title' | t" />
+  <app-page-header [flush]="true" [title]="'admin.mailTemplates.title' | t">
+    <app-breadcrumbs crumbs />
+  </app-page-header>
 
   <div class="mt__layout">
     @if (phone()) {

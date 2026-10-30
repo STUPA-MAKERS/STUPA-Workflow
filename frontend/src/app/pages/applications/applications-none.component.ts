@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { DetailNoneComponent } from '@shared/ui/detail-none/detail-none.component';
+import { DetailNoneComponent } from '@stupa-makers/ui-kit';
 
 /**
  * The detail pane of `/applications` before a row is open. Only the side-by-side layout
@@ -12,6 +12,11 @@ import { DetailNoneComponent } from '@shared/ui/detail-none/detail-none.componen
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [TranslatePipe, DetailNoneComponent],
   templateUrl: './applications-none.component.html',
-  styleUrl: '../../shared/ui/detail-none/detail-none-host.scss',
+  styles: `
+    @use 'detail-none-host' as dnh;
+    :host {
+      @include dnh.host;
+    }
+  `,
 })
 export class ApplicationsNoneComponent {}

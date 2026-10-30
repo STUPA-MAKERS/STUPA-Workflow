@@ -6,11 +6,8 @@ import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { FabComponent } from '@shared/ui/fab/fab.component';
 import {
-  PageHeaderComponent,
-} from '@shared/ui';
-import {
+  FabComponent,
   ConfirmDialogComponent,
   EmptyStateComponent,
   IconComponent,
@@ -21,7 +18,9 @@ import {
   SkeletonComponent,
   StatusTextComponent,
   ToastService,
+  PageHeaderComponent,
 } from '@stupa-makers/ui-kit';
+import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { problemCode } from '@core/api/problem';
 import { AdminApiService } from '../admin-api.service';
 import type { CdVariantOption, Gremium } from '../admin.models';
@@ -79,6 +78,7 @@ interface Setting {
     EmptyStateComponent,
     NoteComponent,
     PageHeaderComponent,
+    BreadcrumbsComponent,
     RowMenuComponent,
     SkeletonComponent,
     StatusTextComponent,

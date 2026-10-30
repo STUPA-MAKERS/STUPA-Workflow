@@ -1,5 +1,7 @@
 <section class="pv admin-page">
-  <app-page-header [flush]="true" [title]="'admin.privacy.title' | t" />
+  <app-page-header [flush]="true" [title]="'admin.privacy.title' | t">
+    <app-breadcrumbs crumbs />
+  </app-page-header>
 
   <section class="pv__queue" aria-labelledby="pv-queue">
     <h2 class="section-title pv__secTitle" id="pv-queue">{{ 'admin.privacy.queueTitle' | t }}</h2>

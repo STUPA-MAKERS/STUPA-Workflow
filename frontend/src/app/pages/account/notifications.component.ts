@@ -5,8 +5,8 @@ import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
-import { EmptyStateComponent, NoteComponent, SkeletonComponent, SwitchComponent } from '@stupa-makers/ui-kit';
+import { EmptyStateComponent, NoteComponent, SkeletonComponent, SwitchComponent, PageHeaderComponent } from '@stupa-makers/ui-kit';
+import { BreadcrumbsComponent } from '../../layout/breadcrumbs.component';
 
 /**
  * Kinds that the page never shows. No mail goes out for them: "vote" has no sender,
@@ -42,7 +42,7 @@ const TEAM_KINDS: ReadonlyMap<string, string> = new Map([
   selector: 'app-account-notifications',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [EmptyStateComponent, NoteComponent, PageHeaderComponent, SkeletonComponent, SwitchComponent, TranslatePipe],
+  imports: [EmptyStateComponent, NoteComponent, PageHeaderComponent, BreadcrumbsComponent, SkeletonComponent, SwitchComponent, TranslatePipe],
   templateUrl: './notifications.component.html',
   styleUrl: './notifications.component.scss',
 })

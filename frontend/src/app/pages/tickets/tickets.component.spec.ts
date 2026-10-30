@@ -13,9 +13,8 @@ import {
   type TicketPage,
   type TicketQuery,
 } from '@core/api/tickets.service';
-import { MEDIA } from '@stupa-makers/ui-kit';
+import { MEDIA, PageFrame } from '@stupa-makers/ui-kit';
 import { matchMediaQueries } from '../../../testing/meeting-fixtures';
-import { PageFrameService } from '../../layout/page-frame.service';
 import { RailStatusService } from '../../layout/rail-status.service';
 import { TicketsPageService } from './tickets-page.service';
 import { TICKET_PAGE, TicketsComponent } from './tickets.component';
@@ -428,11 +427,11 @@ describe('TicketsComponent', () => {
       await harness.fixture.whenStable();
       harness.detectChanges();
       expect(page.split()).toBe(true);
-      expect(TestBed.inject(PageFrameService).fill()).toBe(true);
+      expect(TestBed.inject(PageFrame).fill()).toBe(true);
       const row = screen.getByRole('link', { name: /Protokoll-PDF/ }).closest('app-list-item')!;
       expect(row.querySelector('app-row-chevron')).toBeNull();
       harness.fixture.destroy();
-      expect(TestBed.inject(PageFrameService).fill()).toBe(false);
+      expect(TestBed.inject(PageFrame).fill()).toBe(false);
     } finally {
       restore();
     }

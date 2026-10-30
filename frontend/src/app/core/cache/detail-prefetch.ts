@@ -9,7 +9,7 @@ import {
   untracked,
 } from '@angular/core';
 import { type Observable, type Subscription, finalize } from 'rxjs';
-import { quietly } from '@core/loading/loading.interceptor';
+import { quietly } from '@stupa-makers/ui-kit';
 import { DETAIL_TTL_MS } from './cache.interceptor';
 
 /** The reads of one list that run at once. */

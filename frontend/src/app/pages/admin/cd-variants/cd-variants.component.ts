@@ -12,9 +12,8 @@ import { errorStatus, problemCode } from '@core/api/problem';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { FabComponent } from '@shared/ui/fab/fab.component';
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import {
+  FabComponent,
   ButtonComponent,
   ConfirmDialogComponent,
   DialogComponent,
@@ -33,7 +32,9 @@ import {
   type SelectOption,
   SkeletonComponent,
   ToastService,
+  PageHeaderComponent,
 } from '@stupa-makers/ui-kit';
+import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
 import {
   CD_BASE_VARIANTS,
@@ -130,6 +131,7 @@ function emptyForm(): VariantForm {
     SelectFieldComponent,
     SkeletonComponent,
     PageHeaderComponent,
+    BreadcrumbsComponent,
     RowMenuComponent,
   ],
   templateUrl: './cd-variants.component.html',

@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { DetailNoneComponent, type DetailNoneState } from '@shared/ui/detail-none/detail-none.component';
+import { DetailNoneComponent, type DetailNoneState } from '@stupa-makers/ui-kit';
 import { GremienStore } from '../gremien.store';
 
 /**
@@ -15,7 +15,12 @@ import { GremienStore } from '../gremien.store';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [TranslatePipe, DetailNoneComponent],
   templateUrl: './gremien-none.component.html',
-  styleUrl: '../../../shared/ui/detail-none/detail-none-host.scss',
+  styles: `
+    @use 'detail-none-host' as dnh;
+    :host {
+      @include dnh.host;
+    }
+  `,
 })
 export class GremienNoneComponent {
   private readonly store = inject(GremienStore, { optional: true });

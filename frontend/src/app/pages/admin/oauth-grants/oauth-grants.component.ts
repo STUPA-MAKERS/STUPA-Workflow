@@ -6,9 +6,6 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
-  PageHeaderComponent,
-} from '@shared/ui';
-import {
   AvatarComponent,
   ButtonComponent,
   ConfirmDialogComponent,
@@ -18,7 +15,9 @@ import {
   NoteComponent,
   SkeletonComponent,
   ToastService,
+  PageHeaderComponent,
 } from '@stupa-makers/ui-kit';
+import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
 import type { AdminPrincipal, OAuthGrantAdmin } from '../admin.models';
 import { personLabel } from '@shared/person-label.util';
@@ -63,6 +62,7 @@ const PAGE_SIZE = 25;
     FilterSelectComponent,
     NoteComponent,
     PageHeaderComponent,
+    BreadcrumbsComponent,
     SkeletonComponent,
   ],
   templateUrl: './oauth-grants.component.html',

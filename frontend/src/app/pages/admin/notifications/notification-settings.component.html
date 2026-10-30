@@ -1,5 +1,7 @@
 <section class="ns admin-page">
-  <app-page-header [flush]="true" [title]="'admin.notifications.title' | t" />
+  <app-page-header [flush]="true" [title]="'admin.notifications.title' | t">
+    <app-breadcrumbs crumbs />
+  </app-page-header>
 
   @if (settings() && error()) {
     <app-note kind="error" icon="alert" role="alert">{{ $any(error()) | t }}</app-note>

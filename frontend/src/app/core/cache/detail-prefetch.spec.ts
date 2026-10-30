@@ -2,8 +2,7 @@ import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Component, inject, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { LoadingService } from '@core/loading/loading.service';
-import { loadingInterceptor } from '@core/loading/loading.interceptor';
+import { LoadingService, loadingInterceptor } from '@stupa-makers/ui-kit';
 import { cacheInterceptor, detailContext } from './cache.interceptor';
 import { prefetchDetails, provideDetailPrefetch } from './detail-prefetch';
 

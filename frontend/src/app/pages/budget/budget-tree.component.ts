@@ -43,10 +43,11 @@ import {
   StatusTextComponent,
   SwitchComponent,
   ToastService,
+  FabComponent,
+  PageHeaderComponent,
 } from '@stupa-makers/ui-kit';
+import { BreadcrumbsComponent } from '../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin/admin-api.service';
-import { FabComponent } from '@shared/ui/fab/fab.component';
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { PALETTE, resolveNodeColors } from './budget-color.util';
 import { BudgetTreeApi, FISCAL_YEAR_CLOSED, type BudgetTreeNode, type FiscalYear } from './budget-tree.api';
 import { problemCode } from '@core/api/problem';
@@ -124,6 +125,7 @@ const MAX_CUTOFF_DAY = 28;
     InputComponent,
     NoteComponent,
     PageHeaderComponent,
+    BreadcrumbsComponent,
     RowDetailDirective,
     RowMenuComponent,
     SegmentedComponent,

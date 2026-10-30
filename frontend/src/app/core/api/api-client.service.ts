@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { type Observable, catchError, map, of, throwError } from 'rxjs';
 import { detailContext, listContext } from '@core/cache/cache.interceptor';
 import { I18nService } from '@core/i18n/i18n.service';
-import { skipLoading } from '@core/loading/loading.interceptor';
+import { skipLoading } from '@stupa-makers/ui-kit';
 import { API_BASE_URL } from './api.config';
 import {
   mapApplication,

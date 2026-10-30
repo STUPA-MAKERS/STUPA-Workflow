@@ -4,7 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { firstValueFrom } from 'rxjs';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { I18nService } from '@core/i18n/i18n.service';
-import { SKIP_LOADING } from '@core/loading/loading.interceptor';
+import { SKIP_LOADING } from '@stupa-makers/ui-kit';
 import type { FormFieldDef } from '@core/api/models';
 import { AdminApiService } from './admin-api.service';
 import { MOCK_GREMIUM_STUPA_ID } from './admin.mock';

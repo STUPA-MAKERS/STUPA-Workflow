@@ -1,7 +1,6 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  type OnDestroy,
   computed,
   effect,
   inject,
@@ -9,13 +8,13 @@ import {
   viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, NavigationEnd, type ParamMap, Router, RouterOutlet } from '@angular/router';
+import { ActivatedRoute, type ParamMap, Router, RouterOutlet } from '@angular/router';
 import type { Observable } from 'rxjs';
-import { filter, map } from 'rxjs/operators';
+import { map } from 'rxjs/operators';
 import { AuthService } from '@core/auth/auth.service';
 import { TodosApiService } from '@core/api/todos.service';
 import { prefetchDetails } from '@core/cache/detail-prefetch';
-import type { PersonRef, Uuid } from '@core/api/models';
+import type { PersonRef } from '@core/api/models';
 import {
   TICKET_KINDS,
   TicketsApiService,
@@ -29,7 +28,6 @@ import {
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import {
   AvatarComponent,
   ButtonComponent,
@@ -46,8 +44,9 @@ import {
   SearchPillComponent,
   SkeletonComponent,
   StickyBarComponent,
+  PageHeaderComponent,
 } from '@stupa-makers/ui-kit';
-import { PageFrameService } from '../../layout/page-frame.service';
+import { injectListDetailPage } from '@stupa-makers/ui-kit/shell';
 import { RailStatusService } from '../../layout/rail-status.service';
 import { TicketsPageService } from './tickets-page.service';
 import { KIND_ICON, KIND_LABEL, STATUS_LABEL, reporterRowName, ticketAge } from './tickets.util';
@@ -121,13 +120,12 @@ export interface TicketGroup {
   templateUrl: './tickets.component.html',
   styleUrl: './tickets.component.scss',
 })
-export class TicketsComponent implements OnDestroy {
+export class TicketsComponent {
   private readonly api = inject(TicketsApiService);
   private readonly i18n = inject(I18nService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly page = inject(TicketsPageService);
-  private readonly frame = inject(PageFrameService);
   private readonly rail = inject(RailStatusService);
   /** The team view; else the own tickets of the reporter. */
   private readonly auth = inject(AuthService);
@@ -137,8 +135,9 @@ export class TicketsComponent implements OnDestroy {
   now: () => Date = () => new Date();
 
   private readonly layout = viewChild(ListDetailLayoutComponent);
-  readonly split = computed(() => this.layout()?.collapsed() === false);
-  readonly selectedId = signal<Uuid | null>(null);
+  private readonly listDetail = injectListDetailPage(this.layout);
+  readonly split = this.listDetail.split;
+  readonly selectedId = this.listDetail.selectedId;
 
   /** The search text of the filters, from the query params. */
   readonly q = signal('');
@@ -269,25 +268,12 @@ export class TicketsComponent implements OnDestroy {
       this.reload();
     });
 
-    this.readSelection();
-    this.router.events
-      .pipe(
-        filter((e) => e instanceof NavigationEnd),
-        takeUntilDestroyed(),
-      )
-      .subscribe(() => this.readSelection());
-
     this.page.changed$.pipe(takeUntilDestroyed()).subscribe(() => {
       this.reload(true);
       this.rail.refresh();
     });
 
     effect(() => this.page.split.set(this.split()));
-    effect(() => this.frame.fill.set(this.split()));
-  }
-
-  ngOnDestroy(): void {
-    this.frame.fill.set(false);
   }
 
   setStatus(value: string): void {
@@ -334,10 +320,6 @@ export class TicketsComponent implements OnDestroy {
       queryParams,
       queryParamsHandling: 'merge',
     });
-  }
-
-  private readSelection(): void {
-    this.selectedId.set(this.route.snapshot.firstChild?.paramMap.get('id') ?? null);
   }
 
   /** One page: every ticket for the team, the own ones for the reporter. */

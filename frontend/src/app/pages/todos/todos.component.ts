@@ -35,9 +35,8 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { TodoLiveService, batchPings } from '@core/ws/todo-live.service';
 import type { TodoPing } from '@core/ws/ws-messages';
-import { FabComponent } from '@shared/ui/fab/fab.component';
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import {
+  FabComponent,
   ButtonComponent,
   EmptyStateComponent,
   FilterSelectComponent,
@@ -61,7 +60,10 @@ import {
   ListDetailBarComponent,
   ListDetailNavDirective,
   SwipeBackDirective,
+  PageFrame,
+  PageHeaderComponent,
 } from '@stupa-makers/ui-kit';
+import { BreadcrumbsComponent } from '../../layout/breadcrumbs.component';
 import { TodoCardDetailComponent } from '../../features/todos/card-detail/todo-card-detail.component';
 import { TodoNewDialogComponent } from '../../features/todos/new-dialog/todo-new-dialog.component';
 import { TodoCacheService } from '../../features/todos/todo-cache.service';
@@ -90,7 +92,6 @@ import {
   sortedColumns,
   type BoardFilter,
 } from '../../features/todos/todos.util';
-import { PageFrameService } from '../../layout/page-frame.service';
 import { TodoArchiveSheetComponent } from './archive-sheet/todo-archive-sheet.component';
 import { TodoBoardPickerComponent } from './board-picker/todo-board-picker.component';
 import { TodoBoardRowsComponent, type RowDrop, type RowLead } from './board-rows/todo-board-rows.component';
@@ -178,6 +179,7 @@ const DUE_TEXT: Record<BoardFilter['due'], TranslationKey> = {
     ListDetailBarComponent,
     ListDetailNavDirective,
     PageHeaderComponent,
+    BreadcrumbsComponent,
     RowMenuComponent,
     SearchPillComponent,
     SegmentedComponent,
@@ -207,7 +209,7 @@ export class TodosComponent implements OnDestroy {
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
-  private readonly frame = inject(PageFrameService);
+  private readonly frame = inject(PageFrame);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
   private readonly live = inject(TodoLiveService);

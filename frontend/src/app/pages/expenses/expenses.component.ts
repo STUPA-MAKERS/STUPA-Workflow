@@ -52,12 +52,11 @@ import {
   StatusTextComponent,
   StickyBarComponent,
   ToastService,
-} from '@stupa-makers/ui-kit';
-import {
+  DetailNoneComponent,
   FabComponent,
   PageHeaderComponent,
-} from '@shared/ui';
-import { PageFrameService } from '../../layout/page-frame.service';
+} from '@stupa-makers/ui-kit';
+import { injectListDetailPage } from '@stupa-makers/ui-kit/shell';
 import { CostCentreSelectComponent } from '../budget/cost-centre-select/cost-centre-select.component';
 import {
   BudgetTreeApi,
@@ -84,7 +83,6 @@ import { ExpensesListState, type ExpenseSortField } from './expenses-list.state'
 import { SubBookingDialogComponent } from './sub-booking-dialog/sub-booking-dialog.component';
 import { TransferDetailComponent } from './transfer-detail/transfer-detail.component';
 import { TransferFormComponent } from './transfer-form/transfer-form.component';
-import { DetailNoneComponent } from '@shared/ui/detail-none/detail-none.component';
 import { CostCentreLabelComponent } from '../budget/cost-centre-label/cost-centre-label.component';
 import { dayMonth } from '@shared/date-format';
 import { swipeFrom } from '@shared/row-swipe';
@@ -182,7 +180,6 @@ export class ExpensesComponent implements OnDestroy {
   private readonly apps = inject(ApiClient);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
-  private readonly frame = inject(PageFrameService);
 
   /**
    * The list state. The template hands the state modules to the forms, which read and set
@@ -197,8 +194,9 @@ export class ExpensesComponent implements OnDestroy {
   readonly phone = mediaQuery(MEDIA.phone);
   /** The list-detail layout, for its split state. */
   private readonly layout = viewChild(ListDetailLayoutComponent);
+  private readonly listDetail = injectListDetailPage(this.layout);
   /** The list and the detail sit side by side. */
-  readonly split = computed(() => this.layout()?.collapsed() === false);
+  readonly split = this.listDetail.split;
 
   readonly canManage = computed(() => this.auth.can('budget.book'));
   readonly canExport = computed(() => this.auth.can('budget.export'));
@@ -577,9 +575,6 @@ export class ExpensesComponent implements OnDestroy {
         if (this.canManage()) for (const top of tree) this.loadFyLabels(top.id, tree);
       });
     });
-
-    effect(() => this.frame.fill.set(this.split()));
-
   }
 
   /**
@@ -738,7 +733,6 @@ export class ExpensesComponent implements OnDestroy {
 
   ngOnDestroy(): void {
     this.list.dispose();
-    this.frame.fill.set(false);
   }
 
   money(amount: string): string {

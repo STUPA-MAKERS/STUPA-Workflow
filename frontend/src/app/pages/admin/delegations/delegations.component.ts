@@ -7,9 +7,6 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
-  PageHeaderComponent,
-} from '@shared/ui';
-import {
   ConfirmDialogComponent,
   EmptyStateComponent,
   FilterSelectComponent,
@@ -20,7 +17,9 @@ import {
   type RowMenuSection,
   SkeletonComponent,
   ToastService,
+  PageHeaderComponent,
 } from '@stupa-makers/ui-kit';
+import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
 import type { Gremium } from '../admin.models';
 import { SubstitutePoolComponent } from './substitute-pool.component';
@@ -57,6 +56,7 @@ import { localToday } from '@shared/date-format';
     IconComponent,
     FilterSelectComponent,
     PageHeaderComponent,
+    BreadcrumbsComponent,
     RowMenuComponent,
     SkeletonComponent,
     SubstitutePoolComponent,
