@@ -1,5 +1,6 @@
 <section class="fe admin-page" [class.fe--wide]="wide()">
   <app-page-header [flush]="true" [title]="'admin.flow.title' | t" [meta]="versionMeta()">
+    <app-breadcrumbs crumbs />
     @if (loaded()) {
       <app-status-text heading class="fe__validity" [kind]="validation().valid ? 'accent' : 'error'">
         <app-icon [name]="validation().valid ? 'check' : 'alert'" [size]="16" />

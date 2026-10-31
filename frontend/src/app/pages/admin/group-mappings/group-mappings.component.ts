@@ -9,9 +9,6 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { Uuid } from '@core/api/models';
 import {
-  PageHeaderComponent,
-} from '@shared/ui';
-import {
   ButtonComponent,
   ConfirmDialogComponent,
   DialogComponent,
@@ -25,7 +22,9 @@ import {
   SkeletonComponent,
   ToastService,
   TruncatedDirective,
+  PageHeaderComponent,
 } from '@stupa-makers/ui-kit';
+import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
 import type {
   Gremium,
@@ -107,6 +106,7 @@ const RESERVED_GROUP_PREFIX = 'vote:';
     RouterLink,
     TranslatePipe,
     PageHeaderComponent,
+    BreadcrumbsComponent,
     RowMenuComponent,
     SkeletonComponent,
     ButtonComponent,

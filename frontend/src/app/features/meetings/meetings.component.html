@@ -1,5 +1,7 @@
 @if (showForbidden() || (detailMode() && !meeting())) {
-<app-page-header [title]="'meetings.title' | t" [rail]="true" [flush]="true" />
+<app-page-header [title]="'meetings.title' | t" [rail]="true" [flush]="true">
+  <app-breadcrumbs crumbs />
+</app-page-header>
 }
 
 @if (showForbidden()) {

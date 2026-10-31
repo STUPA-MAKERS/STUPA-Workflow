@@ -1,7 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { SKIP_LOADING } from '@core/loading/loading.interceptor';
+import { SKIP_LOADING } from '@stupa-makers/ui-kit';
 import { USE_MOCK_API } from './api.config';
 import { GremienApiService } from './gremien.service';
 

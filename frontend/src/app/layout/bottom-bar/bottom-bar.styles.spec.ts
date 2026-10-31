@@ -1,13 +1,15 @@
 /**
- * Style contract of the phone bottom bar. jsdom does no layout, so this spec reads the
- * styles: the bar height, the surface that sets it apart from the cards, and the
- * padding that keeps the page clear of the bar.
+ * Style contract of the phone bottom bar of the kit shell, which the app uses. jsdom does no
+ * layout, so this spec reads the styles: the bar height, the surface that sets it apart from
+ * the cards, and the padding that keeps the page clear of the bar.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const bar = readFileSync(join(__dirname, 'bottom-bar.component.scss'), 'utf8');
-const shell = readFileSync(join(__dirname, '../shell.component.scss'), 'utf8');
+const kit = join(__dirname, '../../../../vendor/ui-kit/shell/src');
+const bar = readFileSync(join(kit, 'bottom-bar/bottom-bar.component.scss'), 'utf8');
+const items = readFileSync(join(kit, '../../src/styles/_nav-items.scss'), 'utf8');
+const shell = readFileSync(join(kit, 'shell/shell.component.scss'), 'utf8');
 
 /** The declarations of the first rule with exactly this selector. */
 function rule(css: string, selector: string): string {
@@ -51,6 +53,7 @@ describe('bottom bar styles', () => {
 
   it('makes every entry fill the bar height, so it is a touch target of at least 44px', () => {
     expect(rule(bar, '.bb')).toMatch(/align-items: stretch;/);
-    expect(rule(bar, '.bb__item')).toMatch(/justify-content: center;/);
+    expect(items).toMatch(/@mixin bar-item\(\$b: bb\) \{\n {2}\.#\{\$b\}__item \{[^}]*justify-content: center;/);
+    expect(bar).toMatch(/@include nav-items\.bar-item;/);
   });
 });

@@ -1,7 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import type { NavKey } from '../nav.service';
 import { RailStatusService } from '../rail-status.service';
 
 /** The highest count the badge spells out; above it shows "99+". */
@@ -25,7 +24,8 @@ const MAX_COUNT = 99;
 export class NavMarkComponent {
   private readonly status = inject(RailStatusService);
 
-  readonly key = input.required<NavKey>();
+  /** The key of the navigation entry (`NavKey`). */
+  readonly key = input.required<string>();
   /**
    * `visual`: the badge or the dot, hidden from screen readers; it sits on the icon.
    * `text`: the same information as hidden text; it goes after the label, so the link

@@ -36,7 +36,9 @@
   [flush]="true"
   [display]="true"
   [title]="'dashboard.greeting' | t: { name: firstName() }"
-/>
+>
+  <app-breadcrumbs crumbs />
+</app-page-header>
 
 <aside
   class="dash__today"
@@ -268,6 +270,6 @@
 }
 @if (phone()) {
   <app-side-sheet side="bottom" [heading]="'shell.account.region' | t" [(open)]="accountOpen">
-    <app-account-menu variant="sheet" (navigated)="closeAccount()" />
+    <app-account variant="sheet" (navigated)="closeAccount()" />
   </app-side-sheet>
 }

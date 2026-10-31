@@ -21,7 +21,6 @@ const KIT = join(SRC, '../vendor/ui-kit/src');
 const GLOBAL_STYLES = join(KIT, 'styles/list-detail.scss');
 const APP_STYLES = join(SRC, 'styles.scss');
 const LAYOUT_SCSS = join(KIT, 'lib/list-detail/list-detail-layout.component.scss');
-const PAGE_HEADER_DIR = join(APP, 'shared/ui/page-header');
 
 /**
  * The list pages known when the geometry was unified. The spec finds the list pages by
@@ -149,9 +148,7 @@ describe('the one list/detail geometry', () => {
    */
   it('no component styles the shared header from outside', () => {
     const intoHeader = /app-page-header[^{};]*\.ph(__|--)|::ng-deep\s*\.ph(__|--)(bar|text|heading|title|meta|subtitle|actions|pane|flush|rail)/;
-    const offenders = appStyles()
-      .filter((f) => !f.startsWith(PAGE_HEADER_DIR))
-      .filter((f) => intoHeader.test(code(f)));
+    const offenders = appStyles().filter((f) => intoHeader.test(code(f)));
     expect(offenders.map((f) => relative(APP, f))).toEqual([]);
   });
 

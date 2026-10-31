@@ -5,7 +5,6 @@ import { I18nService } from '@core/i18n/i18n.service';
 import type { TranslationKey } from '@core/i18n/translations';
 import { setI18n } from '@shared/forms/i18n-text';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import {
   ButtonComponent,
   EmptyStateComponent,
@@ -20,10 +19,12 @@ import {
   SkeletonComponent,
   BadgeComponent,
   ToastService,
+  FabComponent,
+  PageHeaderComponent,
 } from '@stupa-makers/ui-kit';
+import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
 import type { MailPreview, MailTemplate } from '../admin.models';
-import { FabComponent } from '@shared/ui/fab/fab.component';
 import { type ContentLang, ContentLangSwitchComponent } from '@shared/ui/content-lang-switch/content-lang-switch.component';
 
 type Lang = ContentLang;
@@ -64,6 +65,7 @@ function sameTexts(a: Record<string, string>, b: Record<string, string>): boolea
     IconComponent,
     InputComponent,
     PageHeaderComponent,
+    BreadcrumbsComponent,
     ContentLangSwitchComponent,
     BadgeComponent,
   ],

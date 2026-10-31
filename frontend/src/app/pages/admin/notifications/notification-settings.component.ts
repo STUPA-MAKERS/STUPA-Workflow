@@ -1,15 +1,16 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import {
   IconComponent,
   InputComponent,
   NoteComponent,
   SwitchComponent,
+  FabComponent,
+  ToastService,
+  PageHeaderComponent,
 } from '@stupa-makers/ui-kit';
-import { FabComponent } from '@shared/ui/fab/fab.component';
-import { ToastService } from '@stupa-makers/ui-kit';
+import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { I18nService } from '@core/i18n/i18n.service';
 import { AdminApiService } from '../admin-api.service';
 import type { NotificationSettings } from '../admin.models';
@@ -39,6 +40,7 @@ import { LoadStateComponent } from '@shared/ui/load-state/load-state.component';
     NoteComponent,
     SwitchComponent,
     PageHeaderComponent,
+    BreadcrumbsComponent,
   ],
   templateUrl: './notification-settings.component.html',
   styleUrl: './notification-settings.component.scss',

@@ -2,7 +2,9 @@
   <app-page-header
     [flush]="true"
     [title]="'admin.groupMappings.title' | t"
-  />
+  >
+    <app-breadcrumbs crumbs />
+  </app-page-header>
 
   @for (sec of sections(); track sec.kind) {
     <section class="gm__section" [attr.aria-labelledby]="'gm-' + sec.kind + '-title'">

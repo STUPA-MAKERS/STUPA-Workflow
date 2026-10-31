@@ -50,12 +50,13 @@ import {
   TabPageDirective,
   TabPagerComponent,
   TabsComponent,
+  FabComponent,
+  PageHeaderComponent,
 } from '@stupa-makers/ui-kit';
-import { FabComponent } from '@shared/ui/fab/fab.component';
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
+import { BreadcrumbsComponent } from '../../layout/breadcrumbs.component';
 import { flowColorKind } from '@shared/status-kind.util';
-import { CommandPaletteService } from '../../features/search/command-palette.service';
-import { AccountMenuComponent } from '../../layout/account-menu/account-menu.component';
+import { FabLinkDirective, CommandPalette } from '@stupa-makers/ui-kit/shell';
+import { AppAccountMenuComponent } from '../../layout/account-menu/account-menu.component';
 import { NavService } from '../../layout/nav.service';
 
 /** The rows a tab loads. The list scrolls inside its pane; "Alle … öffnen" shows the rest. */
@@ -152,15 +153,17 @@ type Loaded<T> = T | null | undefined;
     DateBlockComponent,
     EmptyStateComponent,
     FabComponent,
+    FabLinkDirective,
     ListItemComponent,
     PageHeaderComponent,
+    BreadcrumbsComponent,
     SearchPillComponent,
     SegBarComponent,
     SideSheetComponent,
     SkeletonComponent,
     StatusTextComponent,
     ScrollFadeDirective,
-    AccountMenuComponent,
+    AppAccountMenuComponent,
   ],
   host: {
     '[class.dash--phone]': 'phone()',
@@ -173,7 +176,7 @@ type Loaded<T> = T | null | undefined;
 export class DashboardComponent {
   readonly auth = inject(AuthService);
   /** The search pill at the top opens the global search. */
-  protected readonly palette = inject(CommandPaletteService);
+  protected readonly palette = inject(CommandPalette);
   private readonly api = inject(ApiClient);
   private readonly i18n = inject(I18nService);
   private readonly nav = inject(NavService);

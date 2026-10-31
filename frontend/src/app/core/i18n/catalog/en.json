@@ -85,6 +85,7 @@
   "account.calendar.rotateError": "Could not create the feed link.",
   "pwa.updateReady": "A new version of the app is available.",
   "pwa.reload": "Reload",
+  "pwa.offline": "You are offline",
   "account.notifications.title": "Notifications",
   "account.notifications.error": "Settings could not be loaded.",
   "account.notifications.saveError": "Saving failed. Please try again.",

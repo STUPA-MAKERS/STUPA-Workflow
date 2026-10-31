@@ -2,7 +2,6 @@ import { Component, signal } from '@angular/core';
 import { Router, provideRouter, type Routes } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { SwUpdate } from '@angular/service-worker';
 import { render, screen, within } from '@testing-library/angular';
 import { DeferBlockState } from '@angular/core/testing';
 import { HelpService } from '../features/help/help.service';
@@ -11,7 +10,10 @@ import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { BrandingService } from '@core/branding/branding.service';
 import type { Principal } from '@core/api/models';
-import { PageFrameService } from './page-frame.service';
+import { provideAppUiKit } from '@core/i18n/ui-kit-intl';
+import { PageFrame } from '@stupa-makers/ui-kit';
+import { CommandPalette } from '@stupa-makers/ui-kit/shell';
+import userEvent from '@testing-library/user-event';
 import { RailStatusService } from './rail-status.service';
 import { createLocationMock, provideLocationMock } from '../../testing/location-mock';
 
@@ -29,6 +31,8 @@ class StubPage {}
 
 const ROUTES: Routes = [
   { path: 'dashboard', component: StubPage },
+  { path: 'account/notifications', component: StubPage },
+  { path: 'expenses', component: StubPage },
   { path: 'protokolle', component: StubPage, data: { footer: true } },
   { path: 'tasks', component: StubPage },
   { path: 'beamer', component: StubPage, data: { chrome: false } },
@@ -41,8 +45,8 @@ const ROUTES: Routes = [
 ];
 
 /** The marks of the rail, set by the test instead of HTTP. */
-function railStatusStub(tasks: number | null = 4, live = true) {
-  return { taskCount: signal(tasks), ticketCount: signal<number | null>(null), live: signal(live), refresh: () => undefined };
+function railStatusStub(tasks: number | null = 4, live = true, tickets: number | null = null) {
+  return { taskCount: signal(tasks), ticketCount: signal<number | null>(tickets), live: signal(live), refresh: () => undefined };
 }
 
 /** The avatars read these. The config is not loaded, so they show the initials. */
@@ -83,7 +87,6 @@ function phoneViewport(): () => void {
   return () => (window.matchMedia = original);
 }
 
-/** The shell holds the update prompt, and the prompt needs SwUpdate. */
 async function setup(
   principal: Principal | null | 'pending',
   opts: { branding?: ReturnType<typeof brandingStub>; status?: ReturnType<typeof railStatusStub> } = {},
@@ -95,7 +98,7 @@ async function setup(
       provideHttpClient(),
       provideHttpClientTesting(),
       { provide: USE_MOCK_API, useValue: false },
-      { provide: SwUpdate, useValue: { isEnabled: false } },
+      provideAppUiKit(),
       provideLocationMock(createLocationMock()),
       { provide: BrandingService, useValue: opts.branding ?? brandingStub() },
       { provide: RailStatusService, useValue: opts.status ?? railStatusStub() },
@@ -373,7 +376,7 @@ describe('ShellComponent', () => {
       const view = await setup(MEMBER, { branding });
       await view.router.navigateByUrl('/protokolle');
       view.fixture.detectChanges();
-      const frame = view.fixture.debugElement.injector.get(PageFrameService);
+      const frame = view.fixture.debugElement.injector.get(PageFrame);
       frame.fill.set(true);
       view.fixture.detectChanges();
       expect(screen.queryByRole('contentinfo')).not.toBeInTheDocument();
@@ -381,6 +384,110 @@ describe('ShellComponent', () => {
       frame.fill.set(false);
       view.fixture.detectChanges();
       expect(screen.getByRole('contentinfo')).toBeInTheDocument();
+    });
+  });
+
+  describe('phone bar', () => {
+    let restore: () => void;
+    beforeEach(() => (restore = phoneViewport()));
+    afterEach(() => restore());
+
+    const bar = () => screen.getByRole('navigation', { name: 'Hauptnavigation' });
+    const more = () => within(bar()).getByRole('button', { name: 'Mehr' });
+    const ADMIN: Principal = { ...MEMBER, display_name: 'Ada Admin', roles: ['admin'] };
+
+    it('shows Start, Anträge, Sitzungen and Aufgaben, then Mehr', async () => {
+      await setup(ADMIN, { status: railStatusStub(8, true) });
+      const labels = Array.from(bar().querySelectorAll('.bb__label')).map((l) => l.textContent?.trim());
+      expect(labels).toEqual(['Start', 'Anträge', 'Sitzungen', 'Aufgaben', 'Mehr']);
+      expect(within(bar()).getByRole('link', { name: 'Aufgaben 8 offen' })).toHaveAttribute('href', '/tasks');
+      expect(within(bar()).getByRole('link', { name: 'Sitzungen Sitzung läuft' })).toBeInTheDocument();
+    });
+
+    /** The bar entries are not repeated in the sheet. The help entries and the account follow. */
+    it('lists the other areas, the search, the help and the account in the Mehr sheet', async () => {
+      const { fixture } = await setup(ADMIN);
+      await userEvent.click(more());
+      fixture.detectChanges();
+      const sheet = screen.getByRole('dialog', { name: 'Mehr' });
+      for (const name of ['Abstimmungen', 'Budget', 'Buchungen', 'Rechnungen', 'Verwaltung']) {
+        expect(within(sheet).getByRole('link', { name })).toBeInTheDocument();
+      }
+      expect(within(sheet).queryByRole('link', { name: 'Start' })).not.toBeInTheDocument();
+      expect(within(sheet).getByRole('button', { name: 'Suche' })).toBeInTheDocument();
+      expect(within(sheet).getByRole('group', { name: 'Hilfe' })).toBeInTheDocument();
+      expect(within(sheet).getByRole('group', { name: 'Konto' })).toBeInTheDocument();
+      expect(within(sheet).getByText('Ada Admin')).toBeInTheDocument();
+      expect(within(sheet).getByRole('link', { name: 'Benachrichtigungen' })).toBeInTheDocument();
+    });
+
+    it('opens the search palette from the sheet and closes the sheet', async () => {
+      const { fixture } = await setup(ADMIN);
+      await userEvent.click(more());
+      fixture.detectChanges();
+      await userEvent.click(screen.getByRole('button', { name: 'Suche' }));
+      fixture.detectChanges();
+      expect(fixture.debugElement.injector.get(CommandPalette).isOpen()).toBe(true);
+      expect(screen.queryByRole('dialog', { name: 'Mehr' })).not.toBeInTheDocument();
+    });
+
+    it('closes the sheet when "Problem melden" opens the dialog', async () => {
+      const { fixture } = await setup(ADMIN);
+      await userEvent.click(more());
+      fixture.detectChanges();
+      await userEvent.click(screen.getByRole('button', { name: 'Problem melden' }));
+      fixture.detectChanges();
+      expect(screen.queryByRole('dialog', { name: 'Mehr' })).not.toBeInTheDocument();
+    });
+
+    it('marks Mehr as active on a page that lives in the sheet and on the account pages', async () => {
+      const { fixture, router } = await setup(ADMIN);
+      await router.navigateByUrl('/expenses');
+      fixture.detectChanges();
+      expect(more()).toHaveClass('is-active');
+      await router.navigateByUrl('/account/notifications');
+      fixture.detectChanges();
+      expect(more()).toHaveClass('is-active');
+      await router.navigateByUrl('/dashboard');
+      fixture.detectChanges();
+      expect(more()).not.toHaveClass('is-active');
+    });
+  });
+
+  describe('nav marks', () => {
+    it('caps the task badge at 99+ but says the full count', async () => {
+      const { container } = await setup(MEMBER, { status: railStatusStub(120, false) });
+      expect(container.querySelector('.mark__count')).toHaveTextContent('99+');
+      expect(screen.getByRole('link', { name: 'Aufgaben 120 offen' })).toBeInTheDocument();
+    });
+
+    it('shows no badge before the first answer', async () => {
+      const { container } = await setup(MEMBER, { status: railStatusStub(null, false) });
+      expect(container.querySelector('.mark__count')).toBeNull();
+      expect(screen.getByRole('link', { name: 'Aufgaben' })).toBeInTheDocument();
+    });
+
+    it('counts the new tickets on the Tickets entry', async () => {
+      await setup({ ...MEMBER, roles: ['admin'] }, { status: railStatusStub(0, false, 3) });
+      expect(screen.getByRole('link', { name: 'Tickets 3 neu' })).toHaveAttribute('href', '/tickets');
+    });
+  });
+
+  describe('rail foot', () => {
+    it('puts the help menu and the account menu at the foot of the rail', async () => {
+      const { container } = await setup(MEMBER);
+      expect(container.querySelector('.rail__tools app-help-menu')).not.toBeNull();
+      expect(
+        screen.getByRole('button', { name: 'Konto: Mia Member' }).closest('.rail__account'),
+      ).not.toBeNull();
+    });
+
+    it('opens the search palette from the rail', async () => {
+      const { fixture } = await setup(MEMBER);
+      const button = within(mainNav() as HTMLElement).getByRole('button', { name: 'Suche' });
+      expect(button).toHaveAttribute('aria-keyshortcuts', expect.stringMatching(/^(Control|Meta)\+K$/));
+      await userEvent.click(button);
+      expect(fixture.debugElement.injector.get(CommandPalette).isOpen()).toBe(true);
     });
   });
 });

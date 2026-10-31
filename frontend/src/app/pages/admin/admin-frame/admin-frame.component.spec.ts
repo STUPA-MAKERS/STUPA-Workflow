@@ -4,7 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter, withComponentInputBinding } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { render, screen } from '@testing-library/angular';
-import { MEDIA } from '@stupa-makers/ui-kit';
+import { MEDIA, PageFrame } from '@stupa-makers/ui-kit';
 import { drag, mediaMatching } from '../../../../testing/touch';
 import userEvent from '@testing-library/user-event';
 import { AuthService } from '@core/auth/auth.service';
@@ -285,7 +285,7 @@ describe('AdminFrameComponent', () => {
     const view = await setup(ALL, '/admin/flow');
     const frame = view.container.querySelector('.af');
     const host = view.fixture.nativeElement as HTMLElement;
-    const pageFrame = view.fixture.debugElement.injector.get(PageFrameService);
+    const pageFrame = view.fixture.debugElement.injector.get(PageFrame);
     expect(frame).toHaveClass('af--pane');
     expect(host).toHaveClass('pane-page');
     expect(pageFrame.fill()).toBe(true);
@@ -334,7 +334,7 @@ describe('AdminFrameComponent', () => {
   /** The sheet is the window: its body is the scroll container of the page. */
   it('beside an admin page is a pane page: it fills the window, and clears that when it goes', async () => {
     const view = await setup(ALL, '/admin/users');
-    const frame = view.fixture.debugElement.injector.get(PageFrameService);
+    const frame = view.fixture.debugElement.injector.get(PageFrame);
     expect(frame.fill()).toBe(true);
     expect(view.container.querySelector('.af__page > .af__pageBody')).not.toBeNull();
     view.fixture.destroy();
@@ -343,7 +343,7 @@ describe('AdminFrameComponent', () => {
 
   it('does not fill the window in one column', async () => {
     const view = await setup(ALL, '/admin/users', false);
-    expect(view.fixture.debugElement.injector.get(PageFrameService).fill()).toBe(false);
+    expect(view.fixture.debugElement.injector.get(PageFrame).fill()).toBe(false);
   });
 
   /** jsdom does no layout, so a plain property stands in for the scroll offset. */
@@ -542,7 +542,7 @@ describe('AdminFrameComponent in account mode', () => {
     const view = await setupAccount(['mcp.use']);
     expect(view.container.querySelector('.af')).toHaveClass('af--split');
     expect(view.container.querySelector('.af__page')).not.toHaveClass('af__hidden');
-    expect(view.fixture.debugElement.injector.get(PageFrameService).fill()).toBe(true);
+    expect(view.fixture.debugElement.injector.get(PageFrame).fill()).toBe(true);
   });
 
   it('wide: an account page sits beside the navigation, with no "Zur Liste"', async () => {

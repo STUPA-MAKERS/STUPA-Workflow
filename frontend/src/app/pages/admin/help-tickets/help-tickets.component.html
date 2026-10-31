@@ -1,5 +1,6 @@
 <section class="ht admin-page">
   <app-page-header [flush]="true" [title]="'admin.helpTickets.title' | t">
+    <app-breadcrumbs crumbs />
     @if (form.state() === 'ok' && dirty()) {
       <app-button actions variant="text" [disabled]="saving()" (click)="discard()">
         {{ 'admin.helpTickets.discard' | t }}

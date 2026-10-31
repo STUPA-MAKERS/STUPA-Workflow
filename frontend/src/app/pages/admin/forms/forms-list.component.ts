@@ -6,8 +6,8 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { I18nMap, Uuid } from '@core/api/models';
 import { resolveI18n } from '@shared/forms/i18n-text';
-import { FabComponent, PageHeaderComponent } from '@shared/ui';
 import {
+  FabComponent,
   ButtonComponent,
   CellDirective,
   CheckboxComponent,
@@ -22,7 +22,9 @@ import {
   type RowMenuSection,
   StatusTextComponent,
   ToastService,
+  PageHeaderComponent,
 } from '@stupa-makers/ui-kit';
+import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
 import { type ApplicationTypeFull, type Gremium, slugify } from '../admin.models';
 
@@ -66,6 +68,7 @@ function emptyForm(): NewForm {
     InputComponent,
     NoteComponent,
     PageHeaderComponent,
+    BreadcrumbsComponent,
     StatusTextComponent,
     RowMenuComponent,
   ],

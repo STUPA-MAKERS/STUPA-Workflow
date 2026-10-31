@@ -6,9 +6,8 @@ import userEvent from '@testing-library/user-event';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { AuthService } from '@core/auth/auth.service';
 import { WsService } from '@core/ws/ws.service';
-import { MEDIA } from '@stupa-makers/ui-kit';
+import { MEDIA, PageFrame } from '@stupa-makers/ui-kit';
 import { matchMediaQueries } from '../../../../testing/meeting-fixtures';
-import { PageFrameService } from '../../../layout/page-frame.service';
 import { MeetingAgendaService } from '../meeting-agenda.service';
 import { MeetingDialogsService } from '../meeting-dialogs.service';
 import { MeetingSessionService } from '../meeting-session.service';
@@ -52,7 +51,7 @@ async function setup(opts: { media?: string[]; view?: string; managed?: string[]
   });
   const injector = view.fixture.debugElement.injector;
   const http = injector.get(HttpTestingController);
-  const frame = injector.get(PageFrameService);
+  const frame = injector.get(PageFrame);
   http.match('/api/meetings/gremien').forEach((r) => r.flush([]));
   return { ...view, http, frame };
 }

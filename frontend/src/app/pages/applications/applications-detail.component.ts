@@ -74,6 +74,7 @@ import {
   TabPagerComponent,
   TabsComponent,
   ToastService,
+  FabComponent,
 } from '@stupa-makers/ui-kit';
 import {
   BudgetTreeApi,
@@ -96,7 +97,6 @@ import { ShareLinksDialogComponent } from './share-links-dialog/share-links-dial
 import { TodoLinkedListComponent } from '../../features/todos/linked-list/todo-linked-list.component';
 import { RailStatusService } from '../../layout/rail-status.service';
 import { provideFormly } from '@shared/formly/formly.providers';
-import { FabComponent } from '@shared/ui/fab/fab.component';
 import { AmountComponent } from '@shared/ui/amount/amount.component';
 import { formatMoney } from '@shared/format-money';
 

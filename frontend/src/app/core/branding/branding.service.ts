@@ -9,7 +9,7 @@ import type {
 } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { applyAccent, normalizeHex } from '@core/theme/accent';
-import { ThemeService } from '@core/theme/theme.service';
+import { ThemeService } from '@stupa-makers/ui-kit';
 
 /** The free texts of the branding, keyed by their slot. */
 export type FreeTexts = NonNullable<NonNullable<PublicSiteConfig['branding']>['freetexts']>;

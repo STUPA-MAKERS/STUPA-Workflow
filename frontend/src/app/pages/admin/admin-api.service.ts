@@ -6,7 +6,7 @@
  * path, which is not part of the API spec.
  */
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { skipLoading } from '@core/loading/loading.interceptor';
+import { skipLoading } from '@stupa-makers/ui-kit';
 import { Injectable, inject } from '@angular/core';
 import { type Observable, map, of, throwError } from 'rxjs';
 import { API_BASE_URL, USE_MOCK_API } from '@core/api/api.config';

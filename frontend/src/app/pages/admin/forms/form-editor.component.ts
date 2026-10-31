@@ -17,7 +17,6 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { FieldType, FormFieldDef, I18nMap, Uuid } from '@core/api/models';
 import { langFieldLabel, resolveI18n, sameI18n, setI18n } from '@shared/forms/i18n-text';
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import {
   ButtonComponent,
   CheckboxComponent,
@@ -36,7 +35,10 @@ import {
   SideSheetComponent,
   StatusTextComponent,
   ToastService,
+  FabComponent,
+  PageHeaderComponent,
 } from '@stupa-makers/ui-kit';
+import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
 import { VersionHistoryComponent } from '../version-history/version-history.component';
 import {
@@ -54,7 +56,6 @@ import {
   normalizeFormField,
   validateFormField,
 } from '../form-field.util';
-import { FabComponent } from '@shared/ui/fab/fab.component';
 import { I18nInputComponent } from '@shared/ui/i18n-input/i18n-input.component';
 import { ContentLangSwitchComponent } from '@shared/ui/content-lang-switch/content-lang-switch.component';
 import { ContentLangState } from '@shared/ui/content-lang-switch/content-lang.state';
@@ -120,6 +121,7 @@ type QPos = QuestionPos;
     InputComponent,
     VersionHistoryComponent,
     PageHeaderComponent,
+    BreadcrumbsComponent,
     RowMenuComponent,
     SideSheetComponent,
     StatusTextComponent,

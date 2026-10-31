@@ -14,7 +14,7 @@ import type { Observable } from 'rxjs';
 import { API_BASE_URL } from '@core/api/api.config';
 import type { IsoDateTime, MessageAttachment, MessageFiles, PersonRef, ScanState, Uuid } from '@core/api/models';
 import { messageFiles } from '@core/api/mappers';
-import { skipLoading } from '@core/loading/loading.interceptor';
+import { skipLoading } from '@stupa-makers/ui-kit';
 import { detailContext } from '@core/cache/cache.interceptor';
 
 export type TicketKind = 'bug' | 'question' | 'idea';

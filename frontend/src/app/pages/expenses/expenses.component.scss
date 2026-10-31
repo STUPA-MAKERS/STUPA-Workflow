@@ -1,7 +1,7 @@
 @use 'breakpoints' as bp;
 @use 'scroll-fade' as fade;
 @use '../budget/swatch';
-@use '../../shared/ui/list-pane' as lp;
+@use 'list-pane' as lp;
 
 :host {
   @include lp.stack;

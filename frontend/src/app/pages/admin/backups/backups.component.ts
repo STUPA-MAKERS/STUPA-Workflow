@@ -4,10 +4,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import {
-  PageHeaderComponent,
-  backupStatus,
-} from '@shared/ui';
+import { backupStatus } from '@shared/ui';
 import {
   ButtonComponent,
   CellDirective,
@@ -27,7 +24,9 @@ import {
   type RowMenuSection,
   StatusTextComponent,
   ToastService,
+  PageHeaderComponent,
 } from '@stupa-makers/ui-kit';
+import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
 import type { Backup, BackupKind } from '../admin.models';
 import { SectionHeaderComponent } from '@shared/ui/section-header/section-header.component';
@@ -82,6 +81,7 @@ const POLL_TIMEOUT_MS = 30 * 60 * 1000;
     InputComponent,
     NoteComponent,
     PageHeaderComponent,
+    BreadcrumbsComponent,
     StatusTextComponent,
     RowMenuComponent,
   ],

@@ -2,7 +2,9 @@
   <app-page-header
     [flush]="true"
     [title]="(section === 'texts' ? 'admin.texts.title' : 'admin.brand.title') | t"
-  />
+  >
+    <app-breadcrumbs crumbs />
+  </app-page-header>
 
   @if (draft(); as d) {
     @if (section === 'texts') {

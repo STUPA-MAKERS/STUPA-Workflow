@@ -1,5 +1,6 @@
 <section class="tr admin-page">
   <app-page-header [flush]="true" [title]="'admin.translations.title' | t">
+    <app-breadcrumbs crumbs />
     @if (dirty()) {
       <app-button actions variant="text" [disabled]="saving()" (click)="discard()">
         {{ 'admin.translations.discard' | t }}

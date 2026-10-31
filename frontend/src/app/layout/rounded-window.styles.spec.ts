@@ -11,7 +11,7 @@ import { join } from 'node:path';
 const app = join(__dirname, '..');
 const read = (path: string): string => readFileSync(join(app, path), 'utf8');
 
-const shell = read('layout/shell.component.scss');
+const shell = read('../../vendor/ui-kit/shell/src/shell/shell.component.scss');
 const listDetail = read('../../vendor/ui-kit/src/lib/list-detail/list-detail-layout.component.scss');
 const adminFrame = read('pages/admin/admin-frame/admin-frame.component.scss');
 const budget = read('pages/budget/budget-dashboard.component.scss');

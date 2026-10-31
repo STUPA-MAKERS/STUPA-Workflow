@@ -64,12 +64,12 @@ import {
   SkeletonComponent,
   StatusTextComponent,
   ToastService,
+  FabComponent,
 } from '@stupa-makers/ui-kit';
 import { AttachmentsPanelComponent } from '../../pages/applications/attachments-panel.component';
 import { applicationTitle, transitionLooks } from '../../pages/applications/applications.util';
 import { shortRef } from './apply.util';
 import { provideFormly } from '@shared/formly/formly.providers';
-import { FabComponent } from '@shared/ui/fab/fab.component';
 
 type Phase = 'loading' | 'expired' | 'error' | 'ready';
 

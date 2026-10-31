@@ -33,14 +33,12 @@ import {
   type StatusKind,
   StatusTextComponent,
   ToastService,
+  PageHeaderComponent,
 } from '@stupa-makers/ui-kit';
 import { AuthService } from '@core/auth/auth.service';
 import { exportDownload } from '@shared/download.util';
 import { SimplifyPathPipe } from '@shared/budget-path';
-import {
-  PageHeaderComponent,
-  flowColorKind,
-} from '@shared/ui';
+import { flowColorKind } from '@shared/ui';
 import { BUDGET_PERMISSIONS } from '../../layout/nav.service';
 import {
   BudgetTreeApi,

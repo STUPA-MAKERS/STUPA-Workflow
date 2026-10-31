@@ -19,13 +19,11 @@ import {
   type TodoMine,
 } from '@core/api/todos.service';
 import { AuthService } from '@core/auth/auth.service';
-import { MEDIA, ToastService } from '@stupa-makers/ui-kit';
-import { PageFrameService } from '../../layout/page-frame.service';
+import { MEDIA, ToastService, PageFrame } from '@stupa-makers/ui-kit';
 import { BOARDS, MEMBERS, asPhone, board, detail, tile } from '../../../testing/todo-fixtures';
 import { drag, mediaMatching } from '../../../testing/touch';
-import { type FakeTodoLive } from '../../../testing/todo-live';
+import { type FakeTodoLive, provideFakeTodoLive } from '../../../testing/todo-live';
 import { TodoLiveService } from '@core/ws/todo-live.service';
-import { provideFakeTodoLive } from '../../../testing/todo-live';
 import { TodoCacheService } from '../../features/todos/todo-cache.service';
 import { ALL_BOARDS, BOARD_POLL_MS, TodosComponent } from './todos.component';
 
@@ -272,7 +270,7 @@ describe('TodosComponent', () => {
     expect(cmp.labelText()).toBe('Label');
     expect(cmp.dueText()).toBe('Fällig');
     expect(cmp.assigneeOptions().map((o) => o.label)).toEqual(['Alle', 'Ich', 'Niemand', 'Selin Yıldız', 'Jonas Weber', 'Gelöschte Person']);
-    expect(TestBed.inject(PageFrameService).fill()).toBe(true);
+    expect(TestBed.inject(PageFrame).fill()).toBe(true);
   });
 
   it('filters in the browser and resets the filters', async () => {
@@ -1475,7 +1473,7 @@ describe('TodosComponent', () => {
       cmp.onPhoneMenu({ id: 'odd', label: '' });
       fireEvent.click(screen.getByRole('button', { name: 'To-Do anlegen' }));
       expect(cmp.newOpen()).toBe(true);
-      expect(TestBed.inject(PageFrameService).fill()).toBe(false);
+      expect(TestBed.inject(PageFrame).fill()).toBe(false);
     });
 
     it('has no FAB on a board that the person only reads', async () => {

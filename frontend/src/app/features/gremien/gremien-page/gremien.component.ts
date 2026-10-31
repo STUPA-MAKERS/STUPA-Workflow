@@ -1,7 +1,6 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  type OnDestroy,
   computed,
   effect,
   inject,
@@ -10,15 +9,11 @@ import {
   viewChild,
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, NavigationEnd, Router, RouterOutlet } from '@angular/router';
-import { filter } from 'rxjs';
+import { ActivatedRoute, Router, RouterOutlet } from '@angular/router';
 import type { GremiumOverview } from '@core/api/gremien.service';
-import type { Uuid } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import {
   ButtonComponent,
   EmptyStateComponent,
@@ -37,8 +32,9 @@ import {
   SearchPillComponent,
   SkeletonComponent,
   StickyBarComponent,
+  PageHeaderComponent,
 } from '@stupa-makers/ui-kit';
-import { PageFrameService } from '../../../layout/page-frame.service';
+import { injectListDetailPage } from '@stupa-makers/ui-kit/shell';
 import { CalendarSubscribeComponent } from '../../meetings/calendar-subscribe/calendar-subscribe.component';
 import { GremienApiService } from '@core/api/gremien.service';
 import { prefetchDetails } from '@core/cache/detail-prefetch';
@@ -110,22 +106,22 @@ export interface GremiumRow {
   templateUrl: './gremien.component.html',
   styleUrl: './gremien.component.scss',
 })
-export class GremienComponent implements OnDestroy {
+export class GremienComponent {
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
-  private readonly frame = inject(PageFrameService);
   protected readonly store = inject(GremienStore);
 
   readonly phone = mediaQuery(MEDIA.phone);
 
   private readonly layout = viewChild(ListDetailLayoutComponent);
+  private readonly listDetail = injectListDetailPage(this.layout);
   /** The list and the detail sit side by side. */
-  readonly split = computed(() => this.layout()?.collapsed() === false);
+  readonly split = this.listDetail.split;
 
   /** The gremium of the child route `:id`. */
-  readonly selectedId = signal<Uuid | null>(null);
+  readonly selectedId = this.listDetail.selectedId;
 
   readonly query = signal('');
   /** The chip "Anzeigen" shows only with `gremium.view_all`. */
@@ -190,15 +186,6 @@ export class GremienComponent implements OnDestroy {
       reads: (r) => [inject(GremienApiService).meetings(r.item.id)],
     });
     this.store.load();
-    this.readSelection();
-    this.router.events
-      .pipe(
-        filter((e) => e instanceof NavigationEnd),
-        takeUntilDestroyed(),
-      )
-      .subscribe(() => this.readSelection());
-
-    effect(() => this.frame.fill.set(this.split()));
 
     effect(() => {
       const split = this.split();
@@ -214,10 +201,6 @@ export class GremienComponent implements OnDestroy {
     });
   }
 
-  ngOnDestroy(): void {
-    this.frame.fill.set(false);
-  }
-
   /** "Zur Liste": close the gremium, keep the tab. */
   closeDetail(): void {
     void this.router.navigate(['/gremien'], { queryParamsHandling: 'preserve' });
@@ -230,10 +213,6 @@ export class GremienComponent implements OnDestroy {
   /** The ⋮ menu of the phone header: "Kalender abonnieren" opens the bottom sheet. */
   onPhoneMenu(item: RowMenuItem, abo: CalendarSubscribeComponent): void {
     if (item.id === 'calendar') abo.open();
-  }
-
-  private readSelection(): void {
-    this.selectedId.set(this.route.snapshot.firstChild?.paramMap.get('id') ?? null);
   }
 
   private toRow(item: GremiumOverview): GremiumRow {

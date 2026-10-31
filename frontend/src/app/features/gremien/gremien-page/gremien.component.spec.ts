@@ -7,11 +7,10 @@ import { of, throwError } from 'rxjs';
 import { ApiClient } from '@core/api/api-client.service';
 import { GremienApiService, type GremiumOverview } from '@core/api/gremien.service';
 import { AuthService } from '@core/auth/auth.service';
-import { MEDIA } from '@stupa-makers/ui-kit';
+import { MEDIA, PageFrame } from '@stupa-makers/ui-kit';
 import { runAxe } from '../../../../testing/a11y';
 import { gremienApiMock, gremium } from '../../../../testing/gremien-fixtures';
 import { matchMediaQueries } from '../../../../testing/meeting-fixtures';
-import { PageFrameService } from '../../../layout/page-frame.service';
 import type { CalendarSubscribeComponent } from '../../meetings/calendar-subscribe/calendar-subscribe.component';
 import { GremienNoneComponent } from '../gremien-none/gremien-none.component';
 import { GREMIUM_VIEW_ALL, GremienComponent } from './gremien.component';
@@ -76,7 +75,7 @@ async function start(
     harness.detectChanges();
   };
   await settle();
-  return { harness, cmp, api, restore, settle, router: TestBed.inject(Router), frame: TestBed.inject(PageFrameService) };
+  return { harness, cmp, api, restore, settle, router: TestBed.inject(Router), frame: TestBed.inject(PageFrame) };
 }
 
 describe('GremienComponent', () => {

@@ -5,6 +5,7 @@
     [title]="resolved(title()) || ('admin.forms.untitled' | t)"
     [meta]="versionMeta()"
   >
+    <app-breadcrumbs crumbs />
     @if (hasVersion()) {
       <app-status-text heading [kind]="active() ? 'accent' : 'muted'">
         {{ (active() ? 'admin.forms.active' : 'admin.forms.inactive') | t }}

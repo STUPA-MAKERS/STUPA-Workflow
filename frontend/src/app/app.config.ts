@@ -8,37 +8,32 @@ import {
   provideZoneChangeDetection,
 } from '@angular/core';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
-import {
-  provideRouter,
-  withComponentInputBinding,
-  withInMemoryScrolling,
-  withViewTransitions,
-} from '@angular/router';
-import { onRouteViewTransition, watchUAVisualTransitions } from '@core/motion/motion';
+import { provideRouter, withComponentInputBinding, withInMemoryScrolling } from '@angular/router';
 import { authInterceptor } from '@core/auth/auth.interceptor';
 import { AuthService } from '@core/auth/auth.service';
 import { lazyMockApiInterceptor } from '@core/api/mock-api.lazy';
 import { cacheInterceptor } from '@core/cache/cache.interceptor';
 import { provideDetailPrefetch } from '@core/cache/detail-prefetch';
-import { loadingInterceptor } from '@core/loading/loading.interceptor';
-import { LoadingService } from '@core/loading/loading.service';
-import { USE_MOCK_API } from '@core/api/api.config';
 import {
+  loadingInterceptor,
+  ThemeService,
   UI_KIT_AVATAR_SOURCE,
-  UI_KIT_INTL,
-  UI_KIT_LOADING,
-  uiKitIntlFromLang,
 } from '@stupa-makers/ui-kit';
+import { provideRouteMotion, watchUAVisualTransitions } from '@stupa-makers/ui-kit/shell';
+import {
+  IS_INSTALLED_APP,
+  lockInstalledAppZoom,
+  OfflineService,
+  SwUpdateService,
+} from '@stupa-makers/ui-kit/pwa';
+import { USE_MOCK_API } from '@core/api/api.config';
 import { LIVE_VOTE_SOURCE } from '@core/ws/live-vote.source';
 import { MockLiveVoteSource } from '@core/ws/mock-live-vote.source';
 import { WsService } from '@core/ws/ws.service';
-import { ThemeService } from '@core/theme/theme.service';
 import { I18nService } from '@core/i18n/i18n.service';
+import { provideAppUiKit } from '@core/i18n/ui-kit-intl';
 import { BrandingService } from '@core/branding/branding.service';
-import { SwUpdateService } from '@core/pwa/sw-update.service';
 import { guardTouchContextMenu } from '@core/touch/touch-context-menu';
-import { lockInstalledAppZoom } from '@core/touch/zoom-lock';
-import { IS_INSTALLED_APP } from '@core/browser/installed-app.token';
 import { AvatarService } from '@shared/ui/avatar/avatar.service';
 import { routes } from './app.routes';
 import { provideServiceWorker } from '@angular/service-worker';
@@ -73,10 +68,7 @@ export const appConfig: ApplicationConfig = {
       routes,
       withComponentInputBinding(),
       withInMemoryScrolling({ scrollPositionRestoration: 'enabled', anchorScrolling: 'enabled' }),
-      withViewTransitions({
-        skipInitialTransition: true,
-        onViewTransitionCreated: onRouteViewTransition,
-      }),
+      provideRouteMotion(),
     ),
     provideHttpClient(
       withInterceptors(
@@ -90,14 +82,7 @@ export const appConfig: ApplicationConfig = {
       provide: LIVE_VOTE_SOURCE,
       useFactory: () => (inject(USE_MOCK_API) ? inject(MockLiveVoteSource) : inject(WsService)),
     },
-    {
-      provide: UI_KIT_INTL,
-      useFactory: () => {
-        const i18n = inject(I18nService);
-        return uiKitIntlFromLang(i18n.locale, undefined, i18n.formatLocale);
-      },
-    },
-    { provide: UI_KIT_LOADING, useFactory: () => ({ visible: inject(LoadingService).visible }) },
+    provideAppUiKit(),
     { provide: UI_KIT_AVATAR_SOURCE, useExisting: AvatarService },
     provideAppInitializer(() => {
       inject(ThemeService).init();
@@ -105,6 +90,7 @@ export const appConfig: ApplicationConfig = {
       inject(BrandingService).init();
       inject(AuthService).ensureLoaded().subscribe();
       inject(SwUpdateService).init();
+      inject(OfflineService).init();
       guardTouchContextMenu(inject(DOCUMENT));
       lockInstalledAppZoom(inject(DOCUMENT), inject(IS_INSTALLED_APP)());
       watchUAVisualTransitions();

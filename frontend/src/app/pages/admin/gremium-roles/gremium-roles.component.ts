@@ -1,8 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { PageHeaderComponent } from '@stupa-makers/ui-kit';
+import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { ActivatedRoute } from '@angular/router';
 import type { Uuid } from '@core/api/models';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { PageHeaderComponent } from '@shared/ui';
 import { AdminApiService } from '../admin-api.service';
 import { GremiumRoleMatrixComponent } from './gremium-role-matrix.component';
 
@@ -19,7 +20,7 @@ import { GremiumRoleMatrixComponent } from './gremium-role-matrix.component';
   selector: 'app-gremium-roles',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, PageHeaderComponent, GremiumRoleMatrixComponent],
+  imports: [TranslatePipe, PageHeaderComponent, BreadcrumbsComponent, GremiumRoleMatrixComponent],
   templateUrl: './gremium-roles.component.html',
   styleUrl: './gremium-roles.component.scss',
 })

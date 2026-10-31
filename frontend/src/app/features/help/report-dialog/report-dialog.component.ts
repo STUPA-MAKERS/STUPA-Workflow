@@ -25,9 +25,8 @@ import { BrandingService } from '@core/branding/branding.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { ThemeService } from '@core/theme/theme.service';
-import { scanStatus } from '@shared/status-kind.util';
 import {
+  ThemeService,
   ButtonComponent,
   ChipComponent,
   DialogComponent,
@@ -39,6 +38,7 @@ import {
   TextareaComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
+import { scanStatus } from '@shared/status-kind.util';
 import { AltchaComponent } from '../../apply/altcha.component';
 import { UPLOAD_ACCEPT } from '../../apply/apply.util';
 import {

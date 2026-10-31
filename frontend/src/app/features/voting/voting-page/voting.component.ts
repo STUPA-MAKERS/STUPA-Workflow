@@ -10,9 +10,9 @@ import {
   viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, NavigationEnd, Router, RouterOutlet, type ParamMap } from '@angular/router';
+import { ActivatedRoute, Router, RouterOutlet, type ParamMap } from '@angular/router';
 import { EMPTY, type Observable, of } from 'rxjs';
-import { catchError, expand, filter, map, reduce } from 'rxjs/operators';
+import { catchError, expand, map, reduce } from 'rxjs/operators';
 import { ApiClient } from '@core/api/api-client.service';
 import { AuthService } from '@core/auth/auth.service';
 import { DelegationsApiService } from '@core/api/delegations.service';
@@ -39,16 +39,16 @@ import {
   SkeletonComponent,
   StatusTextComponent,
   StickyBarComponent,
+  FabComponent,
+  PageHeaderComponent,
 } from '@stupa-makers/ui-kit';
+import { injectListDetailPage } from '@stupa-makers/ui-kit/shell';
 import { meetingVoteStatus, type StatusView } from '@shared/status-kind.util';
-import { PageFrameService } from '../../../layout/page-frame.service';
 import { LIVE_MAX_PAGES, LIVE_PAGE_LIMIT } from '../../../layout/rail-status.service';
 import { VotingPageService } from './voting-page.service';
 import { closedStatus } from '../election.util';
 import { pollStatus } from '../poll.util';
 import { NewPollDialogComponent } from '../new-poll-dialog/new-poll-dialog.component';
-import { FabComponent } from '@shared/ui/fab/fab.component';
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
 import { clock, dayMonthYear, weekdayDate } from '@shared/date-format';
 import { formatMoment } from '@core/i18n/localized-date.pipe';
@@ -166,17 +166,17 @@ export class VotingComponent implements OnDestroy {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly page = inject(VotingPageService);
-  private readonly frame = inject(PageFrameService);
 
   readonly phone = mediaQuery(MEDIA.phone);
 
   /** The list-detail layout, for its split state. */
   private readonly layout = viewChild(ListDetailLayoutComponent);
+  private readonly listDetail = injectListDetailPage(this.layout);
   /** The list and the detail sit side by side. */
-  readonly split = computed(() => this.layout()?.collapsed() === false);
+  readonly split = this.listDetail.split;
 
   /** The id of the vote in the detail pane, from the child route. */
-  readonly selectedId = signal<Uuid | null>(null);
+  readonly selectedId = this.listDetail.selectedId;
 
   readonly loading = signal(true);
   readonly loadingMore = signal(false);
@@ -330,14 +330,6 @@ export class VotingComponent implements OnDestroy {
       this.reload();
     });
 
-    this.readSelection();
-    this.router.events
-      .pipe(
-        filter((e) => e instanceof NavigationEnd),
-        takeUntilDestroyed(),
-      )
-      .subscribe(() => this.readSelection());
-
     this.page.changes$.pipe(takeUntilDestroyed()).subscribe((change) => {
       if (change.kind === 'deleted') {
         const before = this.items().length;
@@ -349,7 +341,6 @@ export class VotingComponent implements OnDestroy {
     });
 
     effect(() => this.page.split.set(this.split()));
-    effect(() => this.frame.fill.set(this.split()));
 
     effect(() => {
       const split = this.split();
@@ -366,7 +357,6 @@ export class VotingComponent implements OnDestroy {
   }
 
   ngOnDestroy(): void {
-    this.frame.fill.set(false);
     if (this.liveTimer) clearTimeout(this.liveTimer);
   }
 
@@ -380,10 +370,6 @@ export class VotingComponent implements OnDestroy {
       queryParamsHandling: 'preserve',
       replaceUrl: replace,
     });
-  }
-
-  private readSelection(): void {
-    this.selectedId.set(this.route.snapshot.firstChild?.paramMap.get('id') ?? null);
   }
 
   setStatus(value: string): void {

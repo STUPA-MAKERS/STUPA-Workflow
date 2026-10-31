@@ -1,7 +1,6 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  type OnDestroy,
   computed,
   effect,
   inject,
@@ -33,14 +32,14 @@ import {
   type StatusKind,
   StatusTextComponent,
   StickyBarComponent,
+  PageHeaderComponent,
 } from '@stupa-makers/ui-kit';
+import { injectListDetailPage } from '@stupa-makers/ui-kit/shell';
 import {
   flowColorKind,
 } from '@shared/status-kind.util';
 import { NO_FILTER, dueInfo, matchesFilter, type DueTone } from '../../features/todos/todos.util';
-import { PageFrameService } from '../../layout/page-frame.service';
 import { ApplicationsPageService } from '../applications/applications-page.service';
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { calendarDaysSince, isoDay } from '@shared/date-format';
 import { groupByMonth, type MonthGroup } from '@shared/group-by-month';
 import { formatMoney } from '@shared/format-money';
@@ -135,13 +134,12 @@ interface TaskRow {
   templateUrl: './tasks.component.html',
   styleUrl: './tasks.component.scss',
 })
-export class TasksComponent implements OnDestroy {
+export class TasksComponent {
   private readonly api = inject(ApiClient);
   private readonly i18n = inject(I18nService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly page = inject(ApplicationsPageService);
-  private readonly frame = inject(PageFrameService);
   private readonly todosApi = inject(TodosApiService);
 
   readonly tasks = signal<ApplicationListItem[]>([]);
@@ -158,11 +156,12 @@ export class TasksComponent implements OnDestroy {
 
   /** The list-detail layout, for its split state. */
   private readonly layout = viewChild(ListDetailLayoutComponent);
+  private readonly listDetail = injectListDetailPage(this.layout);
   /** The list and the detail sit side by side. */
-  readonly split = computed(() => this.layout()?.collapsed() === false);
+  readonly split = this.listDetail.split;
 
   /** The id of the application in the detail pane, from the child route. */
-  readonly selectedId = signal<Uuid | null>(null);
+  readonly selectedId = this.listDetail.selectedId;
   /** The id of the To-Do in the detail pane (`/tasks/todo/:cardId`). */
   readonly selectedTodo = signal<Uuid | null>(null);
   readonly detailOpen = computed(() => this.selectedId() !== null || this.selectedTodo() !== null);
@@ -296,11 +295,6 @@ export class TasksComponent implements OnDestroy {
     });
 
     effect(() => this.page.split.set(this.split()));
-    effect(() => this.frame.fill.set(this.split()));
-  }
-
-  ngOnDestroy(): void {
-    this.frame.fill.set(false);
   }
 
   setShow(value: string): void {
@@ -366,9 +360,7 @@ export class TasksComponent implements OnDestroy {
   }
 
   private readSelection(): void {
-    const child = this.route.snapshot.firstChild?.paramMap;
-    this.selectedId.set(child?.get('id') ?? null);
-    this.selectedTodo.set(child?.get('cardId') ?? null);
+    this.selectedTodo.set(this.route.snapshot.firstChild?.paramMap.get('cardId') ?? null);
   }
 
   /** Pull to refresh: the tasks and the to-dos load again. */

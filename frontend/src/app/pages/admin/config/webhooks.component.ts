@@ -13,10 +13,8 @@ import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { ExpandRowComponent } from '@shared/ui/expand-row/expand-row.component';
-import { FabComponent } from '@shared/ui/fab/fab.component';
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
-import { type StatusView, webhookDeliveryStatus } from '@shared/status-kind.util';
 import {
+  FabComponent,
   ButtonComponent,
   CheckboxComponent,
   ConfirmDialogComponent,
@@ -29,7 +27,10 @@ import {
   StatusTextComponent,
   SwitchComponent,
   ToastService,
+  PageHeaderComponent,
 } from '@stupa-makers/ui-kit';
+import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
+import { type StatusView, webhookDeliveryStatus } from '@shared/status-kind.util';
 import { AdminApiService } from '../admin-api.service';
 import {
   EVENT_NAMES,
@@ -73,6 +74,7 @@ function emptyHook(): WebhookConfig {
     DialogComponent,
     InputComponent,
     PageHeaderComponent,
+    BreadcrumbsComponent,
     RowMenuComponent,
     SkeletonComponent,
     StatusTextComponent,

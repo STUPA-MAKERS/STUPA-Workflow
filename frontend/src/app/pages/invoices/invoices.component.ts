@@ -2,7 +2,6 @@ import {
   ChangeDetectionStrategy,
   Component,
   type ElementRef,
-  type OnDestroy,
   computed,
   effect,
   inject,
@@ -48,14 +47,13 @@ import {
   StatusTextComponent,
   StickyBarComponent,
   ToastService,
-} from '@stupa-makers/ui-kit';
-import {
+  DetailNoneComponent,
   FabComponent,
   PageHeaderComponent,
-  invoiceStatus,
-} from '@shared/ui';
+} from '@stupa-makers/ui-kit';
+import { injectListDetailPage } from '@stupa-makers/ui-kit/shell';
+import { invoiceStatus } from '@shared/ui';
 import { swipeFrom } from '@shared/row-swipe';
-import { PageFrameService } from '../../layout/page-frame.service';
 import {
   BudgetTreeApi,
   type BudgetTreeNode,
@@ -73,7 +71,6 @@ import {
   invoiceFieldsValid,
 } from './invoice-form/invoice-form.component';
 import { debounced } from '@shared/debounced';
-import { DetailNoneComponent } from '@shared/ui/detail-none/detail-none.component';
 import { dayMonth } from '@shared/date-format';
 import { groupByMonth } from '@shared/group-by-month';
 import { formatMoney } from '@shared/format-money';
@@ -154,14 +151,13 @@ const SEGMENT_QUERY: Record<InvoiceSegment, Pick<InvoiceQuery, 'status' | 'booke
   templateUrl: './invoices.component.html',
   styleUrl: './invoices.component.scss',
 })
-export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
+export class InvoicesComponent implements InvoiceFormHost {
   private readonly api = inject(BudgetTreeApi);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
-  private readonly frame = inject(PageFrameService);
 
   readonly canManage = computed(() => this.auth.can('budget.book'));
 
@@ -169,7 +165,8 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
   readonly phone = mediaQuery(MEDIA.phone);
   /** The list-detail layout, for its split state. */
   private readonly layout = viewChild(ListDetailLayoutComponent);
-  readonly split = computed(() => this.layout()?.collapsed() === false);
+  private readonly listDetail = injectListDetailPage(this.layout);
+  readonly split = this.listDetail.split;
 
   /** The status as coloured text. */
   readonly invoiceStatus = invoiceStatus;
@@ -329,10 +326,6 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
   /** The search reloads after a pause; the component's end drops a waiting reload. */
   private readonly debouncedReload = debounced(() => this.reload());
 
-  ngOnDestroy(): void {
-    this.frame.fill.set(false);
-  }
-
   readonly fileInput = viewChild<ElementRef<HTMLInputElement>>('fileInput');
 
   /** What the import found: the note at the top of the review form. */
@@ -469,9 +462,6 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
       const inv = this.selectedInvoice();
       untracked(() => this.loadTreeOnce(inv));
     });
-
-    effect(() => this.frame.fill.set(this.split()));
-
   }
 
   /**
