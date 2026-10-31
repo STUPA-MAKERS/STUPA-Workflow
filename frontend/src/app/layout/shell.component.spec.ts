@@ -431,6 +431,15 @@ describe('ShellComponent', () => {
       expect(screen.queryByRole('dialog', { name: 'Mehr' })).not.toBeInTheDocument();
     });
 
+    it('closes the sheet when "Problem melden" opens the dialog', async () => {
+      const { fixture } = await setup(ADMIN);
+      await userEvent.click(more());
+      fixture.detectChanges();
+      await userEvent.click(screen.getByRole('button', { name: 'Problem melden' }));
+      fixture.detectChanges();
+      expect(screen.queryByRole('dialog', { name: 'Mehr' })).not.toBeInTheDocument();
+    });
+
     it('marks Mehr as active on a page that lives in the sheet and on the account pages', async () => {
       const { fixture, router } = await setup(ADMIN);
       await router.navigateByUrl('/expenses');

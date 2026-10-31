@@ -84,6 +84,7 @@
   "account.calendar.rotateError": "Der Abo-Link konnte nicht erzeugt werden.",
   "pwa.updateReady": "Eine neue Version der App ist verfügbar.",
   "pwa.reload": "Neu laden",
+  "pwa.offline": "Keine Verbindung",
   "account.notifications.title": "Benachrichtigungen",
   "account.notifications.error": "Einstellungen konnten nicht geladen werden.",
   "account.notifications.saveError": "Speichern fehlgeschlagen. Versuche es noch einmal.",

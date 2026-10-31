@@ -20,7 +20,12 @@ import {
   UI_KIT_AVATAR_SOURCE,
 } from '@stupa-makers/ui-kit';
 import { provideRouteMotion, watchUAVisualTransitions } from '@stupa-makers/ui-kit/shell';
-import { IS_INSTALLED_APP, lockInstalledAppZoom, SwUpdateService } from '@stupa-makers/ui-kit/pwa';
+import {
+  IS_INSTALLED_APP,
+  lockInstalledAppZoom,
+  OfflineService,
+  SwUpdateService,
+} from '@stupa-makers/ui-kit/pwa';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { LIVE_VOTE_SOURCE } from '@core/ws/live-vote.source';
 import { MockLiveVoteSource } from '@core/ws/mock-live-vote.source';
@@ -85,6 +90,7 @@ export const appConfig: ApplicationConfig = {
       inject(BrandingService).init();
       inject(AuthService).ensureLoaded().subscribe();
       inject(SwUpdateService).init();
+      inject(OfflineService).init();
       guardTouchContextMenu(inject(DOCUMENT));
       lockInstalledAppZoom(inject(DOCUMENT), inject(IS_INSTALLED_APP)());
       watchUAVisualTransitions();
