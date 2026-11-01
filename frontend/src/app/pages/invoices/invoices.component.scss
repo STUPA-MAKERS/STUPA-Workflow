@@ -57,20 +57,6 @@
   @include fade.fade-y(var(--inv-fade));
 }
 
-.inv__group {
-  @include lp.stack;
-}
-.inv__month {
-  @include lp.month;
-}
-.inv__group:first-child .inv__month,
-.inv__skel .inv__month {
-  padding-top: var(--space-2);
-}
-// About as wide as "September 2026".
-.inv__skelMonth {
-  width: 7rem;
-}
 .inv__rows {
   @include lp.stack;
 }
@@ -145,8 +131,5 @@
   }
   .inv__chips {
     @include lp.phone-chips;
-  }
-  .inv__month {
-    padding-inline: var(--space-1);
   }
 }

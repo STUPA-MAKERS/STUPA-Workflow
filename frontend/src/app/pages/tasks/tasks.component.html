@@ -69,10 +69,7 @@
             }
           }
           @for (group of showApplications() ? groups() : []; track group.key + $index) {
-            <section class="tasks__group" [attr.aria-label]="group.label || null">
-              @if (group.label) {
-                <h2 class="sec tasks__month">{{ group.label }}</h2>
-              }
+            <app-list-group [label]="group.label">
               <div class="tasks__rows" [class.rowgroup]="!split()" role="list">
                 @for (row of group.items; track row.item.id) {
                   <app-list-item
@@ -109,7 +106,7 @@
                   </app-list-item>
                 }
               </div>
-            </section>
+            </app-list-group>
           }
           @if (showTodos()) {
             <section class="tasks__group" aria-labelledby="tasks-todos-head">

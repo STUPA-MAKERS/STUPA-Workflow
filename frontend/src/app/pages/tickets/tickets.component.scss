@@ -50,20 +50,6 @@
   @include fade.fade-y(var(--tk-fade));
 }
 
-.tk__group {
-  @include lp.stack;
-}
-.tk__groupTitle {
-  @include lp.month;
-}
-.tk__group:first-child .tk__groupTitle {
-  padding-top: var(--space-2);
-}
-.tk__groupCount {
-  margin-inline-start: 4px;
-  color: var(--color-text-muted);
-  font-weight: var(--fw-regular);
-}
 .tk__rows {
   @include lp.stack;
 }
@@ -136,9 +122,6 @@
 @include bp.phone {
   .tk__chips {
     @include lp.phone-chips;
-  }
-  .tk__groupTitle {
-    padding-inline: var(--space-1);
   }
   .tk__showClosed {
     margin-inline: var(--space-1);

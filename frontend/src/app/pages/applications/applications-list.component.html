@@ -153,9 +153,7 @@
           </app-note>
         } @else if (loading()) {
           <div class="apps__skel skel-in">
-            <h2 class="sec apps__month" aria-hidden="true">
-              <span class="skel-text skel-text--accent apps__skelMonth"></span>
-            </h2>
+            <app-list-group skeleton="7rem" />
             <app-skeleton
               variant="items"
               [count]="12"
@@ -174,10 +172,7 @@
         } @else {
           <div class="apps__groups" animate.enter="motion-fade-in" [class.skel-stale]="reloading()" [attr.inert]="reloading() ? '' : null">
             @for (group of groups(); track group.key + $index) {
-              <section class="apps__group" [attr.aria-label]="group.label || null">
-                @if (group.label) {
-                  <h2 class="sec apps__month">{{ group.label }}</h2>
-                }
+              <app-list-group [label]="group.label">
                 <div class="apps__rows" [class.rowgroup]="!split()" role="list">
                   @for (row of group.items; track row.item.id) {
                     <app-list-item
@@ -230,7 +225,7 @@
                     </app-list-item>
                   }
                 </div>
-              </section>
+              </app-list-group>
             }
           </div>
 

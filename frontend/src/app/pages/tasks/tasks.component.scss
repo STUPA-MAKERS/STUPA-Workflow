@@ -28,14 +28,9 @@
   @include fade.fade-y(var(--tasks-fade));
 }
 
+// The to-do section below the month groups.
 .tasks__group {
   @include lp.stack;
-}
-.tasks__month {
-  @include lp.month;
-}
-.tasks__group:first-child .tasks__month {
-  padding-top: var(--space-2);
 }
 .tasks__rows {
   @include lp.stack;
@@ -84,9 +79,6 @@
 }
 
 @include bp.phone {
-  .tasks__month {
-    padding-inline: var(--space-1);
-  }
   .tasks__chev {
     display: none;
   }
