@@ -130,7 +130,7 @@ async function start(url = '/tickets', opts: Opts = {}) {
 }
 
 const groupTitles = () =>
-  Array.from(document.querySelectorAll('.tk__groupTitle')).map((h) => h.textContent?.replace(/\s+/g, ' ').trim());
+  Array.from(document.querySelectorAll('app-list-group h2')).map((h) => h.textContent?.replace(/\s+/g, ' ').trim());
 
 describe('TicketsComponent', () => {
   afterEach(() => localStorage.clear());
@@ -146,7 +146,7 @@ describe('TicketsComponent', () => {
       offset: 0,
     });
     expect(api.list).toHaveBeenCalledWith(expect.objectContaining({ status: ['done', 'rejected'], limit: 1 }));
-    expect(groupTitles()).toEqual(['Neu 1', 'In Bearbeitung 1', 'Erledigt oder abgelehnt 2']);
+    expect(groupTitles()).toEqual(['Neu', 'In Bearbeitung', 'Erledigt oder abgelehnt']);
     expect(screen.getByRole('searchbox')).toHaveAttribute('placeholder', '4 Tickets durchsuchen');
 
     const link = screen.getByRole('link', { name: /Upload bricht/ });
@@ -176,7 +176,7 @@ describe('TicketsComponent', () => {
   it('draws the groups and rows of the list while it loads, and names no count yet', async () => {
     await start('/tickets', { answer: () => new Subject<TicketPage>() });
     expect(screen.getByRole('searchbox')).toHaveAttribute('placeholder', 'Tickets durchsuchen');
-    expect(document.querySelectorAll('.tk__skel .tk__group')).toHaveLength(2);
+    expect(document.querySelectorAll('.tk__skel app-list-group')).toHaveLength(2);
     expect(document.querySelectorAll('.tk__skel .sk__item')).toHaveLength(6);
     expect(document.querySelectorAll('.tk__skel .sk__itemLead')).toHaveLength(6);
     expect(document.querySelectorAll('.tk__skel .sk__itemAvatar')).toHaveLength(6);
@@ -282,7 +282,7 @@ describe('TicketsComponent', () => {
 
   it('groups all four states in the view "Alle"', async () => {
     await start('/tickets?status=all', { answer: () => of(pageOf([...OPEN, ...CLOSED])) });
-    expect(groupTitles()).toEqual(['Neu 1', 'In Bearbeitung 1', 'Erledigt 1', 'Abgelehnt 1']);
+    expect(groupTitles()).toEqual(['Neu', 'In Bearbeitung', 'Erledigt', 'Abgelehnt']);
   });
 
   it('resets every filter and the search', async () => {

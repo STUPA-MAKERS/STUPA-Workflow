@@ -112,6 +112,8 @@ describe('GremienComponent', () => {
     expect(s.cmp.others()).toEqual([]);
     expect(s.cmp.viewAll()).toBe(false);
     expect(screen.queryByText('Weitere Gremien')).toBeNull();
+    // The head of the group names the group only, without a count of the rows.
+    expect(screen.getByRole('heading', { level: 2, name: 'Meine Gremien' }).textContent?.trim()).toBe('Meine Gremien');
     expect(screen.getByText('Sitzung läuft')).toBeTruthy();
     const link = screen.getByRole('link', { name: /Studierendenparlament/ });
     expect(link.getAttribute('href')).toBe('/gremien/g-1');

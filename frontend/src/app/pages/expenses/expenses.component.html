@@ -124,9 +124,7 @@
         @if (tab() === 'transfers') {
           @if (transferLoading()) {
             <div class="exp__skel skel-in">
-              <h2 class="sec exp__month" aria-hidden="true">
-                <span class="skel-text skel-text--accent exp__skelMonth"></span>
-              </h2>
+              <app-list-group skeleton="7rem" />
               <app-skeleton
                 variant="items"
                 [count]="12"
@@ -139,10 +137,7 @@
           } @else {
             <div class="exp__groups" [class.skel-stale]="transferReloading()" [attr.inert]="transferReloading() ? '' : null">
             @for (group of transferGroups(); track group.key + $index) {
-              <section class="exp__group" [attr.aria-label]="group.label || null">
-                @if (group.label) {
-                  <h2 class="sec exp__month">{{ group.label }}</h2>
-                }
+              <app-list-group [label]="group.label">
                 <div class="exp__rows" [class.rowgroup]="!split()" role="list">
                   @for (t of group.items; track t.transferId) {
                     @let from = costCentre(t.fromBudgetId, t.fromPathKey);
@@ -185,7 +180,7 @@
                     </app-list-item>
                   }
                 </div>
-              </section>
+              </app-list-group>
             }
             </div>
             @if (transferHasMore()) {
@@ -200,9 +195,7 @@
         } @else {
           @if (loading()) {
             <div class="exp__skel skel-in">
-              <h2 class="sec exp__month" aria-hidden="true">
-                <span class="skel-text skel-text--accent exp__skelMonth"></span>
-              </h2>
+              <app-list-group skeleton="7rem" />
               <app-skeleton
                 variant="items"
                 [count]="12"
@@ -215,10 +208,7 @@
           } @else {
             <div class="exp__groups" [class.skel-stale]="reloading()" [attr.inert]="reloading() ? '' : null">
             @for (group of groups(); track group.key + $index) {
-              <section class="exp__group" [attr.aria-label]="group.label || null">
-                @if (group.label) {
-                  <h2 class="sec exp__month">{{ group.label }}</h2>
-                }
+              <app-list-group [label]="group.label">
                 <div class="exp__rows" [class.rowgroup]="!split()" role="list">
                   @for (e of group.items; track e.id) {
                     @let cc = costCentre(e.budgetId, e.pathKey);
@@ -293,7 +283,7 @@
                     </app-list-item>
                   }
                 </div>
-              </section>
+              </app-list-group>
             }
             </div>
             @if (hasMore()) {

@@ -1,4 +1,3 @@
-@use 'breakpoints' as bp;
 @use 'scroll-fade' as fade;
 @use 'list-pane' as lp;
 
@@ -50,25 +49,6 @@
   @include fade.fade-y(var(--grl-fade));
 }
 
-.grl__group {
-  @include lp.stack;
-}
-.grl__head {
-  @include lp.month;
-}
-.grl__group:first-child .grl__head,
-.grl__skel .grl__head {
-  padding-top: var(--space-1);
-}
-// About as wide as "Meine Gremien 3".
-.grl__skelHead {
-  width: 7.5rem;
-}
-.grl__count {
-  margin-inline-start: 2px;
-  color: var(--color-text-muted);
-  font-weight: var(--fw-medium);
-}
 .grl__rows {
   @include lp.stack;
 }
@@ -114,8 +94,3 @@
   min-height: 0;
 }
 
-@include bp.phone {
-  .grl__head {
-    padding-inline: var(--space-1);
-  }
-}
