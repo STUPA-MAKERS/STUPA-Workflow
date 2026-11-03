@@ -51,7 +51,13 @@
     <app-note class="td__loadError" kind="error" icon="alert" role="alert" retryable (retry)="retry()">{{ 'tickets.detail.error.load' | t }}</app-note>
   </div>
 } @else if (ticket(); as ticket) {
-  <article class="td" animate.enter="motion-fade-in" [class.td--split]="split()" aria-labelledby="td-title">
+  <article
+    class="td"
+    animate.enter="motion-fade-in"
+    [class.td--split]="split()"
+    [class.td--log]="!split() && tab() === 'log'"
+    aria-labelledby="td-title"
+  >
     <header class="sheet-head td__head">
       <app-sheet-bar [bleed]="split()">
         <h2 appSheetBarTitle id="td-title" class="sheet-title td__title">{{ ticket.title }}</h2>
