@@ -6,8 +6,12 @@
   display: block;
   min-width: 0;
 }
+/* A chip keeps the width of its content, like `app-filter-select`. A phone chip row does not
+   wrap and scrolls, so a chip that can shrink falls to 0 there and its button paints over
+   the next chip. */
 :host(.ccs--chip) {
   display: inline-flex;
+  flex: none;
   max-width: 100%;
 }
 .ccs__chip {
