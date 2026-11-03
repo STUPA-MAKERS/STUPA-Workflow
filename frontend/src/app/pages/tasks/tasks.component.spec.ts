@@ -197,7 +197,7 @@ describe('TasksComponent', () => {
     expect(mine).toHaveBeenCalledTimes(2);
   });
 
-  it('opens the next task when a transition takes the open task out of the list', async () => {
+  it('keeps the open application when a transition takes it out of the list', async () => {
     const { router, pageService, settle, listTasks } = await start('/tasks/a2', [
       THREE,
       [THREE[0], THREE[2]],
@@ -205,23 +205,15 @@ describe('TasksComponent', () => {
     pageService.notify({ id: 'a2', kind: 'updated', source: 'detail' });
     await settle();
     expect(listTasks).toHaveBeenCalledTimes(2);
-    expect(router.url).toBe('/tasks/a3');
+    expect(router.url).toBe('/tasks/a2');
     expect(screen.queryByRole('link', { name: 'Zweiter', hidden: true })).not.toBeInTheDocument();
   });
 
-  it('opens the task before it when the last task leaves the list', async () => {
-    const { router, pageService, settle } = await start('/tasks/a3', [THREE, THREE.slice(0, 2)]);
-    pageService.notify({ id: 'a3', kind: 'updated', source: 'detail' });
-    await settle();
-    expect(router.url).toBe('/tasks/a2');
-  });
-
-  it('shows the empty state when the last task leaves the list', async () => {
+  it('keeps the last open application when no task is left', async () => {
     const { router, pageService, settle } = await start('/tasks/a1', [[THREE[0]], []]);
     pageService.notify({ id: 'a1', kind: 'updated', source: 'detail' });
     await settle();
-    expect(router.url).toBe('/tasks');
-    expect(screen.getAllByText('Keine offenen Aufgaben.').length).toBeGreaterThan(0);
+    expect(router.url).toBe('/tasks/a1');
   });
 
   it('keeps the open task when it stays in the list after a change', async () => {
