@@ -78,13 +78,12 @@ function host() {
 
 async function setup(mode: 'create' | 'edit', h = host(), layout: 'pane' | 'sheet' = 'pane') {
   localStorage.setItem('ap.locale', 'de');
-  const remove = jest.fn();
   const openDuplicate = jest.fn();
   const view = await render(InvoiceFormComponent, {
     inputs: { host: h, mode, layout },
-    on: { remove, openDuplicate },
+    on: { openDuplicate },
   });
-  return { view, h, remove, openDuplicate, user: userEvent.setup() };
+  return { view, h, openDuplicate, user: userEvent.setup() };
 }
 
 describe('InvoiceFormComponent', () => {
@@ -138,7 +137,7 @@ describe('InvoiceFormComponent', () => {
     expect(h.calls).toContain('picked');
   });
 
-  it('sets the status with the segments and submits or cancels', async () => {
+  it('sets the status with the segments and submits with the fab or closes', async () => {
     const h = host();
     const { view, user } = await setup('create', h);
     await user.click(screen.getByRole('radio', { name: 'Bezahlt' }));
@@ -147,23 +146,22 @@ describe('InvoiceFormComponent', () => {
     expect(h.newStatus()).toBe('open');
     view.fixture.componentInstance.submit(new Event('submit'));
     expect(h.calls).toContain('create');
-    await user.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    await user.click(screen.getByRole('button', { name: 'Schließen' }));
     expect(h.createOpen()).toBe(false);
   });
 
-  it('edits a stored invoice with its receipt, and deletes, saves or cancels', async () => {
+  it('edits a stored invoice with its receipt and saves with the fab, without a delete', async () => {
     const h = host();
     h.editing.set(INVOICE);
-    const { view, remove, user } = await setup('edit', h);
+    const { view, user } = await setup('edit', h);
     expect(screen.getByRole('heading', { name: 'Rechnung bearbeiten' })).toBeInTheDocument();
     expect(screen.getByText('RE-2026-118')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /RE\.pdf/ }));
     expect(h.calls).toContain('file');
     await user.click(screen.getByRole('radio', { name: 'Bezahlt' }));
     expect(h.editStatus()).toBe('paid');
-    await user.click(screen.getByRole('button', { name: 'Löschen' }));
-    expect(remove).toHaveBeenCalled();
-    view.fixture.componentInstance.submit(new Event('submit'));
+    expect(screen.queryByRole('button', { name: 'Löschen' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
     expect(h.calls).toContain('save');
     view.fixture.componentInstance.close();
     expect(h.editing()).toBeNull();

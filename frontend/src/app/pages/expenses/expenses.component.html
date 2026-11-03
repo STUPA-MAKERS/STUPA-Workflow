@@ -387,6 +387,59 @@
           }
         }
       }
+      <ng-template #form let-inSheet>
+        @switch (formMode()) {
+          @case ('create') {
+            <app-booking-form
+              mode="create"
+              [state]="dialogs"
+              [tree]="budgetTree()"
+              [costCentres]="costCentres()"
+              [saving]="saving()"
+              [layout]="inSheet ? 'sheet' : split() ? 'pane' : 'page'"
+            />
+          }
+          @case ('edit') {
+            @let e = editing()!;
+            <app-booking-form
+              mode="edit"
+              [state]="dialogs"
+              [tree]="budgetTree()"
+              [costCentres]="costCentres()"
+              [saving]="saving()"
+              [layout]="inSheet ? 'sheet' : split() ? 'pane' : 'page'"
+              [fyLabel]="fyLabel(e.fiscalYearId)"
+              [subRows]="sub.subOf(e.id)"
+              (addSub)="openCreateSub(e)"
+              (editSub)="openEdit($event)"
+              (removeSub)="askDelete($event)"
+            />
+          }
+          @case ('transfer-create') {
+            <app-transfer-form
+              mode="create"
+              [dialogs]="dialogs"
+              [transfers]="transfers"
+              [tree]="budgetTree()"
+              [costCentres]="costCentres()"
+              [saving]="saving()"
+              [layout]="inSheet ? 'sheet' : split() ? 'pane' : 'page'"
+            />
+          }
+          @case ('transfer-edit') {
+            <app-transfer-form
+              mode="edit"
+              [dialogs]="dialogs"
+              [transfers]="transfers"
+              [tree]="budgetTree()"
+              [costCentres]="costCentres()"
+              [saving]="transferSaving()"
+              [layout]="inSheet ? 'sheet' : split() ? 'pane' : 'page'"
+              [fyLabel]="fyLabel(editingTransfer()!.fiscalYearId)"
+            />
+          }
+        }
+      </ng-template>
     </div>
   </app-list-detail>
 </div>
@@ -428,61 +481,6 @@
   ><app-icon name="trash" /></app-button>
 </ng-template>
 
-<ng-template #form let-inSheet>
-  @switch (formMode()) {
-    @case ('create') {
-      <app-booking-form
-        mode="create"
-        [state]="dialogs"
-        [tree]="budgetTree()"
-        [costCentres]="costCentres()"
-        [saving]="saving()"
-        [layout]="inSheet ? 'sheet' : split() ? 'pane' : 'page'"
-      />
-    }
-    @case ('edit') {
-      @let e = editing()!;
-      <app-booking-form
-        mode="edit"
-        [state]="dialogs"
-        [tree]="budgetTree()"
-        [costCentres]="costCentres()"
-        [saving]="saving()"
-        [layout]="inSheet ? 'sheet' : split() ? 'pane' : 'page'"
-        [fyLabel]="fyLabel(e.fiscalYearId)"
-        [subRows]="sub.subOf(e.id)"
-        (remove)="askDelete(e)"
-        (addSub)="openCreateSub(e)"
-        (editSub)="openEdit($event)"
-        (removeSub)="askDelete($event)"
-      />
-    }
-    @case ('transfer-create') {
-      <app-transfer-form
-        mode="create"
-        [dialogs]="dialogs"
-        [transfers]="transfers"
-        [tree]="budgetTree()"
-        [costCentres]="costCentres()"
-        [saving]="saving()"
-        [layout]="inSheet ? 'sheet' : split() ? 'pane' : 'page'"
-      />
-    }
-    @case ('transfer-edit') {
-      <app-transfer-form
-        mode="edit"
-        [dialogs]="dialogs"
-        [transfers]="transfers"
-        [tree]="budgetTree()"
-        [costCentres]="costCentres()"
-        [saving]="transferSaving()"
-        [layout]="inSheet ? 'sheet' : split() ? 'pane' : 'page'"
-        [fyLabel]="fyLabel(editingTransfer()!.fiscalYearId)"
-        (remove)="askDeleteTransfer(editingTransfer()!)"
-      />
-    }
-  }
-</ng-template>
 
 @if (phone()) {
   <app-side-sheet

@@ -103,7 +103,6 @@ let LAYOUT: 'pane' | 'sheet' = 'pane';
       [tree]="tree"
       [costCentres]="costCentres"
       fyLabel="2026"
-      (remove)="removed = removed + 1"
     />
   `,
 })
@@ -116,7 +115,6 @@ class HostComponent {
   readonly layout = LAYOUT;
   readonly tree = TREE;
   readonly costCentres = costCentreIndex(TREE);
-  removed = 0;
 }
 
 async function setup(mode: 'create' | 'edit', layout: 'pane' | 'sheet' = 'pane') {
@@ -263,7 +261,7 @@ describe('TransferFormComponent', () => {
     expect(screen.getByRole('button', { name: 'Übertragen' })).toBeDisabled();
   });
 
-  it('submits and cancels a new transfer with the buttons of the foot', async () => {
+  it('submits a new transfer with the fab and closes with the head', async () => {
     const { host, view, user } = await setup('create');
     const create = jest.spyOn(host.dialogs, 'createTransfer').mockImplementation(() => undefined);
     host.dialogs.tFromId.set('kul');
@@ -274,21 +272,20 @@ describe('TransferFormComponent', () => {
     view.fixture.detectChanges();
     await user.click(screen.getByRole('button', { name: /^20,00\s€ übertragen$/ }));
     expect(create).toHaveBeenCalledTimes(1);
-    await user.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    await user.click(screen.getByRole('button', { name: 'Schließen' }));
     expect(host.dialogs.transferOpen()).toBe(false);
   });
 
-  it('locks the pair in the edit and deletes, saves or cancels', async () => {
-    const { host, form, view, user } = await setup('edit');
+  it('locks the pair in the edit and saves with the fab, without a delete', async () => {
+    const { host, form, user } = await setup('edit');
     expect(screen.getByRole('heading', { name: 'Übertrag bearbeiten' })).toBeInTheDocument();
     expect(screen.getByText('Kultur')).toBeInTheDocument();
     expect(screen.getByText('Hochschulsport')).toBeInTheDocument();
     expect(screen.getByText('2026')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Von Kostenstelle/ })).toBeNull();
-    await user.click(screen.getByRole('button', { name: 'Löschen' }));
-    expect(view.fixture.componentInstance.removed).toBe(1);
+    expect(screen.queryByRole('button', { name: 'Löschen' })).toBeNull();
     const save = jest.spyOn(host.transfers, 'saveEdit').mockImplementation(() => undefined);
-    form.submit(new Event('submit'));
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
     expect(save).toHaveBeenCalled();
     form.close();
     expect(host.transfers.editing()).toBeNull();
