@@ -46,7 +46,7 @@
           size="sm"
           [loading]="bulkDeleting()"
           [disabled]="bulkDeleting()"
-          (click)="bulkDelete()"
+          (click)="askBulkDelete()"
         >
           {{ 'applications.attachments.deleteSelected' | t }}
         </app-button>
@@ -109,7 +109,7 @@
                 [ariaLabel]="'applications.attachments.delete' | t"
                 [disabled]="removingId() === att.id"
                 [loading]="removingId() === att.id"
-                (click)="remove(att)"
+                (click)="askRemove(att)"
               >
                 <app-icon name="trash" />
               </app-button>
@@ -126,6 +126,15 @@
     <app-drop-overlay [label]="'applications.attachments.drop' | t" />
   }
 </section>
+
+<app-confirm-dialog
+  [open]="confirming() !== null"
+  [title]="confirmText().title"
+  [body]="confirmText().body"
+  [busy]="removingId() !== null || bulkDeleting()"
+  (confirm)="confirmDelete()"
+  (cancel)="cancelDelete()"
+/>
 
 <app-file-viewer
   [items]="viewerItems()"

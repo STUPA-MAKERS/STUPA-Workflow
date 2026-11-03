@@ -29,6 +29,7 @@ import {
   ThemeService,
   ButtonComponent,
   ChipComponent,
+  ConfirmDialogComponent,
   DialogComponent,
   formatBytes,
   IconComponent,
@@ -92,6 +93,7 @@ const KIND_LABEL: Record<TicketKind, TranslationKey> = {
     TranslatePipe,
     AltchaComponent,
     ButtonComponent,
+    ConfirmDialogComponent,
     DialogComponent,
     IconComponent,
     InputComponent,
@@ -155,6 +157,8 @@ export class ReportDialogComponent {
   });
 
   readonly files = this.drafts.files;
+  /** The file whose remove waits for the confirmation. */
+  readonly fileToRemove = signal<DraftFile | null>(null);
   readonly pending = this.drafts.pending;
   readonly full = computed(() => this.drafts.count() + this.pending().length >= MAX_TICKET_FILES);
 
@@ -286,6 +290,13 @@ export class ReportDialogComponent {
     for (const f of failed) {
       this.toast.error(`${f.filename}: ${this.i18n.translate(f.reason)}`);
     }
+  }
+
+  /** The confirmation of a chip's remove button. */
+  confirmRemoveFile(): void {
+    const file = this.fileToRemove();
+    this.fileToRemove.set(null);
+    if (file) void this.removeFile(file);
   }
 
   async removeFile(file: DraftFile): Promise<void> {

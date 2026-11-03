@@ -108,11 +108,17 @@ describe('AttachmentsPanelComponent', () => {
     expect(screen.getByText('plan.pdf')).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Anhang löschen' }));
+    detectChanges();
+    http.expectNone((r) => r.method === 'DELETE');
+    const dialog = screen.getByRole('dialog', { name: 'Anhang löschen?' });
+    expect(dialog).toHaveTextContent('„plan.pdf“ wird gelöscht. Das lässt sich nicht rückgängig machen.');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Löschen' }));
     const del = http.expectOne((r) => r.method === 'DELETE' && r.url === '/api/attachments/att-1');
     del.flush(null, { status: 204, statusText: 'No Content' });
     detectChanges();
 
     expect(screen.queryByText('plan.pdf')).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Anhang löschen?' })).not.toBeInTheDocument();
     expect(success).toHaveBeenCalled();
     http.verify();
   });
@@ -380,6 +386,10 @@ describe('AttachmentsPanelComponent', () => {
     const error = jest.spyOn(toast, 'error');
 
     await userEvent.click(screen.getByRole('button', { name: 'Anhang löschen' }));
+    detectChanges();
+    await userEvent.click(
+      within(screen.getByRole('dialog', { name: 'Anhang löschen?' })).getByRole('button', { name: 'Löschen' }),
+    );
     http
       .expectOne((r) => r.method === 'DELETE' && r.url === '/api/attachments/att-1')
       .flush({ title: 'e' }, { status: 500, statusText: 'Server Error' });
@@ -552,6 +562,56 @@ describe('AttachmentsPanelComponent', () => {
     expect(cmp.selectedCount()).toBe(0);
     expect(success).toHaveBeenCalledWith('Anhang gelöscht.');
     http.verify();
+  });
+
+  /** "Abbrechen" deletes nothing; a selection of one names its file, more name the count. */
+  it('asks before a delete of the selection and deletes nothing on Abbrechen', async () => {
+    const { http, detectChanges, fixture } = await setup();
+    const cmp = fixture.componentInstance;
+    await uploadFile('a.pdf');
+    http.expectOne(uploadUrl).flush(wire({ id: 'a', filename: 'a.pdf' }), { status: 201, statusText: 'Created' });
+    await uploadFile('b.pdf');
+    http.expectOne(uploadUrl).flush(wire({ id: 'b', filename: 'b.pdf' }), { status: 201, statusText: 'Created' });
+    cmp.toggleSelect('a', true);
+    detectChanges();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Auswahl löschen' }));
+    detectChanges();
+    let dialog = screen.getByRole('dialog', { name: 'Anhang löschen?' });
+    expect(dialog).toHaveTextContent('„a.pdf“ wird gelöscht.');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    detectChanges();
+    expect(cmp.confirming()).toBeNull();
+    http.expectNone((r) => r.method === 'DELETE');
+
+    cmp.toggleSelect('b', true);
+    detectChanges();
+    await userEvent.click(screen.getByRole('button', { name: 'Auswahl löschen' }));
+    detectChanges();
+    dialog = screen.getByRole('dialog', { name: 'Anhänge löschen?' });
+    expect(dialog).toHaveTextContent('2 Anhänge werden gelöscht. Das lässt sich nicht rückgängig machen.');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Löschen' }));
+    http.expectOne((r) => r.method === 'DELETE' && r.url === '/api/attachments/a').flush(null, { status: 204, statusText: 'No Content' });
+    expect(cmp.bulkDeleting()).toBe(true);
+    cmp.cancelDelete();
+    expect(cmp.confirming()).toBe('selection');
+    http.expectOne((r) => r.method === 'DELETE' && r.url === '/api/attachments/b').flush(null, { status: 204, statusText: 'No Content' });
+    http.expectOne((r) => r.method === 'GET' && r.url === `/api/applications/${APP_ID}/attachments`).flush([]);
+    detectChanges();
+    expect(cmp.confirming()).toBeNull();
+    http.verify();
+  });
+
+  /** The guards also hold when a caller bypasses the template. */
+  it('opens no confirmation without the right or while a delete runs', async () => {
+    const { fixture } = await setup(true, false);
+    const cmp = fixture.componentInstance;
+    cmp.askRemove(wire() as never);
+    cmp.toggleSelect('att-1', true);
+    cmp.askBulkDelete();
+    expect(cmp.confirming()).toBeNull();
+    cmp.confirmDelete();
+    expect(cmp.confirmText()).toEqual({ title: '', body: '' });
   });
 
   it('no-ops bulkDelete with an empty selection or while already running', async () => {

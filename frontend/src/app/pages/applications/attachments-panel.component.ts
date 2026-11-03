@@ -20,6 +20,7 @@ import type { Attachment, ScanState, Uuid } from '@core/api/models';
 import {
   ButtonComponent,
   CheckboxComponent,
+  ConfirmDialogComponent,
   DropOverlayComponent,
   EmptyStateComponent,
   FileDropDirective,
@@ -77,6 +78,7 @@ import { formatBytes } from './applications.util';
     TranslatePipe,
     ButtonComponent,
     CheckboxComponent,
+    ConfirmDialogComponent,
     FileViewerComponent,
     IconComponent,
     ImageThumbComponent,
@@ -144,6 +146,32 @@ export class AttachmentsPanelComponent {
   readonly selected = signal<ReadonlySet<Uuid>>(new Set());
   readonly bulkDeleting = signal(false);
   readonly selectedCount = computed(() => this.selected().size);
+
+  /** What the open confirmation deletes: one attachment or the selection. */
+  readonly confirming = signal<Attachment | 'selection' | null>(null);
+  /** The title and the text of the confirmation. A selection of one names its file. */
+  readonly confirmText = computed(() => {
+    const target = this.confirming();
+    if (target === null) return { title: '', body: '' };
+    const one =
+      target === 'selection'
+        ? this.selectedCount() === 1
+          ? this.attachments().find((a) => this.selected().has(a.id))
+          : undefined
+        : target;
+    if (one) {
+      return {
+        title: this.i18n.translate('applications.attachments.deleteTitle'),
+        body: this.i18n.translate('applications.attachments.deleteConfirm', { name: one.filename }),
+      };
+    }
+    return {
+      title: this.i18n.translate('applications.attachments.deleteSelectedTitle'),
+      body: this.i18n.translate('applications.attachments.deleteSelectedConfirm', {
+        count: this.selectedCount(),
+      }),
+    };
+  });
 
   /** The scan state as coloured text. */
   readonly scan = scanStatus;
@@ -228,6 +256,31 @@ export class AttachmentsPanelComponent {
     });
   }
 
+  /** The trash button of a row: ask before the delete. */
+  askRemove(att: Attachment): void {
+    if (!this.deleteAllowed() || this.removingId()) return;
+    this.confirming.set(att);
+  }
+
+  /** "Auswahl löschen": ask before the delete. */
+  askBulkDelete(): void {
+    if (!this.deleteAllowed() || !this.selectedCount() || this.bulkDeleting()) return;
+    this.confirming.set('selection');
+  }
+
+  /** The confirmation runs the delete; the dialog closes when the delete is done. */
+  confirmDelete(): void {
+    const target = this.confirming();
+    if (target === 'selection') this.bulkDelete();
+    else if (target) this.remove(target);
+  }
+
+  /** "Abbrechen" closes the confirmation, but not while the delete runs. */
+  cancelDelete(): void {
+    if (this.removingId() || this.bulkDeleting()) return;
+    this.confirming.set(null);
+  }
+
   /** Delete the selected attachments sequentially (concatMap), then clear the selection. */
   bulkDelete(): void {
     const ids = [...this.selected()];
@@ -241,12 +294,14 @@ export class AttachmentsPanelComponent {
         error: () => {
           failed = true;
           this.bulkDeleting.set(false);
+          this.confirming.set(null);
           this.refreshAfterBulk(ids);
           this.toast.error(this.i18n.translate('applications.attachments.deleteError'));
         },
         complete: () => {
           if (failed) return;
           this.bulkDeleting.set(false);
+          this.confirming.set(null);
           this.refreshAfterBulk(ids);
           this.toast.success(this.i18n.translate('applications.attachments.deleted'));
         },
@@ -404,10 +459,12 @@ export class AttachmentsPanelComponent {
       next: () => {
         this.attachments.update((list) => list.filter((a) => a.id !== att.id));
         this.removingId.set(null);
+        this.confirming.set(null);
         this.toast.success(this.i18n.translate('applications.attachments.deleted'));
       },
       error: () => {
         this.removingId.set(null);
+        this.confirming.set(null);
         this.toast.error(this.i18n.translate('applications.attachments.deleteError'));
       },
     });

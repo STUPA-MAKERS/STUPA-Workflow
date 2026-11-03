@@ -1,6 +1,6 @@
 import { computed, signal } from '@angular/core';
 import { FormGroup } from '@angular/forms';
-import { render, screen, waitFor } from '@testing-library/angular';
+import { render, screen, waitFor, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { FormlyForm, type FormlyFieldConfig } from '@ngx-formly/core';
 import { ToastService } from '@stupa-makers/ui-kit';
@@ -126,11 +126,25 @@ describe('DraftFilesComponent', () => {
       {},
       fakeDrafts([draft('a'), draft('keep'), draft('x', { failed: true })]),
     );
+    const confirm = () =>
+      userEvent.click(
+        within(screen.getByRole('dialog', { name: 'Anhang entfernen?' })).getByRole('button', { name: 'Entfernen' }),
+      );
     await userEvent.click(screen.getByRole('button', { name: 'a.pdf entfernen' }));
+    expect(drafts.remove).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog', { name: 'Anhang entfernen?' })).toHaveTextContent('„a.pdf“ wird entfernt.');
+    await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    expect(drafts.remove).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: 'a.pdf entfernen' }));
+    await confirm();
     expect(drafts.remove).toHaveBeenCalledWith('a');
     expect(changed).toHaveBeenLastCalledWith(['keep']);
     await userEvent.click(screen.getByRole('button', { name: 'keep.pdf entfernen' }));
+    await confirm();
     expect(toast.error).toHaveBeenCalledWith('Die Datei konnte nicht entfernt werden.');
+    await userEvent.click(screen.getByRole('button', { name: 'x.pdf entfernen' }));
+    expect(screen.queryByRole('dialog', { name: 'Anhang entfernen?' })).not.toBeInTheDocument();
+    expect(drafts.remove).toHaveBeenCalledWith('x');
   });
 
   it('names a dropped file of a wrong type', async () => {
@@ -178,6 +192,9 @@ describe('FormlyDraftFilesType', () => {
     expect(form.valid).toBe(true);
 
     await userEvent.click(screen.getByRole('button', { name: 'r1.pdf entfernen' }));
+    await userEvent.click(
+      within(screen.getByRole('dialog', { name: 'Anhang entfernen?' })).getByRole('button', { name: 'Entfernen' }),
+    );
     await waitFor(() => expect(model['receipt']).toBeNull());
   });
 

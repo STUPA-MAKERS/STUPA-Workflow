@@ -76,7 +76,7 @@
               removeSize="lg"
               [removable]="true"
               [removeLabel]="'apply.files.remove' | t: { name: file.filename }"
-              (remove)="removeFile(file)"
+              (remove)="file.failed ? removeFile(file) : fileToRemove.set(file)"
             >
               <app-icon [name]="file.mime.startsWith('image/') ? 'image' : 'file'" [size]="18" />
               <span class="rd__chipText">
@@ -150,3 +150,12 @@
     </ng-container>
   }
 </app-dialog>
+
+<app-confirm-dialog
+  [open]="fileToRemove() !== null"
+  [title]="'apply.files.removeTitle' | t"
+  [body]="'apply.files.removeConfirm' | t: { name: fileToRemove()?.filename ?? '' }"
+  [confirmLabel]="'apply.files.removeAction' | t"
+  (confirm)="confirmRemoveFile()"
+  (cancel)="fileToRemove.set(null)"
+/>
