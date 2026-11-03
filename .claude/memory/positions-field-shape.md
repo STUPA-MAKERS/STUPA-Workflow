@@ -22,7 +22,7 @@ field is an **array of position objects**:
 
 Rules (`_validate_positions` in `backend/app/modules/forms/validation.py`):
 
-- The offer keys are `label` / `value` (a finite number > 0) / `preferred`, **NOT**
+- The offer keys are `label` / `value` (a finite number ≥ 0) / `preferred`, **NOT**
   `vendor` / `amount` / `quantity`. Wrong keys give `422 Invalid application data.`
 - **Exactly one** offer per position has `preferred: true`.
 - At least `minPositions` positions (default 1) and `minOffers` offers per position
@@ -34,7 +34,7 @@ Rules (`_validate_positions` in `backend/app/modules/forms/validation.py`):
   `positions`.
 - The promoted `amount` is the sum of the preferred offer values over all positions
   (`positions_total`); no `isPromoted` flag is needed.
-- A form can add one `funding` field ("Beantragte Förderung"): a number > 0, at most the
+- A form can add one `funding` field ("Beantragte Förderung"): a number ≥ 0, at most the
   cost total. When it is filled in, it is the `amount` instead of the cost total.
 
 A 422 comes back as `application/problem+json` with `errors: [{field, msg}]`, where `field` is

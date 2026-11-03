@@ -49,26 +49,30 @@
   </div>
 } @else if (app(); as application) {
   @if (editing()) {
-    <article class="ad ad--edit" [class.ad--split]="split()" aria-labelledby="ad-edit-title">
-      <header class="ad__editBar">
-        @if (phone()) {
-          <app-button
-            variant="text"
-            [iconOnly]="true"
-            [ariaLabel]="'action.cancel' | t"
-            (click)="cancelEdit()"
-          ><app-icon name="x" /></app-button>
-        } @else {
-          <app-icon class="ad__editIcon" name="edit" [size]="18" />
-        }
-        <p class="ad__editText ell">
-          <strong id="ad-edit-title">{{ 'applications.edit.title' | t }}</strong>
-        </p>
-        @if (!phone()) {
-          <app-button variant="text" (click)="cancelEdit()">{{ 'action.cancel' | t }}</app-button>
-        }
-        <span class="ad__editFade" aria-hidden="true"></span>
-      </header>
+    <article class="ad ad--edit" [class.ad--split]="split()" [class.ad--docked]="editDocked()" aria-labelledby="ad-edit-title">
+      @if (!editDocked()) {
+        <header class="ad__editBar">
+          @if (phone()) {
+            <app-button
+              variant="text"
+              [iconOnly]="true"
+              [ariaLabel]="'action.cancel' | t"
+              (click)="cancelEdit()"
+            ><app-icon name="x" /></app-button>
+          } @else {
+            <app-icon class="ad__editIcon" name="edit" [size]="18" />
+          }
+          <p class="ad__editText ell">
+            <strong id="ad-edit-title">{{ 'applications.edit.title' | t }}</strong>
+          </p>
+          @if (!phone()) {
+            <app-button variant="text" (click)="cancelEdit()">{{ 'action.cancel' | t }}</app-button>
+          }
+          <span class="ad__editFade" aria-hidden="true"></span>
+        </header>
+      } @else {
+        <h2 id="ad-edit-title" class="sr-only">{{ 'applications.edit.title' | t }}</h2>
+      }
       <div class="ad__edit fe-form">
         <formly-form [form]="editForm" [fields]="editFields()" [model]="editModel" (modelChange)="editDirty.set(true)" />
       </div>

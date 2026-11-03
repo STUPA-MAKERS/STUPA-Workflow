@@ -26,7 +26,7 @@ describe('server-errors', () => {
   });
 
   it.each([
-    ['costs[0].offers[1]', 'offer value must be greater than 0', 'apply.positions.errOffers'],
+    ['costs[0].offers[1]', 'offer value must not be negative', 'apply.positions.errOffers'],
     ['costs[0]', 'opting out of comparison offers needs a reason', 'apply.positions.errNoOffersReason'],
     ['costs[0]', 'needs at least 1 comparison offer(s)', 'forms.positions.errOffersServer'],
     ['costs[0]', 'has more than 10 comparison offer(s)', 'forms.positions.errTooManyOffers'],
