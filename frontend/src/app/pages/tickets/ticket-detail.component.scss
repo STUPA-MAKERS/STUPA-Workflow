@@ -200,6 +200,34 @@
   --chat-composer-bleed: var(--space-4);
 }
 
+// A desktop with one pane at a time: on the log tab the sheet takes the height of the window
+// and no more, so the log fills the room below the tabs and scrolls inside; the composer
+// stays at the foot. The details tab keeps the page scroll.
+@include bp.narrow {
+  .td--log {
+    min-height: 0;
+  }
+  .td--log app-tab-pager.td__tabs {
+    flex: 1 1 0;
+    min-height: 0;
+  }
+  .td--log app-tab-pager.td__tabs ::ng-deep > .tp__panel:not([hidden]) {
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .td--log .td__panel--log,
+  .td--log .td__panel--log .td__sec,
+  .td--log .td__panel--log .td__chat {
+    flex: 1 1 0;
+    min-height: 0;
+  }
+  .td--log .td__panel--log .td__chat {
+    --chat-log-basis: 0;
+  }
+}
+
 .td__closeBox {
   display: flex;
   flex-direction: column;

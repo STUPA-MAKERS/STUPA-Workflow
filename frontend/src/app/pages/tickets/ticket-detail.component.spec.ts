@@ -318,6 +318,20 @@ describe('TicketDetailComponent', () => {
     expect(cmp.tab()).toBe('details');
   });
 
+  it('bounds the sheet to the window only on the log tab of one pane', async () => {
+    const { cmp, harness } = await start();
+    const sheet = () => harness.fixture.nativeElement.querySelector('article.td') as HTMLElement;
+    expect(sheet()).toHaveClass('td--log');
+    cmp.selectTab('details');
+    harness.detectChanges();
+    expect(sheet()).not.toHaveClass('td--log');
+  });
+
+  it('does not bound the split sheet', async () => {
+    const { harness } = await start('/tickets/t40', { split: true });
+    expect(harness.fixture.nativeElement.querySelector('article.td')).not.toHaveClass('td--log');
+  });
+
   it('shows the details: reporter, mail, the context and the linked object', async () => {
     await start('/tickets/t40', { split: true });
     expect(screen.getByRole('heading', { name: 'Verlauf' })).toHaveClass('sr-only');
