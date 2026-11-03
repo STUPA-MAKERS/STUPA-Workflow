@@ -100,8 +100,9 @@ interface TaskRow {
  * server that does not send it gives the time of the last change (`updatedAt`).
  *
  * When the detail changes the open application (a transition, for example), the list
- * loads again. If the application is no longer a task, the page opens the next task, or
- * the empty state when no task is left.
+ * loads again. The open application stays open, also when it is no longer a task and
+ * leaves the list, so the user sees the result of the change. The page never opens
+ * another task on its own.
  *
  * Below the applications the group "To-Dos" lists the open cards assigned to the user
  * over all boards (`GET /todos/mine`, by due date). A card opens as
@@ -382,19 +383,17 @@ export class TasksComponent {
    * Load the task list. The loaded rows stay until the answer arrives, so a reload after
    * a change does not flash to placeholders.
    *
-   * `changedId`: the application that the detail changed. When it was the open task and
-   * it left the list, the page opens the next task.
+   * `changedId`: the application that the detail changed. A failed reload after a change
+   * keeps the rows; the open application stays open either way.
    */
   private load(changedId?: Uuid): void {
     const seq = ++this.fetchSeq;
-    const before = this.tasks().map((t) => t.id);
     this.api.listTasks().subscribe({
       next: (t) => {
         if (seq !== this.fetchSeq) return;
         this.tasks.set(t);
         this.error.set(false);
         this.loading.set(false);
-        if (changedId) this.advance(changedId, before);
       },
       error: () => {
         if (seq !== this.fetchSeq) return;
@@ -405,28 +404,5 @@ export class TasksComponent {
         this.loading.set(false);
       },
     });
-  }
-
-  /**
-   * The open task left the list: open the task that followed it, else the one before it,
-   * else no task (the empty state). An open application that was never a task (a deep
-   * link) stays open.
-   */
-  private advance(changedId: Uuid, before: readonly Uuid[]): void {
-    const open = this.selectedId();
-    if (!open || open !== changedId) return;
-    const now = new Set(this.tasks().map((t) => t.id));
-    if (now.has(open)) return;
-    const at = before.indexOf(open);
-    if (at < 0) return;
-    const next =
-      before.slice(at + 1).find((id) => now.has(id)) ??
-      before
-        .slice(0, at)
-        .reverse()
-        .find((id) => now.has(id)) ??
-      this.tasks()[0]?.id ??
-      null;
-    void this.router.navigate(next ? ['/tasks', next] : ['/tasks'], { replaceUrl: true });
   }
 }
