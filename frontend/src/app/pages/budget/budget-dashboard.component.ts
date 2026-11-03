@@ -1,9 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { i18nLabel } from '@shared/forms/i18n-text';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, type ParamMap, Router, RouterLink } from '@angular/router';
 import { NgTemplateOutlet } from '@angular/common';
-import { Subject, of } from 'rxjs';
+import { Subject, forkJoin, of } from 'rxjs';
 import { catchError, map, switchMap } from 'rxjs/operators';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -15,7 +14,6 @@ import {
   EmptyStateComponent,
   FilterSelectComponent,
   IconComponent,
-  ListItemComponent,
   MEDIA,
   mediaQuery,
   NoteComponent,
@@ -30,21 +28,19 @@ import {
   SheetBarKickerDirective,
   SideSheetComponent,
   SkeletonComponent,
-  type StatusKind,
-  StatusTextComponent,
   ToastService,
   PageHeaderComponent,
 } from '@stupa-makers/ui-kit';
 import { AuthService } from '@core/auth/auth.service';
 import { exportDownload } from '@shared/download.util';
 import { SimplifyPathPipe } from '@shared/budget-path';
-import { flowColorKind } from '@shared/ui';
 import { BUDGET_PERMISSIONS } from '../../layout/nav.service';
 import {
   BudgetTreeApi,
   type BudgetAllocationView,
   type BudgetApplication,
   type BudgetTreeNode,
+  type Expense,
   type FiscalYear,
 } from './budget-tree.api';
 import { BudgetCrumbsComponent } from './budget-crumbs.component';
@@ -52,6 +48,9 @@ import { BudgetPieComponent, type PieSlice } from './budget-pie.component';
 import { BudgetSunburstComponent, type SunburstMetric } from './budget-sunburst.component';
 import { nodeColors, resolveNodeColors } from './budget-color.util';
 import { formatMoney } from '@shared/format-money';
+import { BudgetItemListComponent } from './budget-items/budget-item-list.component';
+import { BudgetItemsDialogComponent } from './budget-items/budget-items-dialog.component';
+import { type BudgetItem, mergeBudgetItems } from './budget-items/budget-items';
 
 /** The amounts of one cost centre in one fiscal year, as numbers. */
 export interface Figures {
@@ -99,14 +98,6 @@ interface UsageRow {
 }
 
 /** An application on the selected cost centre, ready to show. */
-interface AppRow {
-  app: BudgetApplication;
-  title: string;
-  statusLabel: string | null;
-  statusKind: StatusKind;
-  costCentre: string | null;
-}
-
 const ZERO: Figures = {
   allocated: 0,
   requested: 0,
@@ -165,13 +156,13 @@ export const APPS_SHOWN = 5;
     IconComponent,
     EmptyStateComponent,
     FilterSelectComponent,
-    ListItemComponent,
+    BudgetItemListComponent,
+    BudgetItemsDialogComponent,
     RowMenuComponent,
     SearchPillComponent,
     SegBarComponent,
     SideSheetComponent,
     SkeletonComponent,
-    StatusTextComponent,
     BudgetPieComponent,
     BudgetSunburstComponent,
     ScrollFadeDirective,
@@ -501,35 +492,24 @@ export class BudgetDashboardComponent {
 
   /** The applications of the selected cost centre and its subtree; `null` while loading. */
   readonly apps = signal<BudgetApplication[] | null>(null);
+  /** The newest bookings of the same cost centre and year, at most {@link APPS_SHOWN}. Empty
+   *  for a reader who may not read the bookings. */
+  readonly previewBookings = signal<Expense[]>([]);
   readonly appsError = signal(false);
-  private readonly appsKey = new Subject<{ ks: string; fy: string }>();
+  private readonly appsKey = new Subject<{ ks: string; fy: string; bookings: boolean }>();
 
-  /** The newest applications first, at most {@link APPS_SHOWN}. */
-  readonly appRows = computed<AppRow[]>(() => {
-    const list = this.apps() ?? [];
-    const byId = this.nodeById();
-    return [...list]
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-      .slice(0, APPS_SHOWN)
-      .map((app) => ({
-        app,
-        title: this.titleOf(app),
-        statusLabel: app.stateLabel ? this.resolveLabel(app.stateLabel) || null : null,
-        statusKind: flowColorKind(app.stateColor),
-        costCentre: app.budgetId ? (byId.get(app.budgetId)?.name ?? null) : null,
-      }));
-  });
-
-  /** Application title. It falls back to "Ohne Titel" when no title is set. */
-  titleOf(app: Pick<BudgetApplication, 'title'>): string {
-    return app.title?.trim() || this.i18n.translate('applications.list.untitled');
-  }
-
-  /** Resolve an i18n label map in the active locale, along its fallback chain, then the
-   *  first entry. */
-  private resolveLabel(map: Record<string, string>): string {
-    return i18nLabel(map, this.i18n.uiLocale(), Object.values(map)[0] ?? '');
-  }
+  /** The card lists the bookings too when the reader may read them. */
+  readonly itemsTitle = computed(() =>
+    this.i18n.translate(this.canSeeBookings() ? 'budget.dash.items' : 'budget.dash.apps'),
+  );
+  /** The newest applications and bookings first, at most {@link APPS_SHOWN}. The preview
+   *  holds the newest of each type, so the newest of both are among them. */
+  readonly previewItems = computed<BudgetItem[]>(() =>
+    mergeBudgetItems(this.apps() ?? [], this.previewBookings(), true).slice(0, APPS_SHOWN),
+  );
+  /** The names of the cost centres, for the rows of the list. */
+  readonly nodeNames = computed<ReadonlyMap<string, { name: string }>>(() => this.nodeById());
+  readonly itemsOpen = signal(false);
 
   readonly overviewOpen = signal(false);
   readonly overviewMetric = signal<SunburstMetric>('allocated');
@@ -588,16 +568,30 @@ export class BudgetDashboardComponent {
   constructor() {
     this.appsKey
       .pipe(
-        switchMap(({ ks, fy }) =>
-          this.api.applications(ks as Uuid, fy || undefined).pipe(
-            map((list) => ({ list, failed: false })),
-            catchError(() => of({ list: [] as BudgetApplication[], failed: true })),
+        switchMap(({ ks, fy, bookings }) =>
+          forkJoin({
+            list: this.api.applications(ks as Uuid, fy || undefined),
+            bookings: bookings
+              ? this.api
+                  .listExpenses({
+                    budget: ks as Uuid,
+                    fiscalYear: (fy || undefined) as Uuid | undefined,
+                    sort: 'createdAt',
+                    order: 'desc',
+                    limit: APPS_SHOWN,
+                  })
+                  .pipe(map((page) => page.items))
+              : of([] as Expense[]),
+          }).pipe(
+            map(({ list, bookings: items }) => ({ list, items, failed: false })),
+            catchError(() => of({ list: [] as BudgetApplication[], items: [] as Expense[], failed: true })),
           ),
         ),
         takeUntilDestroyed(),
       )
-      .subscribe(({ list, failed }) => {
+      .subscribe(({ list, items, failed }) => {
         this.apps.set(list);
+        this.previewBookings.set(items);
         this.appsError.set(failed);
       });
 
@@ -751,11 +745,13 @@ export class BudgetDashboardComponent {
     const ks = this.selectedKsId();
     if (!ks) {
       this.apps.set([]);
+      this.previewBookings.set([]);
       return;
     }
     this.apps.set(null);
+    this.previewBookings.set([]);
     this.appsError.set(false);
-    this.appsKey.next({ ks, fy: this.selectedFyId() });
+    this.appsKey.next({ ks, fy: this.selectedFyId(), bookings: this.canSeeBookings() });
   }
 
   private syncUrl(): void {
@@ -803,8 +799,9 @@ export class BudgetDashboardComponent {
     this.syncUrl();
   }
 
-  openApplications(): void {
-    void this.router.navigate(['/applications'], { queryParams: { budget: this.selectedKsId() } });
+  /** "Alle ansehen": every application and booking in a dialog, a bottom sheet on a phone. */
+  openItems(): void {
+    this.itemsOpen.set(true);
   }
 
   /** The actions of the page, as the "more" menu of a phone. */
