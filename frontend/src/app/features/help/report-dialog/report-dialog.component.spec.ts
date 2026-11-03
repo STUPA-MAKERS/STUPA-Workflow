@@ -1,6 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { computed, signal } from '@angular/core';
-import { render, screen } from '@testing-library/angular';
+import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { Subject, of, throwError } from 'rxjs';
 import { TicketsApiService, type TicketCreate, type TicketCreated } from '@core/api/tickets.service';
@@ -389,6 +389,12 @@ describe('ReportDialogComponent', () => {
 
     drafts.removeOk = false;
     await userEvent.click(screen.getByRole('button', { name: /scan\.pdf/ }));
+    fixture.detectChanges();
+    expect(drafts.remove).toHaveBeenCalledTimes(1);
+    const confirm = screen.getByRole('dialog', { name: 'Anhang entfernen?' });
+    expect(confirm).toHaveTextContent('„scan.pdf“ wird entfernt.');
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Entfernen' }));
+    expect(drafts.remove).toHaveBeenCalledWith('1');
     expect(toast.error).toHaveBeenCalledWith('Die Datei konnte nicht entfernt werden.');
   });
 

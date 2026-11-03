@@ -1,8 +1,9 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { scanStatus } from '@shared/status-kind.util';
 import {
+  ConfirmDialogComponent,
   FileDropZoneComponent,
   formatBytes,
   IconComponent,
@@ -17,9 +18,9 @@ import { DraftAttachmentsService, type DraftFile } from '../draft-attachments.se
  * (`fieldKey` null).
  *
  * A row per file: name (it wraps, never cut), size and scan state as status text, and
- * a delete button. A file the server lost (422 on the submit) shows "Nicht mehr
- * vorhanden" in red; its button only takes it off the list. Below the rows the drop
- * zone with the limits.
+ * a delete button that asks for a confirmation first. A file the server lost (422 on the
+ * submit) shows "Nicht mehr vorhanden" in red; its button takes it off the list at once.
+ * Below the rows the drop zone with the limits.
  *
  * `changed` emits the ids of the field after each upload and delete; the formly field
  * keeps them as its value.
@@ -30,6 +31,7 @@ import { DraftAttachmentsService, type DraftFile } from '../draft-attachments.se
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     TranslatePipe,
+    ConfirmDialogComponent,
     IconComponent,
     FileDropZoneComponent,
     StatusTextComponent,
@@ -63,6 +65,8 @@ export class DraftFilesComponent {
     this.drafts.pending().filter((p) => p.fieldKey === this.fieldKey()),
   );
   protected readonly busy = this.drafts.busy;
+  /** The file whose delete waits for the confirmation. */
+  protected readonly toRemove = signal<DraftFile | null>(null);
 
   /** "3 von 20 Dateien · 544 KB von 50 MB". */
   protected readonly summaryText = computed(() => {
@@ -103,6 +107,13 @@ export class DraftFilesComponent {
     for (const f of files) {
       this.toast.error(`${f.name}: ${this.i18n.translate('apply.files.error.type')}`);
     }
+  }
+
+  /** The confirmation of a row's delete button. */
+  protected confirmRemove(): void {
+    const file = this.toRemove();
+    this.toRemove.set(null);
+    if (file) void this.remove(file);
   }
 
   protected async remove(file: DraftFile): Promise<void> {

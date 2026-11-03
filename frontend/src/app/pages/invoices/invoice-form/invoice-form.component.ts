@@ -7,12 +7,14 @@ import {
   inject,
   input,
   output,
+  signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
+  ConfirmDialogComponent,
   CurrencyInputComponent,
   DatepickerComponent,
   formatBytes,
@@ -115,6 +117,7 @@ export interface InvoiceFormHost {
     PaneFormHeadComponent,
     NoteComponent,
     ButtonComponent,
+    ConfirmDialogComponent,
     CurrencyInputComponent,
     DatepickerComponent,
     FormsModule,
@@ -137,6 +140,14 @@ export class InvoiceFormComponent {
   readonly remove = output<void>();
   /** "Vorhandene öffnen" at a duplicate. */
   readonly openDuplicate = output<void>();
+
+  /** The remove of the picked receipt waits for the confirmation. */
+  protected readonly confirmClear = signal(false);
+
+  protected clearAttachment(): void {
+    this.confirmClear.set(false);
+    this.host().clearAttachment();
+  }
 
   protected readonly title = computed(() => {
     if (this.mode() === 'edit') return 'invoices.edit' as const;
