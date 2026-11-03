@@ -17,6 +17,7 @@ import { provideDetailPrefetch } from '@core/cache/detail-prefetch';
 import {
   loadingInterceptor,
   ThemeService,
+  startOverlayScrollbars,
   UI_KIT_AVATAR_SOURCE,
 } from '@stupa-makers/ui-kit';
 import { provideRouteMotion, watchUAVisualTransitions } from '@stupa-makers/ui-kit/shell';
@@ -94,6 +95,7 @@ export const appConfig: ApplicationConfig = {
       guardTouchContextMenu(inject(DOCUMENT));
       lockInstalledAppZoom(inject(DOCUMENT), inject(IS_INSTALLED_APP)());
       watchUAVisualTransitions();
+      startOverlayScrollbars(inject(DOCUMENT));
       return i18n.ready();
     }),
     provideServiceWorker('ngsw-worker.js', {
