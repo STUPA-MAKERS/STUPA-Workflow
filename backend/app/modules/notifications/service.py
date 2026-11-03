@@ -18,11 +18,11 @@ import logging
 import uuid
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import and_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.notifications.kinds import NOTIFICATION_KINDS
+from app.modules.notifications.kinds import NOTIFICATION_KINDS, kind_default
 from app.modules.notifications.layout import (
     append_link_text,
     reason_text,
@@ -387,7 +387,8 @@ class NotificationService:
     async def get_preferences(self, principal_sub: str) -> list[tuple[str, bool]]:
         """Return the effective switches of the user.
 
-        The result holds the full catalogue with the stored deviations merged in.
+        The result holds the full catalogue with the stored deviations merged in. A
+        kind without a stored row has its default (`kinds.kind_default`).
         """
         principal_id = await self._principal_id(principal_sub)
         stored: dict[str, bool] = {}
@@ -400,14 +401,15 @@ class NotificationService:
                 )
             ).all()
             stored = {kind: enabled for kind, enabled in rows}
-        return [(k, stored.get(k, True)) for k in NOTIFICATION_KINDS]
+        return [(k, stored.get(k, kind_default(k))) for k in NOTIFICATION_KINDS]
 
     async def set_preferences(
         self, principal_sub: str, items: list[tuple[str, bool]]
     ) -> list[tuple[str, bool]]:
         """Upsert the own switches in bulk.
 
-        The method stores only the deviations from the default.
+        The method stores only the deviations from the default of each kind
+        (`kinds.kind_default`) and deletes a row that equals the default.
         """
         unknown = sorted({k for k, _ in items} - set(NOTIFICATION_KINDS))
         if unknown:
@@ -422,17 +424,17 @@ class NotificationService:
             row = await self.session.get(
                 NotificationPreference, (principal_id, kind)
             )
-            if enabled:
+            if enabled == kind_default(kind):
                 if row is not None:
                     await self.session.delete(row)
             elif row is None:
                 self.session.add(
                     NotificationPreference(
-                        principal_id=principal_id, kind=kind, enabled=False
+                        principal_id=principal_id, kind=kind, enabled=enabled
                     )
                 )
             else:
-                row.enabled = False
+                row.enabled = enabled
         await self.session.commit()
         return await self.get_preferences(principal_sub)
 
@@ -604,7 +606,9 @@ class NotificationService:
         filter and the footer reason; an unknown or DB-only key falls back to
         ``status_update``. Without a DB template a catalog key (for example
         ``status_update_team``) uses its own builtin, every other key the
-        ``status_update`` builtin.
+        ``status_update`` builtin. A status mail to the team only (no ``applicant``
+        spec) filters on the kind ``status_update_team``, which is off by default; the
+        footer reason stays ``status_update``.
         """
         from app.modules.notifications.templates_catalogue import CATALOGUE_BY_KEY
 
@@ -612,7 +616,7 @@ class NotificationService:
         reason = spec.kind if spec is not None else DEFAULT_NOTIFY_TEMPLATE_KEY
         recipients = await self.resolver.resolve(specs, application_id=application_id)
         recipients = await filter_recipients_by_preference(
-            self.session, recipients, reason
+            self.session, recipients, _filter_kind(reason, specs)
         )
         if not recipients:
             logger.info("notify action resolved no recipients — skipped")
@@ -784,16 +788,21 @@ class NotificationService:
 async def filter_recipients_by_preference(
     session: AsyncSession, recipients: list[str], kind: str
 ) -> list[str]:
-    """Drop the recipients that opted out of ``kind``.
+    """Drop the recipients whose switch for ``kind`` is off.
 
-    The match runs on the principal mail (CITEXT, case-insensitive). An address without
-    an account (anonymous applicant, mailing list) has no preference and stays. An
-    unknown kind never filters. The send stays fail-open.
+    The match runs on the principal mail (CITEXT, case-insensitive). A kind that is
+    on by default drops the accounts with an ``enabled = false`` row. A kind that is
+    off by default (`kinds.DEFAULT_OFF_KINDS`) drops every account without an
+    ``enabled = true`` row. An address without an account (anonymous applicant,
+    mailing list) has no preference and stays. An unknown kind never filters. The
+    send stays fail-open.
     """
     if not recipients or kind not in NOTIFICATION_KINDS:
         return recipients
     from app.modules.auth.models import Principal as PrincipalRow
 
+    if not kind_default(kind):
+        return await _opted_in(session, recipients, kind)
     disabled = (
         await session.scalars(
             select(PrincipalRow.email)
@@ -810,6 +819,39 @@ async def filter_recipients_by_preference(
     ).all()
     blocked = {e.lower() for e in disabled if e}
     return [r for r in recipients if r.lower() not in blocked]
+
+
+async def _opted_in(session: AsyncSession, recipients: list[str], kind: str) -> list[str]:
+    """Keep the addresses without an account and the accounts that switched ``kind`` on."""
+    from app.modules.auth.models import Principal as PrincipalRow
+
+    rows = (
+        await session.execute(
+            select(PrincipalRow.email, NotificationPreference.enabled)
+            .outerjoin(
+                NotificationPreference,
+                and_(
+                    NotificationPreference.principal_id == PrincipalRow.id,
+                    NotificationPreference.kind == kind,
+                ),
+            )
+            .where(PrincipalRow.email.in_(recipients))
+        )
+    ).all()
+    accounts = {str(email).lower() for email, _enabled in rows if email}
+    allowed = {str(email).lower() for email, enabled in rows if email and enabled}
+    return [r for r in recipients if r.lower() not in accounts or r.lower() in allowed]
+
+
+def _filter_kind(reason: str, specs: list[dict[str, Any]]) -> str:
+    """Return the preference kind of a ``notify`` send.
+
+    A ``status_update`` send without an ``applicant`` spec goes to the team, so it
+    filters on ``status_update_team``. Every other send filters on its own kind.
+    """
+    if reason == "status_update" and not any(s.get("kind") == "applicant" for s in specs):
+        return "status_update_team"
+    return reason
 
 
 def _idem_parts(base: str | None, *parts: str) -> tuple[str, ...]:

@@ -29,6 +29,8 @@ The kinds:
   was mentioned in a to-do comment, or an assigned to-do is due the next day.
 - ``mention``: the user was mentioned in an application comment or a ticket note
   (``comment_mentioned``, ``ticket_mentioned``).
+- ``status_update_team``: a status change of an application that a flow ``notify``
+  action sends to the team (every recipient kind except ``applicant``).
 - ``poll_started``: a poll of a Gremium of the user started (members with
   ``vote.cast``).
 - ``poll_reminder``: 24 h before the end of a poll that the user has not answered.
@@ -38,6 +40,7 @@ from __future__ import annotations
 
 NOTIFICATION_KINDS: tuple[str, ...] = (
     "status_update",
+    "status_update_team",
     "comment",
     "task",
     "task_reminder",
@@ -55,3 +58,17 @@ NOTIFICATION_KINDS: tuple[str, ...] = (
     "poll_started",
     "poll_reminder",
 )
+
+#: The kinds that are off until the person switches them on. They are the mails to
+#: Gremium members about applications. One status change can mail a whole Gremium, so
+#: a member gets them only after an explicit opt-in on the account page. The
+#: preference table stores the deviation from this default: an ``enabled = true`` row
+#: for one of these kinds, an ``enabled = false`` row for every other kind.
+DEFAULT_OFF_KINDS: frozenset[str] = frozenset(
+    {"status_update_team", "task", "task_reminder"}
+)
+
+
+def kind_default(kind: str) -> bool:
+    """Return the switch value of ``kind`` for a person who never changed it."""
+    return kind not in DEFAULT_OFF_KINDS

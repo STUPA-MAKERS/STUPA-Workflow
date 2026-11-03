@@ -91,6 +91,7 @@
   "account.notifications.saveError": "Saving failed. Please try again.",
   "account.notifications.empty": "There are no notifications that you can turn off for your account.",
   "account.notifications.kind.status_update": "Status updates on applications",
+  "account.notifications.kind.status_update_team": "Status updates on committee applications",
   "account.notifications.kind.comment": "New comments",
   "account.notifications.kind.task": "New tasks",
   "account.notifications.kind.task_reminder": "Task reminders",
