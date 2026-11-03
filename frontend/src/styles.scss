@@ -1,6 +1,7 @@
 @use 'fonts';
 @use 'tokens';
 @use 'base';
+@use 'scrollbars';
 @use 'surface';
 @use 'skeleton';
 @use 'breakpoints' as bp;
@@ -35,10 +36,12 @@
   color: var(--color-text);
 }
 
-// Thin grey scrollbars on every scroll box. Chrome on Linux otherwise draws the wide classic bar
-// with a light track, which shows as a bright stripe in the dark theme. `scrollbar-color` inherits
-// from the root; `scrollbar-width` does not inherit, so it goes on every element. Its specificity
-// is zero, so a component that sets `scrollbar-width: none` still hides its bar.
+// Thin grey scrollbars on every scroll box. With a mouse or a trackpad the kit draws its own
+// overlay bars (`startOverlayScrollbars`) and makes these transparent, so they only keep the
+// gutter; they show as they are until the app starts. Chrome on Linux otherwise draws the wide
+// classic bar with a light track. `scrollbar-color` inherits from the root; `scrollbar-width`
+// does not inherit, so it goes on every element. Its specificity is zero, so a component that
+// sets `scrollbar-width: none` still hides its bar, and the kit then draws none for it either.
 :root {
   scrollbar-color: #5a5a5a transparent;
 }
