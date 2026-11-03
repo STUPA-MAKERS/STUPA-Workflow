@@ -350,6 +350,26 @@ describe('BudgetTreeComponent', () => {
     expect(c.headerMenu()[0].items[0].disabledReason).toBeTruthy();
   });
 
+  it('closes and reopens the picked fiscal year from the header menu', async () => {
+    const { c } = await setup();
+    c.fiscalYears.set([FY]);
+    c.selectedFyId.set(FY.id);
+    const sections = c.headerMenu();
+    expect(sections[1].items[0].id).toBe('fyClose');
+    c.onHeaderMenu(sections[1].items[0]);
+    expect(c.fyCloseTarget()).toBe(FY);
+    c.closeFyClose();
+    expect(c.fyCloseTarget()).toBeNull();
+    expect(c.fyOpen()).toBe(false);
+    const closed = { ...FY, closedAt: '2026-10-25T12:00:00Z' };
+    c.fiscalYears.set([closed]);
+    expect(c.headerMenu()[1].items[0].id).toBe('fyReopen');
+    c.onHeaderMenu(c.headerMenu()[1].items[0]);
+    expect(c.fyCloseTarget()).toBe(closed);
+    c.selectedFyId.set('');
+    expect(c.headerMenu().length).toBe(1);
+  });
+
   it('names the picked budget, its cutoff and the fiscal years in the pickers', async () => {
     const { c } = await setup();
     expect(c.topOptions()).toEqual([{ value: 'b-vs', label: 'VS-Mittel (VS)' }]);

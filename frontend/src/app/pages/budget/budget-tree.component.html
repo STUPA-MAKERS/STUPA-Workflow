@@ -336,6 +336,7 @@
   (closed)="closeFy()"
 >
   <form id="bt-fy-form" class="bt__form" (submit)="createFiscalYear($event)">
+    <h3 class="section-title">{{ 'budget.tree.fyNew' | t }}</h3>
     <app-input
       type="number"
       [label]="'budget.tree.fyYear' | t"
