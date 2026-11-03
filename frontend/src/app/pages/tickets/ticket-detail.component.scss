@@ -185,6 +185,35 @@
   flex: 1 0 auto;
   align-items: stretch;
 }
+// Side by side the two columns never wrap: stacked, the log shrank to its minimum and the
+// sheet ran past the pane. The fields of a narrow details column stack instead.
+.td--split .td__cols {
+  flex-wrap: nowrap;
+}
+.td--split .td__col:first-child {
+  min-width: 0;
+}
+.td--split .td__col:last-child {
+  min-width: 15rem;
+  container-type: inline-size;
+}
+@container (max-width: 22rem) {
+  .td__pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .td__pair:first-child > :last-child {
+    border-top-right-radius: 4px;
+  }
+  .td__pair:first-child > :first-child {
+    border-top-right-radius: var(--radius-lg);
+  }
+  .td__pair:last-child > :first-child {
+    border-bottom-left-radius: 4px;
+  }
+  .td__pair:last-child > :last-child {
+    border-bottom-left-radius: var(--radius-lg);
+  }
+}
 .td--split .td__col--log > .td__sec,
 .td--split .td__chat {
   flex: 1 1 auto;
