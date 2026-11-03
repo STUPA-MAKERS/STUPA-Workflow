@@ -91,7 +91,7 @@ Chat files: `tickets_note`, `todo_comment` and `comment_application` take `file_
 (at most 5 local files per message). The tool uploads each one as a draft
 (`POST /apply/attachments`) and binds the drafts to the new message.
 Meetings: `list_meetings`, `get_meeting`, `create_meeting`, `update_meeting`, `delete_meeting`,
-the agenda tools, attendance (`get_attendance`, `set_attendance`, `reset_attendance`) and the
+the agenda tools (`get_agenda` reads it), attendance (`get_attendance`, `set_attendance`, `reset_attendance`) and the
 minute-taker handover (`protokollant_handover`, `cancel_protokollant_handover`).
 Public meeting: `list_meeting_guests`, `admit_meeting_guest`, `admit_all_meeting_guests`,
 `reject_meeting_guest`, `remove_meeting_guest`, `rename_meeting_guest`,

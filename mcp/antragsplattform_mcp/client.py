@@ -3,7 +3,10 @@
 The client attaches the OAuth bearer token. On a 401 it forces one token refresh or login
 and retries once. A token request can open a browser. That step therefore runs in a
 worker thread and never blocks the async event loop. The client raises `ApiError` with
-the problem-detail message of the platform where the platform sends one.
+the problem-detail message of the platform where the platform sends one. A request that
+gets no answer (timeout, dropped connection) raises `ApiError` with status 0 and a
+message that names the failure, because an exception without text reaches the agent as
+an empty tool error, and the platform can have applied a write that got no answer.
 """
 
 from __future__ import annotations
@@ -22,9 +25,28 @@ from .config import Config
 
 class ApiError(RuntimeError):
     def __init__(self, status: int, message: str) -> None:
-        super().__init__(f"{status}: {message}")
+        super().__init__(f"{status}: {message}" if status else message)
         self.status = status
         self.message = message
+
+
+def _transport_error(method: str, path: str, exc: httpx.TransportError) -> ApiError:
+    """Turn an httpx transport failure into an `ApiError` with a readable message.
+
+    A timeout from httpx often has an empty text. The message therefore always names
+    the exception type. A write can reach the platform although its answer is lost, so
+    the message tells the agent to read the current state before it repeats the call.
+    """
+    detail = str(exc).strip()
+    kind = type(exc).__name__
+    reason = f"{kind}: {detail}" if detail else kind
+    message = f"no answer from the platform for {method} {path} ({reason})."
+    if method.upper() != "GET":
+        message += (
+            " The platform can have applied the change."
+            " Read the current state before you repeat the call."
+        )
+    return ApiError(0, message)
 
 
 def _safe_path(path: str) -> str:
@@ -77,12 +99,15 @@ class ApiClient:
         path = _safe_path(path)
         token = await self._token()
         headers = {"Authorization": f"Bearer {token}", **kwargs.pop("headers", {})}
-        resp = await self._client.request(method, path, headers=headers, **kwargs)
-        if resp.status_code == 401:
-            # The server rejected the token. Get a fresh credential and retry once.
-            token = await self._token(force_login=True)
-            headers["Authorization"] = f"Bearer {token}"
+        try:
             resp = await self._client.request(method, path, headers=headers, **kwargs)
+            if resp.status_code == 401:
+                # The server rejected the token. Get a fresh credential and retry once.
+                token = await self._token(force_login=True)
+                headers["Authorization"] = f"Bearer {token}"
+                resp = await self._client.request(method, path, headers=headers, **kwargs)
+        except httpx.TransportError as exc:
+            raise _transport_error(method, path, exc) from exc
         return self._unwrap(resp)
 
     @asynccontextmanager
