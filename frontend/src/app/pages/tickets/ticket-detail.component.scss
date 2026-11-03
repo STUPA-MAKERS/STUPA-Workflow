@@ -236,9 +236,13 @@
   .td--log {
     min-height: 0;
   }
+  // The composer ends as far above the window edge as the page starts below it: the pager
+  // takes the bottom padding of the page, less the top padding and the gap that `app-chat`
+  // keeps before its file viewer.
   .td--log app-tab-pager.td__tabs {
     flex: 1 1 0;
     min-height: 0;
+    margin-bottom: calc(var(--main-pad-top, 0px) - var(--main-pad-bottom, 0px) - var(--space-3));
   }
   .td--log app-tab-pager.td__tabs ::ng-deep > .tp__panel:not([hidden]) {
     display: flex;
