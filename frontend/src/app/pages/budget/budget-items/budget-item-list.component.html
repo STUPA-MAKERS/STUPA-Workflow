@@ -1,0 +1,30 @@
+<div class="rowgroup" role="list">
+  @for (r of rows(); track r.key) {
+    <app-list-item role="listitem" [title]="r.title" [link]="r.link" [linkQueryParams]="r.queryParams">
+      <app-icon lead class="bil__icon" [name]="r.icon" [size]="20" />
+      <span sub>
+        <span class="sr-only">{{ r.typeLabel }}:</span>
+        @if (r.statusLabel) {
+          <app-status-text [kind]="r.statusKind">{{ r.statusLabel }}</app-status-text>
+        }
+        @if (r.pathKey) {
+          @if (r.statusLabel) {
+            <span class="bil__dot" aria-hidden="true">·</span>
+          }
+          <span class="mono">{{ r.pathKey | simplifyPath }}</span>
+        }
+        @if (r.costCentre) {
+          @if (r.statusLabel || r.pathKey) {
+            <span class="bil__dot" aria-hidden="true">·</span>
+          }
+          <span>{{ r.costCentre }}</span>
+        }
+        @if (r.date) {
+          <span class="bil__dot" aria-hidden="true">·</span>
+          <span class="mono">{{ r.date }}</span>
+        }
+      </span>
+      <span trail class="mono bil__amount" [class.bil__amount--in]="r.income">{{ r.amount }}</span>
+    </app-list-item>
+  }
+</div>

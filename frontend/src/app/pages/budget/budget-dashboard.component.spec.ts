@@ -12,9 +12,11 @@ import type {
   BudgetAllocationView,
   BudgetApplication,
   BudgetTreeNode,
+  Expense,
   FiscalYear,
 } from './budget-tree.api';
 import { PALETTE, shadeColor } from './budget-color.util';
+import { itemApp, itemBooking } from './budget-items/budget-items.fixtures';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Inst = any;
@@ -119,21 +121,8 @@ const TREE: BudgetTreeNode[] = [
   }),
 ];
 
-function app(over: Partial<BudgetApplication> & { applicationId: string }): BudgetApplication {
-  return {
-    applicationId: over.applicationId,
-    title: 'title' in over ? (over.title ?? null) : `Antrag ${over.applicationId}`,
-    budgetId: 'budgetId' in over ? (over.budgetId ?? null) : 'b-800',
-    pathKey: 'pathKey' in over ? (over.pathKey ?? null) : 'VS-800',
-    fiscalYearId: over.fiscalYearId ?? 'fy-1',
-    amount: over.amount === undefined ? '120.00' : over.amount,
-    currency: over.currency ?? 'EUR',
-    stateId: over.stateId ?? null,
-    stateLabel: 'stateLabel' in over ? over.stateLabel : { de: 'In Prüfung', en: 'In review' },
-    stateColor: over.stateColor ?? '#d9a400',
-    createdAt: over.createdAt ?? '2026-05-01T10:00:00Z',
-  };
-}
+const app = itemApp;
+const booking = itemBooking;
 
 const ALL_PERMS = ['budget.view', 'budget.structure', 'budget.book', 'budget.export'];
 
@@ -163,6 +152,7 @@ interface SetupOpts {
   perms?: string[];
   queryParams?: Record<string, string>;
   apps?: BudgetApplication[];
+  bookings?: Expense[];
   wide?: boolean;
   phone?: boolean;
 }
@@ -187,10 +177,14 @@ function providers(opts: SetupOpts, params = new BehaviorSubject(convertToParamM
   ];
 }
 
-/** Answer every outstanding applications request of the sheet. */
-function flushApps(http: HttpTestingController, apps: BudgetApplication[] = []): void {
+/** Answer every outstanding applications request of the sheet, and the bookings request
+ *  of its preview. */
+function flushApps(http: HttpTestingController, apps: BudgetApplication[] = [], bookings: Expense[] = []): void {
   for (const req of http.match((r) => /\/budgets\/[^/]+\/applications$/.test(r.url))) {
-    req.flush(apps);
+    if (!req.cancelled) req.flush(apps);
+  }
+  for (const req of http.match((r) => r.url.endsWith('/expenses'))) {
+    if (!req.cancelled) req.flush({ items: bookings, total: bookings.length, limit: 5, offset: 0 });
   }
 }
 
@@ -206,7 +200,7 @@ async function setup(opts: SetupOpts = {}) {
   for (const top of tops) {
     http.expectOne((r) => r.url.endsWith(`/budgets/${top.id}/fiscal-years`)).flush(fys);
   }
-  flushApps(http, opts.apps);
+  flushApps(http, opts.apps, opts.bookings);
   view.fixture.detectChanges();
   return { ...view, http, params, c: view.fixture.componentInstance as unknown as Inst };
 }
@@ -479,14 +473,20 @@ describe('BudgetDashboardComponent', () => {
       expect(c.breadcrumbs().map((n: { id: string }) => n.id)).toEqual(['orphan']);
     });
 
-    it('opens the bookings and the applications of the cost centre', async () => {
+    it('opens the bookings page and the dialog with every item of the cost centre', async () => {
       const view = await setup({ apps: [app({ applicationId: 'a-1' })] });
       const nav = jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
       screen.getByRole('button', { name: 'Buchungen ansehen' }).click();
       expect(nav).toHaveBeenCalledWith(['/expenses'], { queryParams: { budget: 'b-vs' } });
       view.fixture.detectChanges();
       screen.getByRole('button', { name: 'Alle ansehen' }).click();
-      expect(nav).toHaveBeenCalledWith(['/applications'], { queryParams: { budget: 'b-vs' } });
+      view.fixture.detectChanges();
+      expect(view.c.itemsOpen()).toBe(true);
+      const req = view.http.expectOne((r) => r.url.endsWith('/expenses') && r.params.get('limit') === '50');
+      expect(req.request.params.get('budget')).toBe('b-vs');
+      req.flush({ items: [], total: 0, limit: 50, offset: 0 });
+      view.fixture.detectChanges();
+      expect(screen.getByRole('dialog', { name: 'Anträge und Buchungen' })).toBeTruthy();
     });
 
     /** A second click while it runs does nothing. */
@@ -694,50 +694,55 @@ describe('BudgetDashboardComponent', () => {
     });
   });
 
-  describe('applications on the cost centre', () => {
-    /** The path joins the keys with "-". */
-    it('lists status, path key, cost centre and amount, newest first', async () => {
+  describe('applications and bookings on the cost centre', () => {
+    it('lists the newest applications and bookings in one list, each with its type icon', async () => {
       const view = await setup({
         apps: [
           app({ applicationId: 'a-old', title: 'Alt', createdAt: '2026-01-01T00:00:00Z' }),
-          app({
-            applicationId: 'a-new',
-            title: 'Neu',
-            budgetId: 'b-810',
-            pathKey: 'VS-800-810',
-            amount: '2890.00',
-            stateLabel: { de: 'Bewilligt', en: 'Approved' },
-            stateColor: '#3f9a5c',
-            createdAt: '2026-06-01T00:00:00Z',
-          }),
+          app({ applicationId: 'a-new', title: 'Neu', createdAt: '2026-06-01T00:00:00Z' }),
         ],
+        bookings: [booking({ id: 'e-1', description: 'Druck', createdAt: '2026-03-01T00:00:00Z' })],
       });
       const section = view.container.querySelector('[aria-labelledby="bd-apps"]') as HTMLElement;
+      expect(section.querySelector('h3')?.textContent).toContain('Anträge und Buchungen');
       const titles = [...section.querySelectorAll('.li__title')].map((t) => t.textContent?.trim());
-      expect(titles).toEqual(['Neu', 'Alt']);
-      const first = section.querySelector('app-list-item') as HTMLElement;
-      expect(first.querySelector('app-status-text')?.textContent).toContain('Bewilligt');
-      expect(first.querySelector('app-status-text')?.classList).toContain('st--accent');
-      expect(first.textContent).toContain('VS-800-810');
-      expect(first.textContent).toContain('Werkstatt');
-      expect(first.textContent).toMatch(/2\.890,00\s€/);
-      expect(first.querySelector('a.li__title')?.getAttribute('href')).toBe('/applications/a-new');
+      expect(titles).toEqual(['Neu', 'Druck', 'Alt']);
+      expect(section.querySelectorAll('app-list-item app-icon[lead]')).toHaveLength(3);
     });
 
-    it('shows at most five and falls back to "Ohne Titel" without a title, never to the id', async () => {
+    it('asks for the five newest bookings of the cost centre and year', async () => {
+      const { c, http } = await bare();
+      http.expectOne((r) => r.url.endsWith('/budgets')).flush(TREE);
+      http.expectOne((r) => r.url.endsWith('/fiscal-years')).flush([FY]);
+      const req = http.expectOne((r) => r.url.endsWith('/expenses'));
+      expect(req.request.params.get('budget')).toBe('b-vs');
+      expect(req.request.params.get('fiscalYear')).toBe('fy-1');
+      expect(req.request.params.get('limit')).toBe('5');
+      expect(req.request.params.get('sort')).toBe('createdAt');
+      req.flush({ items: [booking({ id: 'e-1' })], total: 1, limit: 5, offset: 0 });
+      flushApps(http);
+      expect(c.previewBookings()).toHaveLength(1);
+    });
+
+    it('lists only applications for a reader without a budget role', async () => {
+      const view = await setup({ tree: TREE, perms: [], apps: [app({ applicationId: 'a-1' })] });
+      expect(view.http.match((r) => r.url.endsWith('/expenses'))).toHaveLength(0);
+      const section = view.container.querySelector('[aria-labelledby="bd-apps"]') as HTMLElement;
+      expect(section.querySelector('h3')?.textContent).toContain('Anträge auf dieser Kostenstelle');
+    });
+
+    it('shows at most five items', async () => {
       const apps = Array.from({ length: 7 }, (_, i) =>
-        app({ applicationId: `abcdefgh-${i}`, title: i === 6 ? null : `A${i}`, createdAt: `2026-0${i + 1}-01T00:00:00Z` }),
+        app({ applicationId: `abcdefgh-${i}`, createdAt: `2026-0${i + 1}-01T00:00:00Z` }),
       );
       const view = await setup({ apps });
-      const c = view.fixture.componentInstance as unknown as Inst;
-      expect(c.appRows()).toHaveLength(5);
-      expect(c.appRows()[0].title).toBe('Ohne Titel');
+      expect(view.c.previewItems()).toHaveLength(5);
       expect(view.container.querySelectorAll('[aria-labelledby="bd-apps"] app-list-item')).toHaveLength(5);
     });
 
-    it('says so when the cost centre has no applications and hides "Alle ansehen"', async () => {
+    it('says so when the cost centre has no items and hides "Alle ansehen"', async () => {
       await setup();
-      expect(screen.getByText('Keine Anträge auf dieser Kostenstelle.')).toBeTruthy();
+      expect(screen.getByText('Keine Anträge oder Buchungen auf dieser Kostenstelle.')).toBeTruthy();
       expect(screen.queryByRole('button', { name: 'Alle ansehen' })).toBeNull();
     });
 
@@ -752,7 +757,7 @@ describe('BudgetDashboardComponent', () => {
         .expectOne((r) => r.url.endsWith('/budgets/b-800/applications'))
         .flush('x', { status: 500, statusText: 'err' });
       fixture.detectChanges();
-      expect(screen.getByText('Die Anträge konnten nicht geladen werden.')).toBeTruthy();
+      expect(screen.getByText('Die Anträge und Buchungen konnten nicht geladen werden.')).toBeTruthy();
     });
 
     it('drops a stale answer when the selection moves on', async () => {
@@ -763,16 +768,8 @@ describe('BudgetDashboardComponent', () => {
       const stale = http.expectOne((r) => r.url.endsWith('/budgets/b-800/applications'));
       expect(stale.cancelled).toBe(true);
       http.expectOne((r) => r.url.endsWith('/budgets/b-900/applications')).flush([app({ applicationId: 'x' })]);
+      flushApps(http);
       expect(c.apps()).toHaveLength(1);
-    });
-
-    it('resolves the state label in the active locale, then de, en and the first entry', async () => {
-      const { c } = await setup();
-      localStorage.setItem('ap.locale', 'fr');
-      expect(c['resolveLabel']({ de: 'D', en: 'E' })).toBe('D');
-      expect(c['resolveLabel']({ en: 'E' })).toBe('E');
-      expect(c['resolveLabel']({ it: 'I' })).toBe('I');
-      expect(c['resolveLabel']({})).toBe('');
     });
   });
 
@@ -1054,22 +1051,6 @@ describe('BudgetDashboardComponent', () => {
     expect(nav).toHaveBeenLastCalledWith([], expect.objectContaining({
       queryParams: { budget: null, ks: null, fy: null },
     }));
-  });
-
-  /** An empty label map gives no status either. */
-  it('shows an application without state, cost centre or amount', async () => {
-    const view = await setup({
-      apps: [app({ applicationId: 'a-1', stateLabel: null, budgetId: null, pathKey: null, amount: null })],
-    });
-    const c = view.fixture.componentInstance as unknown as Inst;
-    expect(c.appRows()[0]).toEqual(expect.objectContaining({ statusLabel: null, costCentre: null }));
-    const row = view.container.querySelector('[aria-labelledby="bd-apps"] app-list-item') as HTMLElement;
-    expect(row.querySelector('app-status-text')).toBeNull();
-    expect(row.textContent).toContain('—');
-    c.apps.set([app({ applicationId: 'a-2', stateLabel: {} })]);
-    expect(c.appRows()[0].statusLabel).toBeNull();
-    c.apps.set(null);
-    expect(c.appRows()).toEqual([]);
   });
 
   /** A node without a currency still formats in euro. */
