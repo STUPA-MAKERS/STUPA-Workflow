@@ -277,7 +277,7 @@ export class MeetingPageComponent {
   private readonly now = openWindowClock();
   /** Where now is in the open window of a planned meeting (see `openWindowState`). */
   protected readonly openWindow = computed(() => openWindowState(this.meeting(), this.now()));
-  /** "Eröffnen ab 17:00" while the window is not open yet, else `''`. */
+  /** "Eröffnen ab 17:00", the label of the open button while the window is not open yet, else `''`. */
   protected readonly opensAtText = computed(() => {
     const at = this.meeting().opensAt;
     if (this.openWindow() !== 'tooEarly' || !at) return '';

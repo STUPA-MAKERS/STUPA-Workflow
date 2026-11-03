@@ -49,14 +49,15 @@ describe('PrepChecklistComponent', () => {
     expect(screen.queryByRole('button', { name: 'Sitzung eröffnen' })).toBeNull();
   });
 
-  /** Late in the evening the window can open on the next day, and the hint then names the day. */
+  /** Late in the evening the window can open on the next day, and the label then names the day. */
   it('keeps the opening disabled before the open window and says when it opens', async () => {
     const opensAt = new Date(Date.now() + 30 * 60_000);
     await setup({ opensAt: opensAt.toISOString(), confirmUntil: new Date(Date.now() + 80 * 60_000).toISOString() });
     const time = opensAt.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
-    const start = screen.getByRole('button', { name: 'Sitzung eröffnen' });
+    expect(screen.queryByRole('button', { name: 'Sitzung eröffnen' })).toBeNull();
+    const start = screen.getByRole('button', { name: new RegExp(`^Eröffnen ab (\\d\\d\\.\\d\\d\\., )?${time}$`) });
     expect(start).toBeDisabled();
-    expect(screen.getByText(new RegExp(`^Eröffnen ab (\\d\\d\\.\\d\\d\\., )?${time}$`))).toBeInTheDocument();
+    expect(screen.getAllByText(/^Eröffnen ab /)).toHaveLength(1);
   });
 
   it('enables the opening inside the window', async () => {
