@@ -1,3 +1,9 @@
+/* The opaque sticky tools cover the rows that scroll up, so the body fades only at its
+   bottom. The top fade would fade out the search, which sits in that zone. */
+.bid__dialog ::ng-deep .dialog__body {
+  --fade: linear-gradient(to bottom, #000 calc(100% - var(--space-4)), transparent);
+}
+
 .bid {
   display: flex;
   flex-direction: column;
@@ -6,13 +12,13 @@
 }
 
 .bid__tools {
-  /* The tools stay on top while the list scrolls. They reach up over the padding of the
-     dialog body, which is the fade zone, so no row shows above them. */
+  /* The tools stay on top while the list scrolls. They start at the top of the dialog
+     body, over its padding, so the search sits right under the title. The sticky offset
+     counts from the content edge of the body, so it is the negative padding. */
   position: sticky;
   top: calc(-1 * var(--space-4));
   z-index: 2;
   margin-top: calc(-1 * var(--space-4));
-  padding-top: var(--space-4);
   padding-bottom: var(--space-1);
   background: var(--color-bg-elevated);
   display: flex;
