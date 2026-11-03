@@ -362,9 +362,10 @@ async def test_notify_explicit_template_key_to_one_audience_sends_once() -> None
 async def test_notify_split_sends_filter_preferences_as_status_update(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Both default sends respect an opt-out of kind `status_update`.
+    """The applicant send filters on `status_update`, the team send on `status_update_team`.
 
-    `status_update_team` maps to the same catalog kind.
+    The team kind is off by default, so a status change mails no Gremium member who did
+    not switch it on.
     """
     import app.modules.notifications.service as svc_mod
 
@@ -387,7 +388,7 @@ async def test_notify_split_sends_filter_preferences_as_status_update(
         ]},
     )
     assert count == 2
-    assert kinds == ["status_update", "status_update"]
+    assert kinds == ["status_update", "status_update_team"]
 
 
 async def test_send_magic_link_uses_db_template() -> None:

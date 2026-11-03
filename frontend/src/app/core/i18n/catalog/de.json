@@ -90,6 +90,7 @@
   "account.notifications.saveError": "Speichern fehlgeschlagen. Versuche es noch einmal.",
   "account.notifications.empty": "Für dein Konto gibt es keine Benachrichtigungen zum Ausschalten.",
   "account.notifications.kind.status_update": "Status-Updates zu Anträgen",
+  "account.notifications.kind.status_update_team": "Status-Updates zu Anträgen des Gremiums",
   "account.notifications.kind.comment": "Neue Kommentare",
   "account.notifications.kind.task": "Neue Aufgaben",
   "account.notifications.kind.task_reminder": "Aufgaben-Erinnerungen",
