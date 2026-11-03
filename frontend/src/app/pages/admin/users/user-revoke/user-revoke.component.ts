@@ -28,6 +28,7 @@ import {
   SkeletonComponent,
   SwitchComponent,
   ToastService,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../../admin-api.service';
 import type {
@@ -50,7 +51,6 @@ import {
   toggleEntry,
   type RevokeEntry,
 } from './revoke-selection';
-import { SectionHeaderComponent } from '@shared/ui/section-header/section-header.component';
 import { personLabel } from '@shared/person-label.util';
 
 /** One line under an entry: what the person has there and what the revoke does with it. */
@@ -103,7 +103,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    SectionHeaderComponent,
+    SectionComponent,
     EmptyStateComponent,
     FormsModule,
     TranslatePipe,

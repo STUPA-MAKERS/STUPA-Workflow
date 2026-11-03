@@ -7,12 +7,10 @@
   </app-page-header>
 
   @for (sec of sections(); track sec.kind) {
-    <section class="gm__section" [attr.aria-labelledby]="'gm-' + sec.kind + '-title'">
-      <app-section-header [headingId]="'gm-' + sec.kind + '-title'" [heading]="key(sec.kind, 'title') | t">
-        <app-button size="sm" variant="tonal" [ariaLabel]="key(sec.kind, 'create') | t" (click)="openAdd(sec.kind)">
-          <app-icon name="plus" /> {{ 'admin.groupMappings.create' | t }}
-        </app-button>
-      </app-section-header>
+    <app-section class="gm__section" [level]="2" [heading]="key(sec.kind, 'title') | t">
+      <app-button sectionAction size="sm" variant="tonal" [ariaLabel]="key(sec.kind, 'create') | t" (click)="openAdd(sec.kind)">
+        <app-icon name="plus" /> {{ 'admin.groupMappings.create' | t }}
+      </app-button>
 
       @if (sec.loading) {
         <app-skeleton variant="rows" [count]="3" [label]="'common.loading' | t" />
@@ -48,7 +46,7 @@
       } @else {
         <app-empty-state rows="3" [heading]="key(sec.kind, 'empty') | t" />
       }
-    </section>
+    </app-section>
   }
 
 </section>

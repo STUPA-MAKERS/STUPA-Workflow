@@ -67,6 +67,7 @@ import {
   SideSheetComponent,
   SkeletonComponent,
   ToastService,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { TodoDueChipComponent } from '../due-chip/todo-due-chip.component';
 import { TodoLinkPickerComponent, linkKey } from '../link-picker/todo-link-picker.component';
@@ -135,6 +136,7 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionComponent,
     ChipComponent,
     FormsModule,
     NgTemplateOutlet,

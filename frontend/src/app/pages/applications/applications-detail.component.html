@@ -286,8 +286,7 @@
 </ng-template>
 
 <ng-template #details let-application>
-  <section class="ad__sec" aria-labelledby="ad-details">
-    <h3 id="ad-details" class="sec ad__secTitle">{{ 'applications.detail.details' | t }}</h3>
+  <app-section class="ad__sec" [heading]="'applications.detail.details' | t">
     <app-field-group>
       <div class="ad__pair">
         <app-field-row [label]="'applications.detail.created' | t">
@@ -339,7 +338,7 @@
         }
       </app-field-row>
     </app-field-group>
-  </section>
+  </app-section>
   <app-todo-linked-list kind="application" headingId="ad-todos" [targetId]="application.id" />
 </ng-template>
 
@@ -367,16 +366,19 @@
 </ng-template>
 
 <ng-template #history>
-  <section id="ad-history" class="ad__sec" tabindex="-1" [attr.aria-labelledby]="split() ? 'ad-history-title' : null">
-    @if (split()) {
-      <h3 id="ad-history-title" class="sec ad__secTitle">{{ 'applications.detail.tab.history' | t }}</h3>
-    }
+  <app-section
+    id="ad-history"
+    class="ad__sec"
+    tabindex="-1"
+    [heading]="'applications.detail.tab.history' | t"
+    [hideHeading]="!split()"
+  >
     @if (historyEntries().length) {
       <app-history [entries]="historyEntries()" />
     } @else {
       <app-empty-state rows="3" [heading]="'applications.history.empty' | t" />
     }
-  </section>
+  </app-section>
 </ng-template>
 
 <app-confirm-dialog
@@ -476,14 +478,14 @@
 <ng-template #answersSkel>
   <div class="ad__skelAnswers skel-in" aria-hidden="true">
     <section class="ad__sec">
-      <h3 class="sec ad__secTitle"><span class="skel-text skel-text--accent ad__skelSec"></span></h3>
+      <span class="ad__skelSecTitle"><span class="skel-text skel-text--accent ad__skelSec"></span></span>
       <div class="rowgroup">
         <ng-container *ngTemplateOutlet="skelRow; context: { label: '5rem', value: '75%' }" />
         <ng-container *ngTemplateOutlet="skelRow; context: { label: '4rem', value: '45%' }" />
       </div>
     </section>
     <section class="ad__sec">
-      <h3 class="sec ad__secTitle"><span class="skel-text skel-text--accent ad__skelSec ad__skelSec--wide"></span></h3>
+      <span class="ad__skelSecTitle"><span class="skel-text skel-text--accent ad__skelSec ad__skelSec--wide"></span></span>
       <div class="rowgroup">
         <ng-container *ngTemplateOutlet="skelRow; context: { label: '3rem', value: '30%' }" />
       </div>
@@ -492,20 +494,17 @@
 </ng-template>
 
 <ng-template #filesSkel>
-  <section class="ad__sec" aria-hidden="true">
-    <div class="ad__skelFilesHead">
-      <h3 class="sec">{{ 'applications.attachments.title' | t }}</h3>
-    </div>
+  <app-section class="ad__sec" aria-hidden="true" [heading]="'applications.attachments.title' | t">
+    <span sectionAction></span>
     <div class="rowgroup skel-in">
       <ng-container *ngTemplateOutlet="skelRow; context: { label: '9rem', value: '6rem' }" />
       <ng-container *ngTemplateOutlet="skelRow; context: { label: '7rem', value: '5rem' }" />
     </div>
-  </section>
+  </app-section>
 </ng-template>
 
 <ng-template #detailsSkel>
-  <section class="ad__sec" aria-hidden="true">
-    <h3 class="sec ad__secTitle">{{ 'applications.detail.details' | t }}</h3>
+  <app-section class="ad__sec" aria-hidden="true" [heading]="'applications.detail.details' | t">
     <div class="rowgroup skel-in">
       <div class="ad__pair">
         <ng-container *ngTemplateOutlet="skelRow; context: { label: '5rem', value: '8rem' }" />
@@ -513,12 +512,11 @@
       </div>
       <ng-container *ngTemplateOutlet="skelRow; context: { label: '5rem', value: '4rem' }" />
     </div>
-  </section>
+  </app-section>
 </ng-template>
 
 <ng-template #historySkel>
-  <section class="ad__sec" aria-hidden="true">
-    <h3 class="sec ad__secTitle">{{ 'applications.detail.tab.history' | t }}</h3>
+  <app-section class="ad__sec" aria-hidden="true" [heading]="'applications.detail.tab.history' | t">
     <div class="ad__skelDay skel-in">
       <p class="cap ad__skelDate"><span class="skel-text skel-text--muted"></span></p>
       <div class="rowgroup">
@@ -534,5 +532,5 @@
         }
       </div>
     </div>
-  </section>
+  </app-section>
 </ng-template>

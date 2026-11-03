@@ -39,8 +39,7 @@
 
   <div class="fd__cols">
     <div class="fd__col">
-      <section class="fd__sec bd__pay" aria-labelledby="bd-pay">
-        <h3 id="bd-pay" class="sec fd__secTitle">{{ 'expenses.detail.payment' | t }}</h3>
+      <app-section class="fd__sec bd__pay" [heading]="'expenses.detail.payment' | t">
         <dl class="fd__card fd__grid">
           <div>
             <dt>{{ 'expenses.field.paymentDate' | t }}</dt>
@@ -67,25 +66,17 @@
             <dd class="fd__wrap">{{ e.category || '—' }}</dd>
           </div>
         </dl>
-      </section>
+      </app-section>
 
       @if (showSubs()) {
-        <section class="fd__sec bd__subs" aria-labelledby="bd-subs">
-          <div class="fd__secHead">
-            <h3 id="bd-subs" class="sec fd__secTitle">
-              {{ 'expenses.sub.title' | t }}
-              @if (isParent()) {
-                <span class="fd__count">{{ e.childCount }}</span>
-              }
-            </h3>
-            @if (canManage() && !e.parentExpenseId) {
-              <app-button variant="text" size="sm" (click)="addSub.emit()">
-                <span class="fd__btn"><app-icon name="plus" />{{
-                  (phone() ? 'expenses.sub.addShort' : 'expenses.sub.add') | t
-                }}</span>
-              </app-button>
-            }
-          </div>
+        <app-section class="fd__sec bd__subs" [heading]="'expenses.sub.title' | t">
+          @if (canManage() && !e.parentExpenseId) {
+            <app-button sectionAction variant="text" size="sm" (click)="addSub.emit()">
+              <span class="fd__btn"><app-icon name="plus" />{{
+                (phone() ? 'expenses.sub.addShort' : 'expenses.sub.add') | t
+              }}</span>
+            </app-button>
+          }
           @if (subLoading() && !subRows().length) {
             <app-skeleton variant="rows" [count]="2" [label]="'expenses.sub.loading' | t" />
           } @else if (subRows().length) {
@@ -112,13 +103,12 @@
           } @else {
             <app-empty-state rows="3" [heading]="'expenses.sub.none' | t" />
           }
-        </section>
+        </app-section>
       }
     </div>
 
     <div class="fd__col">
-      <section class="fd__sec bd__details" aria-labelledby="bd-details">
-        <h3 id="bd-details" class="sec fd__secTitle">{{ 'expenses.detail.details' | t }}</h3>
+      <app-section class="fd__sec bd__details" [heading]="'expenses.detail.details' | t">
         <dl class="fd__card fd__stack">
           <div>
             <dt>{{ 'expenses.detail.costCentreFy' | t }}</dt>
@@ -146,11 +136,10 @@
             </div>
           }
         </dl>
-      </section>
+      </app-section>
 
       @if (app() || inv()) {
-        <section class="fd__sec bd__linked" aria-labelledby="bd-linked">
-          <h3 id="bd-linked" class="sec fd__secTitle">{{ 'expenses.detail.linked' | t }}</h3>
+        <app-section class="fd__sec bd__linked" [heading]="'expenses.detail.linked' | t">
           <div class="rowgroup">
             @if (app(); as a) {
               <a class="fd__link" [routerLink]="['/applications', a.id]">
@@ -206,14 +195,11 @@
               }
             }
           </div>
-        </section>
+        </app-section>
       }
 
-      <section class="fd__sec bd__cc" aria-labelledby="bd-cc">
-        <div class="fd__secHead">
-          <h3 id="bd-cc" class="sec fd__secTitle">{{ 'expenses.field.costCentre' | t }}</h3>
-          <a class="fd__secLink" routerLink="/budget" [queryParams]="budgetLink()">{{ 'expenses.detail.toBudget' | t }}</a>
-        </div>
+      <app-section class="fd__sec bd__cc" [heading]="'expenses.field.costCentre' | t">
+        <a sectionAction class="fd__secLink" routerLink="/budget" [queryParams]="budgetLink()">{{ 'expenses.detail.toBudget' | t }}</a>
         <div class="fd__card fd__ccCard">
           <div class="fd__ccHead">
             @if (cc().color) {
@@ -242,7 +228,7 @@
             </dl>
           }
         </div>
-      </section>
+      </app-section>
 
       <app-todo-linked-list class="bd__todos" kind="expense" headingId="bd-todos" [targetId]="e.id" />
     </div>

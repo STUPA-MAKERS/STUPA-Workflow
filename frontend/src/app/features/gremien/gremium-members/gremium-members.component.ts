@@ -26,6 +26,7 @@ import {
   SearchPillComponent,
   SkeletonComponent,
   StickyBarComponent,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { fileSlug, localized, roleRank, toCsv } from '../gremien.util';
 import { dayMonthYear } from '@shared/date-format';
@@ -57,6 +58,7 @@ export interface MemberRow {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionComponent,
     NoteComponent,
     StickyBarComponent,
     TranslatePipe,

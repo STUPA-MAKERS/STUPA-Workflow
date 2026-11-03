@@ -329,7 +329,7 @@ describe('HelpTicketsComponent', () => {
       expect(screen.getByRole('button', { name: 'Finn Schulze entsperren' })).toHaveFocus();
     });
 
-    it('gives the focus to the row before after the last unblock, then to the heading', async () => {
+    it('gives the focus to the row before after the last unblock, then to the section', async () => {
       const { fixture } = await setup({ perms: ['admin.site', 'ticket.manage'] });
       await userEvent.click(screen.getByRole('button', { name: 'weg@example.org entsperren' }));
       await fixture.whenStable();
@@ -338,7 +338,7 @@ describe('HelpTicketsComponent', () => {
       await fixture.whenStable();
       await userEvent.click(screen.getByRole('button', { name: 'spam@example.org entsperren' }));
       await fixture.whenStable();
-      expect(screen.getByRole('heading', { name: 'Gesperrte Absender' })).toHaveFocus();
+      expect(screen.getByRole('group', { name: 'Gesperrte Absender' })).toHaveFocus();
     });
 
     it('names a failed unblock and keeps the row, one unblock at a time', async () => {

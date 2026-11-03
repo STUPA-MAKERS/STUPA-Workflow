@@ -25,11 +25,11 @@ import {
   StatusTextComponent,
   ToastService,
   PageHeaderComponent,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
 import type { Backup, BackupKind } from '../admin.models';
-import { SectionHeaderComponent } from '@shared/ui/section-header/section-header.component';
 
 /** File name the browser saves an archive under. Mirrors the server-side name. */
 function archiveFileName(createdAt: string): string {
@@ -66,8 +66,8 @@ const POLL_TIMEOUT_MS = 30 * 60 * 1000;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionComponent,
     FilePickerComponent,
-    SectionHeaderComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,
     FormsModule,

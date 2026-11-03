@@ -187,8 +187,7 @@
 </ng-template>
 
 <ng-template #details let-ticket>
-  <section class="td__sec" aria-labelledby="td-details">
-    <h3 id="td-details" class="sec td__secTitle" [class.sr-only]="!split()">{{ 'tickets.detail.details' | t }}</h3>
+  <app-section class="td__sec" headingId="td-details" [heading]="'tickets.detail.details' | t" [hideHeading]="!split()">
     <app-field-group>
       @if (!manager) {
         <div class="td__pair">
@@ -256,17 +255,14 @@
         />
       </app-field-row>
     </ng-template>
-  </section>
+  </app-section>
 
   @if (manager) {
-    <section class="td__sec" aria-labelledby="td-todos">
-      <div class="td__secHead">
-        <h3 id="td-todos" class="sec td__secTitle">{{ 'tickets.todos.title' | t }}</h3>
-        <app-button variant="text" size="sm" (click)="todoOpen.set(true)">
-          <app-icon name="plus" />
-          {{ 'tickets.todos.add' | t }}
-        </app-button>
-      </div>
+    <app-section class="td__sec" [heading]="'tickets.todos.title' | t">
+      <app-button sectionAction variant="text" size="sm" (click)="todoOpen.set(true)">
+        <app-icon name="plus" />
+        {{ 'tickets.todos.add' | t }}
+      </app-button>
       <app-todo-linked-list
         kind="ticket"
         avatarSize="xs"
@@ -274,12 +270,11 @@
         [items]="todos()"
         [showTitle]="false"
       />
-    </section>
+    </app-section>
   }
 
   @if (contextRows().length || contextLink()) {
-    <section class="td__sec" aria-labelledby="td-context">
-      <h3 id="td-context" class="sec td__secTitle">{{ 'tickets.detail.context' | t }}</h3>
+    <app-section class="td__sec" [heading]="'tickets.detail.context' | t">
       <app-field-group>
         @for (row of contextRows(); track row.label) {
           <app-field-row [label]="row.label | t">
@@ -296,7 +291,7 @@
           </app-field-row>
         }
       </app-field-group>
-    </section>
+    </app-section>
   }
 </ng-template>
 
@@ -304,8 +299,7 @@
   <app-field-row [label]="label | t"><span class="skel-text skel-in" [style.width]="width"></span></app-field-row>
 </ng-template>
 <ng-template #detailsSkel>
-  <section class="td__sec">
-    <h3 class="sec td__secTitle">{{ 'tickets.detail.details' | t }}</h3>
+  <app-section class="td__sec" [heading]="'tickets.detail.details' | t">
     @if (!manager) {
       <app-field-group>
         <div class="td__pair">
@@ -326,14 +320,11 @@
         </div>
       </app-field-group>
     }
-  </section>
+  </app-section>
   @if (manager) {
-    <section class="td__sec">
-      <div class="td__secHead">
-        <h3 class="sec td__secTitle">{{ 'tickets.todos.title' | t }}</h3>
-        <span class="td__skelAdd skel-in"><span class="skel-text skel-text--muted"></span></span>
-      </div>
-    </section>
+    <app-section class="td__sec" [heading]="'tickets.todos.title' | t">
+      <span sectionAction class="td__skelAdd skel-in"><span class="skel-text skel-text--muted"></span></span>
+    </app-section>
   }
 </ng-template>
 

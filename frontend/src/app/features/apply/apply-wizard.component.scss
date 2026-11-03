@@ -138,14 +138,8 @@
 .wz__pii {
   margin-top: var(--space-2);
 }
-.wz__sec {
-  padding: 0 var(--space-1);
-}
-
 .wz__block {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+  --section-gap: var(--space-2);
 }
 .wz__fileList {
   margin: 0;

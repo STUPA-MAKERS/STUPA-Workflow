@@ -5,10 +5,9 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { type SettingsForm, settingsForm } from '@shared/forms/settings-form';
 import { LoadStateComponent } from '@shared/ui/load-state/load-state.component';
-import { InputComponent } from '@stupa-makers/ui-kit';
+import { InputComponent, SectionComponent } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../../admin-api.service';
 import { MAX_LEAD_MINUTES, type MeetingSettings } from '../../admin.models';
-import { SectionHeaderComponent } from '@shared/ui/section-header/section-header.component';
 
 type Body = Pick<MeetingSettings, 'openLeadMinutes' | 'confirmLeadMinutes'>;
 
@@ -49,7 +48,7 @@ function draftOf(s: MeetingSettings): Draft {
   selector: 'app-meeting-window-settings',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [SectionHeaderComponent, FormsModule, TranslatePipe, InputComponent, LoadStateComponent],
+  imports: [SectionComponent, FormsModule, TranslatePipe, InputComponent, LoadStateComponent],
   templateUrl: './meeting-window.component.html',
   styleUrl: '../guest-settings/guest-settings.component.scss',
 })

@@ -565,7 +565,7 @@ describe('BudgetDashboardComponent', () => {
     it('switches the figure and drops empty slices', async () => {
       const view = await setup();
       const c = view.fixture.componentInstance as unknown as Inst;
-      (view.container.querySelector('.bd__secHead app-filter-select button') as HTMLElement).click();
+      (view.container.querySelector('.section__head app-filter-select button') as HTMLElement).click();
       view.fixture.detectChanges();
       const list = screen.getByRole('listbox', { name: 'Kennzahl' });
       within(list).getByRole('option', { name: c.metricLabel('requested') }).click();
@@ -671,7 +671,7 @@ describe('BudgetDashboardComponent', () => {
     it('opens no native select: the metric and the year chip open the menu of the app', async () => {
       const view = await setup();
       expect(view.container.querySelector('select')).toBeNull();
-      const chip = view.container.querySelector('.bd__secHead app-filter-select button') as HTMLElement;
+      const chip = view.container.querySelector('.section__head app-filter-select button') as HTMLElement;
       expect(chip).toHaveAttribute('aria-haspopup', 'listbox');
       expect(chip).toHaveClass('chip', 'on');
     });

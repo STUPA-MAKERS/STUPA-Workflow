@@ -41,10 +41,7 @@
             />
           @if (isOpen(g)) {
             <div class="grem__body">
-              <section class="grem__settings" [attr.aria-labelledby]="'grem-set-' + g.id">
-                <h2 class="section-title" [id]="'grem-set-' + g.id">
-                  {{ 'admin.gremien.settings' | t }}
-                </h2>
+              <app-section class="grem__settings" [level]="2" [heading]="'admin.gremien.settings' | t">
                 <dl class="kv grem__grid">
                   @for (s of settings(g); track s.label) {
                     <div [class.kv__wide]="s.copyable">
@@ -53,7 +50,7 @@
                     </div>
                   }
                 </dl>
-              </section>
+              </app-section>
 
               <app-gremium-role-matrix
                 [gremiumId]="g.id"

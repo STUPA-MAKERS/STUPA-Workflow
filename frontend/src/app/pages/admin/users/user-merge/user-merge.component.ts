@@ -28,6 +28,7 @@ import {
   SearchPillComponent,
   SkeletonComponent,
   ToastService,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../../admin-api.service';
 import type {
@@ -94,6 +95,7 @@ interface ConflictProblem {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionComponent,
     EmptyStateComponent,
     FormsModule,
     TranslatePipe,

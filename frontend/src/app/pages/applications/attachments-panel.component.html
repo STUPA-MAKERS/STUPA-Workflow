@@ -1,14 +1,15 @@
-<section
+<app-section
   class="att"
-  aria-labelledby="att-title"
+  headingId="att-title"
+  [heading]="'applications.attachments.title' | t"
+  [hideHeading]="!titled()"
   appFileDrop
   #drop="appFileDrop"
   [appFileDropEnabled]="canUpload() && dropTarget()"
   (appFileDrop)="upload($event)"
 >
-  <div class="att__head">
-    <h3 id="att-title" class="sec att__title" [class.sr-only]="!titled()">{{ 'applications.attachments.title' | t }}</h3>
-    @if (canUpload()) {
+  @if (canUpload()) {
+    <span sectionAction class="att__upload">
       <input
         #fileInput
         type="file"
@@ -30,8 +31,8 @@
           {{ (uploading() ? 'applications.attachments.uploading' : 'applications.attachments.upload') | t }}
         </span>
       </app-button>
-    }
-  </div>
+    </span>
+  }
 
   @if (attachments().length) {
     @if (deleteAllowed() && selectedCount()) {
@@ -125,7 +126,7 @@
   @if (drop.active()) {
     <app-drop-overlay [label]="'applications.attachments.drop' | t" />
   }
-</section>
+</app-section>
 
 <app-confirm-dialog
   [open]="confirming() !== null"

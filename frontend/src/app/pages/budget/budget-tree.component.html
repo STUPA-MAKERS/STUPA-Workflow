@@ -336,18 +336,18 @@
   (closed)="closeFy()"
 >
   <form id="bt-fy-form" class="bt__form" (submit)="createFiscalYear($event)">
-    <h3 class="section-title">{{ 'budget.tree.fyNew' | t }}</h3>
-    <app-input
-      type="number"
-      [label]="'budget.tree.fyYear' | t"
-      [ngModel]="newFy().year"
-      (ngModelChange)="patchFyYear($event)"
-      name="fyYear"
-    />
+    <app-section [heading]="'budget.tree.fyNew' | t">
+      <app-input
+        type="number"
+        [label]="'budget.tree.fyYear' | t"
+        [ngModel]="newFy().year"
+        (ngModelChange)="patchFyYear($event)"
+        name="fyYear"
+      />
+    </app-section>
   </form>
 
-  <section class="bt__fyManage" [attr.aria-label]="'budget.tree.fyExisting' | t">
-    <h3 class="section-title">{{ 'budget.tree.fyExisting' | t }}</h3>
+  <app-section class="bt__fyManage" [heading]="'budget.tree.fyExisting' | t">
     @if (fiscalYears().length) {
       <app-data-table
         surface="rowgroup"
@@ -378,7 +378,7 @@
     } @else {
       <app-empty-state shape="table" rows="3" [heading]="'budget.tree.fyEmpty' | t" />
     }
-  </section>
+  </app-section>
 
   <div dialog-footer class="bt__foot">
     <app-button variant="text" (click)="closeFy()">{{ 'action.cancel' | t }}</app-button>

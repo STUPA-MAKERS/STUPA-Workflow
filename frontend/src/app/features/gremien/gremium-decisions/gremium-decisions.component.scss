@@ -26,14 +26,6 @@
 .gdc__group {
   @include gremien-tab.group;
 }
-.gdc__head {
-  @include gremien-tab.head;
-}
-.gdc__meeting {
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-  font-weight: var(--fw-regular);
-}
 
 .gdc__lead {
   display: inline-flex;

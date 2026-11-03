@@ -103,7 +103,7 @@ describe('MeetingDetailSheetComponent', () => {
     fixture.detectChanges();
     const rows = within(screen.getAllByRole('list')[0]).getAllByRole('listitem');
     expect(rows).toHaveLength(3);
-    expect(within(rows[0]).getByText('behandelt')).toBeInTheDocument();
+    expect(rows[0].querySelector('.ms__topMark')).toBeNull();
     expect(rows[1]).toHaveAttribute('aria-current', 'step');
     expect(within(rows[1]).getByText('Jetzt')).toBeInTheDocument();
     expect(rows[2].querySelector('.ms__topSub')?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
@@ -112,7 +112,7 @@ describe('MeetingDetailSheetComponent', () => {
     expect(rows[0].querySelector('.ms__topSub')).toBeNull();
     expect(rows[1].querySelector('.ms__topSub')).toBeNull();
     expect(screen.queryByText(/Freitext/)).toBeNull();
-    expect(screen.getByText('3 TOPs')).toBeInTheDocument();
+    expect(screen.queryByText('3 TOPs')).toBeNull();
   });
 
   it('marks only a stored tick as done, not every item before the current one', async () => {
@@ -120,8 +120,8 @@ describe('MeetingDetailSheetComponent', () => {
     flush(http, 'm-1', { agenda: [AGENDA[0], { ...AGENDA[1], doneAt: '2026-10-15T16:20:00Z' }, AGENDA[2]] });
     fixture.detectChanges();
     const rows = within(screen.getAllByRole('list')[0]).getAllByRole('listitem');
-    expect(within(rows[0]).queryByText('behandelt')).toBeNull();
-    expect(within(rows[1]).getByText('behandelt')).toBeInTheDocument();
+    expect(rows[0].querySelector('.ms__topMark')).toBeNull();
+    expect(rows[1].querySelector('.ms__topMark')).toBeNull();
     expect(within(rows[2]).getByText('Jetzt')).toBeInTheDocument();
   });
 
@@ -140,11 +140,11 @@ describe('MeetingDetailSheetComponent', () => {
     flush(http);
     fixture.detectChanges();
     expect(screen.getByText('TOP 2 von 3')).toBeInTheDocument();
-    expect(screen.getByText('67 %')).toBeInTheDocument();
+    expect(screen.queryByText('67 %')).toBeNull();
     expect(screen.getByText('TOP 2 · Einfache Mehrheit')).toBeInTheDocument();
-    expect(screen.getByText('14 / 19')).toBeInTheDocument();
+    expect(screen.queryByText('14 / 19')).toBeNull();
     expect(screen.getAllByText('14 von 19 Anwesenden haben abgestimmt').length).toBeGreaterThan(0);
-    expect(screen.getByText('1 von 3')).toBeInTheDocument();
+    expect(screen.queryByText('1 von 3')).toBeNull();
     expect(screen.getByText(/Jonas Weber/)).toHaveTextContent('Jonas Weber wird vertreten von Paul Neumann');
     expect(screen.getByText('mit Stimmrecht')).toBeInTheDocument();
     expect(screen.getByText('Entwurf')).toBeInTheDocument();
@@ -221,7 +221,6 @@ describe('MeetingDetailSheetComponent', () => {
     expect(screen.getByText('Keine Protokollführung')).toHaveClass('ms__warn');
     expect(screen.getByText('18:00–20:00')).toBeInTheDocument();
     expect(screen.getByText('Noch keine TOPs.')).toBeInTheDocument();
-    expect(screen.getByText('keine TOPs')).toBeInTheDocument();
     expect(screen.queryByText('Jetzt')).toBeNull();
     expect(screen.queryByText('Vertretungen')).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Protokoll' })).toBeNull();
@@ -312,7 +311,7 @@ describe('MeetingDetailSheetComponent', () => {
       { ...DELEGATION, delegatorName: null, delegateName: null, delegateVoting: false },
     ]);
     fixture.detectChanges();
-    expect(screen.getByText('0 von 0')).toBeInTheDocument();
+    expect(fixture.nativeElement.querySelector('.ms__stats dd')).toHaveTextContent('0');
     expect(screen.getByTitle('Unbenannter TOP')).toBeInTheDocument();
     expect(screen.getByText(/Unbekannt/)).toHaveTextContent('Unbekannt wird vertreten von Unbekannt');
     expect(screen.queryByText('mit Stimmrecht')).toBeNull();

@@ -3,8 +3,7 @@
     <app-breadcrumbs crumbs />
   </app-page-header>
 
-  <section class="pv__queue" aria-labelledby="pv-queue">
-    <h2 class="section-title pv__secTitle" id="pv-queue">{{ 'admin.privacy.queueTitle' | t }}</h2>
+  <app-section class="pv__queue" [level]="2" [heading]="'admin.privacy.queueTitle' | t">
     @if (loading() || erasures().length) {
       <app-data-table
         surface="rowgroup"
@@ -43,11 +42,10 @@
     } @else {
       <app-empty-state shape="table" [heading]="'admin.privacy.queueEmpty' | t" />
     }
-  </section>
+  </app-section>
 
   <div class="pv__cards">
-    <section class="pv__card" aria-labelledby="pv-auskunft">
-      <h2 class="section-title" id="pv-auskunft">{{ 'admin.privacy.auskunftTitle' | t }}</h2>
+    <app-section class="pv__card" [level]="2" [heading]="'admin.privacy.auskunftTitle' | t">
       <form class="pv__form" (submit)="$event.preventDefault(); exportAuskunft()">
         <app-input
           type="email"
@@ -62,10 +60,9 @@
           </app-button>
         </div>
       </form>
-    </section>
+    </app-section>
 
-    <section class="pv__card" aria-labelledby="pv-principal">
-      <h2 class="section-title" id="pv-principal">{{ 'admin.privacy.principalTitle' | t }}</h2>
+    <app-section class="pv__card" [level]="2" [heading]="'admin.privacy.principalTitle' | t">
       <form class="pv__form" (submit)="$event.preventDefault(); askPrincipalErase()">
         @if (person(); as p) {
           <div class="pv__person">
@@ -112,13 +109,10 @@
           </app-button>
         </div>
       </form>
-    </section>
+    </app-section>
   </div>
 
-  <section class="pv__card pv__retention" aria-labelledby="pv-retention">
-    <div class="pv__retentionText">
-      <h2 class="section-title" id="pv-retention">{{ 'admin.privacy.retentionTitle' | t }}</h2>
-    </div>
+  <app-section class="pv__card" [level]="2" [heading]="'admin.privacy.retentionTitle' | t">
     <form class="pv__retentionForm" (submit)="$event.preventDefault(); saveRetention()">
       <app-input
         class="pv__months"
@@ -129,7 +123,7 @@
         name="retentionMonths"
       />
     </form>
-  </section>
+  </app-section>
 
   @if (retentionDirty()) {
     <app-fab

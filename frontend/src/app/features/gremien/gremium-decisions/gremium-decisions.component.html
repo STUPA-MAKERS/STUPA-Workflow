@@ -54,10 +54,7 @@
   }
 } @else {
   @for (g of groups(); track g.key) {
-    <section class="gdc__group" [attr.aria-labelledby]="'gdc-g-' + $index">
-      <h3 class="sec gdc__head" [id]="'gdc-g-' + $index">
-        {{ g.label }} <span class="gdc__meeting">{{ g.meeting }}</span>
-      </h3>
+    <app-section class="gdc__group" [heading]="g.label" [meta]="g.meeting">
       <div class="rowgroup" role="list">
         @for (row of g.rows; track row.decision.id) {
           <app-list-item
@@ -91,7 +88,7 @@
           </app-list-item>
         }
       </div>
-    </section>
+    </app-section>
   }
   @if (nextCursor()) {
     <div class="gdc__more">

@@ -51,17 +51,10 @@
       }
 
       @if (p.gremien.length) {
-        <section class="ur__sec" aria-labelledby="ur-gremien">
-          <app-section-header
-            class="ur__secHead"
-            [level]="3"
-            headingId="ur-gremien"
-            [heading]="'admin.users.revoke.gremien' | t: { n: p.gremien.length }"
-          >
-            <app-button variant="text" size="sm" [disabled]="p.isSelf" (click)="toggleAll()">{{
-              (allSelected() ? 'admin.users.revoke.deselectAll' : 'admin.users.revoke.selectAll') | t
-            }}</app-button>
-          </app-section-header>
+        <app-section class="ur__sec" [heading]="'admin.users.revoke.gremien' | t: { n: p.gremien.length }">
+          <app-button sectionAction variant="text" size="sm" [disabled]="p.isSelf" (click)="toggleAll()">{{
+            (allSelected() ? 'admin.users.revoke.deselectAll' : 'admin.users.revoke.selectAll') | t
+          }}</app-button>
           <ul class="ur__items">
             @for (g of p.gremien; track g.gremiumId) {
               @let e = gEntry(g);
@@ -98,17 +91,11 @@
               </li>
             }
           </ul>
-        </section>
+        </app-section>
       }
 
       @if (p.globalRoles.length) {
-        <section class="ur__sec" aria-labelledby="ur-roles">
-          <app-section-header
-            class="ur__secHead"
-            [level]="3"
-            headingId="ur-roles"
-            [heading]="'admin.users.revoke.roles' | t: { n: p.globalRoles.length }"
-          />
+        <app-section class="ur__sec" [heading]="'admin.users.revoke.roles' | t: { n: p.globalRoles.length }">
           <ul class="ur__items">
             @for (r of p.globalRoles; track r.roleId) {
               @let e = rEntry(r);
@@ -145,7 +132,7 @@
               </li>
             }
           </ul>
-        </section>
+        </app-section>
       }
 
       @if (!empty()) {

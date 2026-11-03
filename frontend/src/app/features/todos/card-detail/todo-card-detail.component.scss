@@ -117,10 +117,10 @@
   scroll-padding-block: var(--space-5);
   @include fade.fade-y(var(--space-5));
 }
-.cd__secHead > app-button {
+.cd__secAction {
   margin-inline-end: calc(-1 * var(--space-2));
 }
-.cd__secHead > app-button.cd__secEnd--icon {
+.cd__secAction--icon {
   margin-inline-end: -10px;
 }
 :host(:not(.cd--phone):not(.cd--pane)) .cd__head app-sheet-bar {
@@ -139,23 +139,9 @@
   flex: 0 1 auto;
 }
 
-.cd__secTitle {
-  margin: 0;
-  font-size: var(--fs-md);
-  font-weight: var(--fw-semibold);
-}
 .cd__sec {
   position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-.cd__secHead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  min-height: 36px;
+  --section-gap: var(--space-2);
 }
 
 .cd__fields {

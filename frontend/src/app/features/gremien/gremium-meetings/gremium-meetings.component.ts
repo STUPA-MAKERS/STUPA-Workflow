@@ -31,6 +31,7 @@ import {
   NoteComponent,
   SkeletonComponent,
   StatusTextComponent,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { topsLabel } from '../../meetings/meetings-overview.util';
 import { GREMIEN_NOW } from '../gremien.store';
@@ -75,6 +76,7 @@ const NO_PROTOCOL: StatusView = { kind: 'muted', key: 'gremien.meetings.protocol
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionComponent,
     RowChevronComponent,
     NoteComponent,
     RouterLink,

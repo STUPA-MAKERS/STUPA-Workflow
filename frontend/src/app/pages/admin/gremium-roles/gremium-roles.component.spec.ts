@@ -53,7 +53,8 @@ describe('GremiumRolesComponent', () => {
     );
     expect(api.listGremiumRoles).toHaveBeenCalledWith('g-1', { quiet: true });
     expect(screen.getByRole('rowheader', { name: /^Vorsitz/ })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Gremienrollen und Berechtigungen' })).toBeNull();
+    const matrixHeading = screen.getByRole('heading', { name: 'Gremienrollen und Berechtigungen' });
+    expect(matrixHeading.closest('.section__head')).toHaveClass('section__head--hidden');
   });
 
   it('keeps the plain title when the gremium is unknown or the read fails', async () => {

@@ -31,11 +31,11 @@ import {
   type SelectFieldOption,
   SkeletonComponent,
   ToastService,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { Subscription } from 'rxjs';
 import { AdminApiService } from '../admin-api.service';
 import { type AdminPrincipal, isActiveMembership } from '../admin.models';
-import { SectionHeaderComponent } from '@shared/ui/section-header/section-header.component';
 import { personLabel } from '@shared/person-label.util';
 
 /** A member of the gremium: a choice of "Vertritt". */
@@ -63,7 +63,7 @@ const SEARCH_LIMIT = 8;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    SectionHeaderComponent,
+    SectionComponent,
     NoteComponent,
     EmptyStateComponent,
     ScrollFadeDirective,

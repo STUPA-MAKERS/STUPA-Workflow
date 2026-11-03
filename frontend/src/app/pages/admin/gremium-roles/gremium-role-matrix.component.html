@@ -1,20 +1,14 @@
-<section
+<app-section
   class="rm"
   [class.rm--bg3]="surface() === 3"
-  [attr.aria-labelledby]="heading() ? uid + '-title' : null"
+  [level]="2"
+  [heading]="'admin.gremiumRoles.matrixTitle' | t"
+  [hideHeading]="!heading()"
 >
-  @if (heading() || (canEdit() && !fab())) {
-    <app-section-header
-      class="rm__head"
-      [headingId]="uid + '-title'"
-      [heading]="heading() ? ('admin.gremiumRoles.matrixTitle' | t) : null"
-    >
-      @if (canEdit() && !fab()) {
-        <app-button size="sm" variant="tonal" (click)="openAdd()">
-          <app-icon name="plus" /> {{ 'admin.gremiumRoles.create' | t }}
-        </app-button>
-      }
-    </app-section-header>
+  @if (canEdit() && !fab()) {
+    <app-button sectionAction size="sm" variant="tonal" (click)="openAdd()">
+      <app-icon name="plus" /> {{ 'admin.gremiumRoles.create' | t }}
+    </app-button>
   }
   @if (canEdit() && fab()) {
     <app-fab [label]="'fab.gremiumRole' | t" (activate)="openAdd()" />
@@ -117,7 +111,7 @@
       }
     </div>
   }
-</section>
+</app-section>
 
 <app-gremium-role-dialog
   [open]="dialogRole() !== undefined"

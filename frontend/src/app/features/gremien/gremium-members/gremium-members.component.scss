@@ -48,13 +48,6 @@
 .gmb__group {
   @include gremien-tab.group;
 }
-.gmb__head {
-  @include gremien-tab.head;
-}
-.gmb__count {
-  color: var(--color-text-muted);
-  font-weight: var(--fw-medium);
-}
 
 .gmb__rows {
   margin: 0;

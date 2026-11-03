@@ -160,14 +160,13 @@
               }
             </div>
 
-            <section class="sp__sec sp__history" aria-labelledby="sp-history">
-              <h2 class="sec sp__secTitle" id="sp-history">{{ 'status.history.title' | t }}</h2>
+            <app-section class="sp__sec sp__history" [level]="2" [heading]="'status.history.title' | t">
               @if (historyEntries().length) {
                 <app-history [entries]="historyEntries()" />
               } @else {
                 <app-empty-state rows="3" [heading]="'status.history.empty' | t" />
               }
-            </section>
+            </app-section>
           </div>
         </article>
       }

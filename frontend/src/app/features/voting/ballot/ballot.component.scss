@@ -6,14 +6,7 @@
 }
 
 .ballot__row {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  min-width: 0;
-}
-
-.ballot__name {
-  padding: 0 2px 2px;
+  --section-gap: 10px;
 }
 
 .ballot__choices {
@@ -190,14 +183,7 @@
   gap: var(--space-4);
 
   .ballot__row {
-    gap: var(--space-2);
-  }
-  .ballot__name {
-    padding: 0;
-    font-size: var(--fs-small);
-    line-height: 1.125rem;
-    font-weight: var(--fw-regular);
-    color: var(--color-text-muted);
+    --section-gap: var(--space-2);
   }
   .ballot__proxy {
     flex-wrap: wrap;
@@ -226,7 +212,7 @@
   gap: var(--space-3) var(--space-4);
 
   .ballot__row {
-    gap: 6px;
+    --section-gap: 6px;
   }
   .ballot__bar {
     grid-column: 1 / -1;

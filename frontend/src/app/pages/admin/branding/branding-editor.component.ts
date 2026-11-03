@@ -27,6 +27,7 @@ import {
   SwitchComponent,
   ToastService,
   PageHeaderComponent,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import type { I18nMap } from '@core/api/models';
@@ -45,7 +46,6 @@ import {
 } from '../admin.models';
 import { brandingLinkErrors } from '../branding.util';
 import { type ContentLang, ContentLangSwitchComponent } from '@shared/ui/content-lang-switch/content-lang-switch.component';
-import { SectionHeaderComponent } from '@shared/ui/section-header/section-header.component';
 
 /** The language of the texts in the editor. */
 type TextLang = ContentLang;
@@ -79,8 +79,8 @@ export type BrandingSection = 'branding' | 'texts';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionComponent,
     FilePickerComponent,
-    SectionHeaderComponent,
     FabComponent,
     SkeletonComponent,
     FormsModule,

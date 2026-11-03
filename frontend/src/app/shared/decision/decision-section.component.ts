@@ -10,6 +10,7 @@ import {
   FieldGroupComponent,
   FieldRowComponent,
   NoteComponent,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 
 /**
@@ -26,6 +27,7 @@ import {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionComponent,
     RouterLink,
     TranslatePipe,
     LocalizedDatePipe,

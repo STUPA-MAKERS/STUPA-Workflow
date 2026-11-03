@@ -1,5 +1,4 @@
-<section class="vh" aria-labelledby="vh-title">
-  <h2 class="sec vh__title" id="vh-title">{{ 'admin.config.history.title' | t }}</h2>
+<app-section class="vh" [level]="2" [heading]="'admin.config.history.title' | t">
   @if (loading()) {
     <app-skeleton variant="rows" [count]="3" [label]="'common.loading' | t" />
   } @else if (revisions().length === 0) {
@@ -58,7 +57,7 @@
       }
     </ol>
   }
-</section>
+</app-section>
 
 @let restoreRev = confirmRestore();
 <app-confirm-dialog

@@ -23,6 +23,7 @@ import {
   TextareaComponent,
   ToastService,
   PageHeaderComponent,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
@@ -88,6 +89,7 @@ interface LanguageDraft {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionComponent,
     ListItemComponent,
     LoadMoreComponent,
     ButtonComponent,

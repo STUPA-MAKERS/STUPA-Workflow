@@ -30,31 +30,15 @@
         }
 
         @for (g of groups(); track g.key) {
-          <section class="af__group" [attr.aria-labelledby]="g.title ? 'af-group-' + g.key : null">
-            @if (g.title) {
-              <h2 class="sec af__groupTitle" [id]="'af-group-' + g.key">{{ g.title | t }}</h2>
-            }
-            <ul class="af__list">
-              @for (p of g.pages; track p.link) {
-                <li>
-                  <a
-                    class="af__item"
-                    [routerLink]="linkOf(p)"
-                    routerLinkActive="af__item--on"
-                    ariaCurrentWhenActive="page"
-                  >
-                    <app-icon class="af__icon" [name]="p.icon" [size]="20" />
-                    <span class="af__itemText">
-                      <span class="af__itemTitle ell" [title]="p.title | t">{{ p.title | t }}</span>
-                      @if (navOnly()) {
-                        <span class="af__itemDesc">{{ p.desc | t }}</span>
-                      }
-                    </span>
-                  </a>
-                </li>
-              }
-            </ul>
-          </section>
+          @if (g.title; as title) {
+            <app-section class="af__group" [level]="2" [heading]="title | t">
+              <ng-container *ngTemplateOutlet="pages; context: { $implicit: g }" />
+            </app-section>
+          } @else {
+            <section class="af__group">
+              <ng-container *ngTemplateOutlet="pages; context: { $implicit: g }" />
+            </section>
+          }
         } @empty {
           <app-empty-state role="status" rows="3" [heading]="'admin.frame.noMatch' | t" />
         }
@@ -80,3 +64,26 @@
     </div>
   </div>
 </div>
+
+<ng-template #pages let-g>
+  <ul class="af__list">
+    @for (p of g.pages; track p.link) {
+      <li>
+        <a
+          class="af__item"
+          [routerLink]="linkOf(p)"
+          routerLinkActive="af__item--on"
+          ariaCurrentWhenActive="page"
+        >
+          <app-icon class="af__icon" [name]="p.icon" [size]="20" />
+          <span class="af__itemText">
+            <span class="af__itemTitle ell" [title]="p.title | t">{{ p.title | t }}</span>
+            @if (navOnly()) {
+              <span class="af__itemDesc">{{ p.desc | t }}</span>
+            }
+          </span>
+        </a>
+      </li>
+    }
+  </ul>
+</ng-template>

@@ -151,7 +151,6 @@
               <div class="cal__fact">
                 <div class="cal__factHead">
                   <strong>{{ 'meetings.overview.topOf' | t: { n: p.position, m: p.count } }}</strong>
-                  <span class="mono">{{ p.percent }} %</span>
                 </div>
                 <app-seg-bar [segments]="c.progressSegs" [total]="p.count" [label]="t('meetings.overview.topOf', { n: p.position, m: p.count })" />
                 @if (p.title) {
@@ -174,8 +173,7 @@
       </section>
 
       @if (upcoming().length) {
-        <section class="cal__upcoming" aria-labelledby="cal-up">
-          <h2 id="cal-up" class="sec cal__upHead">{{ 'meetings.overview.upcoming' | t }}</h2>
+        <app-section [level]="2" [heading]="'meetings.overview.upcoming' | t">
           <div class="cal__rows" role="list">
             @for (m of upcoming(); track m.id) {
               @let st = status(m);
@@ -200,7 +198,7 @@
               </app-list-item>
             }
           </div>
-        </section>
+        </app-section>
       }
     </div>
   </aside>

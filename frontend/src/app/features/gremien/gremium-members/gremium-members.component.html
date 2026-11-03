@@ -61,10 +61,7 @@
     </div>
   }
   @for (g of groups(); track g.key) {
-    <section class="gmb__group" [attr.aria-labelledby]="'gmb-g-' + g.key">
-      <h3 class="sec gmb__head" [id]="'gmb-g-' + g.key">
-        {{ g.label }} <span class="gmb__count">{{ g.rows.length }}</span>
-      </h3>
+    <app-section class="gmb__group" [heading]="g.label">
       <ul class="rowgroup gmb__rows">
         @for (row of g.rows; track row.member.principalId + row.member.roleId) {
           <li class="gmb__row">
@@ -86,6 +83,6 @@
           </li>
         }
       </ul>
-    </section>
+    </app-section>
   }
 }

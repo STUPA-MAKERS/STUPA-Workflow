@@ -13,8 +13,7 @@
   } @else if (loadError()) {
     <app-note kind="error" icon="alert" role="alert">{{ 'admin.translations.loadError' | t }}</app-note>
   } @else {
-    <section class="tr__sec" aria-labelledby="tr-langs">
-      <h2 id="tr-langs" class="section-title tr__secTitle">{{ 'admin.translations.languages' | t }}</h2>
+    <app-section class="tr__sec" [level]="2" [heading]="'admin.translations.languages' | t">
       <ul class="rowgroup tr__langs">
         <app-list-item [title]="'shell.lang.de' | t" sub="de">
           <app-badge trail>{{ 'admin.translations.builtIn' | t }}</app-badge>
@@ -40,10 +39,9 @@
           </app-list-item>
         }
       </ul>
-    </section>
+    </app-section>
 
-    <section class="tr__sec" aria-labelledby="tr-texts">
-      <h2 id="tr-texts" class="section-title tr__secTitle">{{ 'admin.translations.texts' | t }}</h2>
+    <app-section class="tr__sec" [level]="2" [heading]="'admin.translations.texts' | t">
       <app-sticky-bar>
         <div class="tr__search" role="search">
           <app-search-pill
@@ -131,7 +129,7 @@
       } @else {
         <app-empty-state rows="3" [heading]="'admin.translations.noMatch' | t" />
       }
-    </section>
+    </app-section>
   }
 
   @if (dirty()) {
