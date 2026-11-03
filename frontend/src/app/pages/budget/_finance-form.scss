@@ -33,18 +33,16 @@
 .ff__head {
   display: flex;
   flex: none;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--space-3);
-  margin: 0 var(--space-6);
-  padding: var(--space-5) 0 var(--space-4);
-  border-bottom: var(--border-width) solid var(--color-border);
+  padding: var(--space-5) var(--space-6) var(--space-4);
 }
 
 .ff__body {
   --ff-fade: var(--space-5);
   flex: 1 1 auto;
   min-height: 0;
-  padding: var(--space-4) var(--space-6) var(--ff-fab-room);
+  padding: var(--space-1) var(--space-6) var(--ff-fab-room);
   overflow-y: auto;
   overscroll-behavior: contain;
 }
