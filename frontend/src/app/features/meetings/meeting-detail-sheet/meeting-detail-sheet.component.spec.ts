@@ -140,7 +140,7 @@ describe('MeetingDetailSheetComponent', () => {
     flush(http);
     fixture.detectChanges();
     expect(screen.getByText('TOP 2 von 3')).toBeInTheDocument();
-    expect(screen.getByText('67 %')).toBeInTheDocument();
+    expect(screen.queryByText('67 %')).toBeNull();
     expect(screen.getByText('TOP 2 · Einfache Mehrheit')).toBeInTheDocument();
     expect(screen.queryByText('14 / 19')).toBeNull();
     expect(screen.getAllByText('14 von 19 Anwesenden haben abgestimmt').length).toBeGreaterThan(0);

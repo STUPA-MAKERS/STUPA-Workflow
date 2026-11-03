@@ -61,7 +61,7 @@
     </div>
   }
   @for (g of groups(); track g.key) {
-    <app-section class="gmb__group" [heading]="g.label" [meta]="g.rows.length">
+    <app-section class="gmb__group" [heading]="g.label">
       <ul class="rowgroup gmb__rows">
         @for (row of g.rows; track row.member.principalId + row.member.roleId) {
           <li class="gmb__row">

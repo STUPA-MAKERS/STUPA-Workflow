@@ -151,7 +151,6 @@
               <div class="cal__fact">
                 <div class="cal__factHead">
                   <strong>{{ 'meetings.overview.topOf' | t: { n: p.position, m: p.count } }}</strong>
-                  <span class="mono">{{ p.percent }} %</span>
                 </div>
                 <app-seg-bar [segments]="c.progressSegs" [total]="p.count" [label]="t('meetings.overview.topOf', { n: p.position, m: p.count })" />
                 @if (p.title) {

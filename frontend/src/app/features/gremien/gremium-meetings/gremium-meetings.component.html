@@ -36,7 +36,7 @@
   }
 } @else {
   @for (g of groups(); track g.key) {
-    <app-section class="gmt__group" [heading]="g.label" [meta]="g.upcoming ? g.rows.length : null">
+    <app-section class="gmt__group" [heading]="g.label">
       <div class="rowgroup" role="list">
         @for (row of g.rows; track row.meeting.id) {
           <app-list-item

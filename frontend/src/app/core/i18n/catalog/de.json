@@ -1558,7 +1558,6 @@
   "admin.gremien.deleteOpenVote": "Eine Abstimmung des Gremiums ist noch offen. Schließe sie oder brich sie zuerst ab.",
   "admin.gremien.deleteFinalized": "Eine Sitzung des Gremiums hat ein finales Protokoll. Zum Löschen fehlt dir das Recht „meeting.delete_finalized“.",
   "admin.gremien.unknownMember": "(ohne Namen)",
-  "admin.gremien.shownOf": "{shown} von {total}",
   "admin.gremien.showAll": "Alle {count} anzeigen",
   "admin.gremien.showLess": "Weniger anzeigen",
   "admin.gremiumRoles.edit": "Gremium-Rolle bearbeiten",

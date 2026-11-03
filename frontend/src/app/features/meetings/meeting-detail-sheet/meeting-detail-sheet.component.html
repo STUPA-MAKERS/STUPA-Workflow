@@ -110,7 +110,6 @@
             <div class="ms__card">
               <div class="ms__cardHead">
                 <strong>{{ 'meetings.overview.topOf' | t: { n: p.position, m: p.count } }}</strong>
-                <span class="mono">{{ p.percent }} %</span>
               </div>
               <app-seg-bar
                 [segments]="p.segs"
@@ -159,7 +158,7 @@
         </app-section>
 
         @if (delegations().length) {
-          <app-section [heading]="'meetings.overview.delegations' | t" [meta]="delegations().length">
+          <app-section [heading]="'meetings.overview.delegations' | t">
             <ul class="ms__dels rowgroup">
               @for (d of delegations(); track d.id) {
                 <li class="ms__del">

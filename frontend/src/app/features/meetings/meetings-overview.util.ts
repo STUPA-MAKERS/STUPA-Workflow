@@ -188,7 +188,6 @@ export function overviewGroups(
 export interface AgendaProgress {
   position: number;
   count: number;
-  percent: number;
   title: string | null;
 }
 
@@ -199,7 +198,6 @@ export function agendaProgress(m: Meeting): AgendaProgress | null {
   return {
     position: current.position,
     count,
-    percent: Math.round((current.position / count) * 100),
     title: current.title,
   };
 }

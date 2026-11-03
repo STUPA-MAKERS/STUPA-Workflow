@@ -1558,7 +1558,6 @@
   "admin.gremien.deleteOpenVote": "A vote of this committee is still open. Close or cancel it first.",
   "admin.gremien.deleteFinalized": "A meeting of this committee has a final protocol. You need the permission “meeting.delete_finalized” to delete it.",
   "admin.gremien.unknownMember": "(no name)",
-  "admin.gremien.shownOf": "{shown} of {total}",
   "admin.gremien.showAll": "Show all {count}",
   "admin.gremien.showLess": "Show less",
   "admin.gremiumRoles.edit": "Edit committee role",

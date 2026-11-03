@@ -19,7 +19,6 @@
     class="gmm__section"
     [level]="2"
     [heading]="'admin.gremien.members' | t"
-    [meta]="!loading() && members().length > preview ? ('admin.gremien.shownOf' | t: { shown: visible().length, total: members().length }) : null"
   >
 
     @if (loading()) {

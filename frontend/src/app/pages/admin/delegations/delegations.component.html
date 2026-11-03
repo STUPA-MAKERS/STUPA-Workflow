@@ -10,7 +10,6 @@
     class="dl__section"
     [level]="2"
     [heading]="'admin.deleg.active' | t"
-    [meta]="!loading() && !loadError() ? active().length : null"
   >
 
     @if (loading()) {

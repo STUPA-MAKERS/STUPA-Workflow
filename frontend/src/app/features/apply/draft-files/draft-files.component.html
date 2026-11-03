@@ -1,4 +1,4 @@
-<app-section class="df" [heading]="heading()" [required]="required()" [meta]="summary() ? summaryText() : null">
+<app-section class="df" [heading]="heading()" [required]="required()">
 
   @if (files().length || pending().length) {
     <ul class="rowgroup df__list">
@@ -48,6 +48,9 @@
     (files)="onFiles($event)"
     (rejected)="onRejected($event)"
   />
+  @if (summary()) {
+    <p class="df__summary">{{ summaryText() }}</p>
+  }
   @if (error(); as e) {
     <p class="df__error" role="alert">{{ e }}</p>
   }

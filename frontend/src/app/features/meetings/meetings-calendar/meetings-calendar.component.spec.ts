@@ -201,7 +201,7 @@ describe('MeetingsCalendarComponent', () => {
     const card = within(panel).getByRole('article', { name: '34. Sitzung des Studierendenparlaments' });
     expect(within(card).getByText('seit 18:04')).toBeInTheDocument();
     expect(within(card).getByText('TOP 3 von 8')).toBeInTheDocument();
-    expect(within(card).getByText('38 %')).toBeInTheDocument();
+    expect(within(card).queryByText('38 %')).toBeNull();
     expect(within(card).getByText('Zuschuss Erstsemester-Party')).toBeInTheDocument();
     expect(within(card).getByText('14 / 19')).toBeInTheDocument();
     await userEvent.click(within(card).getByRole('button', { name: /^Details$/ }));

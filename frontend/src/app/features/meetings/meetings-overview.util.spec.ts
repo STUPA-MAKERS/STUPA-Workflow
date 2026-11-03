@@ -201,7 +201,7 @@ describe('meetings-overview.util', () => {
         agendaItemCount: 8,
         currentAgendaItem: { position: 3, title: 'Zuschuss' },
       });
-      expect(agendaProgress(live)).toEqual({ position: 3, count: 8, percent: 38, title: 'Zuschuss' });
+      expect(agendaProgress(live)).toEqual({ position: 3, count: 8, title: 'Zuschuss' });
       expect(agendaProgress({ ...live, status: 'planned' })).toBeNull();
       expect(agendaProgress({ ...live, currentAgendaItem: null })).toBeNull();
       expect(agendaProgress({ ...live, agendaItemCount: 0 })).toBeNull();

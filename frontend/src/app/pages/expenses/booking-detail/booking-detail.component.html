@@ -69,7 +69,7 @@
       </app-section>
 
       @if (showSubs()) {
-        <app-section class="fd__sec bd__subs" [heading]="'expenses.sub.title' | t" [meta]="isParent() ? e.childCount : null">
+        <app-section class="fd__sec bd__subs" [heading]="'expenses.sub.title' | t">
           @if (canManage() && !e.parentExpenseId) {
             <app-button sectionAction variant="text" size="sm" (click)="addSub.emit()">
               <span class="fd__btn"><app-icon name="plus" />{{
