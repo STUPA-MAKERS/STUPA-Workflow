@@ -53,14 +53,12 @@
 
     <div class="fd__cols">
       <div class="fd__col">
-        <section class="fd__sec" aria-labelledby="bp-reassign">
-          <h3 id="bp-reassign" class="sec fd__secTitle">{{ 'expenses.bulk.reassign' | t }}</h3>
+        <app-section class="fd__sec" [heading]="'expenses.bulk.reassign' | t">
           <ng-container *ngTemplateOutlet="reassignForm" />
-        </section>
+        </app-section>
       </div>
       <div class="fd__col">
-        <section class="fd__sec" aria-labelledby="bp-rows">
-          <h3 id="bp-rows" class="sec fd__secTitle">{{ 'ui.selection.toolbar' | t }}</h3>
+        <app-section class="fd__sec" [heading]="'ui.selection.toolbar' | t">
           <div class="rowgroup" role="list">
             @for (e of rows(); track e.id) {
               @let cc = costCentre(e);
@@ -77,22 +75,20 @@
             }
             <app-sum-row strong [label]="'expenses.bulk.sum' | t" [amount]="sum()" />
           </div>
-        </section>
+        </app-section>
 
         @if (canExport()) {
-          <section class="fd__sec" aria-labelledby="bp-export">
-            <h3 id="bp-export" class="sec fd__secTitle">{{ 'expenses.export' | t }}</h3>
+          <app-section class="fd__sec" [heading]="'expenses.export' | t">
             <div class="bp__action">
               <span>{{ 'expenses.bulk.exportLine' | t: { count: rows().length } }}</span>
               <app-button variant="fill" size="sm" [disabled]="busy()" (click)="exported.emit()">
                 <span class="ff__btn"><app-icon name="download" />{{ 'expenses.bulk.exportConfirm' | t }}</span>
               </app-button>
             </div>
-          </section>
+          </app-section>
         }
 
-        <section class="fd__sec" aria-labelledby="bp-delete">
-          <h3 id="bp-delete" class="sec fd__secTitle">{{ 'action.delete' | t }}</h3>
+        <app-section class="fd__sec" [heading]="'action.delete' | t">
           <div class="bp__action">
             <span>{{ deleteReason() ?? ('expenses.bulk.deleteLimit' | t: { max: deleteMax() }) }}</span>
             <app-button variant="danger" size="sm" [disabled]="busy() || deleteReason() !== null" (click)="remove.emit()">
@@ -101,7 +97,7 @@
               }}</span>
             </app-button>
           </div>
-        </section>
+        </app-section>
       </div>
     </div>
   </article>

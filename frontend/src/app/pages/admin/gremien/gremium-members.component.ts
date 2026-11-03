@@ -22,6 +22,7 @@ import {
   NoteComponent,
   SkeletonComponent,
   PageHeaderComponent,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
@@ -34,7 +35,6 @@ import {
   MEMBER_GREMIUM_ROLE_KEY,
 } from '../admin.models';
 import { SubstitutePoolComponent } from '../delegations/substitute-pool.component';
-import { SectionHeaderComponent } from '@shared/ui/section-header/section-header.component';
 import { personLabel } from '@shared/person-label.util';
 
 /** One row of the member list. */
@@ -65,8 +65,8 @@ export const MEMBER_PREVIEW = 7;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionComponent,
     ButtonComponent,
-    SectionHeaderComponent,
     EmptyStateComponent,
     RouterLink,
     TranslatePipe,

@@ -24,6 +24,7 @@ import {
   StatusTextComponent,
   ToastService,
   PageHeaderComponent,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
@@ -64,6 +65,7 @@ const FIXED_ROLES = new Set(['admin', 'member']);
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [ContentLangState],
   imports: [
+    SectionComponent,
     ContentLangSwitchComponent,
     ExpandRowComponent,
     I18nInputComponent,

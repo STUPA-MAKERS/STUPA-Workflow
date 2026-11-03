@@ -16,6 +16,7 @@ import {
   SheetBarTitleDirective,
   SkeletonComponent,
   StatusTextComponent,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { flowColorKind, invoiceStatus } from '@shared/ui';
 import { simplifyPathKey } from '@shared/budget-path';
@@ -51,6 +52,7 @@ import { formatMoney } from '@shared/format-money';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionComponent,
     SheetActionComponent,
     SumRowComponent,
     BookingRowComponent,

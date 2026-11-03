@@ -284,20 +284,9 @@
 }
 
 .dash__block {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  min-width: 0;
+  padding-top: 10px;
 }
-.dash__blockHead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  min-height: 2rem;
-  padding: 10px 6px 0;
-}
-.dash__blockHead .dash__more {
+.dash__block .dash__more {
   margin-inline-end: -4px;
 }
 

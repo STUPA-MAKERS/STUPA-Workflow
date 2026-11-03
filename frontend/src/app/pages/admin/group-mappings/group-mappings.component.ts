@@ -23,6 +23,7 @@ import {
   ToastService,
   TruncatedDirective,
   PageHeaderComponent,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
@@ -34,7 +35,6 @@ import type {
   GroupMapping,
   Role,
 } from '../admin.models';
-import { SectionHeaderComponent } from '@shared/ui/section-header/section-header.component';
 
 /** The three separate mapping kinds. Each has its own table and dialog. */
 export type MappingKind = 'global' | 'membership' | 'role';
@@ -98,7 +98,7 @@ const RESERVED_GROUP_PREFIX = 'vote:';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    SectionHeaderComponent,
+    SectionComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,
     TruncatedDirective,

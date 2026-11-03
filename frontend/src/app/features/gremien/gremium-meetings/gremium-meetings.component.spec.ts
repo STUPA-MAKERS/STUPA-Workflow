@@ -55,7 +55,7 @@ describe('GremiumMeetingsComponent', () => {
     expect(view.api.meetings).toHaveBeenCalledWith('g-1');
     expect(view.count).toHaveBeenCalledWith(MEETINGS.length);
     const heads = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent?.replace(/\s+/g, ' ').trim());
-    expect(heads).toEqual(['Kommend 3', 'Oktober 2026', 'September 2026', 'November 2025', 'Ohne Datum']);
+    expect(heads).toEqual(['Kommend', 'Oktober 2026', 'September 2026', 'November 2025', 'Ohne Datum']);
     const titles = view.cmp.groups()[0].rows.map((r) => r.meeting.id);
     expect(titles).toEqual(['m-p1', 'm-p2', 'm-p3']);
     const closed = view.cmp.groups()[1].rows[0];

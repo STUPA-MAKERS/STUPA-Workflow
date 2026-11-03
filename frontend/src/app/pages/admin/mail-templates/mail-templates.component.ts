@@ -21,6 +21,7 @@ import {
   ToastService,
   FabComponent,
   PageHeaderComponent,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
@@ -52,6 +53,7 @@ function sameTexts(a: Record<string, string>, b: Record<string, string>): boolea
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionComponent,
     ListItemComponent,
     SkeletonComponent,
     EmptyStateComponent,

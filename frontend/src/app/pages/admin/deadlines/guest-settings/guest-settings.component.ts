@@ -9,10 +9,10 @@ import {
   InputComponent,
   SelectFieldComponent,
   type SelectOption,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../../admin-api.service';
 import { type GuestSettings, MAX_CONFIRM_TTL_HOURS, MAX_LINK_TTL_DAYS } from '../../admin.models';
-import { SectionHeaderComponent } from '@shared/ui/section-header/section-header.component';
 
 /** The body of the PUT. */
 type Body = Pick<GuestSettings, 'confirmTtlHours' | 'linkTtlDays'>;
@@ -60,7 +60,7 @@ function draftOf(s: GuestSettings): Draft {
   selector: 'app-guest-settings',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [SectionHeaderComponent, FormsModule, TranslatePipe, InputComponent, SelectFieldComponent, LoadStateComponent],
+  imports: [SectionComponent, FormsModule, TranslatePipe, InputComponent, SelectFieldComponent, LoadStateComponent],
   templateUrl: './guest-settings.component.html',
   styleUrl: './guest-settings.component.scss',
 })

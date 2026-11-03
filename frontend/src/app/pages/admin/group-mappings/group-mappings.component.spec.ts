@@ -96,12 +96,12 @@ describe('GroupMappingsComponent', () => {
     for (const name of ['Globale Rollen', 'Gremien-Mitgliedschaft', 'Gremien-Rollen']) {
       expect(screen.getByRole('heading', { level: 2, name })).toBeInTheDocument();
     }
-    const global = screen.getByRole('region', { name: 'Globale Rollen' });
+    const global = screen.getByRole('group', { name: 'Globale Rollen' });
     expect(within(global).getByText('stupa-vorstand')).toBeInTheDocument();
     expect(within(global).queryByText('StuPa')).toBeNull();
-    const membership = screen.getByRole('region', { name: 'Gremien-Mitgliedschaft' });
+    const membership = screen.getByRole('group', { name: 'Gremien-Mitgliedschaft' });
     expect(within(membership).getByText('stupa-mitglieder')).toBeInTheDocument();
-    const role = screen.getByRole('region', { name: 'Gremien-Rollen' });
+    const role = screen.getByRole('group', { name: 'Gremien-Rollen' });
     expect(within(role).getByText('Präsidium')).toBeInTheDocument();
   });
 
@@ -140,7 +140,7 @@ describe('GroupMappingsComponent', () => {
       target: 'StuPa',
       role: 'Präsidium',
     });
-    const role = screen.getByRole('region', { name: 'Gremien-Rollen' });
+    const role = screen.getByRole('group', { name: 'Gremien-Rollen' });
     expect(within(role).getByText('Präsidium').tagName).toBe('STRONG');
     expect(screen.queryByText('Das Präfix „vote:“ ist reserviert.')).not.toBeInTheDocument();
   });

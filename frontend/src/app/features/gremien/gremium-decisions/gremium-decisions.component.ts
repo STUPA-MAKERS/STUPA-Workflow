@@ -37,6 +37,7 @@ import {
   SkeletonComponent,
   StatusTextComponent,
   StickyBarComponent,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { electionStatus } from '../../voting/election.util';
 import { GREMIEN_NOW } from '../gremien.store';
@@ -92,6 +93,7 @@ const NO_RESULT: StatusView = { kind: 'muted', key: 'gremien.decisions.noResult'
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionComponent,
     RowChevronComponent,
     NoteComponent,
     StickyBarComponent,

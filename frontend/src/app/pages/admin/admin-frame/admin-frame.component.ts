@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -39,6 +40,7 @@ import {
   SwipeBackDirective,
   PageFrame,
   PageHeaderComponent,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { PageFrameService } from '../../../layout/page-frame.service';
 import { AdminHealthComponent } from '../admin-health/admin-health.component';
@@ -146,6 +148,8 @@ const sheetScroll = new Map<number, number>();
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [ListDetailNav],
   imports: [
+    NgTemplateOutlet,
+    SectionComponent,
     EmptyStateComponent,
     ListDetailBarComponent,
     PageHeaderComponent,

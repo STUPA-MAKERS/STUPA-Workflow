@@ -155,8 +155,10 @@
   z-index: 1;
   pointer-events: none;
 }
+// flex: none, because a cell whose entries overflow would shrink the pill and lift the number.
 .cal__num {
   display: grid;
+  flex: none;
   align-self: flex-end;
   place-items: center;
   min-width: 1.625rem;
@@ -335,15 +337,6 @@
   font-size: 0.8125rem;
 }
 
-.cal__upcoming {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  min-width: 0;
-}
-.cal__upHead {
-  padding-inline: var(--space-1);
-}
 .cal__rows {
   display: flex;
   flex-direction: column;

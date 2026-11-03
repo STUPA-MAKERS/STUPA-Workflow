@@ -107,7 +107,7 @@ describe('DelegationsComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   /** Without names the row says so; it never shows an id. */
-  it('lists the active delegations by meeting date, with the tags and the count', async () => {
+  it('lists the active delegations by meeting date, with the tags and no count', async () => {
     await setup();
     const rows = within(activeList()).getAllByRole('listitem');
     expect(rows.map((r) => r.querySelector('.dl__title')?.textContent?.trim())).toEqual([
@@ -124,7 +124,7 @@ describe('DelegationsComponent', () => {
       '/meetings/m-1',
     );
     expect(within(rows[2]).getAllByText('(ohne Namen)')).toHaveLength(2);
-    expect(screen.getByText('3')).toBeInTheDocument();
+    expect(screen.queryByText('3')).toBeNull();
   });
 
   it('keeps the delegations of past meetings behind a toggle', async () => {

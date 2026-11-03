@@ -9,6 +9,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, date, datetime
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -30,6 +31,7 @@ from app.modules.budget.tree_schemas import (
     FiscalYearUpdate,
     MoveFiscalYearRequest,
 )
+from app.settings import get_settings
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 from tests._support.auth_fakes import fake_session, result
 
@@ -710,6 +712,19 @@ async def test_resolve_fiscal_year_wrong_top() -> None:
     svc = BudgetTreeService(sess)
     with pytest.raises(ValidationProblem):
         await svc._resolve_fiscal_year(node, fy.id)
+
+
+async def test_resolve_fiscal_year_picks_current_of_several() -> None:
+    """Of several active open fiscal years, the one that contains today is the default."""
+    top = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
+    node = _budget(id=uuid.uuid4(), path_key="VS-800", key="800")
+    this_year = datetime.now(ZoneInfo(get_settings().local_timezone)).year
+    old = _fy(id=uuid.uuid4(), budget_id=top.id, year=this_year - 1)
+    cur = _fy(id=uuid.uuid4(), budget_id=top.id, year=this_year)
+    nxt = _fy(id=uuid.uuid4(), budget_id=top.id, year=this_year + 1)
+    sess = fake_session(result(top), result(old, cur, nxt))
+    svc = BudgetTreeService(sess)
+    assert await svc._resolve_fiscal_year(node, None) == cur.id
 
 
 async def test_resolve_fiscal_year_ambiguous() -> None:

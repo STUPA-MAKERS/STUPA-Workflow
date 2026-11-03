@@ -103,7 +103,6 @@ let CONFIG: { mode: 'create' | 'edit'; expense: Expense; inputs: Record<string, 
       [fyLabel]="$any(inputs['fyLabel'] === undefined ? '2026' : inputs['fyLabel'])"
       [subRows]="$any(inputs['subRows'] ?? [])"
       [layout]="$any(inputs['layout'] ?? 'pane')"
-      (remove)="handlers.remove()"
       (addSub)="handlers.addSub()"
       (editSub)="handlers.editSub($event)"
       (removeSub)="handlers.removeSub($event)"
@@ -120,7 +119,6 @@ class HostComponent {
   readonly tree = TREE;
   readonly costCentres = costCentreIndex(TREE);
   readonly handlers = {
-    remove: jest.fn(),
     addSub: jest.fn(),
     editSub: jest.fn(),
     removeSub: jest.fn(),
@@ -294,7 +292,7 @@ describe('BookingFormComponent', () => {
     expect(dialogs.newApplicationId()).toBe('');
   });
 
-  it('cancels and submits a new booking with the buttons of the foot', async () => {
+  it('submits a new booking with the fab and closes with the head', async () => {
     const { dialogs, user, view } = await setup('create');
     const save = screen.getByRole('button', { name: 'Buchung speichern' });
     expect(save).toBeDisabled();
@@ -307,12 +305,7 @@ describe('BookingFormComponent', () => {
     expect(save).toBeEnabled();
     await user.click(save);
     expect(submit).toHaveBeenCalledTimes(1);
-    await user.click(screen.getByRole('button', { name: 'Abbrechen' }));
-    expect(dialogs.createOpen()).toBe(false);
-  });
-
-  it('closes with the round button of the head', async () => {
-    const { dialogs, user } = await setup('create');
+    expect(screen.queryByRole('button', { name: 'Abbrechen' })).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Schließen' }));
     expect(dialogs.createOpen()).toBe(false);
   });
@@ -327,7 +320,7 @@ describe('BookingFormComponent', () => {
       paymentDate: '2026-09-25',
       correspondent: 'Radhaus',
     };
-    const { addSub, editSub, removeSub, remove, user, view } = await setup('edit', {
+    const { addSub, editSub, removeSub, user, view } = await setup('edit', {
       expense: { ...EXPENSE, applicationId: 'a', applicationTitle: 'Lastenrad', childCount: 1 },
       subRows: [sub],
     });
@@ -350,8 +343,7 @@ describe('BookingFormComponent', () => {
     await user.click(screen.getByRole('button', { name: 'Aktionen für „Rahmen“' }));
     await user.click(screen.getByRole('menuitem', { name: 'Löschen' }));
     expect(removeSub).toHaveBeenCalledWith(sub);
-    await user.click(screen.getByRole('button', { name: 'Löschen' }));
-    expect(remove).toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Löschen' })).toBeNull();
   });
 
   /** A pick without an id changes nothing. */
@@ -387,11 +379,11 @@ describe('BookingFormComponent', () => {
     expect(screen.queryByRole('group', { name: 'Unterbuchungen' })).toBeNull();
   });
 
-  it('leaves out its head in the bottom sheet and makes the delete an icon', async () => {
+  it('leaves out its head and the delete in the bottom sheet', async () => {
     const { view } = await setup('edit', { layout: 'sheet' });
     expect(screen.queryByRole('heading', { name: 'Buchung bearbeiten' })).toBeNull();
     expect(view.container.querySelector('.mf--sheet')).not.toBeNull();
-    expect(screen.getByRole('button', { name: 'Löschen' }).textContent?.trim()).toBe('');
+    expect(screen.queryByRole('button', { name: 'Löschen' })).toBeNull();
   });
 
   it('names the save button short in the bottom sheet', async () => {

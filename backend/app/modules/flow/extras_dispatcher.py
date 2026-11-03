@@ -5,8 +5,9 @@ the given Gremium that is still `planned` and whose date is today or later in lo
 Without a `gremiumId` the handler takes the Gremium of the vote
 (`application.vote_gremium_id`, set by the engine before the commit). A live or closed
 meeting never gets the item. If no such meeting exists, the handler logs the case and
-skips the action. `assignBudget` attaches a cost center. It derives the fiscal year from
-the single active fiscal year of the top-level node. `assignBudgetFromField` does the
+skips the action. `assignBudget` attaches a cost center. It derives the current fiscal
+year of the top-level node: the single active open year, or of several the one that
+contains today. `assignBudgetFromField` does the
 same with the cost center id that a form field holds. `assignBudgetFromApplicantGremium`
 takes the single cost center whose own deciding Gremium is a Gremium of the applicant.
 `assignBudgetFromMap` maps the value of a form field to a cost center. No cost-center
@@ -32,7 +33,7 @@ from app.modules.applications.models import Application
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.budget.tree_models import Budget, FiscalYear
-from app.modules.budget.tree_rules import _SEP
+from app.modules.budget.tree_rules import _SEP, pick_fiscal_year
 from app.modules.flow.context import committee_ids_for_sub
 from app.modules.flow.dispatch import DispatchedAction
 from app.modules.flow.vote_gremium import fill_snapshot, in_budget_vote_state
@@ -325,7 +326,7 @@ class FlowExtrasActionDispatcher:
     async def _assign_node(
         self, session: AsyncSession, app: Application, budget_id: UUID, *, source: str
     ) -> bool:
-        """Assign the cost center and its single active open fiscal year, then write the audit.
+        """Assign the cost center and its current fiscal year, then write the audit.
 
         The call is idempotent. A retry of the same action (same idempotency key)
         finds the cost center already set and changes nothing, so it writes no second
@@ -335,8 +336,9 @@ class FlowExtrasActionDispatcher:
         waits for this commit, or this read sees it. The method skips the change while the
         deciding Gremium of the running vote comes from the current cost center
         (`application.vote_gremium_id`), and when the fiscal year is closed, because a closed
-        fiscal year is frozen. The manual route gives 409 in both cases. It sets the active open
-        fiscal year only when it is unambiguous, otherwise it leaves it open. The audit entry
+        fiscal year is frozen. The manual route gives 409 in both cases. It sets the current fiscal
+        year (`tree_rules.pick_fiscal_year`) only when it is unambiguous, otherwise it leaves it
+        open. The audit entry
         mirrors `BudgetTreeService`, because every money mutation needs an audit trail.
 
         Returns:
@@ -375,17 +377,19 @@ class FlowExtrasActionDispatcher:
             return False
         app.budget_id = node.id
         top = await self._top_level(session, node)
-        active_ids = (
+        open_years = (
             await session.scalars(
-                select(FiscalYear.id).where(
+                select(FiscalYear).where(
                     FiscalYear.budget_id == top.id,
                     FiscalYear.active.is_(True),
                     FiscalYear.closed_at.is_(None),
                 )
             )
         ).all()
-        if len(active_ids) == 1:
-            app.fiscal_year_id = active_ids[0]
+        today = datetime.now(ZoneInfo(get_settings().local_timezone)).date()
+        picked = pick_fiscal_year([(f.id, f.start_date, f.end_date) for f in open_years], today)
+        if picked is not None:
+            app.fiscal_year_id = picked
         await audit_record(
             session,
             actor=_FLOW_ACTOR,

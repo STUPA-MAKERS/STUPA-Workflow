@@ -36,13 +36,7 @@
   }
 } @else {
   @for (g of groups(); track g.key) {
-    <section class="gmt__group" [attr.aria-labelledby]="'gmt-g-' + g.key">
-      <h3 class="sec gmt__head" [id]="'gmt-g-' + g.key">
-        {{ g.label }}
-        @if (g.upcoming) {
-          <span class="gmt__count">{{ g.rows.length }}</span>
-        }
-      </h3>
+    <app-section class="gmt__group" [heading]="g.label">
       <div class="rowgroup" role="list">
         @for (row of g.rows; track row.meeting.id) {
           <app-list-item
@@ -80,6 +74,6 @@
           </app-list-item>
         }
       </div>
-    </section>
+    </app-section>
   }
 }

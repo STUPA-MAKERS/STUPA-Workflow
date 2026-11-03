@@ -5,22 +5,10 @@
 
 .att {
   position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  min-width: 0;
+  --section-gap: var(--space-2);
 }
-.att__head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: var(--control-height-sm);
-  padding-inline-start: var(--space-1);
-}
-.att__title {
-  flex: 1 1 auto;
-}
-.att__head app-button {
+.att__upload {
+  display: inline-flex;
   margin-inline-end: calc(-1 * var(--space-2));
 }
 .att__btn {

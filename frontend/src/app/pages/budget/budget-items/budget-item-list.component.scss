@@ -1,0 +1,19 @@
+:host {
+  display: block;
+}
+
+.bil__icon {
+  display: inline-flex;
+  color: var(--color-text-muted);
+}
+.bil__dot {
+  margin-inline: 6px;
+  color: var(--color-text-subtle);
+}
+.bil__amount {
+  font-size: 0.78125rem;
+  white-space: nowrap;
+}
+.bil__amount--in {
+  color: var(--color-accent-text);
+}

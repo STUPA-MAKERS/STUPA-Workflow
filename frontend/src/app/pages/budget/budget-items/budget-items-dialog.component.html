@@ -1,0 +1,41 @@
+<app-dialog class="bid__dialog" [open]="open()" [title]="title()" [closeLabel]="'action.close' | t" size="lg" (closed)="close()">
+  <div class="bid">
+    <div class="bid__tools">
+      <app-search-pill
+        class="bid__search"
+        size="md"
+        [placeholder]="'budget.dash.itemsSearch' | t"
+        [clearable]="true"
+        [value]="query()"
+        (valueChange)="onQuery($event)"
+      />
+      @if (withBookings()) {
+        <div class="bid__chips" role="group" [attr.aria-label]="'budget.dash.filters' | t">
+          <app-filter-select
+            [label]="'budget.dash.type' | t"
+            [options]="typeOptions()"
+            [value]="type()"
+            (valueChange)="setType($event)"
+            [text]="typeText()"
+            filled
+          />
+        </div>
+      }
+    </div>
+
+    @if (loadingFirst()) {
+      <app-skeleton variant="rows" [count]="6" [label]="'budget.dash.itemsLoading' | t" />
+    } @else if (error() && !items().length) {
+      <app-note kind="error" icon="alert" role="alert" retryable (retry)="retry()">{{ 'budget.dash.itemsError' | t }}</app-note>
+    } @else if (!items().length) {
+      <app-empty-state rows="3" [heading]="'budget.dash.itemsNone' | t" />
+    } @else {
+      <app-budget-item-list [items]="items()" [names]="names()" />
+      @if (error()) {
+        <app-note kind="error" icon="alert" role="alert" retryable (retry)="retry()">{{ 'budget.dash.itemsError' | t }}</app-note>
+      } @else if (hasMore()) {
+        <app-load-more [label]="'budget.dash.loadMore' | t" [loading]="loading()" (more)="loadMore()" />
+      }
+    }
+  </div>
+</app-dialog>

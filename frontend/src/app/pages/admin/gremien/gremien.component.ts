@@ -19,6 +19,7 @@ import {
   StatusTextComponent,
   ToastService,
   PageHeaderComponent,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { problemCode } from '@core/api/problem';
@@ -69,6 +70,7 @@ interface Setting {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionComponent,
     ExpandRowComponent,
     FabComponent,
     ConfirmDialogComponent,

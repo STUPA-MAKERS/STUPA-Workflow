@@ -11,7 +11,9 @@
   min-height: 0;
 }
 
+// The floating main action covers the end of the body, so the body keeps room for it.
 .ff {
+  --ff-fab-room: calc(56px + var(--space-6));
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
@@ -20,6 +22,7 @@
   margin: 0;
 }
 .ff--pane {
+  position: relative;
   border-radius: var(--radius-2xl);
   background: var(--color-surface-1);
 }
@@ -30,23 +33,21 @@
 .ff__head {
   display: flex;
   flex: none;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--space-3);
-  margin: 0 var(--space-6);
-  padding: var(--space-5) 0 var(--space-4);
-  border-bottom: var(--border-width) solid var(--color-border);
+  padding: var(--space-5) var(--space-6) var(--space-4);
 }
 
 .ff__body {
   --ff-fade: var(--space-5);
   flex: 1 1 auto;
   min-height: 0;
-  padding: var(--space-4) var(--space-6) var(--space-6);
+  padding: var(--space-1) var(--space-6) var(--ff-fab-room);
   overflow-y: auto;
   overscroll-behavior: contain;
 }
 .ff--sheet .ff__body {
-  padding: var(--space-2) 0 var(--space-5);
+  padding: var(--space-2) 0 var(--ff-fab-room);
 }
 .ff__body {
   @include fade.fade-y(var(--ff-fade));
@@ -74,14 +75,10 @@
   padding: 0;
   border: 0;
 }
-.ff__secTitle {
-  margin: 0 0 2px;
-  padding: 0 var(--space-1);
-}
 .ff__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-2);
+  gap: var(--space-3);
 }
 .ff__grid--3 {
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -158,22 +155,6 @@
   outline: 2px solid var(--color-focus-ring);
 }
 
-
-.ff__foot {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: var(--space-3);
-  min-height: 4.25rem;
-  padding: var(--space-3) var(--space-6);
-  border-top: var(--border-width) solid var(--color-border);
-  border-radius: 0 0 var(--radius-2xl) var(--radius-2xl);
-  background: var(--color-surface-2);
-}
-.ff--sheet .ff__foot {
-  padding: var(--space-3) 0;
-  border-radius: 0;
-}
 .ff__btn {
   display: inline-flex;
   align-items: center;
@@ -181,11 +162,8 @@
   white-space: nowrap;
 }
 
+// One view: the form docks in the bar of the layout and fills the page like a detail.
 .ff--page .ff__body {
+  padding: var(--space-4) 0 var(--ff-fab-room);
   overflow: visible;
-}
-.ff--page .ff__foot {
-  position: sticky;
-  bottom: 0;
-  z-index: var(--z-sticky);
 }

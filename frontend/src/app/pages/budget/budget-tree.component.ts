@@ -45,6 +45,7 @@ import {
   ToastService,
   FabComponent,
   PageHeaderComponent,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin/admin-api.service';
@@ -109,6 +110,7 @@ const MAX_CUTOFF_DAY = 28;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionComponent,
     FabComponent,
     ConfirmDialogComponent,
     FormsModule,
@@ -226,6 +228,8 @@ export class BudgetTreeComponent {
   readonly fyDeleteBlocked = signal<string | null>(null);
   /** The fiscal year to close, or to reopen when it is closed. */
   readonly fyCloseTarget = signal<FiscalYear | null>(null);
+  /** The close confirm came from the fiscal year list, so a cancel or a success opens the list again. */
+  private fyCloseFromList = false;
 
   readonly selectedTop = computed<BudgetTreeNode | null>(
     () => this.tree().find((n) => n.id === this.selectedTopId()) ?? null,
@@ -522,13 +526,27 @@ export class BudgetTreeComponent {
       { id: 'cutoff', label: t('budget.tree.stichtagTitle'), disabledReason: noTop },
     ];
     if (this.phone()) items.push({ id: 'fy', label: t('budget.tree.fyTitle'), icon: 'cal', disabledReason: noTop });
-    return [{ items }];
+    const sections: RowMenuSection[] = [{ items }];
+    const fy = this.selectedFy();
+    if (fy) {
+      sections.push({
+        items: [
+          fy.closedAt
+            ? { id: 'fyReopen', label: this.i18n.translate('budget.tree.fyReopenSelected', { year: fy.display }), icon: 'undo' }
+            : { id: 'fyClose', label: this.i18n.translate('budget.tree.fyCloseSelected', { year: fy.display }), icon: 'lock' },
+        ],
+      });
+    }
+    return sections;
   });
 
   onHeaderMenu(item: RowMenuItem): void {
     if (item.id === 'states') this.openStateConfig();
     else if (item.id === 'cutoff') this.openStichtag();
-    else this.openFy();
+    else if (item.id === 'fyClose' || item.id === 'fyReopen') {
+      const fy = this.selectedFy();
+      if (fy) this.askFyClose(fy, false);
+    } else this.openFy();
   }
 
   /** Load sequence counter. It increases for each load. A response of an older
@@ -958,14 +976,16 @@ export class BudgetTreeComponent {
       });
   }
 
-  askFyClose(fy: FiscalYear): void {
+  /** Ask to close or reopen `fy`. `fromList` is true when the fiscal year list asks. */
+  askFyClose(fy: FiscalYear, fromList = true): void {
+    this.fyCloseFromList = fromList;
     this.fyOpen.set(false);
     this.fyCloseTarget.set(fy);
   }
 
   closeFyClose(): void {
     this.fyCloseTarget.set(null);
-    this.fyOpen.set(true);
+    if (this.fyCloseFromList) this.fyOpen.set(true);
   }
 
   /** Close the target year, or reopen it when it is closed. */

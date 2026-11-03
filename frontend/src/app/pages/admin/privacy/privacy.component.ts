@@ -29,6 +29,7 @@ import {
   ToastService,
   FabComponent,
   PageHeaderComponent,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
@@ -57,6 +58,7 @@ const PERSON_HITS = 6;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionComponent,
     FabComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,

@@ -105,17 +105,15 @@
 
         <div class="bd__cols" [class.bd__cols--single]="!hasChildren()">
           @if (hasChildren()) {
-            <section class="bd__sec" aria-labelledby="bd-dist">
-              <div class="bd__secHead">
-                <h3 id="bd-dist" class="bd__h">{{ 'budget.dash.distribution' | t }}</h3>
-<app-filter-select
-                  [label]="'budget.dash.metric' | t"
-                  [options]="metricOptions()"
-                  [value]="metric()"
-                  (valueChange)="onMetricChange($event)"
-                  [active]="true"
-                />
-              </div>
+            <app-section class="bd__sec" size="lg" [heading]="'budget.dash.distribution' | t">
+              <app-filter-select
+                sectionAction
+                [label]="'budget.dash.metric' | t"
+                [options]="metricOptions()"
+                [value]="metric()"
+                (valueChange)="onMetricChange($event)"
+                [active]="true"
+              />
               <app-budget-pie
                 [label]="metricLabel(metric())"
                 [ariaLabel]="('budget.dash.distributionOf' | t: { metric: metricLabel(metric()) })"
@@ -123,13 +121,10 @@
                 [currency]="current()?.currency ?? 'EUR'"
                 (sliceClick)="selectKs($event)"
               />
-            </section>
+            </app-section>
           }
 
-          <section class="bd__sec" aria-labelledby="bd-usage">
-            <div class="bd__secHead">
-              <h3 id="bd-usage" class="bd__h">{{ 'budget.usage.heading' | t }}</h3>
-            </div>
+          <app-section class="bd__sec" size="lg" [heading]="'budget.usage.heading' | t">
             <div class="bd__usageCols" aria-hidden="true">
               <span class="bd__grow"></span>
               <span class="bd__c1">{{ 'budget.dash.fig.requested' | t }}</span>
@@ -170,44 +165,23 @@
                 </li>
               }
             </ul>
-          </section>
+          </app-section>
         </div>
 
-        <section class="bd__sec" aria-labelledby="bd-apps">
-          <div class="bd__secHead bd__secHead--apps">
-            <h3 id="bd-apps" class="bd__h">{{ 'budget.dash.apps' | t }}</h3>
-            @if (apps()?.length) {
-              <app-button variant="text" size="sm" (click)="openApplications()">{{ 'budget.dash.appsAll' | t }}</app-button>
-            }
-          </div>
-          @if (apps() === null) {
-            <app-skeleton variant="rows" [count]="3" [label]="'budget.dash.appsLoading' | t" />
-          } @else if (appsError()) {
-            <app-note kind="error" icon="alert" role="alert" retryable (retry)="loadApps()">{{ 'budget.dash.appsError' | t }}</app-note>
-          } @else if (!appRows().length) {
-            <app-empty-state rows="3" [heading]="'budget.dash.appsNone' | t" />
-          } @else {
-            <div class="rowgroup">
-              @for (r of appRows(); track r.app.applicationId) {
-                <app-list-item [title]="r.title" [link]="['/applications', r.app.applicationId]">
-                  <span sub>
-                    @if (r.statusLabel) {
-                      <app-status-text [kind]="r.statusKind">{{ r.statusLabel }}</app-status-text>
-                      <span class="bd__dot" aria-hidden="true">·</span>
-                    }
-                    @if (r.app.pathKey) {
-                      <span class="mono">{{ r.app.pathKey | simplifyPath }}</span>
-                    }
-                    @if (r.costCentre) {
-                      <span class="bd__appKs">{{ r.costCentre }}</span>
-                    }
-                  </span>
-                  <span trail class="mono bd__amount">{{ r.app.amount === null ? '—' : money(r.app.amount, r.app.currency ?? 'EUR') }}</span>
-                </app-list-item>
-              }
-            </div>
+        <app-section class="bd__sec bd__sec--apps" size="lg" headingId="bd-apps" [heading]="itemsTitle()">
+          @if (previewItems().length) {
+            <app-button sectionAction variant="text" size="sm" (click)="openItems()">{{ 'budget.dash.appsAll' | t }}</app-button>
           }
-        </section>
+          @if (apps() === null) {
+            <app-skeleton variant="rows" [count]="3" [label]="(canSeeBookings() ? 'budget.dash.itemsLoading' : 'budget.dash.appsLoading') | t" />
+          } @else if (appsError()) {
+            <app-note kind="error" icon="alert" role="alert" retryable (retry)="loadApps()">{{ (canSeeBookings() ? 'budget.dash.itemsError' : 'budget.dash.appsError') | t }}</app-note>
+          } @else if (!previewItems().length) {
+            <app-empty-state rows="3" [heading]="(canSeeBookings() ? 'budget.dash.itemsNone' : 'budget.dash.appsNone') | t" />
+          } @else {
+            <app-budget-item-list [items]="previewItems()" [names]="nodeNames()" />
+          }
+        </app-section>
       </div>
     </article>
   </div>
@@ -319,6 +293,16 @@
       [active]="true"
     />
   </ng-template>
+
+  <app-budget-items-dialog
+    [(open)]="itemsOpen"
+    [title]="itemsTitle()"
+    [ksId]="selectedKsId()"
+    [fyId]="selectedFyId()"
+    [apps]="apps() ?? []"
+    [withBookings]="canSeeBookings()"
+    [names]="nodeNames()"
+  />
 
   <app-dialog
     [open]="overviewOpen()"

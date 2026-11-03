@@ -9,6 +9,7 @@ import {
   FabComponent,
   ToastService,
   PageHeaderComponent,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -31,6 +32,7 @@ import { LoadStateComponent } from '@shared/ui/load-state/load-state.component';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionComponent,
     LoadStateComponent,
     FormsModule,
     TranslatePipe,

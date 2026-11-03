@@ -715,8 +715,8 @@ export class BudgetTreeApi {
 
   /** Assign an application to a cost center. ``budgetId=null`` removes the
    *  assignment. ``fiscalYearId`` is optional. If it is set, it names the fiscal
-   *  year. If it is unset, the server derives the single active fiscal year, else
-   *  it answers 422. */
+   *  year. If it is unset, the server derives the current fiscal year (the only
+   *  active open one, else the active open one that holds today), else it answers 422. */
   assignBudget(
     applicationId: Uuid,
     budgetId: Uuid | null,

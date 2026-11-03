@@ -453,7 +453,7 @@ describe('ApplicationsDetailComponent', () => {
     expect(busy.querySelectorAll('.ad__cols > .ad__col')).toHaveLength(2);
     expect(within(busy as HTMLElement).getByText('Details')).toBeInTheDocument();
     expect(within(busy as HTMLElement).getByText('Verlauf')).toBeInTheDocument();
-    expect(busy.querySelector('.ad__skelAnswers h3 .skel-text')).not.toBeNull();
+    expect(busy.querySelector('.ad__skelAnswers .ad__skelSecTitle .skel-text')).not.toBeNull();
     http.expectOne(url('')).flush(appWire());
     flushAttachments(http);
   });

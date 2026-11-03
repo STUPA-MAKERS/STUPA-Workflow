@@ -27,6 +27,7 @@ import {
   StatusTextComponent,
   ToastService,
   FabComponent,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import {
@@ -38,7 +39,6 @@ import {
   sortGremiumRoles,
 } from '../admin.models';
 import { GremiumRoleDialogComponent } from './gremium-role-dialog.component';
-import { SectionHeaderComponent } from '@shared/ui/section-header/section-header.component';
 
 let nextId = 0;
 
@@ -61,7 +61,7 @@ let nextId = 0;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    SectionHeaderComponent,
+    SectionComponent,
     NoteComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,

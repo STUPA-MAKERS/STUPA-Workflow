@@ -11,15 +11,9 @@
   margin: 0;
 }
 
-.ht__sec {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  min-width: 0;
-}
-.ht__secTitle {
-  margin: 0;
-  padding: 0 var(--space-1);
+
+.ht__sec:focus {
+  outline: none;
 }
 
 .ht__rows {

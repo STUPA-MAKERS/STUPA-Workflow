@@ -19,8 +19,7 @@
   <div class="ff__body" appScrollFade="y">
     <div class="ff__cols">
       <div class="ff__col">
-        <fieldset class="ff__sec">
-          <legend class="sec ff__secTitle">{{ 'applications.capture.applicant' | t }}</legend>
+        <app-section [heading]="'applications.capture.applicant' | t">
           <app-segmented
             [ariaLabel]="'applications.capture.applicant' | t"
             width="fill"
@@ -85,10 +84,9 @@
               />
             </div>
           }
-        </fieldset>
+        </app-section>
 
-        <fieldset class="ff__sec">
-          <legend class="sec ff__secTitle">{{ 'applications.capture.application' | t }}</legend>
+        <app-section [heading]="'applications.capture.application' | t">
           <app-select
             name="type"
             [label]="'applications.capture.type' | t"
@@ -117,15 +115,14 @@
               (ngModelChange)="intake.set($event ?? '')"
             />
           </div>
-        </fieldset>
+        </app-section>
       </div>
     </div>
 
     @if (loadingForm()) {
       <app-skeleton class="cap__loading" variant="lines" [count]="3" [label]="'apply.form.loading' | t" />
     } @else if (effForm()) {
-      <fieldset class="ff__sec cap__answers">
-        <legend class="sec ff__secTitle">{{ 'applications.capture.details' | t }}</legend>
+      <app-section class="cap__answers" [heading]="'applications.capture.details' | t">
         <div class="fe-form">
           <formly-form [form]="form" [fields]="fields()" [model]="model" />
         </div>
@@ -134,22 +131,19 @@
           [heading]="'apply.files.title' | t"
           [summary]="true"
         />
-      </fieldset>
+      </app-section>
     } @else {
       <app-note class="cap__pickType" icon="info" [surface]="layout() === 'sheet' ? 3 : 2">{{ 'applications.capture.pickType' | t }}</app-note>
     }
   </div>
 
-  <footer class="ff__foot" appPaneFormFoot (cancelled)="close()">
-    <app-button variant="fill"
-      data-testid="cap-submit"
-      [disabled]="!canSubmit()"
-      [loading]="saving()"
-      (click)="submit($event)"
-    >
-      <span class="ff__btn"><app-icon name="send" />{{
-        (layout() === 'sheet' ? 'applications.capture.submitShort' : 'applications.capture.submit') | t
-      }}</span>
-    </app-button>
-  </footer>
+  <app-fab
+    data-testid="cap-submit"
+    icon="send"
+    [label]="(layout() === 'sheet' ? 'applications.capture.submitShort' : 'applications.capture.submit') | t"
+    [contained]="layout() !== 'page'"
+    [disabled]="!canSubmit()"
+    [loading]="saving()"
+    (activate)="submit()"
+  />
 </form>

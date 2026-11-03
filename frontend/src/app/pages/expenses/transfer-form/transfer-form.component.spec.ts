@@ -7,7 +7,7 @@ import userEvent from '@testing-library/user-event';
 import { USE_MOCK_API } from '@core/api/api.config';
 import type { BudgetTransfer, BudgetTreeNode } from '../../budget/budget-tree.api';
 import { costCentreIndex } from '../../budget/expense-display.util';
-import { currentFiscalYear, ExpenseDialogsState } from '../expense-dialogs.state';
+import { currentFiscalYear, defaultFiscalYear, ExpenseDialogsState } from '../expense-dialogs.state';
 import { ExpenseSubBookingsState } from '../expense-sub-bookings.state';
 import { ExpenseTransfersState } from '../expense-transfers.state';
 import { ExpensesListState } from '../expenses-list.state';
@@ -103,7 +103,6 @@ let LAYOUT: 'pane' | 'sheet' = 'pane';
       [tree]="tree"
       [costCentres]="costCentres"
       fyLabel="2026"
-      (remove)="removed = removed + 1"
     />
   `,
 })
@@ -116,7 +115,6 @@ class HostComponent {
   readonly layout = LAYOUT;
   readonly tree = TREE;
   readonly costCentres = costCentreIndex(TREE);
-  removed = 0;
 }
 
 async function setup(mode: 'create' | 'edit', layout: 'pane' | 'sheet' = 'pane') {
@@ -263,7 +261,7 @@ describe('TransferFormComponent', () => {
     expect(screen.getByRole('button', { name: 'Übertragen' })).toBeDisabled();
   });
 
-  it('submits and cancels a new transfer with the buttons of the foot', async () => {
+  it('submits a new transfer with the fab and closes with the head', async () => {
     const { host, view, user } = await setup('create');
     const create = jest.spyOn(host.dialogs, 'createTransfer').mockImplementation(() => undefined);
     host.dialogs.tFromId.set('kul');
@@ -274,21 +272,20 @@ describe('TransferFormComponent', () => {
     view.fixture.detectChanges();
     await user.click(screen.getByRole('button', { name: /^20,00\s€ übertragen$/ }));
     expect(create).toHaveBeenCalledTimes(1);
-    await user.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    await user.click(screen.getByRole('button', { name: 'Schließen' }));
     expect(host.dialogs.transferOpen()).toBe(false);
   });
 
-  it('locks the pair in the edit and deletes, saves or cancels', async () => {
-    const { host, form, view, user } = await setup('edit');
+  it('locks the pair in the edit and saves with the fab, without a delete', async () => {
+    const { host, form, user } = await setup('edit');
     expect(screen.getByRole('heading', { name: 'Übertrag bearbeiten' })).toBeInTheDocument();
     expect(screen.getByText('Kultur')).toBeInTheDocument();
     expect(screen.getByText('Hochschulsport')).toBeInTheDocument();
     expect(screen.getByText('2026')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Von Kostenstelle/ })).toBeNull();
-    await user.click(screen.getByRole('button', { name: 'Löschen' }));
-    expect(view.fixture.componentInstance.removed).toBe(1);
+    expect(screen.queryByRole('button', { name: 'Löschen' })).toBeNull();
     const save = jest.spyOn(host.transfers, 'saveEdit').mockImplementation(() => undefined);
-    form.submit(new Event('submit'));
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
     expect(save).toHaveBeenCalled();
     form.close();
     expect(host.transfers.editing()).toBeNull();
@@ -318,5 +315,25 @@ describe('currentFiscalYear', () => {
     expect(currentFiscalYear([fys[0]], today)?.id).toBe('a');
     expect(currentFiscalYear([fys[0], { ...fys[0], id: 'c' }], today)).toBeNull();
     expect(currentFiscalYear([])).toBeNull();
+  });
+});
+
+describe('defaultFiscalYear', () => {
+  it('takes the only active open year, else the active open one that holds today', () => {
+    const y = (id: string, start: number, active = true, closedAt: string | null = null) => ({
+      ...FY,
+      id,
+      startDate: `${start}-01-01`,
+      endDate: `${start}-12-31`,
+      active,
+      closedAt,
+    });
+    const today = new Date('2026-11-03T12:00:00Z');
+    expect(defaultFiscalYear([y('a', 2025)], today)?.id).toBe('a');
+    expect(defaultFiscalYear([y('a', 2025), y('b', 2026), y('c', 2027)], today)?.id).toBe('b');
+    expect(defaultFiscalYear([y('a', 2025), y('b', 2026, false)], today)?.id).toBe('a');
+    expect(defaultFiscalYear([y('a', 2025), y('b', 2026, true, '2026-10-01T00:00:00Z')], today)?.id).toBe('a');
+    expect(defaultFiscalYear([y('a', 2024), y('b', 2025)], today)).toBeNull();
+    expect(defaultFiscalYear([])).toBeNull();
   });
 });

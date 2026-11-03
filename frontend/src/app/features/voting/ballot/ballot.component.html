@@ -8,10 +8,7 @@
 }
 
 @if (own) {
-  <section class="ballot__row" [attr.aria-label]="'voting.ballot.own' | t">
-    @if (named()) {
-      <h2 class="sec ballot__name">{{ 'voting.ballot.own' | t }}</h2>
-    }
+  <app-section class="ballot__row" [level]="2" [heading]="'voting.ballot.own' | t" [hideHeading]="!named()">
     @if (dateMode()) {
       <ng-container
         [ngTemplateOutlet]="dates"
@@ -23,7 +20,7 @@
         [ngTemplateOutletContext]="{ row: 'own', cast: own.cast, label: ('voting.ballot.own' | t) }"
       />
     } @else if (compact()) {
-      <div class="ballot__proxy" role="group" [attr.aria-label]="'voting.ballot.own' | t">
+      <div class="ballot__proxy">
         @for (opt of options(); track opt) {
           @let on = isOn('own', opt);
           <button
@@ -42,7 +39,7 @@
         }
       </div>
     } @else {
-      <div class="ballot__choices" role="group" [attr.aria-label]="'voting.ballot.own' | t">
+      <div class="ballot__choices">
         @for (opt of options(); track opt) {
           @let on = isOn('own', opt);
           <button
@@ -75,15 +72,12 @@
         </p>
       </div>
     }
-  </section>
+  </app-section>
 }
 
 @if (proxy) {
   @let name = proxyName() ?? '';
-  <section class="ballot__row" [attr.aria-label]="'voting.ballot.proxy' | t: { name }">
-    <h2 class="sec ballot__name ell" [title]="'voting.ballot.proxy' | t: { name }">
-      {{ 'voting.ballot.proxy' | t: { name } }}
-    </h2>
+  <app-section class="ballot__row" [level]="2" [heading]="'voting.ballot.proxy' | t: { name }">
     @if (dateMode()) {
       <ng-container
         [ngTemplateOutlet]="dates"
@@ -95,7 +89,7 @@
         [ngTemplateOutletContext]="{ row: 'proxy', cast: proxy.cast, label: ('voting.ballot.proxy' | t: { name }) }"
       />
     } @else {
-    <div class="ballot__proxy" role="group" [attr.aria-label]="'voting.ballot.proxy' | t: { name }">
+    <div class="ballot__proxy">
       @for (opt of options(); track opt) {
         @let on = isOn('proxy', opt);
         <button
@@ -122,7 +116,7 @@
         }}
       </p>
     }
-  </section>
+  </app-section>
 }
 
 @if (showBar()) {

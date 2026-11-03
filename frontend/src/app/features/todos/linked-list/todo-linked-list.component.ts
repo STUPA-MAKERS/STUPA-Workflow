@@ -10,6 +10,7 @@ import {
   type AvatarSize,
   AvatarStackComponent,
   IconComponent,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { TodoLinkedRefresh, linkedKey } from './todo-linked-refresh';
 import { personName } from '@shared/person-label.util';
@@ -29,7 +30,7 @@ import { personName } from '@shared/person-label.util';
   selector: 'app-todo-linked-list',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, TranslatePipe, AvatarStackComponent, IconComponent],
+  imports: [SectionComponent, RouterLink, TranslatePipe, AvatarStackComponent, IconComponent],
   templateUrl: './todo-linked-list.component.html',
   styleUrl: './todo-linked-list.component.scss',
 })

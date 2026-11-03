@@ -1,10 +1,10 @@
-<section class="sp" aria-labelledby="sp-title">
-  <app-section-header class="sp__head" headingId="sp-title" [heading]="'admin.substitutes.title' | t">
+<app-section class="sp" headingId="sp-title" [level]="2" [heading]="'admin.substitutes.title' | t">
+  <span sectionAction class="sp__actions">
     <ng-content select="[poolActions]" />
     <app-button variant="text" size="sm" (click)="openAdd()">
       <app-icon name="plus" /> {{ 'admin.substitutes.add' | t }}
     </app-button>
-  </app-section-header>
+  </span>
 
   @if (loading()) {
     <app-skeleton variant="rows" [count]="2" [label]="'common.loading' | t" />
@@ -36,7 +36,7 @@
   } @else {
     <app-empty-state shape="person" rows="3" [heading]="'admin.substitutes.empty' | t" />
   }
-</section>
+</app-section>
 
 <app-dialog
   [open]="addOpen()"

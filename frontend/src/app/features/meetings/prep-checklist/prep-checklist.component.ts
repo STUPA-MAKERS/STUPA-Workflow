@@ -10,8 +10,8 @@ import { openWindowClock, openWindowState, openWindowWhen } from '../open-window
  *
  * Two cards: the minute-taker ("Zuweisen"; the opening needs one, so a missing one is
  * marked) and the attendance ("0 von 23 anwesend", "Erfassen"). Below them "Sitzung eröffnen", disabled
- * until a minute-taker is set and until the open window of the meeting opens
- * ("Eröffnen ab 17:00").
+ * until a minute-taker is set and until the open window of the meeting opens. Before
+ * the window opens, the button label names the time ("Eröffnen ab 17:00").
  */
 @Component({
   selector: 'app-prep-checklist',
@@ -32,7 +32,7 @@ export class PrepChecklistComponent {
   readonly recordAttendance = output<void>();
   readonly start = output<void>();
 
-  /** "Eröffnen ab 17:00" while the open window is not open yet, else `''`. */
+  /** "Eröffnen ab 17:00", the label of the open button while the window is not open yet, else `''`. */
   protected readonly opensAtText = computed(() => {
     const m = this.meeting();
     if (!m.opensAt || openWindowState(m, this.now()) !== 'tooEarly') return '';

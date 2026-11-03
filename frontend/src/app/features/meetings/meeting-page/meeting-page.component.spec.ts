@@ -322,11 +322,13 @@ describe('MeetingPageComponent', () => {
       expect(on.startSession).toHaveBeenCalledTimes(2);
     });
 
-    /** The header and the checklist both name the time. */
+    /** The open buttons in the header and in the checklist name the time as their label. */
     it('keeps the opening disabled before the open window and says when it opens', async () => {
       const soon = (min: number): string => new Date(Date.now() + min * 60_000).toISOString();
       const { on } = await setup({ meeting: planned({ opensAt: soon(30), confirmUntil: soon(80) }), protocol: null });
-      const starts = screen.getAllByRole('button', { name: 'Sitzung eröffnen' });
+      expect(screen.queryByRole('button', { name: 'Sitzung eröffnen' })).toBeNull();
+      const starts = screen.getAllByRole('button', { name: /^Eröffnen ab / });
+      expect(starts).toHaveLength(2);
       starts.forEach((b) => expect(b).toBeDisabled());
       expect(screen.getAllByText(/^Eröffnen ab /)).toHaveLength(2);
       expect(starts[0].getAttribute('title')).toMatch(/^Eröffnen ab /);

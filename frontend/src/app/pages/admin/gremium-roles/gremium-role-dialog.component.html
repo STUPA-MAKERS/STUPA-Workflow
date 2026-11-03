@@ -44,8 +44,7 @@
     </fieldset>
 
     @if (showGroups()) {
-      <section class="rd__groups" aria-labelledby="rd-groups-title">
-        <h3 class="section-title rd__cap" id="rd-groups-title">{{ 'admin.gremiumRoles.groups' | t }}</h3>
+      <app-section class="rd__groups" [heading]="'admin.gremiumRoles.groups' | t">
         <div class="rd__groupBox">
           <span class="rd__groupText">
             @if (isMemberRole()) {
@@ -61,7 +60,7 @@
             'admin.gremiumRoles.changeGroups' | t
           }}</a>
         </div>
-      </section>
+      </app-section>
     }
 
     @if (saveFailed()) {

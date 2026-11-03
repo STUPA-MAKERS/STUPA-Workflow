@@ -10,8 +10,7 @@
   <app-load-state [state]="loadState()" [lines]="4" [errorText]="'admin.notifications.error' | t">
     <ng-template #content>
       @if (settings(); as s) {
-      <section class="ns__sec" aria-labelledby="ns-reminder">
-        <h2 class="section-title ns__secTitle" id="ns-reminder">{{ 'admin.notifications.taskReminder' | t }}</h2>
+      <app-section class="ns__sec" [level]="2" [heading]="'admin.notifications.taskReminder' | t">
         <div class="ns__rows">
           <app-switch class="ns__row" [checked]="s.taskReminderEnabled" (checkedChange)="patch({ taskReminderEnabled: $event })">
             {{ 'admin.notifications.enabled' | t }}
@@ -37,7 +36,7 @@
             name="repeatDays"
           />
         </div>
-      </section>
+      </app-section>
       }
     </ng-template>
   </app-load-state>
