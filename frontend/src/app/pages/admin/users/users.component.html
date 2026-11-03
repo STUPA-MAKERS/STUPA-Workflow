@@ -2,7 +2,9 @@
   <app-page-header
     [flush]="true"
     [title]="'admin.users.title' | t"
-  />
+  >
+    <app-breadcrumbs crumbs />
+  </app-page-header>
 
   @if (canManageMappings()) {
     <app-note class="au__note">

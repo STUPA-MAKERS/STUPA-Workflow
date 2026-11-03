@@ -32,7 +32,7 @@
             type="button"
             class="df__remove"
             [attr.aria-label]="'apply.files.remove' | t: { name: file.filename }"
-            (click)="remove(file)"
+            (click)="file.failed ? remove(file) : toRemove.set(file)"
           >
             <app-icon name="x" [size]="17" />
           </button>
@@ -63,3 +63,12 @@
     <p class="df__error" role="alert">{{ e }}</p>
   }
 </section>
+
+<app-confirm-dialog
+  [open]="toRemove() !== null"
+  [title]="'apply.files.removeTitle' | t"
+  [body]="'apply.files.removeConfirm' | t: { name: toRemove()?.filename ?? '' }"
+  [confirmLabel]="'apply.files.removeAction' | t"
+  (confirm)="confirmRemove()"
+  (cancel)="toRemove.set(null)"
+/>

@@ -77,9 +77,7 @@
           <app-note class="vl__loadError" kind="error" icon="alert" role="alert" retryable (retry)="reload()">{{ 'voting.list.error' | t }}</app-note>
         } @else if (loading()) {
           <div class="vl__skel skel-in">
-            <h2 class="sec vl__month" aria-hidden="true">
-              <span class="skel-text skel-text--accent vl__skelMonth"></span>
-            </h2>
+            <app-list-group skeleton="7rem" />
             <app-skeleton
               variant="items"
               [count]="12"
@@ -104,8 +102,7 @@
         } @else {
           <div class="vl__groups" animate.enter="motion-fade-in" [class.skel-stale]="reloading()" [attr.inert]="reloading() ? '' : null">
           @for (group of groups(); track group.key) {
-            <section class="vl__group" [attr.aria-labelledby]="'vl-g-' + group.key">
-              <h2 class="sec vl__month" [id]="'vl-g-' + group.key">{{ group.label }}</h2>
+            <app-list-group [label]="group.label">
               <div class="vl__rows" [class.rowgroup]="!split()" role="list">
                 @for (row of group.rows; track row.item.id) {
                   <app-list-item
@@ -144,7 +141,7 @@
                   </app-list-item>
                 }
               </div>
-            </section>
+            </app-list-group>
           }
           </div>
 

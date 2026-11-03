@@ -2781,7 +2781,7 @@ describe('ExpensesComponent (list/detail)', () => {
     const income = { ...EXPENSE, id: 'e-2', kind: 'income' as const, description: 'Pfand', paymentDate: '2026-04-02' };
     const { container } = await setup({ page: page([EXPENSE, income]), tree: FIG_TREE });
     expect(await screen.findByText('Druckkosten Flyer')).toBeInTheDocument();
-    const months = [...container.querySelectorAll('.exp__month')].map((h) => h.textContent?.trim());
+    const months = [...container.querySelectorAll('app-list-group h2')].map((h) => h.textContent?.trim());
     expect(months).toEqual(['Mai 2026', 'April 2026']);
     expect(screen.getByText(/−120,00/)).toBeInTheDocument();
     expect(screen.getByText(/\+120,00/)).toBeInTheDocument();

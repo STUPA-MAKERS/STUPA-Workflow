@@ -1,5 +1,7 @@
 <section class="wh admin-page">
-  <app-page-header [flush]="true" [title]="'admin.webhook.title' | t" />
+  <app-page-header [flush]="true" [title]="'admin.webhook.title' | t">
+    <app-breadcrumbs crumbs />
+  </app-page-header>
 
   @if (loading()) {
     <app-skeleton variant="rows" [count]="3" [label]="'common.loading' | t" />

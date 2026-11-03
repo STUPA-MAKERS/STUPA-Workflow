@@ -2,7 +2,9 @@
   <app-page-header
     [flush]="true"
     [title]="'account.notifications.title' | t"
-  />
+  >
+    <app-breadcrumbs crumbs />
+  </app-page-header>
 
   @if (error(); as e) {
     <app-note kind="error" icon="alert" role="alert">{{ e | t }}</app-note>

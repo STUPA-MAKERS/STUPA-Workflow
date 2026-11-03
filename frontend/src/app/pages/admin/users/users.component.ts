@@ -7,7 +7,6 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { i18nLabel } from '@shared/forms/i18n-text';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { PageHeaderComponent } from '@shared/ui';
 import {
   AvatarComponent,
   CapitalizePipe,
@@ -24,7 +23,9 @@ import {
   StatusTextComponent,
   StickyBarComponent,
   ToastService,
+  PageHeaderComponent,
 } from '@stupa-makers/ui-kit';
+import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
 import type { AdminPrincipal, GroupMapping, PrincipalFilters, Role } from '../admin.models';
 import { UserMergeComponent } from './user-merge/user-merge.component';
@@ -85,6 +86,7 @@ export function principalFilters(
     EmptyStateComponent,
     NoteComponent,
     PageHeaderComponent,
+    BreadcrumbsComponent,
     RowMenuComponent,
     SearchPillComponent,
     StickyBarComponent,

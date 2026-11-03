@@ -1,5 +1,7 @@
 <section class="fl admin-page">
-  <app-page-header [flush]="true" [title]="'admin.forms.listTitle' | t" />
+  <app-page-header [flush]="true" [title]="'admin.forms.listTitle' | t">
+    <app-breadcrumbs crumbs />
+  </app-page-header>
 
   @if (loadError()) {
     <app-note kind="error" icon="alert" role="alert">{{ 'admin.forms.overviewError' | t }}</app-note>

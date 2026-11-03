@@ -140,6 +140,14 @@ async function setup(opts: SetupOpts = {}) {
   return { view, send, edit, del, retry, discard, refresh, set, log, input, cmp, api, toast, pick, settle, user: userEvent.setup() };
 }
 
+
+/** Confirm the open "Anhang entfernen?" dialog of a draft chip. */
+async function confirmRemove(settle: () => Promise<void>): Promise<void> {
+  await settle();
+  const dialog = screen.getByRole('dialog', { name: 'Anhang entfernen?' });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Entfernen' }));
+  await settle();
+}
 describe('ChatComponent', () => {
   const realMatchMedia = window.matchMedia;
   afterEach(() => {
@@ -1297,6 +1305,14 @@ describe('ChatComponent', () => {
       await pick(pdf(), pdf('b.pdf'));
       fireEvent.click(screen.getByRole('button', { name: 'angebot.pdf entfernen' }));
       await settle();
+      expect(api.deleteDraftAttachment).not.toHaveBeenCalled();
+      const dialog = screen.getByRole('dialog', { name: 'Anhang entfernen?' });
+      expect(dialog).toHaveTextContent('„angebot.pdf“ wird entfernt.');
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+      await settle();
+      expect(api.deleteDraftAttachment).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole('button', { name: 'angebot.pdf entfernen' }));
+      await confirmRemove(settle);
       expect(api.deleteDraftAttachment).toHaveBeenCalledWith('d1', 'tok');
       expect(view.container.querySelectorAll('.chat__draft')).toHaveLength(1);
       api.deleteDraftAttachment.mockReturnValueOnce(throwError(() => new HttpErrorResponse({ status: 500 })));
@@ -1381,6 +1397,10 @@ describe('ChatComponent', () => {
       await pick(pdf(), pdf('b.pdf'));
       api.deleteDraftAttachment.mockReturnValueOnce(gone);
       fireEvent.click(screen.getByRole('button', { name: 'angebot.pdf entfernen' }));
+      view.fixture.detectChanges();
+      fireEvent.click(
+        within(screen.getByRole('dialog', { name: 'Anhang entfernen?' })).getByRole('button', { name: 'Entfernen' }),
+      );
       view.fixture.detectChanges();
       expect(view.container.querySelectorAll('.chat__draft')).toHaveLength(1);
       fireEvent.keyDown(input(), { key: 'Enter' });
@@ -1682,13 +1702,13 @@ describe('ChatComponent', () => {
       const { pick, settle, input } = await setup({ canAttach: true });
       await pick(pdf('a.pdf'), pdf('b.pdf'), pdf('c.pdf'));
       fireEvent.click(screen.getByRole('button', { name: 'b.pdf entfernen' }));
-      await settle();
+      await confirmRemove(settle);
       expect(screen.getByRole('button', { name: 'c.pdf entfernen' })).toHaveFocus();
       fireEvent.click(screen.getByRole('button', { name: 'c.pdf entfernen' }));
-      await settle();
+      await confirmRemove(settle);
       expect(screen.getByRole('button', { name: 'a.pdf entfernen' })).toHaveFocus();
       fireEvent.click(screen.getByRole('button', { name: 'a.pdf entfernen' }));
-      await settle();
+      await confirmRemove(settle);
       expect(input()).toHaveFocus();
     });
 

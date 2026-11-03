@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, viewChild } from '@angular/core';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { FabComponent } from '@shared/ui/fab/fab.component';
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
+import { FabComponent, PageHeaderComponent } from '@stupa-makers/ui-kit';
+import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { GuestSettingsComponent } from './guest-settings/guest-settings.component';
 import { MeetingWindowSettingsComponent } from './meeting-window/meeting-window.component';
 
@@ -22,6 +22,7 @@ import { MeetingWindowSettingsComponent } from './meeting-window/meeting-window.
     FabComponent,
     TranslatePipe,
     PageHeaderComponent,
+    BreadcrumbsComponent,
     GuestSettingsComponent,
     MeetingWindowSettingsComponent,
   ],

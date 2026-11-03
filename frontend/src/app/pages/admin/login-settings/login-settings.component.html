@@ -1,5 +1,7 @@
 <section class="ls admin-page">
-  <app-page-header [flush]="true" [title]="'admin.loginSettings.title' | t" />
+  <app-page-header [flush]="true" [title]="'admin.loginSettings.title' | t">
+    <app-breadcrumbs crumbs />
+  </app-page-header>
 
   <app-load-state
     [state]="form.state()"

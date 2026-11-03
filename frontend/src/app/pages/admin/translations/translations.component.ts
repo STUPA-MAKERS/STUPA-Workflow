@@ -1,16 +1,7 @@
 import { LoadMoreComponent } from '@shared/ui/load-more/load-more.component';
-import { ListItemComponent } from '@stupa-makers/ui-kit';
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { HttpErrorResponse } from '@angular/common/http';
-import { FormsModule } from '@angular/forms';
-import { forkJoin, from } from 'rxjs';
-import { I18nService } from '@core/i18n/i18n.service';
-import { placeholdersOf, samePlaceholders } from '@core/i18n/placeholders';
-import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { type TranslationKey, de, loadCatalog } from '@core/i18n/translations';
-import { PageHeaderComponent } from '@shared/ui';
-import { FabComponent } from '@shared/ui/fab/fab.component';
 import {
+  ListItemComponent,
+  FabComponent,
   ButtonComponent,
   ConfirmDialogComponent,
   DialogComponent,
@@ -31,7 +22,17 @@ import {
   SwitchComponent,
   TextareaComponent,
   ToastService,
+  PageHeaderComponent,
 } from '@stupa-makers/ui-kit';
+import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
+import { FormsModule } from '@angular/forms';
+import { forkJoin, from } from 'rxjs';
+import { I18nService } from '@core/i18n/i18n.service';
+import { placeholdersOf, samePlaceholders } from '@core/i18n/placeholders';
+import { TranslatePipe } from '@core/i18n/translate.pipe';
+import { type TranslationKey, de, loadCatalog } from '@core/i18n/translations';
 import { type AdminUiLanguage, TranslationsApiService } from './translations-api.service';
 
 /** Every key of the catalog, in catalog order. */
@@ -101,6 +102,7 @@ interface LanguageDraft {
     InputComponent,
     NoteComponent,
     PageHeaderComponent,
+    BreadcrumbsComponent,
     RowMenuComponent,
     SearchPillComponent,
     SkeletonComponent,

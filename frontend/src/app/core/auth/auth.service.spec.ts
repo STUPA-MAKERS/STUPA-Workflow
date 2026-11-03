@@ -6,7 +6,7 @@ import {
 } from '@angular/common/http/testing';
 import { AuthService, loginReturnTo } from './auth.service';
 import { USE_MOCK_API } from '../api/api.config';
-import { IS_INSTALLED_APP } from '../browser/installed-app.token';
+import { IS_INSTALLED_APP } from '@stupa-makers/ui-kit/pwa';
 import type { Principal } from '../api/models';
 import {
   createLocationMock,

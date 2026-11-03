@@ -57,9 +57,7 @@
       >
         @if (store.loading()) {
           <div class="grl__skel skel-in">
-            <h2 class="sec grl__head" aria-hidden="true">
-              <span class="skel-text skel-text--accent grl__skelHead"></span>
-            </h2>
+            <app-list-group skeleton="6.5rem" />
             <app-skeleton
               variant="items"
               [count]="8"
@@ -82,12 +80,12 @@
         } @else {
           @if (mine().length) {
             <ng-container
-              *ngTemplateOutlet="group; context: { $implicit: mine(), key: 'mine', label: 'gremien.list.mine' | t }"
+              *ngTemplateOutlet="group; context: { $implicit: mine(), label: 'gremien.list.mine' | t }"
             />
           }
           @if (others().length) {
             <ng-container
-              *ngTemplateOutlet="group; context: { $implicit: others(), key: 'others', label: 'gremien.list.others' | t }"
+              *ngTemplateOutlet="group; context: { $implicit: others(), label: 'gremien.list.others' | t }"
             />
           }
         }
@@ -100,11 +98,8 @@
   </app-list-detail>
 </div>
 
-<ng-template #group let-rows let-key="key" let-label="label">
-  <section class="grl__group" [attr.aria-labelledby]="'grl-g-' + key">
-    <h2 class="sec grl__head" [id]="'grl-g-' + key">
-      {{ label }} <span class="grl__count">{{ rows.length }}</span>
-    </h2>
+<ng-template #group let-rows let-label="label">
+  <app-list-group [label]="label">
     <div class="grl__rows" [class.rowgroup]="!split()" role="list">
       @for (row of rows; track row.item.id) {
         <app-list-item
@@ -136,5 +131,5 @@
         </app-list-item>
       }
     </div>
-  </section>
+  </app-list-group>
 </ng-template>

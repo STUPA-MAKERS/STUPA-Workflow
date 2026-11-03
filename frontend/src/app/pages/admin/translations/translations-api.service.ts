@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import type { Observable } from 'rxjs';
 import { API_BASE_URL } from '@core/api/api.config';
-import { skipLoading } from '@core/loading/loading.interceptor';
+import { skipLoading } from '@stupa-makers/ui-kit';
 
 /** An extra UI language as the admin page lists it (P admin.translations). */
 export interface AdminUiLanguage {

@@ -71,7 +71,7 @@ describe('touch styles', () => {
     expect(styles).toMatch(
       /@media \(display-mode: standalone\), \(display-mode: fullscreen\) \{\s*html,\s*body \{\s*overscroll-behavior-y: none;/,
     );
-    expect(read('shared/ui/_list-pane.scss')).toMatch(/overscroll-behavior: contain;/);
+    expect(read('../../vendor/ui-kit/src/styles/_list-pane.scss')).toMatch(/overscroll-behavior: contain;/);
   });
 
   it('keeps the Markdown and the chat texts selectable on a touch screen', () => {
@@ -95,16 +95,21 @@ describe('touch styles', () => {
     expect(rule).toMatch(/app-bottom-bar \{\s*display: none;/);
   });
 
-  /** The pill shrinks like a button; the entry keeps its size. */
+  /** The pill shrinks like a button; the entry keeps its size. The kit shell draws both bars. */
   it.each([
-    ['bottom bar', 'layout/bottom-bar/bottom-bar.component.scss', '.bb'],
-    ['navigation rail', 'layout/nav-rail/nav-rail.component.scss', '.rail'],
-  ])('gives the %s entries the press tint and keeps their labels unselectable', (_n, path, b) => {
-    const scss = read(path);
-    expect(scss).toContain("@use 'press';");
+    ['bottom bar', 'bottom-bar/bottom-bar.component.scss', 'bar-item'],
+    ['navigation rail', 'nav-rail/nav-rail.component.scss', 'rail-item'],
+  ])('gives the %s entries the press tint and keeps their labels unselectable', (_n, path, mixin) => {
+    const kit = '../../vendor/ui-kit/shell/src/';
+    const scss = read(kit + path);
+    expect(scss).toContain("@use '../../../src/styles/press';");
+    expect(scss).toContain("@use '../../../src/styles/nav-items';");
     expect(scss).toContain('@include press.chrome-text;');
-    expect(scss).toContain(`${b}__item:active ${b}__ind::after {\n  background: var(--press-tint);`);
-    expect(scss).toContain(`${b}__item:active ${b}__ind {\n  @include press.press-scale;`);
+    expect(scss).toContain(`@include nav-items.${mixin};`);
+    const items = read('../../vendor/ui-kit/src/styles/_nav-items.scss');
+    const body = items.slice(items.indexOf(`@mixin ${mixin}(`));
+    expect(body).toContain('.#{$b}__item:active .#{$b}__ind::after {\n    background: var(--press-tint);');
+    expect(body).toContain('.#{$b}__item:active .#{$b}__ind {\n    @include press.press-scale;');
   });
 
   /**
@@ -138,7 +143,7 @@ describe('touch styles', () => {
       /:host\(:active\) \{\s*background-image: linear-gradient\(var\(--press-tint\), var\(--press-tint\)\);\s*@include press\.press-scale\(row\);/,
     );
     expect(read('../styles.scss')).toMatch(/\.sheet-back-link \{[^}]*@include press\.press;/);
-    expect(read('shared/ui/page-header/page-header.component.scss')).toContain(
+    expect(read('../../vendor/ui-kit/src/lib/page-header/page-header.component.scss')).toContain(
       '@include press.chrome-text;',
     );
   });

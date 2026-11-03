@@ -344,6 +344,10 @@ async def test_candidates_no_groups_skips_mapping_query() -> None:
     assert out[0].committees == frozenset({str(gid)})
 
 
+async def _all_read(_s: Any, _app_id: Any, ids: Any, _now: Any) -> set[uuid.UUID]:
+    return set(ids)
+
+
 def _app_ns(**over: Any) -> SimpleNamespace:
     base: dict[str, Any] = {
         "id": uuid.uuid4(),
@@ -361,15 +365,25 @@ def _app_ns(**over: Any) -> SimpleNamespace:
     return SimpleNamespace(**base)
 
 
-async def test_actionable_vote_state_unchanged() -> None:
-    gid = uuid.uuid4()
-    session = FakeSession(scalar=[gid], scalars=[["v@x.de"]])
+async def test_actionable_vote_state_mails_open_vote_casters(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A vote state mails the casters of an open vote, not the whole Gremium."""
+    app = _app_ns(vote_gremium_id=uuid.uuid4())
+    seen: list[Any] = []
+
+    async def fake_casters(_s: Any, a: Any, _now: Any) -> list[str]:
+        seen.append(a)
+        return ["v@x.de"]
+
+    monkeypatch.setattr(recipients_mod, "_open_vote_casters", fake_casters)
     out = await actionable_principal_emails(
-        cast(AsyncSession, session),
-        application_id=uuid.uuid4(),
-        state=State(kind="vote", config={"gremiumId": str(uuid.uuid4())}),
+        cast(AsyncSession, FakeSession(scalar=[app])),
+        application_id=app.id,
+        state=State(kind="vote", config={}),
     )
     assert out == ["v@x.de"]
+    assert seen == [app]
 
 
 async def test_resolver_vote_and_budget_gremium(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -439,6 +453,7 @@ async def test_actionable_excludes_admin_without_firable_guard(
         captured["base"] = (app, manual)
         return GuardContext(manual=True)
 
+    monkeypatch.setattr(recipients_mod, "_readers", _all_read)
     monkeypatch.setattr(recipients_mod, "build_base_context", fake_base)
 
     app = _app_ns(gremium_id=uuid.uuid4())
@@ -479,6 +494,7 @@ async def test_actionable_seeds_with_app_gremium_and_dedups(
             _candidate(sub="c", email="a@x.de"),
         ]
 
+    monkeypatch.setattr(recipients_mod, "_readers", _all_read)
     monkeypatch.setattr(recipients_mod, "build_base_context", fake_base)
     monkeypatch.setattr(
         recipients_mod, "_candidates_with_transition_permission", fake_candidates

@@ -1,7 +1,7 @@
 @use 'breakpoints' as bp;
 @use 'dot-parts' as dots;
 @use 'scroll-fade' as fade;
-@use '../../../shared/ui/list-pane' as lp;
+@use 'list-pane' as lp;
 
 // The same two panes as applications-list.component.scss.
 
@@ -51,20 +51,6 @@
   @include fade.fade-y(var(--vl-fade));
 }
 
-.vl__group {
-  @include lp.stack;
-}
-.vl__month {
-  @include lp.month;
-}
-.vl__group:first-child .vl__month,
-.vl__skel .vl__month {
-  padding-top: var(--space-2);
-}
-// About as wide as "September 2026".
-.vl__skelMonth {
-  width: 7rem;
-}
 .vl__rows {
   @include lp.stack;
 }
@@ -127,9 +113,6 @@
 @include bp.phone {
   .vl__chips {
     @include lp.phone-chips;
-  }
-  .vl__month {
-    padding-inline: var(--space-1);
   }
   .vl__chev {
     display: none;

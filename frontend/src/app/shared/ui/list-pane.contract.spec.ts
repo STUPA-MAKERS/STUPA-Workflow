@@ -1,6 +1,6 @@
 /**
- * One set of rules for the list pane pages (`_list-pane.scss`) and one fade for a scroll
- * area (the ui-kit partial `_scroll-fade.scss`).
+ * One set of rules for the list pane pages (the ui-kit partial `_list-pane.scss`) and one
+ * fade for a scroll area (the ui-kit partial `_scroll-fade.scss`).
  *
  * The lists of applications, bookings, invoices, tasks, votes, tickets, meetings and
  * gremien each had a copy of the column, the chips, the scroll area with its fade, the
@@ -26,7 +26,7 @@ const PAGES: [scss: string, block: string][] = [
 describe('the list pane pages', () => {
   it.each(PAGES)('%s takes the scroll area and the groups from the list pane', (scss, block) => {
     const src = read(scss);
-    expect(src).toMatch(/@use '[./]+\/shared\/ui\/list-pane' as lp;/);
+    expect(src).toMatch(/@use 'list-pane' as lp;/);
     expect(src).toContain(`@include lp.scroll(--${block}-fade);`);
     expect(src).toContain(`@include lp.split-scroll(--${block}-fade);`);
     expect(src).toContain('@include lp.stack;');
@@ -52,12 +52,13 @@ describe('the list pane pages', () => {
     expect(fade).toContain('@mixin fade-y($size');
     expect(fade).toContain('@mixin fade-x($size');
     expect(existsSync(join(APP, 'shared/ui/_scroll-fade.scss'))).toBe(false);
-    const pane = read('shared/ui/_list-pane.scss');
+    expect(existsSync(join(APP, 'shared/ui/_list-pane.scss'))).toBe(false);
+    const pane = read('../../vendor/ui-kit/src/styles/_list-pane.scss');
     expect(pane).toContain("@use 'scroll-fade' as fade;");
   });
 
   it('cuts the phone chips at the screen edges, not with a fade', () => {
-    const pane = read('shared/ui/_list-pane.scss');
+    const pane = read('../../vendor/ui-kit/src/styles/_list-pane.scss');
     expect(pane).not.toContain('fade.fade-x');
     expect(pane).toMatch(/@mixin phone-chips \{[^}]*margin-inline: calc\(-1 \* var\(--space-4\)\);/);
   });

@@ -14,7 +14,7 @@ import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angul
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { BehaviorSubject } from 'rxjs';
-import { ToastService } from '@stupa-makers/ui-kit';
+import { ListDetailNav, ToastService } from '@stupa-makers/ui-kit';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { AuthService } from '@core/auth/auth.service';
 import type {
@@ -95,6 +95,8 @@ interface Opts {
   page?: boolean;
   phone?: boolean;
   tree?: unknown[];
+  /** The bar of the list/detail layout, one view at a time. */
+  nav?: ListDetailNav;
 }
 
 async function setup(opts: Opts = {}) {
@@ -130,6 +132,7 @@ async function setup(opts: Opts = {}) {
         useValue: { paramMap: paramMap$, fragment: new BehaviorSubject<string | null>(null), snapshot: { fragment: null } },
       },
       ...(opts.page === false ? [] : [{ provide: ApplicationsPageService, useValue: page }]),
+      ...(opts.nav ? [{ provide: ListDetailNav, useValue: opts.nav }] : []),
     ],
   });
   window.matchMedia = originalMatch;
@@ -461,6 +464,36 @@ describe('ApplicationsDetailComponent — header', () => {
       detectChanges();
       expect(cmp.editing()).toBe(false);
       expect(screen.getByRole('tablist')).toBeInTheDocument();
+    });
+
+    it('docks the edit in the bar of the layout: an X and the title there, no own bar', async () => {
+      const nav = new ListDetailNav();
+      nav.active.set(true);
+      const { cmp, detectChanges, fixture } = await setup({ split: false, phone: true, nav });
+      const g = globalThis as unknown as { structuredClone?: unknown };
+      const saved = g.structuredClone;
+      g.structuredClone = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
+      try {
+        cmp.startEdit(cmp.app() as NonNullable<ReturnType<typeof cmp.app>>);
+      } finally {
+        g.structuredClone = saved;
+      }
+      detectChanges();
+      expect(cmp.editDocked()).toBe(true);
+      expect(document.querySelector('.ad__editBar')).toBeNull();
+      expect(document.querySelector('.ad--docked')).not.toBeNull();
+      const task = nav.task();
+      expect(task?.title).toBe('Antrag bearbeiten');
+      expect(task?.cancelLabel).toBe('Abbrechen');
+      task?.cancel();
+      detectChanges();
+      expect(cmp.editing()).toBe(false);
+      expect(nav.task()).toBeNull();
+      cmp.editing.set(true);
+      detectChanges();
+      expect(nav.task()).not.toBeNull();
+      fixture.destroy();
+      expect(nav.task()).toBeNull();
     });
 
     it('switches to the history for "Versionen vergleichen"', async () => {

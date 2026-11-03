@@ -1,10 +1,11 @@
+import { provideAppUiKit } from '@core/i18n/ui-kit-intl';
 import { LINK } from '../../../testing/guest-fixtures';
 import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { Subject, of, throwError } from 'rxjs';
 import { fireEvent, render, screen } from '@testing-library/angular';
 import { ApiClient } from '@core/api/api-client.service';
 import type { AgendaItem, Meeting, MeetingVote, Vote } from '@core/api/models';
-import { ThemeService } from '@core/theme/theme.service';
+import { ThemeService } from '@stupa-makers/ui-kit';
 import { LIVE_VOTE_SOURCE, type LiveVoteSource } from '@core/ws/live-vote.source';
 import type { MeetingChannel } from '@core/ws/ws.service';
 import type { ClientMessage, ServerMessage } from '@core/ws/ws-messages';
@@ -95,6 +96,7 @@ async function setup(
   const id = opts.id === undefined ? 'm1' : opts.id;
   const view = await render(BeamerComponent, {
     providers: [
+      provideAppUiKit(),
       provideRouter([]),
       { provide: LIVE_VOTE_SOURCE, useValue: source },
       { provide: ApiClient, useValue: api },

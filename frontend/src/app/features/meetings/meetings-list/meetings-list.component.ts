@@ -22,14 +22,15 @@ import type { Meeting, Uuid } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { meetingStatus, type StatusView } from '@shared/status-kind.util';
-import { FabComponent } from '@shared/ui/fab/fab.component';
 import {
+  FabComponent,
   ButtonComponent,
   DateBlockComponent,
   EmptyStateComponent,
   FilterSelectComponent,
   IconComponent,
   ListDetailLayoutComponent,
+  ListGroupComponent,
   ListItemComponent,
   MEDIA,
   mediaQuery,
@@ -41,6 +42,7 @@ import {
   SkeletonComponent,
   StatusTextComponent,
   StickyBarComponent,
+  PageHeaderComponent,
 } from '@stupa-makers/ui-kit';
 import { CalendarSubscribeComponent } from '../calendar-subscribe/calendar-subscribe.component';
 import {
@@ -57,7 +59,6 @@ import {
 } from '../meetings-overview.util';
 import { MeetingsTimelineService } from '../meetings-timeline.service';
 import { beamerUrl } from '../../voting/beamer-link.util';
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
 import { MeetingsViewActionsComponent } from '../meetings-view-actions/meetings-view-actions.component';
 import { weekdayName } from '@shared/date-format';
@@ -96,6 +97,7 @@ import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.direc
     FabComponent,
     FilterSelectComponent,
     ListDetailLayoutComponent,
+    ListGroupComponent,
     ListItemComponent,
     RowMenuComponent,
     SearchPillComponent,

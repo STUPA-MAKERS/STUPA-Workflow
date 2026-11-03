@@ -1,7 +1,7 @@
 @use 'breakpoints' as bp;
 @use 'scroll-fade' as fade;
 @use '../../shared/ui/surface-card' as sc;
-@use '../../shared/ui/list-pane' as lp;
+@use 'list-pane' as lp;
 
 :host {
   @include lp.stack;
@@ -86,15 +86,6 @@
   @include fade.fade-y(var(--apps-fade));
 }
 
-.apps__group {
-  @include lp.stack;
-}
-.apps__month {
-  @include lp.month;
-}
-.apps__group:first-child .apps__month {
-  padding-top: var(--space-2);
-}
 .apps__rows {
   @include lp.stack;
 }
@@ -121,12 +112,6 @@
 // Without hover (touch), the menu always shows.
 @include lp.hover-menu(apps);
 
-.apps__skel .apps__month {
-  padding-top: var(--space-2);
-}
-.apps__skelMonth {
-  width: 7rem;
-}
 .apps__progress {
   top: auto;
   bottom: 0;
@@ -198,8 +183,5 @@
 @include bp.phone {
   .apps__chips {
     @include lp.phone-chips;
-  }
-  .apps__month {
-    padding-inline: var(--space-1);
   }
 }

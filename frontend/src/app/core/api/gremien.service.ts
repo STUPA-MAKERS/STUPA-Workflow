@@ -14,7 +14,7 @@ import type { Observable } from 'rxjs';
 import { API_BASE_URL } from '@core/api/api.config';
 import type { IsoDateTime, Uuid } from '@core/api/models';
 import { detailContext } from '@core/cache/cache.interceptor';
-import { skipLoading } from '@core/loading/loading.interceptor';
+import { skipLoading } from '@stupa-makers/ui-kit';
 
 /** A text per locale, for example the name of a gremium role (`{ de, en }`). */
 export type LocalizedText = Readonly<Record<string, string>>;

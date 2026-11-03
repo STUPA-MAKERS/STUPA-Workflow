@@ -1,5 +1,6 @@
 <div class="td" [class.td--phone]="phone()">
   <app-page-header [flush]="true" [pane]="phone()" [title]="'nav.todos' | t">
+    <app-breadcrumbs crumbs />
     <ng-container ngProjectAs="[actions]">
       @if (phone()) {
         <app-button

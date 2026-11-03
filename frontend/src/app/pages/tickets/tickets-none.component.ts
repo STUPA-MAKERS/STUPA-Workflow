@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { DetailNoneComponent, type DetailNoneState } from '@shared/ui/detail-none/detail-none.component';
+import { DetailNoneComponent, type DetailNoneState } from '@stupa-makers/ui-kit';
 import { TicketsComponent } from './tickets.component';
 
 /**
@@ -14,7 +14,12 @@ import { TicketsComponent } from './tickets.component';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [TranslatePipe, DetailNoneComponent],
   templateUrl: './tickets-none.component.html',
-  styleUrl: '../../shared/ui/detail-none/detail-none-host.scss',
+  styles: `
+    @use 'detail-none-host' as dnh;
+    :host {
+      @include dnh.host;
+    }
+  `,
 })
 export class TicketsNoneComponent {
   private readonly page = inject(TicketsComponent, { optional: true });

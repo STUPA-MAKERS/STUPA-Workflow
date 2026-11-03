@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const read = (rel: string): string => readFileSync(join(__dirname, rel), 'utf8');
-const shell = read('shell.component.scss');
+const shell = read('../../../vendor/ui-kit/shell/src/shell/shell.component.scss');
 
 /** The declarations of the first rule with exactly this selector. */
 function rule(css: string, selector: string): string {
@@ -61,7 +61,7 @@ describe('safe-area styles', () => {
 
   it('keeps the rail, the main region and the phone sides clear of the notch', () => {
     expect(rule(shell, '.frame--rail')).toMatch(
-      /grid-template-columns: calc\(var\(--rail-width\) \+ var\(--app-left-safe-area\)\) minmax\(0, 1fr\);/,
+      /grid-template-columns:\s+calc\(var\(--rail-width\) \+ var\(--app-left-safe-area\)\)\s+minmax\(0, 1fr\);/,
     );
     expect(rule(shell, '.frame__rail')).toMatch(
       /padding: var\(--app-top-safe-area\) 0 env\(safe-area-inset-bottom, 0px\) var\(--app-left-safe-area\);/,
@@ -84,7 +84,7 @@ describe('safe-area styles', () => {
     expect(read('../features/apply/status-timeline.component.scss')).toMatch(
       /top: var\(--app-top-safe-area, 0px\);/,
     );
-    expect(read('../features/search/command-palette.component.scss')).toMatch(
+    expect(read('../../../vendor/ui-kit/shell/src/command-palette/command-palette.component.scss')).toMatch(
       /top: calc\(var\(--space-4\) \+ var\(--app-top-safe-area, 0px\)\);/,
     );
   });

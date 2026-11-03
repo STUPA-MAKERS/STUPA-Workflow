@@ -15,8 +15,10 @@ cost center of the application.
 The resolver removes duplicates and sorts the result. It drops empty addresses.
 
 ``actionable_principal_emails`` returns everyone who can act on the current state of an
-application. Only a principal that can really fire a ``requires_action`` transition gets
-mail. The guard must pass. Admins are not included unconditionally.
+application, by the rule of the task list (``ListingOps.list_tasks``): the person can
+read the application and either fire a ``requires_action`` transition (the guard
+passes) or still cast a ballot in an open vote. Admins are not included
+unconditionally. A member of a Gremium who can only read the application gets no mail.
 """
 
 from __future__ import annotations
@@ -30,6 +32,7 @@ from typing import Any
 from sqlalchemy import ColumnElement, Select, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.admin.gremium_roles import membership_active_clause
 from app.modules.admin.models import GremiumMembership
 from app.modules.applications.models import Applicant, Application
 from app.modules.auth.models import (
@@ -39,6 +42,7 @@ from app.modules.auth.models import (
     RoleAssignment,
     RolePermission,
 )
+from app.modules.auth.principal import Principal as AuthPrincipal
 from app.modules.budget.decision import effective_decision_gremium
 from app.modules.flow.context import build_base_context, with_actor
 from app.modules.flow.models import State, Transition
@@ -403,27 +407,31 @@ async def actionable_principal_emails(
     application_id: uuid.UUID,
     state: State | None,
 ) -> list[str]:
-    """Return the addresses of everyone who can act on the current state.
+    """Return the addresses of everyone who can act on the current state now.
 
-    For a ``vote`` state the result holds the members of the voting gremium (the
-    snapshot ``application.vote_gremium_id``). For every other state it holds exactly
-    the principals for which at least one manual ``requires_action`` transition fires.
-    A transition fires only when its guard passes. This mirrors the task-list semantics
-    of ``list_tasks`` and ``available_transitions``. The seed holds admins like every
-    other holder of the transition permission. An admin gets mail only when a guard
-    fires for them too. The transitions are the manual non-branch ones that count as an
-    open task, as in ``FlowService._outgoing`` and ``list_tasks``.
+    The rule is the one of the task list (``ListingOps.list_tasks``), so a mail goes
+    only to a person who has the application as a task:
+
+    * A ``vote`` state: the members of the voting Gremium that an open vote of the
+      application still takes a ballot from (``VotingService.can_still_cast``). The
+      state alone is no task. While no vote is open, for example before the meeting
+      opens it, nobody gets mail.
+    * Every other state: the principals for which at least one manual
+      ``requires_action`` transition fires (the guard passes) and that can read the
+      application (``access.resolve_app_read``, the check of the transition route).
+
+    The transitions are the manual non-branch ones that count as an open task, as in
+    ``FlowService._outgoing`` and ``list_tasks``.
     """
-    if state is not None and state.kind == "vote":
-        return await RecipientResolver(session).resolve(
-            [{"kind": "voteGremium"}], application_id=application_id
-        )
-
     app = await session.scalar(
         select(Application).where(Application.id == application_id)
     )
     if app is None or app.current_state_id is None:
         return []
+    now = datetime.now(UTC)
+    if state is not None and state.kind == "vote":
+        return await _open_vote_casters(session, app, now)
+
     transitions = list(
         (
             await session.scalars(
@@ -444,12 +452,102 @@ async def actionable_principal_emails(
 
     base_ctx = await build_base_context(session, app, manual=True)
     candidates = await _candidates_with_transition_permission(
-        session, datetime.now(UTC), gremium_id=app.gremium_id
+        session, now, gremium_id=app.gremium_id
     )
     firable = firable_candidates(
         candidates, transitions, base_ctx, created_by=app.created_by
     )
-    return sorted({c.email for c in firable})
+    readers = await _readers(session, app.id, [c.principal_id for c in firable], now)
+    return sorted({c.email for c in firable if c.principal_id in readers})
+
+
+async def _resolved_principals(
+    session: AsyncSession, principal_ids: Sequence[uuid.UUID], now: datetime
+) -> list[tuple[uuid.UUID, str, AuthPrincipal]]:
+    """Resolve the active principal rows into ``(id, email, Principal)`` triples.
+
+    A deactivated account and an account without an address get no mail.
+    """
+    from app.modules.auth.rbac import resolve_principal
+
+    if not principal_ids:
+        return []
+    rows = (
+        await session.scalars(
+            select(Principal).where(
+                Principal.id.in_(principal_ids),
+                Principal.active.is_(True),
+                Principal.email.is_not(None),
+            )
+        )
+    ).all()
+    return [
+        (row.id, str(row.email), await resolve_principal(session, row, now))
+        for row in rows
+    ]
+
+
+async def _readers(
+    session: AsyncSession,
+    application_id: uuid.UUID,
+    principal_ids: Sequence[uuid.UUID],
+    now: datetime,
+) -> set[uuid.UUID]:
+    """Return the ids of the principals that can read the application.
+
+    The check is ``access.resolve_app_read``, the read check of the transition route,
+    so the mail and the route agree on who acts.
+    """
+    from app.modules.applications.access import resolve_app_read
+    from app.shared.errors import ForbiddenError
+
+    out: set[uuid.UUID] = set()
+    for pid, _email, principal in await _resolved_principals(
+        session, principal_ids, now
+    ):
+        try:
+            await resolve_app_read(session, application_id, principal, None)
+        except ForbiddenError:
+            continue
+        out.add(pid)
+    return out
+
+
+async def _open_vote_casters(
+    session: AsyncSession, app: Application, now: datetime
+) -> list[str]:
+    """Return the members that an open vote of the application still takes a ballot from.
+
+    The candidates are the current members of the voting Gremium. The rule is the gate of
+    the cast route (``VotingService.can_still_cast``), as in the task list.
+    """
+    from app.modules.voting.models import Vote
+    from app.modules.voting.service import VotingService
+
+    votes = (
+        await session.scalars(
+            select(Vote).where(Vote.application_id == app.id, Vote.status == "open")
+        )
+    ).all()
+    if not votes or app.vote_gremium_id is None:
+        return []
+    member_ids = (
+        await session.scalars(
+            select(GremiumMembership.principal_id).where(
+                GremiumMembership.gremium_id == app.vote_gremium_id,
+                membership_active_clause(now),
+            )
+        )
+    ).all()
+    voting = VotingService(session)
+    out: set[str] = set()
+    resolved = await _resolved_principals(session, list(member_ids), now)
+    for _pid, email, principal in resolved:
+        for vote in votes:
+            if await voting.can_still_cast(vote, principal, now=now):
+                out.add(email)
+                break
+    return sorted(out)
 
 
 async def state_actionable(session: AsyncSession, state: State | None) -> bool:

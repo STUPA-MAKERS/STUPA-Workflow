@@ -138,7 +138,11 @@ async def list_meetings() -> dict:
 
 @group.tool
 async def get_meeting(meeting_id: str) -> dict:
-    """Fetch one meeting with its agenda, its attendance and its votes."""
+    """Fetch one meeting with its votes and the number of its agenda items.
+
+    The answer holds no agenda and no attendance: `agendaItemCount` only counts the
+    items. Read the agenda with `get_agenda` and the attendance with `get_attendance`.
+    """
     return await api().get(f"/meetings/{meeting_id}")
 
 
@@ -282,6 +286,18 @@ async def reset_attendance(meeting_id: str, principal_id: str) -> dict:
 
 
 @group.tool
+async def get_agenda(meeting_id: str) -> list[dict]:
+    """Read the agenda of a meeting: its items in their order.
+
+    Each item has `id`, `title`, `position`, `body` (markdown), `nonPublic`, `doneAt`,
+    and for an application item `applicationId`, `stateLabel` and `amount` (a to-do
+    item has `todoId`). Needs read access to the meeting. Read the agenda here before
+    you change it, and after a failed write before you repeat it.
+    """
+    return await api().get(f"/meetings/{meeting_id}/agenda")
+
+
+@group.tool
 async def add_agenda_item(
     meeting_id: str,
     application_id: str | None = None,
@@ -293,7 +309,11 @@ async def add_agenda_item(
     free-text item. Requires write access to the meeting: session.manage
     or protocol.write in its gremium, the assigned minute-taker, or admin. Only a
     planned or live meeting takes a new item; a closed meeting gives 409
-    `meeting_closed`.
+    `meeting_closed`. Returns the whole agenda after the add.
+
+    A second free-text item with the same title is a second item. If the call fails
+    without an answer from the platform, read the agenda with `get_agenda` before you
+    add the item again.
     """
     return await api().post(
         f"/meetings/{meeting_id}/agenda",

@@ -14,10 +14,9 @@ import type { AgendaItem, JoinLink, Meeting, Vote, VoteResult } from '@core/api/
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { BrandingService } from '@core/branding/branding.service';
-import { ThemeService } from '@core/theme/theme.service';
+import { ThemeService, IconComponent } from '@stupa-makers/ui-kit';
 import { LiveVoteService, type LiveVoteSession } from '@core/ws/live-vote.service';
 import type { VoteClosedMsg } from '@core/ws/ws-messages';
-import { IconComponent } from '@stupa-makers/ui-kit';
 import {
   type BeamerJoin,
   type BeamerPresence,

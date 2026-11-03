@@ -20,15 +20,16 @@ import type {
   Uuid,
 } from '@core/api/models';
 import type { BadgeVariant } from '@stupa-makers/ui-kit';
+import { BreadcrumbsComponent } from '../../layout/breadcrumbs.component';
 import {
   BadgeComponent,
   ButtonComponent,
   CardComponent,
   IconComponent,
   NoteComponent,
+  PageHeaderComponent,
 } from '@stupa-makers/ui-kit';
 import type { TranslationKey } from '@core/i18n/translations';
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { AgendaItemDialogComponent } from './agenda-item-dialog/agenda-item-dialog.component';
 import { CloseMeetingDialogComponent } from './close-meeting-dialog/close-meeting-dialog.component';
 import { EarlyOpenDialogComponent } from './early-open-dialog/early-open-dialog.component';
@@ -86,6 +87,7 @@ import { beamerUrl } from '../voting/beamer-link.util';
     CardComponent,
     IconComponent,
     PageHeaderComponent,
+    BreadcrumbsComponent,
     MeetingPageComponent,
     MeetingFollowViewComponent,
     MeetingsOverviewComponent,

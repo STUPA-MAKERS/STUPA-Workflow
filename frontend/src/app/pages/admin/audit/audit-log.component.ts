@@ -1,6 +1,7 @@
 import { ExpandRowComponent } from '@shared/ui/expand-row/expand-row.component';
 import { LoadMoreComponent } from '@shared/ui/load-more/load-more.component';
-import { StickyBarComponent as _Sb } from '@stupa-makers/ui-kit';
+import { StickyBarComponent as _Sb, PageHeaderComponent } from '@stupa-makers/ui-kit';
+import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -14,9 +15,6 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import {
-  PageHeaderComponent,
-} from '@shared/ui';
 import {
   ButtonComponent,
   ConfigDiffComponent,
@@ -253,6 +251,7 @@ type VerifyState =
     IconComponent,
     FilterSelectComponent,
     PageHeaderComponent,
+    BreadcrumbsComponent,
     SkeletonComponent,
     RangeChipComponent,
   ],

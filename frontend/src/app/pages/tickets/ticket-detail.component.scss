@@ -185,6 +185,35 @@
   flex: 1 0 auto;
   align-items: stretch;
 }
+// Side by side the two columns never wrap: stacked, the log shrank to its minimum and the
+// sheet ran past the pane. The fields of a narrow details column stack instead.
+.td--split .td__cols {
+  flex-wrap: nowrap;
+}
+.td--split .td__col:first-child {
+  min-width: 0;
+}
+.td--split .td__col:last-child {
+  min-width: 15rem;
+  container-type: inline-size;
+}
+@container (max-width: 22rem) {
+  .td__pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .td__pair:first-child > :last-child {
+    border-top-right-radius: 4px;
+  }
+  .td__pair:first-child > :first-child {
+    border-top-right-radius: var(--radius-lg);
+  }
+  .td__pair:last-child > :first-child {
+    border-bottom-left-radius: 4px;
+  }
+  .td__pair:last-child > :last-child {
+    border-bottom-left-radius: var(--radius-lg);
+  }
+}
 .td--split .td__col--log > .td__sec,
 .td--split .td__chat {
   flex: 1 1 auto;
@@ -198,6 +227,38 @@
   --chat-log-min: 12rem;
   --chat-log-max: none;
   --chat-composer-bleed: var(--space-4);
+}
+
+// A desktop with one pane at a time: on the log tab the sheet takes the height of the window
+// and no more, so the log fills the room below the tabs and scrolls inside; the composer
+// stays at the foot. The details tab keeps the page scroll.
+@include bp.narrow {
+  .td--log {
+    min-height: 0;
+  }
+  // The composer ends as far above the window edge as the page starts below it: the pager
+  // takes the bottom padding of the page, less the top padding and the gap that `app-chat`
+  // keeps before its file viewer.
+  .td--log app-tab-pager.td__tabs {
+    flex: 1 1 0;
+    min-height: 0;
+    margin-bottom: calc(var(--main-pad-top, 0px) - var(--main-pad-bottom, 0px) - var(--space-3));
+  }
+  .td--log app-tab-pager.td__tabs ::ng-deep > .tp__panel:not([hidden]) {
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .td--log .td__panel--log,
+  .td--log .td__panel--log .td__sec,
+  .td--log .td__panel--log .td__chat {
+    flex: 1 1 0;
+    min-height: 0;
+  }
+  .td--log .td__panel--log .td__chat {
+    --chat-log-basis: 0;
+  }
 }
 
 .td__closeBox {

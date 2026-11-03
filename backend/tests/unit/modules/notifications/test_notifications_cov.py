@@ -24,6 +24,7 @@ from app.modules.notifications.auto import (
     get_auto_mailer,
     meeting_delegation_mail_info,
 )
+from app.modules.notifications.kinds import kind_default
 from app.modules.notifications.models import (
     MailTemplate,
     NotificationPreference,
@@ -479,8 +480,9 @@ async def test_update_notification_settings_no_changes_keeps_values(
 async def test_get_preferences_no_principal_all_default() -> None:
     session = FakeSession(scalar=[None])
     prefs = await _svc(session).get_preferences("ghost")
-    assert all(enabled for _, enabled in prefs)
-    assert {k for k, _ in prefs}
+    assert all(enabled is kind_default(kind) for kind, enabled in prefs)
+    assert dict(prefs)["task"] is False
+    assert dict(prefs)["comment"] is True
 
 
 async def test_get_preferences_merges_stored_disable() -> None:
@@ -652,7 +654,7 @@ async def test_handle_notify_action_filter_removes_all_recipients() -> None:
     svc = _svc(session, queue)
     svc.resolver = cast(Any, FakeResolver(["a@x.de"]))
     count = await svc.handle_notify_action(
-        {"type": "notify", "templateKey": "status_update"},
+        {"type": "notify", "templateKey": "status_update", "recipients": [{"kind": "applicant"}]},
     )
     assert count == 0
     assert queue.messages == []
@@ -798,19 +800,6 @@ async def test_resolve_explicit_now_passed() -> None:
         [{"kind": "role", "ref": "manager"}], now=datetime.now(UTC)
     )
     assert out == ["r@x.de"]
-
-
-async def test_actionable_vote_state_with_gremium() -> None:
-    """Resolve the members of the ``vote_gremium_id`` snapshot."""
-    from app.modules.flow.models import State
-
-    gid = uuid.uuid4()
-    state = State(kind="vote", config={"gremiumId": str(gid)})
-    session = FakeSession(scalar=[gid], scalars=[["v@x.de"]])
-    out = await actionable_principal_emails(
-        cast(AsyncSession, session), application_id=uuid.uuid4(), state=state
-    )
-    assert out == ["v@x.de"]
 
 
 async def test_actionable_vote_state_without_gremium_returns_empty() -> None:

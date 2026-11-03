@@ -14,16 +14,9 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { CATALOG, type TranslationKey } from '@core/i18n/translations';
 import { langFieldLabel, setI18n } from '@shared/forms/i18n-text';
 import { DEFAULT_ACCENT, normalizeHex } from '@core/theme/accent';
-import { ThemeService } from '@core/theme/theme.service';
-import type { I18nMap } from '@core/api/models';
 import {
-  defaultSubmittedText,
-  SUBMITTED_FREETEXT,
-  type SubmittedKind,
-} from '@core/branding/submitted-texts';
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
-import { FabComponent } from '@shared/ui/fab/fab.component';
-import {
+  ThemeService,
+  FabComponent,
   ButtonComponent,
   FilePickerComponent,
   formatBytes,
@@ -33,7 +26,15 @@ import {
   SkeletonComponent,
   SwitchComponent,
   ToastService,
+  PageHeaderComponent,
 } from '@stupa-makers/ui-kit';
+import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
+import type { I18nMap } from '@core/api/models';
+import {
+  defaultSubmittedText,
+  SUBMITTED_FREETEXT,
+  type SubmittedKind,
+} from '@core/branding/submitted-texts';
 import { AdminApiService } from '../admin-api.service';
 import {
   type Branding,
@@ -91,6 +92,7 @@ export type BrandingSection = 'branding' | 'texts';
     ContentLangSwitchComponent,
     SwitchComponent,
     PageHeaderComponent,
+    BreadcrumbsComponent,
   ],
   templateUrl: './branding-editor.component.html',
   styleUrl: './branding-editor.component.scss',

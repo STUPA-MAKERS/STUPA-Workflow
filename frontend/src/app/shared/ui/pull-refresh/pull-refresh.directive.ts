@@ -10,9 +10,9 @@ import {
   output,
 } from '@angular/core';
 import { freshly } from '@core/cache/cache.interceptor';
-import { visibly } from '@core/loading/loading.interceptor';
-import { LoadingService } from '@core/loading/loading.service';
 import {
+  visibly,
+  LoadingService,
   GESTURE_SLOP,
   haptic,
   modalOpen,

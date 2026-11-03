@@ -560,6 +560,15 @@ describe('FormlyPositionsType — validation reflection', () => {
     expect(control.errors).toEqual({ positions: true });
   });
 
+  it('accepts an offer of 0 €', async () => {
+    const { cmp, control } = await setup({
+      props: { minOffers: 1, minPositions: 1 },
+      value: [{ label: 'P', offers: [{ label: 'A', value: 0, preferred: true }] }],
+    });
+    cmp.setPositionLabel(0, 'P');
+    expect(control.errors).toBeNull();
+  });
+
   it('required + zero positions is invalid', async () => {
     const { cmp, control } = await setup({
       props: { required: true, minPositions: 1 },
@@ -601,6 +610,7 @@ describe('FormlyPositionsType — inline error helpers', () => {
     expect(prot(cmp).offerValueInvalid({ label: 'a', value: null, preferred: false })).toBe(true);
     expect(prot(cmp).offerValueInvalid({ label: 'a', value: -1, preferred: false })).toBe(true);
     expect(prot(cmp).offerValueInvalid({ label: 'a', value: 5, preferred: false })).toBe(false);
+    expect(prot(cmp).offerValueInvalid({ label: 'a', value: 0, preferred: false })).toBe(false);
   });
 
   it('cardError returns empty string while not showing errors', async () => {
@@ -637,7 +647,7 @@ describe('FormlyPositionsType — inline error helpers', () => {
     const { cmp } = await setup({ props: { minOffers: 1 }, showError: true });
     expect(
       prot(cmp).cardError({ label: 'P', offers: [{ label: '', value: 1, preferred: true }] }),
-    ).toBe('Jedes Angebot braucht eine Bezeichnung und einen Wert > 0.');
+    ).toBe('Jedes Angebot braucht eine Bezeichnung und einen Wert ≥ 0.');
   });
 
   it('cardError returns empty string for a fully valid position while showing errors', async () => {

@@ -1,5 +1,7 @@
 <section class="cdv admin-page">
-  <app-page-header [flush]="true" [title]="'admin.cdVariants.title' | t" />
+  <app-page-header [flush]="true" [title]="'admin.cdVariants.title' | t">
+    <app-breadcrumbs crumbs />
+  </app-page-header>
 
   @if (loading()) {
     <app-skeleton variant="rows" [count]="3" [label]="'admin.cdVariants.loading' | t" />

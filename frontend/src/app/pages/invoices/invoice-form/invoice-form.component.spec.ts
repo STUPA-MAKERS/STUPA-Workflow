@@ -1,5 +1,5 @@
 import { computed, signal } from '@angular/core';
-import { render, screen } from '@testing-library/angular';
+import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import type { Invoice, InvoiceStatus } from '../../budget/budget-tree.api';
 import {
@@ -111,6 +111,13 @@ describe('InvoiceFormComponent', () => {
     await user.click(screen.getByRole('button', { name: 'Vorhandene öffnen' }));
     expect(openDuplicate).toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'Beleg entfernen' }));
+    expect(h.calls).not.toContain('clear');
+    const confirm = screen.getByRole('dialog', { name: 'Beleg entfernen?' });
+    expect(confirm).toHaveTextContent('„2026-0931.pdf“ wird entfernt.');
+    await user.click(within(confirm).getByRole('button', { name: 'Abbrechen' }));
+    expect(h.calls).not.toContain('clear');
+    await user.click(screen.getByRole('button', { name: 'Beleg entfernen' }));
+    await user.click(within(screen.getByRole('dialog', { name: 'Beleg entfernen?' })).getByRole('button', { name: 'Entfernen' }));
     expect(h.calls).toContain('clear');
     h.importFileSize.set(3_000_000);
     view.fixture.detectChanges();

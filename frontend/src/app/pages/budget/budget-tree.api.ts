@@ -1,6 +1,6 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { skipLoading } from '@core/loading/loading.interceptor';
+import { skipLoading } from '@stupa-makers/ui-kit';
 import { cached, detailContext, listContext } from '@core/cache/cache.interceptor';
 import type { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';

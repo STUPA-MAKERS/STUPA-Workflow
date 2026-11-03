@@ -1,7 +1,7 @@
 @use 'breakpoints' as bp;
 @use 'scroll-fade' as fade;
 @use '../budget/swatch';
-@use '../../shared/ui/list-pane' as lp;
+@use 'list-pane' as lp;
 
 :host {
   @include lp.stack;
@@ -56,19 +56,6 @@
   @include fade.fade-y(var(--exp-fade));
 }
 
-.exp__group {
-  @include lp.stack;
-}
-.exp__month {
-  @include lp.month;
-}
-.exp__group:first-child .exp__month,
-.exp__skel .exp__month {
-  padding-top: var(--space-2);
-}
-.exp__skelMonth {
-  width: 7rem;
-}
 .exp__rows {
   @include lp.stack;
 }
@@ -154,8 +141,5 @@
   }
   .exp__arrow {
     margin-inline: var(--space-1);
-  }
-  .exp__month {
-    padding-inline: var(--space-1);
   }
 }
