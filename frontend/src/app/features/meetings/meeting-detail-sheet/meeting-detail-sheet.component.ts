@@ -41,7 +41,6 @@ import {
   agendaProgress,
   attendanceCounts,
   openVoteOf,
-  topsLabel,
 } from '../meetings-overview.util';
 import { weekdayDate } from '@shared/date-format';
 
@@ -245,11 +244,6 @@ export class MeetingDetailSheetComponent {
     if (item.id === 'edit') this.edit.emit(m);
     else if (item.id === 'beamer') this.beamer.emit(m);
     else this.remove.emit(m);
-  }
-
-  /** "8 TOPs", "1 TOP" or "keine TOPs". */
-  topsText(n: number): string {
-    return topsLabel(n, (k, p) => this.i18n.translate(k, p));
   }
 
   /** "Anwesend 19 von 23" for the screen reader label of a bar. */

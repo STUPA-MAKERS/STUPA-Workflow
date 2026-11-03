@@ -891,7 +891,6 @@
   "meetings.overview.topOf": "Item {n} of {m}",
   "meetings.overview.vote": "Vote",
   "meetings.overview.voteOpen": "Vote open",
-  "meetings.overview.presentOf": "{n} of {m}",
   "meetings.overview.attendanceError": "Could not load the attendance.",
   "meetings.overview.delegations": "Delegations",
   "meetings.overview.unknownPerson": "Unknown",

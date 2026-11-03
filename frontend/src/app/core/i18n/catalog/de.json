@@ -891,7 +891,6 @@
   "meetings.overview.topOf": "TOP {n} von {m}",
   "meetings.overview.vote": "Abstimmung",
   "meetings.overview.voteOpen": "Abstimmung offen",
-  "meetings.overview.presentOf": "{n} von {m}",
   "meetings.overview.attendanceError": "Die Anwesenheit konnte nicht geladen werden.",
   "meetings.overview.delegations": "Vertretungen",
   "meetings.overview.unknownPerson": "Unbekannt",

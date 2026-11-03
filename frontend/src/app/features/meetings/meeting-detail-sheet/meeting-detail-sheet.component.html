@@ -67,11 +67,7 @@
     </div>
   } @else {
     <div class="ms__body">
-      <app-section
-        class="ms__agenda"
-        [heading]="'meetings.agenda.title' | t"
-        [meta]="data()?.agenda ? topsText(agendaRows().length) : null"
-      >
+      <app-section class="ms__agenda" [heading]="'meetings.agenda.title' | t">
         @if (!data()?.agenda) {
           <p class="ms__note ms__note--error" role="alert">{{ 'meetings.overview.agendaError' | t }}</p>
         } @else if (!agendaRows().length) {
@@ -99,10 +95,8 @@
                     </span>
                   }
                 </span>
-                @if (row.mark === 'done') {
-                  <span class="ms__topMark">{{ 'meetings.dock.done' | t }}</span>
-                } @else if (row.mark === 'now') {
-                  <span class="ms__topMark ms__topMark--now">{{ 'meetings.list.now' | t }}</span>
+                @if (row.mark === 'now') {
+                  <span class="ms__topMark">{{ 'meetings.list.now' | t }}</span>
                 }
               </li>
             }
@@ -140,7 +134,6 @@
                     <span class="ms__voteMeta">{{ v.meta }}</span>
                   }
                 </span>
-                <span class="mono">{{ v.voted }} / {{ v.present }}</span>
               </div>
               <app-seg-bar
                 [segments]="v.segs"
@@ -152,11 +145,7 @@
           </app-section>
         }
 
-        @let att = counts();
-        <app-section
-          [heading]="'meetings.attendance.title' | t"
-          [meta]="att ? ('meetings.overview.presentOf' | t: { n: att.present, m: att.total }) : null"
-        >
+        <app-section [heading]="'meetings.attendance.title' | t">
           @if (counts(); as c) {
             <dl class="ms__card ms__stats">
               <div><dt>{{ 'meetings.attendance.present' | t }}</dt><dd class="mono">{{ c.present }}</dd></div>

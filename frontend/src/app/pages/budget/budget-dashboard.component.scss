@@ -323,6 +323,9 @@
 .bd__sec {
   --section-gap: var(--space-4);
 }
+.bd__sec--apps {
+  --section-inset: var(--space-1);
+}
 
 .bd__usage {
   display: flex;

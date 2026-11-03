@@ -105,7 +105,7 @@
 
         <div class="bd__cols" [class.bd__cols--single]="!hasChildren()">
           @if (hasChildren()) {
-            <app-section class="bd__sec" [heading]="'budget.dash.distribution' | t">
+            <app-section class="bd__sec" size="lg" [heading]="'budget.dash.distribution' | t">
               <app-filter-select
                 sectionAction
                 [label]="'budget.dash.metric' | t"
@@ -124,7 +124,7 @@
             </app-section>
           }
 
-          <app-section class="bd__sec" [heading]="'budget.usage.heading' | t">
+          <app-section class="bd__sec" size="lg" [heading]="'budget.usage.heading' | t">
             <div class="bd__usageCols" aria-hidden="true">
               <span class="bd__grow"></span>
               <span class="bd__c1">{{ 'budget.dash.fig.requested' | t }}</span>
@@ -168,7 +168,7 @@
           </app-section>
         </div>
 
-        <app-section class="bd__sec" headingId="bd-apps" [heading]="itemsTitle()">
+        <app-section class="bd__sec bd__sec--apps" size="lg" headingId="bd-apps" [heading]="itemsTitle()">
           @if (previewItems().length) {
             <app-button sectionAction variant="text" size="sm" (click)="openItems()">{{ 'budget.dash.appsAll' | t }}</app-button>
           }
