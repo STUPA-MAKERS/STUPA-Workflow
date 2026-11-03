@@ -360,7 +360,7 @@
   "apply.positions.errMinOffers": "Too few comparison offers for this position.",
   "apply.positions.errPreferred": "Exactly one offer must be marked as preferred.",
   "apply.positions.errLabel": "Position label is missing.",
-  "apply.positions.errOffers": "Each offer needs a label and a value > 0.",
+  "apply.positions.errOffers": "Each offer needs a label and a value ≥ 0.",
   "apply.positions.errAmountFormat": "Not a valid amount. Example: 1,234.56 (at most 2 decimals).",
   "apply.positions.invalid": "Each position needs a label, enough comparison offers (value > 0) and exactly one preferred offer.",
   "apply.positions.noOffers": "No comparison offers are possible for this position",

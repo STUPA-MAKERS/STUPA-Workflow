@@ -285,6 +285,11 @@
     --ad-gutter: var(--space-4);
   }
 }
+// Docked in the bar of the layout, the edit has no bar of its own: a field scrolls into
+// view below the bar of the layout.
+.ad--docked {
+  --ad-edit-bar: var(--ld-sticky-top, 0px);
+}
 .ad__edit ::ng-deep :is(input, textarea, select, button, a, [tabindex], [role='alert']) {
   scroll-margin-top: calc(var(--ad-edit-bar) + var(--space-4));
   scroll-margin-bottom: calc(var(--app-bottom-inset, 0px) + var(--space-4));

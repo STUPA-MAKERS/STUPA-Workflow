@@ -177,12 +177,20 @@ def test_positions_default_min_offers_is_three() -> None:
     assert any("at least 3 comparison offer" in e.msg for e in errors)
 
 
-def test_positions_non_positive_value_rejected() -> None:
+def test_positions_negative_value_rejected() -> None:
+    field = _positions_field(validation={"minOffers": 1})
+    value = [_position("P", ("A", -1, True))]
+    errors: list[FieldError] = []
+    _validate_value(field, value, errors)
+    assert any("must not be negative" in e.msg for e in errors)
+
+
+def test_positions_zero_value_accepted() -> None:
     field = _positions_field(validation={"minOffers": 1})
     value = [_position("P", ("A", 0, True))]
     errors: list[FieldError] = []
     _validate_value(field, value, errors)
-    assert any("greater than 0" in e.msg for e in errors)
+    assert errors == []
 
 
 def test_positions_min_positions() -> None:
@@ -365,12 +373,19 @@ def test_funding_without_positions_answer_rejected() -> None:
 
 @pytest.mark.parametrize(
     ("bad", "msg"),
-    [(0, "must be greater than 0"), (-5, "must be greater than 0"), ("abc", "must be a number")],
+    [(-5, "must not be negative"), ("abc", "must be a number")],
 )
 def test_funding_bad_value_gives_one_error(bad: object, msg: str) -> None:
     with pytest.raises(AnswerValidationError) as ei:
         validate_answers(_funding_form(), {"positions": _costs(100), "foerderung": bad})
     assert [e.msg for e in ei.value.errors] == [msg]
+
+
+def test_funding_zero_accepted_and_promoted() -> None:
+    validate_answers(_funding_form(), {"positions": _costs(100), "foerderung": 0})
+    assert extract_promoted(_funding_form(), {"positions": _costs(100), "foerderung": 0}) == {
+        "amount": Decimal("0")
+    }
 
 
 def test_funding_before_positions_in_field_order() -> None:

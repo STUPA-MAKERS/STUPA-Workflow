@@ -620,11 +620,11 @@ def test_positions_offer_value_invalid_is_finite_error() -> None:
     assert any(e.msg == "offer value must be a finite number" for e in errors)
 
 
-def test_positions_offer_value_zero_error() -> None:
+def test_positions_offer_value_negative_error() -> None:
     errors: list[FieldError] = []
-    value = [{"label": "P", "offers": [{"label": "A", "value": 0, "preferred": True}]}]
+    value = [{"label": "P", "offers": [{"label": "A", "value": -1, "preferred": True}]}]
     _validate_value(_pos_field(validation={"minOffers": 1}), value, errors)
-    assert any(e.msg == "offer value must be greater than 0" for e in errors)
+    assert any(e.msg == "offer value must not be negative" for e in errors)
 
 
 def test_positions_too_many_preferred() -> None:
