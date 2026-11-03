@@ -35,7 +35,7 @@ export function openWindowClock(periodMs = 15_000): Signal<number> {
 }
 
 /**
- * When the window opens, for the hint at the open button: `17:00` on the same day,
+ * When the window opens, for the label of the open button: `17:00` on the same day,
  * else `19.10., 17:00`. Local time of the browser.
  */
 export function openWindowWhen(iso: string, now: number, i18nLocale: string): string {
