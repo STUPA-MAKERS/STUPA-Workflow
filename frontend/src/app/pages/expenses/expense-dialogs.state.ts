@@ -32,6 +32,21 @@ export function currentFiscalYear(
 }
 
 /**
+ * The default year of a booking or transfer form, as the server derives it: the
+ * only active open year, else the active open year that holds today, else null.
+ */
+export function defaultFiscalYear(
+  fys: readonly FiscalYear[],
+  today = new Date(),
+): FiscalYear | null {
+  const active = fys.filter((f) => f.active && !f.closedAt);
+  if (active.length === 1) return active[0];
+  const iso = today.toISOString().slice(0, 10);
+  const now = active.filter((f) => f.startDate <= iso && iso <= f.endDate);
+  return now.length === 1 ? now[0] : null;
+}
+
+/**
  * Booking forms: create (standalone or application-bound), edit, delete, transfer
  * between cost centres, and the invoice cache behind the invoice field and the
  * "Verknüpft" card of the detail. One form shows at a time.
@@ -353,7 +368,7 @@ export class ExpenseDialogsState {
     if (id) this.loadFiscalYears(id);
   }
 
-  /** `prefer`: the year to pick when it is open, else the only active one is picked. */
+  /** `prefer`: the year to pick when it is open, else `defaultFiscalYear` is picked. */
   private loadFiscalYears(budgetId: string, prefer = ''): void {
     const top = findTopBudgetNode(this.list.budgetTree(), budgetId);
     if (!top) return;
@@ -363,9 +378,9 @@ export class ExpenseDialogsState {
         if (this.newBudgetId() !== budgetId) return;
         const open = fys.filter((f) => !f.closedAt);
         this.fiscalYearOptions.set(open.map((f) => ({ value: f.id, label: f.display })));
-        const active = open.filter((f) => f.active);
+        const fallback = defaultFiscalYear(open);
         if (prefer && open.some((f) => f.id === prefer)) this.newFiscalYearId.set(prefer);
-        else if (active.length === 1) this.newFiscalYearId.set(active[0].id);
+        else if (fallback) this.newFiscalYearId.set(fallback.id);
       },
       error: () => this.fiscalYearOptions.set([]),
     });
@@ -625,8 +640,8 @@ export class ExpenseDialogsState {
         this.rememberTopYear(top.id, fys);
         const open = fys.filter((f) => !f.closedAt);
         this.transferFyOptions.set(open.map((f) => ({ value: f.id, label: f.display })));
-        const active = open.filter((f) => f.active);
-        if (active.length === 1) this.tFiscalYearId.set(active[0].id);
+        const fallback = defaultFiscalYear(open);
+        if (fallback) this.tFiscalYearId.set(fallback.id);
       },
       error: () => this.transferFyOptions.set([]),
     });
