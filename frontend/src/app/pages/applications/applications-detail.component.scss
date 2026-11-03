@@ -290,6 +290,10 @@
 .ad--docked {
   --ad-edit-bar: var(--ld-sticky-top, 0px);
 }
+// The form keeps the gap below the bar that the sheet head of the detail has.
+.ad--docked .ad__edit {
+  padding-top: var(--space-4);
+}
 .ad__edit ::ng-deep :is(input, textarea, select, button, a, [tabindex], [role='alert']) {
   scroll-margin-top: calc(var(--ad-edit-bar) + var(--space-4));
   scroll-margin-bottom: calc(var(--app-bottom-inset, 0px) + var(--space-4));
