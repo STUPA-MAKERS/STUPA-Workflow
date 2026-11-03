@@ -22,8 +22,7 @@
 
   <div class="mf__body" appScrollFade="y">
     <div class="tf">
-      <section class="mf__sec" aria-labelledby="tf-pair">
-        <h3 id="tf-pair" class="sec mf__secTitle">{{ 'expenses.transfers.pairTitle' | t }}</h3>
+      <app-section [heading]="'expenses.transfers.pairTitle' | t">
         @if (mode() === 'create') {
           @let legs = free();
           <div class="tf__legs">
@@ -111,7 +110,7 @@
             }
           </div>
         }
-      </section>
+      </app-section>
 
       @if (mode() === 'create') {
         <div class="tf__fields">

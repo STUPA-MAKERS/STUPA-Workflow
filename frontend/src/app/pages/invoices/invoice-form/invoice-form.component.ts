@@ -27,6 +27,7 @@ import {
   type SegmentedOption,
   type SelectOption,
   TextareaComponent,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import type { Invoice, InvoiceStatus } from '../../budget/budget-tree.api';
 import type { FinanceFormLayout } from '../../expenses/booking-form/booking-form.component';
@@ -112,6 +113,7 @@ export interface InvoiceFormHost {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionComponent,
     TextareaComponent,
     PaneFormHeadComponent,
     NoteComponent,

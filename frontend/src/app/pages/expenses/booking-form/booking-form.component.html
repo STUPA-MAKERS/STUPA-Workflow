@@ -74,8 +74,7 @@
           }
         </div>
 
-        <fieldset class="mf__sec">
-          <legend class="sec mf__secTitle">{{ 'expenses.form.assignment' | t }}</legend>
+        <app-section [heading]="'expenses.form.assignment' | t">
           @if (mode() === 'create') {
             @if (s.newApplicationId()) {
               <app-locked-field filled [label]="'expenses.field.costCentre' | t">{{
@@ -178,11 +177,13 @@
               }}</app-locked-field>
             }
           }
-        </fieldset>
+        </app-section>
 
         @if (mode() === 'edit' && e && !e.parentExpenseId) {
-          <fieldset class="mf__sec">
-            <legend class="sec mf__secTitle">{{ 'expenses.sub.title' | t }}</legend>
+          <app-section [heading]="'expenses.sub.title' | t">
+            <app-button sectionAction variant="text" size="sm" (click)="addSub.emit()">
+              <span class="mf__btn"><app-icon name="plus" />{{ 'expenses.sub.add' | t }}</span>
+            </app-button>
             @if (subRows().length) {
               <div class="rowgroup" [class.rowgroup--bg3]="layout() === 'sheet'" role="list">
                 @for (r of subRows(); track r.id) {
@@ -202,17 +203,15 @@
                 }
                 <app-sum-row quiet [label]="'expenses.sub.sumLine' | t" [amount]="signed(e)" />
               </div>
+            } @else {
+              <app-empty-state rows="3" [heading]="'expenses.sub.none' | t" />
             }
-            <app-button class="bf__addSub" variant="text" size="sm" (click)="addSub.emit()">
-              <span class="mf__btn"><app-icon name="plus" />{{ 'expenses.sub.add' | t }}</span>
-            </app-button>
-          </fieldset>
+          </app-section>
         }
       </div>
 
       <div class="mf__col">
-        <fieldset class="mf__sec">
-          <legend class="sec mf__secTitle">{{ 'expenses.form.receipt' | t }}</legend>
+        <app-section [heading]="'expenses.form.receipt' | t">
           @if (mode() === 'create') {
             <app-select
               name="invoice"
@@ -304,10 +303,9 @@
               />
             </div>
           }
-        </fieldset>
+        </app-section>
 
-        <fieldset class="mf__sec">
-          <legend class="sec mf__secTitle">{{ 'expenses.form.payment' | t }}</legend>
+        <app-section [heading]="'expenses.form.payment' | t">
           <app-chip-group
             class="mf__chips"
             [ariaLabel]="'expenses.field.paymentMethod' | t"
@@ -332,7 +330,7 @@
               ></textarea>
             }
           </app-textarea>
-        </fieldset>
+        </app-section>
       </div>
     </div>
   </div>

@@ -41,6 +41,7 @@ import {
   type SelectOption,
   SkeletonComponent,
   ToastService,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import {
   DRAFT_FILES_STORAGE_KEY,
@@ -104,6 +105,7 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionComponent,
     AutocompleteComponent,
     PaneFormHeadComponent,
     NoteComponent,

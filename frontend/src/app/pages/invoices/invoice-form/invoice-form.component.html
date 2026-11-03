@@ -22,8 +22,7 @@
   <div class="ff__body" appScrollFade="y">
     <div class="ff__cols if__cols">
       <div class="ff__col if__fileCol">
-        <section class="ff__sec" aria-labelledby="if-file">
-          <h3 id="if-file" class="sec ff__secTitle">{{ 'invoices.detail.receipt' | t }}</h3>
+        <app-section [heading]="'invoices.detail.receipt' | t">
           @if (mode() === 'create') {
             @if (h.importToken()) {
               <div class="if__file">
@@ -68,7 +67,7 @@
               <app-note icon="file" [surface]="layout() === 'sheet' ? 3 : 2">{{ 'invoices.detail.noFile' | t }}</app-note>
             }
           }
-        </section>
+        </app-section>
       </div>
 
       <div class="ff__col if__fields">
