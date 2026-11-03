@@ -807,7 +807,7 @@
   "applications.budget.change": "Change cost centre",
   "applications.budget.invalid": "Assignment not allowed – check cost centre / fiscal year.",
   "applications.budget.fiscalYear": "Fiscal year",
-  "applications.budget.fiscalAuto": "Automatic (active fiscal year)",
+  "applications.budget.fiscalAuto": "Automatic (current fiscal year)",
   "applications.budget.fiscalInactive": "inactive",
   "applications.detail.positionsTotal": "Total amount",
   "applications.detail.positionUntitled": "Untitled position",

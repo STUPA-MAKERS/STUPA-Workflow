@@ -807,7 +807,7 @@
   "applications.budget.change": "Kostenstelle ändern",
   "applications.budget.invalid": "Zuordnung nicht möglich — Kostenstelle/Haushaltsjahr prüfen.",
   "applications.budget.fiscalYear": "Haushaltsjahr",
-  "applications.budget.fiscalAuto": "Automatisch (aktives HHJ)",
+  "applications.budget.fiscalAuto": "Automatisch (aktuelles HHJ)",
   "applications.budget.fiscalInactive": "inaktiv",
   "applications.detail.positionsTotal": "Gesamtbetrag",
   "applications.detail.positionUntitled": "Position ohne Bezeichnung",

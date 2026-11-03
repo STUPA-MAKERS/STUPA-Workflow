@@ -577,7 +577,7 @@ describe('ApplicationsDetailComponent — header', () => {
         fiscalChoice: () => string;
         fiscalYears: () => unknown[];
       };
-      expect(c.fiscalOptions().map((o) => o.label)).toEqual(['Automatisch (aktives HHJ)', '2026', '2025 (inaktiv)']);
+      expect(c.fiscalOptions().map((o) => o.label)).toEqual(['Automatisch (aktuelles HHJ)', '2026', '2025 (inaktiv)']);
 
       c.onBudgetPicked('b1');
       expect(c.fiscalChoice()).toBe('');
@@ -600,10 +600,10 @@ describe('ApplicationsDetailComponent — header', () => {
         app: { update: (f: (a: Record<string, unknown>) => Record<string, unknown>) => void };
       };
       c.fiscalYears.set([YEARS[0], closed]);
-      expect(c.fiscalOptions().map((o) => o.label)).toEqual(['Automatisch (aktives HHJ)', '2026']);
+      expect(c.fiscalOptions().map((o) => o.label)).toEqual(['Automatisch (aktuelles HHJ)', '2026']);
       c.app.update((a) => ({ ...a, fiscalYearId: 'fyc' }));
       expect(c.fiscalOptions().map((o) => o.label)).toEqual([
-        'Automatisch (aktives HHJ)',
+        'Automatisch (aktuelles HHJ)',
         '2026',
         '2024 · abgeschlossen',
       ]);

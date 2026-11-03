@@ -8,6 +8,7 @@ with the same idempotency key changes nothing and writes no second audit entry.
 
 from __future__ import annotations
 
+from datetime import date
 from types import SimpleNamespace
 from typing import Any
 from uuid import UUID, uuid4
@@ -38,7 +39,10 @@ class _Result:
 class _Session:
     def __init__(self, store: dict[UUID, Any], active_fy: tuple[UUID, ...]) -> None:
         self.store = store
-        self.active_fy = list(active_fy)
+        self.active_fy = [
+            SimpleNamespace(id=f, start_date=date(2026, 1, 1), end_date=date(2026, 12, 31))
+            for f in active_fy
+        ]
         self.committed = 0
 
     async def get(self, _model: Any, ident: UUID, **_kw: Any) -> Any:

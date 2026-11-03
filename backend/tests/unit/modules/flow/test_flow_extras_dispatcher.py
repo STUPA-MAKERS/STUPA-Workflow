@@ -7,16 +7,18 @@ The suite covers the branches without a DB. It uses an in-memory session fake
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from types import SimpleNamespace
 from typing import Any
 from uuid import UUID, uuid4
+from zoneinfo import ZoneInfo
 
 import pytest
 
 from app.modules.flow import extras_dispatcher as extras_mod
 from app.modules.flow.dispatch import DispatchedAction
 from app.modules.flow.extras_dispatcher import FlowExtrasActionDispatcher
+from app.settings import get_settings
 from app.shared.errors import ConflictError, NotFoundError
 
 
@@ -39,12 +41,14 @@ class _Session:
         *,
         meeting: Any = None,
         store: dict[UUID, Any] | None = None,
-        active_fy: tuple[UUID, ...] = (),
+        active_fy: tuple[Any, ...] = (),
         raise_on_get: bool = False,
     ) -> None:
         self.meeting = meeting
         self.store = store or {}
-        self.active_fy = list(active_fy)
+        self.active_fy = [
+            f if isinstance(f, SimpleNamespace) else _open_fy(f) for f in active_fy
+        ]
         self.raise_on_get = raise_on_get
         self.committed = 0
 
@@ -61,6 +65,11 @@ class _Session:
 
     async def commit(self) -> None:
         self.committed += 1
+
+
+def _open_fy(fid: UUID, year: int = 2026) -> SimpleNamespace:
+    """Build an active open fiscal year row for the fake session."""
+    return SimpleNamespace(id=fid, start_date=date(year, 1, 1), end_date=date(year, 12, 31))
 
 
 def _stub_audit(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
@@ -226,6 +235,26 @@ async def test_assign_budget_sets_single_active_fiscal_year(
     assert app.budget_id == node_id
     assert app.fiscal_year_id == fy_id
     assert session.committed == 1
+
+
+async def test_assign_budget_picks_current_of_several_fiscal_years(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Of several active open fiscal years, set the one that contains today."""
+    _stub_audit(monkeypatch)
+    app_id, node_id, old_id, cur_id = uuid4(), uuid4(), uuid4(), uuid4()
+    this_year = datetime.now(ZoneInfo(get_settings().local_timezone)).year
+    app = SimpleNamespace(id=app_id, budget_id=None, fiscal_year_id=None,
+        current_state_id=None)
+    node = SimpleNamespace(id=node_id, parent_id=None)
+    session = _Session(
+        store={app_id: app, node_id: node},
+        active_fy=(_open_fy(old_id, this_year - 1), _open_fy(cur_id, this_year)),
+    )
+    await FlowExtrasActionDispatcher(_maker(session)).dispatch(
+        [_action("assignBudget", budgetId=str(node_id), application_id=app_id)]
+    )
+    assert app.fiscal_year_id == cur_id
 
 
 async def test_assign_budget_ambiguous_fiscal_year_left_open(

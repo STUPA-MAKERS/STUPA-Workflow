@@ -66,10 +66,16 @@ def test_node_available() -> None:
 
 
 def test_pick_fiscal_year() -> None:
-    one = uuid.uuid4()
-    assert r.pick_fiscal_year([one]) == one
-    assert r.pick_fiscal_year([]) is None
-    assert r.pick_fiscal_year([uuid.uuid4(), uuid.uuid4()]) is None
+    """One candidate wins. Of several, the one that contains today wins."""
+    today = date(2026, 11, 3)
+    one, old, cur = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    y2025 = (date(2025, 1, 1), date(2025, 12, 31))
+    y2026 = (date(2026, 1, 1), date(2026, 12, 31))
+    assert r.pick_fiscal_year([(one, *y2025)], today) == one
+    assert r.pick_fiscal_year([], today) is None
+    assert r.pick_fiscal_year([(old, *y2025), (cur, *y2026)], today) == cur
+    assert r.pick_fiscal_year([(old, *y2025), (cur, *y2026)], date(2027, 2, 1)) is None
+    assert r.pick_fiscal_year([(old, *y2026), (cur, *y2026)], today) is None
 
 
 def test_rollup_committed() -> None:

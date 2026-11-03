@@ -175,13 +175,20 @@ def node_available(
     return as_amount(allocated) - bound - expended + income
 
 
-def pick_fiscal_year[T](active_ids: Sequence[T]) -> T | None:
-    """Derive the fiscal year for a budget assignment.
+def pick_fiscal_year[T](candidates: Sequence[tuple[T, date, date]], today: date) -> T | None:
+    """Derive the fiscal year for an operation without an explicit fiscal year.
 
-    Exactly one active year selects that year. Every other case returns `None`,
-    and the service leaves the fiscal year open.
+    `candidates` holds `(id, start_date, end_date)` of every active open year of
+    the top-level budget. Exactly one candidate selects that year. With several
+    candidates, the one whose date range contains `today` is the current year
+    and is selected, because several years stay active while the old year is
+    still being settled. Every other case returns `None`, and the caller asks
+    for an explicit fiscal year or leaves it open.
     """
-    return active_ids[0] if len(active_ids) == 1 else None
+    if len(candidates) == 1:
+        return candidates[0][0]
+    current = [fid for fid, start, end in candidates if start <= today <= end]
+    return current[0] if len(current) == 1 else None
 
 
 def is_valid_fiscal_start(start_month: int, start_day: int) -> bool:
