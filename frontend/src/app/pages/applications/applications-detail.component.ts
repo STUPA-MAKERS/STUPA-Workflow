@@ -78,6 +78,7 @@ import {
   TabsComponent,
   ToastService,
   FabComponent,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import {
   BudgetTreeApi,
@@ -162,6 +163,7 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionComponent,
     AmountComponent,
     DropOverlayComponent,
     FileDropDirective,

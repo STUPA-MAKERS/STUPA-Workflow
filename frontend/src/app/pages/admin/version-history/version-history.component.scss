@@ -3,13 +3,7 @@
 }
 
 .vh {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
   container-type: inline-size;
-}
-.vh__title {
-  padding-inline: var(--space-1);
 }
 
 .vh__list {

@@ -1,15 +1,4 @@
-<section class="df" [attr.aria-label]="heading()">
-  <div class="df__head">
-    <h3 class="sec df__title">
-      {{ heading() }}
-      @if (required()) {
-        <span class="df__req" aria-hidden="true">*</span>
-      }
-    </h3>
-    @if (summary()) {
-      <span class="df__count">{{ summaryText() }}</span>
-    }
-  </div>
+<app-section class="df" [heading]="heading()" [required]="required()" [meta]="summary() ? summaryText() : null">
 
   @if (files().length || pending().length) {
     <ul class="rowgroup df__list">
@@ -62,7 +51,7 @@
   @if (error(); as e) {
     <p class="df__error" role="alert">{{ e }}</p>
   }
-</section>
+</app-section>
 
 <app-confirm-dialog
   [open]="toRemove() !== null"

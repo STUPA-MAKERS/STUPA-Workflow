@@ -31,6 +31,7 @@ import {
   SheetBarComponent,
   SheetBarTitleDirective,
   StatusTextComponent,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { keeperNames } from '../keepers.util';
 import { majorityLabel, meetingTimeText, voteMetaLine } from '../meetings-display.util';
@@ -81,6 +82,7 @@ interface AgendaRow {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionComponent,
     EmptyStateComponent,
     SheetBarComponent,
     SheetBarTitleDirective,

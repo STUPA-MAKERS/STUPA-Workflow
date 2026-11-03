@@ -65,6 +65,7 @@ import {
   StatusTextComponent,
   ToastService,
   FabComponent,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { AttachmentsPanelComponent } from '../../pages/applications/attachments-panel.component';
 import { applicationTitle, transitionLooks } from '../../pages/applications/applications.util';
@@ -114,6 +115,7 @@ type Phase = 'loading' | 'expired' | 'error' | 'ready';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionComponent,
     SkeletonComponent,
     FabComponent,
     ConfirmDialogComponent,

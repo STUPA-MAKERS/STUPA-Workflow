@@ -52,6 +52,7 @@ import {
   type Step,
   StepperComponent,
   ToastService,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { AltchaComponent } from './altcha.component';
 import { DraftAttachmentsService } from './draft-attachments.service';
@@ -134,6 +135,7 @@ const STEP_LABEL: Record<StepKey, TranslationKey> = {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,
     SkeletonComponent,

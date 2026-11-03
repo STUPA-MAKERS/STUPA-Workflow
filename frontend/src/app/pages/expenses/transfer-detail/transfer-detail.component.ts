@@ -10,6 +10,7 @@ import {
   type RowMenuSection,
   SheetBarComponent,
   SheetBarTitleDirective,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import type { BudgetTransfer } from '../../budget/budget-tree.api';
 import {
@@ -30,7 +31,7 @@ import { formatMoney } from '@shared/format-money';
   selector: 'app-transfer-detail',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [SheetActionComponent, TransferLegComponent, NoteComponent, SheetBarComponent, SheetBarTitleDirective, IconComponent, LocalizedDatePipe, RowMenuComponent, TranslatePipe],
+  imports: [SectionComponent, SheetActionComponent, TransferLegComponent, NoteComponent, SheetBarComponent, SheetBarTitleDirective, IconComponent, LocalizedDatePipe, RowMenuComponent, TranslatePipe],
   templateUrl: './transfer-detail.component.html',
   styleUrl: './transfer-detail.component.scss',
 })

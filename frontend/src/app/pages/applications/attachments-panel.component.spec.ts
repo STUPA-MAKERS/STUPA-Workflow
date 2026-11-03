@@ -51,9 +51,9 @@ describe('AttachmentsPanelComponent', () => {
 
   it('shows its heading, or keeps it for screen readers only in a titled sheet', async () => {
     const { rerender } = await setup(false);
-    expect(screen.getByRole('heading', { name: 'Anhänge' })).not.toHaveClass('sr-only');
+    expect(screen.getByRole('heading', { name: 'Anhänge' }).closest('.section__head')).not.toHaveClass('section__head--hidden');
     await rerender({ inputs: { applicationId: APP_ID, canUpload: false, titled: false }, partialUpdate: true });
-    expect(screen.getByRole('heading', { name: 'Anhänge' })).toHaveClass('sr-only');
+    expect(screen.getByRole('heading', { name: 'Anhänge' }).closest('.section__head')).toHaveClass('section__head--hidden');
   });
 
   it('shows a thumbnail for a clean image and the clip icon for other files', async () => {

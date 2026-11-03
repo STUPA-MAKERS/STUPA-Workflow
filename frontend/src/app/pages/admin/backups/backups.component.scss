@@ -13,6 +13,7 @@
 
 .bk__card {
   @include sc.card;
+  gap: var(--space-2);
 }
 .bk__disabledHint {
   margin: 0;
@@ -31,15 +32,6 @@
   min-width: 0;
 }
 
-.bk__list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-.bk__listHead {
-  --sh-align: baseline;
-  --sh-gap: var(--space-1) var(--space-4);
-}
 
 .bk__nowrap {
   white-space: nowrap;

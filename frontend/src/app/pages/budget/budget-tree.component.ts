@@ -45,6 +45,7 @@ import {
   ToastService,
   FabComponent,
   PageHeaderComponent,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin/admin-api.service';
@@ -109,6 +110,7 @@ const MAX_CUTOFF_DAY = 28;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionComponent,
     FabComponent,
     ConfirmDialogComponent,
     FormsModule,

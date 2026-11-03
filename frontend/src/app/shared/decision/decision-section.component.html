@@ -1,10 +1,10 @@
-<section class="dsec" [attr.aria-labelledby]="headingId()" data-testid="decision-section">
-  <div class="dsec__head">
-    <h3 [id]="headingId()" class="sec dsec__title">{{ 'decision.title' | t }}</h3>
-    @if (deviates()) {
-      <span class="dsec__tag">{{ 'decision.tag' | t }}</span>
-    }
-  </div>
+<app-section
+  class="dsec"
+  data-testid="decision-section"
+  [headingId]="headingId()"
+  [heading]="'decision.title' | t"
+  [meta]="deviates() ? ('decision.tag' | t) : null"
+>
   <app-field-group>
     @if (decision().amountDeviates) {
       <div class="dsec__pair">
@@ -49,4 +49,4 @@
   @if (applicant() && applicantNote()) {
     <app-note icon="info">{{ applicantNote() }}</app-note>
   }
-</section>
+</app-section>

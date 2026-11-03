@@ -6,13 +6,12 @@
     <app-breadcrumbs crumbs />
   </app-page-header>
 
-  <section class="dl__section" aria-labelledby="dl-active-title">
-    <app-section-header
-      class="dl__head"
-      headingId="dl-active-title"
-      [heading]="'admin.deleg.active' | t"
-      [count]="!loading() && !loadError() ? active().length : null"
-    />
+  <app-section
+    class="dl__section"
+    [level]="2"
+    [heading]="'admin.deleg.active' | t"
+    [meta]="!loading() && !loadError() ? active().length : null"
+  >
 
     @if (loading()) {
       <app-skeleton variant="rows" [count]="3" [label]="'admin.deleg.loading' | t" />
@@ -81,7 +80,7 @@
         }
       }
     }
-  </section>
+  </app-section>
 
   @if (poolGremiumId()) {
     <app-substitute-pool [gremiumId]="poolGremiumId()">

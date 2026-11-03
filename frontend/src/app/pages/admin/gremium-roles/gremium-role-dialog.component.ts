@@ -22,6 +22,7 @@ import {
   DialogComponent,
   InputComponent,
   NoteComponent,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import { GREMIUM_PERMISSIONS, ROLE_KEY_PATTERN, type GremiumRole } from '../admin.models';
@@ -54,6 +55,7 @@ const NEW_ROLE_PERMISSIONS = ['vote.cast'];
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [ContentLangState],
   imports: [
+    SectionComponent,
     ContentLangSwitchComponent,
     I18nInputComponent,
     FormsModule,

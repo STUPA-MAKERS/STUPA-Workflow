@@ -47,8 +47,9 @@ describe('TodoLinkedListComponent', () => {
 
   it('leaves out the heading on request and keeps the name of the section', async () => {
     await setup(() => of([card()]), { showTitle: false });
-    expect(screen.queryByRole('heading', { name: 'To-Dos' })).toBeNull();
-    expect(screen.getByRole('region', { name: 'To-Dos' })).not.toHaveAttribute('aria-labelledby');
+    const heading = screen.getByRole('heading', { name: 'To-Dos' });
+    expect(heading.closest('.section__head')).toHaveClass('section__head--hidden');
+    expect(screen.getByRole('group', { name: 'To-Dos' })).toBeInTheDocument();
   });
 
   it('shows the cards of the page without a read of its own', async () => {

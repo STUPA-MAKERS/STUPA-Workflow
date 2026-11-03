@@ -46,8 +46,7 @@
                 }
 
                 @for (sec of sections(); track sec.key) {
-                  <fieldset class="ar__sec">
-                    <legend class="ar__secTitle">{{ sec.title | t }}</legend>
+                  <app-section [heading]="sec.title | t">
                     <div class="ar__grid">
                       @for (perm of sec.keys; track perm) {
                         <app-checkbox
@@ -63,7 +62,7 @@
                         >
                       }
                     </div>
-                  </fieldset>
+                  </app-section>
                 }
               </div>
             }

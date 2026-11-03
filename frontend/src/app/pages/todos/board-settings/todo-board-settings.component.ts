@@ -38,6 +38,7 @@ import {
   type SelectOption,
   SwitchComponent,
   ToastService,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { LABEL_COLORS, LABEL_COLOR_NAME, sortedColumns } from '../../../features/todos/todos.util';
 
@@ -62,6 +63,7 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionComponent,
     CdkDrag,
     CdkDragHandle,
     CdkDropList,

@@ -337,15 +337,6 @@
   font-size: 0.8125rem;
 }
 
-.cal__upcoming {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  min-width: 0;
-}
-.cal__upHead {
-  padding-inline: var(--space-1);
-}
 .cal__rows {
   display: flex;
   flex-direction: column;

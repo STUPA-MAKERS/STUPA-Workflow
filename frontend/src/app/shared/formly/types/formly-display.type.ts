@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { FieldType, type FieldTypeConfig } from '@ngx-formly/core';
+import { SectionComponent } from '@stupa-makers/ui-kit';
 
 /**
  * Formly field type `display` for content that the applicant cannot edit.
@@ -11,14 +12,14 @@ import { FieldType, type FieldTypeConfig } from '@ngx-formly/core';
   selector: 'app-formly-display',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [SectionComponent],
   template: `
     @if (isHeading) {
-      <div class="display__heading">
-        <h3 class="sec display__headingTitle">{{ props.label || text }}</h3>
+      <app-section class="display__heading" [heading]="props.label || text">
         @if (props.description) {
           <p class="display__headingSub">{{ props.description }}</p>
         }
-      </div>
+      </app-section>
     } @else {
       <div class="display" [class.display--computed]="isComputed">
         @if (props.label) {
@@ -32,13 +33,10 @@ import { FieldType, type FieldTypeConfig } from '@ngx-formly/core';
     `
       .display__heading {
         margin-top: var(--space-3);
-        padding: 0 var(--space-1);
-      }
-      .display__headingTitle {
-        margin: 0;
       }
       .display__headingSub {
-        margin: var(--space-1) 0 0;
+        margin: 0;
+        padding: 0 var(--space-1);
         font-size: var(--fs-sm);
         color: var(--color-text-muted);
       }

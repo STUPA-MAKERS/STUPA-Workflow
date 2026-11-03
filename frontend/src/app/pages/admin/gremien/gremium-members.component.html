@@ -15,17 +15,12 @@
     </app-note>
   }
 
-  <section class="gmm__section" aria-labelledby="gmm-members-title">
-    <app-section-header
-      class="gmm__head"
-      headingId="gmm-members-title"
-      [heading]="'admin.gremien.members' | t"
-      [count]="
-        !loading() && members().length > preview
-          ? ('admin.gremien.shownOf' | t: { shown: visible().length, total: members().length })
-          : null
-      "
-    />
+  <app-section
+    class="gmm__section"
+    [level]="2"
+    [heading]="'admin.gremien.members' | t"
+    [meta]="!loading() && members().length > preview ? ('admin.gremien.shownOf' | t: { shown: visible().length, total: members().length }) : null"
+  >
 
     @if (loading()) {
       <app-skeleton variant="rows" [count]="5" [label]="'common.loading' | t" />
@@ -60,7 +55,7 @@
         </app-button>
       }
     }
-  </section>
+  </app-section>
 
   @if (canPool()) {
     <app-substitute-pool [gremiumId]="gremiumId" [members]="poolMembers()" />

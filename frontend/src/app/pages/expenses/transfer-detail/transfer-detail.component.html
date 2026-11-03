@@ -39,8 +39,7 @@
         </div>
       </div>
 
-      <section class="fd__sec" aria-labelledby="tdt-data">
-        <h3 id="tdt-data" class="sec fd__secTitle">{{ 'expenses.detail.data' | t }}</h3>
+      <app-section class="fd__sec" [heading]="'expenses.detail.data' | t">
         <dl class="fd__card fd__grid">
           <div>
             <dt>{{ 'expenses.col.amount' | t }}</dt>
@@ -63,14 +62,13 @@
             <dd class="fd__note">{{ t.note || '—' }}</dd>
           </div>
         </dl>
-      </section>
+      </app-section>
 
       <app-note icon="lock">{{ 'expenses.transfers.pairLocked' | t }}</app-note>
     </div>
 
     <div class="fd__col">
-      <section class="fd__sec" aria-labelledby="tdt-details">
-        <h3 id="tdt-details" class="sec fd__secTitle">{{ 'expenses.detail.details' | t }}</h3>
+      <app-section class="fd__sec" [heading]="'expenses.detail.details' | t">
         <dl class="fd__card fd__stack">
           <div>
             <dt>{{ 'expenses.detail.createdBy' | t }}</dt>
@@ -81,7 +79,7 @@
             <dd class="mono">{{ t.createdAt | ldate: 'medium' }}</dd>
           </div>
         </dl>
-      </section>
+      </app-section>
     </div>
   </div>
 </article>

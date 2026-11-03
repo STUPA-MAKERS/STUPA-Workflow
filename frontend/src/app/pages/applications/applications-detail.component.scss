@@ -74,12 +74,6 @@
 .ad__skelSec--wide {
   width: 7.5rem;
 }
-.ad__skelFilesHead {
-  display: flex;
-  align-items: center;
-  min-height: var(--control-height-sm);
-  padding-inline-start: var(--space-1);
-}
 // One `app-field-row`: 58px, a 16px label line over a 22px value line.
 .ad__skelRow {
   display: flex;
@@ -219,12 +213,17 @@
   flex-direction: column;
   gap: var(--space-2);
   min-width: 0;
+  --section-gap: var(--space-2);
 }
 .ad__sec:focus {
   outline: none;
 }
-.ad__secTitle {
+// The placeholder of an answer section title: the line box of the `app-section` title.
+.ad__skelSecTitle {
+  display: block;
   padding: 0 var(--space-1);
+  font-size: 0.84375rem;
+  line-height: 1.25rem;
 }
 
 // 11rem holds a medium date in DE and EN on one line.

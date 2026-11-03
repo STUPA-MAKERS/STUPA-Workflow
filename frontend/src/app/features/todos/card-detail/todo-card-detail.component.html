@@ -289,7 +289,13 @@
   </dl>
 
   @if (canWrite() || card.links.length) {
-    <section class="cd__sec" aria-labelledby="cd-links">
+    <app-section class="cd__sec" [heading]="'todos.card.links' | t">
+      @if (canWrite()) {
+        <app-button sectionAction class="cd__secAction" variant="text" size="sm" (click)="pickerOpen.set(!pickerOpen())">
+          <app-icon name="plus" />
+          {{ 'todos.card.link' | t }}
+        </app-button>
+      }
       <div class="cd__pickerAnchor">
         <app-todo-link-picker
           class="cd__picker"
@@ -298,15 +304,6 @@
           [linked]="linkedKeys()"
           (picked)="pickLink($event)"
         />
-      </div>
-      <div class="cd__secHead">
-        <h3 id="cd-links" class="cd__secTitle">{{ 'todos.card.links' | t }}</h3>
-        @if (canWrite()) {
-          <app-button variant="text" size="sm" (click)="pickerOpen.set(!pickerOpen())">
-            <app-icon name="plus" />
-            {{ 'todos.card.link' | t }}
-          </app-button>
-        }
       </div>
       @if (card.links.length) {
         <ul class="cd__links">
@@ -340,27 +337,25 @@
           }
         </ul>
       }
-    </section>
+    </app-section>
 
   }
 
   @if (canWrite() || card.descriptionMd) {
-    <section class="cd__sec" aria-labelledby="cd-desc">
-      <div class="cd__secHead">
-        <h3 id="cd-desc" class="cd__secTitle">{{ 'todos.card.description' | t }}</h3>
-        @if (canWrite() && !editingDesc()) {
-          <app-button
-            class="cd__secEnd--icon"
-            data-focus="desc-edit"
-            variant="text"
-            [iconOnly]="true"
-            [ariaLabel]="'todos.card.editDescription' | t"
-            (click)="startDesc()"
-          >
-            <app-icon name="edit" />
-          </app-button>
-        }
-      </div>
+    <app-section class="cd__sec" [heading]="'todos.card.description' | t">
+      @if (canWrite() && !editingDesc()) {
+        <app-button
+          sectionAction
+          class="cd__secAction cd__secAction--icon"
+          data-focus="desc-edit"
+          variant="text"
+          [iconOnly]="true"
+          [ariaLabel]="'todos.card.editDescription' | t"
+          (click)="startDesc()"
+        >
+          <app-icon name="edit" />
+        </app-button>
+      }
       @if (editingDesc()) {
         <label class="cd__area">
           <span class="sr-only">{{ 'todos.card.description' | t }}</span>
@@ -393,28 +388,25 @@
       } @else if (card.descriptionMd) {
         <app-markdown-view class="cd__desc" [src]="card.descriptionMd" />
       }
-    </section>
+    </app-section>
 
   }
 
   @if (canWrite() || items().length) {
-    <section class="cd__sec" aria-labelledby="cd-check">
-      <div class="cd__secHead">
-        <h3 id="cd-check" class="cd__secTitle">{{ 'todos.card.checklist' | t }}</h3>
-        @if (items().length) {
-          <span class="cd__progress">
-            <span class="num">{{ doneItems().length }}/{{ items().length }}</span>
-            <app-seg-bar
-              class="cd__checkBar"
-              size="thin"
-              aria-hidden="true"
-              [segments]="[{ value: doneItems().length, tone: 'filled' }]"
-              [total]="items().length"
-              [label]="doneItems().length + '/' + items().length"
-            />
-          </span>
-        }
-      </div>
+    <app-section class="cd__sec" [heading]="'todos.card.checklist' | t">
+      @if (items().length) {
+        <span sectionAction class="cd__progress">
+          <span class="num">{{ doneItems().length }}/{{ items().length }}</span>
+          <app-seg-bar
+            class="cd__checkBar"
+            size="thin"
+            aria-hidden="true"
+            [segments]="[{ value: doneItems().length, tone: 'filled' }]"
+            [total]="items().length"
+            [label]="doneItems().length + '/' + items().length"
+          />
+        </span>
+      }
       <ul class="cd__items">
         @if (showDone()) {
           @for (item of doneItems(); track item.id) {
@@ -454,7 +446,7 @@
           </button>
         }
       }
-    </section>
+    </app-section>
   }
 </ng-template>
 
@@ -539,8 +531,8 @@
       </dd>
     </div>
   </dl>
-  <section class="cd__sec">
-    <div class="cd__secHead"><h3 class="cd__secTitle">{{ 'todos.card.links' | t }}</h3></div>
+  <app-section class="cd__sec" [heading]="'todos.card.links' | t">
+    <span sectionAction></span>
     <ul class="cd__links skel-in">
       @for (w of ['62%', '48%']; track $index) {
         <li class="cd__linkRow">
@@ -552,17 +544,17 @@
         </li>
       }
     </ul>
-  </section>
-  <section class="cd__sec">
-    <div class="cd__secHead"><h3 class="cd__secTitle">{{ 'todos.card.description' | t }}</h3></div>
+  </app-section>
+  <app-section class="cd__sec" [heading]="'todos.card.description' | t">
+    <span sectionAction></span>
     <p class="cd__skelLines skel-in">
       <span class="skel-text" style="width: 92%"></span>
       <span class="skel-text" style="width: 84%"></span>
       <span class="skel-text" style="width: 56%"></span>
     </p>
-  </section>
-  <section class="cd__sec">
-    <div class="cd__secHead"><h3 class="cd__secTitle">{{ 'todos.card.checklist' | t }}</h3></div>
+  </app-section>
+  <app-section class="cd__sec" [heading]="'todos.card.checklist' | t">
+    <span sectionAction></span>
     <ul class="cd__items skel-in">
       @for (w of ['58%', '46%', '52%']; track $index) {
         <li class="cd__item">
@@ -573,5 +565,5 @@
         </li>
       }
     </ul>
-  </section>
+  </app-section>
 </ng-template>

@@ -30,6 +30,7 @@ import {
   SkeletonComponent,
   ToastService,
   PageHeaderComponent,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { AuthService } from '@core/auth/auth.service';
 import { exportDownload } from '@shared/download.util';
@@ -142,6 +143,7 @@ export const APPS_SHOWN = 5;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionComponent,
     NoteComponent,
     PageHeaderComponent,
     SheetBarComponent,
