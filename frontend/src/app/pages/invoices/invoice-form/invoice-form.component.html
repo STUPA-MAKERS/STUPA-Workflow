@@ -226,26 +226,14 @@
     </div>
   </div>
 
-  <footer
-    class="ff__foot"
-    appPaneFormFoot
-    [deletable]="mode() === 'edit'"
-    [compact]="layout() === 'sheet'"
-    (removed)="remove.emit()"
-    (cancelled)="close()"
-  >
-    @if (mode() === 'create') {
-      <app-button variant="fill" [disabled]="!h.canSubmitCreate()" [loading]="h.saving()" (click)="submit($event)">
-        <span class="ff__btn"><app-icon name="plus" />{{
-          (layout() === 'sheet' ? 'expenses.form.addShort' : 'invoices.add') | t
-        }}</span>
-      </app-button>
-    } @else {
-      <app-button variant="fill" [disabled]="!h.canSubmitEdit()" [loading]="h.saving()" (click)="submit($event)">{{
-        'action.save' | t
-      }}</app-button>
-    }
-  </footer>
+  <app-fab
+    [icon]="mode() === 'create' ? 'plus' : 'check'"
+    [label]="(mode() === 'create' ? (layout() === 'sheet' ? 'expenses.form.addShort' : 'invoices.add') : 'action.save') | t"
+    [contained]="layout() !== 'page'"
+    [disabled]="mode() === 'create' ? !h.canSubmitCreate() : !h.canSubmitEdit()"
+    [loading]="h.saving()"
+    (activate)="save()"
+  />
 </form>
 
 <app-confirm-dialog

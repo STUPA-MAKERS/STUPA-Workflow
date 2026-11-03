@@ -7,7 +7,9 @@
   min-height: 0;
 }
 
+// The floating "Speichern" covers the end of the body, so the body keeps room for it.
 .mf {
+  --mf-fab-room: calc(56px + var(--space-6));
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
@@ -16,6 +18,7 @@
   margin: 0;
 }
 .mf--pane {
+  position: relative;
   border-radius: var(--radius-2xl);
   background: var(--color-surface-1);
 }
@@ -34,7 +37,7 @@
 .mf__body {
   flex: 1 1 auto;
   min-height: 0;
-  padding: var(--space-1) var(--space-6) var(--space-5);
+  padding: var(--space-1) var(--space-6) var(--mf-fab-room);
   overflow-y: auto;
   overscroll-behavior: contain;
   container-type: inline-size;
@@ -42,7 +45,7 @@
   @include fade.fade-y(var(--space-5));
 }
 .mf--sheet .mf__body {
-  padding: var(--space-1) 0 var(--space-5);
+  padding: var(--space-1) 0 var(--mf-fab-room);
 }
 
 .mf__cols {
@@ -99,37 +102,15 @@
   font-size: var(--fs-small);
 }
 
-.mf__foot {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-4) var(--space-6) var(--space-5);
-  border-top: var(--border-width) solid var(--color-border);
-  border-radius: 0 0 var(--radius-2xl) var(--radius-2xl);
-  background: var(--color-surface-1);
-}
-.mf--sheet .mf__foot {
-  padding: var(--space-3) 0;
-  border-radius: 0;
-  background: var(--color-surface-2);
+
+// One view: the form docks in the bar of the layout and fills the page like a detail.
+.mf--page .mf__body {
+  padding: var(--space-4) 0 var(--mf-fab-room);
+  overflow: visible;
 }
 .mf__btn {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
   white-space: nowrap;
-}
-.mf__primary {
-  --control-height-lg: 3.5rem;
-  min-width: 0;
-}
-
-.mf--page .mf__body {
-  overflow: visible;
-}
-.mf--page .mf__foot {
-  position: sticky;
-  bottom: 0;
-  z-index: var(--z-sticky);
 }

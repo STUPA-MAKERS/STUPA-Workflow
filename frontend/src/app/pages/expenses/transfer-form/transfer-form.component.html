@@ -200,38 +200,14 @@
     </div>
   </div>
 
-  <footer
-    class="mf__foot"
-    appPaneFormFoot
-    [deletable]="mode() === 'edit'"
-    [compact]="layout() === 'sheet'"
-    (removed)="remove.emit()"
-    (cancelled)="close()"
-  >
-    @if (mode() === 'create') {
-      <app-button
-        class="mf__primary"
-        variant="fill"
-        size="lg"
-        [disabled]="!d.canSubmitTransfer()"
-        [loading]="saving()"
-        (click)="submit($event)"
-      >
-        <span class="mf__btn"><app-icon name="swap" />{{ submitLabel() }}</span>
-      </app-button>
-    } @else {
-      <app-button
-        class="mf__primary"
-        variant="fill"
-        size="lg"
-        [disabled]="!t.canSubmitEdit()"
-        [loading]="saving()"
-        (click)="submit($event)"
-      >
-        <span class="mf__btn"><app-icon name="check" />{{ 'action.save' | t }}</span>
-      </app-button>
-    }
-  </footer>
+  <app-fab
+    [icon]="mode() === 'create' ? 'swap' : 'check'"
+    [label]="mode() === 'create' ? submitLabel() : ('action.save' | t)"
+    [contained]="layout() !== 'page'"
+    [disabled]="mode() === 'create' ? !d.canSubmitTransfer() : !t.canSubmitEdit()"
+    [loading]="saving()"
+    (activate)="save()"
+  />
 </form>
 
 <ng-template #freeLine let-f>

@@ -337,27 +337,12 @@
     </div>
   </div>
 
-  <footer
-    class="mf__foot"
-    appPaneFormFoot
-    [deletable]="mode() === 'edit'"
-    [compact]="layout() === 'sheet'"
-    (removed)="remove.emit()"
-    (cancelled)="close()"
-  >
-    <app-button
-      class="mf__primary"
-      variant="fill"
-      size="lg"
-      [disabled]="mode() === 'create' && !s.canSubmitCreate()"
-      [loading]="saving()"
-      (click)="submit($event)"
-    >
-      <span class="mf__btn"
-        ><app-icon name="check" />{{
-          (mode() === 'create' && layout() !== 'sheet' ? 'expenses.form.save' : 'action.save') | t
-        }}</span
-      >
-    </app-button>
-  </footer>
+  <app-fab
+    icon="check"
+    [label]="(mode() === 'create' && layout() !== 'sheet' ? 'expenses.form.save' : 'action.save') | t"
+    [contained]="layout() !== 'page'"
+    [disabled]="mode() === 'create' && !s.canSubmitCreate()"
+    [loading]="saving()"
+    (activate)="save()"
+  />
 </form>

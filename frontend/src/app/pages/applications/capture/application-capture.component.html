@@ -140,16 +140,13 @@
     }
   </div>
 
-  <footer class="ff__foot" appPaneFormFoot (cancelled)="close()">
-    <app-button variant="fill"
-      data-testid="cap-submit"
-      [disabled]="!canSubmit()"
-      [loading]="saving()"
-      (click)="submit($event)"
-    >
-      <span class="ff__btn"><app-icon name="send" />{{
-        (layout() === 'sheet' ? 'applications.capture.submitShort' : 'applications.capture.submit') | t
-      }}</span>
-    </app-button>
-  </footer>
+  <app-fab
+    data-testid="cap-submit"
+    icon="send"
+    [label]="(layout() === 'sheet' ? 'applications.capture.submitShort' : 'applications.capture.submit') | t"
+    [contained]="layout() !== 'page'"
+    [disabled]="!canSubmit()"
+    [loading]="saving()"
+    (activate)="submit()"
+  />
 </form>

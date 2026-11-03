@@ -9,6 +9,7 @@ import {
   ChipGroupComponent,
   CurrencyInputComponent,
   DatepickerComponent,
+  FabComponent,
   IconComponent,
   InputComponent,
   LockedFieldComponent,
@@ -23,7 +24,6 @@ import {
 } from '@stupa-makers/ui-kit';
 import { formatMoney } from '@shared/format-money';
 import { PaneFormHeadComponent } from '@shared/ui/pane-form/pane-form-head.component';
-import { PaneFormFootComponent } from '@shared/ui/pane-form/pane-form-foot.component';
 import { BookingRowComponent } from '../../budget/booking-row/booking-row.component';
 import { SumRowComponent } from '../../budget/booking-row/sum-row.component';
 import { CostCentreSelectComponent } from '../../budget/cost-centre-select/cost-centre-select.component';
@@ -92,13 +92,13 @@ const PAYMENT_METHODS: readonly ('' | PaymentMethod)[] = [
     BookingRowComponent,
     SumRowComponent,
     PaneFormHeadComponent,
-    PaneFormFootComponent,
     AutocompleteComponent,
     ButtonComponent,
     ChipGroupComponent,
     CostCentreSelectComponent,
     CurrencyInputComponent,
     DatepickerComponent,
+    FabComponent,
     FormsModule,
     IconComponent,
     InputComponent,
@@ -127,7 +127,6 @@ export class BookingFormComponent {
   /** The sub-bookings of the edited booking. */
   readonly subRows = input<readonly Expense[]>([]);
 
-  readonly remove = output<void>();
   readonly addSub = output<void>();
   readonly editSub = output<Expense>();
   readonly removeSub = output<Expense>();
@@ -246,6 +245,11 @@ export class BookingFormComponent {
   close(): void {
     if (this.mode() === 'create') this.state().createOpen.set(false);
     else this.state().editing.set(null);
+  }
+
+  /** The floating "Speichern" was pressed. */
+  save(): void {
+    this.submit(new Event('submit'));
   }
 
   submit(event: Event): void {

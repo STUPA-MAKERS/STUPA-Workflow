@@ -4,6 +4,8 @@
     <p class="pfh__subtitle">{{ subtitle() }}</p>
   }
 </div>
-<app-button variant="text" [iconOnly]="true" [ariaLabel]="'action.close' | t" (click)="closed.emit()">
-  <app-icon name="x" />
-</app-button>
+@if (!docked()) {
+  <app-button variant="text" [iconOnly]="true" [ariaLabel]="'action.close' | t" (click)="closed.emit()">
+    <app-icon name="x" />
+  </app-button>
+}

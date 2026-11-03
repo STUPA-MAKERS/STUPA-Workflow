@@ -28,7 +28,7 @@ import { applyServerErrors, clearServerErrors } from '@shared/forms/server-error
 import { debounced } from '@shared/debounced';
 import {
   AutocompleteComponent,
-  ButtonComponent,
+  FabComponent,
   DatepickerComponent,
   IconComponent,
   InputComponent,
@@ -50,7 +50,6 @@ import { DraftFilesComponent } from '../../../features/apply/draft-files/draft-f
 import { FormlyDraftFilesType } from '../../../features/apply/draft-files/formly-draft-files.type';
 import { provideFormly } from '@shared/formly/formly.providers';
 import { PaneFormHeadComponent } from '@shared/ui/pane-form/pane-form-head.component';
-import { PaneFormFootComponent } from '@shared/ui/pane-form/pane-form-foot.component';
 import { localToday } from '@shared/date-format';
 
 /** Who the application is for: an account, or a new person without one. */
@@ -82,7 +81,7 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  *
  * The form has the pattern of "Buchung hinzufügen" (`booking-form`): a fixed head with
  * the title and the close button, a body of sections that scrolls with a fade, and a
- * fixed foot with "Abbrechen" and the submit. Side by side it fills the detail pane
+ * floating submit (`app-fab`). Side by side it fills the detail pane
  * (`layout="pane"`); on a phone a bottom sheet holds it (`layout="sheet"`, the sheet
  * brings the head).
  *
@@ -106,13 +105,12 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     AutocompleteComponent,
-    PaneFormFootComponent,
     PaneFormHeadComponent,
     NoteComponent,
     FormsModule,
     FormlyForm,
     TranslatePipe,
-    ButtonComponent,
+    FabComponent,
     DatepickerComponent,
     IconComponent,
     InputComponent,
