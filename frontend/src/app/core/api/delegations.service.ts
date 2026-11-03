@@ -10,7 +10,7 @@
  */
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { skipLoading } from '@core/loading/loading.interceptor';
+import { skipLoading } from '@stupa-makers/ui-kit';
 import { detailContext } from '@core/cache/cache.interceptor';
 import type { Observable } from 'rxjs';
 import { API_BASE_URL } from '@core/api/api.config';

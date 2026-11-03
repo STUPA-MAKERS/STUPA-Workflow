@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { DetailNoneComponent } from '@shared/ui/detail-none/detail-none.component';
+import { DetailNoneComponent } from '@stupa-makers/ui-kit';
 
 /**
  * The sheet of `/account` before an account page is open. Only the wide frame shows it,
@@ -12,6 +12,11 @@ import { DetailNoneComponent } from '@shared/ui/detail-none/detail-none.componen
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [TranslatePipe, DetailNoneComponent],
   templateUrl: './account-none.component.html',
-  styleUrl: '../../shared/ui/detail-none/detail-none-host.scss',
+  styles: `
+    @use 'detail-none-host' as dnh;
+    :host {
+      @include dnh.host;
+    }
+  `,
 })
 export class AccountNoneComponent {}

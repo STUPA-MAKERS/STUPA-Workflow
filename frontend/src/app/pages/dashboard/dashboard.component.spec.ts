@@ -10,8 +10,8 @@ import userEvent from '@testing-library/user-event';
 import { DashboardComponent } from './dashboard.component';
 import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
-import { SKIP_LOADING } from '@core/loading/loading.interceptor';
-import { CommandPaletteService } from '../../features/search/command-palette.service';
+import { SKIP_LOADING } from '@stupa-makers/ui-kit';
+import { CommandPalette } from '@stupa-makers/ui-kit/shell';
 import type {
   ApplicationListItemWire,
   ApplicationTypeListItemWire,
@@ -237,7 +237,7 @@ describe('DashboardComponent', () => {
       const nav = jest.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
       screen.getByRole('button', { name: 'Antrag stellen' }).click();
       expect(nav).toHaveBeenCalledWith('/apply');
-      const palette = fixture.debugElement.injector.get(CommandPaletteService);
+      const palette = fixture.debugElement.injector.get(CommandPalette);
       screen.getByRole('button', { name: 'Suche' }).click();
       expect(palette.isOpen()).toBe(true);
       http.verify();

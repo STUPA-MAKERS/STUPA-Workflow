@@ -7,7 +7,7 @@ import { Subject } from 'rxjs';
 import { USE_MOCK_API } from '@core/api/api.config';
 import type { Principal } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
-import { SKIP_LOADING } from '@core/loading/loading.interceptor';
+import { SKIP_LOADING } from '@stupa-makers/ui-kit';
 import type { MeetingStateMsg } from '@core/ws/ws-messages';
 import { WsService } from '@core/ws/ws.service';
 import { createLocationMock, provideLocationMock } from '../../testing/location-mock';

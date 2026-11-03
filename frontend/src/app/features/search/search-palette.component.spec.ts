@@ -6,8 +6,10 @@ import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { USE_MOCK_API } from '@core/api/api.config';
 import type { SearchResults } from '@core/api/models';
-import { CommandPaletteComponent } from './command-palette.component';
-import { CommandPaletteService } from './command-palette.service';
+import { By } from '@angular/platform-browser';
+import { provideAppUiKit } from '@core/i18n/ui-kit-intl';
+import { CommandPalette, CommandPaletteComponent } from '@stupa-makers/ui-kit/shell';
+import { SearchPaletteComponent } from './search-palette.component';
 import { PageIndexService } from './page-index.service';
 import { runAxe } from '../../../testing/a11y';
 
@@ -32,8 +34,9 @@ const HITS: SearchResults = {
 
 async function setup(pages = PAGES) {
   localStorage.setItem('ap.locale', 'de');
-  const view = await render(CommandPaletteComponent, {
+  const view = await render(SearchPaletteComponent, {
     providers: [
+      provideAppUiKit(),
       provideRouter([]),
       provideHttpClient(),
       provideHttpClientTesting(),
@@ -43,7 +46,9 @@ async function setup(pages = PAGES) {
   });
   const http = TestBed.inject(HttpTestingController);
   const router = TestBed.inject(Router);
-  const cmp = view.fixture.componentInstance;
+  /** The palette of the kit: the dialog, the field and the keyboard. */
+  const cmp = view.fixture.debugElement.query(By.directive(CommandPaletteComponent))
+    .componentInstance as CommandPaletteComponent;
   return { ...view, http, router, cmp };
 }
 
@@ -77,7 +82,7 @@ async function answer(http: HttpTestingController, body: SearchResults = HITS) {
 }
 
 /** jsdom has no layout, so no scrollIntoView. The arrow keys call it for the active row. */
-describe('CommandPaletteComponent', () => {
+describe('SearchPaletteComponent', () => {
   const scrollIntoView = jest.fn();
   beforeAll(() => (Element.prototype.scrollIntoView = scrollIntoView));
   beforeEach(() => {
@@ -137,13 +142,14 @@ describe('CommandPaletteComponent', () => {
    * admin pages, where it is true.
    */
   it('gives a page row the icon of its section, not a gear for everything', async () => {
-    const { cmp } = await setup([
+    const { cmp, fixture } = await setup([
       { path: '/dashboard', label: 'Seite Dashboard', parentLabel: null },
       { path: '/admin/roles', label: 'Seite Rollen', parentLabel: 'Verwaltung' },
       { path: '/invoices', label: 'Seite Rechnungen', parentLabel: null },
     ]);
     cmp.show();
-    cmp.query.set('seite');
+    cmp.onQuery('seite');
+    fixture.detectChanges();
     const byTitle = new Map(cmp.rows().map((r) => [r.title, r.icon]));
     expect(byTitle.get('Seite Dashboard')).toBe('home');
     expect(byTitle.get('Seite Rollen')).toBe('gear');
@@ -151,9 +157,10 @@ describe('CommandPaletteComponent', () => {
   });
 
   it('falls back to a gear for a section nothing maps', async () => {
-    const { cmp } = await setup([{ path: '/somewhere-new', label: 'Neu', parentLabel: null }]);
+    const { cmp, fixture } = await setup([{ path: '/somewhere-new', label: 'Neu', parentLabel: null }]);
     cmp.show();
-    cmp.query.set('ne');
+    cmp.onQuery('ne');
+    fixture.detectChanges();
     expect(cmp.rows()[0]?.icon).toBe('gear');
   });
 
@@ -397,7 +404,7 @@ describe('CommandPaletteComponent', () => {
 
   it('opens from the service and starts clean there too', async () => {
     const { cmp, fixture, http } = await setup([]);
-    const svc = TestBed.inject(CommandPaletteService);
+    const svc = TestBed.inject(CommandPalette);
     svc.open();
     cmp.onQuery('Beamer');
     await answer(http);
@@ -410,13 +417,14 @@ describe('CommandPaletteComponent', () => {
   });
 
   it('keeps searching after a failed request', async () => {
-    const { cmp, http } = await setup([]);
+    const { cmp, http, fixture } = await setup([]);
     cmp.show();
     cmp.onQuery('Beamer');
     jest.advanceTimersByTime(200);
     http.expectOne((r) => r.url.endsWith('/api/search')).flush(null, { status: 500, statusText: 'Error' });
     cmp.onQuery('Beamer2');
     await answer(http);
+    fixture.detectChanges();
     expect(cmp.rows().map((r) => r.title)).toEqual(['Anschaffung Beamer']);
   });
 

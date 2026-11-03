@@ -12,7 +12,6 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import {
   ButtonComponent,
   ConfirmDialogComponent,
@@ -22,7 +21,9 @@ import {
   IconComponent,
   NoteComponent,
   SkeletonComponent,
+  PageHeaderComponent,
 } from '@stupa-makers/ui-kit';
+import { BreadcrumbsComponent } from '../../layout/breadcrumbs.component';
 import { scopeLabel } from './scope-labels';
 
 /** What the confirmation dialog asks: revoke one grant, or all of them. */
@@ -51,6 +52,7 @@ type Confirm = { kind: 'one'; grant: OAuthGrant } | { kind: 'all' };
     LocalizedDatePipe,
     NoteComponent,
     PageHeaderComponent,
+    BreadcrumbsComponent,
     SkeletonComponent,
     TranslatePipe,
   ],

@@ -4,8 +4,7 @@ import { AuthService } from '@core/auth/auth.service';
 import { BrandingService } from '@core/branding/branding.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { ThemeService } from '@core/theme/theme.service';
-import { ButtonComponent, IconComponent } from '@stupa-makers/ui-kit';
+import { ThemeService, ButtonComponent, IconComponent } from '@stupa-makers/ui-kit';
 import { HelpMenuComponent } from '../../features/help/help-menu/help-menu.component';
 import { LanguageSelectComponent } from '../language-select/language-select.component';
 

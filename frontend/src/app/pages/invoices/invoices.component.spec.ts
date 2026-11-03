@@ -1355,7 +1355,7 @@ describe('InvoicesComponent (list/detail)', () => {
     const { container } = await setup({
       initial: [inv(), inv({ id: 'i-2', status: 'paid', supplier: null, number: 'R-2', issueDate: '2025-12-20' })],
     });
-    const months = [...container.querySelectorAll('.inv__month')].map((h) => h.textContent?.trim());
+    const months = [...container.querySelectorAll('app-list-group h2')].map((h) => h.textContent?.trim());
     expect(months).toEqual(['Januar 2026', 'Dezember 2025']);
     expect(screen.getByRole('link', { name: /ACME GmbH/ }).getAttribute('href')).toContain('id=i-1');
     expect(screen.getByRole('link', { name: /^R-2/ })).toBeInTheDocument();

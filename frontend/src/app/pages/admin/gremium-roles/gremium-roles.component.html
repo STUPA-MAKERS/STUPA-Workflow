@@ -2,7 +2,9 @@
   <app-page-header
     [flush]="true"
     [title]="('admin.gremiumRoles.title' | t) + titleSuffix()"
-  />
+  >
+    <app-breadcrumbs crumbs />
+  </app-page-header>
   <app-gremium-role-matrix
     [gremiumId]="gremiumId"
     [gremiumName]="gremiumName()"

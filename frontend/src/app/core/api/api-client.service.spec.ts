@@ -5,7 +5,7 @@ import {
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
 import { I18nService } from '@core/i18n/i18n.service';
-import { SKIP_LOADING } from '@core/loading/loading.interceptor';
+import { SKIP_LOADING } from '@stupa-makers/ui-kit';
 import { ApiClient } from './api-client.service';
 import { USE_MOCK_API } from './api.config';
 import type {

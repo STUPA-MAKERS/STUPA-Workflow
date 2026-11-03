@@ -297,7 +297,7 @@ describe('ApplicationsListComponent', () => {
       const { first, harness, cmp } = await start('/applications', { holdList: true });
       const el = harness.fixture.nativeElement as HTMLElement;
       expect(el.querySelector('.apps__skel')).toHaveClass('skel-in');
-      expect(el.querySelector('.apps__skel h2.apps__month .skel-text')).not.toBeNull();
+      expect(el.querySelector('.apps__skel app-list-group h2 .skel-text')).not.toBeNull();
       expect(el.querySelectorAll('.apps__skel .sk__item')).toHaveLength(12);
       expect(el.querySelector('.sk__items')).toHaveClass('rowgroup');
       expect(cmp.reloading()).toBe(false);

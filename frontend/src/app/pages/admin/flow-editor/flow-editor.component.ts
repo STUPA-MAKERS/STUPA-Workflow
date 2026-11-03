@@ -31,8 +31,10 @@ import {
   SkeletonComponent,
   StatusTextComponent,
   ToastService,
+  FabComponent,
+  PageHeaderComponent,
 } from '@stupa-makers/ui-kit';
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
+import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
 import {
   COMPARE_OPS,
@@ -51,7 +53,6 @@ import {
   serializeFlowGraph,
   validateFlowGraph,
 } from '../flow-graph.util';
-import { FabComponent } from '@shared/ui/fab/fab.component';
 import { VersionHistoryComponent } from '../version-history/version-history.component';
 import { FlowCanvasInteraction, type TempEdge } from './flow-canvas-interaction';
 import { createFlowCanvasView } from './flow-canvas-view';
@@ -143,6 +144,7 @@ const MIN_FIT_SCALE = 0.75;
     TransitionListsComponent,
     TransitionDetailComponent,
     PageHeaderComponent,
+    BreadcrumbsComponent,
     IconComponent,
     StatusTextComponent,
     RowMenuComponent,

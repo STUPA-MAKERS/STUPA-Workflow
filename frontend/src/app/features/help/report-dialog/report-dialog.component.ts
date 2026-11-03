@@ -25,11 +25,11 @@ import { BrandingService } from '@core/branding/branding.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { ThemeService } from '@core/theme/theme.service';
-import { scanStatus } from '@shared/status-kind.util';
 import {
+  ThemeService,
   ButtonComponent,
   ChipComponent,
+  ConfirmDialogComponent,
   DialogComponent,
   formatBytes,
   IconComponent,
@@ -39,6 +39,7 @@ import {
   TextareaComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
+import { scanStatus } from '@shared/status-kind.util';
 import { AltchaComponent } from '../../apply/altcha.component';
 import { UPLOAD_ACCEPT } from '../../apply/apply.util';
 import {
@@ -92,6 +93,7 @@ const KIND_LABEL: Record<TicketKind, TranslationKey> = {
     TranslatePipe,
     AltchaComponent,
     ButtonComponent,
+    ConfirmDialogComponent,
     DialogComponent,
     IconComponent,
     InputComponent,
@@ -155,6 +157,8 @@ export class ReportDialogComponent {
   });
 
   readonly files = this.drafts.files;
+  /** The file whose remove waits for the confirmation. */
+  readonly fileToRemove = signal<DraftFile | null>(null);
   readonly pending = this.drafts.pending;
   readonly full = computed(() => this.drafts.count() + this.pending().length >= MAX_TICKET_FILES);
 
@@ -286,6 +290,13 @@ export class ReportDialogComponent {
     for (const f of failed) {
       this.toast.error(`${f.filename}: ${this.i18n.translate(f.reason)}`);
     }
+  }
+
+  /** The confirmation of a chip's remove button. */
+  confirmRemoveFile(): void {
+    const file = this.fileToRemove();
+    this.fileToRemove.set(null);
+    if (file) void this.removeFile(file);
   }
 
   async removeFile(file: DraftFile): Promise<void> {

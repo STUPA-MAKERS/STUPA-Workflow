@@ -6,7 +6,7 @@ import userEvent from '@testing-library/user-event';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
-import { ThemeService } from '@core/theme/theme.service';
+import { ThemeService } from '@stupa-makers/ui-kit';
 import { createLocationMock, provideLocationMock } from '../../../testing/location-mock';
 import { PublicHeaderComponent } from './public-header.component';
 

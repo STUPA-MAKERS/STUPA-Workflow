@@ -147,7 +147,7 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
       !!p.label.trim() &&
       p.offers.length >= this.requiredOffers(p) &&
       p.offers.filter((o) => o.preferred).length === 1 &&
-      p.offers.every((o) => !!o.label.trim() && o.value !== null && o.value > 0) &&
+      p.offers.every((o) => !!o.label.trim() && o.value !== null && o.value >= 0) &&
       !(p.noOffers === true && !(p.noOffersReason ?? '').trim())
     );
   }
@@ -192,7 +192,7 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
     return this.showError && !o.label.trim();
   }
   protected offerValueInvalid(o: Offer, pi: number, oi: number): boolean {
-    return this.amountInvalid(pi, oi) || (this.showError && (o.value === null || o.value <= 0));
+    return this.amountInvalid(pi, oi) || (this.showError && (o.value === null || o.value < 0));
   }
   protected reasonInvalid(p: Position): boolean {
     return this.showError && p.noOffers === true && !(p.noOffersReason ?? '').trim();
@@ -210,7 +210,7 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
     if (p.offers.length < this.requiredOffers(p)) return this.t('apply.positions.errMinOffers');
     if (p.offers.filter((o) => o.preferred).length !== 1) return this.t('apply.positions.errPreferred');
     if (!p.label.trim()) return this.t('apply.positions.errLabel');
-    if (p.offers.some((o) => !o.label.trim() || o.value === null || o.value <= 0)) {
+    if (p.offers.some((o) => !o.label.trim() || o.value === null || o.value < 0)) {
       return this.t('apply.positions.errOffers');
     }
     if (this.reasonInvalid(p)) return this.t('apply.positions.errNoOffersReason');
@@ -242,7 +242,7 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
     this.revalidate(next);
   }
 
-  /** Mirror validity onto the FormControl (min positions/offers, one preferred, values > 0). */
+  /** Mirror validity onto the FormControl (min positions/offers, one preferred, values ≥ 0). */
   private revalidate(positions: Position[]): void {
     let ok = positions.length >= this.minPositions;
     for (const p of positions) {

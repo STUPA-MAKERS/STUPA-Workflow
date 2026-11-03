@@ -4,7 +4,7 @@ import { catchError, map } from 'rxjs/operators';
 import { ApiClient } from '../api/api-client.service';
 import type { Principal } from '../api/models';
 import { LOCATION } from '../browser/location.token';
-import { IS_INSTALLED_APP } from '../browser/installed-app.token';
+import { IS_INSTALLED_APP } from '@stupa-makers/ui-kit/pwa';
 import { HttpCacheService } from '@core/cache/http-cache.service';
 
 /**

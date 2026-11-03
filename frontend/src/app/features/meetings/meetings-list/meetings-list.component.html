@@ -58,9 +58,7 @@
       >
         @if (timeline.loadingList()) {
           <div class="mtl__skel skel-in">
-            <h2 class="sec mtl__month" aria-hidden="true">
-              <span class="skel-text skel-text--accent mtl__skelMonth"></span>
-            </h2>
+            <app-list-group skeleton="7rem" />
             <app-skeleton
               class="mtl__skelRows"
               variant="items"
@@ -105,14 +103,13 @@
             <app-empty-state shape="date" class="mtl__upcoming" rows="2" [heading]="'meetings.list.noUpcoming' | t" />
           }
           @for (g of groups(); track g.key) {
-            <section class="mtl__group" [attr.aria-labelledby]="'mtl-g-' + g.key">
-              <h2 class="sec mtl__month" [id]="'mtl-g-' + g.key">{{ groupLabel(g) }}</h2>
+            <app-list-group [label]="groupLabel(g)">
               <div class="mtl__rows" [class.rowgroup]="!split()" role="list">
                 @for (m of g.items; track m.id) {
                   <ng-container *ngTemplateOutlet="row; context: { $implicit: m, past: g.kind === 'past' }" />
                 }
               </div>
-            </section>
+            </app-list-group>
             @if (g.kind !== 'past' && timeline.upcomingHasMore() && ($last || groups()[$index + 1].kind === 'past')) {
               <div class="mtl__more">
                 <app-button variant="text" size="sm" [loading]="timeline.loadingUpcoming()" (click)="timeline.loadMoreUpcoming()">

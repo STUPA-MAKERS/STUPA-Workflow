@@ -2,7 +2,9 @@
   <app-page-header
     [flush]="true"
     [title]="'admin.oauthGrants.title' | t"
-  />
+  >
+    <app-breadcrumbs crumbs />
+  </app-page-header>
 
   <div class="og__filters">
     <app-filter-select

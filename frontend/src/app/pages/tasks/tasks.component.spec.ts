@@ -407,14 +407,14 @@ describe('TasksComponent', () => {
     it('puts the applications of all months in one list without month headings', async () => {
       const { harness } = await start('/tasks', [THREE], { todos: TODOS });
       const container = harness.fixture.nativeElement as HTMLElement;
-      const lists = container.querySelectorAll('.tasks__group:not([aria-labelledby]) .tasks__rows');
+      const lists = container.querySelectorAll('app-list-group .tasks__rows');
       expect(lists).toHaveLength(1);
       expect(within(lists[0] as HTMLElement).getAllByRole('link').map((l) => l.textContent)).toEqual([
         expect.stringContaining('Erster'),
         expect.stringContaining('Zweiter'),
         expect.stringContaining('Dritter'),
       ]);
-      expect(container.querySelector('.tasks__month')).toBeNull();
+      expect(container.querySelector('app-list-group h2')).toBeNull();
     });
 
     it('shows one group with "Anzeigen" and filters the To-Dos by due date', async () => {

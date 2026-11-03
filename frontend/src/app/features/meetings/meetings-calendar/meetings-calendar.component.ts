@@ -21,8 +21,8 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { meetingStatus, type StatusView } from '@shared/status-kind.util';
-import { FabComponent } from '@shared/ui/fab/fab.component';
 import {
+  FabComponent,
   ButtonComponent,
   DateBlockComponent,
   EmptyStateComponent,
@@ -41,6 +41,7 @@ import {
   SegBarComponent,
   SheetBarComponent,
   StatusTextComponent,
+  PageHeaderComponent,
 } from '@stupa-makers/ui-kit';
 import { CalendarSubscribeComponent } from '../calendar-subscribe/calendar-subscribe.component';
 import { MeetingDialogsService } from '../meeting-dialogs.service';
@@ -64,7 +65,6 @@ import {
 } from '../meetings-overview.util';
 import { MeetingsTimelineService } from '../meetings-timeline.service';
 import { beamerUrl } from '../../voting/beamer-link.util';
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { MeetingsViewActionsComponent } from '../meetings-view-actions/meetings-view-actions.component';
 import {
   isoDay,

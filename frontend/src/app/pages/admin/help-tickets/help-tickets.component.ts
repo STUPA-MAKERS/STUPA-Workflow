@@ -15,7 +15,6 @@ import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { PageHeaderComponent } from '@shared/ui';
 import { type SettingsForm, settingsForm } from '@shared/forms/settings-form';
 import { LoadStateComponent } from '@shared/ui/load-state/load-state.component';
 import {
@@ -27,8 +26,10 @@ import {
   NoteComponent,
   SwitchComponent,
   ToastService,
+  FabComponent,
+  PageHeaderComponent,
 } from '@stupa-makers/ui-kit';
-import { FabComponent } from '@shared/ui/fab/fab.component';
+import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
 import type { HelpTicketsSettings } from '../admin.models';
 import { personLabel } from '@shared/person-label.util';
@@ -80,6 +81,7 @@ export function isHttpUrl(text: string): boolean {
     TranslatePipe,
     LocalizedDatePipe,
     PageHeaderComponent,
+    BreadcrumbsComponent,
     FilterSelectComponent,
     ButtonComponent,
     InputComponent,

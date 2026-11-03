@@ -206,7 +206,7 @@
               removeSize="lg"
               [removable]="true"
               [removeLabel]="'chat.removeFile' | t: { name: f.filename }"
-              (remove)="removeFile(f)"
+              (remove)="f.failed ? removeFile(f) : fileToRemove.set(f)"
             >
               <span class="chat__fileIcon" aria-hidden="true">
                 <app-icon [name]="f.mime.startsWith('image/') ? 'image' : 'file'" [size]="17" />
@@ -293,6 +293,15 @@
 @if (fileDrag.active()) {
   <app-drop-overlay [label]="'chat.drop' | t" />
 }
+
+<app-confirm-dialog
+  [open]="fileToRemove() !== null"
+  [title]="'apply.files.removeTitle' | t"
+  [body]="'apply.files.removeConfirm' | t: { name: fileToRemove()?.filename ?? '' }"
+  [confirmLabel]="'apply.files.removeAction' | t"
+  (confirm)="confirmRemoveFile()"
+  (cancel)="fileToRemove.set(null)"
+/>
 
 <app-confirm-dialog
   [open]="deleting() !== null"

@@ -1,5 +1,7 @@
 <section class="bk admin-page">
-  <app-page-header [flush]="true" [title]="'admin.backups.title' | t" />
+  <app-page-header [flush]="true" [title]="'admin.backups.title' | t">
+    <app-breadcrumbs crumbs />
+  </app-page-header>
 
   @if (!enabled()) {
     <app-note kind="warn" icon="alert">

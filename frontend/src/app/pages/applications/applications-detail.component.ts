@@ -2,6 +2,7 @@ import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   Injector,
   afterNextRender,
   computed,
@@ -57,6 +58,8 @@ import {
   FieldRowComponent,
   FileDropDirective,
   IconComponent,
+  ListDetailNav,
+  type ListDetailTask,
   MEDIA,
   mediaQuery,
   NoteComponent,
@@ -74,6 +77,7 @@ import {
   TabPagerComponent,
   TabsComponent,
   ToastService,
+  FabComponent,
 } from '@stupa-makers/ui-kit';
 import {
   BudgetTreeApi,
@@ -96,7 +100,6 @@ import { ShareLinksDialogComponent } from './share-links-dialog/share-links-dial
 import { TodoLinkedListComponent } from '../../features/todos/linked-list/todo-linked-list.component';
 import { RailStatusService } from '../../layout/rail-status.service';
 import { provideFormly } from '@shared/formly/formly.providers';
-import { FabComponent } from '@shared/ui/fab/fab.component';
 import { AmountComponent } from '@shared/ui/amount/amount.component';
 import { formatMoney } from '@shared/format-money';
 
@@ -418,6 +421,14 @@ export class ApplicationsDetailComponent {
 
   /** Inline editing for the creator or a manager. */
   readonly editing = signal(false);
+  /** The bar of the list/detail layout, present when the detail runs in it. */
+  private readonly ldNav = inject(ListDetailNav, { optional: true });
+  /**
+   * One view at a time, the edit takes over the bar of the layout: an X in place of the
+   * back arrow and "Antrag bearbeiten" as its title. The edit then has no bar of its own,
+   * so the screen shows one bar, not two.
+   */
+  readonly editDocked = computed(() => this.editing() && !!this.ldNav?.active());
   readonly editFields = signal<FormlyFieldConfig[]>([]);
   readonly savingEdit = signal(false);
   /** A field of the edit form changed. Only then the page shows "Speichern". */
@@ -801,6 +812,7 @@ export class ApplicationsDetailComponent {
    * detail-to-detail navigation and the constructor does not run again.
    */
   constructor() {
+    this.dockEditInBar();
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((pm) => {
       this.loadApplication(pm.get('id') ?? '');
     });
@@ -1132,6 +1144,33 @@ export class ApplicationsDetailComponent {
 
   cancelEdit(): void {
     this.editing.set(false);
+  }
+
+  /** Hand the edit to the bar of the layout while it docks there (`editDocked`). */
+  private dockEditInBar(): void {
+    const nav = this.ldNav;
+    if (!nav) return;
+    let mine: ListDetailTask | null = null;
+    const release = () => {
+      if (mine && nav.task() === mine) nav.task.set(null);
+      mine = null;
+    };
+    effect(() => {
+      if (!this.editDocked()) {
+        untracked(release);
+        return;
+      }
+      const task: ListDetailTask = {
+        title: this.i18n.translate('applications.edit.title'),
+        cancelLabel: this.i18n.translate('action.cancel'),
+        cancel: () => this.cancelEdit(),
+      };
+      untracked(() => {
+        mine = task;
+        nav.task.set(task);
+      });
+    });
+    inject(DestroyRef).onDestroy(release);
   }
 
   /**

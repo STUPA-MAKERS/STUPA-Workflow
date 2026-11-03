@@ -98,9 +98,7 @@
       >
         @if (loading()) {
           <div class="inv__skel skel-in">
-            <h2 class="sec inv__month" aria-hidden="true">
-              <span class="skel-text skel-text--accent inv__skelMonth"></span>
-            </h2>
+            <app-list-group skeleton="7rem" />
             <app-skeleton
               variant="items"
               [count]="12"
@@ -117,10 +115,7 @@
         } @else {
           <div class="inv__groups" [class.skel-stale]="reloading()" [attr.inert]="reloading() ? '' : null">
           @for (group of groups(); track group.key + $index) {
-            <section class="inv__group" [attr.aria-label]="group.label || null">
-              @if (group.label) {
-                <h2 class="sec inv__month">{{ group.label }}</h2>
-              }
+            <app-list-group [label]="group.label">
               <div class="inv__rows" [class.rowgroup]="!split()" role="list">
                 @for (i of group.items; track i.id) {
                   @let st = invoiceStatus(i.status);
@@ -174,7 +169,7 @@
                   </app-list-item>
                 }
               </div>
-            </section>
+            </app-list-group>
           }
           </div>
           @if (hasMore()) {

@@ -37,10 +37,11 @@ import {
   SearchPillComponent,
   StickyBarComponent,
   SwipeBackDirective,
+  PageFrame,
+  PageHeaderComponent,
 } from '@stupa-makers/ui-kit';
 import { PageFrameService } from '../../../layout/page-frame.service';
 import { AdminHealthComponent } from '../admin-health/admin-health.component';
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { FRAME_MODES, type FrameModeKey, type FramePage } from './frame-modes';
 
 /** One group of the navigation with the pages the principal may open. */
@@ -168,6 +169,7 @@ export class AdminFrameComponent {
   private readonly i18n = inject(I18nService);
   private readonly router = inject(Router);
   private readonly pageFrame = inject(PageFrameService);
+  private readonly fill = inject(PageFrame).fill;
   private readonly injector = inject(Injector);
   /** The link to the bar: the page header reports its title and hands its actions to it. */
   protected readonly nav = inject(ListDetailNav);
@@ -315,8 +317,8 @@ export class AdminFrameComponent {
     afterNextRender(() => this.revealActive());
     effect(() => this.nav.active.set(this.showBar()));
 
-    effect(() => this.pageFrame.fill.set(this.split() || this.fullPane()));
-    inject(DestroyRef).onDestroy(() => this.pageFrame.fill.set(false));
+    effect(() => this.fill.set(this.split() || this.fullPane()));
+    inject(DestroyRef).onDestroy(() => this.fill.set(false));
 
     effect(() =>
       this.pageFrame.crumbRoot.set(this.split() ? this.mode().home.replace(/^\//, '') : null),

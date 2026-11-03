@@ -21,10 +21,9 @@ import {
   EmptyStateComponent,
   NoteComponent,
   SkeletonComponent,
-} from '@stupa-makers/ui-kit';
-import {
   PageHeaderComponent,
-} from '@shared/ui';
+} from '@stupa-makers/ui-kit';
+import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
 import {
   FORCED_GREMIUM_ROLE_KEYS,
@@ -75,6 +74,7 @@ export const MEMBER_PREVIEW = 7;
     AvatarComponent,
     NoteComponent,
     PageHeaderComponent,
+    BreadcrumbsComponent,
     SkeletonComponent,
     SubstitutePoolComponent,
   ],

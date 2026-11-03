@@ -1,6 +1,6 @@
 @use 'breakpoints' as bp;
 @use 'scroll-fade' as fade;
-@use '../../../shared/ui/list-pane' as lp;
+@use 'list-pane' as lp;
 
 // The list/detail pane page of applications-list.component.scss.
 
@@ -41,17 +41,6 @@
 
 .mtl__group {
   @include lp.stack;
-}
-.mtl__month {
-  @include lp.month;
-}
-.mtl__group:first-child .mtl__month,
-.mtl__skel .mtl__month {
-  padding-top: var(--space-2);
-}
-// Sized like "Oktober 2026" and `app-date-block`, so the rows have their loaded height.
-.mtl__skelMonth {
-  width: 7rem;
 }
 .mtl__skelRows {
   --sk-lead-w: 3rem;
@@ -112,9 +101,6 @@
 }
 
 @include bp.phone {
-  .mtl__month {
-    padding-inline: var(--space-1);
-  }
   .mtl__scroll {
     padding-bottom: var(--space-4);
   }

@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { DetailNoneComponent, type DetailNoneState } from '@shared/ui/detail-none/detail-none.component';
+import { DetailNoneComponent, type DetailNoneState } from '@stupa-makers/ui-kit';
 import { TasksComponent } from './tasks.component';
 
 /**
@@ -17,7 +17,12 @@ import { TasksComponent } from './tasks.component';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [TranslatePipe, DetailNoneComponent],
   templateUrl: './tasks-none.component.html',
-  styleUrl: '../../shared/ui/detail-none/detail-none-host.scss',
+  styles: `
+    @use 'detail-none-host' as dnh;
+    :host {
+      @include dnh.host;
+    }
+  `,
 })
 export class TasksNoneComponent {
   private readonly page = inject(TasksComponent, { optional: true });

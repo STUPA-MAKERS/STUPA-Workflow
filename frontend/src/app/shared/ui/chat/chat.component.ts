@@ -318,6 +318,8 @@ export class ChatComponent {
   protected readonly editingId = signal<string | null>(null);
   protected readonly editDraft = signal('');
   protected readonly deleting = signal<ChatMessage | null>(null);
+  /** The draft file whose remove waits for the confirmation. */
+  protected readonly fileToRemove = signal<DraftFile | null>(null);
   /** The message whose delete was confirmed, until it leaves `messages`. */
   private deletedId: string | null = null;
   /** The own message whose phone menu is open. */
@@ -755,6 +757,13 @@ export class ChatComponent {
     if (this.full() && attach?.contains(document.activeElement)) {
       this.composerInput()?.nativeElement.focus();
     }
+  }
+
+  /** The confirmation of a chip's remove button. */
+  protected confirmRemoveFile(): void {
+    const file = this.fileToRemove();
+    this.fileToRemove.set(null);
+    if (file) void this.removeFile(file);
   }
 
   /**

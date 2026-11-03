@@ -428,15 +428,17 @@ def _validate_number(field: FormFieldDef, value: object, errors: list[FieldError
 
 
 def _validate_funding(field: FormFieldDef, value: object, errors: list[FieldError]) -> None:
-    """Validate the requested funding: a finite number above 0.
+    """Validate the requested funding: a finite number of 0 or more.
+
+    0 is valid, because an applicant can ask for an approval without money.
 
     The check against the cost total runs after all fields (`_check_funding_total`),
     because the positions can come after the funding field.
     """
     before = len(errors)
     _validate_number(field, value, errors)
-    if len(errors) == before and Decimal(str(value)) <= 0:
-        _err(errors, field.key, "must be greater than 0")
+    if len(errors) == before and Decimal(str(value)) < 0:
+        _err(errors, field.key, "must not be negative")
 
 
 def _check_funding_total(
@@ -635,7 +637,7 @@ def _validate_positions(field: FormFieldDef, value: object, errors: list[FieldEr
 
     The list needs at least ``minPositions`` positions. Each position needs at least
     ``minOffers`` offers and exactly one preferred offer. Every offer value must be a
-    finite number above 0. The error keys use a 0-indexed position.
+    finite number of 0 or more. The error keys use a 0-indexed position.
 
     A position can opt out of the comparison offers with ``noOffers: true`` and a
     mandatory ``noOffersReason``. The field must allow this through ``allowNoOffers``,
@@ -707,8 +709,8 @@ def _validate_positions(field: FormFieldDef, value: object, errors: list[FieldEr
             num = _offer_value(offer)
             if num is None:
                 _err(errors, owhere, "offer value must be a finite number")
-            elif num <= 0:
-                _err(errors, owhere, "offer value must be greater than 0")
+            elif num < 0:
+                _err(errors, owhere, "offer value must not be negative")
             if offer.get("preferred") is True:
                 preferred_count += 1
         if offers and preferred_count != 1:

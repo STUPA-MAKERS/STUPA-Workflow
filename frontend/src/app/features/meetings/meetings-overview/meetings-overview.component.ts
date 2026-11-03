@@ -9,8 +9,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { AuthService } from '@core/auth/auth.service';
-import { MEDIA, mediaQuery } from '@stupa-makers/ui-kit';
-import { PageFrameService } from '../../../layout/page-frame.service';
+import { MEDIA, mediaQuery, PageFrame } from '@stupa-makers/ui-kit';
 import { CreateMeetingDialogComponent } from '../create-meeting-dialog/create-meeting-dialog.component';
 import { MeetingsCalendarComponent } from '../meetings-calendar/meetings-calendar.component';
 import { MeetingsListComponent } from '../meetings-list/meetings-list.component';
@@ -39,7 +38,7 @@ import { MeetingsTimelineService } from '../meetings-timeline.service';
 })
 export class MeetingsOverviewComponent implements OnDestroy {
   private readonly auth = inject(AuthService);
-  private readonly frame = inject(PageFrameService);
+  private readonly frame = inject(PageFrame);
   protected readonly timeline = inject(MeetingsTimelineService);
 
   readonly phone = mediaQuery(MEDIA.phone);
