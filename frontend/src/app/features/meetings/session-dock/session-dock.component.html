@@ -27,6 +27,9 @@
         <span class="sd__small">{{ closedLine() }}</span>
         <span class="sd__strong">{{ agenda().length === 1 ? ('meetings.dock.topsOne' | t) : ('meetings.dock.tops' | t: { n: agenda().length }) }}</span>
       </div>
+      @if (phone()) {
+        <ng-container [ngTemplateOutlet]="phoneTools" />
+      }
     } @else {
       <div class="sd__nav">
         <app-button variant="text" [iconOnly]="true" [disabled]="!hasPrev()" [ariaLabel]="'meetings.dock.prev' | t" (click)="step.emit(-1)"><app-icon name="left" /></app-button>
@@ -42,6 +45,9 @@
         </span>
         <app-button variant="text" [iconOnly]="true" [disabled]="!hasNext()" [ariaLabel]="'meetings.dock.next' | t" (click)="step.emit(1)"><app-icon name="right" /></app-button>
       </div>
+      @if (phone()) {
+        <ng-container [ngTemplateOutlet]="phoneTools" />
+      }
       <span class="sd__vr" aria-hidden="true"></span>
       <div class="sd__mid">
         @if (nowElsewhere(); as now) {
@@ -71,6 +77,43 @@
     }
   </div>
 }
+
+<!-- On a phone: "Erledigt", the attendance and the view switch as icon buttons. -->
+<ng-template #phoneTools>
+  <div class="sd__tools">
+    @if (done() !== null) {
+      <app-button
+        [variant]="done() ? 'tonal' : 'text'"
+        [iconOnly]="true"
+        [ariaPressed]="done()"
+        [ariaLabel]="'meetings.agenda.done' | t"
+        (click)="doneChange.emit(!done())"
+      ><app-icon name="check" /></app-button>
+    }
+    <span class="sd__tool">
+      <app-button
+        [variant]="panel() === 'attendance' ? 'tonal' : 'text'"
+        [iconOnly]="true"
+        [ariaLabel]="'meetings.attendance.title' | t"
+        (click)="togglePanel('attendance')"
+      ><app-icon name="users" /></app-button>
+      @if (guestChip(); as g) {
+        @if (g.pending > 0) {
+          <span class="sd__badge sd__badge--tool num" [attr.aria-label]="'guests.dock.pending' | t: { n: g.pending }">{{ g.pending }}</span>
+        }
+      }
+    </span>
+    @if (modeToggle()) {
+      <app-button
+        [variant]="mode() === 'raw' ? 'tonal' : 'text'"
+        [iconOnly]="true"
+        [ariaPressed]="mode() === 'raw'"
+        [ariaLabel]="'meetings.editor.modeRaw' | t"
+        (click)="toggleMode()"
+      ><app-icon name="code" /></app-button>
+    }
+  </div>
+</ng-template>
 
 <ng-template #presentChip>
   <button

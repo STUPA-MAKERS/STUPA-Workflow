@@ -1,3 +1,4 @@
+import type { EditorMode } from '../top-sheet/top-sheet.component';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -90,6 +91,16 @@ export class SessionDockComponent {
   /** The own ballot of the open vote ("Ja", "abgegeben"), or `null`. */
   readonly myVote = input<string | null>(null);
   readonly panel = model<DockPanel>('none');
+  /**
+   * The done mark of the open item for the icon button of a phone, or `null` for no button
+   * (only a writer of the minutes ticks an item).
+   */
+  readonly done = input<boolean | null>(null);
+  /** The view switch of the protocol text as an icon button of a phone. */
+  readonly modeToggle = input(false);
+  readonly mode = model<EditorMode>('formatted');
+  /** The icon button "Erledigt" of a phone: the new done mark of the open item. */
+  readonly doneChange = output<boolean>();
   /** The distance of the popover from the end edge of the dock: the end of its chip. */
   protected readonly popEnd = signal(0);
 
@@ -154,6 +165,11 @@ export class SessionDockComponent {
     const m = this.meeting();
     return m.status === 'live' && (m.canManage || m.isProtokollant);
   });
+  /** Switch the protocol text between the formatted view and the Markdown source. */
+  protected toggleMode(): void {
+    this.mode.set(this.mode() === 'raw' ? 'formatted' : 'raw');
+  }
+
   /** The panel on screen: the minute-taker only for the people who may change it. */
   protected readonly shownPanel = computed<DockPanel>(() => {
     const panel = this.panel();

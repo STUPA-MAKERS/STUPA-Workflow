@@ -181,9 +181,35 @@
     border-radius: 0;
     background: transparent;
   }
+  // "TOP 3 von 6" sits at the start edge, the icon buttons at the end edge.
   .sd__nav {
     flex: 1 1 auto;
-    justify-content: space-between;
+  }
+  .sd__pos {
+    align-items: flex-start;
+    min-width: 0;
+    padding-inline: var(--space-2);
+  }
+  .sd__tools {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: var(--space-1);
+    margin-inline-start: auto;
+  }
+  .sd__tool {
+    position: relative;
+    display: inline-flex;
+  }
+  .sd__badge--tool {
+    position: absolute;
+    top: -2px;
+    inset-inline-end: -2px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    font-size: 0.6875rem;
+    pointer-events: none;
   }
   .sd__vr {
     display: none;

@@ -131,7 +131,7 @@
         @if (!saveInFoot()) {
           <ng-container [ngTemplateOutlet]="saveTpl" />
         }
-        @if (editable()) {
+        @if (editable() && barControls()) {
           <app-button
             class="ts__done"
             variant="outlined"
@@ -142,6 +142,7 @@
             {{ 'meetings.agenda.done' | t }}
           </app-button>
         }
+        @if (barControls()) {
         <app-segmented
           class="ts__mode"
           size="control"
@@ -152,6 +153,7 @@
           [value]="mode()"
           (valueChange)="setMode($event)"
         />
+        }
       </div>
       <div class="ts__rule"></div>
       }

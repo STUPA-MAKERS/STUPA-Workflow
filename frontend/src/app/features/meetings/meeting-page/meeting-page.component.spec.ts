@@ -266,9 +266,25 @@ describe('MeetingPageComponent', () => {
       await userEvent.keyboard('{Escape}');
       expect(screen.queryByRole('dialog')).toBeNull();
       const menu = await openMenu();
-      await userEvent.click(within(menu).getByRole('menuitem', { name: 'Anwesenheit erfassen' }));
+      expect(within(menu).queryByRole('menuitem', { name: 'Anwesenheit erfassen' })).toBeNull();
+      await userEvent.keyboard('{Escape}');
+      await userEvent.click(screen.getByRole('button', { name: 'Anwesenheit' }));
       expect(screen.getByRole('dialog', { name: 'Anwesenheit' })).toHaveClass('ss--bottom');
       flushDelegations();
+    });
+
+    /** The phone dock holds "Erledigt" and the view switch as icon buttons, the sheet not. */
+    it('ticks the item and switches the view from the phone dock', async () => {
+      const { on, fixture } = await setup({}, [MEDIA.phone]);
+      const host = fixture.nativeElement as HTMLElement;
+      expect(host.querySelector('.ts__done')).toBeNull();
+      expect(host.querySelector('.ts__mode')).toBeNull();
+      await userEvent.click(screen.getByRole('button', { name: 'Erledigt' }));
+      expect(on.setDone).toHaveBeenCalledWith(expect.objectContaining({ done: true }));
+      const raw = screen.getByRole('button', { name: 'Markdown' });
+      await userEvent.click(raw);
+      expect(raw.closest('button') ?? raw).toHaveAttribute('aria-pressed', 'true');
+      expect(host.querySelector('.ts__raw')).not.toBeNull();
     });
 
     /** The dock has no chips on a phone, so the minute-taker is an entry of the menu. */

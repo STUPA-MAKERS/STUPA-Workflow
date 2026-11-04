@@ -1,3 +1,4 @@
+import type { EditorMode } from '../top-sheet/top-sheet.component';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -218,6 +219,18 @@ export class MeetingPageComponent {
    * The text of the item can be written. A planned meeting has no protocol yet, but its
    * text can be prepared; the start creates the protocol around it.
    */
+  /** The view of the protocol text, shared by the sheet and the icon button of the phone dock. */
+  protected readonly editorMode = signal<EditorMode>('formatted');
+  /** The done mark of the open item for the phone dock, or `null` for no button there. */
+  protected readonly dockDone = computed<boolean | null>(() => {
+    const t = this.top();
+    return this.phone() && this.editable() && t ? !!t.doneAt : null;
+  });
+  /** The view switch in the phone dock: the sheet shows it while the protocol is open. */
+  protected readonly dockModeToggle = computed(() => {
+    const p = this.protocol();
+    return this.phone() && !!p && !p.isLocked && this.top() !== null;
+  });
   protected readonly editable = computed(
     () =>
       (this.protocol() !== null || this.meeting().status === 'planned') &&
@@ -314,7 +327,10 @@ export class MeetingPageComponent {
     const main: RowMenuItem[] = [];
     if (this.canBackToPrep()) main.push({ id: 'prep', label: t('meetings.prep.back'), icon: 'clipcheck' });
     if (m.canManage) main.push({ id: 'settings', label: t('meetings.settings.title'), icon: 'edit' });
-    main.push({ id: 'attendance', label: t('meetings.page.recordAttendance'), icon: 'users' });
+    // A phone dock holds the attendance as an icon button; before the opening it shows nothing.
+    if (!this.phone() || m.status === 'planned') {
+      main.push({ id: 'attendance', label: t('meetings.page.recordAttendance'), icon: 'users' });
+    }
     const keeper =
       (m.status === 'planned' && m.canManage) ||
       (m.status === 'live' && (m.canManage || m.isProtokollant));

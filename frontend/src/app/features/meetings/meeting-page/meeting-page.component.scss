@@ -209,8 +209,8 @@
     // gap above the navigation bar, so the protocol shows through the glass, and a light
     // shadow lifts the dock off it. The rounded box clips the glass, which reaches past both
     // edges (`frosted`).
-    @include frosted(var(--color-surface-2));
     box-shadow: var(--shadow-md);
+    @include frosted(var(--color-surface-2));
   }
   // Before the opening the dock only says "Noch nicht eröffnet", which the status in the
   // head already says, so it shows nothing there (`SessionDockComponent`).

@@ -170,6 +170,11 @@ export class TopSheetComponent {
    */
   readonly linked = input(true);
   /**
+   * "Erledigt" and the view switch in the bar. On a phone the dock of the page holds them
+   * as icon buttons, and the page binds `mode`.
+   */
+  readonly barControls = input(true);
+  /**
    * The viewer may rename the item (`canChangeAgenda`). A click on the title then opens
    * the title field in place of the heading. An application item keeps the title of its
    * application in its row below the title.
@@ -267,7 +272,7 @@ export class TopSheetComponent {
   }
 
   /** The view of the text. */
-  protected readonly mode = signal<EditorMode>('formatted');
+  readonly mode = model<EditorMode>('formatted');
 
   protected readonly modeOptions = computed<SegmentedOption[]>(() => {
     this.i18n.uiLocale();
