@@ -230,16 +230,18 @@ export class MeetingPageComponent {
   /** The done mark of the open item for the dock, or `null` for no button there. */
   protected readonly dockDone = computed<boolean | null>(() => {
     const t = this.top();
-    return this.meeting().status !== 'planned' && this.editable() && t ? !!t.doneAt : null;
+    return this.editable() && t && !this.preparing() ? !!t.doneAt : null;
   });
   /** The vote icon button of the dock below the wide layout: the number of votes, or `null`. */
   protected readonly dockVotes = computed<number | null>(() =>
     !this.wide() && this.showVotes() ? this.votes().length : null,
   );
-  /** The view switch in the dock: the sheet shows it only before the opening. */
+  /** The view switch in the dock, while an item is open and its text is not locked. A planned
+   * meeting has no protocol yet, but the text of its items can be prepared. */
   protected readonly dockModeToggle = computed(() => {
     const p = this.protocol();
-    return this.meeting().status !== 'planned' && !!p && !p.isLocked && this.top() !== null;
+    if (this.top() === null || this.preparing()) return false;
+    return this.meeting().status === 'planned' ? !p?.isLocked : !!p && !p.isLocked;
   });
   /** The sheet of the open item: the dock runs its format tools. */
   protected readonly sheet = viewChild(TopSheetComponent);
