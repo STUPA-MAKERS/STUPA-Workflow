@@ -17,7 +17,12 @@
 
 @if (!phone() || m.status !== 'planned') {
   <div class="sd">
-    @if (m.status === 'planned') {
+    @if (phone() && formatting() && formatTools(); as tools) {
+      <app-button variant="text" [iconOnly]="true" [ariaLabel]="'meetings.dock.formatBack' | t" (click)="formatting.set(false)"><app-icon name="back" /></app-button>
+      <div class="sd__format" role="toolbar" [attr.aria-label]="'meetings.editor.toolbar' | t">
+        <ng-container [ngTemplateOutlet]="tools" />
+      </div>
+    } @else if (m.status === 'planned') {
       <div class="sd__state">
         <span class="sd__small">{{ 'meetings.dock.notStarted' | t }}</span>
         <span class="sd__strong">{{ 'meetings.dock.topsPrepared' | t: { n: agenda().length } }}</span>
@@ -53,7 +58,7 @@
         @if (nowElsewhere(); as now) {
           <span class="sd__now">{{ 'meetings.dock.nowRunning' | t: { top: now.label } }}</span>
           <app-button size="sm" variant="tonal" (click)="jumpNow.emit(now.item.id)">{{ 'meetings.dock.backToNow' | t }}</app-button>
-        } @else if (myVote(); as choice) {
+        } @else if (!phone() && myVote(); as choice) {
           <span class="sd__vote">
             <app-icon name="vote" [size]="18" />
             <span>{{ 'meetings.dock.yourVote' | t }}: <strong>{{ choice }}</strong></span>
@@ -81,6 +86,9 @@
 <!-- On a phone: "Erledigt", the attendance and the view switch as icon buttons. -->
 <ng-template #phoneTools>
   <div class="sd__tools">
+    @if (formatTools()) {
+      <app-button variant="text" [iconOnly]="true" [ariaLabel]="'meetings.editor.toolbar' | t" (click)="formatting.set(true)"><app-icon name="letters" /></app-button>
+    }
     @if (done() !== null) {
       <app-button
         [variant]="done() ? 'tonal' : 'text'"
@@ -103,6 +111,14 @@
         }
       }
     </span>
+    @if (votes() !== null) {
+      <span class="sd__tool">
+        <app-button variant="text" [iconOnly]="true" [ariaLabel]="'meetings.vote.count' | t" (click)="openVotes.emit()"><app-icon name="vote" /></app-button>
+        @if (votes()) {
+          <span class="sd__badge sd__badge--tool num" [class.sd__badge--quiet]="!openVote()" aria-hidden="true">{{ votes() }}</span>
+        }
+      </span>
+    }
     @if (modeToggle()) {
       <app-button
         [variant]="mode() === 'raw' ? 'tonal' : 'text'"

@@ -4,17 +4,19 @@ import {
   Component,
   ElementRef,
   computed,
+  effect,
   inject,
   input,
   model,
   output,
   signal,
+  type TemplateRef,
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import type { AgendaItem, Attendance, Meeting, Uuid } from '@core/api/models';
+import type { AgendaItem, Attendance, Meeting, MeetingVote, Uuid } from '@core/api/models';
 import { ButtonComponent, IconComponent, MEDIA, mediaQuery, SideSheetComponent } from '@stupa-makers/ui-kit';
 import { KeeperMenuComponent } from '../keeper-menu/keeper-menu.component';
 import { keeperNames } from '../keepers.util';
@@ -101,6 +103,26 @@ export class SessionDockComponent {
   readonly mode = model<EditorMode>('formatted');
   /** The icon button "Erledigt" of a phone: the new done mark of the open item. */
   readonly doneChange = output<boolean>();
+  /** The vote icon button of a phone: the number of votes of the open item, or `null`. */
+  readonly votes = input<number | null>(null);
+  /** The open vote of the open item: it colours the number on the vote button of a phone. */
+  readonly openVote = input<MeetingVote | null>(null);
+  /** The vote icon button of a phone: open the vote cards. */
+  readonly openVotes = output<void>();
+  /**
+   * The format tools of the protocol for a phone, or `null` when the text takes none. "Aa"
+   * turns the dock row into them, and the back arrow at the start turns it back.
+   */
+  readonly formatTools = input<TemplateRef<unknown> | null>(null);
+  /** The dock row shows the format tools. */
+  protected readonly formatting = signal(false);
+
+  constructor() {
+    // Without tools (another item, a locked text) the row returns to the navigation.
+    effect(() => {
+      if (!this.formatTools()) this.formatting.set(false);
+    });
+  }
   /** The distance of the popover from the end edge of the dock: the end of its chip. */
   protected readonly popEnd = signal(0);
 

@@ -260,7 +260,7 @@ describe('MeetingPageComponent', () => {
 
     it('opens the agenda and the attendance as bottom sheets on a phone', async () => {
       const { flushDelegations } = await setup({}, [MEDIA.phone]);
-      await userEvent.click(screen.getByRole('button', { name: /Tagesordnung/ }));
+      await userEvent.click(within(await openMenu()).getByRole('menuitem', { name: 'Tagesordnung' }));
       const agenda = screen.getByRole('dialog', { name: 'Tagesordnung' });
       expect(agenda).toHaveClass('ss--bottom');
       await userEvent.keyboard('{Escape}');
@@ -271,6 +271,30 @@ describe('MeetingPageComponent', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Anwesenheit' }));
       expect(screen.getByRole('dialog', { name: 'Anwesenheit' })).toHaveClass('ss--bottom');
       flushDelegations();
+    });
+
+    /** "Aa" turns the phone dock into the format tools; the back arrow turns it back. */
+    it('swaps the phone dock row for the format tools and back', async () => {
+      const { fixture } = await setup({}, [MEDIA.phone]);
+      const host = fixture.nativeElement as HTMLElement;
+      expect(host.querySelector('.ts__bar')).toBeNull();
+      await userEvent.click(screen.getByRole('button', { name: 'Format' }));
+      const tools = screen.getByRole('toolbar', { name: 'Format' });
+      expect(within(tools).getByRole('button', { name: 'Fett' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Nächster TOP' })).toBeNull();
+      await userEvent.click(screen.getByRole('button', { name: 'Zurück zur Navigation' }));
+      expect(screen.getByRole('button', { name: 'Nächster TOP' })).toBeInTheDocument();
+    });
+
+    /** The protocol has the phone page to itself: the vote cards open as a bottom sheet. */
+    it('opens the vote cards from the phone dock instead of above the text', async () => {
+      const { fixture } = await setup({}, [MEDIA.phone]);
+      const host = fixture.nativeElement as HTMLElement;
+      expect(host.querySelector('aside.mp__votes')).toBeNull();
+      await userEvent.click(screen.getByRole('button', { name: 'Abstimmungen' }));
+      const sheet = screen.getByRole('dialog', { name: 'Abstimmungen' });
+      expect(sheet).toHaveClass('ss--bottom');
+      expect(sheet.querySelector('.mp__votes--sheet')).not.toBeNull();
     });
 
     /** The phone dock holds "Erledigt" and the view switch as icon buttons, the sheet not. */
@@ -308,7 +332,7 @@ describe('MeetingPageComponent', () => {
 
     it('opens the agenda from the start edge below the wide layout', async () => {
       await setup();
-      await userEvent.click(screen.getByRole('button', { name: /Tagesordnung/ }));
+      await userEvent.click(within(await openMenu()).getByRole('menuitem', { name: 'Tagesordnung' }));
       expect(screen.getByRole('dialog', { name: 'Tagesordnung' })).toHaveClass('ss--start');
     });
 
@@ -402,7 +426,8 @@ describe('MeetingPageComponent', () => {
 
     it('opens a picked item of the preparation sheet', async () => {
       const { on } = await setup({ meeting: planned({ canManageVotes: true }), protocol: null });
-      await userEvent.click(screen.getByTitle('Tagesordnung öffnen'));
+      await userEvent.click(screen.getByRole('button', { name: 'Sitzungsmenü' }));
+      await userEvent.click(await screen.findByRole('menuitem', { name: 'Tagesordnung' }));
       const sheet = await screen.findByRole('dialog', { name: 'Tagesordnung' });
       await userEvent.click(within(sheet).getByRole('button', { name: 'Bericht des Finanzreferats' }));
       expect(on.selectTop).toHaveBeenCalledWith('t-2');
@@ -438,7 +463,8 @@ describe('MeetingPageComponent', () => {
 
     it('opens the agenda as a sheet below the wide layout and closes it on a pick', async () => {
       const { on } = await setup();
-      await userEvent.click(screen.getByTitle('Tagesordnung öffnen'));
+      await userEvent.click(screen.getByRole('button', { name: 'Sitzungsmenü' }));
+      await userEvent.click(await screen.findByRole('menuitem', { name: 'Tagesordnung' }));
       const sheet = await screen.findByRole('dialog', { name: 'Tagesordnung' });
       await userEvent.click(within(sheet).getByRole('button', { name: 'Bericht des Finanzreferats' }));
       expect(on.selectTop).toHaveBeenCalledWith('t-2');
@@ -448,7 +474,8 @@ describe('MeetingPageComponent', () => {
     /** A closed meeting changes no agenda. */
     it('puts the add into the header of the agenda sheet', async () => {
       const { on, fixture } = await setup();
-      await userEvent.click(screen.getByTitle('Tagesordnung öffnen'));
+      await userEvent.click(screen.getByRole('button', { name: 'Sitzungsmenü' }));
+      await userEvent.click(await screen.findByRole('menuitem', { name: 'Tagesordnung' }));
       const sheet = await screen.findByRole('dialog', { name: 'Tagesordnung' });
       const adds = within(sheet).getAllByRole('button', { name: 'TOP hinzufügen' });
       expect(adds).toHaveLength(1);

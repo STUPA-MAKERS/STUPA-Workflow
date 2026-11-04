@@ -25,12 +25,9 @@ import {
   EmptyStateComponent,
   IconComponent,
   type IconName,
-  MEDIA,
-  mediaQuery,
   NoteComponent,
   SegmentedComponent,
   type SegmentedOption,
-  type StatusKind,
   StatusTextComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
@@ -170,8 +167,9 @@ export class TopSheetComponent {
    */
   readonly linked = input(true);
   /**
-   * "Erledigt" and the view switch in the bar. On a phone the dock of the page holds them
-   * as icon buttons, and the page binds `mode`.
+   * The bar: the format tools, "Erledigt" and the view switch. On a phone the dock of the
+   * page holds them as icon buttons (the tools behind "Aa"), and the page binds `mode`;
+   * the save state then sits beside the title.
    */
   readonly barControls = input(true);
   /**
@@ -193,18 +191,8 @@ export class TopSheetComponent {
   /** "Erledigt" in the bar: set or remove the done mark of the open item. */
   readonly doneChange = output<{ item: AgendaItem; done: boolean }>();
 
-  private readonly phone = mediaQuery(MEDIA.phone);
 
-  /**
-   * The save state sits in the footer of a live protocol, so the bar keeps one row. A
-   * phone keeps it in the bar: there the footer is at the end of the text.
-   */
-  protected readonly saveInFoot = computed(() => {
-    const m = this.meeting();
-    return !!this.protocol() && m.status !== 'closed' && !this.follow() && !this.phone();
-  });
-
-  protected readonly tools = TOOLS;
+  readonly tools = TOOLS;
 
   /**
    * The item whose rename started from this heading. The agenda pane shows its own field
@@ -301,7 +289,7 @@ export class TopSheetComponent {
   };
 
   /** The formats at the cursor. The Markdown source shows none as pressed. */
-  protected readonly activeFormats = computed(() =>
+  readonly activeFormats = computed(() =>
     this.mode() === 'raw' ? NO_FORMATS : (this.editor()?.activeFormats() ?? NO_FORMATS),
   );
 
@@ -310,7 +298,7 @@ export class TopSheetComponent {
   }
 
   /** A button of the format bar: in the editor, or in the Markdown source. */
-  protected toggleFormat(format: MarkdownFormat): void {
+  toggleFormat(format: MarkdownFormat): void {
     if (this.mode() !== 'raw') {
       this.editor()?.toggleFormat(format);
       return;
@@ -329,7 +317,7 @@ export class TopSheetComponent {
   }
 
   /** "Tabelle einfügen": in the editor, or as a Markdown table in the source. */
-  protected insertTable(): void {
+  insertTable(): void {
     if (this.mode() !== 'raw') {
       this.editor()?.insertTable();
       return;
@@ -345,7 +333,7 @@ export class TopSheetComponent {
   }
 
   /** "Bild einfügen": the file dialog of the editor or of the Markdown source. */
-  protected insertImage(): void {
+  insertImage(): void {
     if (this.mode() !== 'raw') {
       this.editor()?.pickImage();
       return;
@@ -411,13 +399,6 @@ export class TopSheetComponent {
       this.i18n.locale(),
     ),
   );
-
-  /** The state of the protocol as status text. */
-  protected protocolState(p: Protocol): { kind: StatusKind; key: TranslationKey } {
-    if (p.isFinal) return { kind: 'accent', key: 'meetings.protocol.final' };
-    if (p.status === 'rendering') return { kind: 'warn', key: 'meetings.protocol.rendering' };
-    return { kind: 'neutral', key: 'meetings.protocol.draft' };
-  }
 }
 
 /** A short hash of a text (FNV-1a, 32 bit), so that a document key changes with it. */

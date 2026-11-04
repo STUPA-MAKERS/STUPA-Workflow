@@ -76,7 +76,7 @@ describe('TopSheetComponent', () => {
     expect(screen.queryByText(/Freitext/)).toBeNull();
     expect(screen.getByRole('heading', { level: 1, name: 'Begrüßung' })).toBeInTheDocument();
     expect(screen.getByText('Gespeichert')).toBeInTheDocument();
-    expect(screen.getByText('Entwurf')).toBeInTheDocument();
+    expect(screen.queryByText('Entwurf')).toBeNull();
     expect(screen.queryByRole('link', { name: 'Antrag Kulturfestival' })).toBeNull();
   });
 
@@ -258,10 +258,9 @@ describe('TopSheetComponent', () => {
     });
   });
 
-  it('shows no format bar to a reader and names the minute-taker', async () => {
+  it('shows no format bar to a reader', async () => {
     await setup({ editable: false, canEdit: false });
     expect(screen.queryByRole('toolbar', { name: 'Format' })).toBeNull();
-    expect(screen.getByText(/Pia Protokoll führt das Protokoll/)).toBeInTheDocument();
   });
 
   /** The foot of a live meeting is gone; the bar says it all. */
@@ -285,16 +284,11 @@ describe('TopSheetComponent', () => {
     expect(screen.queryByText('Gespeichert')).toBeNull();
   });
 
-  it('keeps the live foot: the protocol state and who writes', async () => {
-    const { fixture, container } = await setup({ protocol: protocol({ status: 'rendering', isLocked: true }) });
-    const foot = () => container.querySelector('.ts__foot') as HTMLElement;
-    expect(foot().textContent?.trim()).toBe('Wird gerendert …');
-    fixture.componentRef.setInput('protocol', protocol());
-    fixture.componentRef.setInput('canEdit', false);
-    fixture.detectChanges();
-    expect(foot()).toHaveTextContent('Entwurf');
-    expect(foot()).toHaveTextContent('Pia Protokoll führt das Protokoll — du liest mit.');
-    expect(screen.queryByRole('status')).toBeNull();
+  /** The protocol area has no foot: the save state sits in the bar. */
+  it('has no foot in a live meeting and keeps the save state in the bar', async () => {
+    const { container } = await setup({ saveState: 'saved' });
+    expect(container.querySelector('.ts__foot')).toBeNull();
+    expect(container.querySelector('.ts__bar .ts__save')).toHaveTextContent('Gespeichert');
   });
 
   /** A live meeting names its keeper in the dock, not here. */

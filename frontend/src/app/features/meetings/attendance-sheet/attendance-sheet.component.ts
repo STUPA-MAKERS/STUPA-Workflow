@@ -267,23 +267,6 @@ export class AttendanceSheetComponent {
     if (value === 'members' || value === 'guests') this.tab.set(value);
   }
 
-  /** The counts per state. A member who does not lead reads one "abwesend" count. */
-  protected readonly counts = computed(() => {
-    const rows = this.attendance();
-    const count = (s: AttendanceStatus | null) => rows.filter((a) => a.status === s).length;
-    const away: { n: number; key: TranslationKey }[] = this.lead()
-      ? [
-          { n: count('excused'), key: 'meetings.attendanceSheet.excused' },
-          { n: count('absent'), key: 'meetings.attendanceSheet.absent' },
-        ]
-      : [{ n: count('excused') + count('absent'), key: 'meetings.attendanceSheet.away' }];
-    return [
-      { n: count('present'), key: 'meetings.attendanceSheet.present' as TranslationKey },
-      ...away,
-      { n: count(null), key: 'meetings.attendanceSheet.open' as TranslationKey },
-    ];
-  });
-
   /** The delegation of a member for this meeting, as the delegator. */
   private delegationOf(principalId: Uuid): Delegation | null {
     return this.delegations().find((d) => d.delegatorId === principalId) ?? null;

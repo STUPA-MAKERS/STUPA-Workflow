@@ -187,11 +187,20 @@
   .sd__nav {
     display: contents;
   }
+  // The dock row holds the arrows at the edges and the icon buttons between them; the
+  // number of the item is in the agenda and in the head of the sheet.
   .sd__pos {
+    display: none;
+  }
+  // The format tools replace the row: the back arrow at the start, the tools after it.
+  .sd__format {
+    display: flex;
     flex: 1 1 auto;
-    align-items: flex-start;
+    align-items: center;
+    justify-content: space-between;
     min-width: 0;
-    padding-inline: var(--space-2);
+    overflow-x: auto;
+    scrollbar-width: none;
   }
   .sd__next {
     order: 1;
@@ -204,13 +213,19 @@
     flex: none;
     align-items: center;
     gap: var(--space-1);
-    margin-inline-start: auto;
+    margin-inline: auto;
   }
   .sd__tool {
     position: relative;
     display: inline-flex;
   }
-  .sd__badge--tool {
+  // The number of votes is grey; a running vote colours it like the open guest requests,
+  // and the own ballot shows in the sheet, so the phone dock has no status line.
+  .sd__badge.sd__badge--quiet {
+    background: var(--color-surface-3);
+    color: var(--color-text);
+  }
+  .sd__badge.sd__badge--tool {
     position: absolute;
     top: -2px;
     inset-inline-end: -2px;
