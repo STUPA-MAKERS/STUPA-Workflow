@@ -49,13 +49,15 @@ describe('GuestViewComponent', () => {
     expect(screen.getByText('Personal')).toBeInTheDocument();
     expect(screen.getByText('Inhalt nur für Mitglieder')).toBeInTheDocument();
     expect(screen.getByText('Antrag')).toBeInTheDocument();
-    expect(screen.queryByText(/^TOP \d/)).toBeNull();
+    // The agenda rows carry no "TOP n" (the protocol page has its own headings).
+    expect(document.querySelector('.gv__agenda')?.textContent).not.toMatch(/TOP \d/);
     expect(document.querySelector('.gv__item[aria-current="step"]')?.textContent).toContain('Antrag');
     expect(screen.getByText('Unbenannter TOP')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('radio', { name: /Protokoll/ }));
+    await userEvent.click(screen.getByRole('tab', { name: /Protokoll/ }));
     expect(screen.getByText('Vorstellung')).toBeInTheDocument();
     expect(screen.getByText('Eröffnet.')).toBeInTheDocument();
-    expect(screen.queryByText('Personal')).toBeNull();
+    // The non-public item has no text on the protocol page.
+    expect(document.querySelector('.gv__proto')?.textContent).not.toContain('Personal');
   });
 
   it('marks only the ticked items as done, not every item before the current one', async () => {
@@ -72,7 +74,7 @@ describe('GuestViewComponent', () => {
   it('says when no protocol text exists yet', async () => {
     const me = guestMe();
     await setup({ ...me, view: { ...me.view!, votes: [], agenda: me.view!.agenda.map((a) => ({ ...a, body: null })) } });
-    await userEvent.click(screen.getByRole('radio', { name: /Protokoll/ }));
+    await userEvent.click(screen.getByRole('tab', { name: /Protokoll/ }));
     expect(screen.getByText('Noch kein Protokolltext zu öffentlichen TOPs.')).toBeInTheDocument();
   });
 

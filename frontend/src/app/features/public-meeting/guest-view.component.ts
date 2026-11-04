@@ -22,10 +22,13 @@ import {
   ButtonComponent,
   EmptyStateComponent,
   IconComponent,
+  MEDIA,
+  mediaQuery,
   NoteComponent,
-  SegmentedComponent,
-  type SegmentedOption,
   StatusTextComponent,
+  type TabItem,
+  TabPageDirective,
+  TabPagerComponent,
 } from '@stupa-makers/ui-kit';
 import type { BallotCaster } from '../voting/ballot/ballot.component';
 import { VotePanelComponent } from '../voting/vote-panel/vote-panel.component';
@@ -63,8 +66,9 @@ interface AgendaRow {
     IconComponent,
     MarkdownViewComponent,
     NoteComponent,
-    SegmentedComponent,
     StatusTextComponent,
+    TabPageDirective,
+    TabPagerComponent,
     VotePanelComponent,
   ],
   templateUrl: './guest-view.component.html',
@@ -90,9 +94,11 @@ export class GuestViewComponent {
   protected readonly view = computed(() => this.me().view);
   protected readonly watch = computed(() => this.me().meeting.guestsMode === 'watch');
 
-  protected readonly tabs = computed<SegmentedOption[]>(() => [
-    { value: 'agenda', label: this.i18n.translate('meetings.agenda.title') },
-    { value: 'protocol', label: this.i18n.translate('guests.view.protocol') },
+  /** On a phone the tabs page by swiping, like every phone page with tabs. */
+  protected readonly phone = mediaQuery(MEDIA.phone);
+  protected readonly tabs = computed<TabItem[]>(() => [
+    { id: 'agenda', label: this.i18n.translate('meetings.agenda.title') },
+    { id: 'protocol', label: this.i18n.translate('guests.view.protocol') },
   ]);
 
   private readonly ordered = computed(() =>

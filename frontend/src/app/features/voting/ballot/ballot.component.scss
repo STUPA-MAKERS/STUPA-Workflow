@@ -1,3 +1,4 @@
+@use 'frosted' as *;
 :host {
   display: flex;
   flex-direction: column;
@@ -168,14 +169,21 @@
     font-size: 1.125rem;
   }
 
+  // Floats over the page like the dock of a meeting: frosted glass with a small gap to the
+  // edges and a light shadow, so the options show through it while they scroll under it.
+  // On a wide screen it keeps the width of the column (`--ballot-bar-max`), centred.
   .ballot__bar {
     position: fixed;
-    inset-inline: 0;
-    bottom: var(--app-bottom-inset, 0px);
+    left: 50%;
+    bottom: calc(var(--app-bottom-inset, 0px) + var(--app-bottom-safe-area, env(safe-area-inset-bottom, 0px)) + var(--space-2));
     z-index: var(--z-sticky, 10);
-    padding: var(--space-3) var(--space-4) calc(var(--space-3) + var(--app-bottom-safe-area, env(safe-area-inset-bottom)));
-    border-top: var(--border-width) solid var(--color-border);
-    background: var(--color-surface-2);
+    width: min(calc(100vw - 2 * var(--space-2)), var(--ballot-bar-max, 40rem));
+    padding: var(--space-2);
+    overflow: hidden;
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-md);
+    transform: translateX(-50%);
+    @include frosted(var(--color-surface-2));
   }
 }
 
