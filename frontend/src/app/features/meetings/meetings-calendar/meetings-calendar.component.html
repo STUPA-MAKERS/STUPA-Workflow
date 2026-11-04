@@ -171,35 +171,6 @@
           </article>
         }
       </section>
-
-      @if (upcoming().length) {
-        <app-section [level]="2" [heading]="'meetings.overview.upcoming' | t">
-          <div class="cal__rows" role="list">
-            @for (m of upcoming(); track m.id) {
-              @let st = status(m);
-              <app-list-item
-                role="listitem"
-                class="cal__upRow"
-                [title]="m.title"
-                [selected]="m.date === selectedDay()"
-                (activate)="showMeeting(m)"
-              >
-                <app-date-block lead [date]="day(m)" />
-                <span sub>
-                  <app-status-text [kind]="st.kind">{{ st.key | t }}</app-status-text>
-                  @if (m.gremiumName) {
-                    <span class="cal__dot" aria-hidden="true">·</span><span>{{ m.gremiumName }}</span>
-                  }
-                </span>
-                <span trail class="cal__facts">
-                  <span class="mono cal__time">{{ rowTime(m) }}</span>
-                  <span class="cal__tops">{{ tops(m) }}</span>
-                </span>
-              </app-list-item>
-            }
-          </div>
-        </app-section>
-      }
     </div>
   </aside>
 
