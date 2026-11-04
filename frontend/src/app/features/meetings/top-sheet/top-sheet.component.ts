@@ -44,13 +44,12 @@ import {
   MarkdownImageUploadDirective,
   imageUploadErrorKey,
 } from '@shared/markdown/markdown-image-upload.directive';
-import { resolveI18n } from '@shared/forms/i18n-text';
 import { meetingKeeperLine } from '../keepers.util';
 import { ProtocolBarComponent } from '../protocol-bar/protocol-bar.component';
 import { type LinkedLead, TodoLinkedListComponent } from '../../todos/linked-list/todo-linked-list.component';
-import { formatMoney } from '@shared/format-money';
 import { voteResultResolver } from '../vote-result/vote-result';
 import { applyRawFormat, insertRawTable } from './raw-format';
+import { topApplicationLead } from '../top-application-lead.util';
 
 /** The autosave state of the text of the open item. */
 export type SaveState = 'idle' | 'saving' | 'saved' | 'error';
@@ -163,6 +162,12 @@ export class TopSheetComponent {
    * below the title, and the text without a protocol of the viewer.
    */
   readonly follow = input(false);
+  /**
+   * Show the linked list (the application and the to-dos) below the title. The meeting
+   * page turns it off and shows the list above the sheet, between the votes and the
+   * protocol.
+   */
+  readonly linked = input(true);
   /**
    * The viewer may rename the item (`canChangeAgenda`). A click on the title then opens
    * the title field in place of the heading. An application item keeps the title of its
@@ -378,25 +383,10 @@ export class TopSheetComponent {
     return this.follow() && m.status === 'live' && !!m.currentAgendaItemId && this.top()?.id === m.currentAgendaItemId;
   });
 
-  /**
-   * The row of the application below the title: its title and "Antrag · Entwurf ·
-   * 1.250,00 €". It opens the application in a new tab, so the minutes stay open.
-   */
-  protected readonly applicationLead = computed<LinkedLead | null>(() => {
-    const t = this.top();
-    if (!t?.applicationId) return null;
-    const parts = [this.i18n.translate('meetings.agenda.kindApplication')];
-    const state = resolveI18n(t.stateLabel, this.i18n.uiLocale());
-    if (state) parts.push(state);
-    const amount = formatMoney(t.amount, this.i18n.formatLocale());
-    if (amount) parts.push(amount);
-    return {
-      icon: 'file',
-      title: t.applicationTitle || t.title || this.i18n.translate('meetings.agenda.untitled'),
-      sub: parts.join(' · '),
-      link: ['/applications', t.applicationId],
-    };
-  });
+  /** The row of the application, the first row of the linked list (`topApplicationLead`). */
+  protected readonly applicationLead = computed<LinkedLead | null>(() =>
+    topApplicationLead(this.top(), this.i18n),
+  );
 
   /** The keeper line of a closed meeting: every minute-taker with the TOPs they wrote. */
   protected readonly keepers = computed(() =>

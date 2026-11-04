@@ -60,10 +60,12 @@
       </p>
     }
 
-    @if (!follow()) {
-      <app-todo-linked-list class="ts__todos" kind="agenda_item" headingId="ts-todos" [showTitle]="false" [targetId]="t.id" [lead]="applicationLead()" />
-    } @else if (applicationLead(); as lead) {
-      <app-todo-linked-list class="ts__todos" kind="agenda_item" headingId="ts-todos" [showTitle]="false" [targetId]="t.id" [items]="[]" [lead]="lead" />
+    @if (linked()) {
+      @if (!follow()) {
+        <app-todo-linked-list class="ts__todos" kind="agenda_item" headingId="ts-todos" [showTitle]="false" [targetId]="t.id" [lead]="applicationLead()" />
+      } @else if (applicationLead(); as lead) {
+        <app-todo-linked-list class="ts__todos" kind="agenda_item" headingId="ts-todos" [showTitle]="false" [targetId]="t.id" [items]="[]" [lead]="lead" />
+      }
     }
 
     @if (follow()) {

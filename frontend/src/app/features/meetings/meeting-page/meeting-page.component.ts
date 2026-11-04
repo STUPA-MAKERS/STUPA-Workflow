@@ -52,6 +52,8 @@ import { voteOptionLabel } from '../meetings-display.util';
 import { openWindowClock, openWindowState, openWindowWhen } from '../open-window.util';
 import { JoinQrComponent } from '../public-join/join-qr.component';
 import { MeetingHeadComponent } from '../meeting-head/meeting-head.component';
+import { topApplicationLead } from '../top-application-lead.util';
+import { TodoLinkedListComponent } from '../../todos/linked-list/todo-linked-list.component';
 import { clock, weekdayDate } from '@shared/date-format';
 
 /** The ids of the session menu. */
@@ -97,6 +99,7 @@ type SessionAction = 'prep' | 'settings' | 'attendance' | 'keeper' | 'beamer' | 
     PrepChecklistComponent,
     SessionDockComponent,
     TopSheetComponent,
+    TodoLinkedListComponent,
     VoteCardComponent,
     AttendanceSheetComponent,
     JoinQrComponent,
@@ -238,6 +241,12 @@ export class MeetingPageComponent {
     const m = this.meeting();
     return m.status === 'planned' && (m.canControl || m.canManage) && this.prepItem();
   });
+
+  /**
+   * The row of the application of the open item, the first row of the linked list above
+   * the sheet (`topApplicationLead`).
+   */
+  protected readonly applicationLead = computed(() => topApplicationLead(this.top(), this.i18n));
 
   /** "Studierendenparlament · Di, 29.09.2026 · seit 18:04". */
   protected readonly subLine = computed(() => {

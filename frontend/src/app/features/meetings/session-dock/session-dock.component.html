@@ -15,60 +15,62 @@
   </div>
 }
 
-<div class="sd">
-  @if (m.status === 'planned') {
-    <div class="sd__state">
-      <span class="sd__small">{{ 'meetings.dock.notStarted' | t }}</span>
-      <span class="sd__strong">{{ 'meetings.dock.topsPrepared' | t: { n: agenda().length } }}</span>
-    </div>
-  } @else if (m.status === 'closed') {
-    <div class="sd__state">
-      <span class="sd__small">{{ closedLine() }}</span>
-      <span class="sd__strong">{{ agenda().length === 1 ? ('meetings.dock.topsOne' | t) : ('meetings.dock.tops' | t: { n: agenda().length }) }}</span>
-    </div>
-  } @else {
-    <div class="sd__nav">
-      <app-button variant="text" [iconOnly]="true" [disabled]="!hasPrev()" [ariaLabel]="'meetings.dock.prev' | t" (click)="step.emit(-1)"><app-icon name="left" /></app-button>
-      <span class="sd__pos">
-        <span class="sd__small">{{ 'meetings.dock.top' | t }}</span>
-        <span class="sd__strong num">
-          @if (topIndex() >= 0) {
-            {{ 'meetings.dock.of' | t: { n: topIndex() + 1, m: agenda().length } }}
-          } @else {
-            {{ 'meetings.dock.none' | t }}
-          }
+@if (!phone() || m.status !== 'planned') {
+  <div class="sd">
+    @if (m.status === 'planned') {
+      <div class="sd__state">
+        <span class="sd__small">{{ 'meetings.dock.notStarted' | t }}</span>
+        <span class="sd__strong">{{ 'meetings.dock.topsPrepared' | t: { n: agenda().length } }}</span>
+      </div>
+    } @else if (m.status === 'closed') {
+      <div class="sd__state">
+        <span class="sd__small">{{ closedLine() }}</span>
+        <span class="sd__strong">{{ agenda().length === 1 ? ('meetings.dock.topsOne' | t) : ('meetings.dock.tops' | t: { n: agenda().length }) }}</span>
+      </div>
+    } @else {
+      <div class="sd__nav">
+        <app-button variant="text" [iconOnly]="true" [disabled]="!hasPrev()" [ariaLabel]="'meetings.dock.prev' | t" (click)="step.emit(-1)"><app-icon name="left" /></app-button>
+        <span class="sd__pos">
+          <span class="sd__small">{{ 'meetings.dock.top' | t }}</span>
+          <span class="sd__strong num">
+            @if (topIndex() >= 0) {
+              {{ 'meetings.dock.of' | t: { n: topIndex() + 1, m: agenda().length } }}
+            } @else {
+              {{ 'meetings.dock.none' | t }}
+            }
+          </span>
         </span>
-      </span>
-      <app-button variant="text" [iconOnly]="true" [disabled]="!hasNext()" [ariaLabel]="'meetings.dock.next' | t" (click)="step.emit(1)"><app-icon name="right" /></app-button>
-    </div>
-    <span class="sd__vr" aria-hidden="true"></span>
-    <div class="sd__mid">
-      @if (nowElsewhere(); as now) {
-        <span class="sd__now">{{ 'meetings.dock.nowRunning' | t: { top: now.label } }}</span>
-        <app-button size="sm" variant="tonal" (click)="jumpNow.emit(now.item.id)">{{ 'meetings.dock.backToNow' | t }}</app-button>
-      } @else if (myVote(); as choice) {
-        <span class="sd__vote">
-          <app-icon name="vote" [size]="18" />
-          <span>{{ 'meetings.dock.yourVote' | t }}: <strong>{{ choice }}</strong></span>
-        </span>
-      }
-    </div>
-  }
+        <app-button variant="text" [iconOnly]="true" [disabled]="!hasNext()" [ariaLabel]="'meetings.dock.next' | t" (click)="step.emit(1)"><app-icon name="right" /></app-button>
+      </div>
+      <span class="sd__vr" aria-hidden="true"></span>
+      <div class="sd__mid">
+        @if (nowElsewhere(); as now) {
+          <span class="sd__now">{{ 'meetings.dock.nowRunning' | t: { top: now.label } }}</span>
+          <app-button size="sm" variant="tonal" (click)="jumpNow.emit(now.item.id)">{{ 'meetings.dock.backToNow' | t }}</app-button>
+        } @else if (myVote(); as choice) {
+          <span class="sd__vote">
+            <app-icon name="vote" [size]="18" />
+            <span>{{ 'meetings.dock.yourVote' | t }}: <strong>{{ choice }}</strong></span>
+          </span>
+        }
+      </div>
+    }
 
-  @if (!phone()) {
-    <span class="sd__spacer"></span>
+    @if (!phone()) {
+      <span class="sd__spacer"></span>
 
-    <div class="sd__chips">
-      @if (m.status === 'live') {
-        <ng-container [ngTemplateOutlet]="presentChip" />
-        <ng-container [ngTemplateOutlet]="keeperChip" />
-      } @else {
-        <ng-container [ngTemplateOutlet]="keeperChip" />
-        <ng-container [ngTemplateOutlet]="presentChip" />
-      }
-    </div>
-  }
-</div>
+      <div class="sd__chips">
+        @if (m.status === 'live') {
+          <ng-container [ngTemplateOutlet]="presentChip" />
+          <ng-container [ngTemplateOutlet]="keeperChip" />
+        } @else {
+          <ng-container [ngTemplateOutlet]="keeperChip" />
+          <ng-container [ngTemplateOutlet]="presentChip" />
+        }
+      </div>
+    }
+  </div>
+}
 
 <ng-template #presentChip>
   <button

@@ -1,5 +1,6 @@
 @use 'breakpoints' as bp;
 @use 'scroll-fade' as fade;
+@use 'frosted' as *;
 
 :host {
   display: flex;
@@ -101,6 +102,12 @@
   flex: 1 1 auto;
   min-height: 24rem;
 }
+// The application and the to-dos of the item sit above the sheet, so the sheet holds only
+// the protocol.
+.mp__linked {
+  flex: none;
+  margin-bottom: var(--space-3);
+}
 .mp__prep {
   flex: 1 1 auto;
   border-radius: var(--radius-2xl);
@@ -196,17 +203,20 @@
     bottom: var(--app-bottom-inset, 0px);
     z-index: var(--z-sticky, 10);
     margin: 0;
-    background: var(--color-surface-2);
     padding-bottom: var(--app-bottom-safe-area, env(safe-area-inset-bottom));
+    // Frosted glass like the bar at the top: the protocol scrolls under the dock from above
+    // and on under the navigation bar, so the glass reaches past both edges, and a light
+    // shadow lifts the dock off it.
+    @include frosted(var(--color-surface-2));
+    box-shadow: var(--shadow-md-up);
   }
-  // Frosted glass like the bar at the top: the protocol scrolls under the dock and shows
-  // through blurred. Without `backdrop-filter` the dock stays solid.
-  @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
-    .mp__dock {
-      background: color-mix(in srgb, var(--color-surface-2) 55%, transparent);
-      -webkit-backdrop-filter: blur(10px) saturate(1.8);
-      backdrop-filter: blur(10px) saturate(1.8);
-    }
+  // Before the opening the dock only says "Noch nicht eröffnet", which the status in the
+  // head already says, so it shows nothing there (`SessionDockComponent`).
+  .mp__dock--quiet {
+    box-shadow: none;
+  }
+  .mp__dock--quiet::before {
+    display: none;
   }
 }
 
