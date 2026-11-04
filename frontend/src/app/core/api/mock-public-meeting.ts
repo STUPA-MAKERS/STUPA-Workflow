@@ -14,6 +14,9 @@
  * - `MOCKJOIN`: no request of this device yet (the form).
  * - `MOCKWAIT`: pending. `MOCKREJECT`: rejected, 150 s until a new request.
  * - `MOCKOFF`: no longer public. `MOCKCLOSED`: closed. Any other code: unknown.
+ *
+ * Member side: `GET /meetings/join/{code}` knows only `MOCKMEMBER`, the live meeting
+ * `d…0001`. Every other code gives 404, so a logged-in mock user stays on the guest page.
  */
 import type {
   GuestAgendaItem,
@@ -102,6 +105,12 @@ const problem = (status: number, code: string): MockReply => ({ status, problem:
 
 /** The lead routes: `/meetings/{id}/guests…`, `/join-link`, `/join-code/rotate`. */
 export function mockLeadGuests(method: string, p: string, body: unknown): MockReply | null {
+  const join = /\/meetings\/join\/([^/]+)$/.exec(p);
+  if (method === 'GET' && join) {
+    return join[1] === 'MOCKMEMBER'
+      ? { status: 200, body: { meetingId: 'd0000000-0000-0000-0000-000000000001' } }
+      : problem(404, 'join_code_unknown');
+  }
   if (method === 'GET' && /\/meetings\/[^/]+\/guests$/.test(p)) {
     return { status: 200, body: GUESTS.filter((g) => g.status !== 'rejected') };
   }

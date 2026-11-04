@@ -15,8 +15,10 @@ The rules:
   (`source='lead'`), `absent` included. A record that the lead set wins: the
   member cannot change it any more (409 `attendance_set_by_lead`) until the lead
   resets it to "open" with a delete of the record.
-- Nobody can set a member `present` while a delegation of that member for the
-  meeting exists (409 `delegation_active`): not the lead, and not the member
+- A check-in (`present`) of a member frees a seat that a pool substitute took
+  for the member (`delegations.pool_seat`).
+- Nobody can set a member `present` while another delegation of that member for
+  the meeting exists (409 `delegation_active`): not the lead, and not the member
   with the own report. The delegation must be revoked first. The delegator can
   revoke it only before the meeting start. During the live meeting, the meeting
   lead (`can_manage`) can revoke it, for example a substitution that the lead
@@ -41,6 +43,7 @@ from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.delegations.models import MeetingDelegation
+from app.modules.delegations.pool_seat import release_pool_seat
 from app.modules.livevote.keepers import (
     KEEPER_PERMISSION,
     VOTE_PERMISSION,
@@ -357,7 +360,7 @@ class AttendanceService:
                 "The meeting lead set this attendance. Only the lead can change it.",
                 code="attendance_set_by_lead",
             )
-        if status == "present" and await self._has_delegation(meeting_id, member.id):
+        if status == "present" and await self._delegated(meeting_id, member.id, requester_sub):
             raise ConflictError(_DELEGATION_ACTIVE, code="delegation_active")
         self._write(
             existing,
@@ -417,6 +420,16 @@ class AttendanceService:
         )
         await self._flush_write()
 
+    async def _delegated(self, meeting_id: UUID, principal_id: UUID, actor_sub: str) -> bool:
+        """Free a pool seat of the member, then tell whether a delegation remains.
+
+        A check-in frees the seat that a pool substitute took for the member
+        (`release_pool_seat`). A delegation that the member gave or that the lead
+        entered stays and refuses the check-in.
+        """
+        await release_pool_seat(self.session, meeting_id, principal_id, actor_sub)
+        return await self._has_delegation(meeting_id, principal_id)
+
     async def _has_delegation(self, meeting_id: UUID, principal_id: UUID) -> bool:
         """Return True when the member delegated for this meeting."""
         found = (
@@ -455,7 +468,7 @@ class AttendanceService:
         members = await self._current_members(meeting.gremium_id)
         if not any(m.id == principal_id for m in members):
             raise NotFoundError("principal is not a current member of this committee")
-        if status == "present" and await self._has_delegation(meeting_id, principal_id):
+        if status == "present" and await self._delegated(meeting_id, principal_id, requester_sub):
             raise ConflictError(_DELEGATION_ACTIVE, code="delegation_active")
         existing = await self._record(meeting_id, principal_id)
         before = existing.status if existing is not None else None

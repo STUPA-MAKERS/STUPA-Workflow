@@ -40,7 +40,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, or_, select, text
+from sqlalchemy import ColumnElement, and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
@@ -58,6 +58,11 @@ from app.modules.delegations.models import (
 from app.modules.delegations.pool import (
     substitute_gremien_for_sub,
     substitutes_for,
+)
+from app.modules.delegations.pool_seat import (
+    lock_meeting_delegations,
+    pool_seat_clause,
+    pool_seat_for,
 )
 from app.modules.delegations.schemas import (
     DelegationCreate,
@@ -88,11 +93,6 @@ _POOL_MANAGE_PERM = "session.manage"
 #: Attendance states in which a member counts as missing. No record counts
 #: as missing too.
 _MISSING_STATES = frozenset({"excused", "absent"})
-#: Advisory-lock base key. It serializes the create per meeting, so a concurrent
-#: insert cannot race the read-then-insert check of the no-chains rule. The lock
-#: takes this key and a derivation of the meeting id as two int4 arguments. The
-#: value spells "DELE" in ASCII.
-_CREATE_LOCK_KEY = 0x4445_4C45
 
 
 def _escape_like(needle: str) -> str:
@@ -172,7 +172,8 @@ async def voting_delegation_check(
     no delegation.
 
     * An outgoing row with `delegate_voting` blocks the caller. The transfer lets
-      only the recipient vote.
+      only the recipient vote. A pool seat (`pool_seat.py`) does not block: the own
+      ballot of the member frees it.
     * An incoming row with `delegate_voting` returns the `sub` of the delegator.
       The caller may then cast one delegated ballot next to the own ballot. That
       ballot runs under `delegator_sub`, so it is a transfer and not a duplicate.
@@ -193,17 +194,23 @@ async def voting_delegation_check(
         return False, None
     pid_subq = select(PrincipalRow.id).where(PrincipalRow.sub == sub).scalar_subquery()
     delegator = aliased(PrincipalRow)
+    delegate = aliased(PrincipalRow)
+    is_delegator = MeetingDelegation.delegator_principal_id == pid_subq
     rows = (
         await session.execute(
             select(
-                MeetingDelegation.delegator_principal_id == pid_subq,
-                MeetingDelegation.delegate_voting,
+                is_delegator,
+                and_(
+                    MeetingDelegation.delegate_voting,
+                    or_(~is_delegator, ~pool_seat_clause(delegate)),
+                ),
                 delegator.sub,
             )
             .join(
                 delegator,
                 delegator.id == MeetingDelegation.delegator_principal_id,
             )
+            .join(delegate, delegate.id == MeetingDelegation.delegate_principal_id)
             .where(
                 MeetingDelegation.meeting_id == meeting_id,
                 MeetingDelegation.gremium_id == gremium_id,
@@ -615,12 +622,7 @@ class DelegationService:
                 recipient already carries a delegated vote (409).
             ValidationProblem: The delegation would build a chain (422).
         """
-        meeting_lock_arg = int.from_bytes(meeting.id.bytes[:4], "big") - 0x8000_0000
-        await self.session.execute(
-            text("SELECT pg_advisory_xact_lock(:k1, :k2)").bindparams(
-                k1=_CREATE_LOCK_KEY, k2=meeting_lock_arg
-            )
-        )
+        await lock_meeting_delegations(self.session, meeting.id)
         existing = (
             await self.session.execute(
                 select(
@@ -960,7 +962,12 @@ class DelegationService:
         return out
 
     async def vote_status(self, vote_id: UUID, actor: Principal) -> VoteDelegationStatus:
-        """Return the delegation view of one vote for the frontend banner."""
+        """Return the delegation view of one vote for the frontend banner.
+
+        A pool seat does not block the member. A pool substitute without a voting
+        delegation exercises the free seat that its represented ballot would take
+        (`pool_seat_for`), so the ballot shows the proxy row for that member.
+        """
         vote = await self.session.get(Vote, vote_id)
         if vote is None:
             raise NotFoundError(f"vote {vote_id} not found")
@@ -974,34 +981,40 @@ class DelegationService:
             gremium_id = UUID(vote.eligible_group)
         except (ValueError, TypeError):
             return empty
+        delegate = aliased(PrincipalRow)
         rows = (
-            (
-                await self.session.execute(
-                    select(MeetingDelegation).where(
-                        MeetingDelegation.meeting_id == vote.meeting_id,
-                        MeetingDelegation.gremium_id == gremium_id,
-                        MeetingDelegation.delegate_voting.is_(True),
-                        or_(
-                            MeetingDelegation.delegator_principal_id == me.id,
-                            MeetingDelegation.delegate_principal_id == me.id,
-                        ),
-                    )
+            await self.session.execute(
+                select(MeetingDelegation, pool_seat_clause(delegate))
+                .join(delegate, delegate.id == MeetingDelegation.delegate_principal_id)
+                .where(
+                    MeetingDelegation.meeting_id == vote.meeting_id,
+                    MeetingDelegation.gremium_id == gremium_id,
+                    MeetingDelegation.delegate_voting.is_(True),
+                    or_(
+                        MeetingDelegation.delegator_principal_id == me.id,
+                        MeetingDelegation.delegate_principal_id == me.id,
+                    ),
                 )
             )
-            .scalars()
-            .all()
-        )
+        ).all()
         blocked = False
         exercising = False
         delegated_to: UUID | None = None
         delegated_by: UUID | None = None
-        for d in rows:
-            if d.delegator_principal_id == me.id:
-                blocked = True
-                delegated_to = d.delegate_principal_id
-            else:
+        for d, seat in rows:
+            if d.delegator_principal_id != me.id:
                 exercising = True
                 delegated_by = d.delegator_principal_id
+            elif not seat:
+                blocked = True
+                delegated_to = d.delegate_principal_id
+        if not exercising:
+            free = await pool_seat_for(
+                self.session, actor.sub, vote.meeting_id, vote.eligible_group, datetime.now(UTC)
+            )
+            if free is not None:
+                exercising = True
+                delegated_by = free.id
         names = await self._names({i for i in (delegated_to, delegated_by) if i})
         return VoteDelegationStatus(
             blocked=blocked,

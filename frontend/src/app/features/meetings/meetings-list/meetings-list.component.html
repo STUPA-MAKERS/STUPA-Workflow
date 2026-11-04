@@ -1,176 +1,134 @@
-<div class="mtl" [class.mtl--split]="split()">
-  <app-list-detail [detailOpen]="selParam() !== null" (back)="clearSelection()">
-    <section list class="ld-pane" aria-labelledby="mtl-title">
-      <app-page-header [pane]="true" titleId="mtl-title" [title]="'meetings.title' | t">
-        <ng-container ngProjectAs="[actions]">
-          @if (phone()) {
-            <app-row-menu
-              [label]="'meetings.overview.menu' | t"
-              [sections]="phoneMenu()"
-              (selected)="onPhoneMenu($event, abo)"
-            />
-          } @else {
-            <app-meetings-view-actions
-              view="list"
-              [showSwitch]="showSwitch()"
-              [abo]="abo"
-              (viewChange)="viewChange.emit($event)"
-            />
-          }
-          <app-calendar-subscribe #abo />
-        </ng-container>
-      </app-page-header>
+<div class="mtl">
+  <section class="ld-pane" aria-labelledby="mtl-title">
+    <app-page-header [pane]="true" titleId="mtl-title" [title]="'meetings.title' | t">
+      <ng-container ngProjectAs="[actions]">
+        @if (phone()) {
+          <app-row-menu
+            [label]="'meetings.overview.menu' | t"
+            [sections]="phoneMenu()"
+            (selected)="onPhoneMenu($event, abo)"
+          />
+        } @else {
+          <app-meetings-view-actions
+            view="list"
+            [showSwitch]="showSwitch()"
+            [abo]="abo"
+            (viewChange)="viewChange.emit($event)"
+          />
+        }
+        <app-calendar-subscribe #abo />
+      </ng-container>
+    </app-page-header>
 
-      <app-sticky-bar class="ld-pane__filters">
-        <app-search-pill
-          [size]="phone() ? 'md' : 'lg'"
-          [placeholder]="(phone() ? 'meetings.overview.searchShort' : 'meetings.list.searchPlaceholder') | t"
-          [label]="'meetings.list.searchPlaceholder' | t"
-          [value]="timeline.searchQuery()"
-          (valueChange)="timeline.onSearch($event)"
+    <app-sticky-bar class="ld-pane__filters">
+      <app-search-pill
+        [size]="phone() ? 'md' : 'lg'"
+        [placeholder]="(phone() ? 'meetings.overview.searchShort' : 'meetings.list.searchPlaceholder') | t"
+        [label]="'meetings.list.searchPlaceholder' | t"
+        [value]="timeline.searchQuery()"
+        (valueChange)="timeline.onSearch($event)"
+      />
+      @if (timeline.showGremiumFilter() || timeline.filterPending()) {
+        <div class="mtl__chips" [attr.inert]="timeline.showGremiumFilter() ? null : ''">
+          <app-filter-select
+            class="mtl__chip"
+            icon="building"
+            [label]="'meetings.list.committeeFilter' | t"
+            [options]="timeline.filterGremiumOptions()"
+            [value]="timeline.gremiumFilter()"
+            (valueChange)="timeline.selectGremiumFilter($event)"
+            [text]="timeline.gremiumFilterLabel()"
+            [active]="timeline.gremiumFilter() !== ''"
+          />
+        </div>
+      }
+      @if (timeline.reloadingList()) {
+        <span class="skel-progress skel-progress--foot" aria-hidden="true"></span>
+      }
+    </app-sticky-bar>
+
+    <div
+      class="mtl__scroll"
+      appPullRefresh
+      [pullRefreshBusy]="timeline.listBusy()"
+      (appPullRefresh)="timeline.refreshList()"
+      appScrollFade="y"
+      [attr.aria-busy]="timeline.reloadingList() || null"
+    >
+      @if (timeline.loadingList()) {
+        <div class="mtl__skel skel-in">
+          <app-list-group skeleton="7rem" />
+          <app-skeleton
+            class="mtl__skelRows"
+            variant="items"
+            [count]="10"
+            [lead]="true"
+            [grouped]="true"
+            [label]="'meetings.list.loading' | t"
+          />
+        </div>
+      } @else if (timeline.searchActive()) {
+        @if (timeline.searchItems().length) {
+          <section class="mtl__group" [attr.aria-label]="'meetings.overview.hits' | t">
+            <div class="mtl__rows rowgroup" role="list">
+              @for (m of timeline.searchItems(); track m.id) {
+                <ng-container *ngTemplateOutlet="row; context: { $implicit: m, past: m.status === 'closed' }" />
+              }
+            </div>
+          </section>
+        }
+        @if (timeline.searchEmpty()) {
+          <app-empty-state shape="date" [heading]="'meetings.list.searchEmpty' | t" />
+        }
+        @if (timeline.searchHasMore() || timeline.loadingSearch()) {
+          <div class="mtl__more">
+            <app-button variant="text" size="sm" [loading]="timeline.loadingSearch()" (click)="timeline.loadMoreSearch()">
+              <app-icon name="down" />
+              {{ 'meetings.list.loadMore' | t }}
+            </app-button>
+          </div>
+        }
+      } @else if (!groups().length) {
+        <app-empty-state shape="date"
+          [heading]="'meetings.overview.empty' | t"
+          [body]="(canCreate() ? 'meetings.overview.emptyCreate' : 'meetings.overview.emptyBody') | t"
         />
-        @if (timeline.showGremiumFilter() || timeline.filterPending()) {
-          <div class="mtl__chips" [attr.inert]="timeline.showGremiumFilter() ? null : ''">
-            <app-filter-select
-              class="mtl__chip"
-              icon="building"
-              [label]="'meetings.list.committeeFilter' | t"
-              [options]="timeline.filterGremiumOptions()"
-              [value]="timeline.gremiumFilter()"
-              (valueChange)="timeline.selectGremiumFilter($event)"
-              [text]="timeline.gremiumFilterLabel()"
-              [active]="timeline.gremiumFilter() !== ''"
-            />
-          </div>
+        @if (timeline.hasMorePast()) {
+          <ng-container *ngTemplateOutlet="loadPast" />
         }
-        @if (timeline.reloadingList()) {
-          <span class="skel-progress skel-progress--foot" aria-hidden="true"></span>
+      } @else {
+        <div class="mtl__groups" animate.enter="motion-fade-in" [class.skel-stale]="timeline.reloadingList()" [attr.inert]="timeline.reloadingList() ? '' : null">
+        @if (!hasUpcoming()) {
+          <app-empty-state shape="date" class="mtl__upcoming" rows="2" [heading]="'meetings.list.noUpcoming' | t" />
         }
-      </app-sticky-bar>
-
-      <div
-        class="mtl__scroll"
-        appPullRefresh
-        [pullRefreshBusy]="timeline.listBusy()"
-        (appPullRefresh)="timeline.refreshList()"
-        appScrollFade="y"
-        [attr.aria-busy]="timeline.reloadingList() || null"
-      >
-        @if (timeline.loadingList()) {
-          <div class="mtl__skel skel-in">
-            <app-list-group skeleton="7rem" />
-            <app-skeleton
-              class="mtl__skelRows"
-              variant="items"
-              [count]="10"
-              [lead]="true"
-              [grouped]="!split()"
-              [label]="'meetings.list.loading' | t"
-            />
-          </div>
-        } @else if (timeline.searchActive()) {
-          @if (timeline.searchItems().length) {
-            <section class="mtl__group" [attr.aria-label]="'meetings.overview.hits' | t">
-              <div class="mtl__rows" [class.rowgroup]="!split()" role="list">
-                @for (m of timeline.searchItems(); track m.id) {
-                  <ng-container *ngTemplateOutlet="row; context: { $implicit: m, past: m.status === 'closed' }" />
-                }
-              </div>
-            </section>
-          }
-          @if (timeline.searchEmpty()) {
-            <app-empty-state shape="date" [heading]="'meetings.list.searchEmpty' | t" />
-          }
-          @if (timeline.searchHasMore() || timeline.loadingSearch()) {
+        @for (g of groups(); track g.key) {
+          <app-list-group [label]="groupLabel(g)">
+            <div class="mtl__rows rowgroup" role="list">
+              @for (m of g.items; track m.id) {
+                <ng-container *ngTemplateOutlet="row; context: { $implicit: m, past: g.kind === 'past' }" />
+              }
+            </div>
+          </app-list-group>
+          @if (g.kind !== 'past' && timeline.upcomingHasMore() && ($last || groups()[$index + 1].kind === 'past')) {
             <div class="mtl__more">
-              <app-button variant="text" size="sm" [loading]="timeline.loadingSearch()" (click)="timeline.loadMoreSearch()">
+              <app-button variant="text" size="sm" [loading]="timeline.loadingUpcoming()" (click)="timeline.loadMoreUpcoming()">
                 <app-icon name="down" />
                 {{ 'meetings.list.loadMore' | t }}
               </app-button>
             </div>
           }
-        } @else if (!groups().length) {
-          <app-empty-state shape="date"
-            [heading]="'meetings.overview.empty' | t"
-            [body]="(canCreate() ? 'meetings.overview.emptyCreate' : 'meetings.overview.emptyBody') | t"
-          />
-          @if (timeline.hasMorePast()) {
-            <ng-container *ngTemplateOutlet="loadPast" />
-          }
-        } @else {
-          <div class="mtl__groups" animate.enter="motion-fade-in" [class.skel-stale]="timeline.reloadingList()" [attr.inert]="timeline.reloadingList() ? '' : null">
-          @if (!hasUpcoming()) {
-            <app-empty-state shape="date" class="mtl__upcoming" rows="2" [heading]="'meetings.list.noUpcoming' | t" />
-          }
-          @for (g of groups(); track g.key) {
-            <app-list-group [label]="groupLabel(g)">
-              <div class="mtl__rows" [class.rowgroup]="!split()" role="list">
-                @for (m of g.items; track m.id) {
-                  <ng-container *ngTemplateOutlet="row; context: { $implicit: m, past: g.kind === 'past' }" />
-                }
-              </div>
-            </app-list-group>
-            @if (g.kind !== 'past' && timeline.upcomingHasMore() && ($last || groups()[$index + 1].kind === 'past')) {
-              <div class="mtl__more">
-                <app-button variant="text" size="sm" [loading]="timeline.loadingUpcoming()" (click)="timeline.loadMoreUpcoming()">
-                  <app-icon name="down" />
-                  {{ 'meetings.list.loadMore' | t }}
-                </app-button>
-              </div>
-            }
-          }
-          @if (timeline.hasMorePast()) {
-            <ng-container *ngTemplateOutlet="loadPast" />
-          }
-          </div>
         }
-      </div>
-
-      @if (canCreate()) {
-        <app-fab [label]="'fab.meeting' | t" [contained]="split()" (activate)="create.emit()" />
-      }
-    </section>
-
-    <div detail class="mtl__detail">
-      @if (selected(); as m) {
-        <app-meeting-detail-sheet
-          [meeting]="m"
-          [split]="split()"
-          [phone]="phone()"
-          (edit)="edit($event)"
-          (remove)="remove($event)"
-          (beamer)="beamer($event)"
-        />
-      } @else if (selError(); as e) {
-        @if (e.id === selParam()) {
-          <div class="mtl__none" role="alert">
-            @if (e.kind === 'forbidden') {
-              <app-empty-state plain icon="lock"
-                fill
-                [heading]="'meetings.overview.selForbidden' | t"
-                [body]="'meetings.overview.selForbiddenBody' | t"
-              />
-            } @else {
-              <app-empty-state plain icon="alert"
-                fill
-                [heading]="'meetings.overview.selFailed' | t"
-                [body]="'meetings.overview.selFailedBody' | t"
-              >
-                <app-button variant="tonal" size="sm" (click)="retrySelected()">
-                  <app-icon name="repeat" />
-                  {{ 'meetings.overview.selRetry' | t }}
-                </app-button>
-              </app-empty-state>
-            }
-          </div>
+        @if (timeline.hasMorePast()) {
+          <ng-container *ngTemplateOutlet="loadPast" />
         }
-      } @else if (split()) {
-        <div class="mtl__none">
-          <app-empty-state plain icon="users" fill [heading]="'meetings.overview.none' | t" />
         </div>
       }
     </div>
-  </app-list-detail>
+
+    @if (canCreate()) {
+      <app-fab [label]="'fab.meeting' | t" (activate)="create.emit()" />
+    }
+  </section>
 </div>
 
 <ng-template #loadPast>
@@ -188,10 +146,8 @@
     class="mtl__row"
     role="listitem"
     [title]="m.title"
-    [selected]="split() && selected()?.id === m.id"
     [wrap]="phone()"
-    (activate)="select(m)"
-    (dblclick)="open(m.id)"
+    (activate)="open(m.id)"
   >
     <app-date-block lead [date]="day(m)" [live]="m.status === 'live'" [muted]="past" />
     <span sub class="mtl__sub">
@@ -210,9 +166,7 @@
           <span class="mtl__tops">{{ tops(m) }}</span>
         </span>
       }
-      @if (!split()) {
-        <app-row-chevron />
-      }
+      <app-row-chevron />
     </span>
   </app-list-item>
 </ng-template>

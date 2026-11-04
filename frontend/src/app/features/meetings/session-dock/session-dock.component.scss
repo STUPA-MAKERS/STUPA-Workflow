@@ -8,7 +8,10 @@
 }
 
 // The page makes the dock frosted glass (`MeetingPageComponent`), so the dock has no surface.
+// The dock is glass (`MeetingPageComponent`): its chips and tonal buttons are neutral
+// overlays of it (`glass-content`).
 .sd {
+  @include glass-content;
   display: flex;
   align-items: center;
   gap: 6px;

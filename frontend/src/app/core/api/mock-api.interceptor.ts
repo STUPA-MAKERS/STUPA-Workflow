@@ -1013,7 +1013,7 @@ const MOCK_PLANNED_MEETING: MeetingOutWire = {
   publicJoinAllowed: false,
   votes: [],
   createdAt: '2026-06-01T10:00:00Z',
-  /** The demo user leads it and nobody keeps the minutes yet: the preparation shows. */
+  /** The demo user leads it and nobody keeps the minutes yet: "Sitzung eröffnen" in the menu says why it is disabled. */
   protocolId: null,
   protokollantId: null,
   protokollantName: null,
@@ -1641,7 +1641,7 @@ const MOCK_ACCOUNT_PATH =
 
 /** The routes of the public meeting: the guest side and the lead side. */
 const PUBLIC_MEETING_PATH =
-  /\/public\/meetings\/|\/meetings\/[^/]+\/(guests(\/[^/]+)*|join-link|join-code\/rotate)$/;
+  /\/public\/meetings\/|\/meetings\/join\/[^/]+$|\/meetings\/[^/]+\/(guests(\/[^/]+)*|join-link|join-code\/rotate)$/;
 
 /** The public protocol routes (`mock-public-protocols.ts`). */
 const PUBLIC_PROTOCOLS_PATH = /\/public\/(gremien|protocols)(\/|$)/;

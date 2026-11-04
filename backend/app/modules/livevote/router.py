@@ -45,6 +45,7 @@ from app.modules.livevote.schemas import (
     AttendanceSetBody,
     GuestNameBody,
     JoinLinkOut,
+    JoinTargetOut,
     MeetingCreate,
     MeetingDefaultsOut,
     MeetingGremiumOut,
@@ -347,6 +348,27 @@ async def list_meeting_filter_gremien(
     must precede ``/meetings/{meeting_id}``, or the UUID path captures ``gremien``.
     """
     return await service.list_filter_gremien(principal)
+
+
+@router.get(
+    "/meetings/join/{code}",
+    response_model=JoinTargetOut,
+    responses=_errors(401, 403, 404),
+)
+async def meeting_of_join_code(
+    code: str, service: ServiceDep, guests: GuestServiceDep, principal: ReaderDep
+) -> JoinTargetOut:
+    """Return the meeting of a join code to a principal who can read it.
+
+    "Mitglied? Mit Konto anmelden" on the join page `/j/{code}` returns there after the
+    login. The page then asks this route and opens the meeting in the app. The code of
+    an open meeting is enough, also when the meeting is no longer public. A closed
+    meeting or an unknown code gives 404 ``join_code_unknown``, a principal without
+    read access 403.
+    """
+    meeting_id = await guests.member_meeting_id(code)
+    await service.assert_can_read(meeting_id, principal)
+    return JoinTargetOut(meetingId=meeting_id)
 
 
 @router.get("/meetings/{meeting_id}", response_model=MeetingOut, responses=_errors(401, 403, 404))

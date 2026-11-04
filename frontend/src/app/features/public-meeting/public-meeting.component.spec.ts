@@ -2,7 +2,8 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, Router, convertToParamMap, type ParamMap } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
-import { BehaviorSubject, of, throwError } from 'rxjs';
+import { signal } from '@angular/core';
+import { BehaviorSubject, type Observable, of, throwError } from 'rxjs';
 import { ApiClient } from '@core/api/api-client.service';
 import { USE_MOCK_API } from '@core/api/api.config';
 import type { GuestMe } from '@core/api/models';
@@ -16,7 +17,20 @@ import { PublicMeetingComponent, normalizeJoinCode } from './public-meeting.comp
 const err = (status: number, code?: string) =>
   new HttpErrorResponse({ status, error: code ? { code } : null });
 
-async function setup(me: GuestMe | HttpErrorResponse, head = guestMe().meeting) {
+/** A fake auth: no session, or the session of a member. */
+function fakeAuth(loggedIn = false) {
+  return {
+    login: jest.fn(),
+    isAuthenticated: signal(loggedIn),
+    ensureLoaded: jest.fn(() => of(loggedIn ? { sub: 'member' } : null)),
+  };
+}
+
+async function setup(
+  me: GuestMe | HttpErrorResponse,
+  head = guestMe().meeting,
+  { loggedIn = false, target = throwError(() => err(403)) as Observable<unknown> } = {},
+) {
   localStorage.setItem('ap.locale', 'de');
   const params = new BehaviorSubject<ParamMap>(convertToParamMap({ code: '7kq-4mp' }));
   const api = {
@@ -26,8 +40,9 @@ async function setup(me: GuestMe | HttpErrorResponse, head = guestMe().meeting) 
     renameGuestMe: jest.fn((_c: string, name: string) => of(guestMe({ status: 'pending', displayName: name, view: null }))),
     leavePublicMeeting: jest.fn(() => of(undefined)),
     castGuestBallot: jest.fn(() => of({ status: 'cast' })),
+    meetingOfJoinCode: jest.fn(() => target),
   };
-  const auth = { login: jest.fn() };
+  const auth = fakeAuth(loggedIn);
   const router = { navigate: jest.fn() };
   const view = await render(PublicMeetingComponent, {
     providers: [
@@ -70,6 +85,28 @@ describe('PublicMeetingComponent', () => {
     expect(screen.getByText(/Fachschaft Informatik · Di, 06\.10\.2026, 18:15/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Mit Konto anmelden' }));
     expect(auth.login).toHaveBeenCalled();
+  });
+
+  it('opens the meeting in the app for a member who comes back from the login', async () => {
+    const { api, router } = await setup(err(401), undefined, {
+      loggedIn: true,
+      target: of({ meetingId: 'm-1' }),
+    });
+    expect(api.meetingOfJoinCode).toHaveBeenCalledWith('7KQ4MP');
+    expect(router.navigate).toHaveBeenCalledWith(['/meetings', 'm-1'], { replaceUrl: true });
+  });
+
+  it('keeps a logged-in non-member a guest, without the login line', async () => {
+    const { api, router } = await setup(err(401), undefined, { loggedIn: true });
+    expect(api.meetingOfJoinCode).toHaveBeenCalledWith('7KQ4MP');
+    expect(router.navigate).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /Beitreten/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Mit Konto anmelden' })).not.toBeInTheDocument();
+  });
+
+  it('asks nothing for the member route without a session', async () => {
+    const { api } = await setup(err(401));
+    expect(api.meetingOfJoinCode).not.toHaveBeenCalled();
   });
 
   it('reports a refused join', async () => {
@@ -198,7 +235,7 @@ describe('PublicMeetingComponent', () => {
     const { fixture } = await render(PublicMeetingComponent, {
       providers: [
         { provide: ApiClient, useValue: api },
-        { provide: AuthService, useValue: { login: jest.fn() } },
+        { provide: AuthService, useValue: fakeAuth() },
         { provide: Router, useValue: { navigate: jest.fn() } },
         { provide: ActivatedRoute, useValue: { paramMap: of(convertToParamMap({})) } },
         { provide: AltchaService, useValue: { solve: () => Promise.resolve(null) } },

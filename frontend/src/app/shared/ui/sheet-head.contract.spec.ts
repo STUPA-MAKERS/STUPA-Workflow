@@ -1,7 +1,7 @@
 /**
  * One head for every detail sheet (`.sheet-head` in `src/styles.scss`).
  *
- * The detail sheets of the meetings, the bookings, the transfers, the invoices, the
+ * The detail sheets of the bookings, the transfers, the invoices, the
  * tickets, the applications and the to-dos each had a copy of the head rule (column,
  * gap, padding, rule) and two of them a copy of the way back to the list. jsdom applies
  * no styles, so this spec reads the sources.
@@ -14,7 +14,6 @@ const read = (path: string) => readFileSync(join(APP, path), 'utf8');
 const global = readFileSync(join(APP, '../styles.scss'), 'utf8');
 
 const SHEETS: [html: string, scss: string, block: string][] = [
-  ['features/meetings/meeting-detail-sheet/meeting-detail-sheet.component.html', 'features/meetings/meeting-detail-sheet/meeting-detail-sheet.component.scss', 'ms'],
   ['pages/expenses/booking-detail/booking-detail.component.html', 'pages/budget/_finance-sheet.scss', 'fd'],
   ['pages/expenses/transfer-detail/transfer-detail.component.html', 'pages/budget/_finance-sheet.scss', 'fd'],
   ['pages/invoices/invoice-detail/invoice-detail.component.html', 'pages/budget/_finance-sheet.scss', 'fd'],
