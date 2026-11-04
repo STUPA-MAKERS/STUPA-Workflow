@@ -1007,6 +1007,16 @@ export class ApiClient {
     return this.http.post<JoinLink>(`${this.base}/meetings/${meetingId}/join-code/rotate`, {});
   }
 
+  /**
+   * GET /meetings/join/{code} — the meeting of a join code, for a logged-in principal who
+   * can read it (403 else, 404 for an unknown code or a closed meeting).
+   */
+  meetingOfJoinCode(code: string): Observable<{ meetingId: Uuid }> {
+    return this.http.get<{ meetingId: Uuid }>(`${this.base}/meetings/join/${code}`, {
+      context: skipLoading(),
+    });
+  }
+
   /** GET /public/meetings/{code} — the head of a public meeting (no login). */
   publicMeeting(code: string): Observable<PublicMeetingHead> {
     return this.http.get<PublicMeetingHead>(`${this.base}/public/meetings/${code}`, {

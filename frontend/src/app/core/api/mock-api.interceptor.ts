@@ -1641,7 +1641,7 @@ const MOCK_ACCOUNT_PATH =
 
 /** The routes of the public meeting: the guest side and the lead side. */
 const PUBLIC_MEETING_PATH =
-  /\/public\/meetings\/|\/meetings\/[^/]+\/(guests(\/[^/]+)*|join-link|join-code\/rotate)$/;
+  /\/public\/meetings\/|\/meetings\/join\/[^/]+$|\/meetings\/[^/]+\/(guests(\/[^/]+)*|join-link|join-code\/rotate)$/;
 
 /** The public protocol routes (`mock-public-protocols.ts`). */
 const PUBLIC_PROTOCOLS_PATH = /\/public\/(gremien|protocols)(\/|$)/;

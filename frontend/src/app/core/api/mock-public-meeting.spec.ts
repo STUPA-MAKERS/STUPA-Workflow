@@ -70,4 +70,14 @@ describe('mock public meeting', () => {
     const s = body<GuestMe>(mockPublicMeeting('GET', '/api/public/meetings/MOCKSECRET/me', null)).view!.votes[0];
     expect(s.myBallot).toEqual({ cast: true, choice: null });
   });
+
+  it('resolves only MOCKMEMBER to a meeting for a member', () => {
+    expect(body<{ meetingId: string }>(mockLeadGuests('GET', '/api/meetings/join/MOCKMEMBER', null))).toEqual({
+      meetingId: 'd0000000-0000-0000-0000-000000000001',
+    });
+    expect(mockLeadGuests('GET', '/api/meetings/join/MOCKJOIN', null)).toEqual({
+      status: 404,
+      problem: { code: 'join_code_unknown' },
+    });
+  });
 });

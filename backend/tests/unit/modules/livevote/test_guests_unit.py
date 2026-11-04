@@ -352,6 +352,13 @@ async def test_meeting_by_code_and_head() -> None:
     assert head.code == "7KQ4MP" and head.gremium_name == "Fachschaft"
 
 
+async def test_member_meeting_id() -> None:
+    with pytest.raises(NotFoundError) as unknown:
+        await GuestService(db()).member_meeting_id("zzz")
+    assert unknown.value.code == "join_code_unknown"
+    assert await GuestService(db(scalars=[MID])).member_meeting_id("7kq-4mp") == MID
+
+
 async def test_resolve_rules() -> None:
     with pytest.raises(UnauthorizedError):
         await GuestService(db()).resolve("7KQ4MP", None)

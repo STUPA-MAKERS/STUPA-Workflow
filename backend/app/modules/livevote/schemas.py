@@ -690,6 +690,12 @@ class JoinLinkOut(_CamelModel):
     qr: QrMatrixOut
 
 
+class JoinTargetOut(_CamelModel):
+    """``GET /meetings/join/{code}`` — the meeting of a join code, for a member."""
+
+    meeting_id: UUID = Field(alias="meetingId")
+
+
 class MeetingDefaultsOut(_CamelModel):
     """``GET /gremien/{id}/meeting-defaults`` — what a new meeting of the gremium allows."""
 
