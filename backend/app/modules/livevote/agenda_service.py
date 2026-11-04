@@ -60,6 +60,7 @@ def title_of(data: dict[str, Any] | None) -> str | None:
     return value.strip() if isinstance(value, str) and value.strip() else None
 
 
+
 def agenda_order() -> tuple[ColumnElement[Any], ...]:
     """Return the sort keys of the agenda order.
 
@@ -183,7 +184,9 @@ class AgendaService:
     async def list(self, meeting_id: UUID) -> list[AgendaItemOut]:
         """List the agenda items of a meeting in their order.
 
-        A free-text item has no application and carries its own title.
+        A free-text item has no application and carries its own title. An application
+        item shows its own title after a rename, else the application title.
+        `applicationTitle` is always the title of the application.
         """
         await self._meeting(meeting_id)
         rows = (
@@ -221,13 +224,15 @@ class AgendaService:
                 if app is not None and app.current_state_id is not None
                 else None
             )
-            title = title_of(app.data) if app is not None else r.title
+            app_title = title_of(app.data) if app is not None else None
+            title = r.title or app_title
             out.append(
                 AgendaItemOut(
                     id=r.id,
                     applicationId=r.application_id,
                     todoId=r.todo_id,
                     title=title,
+                    applicationTitle=app_title,
                     body=r.body,
                     position=r.position,
                     nonPublic=r.non_public,
@@ -250,9 +255,10 @@ class AgendaService:
     ) -> list[AgendaItemOut]:
         """Update the Markdown body, the title or the visibility of an agenda item.
 
-        A `title` renames a free-text item only. An application item keeps the
-        title of its application. `non_public` hides the item content in the
-        public protocol PDF.
+        A `title` renames the item. An application item then shows this title in
+        place of the title of its application. A title equal to the application title
+        removes the own title again, so the item follows later edits of the application.
+        `non_public` hides the item content in the public protocol PDF.
 
         A rename needs a `planned` or `live` meeting. The body and `non_public`
         need a `planned` or `live` meeting, or a closed meeting with a draft protocol.
@@ -269,7 +275,7 @@ class AgendaService:
         """
         meeting = await self._meeting(meeting_id)
         row = await self.item(meeting_id, item_id)
-        renames = title is not None and row.application_id is None
+        renames = title is not None
         if renames:
             self._assert_agenda_open(meeting)
         if body is not None or non_public is not None:
@@ -279,9 +285,11 @@ class AgendaService:
             row.body = body
             if meeting.status == "closed":
                 changed.append("body")
-        if renames and title is not None and title.strip() != row.title:
-            row.title = title.strip()
-            changed.append("title")
+        if title is not None:
+            own = await self._own_title(row, title.strip())
+            if own != row.title:
+                row.title = own
+                changed.append("title")
         if non_public is not None and non_public != row.non_public:
             if non_public and await self._has_guest_vote(row.id):
                 raise ConflictError(
@@ -295,6 +303,16 @@ class AgendaService:
         await self.session.flush()
         await self.session.commit()
         return await self.list(meeting_id)
+
+    async def _own_title(self, row: MeetingAgendaItem, title: str) -> str | None:
+        """Return the title to store for a rename of `row` to `title`.
+
+        An application item stores `None` when `title` is the application title.
+        """
+        if row.application_id is None:
+            return title
+        app = await self.session.get(Application, row.application_id)
+        return None if app is not None and title == title_of(app.data) else title
 
     async def set_done(
         self, meeting_id: UUID, item_id: UUID, *, done: bool, actor: str

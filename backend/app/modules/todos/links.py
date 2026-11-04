@@ -234,9 +234,9 @@ class LinkResolver:
         )
         out: dict[uuid.UUID, Resolved] = {}
         for item, m in visible:
-            title = (
+            title = item.title or (
                 titles.get(item.application_id) if item.application_id is not None else None
-            ) or (item.title or "")
+            ) or ""
             out[item.id] = Resolved(
                 accessible=True,
                 title=title,

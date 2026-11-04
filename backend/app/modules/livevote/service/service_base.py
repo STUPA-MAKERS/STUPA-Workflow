@@ -200,7 +200,7 @@ class MeetingServiceBase:
             item: CurrentAgendaItemOut | None = None
             if hit is not None:
                 position, application_id, title = hit
-                if application_id is not None:
+                if application_id is not None and not title:
                     title = app_titles.get(application_id)
                 item = CurrentAgendaItemOut(position=position, title=title)
             out[meeting.id] = (counts.get(meeting.id, 0), item)

@@ -388,7 +388,10 @@ export interface AgendaItem {
   applicationId: Uuid | null;
   /** The to-do card that the item was made from, or `null`. */
   todoId?: Uuid | null;
+  /** The own title of the item, else the title of its application. */
   title: string | null;
+  /** The title of the application. `null` for a free-text item. */
+  applicationTitle?: string | null;
   /** Markdown text of this agenda item. Each item has its own editor. */
   body?: string | null;
   position: number;

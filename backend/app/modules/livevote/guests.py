@@ -943,7 +943,8 @@ class GuestService:
             GuestAgendaItem(
                 id=item.id,
                 position=position,
-                title=titles.get(item.application_id) if item.application_id else item.title,
+                title=item.title
+                or (titles.get(item.application_id) if item.application_id else None),
                 kind="application" if item.application_id else "freetext",
                 nonPublic=item.non_public,
                 body=None if item.non_public or meeting.status == "planned" else item.body,
