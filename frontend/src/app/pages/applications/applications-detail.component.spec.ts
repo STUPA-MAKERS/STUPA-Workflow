@@ -1107,7 +1107,9 @@ describe('ApplicationsDetailComponent', () => {
     expect(answers.textContent).toContain('1.234,50');
     expect(within(answers).queryByText('Titel')).not.toBeInTheDocument();
     expect(within(answers).queryByText('Leer')).not.toBeInTheDocument();
-    expect(within(answers).getByText('Kostenaufstellung')).toBeInTheDocument();
+    // The cost table has no caption row of its own; its label names the group.
+    expect(within(answers).getByRole('group', { name: 'Kostenaufstellung' })).toBeInTheDocument();
+    expect(within(answers).queryByText('Kostenaufstellung')).toBeNull();
     expect(within(answers).getByText('Bühne')).toBeInTheDocument();
     expect(within(answers).getByRole('heading', { name: 'Weitere Angaben' })).toBeInTheDocument();
     http.verify();

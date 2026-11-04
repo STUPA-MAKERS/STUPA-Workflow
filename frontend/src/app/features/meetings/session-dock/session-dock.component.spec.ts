@@ -57,7 +57,7 @@ describe('SessionDockComponent', () => {
   describe('live', () => {
     it('steps through the agenda and disables the edges', async () => {
       const { on, fixture } = await setup();
-      expect(screen.getByText('1 von 3')).toBeInTheDocument();
+      expect(screen.getByText('1 von 3', { selector: '.sd__strong' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Vorheriger TOP' })).toBeDisabled();
       await userEvent.click(screen.getByRole('button', { name: 'Nächster TOP' }));
       expect(on.step).toHaveBeenCalledWith(1);
@@ -101,7 +101,8 @@ describe('SessionDockComponent', () => {
     it('counts the present members and opens the attendance sheet of the page', async () => {
       const { fixture } = await setup();
       const chip = screen.getByTitle('Anwesenheit');
-      expect(chip).toHaveTextContent('Anwesend 1 von 3');
+      expect(chip).toHaveTextContent('1 von 3');
+      expect(chip).toHaveAccessibleName('Anwesend 1 von 3');
       await userEvent.click(chip);
       expect(fixture.componentInstance.panel()).toBe('attendance');
       expect(chip).toHaveAttribute('aria-expanded', 'true');
@@ -150,13 +151,13 @@ describe('SessionDockComponent', () => {
     it('shows the minute-taker without the handover to a member who neither leads nor keeps the minutes', async () => {
       await setup({ meeting: meeting({ canManage: false, isProtokollant: false }) });
       expect(screen.queryByTitle('Protokollführung übergeben')).toBeNull();
-      expect(screen.getByText('Protokoll: Pia Protokoll')).toBeInTheDocument();
+      expect(screen.getByText('Pia Protokoll')).toBeInTheDocument();
       expect(screen.getByTitle('Protokoll: Pia Protokoll')).toHaveClass('sd__chip--static');
     });
 
     it('offers the handover to the minute-taker', async () => {
       await setup({ meeting: meeting({ canManage: false, isProtokollant: true }) });
-      expect(chip()).toHaveTextContent('Protokoll: Pia Protokoll');
+      expect(chip()).toHaveTextContent('Pia Protokoll');
     });
 
     /** The current minute-taker is marked and is no target. */
@@ -320,7 +321,7 @@ describe('SessionDockComponent', () => {
       expect(keepers.getAttribute('title')).toBe(
         'Protokoll: Pia Protokoll, Mika Mitglied\nSitzung geschlossen — die Protokollführung steht fest.',
       );
-      expect(keepers).toHaveTextContent('Protokoll: Pia Protokoll, Mika Mitglied');
+      expect(keepers).toHaveTextContent('Pia Protokoll, Mika Mitglied');
       expect(keepers.tagName).toBe('SPAN');
       await userEvent.click(screen.getByTitle('Anwesenheit'));
       expect(fixture.componentInstance.panel()).toBe('attendance');
@@ -330,7 +331,7 @@ describe('SessionDockComponent', () => {
       await setup({ meeting: closed({ keeperPeriods: [], closedAt: null }), agenda: [AGENDA[0]] });
       expect(screen.getByText('Geschlossen')).toBeInTheDocument();
       expect(screen.getByText('1 TOP')).toBeInTheDocument();
-      expect(screen.getByText('Protokoll: Pia Protokoll')).toBeInTheDocument();
+      expect(screen.getByText('Pia Protokoll')).toBeInTheDocument();
     });
   });
 
@@ -392,7 +393,8 @@ describe('SessionDockComponent', () => {
     it('counts the guests on the attendance chip and badges the open requests', async () => {
       const { fixture } = await setup({ meeting: meeting({ publicJoin: true, admittedGuests: 7, pendingGuests: 3 }) });
       const chip = screen.getByRole('button', { name: /Anwesend/ });
-      expect(chip).toHaveTextContent(/Anwesend \d+ \+ 7 Gäste/);
+      expect(chip).toHaveTextContent(/^\d+ \+ 7 Gäste/);
+      expect(chip).toHaveAccessibleName(/^Anwesend \d+ \+ 7 Gäste$/);
       expect(within(chip).getByLabelText('3 offene Beitrittsanfragen')).toHaveTextContent('3');
       fixture.componentRef.setInput('meeting', meeting({ publicJoin: false, admittedGuests: 2, pendingGuests: 4, status: 'closed' }));
       fixture.detectChanges();

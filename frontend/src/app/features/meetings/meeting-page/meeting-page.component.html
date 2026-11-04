@@ -12,38 +12,8 @@
   [sub]="subLine() || null"
   (back)="back.emit()"
 >
-  @if (showPresence()) {
-    <div class="mp__presence">
-      <button
-        type="button"
-        class="mp__chip"
-        [attr.aria-expanded]="presenceOpen()"
-        [title]="presenceTitle()"
-        (click)="presenceOpen.set(!presenceOpen())"
-        (blur)="presenceOpen.set(false)"
-      >
-        <app-icon name="eye" [size]="18" />
-        {{ 'meetings.dock.live' | t: { n: viewers().length } }}
-      </button>
-      @if (presenceOpen()) {
-        <ul class="mp__viewers" [attr.aria-label]="'meetings.viewers.title' | t">
-          @for (name of viewers(); track name) {
-            <li>{{ name }}</li>
-          } @empty {
-            <li class="mp__muted">{{ 'meetings.viewers.empty' | t }}</li>
-          }
-        </ul>
-      }
-    </div>
-  }
-
-  <app-join-qr [meeting]="m" [button]="!phone()" [(open)]="qrOpen" (beamer)="toggleBeamer.emit()" />
-
-  @if (wide() && m.status !== 'closed' && m.canManage) {
-    <app-button class="mp__beamer" variant="tonal" (click)="toggleBeamer.emit()">
-      <app-icon name="monitor" />
-      {{ 'meetings.beamer.enter' | t }}
-    </app-button>
+  @if (phone()) {
+    <app-join-qr [meeting]="m" [button]="false" [(open)]="qrOpen" />
   }
 
   @if (!phone()) {
@@ -72,7 +42,7 @@
     </section>
   }
 
-  @if (showVotes() && !phone()) {
+  @if (showVotes() && wide()) {
     <aside class="mp__votes" appScrollFade="y" [attr.aria-label]="'meetings.vote.count' | t">
       <ng-container [ngTemplateOutlet]="votesTpl" />
     </aside>
@@ -96,7 +66,7 @@
       <app-top-sheet
         class="mp__sheet"
         [linked]="false"
-        [barControls]="!phone() || m.status === 'planned'"
+        [barControls]="m.status === 'planned'"
         [(mode)]="editorMode"
         [meeting]="m"
         [protocol]="proto"
@@ -132,10 +102,12 @@
   [(panel)]="panel"
   [done]="dockDone()"
   [votes]="dockVotes()"
-  [openVote]="phone() ? openVote() : null"
+  [openVote]="wide() ? null : openVote()"
   (openVotes)="votesOpen.set(true)"
   [modeToggle]="dockModeToggle()"
   [formatTools]="dockFormat()"
+  [presence]="showPresence() && !phone() ? presenceTpl : null"
+  [extraTools]="phone() ? null : showTpl"
   [(mode)]="editorMode"
   (doneChange)="top() && setDone.emit({ item: top()!, done: $event })"
   (step)="step($event)"
@@ -196,7 +168,7 @@
   />
 </ng-template>
 
-<!-- The vote cards of the open item: a column beside the sheet, on a phone a bottom sheet
+<!-- The vote cards of the open item: a column beside the sheet, below the wide layout a side sheet (a bottom sheet on a phone)
      that the dock opens, so the protocol text has the page to itself. -->
 <ng-template #votesTpl>
   @for (vote of votes(); track vote.id) {
@@ -230,8 +202,8 @@
   }
 </ng-template>
 
-@if (phone()) {
-  <app-side-sheet side="bottom" [heading]="'meetings.vote.count' | t" [(open)]="votesOpen">
+@if (!wide()) {
+  <app-side-sheet [side]="phone() ? 'bottom' : 'end'" [heading]="'meetings.vote.count' | t" [(open)]="votesOpen">
     @if (votesOpen()) {
       <div class="mp__votes mp__votes--sheet">
         <ng-container [ngTemplateOutlet]="votesTpl" />
@@ -240,7 +212,7 @@
   </app-side-sheet>
 }
 
-<!-- The format tools of the sheet for "Aa" of the phone dock. A press keeps the focus in
+<!-- The format tools of the sheet for the dock ("Aa" on a phone). A press keeps the focus in
      the text, so the tool applies at the cursor. -->
 <ng-template #formatTpl>
   @if (sheet(); as ts) {
@@ -264,5 +236,41 @@
     <button type="button" class="mp__tool" [attr.aria-label]="'meetings.editor.image' | t" (pointerdown)="$event.preventDefault()" (mousedown)="$event.preventDefault()" (click)="ts.insertImage()">
       <app-icon name="image" [size]="20" />
     </button>
+  }
+</ng-template>
+
+<!-- Who has the meeting open: the first chip of the dock on a wider screen. -->
+<ng-template #presenceTpl let-tight>
+  <div class="mp__presence">
+    <button
+      type="button"
+      class="mp__chip"
+      [attr.aria-expanded]="presenceOpen()"
+      [title]="presenceTitle()"
+      (click)="presenceOpen.set(!presenceOpen())"
+      (blur)="presenceOpen.set(false)"
+    >
+      <app-icon name="eye" [size]="18" />
+      {{ tight ? viewers().length : ('meetings.dock.live' | t: { n: viewers().length }) }}
+    </button>
+    @if (presenceOpen()) {
+      <ul class="mp__viewers" [attr.aria-label]="'meetings.viewers.title' | t">
+        @for (name of viewers(); track name) {
+          <li>{{ name }}</li>
+        } @empty {
+          <li class="mp__muted">{{ 'meetings.viewers.empty' | t }}</li>
+        }
+      </ul>
+    }
+  </div>
+</ng-template>
+
+<!-- The QR code and the beamer as icon buttons of the dock on a wider screen. -->
+<ng-template #showTpl>
+  <app-join-qr [meeting]="meeting()" [iconOnly]="true" [(open)]="qrOpen" />
+  @if (wide() && meeting().status !== 'closed' && meeting().canManage) {
+    <app-button variant="text" [iconOnly]="true" [ariaLabel]="'meetings.beamer.enter' | t" (click)="toggleBeamer.emit()">
+      <app-icon name="monitor" />
+    </app-button>
   }
 </ng-template>

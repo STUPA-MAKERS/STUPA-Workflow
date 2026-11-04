@@ -2,7 +2,9 @@ import type { EditorMode } from '../top-sheet/top-sheet.component';
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   ElementRef,
+  afterEveryRender,
   computed,
   effect,
   inject,
@@ -11,6 +13,7 @@ import {
   output,
   signal,
   type TemplateRef,
+  viewChild,
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -103,26 +106,85 @@ export class SessionDockComponent {
   readonly mode = model<EditorMode>('formatted');
   /** The icon button "Erledigt" of a phone: the new done mark of the open item. */
   readonly doneChange = output<boolean>();
-  /** The vote icon button of a phone: the number of votes of the open item, or `null`. */
+  /** The vote icon button below the wide layout: the number of votes of the open item, or `null`. */
   readonly votes = input<number | null>(null);
-  /** The open vote of the open item: it colours the number on the vote button of a phone. */
+  /** The open vote of the open item: it colours the number on the vote button. */
   readonly openVote = input<MeetingVote | null>(null);
-  /** The vote icon button of a phone: open the vote cards. */
+  /** The vote icon button: open the vote cards in their sheet. */
   readonly openVotes = output<void>();
   /**
    * The format tools of the protocol for a phone, or `null` when the text takes none. "Aa"
    * turns the dock row into them, and the back arrow at the start turns it back.
    */
   readonly formatTools = input<TemplateRef<unknown> | null>(null);
+  /** The presence chip of the page ("2 live"), first among the chips on a wider screen. */
+  readonly presence = input<TemplateRef<unknown> | null>(null);
+  /** More icon buttons of the page after the view switch (QR code, beamer) on a wider screen. */
+  readonly extraTools = input<TemplateRef<unknown> | null>(null);
   /** The dock row shows the format tools. */
   protected readonly formatting = signal(false);
+  /**
+   * How far the row of a wider screen folds to keep one line, because the dock never takes
+   * two: 0 shows everything, 1 moves the format tools behind an "Aa" button as on a phone,
+   * 2 also shortens the chips to their numbers and icons.
+   */
+  private readonly fold = signal<0 | 1 | 2>(0);
+  /** The format tools sit behind "Aa". */
+  protected readonly compact = computed(() => this.fold() >= 1);
+  /** The chips show only their numbers and icons. */
+  protected readonly tight = computed(() => this.fold() >= 2);
+  /** The row: its width decides `fold`. */
+  private readonly bar = viewChild<ElementRef<HTMLElement>>('bar');
+  /** The width the row needed at each fold, measured when it overflowed there. */
+  private readonly need = [0, 0, 0];
 
   constructor() {
     // Without tools (another item, a locked text) the row returns to the navigation.
     effect(() => {
       if (!this.formatTools()) this.formatting.set(false);
     });
+    // Leaving the compact row closes the format row, which then sits in the dock itself.
+    effect(() => {
+      if (!this.compact() && !this.phone()) this.formatting.set(false);
+    });
+    afterEveryRender({ read: () => this.measure() });
+    // The web font is wider than the fallback, so the row measures again once it is loaded.
+    void (typeof document !== 'undefined' ? document.fonts?.ready : undefined)?.then(() => this.measure());
+    if (typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver(() => this.measure());
+      effect(() => {
+        observer.disconnect();
+        const el = this.bar()?.nativeElement;
+        if (el) observer.observe(el);
+      });
+      inject(DestroyRef).onDestroy(() => observer.disconnect());
+    }
   }
+
+  /**
+   * Fold the row one step when it overflows or a chip text is cut, and unfold it once the
+   * width it needed one step less folded is back.
+   */
+  private measure(): void {
+    const el = this.bar()?.nativeElement;
+    if (!el || this.phone() || el.clientWidth === 0) return;
+    const fold = this.fold();
+    if (fold > 0 && el.clientWidth >= this.need[fold - 1]) {
+      this.fold.set((fold - 1) as 0 | 1);
+      return;
+    }
+    if (fold === 2) return;
+    let cut = 0;
+    for (const text of Array.from(el.querySelectorAll<HTMLElement>('.sd__chipText'))) {
+      cut += Math.max(0, text.scrollWidth - text.clientWidth);
+    }
+    const need = el.scrollWidth + cut;
+    if (need > el.clientWidth) {
+      this.need[fold] = need;
+      this.fold.set((fold + 1) as 1 | 2);
+    }
+  }
+
   /** The distance of the popover from the end edge of the dock: the end of its chip. */
   protected readonly popEnd = signal(0);
 

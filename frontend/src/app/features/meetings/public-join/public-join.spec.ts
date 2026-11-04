@@ -109,10 +109,8 @@ describe('JoinQrComponent', () => {
     restore = matchMediaQueries(...media);
     const api = { listMeetingGuests: jest.fn(() => of([])), getJoinLink: jest.fn(() => of(LINK)) };
     const m = meeting({ publicJoin: true, joinCode: '7KQ4MP', ...over });
-    const beamer = jest.fn();
     const view = await render(JoinQrComponent, {
       inputs: { meeting: m },
-      on: { beamer },
       providers: [
         MeetingGuestsService,
         { provide: ApiClient, useValue: api },
@@ -121,12 +119,12 @@ describe('JoinQrComponent', () => {
     });
     view.fixture.debugElement.injector.get(MeetingGuestsService).sync(m);
     view.fixture.detectChanges();
-    return { ...view, beamer };
+    return view;
   }
 
-  it('opens a popover with the large code, copies the link and shows it on the beamer', async () => {
+  it('opens a popover with the large code and copies the link, without a beamer action', async () => {
     const writeText = clipboard();
-    const { beamer, fixture } = await setup();
+    const { fixture } = await setup();
     await userEvent.click(screen.getByRole('button', { name: /QR-Code/ }));
     const pop = screen.getByRole('dialog', { name: 'QR-Code zum Beitreten' });
     expect(pop).toHaveTextContent('Mit dem Handy scannen');
@@ -142,9 +140,7 @@ describe('JoinQrComponent', () => {
     await Promise.resolve();
     jest.advanceTimersByTime(JOIN_COPIED_MS);
     jest.useRealTimers();
-    await userEvent.click(screen.getByRole('button', { name: /Auf dem Beamer zeigen/ }));
-    expect(beamer).toHaveBeenCalled();
-    expect(screen.queryByRole('dialog', { name: 'QR-Code zum Beitreten' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Auf dem Beamer zeigen/ })).toBeNull();
     fixture.destroy();
   });
 

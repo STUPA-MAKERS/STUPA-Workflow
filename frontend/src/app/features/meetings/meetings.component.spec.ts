@@ -174,6 +174,9 @@ function routerStub(navigate: jest.Mock = jest.fn(() => Promise.resolve(true))) 
  * The Gremium dropdown loads `/gremien` at start, only for a meeting manager. The overview route
  * loads the timeline: one cursor page each for past and upcoming.
  */
+/** The vote button of the dock, which opens the vote cards below the wide layout. */
+const VOTES = 'Abstimmungen';
+
 async function setup(
   opts: {
     perms?: string[];
@@ -522,7 +525,9 @@ describe('MeetingsComponent', () => {
     fixture.detectChanges();
     expect((fixture.componentInstance as Cmp).canEditProtocol()).toBe(true);
     expect(await screen.findByRole('toolbar', { name: 'Format' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Ins Protokoll übernehmen' })).toBeInTheDocument();
+    // Below the wide layout the vote cards open as a side sheet from the dock.
+    await userEvent.click(screen.getByRole('button', { name: VOTES }));
+    expect(await screen.findByRole('button', { name: 'Ins Protokoll übernehmen' })).toBeInTheDocument();
   });
 
   /** The right stays; the lock of the protocol takes the editor away. */
@@ -660,7 +665,7 @@ describe('MeetingsComponent', () => {
     expect(req.request.method).toBe('PATCH');
     expect(req.request.body.protokollantId).toBe('pr-1');
     req.flush({ ...MEETING, protokollantId: 'pr-1', protokollantName: 'Max P' });
-    expect(await screen.findByText('Protokoll: Max P')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Protokoll: Max P' })).toBeInTheDocument();
   });
 
   /**
@@ -762,6 +767,7 @@ describe('MeetingsComponent', () => {
     it('keeps the agenda editor and vote creation for a manager who is not the minute-taker', async () => {
       await loadOtherProtokollant({ status: 'live', votes: [] });
 
+      await userEvent.click(await screen.findByRole('button', { name: VOTES }));
       expect(await screen.findByRole('button', { name: 'Beschlussfrage hinzufügen' })).toBeInTheDocument();
       await userEvent.click(screen.getByRole('button', { name: 'Sitzungsmenü' }));
       await userEvent.click(await screen.findByRole('menuitem', { name: 'Tagesordnung' }));
@@ -775,7 +781,7 @@ describe('MeetingsComponent', () => {
     it('shows the protocol pane read-only to a manager who is not the minute-taker', async () => {
       const { container, fixture } = await loadOtherProtokollant({ status: 'live' });
 
-      expect(await screen.findByText('Protokoll: Other P')).toBeInTheDocument();
+      expect(await screen.findByText('Other P', { selector: '.sd__chipText' })).toBeInTheDocument();
       await renderDeferred(fixture);
       expect(container.querySelector('.mde__host--disabled')).toBeTruthy();
     });
@@ -788,7 +794,7 @@ describe('MeetingsComponent', () => {
         isProtokollant: true,
       });
 
-      expect(await screen.findByText('Protokoll: Ich')).toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: 'Protokoll: Ich' })).toBeInTheDocument();
       expect(container.querySelector('.mde__host--disabled')).toBeNull();
     });
   });

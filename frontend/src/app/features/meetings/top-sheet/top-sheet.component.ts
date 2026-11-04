@@ -28,6 +28,7 @@ import {
   NoteComponent,
   SegmentedComponent,
   type SegmentedOption,
+  ScrollFadeDirective,
   StatusTextComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
@@ -121,6 +122,7 @@ function altOf(file: File): string {
     MarkdownImageUploadDirective,
     NoteComponent,
     ProtocolBarComponent,
+    ScrollFadeDirective,
     SegmentedComponent,
     StatusTextComponent,
     TodoLinkedListComponent,

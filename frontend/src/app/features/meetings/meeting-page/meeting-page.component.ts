@@ -227,24 +227,24 @@ export class MeetingPageComponent {
    */
   /** The view of the protocol text, shared by the sheet and the icon button of the phone dock. */
   protected readonly editorMode = signal<EditorMode>('formatted');
-  /** The done mark of the open item for the phone dock, or `null` for no button there. */
+  /** The done mark of the open item for the dock, or `null` for no button there. */
   protected readonly dockDone = computed<boolean | null>(() => {
     const t = this.top();
-    return this.phone() && this.editable() && t ? !!t.doneAt : null;
+    return this.meeting().status !== 'planned' && this.editable() && t ? !!t.doneAt : null;
   });
-  /** The vote icon button of the phone dock: the number of votes of the item, or `null`. */
+  /** The vote icon button of the dock below the wide layout: the number of votes, or `null`. */
   protected readonly dockVotes = computed<number | null>(() =>
-    this.phone() && this.showVotes() ? this.votes().length : null,
+    !this.wide() && this.showVotes() ? this.votes().length : null,
   );
-  /** The view switch in the phone dock: the sheet shows it while the protocol is open. */
+  /** The view switch in the dock: the sheet shows it only before the opening. */
   protected readonly dockModeToggle = computed(() => {
     const p = this.protocol();
-    return this.phone() && !!p && !p.isLocked && this.top() !== null;
+    return this.meeting().status !== 'planned' && !!p && !p.isLocked && this.top() !== null;
   });
-  /** The sheet of the open item: the phone dock runs its format tools. */
+  /** The sheet of the open item: the dock runs its format tools. */
   protected readonly sheet = viewChild(TopSheetComponent);
   private readonly formatTpl = viewChild<TemplateRef<unknown>>('formatTpl');
-  /** The format tools for "Aa" of the phone dock, while the text of the item can be written. */
+  /** The format tools of the dock ("Aa" on a phone), while the text of the item can be written. */
   protected readonly dockFormat = computed<TemplateRef<unknown> | null>(() =>
     this.dockModeToggle() && this.editable() ? (this.formatTpl() ?? null) : null,
   );

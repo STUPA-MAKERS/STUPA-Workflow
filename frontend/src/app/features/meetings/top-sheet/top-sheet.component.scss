@@ -245,6 +245,15 @@
   flex: none;
 }
 
+// The text scrolls inside the sheet on a wider screen: its top end fades below the title
+// while lines lie above it. The foot ends at the round edge of the sheet.
+@include bp.not-phone {
+  .ts__editor.is-fade-start {
+    -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--space-5));
+    mask-image: linear-gradient(to bottom, transparent, #000 var(--space-5));
+  }
+}
+
 @include bp.phone {
   // The protocol is the page there, not a card on it: no surface, no clip, and the format
   // bar sticks below the bar of the page (`--ld-bar-height`) while the text scrolls, as
