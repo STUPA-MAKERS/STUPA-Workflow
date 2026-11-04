@@ -141,6 +141,8 @@
 
 .cd__sec {
   position: relative;
+  // The titles align with the edge of the text below them, not with the inset of a list.
+  --section-inset: 0px;
   --section-gap: var(--space-2);
 }
 
