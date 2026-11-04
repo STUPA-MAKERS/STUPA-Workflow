@@ -43,7 +43,7 @@
             }
           </span>
         </span>
-        <app-button variant="text" [iconOnly]="true" [disabled]="!hasNext()" [ariaLabel]="'meetings.dock.next' | t" (click)="step.emit(1)"><app-icon name="right" /></app-button>
+        <app-button class="sd__next" variant="text" [iconOnly]="true" [disabled]="!hasNext()" [ariaLabel]="'meetings.dock.next' | t" (click)="step.emit(1)"><app-icon name="right" /></app-button>
       </div>
       @if (phone()) {
         <ng-container [ngTemplateOutlet]="phoneTools" />

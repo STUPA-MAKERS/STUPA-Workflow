@@ -181,14 +181,23 @@
     border-radius: 0;
     background: transparent;
   }
-  // "TOP 3 von 6" sits at the start edge, the icon buttons at the end edge.
+  // The arrows stay at the two edges: "TOP 3 von 6" follows the previous arrow, the icon
+  // buttons come before the next arrow. The nav box steps aside, so its parts and the
+  // buttons share one row.
   .sd__nav {
-    flex: 1 1 auto;
+    display: contents;
   }
   .sd__pos {
+    flex: 1 1 auto;
     align-items: flex-start;
     min-width: 0;
     padding-inline: var(--space-2);
+  }
+  .sd__next {
+    order: 1;
+  }
+  .sd__mid {
+    order: 2;
   }
   .sd__tools {
     display: flex;
