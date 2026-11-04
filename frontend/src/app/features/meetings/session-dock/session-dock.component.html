@@ -55,17 +55,19 @@
     </div>
   }
 
-  <span class="sd__spacer"></span>
+  @if (!phone()) {
+    <span class="sd__spacer"></span>
 
-  <div class="sd__chips">
-    @if (m.status === 'live') {
-      <ng-container [ngTemplateOutlet]="presentChip" />
-      <ng-container [ngTemplateOutlet]="keeperChip" />
-    } @else {
-      <ng-container [ngTemplateOutlet]="keeperChip" />
-      <ng-container [ngTemplateOutlet]="presentChip" />
-    }
-  </div>
+    <div class="sd__chips">
+      @if (m.status === 'live') {
+        <ng-container [ngTemplateOutlet]="presentChip" />
+        <ng-container [ngTemplateOutlet]="keeperChip" />
+      } @else {
+        <ng-container [ngTemplateOutlet]="keeperChip" />
+        <ng-container [ngTemplateOutlet]="presentChip" />
+      }
+    </div>
+  }
 </div>
 
 <ng-template #presentChip>

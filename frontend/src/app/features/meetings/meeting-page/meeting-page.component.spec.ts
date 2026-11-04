@@ -271,6 +271,25 @@ describe('MeetingPageComponent', () => {
       flushDelegations();
     });
 
+    /** The dock has no chips on a phone, so the minute-taker is an entry of the menu. */
+    it('hands the minutes over from the phone menu, and offers no handover without the right', async () => {
+      const { fixture } = await setup({}, [MEDIA.phone]);
+      let menu = await openMenu();
+      await userEvent.click(within(menu).getByRole('menuitem', { name: 'Protokollführung übergeben' }));
+      expect(await screen.findByRole('dialog', { name: 'Protokollführung übergeben' })).toHaveClass('ss--bottom');
+      fixture.componentRef.setInput('meeting', meeting({ canManage: false, isProtokollant: false }));
+      fixture.detectChanges();
+      await userEvent.keyboard('{Escape}');
+      menu = await openMenu();
+      expect(within(menu).queryByRole('menuitem', { name: /Protokollführung/ })).toBeNull();
+    });
+
+    it('keeps the minute-taker out of the menu on a tablet, where the dock has the chip', async () => {
+      await setup();
+      const menu = await openMenu();
+      expect(within(menu).queryByRole('menuitem', { name: /Protokollführung/ })).toBeNull();
+    });
+
     it('opens the agenda from the start edge below the wide layout', async () => {
       await setup();
       await userEvent.click(screen.getByRole('button', { name: /Tagesordnung/ }));

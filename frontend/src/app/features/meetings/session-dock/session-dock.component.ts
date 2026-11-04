@@ -46,6 +46,10 @@ export type DockPanel = 'none' | 'attendance' | 'protokollant';
  * goes to the handover dialog of the page. The attendance chip opens the attendance sheet
  * of the page.
  *
+ * On a phone the dock has no chips: the attendance and the minute-taker are entries of
+ * the session menu in the head, because the two chips took a whole row of the dock. The
+ * menu sets `panel`, so the minute-taker sheet still opens from the dock.
+ *
  * On a phone the dock is a fixed layer above the page and holds the bottom sheet. While
  * the sheet is open, the layer moves up to the dialog level, because otherwise the
  * navigation bar covers the sheet and its scrim.

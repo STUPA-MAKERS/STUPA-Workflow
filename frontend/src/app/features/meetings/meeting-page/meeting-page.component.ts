@@ -55,7 +55,7 @@ import { MeetingHeadComponent } from '../meeting-head/meeting-head.component';
 import { clock, weekdayDate } from '@shared/date-format';
 
 /** The ids of the session menu. */
-type SessionAction = 'settings' | 'attendance' | 'beamer' | 'qr' | 'close' | 'delete';
+type SessionAction = 'settings' | 'attendance' | 'keeper' | 'beamer' | 'qr' | 'close' | 'delete';
 
 /**
  * The session page of the meeting lead and the minute-taker (`/meetings/:id`).
@@ -305,6 +305,16 @@ export class MeetingPageComponent {
     const main: RowMenuItem[] = [];
     if (m.canManage) main.push({ id: 'settings', label: t('meetings.settings.title'), icon: 'edit' });
     main.push({ id: 'attendance', label: t('meetings.page.recordAttendance'), icon: 'users' });
+    const keeper =
+      (m.status === 'planned' && m.canManage) ||
+      (m.status === 'live' && (m.canManage || m.isProtokollant));
+    if (this.phone() && keeper) {
+      main.push({
+        id: 'keeper',
+        label: t(m.status === 'live' ? 'meetings.handover.title' : 'meetings.dock.pickProtokollant'),
+        icon: m.status === 'live' ? 'swap' : 'clipcheck',
+      });
+    }
     if (!this.wide() && m.status !== 'closed' && m.canManage) {
       main.push({ id: 'beamer', label: t('meetings.beamer.enter'), icon: 'monitor' });
     }
@@ -469,6 +479,9 @@ export class MeetingPageComponent {
         break;
       case 'attendance':
         this.panel.set('attendance');
+        break;
+      case 'keeper':
+        this.panel.set('protokollant');
         break;
       case 'beamer':
         this.toggleBeamer.emit();
