@@ -913,7 +913,6 @@
   "meetings.overview.dayOne": "1 meeting",
   "meetings.overview.dayMany": "{n} meetings",
   "meetings.overview.beamerShort": "Projector",
-  "meetings.overview.upcoming": "Upcoming",
   "meetings.control.title": "Session control",
   "meetings.attendance.title": "Attendance",
   "meetings.attendance.you": "(you)",

@@ -24,11 +24,9 @@ import { meetingStatus, type StatusView } from '@shared/status-kind.util';
 import {
   FabComponent,
   ButtonComponent,
-  DateBlockComponent,
   EmptyStateComponent,
   FilterSelectComponent,
   IconComponent,
-  ListItemComponent,
   MEDIA,
   mediaQuery,
   NoteComponent,
@@ -42,11 +40,10 @@ import {
   SheetBarComponent,
   StatusTextComponent,
   PageHeaderComponent,
-  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { CalendarSubscribeComponent } from '../calendar-subscribe/calendar-subscribe.component';
 import { MeetingDialogsService } from '../meeting-dialogs.service';
-import { meetingDay, meetingTimeText } from '../meetings-display.util';
+import { meetingTimeText } from '../meetings-display.util';
 import {
   type AgendaProgress,
   type CalendarDay,
@@ -61,7 +58,6 @@ import {
   monthOf,
   openVoteOf,
   shiftMonth,
-  topsLabel,
   weekdayNames,
 } from '../meetings-overview.util';
 import { MeetingsTimelineService } from '../meetings-timeline.service';
@@ -73,13 +69,10 @@ import {
   parseDay,
   shortTime,
   weekdayDate,
-  weekdayName,
 } from '@shared/date-format';
 
 /** A cell shows this many meetings; the rest is "+n" and shows in the side panel. */
 export const CELL_ENTRIES = 2;
-/** The side panel lists this many upcoming meetings. */
-export const UPCOMING_COUNT = 5;
 
 /** One meeting of the selected day, as the side panel shows it. */
 interface DayCard {
@@ -104,8 +97,7 @@ interface DayCard {
  *
  * The side panel shows the meetings of the selected day: status, "Details" (opens the meeting), the
  * beamer (`canManage`), edit and delete in the ⋮ menu (`canManage`), and for a live
- * meeting the current item and the turnout of its open vote. Below it: the upcoming
- * meetings; a click selects their day.
+ * meeting the current item and the turnout of its open vote.
  *
  * Data: `GET /meetings?dateFrom&dateTo` for the days of the grid, with the Gremium filter
  * of the overview. A phone has no calendar (the overview shows the list there).
@@ -115,7 +107,6 @@ interface DayCard {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    SectionComponent,
     MeetingsViewActionsComponent,
     NoteComponent,
     EmptyStateComponent,
@@ -125,9 +116,7 @@ interface DayCard {
     TranslatePipe,
     ButtonComponent,
     IconComponent,
-    DateBlockComponent,
     FilterSelectComponent,
-    ListItemComponent,
     RowMenuComponent,
     SearchPillComponent,
     SegBarComponent,
@@ -202,15 +191,6 @@ export class MeetingsCalendarComponent {
       : day;
   });
 
-  /** The next planned meetings (the timeline of the overview), for "Anstehend". */
-  readonly upcoming = computed(() => {
-    const q = this.query();
-    return this.timeline
-      .upcomingItems()
-      .filter((m) => m.status !== 'live' && matchesQuery(m, q))
-      .slice(0, UPCOMING_COUNT);
-  });
-
   /** The filter offers a choice only when the user reads more than one Gremium. */
   constructor() {
     this.scheduleMidnight();
@@ -280,11 +260,6 @@ export class MeetingsCalendarComponent {
     const ref = monthOf(day);
     const cur = this.month();
     if (ref.year !== cur.year || ref.month !== cur.month) this.month.set(ref);
-  }
-
-  /** An upcoming meeting: show its day. */
-  showMeeting(m: Meeting): void {
-    if (m.date) this.selectDay(m.date);
   }
 
   /**
@@ -362,26 +337,6 @@ export class MeetingsCalendarComponent {
   /** "+2" below the entries of a full day. */
   more(iso: string): number {
     return Math.max(0, this.meetingsOf(iso).length - CELL_ENTRIES);
-  }
-
-  day(m: Meeting): string | null {
-    return meetingDay(m);
-  }
-
-  status(m: Meeting): StatusView {
-    return meetingStatus(m.status);
-  }
-
-  /** "Fr, 17:30" for a row of "Anstehend". */
-  rowTime(m: Meeting): string {
-    const start = shortTime(m.startTime);
-    if (!m.date) return start;
-    const weekday = weekdayName(m.date, this.i18n.formatLocale());
-    return start ? `${weekday}, ${start}` : weekday;
-  }
-
-  tops(m: Meeting): string {
-    return topsLabel(m.agendaItemCount ?? 0, (k, p) => this.i18n.translate(k, p));
   }
 
   private moveMonth(delta: number): void {

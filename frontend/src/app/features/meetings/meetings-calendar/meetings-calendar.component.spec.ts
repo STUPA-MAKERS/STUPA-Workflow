@@ -5,7 +5,6 @@ import { Router, provideRouter } from '@angular/router';
 import { fireEvent, render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { USE_MOCK_API } from '@core/api/api.config';
-import { mapMeeting } from '@core/api/mappers';
 import type { MeetingOutWire } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { WsService } from '@core/ws/ws.service';
@@ -17,7 +16,7 @@ import { MeetingDialogsService } from '../meeting-dialogs.service';
 import { MeetingSessionService } from '../meeting-session.service';
 import { OVERVIEW_NOW } from '../meetings-overview.util';
 import { MeetingsTimelineService } from '../meetings-timeline.service';
-import { MeetingsCalendarComponent, UPCOMING_COUNT } from './meetings-calendar.component';
+import { MeetingsCalendarComponent } from './meetings-calendar.component';
 
 /** "Now" of the board: Tuesday, 29.09.2026, 18:50. */
 const NOW = new Date(2026, 8, 29, 18, 50);
@@ -303,30 +302,7 @@ describe('MeetingsCalendarComponent', () => {
     expect(document.activeElement).toBe(grid.querySelector('.cal__cell--sel .cal__day'));
   });
 
-  /** A meeting without a date has no day to show; one without a time shows its weekday. */
-  it('lists the upcoming meetings without the live one; a click shows their day', async () => {
-    const view = await setup();
-    load(view);
-    const upcoming = [LIVE, FA, ...Array.from({ length: 6 }, (_, i) => wire(`m-u${i}`, `Kommend ${i}`, `2026-10-${10 + i}`))];
-    view.timeline.upcomingItems.set(upcoming.map(mapMeeting));
-    view.fixture.detectChanges();
-    const list = within(screen.getByRole('group', { name: 'Anstehend' })).getAllByRole('listitem');
-    expect(list).toHaveLength(UPCOMING_COUNT);
-    expect(within(list[0]).getByText('Fr, 17:30')).toBeInTheDocument();
-    expect(within(list[0]).getByText('keine TOPs')).toBeInTheDocument();
-    await userEvent.click(within(list[1]).getByRole('button', { name: 'Kommend 0' }));
-    expect(screen.getByRole('heading', { name: 'Oktober 2026' })).toBeInTheDocument();
-    monthReq(view.http).flush([]);
-    view.fixture.detectChanges();
-    expect(screen.getByRole('button', { name: 'Kommend 0' })).toHaveAttribute('aria-current', 'true');
-    const cmp = view.fixture.componentInstance;
-    cmp.showMeeting({ ...view.timeline.upcomingItems()[0], date: null });
-    expect(cmp.rowTime({ ...view.timeline.upcomingItems()[0], startTime: null })).toBe('Di');
-    expect(cmp.rowTime({ ...view.timeline.upcomingItems()[0], date: null })).toBe('18:00');
-    expect(cmp.tops({ ...view.timeline.upcomingItems()[0], agendaItemCount: undefined })).toBe('keine TOPs');
-  });
-
-  it('filters the grid and the upcoming list in the browser, without a server search', async () => {
+  it('filters the grid in the browser, without a server search', async () => {
     const view = await setup();
     load(view);
     const onSearch = jest.spyOn(view.timeline, 'onSearch');
