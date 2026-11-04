@@ -3127,7 +3127,6 @@
   "guests.qr.scan": "Scan with your phone",
   "guests.qr.code": "Code {code}",
   "guests.qr.copy": "Copy link",
-  "guests.qr.beamer": "Show on the beamer",
   "guests.beamer.hint": "Enter your name, then the meeting lead admits you.",
   "guests.beamer.join": "Join with your phone",
   "guests.beamer.presence": "{n} present · {members} members + {guests} guests",

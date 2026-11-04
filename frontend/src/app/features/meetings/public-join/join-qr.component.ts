@@ -5,7 +5,6 @@ import {
   inject,
   input,
   model,
-  output,
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import type { Meeting } from '@core/api/models';
@@ -24,9 +23,9 @@ import { MeetingGuestsService } from '../meeting-guests.service';
 import { JOIN_COPIED_MS } from './join-link.component';
 
 /**
- * "QR-Code" in the header of the session page (variant A): a popover with the large
- * code, the link, "Link kopieren" and "Auf dem Beamer zeigen". For a room without a
- * beamer the lead shows the laptop or the phone around. A phone shows the same content
+ * "QR-Code" of the session page: a frosted popover with the large code, the link and
+ * "Link kopieren". The beamer has its own button beside it. For a room without a beamer
+ * the lead shows the laptop or the phone around. A phone shows the same content
  * as a bottom sheet; the page opens it from its menu and from the attendance sheet
  * ("Groß zeigen"). Only the lead of a public meeting that is not closed has it.
  */
@@ -53,8 +52,6 @@ export class JoinQrComponent {
    */
   readonly iconOnly = input(false);
   readonly open = model(false);
-  /** "Auf dem Beamer zeigen". */
-  readonly beamer = output<void>();
 
   protected readonly copiedMs = JOIN_COPIED_MS;
 
@@ -68,10 +65,5 @@ export class JoinQrComponent {
 
   protected qrLabel(url: string): string {
     return this.i18n.translate('guests.qr.label', { url });
-  }
-
-  showOnBeamer(): void {
-    this.open.set(false);
-    this.beamer.emit();
   }
 }

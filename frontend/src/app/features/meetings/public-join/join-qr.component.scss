@@ -1,3 +1,5 @@
+@use 'frosted' as *;
+
 :host {
   display: contents;
 }
@@ -25,8 +27,8 @@
   max-width: calc(100vw - 2 * var(--space-4));
   padding: var(--space-4);
   border-radius: var(--radius-xl, 20px);
-  background: var(--color-surface-1);
   box-shadow: var(--shadow-lg);
+  @include frosted-pop(var(--color-surface-3));
 }
 // In the dock at the foot of the page the code opens above the button.
 .jq--up .jq__pop {

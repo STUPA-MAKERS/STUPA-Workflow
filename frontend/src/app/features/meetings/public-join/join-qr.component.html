@@ -53,12 +53,6 @@
           [copiedLabel]="'guests.link.copied' | t"
           [resetMs]="copiedMs"
         />
-        @if (!phone()) {
-          <app-button size="sm" variant="tonal" (click)="showOnBeamer()">
-            <app-icon name="monitor" />
-            {{ 'guests.qr.beamer' | t }}
-          </app-button>
-        }
       </div>
     </div>
   </ng-template>

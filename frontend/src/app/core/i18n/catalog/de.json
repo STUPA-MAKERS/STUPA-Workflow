@@ -3127,7 +3127,6 @@
   "guests.qr.scan": "Mit dem Handy scannen",
   "guests.qr.code": "Code {code}",
   "guests.qr.copy": "Link kopieren",
-  "guests.qr.beamer": "Auf dem Beamer zeigen",
   "guests.beamer.hint": "Name eingeben, dann lässt dich die Sitzungsleitung zu.",
   "guests.beamer.join": "Mit dem Handy beitreten",
   "guests.beamer.presence": "{n} Anwesende · {members} Mitglieder + {guests} Gäste",
