@@ -76,6 +76,10 @@
   @include lp.scroll(--apps-fade);
   padding-bottom: calc(56px + var(--space-6));
 }
+// On a phone the frame already keeps the floating button free (`frame--fab`).
+:host-context(.frame--fab) .apps__scroll {
+  padding-bottom: 0;
+}
 .apps--split .apps__scroll {
   @include lp.split-scroll(--apps-fade);
 }
@@ -125,12 +129,6 @@
 }
 .apps__more {
   @include lp.more;
-}
-.apps__count {
-  margin: var(--space-3) 0 0;
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-  text-align: center;
 }
 
 .apps__detail {
