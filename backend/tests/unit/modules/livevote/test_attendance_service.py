@@ -118,6 +118,24 @@ async def test_set_self_present_drops_note() -> None:
     assert (row.status, row.note) == ("present", None)
 
 
+async def test_check_in_frees_a_pool_seat(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A check-in frees the seat that a pool substitute took, then the report goes in."""
+    freed: list[tuple[Any, Any, str]] = []
+
+    async def _release(_s: Any, meeting_id: Any, member_id: Any, actor: str) -> bool:
+        freed.append((meeting_id, member_id, actor))
+        return True
+
+    monkeypatch.setattr(attendance_mod, "release_pool_seat", _release)
+    meeting = _meeting("live")
+    me = _member("me")
+    row = _row(me.id, status="absent", source="self", note=None)
+    db = fake_session(result(meeting), result(me), result(row), result(), result(meeting))
+    await AttendanceService(db).set_self(meeting.id, "present", "me")
+    assert freed == [(meeting.id, me.id, "me")]
+    assert row.status == "present"
+
+
 async def test_set_self_present_conflict_with_delegation() -> None:
     """The delegation rule also holds for the own report: a delegator cannot report "present"."""
     meeting = _meeting("live")
