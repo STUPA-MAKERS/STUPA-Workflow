@@ -1,13 +1,28 @@
-<app-button class="mh__back" variant="text" [iconOnly]="true" [ariaLabel]="'meetings.page.back' | t" (click)="back.emit()">
-  <app-icon name="back" />
-</app-button>
-<div class="mh__titles">
-  <div class="mh__titleLine">
-    <h1 class="mh__title" [title]="heading()">{{ heading() }}</h1>
-    <app-status-text class="mh__status" [kind]="statusKind()">{{ statusText() }}</app-status-text>
+@if (phone()) {
+  <app-list-detail-bar class="mh__bar" [label]="'meetings.page.back' | t" [title]="heading()" (back)="back.emit()" />
+  <h1 class="sr-only">{{ heading() }}</h1>
+} @else {
+  <app-button class="mh__back" variant="text" [iconOnly]="true" [ariaLabel]="'meetings.page.back' | t" (click)="back.emit()">
+    <app-icon name="back" />
+  </app-button>
+  <div class="mh__titles">
+    <div class="mh__titleLine">
+      <h1 class="mh__title" [title]="heading()">{{ heading() }}</h1>
+      <app-status-text class="mh__status" [kind]="statusKind()">{{ statusText() }}</app-status-text>
+    </div>
+    @if (sub() !== null) {
+      <span class="mh__sub">{{ sub() }}</span>
+    }
   </div>
-  @if (sub() !== null) {
-    <span class="mh__sub">{{ sub() }}</span>
+  <ng-container [ngTemplateOutlet]="actions" />
+}
+
+<ng-template #actions><ng-content /></ng-template>
+
+<ng-template #subtitle>
+  <app-status-text class="mh__barStatus" [kind]="statusKind()">{{ statusText() }}</app-status-text>
+  @if (sub()) {
+    <span aria-hidden="true">·</span>
+    <span class="mh__barSub">{{ sub() }}</span>
   }
-</div>
-<ng-content />
+</ng-template>

@@ -105,13 +105,11 @@ const sheet = () => screen.getByRole('dialog', { name: 'Anwesenheit' });
 const row = (name: string) => within(sheet()).getByRole('radiogroup', { name: `Anwesenheit von ${name}` });
 
 describe('AttendanceSheetComponent', () => {
-  it('counts the states and filters the members by the search', async () => {
+  /** The rows carry the states; the sheet shows no count line above them. */
+  it('shows no count line and filters the members by the search', async () => {
     await setup();
     expect(sheet()).toHaveClass('ss--end');
-    const counts = [...(sheet().querySelectorAll('.as__counts > span') as NodeListOf<HTMLElement>)];
-    expect(counts.map((c) => c.textContent?.replace(/\s+/g, ' ').trim())).toEqual([
-      '1 anwesend', '2 entschuldigt', '1 unentschuldigt', '1 offen',
-    ]);
+    expect(sheet().querySelector('.as__counts')).toBeNull();
     await userEvent.type(within(sheet()).getByRole('searchbox', { name: 'Mitglied suchen' }), 'vera');
     expect(within(sheet()).getAllByRole('radiogroup')).toHaveLength(1);
     await userEvent.type(within(sheet()).getByRole('searchbox', { name: 'Mitglied suchen' }), 'zzz');
@@ -167,14 +165,6 @@ describe('AttendanceSheetComponent', () => {
     radio('Unentschuldigt').blur();
     fixture.detectChanges();
     expect(radio('Entschuldigt')).toHaveAttribute('tabindex', '0');
-  });
-
-  it('counts an excuse and an absence as one "abwesend" for a member', async () => {
-    await setup({ meeting: meeting({ canControl: false }) });
-    const counts = [...(sheet().querySelectorAll('.as__counts > span') as NodeListOf<HTMLElement>)];
-    expect(counts.map((c) => c.textContent?.replace(/\s+/g, ' ').trim())).toEqual([
-      '1 anwesend', '3 abwesend', '1 offen',
-    ]);
   });
 
   it('names the minute-taker in the sub line', async () => {

@@ -157,12 +157,12 @@ describe('poll in the meeting', () => {
       expect(screen.queryByText('Angenommen')).toBeNull();
     });
 
-    it('an open poll shows "Umfrage offen" and the poll ballot', async () => {
+    it('an open poll shows the poll ballot without a status caption', async () => {
       await card(
         poll({ status: 'open', pollResult: null, counts: null, poll: DATE, guestsVote: true, presentMembers: 3, presentGuests: 1 }),
         true,
       );
-      expect(screen.getByText('Umfrage offen')).toBeInTheDocument();
+      expect(screen.queryByText('Umfrage offen')).toBeNull();
       expect(screen.getAllByRole('radiogroup')).toHaveLength(2);
       expect(screen.getByRole('button', { name: 'Antworten abgeben' })).toBeDisabled();
     });

@@ -1,3 +1,4 @@
+import type { EditorMode } from '../top-sheet/top-sheet.component';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -8,6 +9,7 @@ import {
   model,
   output,
   signal,
+  type TemplateRef,
   viewChild,
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
@@ -52,10 +54,12 @@ import { voteOptionLabel } from '../meetings-display.util';
 import { openWindowClock, openWindowState, openWindowWhen } from '../open-window.util';
 import { JoinQrComponent } from '../public-join/join-qr.component';
 import { MeetingHeadComponent } from '../meeting-head/meeting-head.component';
+import { topApplicationLead } from '../top-application-lead.util';
+import { TodoLinkedListComponent } from '../../todos/linked-list/todo-linked-list.component';
 import { clock, weekdayDate } from '@shared/date-format';
 
 /** The ids of the session menu. */
-type SessionAction = 'settings' | 'attendance' | 'beamer' | 'qr' | 'close' | 'delete';
+type SessionAction = 'agenda' | 'prep' | 'settings' | 'attendance' | 'votes' | 'keeper' | 'beamer' | 'qr' | 'close' | 'delete';
 
 /**
  * The session page of the meeting lead and the minute-taker (`/meetings/:id`).
@@ -74,7 +78,10 @@ type SessionAction = 'settings' | 'attendance' | 'beamer' | 'qr' | 'close' | 'de
  *
  * Wide (>= 1200px): three columns. Below that the agenda moves into a sheet from the
  * start edge, and the vote cards go above the item. On a phone the agenda sheet, the
- * attendance and the minute-taker open as bottom sheets.
+ * attendance and the minute-taker open as bottom sheets, and the protocol text has the
+ * page to itself: the vote cards open as a bottom sheet from an icon button of the dock,
+ * whose number turns to the accent colour while a vote of the item runs (before the
+ * opening, when the phone has no dock, from the session menu).
  *
  * The reason for a disabled action is visible text, not only a tooltip, because a disabled button
  * takes no focus and no touch. The agenda sheet stays outside the body, because the scroll fade of
@@ -97,6 +104,7 @@ type SessionAction = 'settings' | 'attendance' | 'beamer' | 'qr' | 'close' | 'de
     PrepChecklistComponent,
     SessionDockComponent,
     TopSheetComponent,
+    TodoLinkedListComponent,
     VoteCardComponent,
     AttendanceSheetComponent,
     JoinQrComponent,
@@ -193,6 +201,8 @@ export class MeetingPageComponent {
   readonly qrOpen = signal(false);
   /** The agenda sheet below the wide layout. */
   readonly agendaOpen = signal(false);
+  /** The bottom sheet of the vote cards on a phone. */
+  readonly votesOpen = signal(false);
   /** The list of the people who have the meeting open. */
   protected readonly presenceOpen = signal(false);
   /** A planned meeting shows an agenda item instead of the preparation. */
@@ -215,6 +225,29 @@ export class MeetingPageComponent {
    * The text of the item can be written. A planned meeting has no protocol yet, but its
    * text can be prepared; the start creates the protocol around it.
    */
+  /** The view of the protocol text, shared by the sheet and the icon button of the phone dock. */
+  protected readonly editorMode = signal<EditorMode>('formatted');
+  /** The done mark of the open item for the dock, or `null` for no button there. */
+  protected readonly dockDone = computed<boolean | null>(() => {
+    const t = this.top();
+    return this.meeting().status !== 'planned' && this.editable() && t ? !!t.doneAt : null;
+  });
+  /** The vote icon button of the dock below the wide layout: the number of votes, or `null`. */
+  protected readonly dockVotes = computed<number | null>(() =>
+    !this.wide() && this.showVotes() ? this.votes().length : null,
+  );
+  /** The view switch in the dock: the sheet shows it only before the opening. */
+  protected readonly dockModeToggle = computed(() => {
+    const p = this.protocol();
+    return this.meeting().status !== 'planned' && !!p && !p.isLocked && this.top() !== null;
+  });
+  /** The sheet of the open item: the dock runs its format tools. */
+  protected readonly sheet = viewChild(TopSheetComponent);
+  private readonly formatTpl = viewChild<TemplateRef<unknown>>('formatTpl');
+  /** The format tools of the dock ("Aa" on a phone), while the text of the item can be written. */
+  protected readonly dockFormat = computed<TemplateRef<unknown> | null>(() =>
+    this.dockModeToggle() && this.editable() ? (this.formatTpl() ?? null) : null,
+  );
   protected readonly editable = computed(
     () =>
       (this.protocol() !== null || this.meeting().status === 'planned') &&
@@ -233,11 +266,17 @@ export class MeetingPageComponent {
     const m = this.meeting();
     return m.status === 'planned' && (m.canControl || m.canManage) && !this.prepItem();
   });
-  /** "Zurück zur Vorbereitung" above the sheet of a planned meeting. */
+  /** "Zurück zur Vorbereitung" in the session menu while an item of a planned meeting is open. */
   protected readonly canBackToPrep = computed(() => {
     const m = this.meeting();
     return m.status === 'planned' && (m.canControl || m.canManage) && this.prepItem();
   });
+
+  /**
+   * The row of the application of the open item, the first row of the linked list above
+   * the sheet (`topApplicationLead`).
+   */
+  protected readonly applicationLead = computed(() => topApplicationLead(this.top(), this.i18n));
 
   /** "Studierendenparlament · Di, 29.09.2026 · seit 18:04". */
   protected readonly subLine = computed(() => {
@@ -303,8 +342,27 @@ export class MeetingPageComponent {
     const m = this.meeting();
     const t = (key: Parameters<I18nService['translate']>[0]): string => this.i18n.translate(key);
     const main: RowMenuItem[] = [];
+    // Below the wide layout the agenda is a sheet, and the menu opens it.
+    if (!this.wide()) main.push({ id: 'agenda', label: t('meetings.agenda.title'), icon: 'list' });
+    if (this.canBackToPrep()) main.push({ id: 'prep', label: t('meetings.prep.back'), icon: 'clipcheck' });
     if (m.canManage) main.push({ id: 'settings', label: t('meetings.settings.title'), icon: 'edit' });
-    main.push({ id: 'attendance', label: t('meetings.page.recordAttendance'), icon: 'users' });
+    // A phone dock holds the attendance as an icon button; before the opening it shows nothing.
+    if (!this.phone() || m.status === 'planned') {
+      main.push({ id: 'attendance', label: t('meetings.page.recordAttendance'), icon: 'users' });
+    }
+    if (this.phone() && m.status === 'planned' && this.showVotes()) {
+      main.push({ id: 'votes', label: t('meetings.vote.count'), icon: 'vote' });
+    }
+    const keeper =
+      (m.status === 'planned' && m.canManage) ||
+      (m.status === 'live' && (m.canManage || m.isProtokollant));
+    if (this.phone() && keeper) {
+      main.push({
+        id: 'keeper',
+        label: t(m.status === 'live' ? 'meetings.handover.title' : 'meetings.dock.pickProtokollant'),
+        icon: m.status === 'live' ? 'swap' : 'clipcheck',
+      });
+    }
     if (!this.wide() && m.status !== 'closed' && m.canManage) {
       main.push({ id: 'beamer', label: t('meetings.beamer.enter'), icon: 'monitor' });
     }
@@ -464,11 +522,23 @@ export class MeetingPageComponent {
 
   protected onMenu(item: RowMenuItem): void {
     switch (item.id as SessionAction) {
+      case 'prep':
+        this.prepItem.set(false);
+        break;
       case 'settings':
         this.openSettings.emit();
         break;
       case 'attendance':
         this.panel.set('attendance');
+        break;
+      case 'keeper':
+        this.panel.set('protokollant');
+        break;
+      case 'agenda':
+        this.agendaOpen.set(true);
+        break;
+      case 'votes':
+        this.votesOpen.set(true);
         break;
       case 'beamer':
         this.toggleBeamer.emit();

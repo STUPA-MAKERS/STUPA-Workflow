@@ -36,8 +36,10 @@ import { problemDetail } from '@core/api/problem';
 /**
  * One vote of the open agenda item, as a card beside the sheet.
  *
- * An open vote shows the question, the rules ("Einfache Mehrheit · offene Abstimmung ·
- * Quorum 12 · seit 18:48") and the progress ("14 von 19 Anwesenden haben abgestimmt").
+ * An open vote shows the question and the progress ("14 von 19 Anwesenden haben
+ * abgestimmt"), without a status caption, a rule line or the attendance box: the item
+ * and the dock already say that it runs. Any other vote shows its status and its rules,
+ * a closed one also its result.
  * The lead sees no interim tally: the server reveals the counts only when every present
  * member voted on an open vote, or after the close. The card then shows them.
  *
@@ -156,11 +158,12 @@ export class VoteCardComponent {
     return voteResultStatus(v.result === 'passed' ? 'passed' : 'rejected');
   });
 
+  /** The rules of a vote that is not open: "Absolute Mehrheit · geheime Abstimmung". */
   protected readonly meta = computed(() =>
     voteMetaLine(this.vote(), (key, params) => this.i18n.translate(key, params), this.i18n.locale()),
   );
 
-  /** A vote with guests: "19 Mitglieder + 7 Gäste anwesend", else `null`. */
+  /** A vote with guests: "19 Mitglieder + 7 Gäste anwesend" for the closed sum, else `null`. */
   protected readonly composition = computed(() => {
     const v = this.vote();
     if (!v.guestsVote) return null;

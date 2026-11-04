@@ -16,11 +16,6 @@
             <strong class="num">{{ gs.guests }}</strong> {{ 'guests.sheet.guests' | t }}
           </p>
         }
-        <p class="as__counts">
-          @for (c of counts(); track c.key) {
-            <span><strong class="num">{{ c.n }}</strong> {{ c.key | t }}</span>
-          }
-        </p>
         <app-search-pill
           class="as__search"
           size="md"

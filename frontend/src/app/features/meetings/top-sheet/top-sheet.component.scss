@@ -1,4 +1,5 @@
 @use 'breakpoints' as bp;
+@use 'frosted' as *;
 
 :host {
   display: flex;
@@ -225,18 +226,6 @@
   padding: var(--space-2) 28px var(--space-5);
 }
 
-.ts__foot {
-  display: flex;
-  flex: none;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-1) var(--space-4);
-  margin-top: auto;
-  padding: var(--space-3) 28px var(--space-4);
-  border-top: var(--border-width) solid var(--color-border);
-  font-size: var(--fs-small);
-  color: var(--color-text-muted);
-}
 .ts__todos {
   flex: none;
   padding: 0 var(--space-5) 10px;
@@ -256,7 +245,31 @@
   flex: none;
 }
 
+// The text scrolls inside the sheet on a wider screen: its top end fades below the title
+// while lines lie above it. The foot ends at the round edge of the sheet.
+@include bp.not-phone {
+  .ts__editor.is-fade-start {
+    -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--space-5));
+    mask-image: linear-gradient(to bottom, transparent, #000 var(--space-5));
+  }
+}
+
 @include bp.phone {
+  // The protocol is the page there, not a card on it: no surface, no clip, and the format
+  // bar sticks below the bar of the page (`--ld-bar-height`) while the text scrolls, as
+  // frosted glass like that bar.
+  .ts {
+    border-radius: 0;
+    background: transparent;
+    overflow: visible;
+  }
+  .ts__bar {
+    position: sticky;
+    top: calc(var(--ld-bar-height, 60px) + env(safe-area-inset-top, 0px));
+    z-index: 2;
+    padding-top: var(--space-1);
+    @include frosted(var(--color-bg), bottom);
+  }
   .ts__head {
     padding: var(--space-4) var(--space-4) var(--space-2);
   }
@@ -275,9 +288,11 @@
     height: 1.375rem;
     font-size: var(--fs-h2);
   }
+  // The tool boxes are 40px around a 20px glyph. The bar starts 12px in, so the glyphs sit
+  // a little inside the 16px edge of the text, clear of the screen edge.
   .ts__bar {
     row-gap: 0;
-    padding-inline: 0 var(--space-4);
+    padding-inline: var(--space-3) var(--space-4);
   }
   .ts__bar::after {
     content: '';
@@ -311,7 +326,6 @@
   .ts__public {
     margin-inline: var(--space-4);
   }
-  .ts__foot,
   .ts__keepers {
     padding-inline: var(--space-4);
   }

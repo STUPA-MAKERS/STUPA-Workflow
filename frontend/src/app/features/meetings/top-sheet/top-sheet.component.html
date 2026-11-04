@@ -44,6 +44,9 @@
           <h1 class="ts__title" [title]="t.title || ('meetings.agenda.untitled' | t)">{{ t.title || ('meetings.agenda.untitled' | t) }}</h1>
         }
       </div>
+      @if (!barControls() && proto && !proto.isLocked) {
+        <ng-container [ngTemplateOutlet]="saveTpl" />
+      }
     </header>
 
     @if (follow() && m.status === 'live' && m.protokollantName) {
@@ -60,10 +63,12 @@
       </p>
     }
 
-    @if (!follow()) {
-      <app-todo-linked-list class="ts__todos" kind="agenda_item" headingId="ts-todos" [showTitle]="false" [targetId]="t.id" [lead]="applicationLead()" />
-    } @else if (applicationLead(); as lead) {
-      <app-todo-linked-list class="ts__todos" kind="agenda_item" headingId="ts-todos" [showTitle]="false" [targetId]="t.id" [items]="[]" [lead]="lead" />
+    @if (linked()) {
+      @if (!follow()) {
+        <app-todo-linked-list class="ts__todos" kind="agenda_item" headingId="ts-todos" [showTitle]="false" [targetId]="t.id" [lead]="applicationLead()" />
+      } @else if (applicationLead(); as lead) {
+        <app-todo-linked-list class="ts__todos" kind="agenda_item" headingId="ts-todos" [showTitle]="false" [targetId]="t.id" [items]="[]" [lead]="lead" />
+      }
     }
 
     @if (follow()) {
@@ -85,7 +90,7 @@
         </div>
       }
     } @else if (proto || m.status === 'planned') {
-      @if (!proto?.isLocked) {
+      @if (!proto?.isLocked && barControls()) {
       <div class="ts__bar">
         @if (editable()) {
           <div class="ts__tools" role="toolbar" [attr.aria-label]="'meetings.editor.toolbar' | t">
@@ -126,9 +131,7 @@
           </div>
         }
         <span class="ts__spacer"></span>
-        @if (!saveInFoot()) {
-          <ng-container [ngTemplateOutlet]="saveTpl" />
-        }
+        <ng-container [ngTemplateOutlet]="saveTpl" />
         @if (editable()) {
           <app-button
             class="ts__done"
@@ -175,6 +178,7 @@
           <app-markdown-editor
             #ed
             class="ts__editor"
+            appScrollFade="y"
             [docKey]="docKey()"
             [voteInfo]="voteInfo()"
             [value]="t.body ?? ''"
@@ -205,19 +209,6 @@
     <p class="ts__muted ts__pad">{{ 'meetings.protocol.none' | t }}</p>
   }
 
-  @if (proto && m.status !== 'closed' && !follow()) {
-    @let ps = protocolState(proto);
-    <footer class="ts__foot">
-      <app-status-text [kind]="ps.kind">{{ ps.key | t }}</app-status-text>
-      @if (!proto.isLocked && !canEdit() && m.canWrite) {
-        <span>{{ 'meetings.protocol.takenBy' | t: { name: m.protokollantName ?? '' } }}</span>
-      }
-      @if (saveInFoot() && !proto.isLocked) {
-        <span class="ts__spacer"></span>
-        <ng-container [ngTemplateOutlet]="saveTpl" />
-      }
-    </footer>
-  }
 </article>
 
 <ng-template #saveTpl>
