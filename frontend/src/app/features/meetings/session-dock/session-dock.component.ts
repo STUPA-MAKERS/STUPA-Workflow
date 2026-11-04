@@ -114,6 +114,8 @@ export class SessionDockComponent {
    * turns the dock row into them, and the back arrow at the start turns it back.
    */
   readonly formatTools = input<TemplateRef<unknown> | null>(null);
+  /** The presence chip of the page ("2 live"), first among the chips on a wider screen. */
+  readonly presence = input<TemplateRef<unknown> | null>(null);
   /** The dock row shows the format tools. */
   protected readonly formatting = signal(false);
 

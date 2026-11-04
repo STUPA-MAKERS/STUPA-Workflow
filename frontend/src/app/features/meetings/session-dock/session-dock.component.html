@@ -75,6 +75,9 @@
       <span class="sd__spacer"></span>
 
       <div class="sd__chips">
+        @if (presence(); as tpl) {
+          <ng-container [ngTemplateOutlet]="tpl" />
+        }
         @if (m.status === 'live') {
           <ng-container [ngTemplateOutlet]="presentChip" />
           <ng-container [ngTemplateOutlet]="keeperChip" />

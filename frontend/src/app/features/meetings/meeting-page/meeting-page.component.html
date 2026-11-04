@@ -12,31 +12,6 @@
   [sub]="subLine() || null"
   (back)="back.emit()"
 >
-  @if (showPresence()) {
-    <div class="mp__presence">
-      <button
-        type="button"
-        class="mp__chip"
-        [attr.aria-expanded]="presenceOpen()"
-        [title]="presenceTitle()"
-        (click)="presenceOpen.set(!presenceOpen())"
-        (blur)="presenceOpen.set(false)"
-      >
-        <app-icon name="eye" [size]="18" />
-        {{ 'meetings.dock.live' | t: { n: viewers().length } }}
-      </button>
-      @if (presenceOpen()) {
-        <ul class="mp__viewers" [attr.aria-label]="'meetings.viewers.title' | t">
-          @for (name of viewers(); track name) {
-            <li>{{ name }}</li>
-          } @empty {
-            <li class="mp__muted">{{ 'meetings.viewers.empty' | t }}</li>
-          }
-        </ul>
-      }
-    </div>
-  }
-
   <app-join-qr [meeting]="m" [button]="!phone()" [(open)]="qrOpen" (beamer)="toggleBeamer.emit()" />
 
   @if (wide() && m.status !== 'closed' && m.canManage) {
@@ -136,6 +111,7 @@
   (openVotes)="votesOpen.set(true)"
   [modeToggle]="dockModeToggle()"
   [formatTools]="dockFormat()"
+  [presence]="showPresence() && !phone() ? presenceTpl : null"
   [(mode)]="editorMode"
   (doneChange)="top() && setDone.emit({ item: top()!, done: $event })"
   (step)="step($event)"
@@ -265,4 +241,30 @@
       <app-icon name="image" [size]="20" />
     </button>
   }
+</ng-template>
+
+<!-- Who has the meeting open: the first chip of the dock on a wider screen. -->
+<ng-template #presenceTpl>
+  <div class="mp__presence">
+    <button
+      type="button"
+      class="mp__chip"
+      [attr.aria-expanded]="presenceOpen()"
+      [title]="presenceTitle()"
+      (click)="presenceOpen.set(!presenceOpen())"
+      (blur)="presenceOpen.set(false)"
+    >
+      <app-icon name="eye" [size]="18" />
+      {{ 'meetings.dock.live' | t: { n: viewers().length } }}
+    </button>
+    @if (presenceOpen()) {
+      <ul class="mp__viewers" [attr.aria-label]="'meetings.viewers.title' | t">
+        @for (name of viewers(); track name) {
+          <li>{{ name }}</li>
+        } @empty {
+          <li class="mp__muted">{{ 'meetings.viewers.empty' | t }}</li>
+        }
+      </ul>
+    }
+  </div>
 </ng-template>
