@@ -1,6 +1,12 @@
 @use 'breakpoints' as bp;
+@use 'frosted' as *;
 
+// The bar sticks to the top of the window. It is glass while content runs under it and the
+// solid page colour at rest (`frosted-rest`), as the bar of a detail.
 :host {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
   display: block;
 }
 
@@ -12,6 +18,16 @@
   height: calc(72px + var(--app-top-safe-area, 0px));
   padding: var(--app-top-safe-area, 0px) max(28px, var(--app-right-safe-area, 0px)) 0
     max(28px, var(--app-left-safe-area, 0px));
+  position: relative;
+  isolation: isolate;
+  @include frosted(var(--color-bg), bottom);
+  transition: box-shadow var(--motion-fast) var(--ease-standard);
+}
+.pub--under {
+  box-shadow: var(--shadow-md);
+}
+.pub:not(.pub--under) {
+  @include frosted-rest(var(--color-bg));
 }
 @include bp.phone {
   .pub {

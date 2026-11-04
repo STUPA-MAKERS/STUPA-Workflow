@@ -119,7 +119,13 @@ export class PublicProtocolsComponent {
 
   protected readonly countText = computed(() =>
     this.i18n.translate(
-      this.appliedQuery() ? 'publicProtocols.list.hits' : 'publicProtocols.list.count',
+      this.total() === 1
+        ? this.appliedQuery()
+          ? 'publicProtocols.list.hitsOne'
+          : 'publicProtocols.list.countOne'
+        : this.appliedQuery()
+          ? 'publicProtocols.list.hits'
+          : 'publicProtocols.list.count',
       { n: this.total() },
     ),
   );

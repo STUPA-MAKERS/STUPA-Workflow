@@ -68,11 +68,13 @@
   gap: 10px;
   min-width: 0;
 }
+// The section title of the design system (`app-section`) above the agenda cards.
 .pd__h2 {
   margin: 0;
   padding: 0 var(--space-1);
-  font-size: var(--fs-h2);
-  line-height: var(--lh-h2);
+  color: var(--color-accent-text);
+  font-size: 0.84375rem;
+  line-height: 1.25rem;
   font-weight: var(--fw-semibold);
 }
 .pd__h3 {

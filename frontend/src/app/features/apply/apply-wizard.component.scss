@@ -1,4 +1,5 @@
 @use 'breakpoints' as bp;
+@use 'frosted' as *;
 
 :host {
   display: block;
@@ -175,9 +176,13 @@
   gap: 10px;
   margin-top: auto;
   padding: 14px 24px;
-  border-top: var(--border-width) solid var(--color-border);
   border-radius: 0 0 var(--radius-2xl) var(--radius-2xl);
-  background: var(--color-surface-1);
+  // Glass in the colour of the sheet: the fields that scroll under the sticky bar show
+  // through blurred, and at the end of the step the bar is one with the sheet.
+  @include frosted(var(--color-surface-1), top, $tint: 70%);
+}
+.wz__nav::before {
+  border-radius: inherit;
 }
 .wz__navGap {
   flex: 1 1 auto;
@@ -256,6 +261,5 @@
     flex-wrap: nowrap;
     padding: 10px var(--space-4);
     border-radius: 0 0 var(--radius-xl) var(--radius-xl);
-    background: var(--color-surface-3);
   }
 }
