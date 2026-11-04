@@ -198,3 +198,11 @@ def test_invalid_math_is_a_compile_error() -> None:
 
     with pytest.raises(CompileError):
         _render("Formel $\\frac{a}{$ und $\\begin{x}$", None)
+
+
+def test_signatures_never_split_across_pages(tmp_path: Path) -> None:
+    filler = "".join(f"\n\nZusatzzeile {k} mit etwas Text." for k in range(28))
+    source = (FIXTURES / "protocol-full.md").read_text() + filler
+    lines = _lines(_render(source, None), tmp_path)
+    heading_page = _find(lines, "Unterschriften")[0]
+    assert _find(lines, "Vorstand")[0] == heading_page
