@@ -357,7 +357,7 @@ describe('SessionDockComponent', () => {
      */
     it('has no chips and opens the minute-taker menu from the panel as a bottom sheet over the navigation bar', async () => {
       const { fixture, container, on } = await setup(
-        { meeting: planned({ protokollantId: null, protokollantName: null }) },
+        { meeting: planned({ protokollantId: null, protokollantName: null }), topIndex: -1 },
         [MEDIA.phone],
       );
       const dock = fixture.componentInstance;
