@@ -3,17 +3,13 @@
   role="group"
   [class.pv--bg1]="surface() === 1"
   [class.pv--bg3]="surface() === 3"
-  [attr.aria-labelledby]="id + '-label'"
+  [attr.aria-label]="label()"
 >
   <div
     class="rowgroup"
     [class.rowgroup--bg1]="surface() === 1"
     [class.rowgroup--bg3]="surface() === 3"
   >
-    <div class="pv__head">
-      <span class="pv__label" [id]="id + '-label'">{{ label() }}</span>
-    </div>
-
     @for (p of rows(); track $index; let i = $index) {
       <div class="pv__pos">
         <button
