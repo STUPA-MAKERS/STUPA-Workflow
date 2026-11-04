@@ -79,8 +79,8 @@ type SessionAction = 'prep' | 'settings' | 'attendance' | 'votes' | 'keeper' | '
  * start edge, and the vote cards go above the item. On a phone the agenda sheet, the
  * attendance and the minute-taker open as bottom sheets, and the protocol text has the
  * page to itself: the vote cards open as a bottom sheet from an icon button of the dock,
- * which shows a running vote of the item as a status line (before the opening, when the
- * phone has no dock, from the session menu).
+ * whose number turns to the accent colour while a vote of the item runs (before the
+ * opening, when the phone has no dock, from the session menu).
  *
  * The reason for a disabled action is visible text, not only a tooltip, because a disabled button
  * takes no focus and no touch. The agenda sheet stays outside the body, because the scroll fade of

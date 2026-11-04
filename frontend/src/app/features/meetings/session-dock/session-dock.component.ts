@@ -103,9 +103,9 @@ export class SessionDockComponent {
   readonly doneChange = output<boolean>();
   /** The vote icon button of a phone: the number of votes of the open item, or `null`. */
   readonly votes = input<number | null>(null);
-  /** The open vote of the open item: a phone shows it as a status line above the dock row. */
+  /** The open vote of the open item: it colours the number on the vote button of a phone. */
   readonly openVote = input<MeetingVote | null>(null);
-  /** The vote icon button or the status line: open the vote cards. */
+  /** The vote icon button of a phone: open the vote cards. */
   readonly openVotes = output<void>();
   /** The distance of the popover from the end edge of the dock: the end of its chip. */
   protected readonly popEnd = signal(0);

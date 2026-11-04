@@ -53,19 +53,7 @@
         @if (nowElsewhere(); as now) {
           <span class="sd__now">{{ 'meetings.dock.nowRunning' | t: { top: now.label } }}</span>
           <app-button size="sm" variant="tonal" (click)="jumpNow.emit(now.item.id)">{{ 'meetings.dock.backToNow' | t }}</app-button>
-        } @else if (phone() && openVote(); as v) {
-          <button type="button" class="sd__live" (click)="openVotes.emit()">
-            <span class="sd__liveDot" aria-hidden="true"></span>
-            <span class="sd__liveText">
-              <strong>{{ 'meetings.dock.voteOpen' | t }}</strong>
-              · {{ 'meetings.dock.voted' | t: { voted: v.voted, present: v.present } }}
-              @if (myVote(); as choice) {
-                · {{ 'meetings.dock.yourVote' | t }}: <strong>{{ choice }}</strong>
-              }
-            </span>
-            <app-icon class="sd__liveChev" name="up" [size]="18" />
-          </button>
-        } @else if (myVote(); as choice) {
+        } @else if (!phone() && myVote(); as choice) {
           <span class="sd__vote">
             <app-icon name="vote" [size]="18" />
             <span>{{ 'meetings.dock.yourVote' | t }}: <strong>{{ choice }}</strong></span>

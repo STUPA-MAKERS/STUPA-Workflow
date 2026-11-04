@@ -210,50 +210,8 @@
     position: relative;
     display: inline-flex;
   }
-  // A running vote of the item: a status line above the row, the whole line opens the votes.
-  .sd__mid:has(.sd__live) {
-    order: -1;
-  }
-  .sd__live {
-    display: flex;
-    flex: 1 1 auto;
-    align-items: center;
-    gap: var(--space-2);
-    min-width: 0;
-    min-height: 40px;
-    padding: 0 var(--space-3);
-    border: 0;
-    border-radius: var(--radius-pill);
-    background: var(--color-selected);
-    color: var(--color-text);
-    font: inherit;
-    font-size: var(--fs-small);
-    text-align: start;
-    cursor: pointer;
-  }
-  .sd__live:focus-visible {
-    outline: 2px solid var(--color-focus-ring);
-    outline-offset: 1px;
-  }
-  .sd__liveDot {
-    flex: none;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--color-accent);
-  }
-  .sd__liveText {
-    flex: 1 1 auto;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .sd__liveChev {
-    flex: none;
-    color: var(--color-text-muted);
-  }
-  // The number of votes is grey; a running vote colours it like the open guest requests.
+  // The number of votes is grey; a running vote colours it like the open guest requests,
+  // and the own ballot shows in the sheet, so the phone dock has no status line.
   .sd__badge.sd__badge--quiet {
     background: var(--color-surface-3);
     color: var(--color-text);
