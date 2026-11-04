@@ -603,7 +603,6 @@
   "applications.list.filter.mineClear": "Remove the filter “Only my applications”",
   "applications.list.loading": "Loading applications …",
   "applications.list.error": "Applications could not be loaded.",
-  "applications.list.count": "{count} of {total}",
   "applications.list.loadMore": "Load more",
   "applications.list.untitled": "Untitled",
   "applications.list.export": "Export",

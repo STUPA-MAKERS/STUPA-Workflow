@@ -603,7 +603,6 @@
   "applications.list.filter.mineClear": "Filter „Nur meine Anträge“ entfernen",
   "applications.list.loading": "Anträge werden geladen …",
   "applications.list.error": "Anträge konnten nicht geladen werden.",
-  "applications.list.count": "{count} von {total}",
   "applications.list.loadMore": "Mehr laden",
   "applications.list.untitled": "Ohne Titel",
   "applications.list.export": "Exportieren",
