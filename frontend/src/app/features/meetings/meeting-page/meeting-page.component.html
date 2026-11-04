@@ -78,37 +78,9 @@
     </app-button>
   }
 
-  @if (showVotes()) {
+  @if (showVotes() && !phone()) {
     <aside class="mp__votes" appScrollFade="y" [attr.aria-label]="'meetings.vote.count' | t">
-      @for (vote of votes(); track vote.id) {
-        <app-vote-card
-          [vote]="vote"
-          [meetingStatus]="m.status"
-          [canManage]="m.canManageVotes"
-          [canRun]="m.canManageVotes && m.isProtokollant"
-          [canVote]="m.canVote"
-          [myChoice]="myChoice(vote.id)"
-          [casting]="casting()"
-          [deleting]="deletingVote()"
-          [locked]="locked()"
-          [canInsert]="pendingResult()?.id === vote.id && editable()"
-          [inProtocol]="inText(vote)"
-          [otherOpen]="anyOpenVote()"
-          (close)="voteClose.emit($event)"
-          (cancel)="voteCancel.emit($event)"
-          (open)="voteOpen.emit($event)"
-          (remove)="voteDelete.emit($event)"
-          (cast)="castVote.emit($event)"
-          (insertResult)="insertResult($event)"
-          (electionChanged)="electionChanged.emit()"
-        />
-      }
-      @if (canAddVote() && top(); as t) {
-        <app-button class="mp__addVote" variant="tonal" [block]="true" (click)="voteDialog.emit(t)">
-          <app-icon name="plus" />
-          {{ (t.applicationId ? addVoteKey() : 'meetings.vote.addQuestion') | t }}
-        </app-button>
-      }
+      <ng-container [ngTemplateOutlet]="votesTpl" />
     </aside>
   }
 
@@ -165,6 +137,9 @@
   [myVote]="myVote()"
   [(panel)]="panel"
   [done]="dockDone()"
+  [votes]="dockVotes()"
+  [openVote]="phone() ? openVote() : null"
+  (openVotes)="votesOpen.set(true)"
   [modeToggle]="dockModeToggle()"
   [(mode)]="editorMode"
   (doneChange)="top() && setDone.emit({ item: top()!, done: $event })"
@@ -225,3 +200,47 @@
     (remove)="removeFromAgenda.emit($event)"
   />
 </ng-template>
+
+<!-- The vote cards of the open item: a column beside the sheet, on a phone a bottom sheet
+     that the dock opens, so the protocol text has the page to itself. -->
+<ng-template #votesTpl>
+  @for (vote of votes(); track vote.id) {
+    <app-vote-card
+      [vote]="vote"
+      [meetingStatus]="m.status"
+      [canManage]="m.canManageVotes"
+      [canRun]="m.canManageVotes && m.isProtokollant"
+      [canVote]="m.canVote"
+      [myChoice]="myChoice(vote.id)"
+      [casting]="casting()"
+      [deleting]="deletingVote()"
+      [locked]="locked()"
+      [canInsert]="pendingResult()?.id === vote.id && editable()"
+      [inProtocol]="inText(vote)"
+      [otherOpen]="anyOpenVote()"
+      (close)="voteClose.emit($event)"
+      (cancel)="voteCancel.emit($event)"
+      (open)="voteOpen.emit($event)"
+      (remove)="voteDelete.emit($event)"
+      (cast)="castVote.emit($event)"
+      (insertResult)="insertResult($event)"
+      (electionChanged)="electionChanged.emit()"
+    />
+  }
+  @if (canAddVote() && top(); as t) {
+    <app-button class="mp__addVote" variant="tonal" [block]="true" (click)="voteDialog.emit(t)">
+      <app-icon name="plus" />
+      {{ (t.applicationId ? addVoteKey() : 'meetings.vote.addQuestion') | t }}
+    </app-button>
+  }
+</ng-template>
+
+@if (phone()) {
+  <app-side-sheet side="bottom" [heading]="'meetings.vote.count' | t" [(open)]="votesOpen">
+    @if (votesOpen()) {
+      <div class="mp__votes mp__votes--sheet">
+        <ng-container [ngTemplateOutlet]="votesTpl" />
+      </div>
+    }
+  </app-side-sheet>
+}

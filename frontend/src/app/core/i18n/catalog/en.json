@@ -1291,6 +1291,8 @@
   "meetings.dock.top": "Item",
   "meetings.dock.none": "–",
   "meetings.dock.voteCast": "cast",
+  "meetings.dock.voteOpen": "Vote open",
+  "meetings.dock.voted": "{voted} of {present} voted",
   "meetings.follow.now": "Now",
   "meetings.keeper.from": "from {start}",
   "meetings.keeper.fromTopAt": "from {top}, {time}",

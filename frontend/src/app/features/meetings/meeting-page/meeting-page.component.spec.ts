@@ -273,6 +273,17 @@ describe('MeetingPageComponent', () => {
       flushDelegations();
     });
 
+    /** The protocol has the phone page to itself: the vote cards open as a bottom sheet. */
+    it('opens the vote cards from the phone dock instead of above the text', async () => {
+      const { fixture } = await setup({}, [MEDIA.phone]);
+      const host = fixture.nativeElement as HTMLElement;
+      expect(host.querySelector('aside.mp__votes')).toBeNull();
+      await userEvent.click(screen.getByRole('button', { name: 'Abstimmungen' }));
+      const sheet = screen.getByRole('dialog', { name: 'Abstimmungen' });
+      expect(sheet).toHaveClass('ss--bottom');
+      expect(sheet.querySelector('.mp__votes--sheet')).not.toBeNull();
+    });
+
     /** The phone dock holds "Erledigt" and the view switch as icon buttons, the sheet not. */
     it('ticks the item and switches the view from the phone dock', async () => {
       const { on, fixture } = await setup({}, [MEDIA.phone]);

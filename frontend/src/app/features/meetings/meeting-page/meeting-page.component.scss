@@ -194,8 +194,10 @@
     border-radius: 0;
     overflow: visible;
   }
+  // The protocol reaches the screen edges and keeps its own 16px inset (`TopSheetComponent`).
   .mp__sheet {
     min-height: 60dvh;
+    margin-inline: calc(-1 * var(--space-3));
   }
   .mp__dock {
     position: fixed;

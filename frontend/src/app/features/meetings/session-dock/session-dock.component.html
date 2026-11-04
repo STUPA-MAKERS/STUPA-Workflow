@@ -53,6 +53,18 @@
         @if (nowElsewhere(); as now) {
           <span class="sd__now">{{ 'meetings.dock.nowRunning' | t: { top: now.label } }}</span>
           <app-button size="sm" variant="tonal" (click)="jumpNow.emit(now.item.id)">{{ 'meetings.dock.backToNow' | t }}</app-button>
+        } @else if (phone() && openVote(); as v) {
+          <button type="button" class="sd__live" (click)="openVotes.emit()">
+            <span class="sd__liveDot" aria-hidden="true"></span>
+            <span class="sd__liveText">
+              <strong>{{ 'meetings.dock.voteOpen' | t }}</strong>
+              · {{ 'meetings.dock.voted' | t: { voted: v.voted, present: v.present } }}
+              @if (myVote(); as choice) {
+                · {{ 'meetings.dock.yourVote' | t }}: <strong>{{ choice }}</strong>
+              }
+            </span>
+            <app-icon class="sd__liveChev" name="up" [size]="18" />
+          </button>
         } @else if (myVote(); as choice) {
           <span class="sd__vote">
             <app-icon name="vote" [size]="18" />
@@ -103,6 +115,14 @@
         }
       }
     </span>
+    @if (votes() !== null) {
+      <span class="sd__tool">
+        <app-button variant="text" [iconOnly]="true" [ariaLabel]="'meetings.vote.count' | t" (click)="openVotes.emit()"><app-icon name="vote" /></app-button>
+        @if (votes()) {
+          <span class="sd__badge sd__badge--tool num" [class.sd__badge--quiet]="!openVote()" aria-hidden="true">{{ votes() }}</span>
+        }
+      </span>
+    }
     @if (modeToggle()) {
       <app-button
         [variant]="mode() === 'raw' ? 'tonal' : 'text'"

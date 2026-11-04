@@ -14,7 +14,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import type { AgendaItem, Attendance, Meeting, Uuid } from '@core/api/models';
+import type { AgendaItem, Attendance, Meeting, MeetingVote, Uuid } from '@core/api/models';
 import { ButtonComponent, IconComponent, MEDIA, mediaQuery, SideSheetComponent } from '@stupa-makers/ui-kit';
 import { KeeperMenuComponent } from '../keeper-menu/keeper-menu.component';
 import { keeperNames } from '../keepers.util';
@@ -101,6 +101,12 @@ export class SessionDockComponent {
   readonly mode = model<EditorMode>('formatted');
   /** The icon button "Erledigt" of a phone: the new done mark of the open item. */
   readonly doneChange = output<boolean>();
+  /** The vote icon button of a phone: the number of votes of the open item, or `null`. */
+  readonly votes = input<number | null>(null);
+  /** The open vote of the open item: a phone shows it as a status line above the dock row. */
+  readonly openVote = input<MeetingVote | null>(null);
+  /** The vote icon button or the status line: open the vote cards. */
+  readonly openVotes = output<void>();
   /** The distance of the popover from the end edge of the dock: the end of its chip. */
   protected readonly popEnd = signal(0);
 
