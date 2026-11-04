@@ -1285,13 +1285,23 @@ describe('TodoCardDetailComponent', () => {
      * The chat waits for the sheet, so a closed sheet marks nothing as seen. The fields stay below
      * the sheet.
      */
-    it('has no tabs: the fields, the bar, and the activity in a sheet from the bottom', async () => {
+    it('has no tabs and no bar: the fields, the ⋮ menu, and the activity in a sheet from the bottom', async () => {
       const { cmp, detect, fixture } = await setup();
       expect(fixture.nativeElement).toHaveClass('cd--phone');
       expect(screen.queryByRole('tablist')).toBeNull();
       expect(screen.queryByRole('button', { name: 'Link kopieren' })).toBeNull();
       expect(fixture.nativeElement.querySelector('app-chat')).toBeNull();
-      fireEvent.click(screen.getByRole('button', { name: /Verschieben/ }));
+      // "Verschieben" and "Erledigt" are in the ⋮ menu, not in a bar at the foot.
+      expect(screen.queryByRole('button', { name: /^Verschieben$|^Erledigt$/ })).toBeNull();
+      expect(fixture.nativeElement.querySelector('.cd__bar')).toBeNull();
+      expect(cmp.menuSections()[0].items.map((i) => [i.id, i.label, i.icon])).toEqual([
+        ['done', 'Erledigt', 'check'],
+        ['move', 'Verschieben', 'swap'],
+      ]);
+      const toggle = jest.spyOn(cmp, 'toggleDone').mockImplementation(() => undefined);
+      cmp.onMenu(cmp.menuSections()[0].items[0]);
+      expect(toggle).toHaveBeenCalled();
+      cmp.onMenu(cmp.menuSections()[0].items[1]);
       expect(cmp.moveOpen()).toBe(true);
       detect();
       fireEvent.click(screen.getByRole('button', { name: 'In anderes Board verschieben' }));
@@ -1299,7 +1309,6 @@ describe('TodoCardDetailComponent', () => {
       expect(cmp.transferOpen()).toBe(true);
       cmp.transferOpen.set(false);
       detect();
-      fireEvent.click(screen.getByRole('button', { name: /Erledigt/ }));
       const open = screen.getByRole('button', { name: 'Aktivität, 1' });
       expect(open.querySelector('.cd__activityN')?.textContent).toBe('1');
       fireEvent.click(open);
@@ -1307,7 +1316,6 @@ describe('TodoCardDetailComponent', () => {
       expect(cmp.activityOpen()).toBe(true);
       const sheet = screen.getByRole('dialog', { name: 'Aktivität' });
       expect(sheet.querySelector('app-chat')).toHaveClass('cd__chat--sheet');
-      expect(screen.getByRole('button', { name: /Verschieben/ })).toBeInTheDocument();
     });
 
     it('closes the activity sheet when another card opens', async () => {
@@ -1345,12 +1353,12 @@ describe('TodoCardDetailComponent', () => {
 
     it('has no "Im Board öffnen" in the menu of the drawer', async () => {
       const { cmp } = await setup();
-      expect(cmp.menuSections()[0].items[0].id).toBe('rename');
+      expect(cmp.menuSections().flatMap((x) => x.items.map((i) => i.id))).not.toContain('openInBoard');
     });
 
     it('shows "Wieder öffnen" on a done card', async () => {
-      await setup({ card: detail({ columnId: 'c-4' }) });
-      expect(screen.getByRole('button', { name: /Wieder öffnen/ })).toBeInTheDocument();
+      const { cmp } = await setup({ card: detail({ columnId: 'c-4' }) });
+      expect(cmp.menuSections()[0].items[0]).toMatchObject({ id: 'done', label: 'Wieder öffnen', icon: 'undo' });
     });
   });
 });
