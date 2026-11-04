@@ -28,6 +28,11 @@
   background: var(--color-surface-1);
   box-shadow: var(--shadow-lg);
 }
+// In the dock at the foot of the page the code opens above the button.
+.jq--up .jq__pop {
+  top: auto;
+  bottom: calc(100% + var(--space-3));
+}
 .jq__body {
   display: flex;
   flex-direction: column;

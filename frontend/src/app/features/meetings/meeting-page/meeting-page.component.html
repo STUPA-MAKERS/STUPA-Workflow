@@ -12,13 +12,8 @@
   [sub]="subLine() || null"
   (back)="back.emit()"
 >
-  <app-join-qr [meeting]="m" [button]="!phone()" [(open)]="qrOpen" (beamer)="toggleBeamer.emit()" />
-
-  @if (wide() && m.status !== 'closed' && m.canManage) {
-    <app-button class="mp__beamer" variant="tonal" (click)="toggleBeamer.emit()">
-      <app-icon name="monitor" />
-      {{ 'meetings.beamer.enter' | t }}
-    </app-button>
+  @if (phone()) {
+    <app-join-qr [meeting]="m" [button]="false" [(open)]="qrOpen" (beamer)="toggleBeamer.emit()" />
   }
 
   @if (!phone()) {
@@ -112,6 +107,7 @@
   [modeToggle]="dockModeToggle()"
   [formatTools]="dockFormat()"
   [presence]="showPresence() && !phone() ? presenceTpl : null"
+  [extraTools]="phone() ? null : showTpl"
   [(mode)]="editorMode"
   (doneChange)="top() && setDone.emit({ item: top()!, done: $event })"
   (step)="step($event)"
@@ -267,4 +263,14 @@
       </ul>
     }
   </div>
+</ng-template>
+
+<!-- The QR code and the beamer as icon buttons of the dock on a wider screen. -->
+<ng-template #showTpl>
+  <app-join-qr [meeting]="meeting()" [iconOnly]="true" [(open)]="qrOpen" (beamer)="toggleBeamer.emit()" />
+  @if (wide() && meeting().status !== 'closed' && meeting().canManage) {
+    <app-button variant="text" [iconOnly]="true" [ariaLabel]="'meetings.beamer.enter' | t" (click)="toggleBeamer.emit()">
+      <app-icon name="monitor" />
+    </app-button>
+  }
 </ng-template>

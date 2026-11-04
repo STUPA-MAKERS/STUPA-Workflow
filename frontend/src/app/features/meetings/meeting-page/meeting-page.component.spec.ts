@@ -240,7 +240,7 @@ describe('MeetingPageComponent', () => {
       expect(screen.queryByRole('button', { name: 'Beamer-Ansicht' })).toBeNull();
     });
 
-    it('keeps the beamer in the header on a wide screen', async () => {
+    it('keeps the beamer in the dock on a wide screen', async () => {
       const { on } = await setup({}, [MEDIA.wide]);
       await userEvent.click(screen.getByRole('button', { name: 'Beamer-Ansicht' }));
       expect(on.toggleBeamer).toHaveBeenCalled();

@@ -116,6 +116,8 @@ export class SessionDockComponent {
   readonly formatTools = input<TemplateRef<unknown> | null>(null);
   /** The presence chip of the page ("2 live"), first among the chips on a wider screen. */
   readonly presence = input<TemplateRef<unknown> | null>(null);
+  /** More icon buttons of the page after the view switch (QR code, beamer) on a wider screen. */
+  readonly extraTools = input<TemplateRef<unknown> | null>(null);
   /** The dock row shows the format tools. */
   protected readonly formatting = signal(false);
 

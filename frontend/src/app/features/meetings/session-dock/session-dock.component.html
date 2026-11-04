@@ -27,6 +27,9 @@
         <span class="sd__small">{{ 'meetings.dock.notStarted' | t }}</span>
         <span class="sd__strong">{{ 'meetings.dock.topsPrepared' | t: { n: agenda().length } }}</span>
       </div>
+      @if (!phone()) {
+        <ng-container [ngTemplateOutlet]="deskTools" />
+      }
     } @else if (m.status === 'closed') {
       <div class="sd__state">
         <span class="sd__small">{{ closedLine() }}</span>
@@ -138,17 +141,18 @@
   </div>
 </ng-template>
 
-<!-- On a wider screen: the format tools of the text, "Erledigt" and the view switch, the
-     icon buttons of the phone dock with the format tools in the row. -->
+<!-- On a wider screen: the format tools of the text, "Erledigt", the view switch and the
+     icon buttons of the page (QR code, beamer), the icon buttons of the phone dock with the
+     format tools in the row. -->
 <ng-template #deskTools>
-  @if (formatTools() || done() !== null || modeToggle()) {
+  @if (formatTools() || done() !== null || modeToggle() || extraTools()) {
     <span class="sd__vr" aria-hidden="true"></span>
     <div class="sd__tools">
       @if (formatTools(); as tools) {
         <div class="sd__format" role="toolbar" [attr.aria-label]="'meetings.editor.toolbar' | t">
           <ng-container [ngTemplateOutlet]="tools" />
         </div>
-        @if (done() !== null || modeToggle()) {
+        @if (done() !== null || modeToggle() || extraTools()) {
           <span class="sd__vr" aria-hidden="true"></span>
         }
       }
@@ -169,6 +173,9 @@
           [ariaLabel]="'meetings.editor.modeRaw' | t"
           (click)="toggleMode()"
         ><app-icon name="code" /></app-button>
+      }
+      @if (extraTools(); as tpl) {
+        <ng-container [ngTemplateOutlet]="tpl" />
       }
     </div>
   }

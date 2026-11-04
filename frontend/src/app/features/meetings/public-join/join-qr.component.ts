@@ -47,6 +47,11 @@ export class JoinQrComponent {
   readonly meeting = input.required<Meeting>();
   /** The trigger button in the header (wide and medium screens). */
   readonly button = input(true);
+  /**
+   * The trigger is an icon button that opens the code above it, for the dock at the foot
+   * of the page.
+   */
+  readonly iconOnly = input(false);
   readonly open = model(false);
   /** "Auf dem Beamer zeigen". */
   readonly beamer = output<void>();

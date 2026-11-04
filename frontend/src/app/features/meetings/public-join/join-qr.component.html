@@ -1,6 +1,15 @@
 @if (link(); as l) {
-  <div class="jq">
-    @if (button()) {
+  <div class="jq" [class.jq--up]="iconOnly()">
+    @if (button() && iconOnly()) {
+      <app-button
+        [variant]="open() ? 'tonal' : 'text'"
+        [iconOnly]="true"
+        [ariaLabel]="'guests.qr.title' | t"
+        [attr.aria-expanded]="open()"
+        aria-haspopup="dialog"
+        (click)="open.set(!open())"
+      ><app-icon name="grid" /></app-button>
+    } @else if (button()) {
       <app-button
         variant="outlined"
         [class.jq__trigger--on]="open()"
