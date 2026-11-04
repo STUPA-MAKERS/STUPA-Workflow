@@ -86,41 +86,50 @@
       </div>
     }
 
-    <app-segmented width="fill" [ariaLabel]="'guests.view.tabs' | t" [options]="tabs()" [value]="tab()" (valueChange)="setTab($event)" />
-
-    @if (tab() === 'agenda') {
-      <ol class="gv__agenda">
-        @for (row of rows(); track row.item.id) {
-          <li class="gv__item" [class.gv__item--now]="row.now" [class.gv__item--done]="row.done" [attr.aria-current]="row.now ? 'step' : null">
-            <app-top-badge
-              class="gv__badge"
-              [number]="row.item.position"
-              [state]="row.done && !row.item.nonPublic ? 'done' : row.now ? 'now' : 'todo'"
-              [lock]="row.item.nonPublic"
-              [iconSize]="15"
-            />
-            <span class="gv__itemText">
-              <span class="gv__itemTitle ell" [title]="row.item.title ?? ''">{{ row.item.title || ('meetings.agenda.untitled' | t) }}</span>
-              @if (row.sub) {
-                <span class="gv__itemSub ell">{{ row.sub }}</span>
-              }
-            </span>
-          </li>
-        }
-      </ol>
-    } @else {
-      <section class="gv__proto" [attr.aria-label]="'guests.view.protocol' | t">
-        <p class="gv__protoNote">
-          <app-icon name="edit" [size]="14" />
-          {{ 'guests.view.protocolNote' | t }}
-        </p>
-        @for (item of excerpts(); track item.id) {
-          <h3 class="gv__protoHead">{{ 'meetings.agenda.top' | t: { n: item.position } }} · {{ item.title }}</h3>
-          <app-markdown-view [src]="item.body ?? ''" [imageSrc]="null" />
-        } @empty {
-          <app-empty-state shape="text" rows="3" [heading]="'guests.view.protocolEmpty' | t" />
-        }
-      </section>
-    }
+    <app-tab-pager
+      class="gv__tabs"
+      idPrefix="gv"
+      [ariaLabel]="'guests.view.tabs' | t"
+      [tabs]="tabs()"
+      [active]="tab()"
+      [paged]="phone()"
+      (activeChange)="setTab($event)"
+    >
+      <ng-template appTabPage="agenda">
+          <ol class="gv__agenda">
+            @for (row of rows(); track row.item.id) {
+              <li class="gv__item" [class.gv__item--now]="row.now" [class.gv__item--done]="row.done" [attr.aria-current]="row.now ? 'step' : null">
+                <app-top-badge
+                  class="gv__badge"
+                  [number]="row.item.position"
+                  [state]="row.done && !row.item.nonPublic ? 'done' : row.now ? 'now' : 'todo'"
+                  [lock]="row.item.nonPublic"
+                  [iconSize]="15"
+                />
+                <span class="gv__itemText">
+                  <span class="gv__itemTitle ell" [title]="row.item.title ?? ''">{{ row.item.title || ('meetings.agenda.untitled' | t) }}</span>
+                  @if (row.sub) {
+                    <span class="gv__itemSub ell">{{ row.sub }}</span>
+                  }
+                </span>
+              </li>
+            }
+          </ol>
+      </ng-template>
+      <ng-template appTabPage="protocol">
+          <section class="gv__proto" [attr.aria-label]="'guests.view.protocol' | t">
+            <p class="gv__protoNote">
+              <app-icon name="edit" [size]="14" />
+              {{ 'guests.view.protocolNote' | t }}
+            </p>
+            @for (item of excerpts(); track item.id) {
+              <h3 class="gv__protoHead">{{ 'meetings.agenda.top' | t: { n: item.position } }} · {{ item.title }}</h3>
+              <app-markdown-view [src]="item.body ?? ''" [imageSrc]="null" />
+            } @empty {
+              <app-empty-state shape="text" rows="3" [heading]="'guests.view.protocolEmpty' | t" />
+            }
+          </section>
+      </ng-template>
+    </app-tab-pager>
   </div>
 }

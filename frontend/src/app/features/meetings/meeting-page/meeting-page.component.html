@@ -66,7 +66,7 @@
       <app-top-sheet
         class="mp__sheet"
         [linked]="false"
-        [barControls]="m.status === 'planned'"
+        [barControls]="false"
         [(mode)]="editorMode"
         [meeting]="m"
         [protocol]="proto"
@@ -93,7 +93,7 @@
 
 <app-session-dock
   class="mp__dock"
-  [class.mp__dock--quiet]="phone() && m.status === 'planned'"
+  [class.mp__dock--quiet]="phone() && m.status === 'planned' && !dockModeToggle()"
   [meeting]="m"
   [agenda]="agenda()"
   [topIndex]="topIndex()"
