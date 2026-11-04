@@ -23,12 +23,15 @@ const PAGES: [scss: string, block: string][] = [
   ['features/gremien/gremien-page/gremien.component.scss', 'grl'],
 ];
 
+/** The meetings list has no detail pane on any screen, so it never takes the split scroll. */
+const SINGLE_COLUMN = new Set(['mtl']);
+
 describe('the list pane pages', () => {
   it.each(PAGES)('%s takes the scroll area and the groups from the list pane', (scss, block) => {
     const src = read(scss);
     expect(src).toMatch(/@use 'list-pane' as lp;/);
     expect(src).toContain(`@include lp.scroll(--${block}-fade);`);
-    expect(src).toContain(`@include lp.split-scroll(--${block}-fade);`);
+    if (!SINGLE_COLUMN.has(block)) expect(src).toContain(`@include lp.split-scroll(--${block}-fade);`);
     expect(src).toContain('@include lp.stack;');
   });
 
