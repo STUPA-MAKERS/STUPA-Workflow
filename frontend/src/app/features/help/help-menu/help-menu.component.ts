@@ -4,6 +4,8 @@ import {
   Component,
   ElementRef,
   HostListener,
+  Injector,
+  afterNextRender,
   computed,
   inject,
   input,
@@ -14,12 +16,20 @@ import {
 import { AuthService } from '@core/auth/auth.service';
 import { BrandingService } from '@core/branding/branding.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { IconComponent } from '@stupa-makers/ui-kit';
+import {
+  IconComponent,
+  MEDIA,
+  SideSheetComponent,
+  mediaQuery,
+  showInTopLayer,
+} from '@stupa-makers/ui-kit';
 import { HelpService } from '../help.service';
 
 /**
  * `rail`: the entry "Hilfe" at the foot of the navigation rail; the menu opens beside it.
- * `header`: the button "Hilfe" of the public header; the menu opens below it.
+ * `header`: the button "Hilfe" of the public header; the menu opens below it, and on a
+ *   phone as the shared bottom sheet, because a popover under a button near the left edge
+ *   does not fit beside it.
  * `sheet`: the entries only, inline in the "Mehr" sheet of the phone bar.
  */
 export type HelpMenuVariant = 'rail' | 'header' | 'sheet';
@@ -44,7 +54,7 @@ let nextId = 0;
   selector: 'app-help-menu',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgTemplateOutlet, TranslatePipe, IconComponent],
+  imports: [NgTemplateOutlet, TranslatePipe, IconComponent, SideSheetComponent],
   templateUrl: './help-menu.component.html',
   styleUrl: './help-menu.component.scss',
 })
@@ -60,6 +70,12 @@ export class HelpMenuComponent {
   readonly navigated = output<void>();
 
   readonly open = signal(false);
+  /** The phone sheet of the `header` variant is open. */
+  readonly sheetOpen = signal(false);
+  private readonly phone = mediaQuery(MEDIA.phone);
+  private readonly injector = inject(Injector);
+  /** The top-layer box of the phone sheet, so the glass of the header does not clip it. */
+  private readonly layer = viewChild<ElementRef<HTMLElement>>('layer');
   /** Fixed position of the popover. */
   readonly position = signal<{ left: number | null; right: number | null; top: number | null; bottom: number | null }>({
     left: null,
@@ -87,6 +103,13 @@ export class HelpMenuComponent {
    * The panel renders in this change detection, so its first control gets the focus right after.
    */
   show(): void {
+    if (this.variant() === 'header' && this.phone()) {
+      this.sheetOpen.set(true);
+      afterNextRender(() => showInTopLayer(this.layer()?.nativeElement), {
+        injector: this.injector,
+      });
+      return;
+    }
     const trigger = this.trigger()!.nativeElement;
     const rect = trigger.getBoundingClientRect();
     if (this.variant() === 'header') {
@@ -119,6 +142,7 @@ export class HelpMenuComponent {
   /** The handbook link was followed (it opens in a new tab). */
   onWiki(): void {
     this.close();
+    this.sheetOpen.set(false);
     this.navigated.emit();
   }
 
@@ -128,6 +152,7 @@ export class HelpMenuComponent {
    */
   report(): void {
     this.close(true);
+    this.sheetOpen.set(false);
     this.navigated.emit();
     this.help.openReport();
   }

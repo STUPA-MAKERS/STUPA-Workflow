@@ -59,19 +59,15 @@
   background: var(--color-surface-1);
 }
 
+// The section title of the design system (`app-section`): small accent type on the inset of
+// the cards, and no count beside it.
 .pp__group {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  margin: var(--space-2) var(--space-1) 0;
-  font-size: var(--fs-h3);
-  line-height: var(--lh-h3);
+  margin: var(--space-2) 0 0;
+  padding: 0 var(--space-1);
+  color: var(--color-accent-text);
+  font-size: 0.84375rem;
+  line-height: 1.25rem;
   font-weight: var(--fw-semibold);
-}
-.pp__groupCount {
-  color: var(--color-text-muted);
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-regular);
 }
 
 .pp__card {

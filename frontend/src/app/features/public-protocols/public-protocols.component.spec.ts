@@ -47,7 +47,7 @@ describe('PublicProtocolsComponent', () => {
     const { api } = await setup();
     expect(api.list).toHaveBeenCalledWith({ gremium: [], semester: '', q: '', limit: 20 });
     expect(screen.getByRole('heading', { level: 1, name: 'Öffentliche Protokolle' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 2, name: /Sommersemester 2026\s*12/ })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Sommersemester 2026' })).toBeInTheDocument();
     const card = screen.getByRole('article');
     expect(within(card).getByText('Studierendenparlament · Di, 29.09.2026')).toBeInTheDocument();
     expect(
@@ -63,7 +63,7 @@ describe('PublicProtocolsComponent', () => {
       '/api/public/protocols/p-1/pdf',
     );
     expect(within(card).getByText('PDF · 212 KB · finalisiert 02.10.2026')).toBeInTheDocument();
-    expect(screen.getByText('1 Protokolle')).toBeInTheDocument();
+    expect(screen.getByText('1 Protokoll')).toBeInTheDocument();
     expect(document.body.textContent).not.toContain('g-1');
     expect(TestBed.inject(Meta).getTag('name="robots"')?.content).toBe('noindex');
   });
@@ -85,7 +85,7 @@ describe('PublicProtocolsComponent', () => {
     expect(screen.getByText('1 Beschluss')).toBeInTheDocument();
     expect(screen.getByText('2 nicht-öffentliche TOPs ausgelassen')).toBeInTheDocument();
     expect(screen.getByText('Ohne Beschluss')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 2, name: /Wintersemester 2025\/26\s*1/ })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Wintersemester 2025/26' })).toBeInTheDocument();
     const first = screen.getAllByRole('article')[0];
     expect(within(first).queryByRole('link', { name: /PDF/ })).toBeNull();
     expect(within(first).getByText('PDF')).toBeInTheDocument();

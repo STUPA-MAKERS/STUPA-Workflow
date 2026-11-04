@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '@core/auth/auth.service';
 import { BrandingService } from '@core/branding/branding.service';
@@ -14,6 +14,10 @@ import { LanguageSelectComponent } from '../language-select/language-select.comp
  * "Anmelden".
  *
  * A signed-out visitor has no account menu, so language and appearance stay in the bar.
+ *
+ * The bar stays at the top while the page scrolls, like the bar of a detail in the signed-in
+ * frame: frosted glass with a light shadow once content runs under it (`pub--under`), the
+ * solid page colour at rest, because at rest the glass would blur the page below into it.
  */
 @Component({
   selector: 'app-public-header',
@@ -35,6 +39,26 @@ export class PublicHeaderComponent {
   readonly branding = inject(BrandingService);
   readonly theme = inject(ThemeService);
   readonly i18n = inject(I18nService);
+
+  /** The page has scrolled, so content runs under the bar. */
+  protected readonly under = signal(false);
+
+  constructor() {
+    let frame = 0;
+    const check = (): void => {
+      frame = 0;
+      this.under.set((document.scrollingElement?.scrollTop ?? window.scrollY) > 0);
+    };
+    const onScroll = (): void => {
+      if (!frame) frame = requestAnimationFrame(check);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    frame = requestAnimationFrame(check);
+    inject(DestroyRef).onDestroy(() => {
+      window.removeEventListener('scroll', onScroll);
+      if (frame) cancelAnimationFrame(frame);
+    });
+  }
 
   /** The wordmark of the branding, or the built-in one in the colours of the theme. */
   readonly logoSrc = this.branding.wordmarkSrc;

@@ -3,6 +3,8 @@ import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { AuthService } from '@core/auth/auth.service';
 import { BrandingService } from '@core/branding/branding.service';
+import { MEDIA } from '@stupa-makers/ui-kit';
+import { matchMediaQueries } from '../../../../testing/meeting-fixtures';
 import { HelpService } from '../help.service';
 import { HelpMenuComponent, type HelpMenuVariant } from './help-menu.component';
 
@@ -186,5 +188,21 @@ describe('HelpMenuComponent', () => {
   it('offers "Problem melden" to a visitor while public tickets are on', async () => {
     await setup({ variant: 'sheet', signedIn: false, publicTickets: true });
     expect(screen.getByRole('button', { name: 'Problem melden' })).toBeInTheDocument();
+  });
+
+  /** On a phone the header button opens the bottom sheet, which a popover beside it would not fit. */
+  it('opens the header menu as the bottom sheet on a phone', async () => {
+    const restore = matchMediaQueries(MEDIA.phone);
+    try {
+      const { fixture } = await setup({ variant: 'header' });
+      await userEvent.click(trigger());
+      fixture.detectChanges();
+      expect(trigger()).toHaveAttribute('aria-expanded', 'true');
+      expect(panel()).toBeNull();
+      expect(screen.getByRole('dialog', { name: 'Hilfe' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /Handbuch im Wiki/ })).toHaveAttribute('href', WIKI);
+    } finally {
+      restore();
+    }
   });
 });

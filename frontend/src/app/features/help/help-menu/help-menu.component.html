@@ -34,8 +34,8 @@
       #trigger
       type="button"
       [class]="variant() === 'header' ? 'hm__head' : 'hm__rail'"
-      [class.is-open]="open()"
-      [attr.aria-expanded]="open()"
+      [class.is-open]="open() || sheetOpen()"
+      [attr.aria-expanded]="open() || sheetOpen()"
       [attr.aria-controls]="open() ? panelId : null"
       (click)="toggle()"
     >
@@ -63,6 +63,15 @@
       >
         <p class="hm__title">{{ 'help.title' | t }}</p>
         <ng-container [ngTemplateOutlet]="entries" />
+      </div>
+    }
+    @if (sheetOpen()) {
+      <div #layer class="hm__layer" popover="manual">
+        <app-side-sheet side="bottom" [heading]="'help.title' | t" [(open)]="sheetOpen">
+          <div class="hm hm--sheet hm--inSheet" role="group">
+            <ng-container [ngTemplateOutlet]="entries" />
+          </div>
+        </app-side-sheet>
       </div>
     }
   }
