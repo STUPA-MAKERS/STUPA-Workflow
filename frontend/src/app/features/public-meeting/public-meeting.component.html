@@ -55,7 +55,9 @@
         <span class="pm__stateIcon pm__stateIcon--muted"><app-icon name="lock" [size]="38" /></span>
         <h1 class="pm__h1">{{ 'guests.page.notPublicTitle' | t }}</h1>
         <p class="pm__lead">{{ 'guests.page.notPublicText' | t }}</p>
-        <p class="pm__login">{{ 'guests.join.member' | t }} <button type="button" class="pm__link" (click)="login()">{{ 'guests.join.login' | t }}</button></p>
+        @if (!loggedIn()) {
+          <p class="pm__login">{{ 'guests.join.member' | t }} <button type="button" class="pm__link" (click)="login()">{{ 'guests.join.login' | t }}</button></p>
+        }
       </div>
     }
     @case ('closed') {
@@ -101,7 +103,9 @@
           </app-button>
           <button type="submit" hidden></button>
         </form>
-        <p class="pm__login">{{ 'guests.join.member' | t }} <button type="button" class="pm__link" (click)="login()">{{ 'guests.join.login' | t }}</button></p>
+        @if (!loggedIn()) {
+          <p class="pm__login">{{ 'guests.join.member' | t }} <button type="button" class="pm__link" (click)="login()">{{ 'guests.join.login' | t }}</button></p>
+        }
         <app-note icon="lock">{{ 'guests.join.privacy' | t }}</app-note>
       }
     }

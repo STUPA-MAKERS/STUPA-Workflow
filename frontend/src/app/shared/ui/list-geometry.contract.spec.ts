@@ -31,7 +31,6 @@ const KNOWN_LIST_PAGES = [
   'pages/applications/applications-list.component',
   'pages/tasks/tasks.component',
   'features/voting/voting-page/voting.component',
-  'features/meetings/meetings-list/meetings-list.component',
   'pages/expenses/expenses.component',
   'pages/invoices/invoices.component',
 ];

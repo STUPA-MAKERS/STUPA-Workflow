@@ -108,3 +108,20 @@ async def test_represented_ballot(world: SimpleNamespace) -> None:
     assert not await _svc().can_still_cast(_vote(), _voter(), now=NOW)
     world.cast_by = {"me"}
     assert await _svc().can_still_cast(_vote(), _voter(), now=NOW)
+
+
+async def test_free_pool_seat_is_a_represented_ballot(
+    world: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A pool substitute without a delegation casts the ballot of a free seat."""
+    seat: dict[str, Any] = {"member": None}
+
+    async def _seat(*_a: Any) -> Any:
+        return seat["member"]
+
+    monkeypatch.setattr(voting_mod, "pool_seat_for", _seat)
+    assert not await _svc().can_still_cast(_vote(), _voter(eligible=False), now=NOW)
+    seat["member"] = SimpleNamespace(sub="absent")
+    assert await _svc().can_still_cast(_vote(), _voter(eligible=False), now=NOW)
+    world.cast_by = {"absent"}
+    assert not await _svc().can_still_cast(_vote(), _voter(eligible=False), now=NOW)

@@ -349,6 +349,58 @@ async def test_cast_as_delegation_without_incoming_403() -> None:
         )
 
 
+async def test_cast_pool_seat_claims_and_runs_under_the_member(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A pool substitute without a delegation claims a seat for the represented ballot.
+
+    The ballot runs under the sub of the member that the claim returns, and the use
+    is audited like a delegated ballot.
+    """
+    claims: list[tuple[str, Any]] = []
+
+    async def _claim(_s: Any, sub: str, meeting_id: Any, *_a: Any) -> str:
+        claims.append((sub, meeting_id))
+        return "absent-member"
+
+    monkeypatch.setattr(voting_service, "claim_pool_seat", _claim)
+    gid = uuid4()
+    vote = _vote(meeting_id=uuid4(), eligible_group=str(gid))
+    db = fake_session(
+        result(vote),
+        result(),
+        result(),
+        result(),
+        result(SimpleNamespace(inserted=True)),
+    )
+    out = await VotingService(db).cast(
+        vote.id, _voter(group="somewhere-else", sub="x"), "yes", now=NOW, as_delegation=True
+    )
+    assert out.status == "cast"
+    assert claims == [("x", vote.meeting_id)]
+    assert any(type(a).__name__ == "AuditEntry" for a in db.added)
+
+
+async def test_cast_own_ballot_frees_a_pool_seat(
+    marks: mock.AsyncMock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The own ballot of a member in a meeting frees a pool seat of the member first."""
+    released: list[tuple[Any, str]] = []
+
+    async def _release(_s: Any, meeting_id: Any, sub: str) -> bool:
+        released.append((meeting_id, sub))
+        return True
+
+    monkeypatch.setattr(voting_service, "release_pool_seat_of", _release)
+    gid = uuid4()
+    vote = _vote(meeting_id=uuid4(), eligible_group=str(gid))
+    db = fake_session(result(vote), result(), result(SimpleNamespace(inserted=True)))
+    out = await VotingService(db).cast(vote.id, _voter(group=vote_group_key(gid)), "yes", now=NOW)
+    assert out.status == "cast"
+    assert released == [(vote.meeting_id, "v1")]
+    marks.assert_awaited_once_with(vote.meeting_id, "v1")
+
+
 async def test_cast_vote_without_meeting_skips_delegation_check() -> None:
     """A vote without a meeting runs no delegation query."""
     vote = _vote()

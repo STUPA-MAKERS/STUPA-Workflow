@@ -750,11 +750,9 @@ describe('MeetingsComponent', () => {
       await loadOtherProtokollant();
 
       expect(await screen.findByRole('toolbar', { name: 'Sitzungssteuerung' })).toBeInTheDocument();
-      const starts = screen.getAllByRole('button', { name: 'Sitzung eröffnen' });
-      expect(starts).toHaveLength(2);
-      starts.forEach((b) => expect(b).toBeEnabled());
       await userEvent.click(screen.getByRole('button', { name: 'Sitzungsmenü' }));
-      expect(await screen.findByRole('menuitem', { name: 'Sitzung bearbeiten' })).toBeInTheDocument();
+      expect(await screen.findByRole('menuitem', { name: 'Sitzung eröffnen' })).not.toHaveAttribute('aria-disabled');
+      expect(screen.getByRole('menuitem', { name: 'Sitzung bearbeiten' })).toBeInTheDocument();
       expect(screen.getByRole('menuitem', { name: 'Sitzung löschen' })).toBeInTheDocument();
       expect(screen.queryByRole('complementary', { name: 'Teilnahme' })).not.toBeInTheDocument();
     });

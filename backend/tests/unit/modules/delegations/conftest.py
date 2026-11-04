@@ -3,7 +3,8 @@
 The service reads the substitute pool through `delegations.pool`. The real
 helpers read the table `delegation_substitute`. The fake session of these tests
 answers each `execute` from a queue, so the fixture puts helpers in place that
-read one queued result each, as the former inline pool queries did.
+read one queued result each, as the former inline pool queries did. The pool
+seat lookup (`pool_seat_for`) finds no seat; `test_pool_seat.py` covers it.
 `tests/unit/modules/delegations/test_pool.py` covers the real helpers.
 """
 
@@ -22,7 +23,12 @@ async def _one_queued_set(session: Any, *_args: Any, **_kw: Any) -> set[UUID]:
     return set((await session.execute(select(literal(1)))).scalars().all())
 
 
+async def _no_seat(*_args: Any, **_kw: Any) -> None:
+    return None
+
+
 @pytest.fixture(autouse=True)
 def _queued_pool(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(service_mod, "substitutes_for", _one_queued_set)
     monkeypatch.setattr(service_mod, "substitute_gremien_for_sub", _one_queued_set)
+    monkeypatch.setattr(service_mod, "pool_seat_for", _no_seat)

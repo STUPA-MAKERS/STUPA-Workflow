@@ -81,10 +81,11 @@ describe('MeetingsOverviewComponent', () => {
     expect(frame.fill()).toBe(false);
   });
 
-  it('is a pane page when the list stands beside the detail', async () => {
+  /** The list has no detail pane, so it scrolls as a page on every screen. */
+  it('is no pane page for the list, also when wide', async () => {
     const { fixture } = await setup({ media: [MEDIA.wide] });
     fixture.detectChanges();
-    expect(fixture.componentInstance.pane()).toBe(true);
+    expect(fixture.componentInstance.pane()).toBe(false);
   });
 
   it('shows the list on a phone, whatever the browser chose', async () => {

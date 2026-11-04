@@ -39,3 +39,11 @@ async def test_substitute_gremien_by_sub_is_one_statement() -> None:
     assert "principal" in sql
     assert "substitute_group" not in sql
     assert len(db.statements) == 1
+
+
+async def test_members_for_substitute_splits_personal_and_gremium_wide() -> None:
+    a = uuid4()
+    db = fake_session(result(a, None))
+    assert await pool.members_for_substitute(db, GREMIUM_ID, uuid4()) == ({a}, True)
+    db = fake_session(result(a))
+    assert await pool.members_for_substitute(db, GREMIUM_ID, uuid4()) == ({a}, False)
