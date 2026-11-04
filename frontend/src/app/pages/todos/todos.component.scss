@@ -187,6 +187,10 @@
   .td__drawer {
     @include frosted-pop(var(--color-surface), 85%, 20px, 1.3);
   }
+  // The fields, rows and chips of the card are neutral overlays of the glass.
+  .td__drawer > app-todo-card-detail {
+    @include glass-content;
+  }
   .td__scrim {
     background: color-mix(in srgb, var(--color-scrim) 60%, transparent);
   }
