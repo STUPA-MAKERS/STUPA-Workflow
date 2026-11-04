@@ -1,5 +1,6 @@
 @use 'breakpoints' as bp;
 @use 'scroll-fade' as fade;
+@use 'frosted' as *;
 
 :host {
   display: flex;
@@ -101,9 +102,11 @@
   flex: 1 1 auto;
   min-height: 24rem;
 }
-.mp__prepBack {
-  align-self: flex-start;
-  margin-bottom: var(--space-2);
+// The application and the to-dos of the item sit above the sheet, so the sheet holds only
+// the protocol.
+.mp__linked {
+  flex: none;
+  margin-bottom: var(--space-3);
 }
 .mp__prep {
   flex: 1 1 auto;
@@ -174,14 +177,12 @@
     flex: 1 0 auto;
     min-height: 100dvh;
     margin-inline: calc(-1 * var(--space-4));
-    padding-bottom: calc(var(--fx-dock-h, 0px) + var(--space-3));
+    padding-bottom: calc(var(--fx-dock-h, 0px) + var(--space-2) + var(--space-3));
   }
+  // The head is the sticky bar of the kit there (`MeetingHeadComponent`); the header box
+  // steps aside, so the bar sticks in the box of the page.
   .mp__head {
-    --mh-title-size: var(--fs-h2);
-    --mh-title-line: 1.375rem;
-    gap: var(--space-1);
-    min-height: 0;
-    padding: var(--space-2) var(--space-2) var(--space-2) var(--space-1);
+    display: contents;
   }
   .mp__presence {
     display: none;
@@ -198,13 +199,26 @@
   }
   .mp__dock {
     position: fixed;
-    inset-inline: 0;
-    bottom: var(--app-bottom-inset, 0px);
+    inset-inline: var(--space-2);
+    bottom: calc(var(--app-bottom-inset, 0px) + var(--space-2));
     z-index: var(--z-sticky, 10);
     margin: 0;
-    border-top: var(--border-width) solid var(--color-border);
-    background: var(--color-surface-2);
-    padding-bottom: var(--app-bottom-safe-area, env(safe-area-inset-bottom));
+    overflow: hidden;
+    border-radius: var(--radius-xl);
+    // Frosted glass like the bar at the top: the dock floats over the protocol with a small
+    // gap above the navigation bar, so the protocol shows through the glass, and a light
+    // shadow lifts the dock off it. The rounded box clips the glass, which reaches past both
+    // edges (`frosted`).
+    box-shadow: var(--shadow-md);
+    @include frosted(var(--color-surface-2));
+  }
+  // Before the opening the dock only says "Noch nicht eröffnet", which the status in the
+  // head already says, so it shows nothing there (`SessionDockComponent`).
+  .mp__dock--quiet {
+    box-shadow: none;
+  }
+  .mp__dock--quiet::before {
+    display: none;
   }
 }
 

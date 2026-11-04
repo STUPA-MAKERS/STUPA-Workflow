@@ -37,3 +37,19 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* On a phone the bar of the kit is the head. The page already reaches to the screen
+   edges and starts below the safe area, so the bar does not pull over a gutter and pulls
+   up only by the safe area, which it then fills itself. */
+.mh__bar {
+  margin: calc(-1 * var(--app-top-safe-area, 0px)) 0 var(--space-3);
+}
+.mh__barStatus {
+  flex: none;
+  font-weight: var(--fw-semibold);
+}
+.mh__barSub {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

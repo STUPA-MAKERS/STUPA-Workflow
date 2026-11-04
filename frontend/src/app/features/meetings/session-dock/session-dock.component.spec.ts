@@ -335,17 +335,24 @@ describe('SessionDockComponent', () => {
   });
 
   describe('on a phone', () => {
-    /** There is no popover and no own backdrop, because the sheet has its scrim. */
-    it('opens the minute-taker menu as a bottom sheet over the navigation bar', async () => {
+    /**
+     * There is no popover and no own backdrop, because the sheet has its scrim. The dock
+     * has no chips there: the session menu of the page sets the panel.
+     */
+    it('has no chips and opens the minute-taker menu from the panel as a bottom sheet over the navigation bar', async () => {
       const { fixture, container, on } = await setup(
         { meeting: planned({ protokollantId: null, protokollantName: null }) },
         [MEDIA.phone],
       );
       const dock = fixture.componentInstance;
       const host = fixture.nativeElement as HTMLElement;
+      expect(container.querySelector('.sd__chips')).toBeNull();
+      expect(screen.queryByRole('button', { name: /Protokollführung fehlt/ })).toBeNull();
+      expect(screen.queryByTitle('Anwesenheit')).toBeNull();
       expect(host.style.zIndex).toBe('');
-      await userEvent.click(screen.getByRole('button', { name: /Protokollführung fehlt/ }));
-      let sheet = screen.getByRole('dialog', { name: 'Protokollführung wählen' });
+      fixture.componentRef.setInput('panel', 'protokollant');
+      fixture.detectChanges();
+      let sheet = await screen.findByRole('dialog', { name: 'Protokollführung wählen' });
       expect(sheet).toHaveClass('ss', 'ss--bottom');
       expect(sheet.querySelector('.ss__handle')).not.toBeNull();
       expect(container.querySelector('.sd__pop')).toBeNull();
@@ -354,8 +361,9 @@ describe('SessionDockComponent', () => {
       await userEvent.keyboard('{Escape}');
       expect(dock.panel()).toBe('none');
       expect(host.style.zIndex).toBe('');
-      await userEvent.click(screen.getByRole('button', { name: /Protokollführung fehlt/ }));
-      sheet = screen.getByRole('dialog', { name: 'Protokollführung wählen' });
+      dock.panel.set('protokollant');
+      fixture.detectChanges();
+      sheet = await screen.findByRole('dialog', { name: 'Protokollführung wählen' });
       await userEvent.click(within(sheet).getByRole('button', { name: /Mika Mitglied/ }));
       expect(on.setProtokollant).toHaveBeenCalledWith('pr-2');
       expect(screen.queryByRole('dialog')).toBeNull();
@@ -363,7 +371,8 @@ describe('SessionDockComponent', () => {
 
     it('keeps the dock below the dialog level while the attendance sheet of the page is open', async () => {
       const { fixture } = await setup({}, [MEDIA.phone]);
-      await userEvent.click(screen.getByTitle('Anwesenheit'));
+      fixture.componentRef.setInput('panel', 'attendance');
+      fixture.detectChanges();
       expect(fixture.componentInstance.panel()).toBe('attendance');
       expect((fixture.nativeElement as HTMLElement).style.zIndex).toBe('');
     });

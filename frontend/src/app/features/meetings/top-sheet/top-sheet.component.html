@@ -60,10 +60,12 @@
       </p>
     }
 
-    @if (!follow()) {
-      <app-todo-linked-list class="ts__todos" kind="agenda_item" headingId="ts-todos" [showTitle]="false" [targetId]="t.id" [lead]="applicationLead()" />
-    } @else if (applicationLead(); as lead) {
-      <app-todo-linked-list class="ts__todos" kind="agenda_item" headingId="ts-todos" [showTitle]="false" [targetId]="t.id" [items]="[]" [lead]="lead" />
+    @if (linked()) {
+      @if (!follow()) {
+        <app-todo-linked-list class="ts__todos" kind="agenda_item" headingId="ts-todos" [showTitle]="false" [targetId]="t.id" [lead]="applicationLead()" />
+      } @else if (applicationLead(); as lead) {
+        <app-todo-linked-list class="ts__todos" kind="agenda_item" headingId="ts-todos" [showTitle]="false" [targetId]="t.id" [items]="[]" [lead]="lead" />
+      }
     }
 
     @if (follow()) {
@@ -129,7 +131,7 @@
         @if (!saveInFoot()) {
           <ng-container [ngTemplateOutlet]="saveTpl" />
         }
-        @if (editable()) {
+        @if (editable() && barControls()) {
           <app-button
             class="ts__done"
             variant="outlined"
@@ -140,6 +142,7 @@
             {{ 'meetings.agenda.done' | t }}
           </app-button>
         }
+        @if (barControls()) {
         <app-segmented
           class="ts__mode"
           size="control"
@@ -150,6 +153,7 @@
           [value]="mode()"
           (valueChange)="setMode($event)"
         />
+        }
       </div>
       <div class="ts__rule"></div>
       }

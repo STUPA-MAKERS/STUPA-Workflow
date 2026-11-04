@@ -15,58 +15,105 @@
   </div>
 }
 
-<div class="sd">
-  @if (m.status === 'planned') {
-    <div class="sd__state">
-      <span class="sd__small">{{ 'meetings.dock.notStarted' | t }}</span>
-      <span class="sd__strong">{{ 'meetings.dock.topsPrepared' | t: { n: agenda().length } }}</span>
-    </div>
-  } @else if (m.status === 'closed') {
-    <div class="sd__state">
-      <span class="sd__small">{{ closedLine() }}</span>
-      <span class="sd__strong">{{ agenda().length === 1 ? ('meetings.dock.topsOne' | t) : ('meetings.dock.tops' | t: { n: agenda().length }) }}</span>
-    </div>
-  } @else {
-    <div class="sd__nav">
-      <app-button variant="text" [iconOnly]="true" [disabled]="!hasPrev()" [ariaLabel]="'meetings.dock.prev' | t" (click)="step.emit(-1)"><app-icon name="left" /></app-button>
-      <span class="sd__pos">
-        <span class="sd__small">{{ 'meetings.dock.top' | t }}</span>
-        <span class="sd__strong num">
-          @if (topIndex() >= 0) {
-            {{ 'meetings.dock.of' | t: { n: topIndex() + 1, m: agenda().length } }}
-          } @else {
-            {{ 'meetings.dock.none' | t }}
-          }
-        </span>
-      </span>
-      <app-button variant="text" [iconOnly]="true" [disabled]="!hasNext()" [ariaLabel]="'meetings.dock.next' | t" (click)="step.emit(1)"><app-icon name="right" /></app-button>
-    </div>
-    <span class="sd__vr" aria-hidden="true"></span>
-    <div class="sd__mid">
-      @if (nowElsewhere(); as now) {
-        <span class="sd__now">{{ 'meetings.dock.nowRunning' | t: { top: now.label } }}</span>
-        <app-button size="sm" variant="tonal" (click)="jumpNow.emit(now.item.id)">{{ 'meetings.dock.backToNow' | t }}</app-button>
-      } @else if (myVote(); as choice) {
-        <span class="sd__vote">
-          <app-icon name="vote" [size]="18" />
-          <span>{{ 'meetings.dock.yourVote' | t }}: <strong>{{ choice }}</strong></span>
-        </span>
+@if (!phone() || m.status !== 'planned') {
+  <div class="sd">
+    @if (m.status === 'planned') {
+      <div class="sd__state">
+        <span class="sd__small">{{ 'meetings.dock.notStarted' | t }}</span>
+        <span class="sd__strong">{{ 'meetings.dock.topsPrepared' | t: { n: agenda().length } }}</span>
+      </div>
+    } @else if (m.status === 'closed') {
+      <div class="sd__state">
+        <span class="sd__small">{{ closedLine() }}</span>
+        <span class="sd__strong">{{ agenda().length === 1 ? ('meetings.dock.topsOne' | t) : ('meetings.dock.tops' | t: { n: agenda().length }) }}</span>
+      </div>
+      @if (phone()) {
+        <ng-container [ngTemplateOutlet]="phoneTools" />
       }
-    </div>
-  }
-
-  <span class="sd__spacer"></span>
-
-  <div class="sd__chips">
-    @if (m.status === 'live') {
-      <ng-container [ngTemplateOutlet]="presentChip" />
-      <ng-container [ngTemplateOutlet]="keeperChip" />
     } @else {
-      <ng-container [ngTemplateOutlet]="keeperChip" />
-      <ng-container [ngTemplateOutlet]="presentChip" />
+      <div class="sd__nav">
+        <app-button variant="text" [iconOnly]="true" [disabled]="!hasPrev()" [ariaLabel]="'meetings.dock.prev' | t" (click)="step.emit(-1)"><app-icon name="left" /></app-button>
+        <span class="sd__pos">
+          <span class="sd__small">{{ 'meetings.dock.top' | t }}</span>
+          <span class="sd__strong num">
+            @if (topIndex() >= 0) {
+              {{ 'meetings.dock.of' | t: { n: topIndex() + 1, m: agenda().length } }}
+            } @else {
+              {{ 'meetings.dock.none' | t }}
+            }
+          </span>
+        </span>
+        <app-button class="sd__next" variant="text" [iconOnly]="true" [disabled]="!hasNext()" [ariaLabel]="'meetings.dock.next' | t" (click)="step.emit(1)"><app-icon name="right" /></app-button>
+      </div>
+      @if (phone()) {
+        <ng-container [ngTemplateOutlet]="phoneTools" />
+      }
+      <span class="sd__vr" aria-hidden="true"></span>
+      <div class="sd__mid">
+        @if (nowElsewhere(); as now) {
+          <span class="sd__now">{{ 'meetings.dock.nowRunning' | t: { top: now.label } }}</span>
+          <app-button size="sm" variant="tonal" (click)="jumpNow.emit(now.item.id)">{{ 'meetings.dock.backToNow' | t }}</app-button>
+        } @else if (myVote(); as choice) {
+          <span class="sd__vote">
+            <app-icon name="vote" [size]="18" />
+            <span>{{ 'meetings.dock.yourVote' | t }}: <strong>{{ choice }}</strong></span>
+          </span>
+        }
+      </div>
+    }
+
+    @if (!phone()) {
+      <span class="sd__spacer"></span>
+
+      <div class="sd__chips">
+        @if (m.status === 'live') {
+          <ng-container [ngTemplateOutlet]="presentChip" />
+          <ng-container [ngTemplateOutlet]="keeperChip" />
+        } @else {
+          <ng-container [ngTemplateOutlet]="keeperChip" />
+          <ng-container [ngTemplateOutlet]="presentChip" />
+        }
+      </div>
     }
   </div>
-</div>
+}
+
+<!-- On a phone: "Erledigt", the attendance and the view switch as icon buttons. -->
+<ng-template #phoneTools>
+  <div class="sd__tools">
+    @if (done() !== null) {
+      <app-button
+        [variant]="done() ? 'tonal' : 'text'"
+        [iconOnly]="true"
+        [ariaPressed]="done()"
+        [ariaLabel]="'meetings.agenda.done' | t"
+        (click)="doneChange.emit(!done())"
+      ><app-icon name="check" /></app-button>
+    }
+    <span class="sd__tool">
+      <app-button
+        [variant]="panel() === 'attendance' ? 'tonal' : 'text'"
+        [iconOnly]="true"
+        [ariaLabel]="'meetings.attendance.title' | t"
+        (click)="togglePanel('attendance')"
+      ><app-icon name="users" /></app-button>
+      @if (guestChip(); as g) {
+        @if (g.pending > 0) {
+          <span class="sd__badge sd__badge--tool num" [attr.aria-label]="'guests.dock.pending' | t: { n: g.pending }">{{ g.pending }}</span>
+        }
+      }
+    </span>
+    @if (modeToggle()) {
+      <app-button
+        [variant]="mode() === 'raw' ? 'tonal' : 'text'"
+        [iconOnly]="true"
+        [ariaPressed]="mode() === 'raw'"
+        [ariaLabel]="'meetings.editor.modeRaw' | t"
+        (click)="toggleMode()"
+      ><app-icon name="code" /></app-button>
+    }
+  </div>
+</ng-template>
 
 <ng-template #presentChip>
   <button

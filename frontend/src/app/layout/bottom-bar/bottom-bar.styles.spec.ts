@@ -43,10 +43,11 @@ describe('bottom bar styles', () => {
     );
   });
 
-  it('has its own surface and a top border, not the card surface', () => {
+  it('has its own surface and a shadow upwards instead of a rule, not the card surface', () => {
     const bb = rule(bar, '.bb');
-    expect(bb).toMatch(/background: var\(--color-surface-3\);/);
-    expect(bb).toMatch(/border-top: var\(--border-width\) solid var\(--color-border\);/);
+    expect(bb).toMatch(/@include frosted\(\s*var\(--color-surface-3\),\s*top,\s*\$fade-to: var\(--color-surface-3\),/);
+    expect(bb).toMatch(/box-shadow: var\(--bb-shadow, var\(--shadow-md-up\)\);/);
+    expect(bb).not.toMatch(/border-top/);
     expect(bb).toMatch(/--nav-mark-ring: var\(--color-surface-3\);/);
     expect(bb).not.toMatch(/--color-surface-[12]\b/);
   });

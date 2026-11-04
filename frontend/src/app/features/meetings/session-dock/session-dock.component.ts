@@ -1,3 +1,4 @@
+import type { EditorMode } from '../top-sheet/top-sheet.component';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -46,6 +47,12 @@ export type DockPanel = 'none' | 'attendance' | 'protokollant';
  * goes to the handover dialog of the page. The attendance chip opens the attendance sheet
  * of the page.
  *
+ * On a phone the dock has no chips: the attendance and the minute-taker are entries of
+ * the session menu in the head, because the two chips took a whole row of the dock. The
+ * menu sets `panel`, so the minute-taker sheet still opens from the dock. Before the
+ * opening the phone dock shows nothing but holds the sheet, because "Noch nicht eröffnet"
+ * is the status in the head.
+ *
  * On a phone the dock is a fixed layer above the page and holds the bottom sheet. While
  * the sheet is open, the layer moves up to the dialog level, because otherwise the
  * navigation bar covers the sheet and its scrim.
@@ -84,6 +91,16 @@ export class SessionDockComponent {
   /** The own ballot of the open vote ("Ja", "abgegeben"), or `null`. */
   readonly myVote = input<string | null>(null);
   readonly panel = model<DockPanel>('none');
+  /**
+   * The done mark of the open item for the icon button of a phone, or `null` for no button
+   * (only a writer of the minutes ticks an item).
+   */
+  readonly done = input<boolean | null>(null);
+  /** The view switch of the protocol text as an icon button of a phone. */
+  readonly modeToggle = input(false);
+  readonly mode = model<EditorMode>('formatted');
+  /** The icon button "Erledigt" of a phone: the new done mark of the open item. */
+  readonly doneChange = output<boolean>();
   /** The distance of the popover from the end edge of the dock: the end of its chip. */
   protected readonly popEnd = signal(0);
 
@@ -148,6 +165,11 @@ export class SessionDockComponent {
     const m = this.meeting();
     return m.status === 'live' && (m.canManage || m.isProtokollant);
   });
+  /** Switch the protocol text between the formatted view and the Markdown source. */
+  protected toggleMode(): void {
+    this.mode.set(this.mode() === 'raw' ? 'formatted' : 'raw');
+  }
+
   /** The panel on screen: the minute-taker only for the people who may change it. */
   protected readonly shownPanel = computed<DockPanel>(() => {
     const panel = this.panel();

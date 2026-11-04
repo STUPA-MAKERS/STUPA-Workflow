@@ -275,9 +275,11 @@
     height: 1.375rem;
     font-size: var(--fs-h2);
   }
+  // The tool boxes are 40px around a 20px glyph, so the bar starts 14px before the 16px
+  // edge of the text, and the glyphs line up with it, as on a wider screen (14px to 28px).
   .ts__bar {
     row-gap: 0;
-    padding-inline: 0 var(--space-4);
+    padding-inline: 2px var(--space-4);
   }
   .ts__bar::after {
     content: '';

@@ -124,14 +124,14 @@
         />
       </div>
     } @else {
-      @if (canBackToPrep()) {
-        <app-button class="mp__prepBack" variant="text" size="sm" (click)="prepItem.set(false)">
-          <app-icon name="back" />
-          {{ 'meetings.prep.back' | t }}
-        </app-button>
+      @if (top(); as t) {
+        <app-todo-linked-list class="mp__linked" kind="agenda_item" headingId="mp-todos" [showTitle]="false" [targetId]="t.id" [lead]="applicationLead()" />
       }
       <app-top-sheet
         class="mp__sheet"
+        [linked]="false"
+        [barControls]="!phone() || m.status === 'planned'"
+        [(mode)]="editorMode"
         [meeting]="m"
         [protocol]="proto"
         [top]="top()"
@@ -157,12 +157,17 @@
 
 <app-session-dock
   class="mp__dock"
+  [class.mp__dock--quiet]="phone() && m.status === 'planned'"
   [meeting]="m"
   [agenda]="agenda()"
   [topIndex]="topIndex()"
   [attendance]="attendance()"
   [myVote]="myVote()"
   [(panel)]="panel"
+  [done]="dockDone()"
+  [modeToggle]="dockModeToggle()"
+  [(mode)]="editorMode"
+  (doneChange)="top() && setDone.emit({ item: top()!, done: $event })"
   (step)="step($event)"
   (jumpNow)="jump($event)"
   (setProtokollant)="setProtokollant.emit($event)"

@@ -1,3 +1,4 @@
+import type { EditorMode } from '../top-sheet/top-sheet.component';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -52,10 +53,12 @@ import { voteOptionLabel } from '../meetings-display.util';
 import { openWindowClock, openWindowState, openWindowWhen } from '../open-window.util';
 import { JoinQrComponent } from '../public-join/join-qr.component';
 import { MeetingHeadComponent } from '../meeting-head/meeting-head.component';
+import { topApplicationLead } from '../top-application-lead.util';
+import { TodoLinkedListComponent } from '../../todos/linked-list/todo-linked-list.component';
 import { clock, weekdayDate } from '@shared/date-format';
 
 /** The ids of the session menu. */
-type SessionAction = 'settings' | 'attendance' | 'beamer' | 'qr' | 'close' | 'delete';
+type SessionAction = 'prep' | 'settings' | 'attendance' | 'keeper' | 'beamer' | 'qr' | 'close' | 'delete';
 
 /**
  * The session page of the meeting lead and the minute-taker (`/meetings/:id`).
@@ -97,6 +100,7 @@ type SessionAction = 'settings' | 'attendance' | 'beamer' | 'qr' | 'close' | 'de
     PrepChecklistComponent,
     SessionDockComponent,
     TopSheetComponent,
+    TodoLinkedListComponent,
     VoteCardComponent,
     AttendanceSheetComponent,
     JoinQrComponent,
@@ -215,6 +219,18 @@ export class MeetingPageComponent {
    * The text of the item can be written. A planned meeting has no protocol yet, but its
    * text can be prepared; the start creates the protocol around it.
    */
+  /** The view of the protocol text, shared by the sheet and the icon button of the phone dock. */
+  protected readonly editorMode = signal<EditorMode>('formatted');
+  /** The done mark of the open item for the phone dock, or `null` for no button there. */
+  protected readonly dockDone = computed<boolean | null>(() => {
+    const t = this.top();
+    return this.phone() && this.editable() && t ? !!t.doneAt : null;
+  });
+  /** The view switch in the phone dock: the sheet shows it while the protocol is open. */
+  protected readonly dockModeToggle = computed(() => {
+    const p = this.protocol();
+    return this.phone() && !!p && !p.isLocked && this.top() !== null;
+  });
   protected readonly editable = computed(
     () =>
       (this.protocol() !== null || this.meeting().status === 'planned') &&
@@ -233,11 +249,17 @@ export class MeetingPageComponent {
     const m = this.meeting();
     return m.status === 'planned' && (m.canControl || m.canManage) && !this.prepItem();
   });
-  /** "Zurück zur Vorbereitung" above the sheet of a planned meeting. */
+  /** "Zurück zur Vorbereitung" in the session menu while an item of a planned meeting is open. */
   protected readonly canBackToPrep = computed(() => {
     const m = this.meeting();
     return m.status === 'planned' && (m.canControl || m.canManage) && this.prepItem();
   });
+
+  /**
+   * The row of the application of the open item, the first row of the linked list above
+   * the sheet (`topApplicationLead`).
+   */
+  protected readonly applicationLead = computed(() => topApplicationLead(this.top(), this.i18n));
 
   /** "Studierendenparlament · Di, 29.09.2026 · seit 18:04". */
   protected readonly subLine = computed(() => {
@@ -303,8 +325,22 @@ export class MeetingPageComponent {
     const m = this.meeting();
     const t = (key: Parameters<I18nService['translate']>[0]): string => this.i18n.translate(key);
     const main: RowMenuItem[] = [];
+    if (this.canBackToPrep()) main.push({ id: 'prep', label: t('meetings.prep.back'), icon: 'clipcheck' });
     if (m.canManage) main.push({ id: 'settings', label: t('meetings.settings.title'), icon: 'edit' });
-    main.push({ id: 'attendance', label: t('meetings.page.recordAttendance'), icon: 'users' });
+    // A phone dock holds the attendance as an icon button; before the opening it shows nothing.
+    if (!this.phone() || m.status === 'planned') {
+      main.push({ id: 'attendance', label: t('meetings.page.recordAttendance'), icon: 'users' });
+    }
+    const keeper =
+      (m.status === 'planned' && m.canManage) ||
+      (m.status === 'live' && (m.canManage || m.isProtokollant));
+    if (this.phone() && keeper) {
+      main.push({
+        id: 'keeper',
+        label: t(m.status === 'live' ? 'meetings.handover.title' : 'meetings.dock.pickProtokollant'),
+        icon: m.status === 'live' ? 'swap' : 'clipcheck',
+      });
+    }
     if (!this.wide() && m.status !== 'closed' && m.canManage) {
       main.push({ id: 'beamer', label: t('meetings.beamer.enter'), icon: 'monitor' });
     }
@@ -464,11 +500,17 @@ export class MeetingPageComponent {
 
   protected onMenu(item: RowMenuItem): void {
     switch (item.id as SessionAction) {
+      case 'prep':
+        this.prepItem.set(false);
+        break;
       case 'settings':
         this.openSettings.emit();
         break;
       case 'attendance':
         this.panel.set('attendance');
+        break;
+      case 'keeper':
+        this.panel.set('protokollant');
         break;
       case 'beamer':
         this.toggleBeamer.emit();
