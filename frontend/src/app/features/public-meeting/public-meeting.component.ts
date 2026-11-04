@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  DestroyRef,
   effect,
   inject,
   signal,
@@ -11,6 +12,8 @@ import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { EMPTY, catchError, switchMap } from 'rxjs';
+import { ApiClient } from '@core/api/api-client.service';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { BrandingService } from '@core/branding/branding.service';
@@ -50,7 +53,10 @@ export function normalizeJoinCode(raw: string): string {
  *
  * No account and no app navigation: the public frame with its footer. A member logs in
  * instead ("Mitglied? Mit Konto anmelden"); there is no duplicate check of names. The
- * page updates itself over the guest channel; a reload gives the same state (cookie).
+ * login returns to this page. A logged-in principal who can read the meeting goes on to
+ * the meeting in the app (`GET /meetings/join/{code}`); anyone else stays a guest and no
+ * longer sees the login line. The page updates itself over the guest channel; a reload
+ * gives the same state (cookie).
  */
 @Component({
   selector: 'app-public-meeting',
@@ -80,10 +86,15 @@ export class PublicMeetingComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
+  private readonly api = inject(ApiClient);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly i18n = inject(I18nService);
   protected readonly guest = inject(GuestSessionService);
   /** The wordmark of the own header: the branding upload, else the built-in one. */
   protected readonly logoSrc = inject(BrandingService).wordmarkSrc;
+
+  /** A session exists: the page offers no login. */
+  protected readonly loggedIn = this.auth.isAuthenticated;
 
   /** The page has scrolled: the content runs under the bar, so the bar is glass. */
   protected readonly scrolled = signal(false);
@@ -179,6 +190,7 @@ export class PublicMeetingComponent {
       const code = normalizeJoinCode(pm.get('code') ?? '');
       this.renaming.set(false);
       this.guest.load(code);
+      this.openAsMember(code);
     });
     effect(() => {
       const me = this.guest.me();
@@ -213,6 +225,23 @@ export class PublicMeetingComponent {
   /** "Mitglied? Mit Konto anmelden". */
   login(): void {
     this.auth.login();
+  }
+
+  /**
+   * A logged-in principal who can read the meeting opens it in the app. The guest page
+   * stays for everyone else: no session, no read access, an unknown or closed code.
+   */
+  private openAsMember(code: string): void {
+    this.auth
+      .ensureLoaded()
+      .pipe(
+        switchMap((p) => (p ? this.api.meetingOfJoinCode(code) : EMPTY)),
+        catchError(() => EMPTY),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe(({ meetingId }) => {
+        void this.router.navigate(['/meetings', meetingId], { replaceUrl: true });
+      });
   }
 
   /** A typed code on the page of an unknown code. */

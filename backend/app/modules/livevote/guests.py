@@ -636,6 +636,26 @@ class GuestService:
             raise NotFoundError("Unknown join code.", code="join_code_unknown")
         return meeting
 
+    async def member_meeting_id(self, code: str) -> UUID:
+        """Return the id of the open meeting with this join code, public or not.
+
+        A member who logs in on the join page goes to the meeting in the app. The
+        meeting may no longer be public, so this lookup ignores the public flag. The
+        caller checks the read access.
+
+        Raises:
+            NotFoundError: ``join_code_unknown``.
+        """
+        meeting_id = await self.session.scalar(
+            select(Meeting.id).where(
+                Meeting.join_code == normalize_code(code),
+                Meeting.status != "closed",
+            )
+        )
+        if meeting_id is None:
+            raise NotFoundError("Unknown join code.", code="join_code_unknown")
+        return meeting_id
+
     async def head(self, code: str) -> PublicMeetingHead:
         """Return the public head of the meeting with this join code."""
         return await self._head(await self.meeting_by_code(code))

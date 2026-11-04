@@ -43,7 +43,7 @@ from app.modules.voting.schemas import TallyOut, VoteOut
 from app.settings import get_settings
 from app.shared import antiabuse
 from app.shared.config_schemas import VoteConfig
-from app.shared.errors import ConflictError, RateLimitedError
+from app.shared.errors import ConflictError, ForbiddenError, NotFoundError, RateLimitedError
 from app.shared.ratelimit import InMemoryRateLimiter
 from tests._support.flow_fakes import FakeSession, result
 from tests.unit.modules.livevote.test_livevote_cov import (
@@ -55,6 +55,7 @@ from tests.unit.modules.livevote.test_livevote_cov import (
 )
 
 NOW = datetime(2026, 10, 6, 18, 0, tzinfo=UTC)
+MEMBER_MEETING = UUID("d0000000-0000-0000-0000-000000000001")
 
 
 def _guest_out(**over: Any) -> MeetingGuestOut:
@@ -120,6 +121,12 @@ class Guests:
         self.calls.append("rotate")
         return await self.join_link(m)
 
+    async def member_meeting_id(self, code: str) -> UUID:
+        self.calls.append(f"member:{code}")
+        if code == "NOPE42":
+            raise NotFoundError("Unknown join code.", code="join_code_unknown")
+        return MEMBER_MEETING
+
 
 @pytest.fixture
 def setup() -> Any:
@@ -164,6 +171,22 @@ def test_lead_routes(setup: Any) -> None:
     ]
     meetings._can_manage = False
     assert client.get(f"{base}/guests").status_code == 403
+
+
+def test_meeting_of_join_code(setup: Any) -> None:
+    """A member who logs in on the join page gets the meeting; others get 403 or 404."""
+    client, meetings, _, _, guests = setup
+    resp = client.get("/api/meetings/join/7KQ4MP")
+    assert resp.status_code == 200
+    assert resp.json() == {"meetingId": str(MEMBER_MEETING)}
+    assert client.get("/api/meetings/join/NOPE42").status_code == 404
+
+    async def refuse(meeting_id: UUID, principal: Principal) -> None:
+        raise ForbiddenError("not allowed to view this meeting")
+
+    meetings.assert_can_read = refuse
+    assert client.get("/api/meetings/join/7KQ4MP").status_code == 403
+    assert guests.calls == ["member:7KQ4MP", "member:NOPE42", "member:7KQ4MP"]
 
 
 def _meeting(public: bool, mode: str = "vote") -> Any:
