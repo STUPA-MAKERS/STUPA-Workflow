@@ -208,8 +208,14 @@
     border-radius: 0;
     box-shadow: none;
   }
+  // The bar is frosted glass in the colour of the card while the card scrolls under it,
+  // like the bar of every other phone detail.
   .td__drawer > app-list-detail-bar {
-    background: var(--color-surface);
+    @include frosted(var(--color-surface), bottom);
+
+    &:not(.ld__bar--under) {
+      @include frosted-rest(var(--color-surface));
+    }
   }
 }
 // The motion of `app-side-sheet` from the end. Reduced motion shortens it to nothing (ui-kit base
