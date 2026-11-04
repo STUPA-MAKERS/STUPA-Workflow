@@ -341,8 +341,8 @@ export class MeetingPageComponent {
     if (!this.wide()) main.push({ id: 'agenda', label: t('meetings.agenda.title'), icon: 'list' });
     if (m.canManage) main.push({ id: 'settings', label: t('meetings.settings.title'), icon: 'edit' });
     // A phone dock holds the attendance and the votes as icon buttons; it is hidden only while a
-    // planned meeting has no item to write (no agenda yet).
-    const noDock = this.phone() && m.status === 'planned' && !this.dockModeToggle();
+    // planned meeting has no item open (no agenda yet).
+    const noDock = this.phone() && m.status === 'planned' && !this.top();
     if (!this.phone() || noDock) {
       main.push({ id: 'attendance', label: t('meetings.page.recordAttendance'), icon: 'users' });
     }
