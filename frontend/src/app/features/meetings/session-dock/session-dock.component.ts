@@ -35,8 +35,9 @@ export type DockPanel = 'none' | 'attendance' | 'protokollant';
 /**
  * The dock at the foot of the session page.
  *
- * Planned: "Noch nicht eröffnet · n TOPs vorbereitet", the minute-taker (marked while it
- * is missing; the meeting lead picks one here) and the attendance.
+ * Planned: the step through the agenda ("TOP 3 von 8") while an item is open, else "Noch
+ * nicht eröffnet · n TOPs vorbereitet"; the minute-taker (marked while it is missing; the
+ * meeting lead picks one here) and the attendance.
  *
  * Live: the step through the agenda ("TOP 3 von 8"), the own ballot of the open vote, or
  * the way back to the item that runs now; the attendance, the minute-taker ("Protokoll:
@@ -55,8 +56,9 @@ export type DockPanel = 'none' | 'attendance' | 'protokollant';
  * On a phone the dock has no chips: the attendance and the minute-taker are entries of
  * the session menu in the head, because the two chips took a whole row of the dock. The
  * menu sets `panel`, so the minute-taker sheet still opens from the dock. Before the
- * opening the phone dock shows nothing but holds the sheet, because "Noch nicht eröffnet"
- * is the status in the head.
+ * opening the phone dock shows nothing but holds the sheet while no item is open, because
+ * "Noch nicht eröffnet" is the status in the head; with an item open it steps through the
+ * agenda like a live meeting.
  *
  * On a phone the dock is a fixed layer above the page and holds the bottom sheet. While
  * the sheet is open, the layer moves up to the dialog level, because otherwise the

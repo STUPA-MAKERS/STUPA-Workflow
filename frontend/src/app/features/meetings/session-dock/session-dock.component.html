@@ -15,14 +15,14 @@
   </div>
 }
 
-@if (!phone() || m.status !== 'planned' || modeToggle()) {
+@if (!phone() || m.status !== 'planned' || topIndex() >= 0) {
   <div #bar class="sd" [class.sd--tight]="tight()">
     @if ((phone() || compact()) && formatting() && formatTools(); as tools) {
       <app-button variant="text" [iconOnly]="true" [ariaLabel]="'meetings.dock.formatBack' | t" (click)="formatting.set(false)"><app-icon name="back" /></app-button>
       <div class="sd__format" role="toolbar" [attr.aria-label]="'meetings.editor.toolbar' | t">
         <ng-container [ngTemplateOutlet]="tools" />
       </div>
-    } @else if (m.status === 'planned') {
+    } @else if (m.status === 'planned' && topIndex() < 0) {
       @if (!phone()) {
         <div class="sd__state">
           <span class="sd__small">{{ 'meetings.dock.notStarted' | t }}</span>

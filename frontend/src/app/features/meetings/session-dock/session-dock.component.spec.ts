@@ -210,11 +210,26 @@ describe('SessionDockComponent', () => {
   });
 
   describe('planned', () => {
-    it('says that the meeting is not open yet and shows no step', async () => {
-      await setup({ meeting: planned() });
+    it('says that the meeting is not open yet and shows no step while no item is open', async () => {
+      await setup({ meeting: planned(), topIndex: -1 });
       expect(screen.getByText('Noch nicht eröffnet')).toBeInTheDocument();
       expect(screen.getByText('3 TOPs vorbereitet')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Nächster TOP' })).toBeNull();
+    });
+
+    it('steps through the agenda while an item is open', async () => {
+      const { on } = await setup({ meeting: planned(), topIndex: 1 });
+      expect(screen.queryByText('Noch nicht eröffnet')).toBeNull();
+      expect(screen.getByText('2 von 3', { selector: '.sd__strong' })).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Nächster TOP' }));
+      expect(on.step).toHaveBeenCalledWith(1);
+      await userEvent.click(screen.getByRole('button', { name: 'Vorheriger TOP' }));
+      expect(on.step).toHaveBeenCalledWith(-1);
+    });
+
+    it('steps through the agenda on a phone too', async () => {
+      await setup({ meeting: planned(), topIndex: 0 }, [MEDIA.phone]);
+      expect(screen.getByRole('button', { name: 'Nächster TOP' })).toBeEnabled();
     });
 
     it('marks a missing minute-taker and opens the picker', async () => {

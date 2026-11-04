@@ -71,7 +71,7 @@
 
 <app-session-dock
   class="mp__dock"
-  [class.mp__dock--quiet]="phone() && m.status === 'planned' && !dockModeToggle()"
+  [class.mp__dock--quiet]="phone() && m.status === 'planned' && !top()"
   [meeting]="m"
   [agenda]="agenda()"
   [topIndex]="topIndex()"
