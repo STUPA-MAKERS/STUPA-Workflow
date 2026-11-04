@@ -232,9 +232,9 @@ export class MeetingPageComponent {
     const t = this.top();
     return this.meeting().status !== 'planned' && this.editable() && t ? !!t.doneAt : null;
   });
-  /** The vote icon button of the phone dock: the number of votes of the item, or `null`. */
+  /** The vote icon button of the dock below the wide layout: the number of votes, or `null`. */
   protected readonly dockVotes = computed<number | null>(() =>
-    this.phone() && this.showVotes() ? this.votes().length : null,
+    !this.wide() && this.showVotes() ? this.votes().length : null,
   );
   /** The view switch in the dock: the sheet shows it only before the opening. */
   protected readonly dockModeToggle = computed(() => {

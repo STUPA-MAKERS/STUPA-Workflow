@@ -656,7 +656,7 @@ describe('MeetingPageComponent', () => {
         vote({ id: 'v-1' }),
         vote({ id: 'v-x', agendaItemId: 't-2', question: 'Anderer TOP?' }),
       ];
-      const { on } = await setup({ meeting: meeting({ votes }) });
+      const { on } = await setup({ meeting: meeting({ votes }) }, [MEDIA.wide]);
       const cards = screen.getAllByRole('heading', { level: 3 });
       expect(cards.map((h) => h.textContent)).toEqual(['Wird der Nachtragshaushalt beschlossen?', 'Vertagen?']);
       await userEvent.click(screen.getByRole('button', { name: 'Abstimmung schließen' }));
@@ -671,7 +671,7 @@ describe('MeetingPageComponent', () => {
     });
 
     it('opens a planned vote', async () => {
-      const { on } = await setup({ meeting: meeting({ votes: [vote({ status: 'draft' })] }) });
+      const { on } = await setup({ meeting: meeting({ votes: [vote({ status: 'draft' })] }) }, [MEDIA.wide]);
       await userEvent.click(screen.getByRole('button', { name: 'Abstimmung öffnen' }));
       expect(on.voteOpen).toHaveBeenCalledWith('v-1');
     });
@@ -684,7 +684,7 @@ describe('MeetingPageComponent', () => {
         vote({ id: 'v-1', status: 'draft' }),
         vote({ id: 'v-x', agendaItemId: 't-2', question: 'Anderer TOP?' }),
       ];
-      const { on, fixture } = await setup({ meeting: meeting({ votes }) });
+      const { on, fixture } = await setup({ meeting: meeting({ votes }) }, [MEDIA.wide]);
       const open = screen.getByRole('button', { name: 'Abstimmung öffnen' });
       expect(open).toBeDisabled();
       expect(open).toHaveAttribute('title', 'Erst die offene Abstimmung schließen oder abbrechen.');
@@ -719,7 +719,7 @@ describe('MeetingPageComponent', () => {
     });
 
     it('offers a decision question on a free-text item, and one vote per application item', async () => {
-      const { on, fixture } = await setup();
+      const { on, fixture } = await setup({}, [MEDIA.wide]);
       await userEvent.click(screen.getByRole('button', { name: 'Beschlussfrage hinzufügen' }));
       expect(on.voteDialog).toHaveBeenCalledWith(AGENDA[0]);
       fixture.componentRef.setInput('top', AGENDA[2]);
@@ -758,7 +758,7 @@ describe('MeetingPageComponent', () => {
      */
     it('carries the result into the text until it is there, then goes quiet', async () => {
       const closed = vote({ status: 'closed', result: 'passed', counts: { yes: 3, no: 1, abstain: 0 }, leading: 'yes', revealed: true });
-      const { on, fixture } = await setup({ meeting: meeting({ votes: [closed] }), top: item({ body: 'Aussprache.\\\n' }) });
+      const { on, fixture } = await setup({ meeting: meeting({ votes: [closed] }), top: item({ body: 'Aussprache.\\\n' }) }, [MEDIA.wide]);
       await userEvent.click(screen.getByRole('button', { name: 'Ins Protokoll übernehmen' }));
       const payload = on.bodyChange.mock.calls[0][0] as { itemId: string; body: string };
       expect(payload.itemId).toBe('t-1');

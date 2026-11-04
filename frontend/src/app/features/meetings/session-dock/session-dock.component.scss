@@ -175,11 +175,35 @@
   pointer-events: none;
 }
 
-@include bp.below-wide {
-  .sd {
-    flex-wrap: wrap;
-    row-gap: var(--space-1);
-  }
+.sd__tool {
+  position: relative;
+  display: inline-flex;
+}
+// The number of votes is grey; a running vote colours it like the open guest requests,
+// and the own ballot shows in the sheet, so the dock has no status line there.
+.sd__badge.sd__badge--quiet {
+  background: var(--color-surface-3);
+  color: var(--color-text);
+}
+.sd__badge.sd__badge--tool {
+  position: absolute;
+  top: -2px;
+  inset-inline-end: -2px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  font-size: 0.6875rem;
+  pointer-events: none;
+}
+
+// The dock keeps one line: the format tools move behind "Aa" (`compact`), then the chips
+// keep only their numbers and icons (`tight`). Only the text of the minute-taker chip
+// shrinks; the other chips keep their text and number.
+.sd__chips > .sd__chip:not(:has(.sd__chipText)) {
+  flex: none;
+}
+.sd--tight .sd__chip {
+  padding: 0 var(--space-3);
 }
 
 // The attendance chip keeps its full text, because a centred chip narrower than its content
@@ -223,26 +247,6 @@
     align-items: center;
     gap: var(--space-1);
     margin-inline: auto;
-  }
-  .sd__tool {
-    position: relative;
-    display: inline-flex;
-  }
-  // The number of votes is grey; a running vote colours it like the open guest requests,
-  // and the own ballot shows in the sheet, so the phone dock has no status line.
-  .sd__badge.sd__badge--quiet {
-    background: var(--color-surface-3);
-    color: var(--color-text);
-  }
-  .sd__badge.sd__badge--tool {
-    position: absolute;
-    top: -2px;
-    inset-inline-end: -2px;
-    min-width: 18px;
-    height: 18px;
-    padding: 0 4px;
-    font-size: 0.6875rem;
-    pointer-events: none;
   }
   .sd__vr {
     display: none;
