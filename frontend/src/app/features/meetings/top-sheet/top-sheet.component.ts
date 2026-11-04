@@ -71,6 +71,7 @@ const TOOLS: readonly FormatTool[] = [
   { format: 'bold', icon: 'bold', label: 'meetings.editor.bold' },
   { format: 'italic', icon: 'italic', label: 'meetings.editor.italic' },
   { format: 'bulletList', icon: 'list', label: 'meetings.editor.list' },
+  { format: 'blockquote', icon: 'quote', label: 'meetings.editor.quote' },
 ];
 
 /** The file name without its extension, as the alt text of an uploaded image. */

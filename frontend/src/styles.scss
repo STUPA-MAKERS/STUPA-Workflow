@@ -209,3 +209,9 @@ app-dialog {
 [role='tabpanel']:not([hidden]) {
   animation: motion-fade-in var(--motion-base) var(--ease-standard);
 }
+
+// The frosted protocol dock of a meeting on a phone ends in the colour of the navigation
+// bar and casts the shadow itself, so the bar drops its own while the dock sits on it.
+body:has(.mp__dock:not(.mp__dock--quiet)) {
+  --bb-shadow: none;
+}
