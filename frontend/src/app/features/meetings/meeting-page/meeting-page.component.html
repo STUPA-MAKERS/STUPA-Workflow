@@ -96,7 +96,7 @@
       <app-top-sheet
         class="mp__sheet"
         [linked]="false"
-        [barControls]="!phone() || m.status === 'planned'"
+        [barControls]="m.status === 'planned'"
         [(mode)]="editorMode"
         [meeting]="m"
         [protocol]="proto"
@@ -240,7 +240,7 @@
   </app-side-sheet>
 }
 
-<!-- The format tools of the sheet for "Aa" of the phone dock. A press keeps the focus in
+<!-- The format tools of the sheet for the dock ("Aa" on a phone). A press keeps the focus in
      the text, so the tool applies at the cursor. -->
 <ng-template #formatTpl>
   @if (sheet(); as ts) {

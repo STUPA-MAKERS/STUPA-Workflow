@@ -52,6 +52,8 @@
       </div>
       @if (phone()) {
         <ng-container [ngTemplateOutlet]="phoneTools" />
+      } @else {
+        <ng-container [ngTemplateOutlet]="deskTools" />
       }
       <span class="sd__vr" aria-hidden="true"></span>
       <div class="sd__mid">
@@ -129,6 +131,39 @@
       ><app-icon name="code" /></app-button>
     }
   </div>
+</ng-template>
+
+<!-- On a wider screen: the format tools of the text, "Erledigt" and the view switch, the
+     icon buttons of the phone dock with the format tools in the row. -->
+<ng-template #deskTools>
+  @if (formatTools() || done() !== null || modeToggle()) {
+    <span class="sd__vr" aria-hidden="true"></span>
+    <div class="sd__tools">
+      @if (formatTools(); as tools) {
+        <div class="sd__format" role="toolbar" [attr.aria-label]="'meetings.editor.toolbar' | t">
+          <ng-container [ngTemplateOutlet]="tools" />
+        </div>
+      }
+      @if (done() !== null) {
+        <app-button
+          [variant]="done() ? 'tonal' : 'text'"
+          [iconOnly]="true"
+          [ariaPressed]="done()"
+          [ariaLabel]="'meetings.agenda.done' | t"
+          (click)="doneChange.emit(!done())"
+        ><app-icon name="check" /></app-button>
+      }
+      @if (modeToggle()) {
+        <app-button
+          [variant]="mode() === 'raw' ? 'tonal' : 'text'"
+          [iconOnly]="true"
+          [ariaPressed]="mode() === 'raw'"
+          [ariaLabel]="'meetings.editor.modeRaw' | t"
+          (click)="toggleMode()"
+        ><app-icon name="code" /></app-button>
+      }
+    </div>
+  }
 </ng-template>
 
 <ng-template #presentChip>

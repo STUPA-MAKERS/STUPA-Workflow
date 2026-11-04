@@ -78,6 +78,16 @@
 .sd__spacer {
   flex: 1 1 auto;
 }
+.sd__tools,
+.sd__format {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+}
+.sd__tools {
+  gap: var(--space-1);
+}
 .sd__chips {
   display: flex;
   flex: 0 1 auto;

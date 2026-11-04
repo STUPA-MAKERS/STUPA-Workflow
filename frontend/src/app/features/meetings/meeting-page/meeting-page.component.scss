@@ -160,8 +160,9 @@
 }
 
 // The dock floats over the foot of the panes as frosted glass, like the phone dock: the
-// panes run to the bottom of the page and keep room under their last line
-// (`--mp-foot`), so the text scrolls under the glass and the end stays reachable.
+// panes end at the lower edge of the dock, so no text shows below it, and keep room
+// under their last line (`--mp-foot`), so the text scrolls under the glass and the end
+// stays reachable.
 @include bp.not-phone {
   :host {
     position: relative;
@@ -180,6 +181,9 @@
   // the glass takes the round corners itself.
   .mp__dock::before {
     border-radius: inherit;
+  }
+  .mp__body {
+    margin-bottom: var(--space-3);
   }
   .mp__body:not(.mp__body--wide),
   .mp__body--wide .mp__agenda,
