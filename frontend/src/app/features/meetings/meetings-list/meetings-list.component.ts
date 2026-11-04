@@ -6,18 +6,11 @@ import {
   inject,
   input,
   output,
-  signal,
-  untracked,
-  viewChild,
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
-import { HttpErrorResponse } from '@angular/common/http';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { map } from 'rxjs/operators';
-import { ApiClient } from '@core/api/api-client.service';
-import { DelegationsApiService } from '@core/api/delegations.service';
-import { prefetchDetails } from '@core/cache/detail-prefetch';
 import type { Meeting, Uuid } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -29,7 +22,6 @@ import {
   EmptyStateComponent,
   FilterSelectComponent,
   IconComponent,
-  ListDetailLayoutComponent,
   ListGroupComponent,
   ListItemComponent,
   MEDIA,
@@ -45,11 +37,6 @@ import {
   PageHeaderComponent,
 } from '@stupa-makers/ui-kit';
 import { CalendarSubscribeComponent } from '../calendar-subscribe/calendar-subscribe.component';
-import {
-  MeetingDetailSheetComponent,
-  meetingSheetReads,
-} from '../meeting-detail-sheet/meeting-detail-sheet.component';
-import { MeetingDialogsService } from '../meeting-dialogs.service';
 import { meetingDay, meetingTimeText } from '../meetings-display.util';
 import {
   type MeetingGroup,
@@ -58,23 +45,22 @@ import {
   topsLabel,
 } from '../meetings-overview.util';
 import { MeetingsTimelineService } from '../meetings-timeline.service';
-import { beamerUrl } from '../../voting/beamer-link.util';
 import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
 import { MeetingsViewActionsComponent } from '../meetings-view-actions/meetings-view-actions.component';
 import { weekdayName } from '@shared/date-format';
 import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.directive';
 
 /**
- * The list view of the meeting overview (`/meetings`): a
- * list/detail pane page like the applications and the tasks.
+ * The list view of the meeting overview (`/meetings`): one column on every screen, with no
+ * detail pane, because the meeting page itself is the detail. A row opens the meeting
+ * page; an old `?sel=<id>` link opens it as well.
  *
- * Left: the title with the switch "Liste | Kalender" and the calendar subscription, the
- * search and the Gremium chip (they never scroll away), then the groups "Jetzt",
+ * The title with the switch "Liste | Kalender" and the calendar subscription, the search
+ * and the Gremium chip (they never scroll away), then the groups "Jetzt",
  * "Anstehend · <Monat>" and "Vergangen · <Monat>". A row shows the date, the title, the
  * status, the Gremium, the time and the number of agenda items. "Frühere Sitzungen laden"
  * ends the list; "Neue Sitzung" is the FAB of the list (on a phone the button of the
- * header). Right: the detail sheet of the selected meeting (`?sel=<id>`); side by side
- * the live meeting, else the next one, shows while nothing is selected.
+ * header). Edit, beamer and delete are in the ⋮ menu of the meeting page.
  *
  * A search collapses the groups into one list of hits by relevance (server side).
  * `MeetingsComponent` provides the timeline and the dialog services.
@@ -96,7 +82,6 @@ import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.direc
     EmptyStateComponent,
     FabComponent,
     FilterSelectComponent,
-    ListDetailLayoutComponent,
     ListGroupComponent,
     ListItemComponent,
     RowMenuComponent,
@@ -105,19 +90,16 @@ import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.direc
     StatusTextComponent,
     StickyBarComponent,
     ScrollFadeDirective,
-    MeetingDetailSheetComponent,
     CalendarSubscribeComponent,
   ],
   templateUrl: './meetings-list.component.html',
   styleUrl: './meetings-list.component.scss',
 })
 export class MeetingsListComponent {
-  private readonly api = inject(ApiClient);
   private readonly i18n = inject(I18nService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   protected readonly timeline = inject(MeetingsTimelineService);
-  private readonly dialogs = inject(MeetingDialogsService);
 
   /** "Neue Sitzung" shows (an admin, or `session.manage` in a Gremium). */
   readonly canCreate = input(false);
@@ -130,49 +112,11 @@ export class MeetingsListComponent {
   /** A phone viewport: the header holds one button and one menu. */
   readonly phone = mediaQuery(MEDIA.phone);
 
-  private readonly layout = viewChild(ListDetailLayoutComponent);
-  /** The list and the detail sit side by side: the page does not scroll. */
-  readonly split = computed(() => this.layout()?.collapsed() === false);
-
-  /** The meeting of `?sel=<id>`. */
-  readonly selParam = toSignal(
+  /** The meeting of an old `?sel=<id>` link: it opens the meeting page. */
+  private readonly selParam = toSignal(
     this.route.queryParamMap.pipe(map((q) => q.get('sel'))),
     { initialValue: null },
   );
-  /** A selected meeting that is not in the loaded pages (a deep link). */
-  private readonly extra = signal<Meeting | null>(null);
-  /**
-   * The read of a deep-linked meeting failed for another reason than "not found": the
-   * selection stays, and the detail pane says why (`forbidden` for 403, else `failed`).
-   */
-  readonly selError = signal<{ id: Uuid; kind: 'forbidden' | 'failed' } | null>(null);
-  private requested: string | null = null;
-
-  /** Every loaded meeting, to find the selected one. */
-  private readonly loaded = computed(() => [
-    ...this.timeline.upcomingItems(),
-    ...this.timeline.pastItems(),
-    ...this.timeline.searchItems(),
-  ]);
-
-  /**
-   * Side by side a sheet always shows: without a selection the live meeting, else the
-   * next one. One pane at a time only a selection opens the detail.
-   */
-  private readonly fallback = computed<Meeting | null>(() => {
-    if (!this.split()) return null;
-    const upcoming = this.timeline.upcomingItems();
-    return upcoming.find((m) => m.status === 'live') ?? upcoming[0] ?? null;
-  });
-
-  readonly selected = computed<Meeting | null>(() => {
-    const id = this.selParam();
-    if (!id) return this.fallback();
-    const found = this.loaded().find((m) => m.id === id);
-    if (found) return found;
-    const extra = this.extra();
-    return extra?.id === id ? extra : null;
-  });
 
   readonly groups = computed<MeetingGroup[]>(() =>
     overviewGroups(this.timeline.upcomingItems(), this.timeline.pastItems(), this.i18n.locale()),
@@ -192,106 +136,15 @@ export class MeetingsListComponent {
   ]);
 
   constructor() {
-    prefetchDetails({
-      items: computed(() => {
-        const found = this.timeline.searchItems();
-        return found.length ? found : [...this.timeline.upcomingItems(), ...this.timeline.pastItems()];
-      }),
-      key: (m) => m.id,
-      reads: (m) =>
-        Object.values(meetingSheetReads(this.api, inject(DelegationsApiService), m)).filter((r) => r !== null),
-    });
     effect(() => {
       const id = this.selParam();
-      const loading = this.timeline.loadingList();
-      if (!id || loading) return;
-      untracked(() => {
-        if (this.requested === id || this.loaded().some((m) => m.id === id)) return;
-        this.readSelected(id);
-      });
-    });
-
-    effect(() => {
-      const change = this.timeline.lastChange();
-      if (!change) return;
-      untracked(() => {
-        if (change.kind === 'updated') {
-          if (this.extra()?.id === change.meeting.id) this.extra.set(change.meeting);
-          return;
-        }
-        if (this.extra()?.id === change.id) this.extra.set(null);
-        if (this.selParam() === change.id) this.clearSelection();
-      });
+      if (id) void this.router.navigate(['/meetings', id], { replaceUrl: true });
     });
   }
 
-  /**
-   * Read a deep-linked meeting. Only a 404 drops the selection (the meeting is gone).
-   * A 403, a server error or a network error keeps it and shows the reason, so a reload
-   * or "Erneut laden" can still reach the meeting. The read runs once per id: after a
-   * failure only the button reads again, not the next change of the list state.
-   *
-   * `requested` stays set, so a later change of the list state does not read again.
-   */
-  private readSelected(id: Uuid): void {
-    this.requested = id;
-    this.selError.set(null);
-    this.api.getMeeting(id).subscribe({
-      next: (m) => this.extra.set(m),
-      error: (err: unknown) => {
-        const status = err instanceof HttpErrorResponse ? err.status : 0;
-        if (status === 404) {
-          this.requested = null;
-          this.clearSelection();
-          return;
-        }
-        this.selError.set({ id, kind: status === 403 ? 'forbidden' : 'failed' });
-      },
-    });
-  }
-
-  /** "Erneut laden" after a failed read of the deep-linked meeting. */
-  retrySelected(): void {
-    const id = this.selParam();
-    if (id) this.readSelected(id);
-  }
-
-  /** Select a meeting: its sheet shows beside the list, or as the next step. */
-  select(m: Meeting): void {
-    void this.router.navigate([], {
-      relativeTo: this.route,
-      queryParams: { sel: m.id },
-      queryParamsHandling: 'merge',
-    });
-  }
-
-  /** Open the meeting page (double click on a row). */
+  /** Open the meeting page. */
   open(id: Uuid): void {
     void this.router.navigate(['/meetings', id]);
-  }
-
-  /** "Zur Liste": close the detail of the one-pane layout. */
-  clearSelection(): void {
-    void this.router.navigate([], {
-      relativeTo: this.route,
-      queryParams: { sel: null },
-      queryParamsHandling: 'merge',
-      replaceUrl: true,
-    });
-  }
-
-  edit(m: Meeting): void {
-    this.dialogs.openSettings(m);
-  }
-
-  remove(m: Meeting): void {
-    this.dialogs.askDeleteMeeting(m);
-  }
-
-  /** "Beamer-Ansicht" in a new tab, so the overview stays. */
-  beamer(m: Meeting): void {
-    const url = this.router.serializeUrl(beamerUrl(this.router, m.id));
-    window.open(url, '_blank', 'noopener');
   }
 
   /** The ⋮ menu of the phone header: "Kalender-Abo" opens the bottom sheet. */

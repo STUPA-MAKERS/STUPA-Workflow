@@ -107,11 +107,6 @@
   flex: none;
   margin-bottom: var(--space-3);
 }
-.mp__prep {
-  flex: 1 1 auto;
-  border-radius: var(--radius-2xl);
-  background: var(--color-surface-1);
-}
 
 .mp__body--wide {
   display: grid;
@@ -136,10 +131,6 @@
 }
 .mp__body--wide .mp__sheet {
   min-height: 0;
-}
-.mp__body--wide .mp__prep {
-  overflow-y: auto;
-  overscroll-behavior: contain;
 }
 .mp__body--wide .mp__votes {
   grid-area: votes;
@@ -240,8 +231,7 @@
 }
 
 .mp__agenda,
-.mp__votes,
-.mp__prep {
+.mp__votes {
   @include fade.fade-y(var(--space-5));
 }
 

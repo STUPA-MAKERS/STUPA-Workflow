@@ -1,22 +1,14 @@
 @use 'scroll-fade' as fade;
 @use 'list-pane' as lp;
 
-// The list/detail pane page of applications-list.component.scss.
+// One column on every screen: the meeting page is the detail.
 
 :host {
   @include lp.stack;
 }
 .mtl {
-  min-width: 0;
-}
-.mtl:not(.mtl--split) {
   @include lp.single-column;
-}
-.mtl:not(.mtl--split) > app-list-detail {
-  flex: 1 0 auto;
-}
-.mtl--split {
-  @include lp.split-column;
+  min-width: 0;
 }
 
 .mtl__chips {
@@ -30,12 +22,6 @@
   @include lp.scroll(--mtl-fade);
   padding-bottom: calc(56px + var(--space-6));
   @include fade.fade-y(var(--mtl-fade));
-}
-.mtl--split .mtl__scroll {
-  @include lp.split-scroll(--mtl-fade);
-}
-.mtl--split .mtl__scroll > * {
-  flex: none;
 }
 
 .mtl__group {
@@ -85,16 +71,4 @@
 .mtl__more--start {
   justify-content: flex-start;
   padding-inline: var(--space-2);
-}
-
-.mtl__detail {
-  @include lp.detail;
-}
-.mtl__none {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  padding: var(--space-4);
-  border-radius: var(--radius-2xl);
-  background: var(--color-surface-1);
 }

@@ -45,7 +45,6 @@ import {
   type AttendanceChange,
   AttendanceSheetComponent,
 } from '../attendance-sheet/attendance-sheet.component';
-import { PrepChecklistComponent } from '../prep-checklist/prep-checklist.component';
 import { type DockPanel, SessionDockComponent } from '../session-dock/session-dock.component';
 import { type SaveState, TopSheetComponent } from '../top-sheet/top-sheet.component';
 import { VoteCardComponent } from '../vote-card/vote-card.component';
@@ -59,18 +58,19 @@ import { TodoLinkedListComponent } from '../../todos/linked-list/todo-linked-lis
 import { clock, weekdayDate } from '@shared/date-format';
 
 /** The ids of the session menu. */
-type SessionAction = 'agenda' | 'prep' | 'settings' | 'attendance' | 'votes' | 'keeper' | 'beamer' | 'qr' | 'close' | 'delete';
+type SessionAction = 'open' | 'agenda' | 'settings' | 'attendance' | 'votes' | 'keeper' | 'beamer' | 'qr' | 'close' | 'delete';
 
 /**
  * The session page of the meeting lead and the minute-taker (`/meetings/:id`).
  *
- * The header carries the title, the status, "Gremium · date · seit HH:MM", the people
- * who have the meeting open, the beamer, the session menu and the one main action (open
- * or close). Below it the agenda pane, the sheet of the open item and the cards of its
- * votes. A planned meeting shows the preparation instead of the sheet until the lead
- * picks an agenda item: then the sheet and the vote cards of that item show, so the
- * text and the votes can be prepared before the start. The dock at the foot steps
- * through the agenda and holds the attendance and the minute-taker.
+ * The header carries the title, the status, "Gremium · date · seit HH:MM", the session
+ * menu and, on a wider screen, the close of a live meeting. "Sitzung eröffnen" is an item
+ * of the session menu, disabled with its reason until a minute-taker is set and the open
+ * window opens. Below the header the agenda pane, the sheet of the open item and the
+ * cards of its votes. A planned meeting opens on its first agenda item, so the text and
+ * the votes can be prepared before the start. The dock at the foot steps through the
+ * agenda and holds the attendance and the minute-taker (on a phone before the opening:
+ * the session menu).
  *
  * A closed meeting finalizes its protocol from the protocol bar of the sheet. The
  * attendance opens as a side sheet. A minute-taker picked in the dock of a live meeting
@@ -80,8 +80,8 @@ type SessionAction = 'agenda' | 'prep' | 'settings' | 'attendance' | 'votes' | '
  * start edge, and the vote cards go above the item. On a phone the agenda sheet, the
  * attendance and the minute-taker open as bottom sheets, and the protocol text has the
  * page to itself: the vote cards open as a bottom sheet from an icon button of the dock,
- * whose number turns to the accent colour while a vote of the item runs (before the
- * opening, when the phone has no dock, from the session menu).
+ * whose number turns to the accent colour while a vote of the item runs (from the session
+ * menu while a planned meeting has no item to write and so no dock).
  *
  * The reason for a disabled action is visible text, not only a tooltip, because a disabled button
  * takes no focus and no touch. The agenda sheet stays outside the body, because the scroll fade of
@@ -101,7 +101,6 @@ type SessionAction = 'agenda' | 'prep' | 'settings' | 'attendance' | 'votes' | '
     RowMenuComponent,
     SideSheetComponent,
     AgendaPaneComponent,
-    PrepChecklistComponent,
     SessionDockComponent,
     TopSheetComponent,
     TodoLinkedListComponent,
@@ -205,8 +204,6 @@ export class MeetingPageComponent {
   readonly votesOpen = signal(false);
   /** The list of the people who have the meeting open. */
   protected readonly presenceOpen = signal(false);
-  /** A planned meeting shows an agenda item instead of the preparation. */
-  protected readonly prepItem = signal(false);
 
   /** Raised by an insert from outside the editor, so the editor loads the new text. */
   protected readonly revision = signal(0);
@@ -230,7 +227,7 @@ export class MeetingPageComponent {
   /** The done mark of the open item for the dock, or `null` for no button there. */
   protected readonly dockDone = computed<boolean | null>(() => {
     const t = this.top();
-    return this.editable() && t && !this.preparing() ? !!t.doneAt : null;
+    return this.editable() && t ? !!t.doneAt : null;
   });
   /** The vote icon button of the dock below the wide layout: the number of votes, or `null`. */
   protected readonly dockVotes = computed<number | null>(() =>
@@ -240,7 +237,7 @@ export class MeetingPageComponent {
    * meeting has no protocol yet, but the text of its items can be prepared. */
   protected readonly dockModeToggle = computed(() => {
     const p = this.protocol();
-    if (this.top() === null || this.preparing()) return false;
+    if (this.top() === null) return false;
     return this.meeting().status === 'planned' ? !p?.isLocked : !!p && !p.isLocked;
   });
   /** The sheet of the open item: the dock runs its format tools. */
@@ -259,20 +256,6 @@ export class MeetingPageComponent {
 
   /** "TOP hinzufügen" in the header of the agenda sheet, and the rename by a click on the title. */
   protected readonly canAddTop = computed(() => canChangeAgenda(this.meeting(), this.locked()));
-
-  /**
-   * The planned meeting shows what the opening needs instead of the sheet, until the
-   * lead picks an agenda item to prepare.
-   */
-  protected readonly preparing = computed(() => {
-    const m = this.meeting();
-    return m.status === 'planned' && (m.canControl || m.canManage) && !this.prepItem();
-  });
-  /** "Zurück zur Vorbereitung" in the session menu while an item of a planned meeting is open. */
-  protected readonly canBackToPrep = computed(() => {
-    const m = this.meeting();
-    return m.status === 'planned' && (m.canControl || m.canManage) && this.prepItem();
-  });
 
   /**
    * The row of the application of the open item, the first row of the linked list above
@@ -318,7 +301,7 @@ export class MeetingPageComponent {
   private readonly now = openWindowClock();
   /** Where now is in the open window of a planned meeting (see `openWindowState`). */
   protected readonly openWindow = computed(() => openWindowState(this.meeting(), this.now()));
-  /** "Eröffnen ab 17:00", the label of the open button while the window is not open yet, else `''`. */
+  /** "Möglich ab 17:00", the reason of the disabled "Sitzung eröffnen" while the window is not open yet, else `''`. */
   protected readonly opensAtText = computed(() => {
     const at = this.meeting().opensAt;
     if (this.openWindow() !== 'tooEarly' || !at) return '';
@@ -336,7 +319,7 @@ export class MeetingPageComponent {
   /**
    * The session menu: settings, attendance and delete. Below the wide layout the beamer
    * of a planned or live meeting goes in here too; on a phone the header keeps only the title, so the close moves in
-   * as well (the opening is on the preparation page, the finalize in the protocol bar).
+   * as well (the finalize is in the protocol bar). The opening is always here, first.
    *
    * The beamer route and its stream need session.manage in the gremium.
    */
@@ -344,15 +327,26 @@ export class MeetingPageComponent {
     const m = this.meeting();
     const t = (key: Parameters<I18nService['translate']>[0]): string => this.i18n.translate(key);
     const main: RowMenuItem[] = [];
+    if (this.mainAction() === 'open') {
+      main.push({
+        id: 'open',
+        label: t('meetings.control.open'),
+        icon: 'play',
+        disabledReason: m.protokollantId
+          ? this.opensAtText() || null
+          : t('meetings.control.needProtokollant'),
+      });
+    }
     // Below the wide layout the agenda is a sheet, and the menu opens it.
     if (!this.wide()) main.push({ id: 'agenda', label: t('meetings.agenda.title'), icon: 'list' });
-    if (this.canBackToPrep()) main.push({ id: 'prep', label: t('meetings.prep.back'), icon: 'clipcheck' });
     if (m.canManage) main.push({ id: 'settings', label: t('meetings.settings.title'), icon: 'edit' });
-    // A phone dock holds the attendance as an icon button; before the opening it shows nothing.
-    if (!this.phone() || m.status === 'planned') {
+    // A phone dock holds the attendance and the votes as icon buttons; it is hidden only while a
+    // planned meeting has no item to write (no agenda yet).
+    const noDock = this.phone() && m.status === 'planned' && !this.dockModeToggle();
+    if (!this.phone() || noDock) {
       main.push({ id: 'attendance', label: t('meetings.page.recordAttendance'), icon: 'users' });
     }
-    if (this.phone() && m.status === 'planned' && this.showVotes()) {
+    if (noDock && this.showVotes()) {
       main.push({ id: 'votes', label: t('meetings.vote.count'), icon: 'vote' });
     }
     const keeper =
@@ -446,7 +440,7 @@ export class MeetingPageComponent {
 
   /** The column of the vote cards shows when there is a vote or one can be added. */
   protected readonly showVotes = computed(
-    () => !this.preparing() && (this.votes().length > 0 || this.canAddVote()),
+    () => this.votes().length > 0 || this.canAddVote(),
   );
 
   /** The own ballot of the open vote, for the dock. */
@@ -494,9 +488,8 @@ export class MeetingPageComponent {
     this.selectTop.emit(id);
   }
 
-  /** Close the panels and show the sheet of the item that opens. */
+  /** Close the panels for the sheet of the item that opens. */
   private open(): void {
-    if (this.meeting().status === 'planned') this.prepItem.set(true);
     this.panel.set('none');
     this.agendaOpen.set(false);
   }
@@ -524,8 +517,8 @@ export class MeetingPageComponent {
 
   protected onMenu(item: RowMenuItem): void {
     switch (item.id as SessionAction) {
-      case 'prep':
-        this.prepItem.set(false);
+      case 'open':
+        this.startSession.emit();
         break;
       case 'settings':
         this.openSettings.emit();

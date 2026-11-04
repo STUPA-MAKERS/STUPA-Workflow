@@ -6,7 +6,6 @@ import {
   effect,
   inject,
   signal,
-  viewChild,
 } from '@angular/core';
 import { AuthService } from '@core/auth/auth.service';
 import { MEDIA, mediaQuery, PageFrame } from '@stupa-makers/ui-kit';
@@ -18,15 +17,15 @@ import { MeetingsTimelineService } from '../meetings-timeline.service';
 
 /**
  * The meeting overview (`/meetings`): the list view
- * (`app-meetings-list`, list and detail) or the calendar view (`app-meetings-calendar`),
+ * (`app-meetings-list`, one column, a row opens the meeting) or the calendar view (`app-meetings-calendar`),
  * with the switch "Liste | Kalender" in the header of both.
  *
- * The browser keeps the chosen view (`localStorage`). A phone shows only the list: a
- * month grid does not fit, and the list there is the step before the detail. "Neue
+ * The browser keeps the chosen view (`localStorage`). A phone shows only the list,
+ * because a month grid does not fit. "Neue
  * Sitzung" opens the create dialog from both views.
  *
  * `pane` tells `MeetingsComponent` that the view fills the free height and scrolls only
- * inside its panes (the list beside the detail, or the wide calendar).
+ * inside its panes (the wide calendar).
  */
 @Component({
   selector: 'app-meetings-overview',
@@ -55,11 +54,8 @@ export class MeetingsOverviewComponent implements OnDestroy {
   );
   readonly createOpen = signal(false);
 
-  private readonly list = viewChild(MeetingsListComponent);
-  /** The view fills the free height of the page and does not scroll as a page. */
-  readonly pane = computed(() =>
-    this.view() === 'calendar' ? this.wide() : this.list()?.split() === true,
-  );
+  /** The wide calendar fills the free height of the page and does not scroll as a page; the list scrolls as a page. */
+  readonly pane = computed(() => this.view() === 'calendar' && this.wide());
 
   constructor() {
     effect(() => this.frame.fill.set(this.pane()));
