@@ -646,7 +646,7 @@ async def test_vote_status_blocked_and_exercising() -> None:
     )
     db = fake_session(
         result(me),
-        result(outgoing, incoming),
+        result((outgoing, False), (incoming, False)),
         _names((to_id, "Vertreter", None), (by_id, "Vertretener", None)),
     )
     db.get_results = [_vote()]
@@ -674,6 +674,31 @@ async def test_vote_status_no_rows_empty_names() -> None:
     assert status.exercising is False
     assert status.delegated_to_name is None
     assert status.delegated_by_name is None
+
+
+async def test_vote_status_pool_seat_does_not_block(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A pool seat of the caller does not block the own ballot.
+
+    The caller has no incoming delegation, so the free seat lookup runs: here a
+    pool substitute exercises the seat of a missing member.
+    """
+    from app.modules.delegations import service as service_mod
+
+    me = _me()
+    absent = SimpleNamespace(id=uuid4(), sub="absent")
+    seat_row = SimpleNamespace(delegator_principal_id=me.id, delegate_principal_id=uuid4())
+
+    async def _seat(*_a: Any) -> Any:
+        return absent
+
+    monkeypatch.setattr(service_mod, "pool_seat_for", _seat)
+    db = fake_session(result(me), result((seat_row, True)), _names((absent.id, "Anna", None)))
+    db.get_results = [_vote()]
+    status = await _svc(db).vote_status(VOTE_ID, _actor())
+    assert status.blocked is False
+    assert status.delegated_to_name is None
+    assert status.exercising is True
+    assert status.delegated_by_name == "Anna"
 
 
 async def test_require_pool_manage_admin_short_circuits() -> None:

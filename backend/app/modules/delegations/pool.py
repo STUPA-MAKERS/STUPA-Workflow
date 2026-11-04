@@ -5,9 +5,9 @@ entries (for one member) and gremium-wide entries (for every member).
 
 Every path that reads the pool uses the helpers of this module: the delegation
 create (`via_pool`), the lead entry during a live meeting, the recipient
-list, the meeting context, the roster guard, the meeting visibility and
-`/auth/me` (`inSubstitutePool`). Do not query the pool table directly in another
-place.
+list, the meeting context, the roster guard, the meeting visibility,
+`/auth/me` (`inSubstitutePool`) and the pool seats (`pool_seat.py`). Do not
+query the pool table directly in another place.
 """
 
 from __future__ import annotations
@@ -38,6 +38,24 @@ async def substitutes_for(
         ),
     )
     return set((await session.execute(stmt)).scalars().all())
+
+
+async def members_for_substitute(
+    session: AsyncSession, gremium_id: UUID, substitute_id: UUID
+) -> tuple[set[UUID], bool]:
+    """Return the members that `substitute_id` may represent in the gremium.
+
+    Returns:
+        The members of the personal entries, and True when a gremium-wide entry
+        lets the substitute represent every member.
+    """
+    stmt = select(DelegationSubstitute.member_principal_id).where(
+        DelegationSubstitute.gremium_id == gremium_id,
+        DelegationSubstitute.substitute_principal_id == substitute_id,
+    )
+    members = set((await session.execute(stmt)).scalars().all())
+    gremium_wide = None in members
+    return {m for m in members if m is not None}, gremium_wide
 
 
 def _substitute_gremien_stmt(principal: UUID | ScalarSelect[UUID]) -> Select[UUID]:

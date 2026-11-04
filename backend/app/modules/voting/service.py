@@ -47,6 +47,11 @@ from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth.principal import Principal
 from app.modules.auth.rbac import vote_group_key
+from app.modules.delegations.pool_seat import (
+    claim_pool_seat,
+    pool_seat_for,
+    release_pool_seat_of,
+)
 from app.modules.delegations.service import voting_delegation_check
 from app.modules.flow.dispatch import ActionDispatcher, NullActionDispatcher
 from app.modules.flow.service import FlowService, StagedFire
@@ -1128,7 +1133,13 @@ class VotingService:
         session and external substitutes reach this point. A represented ballot audits
         the use of the delegation. On a later 409 (double vote) the session dependency
         rolls back the transaction, and this entry with it. A member who casts the own
-        ballot in a meeting takes part in the meeting.
+        ballot in a meeting takes part in the meeting, which frees a pool seat of the
+        member (``release_pool_seat_of``).
+
+        A pool substitute without a voting delegation claims a free seat with the first
+        represented ballot (``claim_pool_seat``). The claim stores a delegation, so the
+        ballot runs under the ``sub`` of the represented member like any delegated
+        ballot, and a refused ballot rolls the claim back.
 
         Raises:
             ConflictError: 409 - the vote is closed or the voter already voted.
@@ -1146,6 +1157,10 @@ class VotingService:
             self.session, principal.sub, vote.meeting_id, vote.eligible_group, now
         )
         if as_delegation:
+            if delegator_sub is None:
+                delegator_sub = await claim_pool_seat(
+                    self.session, principal.sub, vote.meeting_id, vote.eligible_group, now
+                )
             if delegator_sub is None:
                 raise ForbiddenError("No delegated voting right for this ballot.")
             voter_sub = delegator_sub
@@ -1169,6 +1184,7 @@ class VotingService:
         if vote.meeting_id is not None and not as_delegation:
             from app.modules.livevote.attendance_service import AttendanceService
 
+            await release_pool_seat_of(self.session, vote.meeting_id, principal.sub)
             await AttendanceService(self.session).mark_present_on_cast(
                 vote.meeting_id, principal.sub
             )
@@ -1292,9 +1308,10 @@ class VotingService:
         The rule mirrors the gate of `cast` without a write: the vote is open and its
         window has not ended, the session is human (no OAuth token), and either the
         own ballot (``vote.cast`` in the gremium of the vote, the right not delegated
-        away) or the represented ballot (a voting delegation for the meeting) is still
-        missing. A ballot that is already in counts as done, because `cast` answers
-        409 for it. The task list (`ListingOps.list_tasks`) reads this method.
+        away) or the represented ballot (a voting delegation for the meeting, or a free
+        pool seat that ``cast`` would claim) is still missing. A ballot that is already
+        in counts as done, because `cast` answers 409 for it. The task list
+        (`ListingOps.list_tasks`) reads this method.
         """
         if vote.status != "open":
             return False
@@ -1313,7 +1330,12 @@ class VotingService:
         ):
             return True
         if delegator_sub is None:
-            return False
+            seat = await pool_seat_for(
+                self.session, principal.sub, vote.meeting_id, vote.eligible_group, now
+            )
+            if seat is None:
+                return False
+            delegator_sub = seat.sub
         return not (await self.my_ballot(vote, delegator_sub, secret=secret)).cast
 
     async def _cast_open(self, vote_id: UUID, voter_sub: str, choice: str) -> BallotAccepted:
