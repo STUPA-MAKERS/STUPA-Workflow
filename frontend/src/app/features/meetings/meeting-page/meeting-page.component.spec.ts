@@ -447,7 +447,8 @@ describe('MeetingPageComponent', () => {
     it('shows a reader without session rights the sheet instead of the checklist', async () => {
       await setup({ meeting: planned({ canControl: false, canManage: false }), protocol: null });
       expect(screen.queryByRole('heading', { name: 'Sitzung vorbereiten' })).toBeNull();
-      expect(screen.getByRole('radio', { name: 'Formatiert' })).toBeInTheDocument();
+      // The format tools of the item are in the dock, as in a live meeting.
+      expect(screen.getByRole('toolbar', { name: 'Format' })).toBeInTheDocument();
       expect(within(await openMenu()).queryByRole('menuitem', { name: 'Zurück zur Vorbereitung' })).toBeNull();
     });
   });
