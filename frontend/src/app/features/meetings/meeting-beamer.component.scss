@@ -1,3 +1,5 @@
+@use 'breakpoints' as bp;
+
 // The type scales with the screen width, so a 1280 × 720 projector and a 1920 × 1080 screen
 // show the same layout as the 1440 × 900 design.
 :host {
@@ -257,4 +259,29 @@
   max-width: 22rem;
   font-size: clamp(0.875rem, 1.1vw, 1.25rem);
   color: var(--color-text-muted);
+}
+
+// On a phone the row is too narrow for the text and the badge side by side: the text
+// wrapped to one word per line beside the badge. The badge goes below the text, and the
+// idle view puts the join card below the "now" text.
+@include bp.phone {
+  .bm__bottom {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .bm__badgeText {
+    max-width: none;
+  }
+  // One fact per line, so no separator ends a line.
+  .bm__foot {
+    flex-direction: column;
+    gap: 0;
+  }
+  .bm__foot .bm__sep {
+    display: none;
+  }
+  .bm__idleWrap--join {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
 }

@@ -72,6 +72,7 @@ export function normalizeJoinCode(raw: string): string {
     SiteFooterComponent,
     LanguageSelectComponent,
   ],
+  host: { '(window:scroll)': 'onScroll()' },
   templateUrl: './public-meeting.component.html',
   styleUrl: './public-meeting.component.scss',
 })
@@ -83,6 +84,9 @@ export class PublicMeetingComponent {
   protected readonly guest = inject(GuestSessionService);
   /** The wordmark of the own header: the branding upload, else the built-in one. */
   protected readonly logoSrc = inject(BrandingService).wordmarkSrc;
+
+  /** The page has scrolled: the content runs under the bar, so the bar is glass. */
+  protected readonly scrolled = signal(false);
 
   protected readonly name = signal('');
   /** The pending request shows the rename form. */
@@ -220,5 +224,9 @@ export class PublicMeetingComponent {
   private dateText(isoDate: string, time: string | null): string {
     const at = time ? `${isoDate}T${time.slice(0, 5)}:00` : isoDate;
     return weekdayDate(at, this.i18n.formatLocale(), { time: !!time }) || isoDate;
+  }
+
+  protected onScroll(): void {
+    this.scrolled.set(window.scrollY > 0);
   }
 }

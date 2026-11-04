@@ -1,6 +1,6 @@
 @let st = state();
 @let h = head();
-<header class="pm__bar">
+<header class="pm__bar" [class.pm__bar--under]="scrolled()">
   <img class="pm__logo" [src]="logoSrc()" alt="" />
   <span class="sr-only">{{ 'guests.page.routeTitle' | t }}</span>
   <span class="pm__spacer"></span>
@@ -71,7 +71,7 @@
     @case ('join') {
       @if (h) {
         <div class="pm__head">
-          <span class="pm__eyebrow cap">{{ 'guests.page.eyebrow' | t }}</span>
+          <span class="pm__eyebrow">{{ 'guests.page.eyebrow' | t }}</span>
           <h1 class="pm__title">{{ h.title }}</h1>
           <span class="pm__meta">
             @if (status(); as s) {
