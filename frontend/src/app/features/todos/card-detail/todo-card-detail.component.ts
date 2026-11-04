@@ -414,6 +414,8 @@ export class TodoCardDetailComponent {
   /**
    * The ⋮ menu. In the pane of "Aufgaben" on a phone it also holds "Im Board öffnen": the
    * header of a phone keeps the title and one action, so the link leaves the kicker line.
+   * On a phone it also holds "Erledigt" (or "Wieder öffnen") and "Verschieben", which have
+   * no bar at the foot of the card.
    */
   readonly menuSections = computed<RowMenuSection[]>(() => {
     const c = this.card();
@@ -424,8 +426,21 @@ export class TodoCardDetailComponent {
         : [];
     if (!c.canWrite) return open;
     if (c.archivedAt) return [...open, { items: [{ id: 'restore', label: this.t('todos.card.restore'), icon: 'undo' }] }];
+    const status: RowMenuSection[] = this.phone()
+      ? [
+          {
+            items: [
+              this.isDone()
+                ? { id: 'done', label: this.t('todos.card.reopen'), icon: 'undo' }
+                : { id: 'done', label: this.t('todos.card.done'), icon: 'check' },
+              { id: 'move', label: this.t('todos.card.move'), icon: 'swap' },
+            ],
+          },
+        ]
+      : [];
     return [
       ...open,
+      ...status,
       {
         items: [
           { id: 'rename', label: this.t('todos.card.rename'), icon: 'edit' },
@@ -902,6 +917,8 @@ export class TodoCardDetailComponent {
 
   onMenu(item: RowMenuItem): void {
     if (item.id === 'openInBoard') this.openInBoard();
+    else if (item.id === 'done') this.toggleDone();
+    else if (item.id === 'move') this.moveOpen.set(true);
     else if (item.id === 'rename') this.startTitle();
     else if (item.id === 'transfer') this.transferOpen.set(true);
     else if (item.id === 'archive') this.archive();

@@ -135,18 +135,6 @@
           <ng-container *ngTemplateOutlet="activity; context: { sheet: true }" />
         }
       </app-side-sheet>
-      @if (canWrite()) {
-        <div class="cd__bar">
-          <app-button class="btn-block" variant="tonal" [disabled]="busy()" (click)="moveOpen.set(true)">
-            <app-icon name="swap" />
-            {{ 'todos.card.move' | t }}
-          </app-button>
-          <app-button class="btn-block" variant="fill" [disabled]="busy()" (click)="toggleDone()">
-            <app-icon [name]="isDone() ? 'undo' : 'check'" />
-            {{ (isDone() ? 'todos.card.reopen' : 'todos.card.done') | t }}
-          </app-button>
-        </div>
-      }
     } @else {
       <div class="cd__cols">
         <section class="cd__col cd__col--chat" [class.cd__col--readonly]="!canWrite()" [attr.aria-label]="'todos.card.activity' | t">
