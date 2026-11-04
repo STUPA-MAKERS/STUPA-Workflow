@@ -366,9 +366,9 @@ describe('ApplicationsListComponent', () => {
   });
 
   describe('paging', () => {
-    it('loads the next page on "Mehr laden" and shows the count', async () => {
+    it('loads the next page on "Mehr laden" and shows no count', async () => {
       const { http, harness } = await start('/applications', { rows: [ROWS[0]], total: 2 });
-      expect(screen.getByText('1 von 2')).toBeInTheDocument();
+      expect(screen.queryByText('1 von 2')).not.toBeInTheDocument();
       await userEvent.click(screen.getByRole('button', { name: 'Mehr laden' }));
       const req = http.expectOne(LIST);
       expect(req.request.params.get('offset')).toBe('1');

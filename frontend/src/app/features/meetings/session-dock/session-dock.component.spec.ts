@@ -57,7 +57,7 @@ describe('SessionDockComponent', () => {
   describe('live', () => {
     it('steps through the agenda and disables the edges', async () => {
       const { on, fixture } = await setup();
-      expect(screen.getByText('1 von 3')).toBeInTheDocument();
+      expect(screen.getByText('1 von 3', { selector: '.sd__strong' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Vorheriger TOP' })).toBeDisabled();
       await userEvent.click(screen.getByRole('button', { name: 'Nächster TOP' }));
       expect(on.step).toHaveBeenCalledWith(1);
@@ -101,7 +101,8 @@ describe('SessionDockComponent', () => {
     it('counts the present members and opens the attendance sheet of the page', async () => {
       const { fixture } = await setup();
       const chip = screen.getByTitle('Anwesenheit');
-      expect(chip).toHaveTextContent('Anwesend 1 von 3');
+      expect(chip).toHaveTextContent('1 von 3');
+      expect(chip).toHaveAccessibleName('Anwesend 1 von 3');
       await userEvent.click(chip);
       expect(fixture.componentInstance.panel()).toBe('attendance');
       expect(chip).toHaveAttribute('aria-expanded', 'true');
@@ -150,13 +151,13 @@ describe('SessionDockComponent', () => {
     it('shows the minute-taker without the handover to a member who neither leads nor keeps the minutes', async () => {
       await setup({ meeting: meeting({ canManage: false, isProtokollant: false }) });
       expect(screen.queryByTitle('Protokollführung übergeben')).toBeNull();
-      expect(screen.getByText('Protokoll: Pia Protokoll')).toBeInTheDocument();
+      expect(screen.getByText('Pia Protokoll')).toBeInTheDocument();
       expect(screen.getByTitle('Protokoll: Pia Protokoll')).toHaveClass('sd__chip--static');
     });
 
     it('offers the handover to the minute-taker', async () => {
       await setup({ meeting: meeting({ canManage: false, isProtokollant: true }) });
-      expect(chip()).toHaveTextContent('Protokoll: Pia Protokoll');
+      expect(chip()).toHaveTextContent('Pia Protokoll');
     });
 
     /** The current minute-taker is marked and is no target. */
@@ -320,7 +321,7 @@ describe('SessionDockComponent', () => {
       expect(keepers.getAttribute('title')).toBe(
         'Protokoll: Pia Protokoll, Mika Mitglied\nSitzung geschlossen — die Protokollführung steht fest.',
       );
-      expect(keepers).toHaveTextContent('Protokoll: Pia Protokoll, Mika Mitglied');
+      expect(keepers).toHaveTextContent('Pia Protokoll, Mika Mitglied');
       expect(keepers.tagName).toBe('SPAN');
       await userEvent.click(screen.getByTitle('Anwesenheit'));
       expect(fixture.componentInstance.panel()).toBe('attendance');
@@ -330,22 +331,29 @@ describe('SessionDockComponent', () => {
       await setup({ meeting: closed({ keeperPeriods: [], closedAt: null }), agenda: [AGENDA[0]] });
       expect(screen.getByText('Geschlossen')).toBeInTheDocument();
       expect(screen.getByText('1 TOP')).toBeInTheDocument();
-      expect(screen.getByText('Protokoll: Pia Protokoll')).toBeInTheDocument();
+      expect(screen.getByText('Pia Protokoll')).toBeInTheDocument();
     });
   });
 
   describe('on a phone', () => {
-    /** There is no popover and no own backdrop, because the sheet has its scrim. */
-    it('opens the minute-taker menu as a bottom sheet over the navigation bar', async () => {
+    /**
+     * There is no popover and no own backdrop, because the sheet has its scrim. The dock
+     * has no chips there: the session menu of the page sets the panel.
+     */
+    it('has no chips and opens the minute-taker menu from the panel as a bottom sheet over the navigation bar', async () => {
       const { fixture, container, on } = await setup(
         { meeting: planned({ protokollantId: null, protokollantName: null }) },
         [MEDIA.phone],
       );
       const dock = fixture.componentInstance;
       const host = fixture.nativeElement as HTMLElement;
+      expect(container.querySelector('.sd__chips')).toBeNull();
+      expect(screen.queryByRole('button', { name: /Protokollführung fehlt/ })).toBeNull();
+      expect(screen.queryByTitle('Anwesenheit')).toBeNull();
       expect(host.style.zIndex).toBe('');
-      await userEvent.click(screen.getByRole('button', { name: /Protokollführung fehlt/ }));
-      let sheet = screen.getByRole('dialog', { name: 'Protokollführung wählen' });
+      fixture.componentRef.setInput('panel', 'protokollant');
+      fixture.detectChanges();
+      let sheet = await screen.findByRole('dialog', { name: 'Protokollführung wählen' });
       expect(sheet).toHaveClass('ss', 'ss--bottom');
       expect(sheet.querySelector('.ss__handle')).not.toBeNull();
       expect(container.querySelector('.sd__pop')).toBeNull();
@@ -354,8 +362,9 @@ describe('SessionDockComponent', () => {
       await userEvent.keyboard('{Escape}');
       expect(dock.panel()).toBe('none');
       expect(host.style.zIndex).toBe('');
-      await userEvent.click(screen.getByRole('button', { name: /Protokollführung fehlt/ }));
-      sheet = screen.getByRole('dialog', { name: 'Protokollführung wählen' });
+      dock.panel.set('protokollant');
+      fixture.detectChanges();
+      sheet = await screen.findByRole('dialog', { name: 'Protokollführung wählen' });
       await userEvent.click(within(sheet).getByRole('button', { name: /Mika Mitglied/ }));
       expect(on.setProtokollant).toHaveBeenCalledWith('pr-2');
       expect(screen.queryByRole('dialog')).toBeNull();
@@ -363,7 +372,8 @@ describe('SessionDockComponent', () => {
 
     it('keeps the dock below the dialog level while the attendance sheet of the page is open', async () => {
       const { fixture } = await setup({}, [MEDIA.phone]);
-      await userEvent.click(screen.getByTitle('Anwesenheit'));
+      fixture.componentRef.setInput('panel', 'attendance');
+      fixture.detectChanges();
       expect(fixture.componentInstance.panel()).toBe('attendance');
       expect((fixture.nativeElement as HTMLElement).style.zIndex).toBe('');
     });
@@ -383,7 +393,8 @@ describe('SessionDockComponent', () => {
     it('counts the guests on the attendance chip and badges the open requests', async () => {
       const { fixture } = await setup({ meeting: meeting({ publicJoin: true, admittedGuests: 7, pendingGuests: 3 }) });
       const chip = screen.getByRole('button', { name: /Anwesend/ });
-      expect(chip).toHaveTextContent(/Anwesend \d+ \+ 7 Gäste/);
+      expect(chip).toHaveTextContent(/^\d+ \+ 7 Gäste/);
+      expect(chip).toHaveAccessibleName(/^Anwesend \d+ \+ 7 Gäste$/);
       expect(within(chip).getByLabelText('3 offene Beitrittsanfragen')).toHaveTextContent('3');
       fixture.componentRef.setInput('meeting', meeting({ publicJoin: false, admittedGuests: 2, pendingGuests: 4, status: 'closed' }));
       fixture.detectChanges();

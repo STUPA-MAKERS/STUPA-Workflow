@@ -25,12 +25,10 @@ import {
   EmptyStateComponent,
   IconComponent,
   type IconName,
-  MEDIA,
-  mediaQuery,
   NoteComponent,
   SegmentedComponent,
   type SegmentedOption,
-  type StatusKind,
+  ScrollFadeDirective,
   StatusTextComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
@@ -44,13 +42,12 @@ import {
   MarkdownImageUploadDirective,
   imageUploadErrorKey,
 } from '@shared/markdown/markdown-image-upload.directive';
-import { resolveI18n } from '@shared/forms/i18n-text';
 import { meetingKeeperLine } from '../keepers.util';
 import { ProtocolBarComponent } from '../protocol-bar/protocol-bar.component';
 import { type LinkedLead, TodoLinkedListComponent } from '../../todos/linked-list/todo-linked-list.component';
-import { formatMoney } from '@shared/format-money';
 import { voteResultResolver } from '../vote-result/vote-result';
 import { applyRawFormat, insertRawTable } from './raw-format';
+import { topApplicationLead } from '../top-application-lead.util';
 
 /** The autosave state of the text of the open item. */
 export type SaveState = 'idle' | 'saving' | 'saved' | 'error';
@@ -72,6 +69,7 @@ const TOOLS: readonly FormatTool[] = [
   { format: 'bold', icon: 'bold', label: 'meetings.editor.bold' },
   { format: 'italic', icon: 'italic', label: 'meetings.editor.italic' },
   { format: 'bulletList', icon: 'list', label: 'meetings.editor.list' },
+  { format: 'blockquote', icon: 'quote', label: 'meetings.editor.quote' },
 ];
 
 /** The file name without its extension, as the alt text of an uploaded image. */
@@ -124,6 +122,7 @@ function altOf(file: File): string {
     MarkdownImageUploadDirective,
     NoteComponent,
     ProtocolBarComponent,
+    ScrollFadeDirective,
     SegmentedComponent,
     StatusTextComponent,
     TodoLinkedListComponent,
@@ -164,6 +163,18 @@ export class TopSheetComponent {
    */
   readonly follow = input(false);
   /**
+   * Show the linked list (the application and the to-dos) below the title. The meeting
+   * page turns it off and shows the list above the sheet, between the votes and the
+   * protocol.
+   */
+  readonly linked = input(true);
+  /**
+   * The bar: the format tools, "Erledigt" and the view switch. On a phone the dock of the
+   * page holds them as icon buttons (the tools behind "Aa"), and the page binds `mode`;
+   * the save state then sits beside the title.
+   */
+  readonly barControls = input(true);
+  /**
    * The viewer may rename the item (`canChangeAgenda`). A click on the title then opens
    * the title field in place of the heading. An application item keeps the title of its
    * application in its row below the title.
@@ -182,18 +193,8 @@ export class TopSheetComponent {
   /** "Erledigt" in the bar: set or remove the done mark of the open item. */
   readonly doneChange = output<{ item: AgendaItem; done: boolean }>();
 
-  private readonly phone = mediaQuery(MEDIA.phone);
 
-  /**
-   * The save state sits in the footer of a live protocol, so the bar keeps one row. A
-   * phone keeps it in the bar: there the footer is at the end of the text.
-   */
-  protected readonly saveInFoot = computed(() => {
-    const m = this.meeting();
-    return !!this.protocol() && m.status !== 'closed' && !this.follow() && !this.phone();
-  });
-
-  protected readonly tools = TOOLS;
+  readonly tools = TOOLS;
 
   /**
    * The item whose rename started from this heading. The agenda pane shows its own field
@@ -261,7 +262,7 @@ export class TopSheetComponent {
   }
 
   /** The view of the text. */
-  protected readonly mode = signal<EditorMode>('formatted');
+  readonly mode = model<EditorMode>('formatted');
 
   protected readonly modeOptions = computed<SegmentedOption[]>(() => {
     this.i18n.uiLocale();
@@ -290,7 +291,7 @@ export class TopSheetComponent {
   };
 
   /** The formats at the cursor. The Markdown source shows none as pressed. */
-  protected readonly activeFormats = computed(() =>
+  readonly activeFormats = computed(() =>
     this.mode() === 'raw' ? NO_FORMATS : (this.editor()?.activeFormats() ?? NO_FORMATS),
   );
 
@@ -299,7 +300,7 @@ export class TopSheetComponent {
   }
 
   /** A button of the format bar: in the editor, or in the Markdown source. */
-  protected toggleFormat(format: MarkdownFormat): void {
+  toggleFormat(format: MarkdownFormat): void {
     if (this.mode() !== 'raw') {
       this.editor()?.toggleFormat(format);
       return;
@@ -318,7 +319,7 @@ export class TopSheetComponent {
   }
 
   /** "Tabelle einfügen": in the editor, or as a Markdown table in the source. */
-  protected insertTable(): void {
+  insertTable(): void {
     if (this.mode() !== 'raw') {
       this.editor()?.insertTable();
       return;
@@ -334,7 +335,7 @@ export class TopSheetComponent {
   }
 
   /** "Bild einfügen": the file dialog of the editor or of the Markdown source. */
-  protected insertImage(): void {
+  insertImage(): void {
     if (this.mode() !== 'raw') {
       this.editor()?.pickImage();
       return;
@@ -378,25 +379,10 @@ export class TopSheetComponent {
     return this.follow() && m.status === 'live' && !!m.currentAgendaItemId && this.top()?.id === m.currentAgendaItemId;
   });
 
-  /**
-   * The row of the application below the title: its title and "Antrag · Entwurf ·
-   * 1.250,00 €". It opens the application in a new tab, so the minutes stay open.
-   */
-  protected readonly applicationLead = computed<LinkedLead | null>(() => {
-    const t = this.top();
-    if (!t?.applicationId) return null;
-    const parts = [this.i18n.translate('meetings.agenda.kindApplication')];
-    const state = resolveI18n(t.stateLabel, this.i18n.uiLocale());
-    if (state) parts.push(state);
-    const amount = formatMoney(t.amount, this.i18n.formatLocale());
-    if (amount) parts.push(amount);
-    return {
-      icon: 'file',
-      title: t.applicationTitle || t.title || this.i18n.translate('meetings.agenda.untitled'),
-      sub: parts.join(' · '),
-      link: ['/applications', t.applicationId],
-    };
-  });
+  /** The row of the application, the first row of the linked list (`topApplicationLead`). */
+  protected readonly applicationLead = computed<LinkedLead | null>(() =>
+    topApplicationLead(this.top(), this.i18n),
+  );
 
   /** The keeper line of a closed meeting: every minute-taker with the TOPs they wrote. */
   protected readonly keepers = computed(() =>
@@ -415,13 +401,6 @@ export class TopSheetComponent {
       this.i18n.locale(),
     ),
   );
-
-  /** The state of the protocol as status text. */
-  protected protocolState(p: Protocol): { kind: StatusKind; key: TranslationKey } {
-    if (p.isFinal) return { kind: 'accent', key: 'meetings.protocol.final' };
-    if (p.status === 'rendering') return { kind: 'warn', key: 'meetings.protocol.rendering' };
-    return { kind: 'neutral', key: 'meetings.protocol.draft' };
-  }
 }
 
 /** A short hash of a text (FNV-1a, 32 bit), so that a document key changes with it. */

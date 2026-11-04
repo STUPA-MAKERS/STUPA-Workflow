@@ -317,13 +317,10 @@
     min-height: 0;
     margin-inline: calc(-1 * var(--space-4));
   }
+  // The head is the sticky bar of the kit there (`MeetingHeadComponent`); the header box
+  // steps aside, so the bar sticks in the box of the page.
   .fv__head {
-    --mh-title-size: var(--fs-h3);
-    --mh-title-line: 1.375rem;
-    --mh-status-size: var(--fs-small);
-    gap: var(--space-1);
-    min-height: 64px;
-    padding: var(--space-2) var(--space-2) var(--space-2) var(--space-1);
+    display: contents;
   }
 }
 

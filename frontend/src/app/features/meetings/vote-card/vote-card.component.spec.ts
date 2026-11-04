@@ -61,9 +61,9 @@ describe('VoteCardComponent', () => {
           counts: { yes: 2, no: 1 },
         }),
       });
-      expect(screen.getByText('Abstimmung offen')).toBeInTheDocument();
+      expect(screen.queryByText('Abstimmung offen')).toBeNull();
       expect(screen.getByRole('heading', { name: 'Wird der Nachtragshaushalt beschlossen?' })).toBeInTheDocument();
-      expect(screen.getByText(/^Einfache Mehrheit · offene Abstimmung · Quorum 12 · seit \d\d:48$/)).toBeInTheDocument();
+      expect(screen.queryByText(/Einfache Mehrheit/)).toBeNull();
       expect(screen.getByText('3 von 4 Anwesenden haben abgestimmt')).toBeInTheDocument();
       expect(screen.getByText('75 %')).toBeInTheDocument();
       expect(screen.getByRole('img', { name: '3 von 4 Anwesenden haben abgestimmt' })).toBeInTheDocument();
@@ -79,8 +79,8 @@ describe('VoteCardComponent', () => {
       expect(screen.getByText('Nein')).toBeInTheDocument();
     });
 
-    it('names the hidden result of a secret vote and a percentage quorum', async () => {
-      await setup({ vote: vote({ secret: true, quorum: { type: 'percent', value: 50 } }) });
+    it('names the rules of a planned secret vote with a percentage quorum', async () => {
+      await setup({ vote: vote({ status: 'draft', secret: true, quorum: { type: 'percent', value: 50 } }) });
       expect(screen.getByText(/geheime Abstimmung · Quorum 50 %/)).toBeInTheDocument();
       expect(screen.queryByText(/Das Ergebnis zeigt sich nach dem Schließen/)).toBeNull();
     });
@@ -97,7 +97,8 @@ describe('VoteCardComponent', () => {
           secret: true,
         }),
       });
-      expect(screen.getByText(/^geheime Abstimmung · seit \d\d:\d\d$/)).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Geheim?' })).toBeInTheDocument();
+      expect(screen.queryByText(/geheime Abstimmung/)).toBeNull();
       expect(screen.queryByText(/Das Ergebnis zeigt sich nach dem Schließen/)).toBeNull();
       expect(screen.queryByText(/Zwischenstand sichtbar/)).toBeNull();
     });
@@ -256,10 +257,10 @@ describe('VoteCardComponent', () => {
   });
 
   describe('a vote with guests', () => {
-    it('shows the room while open', async () => {
+    it('leaves the room and the rules off while open', async () => {
       await setup({ vote: vote({ guestsVote: true, majorityRule: 'simple', presentMembers: 19, presentGuests: 7 }) });
-      expect(screen.getByText('19 Mitglieder + 7 Gäste anwesend')).toBeInTheDocument();
-      expect(screen.getByText(/Einfache Mehrheit der abgegebenen Stimmen/)).toBeInTheDocument();
+      expect(screen.queryByText('19 Mitglieder + 7 Gäste anwesend')).toBeNull();
+      expect(screen.queryByText(/Einfache Mehrheit der abgegebenen Stimmen/)).toBeNull();
     });
 
     it('sums the closed result up without a quorum', async () => {

@@ -1751,3 +1751,52 @@ def test_todo_link_budget_vote_gremium(alembic_cfg: Config, engine: Engine) -> N
     with engine.begin() as conn:
         conn.execute(text("DELETE FROM gremium WHERE id = :g"), {"g": gremium})
         conn.execute(text("DELETE FROM principal WHERE id = :w"), {"w": who})
+
+
+def _vote_status_checks(conn: Connection) -> dict[str, str]:
+    """Return the status CHECKs of ``vote`` by name, with their condition."""
+    rows = conn.execute(
+        text(
+            "SELECT conname, pg_get_constraintdef(oid) FROM pg_constraint "
+            "WHERE conrelid = 'vote'::regclass AND contype = 'c' "
+            "AND pg_get_constraintdef(oid) LIKE '%status%'"
+        )
+    )
+    return {name: cond for name, cond in rows.tuples()}
+
+
+def test_fix_vote_status_constraint(alembic_cfg: Config, engine: Engine) -> None:
+    """Migration 4fd514277924.
+
+    A database that 0001 built before ``cancelled`` existed keeps the old
+    ``ck_vote_vote_status`` beside the ``vote_status`` of 0012, and that old CHECK refuses
+    every cancel. The upgrade leaves one CHECK under the convention name that allows
+    ``cancelled``. A second run changes nothing.
+    """
+    command.downgrade(alembic_cfg, "b80a146809d4")
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE vote DROP CONSTRAINT IF EXISTS ck_vote_vote_status"))
+        conn.execute(
+            text(
+                "ALTER TABLE vote ADD CONSTRAINT ck_vote_vote_status "
+                "CHECK (status IN ('draft','open','closed'))"
+            )
+        )
+        vote = conn.execute(
+            text(
+                "INSERT INTO vote (eligible_group, config, status) "
+                "VALUES ('stupa', '{}'::jsonb, 'open') RETURNING id"
+            )
+        ).scalar_one()
+    with pytest.raises(IntegrityError), engine.begin() as conn:
+        conn.execute(text("UPDATE vote SET status = 'cancelled' WHERE id = :v"), {"v": vote})
+
+    command.upgrade(alembic_cfg, "head")
+    command.downgrade(alembic_cfg, "b80a146809d4")
+    command.upgrade(alembic_cfg, "head")
+    with engine.begin() as conn:
+        checks = _vote_status_checks(conn)
+        assert list(checks) == ["ck_vote_vote_status"]
+        assert "cancelled" in checks["ck_vote_vote_status"]
+        conn.execute(text("UPDATE vote SET status = 'cancelled' WHERE id = :v"), {"v": vote})
+        conn.execute(text("DELETE FROM vote WHERE id = :v"), {"v": vote})

@@ -1,3 +1,5 @@
+@use 'frosted' as *;
+
 :host {
   display: inline-flex;
   flex: none;
@@ -50,8 +52,8 @@
   padding: var(--space-2);
   overflow-y: auto;
   border-radius: var(--radius-xl);
-  background: var(--color-surface-3);
   box-shadow: var(--shadow-elevated);
+  @include frosted-pop(var(--color-surface-3));
 }
 .bp__sheet {
   display: flex;

@@ -240,7 +240,7 @@ describe('MeetingPageComponent', () => {
       expect(screen.queryByRole('button', { name: 'Beamer-Ansicht' })).toBeNull();
     });
 
-    it('keeps the beamer in the header on a wide screen', async () => {
+    it('keeps the beamer in the dock on a wide screen', async () => {
       const { on } = await setup({}, [MEDIA.wide]);
       await userEvent.click(screen.getByRole('button', { name: 'Beamer-Ansicht' }));
       expect(on.toggleBeamer).toHaveBeenCalled();
@@ -260,20 +260,79 @@ describe('MeetingPageComponent', () => {
 
     it('opens the agenda and the attendance as bottom sheets on a phone', async () => {
       const { flushDelegations } = await setup({}, [MEDIA.phone]);
-      await userEvent.click(screen.getByRole('button', { name: /Tagesordnung/ }));
+      await userEvent.click(within(await openMenu()).getByRole('menuitem', { name: 'Tagesordnung' }));
       const agenda = screen.getByRole('dialog', { name: 'Tagesordnung' });
       expect(agenda).toHaveClass('ss--bottom');
       await userEvent.keyboard('{Escape}');
       expect(screen.queryByRole('dialog')).toBeNull();
       const menu = await openMenu();
-      await userEvent.click(within(menu).getByRole('menuitem', { name: 'Anwesenheit erfassen' }));
+      expect(within(menu).queryByRole('menuitem', { name: 'Anwesenheit erfassen' })).toBeNull();
+      await userEvent.keyboard('{Escape}');
+      await userEvent.click(screen.getByRole('button', { name: 'Anwesenheit' }));
       expect(screen.getByRole('dialog', { name: 'Anwesenheit' })).toHaveClass('ss--bottom');
       flushDelegations();
     });
 
+    /** "Aa" turns the phone dock into the format tools; the back arrow turns it back. */
+    it('swaps the phone dock row for the format tools and back', async () => {
+      const { fixture } = await setup({}, [MEDIA.phone]);
+      const host = fixture.nativeElement as HTMLElement;
+      expect(host.querySelector('.ts__bar')).toBeNull();
+      await userEvent.click(screen.getByRole('button', { name: 'Format' }));
+      const tools = screen.getByRole('toolbar', { name: 'Format' });
+      expect(within(tools).getByRole('button', { name: 'Fett' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Nächster TOP' })).toBeNull();
+      await userEvent.click(screen.getByRole('button', { name: 'Zurück zur Navigation' }));
+      expect(screen.getByRole('button', { name: 'Nächster TOP' })).toBeInTheDocument();
+    });
+
+    /** The protocol has the phone page to itself: the vote cards open as a bottom sheet. */
+    it('opens the vote cards from the phone dock instead of above the text', async () => {
+      const { fixture } = await setup({}, [MEDIA.phone]);
+      const host = fixture.nativeElement as HTMLElement;
+      expect(host.querySelector('aside.mp__votes')).toBeNull();
+      await userEvent.click(screen.getByRole('button', { name: 'Abstimmungen' }));
+      const sheet = screen.getByRole('dialog', { name: 'Abstimmungen' });
+      expect(sheet).toHaveClass('ss--bottom');
+      expect(sheet.querySelector('.mp__votes--sheet')).not.toBeNull();
+    });
+
+    /** The phone dock holds "Erledigt" and the view switch as icon buttons, the sheet not. */
+    it('ticks the item and switches the view from the phone dock', async () => {
+      const { on, fixture } = await setup({}, [MEDIA.phone]);
+      const host = fixture.nativeElement as HTMLElement;
+      expect(host.querySelector('.ts__done')).toBeNull();
+      expect(host.querySelector('.ts__mode')).toBeNull();
+      await userEvent.click(screen.getByRole('button', { name: 'Erledigt' }));
+      expect(on.setDone).toHaveBeenCalledWith(expect.objectContaining({ done: true }));
+      const raw = screen.getByRole('button', { name: 'Markdown' });
+      await userEvent.click(raw);
+      expect(raw.closest('button') ?? raw).toHaveAttribute('aria-pressed', 'true');
+      expect(host.querySelector('.ts__raw')).not.toBeNull();
+    });
+
+    /** The dock has no chips on a phone, so the minute-taker is an entry of the menu. */
+    it('hands the minutes over from the phone menu, and offers no handover without the right', async () => {
+      const { fixture } = await setup({}, [MEDIA.phone]);
+      let menu = await openMenu();
+      await userEvent.click(within(menu).getByRole('menuitem', { name: 'Protokollführung übergeben' }));
+      expect(await screen.findByRole('dialog', { name: 'Protokollführung übergeben' })).toHaveClass('ss--bottom');
+      fixture.componentRef.setInput('meeting', meeting({ canManage: false, isProtokollant: false }));
+      fixture.detectChanges();
+      await userEvent.keyboard('{Escape}');
+      menu = await openMenu();
+      expect(within(menu).queryByRole('menuitem', { name: /Protokollführung/ })).toBeNull();
+    });
+
+    it('keeps the minute-taker out of the menu on a tablet, where the dock has the chip', async () => {
+      await setup();
+      const menu = await openMenu();
+      expect(within(menu).queryByRole('menuitem', { name: /Protokollführung/ })).toBeNull();
+    });
+
     it('opens the agenda from the start edge below the wide layout', async () => {
       await setup();
-      await userEvent.click(screen.getByRole('button', { name: /Tagesordnung/ }));
+      await userEvent.click(within(await openMenu()).getByRole('menuitem', { name: 'Tagesordnung' }));
       expect(screen.getByRole('dialog', { name: 'Tagesordnung' })).toHaveClass('ss--start');
     });
 
@@ -352,19 +411,23 @@ describe('MeetingPageComponent', () => {
     });
 
     /** The text of the item can be written before the start, without a protocol. */
-    it('opens a picked item of the preparation pane to prepare it, and goes back', async () => {
+    it('opens a picked item of the preparation pane to prepare it, and goes back from the menu', async () => {
       const { on } = await setup({ meeting: planned({ canManageVotes: true }), protocol: null }, [MEDIA.wide]);
       await userEvent.click(screen.getByRole('button', { name: 'Bericht des Finanzreferats' }));
       expect(on.selectTop).toHaveBeenCalledWith('t-2');
       expect(screen.queryByRole('heading', { name: 'Sitzung vorbereiten' })).toBeNull();
       expect(screen.getByRole('toolbar', { name: 'Format' })).toBeInTheDocument();
-      await userEvent.click(screen.getByRole('button', { name: 'Zurück zur Vorbereitung' }));
+      expect(screen.queryByRole('button', { name: 'Zurück zur Vorbereitung' })).toBeNull();
+      const menu = await openMenu();
+      await userEvent.click(within(menu).getByRole('menuitem', { name: 'Zurück zur Vorbereitung' }));
       expect(screen.getByRole('heading', { name: 'Sitzung vorbereiten' })).toBeInTheDocument();
+      expect(within(await openMenu()).queryByRole('menuitem', { name: 'Zurück zur Vorbereitung' })).toBeNull();
     });
 
     it('opens a picked item of the preparation sheet', async () => {
       const { on } = await setup({ meeting: planned({ canManageVotes: true }), protocol: null });
-      await userEvent.click(screen.getByTitle('Tagesordnung öffnen'));
+      await userEvent.click(screen.getByRole('button', { name: 'Sitzungsmenü' }));
+      await userEvent.click(await screen.findByRole('menuitem', { name: 'Tagesordnung' }));
       const sheet = await screen.findByRole('dialog', { name: 'Tagesordnung' });
       await userEvent.click(within(sheet).getByRole('button', { name: 'Bericht des Finanzreferats' }));
       expect(on.selectTop).toHaveBeenCalledWith('t-2');
@@ -385,7 +448,7 @@ describe('MeetingPageComponent', () => {
       await setup({ meeting: planned({ canControl: false, canManage: false }), protocol: null });
       expect(screen.queryByRole('heading', { name: 'Sitzung vorbereiten' })).toBeNull();
       expect(screen.getByRole('radio', { name: 'Formatiert' })).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Zurück zur Vorbereitung' })).toBeNull();
+      expect(within(await openMenu()).queryByRole('menuitem', { name: 'Zurück zur Vorbereitung' })).toBeNull();
     });
   });
 
@@ -400,7 +463,8 @@ describe('MeetingPageComponent', () => {
 
     it('opens the agenda as a sheet below the wide layout and closes it on a pick', async () => {
       const { on } = await setup();
-      await userEvent.click(screen.getByTitle('Tagesordnung öffnen'));
+      await userEvent.click(screen.getByRole('button', { name: 'Sitzungsmenü' }));
+      await userEvent.click(await screen.findByRole('menuitem', { name: 'Tagesordnung' }));
       const sheet = await screen.findByRole('dialog', { name: 'Tagesordnung' });
       await userEvent.click(within(sheet).getByRole('button', { name: 'Bericht des Finanzreferats' }));
       expect(on.selectTop).toHaveBeenCalledWith('t-2');
@@ -410,7 +474,8 @@ describe('MeetingPageComponent', () => {
     /** A closed meeting changes no agenda. */
     it('puts the add into the header of the agenda sheet', async () => {
       const { on, fixture } = await setup();
-      await userEvent.click(screen.getByTitle('Tagesordnung öffnen'));
+      await userEvent.click(screen.getByRole('button', { name: 'Sitzungsmenü' }));
+      await userEvent.click(await screen.findByRole('menuitem', { name: 'Tagesordnung' }));
       const sheet = await screen.findByRole('dialog', { name: 'Tagesordnung' });
       const adds = within(sheet).getAllByRole('button', { name: 'TOP hinzufügen' });
       expect(adds).toHaveLength(1);
@@ -591,7 +656,7 @@ describe('MeetingPageComponent', () => {
         vote({ id: 'v-1' }),
         vote({ id: 'v-x', agendaItemId: 't-2', question: 'Anderer TOP?' }),
       ];
-      const { on } = await setup({ meeting: meeting({ votes }) });
+      const { on } = await setup({ meeting: meeting({ votes }) }, [MEDIA.wide]);
       const cards = screen.getAllByRole('heading', { level: 3 });
       expect(cards.map((h) => h.textContent)).toEqual(['Wird der Nachtragshaushalt beschlossen?', 'Vertagen?']);
       await userEvent.click(screen.getByRole('button', { name: 'Abstimmung schließen' }));
@@ -606,7 +671,7 @@ describe('MeetingPageComponent', () => {
     });
 
     it('opens a planned vote', async () => {
-      const { on } = await setup({ meeting: meeting({ votes: [vote({ status: 'draft' })] }) });
+      const { on } = await setup({ meeting: meeting({ votes: [vote({ status: 'draft' })] }) }, [MEDIA.wide]);
       await userEvent.click(screen.getByRole('button', { name: 'Abstimmung öffnen' }));
       expect(on.voteOpen).toHaveBeenCalledWith('v-1');
     });
@@ -619,7 +684,7 @@ describe('MeetingPageComponent', () => {
         vote({ id: 'v-1', status: 'draft' }),
         vote({ id: 'v-x', agendaItemId: 't-2', question: 'Anderer TOP?' }),
       ];
-      const { on, fixture } = await setup({ meeting: meeting({ votes }) });
+      const { on, fixture } = await setup({ meeting: meeting({ votes }) }, [MEDIA.wide]);
       const open = screen.getByRole('button', { name: 'Abstimmung öffnen' });
       expect(open).toBeDisabled();
       expect(open).toHaveAttribute('title', 'Erst die offene Abstimmung schließen oder abbrechen.');
@@ -654,7 +719,7 @@ describe('MeetingPageComponent', () => {
     });
 
     it('offers a decision question on a free-text item, and one vote per application item', async () => {
-      const { on, fixture } = await setup();
+      const { on, fixture } = await setup({}, [MEDIA.wide]);
       await userEvent.click(screen.getByRole('button', { name: 'Beschlussfrage hinzufügen' }));
       expect(on.voteDialog).toHaveBeenCalledWith(AGENDA[0]);
       fixture.componentRef.setInput('top', AGENDA[2]);
@@ -693,7 +758,7 @@ describe('MeetingPageComponent', () => {
      */
     it('carries the result into the text until it is there, then goes quiet', async () => {
       const closed = vote({ status: 'closed', result: 'passed', counts: { yes: 3, no: 1, abstain: 0 }, leading: 'yes', revealed: true });
-      const { on, fixture } = await setup({ meeting: meeting({ votes: [closed] }), top: item({ body: 'Aussprache.\\\n' }) });
+      const { on, fixture } = await setup({ meeting: meeting({ votes: [closed] }), top: item({ body: 'Aussprache.\\\n' }) }, [MEDIA.wide]);
       await userEvent.click(screen.getByRole('button', { name: 'Ins Protokoll übernehmen' }));
       const payload = on.bodyChange.mock.calls[0][0] as { itemId: string; body: string };
       expect(payload.itemId).toBe('t-1');

@@ -1,4 +1,5 @@
 @use 'breakpoints' as bp;
+@use 'frosted' as *;
 
 :host {
   position: relative;
@@ -6,6 +7,7 @@
   min-width: 0;
 }
 
+// The page makes the dock frosted glass (`MeetingPageComponent`), so the dock has no surface.
 .sd {
   display: flex;
   align-items: center;
@@ -13,7 +15,6 @@
   min-height: 72px;
   padding: var(--space-2) var(--space-5) var(--space-2) var(--space-2);
   border-radius: var(--radius-xl);
-  background: var(--color-surface-2);
 }
 .sd__small {
   font-size: var(--fs-small);
@@ -77,6 +78,16 @@
 }
 .sd__spacer {
   flex: 1 1 auto;
+}
+.sd__tools,
+.sd__format {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+}
+.sd__tools {
+  gap: var(--space-1);
 }
 .sd__chips {
   display: flex;
@@ -156,19 +167,43 @@
   padding: 10px 0;
   overflow-y: auto;
   border-radius: var(--radius-field);
-  background: var(--color-surface-3);
   color: var(--color-text);
   box-shadow: var(--shadow-elevated);
+  @include frosted-pop(var(--color-surface-3));
 }
 .sd__chev {
   pointer-events: none;
 }
 
-@include bp.below-wide {
-  .sd {
-    flex-wrap: wrap;
-    row-gap: var(--space-1);
-  }
+.sd__tool {
+  position: relative;
+  display: inline-flex;
+}
+// The number of votes is grey; a running vote colours it like the open guest requests,
+// and the own ballot shows in the sheet, so the dock has no status line there.
+.sd__badge.sd__badge--quiet {
+  background: var(--color-surface-3);
+  color: var(--color-text);
+}
+.sd__badge.sd__badge--tool {
+  position: absolute;
+  top: -2px;
+  inset-inline-end: -2px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  font-size: 0.6875rem;
+  pointer-events: none;
+}
+
+// The dock keeps one line: the format tools move behind "Aa" (`compact`), then the chips
+// keep only their numbers and icons (`tight`). Only the text of the minute-taker chip
+// shrinks; the other chips keep their text and number.
+.sd__chips > .sd__chip:not(:has(.sd__chipText)) {
+  flex: none;
+}
+.sd--tight .sd__chip {
+  padding: 0 var(--space-3);
 }
 
 // The attendance chip keeps its full text, because a centred chip narrower than its content
@@ -179,9 +214,39 @@
     padding: var(--space-2) var(--space-3);
     border-radius: 0;
   }
+  // The arrows stay at the two edges: "TOP 3 von 6" follows the previous arrow, the icon
+  // buttons come before the next arrow. The nav box steps aside, so its parts and the
+  // buttons share one row.
   .sd__nav {
+    display: contents;
+  }
+  // The dock row holds the arrows at the edges and the icon buttons between them; the
+  // number of the item is in the agenda and in the head of the sheet.
+  .sd__pos {
+    display: none;
+  }
+  // The format tools replace the row: the back arrow at the start, the tools after it.
+  .sd__format {
+    display: flex;
     flex: 1 1 auto;
+    align-items: center;
     justify-content: space-between;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .sd__next {
+    order: 1;
+  }
+  .sd__mid {
+    order: 2;
+  }
+  .sd__tools {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: var(--space-1);
+    margin-inline: auto;
   }
   .sd__vr {
     display: none;

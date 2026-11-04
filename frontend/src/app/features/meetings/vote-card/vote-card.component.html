@@ -1,29 +1,22 @@
 @let v = vote();
 <section class="vc" [attr.aria-label]="v.question || ('meetings.vote.untitled' | t)">
-  <div class="vc__status">
-    <app-status-text class="vc__cap" [kind]="status().kind">{{ capKey() | t }}</app-status-text>
-    @if (!folded() && result(); as r) {
-      <app-status-text class="vc__result" [kind]="r.kind">{{ r.key | t }}</app-status-text>
-    }
-  </div>
+  @if (v.status !== 'open') {
+    <div class="vc__status">
+      <app-status-text class="vc__cap" [kind]="status().kind">{{ capKey() | t }}</app-status-text>
+      @if (!folded() && result(); as r) {
+        <app-status-text class="vc__result" [kind]="r.kind">{{ r.key | t }}</app-status-text>
+      }
+    </div>
+  }
   @if (!folded() && electionCap(); as cap) {
     <p class="vc__meta">{{ cap }}</p>
   }
   <h3 class="vc__q">{{ v.question || ('meetings.vote.untitled' | t) }}</h3>
-  @if (meta() && !folded()) {
+  @if (v.status !== 'open' && !folded() && meta()) {
     <p class="vc__meta">{{ meta() }}</p>
   }
   @if (!folded() && v.result === 'rejected' && v.failedReason === 'quorum') {
     <p class="vc__fail">{{ 'vote.failedQuorum' | t }}</p>
-  }
-
-  @if (composition(); as comp) {
-    @if (v.status === 'open') {
-      <p class="vc__comp">
-        <app-icon name="users" [size]="16" />
-        <span>{{ comp }}</span>
-      </p>
-    }
   }
 
   @if (v.status === 'open') {
