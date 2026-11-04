@@ -18,7 +18,7 @@
 @if (!phone() || m.status !== 'planned') {
   <div class="sd">
     @if (phone() && formatting() && formatTools(); as tools) {
-      <app-button variant="text" [iconOnly]="true" [ariaLabel]="'meetings.dock.formatBack' | t" (click)="formatting.set(false)"><app-icon name="left" /></app-button>
+      <app-button variant="text" [iconOnly]="true" [ariaLabel]="'meetings.dock.formatBack' | t" (click)="formatting.set(false)"><app-icon name="back" /></app-button>
       <div class="sd__format" role="toolbar" [attr.aria-label]="'meetings.editor.toolbar' | t">
         <ng-container [ngTemplateOutlet]="tools" />
       </div>
