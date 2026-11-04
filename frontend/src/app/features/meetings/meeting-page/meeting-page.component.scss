@@ -176,12 +176,23 @@
     margin-inline: calc(-1 * var(--space-4));
     padding-bottom: calc(var(--fx-dock-h, 0px) + var(--space-3));
   }
+  // The page scrolls the document on a phone, so the head sticks at the top of the window, as
+  // the compact bar of a one-view detail does. It reaches into the safe area above it and covers
+  // it, so the content does not show under the status bar, and its rule closes it.
   .mp__head {
     --mh-title-size: var(--fs-h2);
     --mh-title-line: 1.375rem;
+    position: sticky;
+    top: 0;
+    z-index: var(--z-sticky, 10);
     gap: var(--space-1);
     min-height: 0;
-    padding: var(--space-2) var(--space-2) var(--space-2) var(--space-1);
+    margin-top: calc(-1 * var(--app-top-safe-area, 0px));
+    margin-bottom: var(--space-3);
+    padding: calc(var(--space-2) + var(--app-top-safe-area, 0px)) var(--space-2) var(--space-2)
+      var(--space-1);
+    border-bottom: var(--border-width) solid var(--color-border);
+    background: var(--color-bg);
   }
   .mp__presence {
     display: none;

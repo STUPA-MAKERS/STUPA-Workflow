@@ -317,13 +317,22 @@
     min-height: 0;
     margin-inline: calc(-1 * var(--space-4));
   }
+  // The head sticks at the top of the window like the head of the meeting page (see there).
   .fv__head {
     --mh-title-size: var(--fs-h3);
     --mh-title-line: 1.375rem;
     --mh-status-size: var(--fs-small);
+    position: sticky;
+    top: 0;
+    z-index: var(--z-sticky, 10);
     gap: var(--space-1);
     min-height: 64px;
-    padding: var(--space-2) var(--space-2) var(--space-2) var(--space-1);
+    margin-top: calc(-1 * var(--app-top-safe-area, 0px));
+    margin-bottom: var(--space-3);
+    padding: calc(var(--space-2) + var(--app-top-safe-area, 0px)) var(--space-2) var(--space-2)
+      var(--space-1);
+    border-bottom: var(--border-width) solid var(--color-border);
+    background: var(--color-bg);
   }
 }
 
