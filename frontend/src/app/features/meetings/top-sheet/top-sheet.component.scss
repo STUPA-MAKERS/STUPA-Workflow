@@ -176,7 +176,7 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  padding: var(--space-5) 28px var(--ts-foot, var(--space-5));
+  padding: var(--space-5) 28px;
 }
 .ts__editor ::ng-deep .mde__host {
   min-height: 100%;
@@ -246,8 +246,7 @@
 }
 
 // The text scrolls inside the sheet on a wider screen: its top end fades below the title
-// while lines lie above it. The foot has no fade, because the text passes under the glass
-// of the dock there.
+// while lines lie above it. The foot ends at the round edge of the sheet.
 @include bp.not-phone {
   .ts__editor.is-fade-start {
     -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--space-5));

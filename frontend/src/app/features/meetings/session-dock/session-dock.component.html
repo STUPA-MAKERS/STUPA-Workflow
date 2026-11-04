@@ -34,6 +34,8 @@
       </div>
       @if (phone()) {
         <ng-container [ngTemplateOutlet]="phoneTools" />
+      } @else {
+        <ng-container [ngTemplateOutlet]="deskTools" />
       }
     } @else {
       <div class="sd__nav">
@@ -143,6 +145,9 @@
         <div class="sd__format" role="toolbar" [attr.aria-label]="'meetings.editor.toolbar' | t">
           <ng-container [ngTemplateOutlet]="tools" />
         </div>
+        @if (done() !== null || modeToggle()) {
+          <span class="sd__vr" aria-hidden="true"></span>
+        }
       }
       @if (done() !== null) {
         <app-button

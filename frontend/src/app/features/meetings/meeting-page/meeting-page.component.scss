@@ -159,19 +159,20 @@
   }
 }
 
-// The dock floats over the foot of the panes as frosted glass, like the phone dock: the
-// panes end at the lower edge of the dock, so no text shows below it, and keep room
-// under their last line (`--mp-foot`), so the text scrolls under the glass and the end
-// stays reachable.
-@include bp.not-phone {
-  :host {
-    position: relative;
-    --mp-foot: calc(var(--fx-dock-h, 0px) + 2 * var(--space-3));
-  }
+// The dock sits below the panes, which end above it, and has the look of the phone dock:
+// a floating frosted glass bar with a light shadow.
+.mp__dock {
+  flex: none;
+  margin: var(--space-3) var(--space-3) var(--space-3) 0;
+}
+@include bp.below-wide {
   .mp__dock {
-    position: absolute;
-    inset-inline: var(--space-3);
-    bottom: var(--space-3);
+    margin-inline-start: var(--space-3);
+  }
+}
+@include bp.not-phone {
+  .mp__dock {
+    position: relative;
     z-index: var(--z-sticky, 10);
     border-radius: var(--radius-xl);
     box-shadow: var(--shadow-md);
@@ -181,19 +182,6 @@
   // the glass takes the round corners itself.
   .mp__dock::before {
     border-radius: inherit;
-  }
-  .mp__body {
-    margin-bottom: var(--space-3);
-  }
-  .mp__body:not(.mp__body--wide),
-  .mp__body--wide .mp__agenda,
-  .mp__body--wide .mp__votes,
-  .mp__body--wide .mp__prep {
-    padding-bottom: var(--mp-foot);
-    scroll-padding-bottom: var(--mp-foot);
-  }
-  .mp__body--wide .mp__sheet {
-    --ts-foot: var(--mp-foot);
   }
 }
 
