@@ -8,10 +8,11 @@ problem+json.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import or_, select
 
@@ -222,12 +223,14 @@ class BudgetTreeServiceBase:
 
         A booking, a transfer and an assignment all use this. An explicit fiscal
         year must belong to the top-level budget. Without one the method takes
-        the single active open fiscal year of the top-level budget. A closed
-        year never counts as that default. The result is never `None`.
+        the current fiscal year of the top-level budget: the single active open
+        year, or among several active open years the one that contains the
+        local date. A closed year never counts as that default. The result is
+        never `None`.
 
         Raises:
             ValidationProblem: The fiscal year belongs to another top-level
-                budget, or no single active open fiscal year exists (422).
+                budget, or no current fiscal year can be derived (422).
             ConflictError: `fiscal_year_closed` (409) for an explicit closed
                 fiscal year.
         """
@@ -241,13 +244,16 @@ class BudgetTreeServiceBase:
                 )
             self._refuse_closed(fy)
             return fy.id
-        active_ids = [
-            f.id for f in await self._fiscal_years_of(top.id) if f.active and f.closed_at is None
+        candidates = [
+            (f.id, f.start_date, f.end_date)
+            for f in await self._fiscal_years_of(top.id)
+            if f.active and f.closed_at is None
         ]
-        picked = tree_rules.pick_fiscal_year(active_ids)
+        today = datetime.now(ZoneInfo(self.settings.local_timezone)).date()
+        picked = tree_rules.pick_fiscal_year(candidates, today)
         if picked is None:
             raise ValidationProblem(
-                "No single active fiscal year — specify fiscalYearId.",
+                "No current fiscal year — specify fiscalYearId.",
                 errors=[{"field": "fiscalYearId", "msg": "ambiguous or missing"}],
             )
         return picked

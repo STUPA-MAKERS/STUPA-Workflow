@@ -201,7 +201,7 @@ describe('MeetingsCalendarComponent', () => {
     const card = within(panel).getByRole('article', { name: '34. Sitzung des Studierendenparlaments' });
     expect(within(card).getByText('seit 18:04')).toBeInTheDocument();
     expect(within(card).getByText('TOP 3 von 8')).toBeInTheDocument();
-    expect(within(card).getByText('38 %')).toBeInTheDocument();
+    expect(within(card).queryByText('38 %')).toBeNull();
     expect(within(card).getByText('Zuschuss Erstsemester-Party')).toBeInTheDocument();
     expect(within(card).getByText('14 / 19')).toBeInTheDocument();
     await userEvent.click(within(card).getByRole('button', { name: /^Details$/ }));
@@ -310,7 +310,7 @@ describe('MeetingsCalendarComponent', () => {
     const upcoming = [LIVE, FA, ...Array.from({ length: 6 }, (_, i) => wire(`m-u${i}`, `Kommend ${i}`, `2026-10-${10 + i}`))];
     view.timeline.upcomingItems.set(upcoming.map(mapMeeting));
     view.fixture.detectChanges();
-    const list = within(screen.getByRole('region', { name: 'Anstehend' })).getAllByRole('listitem');
+    const list = within(screen.getByRole('group', { name: 'Anstehend' })).getAllByRole('listitem');
     expect(list).toHaveLength(UPCOMING_COUNT);
     expect(within(list[0]).getByText('Fr, 17:30')).toBeInTheDocument();
     expect(within(list[0]).getByText('keine TOPs')).toBeInTheDocument();

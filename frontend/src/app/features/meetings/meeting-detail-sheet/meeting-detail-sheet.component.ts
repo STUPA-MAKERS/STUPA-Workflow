@@ -31,6 +31,7 @@ import {
   SheetBarComponent,
   SheetBarTitleDirective,
   StatusTextComponent,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { keeperNames } from '../keepers.util';
 import { majorityLabel, meetingTimeText, voteMetaLine } from '../meetings-display.util';
@@ -40,7 +41,6 @@ import {
   agendaProgress,
   attendanceCounts,
   openVoteOf,
-  topsLabel,
 } from '../meetings-overview.util';
 import { weekdayDate } from '@shared/date-format';
 
@@ -81,6 +81,7 @@ interface AgendaRow {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionComponent,
     EmptyStateComponent,
     SheetBarComponent,
     SheetBarTitleDirective,
@@ -243,11 +244,6 @@ export class MeetingDetailSheetComponent {
     if (item.id === 'edit') this.edit.emit(m);
     else if (item.id === 'beamer') this.beamer.emit(m);
     else this.remove.emit(m);
-  }
-
-  /** "8 TOPs", "1 TOP" or "keine TOPs". */
-  topsText(n: number): string {
-    return topsLabel(n, (k, p) => this.i18n.translate(k, p));
   }
 
   /** "Anwesend 19 von 23" for the screen reader label of a bar. */

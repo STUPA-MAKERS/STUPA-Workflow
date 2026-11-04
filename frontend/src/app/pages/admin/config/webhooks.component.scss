@@ -29,9 +29,6 @@
 }
 
 .wh__status {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
   padding: var(--space-4);
   border-radius: var(--radius-lg);
   background: var(--color-surface-3);

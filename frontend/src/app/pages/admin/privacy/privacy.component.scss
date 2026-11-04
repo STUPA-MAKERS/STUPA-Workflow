@@ -5,14 +5,6 @@
   display: block;
 }
 
-.pv__queue {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-.pv__secTitle {
-  padding-inline: var(--space-1);
-}
 
 .pv__mail {
   overflow-wrap: anywhere;
@@ -32,6 +24,7 @@
 
 .pv__card {
   @include sc.card;
+  gap: var(--space-2);
   --sp-bg: var(--color-surface-3);
 }
 .pv__form {
@@ -77,19 +70,6 @@
   gap: 2px;
 }
 
-.pv__retention {
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-}
-.pv__retentionText {
-  display: flex;
-  flex: 1 1 18rem;
-  flex-direction: column;
-  gap: var(--space-1);
-}
 .pv__retentionForm {
   display: flex;
   align-items: center;

@@ -188,9 +188,10 @@ async def assign_application_budget(
 ) -> dict:
     """Bind an application to a cost center.
 
-    Pass null to remove the binding. The fiscal year comes from the single active year
-    of the top-level node. While the application sits in a vote state whose Gremium
-    comes from the cost center, the server refuses the change with 409
+    Pass null to remove the binding. The fiscal year is the current year of the top-level
+    node: its only active open year, else the active open year that holds today. While
+    the application sits in a vote state whose Gremium comes from the cost center, the
+    server refuses the change with 409
     `budget_locked_by_vote`. Requires application.manage.
     """
     return await api().post(

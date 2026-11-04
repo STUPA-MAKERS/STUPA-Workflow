@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -7,16 +7,17 @@ import {
   ButtonComponent,
   CurrencyInputComponent,
   DatepickerComponent,
+  FabComponent,
   IconComponent,
   InputComponent,
   LockedFieldComponent,
   SelectFieldComponent,
   TextareaComponent,
   ScrollFadeDirective,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { formatMoney } from '@shared/format-money';
 import { PaneFormHeadComponent } from '@shared/ui/pane-form/pane-form-head.component';
-import { PaneFormFootComponent } from '@shared/ui/pane-form/pane-form-foot.component';
 import { CostCentreSelectComponent } from '../../budget/cost-centre-select/cost-centre-select.component';
 import type { BudgetTreeNode } from '../../budget/budget-tree.api';
 import {
@@ -59,13 +60,14 @@ interface LegFree {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionComponent,
     ScrollFadeDirective,
     PaneFormHeadComponent,
-    PaneFormFootComponent,
     ButtonComponent,
     CostCentreSelectComponent,
     CurrencyInputComponent,
     DatepickerComponent,
+    FabComponent,
     FormsModule,
     IconComponent,
     InputComponent,
@@ -90,8 +92,6 @@ export class TransferFormComponent {
   readonly layout = input<FinanceFormLayout>('pane');
   /** The label of the fiscal year of the edited transfer. */
   readonly fyLabel = input<string | null>(null);
-
-  readonly remove = output<void>();
 
   /** The fixed pair of the transfer under correction. */
   protected readonly pair = computed(() => {
@@ -151,6 +151,11 @@ export class TransferFormComponent {
   close(): void {
     if (this.mode() === 'create') this.dialogs().transferOpen.set(false);
     else this.transfers().closeEdit();
+  }
+
+  /** The floating main action was pressed. */
+  save(): void {
+    this.submit(new Event('submit'));
   }
 
   submit(event: Event): void {

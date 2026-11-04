@@ -78,6 +78,7 @@ import {
   TabsComponent,
   ToastService,
   FabComponent,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import {
   BudgetTreeApi,
@@ -162,6 +163,7 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionComponent,
     AmountComponent,
     DropOverlayComponent,
     FileDropDirective,
@@ -343,8 +345,8 @@ export class ApplicationsDetailComponent {
   protected readonly assigningBudget = signal(false);
   protected readonly budgetDialogOpen = signal(false);
   /** Fiscal-year choice among the years of the top budget of the selected cost centre.
-   *  An empty value means automatic. The server then derives the single active year,
-   *  or it answers 422. */
+   *  An empty value means automatic. The server then derives the current year (the only
+   *  active open one, else the active open one that holds today), or it answers 422. */
   protected readonly fiscalYears = signal<FiscalYear[]>([]);
   protected readonly fiscalChoice = signal('');
   /** Maps `budgetId` to "FULL-PATH – name" for the badge of the current cost centre. */

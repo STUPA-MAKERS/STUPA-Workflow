@@ -52,6 +52,7 @@ import {
   TabsComponent,
   FabComponent,
   PageHeaderComponent,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../layout/breadcrumbs.component';
 import { flowColorKind } from '@shared/status-kind.util';
@@ -139,6 +140,7 @@ type Loaded<T> = T | null | undefined;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionComponent,
     NoteComponent,
     NgTemplateOutlet,
     RouterLink,

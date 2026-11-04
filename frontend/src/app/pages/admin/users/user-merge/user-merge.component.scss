@@ -106,13 +106,7 @@
 }
 
 .um__sec {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  min-width: 0;
-}
-.um__secTitle {
-  margin: 0;
+  --section-gap: var(--space-2);
 }
 
 .um__area {

@@ -55,21 +55,16 @@
     </section>
   }
 
-  <section class="gr__active" aria-labelledby="gr-active-title">
-    <div class="gr__activeHead">
-      <h2 class="sec gr__activeTitle" id="gr-active-title">
-        @if (loaded()) {
-          {{ 'account.grants.activeCount' | t: { count: grants().length } }}
-        } @else {
-          {{ 'account.grants.active' | t }}
-        }
-      </h2>
-      @if (grants().length > 0) {
-        <app-button variant="danger" size="sm" (click)="askRevokeAll()">
-          {{ 'account.grants.revokeAll' | t }}
-        </app-button>
-      }
-    </div>
+  <app-section
+    class="gr__active"
+    [level]="2"
+    [heading]="loaded() ? ('account.grants.activeCount' | t: { count: grants().length }) : ('account.grants.active' | t)"
+  >
+    @if (grants().length > 0) {
+      <app-button sectionAction variant="danger" size="sm" (click)="askRevokeAll()">
+        {{ 'account.grants.revokeAll' | t }}
+      </app-button>
+    }
 
     @if (loadError()) {
       <app-note kind="error" icon="alert" role="alert">{{ 'account.grants.error' | t }}</app-note>
@@ -108,7 +103,7 @@
         }
       </ul>
     }
-  </section>
+  </app-section>
 </section>
 
 <app-confirm-dialog

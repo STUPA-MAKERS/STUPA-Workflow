@@ -55,8 +55,7 @@
 
   <div class="fd__cols">
     <div class="fd__col">
-      <section class="fd__sec id__secFile" aria-labelledby="id-file">
-        <h3 id="id-file" class="sec fd__secTitle">{{ 'invoices.detail.receipt' | t }}</h3>
+      <app-section class="fd__sec id__secFile" [heading]="'invoices.detail.receipt' | t">
         @if (i.hasFile) {
           <button type="button" class="fd__card id__file" (click)="openFile.emit()">
             <app-icon class="id__fileIcon" name="file" [size]="22" />
@@ -72,10 +71,9 @@
         } @else {
           <app-note icon="file">{{ 'invoices.detail.noFile' | t }}</app-note>
         }
-      </section>
+      </app-section>
 
-      <section class="fd__sec id__secData" aria-labelledby="id-data">
-        <h3 id="id-data" class="sec fd__secTitle">{{ 'invoices.detail.data' | t }}</h3>
+      <app-section class="fd__sec id__secData" [heading]="'invoices.detail.data' | t">
         <dl class="fd__card fd__grid">
           <div>
             <dt>{{ 'invoices.field.number' | t }}</dt>
@@ -104,12 +102,11 @@
             </div>
           }
         </dl>
-      </section>
+      </app-section>
     </div>
 
     <div class="fd__col">
-      <section class="fd__sec id__secAmounts" aria-labelledby="id-amounts">
-        <h3 id="id-amounts" class="sec fd__secTitle">{{ 'invoices.detail.amounts' | t }}</h3>
+      <app-section class="fd__sec id__secAmounts" [heading]="'invoices.detail.amounts' | t">
         <dl class="fd__card id__amounts">
           <div>
             <dt>{{ 'invoices.field.net' | t }}</dt>
@@ -124,21 +121,15 @@
             <dd class="mono">{{ money(i.grossAmount) }}</dd>
           </div>
         </dl>
-      </section>
+      </app-section>
 
       @if (i.linkedBookings !== undefined) {
-        <section class="fd__sec id__secBookings" aria-labelledby="id-bookings">
-          <div class="fd__secHead">
-            <h3 id="id-bookings" class="sec fd__secTitle">
-              {{ 'invoices.col.bookings' | t }}
-              <span class="fd__count">{{ bookings().length }}</span>
-            </h3>
-            @if (canManage()) {
-              <app-button variant="tonal" size="sm" (click)="createBooking.emit()">
-                <span class="fd__btn"><app-icon name="plus" />{{ 'invoices.createBooking' | t }}</span>
-              </app-button>
-            }
-          </div>
+        <app-section class="fd__sec id__secBookings" [heading]="'invoices.col.bookings' | t">
+          @if (canManage()) {
+            <app-button sectionAction variant="tonal" size="sm" (click)="createBooking.emit()">
+              <span class="fd__btn"><app-icon name="plus" />{{ 'invoices.createBooking' | t }}</span>
+            </app-button>
+          }
           @if (!bookings().length) {
             <app-empty-state rows="3" [heading]="'invoices.detail.noBookings' | t" />
           } @else {
@@ -183,7 +174,7 @@
               }
             </div>
           }
-        </section>
+        </app-section>
       }
 
       <app-todo-linked-list class="id__todos" kind="invoice" headingId="id-todos" [targetId]="i.id" />

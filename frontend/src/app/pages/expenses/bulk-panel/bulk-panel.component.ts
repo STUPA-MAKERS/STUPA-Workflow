@@ -17,6 +17,7 @@ import {
   InputComponent,
   SheetBarComponent,
   SheetBarTitleDirective,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { CostCentreSelectComponent } from '../../budget/cost-centre-select/cost-centre-select.component';
 import type { BudgetTreeNode, Expense } from '../../budget/budget-tree.api';
@@ -43,6 +44,7 @@ import { formatMoney } from '@shared/format-money';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionComponent,
     SumRowComponent,
     BookingRowComponent,
     SheetBarComponent,

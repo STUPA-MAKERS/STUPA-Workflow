@@ -9,6 +9,7 @@ import {
   IconComponent,
   StatusTextComponent,
   ToastService,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { UPLOAD_ACCEPT } from '../apply.util';
 import { DraftAttachmentsService, type DraftFile } from '../draft-attachments.service';
@@ -30,6 +31,7 @@ import { DraftAttachmentsService, type DraftFile } from '../draft-attachments.se
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionComponent,
     TranslatePipe,
     ConfirmDialogComponent,
     IconComponent,

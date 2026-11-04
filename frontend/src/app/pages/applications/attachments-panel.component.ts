@@ -32,6 +32,7 @@ import {
   SelectionBarComponent,
   StatusTextComponent,
   ToastService,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { scanStatus } from '@shared/status-kind.util';
 import {
@@ -71,6 +72,7 @@ import { formatBytes } from './applications.util';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionComponent,
     DropOverlayComponent,
     EmptyStateComponent,
     FileDropDirective,

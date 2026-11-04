@@ -138,7 +138,7 @@ describe('GremiumMembersComponent', () => {
     );
     await setup({ api: makeApi({ listGremiumMemberships: jest.fn(() => of(many)) }) });
     expect(names()).toHaveLength(MEMBER_PREVIEW);
-    expect(screen.getByText(`${MEMBER_PREVIEW} von ${MEMBER_PREVIEW + 2}`)).toBeInTheDocument();
+    expect(screen.queryByText(`${MEMBER_PREVIEW} von ${MEMBER_PREVIEW + 2}`)).toBeNull();
     await userEvent.click(
       screen.getByRole('button', { name: `Alle ${MEMBER_PREVIEW + 2} anzeigen` }),
     );

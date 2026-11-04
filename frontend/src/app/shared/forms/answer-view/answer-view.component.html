@@ -1,6 +1,5 @@
 @for (block of blocks(); track block.key) {
-  <section class="av__sec" [attr.aria-label]="block.label">
-    <h3 class="sec av__title">{{ block.label }}</h3>
+  <app-section class="av__sec" [heading]="block.label">
     @for (chunk of block.chunks; track chunk.key) {
       @if (chunk.kind === 'positions') {
         <app-positions-view [label]="chunk.label" [value]="chunk.value" [surface]="surface()" />
@@ -56,7 +55,7 @@
         </app-field-group>
       }
     }
-  </section>
+  </app-section>
 } @empty {
   @if (emptyText()) {
     <p class="av__none">{{ emptyText() }}</p>

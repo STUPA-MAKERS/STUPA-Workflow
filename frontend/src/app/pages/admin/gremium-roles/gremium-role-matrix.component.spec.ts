@@ -255,7 +255,8 @@ describe('GremiumRoleMatrixComponent', () => {
 
   it('shows the heading by default and leaves it out on the roles page (2)', async () => {
     await setup({ inputs: { heading: false } });
-    expect(screen.queryByRole('heading', { name: 'Gremienrollen und Berechtigungen' })).toBeNull();
+    const heading = screen.getByRole('heading', { name: 'Gremienrollen und Berechtigungen' });
+    expect(heading.closest('.section__head')).toHaveClass('section__head--hidden');
   });
 
   it('ignores the mapping reads when they fail', async () => {

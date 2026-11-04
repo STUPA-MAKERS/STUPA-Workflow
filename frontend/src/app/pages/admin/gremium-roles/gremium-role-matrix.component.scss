@@ -4,17 +4,9 @@
 }
 
 .rm {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  min-width: 0;
   container-type: inline-size;
 }
 
-.rm__head {
-  --sh-min-height: 2.5rem;
-  --sh-inset: 0;
-}
 
 .rm__table {
   min-width: 0;

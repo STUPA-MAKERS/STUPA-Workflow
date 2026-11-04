@@ -42,6 +42,7 @@ import {
   SheetBarComponent,
   StatusTextComponent,
   PageHeaderComponent,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { CalendarSubscribeComponent } from '../calendar-subscribe/calendar-subscribe.component';
 import { MeetingDialogsService } from '../meeting-dialogs.service';
@@ -114,6 +115,7 @@ interface DayCard {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionComponent,
     MeetingsViewActionsComponent,
     NoteComponent,
     EmptyStateComponent,

@@ -14,6 +14,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
+  FabComponent,
   ConfirmDialogComponent,
   CurrencyInputComponent,
   DatepickerComponent,
@@ -26,11 +27,11 @@ import {
   type SegmentedOption,
   type SelectOption,
   TextareaComponent,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import type { Invoice, InvoiceStatus } from '../../budget/budget-tree.api';
 import type { FinanceFormLayout } from '../../expenses/booking-form/booking-form.component';
 import { PaneFormHeadComponent } from '@shared/ui/pane-form/pane-form-head.component';
-import { PaneFormFootComponent } from '@shared/ui/pane-form/pane-form-foot.component';
 
 /** What the import found: `parsed` (ZUGFeRD read), `manual` (no ZUGFeRD), or nothing. */
 export type InvoiceImportNotice = 'parsed' | 'manual' | null;
@@ -112,11 +113,12 @@ export interface InvoiceFormHost {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionComponent,
     TextareaComponent,
-    PaneFormFootComponent,
     PaneFormHeadComponent,
     NoteComponent,
     ButtonComponent,
+    FabComponent,
     ConfirmDialogComponent,
     CurrencyInputComponent,
     DatepickerComponent,
@@ -137,7 +139,6 @@ export class InvoiceFormComponent {
   readonly mode = input<'create' | 'edit'>('create');
   readonly layout = input<FinanceFormLayout>('pane');
 
-  readonly remove = output<void>();
   /** "Vorhandene öffnen" at a duplicate. */
   readonly openDuplicate = output<void>();
 
@@ -184,6 +185,11 @@ export class InvoiceFormComponent {
   close(): void {
     if (this.mode() === 'create') this.host().createOpen.set(false);
     else this.host().editing.set(null);
+  }
+
+  /** The floating main action was pressed. */
+  save(): void {
+    this.submit(new Event('submit'));
   }
 
   submit(event: Event): void {

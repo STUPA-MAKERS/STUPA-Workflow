@@ -98,23 +98,6 @@
   gap: var(--space-3);
 }
 
-.ar__sec {
-  display: block;
-  min-width: 0;
-  margin: 0;
-  padding: 0;
-  border: 0;
-}
-// A legend takes no part in the gap of the fieldset, so it keeps its own space.
-.ar__secTitle {
-  margin-bottom: var(--space-3);
-  padding: 0;
-  font-size: var(--fs-xs);
-  font-weight: var(--fw-semibold);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-}
 
 .ar__grid {
   display: grid;

@@ -104,13 +104,10 @@
     }
 
     @if (upcoming().length) {
-      <section class="dash__block" aria-labelledby="dash-upcoming-h">
-        <div class="dash__blockHead">
-          <h3 id="dash-upcoming-h" class="sec">{{ 'dashboard.today.upcoming' | t: { n: plannedCount() } }}</h3>
-          @if (canSeeMeetings()) {
-            <a class="dash__more" routerLink="/meetings">{{ 'dashboard.today.all' | t }}</a>
-          }
-        </div>
+      <app-section class="dash__block" [heading]="'dashboard.today.upcoming' | t: { n: plannedCount() }">
+        @if (canSeeMeetings()) {
+          <a sectionAction class="dash__more" routerLink="/meetings">{{ 'dashboard.today.all' | t }}</a>
+        }
         <div class="rowgroup">
           @for (u of upcoming(); track u.meeting.id) {
             <app-list-item [title]="u.meeting.title" [link]="['/meetings', u.meeting.id]" [wrap]="true">
@@ -131,7 +128,7 @@
             </app-list-item>
           }
         </div>
-      </section>
+      </app-section>
     }
 
     @if (noMeetings()) {

@@ -28,6 +28,7 @@ import {
   SwitchComponent,
   ToastService,
   PageHeaderComponent,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { type StatusView, webhookDeliveryStatus } from '@shared/status-kind.util';
@@ -62,6 +63,7 @@ function emptyHook(): WebhookConfig {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionComponent,
     ExpandRowComponent,
     FabComponent,
     ConfirmDialogComponent,

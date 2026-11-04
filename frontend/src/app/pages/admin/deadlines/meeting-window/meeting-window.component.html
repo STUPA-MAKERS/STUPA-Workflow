@@ -1,6 +1,5 @@
 @if (form.state() !== 'forbidden') {
-  <section class="gs" aria-labelledby="mw-title">
-    <app-section-header class="gs__head" headingId="mw-title" [heading]="'admin.meetingWindow.title' | t" />
+  <app-section class="gs" [level]="2" [heading]="'admin.meetingWindow.title' | t">
 
     <app-load-state [state]="form.state()" [lines]="2" [errorText]="'admin.guest.loadError' | t">
       <ng-template #content>
@@ -31,5 +30,5 @@
         </form>
       </ng-template>
     </app-load-state>
-  </section>
+  </app-section>
 }

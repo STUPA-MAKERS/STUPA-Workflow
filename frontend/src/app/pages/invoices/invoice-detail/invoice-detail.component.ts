@@ -15,6 +15,7 @@ import {
   SheetBarComponent,
   SheetBarTitleDirective,
   StatusTextComponent,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import {
   invoiceStatus,
@@ -46,6 +47,7 @@ import { formatMoney } from '@shared/format-money';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionComponent,
     SheetActionComponent,
     NoteComponent,
     EmptyStateComponent,

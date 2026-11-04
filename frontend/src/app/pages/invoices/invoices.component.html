@@ -228,6 +228,14 @@
           }
         }
       }
+      <ng-template #form let-layout>
+        <app-invoice-form
+          [mode]="formMode() === 'edit' ? 'edit' : 'create'"
+          [host]="this"
+          [layout]="layout"
+          (openDuplicate)="openDuplicate()"
+        />
+      </ng-template>
     </div>
   </app-list-detail>
 
@@ -236,15 +244,6 @@
   }
 </div>
 
-<ng-template #form let-layout>
-  <app-invoice-form
-    [mode]="formMode() === 'edit' ? 'edit' : 'create'"
-    [host]="this"
-    [layout]="layout"
-    (remove)="askDelete(editing()!)"
-    (openDuplicate)="openDuplicate()"
-  />
-</ng-template>
 
 @if (phone()) {
   <app-side-sheet

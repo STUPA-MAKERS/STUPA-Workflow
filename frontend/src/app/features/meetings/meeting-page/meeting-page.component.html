@@ -49,12 +49,9 @@
   @if (!phone()) {
     @switch (mainAction()) {
       @case ('open') {
-        @if (opensAtText()) {
-          <span class="mp__blocked">{{ opensAtText() }}</span>
-        }
         <app-button variant="fill" [disabled]="!m.protokollantId || !!opensAtText()" [title]="m.protokollantId ? (opensAtText() || ('meetings.control.open' | t)) : ('meetings.control.needProtokollant' | t)" (click)="startSession.emit()">
           <app-icon name="play" />
-          {{ 'meetings.control.open' | t }}
+          {{ opensAtText() || ('meetings.control.open' | t) }}
         </app-button>
       }
       @case ('close') {

@@ -3,17 +3,9 @@
 }
 
 .gs {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
   container-type: inline-size;
 }
 
-.gs__head {
-  --sh-wrap: nowrap;
-  --sh-gap: var(--space-4);
-  --sh-title-min: 0;
-}
 
 .gs__grid {
   display: grid;

@@ -101,8 +101,7 @@
           </div>
 
           @if (conflicts().length) {
-            <section class="um__sec" aria-labelledby="um-conflicts">
-              <h3 class="section-title um__secTitle" id="um-conflicts">{{ 'admin.users.merge.conflictsTitle' | t }}</h3>
+            <app-section class="um__sec" [heading]="'admin.users.merge.conflictsTitle' | t">
               <app-note kind="error" icon="alert">
                 <span>{{ 'admin.users.merge.conflictsLead' | t }}</span>
               </app-note>
@@ -117,12 +116,11 @@
                   </li>
                 }
               </ul>
-            </section>
+            </app-section>
           }
 
           @if (p.extraPermissions?.length) {
-            <section class="um__sec" aria-labelledby="um-rights">
-              <h3 class="section-title um__secTitle" id="um-rights">{{ 'admin.users.merge.rightsTitle' | t }}</h3>
+            <app-section class="um__sec" [heading]="'admin.users.merge.rightsTitle' | t">
               <app-note [kind]="p.actorHoldsExtra === false ? 'error' : 'warn'" icon="shield">
                 <span>{{
                   (p.actorHoldsExtra === false ? 'admin.users.merge.rightsBlocked' : 'admin.users.merge.rightsLead')
@@ -134,11 +132,10 @@
                   <li class="code-tag um__right mono">{{ permissionLabel(r) }}</li>
                 }
               </ul>
-            </section>
+            </app-section>
           }
 
-          <section class="um__sec" aria-labelledby="um-areas">
-            <h3 class="section-title um__secTitle" id="um-areas">{{ 'admin.users.merge.areasTitle' | t }}</h3>
+          <app-section class="um__sec" [heading]="'admin.users.merge.areasTitle' | t">
             @if (previewAreas().length) {
               <ul class="rowgroup um__areas">
                 @for (a of previewAreas(); track a.area) {
@@ -152,7 +149,7 @@
               <app-empty-state rows="2" [heading]="'admin.users.merge.nothing' | t" />
             }
             <p class="um__legend um__muted">{{ 'admin.users.merge.legend' | t }}</p>
-          </section>
+          </app-section>
 
           @if (p.canMerge) {
             <app-note kind="warn" icon="lock">

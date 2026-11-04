@@ -39,13 +39,6 @@
 .gmt__group {
   @include gremien-tab.group;
 }
-.gmt__head {
-  @include gremien-tab.head;
-}
-.gmt__count {
-  color: var(--color-text-muted);
-  font-weight: var(--fw-medium);
-}
 
 .gmt__sub {
   @include gremien-tab.parts('.gmt__part');

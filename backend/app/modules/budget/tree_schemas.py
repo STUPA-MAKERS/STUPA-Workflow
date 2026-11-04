@@ -209,9 +209,9 @@ class AssignBudgetRequest(_CamelModel):
 
     `budgetId=null` clears the assignment and sets `fiscalYearId` to null too.
     `fiscalYearId` is optional. A given value must belong to the top budget of
-    the cost center. Without a value the service derives the single active
-    fiscal year. It otherwise demands an explicit choice with a 422, as with
-    expenses.
+    the cost center. Without a value the service derives the current fiscal
+    year (`tree_rules.pick_fiscal_year`). It otherwise demands an explicit
+    choice with a 422, as with expenses.
     """
 
     budget_id: UUID | None = Field(default=None, alias="budgetId")
@@ -267,8 +267,8 @@ class ExpenseCreate(_CamelModel):
     `budgetId` and `fiscalYearId`. `applicationId` binds the booking and
     replaces its binding pro rata. It is allowed for `kind='expense'` only.
     `fiscalYearId` is optional for a standalone expense. Without it the server
-    picks the single active fiscal year of the top budget. An ambiguous or
-    missing year gives a 422.
+    picks the current fiscal year of the top budget (`tree_rules.pick_fiscal_year`).
+    An ambiguous or missing year gives a 422.
     """
 
     amount: Decimal = Field(gt=0, le=_MAX_AMOUNT, allow_inf_nan=False)

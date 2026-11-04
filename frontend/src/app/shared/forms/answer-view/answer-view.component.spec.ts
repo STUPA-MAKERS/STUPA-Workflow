@@ -170,8 +170,10 @@ describe('AnswerViewComponent', () => {
       { costs: [{ label: 'Raum', offers: [{ label: 'Mensa', value: 450, preferred: true }] }], fee: 2 },
     );
     const sec = container.querySelector('.av__sec') as HTMLElement;
-    const kids = [...sec.children].map((el) => el.tagName.toLowerCase());
-    expect(kids).toEqual(['h3', 'app-positions-view', 'app-field-group']);
+    const body = sec.querySelector('.section__body') as HTMLElement;
+    const kids = [...body.children].map((el) => el.tagName.toLowerCase());
+    expect(within(sec).getByRole('heading', { level: 3 })).toBeInTheDocument();
+    expect(kids).toEqual(['app-positions-view', 'app-field-group']);
     expect(within(sec).getByText('Raum')).toBeInTheDocument();
   });
 

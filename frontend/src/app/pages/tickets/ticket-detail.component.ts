@@ -78,6 +78,7 @@ import {
   TabPagerComponent,
   TabsComponent,
   ToastService,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { browserLabel, viewportLabel } from '../../features/help/report-context';
 import { TodoLinkedListComponent } from '../../features/todos/linked-list/todo-linked-list.component';
@@ -188,6 +189,7 @@ export function fromMine(m: MyTicketDetail, reporter: TicketReporter): TicketDet
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionComponent,
     FormsModule,
     NgTemplateOutlet,
     RouterLink,

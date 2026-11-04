@@ -73,19 +73,17 @@
         </label>
 
         @if (placeholderList().length) {
-          <div class="mt__block">
-            <h3 class="section-title mt__cap">{{ 'admin.mailTemplates.placeholders' | t }}</h3>
+          <app-section class="mt__block" [heading]="'admin.mailTemplates.placeholders' | t">
             <ul class="mt__chips">
               @for (p of placeholderList(); track p.key) {
                 <li><code class="code-tag code-tag--outlined mt__chip mono" [title]="p.desc">{{ p.token }}</code></li>
               }
             </ul>
-          </div>
+          </app-section>
         }
 
         @if (preview(); as pv) {
-          <div class="mt__block">
-            <h3 class="section-title mt__cap">{{ 'admin.mailTemplates.previewHeading' | t }} ({{ pv.lang | uppercase }})</h3>
+          <app-section class="mt__block" [heading]="('admin.mailTemplates.previewHeading' | t) + ' (' + (pv.lang | uppercase) + ')'">
             <div class="mt__preview">
               <p class="mt__previewSubj">{{ pv.subject }}</p>
               <p class="mt__previewText">{{ pv.text }}</p>
@@ -93,7 +91,7 @@
                 <div class="mt__previewHtml" [innerHTML]="pv.html"></div>
               }
             </div>
-          </div>
+          </app-section>
         }
 
         <div class="mt__actions">

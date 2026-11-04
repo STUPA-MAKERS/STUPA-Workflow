@@ -6,7 +6,7 @@ import { formatAnswer, formatFieldValue, isEmptyAnswer } from '../answer-format'
 import { resolveI18n } from '../i18n-text';
 import { evalJsonLogic, isFieldVisible } from '../jsonlogic';
 import { PositionsViewComponent } from '../positions-view/positions-view.component';
-import { FieldGroupComponent, FieldRowComponent } from '@stupa-makers/ui-kit';
+import { FieldGroupComponent, FieldRowComponent, SectionComponent } from '@stupa-makers/ui-kit';
 
 /** One answer as a label and its text. */
 export interface AnswerCell {
@@ -66,7 +66,7 @@ const MONO: ReadonlySet<FieldType> = new Set(['iban', 'currency', 'funding']);
   selector: 'app-answer-view',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FieldGroupComponent, FieldRowComponent, MarkdownViewComponent, PositionsViewComponent],
+  imports: [SectionComponent, FieldGroupComponent, FieldRowComponent, MarkdownViewComponent, PositionsViewComponent],
   templateUrl: './answer-view.component.html',
   styleUrl: './answer-view.component.scss',
 })

@@ -22,6 +22,7 @@ import {
   NoteComponent,
   SkeletonComponent,
   PageHeaderComponent,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../layout/breadcrumbs.component';
 import { scopeLabel } from './scope-labels';
@@ -44,6 +45,7 @@ type Confirm = { kind: 'one'; grant: OAuthGrant } | { kind: 'all' };
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionComponent,
     ConfirmDialogComponent,
     ButtonComponent,
     CopyButtonComponent,

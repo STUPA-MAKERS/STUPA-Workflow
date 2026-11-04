@@ -22,8 +22,7 @@
   <div class="ff__body" appScrollFade="y">
     <div class="ff__cols if__cols">
       <div class="ff__col if__fileCol">
-        <section class="ff__sec" aria-labelledby="if-file">
-          <h3 id="if-file" class="sec ff__secTitle">{{ 'invoices.detail.receipt' | t }}</h3>
+        <app-section [heading]="'invoices.detail.receipt' | t">
           @if (mode() === 'create') {
             @if (h.importToken()) {
               <div class="if__file">
@@ -68,7 +67,7 @@
               <app-note icon="file" [surface]="layout() === 'sheet' ? 3 : 2">{{ 'invoices.detail.noFile' | t }}</app-note>
             }
           }
-        </section>
+        </app-section>
       </div>
 
       <div class="ff__col if__fields">
@@ -226,26 +225,14 @@
     </div>
   </div>
 
-  <footer
-    class="ff__foot"
-    appPaneFormFoot
-    [deletable]="mode() === 'edit'"
-    [compact]="layout() === 'sheet'"
-    (removed)="remove.emit()"
-    (cancelled)="close()"
-  >
-    @if (mode() === 'create') {
-      <app-button variant="fill" [disabled]="!h.canSubmitCreate()" [loading]="h.saving()" (click)="submit($event)">
-        <span class="ff__btn"><app-icon name="plus" />{{
-          (layout() === 'sheet' ? 'expenses.form.addShort' : 'invoices.add') | t
-        }}</span>
-      </app-button>
-    } @else {
-      <app-button variant="fill" [disabled]="!h.canSubmitEdit()" [loading]="h.saving()" (click)="submit($event)">{{
-        'action.save' | t
-      }}</app-button>
-    }
-  </footer>
+  <app-fab
+    [icon]="mode() === 'create' ? 'plus' : 'check'"
+    [label]="(mode() === 'create' ? (layout() === 'sheet' ? 'expenses.form.addShort' : 'invoices.add') : 'action.save') | t"
+    [contained]="layout() !== 'page'"
+    [disabled]="mode() === 'create' ? !h.canSubmitCreate() : !h.canSubmitEdit()"
+    [loading]="h.saving()"
+    (activate)="save()"
+  />
 </form>
 
 <app-confirm-dialog

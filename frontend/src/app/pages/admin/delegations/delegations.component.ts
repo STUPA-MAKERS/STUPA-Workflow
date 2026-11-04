@@ -18,12 +18,12 @@ import {
   SkeletonComponent,
   ToastService,
   PageHeaderComponent,
+  SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
 import type { Gremium } from '../admin.models';
 import { SubstitutePoolComponent } from './substitute-pool.component';
-import { SectionHeaderComponent } from '@shared/ui/section-header/section-header.component';
 import { localToday } from '@shared/date-format';
 
 /**
@@ -45,7 +45,7 @@ import { localToday } from '@shared/date-format';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    SectionHeaderComponent,
+    SectionComponent,
     NoteComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,

@@ -52,8 +52,7 @@
               <p class="wh__noEvents">{{ 'admin.webhook.noEvents' | t }}</p>
             }
             @if (canManage()) {
-              <section class="wh__status" [attr.aria-label]="'admin.webhook.delivery.title' | t">
-                <h2 class="section-title">{{ 'admin.webhook.delivery.title' | t }}</h2>
+              <app-section class="wh__status" [level]="2" [heading]="'admin.webhook.delivery.title' | t">
                 @if (s) {
                   <dl class="kv wh__grid">
                     <div>
@@ -88,7 +87,7 @@
                 } @else {
                   <app-empty-state rows="2" [heading]="'admin.webhook.delivery.none' | t" />
                 }
-              </section>
+              </app-section>
             }
           </app-expand-row>
         </li>

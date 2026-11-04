@@ -35,11 +35,8 @@
     <div class="pc__start">
       <app-button variant="fill" [disabled]="!m.protokollantId || !!opensAtText()" [title]="m.protokollantId ? (opensAtText() || ('meetings.control.open' | t)) : ('meetings.control.needProtokollant' | t)" (click)="start.emit()">
         <app-icon name="play" />
-        {{ 'meetings.control.open' | t }}
+        {{ opensAtText() || ('meetings.control.open' | t) }}
       </app-button>
-      @if (opensAtText()) {
-        <span class="pc__hint">{{ opensAtText() }}</span>
-      }
     </div>
   }
 </section>
