@@ -454,30 +454,6 @@
   --chat-composer-surface: transparent;
   --chat-composer-bleed: var(--space-4);
 }
-.cd__bar {
-  --cd-bar-bg: var(--color-surface);
-  position: sticky;
-  bottom: 0;
-  z-index: 2;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-3);
-  margin-top: var(--space-4);
-  padding: var(--space-3) 0;
-  background: var(--cd-bar-bg);
-}
-.cd__bar::before {
-  content: '';
-  position: absolute;
-  inset: auto 0 100%;
-  height: var(--space-5);
-  background: linear-gradient(to top, var(--cd-bar-bg), transparent);
-  pointer-events: none;
-}
-:host(.cd--pane) .cd__bar {
-  --cd-bar-bg: var(--color-bg);
-}
-
 // The places of the 40px icon buttons of the sheet bar.
 .cd__skelIcon {
   display: grid;
