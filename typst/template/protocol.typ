@@ -438,24 +438,28 @@
 
 #let signatures(signers) = {
   // \section*{Unterschriften}, then two minipages per row (0.46\linewidth,
-  // centered): a 5cm rule, the name and the role in \small.
-  block(text(font: head-font, size: size.Large, weight: "bold")[Unterschriften])
-  v(55.76pt)
-  let cell(role, name) = box(width: 46%, align(center, {
-    rect(width: 5cm, height: 0.4pt, fill: black, stroke: none)
-    v(7.38pt)
-    block(if name != "" { name } else { [~] })
-    v(1.22pt)
-    block(text(size: size.small, role))
-  }))
-  for (i, row) in signers.chunks(2).enumerate() {
-    if i > 0 { v(44.95pt) }
-    block(width: 100%, {
-      cell(..row.at(0))
-      h(1fr)
-      if row.len() > 1 { cell(..row.at(1)) }
-    })
-  }
+  // centered): a 5cm rule, the name and the role in \small. One unbreakable
+  // block, because a heading alone at the foot of a page with the lines on the
+  // next one is a signature page nobody can sign.
+  block(breakable: false, width: 100%, {
+    block(text(font: head-font, size: size.Large, weight: "bold")[Unterschriften])
+    v(55.76pt)
+    let cell(role, name) = box(width: 46%, align(center, {
+      rect(width: 5cm, height: 0.4pt, fill: black, stroke: none)
+      v(7.38pt)
+      block(if name != "" { name } else { [~] })
+      v(1.22pt)
+      block(text(size: size.small, role))
+    }))
+    for (i, row) in signers.chunks(2).enumerate() {
+      if i > 0 { v(44.95pt) }
+      block(width: 100%, {
+        cell(..row.at(0))
+        h(1fr)
+        if row.len() > 1 { cell(..row.at(1)) }
+      })
+    }
+  })
 }
 
 // -- blocks -------------------------------------------------------------------
