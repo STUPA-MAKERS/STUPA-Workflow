@@ -371,14 +371,17 @@ describe('MeetingPageComponent', () => {
     });
 
     /** The text of the item can be written before the start, without a protocol. */
-    it('opens a picked item of the preparation pane to prepare it, and goes back', async () => {
+    it('opens a picked item of the preparation pane to prepare it, and goes back from the menu', async () => {
       const { on } = await setup({ meeting: planned({ canManageVotes: true }), protocol: null }, [MEDIA.wide]);
       await userEvent.click(screen.getByRole('button', { name: 'Bericht des Finanzreferats' }));
       expect(on.selectTop).toHaveBeenCalledWith('t-2');
       expect(screen.queryByRole('heading', { name: 'Sitzung vorbereiten' })).toBeNull();
       expect(screen.getByRole('toolbar', { name: 'Format' })).toBeInTheDocument();
-      await userEvent.click(screen.getByRole('button', { name: 'Zurück zur Vorbereitung' }));
+      expect(screen.queryByRole('button', { name: 'Zurück zur Vorbereitung' })).toBeNull();
+      const menu = await openMenu();
+      await userEvent.click(within(menu).getByRole('menuitem', { name: 'Zurück zur Vorbereitung' }));
       expect(screen.getByRole('heading', { name: 'Sitzung vorbereiten' })).toBeInTheDocument();
+      expect(within(await openMenu()).queryByRole('menuitem', { name: 'Zurück zur Vorbereitung' })).toBeNull();
     });
 
     it('opens a picked item of the preparation sheet', async () => {
@@ -404,7 +407,7 @@ describe('MeetingPageComponent', () => {
       await setup({ meeting: planned({ canControl: false, canManage: false }), protocol: null });
       expect(screen.queryByRole('heading', { name: 'Sitzung vorbereiten' })).toBeNull();
       expect(screen.getByRole('radio', { name: 'Formatiert' })).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Zurück zur Vorbereitung' })).toBeNull();
+      expect(within(await openMenu()).queryByRole('menuitem', { name: 'Zurück zur Vorbereitung' })).toBeNull();
     });
   });
 

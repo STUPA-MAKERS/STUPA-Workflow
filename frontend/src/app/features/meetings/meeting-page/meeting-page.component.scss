@@ -101,10 +101,6 @@
   flex: 1 1 auto;
   min-height: 24rem;
 }
-.mp__prepBack {
-  align-self: flex-start;
-  margin-bottom: var(--space-2);
-}
 .mp__prep {
   flex: 1 1 auto;
   border-radius: var(--radius-2xl);
@@ -200,9 +196,17 @@
     bottom: var(--app-bottom-inset, 0px);
     z-index: var(--z-sticky, 10);
     margin: 0;
-    border-top: var(--border-width) solid var(--color-border);
     background: var(--color-surface-2);
     padding-bottom: var(--app-bottom-safe-area, env(safe-area-inset-bottom));
+  }
+  // Frosted glass like the bar at the top: the protocol scrolls under the dock and shows
+  // through blurred. Without `backdrop-filter` the dock stays solid.
+  @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+    .mp__dock {
+      background: color-mix(in srgb, var(--color-surface-2) 55%, transparent);
+      -webkit-backdrop-filter: blur(10px) saturate(1.8);
+      backdrop-filter: blur(10px) saturate(1.8);
+    }
   }
 }
 

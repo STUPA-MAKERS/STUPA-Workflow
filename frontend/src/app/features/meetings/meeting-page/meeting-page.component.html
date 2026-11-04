@@ -124,12 +124,6 @@
         />
       </div>
     } @else {
-      @if (canBackToPrep()) {
-        <app-button class="mp__prepBack" variant="text" size="sm" (click)="prepItem.set(false)">
-          <app-icon name="back" />
-          {{ 'meetings.prep.back' | t }}
-        </app-button>
-      }
       <app-top-sheet
         class="mp__sheet"
         [meeting]="m"

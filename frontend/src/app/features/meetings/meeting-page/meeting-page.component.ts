@@ -55,7 +55,7 @@ import { MeetingHeadComponent } from '../meeting-head/meeting-head.component';
 import { clock, weekdayDate } from '@shared/date-format';
 
 /** The ids of the session menu. */
-type SessionAction = 'settings' | 'attendance' | 'keeper' | 'beamer' | 'qr' | 'close' | 'delete';
+type SessionAction = 'prep' | 'settings' | 'attendance' | 'keeper' | 'beamer' | 'qr' | 'close' | 'delete';
 
 /**
  * The session page of the meeting lead and the minute-taker (`/meetings/:id`).
@@ -233,7 +233,7 @@ export class MeetingPageComponent {
     const m = this.meeting();
     return m.status === 'planned' && (m.canControl || m.canManage) && !this.prepItem();
   });
-  /** "Zurück zur Vorbereitung" above the sheet of a planned meeting. */
+  /** "Zurück zur Vorbereitung" in the session menu while an item of a planned meeting is open. */
   protected readonly canBackToPrep = computed(() => {
     const m = this.meeting();
     return m.status === 'planned' && (m.canControl || m.canManage) && this.prepItem();
@@ -303,6 +303,7 @@ export class MeetingPageComponent {
     const m = this.meeting();
     const t = (key: Parameters<I18nService['translate']>[0]): string => this.i18n.translate(key);
     const main: RowMenuItem[] = [];
+    if (this.canBackToPrep()) main.push({ id: 'prep', label: t('meetings.prep.back'), icon: 'clipcheck' });
     if (m.canManage) main.push({ id: 'settings', label: t('meetings.settings.title'), icon: 'edit' });
     main.push({ id: 'attendance', label: t('meetings.page.recordAttendance'), icon: 'users' });
     const keeper =
@@ -474,6 +475,9 @@ export class MeetingPageComponent {
 
   protected onMenu(item: RowMenuItem): void {
     switch (item.id as SessionAction) {
+      case 'prep':
+        this.prepItem.set(false);
+        break;
       case 'settings':
         this.openSettings.emit();
         break;
