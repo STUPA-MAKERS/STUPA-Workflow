@@ -177,7 +177,7 @@
     flex: 1 0 auto;
     min-height: 100dvh;
     margin-inline: calc(-1 * var(--space-4));
-    padding-bottom: calc(var(--fx-dock-h, 0px) + var(--space-3));
+    padding-bottom: calc(var(--fx-dock-h, 0px) + var(--space-2) + var(--space-3));
   }
   // The head is the sticky bar of the kit there (`MeetingHeadComponent`); the header box
   // steps aside, so the bar sticks in the box of the page.
@@ -199,17 +199,18 @@
   }
   .mp__dock {
     position: fixed;
-    inset-inline: 0;
-    bottom: var(--app-bottom-inset, 0px);
+    inset-inline: var(--space-2);
+    bottom: calc(var(--app-bottom-inset, 0px) + var(--space-2));
     z-index: var(--z-sticky, 10);
     margin: 0;
-    padding-bottom: var(--app-bottom-safe-area, env(safe-area-inset-bottom));
-    // Frosted glass like the bar at the top: the protocol scrolls under the dock from above
-    // and on under the navigation bar, so the glass reaches past both edges, and a light
-    // shadow lifts the dock off it. The glass turns into the colour of the navigation bar
-    // at its foot, and the bar drops its shadow (`styles.scss`), so the two read as one.
-    @include frosted(var(--color-surface-2), $fade-to: var(--color-surface-3));
-    box-shadow: var(--shadow-md-up);
+    overflow: hidden;
+    border-radius: var(--radius-xl);
+    // Frosted glass like the bar at the top: the dock floats over the protocol with a small
+    // gap above the navigation bar, so the protocol shows through the glass, and a light
+    // shadow lifts the dock off it. The rounded box clips the glass, which reaches past both
+    // edges (`frosted`).
+    @include frosted(var(--color-surface-2));
+    box-shadow: var(--shadow-md);
   }
   // Before the opening the dock only says "Noch nicht eröffnet", which the status in the
   // head already says, so it shows nothing there (`SessionDockComponent`).
