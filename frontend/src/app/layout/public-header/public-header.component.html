@@ -1,4 +1,4 @@
-<header class="pub">
+<header class="pub" [class.pub--under]="under()">
   <a class="pub__brand" routerLink="/" [attr.aria-label]="branding.appName()">
     <img class="pub__logo" [src]="logoSrc()" alt="" />
     <img class="pub__mark" [src]="markSrc()" alt="" />

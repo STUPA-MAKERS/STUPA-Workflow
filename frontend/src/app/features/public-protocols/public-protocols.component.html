@@ -72,10 +72,7 @@
       </div>
     } @else {
       @for (group of groups(); track group.key) {
-        <h2 class="pp__group">
-          <span>{{ group.label }}</span>
-          <span class="pp__groupCount num">{{ group.count }}</span>
-        </h2>
+        <h2 class="pp__group">{{ group.label }}</h2>
         @for (p of group.items; track p.id) {
           <article class="pp__card">
             <app-date-block class="pp__date" [date]="dateOf(p)" />

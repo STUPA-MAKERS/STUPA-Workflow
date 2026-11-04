@@ -54,7 +54,8 @@
               <span class="home__latestText">
                 <span class="home__latestName">{{ p.title }}</span>
                 <span class="home__latestMeta">{{
-                  'home.latest.meta' | t: { gremium: p.gremium.name, n: publicTops(p) }
+                  (publicTops(p) === 1 ? 'home.latest.metaOne' : 'home.latest.meta')
+                    | t: { gremium: p.gremium.name, n: publicTops(p) }
                 }}</span>
               </span>
             </a>
@@ -62,7 +63,10 @@
         }
       </ul>
       <a class="home__latestAll" routerLink="/protokolle">
-        {{ 'home.latest.all' | t: { n: protocolTotal() } }}
+        {{
+          (protocolTotal() === 1 ? 'home.latest.allOne' : 'home.latest.all')
+            | t: { n: protocolTotal() }
+        }}
         <app-icon name="arrow" [size]="15" />
       </a>
     </section>

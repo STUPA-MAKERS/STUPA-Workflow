@@ -1,3 +1,5 @@
+// One block in the middle of the page: the code, the heading with its icon, the text and the
+// way back, each centred, so the block reads as one and sits in the middle of the frame.
 :host {
   display: flex;
   flex: 1 0 auto;
@@ -8,9 +10,10 @@
 .err {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   gap: 14px;
   width: min(560px, 100%);
+  text-align: center;
 }
 
 .err__code {
@@ -23,6 +26,7 @@
 .err__head {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 10px;
 }
 .err__icon {

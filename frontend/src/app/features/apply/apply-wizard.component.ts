@@ -180,6 +180,12 @@ export class ApplyWizardComponent {
    * field and no ALTCHA.
    */
   protected readonly loggedIn = this.auth.isAuthenticated;
+  /**
+   * The bar of a detail with the arrow back, on a phone in the signed-in frame. The public
+   * frame has its own bar at the top (logo, help, language), so a second bar below it would
+   * stack two bars; there the title stays in the page.
+   */
+  protected readonly bar = computed(() => this.phone() && this.loggedIn());
 
   readonly types = signal<ApplicationType[]>([]);
   readonly typeId = signal<Uuid | null>(null);

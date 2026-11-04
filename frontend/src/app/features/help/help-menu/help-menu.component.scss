@@ -1,5 +1,6 @@
 @use 'breakpoints' as bp;
 @use 'frosted' as *;
+@use 'option-menu' as om;
 
 :host {
   display: block;
@@ -202,4 +203,13 @@
   .hm--sheet .hm__item:hover {
     background: var(--color-surface-3);
   }
+}
+
+/* The phone sheet of the public header sits in the top layer, so no glass or scroll box
+   of the header clips it. In the sheet the entries need no rule below them. */
+.hm__layer {
+  @include om.layer;
+}
+.hm--inSheet {
+  border-bottom: 0;
 }
