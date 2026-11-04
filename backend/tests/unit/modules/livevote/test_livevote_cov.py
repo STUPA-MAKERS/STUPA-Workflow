@@ -1838,20 +1838,24 @@ async def test_set_body_without_change_writes_no_audit(
     assert sess.committed == 1
 
 
-async def test_set_body_title_ignored_for_application_top() -> None:
-    """Ignore the title for an application item.
-
-    An application item inherits the title of the application.
-    """
+async def test_set_body_renames_application_top() -> None:
+    """An application item takes its own title, which replaces the application title."""
     m = _meeting()
-    item = _agenda_item(application_id=uuid4(), title="orig")
-    sess = _QueueSession(
-        executes=[res(m), res(item), res(m)],
-        scalars_q=[[]],
-    )
-    svc = AgendaService(sess)  # type: ignore[arg-type]
-    await svc.set_body(m.id, item.id, title="ignored")
-    assert item.title == "orig"
+    item = _agenda_item(application_id=uuid4(), title=None)
+    app = SimpleNamespace(data={"title": "Antrag"})
+    sess = _QueueSession(executes=[res(m), res(item), res(m)], scalars_q=[[]], get_q=[app])
+    await AgendaService(sess).set_body(m.id, item.id, title=" Eigener Titel ")  # type: ignore[arg-type]
+    assert item.title == "Eigener Titel"
+
+
+async def test_set_body_application_title_clears_own_title() -> None:
+    """A rename to the application title removes the own title of an application item."""
+    m = _meeting()
+    item = _agenda_item(application_id=uuid4(), title="Eigener Titel")
+    app = SimpleNamespace(data={"title": "Antrag"})
+    sess = _QueueSession(executes=[res(m), res(item), res(m)], scalars_q=[[]], get_q=[app])
+    await AgendaService(sess).set_body(m.id, item.id, title="Antrag")  # type: ignore[arg-type]
+    assert item.title is None
 
 
 async def test_set_body_on_planned_meeting_ok(audit_calls: list[dict[str, Any]]) -> None:

@@ -13,9 +13,6 @@
             <span class="ts__now">{{ 'meetings.follow.now' | t }}</span> ·
           }
           {{ kindLine(t) }}
-          @if (stateLabel(); as st) {
-            · <app-status-text kind="neutral">{{ st }}</app-status-text>
-          }
           @if (t.nonPublic) {
             · {{ 'meetings.agenda.nonPublicLabel' | t }}
           }
@@ -47,12 +44,6 @@
           <h1 class="ts__title" [title]="t.title || ('meetings.agenda.untitled' | t)">{{ t.title || ('meetings.agenda.untitled' | t) }}</h1>
         }
       </div>
-      @if (t.applicationId) {
-        <a class="ts__open" [routerLink]="['/applications', t.applicationId]" target="_blank" rel="noopener">
-          {{ 'meetings.agenda.openApplication' | t }}
-          <app-icon name="ext" [size]="18" />
-        </a>
-      }
     </header>
 
     @if (follow() && m.status === 'live' && m.protokollantName) {
@@ -70,7 +61,9 @@
     }
 
     @if (!follow()) {
-      <app-todo-linked-list class="ts__todos" kind="agenda_item" headingId="ts-todos" [showTitle]="false" [targetId]="t.id" />
+      <app-todo-linked-list class="ts__todos" kind="agenda_item" headingId="ts-todos" [showTitle]="false" [targetId]="t.id" [lead]="applicationLead()" />
+    } @else if (applicationLead(); as lead) {
+      <app-todo-linked-list class="ts__todos" kind="agenda_item" headingId="ts-todos" [showTitle]="false" [targetId]="t.id" [items]="[]" [lead]="lead" />
     }
 
     @if (follow()) {

@@ -10,10 +10,20 @@ import {
   type AvatarSize,
   AvatarStackComponent,
   IconComponent,
+  type IconName,
   SectionComponent,
 } from '@stupa-makers/ui-kit';
 import { TodoLinkedRefresh, linkedKey } from './todo-linked-refresh';
 import { personName } from '@shared/person-label.util';
+
+/** A row above the cards in the same look, for the object that the list belongs to. */
+export interface LinkedLead {
+  icon: IconName;
+  title: string;
+  sub: string;
+  /** The router link. The row opens it in a new tab. */
+  link: readonly unknown[];
+}
 
 /**
  * The back-reference "To-Dos" of an object (an application, an agenda item, a vote, an
@@ -21,7 +31,9 @@ import { personName } from '@shared/person-label.util';
  * linked to it that the viewer may read (`GET /todos/linked`), each with its board, its
  * column, the due date and the people. A row opens the card on its board.
  *
- * Nothing linked, or the read fails: the component shows nothing.
+ * Nothing linked, or the read fails: the component shows nothing, or only the `lead` row.
+ * The TOP sheet puts the application of an application item there, "Antrag · Entwurf ·
+ * 1.250,00 €", above the cards of the TOP.
  *
  * A page that needs the cards itself (the ticket page counts the open ones) passes them
  * as `items`; the list then reads nothing.
@@ -53,6 +65,8 @@ export class TodoLinkedListComponent {
   /** The cards to show, read by the page. `null` reads them here. */
   readonly items = input<readonly TodoLinkedCard[] | null>(null);
   readonly avatarSize = input<AvatarSize>('sm');
+  /** The row above the cards. */
+  readonly lead = input<LinkedLead | null>(null);
 
   private readonly loaded = signal<readonly TodoLinkedCard[]>([]);
   readonly cards = computed(() => this.items() ?? this.loaded());

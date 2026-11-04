@@ -1113,7 +1113,7 @@ class ProtocolService:
         blocks: list[str] = []
         for number, item in enumerate(items, start=1):
             app_id = getattr(item, "application_id", None)
-            own = app_titles.get(app_id) if app_id is not None else item.title
+            own = item.title or (app_titles.get(app_id) if app_id is not None else None)
             heading = (own or "Tagesordnungspunkt").strip()
             if public and item.non_public:
                 block = [f"# {_NON_PUBLIC_HEADING}", _NON_PUBLIC_PLACEHOLDER]
