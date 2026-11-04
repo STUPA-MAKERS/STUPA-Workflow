@@ -159,13 +159,37 @@
   }
 }
 
-.mp__dock {
-  flex: none;
-  margin: var(--space-3) var(--space-3) var(--space-3) 0;
-}
-@include bp.below-wide {
+// The dock floats over the foot of the panes as frosted glass, like the phone dock: the
+// panes run to the bottom of the page and keep room under their last line
+// (`--mp-foot`), so the text scrolls under the glass and the end stays reachable.
+@include bp.not-phone {
+  :host {
+    position: relative;
+    --mp-foot: calc(var(--fx-dock-h, 0px) + 2 * var(--space-3));
+  }
   .mp__dock {
-    margin-inline-start: var(--space-3);
+    position: absolute;
+    inset-inline: var(--space-3);
+    bottom: var(--space-3);
+    z-index: var(--z-sticky, 10);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-md);
+    @include frosted(var(--color-surface-2), $reach: 0px);
+  }
+  // The popover of the minute-taker chip opens above the dock, so the dock does not clip;
+  // the glass takes the round corners itself.
+  .mp__dock::before {
+    border-radius: inherit;
+  }
+  .mp__body:not(.mp__body--wide),
+  .mp__body--wide .mp__agenda,
+  .mp__body--wide .mp__votes,
+  .mp__body--wide .mp__prep {
+    padding-bottom: var(--mp-foot);
+    scroll-padding-bottom: var(--mp-foot);
+  }
+  .mp__body--wide .mp__sheet {
+    --ts-foot: var(--mp-foot);
   }
 }
 

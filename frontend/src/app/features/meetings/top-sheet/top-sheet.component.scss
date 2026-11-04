@@ -176,7 +176,7 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  padding: var(--space-5) 28px;
+  padding: var(--space-5) 28px var(--ts-foot, var(--space-5));
 }
 .ts__editor ::ng-deep .mde__host {
   min-height: 100%;

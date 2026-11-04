@@ -6,6 +6,7 @@
   min-width: 0;
 }
 
+// The page makes the dock frosted glass (`MeetingPageComponent`), so the dock has no surface.
 .sd {
   display: flex;
   align-items: center;
@@ -13,7 +14,6 @@
   min-height: 72px;
   padding: var(--space-2) var(--space-5) var(--space-2) var(--space-2);
   border-radius: var(--radius-xl);
-  background: var(--color-surface-2);
 }
 .sd__small {
   font-size: var(--fs-small);
@@ -174,12 +174,10 @@
 // The attendance chip keeps its full text, because a centred chip narrower than its content
 // pushes the icon out over its start edge.
 @include bp.phone {
-  // The page makes the dock frosted glass there, so the dock itself has no surface.
   .sd {
     min-height: 0;
     padding: var(--space-2) var(--space-3);
     border-radius: 0;
-    background: transparent;
   }
   // The arrows stay at the two edges: "TOP 3 von 6" follows the previous arrow, the icon
   // buttons come before the next arrow. The nav box steps aside, so its parts and the
