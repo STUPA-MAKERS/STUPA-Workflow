@@ -9,6 +9,7 @@ import {
   model,
   output,
   signal,
+  type TemplateRef,
   viewChild,
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
@@ -240,6 +241,13 @@ export class MeetingPageComponent {
     const p = this.protocol();
     return this.phone() && !!p && !p.isLocked && this.top() !== null;
   });
+  /** The sheet of the open item: the phone dock runs its format tools. */
+  protected readonly sheet = viewChild(TopSheetComponent);
+  private readonly formatTpl = viewChild<TemplateRef<unknown>>('formatTpl');
+  /** The format tools for "Aa" of the phone dock, while the text of the item can be written. */
+  protected readonly dockFormat = computed<TemplateRef<unknown> | null>(() =>
+    this.dockModeToggle() && this.editable() ? (this.formatTpl() ?? null) : null,
+  );
   protected readonly editable = computed(
     () =>
       (this.protocol() !== null || this.meeting().status === 'planned') &&

@@ -226,3 +226,26 @@
 .mp__prep {
   @include fade.fade-y(var(--space-5));
 }
+
+// The format tools in the phone dock (`#formatTpl`), like the tools of the sheet bar.
+.mp__tool {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--control-height);
+  height: var(--control-height);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+}
+.mp__tool--on {
+  background: var(--color-selected);
+  color: var(--color-accent-text);
+}
+.mp__tool:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}

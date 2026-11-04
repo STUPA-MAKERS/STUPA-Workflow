@@ -17,7 +17,12 @@
 
 @if (!phone() || m.status !== 'planned') {
   <div class="sd">
-    @if (m.status === 'planned') {
+    @if (phone() && formatting() && formatTools(); as tools) {
+      <app-button variant="text" [iconOnly]="true" [ariaLabel]="'meetings.dock.formatBack' | t" (click)="formatting.set(false)"><app-icon name="left" /></app-button>
+      <div class="sd__format" role="toolbar" [attr.aria-label]="'meetings.editor.toolbar' | t">
+        <ng-container [ngTemplateOutlet]="tools" />
+      </div>
+    } @else if (m.status === 'planned') {
       <div class="sd__state">
         <span class="sd__small">{{ 'meetings.dock.notStarted' | t }}</span>
         <span class="sd__strong">{{ 'meetings.dock.topsPrepared' | t: { n: agenda().length } }}</span>
@@ -81,6 +86,9 @@
 <!-- On a phone: "Erledigt", the attendance and the view switch as icon buttons. -->
 <ng-template #phoneTools>
   <div class="sd__tools">
+    @if (formatTools()) {
+      <app-button variant="text" [iconOnly]="true" [ariaLabel]="'meetings.editor.toolbar' | t" (click)="formatting.set(true)"><app-icon name="letters" /></app-button>
+    }
     @if (done() !== null) {
       <app-button
         [variant]="done() ? 'tonal' : 'text'"

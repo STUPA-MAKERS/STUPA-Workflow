@@ -273,6 +273,19 @@ describe('MeetingPageComponent', () => {
       flushDelegations();
     });
 
+    /** "Aa" turns the phone dock into the format tools; the back arrow turns it back. */
+    it('swaps the phone dock row for the format tools and back', async () => {
+      const { fixture } = await setup({}, [MEDIA.phone]);
+      const host = fixture.nativeElement as HTMLElement;
+      expect(host.querySelector('.ts__bar')).toBeNull();
+      await userEvent.click(screen.getByRole('button', { name: 'Format' }));
+      const tools = screen.getByRole('toolbar', { name: 'Format' });
+      expect(within(tools).getByRole('button', { name: 'Fett' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Nächster TOP' })).toBeNull();
+      await userEvent.click(screen.getByRole('button', { name: 'Zurück zur Navigation' }));
+      expect(screen.getByRole('button', { name: 'Nächster TOP' })).toBeInTheDocument();
+    });
+
     /** The protocol has the phone page to itself: the vote cards open as a bottom sheet. */
     it('opens the vote cards from the phone dock instead of above the text', async () => {
       const { fixture } = await setup({}, [MEDIA.phone]);

@@ -167,8 +167,9 @@ export class TopSheetComponent {
    */
   readonly linked = input(true);
   /**
-   * "Erledigt" and the view switch in the bar. On a phone the dock of the page holds them
-   * as icon buttons, and the page binds `mode`.
+   * The bar: the format tools, "Erledigt" and the view switch. On a phone the dock of the
+   * page holds them as icon buttons (the tools behind "Aa"), and the page binds `mode`;
+   * the save state then sits beside the title.
    */
   readonly barControls = input(true);
   /**
@@ -191,7 +192,7 @@ export class TopSheetComponent {
   readonly doneChange = output<{ item: AgendaItem; done: boolean }>();
 
 
-  protected readonly tools = TOOLS;
+  readonly tools = TOOLS;
 
   /**
    * The item whose rename started from this heading. The agenda pane shows its own field
@@ -288,7 +289,7 @@ export class TopSheetComponent {
   };
 
   /** The formats at the cursor. The Markdown source shows none as pressed. */
-  protected readonly activeFormats = computed(() =>
+  readonly activeFormats = computed(() =>
     this.mode() === 'raw' ? NO_FORMATS : (this.editor()?.activeFormats() ?? NO_FORMATS),
   );
 
@@ -297,7 +298,7 @@ export class TopSheetComponent {
   }
 
   /** A button of the format bar: in the editor, or in the Markdown source. */
-  protected toggleFormat(format: MarkdownFormat): void {
+  toggleFormat(format: MarkdownFormat): void {
     if (this.mode() !== 'raw') {
       this.editor()?.toggleFormat(format);
       return;
@@ -316,7 +317,7 @@ export class TopSheetComponent {
   }
 
   /** "Tabelle einfügen": in the editor, or as a Markdown table in the source. */
-  protected insertTable(): void {
+  insertTable(): void {
     if (this.mode() !== 'raw') {
       this.editor()?.insertTable();
       return;
@@ -332,7 +333,7 @@ export class TopSheetComponent {
   }
 
   /** "Bild einfügen": the file dialog of the editor or of the Markdown source. */
-  protected insertImage(): void {
+  insertImage(): void {
     if (this.mode() !== 'raw') {
       this.editor()?.pickImage();
       return;

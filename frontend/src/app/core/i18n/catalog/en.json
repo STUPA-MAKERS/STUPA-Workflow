@@ -1290,6 +1290,7 @@
   "meetings.dock.top": "Item",
   "meetings.dock.none": "–",
   "meetings.dock.voteCast": "cast",
+  "meetings.dock.formatBack": "Back to the navigation",
   "meetings.follow.now": "Now",
   "meetings.keeper.from": "from {start}",
   "meetings.keeper.fromTopAt": "from {top}, {time}",

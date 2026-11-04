@@ -4,11 +4,13 @@ import {
   Component,
   ElementRef,
   computed,
+  effect,
   inject,
   input,
   model,
   output,
   signal,
+  type TemplateRef,
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -107,6 +109,20 @@ export class SessionDockComponent {
   readonly openVote = input<MeetingVote | null>(null);
   /** The vote icon button of a phone: open the vote cards. */
   readonly openVotes = output<void>();
+  /**
+   * The format tools of the protocol for a phone, or `null` when the text takes none. "Aa"
+   * turns the dock row into them, and the back arrow at the start turns it back.
+   */
+  readonly formatTools = input<TemplateRef<unknown> | null>(null);
+  /** The dock row shows the format tools. */
+  protected readonly formatting = signal(false);
+
+  constructor() {
+    // Without tools (another item, a locked text) the row returns to the navigation.
+    effect(() => {
+      if (!this.formatTools()) this.formatting.set(false);
+    });
+  }
   /** The distance of the popover from the end edge of the dock: the end of its chip. */
   protected readonly popEnd = signal(0);
 
