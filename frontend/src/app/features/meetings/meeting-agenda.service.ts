@@ -115,9 +115,11 @@ export class MeetingAgendaService implements OnDestroy {
     });
   }
 
-  /** Start inline rename of a freetext TOP (application TOPs keep their title). */
+  /**
+   * Start the inline rename of a TOP. An application TOP that takes the title of its
+   * application again follows later edits of the application.
+   */
   startRename(item: AgendaItem): void {
-    if (item.applicationId) return;
     this.renamingTopId.set(item.id);
     this.renameDraft.set(item.title ?? '');
   }
@@ -131,7 +133,7 @@ export class MeetingAgendaService implements OnDestroy {
   renameTop(meetingId: Uuid | null, item: AgendaItem): void {
     if (this.renamingTopId() !== item.id) return;
     const title = this.renameDraft().trim();
-    if (!meetingId || item.applicationId || !title || title === (item.title ?? '')) {
+    if (!meetingId || !title || title === (item.title ?? '')) {
       this.cancelRename();
       return;
     }

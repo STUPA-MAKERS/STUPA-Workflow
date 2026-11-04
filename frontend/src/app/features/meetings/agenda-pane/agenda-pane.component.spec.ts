@@ -194,14 +194,14 @@ describe('AgendaPaneComponent', () => {
       expect(on.setNonPublic).toHaveBeenCalledWith({ item: AGENDA[2], nonPublic: false });
     });
 
-    it('offers no move beyond the edges and no rename for an application item', async () => {
+    it('offers no move beyond the edges and a rename for an application item', async () => {
       await setup();
       let menu = await openMenu(0);
       expect(within(menu).queryByRole('menuitem', { name: 'Nach oben' })).toBeNull();
       await userEvent.keyboard('{Escape}');
       menu = await openMenu(2);
       expect(within(menu).queryByRole('menuitem', { name: 'Nach unten' })).toBeNull();
-      expect(within(menu).queryByRole('menuitem', { name: 'TOP umbenennen' })).toBeNull();
+      expect(within(menu).getByRole('menuitem', { name: 'TOP umbenennen' })).toBeInTheDocument();
     });
 
     it('removes an item without votes after "TOP entfernen?"', async () => {

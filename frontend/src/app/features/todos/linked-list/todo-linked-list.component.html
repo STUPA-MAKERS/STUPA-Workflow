@@ -1,6 +1,16 @@
-@if (cards().length) {
+@if (cards().length || lead()) {
   <app-section class="tl" [headingId]="headingId()" [heading]="'todos.linked.title' | t" [hideHeading]="!showTitle()">
     <ul class="rowgroup tl__list">
+      @if (lead(); as l) {
+        <li class="tl__row">
+          <app-icon class="tl__icon" [name]="l.icon" [size]="18" />
+          <span class="tl__text">
+            <a class="tl__link" [routerLink]="l.link" target="_blank" rel="noopener">{{ l.title }}</a>
+            <span class="tl__sub">{{ l.sub }}</span>
+          </span>
+          <app-icon class="tl__icon" name="ext" [size]="18" />
+        </li>
+      }
       @for (card of cards(); track card.id) {
         <li class="tl__row" [class.tl__row--done]="card.isDone">
           <app-icon class="tl__icon" [name]="card.isDone ? 'circleok' : 'circle'" [size]="18" />

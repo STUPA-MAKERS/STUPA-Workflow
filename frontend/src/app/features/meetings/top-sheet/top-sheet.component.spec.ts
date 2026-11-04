@@ -77,7 +77,7 @@ describe('TopSheetComponent', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Begrüßung' })).toBeInTheDocument();
     expect(screen.getByText('Gespeichert')).toBeInTheDocument();
     expect(screen.getByText('Entwurf')).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /Antrag öffnen/ })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Antrag Kulturfestival' })).toBeNull();
   });
 
   it('ticks the open item with "Erledigt" and removes the tick with the same toggle', async () => {
@@ -104,13 +104,25 @@ describe('TopSheetComponent', () => {
     expect(screen.queryByRole('button', { name: 'Erledigt' })).toBeNull();
   });
 
-  it('opens the application in a new tab and shows its state and the NÖ flag', async () => {
-    await setup({ top: AGENDA[2], topIndex: 2 });
-    expect(screen.getByText(/TOP 3 · Antrag/)).toHaveTextContent('Abstimmung');
+  it('shows the application as a row above the to-dos, opening in a new tab', async () => {
+    const { container } = await setup({
+      top: { ...AGENDA[2], title: 'Kulturfestival', applicationTitle: 'Antrag Kulturfestival', amount: '1250' },
+      topIndex: 2,
+    });
+    expect(screen.getByText(/TOP 3 · Antrag/)).not.toHaveTextContent('Abstimmung');
     expect(screen.getByText(/Nicht öffentlich \(NÖ\)/)).toBeInTheDocument();
-    const link = screen.getByRole('link', { name: /Antrag öffnen/ });
+    expect(screen.getByRole('heading', { level: 1, name: 'Kulturfestival' })).toBeInTheDocument();
+    const link = screen.getByRole('link', { name: 'Antrag Kulturfestival' });
     expect(link).toHaveAttribute('href', '/applications/app-1');
     expect(link).toHaveAttribute('target', '_blank');
+    const row = link.closest('li');
+    expect(row).toHaveTextContent(/Antrag · Abstimmung · 1\.250,00\s€/);
+    expect(container.querySelector('app-todo-linked-list li')).toBe(row);
+  });
+
+  it('keeps the application row in the participant view', async () => {
+    await setup({ top: AGENDA[2], topIndex: 2, follow: true });
+    expect(screen.getByRole('link', { name: 'Antrag Kulturfestival' })).toHaveAttribute('href', '/applications/app-1');
   });
 
   it('reports saving and a failed save', async () => {
@@ -466,13 +478,17 @@ describe('TopSheetComponent', () => {
       expect(view.renameTop).not.toHaveBeenCalled();
     });
 
+    it('renames an application item too', async () => {
+      await setup({ canRename: true, top: AGENDA[2], topIndex: 2 });
+      expect(screen.getByRole('button', { name: /TOP umbenennen/ })).toBeInTheDocument();
+    });
+
     it('shows no field for a rename from the agenda pane', async () => {
       await setup({ canRename: true, renamingTopId: AGENDA[0].id });
       expect(screen.queryByRole('textbox', { name: 'TOP umbenennen' })).toBeNull();
     });
 
     it.each<[string, Partial<Inputs>]>([
-      ['an application item', { canRename: true, top: AGENDA[2], topIndex: 2 }],
       ['a reader', {}],
       ['the participant view', { canRename: true, follow: true }],
     ])('keeps a plain title for %s', async (_name, over) => {

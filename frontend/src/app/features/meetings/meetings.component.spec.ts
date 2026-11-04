@@ -1144,10 +1144,16 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.renameDraft()).toBe('');
     });
 
-    it('does not start renaming an application TOP', async () => {
-      const { cmp } = await loaded();
-      cmp.startRename(AGENDA_ITEM({ applicationId: 'app-1' }) as never);
-      expect(cmp.renamingTopId()).toBeNull();
+    it('renames an application TOP too', async () => {
+      const { cmp, http } = await loaded();
+      const item = AGENDA_ITEM({ id: 't-app', applicationId: 'app-1', title: 'Antrag' });
+      cmp.startRename(item as never);
+      expect(cmp.renamingTopId()).toBe('t-app');
+      cmp.renameDraft.set('Eigener Titel');
+      cmp.renameTop(item as never);
+      const req = http.expectOne('/api/meetings/m-1/agenda/t-app');
+      expect(req.request.body).toEqual({ title: 'Eigener Titel' });
+      req.flush([AGENDA_ITEM({ id: 't-app', applicationId: 'app-1', title: 'Eigener Titel' })]);
     });
 
     it('saves a changed freetext title', async () => {
@@ -2401,19 +2407,6 @@ describe('MeetingsComponent — methods', () => {
       cmp.startRename(AGENDA_ITEM({ applicationId: null, title: null }) as never);
       expect(cmp.renamingTopId()).toBe('t-1');
       expect(cmp.renameDraft()).toBe('');
-    });
-
-    /**
-     * The test sets renamingTopId to the application TOP id by hand, because startRename rejects
-     * it. renameTop then takes the item.applicationId branch, cancels and sends no request.
-     */
-    it('cancels a rename when the item turns out to be application-bound', async () => {
-      const { cmp, http } = await loaded();
-      cmp.renamingTopId.set('t-app');
-      cmp.renameDraft.set('Neu');
-      cmp.renameTop(AGENDA_ITEM({ id: 't-app', applicationId: 'app-1', title: 'X' }) as never);
-      expect(cmp.renamingTopId()).toBeNull();
-      http.verify();
     });
 
     /**
