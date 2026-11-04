@@ -16,8 +16,6 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { map } from 'rxjs/operators';
 import { ApiClient } from '@core/api/api-client.service';
-import { DelegationsApiService } from '@core/api/delegations.service';
-import { prefetchDetails } from '@core/cache/detail-prefetch';
 import type { Meeting, Uuid } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -45,10 +43,7 @@ import {
   PageHeaderComponent,
 } from '@stupa-makers/ui-kit';
 import { CalendarSubscribeComponent } from '../calendar-subscribe/calendar-subscribe.component';
-import {
-  MeetingDetailSheetComponent,
-  meetingSheetReads,
-} from '../meeting-detail-sheet/meeting-detail-sheet.component';
+import { MeetingDetailSheetComponent } from '../meeting-detail-sheet/meeting-detail-sheet.component';
 import { MeetingDialogsService } from '../meeting-dialogs.service';
 import { meetingDay, meetingTimeText } from '../meetings-display.util';
 import {
@@ -74,7 +69,8 @@ import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.direc
  * status, the Gremium, the time and the number of agenda items. "Frühere Sitzungen laden"
  * ends the list; "Neue Sitzung" is the FAB of the list (on a phone the button of the
  * header). Right: the detail sheet of the selected meeting (`?sel=<id>`); side by side
- * the live meeting, else the next one, shows while nothing is selected.
+ * the live meeting, else the next one, shows while nothing is selected. In the one-pane
+ * layout a row opens the meeting page itself.
  *
  * A search collapses the groups into one list of hits by relevance (server side).
  * `MeetingsComponent` provides the timeline and the dialog services.
@@ -192,15 +188,6 @@ export class MeetingsListComponent {
   ]);
 
   constructor() {
-    prefetchDetails({
-      items: computed(() => {
-        const found = this.timeline.searchItems();
-        return found.length ? found : [...this.timeline.upcomingItems(), ...this.timeline.pastItems()];
-      }),
-      key: (m) => m.id,
-      reads: (m) =>
-        Object.values(meetingSheetReads(this.api, inject(DelegationsApiService), m)).filter((r) => r !== null),
-    });
     effect(() => {
       const id = this.selParam();
       const loading = this.timeline.loadingList();
@@ -256,8 +243,16 @@ export class MeetingsListComponent {
     if (id) this.readSelected(id);
   }
 
-  /** Select a meeting: its sheet shows beside the list, or as the next step. */
+  /**
+   * Select a meeting: beside the list its sheet shows. In the one-pane layout the row opens
+   * the meeting at once, because a sheet that holds only the way into the meeting is a step
+   * that leads nowhere else.
+   */
   select(m: Meeting): void {
+    if (!this.split()) {
+      this.open(m.id);
+      return;
+    }
     void this.router.navigate([], {
       relativeTo: this.route,
       queryParams: { sel: m.id },

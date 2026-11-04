@@ -362,69 +362,73 @@ describe('MeetingPageComponent', () => {
   describe('planned', () => {
     const planned = (over: Partial<Meeting> = {}) => meeting({ status: 'planned', ...over });
 
-    /** There is no sheet and no vote column before the opening. */
-    it('shows the checklist and keeps the opening disabled without a minute-taker', async () => {
-      await setup({ meeting: planned({ protokollantId: null, protokollantName: null }), protocol: null });
-      expect(screen.getByRole('heading', { name: 'Sitzung vorbereiten' })).toBeInTheDocument();
-      const starts = screen.getAllByRole('button', { name: 'Sitzung eröffnen' });
-      expect(starts).toHaveLength(2);
-      starts.forEach((b) => expect(b).toBeDisabled());
-      expect(screen.queryByText('Noch kein TOP geöffnet')).toBeNull();
-      expect(screen.queryByRole('complementary')).toBeNull();
+    /** The opening is a menu item on every screen; the page opens on the item, not on a checklist. */
+    it.each([[[]], [[MEDIA.wide]], [[MEDIA.phone]]])(
+      'keeps the opening in the menu, disabled without a minute-taker (%j)',
+      async (media) => {
+        const { on } = await setup({ meeting: planned({ protokollantId: null, protokollantName: null }), protocol: null }, media);
+        expect(screen.queryByRole('button', { name: 'Sitzung eröffnen' })).toBeNull();
+        expect(screen.queryByRole('heading', { name: 'Sitzung vorbereiten' })).toBeNull();
+        const menu = await openMenu();
+        const start = within(menu).getByRole('menuitem', { name: 'Sitzung eröffnen' });
+        expect(start).toHaveAttribute('aria-disabled', 'true');
+        expect(within(menu).getAllByText('Erst die Protokollführung zuweisen.').length).toBeGreaterThan(0);
+        await userEvent.click(start);
+        expect(on.startSession).not.toHaveBeenCalled();
+      },
+    );
+
+    it('opens from the menu once a minute-taker is set', async () => {
+      const { on } = await setup({ meeting: planned(), protocol: null }, [MEDIA.wide]);
+      const menu = await openMenu();
+      const start = within(menu).getByRole('menuitem', { name: 'Sitzung eröffnen' });
+      expect(start).not.toHaveAttribute('aria-disabled');
+      await userEvent.click(start);
+      expect(on.startSession).toHaveBeenCalledTimes(1);
     });
 
-    it('opens from the header and from the checklist once a minute-taker is set', async () => {
-      const { on } = await setup({ meeting: planned(), protocol: null });
-      const starts = screen.getAllByRole('button', { name: 'Sitzung eröffnen' });
-      await userEvent.click(starts[0]);
-      await userEvent.click(starts[1]);
-      expect(on.startSession).toHaveBeenCalledTimes(2);
-    });
-
-    /** The open buttons in the header and in the checklist name the time as their label. */
+    /** The disabled item says when the open window opens. */
     it('keeps the opening disabled before the open window and says when it opens', async () => {
       const soon = (min: number): string => new Date(Date.now() + min * 60_000).toISOString();
       const { on } = await setup({ meeting: planned({ opensAt: soon(30), confirmUntil: soon(80) }), protocol: null });
-      expect(screen.queryByRole('button', { name: 'Sitzung eröffnen' })).toBeNull();
-      const starts = screen.getAllByRole('button', { name: /^Eröffnen ab / });
-      expect(starts).toHaveLength(2);
-      starts.forEach((b) => expect(b).toBeDisabled());
-      expect(screen.getAllByText(/^Eröffnen ab /)).toHaveLength(2);
-      expect(starts[0].getAttribute('title')).toMatch(/^Eröffnen ab /);
+      const menu = await openMenu();
+      const start = within(menu).getByRole('menuitem', { name: 'Sitzung eröffnen' });
+      expect(start).toHaveAttribute('aria-disabled', 'true');
+      expect(start.getAttribute('title')).toMatch(/^Möglich ab /);
+      await userEvent.click(start);
       expect(on.startSession).not.toHaveBeenCalled();
     });
 
-    it('opens the matching place from every card', async () => {
-      const { flushDelegations } = await setup({ meeting: planned(), protocol: null });
-      expect(screen.queryByRole('button', { name: 'Tagesordnung bearbeiten' })).toBeNull();
-      await userEvent.click(screen.getByRole('button', { name: 'Ändern' }));
+    it('shows no opening to a reader without session control', async () => {
+      await setup({ meeting: planned({ canControl: false, canManage: false }), protocol: null });
+      expect(within(await openMenu()).queryByRole('menuitem', { name: 'Sitzung eröffnen' })).toBeNull();
+    });
+
+    /** The minute-taker and the attendance stay in the dock on a wider screen and in the menu on a phone. */
+    it('reaches the minute-taker from the phone menu and the attendance from the phone dock', async () => {
+      const { flushDelegations } = await setup({ meeting: planned(), protocol: null }, [MEDIA.phone]);
+      const menu = await openMenu();
+      await userEvent.click(within(menu).getByRole('menuitem', { name: 'Protokollführung wählen' }));
       expect(screen.getByRole('dialog', { name: 'Protokollführung wählen' })).toBeInTheDocument();
-      await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+      await userEvent.keyboard('{Escape}');
+      expect(within(await openMenu()).queryByRole('menuitem', { name: 'Anwesenheit erfassen' })).toBeNull();
+      await userEvent.keyboard('{Escape}');
+      await userEvent.click(screen.getByRole('button', { name: 'Anwesenheit' }));
       expect(screen.getByRole('dialog', { name: 'Anwesenheit' })).toBeInTheDocument();
       flushDelegations();
     });
 
-    it('shows the agenda pane on a wide screen and marks no row', async () => {
-      await setup({ meeting: planned(), protocol: null }, [MEDIA.wide]);
-      expect(screen.getByRole('button', { name: 'Begrüßung' })).not.toHaveAttribute('aria-current');
-      expect(screen.getByRole('heading', { name: 'Tagesordnung · 3 TOPs' })).toBeInTheDocument();
-    });
-
-    /** The text of the item can be written before the start, without a protocol. */
-    it('opens a picked item of the preparation pane to prepare it, and goes back from the menu', async () => {
+    /** The text of the selected item can be written before the start, without a protocol. */
+    it('opens on the selected item and marks it in the agenda pane', async () => {
       const { on } = await setup({ meeting: planned({ canManageVotes: true }), protocol: null }, [MEDIA.wide]);
+      expect(screen.getByRole('button', { name: 'Begrüßung' })).toHaveAttribute('aria-current');
+      expect(screen.getByRole('toolbar', { name: 'Format' })).toBeInTheDocument();
       await userEvent.click(screen.getByRole('button', { name: 'Bericht des Finanzreferats' }));
       expect(on.selectTop).toHaveBeenCalledWith('t-2');
-      expect(screen.queryByRole('heading', { name: 'Sitzung vorbereiten' })).toBeNull();
-      expect(screen.getByRole('toolbar', { name: 'Format' })).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Zurück zur Vorbereitung' })).toBeNull();
-      const menu = await openMenu();
-      await userEvent.click(within(menu).getByRole('menuitem', { name: 'Zurück zur Vorbereitung' }));
-      expect(screen.getByRole('heading', { name: 'Sitzung vorbereiten' })).toBeInTheDocument();
       expect(within(await openMenu()).queryByRole('menuitem', { name: 'Zurück zur Vorbereitung' })).toBeNull();
     });
 
-    it('opens a picked item of the preparation sheet', async () => {
+    it('opens a picked item of the agenda sheet', async () => {
       const { on } = await setup({ meeting: planned({ canManageVotes: true }), protocol: null });
       await userEvent.click(screen.getByRole('button', { name: 'Sitzungsmenü' }));
       await userEvent.click(await screen.findByRole('menuitem', { name: 'Tagesordnung' }));
@@ -442,14 +446,6 @@ describe('MeetingPageComponent', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Antrag Kulturfestival' }));
       await userEvent.click(screen.getByRole('button', { name: 'Abstimmung vorbereiten' }));
       expect(on.voteDialog).toHaveBeenCalledWith(AGENDA[2]);
-    });
-
-    it('shows a reader without session rights the sheet instead of the checklist', async () => {
-      await setup({ meeting: planned({ canControl: false, canManage: false }), protocol: null });
-      expect(screen.queryByRole('heading', { name: 'Sitzung vorbereiten' })).toBeNull();
-      // The format tools of the item are in the dock, as in a live meeting.
-      expect(screen.getByRole('toolbar', { name: 'Format' })).toBeInTheDocument();
-      expect(within(await openMenu()).queryByRole('menuitem', { name: 'Zurück zur Vorbereitung' })).toBeNull();
     });
   });
 
@@ -643,7 +639,7 @@ describe('MeetingPageComponent', () => {
       fixture.componentRef.setInput('meeting', meeting({ status: 'planned', protokollantId: null }));
       fixture.componentRef.setInput('protocol', null);
       fixture.detectChanges();
-      await userEvent.click(screen.getByRole('button', { name: 'Zuweisen' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Protokollführung fehlt' }));
       await userEvent.click(screen.getByRole('button', { name: /Alina Admin/ }));
       expect(on.setProtokollant).toHaveBeenCalledWith('pr-3');
     });

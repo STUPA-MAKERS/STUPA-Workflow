@@ -16,20 +16,10 @@
     <app-join-qr [meeting]="m" [button]="false" [(open)]="qrOpen" />
   }
 
-  @if (!phone()) {
-    @switch (mainAction()) {
-      @case ('open') {
-        <app-button variant="fill" [disabled]="!m.protokollantId || !!opensAtText()" [title]="m.protokollantId ? (opensAtText() || ('meetings.control.open' | t)) : ('meetings.control.needProtokollant' | t)" (click)="startSession.emit()">
-          <app-icon name="play" />
-          {{ opensAtText() || ('meetings.control.open' | t) }}
-        </app-button>
-      }
-      @case ('close') {
-        <app-button variant="danger" [loading]="finalizing()" [disabled]="anyOpenVote()" [title]="(anyOpenVote() ? 'meetings.page.closeBlocked' : 'meetings.control.closeSession') | t" (click)="closeSession.emit()">
-          {{ 'meetings.control.closeSession' | t }}
-        </app-button>
-      }
-    }
+  @if (!phone() && mainAction() === 'close') {
+    <app-button variant="danger" [loading]="finalizing()" [disabled]="anyOpenVote()" [title]="(anyOpenVote() ? 'meetings.page.closeBlocked' : 'meetings.control.closeSession') | t" (click)="closeSession.emit()">
+      {{ 'meetings.control.closeSession' | t }}
+    </app-button>
   }
 
   <app-row-menu [sections]="menu()" [label]="'meetings.page.menu' | t" (selected)="onMenu($event)" />
@@ -49,45 +39,33 @@
   }
 
   <div class="mp__main">
-    @if (preparing()) {
-      <div class="mp__prep" appScrollFade="y">
-        <app-prep-checklist
-          [meeting]="m"
-          [attendance]="attendance()"
-          (assignKeeper)="panel.set('protokollant')"
-          (recordAttendance)="panel.set('attendance')"
-          (start)="startSession.emit()"
-        />
-      </div>
-    } @else {
-      @if (top(); as t) {
-        <app-todo-linked-list class="mp__linked" kind="agenda_item" headingId="mp-todos" [showTitle]="false" [targetId]="t.id" [lead]="applicationLead()" />
-      }
-      <app-top-sheet
-        class="mp__sheet"
-        [linked]="false"
-        [barControls]="false"
-        [(mode)]="editorMode"
-        [meeting]="m"
-        [protocol]="proto"
-        [top]="top()"
-        [topIndex]="topIndex()"
-        [editable]="editable()"
-        [canEdit]="canEdit()"
-        [saveState]="saveState()"
-        [revision]="revision()"
-        [finalizing]="finalizing()"
-        [canRename]="canAddTop()"
-        [renamingTopId]="renamingTopId()"
-        [(renameDraft)]="renameDraft"
-        (bodyChange)="bodyChange.emit($event)"
-        (finalize)="finalize.emit()"
-        (startRename)="startRename.emit($event)"
-        (cancelRename)="cancelRename.emit()"
-        (renameTop)="renameTop.emit($event)"
-        (doneChange)="setDone.emit($event)"
-      />
+    @if (top(); as t) {
+      <app-todo-linked-list class="mp__linked" kind="agenda_item" headingId="mp-todos" [showTitle]="false" [targetId]="t.id" [lead]="applicationLead()" />
     }
+    <app-top-sheet
+      class="mp__sheet"
+      [linked]="false"
+      [barControls]="false"
+      [(mode)]="editorMode"
+      [meeting]="m"
+      [protocol]="proto"
+      [top]="top()"
+      [topIndex]="topIndex()"
+      [editable]="editable()"
+      [canEdit]="canEdit()"
+      [saveState]="saveState()"
+      [revision]="revision()"
+      [finalizing]="finalizing()"
+      [canRename]="canAddTop()"
+      [renamingTopId]="renamingTopId()"
+      [(renameDraft)]="renameDraft"
+      (bodyChange)="bodyChange.emit($event)"
+      (finalize)="finalize.emit()"
+      (startRename)="startRename.emit($event)"
+      (cancelRename)="cancelRename.emit()"
+      (renameTop)="renameTop.emit($event)"
+      (doneChange)="setDone.emit($event)"
+    />
   </div>
 </div>
 
@@ -150,7 +128,7 @@
     [inSheet]="inSheet === true"
     [meeting]="m"
     [agenda]="agenda()"
-    [selectedId]="preparing() ? null : (top()?.id ?? null)"
+    [selectedId]="top()?.id ?? null"
     [locked]="locked()"
     [savingAgenda]="savingAgenda()"
     [renamingTopId]="renamingTopId()"

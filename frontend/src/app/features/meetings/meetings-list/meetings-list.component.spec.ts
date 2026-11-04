@@ -141,14 +141,6 @@ function load(
   return { past, upcoming };
 }
 
-/** Answer the reads of the detail sheet. */
-function flushSheet(http: HttpTestingController, id: string): void {
-  http.expectOne(`/api/meetings/${id}/agenda`).flush([]);
-  http.expectOne(`/api/meetings/${id}/attendance`).flush([]);
-  http.expectOne((r) => r.url === '/api/delegations' && r.params.get('meetingId') === id).flush([]);
-  http.match(`/api/meetings/${id}/protocol`).forEach((r) => r.flush({ id: 'p', meetingId: id, markdown: '', status: 'draft' }));
-}
-
 const titles = (el: HTMLElement): (string | undefined)[] =>
   Array.from(el.querySelectorAll('.li__title')).map((b) => b.textContent?.trim());
 
@@ -322,15 +314,18 @@ describe('MeetingsListComponent', () => {
   });
 
   describe('one pane at a time', () => {
-    it('opens the detail step of a row through `?sel` and goes back to the list', async () => {
+    /** A sheet with only the way into the meeting would be a step that leads nowhere else. */
+    it('opens the meeting page from a row, without a detail step', async () => {
       const view = await setup();
       load(view);
       await userEvent.click(screen.getByRole('button', { name: '35. Sitzung' }));
       await view.fixture.whenStable();
-      view.fixture.detectChanges();
-      expect(view.router.url).toBe('/?sel=m-35');
-      flushSheet(view.http, 'm-35');
-      view.fixture.detectChanges();
+      expect(view.router.url).toBe('/meetings/m-35');
+    });
+
+    it('shows a deep-linked sheet and goes back to the list', async () => {
+      const view = await setup({ url: '/?sel=m-35' });
+      load(view);
       expect(screen.getByRole('heading', { level: 2, name: '35. Sitzung' })).toBeInTheDocument();
       await userEvent.click(screen.getByRole('button', { name: 'Zur Liste' }));
       await view.fixture.whenStable();
@@ -355,7 +350,6 @@ describe('MeetingsListComponent', () => {
       load(view);
       view.http.expectOne('/api/meetings/m-99').flush(wire('m-99', 'Alte Sitzung', 'closed', { date: '2025-01-01' }));
       view.fixture.detectChanges();
-      flushSheet(view.http, 'm-99');
       view.fixture.detectChanges();
       expect(screen.getByRole('heading', { level: 2, name: 'Alte Sitzung' })).toBeInTheDocument();
       const updated = { ...view.timeline.pastItems()[0], id: 'm-99', title: 'Alte Sitzung (neu)' };
@@ -413,7 +407,6 @@ describe('MeetingsListComponent', () => {
         .expectOne('/api/meetings/m-500')
         .flush(wire('m-500', 'Wieder da', 'closed', { date: '2025-01-01' }));
       view.fixture.detectChanges();
-      flushSheet(view.http, 'm-500');
       view.fixture.detectChanges();
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
       expect(screen.getByRole('heading', { level: 2, name: 'Wieder da' })).toBeInTheDocument();
@@ -425,7 +418,6 @@ describe('MeetingsListComponent', () => {
     it('keeps the selection when another meeting is deleted', async () => {
       const view = await setup({ url: '/?sel=m-35' });
       load(view);
-      flushSheet(view.http, 'm-35');
       view.timeline.removeFromTimeline('m-36');
       view.fixture.detectChanges();
       await view.fixture.whenStable();
@@ -435,7 +427,6 @@ describe('MeetingsListComponent', () => {
     it('edits, deletes and projects the selected meeting from the sheet', async () => {
       const view = await setup({ url: '/?sel=m-35' });
       load(view);
-      flushSheet(view.http, 'm-35');
       view.fixture.detectChanges();
       await userEvent.click(screen.getByRole('button', { name: 'Sitzung bearbeiten: 35. Sitzung' }));
       expect(view.dialogs.settingsMeeting()?.id).toBe('m-35');
@@ -443,7 +434,8 @@ describe('MeetingsListComponent', () => {
       await userEvent.click(within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Sitzung löschen' }));
       expect(view.dialogs.deleteMeeting()?.id).toBe('m-35');
       const open = jest.spyOn(window, 'open').mockImplementation(() => null);
-      await userEvent.click(screen.getByRole('button', { name: /Beamer-Ansicht/ }));
+      await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen: 35. Sitzung' }));
+      await userEvent.click(within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Beamer-Ansicht' }));
       expect(open).toHaveBeenCalledWith(
         expect.stringMatching(/^\/voting\/beamer\/m-35\?from=/),
         '_blank',
@@ -475,7 +467,6 @@ describe('MeetingsListComponent', () => {
     it('shows the live meeting while nothing is selected, and marks the selected row', async () => {
       const view = await setup({ media: [MEDIA.wide] });
       load(view);
-      flushSheet(view.http, 'm-34');
       view.fixture.detectChanges();
       expect(view.container.querySelector('.mtl')).toHaveClass('mtl--split');
       expect(screen.getByRole('heading', { level: 2, name: '34. Sitzung' })).toBeInTheDocument();
@@ -484,7 +475,6 @@ describe('MeetingsListComponent', () => {
       await userEvent.click(screen.getByRole('button', { name: '35. Sitzung' }));
       await view.fixture.whenStable();
       view.fixture.detectChanges();
-      flushSheet(view.http, 'm-35');
       view.fixture.detectChanges();
       expect(screen.getByRole('heading', { level: 2, name: '35. Sitzung' })).toBeInTheDocument();
       expect(await runAxe(view.container)).toHaveNoViolations();
@@ -493,7 +483,6 @@ describe('MeetingsListComponent', () => {
     it('shows the next meeting without a live one, and an empty sheet without any', async () => {
       const view = await setup({ media: [MEDIA.wide] });
       load(view, { upcoming: { items: [PLANNED], nextCursor: null } });
-      flushSheet(view.http, 'm-35');
       view.fixture.detectChanges();
       expect(screen.getByRole('heading', { level: 2, name: '35. Sitzung' })).toBeInTheDocument();
       view.timeline.upcomingItems.set([]);
