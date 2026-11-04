@@ -25,12 +25,9 @@ import {
   EmptyStateComponent,
   IconComponent,
   type IconName,
-  MEDIA,
-  mediaQuery,
   NoteComponent,
   SegmentedComponent,
   type SegmentedOption,
-  type StatusKind,
   StatusTextComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
@@ -193,16 +190,6 @@ export class TopSheetComponent {
   /** "Erledigt" in the bar: set or remove the done mark of the open item. */
   readonly doneChange = output<{ item: AgendaItem; done: boolean }>();
 
-  private readonly phone = mediaQuery(MEDIA.phone);
-
-  /**
-   * The save state sits in the footer of a live protocol, so the bar keeps one row. A
-   * phone keeps it in the bar: there the footer is at the end of the text.
-   */
-  protected readonly saveInFoot = computed(() => {
-    const m = this.meeting();
-    return !!this.protocol() && m.status !== 'closed' && !this.follow() && !this.phone();
-  });
 
   protected readonly tools = TOOLS;
 
@@ -411,13 +398,6 @@ export class TopSheetComponent {
       this.i18n.locale(),
     ),
   );
-
-  /** The state of the protocol as status text. */
-  protected protocolState(p: Protocol): { kind: StatusKind; key: TranslationKey } {
-    if (p.isFinal) return { kind: 'accent', key: 'meetings.protocol.final' };
-    if (p.status === 'rendering') return { kind: 'warn', key: 'meetings.protocol.rendering' };
-    return { kind: 'neutral', key: 'meetings.protocol.draft' };
-  }
 }
 
 /** A short hash of a text (FNV-1a, 32 bit), so that a document key changes with it. */

@@ -70,12 +70,6 @@
     <section class="mp__agenda" appScrollFade="y" [attr.aria-label]="'meetings.agenda.title' | t">
       <ng-container [ngTemplateOutlet]="agendaTpl" />
     </section>
-  } @else {
-    <app-button class="mp__agendaBtn" variant="tonal" size="sm" [title]="'meetings.dock.agenda' | t" (click)="agendaOpen.set(true)">
-      <app-icon name="list" />
-      {{ 'meetings.agenda.title' | t }}
-      <span class="mp__muted">· {{ agenda().length }}</span>
-    </app-button>
   }
 
   @if (showVotes() && !phone()) {

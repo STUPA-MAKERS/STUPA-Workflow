@@ -1137,7 +1137,6 @@
   "meetings.protocol.saved": "Saved",
   "meetings.protocol.saveFailed": "Save failed",
   "meetings.protocol.selectTop": "Select an item on the left to edit its text.",
-  "meetings.protocol.takenBy": "{name} takes the minutes — you read along.",
   "meetings.create.title": "Create meeting",
   "meetings.create.step": "Step {n} of {m}",
   "meetings.create.name": "Title",

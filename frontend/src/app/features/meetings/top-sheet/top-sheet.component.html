@@ -128,9 +128,7 @@
           </div>
         }
         <span class="ts__spacer"></span>
-        @if (!saveInFoot()) {
-          <ng-container [ngTemplateOutlet]="saveTpl" />
-        }
+        <ng-container [ngTemplateOutlet]="saveTpl" />
         @if (editable() && barControls()) {
           <app-button
             class="ts__done"
@@ -209,19 +207,6 @@
     <p class="ts__muted ts__pad">{{ 'meetings.protocol.none' | t }}</p>
   }
 
-  @if (proto && m.status !== 'closed' && !follow()) {
-    @let ps = protocolState(proto);
-    <footer class="ts__foot">
-      <app-status-text [kind]="ps.kind">{{ ps.key | t }}</app-status-text>
-      @if (!proto.isLocked && !canEdit() && m.canWrite) {
-        <span>{{ 'meetings.protocol.takenBy' | t: { name: m.protokollantName ?? '' } }}</span>
-      }
-      @if (saveInFoot() && !proto.isLocked) {
-        <span class="ts__spacer"></span>
-        <ng-container [ngTemplateOutlet]="saveTpl" />
-      }
-    </footer>
-  }
 </article>
 
 <ng-template #saveTpl>

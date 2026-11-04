@@ -58,7 +58,7 @@ import { TodoLinkedListComponent } from '../../todos/linked-list/todo-linked-lis
 import { clock, weekdayDate } from '@shared/date-format';
 
 /** The ids of the session menu. */
-type SessionAction = 'prep' | 'settings' | 'attendance' | 'votes' | 'keeper' | 'beamer' | 'qr' | 'close' | 'delete';
+type SessionAction = 'agenda' | 'prep' | 'settings' | 'attendance' | 'votes' | 'keeper' | 'beamer' | 'qr' | 'close' | 'delete';
 
 /**
  * The session page of the meeting lead and the minute-taker (`/meetings/:id`).
@@ -334,6 +334,8 @@ export class MeetingPageComponent {
     const m = this.meeting();
     const t = (key: Parameters<I18nService['translate']>[0]): string => this.i18n.translate(key);
     const main: RowMenuItem[] = [];
+    // Below the wide layout the agenda is a sheet, and the menu opens it.
+    if (!this.wide()) main.push({ id: 'agenda', label: t('meetings.agenda.title'), icon: 'list' });
     if (this.canBackToPrep()) main.push({ id: 'prep', label: t('meetings.prep.back'), icon: 'clipcheck' });
     if (m.canManage) main.push({ id: 'settings', label: t('meetings.settings.title'), icon: 'edit' });
     // A phone dock holds the attendance as an icon button; before the opening it shows nothing.
@@ -523,6 +525,9 @@ export class MeetingPageComponent {
         break;
       case 'keeper':
         this.panel.set('protokollant');
+        break;
+      case 'agenda':
+        this.agendaOpen.set(true);
         break;
       case 'votes':
         this.votesOpen.set(true);

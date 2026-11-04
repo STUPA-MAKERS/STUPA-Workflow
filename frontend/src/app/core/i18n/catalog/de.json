@@ -1137,7 +1137,6 @@
   "meetings.protocol.saved": "Gespeichert",
   "meetings.protocol.saveFailed": "Speichern fehlgeschlagen",
   "meetings.protocol.selectTop": "Wähle links einen TOP, um seinen Text zu bearbeiten.",
-  "meetings.protocol.takenBy": "{name} führt das Protokoll — du liest mit.",
   "meetings.create.title": "Sitzung anlegen",
   "meetings.create.step": "Schritt {n} von {m}",
   "meetings.create.name": "Titel",

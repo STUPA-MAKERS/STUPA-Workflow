@@ -226,18 +226,6 @@
   padding: var(--space-2) 28px var(--space-5);
 }
 
-.ts__foot {
-  display: flex;
-  flex: none;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-1) var(--space-4);
-  margin-top: auto;
-  padding: var(--space-3) 28px var(--space-4);
-  border-top: var(--border-width) solid var(--color-border);
-  font-size: var(--fs-small);
-  color: var(--color-text-muted);
-}
 .ts__todos {
   flex: none;
   padding: 0 var(--space-5) 10px;
@@ -329,7 +317,6 @@
   .ts__public {
     margin-inline: var(--space-4);
   }
-  .ts__foot,
   .ts__keepers {
     padding-inline: var(--space-4);
   }
