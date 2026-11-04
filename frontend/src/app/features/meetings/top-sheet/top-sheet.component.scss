@@ -98,29 +98,6 @@
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 1px;
 }
-.ts__open {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: var(--control-height);
-  padding: 0 var(--space-3);
-  border-radius: var(--radius-pill);
-  color: var(--color-accent-text);
-  font-size: var(--fs-body);
-  font-weight: var(--fw-semibold);
-  text-decoration: none;
-}
-@media (hover: hover) {
-  .ts__open:hover {
-    background: var(--color-selected);
-  }
-}
-.ts__open:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 1px;
-}
-
 .ts__bar {
   display: flex;
   flex: none;

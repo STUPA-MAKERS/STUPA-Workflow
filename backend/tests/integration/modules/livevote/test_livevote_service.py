@@ -422,14 +422,16 @@ async def test_broker_publisher_roundtrip_over_redis(redis_url: str) -> None:
         await client.aclose()
 
 
-async def test_agenda_set_body_renames_freetext_top_only(session: AsyncSession) -> None:
-    """``set_body(title=...)`` renames free-text agenda items but never application ones.
+async def test_agenda_set_body_renames_tops(session: AsyncSession) -> None:
+    """``set_body(title=...)`` renames free-text and application agenda items.
 
     The body needs a live meeting; the rename alone also passes when planned. An application
-    item ignores the title, which comes from the application. With `body=None` the existing
-    body stays, but the rename still happens.
+    item shows its own title after a rename and keeps the application title in
+    `applicationTitle`. A rename back to the application title removes the own title. With
+    `body=None` the existing body stays, but the rename still happens.
     """
     gremium, application = await _gremium_and_application(session)
+    application.data = {"title": "Antrag X"}
     meeting = Meeting(gremium_id=gremium.id, title="GV", status="live")
     session.add(meeting)
     await session.flush()
@@ -447,7 +449,14 @@ async def test_agenda_set_body_renames_freetext_top_only(session: AsyncSession) 
     assert by_id[free.id].title == "Neuer Titel"
     assert by_id[free.id].body == "hello"
 
-    items = await svc.set_body(meeting.id, backed.id, body="x", title="HACK")
+    items = await svc.set_body(meeting.id, backed.id, body="x", title="Eigener Titel")
+    by_id = {i.id: i for i in items}
+    assert by_id[backed.id].title == "Eigener Titel"
+    assert by_id[backed.id].application_title == "Antrag X"
+
+    items = await svc.set_body(meeting.id, backed.id, title="Antrag X")
+    by_id = {i.id: i for i in items}
+    assert by_id[backed.id].title == "Antrag X"
     refreshed = await session.get(MeetingAgendaItem, backed.id)
     assert refreshed is not None and refreshed.title is None
 

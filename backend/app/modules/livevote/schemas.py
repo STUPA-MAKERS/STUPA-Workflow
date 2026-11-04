@@ -434,7 +434,10 @@ class AgendaItemOut(_CamelModel):
     application_id: UUID | None = Field(default=None, alias="applicationId")
     #: The to-do card of an item of kind to-do (the item title is the card title).
     todo_id: UUID | None = Field(default=None, alias="todoId")
+    #: The title of the item: its own title, else the title of its application.
     title: str | None = None
+    #: The title of the application. None for a free-text item.
+    application_title: str | None = Field(default=None, alias="applicationTitle")
     #: Markdown text of this agenda item.
     body: str | None = None
     position: int = 0
@@ -594,9 +597,9 @@ AGENDA_BODY_MAX = 512_000
 class AgendaBodyBody(_CamelModel):
     """``PATCH …/agenda/{itemId}`` — set the markdown body or the title of an item.
 
-    ``title`` renames only a free-text agenda item. An application agenda item
-    inherits the title from the application. ``body`` sets the markdown text. Both
-    fields are optional.
+    ``title`` renames the item. An application item shows the title of its
+    application until a rename. ``body`` sets the markdown text. Both fields are
+    optional.
     """
 
     body: str | None = None

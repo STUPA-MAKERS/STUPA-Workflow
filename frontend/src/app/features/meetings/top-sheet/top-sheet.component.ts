@@ -16,7 +16,6 @@ import {
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
-import { RouterLink } from '@angular/router';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
@@ -48,7 +47,8 @@ import {
 import { resolveI18n } from '@shared/forms/i18n-text';
 import { meetingKeeperLine } from '../keepers.util';
 import { ProtocolBarComponent } from '../protocol-bar/protocol-bar.component';
-import { TodoLinkedListComponent } from '../../todos/linked-list/todo-linked-list.component';
+import { type LinkedLead, TodoLinkedListComponent } from '../../todos/linked-list/todo-linked-list.component';
+import { formatMoney } from '@shared/format-money';
 import { voteResultResolver } from '../vote-result/vote-result';
 import { applyRawFormat, insertRawTable } from './raw-format';
 
@@ -80,8 +80,8 @@ function altOf(file: File): string {
 }
 
 /**
- * The sheet of the open agenda item: "TOP 3 · Antrag", the title, "Antrag öffnen", the
- * format bar with the save state, and the Markdown editor of the text.
+ * The sheet of the open agenda item: "TOP 3 · Antrag", the title, the rows of the
+ * application and of the linked to-do cards below the title, the format bar with the save state, and the Markdown editor of the text.
  *
  * A planned meeting has no protocol yet, but the text of its items can be prepared
  * (`editable`); the start creates the protocol around it.
@@ -118,7 +118,6 @@ function altOf(file: File): string {
     EmptyStateComponent,
     FormsModule,
     NgTemplateOutlet,
-    RouterLink,
     TranslatePipe,
     IconComponent,
     MarkdownEditorComponent,
@@ -165,9 +164,9 @@ export class TopSheetComponent {
    */
   readonly follow = input(false);
   /**
-   * The viewer may rename a free-text item (`canChangeAgenda`). A click on the title
-   * then opens the title field in place of the heading. An application item keeps the
-   * title of its application.
+   * The viewer may rename the item (`canChangeAgenda`). A click on the title then opens
+   * the title field in place of the heading. An application item keeps the title of its
+   * application in its row below the title.
    */
   readonly canRename = input(false);
   /** The item in the inline rename of the agenda, shared with the agenda pane. */
@@ -206,7 +205,7 @@ export class TopSheetComponent {
   /** The title of the open item can change here. */
   protected readonly titleRenamable = computed(() => {
     const t = this.top();
-    return this.canRename() && !this.follow() && !!t && !t.applicationId;
+    return this.canRename() && !this.follow() && !!t;
   });
   /** The heading shows the title field. */
   protected readonly titleEditing = computed(
@@ -379,10 +378,25 @@ export class TopSheetComponent {
     return this.follow() && m.status === 'live' && !!m.currentAgendaItemId && this.top()?.id === m.currentAgendaItemId;
   });
 
-  /** The state of the application of the item, in the language of the page. */
-  protected readonly stateLabel = computed(() =>
-    resolveI18n(this.top()?.stateLabel, this.i18n.uiLocale()),
-  );
+  /**
+   * The row of the application below the title: its title and "Antrag · Entwurf ·
+   * 1.250,00 €". It opens the application in a new tab, so the minutes stay open.
+   */
+  protected readonly applicationLead = computed<LinkedLead | null>(() => {
+    const t = this.top();
+    if (!t?.applicationId) return null;
+    const parts = [this.i18n.translate('meetings.agenda.kindApplication')];
+    const state = resolveI18n(t.stateLabel, this.i18n.uiLocale());
+    if (state) parts.push(state);
+    const amount = formatMoney(t.amount, this.i18n.formatLocale());
+    if (amount) parts.push(amount);
+    return {
+      icon: 'file',
+      title: t.applicationTitle || t.title || this.i18n.translate('meetings.agenda.untitled'),
+      sub: parts.join(' · '),
+      link: ['/applications', t.applicationId],
+    };
+  });
 
   /** The keeper line of a closed meeting: every minute-taker with the TOPs they wrote. */
   protected readonly keepers = computed(() =>

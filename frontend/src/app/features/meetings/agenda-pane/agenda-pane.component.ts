@@ -266,9 +266,7 @@ export class AgendaPaneComponent {
     if (!this.canChangeAgenda()) return [{ items: [nonPublic] }];
 
     const edit: RowMenuItem[] = [];
-    if (!item.applicationId) {
-      edit.push({ id: 'rename', label: t('meetings.agenda.rename'), icon: 'edit' });
-    }
+    edit.push({ id: 'rename', label: t('meetings.agenda.rename'), icon: 'edit' });
     if (index > 0) edit.push({ id: 'up', label: t('meetings.agenda.moveUp'), icon: 'up' });
     if (index < this.agenda().length - 1) {
       edit.push({ id: 'down', label: t('meetings.agenda.moveDown'), icon: 'down' });
@@ -342,7 +340,7 @@ export class AgendaPaneComponent {
       links.push({
         kind: 'application',
         targetId: item.applicationId,
-        label: `${this.i18n.translate('todos.linkKind.application')} · ${title}`,
+        label: `${this.i18n.translate('todos.linkKind.application')} · ${item.applicationTitle || title}`,
       });
     }
     links.push({ kind: 'agenda_item', targetId: item.id, label: `${this.meeting().title} · ${top}` });
