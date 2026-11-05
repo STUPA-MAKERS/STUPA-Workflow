@@ -224,3 +224,12 @@
     gap: var(--space-5);
   }
 }
+
+/* No chip row follows the search pill here, so the stuck glass ends right below the pill.
+   The gap below the pill is the gutter, the same as above and at the sides. The negative
+   margin of the bar takes the same value, so the rows below do not move. */
+@include bp.phone {
+  .af__search {
+    --stb-pad: var(--stb-bleed, var(--space-4));
+  }
+}
