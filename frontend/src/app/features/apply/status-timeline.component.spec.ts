@@ -290,6 +290,7 @@ describe('StatusTimelineComponent', () => {
     expect(comp.noteText('vote:passed')).toBe('Abstimmungsergebnis: Angenommen');
     expect(comp.noteText('vote:rejected')).toBe('Abstimmungsergebnis: Abgelehnt');
     expect(comp.noteText('Bitte nachreichen')).toBe('Bitte nachreichen');
+    expect(comp.noteText('vote:repeat')).toBe('Erneute Abstimmung');
   });
 
   it('locks the edit row in a locked status and says why', async () => {

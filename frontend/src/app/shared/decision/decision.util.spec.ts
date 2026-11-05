@@ -8,6 +8,7 @@ import {
   decisionHistoryLine,
   decisionQuestion,
   draftError,
+  draftOf,
   emptyDraft,
   formatDiff,
   toProposal,
@@ -129,5 +130,18 @@ describe('decision.util', () => {
     it('gives null for a decision as requested', () => {
       expect(decisionHistoryLine({ ...base, amountDeviates: false }, 'de-DE', 'EUR', t)).toBeNull();
     });
+  });
+});
+
+describe('draftOf', () => {
+  it('starts from a stored proposal, or from an empty draft', () => {
+    expect(draftOf(null, '500.00')).toEqual(emptyDraft('500.00'));
+    expect(draftOf({ approvedAmount: '300.00', conditions: ['Belege'] }, '500.00')).toEqual({
+      enabled: true,
+      amount: '300.00',
+      conditions: ['Belege'],
+    });
+    expect(draftOf({ approvedAmount: null, conditions: [] }, '500.00').amount).toBe('500.00');
+    expect(draftOf({ approvedAmount: null, conditions: [] }, null).amount).toBe('');
   });
 });

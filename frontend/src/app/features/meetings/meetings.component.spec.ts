@@ -888,6 +888,24 @@ describe('MeetingsComponent — methods', () => {
       expect(screen.queryByRole('dialog', { name: 'Abstimmung vorbereiten' })).toBeNull();
     });
 
+    it('changes a prepared vote from its card and repeats a closed one', async () => {
+      const { cmp, http, fixture } = await loaded();
+      cmp.agenda.set([AGENDA_ITEM({ id: 't-2', title: 'Bericht' })] as never);
+      const draft = { id: 'v-7', agendaItemId: 't-2', status: 'draft', question: 'Frage?' } as never;
+      cmp.openVoteSource({ mode: 'edit', vote: draft });
+      fixture.detectChanges();
+      const dialog = screen.getByRole('dialog', { name: 'Abstimmung bearbeiten' });
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+      const req = http.expectOne('/api/meetings/m-1/votes/v-7');
+      expect(req.request.method).toBe('PUT');
+      req.flush({ ...MEETING, votes: [] });
+      fixture.detectChanges();
+      expect(screen.queryByRole('dialog', { name: 'Abstimmung bearbeiten' })).toBeNull();
+      cmp.openVoteSource({ mode: 'repeat', vote: { id: 'v-9', agendaItemId: 't-404' } as never });
+      fixture.detectChanges();
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
     it('deletes the open meeting through the dialog and goes back to the list', async () => {
       const { cmp, http, fixture, navigate } = await loaded();
       cmp.askDeleteMeeting(cmp.meeting()!);

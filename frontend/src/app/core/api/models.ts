@@ -1426,6 +1426,10 @@ export interface MeetingVoteOutWire extends ElectionFields {
   presentGuests?: number | null;
   /** The decision proposal of an application vote. */
   proposal?: DecisionProposal | null;
+  /** A repeat ("Erneut abstimmen"): the closed vote of the same agenda item it repeats. */
+  repeatOfId?: Uuid | null;
+  /** The number of the vote in its repeat chain: 1 for a first vote, 2 for the first repeat. */
+  attempt?: number;
 }
 
 /** `MeetingOut`. Meeting state and votes. GET /meetings/{id}. */
@@ -1627,6 +1631,12 @@ export interface MeetingVote extends ElectionFields {
   /** Present members and admitted guests ("19 Mitglieder + 7 Gäste anwesend"). */
   presentMembers?: number | null;
   presentGuests?: number | null;
+  /** The decision proposal of an application vote, for the edit of a prepared vote. */
+  proposal?: DecisionProposal | null;
+  /** A repeat ("Erneut abstimmen"): the closed vote of the same agenda item it repeats. */
+  repeatOfId?: Uuid | null;
+  /** The number of the vote in its repeat chain: 2 for the first repeat. */
+  attempt?: number;
 }
 
 /** The agenda item the room handles now, as `MeetingOut.currentAgendaItem` sends it. */

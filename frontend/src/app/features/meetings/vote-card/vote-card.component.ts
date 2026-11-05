@@ -43,8 +43,11 @@ import { problemDetail } from '@core/api/problem';
  * The lead sees no interim tally: the server reveals the counts only when every present
  * member voted on an open vote, or after the close. The card then shows them.
  *
- * The vote manager closes or cancels (danger) an open vote, opens a planned one and
- * deletes a planned or cancelled one while the meeting is planned or live. Only one
+ * The vote manager closes or cancels (danger) an open vote, opens a planned one, changes
+ * it ("Bearbeiten") and deletes a planned or cancelled one while the meeting is planned
+ * or live. In a live meeting a closed vote can be voted on again ("Erneut abstimmen"):
+ * the repeat names its number ("2. Abstimmung"), and the closed vote keeps its result and
+ * says "Wiederholt" once the repeat opened. Only one
  * vote of the meeting is open at a time, so "Abstimmung öffnen" waits for it. A voter
  * who did not vote yet gets the options; a ballot never changes once it is cast.
  * A closed vote offers to put its result into the text of the item ("Ins Protokoll
@@ -103,11 +106,22 @@ export class VoteCardComponent {
    * waits: the reconnect state, the beamer and the dock follow only one open vote.
    */
   readonly otherOpen = input(false);
+  /** A repeat of this closed vote opened: the card says "Wiederholt", the result stays. */
+  readonly repeated = input(false);
+  /**
+   * The closed vote can be voted on again ("Erneut abstimmen"): it has no repeat yet, and
+   * its agenda item has no prepared or open vote.
+   */
+  readonly canRepeat = input(false);
 
   readonly close = output<Uuid>();
   readonly cancel = output<Uuid>();
   readonly open = output<Uuid>();
   readonly remove = output<Uuid>();
+  /** "Bearbeiten" of a prepared vote: the page opens the vote dialog with it. */
+  readonly edit = output<MeetingVote>();
+  /** "Erneut abstimmen" of a closed vote: the page opens the vote dialog with it. */
+  readonly repeat = output<MeetingVote>();
   readonly cast = output<{ voteId: Uuid; choice: string }>();
   readonly insertResult = output<MeetingVote>();
   /** The lot was drawn, or the runoff opened: the page reads the meeting again. */
@@ -126,6 +140,16 @@ export class VoteCardComponent {
     if (poll) return pollCaption(poll, (k, p) => this.i18n.translate(k, p));
     const el = this.election();
     return el ? electionCaption(el, this.vote().round, (k, p) => this.i18n.translate(k, p)) : null;
+  });
+  /** A repeat names its number: "2. Abstimmung", an election "2. Wahlgang". */
+  protected readonly attemptCap = computed(() => {
+    const v = this.vote();
+    const attempt = v.attempt ?? 1;
+    if (attempt < 2) return null;
+    if (this.election()) {
+      return this.i18n.translate('meetings.vote.attemptElection', { n: (v.round ?? 1) + attempt - 1 });
+    }
+    return this.i18n.translate('meetings.vote.attempt', { n: attempt });
   });
   /** The election ballot sends the list of the candidate ids. */
   protected readonly caster: BallotCaster = (choice) =>

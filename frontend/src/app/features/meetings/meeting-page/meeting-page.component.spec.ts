@@ -32,7 +32,7 @@ const OUTPUTS = [
   'deleteMeeting', 'toggleBeamer', 'attendanceChange', 'attendanceReset', 'addTop',
   'removeFromAgenda', 'startRename', 'cancelRename', 'renameTop', 'setNonPublic', 'moveTop',
   'setProtokollant', 'pickHandover', 'cancelHandover',
-  'attendanceConflictResolved', 'nextTop', 'setDone',
+  'attendanceConflictResolved', 'nextTop', 'setDone', 'voteSource',
 ] as const;
 
 type Inputs = {
@@ -671,6 +671,31 @@ describe('MeetingPageComponent', () => {
       const { on } = await setup({ meeting: meeting({ votes: [vote({ status: 'draft' })] }) }, [MEDIA.wide]);
       await userEvent.click(screen.getByRole('button', { name: 'Abstimmung öffnen' }));
       expect(on.voteOpen).toHaveBeenCalledWith('v-1');
+    });
+
+    it('changes a planned vote and repeats a closed one', async () => {
+      const draft = vote({ id: 'v-1', status: 'draft' });
+      const { on, fixture } = await setup({ meeting: meeting({ votes: [draft] }) }, [MEDIA.wide]);
+      await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
+      expect(on.voteSource).toHaveBeenCalledWith({ mode: 'edit', vote: draft });
+      const closed = vote({ id: 'v-1', status: 'closed', result: 'passed' });
+      fixture.componentRef.setInput('meeting', meeting({ votes: [closed] }));
+      fixture.detectChanges();
+      await userEvent.click(screen.getByRole('button', { name: 'Erneut abstimmen' }));
+      expect(on.voteSource).toHaveBeenCalledWith({ mode: 'repeat', vote: closed });
+      const again = vote({ id: 'v-2', status: 'open', repeatOfId: 'v-1', attempt: 2 });
+      fixture.componentRef.setInput('meeting', meeting({ votes: [closed, again] }));
+      fixture.detectChanges();
+      expect(screen.queryByRole('button', { name: 'Erneut abstimmen' })).toBeNull();
+      expect(screen.getByText('Wiederholt')).toBeInTheDocument();
+      expect(screen.getByText('2. Abstimmung')).toBeInTheDocument();
+      fixture.componentRef.setInput(
+        'meeting',
+        meeting({ votes: [closed, { ...again, status: 'cancelled' }] }),
+      );
+      fixture.detectChanges();
+      expect(screen.queryByText('Wiederholt')).toBeNull();
+      expect(screen.getByRole('button', { name: 'Erneut abstimmen' })).toBeInTheDocument();
     });
 
     /**

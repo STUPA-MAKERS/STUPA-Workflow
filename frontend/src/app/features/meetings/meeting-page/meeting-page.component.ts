@@ -167,6 +167,8 @@ export class MeetingPageComponent {
   readonly voteCancel = output<Uuid>();
   readonly voteDelete = output<Uuid>();
   readonly voteDialog = output<AgendaItem>();
+  /** "Bearbeiten" of a prepared vote, or "Erneut abstimmen" of a closed one. */
+  readonly voteSource = output<{ mode: 'edit' | 'repeat'; vote: MeetingVote }>();
   readonly startSession = output<void>();
   readonly closeSession = output<void>();
   readonly finalize = output<void>();
@@ -403,6 +405,28 @@ export class MeetingPageComponent {
   protected readonly anyOpenVote = computed(() =>
     this.meeting().votes.some((v) => v.status === 'open'),
   );
+
+  /** The closed votes of the open item whose repeat opened: their cards say "Wiederholt". */
+  protected readonly repeatedIds = computed(
+    () =>
+      new Set(
+        this.votes()
+          .filter((v) => v.repeatOfId && (v.status === 'open' || v.status === 'closed'))
+          .map((v) => v.repeatOfId as string),
+      ),
+  );
+  /**
+   * The closed votes of the open item that can be voted on again: no repeat of them is
+   * prepared, open or closed, and the item has no prepared or open vote.
+   */
+  protected readonly repeatableIds = computed(() => {
+    const own = this.votes();
+    if (own.some((v) => v.status === 'draft' || v.status === 'open')) return new Set<string>();
+    const taken = new Set(
+      own.filter((v) => v.repeatOfId && v.status !== 'cancelled').map((v) => v.repeatOfId),
+    );
+    return new Set(own.filter((v) => v.status === 'closed' && !taken.has(v.id)).map((v) => v.id));
+  });
 
   /** The newest closed vote whose result is not in the text yet. */
   protected readonly pendingResult = computed<MeetingVote | null>(() => {

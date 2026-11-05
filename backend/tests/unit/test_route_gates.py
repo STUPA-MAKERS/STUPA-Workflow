@@ -135,6 +135,7 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
         f"{_MEETING_VOTES} + PermissionOps.assert_can_run_votes"
     ),
     ("DELETE", "/api/meetings/{meeting_id}/votes/{vote_id}"): _MEETING_VOTES,
+    ("PUT", "/api/meetings/{meeting_id}/votes/{vote_id}"): _MEETING_VOTES,
     ("GET", "/api/notifications/preferences"): _SELF,
     ("PUT", "/api/notifications/preferences"): _SELF,
     ("GET", "/api/oauth/consent-request"): _SELF,

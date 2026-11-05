@@ -230,6 +230,10 @@ class VoteCreateInternal(_CamelModel):
     #: The election that a runoff continues, and its round.
     parent_vote_id: UUID | None = Field(default=None, alias="parentVoteId")
     round: int = Field(default=1, ge=1)
+    #: The closed meeting vote that this vote repeats, and the number of the vote in
+    #: that chain (1 for a first vote).
+    repeat_of_id: UUID | None = Field(default=None, alias="repeatOfId")
+    attempt: int = Field(default=1, ge=1)
     #: Authoritative eligible-voter count (roster basis) and the denominator of the
     #: percent quorum. It does NOT come from the logged-in users, because that would be
     #: fail-open. A percent quorum requires it. Without it the quorum stays fail-closed.
@@ -355,6 +359,10 @@ class VoteOut(_CamelModel):
     election_result: ElectionResultOut | None = Field(default=None, alias="electionResult")
     parent_vote_id: UUID | None = Field(default=None, alias="parentVoteId")
     round: int = 1
+    #: A repeat ("erneut abstimmen") names the closed vote it repeats and its number
+    #: in that chain (1 for a first vote).
+    repeat_of_id: UUID | None = Field(default=None, alias="repeatOfId")
+    attempt: int = 1
     #: A poll carries its mode and options (``config`` then holds the projection: the
     #: option ids plus ``abstain``). ``pollResult`` holds the counts once the poll
     #: closed, and while it runs as soon as the counts are revealed.

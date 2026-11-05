@@ -460,8 +460,12 @@ export class StatusTimelineComponent {
     });
   }
 
-  /** Make the machine note of a vote readable; a tie is a rejection. */
+  /**
+   * Make the machine note of a vote readable; a tie is a rejection. `vote:repeat` marks
+   * the move back into the vote state when a meeting votes on the application again.
+   */
   noteText(note: string): string {
+    if (note === 'vote:repeat') return this.i18n.translate('status.history.voteRepeat');
     const resultKeys = {
       'vote:passed': 'vote.result.passed',
       'vote:rejected': 'vote.result.rejected',

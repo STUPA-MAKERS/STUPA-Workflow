@@ -270,6 +270,8 @@ export function mapMeetingVote(wire: MeetingVoteOutWire): MeetingVote {
     guestsVote: wire.guestsVote ?? false,
     presentMembers: wire.presentMembers ?? null,
     presentGuests: wire.presentGuests ?? null,
+    ...(wire.proposal ? { proposal: wire.proposal } : {}),
+    ...(wire.repeatOfId ? { repeatOfId: wire.repeatOfId, attempt: wire.attempt ?? 2 } : {}),
     ...electionFields(wire),
   };
 }

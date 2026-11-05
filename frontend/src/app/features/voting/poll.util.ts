@@ -223,6 +223,32 @@ export function emptyPollDraft(): PollDraft {
   return { mode: 'single', maxChoices: 2, options: [] };
 }
 
+/**
+ * The editor draft of a stored poll, for the edit or the repeat of a meeting poll. The
+ * options get negative keys, so they never meet the keys that the editor gives new rows.
+ * A date option shows its local day and times.
+ */
+export function pollDraftOf(poll: PollConfig): PollDraft {
+  const two = (n: number): string => String(n).padStart(2, '0');
+  const day = (d: Date): string => `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}`;
+  const time = (d: Date): string => `${two(d.getHours())}:${two(d.getMinutes())}`;
+  return {
+    mode: poll.mode,
+    maxChoices: poll.maxChoices ?? 2,
+    options: poll.options.map((o, i) => {
+      const start = o.start ? new Date(o.start) : null;
+      const end = o.end ? new Date(o.end) : null;
+      return {
+        key: -(i + 1),
+        label: o.label ?? '',
+        date: start ? day(start) : '',
+        start: start ? time(start) : '',
+        end: end ? time(end) : '',
+      };
+    }),
+  };
+}
+
 /** A local `YYYY-MM-DD` and `HH:MM` as an ISO moment, or `null`. */
 export function localMoment(date: string, time: string): IsoDateTime | null {
   if (!date || !time) return null;

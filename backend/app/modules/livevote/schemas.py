@@ -189,6 +189,11 @@ class MeetingVoteOut(_CamelModel):
     election_result: ElectionResultOut | None = Field(default=None, alias="electionResult")
     parent_vote_id: UUID | None = Field(default=None, alias="parentVoteId")
     round: int = 1
+    #: A repeat ("erneut abstimmen") names the closed vote of the same agenda item that
+    #: it repeats, and its number in that chain (1 for a first vote). The repeated
+    #: vote keeps its result.
+    repeat_of_id: UUID | None = Field(default=None, alias="repeatOfId")
+    attempt: int = 1
     #: A poll with its mode and options, and its counts once closed or revealed.
     poll: PollConfig | None = None
     poll_result: PollResultOut | None = Field(default=None, alias="pollResult")
@@ -482,16 +487,12 @@ class ElectionCandidateIn(_CamelModel):
     principal_id: UUID | None = Field(default=None, alias="principalId")
 
 
-class MeetingVoteOpenBody(_CamelModel):
-    """``POST /meetings/{id}/votes`` — open a live vote on an agenda item.
+class MeetingVoteBody(_CamelModel):
+    """The question, the rules and the options of a meeting vote.
 
-    The route binds a new vote to the agenda item (``agendaItemId``) and opens it at
-    once. ``draft`` only prepares the vote: it stays a ``draft``, also in a planned
-    meeting, until the open route of the meeting opens it. An application agenda
-    item allows exactly one vote, because that vote fires the pass or fail branch
-    of the application on close. A free-text agenda item allows several generic
-    questions. ``question`` goes into the protocol
-    snippet.
+    ``POST /meetings/{id}/votes`` creates a vote from it (``MeetingVoteOpenBody``),
+    and ``PUT /meetings/{id}/votes/{voteId}`` replaces them in a prepared draft.
+    ``question`` goes into the protocol snippet.
 
     The body has no ``tieBreak``: a meeting vote has no casting vote, and the route
     always stores ``tieBreak=rejected``.
@@ -531,11 +532,9 @@ class MeetingVoteOpenBody(_CamelModel):
     #: server gives the option ids. ``question`` is required, ``options`` and
     #: ``majorityRule`` do not apply, and a poll has no quorum.
     poll: PollIn | None = None
-    #: Prepare the question only: the vote stays a draft and does not open.
-    draft: bool = False
 
     @model_validator(mode="after")
-    def _min_options(self) -> MeetingVoteOpenBody:
+    def _min_options(self) -> MeetingVoteBody:
         """Check the options, the poll and the election candidates.
 
         A candidate name without an account must not repeat any other candidate name, else the
@@ -568,6 +567,24 @@ class MeetingVoteOpenBody(_CamelModel):
             {"id": f"c{n}", "name": c.name, "principalId": c.principal_id}
             for n, c in enumerate(self.candidates, start=1)
         ]
+
+
+class MeetingVoteOpenBody(MeetingVoteBody):
+    """``POST /meetings/{id}/votes`` — open a live vote on an agenda item.
+
+    The route binds a new vote to the agenda item (``agendaItemId``) and opens it at
+    once. ``draft`` only prepares the vote: it stays a ``draft``, also in a planned
+    meeting, until the open route of the meeting opens it. An application agenda
+    item allows exactly one vote, because that vote fires the pass or fail branch
+    of the application on close. A free-text agenda item allows several generic
+    questions.
+    """
+
+    #: Prepare the question only: the vote stays a draft and does not open.
+    draft: bool = False
+    #: Repeat this closed vote of the same agenda item ("erneut abstimmen"). The new
+    #: vote counts on (``attempt``), and the closed vote keeps its result.
+    repeat_of: UUID | None = Field(default=None, alias="repeatOf")
 
 
 class AgendaAddBody(_CamelModel):
