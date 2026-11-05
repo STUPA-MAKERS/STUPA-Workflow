@@ -18,7 +18,7 @@ description: Outbound event webhooks — SSRF-guarded, HMAC-SHA256-signed HTTP P
 
 **Domain / data model:**
 - `Webhook` (table `webhook`): `name`, `url`, `events` (Text[] whitelist), `secret` (LargeBinary, server-generated `secrets.token_bytes(32)`, never returned/logged), `active`.
-- `WebhookDelivery` (table `webhook_delivery`): `webhook_id` (FK CASCADE), `event`, `payload` (JSONB), `status` ∈ `pending|ok|failed|dead` (CHECK), `attempts`, `idempotency_key`, `last_at`, `next_at`, `response_code`. Index `(status, next_at)` = worker pickup. Unique `(webhook_id, idempotency_key)` = dedup (NULL key = no dedup, present since the 0001 baseline).
+- `WebhookDelivery` (table `webhook_delivery`): `webhook_id` (FK CASCADE), `event`, `payload` (JSONB), `status` ∈ `pending|ok|failed|dead` (CHECK), `attempts`, `idempotency_key`, `last_at`, `response_code`. No pickup query: each delivery is one arq job `deliver_webhook` (job key `webhook:<id>`), and a retry is the same job deferred by `arq.Retry`. Unique `(webhook_id, idempotency_key)` = dedup (NULL key = no dedup, present since the 0001 baseline).
 - `events` is stored and validated, but no code fans a domain event out to the subscriptions. Only the flow `webhook` action (one named webhook) creates deliveries. `events` values are `EventName` from `app/shared/config_schemas.py`: `application_created`, `application_updated`, `status_changed`, `vote_opened`, `vote_closed`, `application_approved`, `application_rejected`, `comment_added`, `budget_reserved`, `budget_booked`, `protocol_finalized`.
 
 **API surface:** (admin router, permission `webhook.manage`)

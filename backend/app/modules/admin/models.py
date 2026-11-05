@@ -301,7 +301,9 @@ class Webhook(UUIDPkMixin, CreatedAtMixin, Base):
 class WebhookDelivery(UUIDPkMixin, Base):
     """Delivery attempt of a webhook.
 
-    The worker picks the rows up through the index ``(status, next_at)``.
+    No query picks the rows up. Each delivery has its own arq job
+    ``deliver_webhook`` with the job key ``webhook:<id>``, and a retry is the
+    same job, deferred by ``arq.Retry`` with an exponential backoff.
     ``idempotency_key`` decouples the event instance from the dispatch. A flow
     retry of the same status event creates no second delivery, because
     ``(webhook_id, idempotency_key)`` is unique. A ``NULL`` key means no
@@ -321,9 +323,6 @@ class WebhookDelivery(UUIDPkMixin, Base):
     last_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    next_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
     response_code: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
     __table_args__ = (
@@ -331,7 +330,6 @@ class WebhookDelivery(UUIDPkMixin, Base):
             "status IN ('pending','ok','failed','dead')",
             name="webhook_delivery_status",
         ),
-        Index("ix_webhook_delivery_status_next_at", "status", "next_at"),
         UniqueConstraint(
             "webhook_id",
             "idempotency_key",
