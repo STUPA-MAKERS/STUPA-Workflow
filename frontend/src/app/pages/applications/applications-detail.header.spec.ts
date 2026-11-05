@@ -79,7 +79,6 @@ const ALL = [
   'application.read',
   'application.manage',
   'application.transition',
-  'application.share',
   'application.archive',
   'application.force_status',
   'application.delete',
@@ -267,9 +266,8 @@ describe('ApplicationsDetailComponent — header', () => {
     expect(notices).toEqual([{ id: 'app-1', kind: 'updated', source: 'detail' }]);
   });
 
-  it('offers share, edit and archive as icon buttons with their rights', async () => {
+  it('offers edit and archive as icon buttons with their rights', async () => {
     await setup();
-    expect(screen.getByRole('button', { name: 'Öffentliche Links' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Bearbeiten' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Archivieren' })).toBeInTheDocument();
   });
@@ -281,7 +279,6 @@ describe('ApplicationsDetailComponent — header', () => {
       versions: [VERSIONS[0]],
     });
     expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Öffentliche Links' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Weitere Aktionen' })).not.toBeInTheDocument();
     expect(screen.queryByRole('group', { name: 'Übergänge' })).not.toBeInTheDocument();
     http.verify();
@@ -313,13 +310,6 @@ describe('ApplicationsDetailComponent — header', () => {
     const { cmp } = await setup({ perms: ['application.read'], app: { canEdit: false } });
     expect(cmp.canUploadFiles()).toBe(false);
     expect(cmp.canDeleteFiles()).toBe(false);
-  });
-
-  it('opens the share links from the header', async () => {
-    const { http, cmp } = await setup();
-    await userEvent.click(screen.getByRole('button', { name: 'Öffentliche Links' }));
-    expect(cmp.shareDialogOpen()).toBe(true);
-    http.expectOne((r) => r.url === '/api/applications/app-1/shares').flush([]);
   });
 
   it('archives from the header and says so on the page', async () => {
@@ -403,15 +393,12 @@ describe('ApplicationsDetailComponent — header', () => {
 
     /** The edit form needs structuredClone, which jsdom lacks. */
     it('takes the header actions into the menu on a phone', async () => {
-      const { cmp, http, detectChanges } = await setup({ phone: true });
-      expect(screen.queryByRole('button', { name: 'Öffentliche Links' })).not.toBeInTheDocument();
-      expect(cmp.menuSections()[0].items.map((i) => i.id)).toEqual(['share', 'edit', 'archive']);
-      cmp.onMenu({ id: 'share', label: '' });
-      detectChanges();
-      http.expectOne((r) => r.url.endsWith('/shares')).flush([]);
+      const { cmp, http } = await setup({ phone: true });
+      expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
+      expect(cmp.menuSections()[0].items.map((i) => i.id)).toEqual(['edit', 'archive']);
       cmp.onMenu({ id: 'archive', label: '' });
       http.expectOne((r) => r.url.endsWith('/archive')).flush(appWire({ archivedAt: 'x' }));
-      expect(cmp.menuSections()[0].items[2].label).toBe('Aus Archiv holen');
+      expect(cmp.menuSections()[0].items[1].label).toBe('Aus Archiv holen');
       const g = globalThis as unknown as { structuredClone?: unknown };
       const saved = g.structuredClone;
       g.structuredClone = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;

@@ -32,7 +32,6 @@ const TRANSITIONS: TransitionOutWire[] = [
 
 const ALL = [
   'application.transition',
-  'application.share',
   'application.archive',
   'application.force_status',
   'application.delete',
@@ -82,7 +81,6 @@ describe('RowTransitionsMenuComponent', () => {
       'Ablehnen',
       'Übergang',
       'Öffnen',
-      'Öffentliche Links',
       'Archivieren',
       'Status setzen',
       'Löschen',
@@ -117,7 +115,6 @@ describe('RowTransitionsMenuComponent', () => {
 
   it.each([
     ['Öffnen', 'open'],
-    ['Öffentliche Links', 'share'],
     ['Archivieren', 'archive'],
     ['Status setzen', 'force'],
     ['Löschen', 'delete'],

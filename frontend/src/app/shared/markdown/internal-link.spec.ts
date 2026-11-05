@@ -36,7 +36,6 @@ describe('routeInternalLink', () => {
     ['a ctrl click', '<a data-t href="/a">x</a>', { ctrlKey: true }],
     ['an API path', '<a data-t href="/api/attachments/1/download">x</a>', {}],
     ['the API root', '<a data-t href="/api">x</a>', {}],
-    ['a share link', '<a data-t href="/s/abc">x</a>', {}],
     ['a well-known path', '<a data-t href="/.well-known/security.txt">x</a>', {}],
   ])('leaves %s to the browser', (_k, html, init) => {
     const { event } = click(html, init);

@@ -26,9 +26,6 @@ Keys that need a note:
 - `application.archive`: move an application out of the working list and back. It is
   reversible, so it is NOT part of `application.delete`. It decides what everyone else
   sees by default, so it is not part of `application.manage` either.
-- `application.share`: create a PUBLIC read-only link. It is its own key, because
-  reading an application and deciding that anyone with a URL may read it are
-  different decisions, and a magic-link reader must not be able to publish.
 - `application.create_on_behalf`: capture an application for an existing account or
   a guest. The application belongs to the applicant; the holder shows only in the
   history and the audit log. Global. Grant it deliberately, because the applicant
@@ -92,7 +89,6 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "application.edit_any",
     "application.delete",
     "application.archive",
-    "application.share",
     "application.create_on_behalf",
     "form.configure",
     "flow.configure",

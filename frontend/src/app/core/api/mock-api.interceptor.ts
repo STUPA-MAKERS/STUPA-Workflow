@@ -84,7 +84,6 @@ const MOCK_PRINCIPAL: Principal = {
     'application.manage',
     'application.transition',
     'application.export',
-    'application.share',
     'application.archive',
     'application.delete',
     'application.force_status',
@@ -1532,7 +1531,7 @@ function mockStartPlannedHandover(fromItem: string | null | undefined, toItem: s
 
 /** The paths of the demo applications in `mock-applications.ts` (id prefix `a1000000-`). */
 const DEMO_APPLICATION_PATH =
-  /\/applications\/a1000000-[^/]+(\/(transitions|attachments|shares|flow-states|form|timeline|versions|transition|archive|force-status))?$/;
+  /\/applications\/a1000000-[^/]+(\/(transitions|attachments|flow-states|form|timeline|versions|transition|archive|force-status))?$/;
 
 /** The Gremium of the demo applications; its planned meetings serve the agenda dialog. */
 const DEMO_GREMIUM = 'g0000000-0000-0000-0000-000000000001';

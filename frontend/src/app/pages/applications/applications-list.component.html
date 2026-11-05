@@ -316,8 +316,6 @@
   </div>
 </app-side-sheet>
 
-<app-share-links-dialog [applicationId]="shareFor()" [(open)]="shareOpen" />
-
 <app-agenda-dialog
   [applicationId]="agendaFor()?.item?.id ?? null"
   [applicationTitle]="agendaFor() ? titleOf(agendaFor()!.item) : ''"

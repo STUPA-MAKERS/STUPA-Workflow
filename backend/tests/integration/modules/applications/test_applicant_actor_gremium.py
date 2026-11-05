@@ -278,7 +278,7 @@ async def test_creator_without_a_member_right_outside_the_scope_reads_as_applica
     api = build_read_api(migrated[1], monkeypatch)
     as_principal(
         api,
-        Principal(sub=seed.owner_sub, display_name=OWNER_NAME, permissions={"application.share"}),
+        Principal(sub=seed.owner_sub, display_name=OWNER_NAME, permissions={"application.archive"}),
     )
     comments = get_json(api, f"/api/applications/{app_id}/comments")
     timeline = get_json(api, f"/api/applications/{app_id}/timeline")

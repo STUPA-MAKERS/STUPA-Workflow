@@ -393,38 +393,6 @@ class ApplicationListItem(_CamelModel):
     state_since: datetime | None = Field(default=None, alias="stateSince")
 
 
-class ShareCreate(_CamelModel):
-    """Ask for a public link. Both fields are optional.
-
-    Attributes:
-        ttl_days: The service bounds it to 1..365 days, default 30. "Never" is not on
-            offer, because an expiry makes a forgotten link stop working by itself.
-        label: A private note of the creator, for example "an die Fachschaft
-            geschickt". Never shown publicly.
-    """
-
-    ttl_days: int | None = Field(default=None, alias="ttlDays", ge=1, le=365)
-    label: str | None = Field(default=None, max_length=200)
-
-
-class ShareOut(_CamelModel):
-    """One share link as its creator sees it.
-
-    ``url`` carries the plaintext token and is therefore present ONLY in the response that
-    created the link. Listing existing links returns it as null, because the server cannot
-    reconstruct a token it only ever stored a hash of — and would not hand it back if it
-    could.
-    """
-
-    id: UUID
-    created_at: datetime = Field(alias="createdAt")
-    expires_at: datetime = Field(alias="expiresAt")
-    revoked_at: datetime | None = Field(default=None, alias="revokedAt")
-    created_by: str | None = Field(default=None, alias="createdBy")
-    label: str | None = None
-    url: str | None = None
-
-
 class CommentCreate(MessageFilesIn, _CamelModel):
     """A new comment. ``attachmentIds`` and ``draftToken`` bind its files.
 

@@ -75,7 +75,6 @@ import {
   rowArchiveItem,
   rowForceItem,
 } from './row-transitions-menu/row-transitions-menu.component';
-import { ShareLinksDialogComponent } from './share-links-dialog/share-links-dialog.component';
 import { ApplicationCaptureComponent } from './capture/application-capture.component';
 import { debounced } from '@shared/debounced';
 import { AmountComponent } from '@shared/ui/amount/amount.component';
@@ -186,7 +185,6 @@ type FilterSheet = 'more' | null;
     ScrollFadeDirective,
     CostCentreSelectComponent,
     RowTransitionsMenuComponent,
-    ShareLinksDialogComponent,
     ForceStatusDialogComponent,
     AgendaDialogComponent,
     DecisionDialogComponent,
@@ -463,9 +461,6 @@ export class ApplicationsListComponent {
     return sections;
   });
 
-  /** The row whose links the share dialog shows. */
-  readonly shareFor = signal<Uuid | null>(null);
-  readonly shareOpen = signal(false);
   /** The row the force-status dialog acts on. */
   readonly forceFor = signal<ApplicationListItem | null>(null);
   readonly forceOpen = signal(false);
@@ -674,10 +669,6 @@ export class ApplicationsListComponent {
     switch (action.kind) {
       case 'open':
         this.open(item.id);
-        return;
-      case 'share':
-        this.shareFor.set(item.id);
-        this.shareOpen.set(true);
         return;
       case 'force':
         this.forceFor.set(item);

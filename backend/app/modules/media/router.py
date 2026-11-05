@@ -10,7 +10,7 @@ that edits a Markdown text with images (``UPLOAD_SCOPES``), else it gets 403: a
 ``GET /api/media/images/{id}`` streams one image to any session: a principal or a
 magic-link applicant. The id is a random uuid4, so it is unguessable on top of the
 session check. The image of a protocol that an applicant cannot read is therefore
-reachable only with its id, the same as with a share link.
+reachable only with its id.
 
 ``GET /api/public/protocols/{protocol_id}/images/{image_id}`` streams an image of a
 public protocol without login. The protocol must be visible, and its public Markdown
