@@ -214,7 +214,8 @@ def test_upgrade_from_an_installed_database(engine: Engine) -> None:
     An installed database carries the old free text on every Gremium. Both slots of every
     variant survive, which a per-logo guard would not do: it would keep the title row
     only. The rebuild leaves the tables at revision ec167d091656, so the test re-applies
-    the square slot of a3f9c2d71e4b, and the tests that run later see the head schema.
+    the square slot of a3f9c2d71e4b and the drop of ``base_variant`` of c71e5a0d9f42, and
+    the tests that run later see the head schema.
     """
     import importlib.util
     from pathlib import Path
@@ -291,6 +292,10 @@ def test_upgrade_from_an_installed_database(engine: Engine) -> None:
                 "ON cd_variant_logo (variant_id) WHERE slot = 'square'"
             )
         )
+        conn.execute(
+            text("ALTER TABLE cd_variant DROP CONSTRAINT IF EXISTS ck_cd_variant_base_variant")
+        )
+        conn.execute(text("ALTER TABLE cd_variant DROP COLUMN IF EXISTS base_variant"))
 
 
 def test_admin_role_holds_the_new_permission(engine: Engine) -> None:
