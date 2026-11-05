@@ -30,9 +30,9 @@
 
         @for (g of groups(); track g.key) {
           @if (g.title; as title) {
-            <app-section class="af__group" [level]="2" [heading]="title | t">
+            <app-list-group class="af__group" [label]="title | t">
               <ng-container *ngTemplateOutlet="pages; context: { $implicit: g }" />
-            </app-section>
+            </app-list-group>
           } @else {
             <section class="af__group">
               <ng-container *ngTemplateOutlet="pages; context: { $implicit: g }" />

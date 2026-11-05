@@ -31,7 +31,11 @@
 .af__navBody {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  // The head of each group (`app-list-group`) brings the space above it; its text lines
+  // up with the icons of the rows, and pinned it reaches over the padding of the nav.
+  gap: var(--space-1);
+  --lg-inset: var(--space-3);
+  --lg-bleed: var(--space-1);
   min-height: 0;
   padding: 0 var(--space-1) var(--space-2);
 }
