@@ -2436,12 +2436,19 @@ function transferPage(items: unknown[] = [TRANSFER], total = items.length) {
   return { items, total, limit: 20, offset: 0 };
 }
 
-/** Open the transfers tab and answer the first page. */
+/** Pick "Übertrag" in the "Art" chip. */
+function pickTransfers(ctx: Awaited<ReturnType<typeof setup>>) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (ctx.fixture.componentInstance as any).setKind('transfer');
+  ctx.detectChanges();
+}
+
+/** Open the transfers and answer the first page. */
 async function openTransfers(
   ctx: Awaited<ReturnType<typeof setup>>,
   body: Parameters<TestRequest['flush']>[0] = transferPage(),
 ) {
-  await userEvent.click(await screen.findByRole('radio', { name: 'Überträge' }));
+  pickTransfers(ctx);
   ctx.http.expectOne((r) => r.url.endsWith('/budget-transfers') && r.method === 'GET').flush(body);
   ctx.detectChanges();
 }
@@ -2481,12 +2488,36 @@ describe('ExpensesComponent — transfers tab', () => {
     expect(c.listBusy()).toBe(false);
   });
 
-  it('shows no transfers tab to a reader without budget.book', async () => {
-    const ctx = await setup({ perms: ['budget.view'] });
-    expect(screen.queryByRole('radio', { name: 'Überträge' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('radio', { name: 'Buchungen' })).not.toBeInTheDocument();
+  it('offers "Übertrag" in the "Art" chip and leaves it for another kind', async () => {
+    const ctx = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = ctx.fixture.componentInstance as any;
+    expect(c.kindOptions().map((o: { value: string }) => o.value)).toEqual(['', 'expense', 'income', 'transfer']);
+    await openTransfers(ctx);
+    expect(c.kindValue()).toBe('transfer');
+    expect(c.kindChipLabel()).toBe('Übertrag');
+    expect(c.activeFilterCount()).toBe(1);
+    c.setKind('income');
+    expect(c.tab()).toBe('bookings');
+    expect(c.kindValue()).toBe('income');
+    const req = ctx.http.expectOne((r) => r.url.endsWith('/expenses') && r.method === 'GET');
+    expect(req.request.params.get('kind')).toBe('income');
+    req.flush(page([]));
+    await openTransfers(ctx);
+    expect(c.kind()).toBe('');
+    c.resetFilters();
+    expect(c.tab()).toBe('bookings');
+    ctx.http.expectOne((r) => r.url.endsWith('/expenses') && r.method === 'GET').flush(page([]));
+    ctx.http.verify();
+  });
+
+  it('shows no transfers tab to a reader without budget.book', async () => {
+    const ctx = await setup({ perms: ['budget.view'] });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = ctx.fixture.componentInstance as any;
+    expect(c.kindOptions().map((o: { value: string }) => o.value)).toEqual(['', 'expense', 'income']);
+    c.setKind('transfer');
+    expect(c.tab()).toBe('bookings');
     c.setTab('transfers');
     expect(c.tab()).toBe('bookings');
     ctx.http.expectNone((r) => r.url.endsWith('/budget-transfers'));
@@ -2629,7 +2660,7 @@ describe('ExpensesComponent — transfers tab', () => {
 
   it('reports a failed load and shows the empty state', async () => {
     const ctx = await setup();
-    await userEvent.click(await screen.findByRole('radio', { name: 'Überträge' }));
+    pickTransfers(ctx);
     ctx.http
       .expectOne((r) => r.url.endsWith('/budget-transfers') && r.method === 'GET')
       .flush({ title: 'e' }, { status: 500, statusText: 'Server Error' });
@@ -2686,10 +2717,11 @@ describe('ExpensesComponent — transfers tab', () => {
     ctx.http.verify();
   });
 
-  it('switches back to the bookings tab without a further transfer request', async () => {
+  it('switches back to the bookings with "Alle" without a further request', async () => {
     const ctx = await setup();
     await openTransfers(ctx);
-    await userEvent.click(screen.getByRole('radio', { name: 'Buchungen' }));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (ctx.fixture.componentInstance as any).setKind('');
     ctx.detectChanges();
     expect(screen.getByText('Keine Buchungen gefunden.')).toBeInTheDocument();
     ctx.http.verify();
@@ -2879,7 +2911,8 @@ describe('ExpensesComponent (list/detail)', () => {
     http.expectOne((r) => r.url.endsWith('/budget-transfers')).flush(transferPage([]));
     cmp.resetFilters();
     flushList(http, page([]));
-    http.expectOne((r) => r.url.endsWith('/budget-transfers')).flush(transferPage([]));
+    expect(cmp.tab()).toBe('bookings');
+    http.expectNone((r) => r.url.endsWith('/budget-transfers'));
     jest.useFakeTimers();
     jest.useRealTimers();
     http.match((r) => r.url.endsWith('/expenses')).forEach((r) => r.flush(page([])));

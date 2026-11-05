@@ -45,8 +45,6 @@ import {
   type RowSwipeAction,
   ScrollFadeDirective,
   SearchPillComponent,
-  SegmentedComponent,
-  type SegmentedOption,
   SelectionBarComponent,
   SideSheetComponent,
   SkeletonComponent,
@@ -114,8 +112,8 @@ const SORTS: readonly { field: ExpenseSortField; order: 'asc' | 'desc'; key: str
  * or transfers beside a detail sheet, like the applications page.
  *
  * The list: title with export, sort and a menu; the search and the chips (cost centre as
- * the tree sheet of the applications page, kind, period, amount); "Buchungen |
- * Überträge" and "n von m"; the rows by month. The detail: the open booking or transfer
+ * the tree sheet of the applications page, kind, period, amount); the rows by month. The
+ * kind chip "Art" also holds "Übertrag", which shows the transfers instead of the bookings. The detail: the open booking or transfer
  * (`?id=` and `?transfer=` in the URL, so the global search lands on a booking), the
  * form of a new or an edited booking or transfer, or, while rows are selected, the
  * panel of the bulk actions.
@@ -159,7 +157,6 @@ const SORTS: readonly { field: ExpenseSortField; order: 'asc' | 'desc'; key: str
     RowMenuComponent,
     ScrollFadeDirective,
     SearchPillComponent,
-    SegmentedComponent,
     SelectionBarComponent,
     SideSheetComponent,
     SkeletonComponent,
@@ -219,7 +216,10 @@ export class ExpensesComponent implements OnDestroy {
   readonly budgetId = this.list.budgetId;
   readonly sortField = this.list.sortField;
   readonly sortOrder = this.list.sortOrder;
-  readonly activeFilterCount = this.list.activeFilterCount;
+  /** The set filters; "Übertrag" in the "Art" chip counts as one. */
+  readonly activeFilterCount = computed(
+    () => this.list.activeFilterCount() + (this.tab() === 'transfers' ? 1 : 0),
+  );
   readonly exporting = this.list.exporting;
   readonly refreshing = this.list.refreshing;
   readonly reloading = this.list.reloading;
@@ -315,23 +315,27 @@ export class ExpensesComponent implements OnDestroy {
   /** Phone: filters and pickers open from the bottom; wider: from the start edge. */
   readonly sheetSide = computed(() => (this.phone() ? 'bottom' : 'start'));
 
+  /** The kinds of the "Art" chip. "Übertrag" shows only for `canManage()`, because the
+   *  server lists transfers only for `budget.book`. */
   readonly kindOptions = computed<FilterSelectOption[]>(() => [
     { value: '', label: this.i18n.translate('expenses.filter.all') },
     { value: 'expense', label: this.i18n.translate('expenses.kind.expense') },
     { value: 'income', label: this.i18n.translate('expenses.kind.income') },
+    ...(this.canManage()
+      ? [{ value: 'transfer', label: this.i18n.translate('expenses.kind.transfer') }]
+      : []),
   ]);
 
+  /** The value of the "Art" chip: "transfer" while the transfers show, else the kind. */
+  readonly kindValue = computed(() => (this.tab() === 'transfers' ? 'transfer' : this.kind()));
+
   readonly kindChipLabel = computed(() => {
-    const k = this.kind();
+    const k = this.kindValue();
+    if (k === 'transfer') return this.i18n.translate('expenses.kind.transfer');
     return k
       ? this.i18n.translate(k === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense')
       : this.i18n.translate('expenses.filter.kind');
   });
-
-  readonly tabOptions = computed<SegmentedOption[]>(() => [
-    { value: 'bookings', label: this.i18n.translate('expenses.tab.bookings') },
-    { value: 'transfers', label: this.i18n.translate('expenses.tab.transfers') },
-  ]);
 
   readonly sortSections = computed<RowMenuSection[]>(() => {
     const current = `${this.sortField()}:${this.sortOrder()}`;
@@ -799,8 +803,21 @@ export class ExpensesComponent implements OnDestroy {
     });
   }
 
+  /** The "Art" chip. "Übertrag" opens the transfers; any other kind opens the bookings
+   *  with that kind. */
   setKind(k: string): void {
-    this.list.setKind(k === 'expense' || k === 'income' ? k : '');
+    if (k === 'transfer') {
+      if (this.kind()) this.list.kind.set('');
+      this.setTab('transfers');
+      return;
+    }
+    const kind = k === 'expense' || k === 'income' ? k : '';
+    if (this.tab() === 'transfers') {
+      this.setTab('bookings');
+      if (kind !== this.kind()) this.list.setKind(kind);
+      return;
+    }
+    this.list.setKind(kind);
   }
 
   selectBudget(id: string): void {
@@ -823,9 +840,11 @@ export class ExpensesComponent implements OnDestroy {
     if (this.tab() === 'transfers') this.transfers.reload();
   }
 
+  /** "Filter zurücksetzen" clears the "Art" chip too, so the transfers give way to the
+   *  bookings. */
   resetFilters(): void {
+    if (this.tab() === 'transfers') this.setTab('bookings');
     this.list.resetFilters();
-    if (this.tab() === 'transfers') this.transfers.reload();
   }
 
   onSort(field: ExpenseSortField): void {
