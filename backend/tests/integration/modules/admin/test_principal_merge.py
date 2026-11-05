@@ -42,7 +42,6 @@ from app.modules.admin.principal_merge import PrincipalMergeService
 from app.modules.applications.models import (
     Application,
     ApplicationDecision,
-    ApplicationShare,
     Comment,
     GuestApplicationSettings,
     StatusEvent,
@@ -302,14 +301,6 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
         assert app is not None
         app.archived_by = old.sub
         app.captured_by = old.sub
-        session.add(
-            ApplicationShare(
-                application_id=app_id,
-                token_hash=uuid.uuid4().bytes,
-                expires_at=datetime.now(UTC) + timedelta(days=1),
-                created_by=old.sub,
-            )
-        )
         session.add(GuestApplicationSettings(id=1, updated_by=old.sub))
         session.add(MeetingSettings(id=1, updated_by=old.sub))
         await session.merge(

@@ -97,7 +97,6 @@ import { DecisionSectionComponent } from '@shared/decision/decision-section.comp
 import { decisionHistoryLine } from '@shared/decision/decision.util';
 import { ApplicationsPageService } from './applications-page.service';
 import { ForceStatusDialogComponent } from './force-status-dialog/force-status-dialog.component';
-import { ShareLinksDialogComponent } from './share-links-dialog/share-links-dialog.component';
 import { TodoLinkedListComponent } from '../../features/todos/linked-list/todo-linked-list.component';
 import { RailStatusService } from '../../layout/rail-status.service';
 import { provideFormly } from '@shared/formly/formly.providers';
@@ -126,7 +125,7 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
  * narrow screen.
  *
  * Header: "<Typ> · Version n", the title, "status · gremium · amount", the firable
- * transitions as buttons, and the actions (share links, edit, archive, and a menu with
+ * transitions as buttons, and the actions (edit, archive, and a menu with
  * Status setzen, Versionen vergleichen, Löschen, Anonymisierung beantragen). Body: the
  * details, the answers by section (`app-answer-view`), the attachments, the history
  * (status changes and versions by day) and the comments.
@@ -146,8 +145,7 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
  *
  * RBAC here only gates the UX. The server decides.
  *
- * The share action sits outside the edit right, because `application.share` decides who may read
- * the record, not who may edit it. An archived application shows a banner, because it looks like an
+ * An archived application shows a banner, because it looks like an
  * active one and someone arriving from a link has no other way to know. Every tab page stays in the
  * DOM, so the attachment count and the scroll of a list survive a tab change. The edit form has no
  * form element, so Enter in a field does not save the whole application. The comment chat exists
@@ -195,7 +193,6 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
     AttachmentsPanelComponent,
     AnswerViewComponent,
     HistoryComponent,
-    ShareLinksDialogComponent,
     ForceStatusDialogComponent,
     AgendaDialogComponent,
     DecisionDialogComponent,
@@ -490,18 +487,6 @@ export class ApplicationsDetailComponent {
     });
   }
   /**
-   * Public share links. `application.share` is its own permission on purpose: reading an
-   * application and deciding it may be read by anyone holding a URL are different
-   * decisions, and the server gates on the same key. The dialog does the rest.
-   */
-  readonly canShare = computed(() => this.auth.can('application.share'));
-  readonly shareDialogOpen = signal(false);
-
-  openShareDialog(): void {
-    this.shareDialogOpen.set(true);
-  }
-
-  /**
    * One value of the version diff on the change line, formatted the way the answers
    * show the field. Cost positions give their summary ("3 Kostenpositionen ·
    * 395,00 €"). A long text, a table or an object of an unknown key gives `null`: the
@@ -759,7 +744,7 @@ export class ApplicationsDetailComponent {
 
   /**
    * The header menu. On a phone it also holds the actions that wider screens show as
-   * icon buttons (share links, edit, archive).
+   * icon buttons (edit, archive).
    */
   readonly menuSections = computed<RowMenuSection[]>(() => {
     const app = this.app();
@@ -767,7 +752,6 @@ export class ApplicationsDetailComponent {
     const t = (key: TranslationKey) => this.i18n.translate(key);
     const quick: RowMenuItem[] = [];
     if (this.phone()) {
-      if (this.canShare()) quick.push({ id: 'share', label: t('applications.row.share'), icon: 'link' });
       if (this.canEditData()) quick.push({ id: 'edit', label: t('applications.detail.edit'), icon: 'edit' });
       if (this.canArchive()) {
         quick.push({
@@ -864,9 +848,6 @@ export class ApplicationsDetailComponent {
     const app = this.app();
     if (!app) return;
     switch (item.id) {
-      case 'share':
-        this.openShareDialog();
-        break;
       case 'edit':
         this.startEdit(app);
         break;

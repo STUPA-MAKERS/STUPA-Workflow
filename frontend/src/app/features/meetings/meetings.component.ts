@@ -59,6 +59,7 @@ import {
   voteStatusVariant,
 } from './meetings-display.util';
 import { beamerUrl } from '../voting/beamer-link.util';
+import { MeetingPageSkeletonComponent } from './meeting-page-skeleton/meeting-page-skeleton.component';
 
 /**
  * Meetings page: the overview (`/meetings`, `MeetingsOverviewComponent`: list or
@@ -83,6 +84,7 @@ import { beamerUrl } from '../voting/beamer-link.util';
     MeetingDialogsService,
   ],
   imports: [
+    MeetingPageSkeletonComponent,
     NoteComponent,
     TranslatePipe,
     BadgeComponent,

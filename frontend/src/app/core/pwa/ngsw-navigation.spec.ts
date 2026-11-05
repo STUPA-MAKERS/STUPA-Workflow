@@ -1,10 +1,8 @@
 /**
  * The service worker must not answer for paths the server renders itself.
  *
- * This exists because it did. `navigationUrls` claims `/**`, so the worker served the
- * Angular shell for `/s/<token>` and the router turned a working share link into the
- * app's own 404 page. nginx proxying that path to the API was necessary and not
- * sufficient: the request never left the browser.
+ * `navigationUrls` claims `/**`, so without an exclusion the worker serves the Angular
+ * shell for a server path and the router turns it into the app's own 404 page.
  *
  * The check is on the config rather than on a running worker, because that is where the
  * mistake is made and it holds without a build.
@@ -17,7 +15,7 @@ interface NgswConfig {
 }
 
 /** Paths the SERVER answers with its own HTML. None may reach the Angular router. */
-const SERVER_RENDERED = ['/s/**', '/api/**'];
+const SERVER_RENDERED = ['/api/**', '/.well-known/**'];
 
 /** The project root is four levels up from src/app/core/pwa. */
 function config(): NgswConfig {

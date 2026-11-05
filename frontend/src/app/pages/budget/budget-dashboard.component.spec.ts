@@ -1082,11 +1082,11 @@ describe('BudgetDashboardComponent', () => {
     fixture.detectChanges();
     expect(c.loading()).toBe(true);
     expect(container.querySelector('.bd__empty')).toBeNull();
-    expect(container.querySelector('.skel')).toBeTruthy();
+    expect(container.querySelector('[aria-busy="true"] .skel-text')).toBeTruthy();
     http.expectOne((r) => r.url.endsWith('/budgets')).flush([]);
     fixture.detectChanges();
     expect(container.querySelector('.bd__empty')).toBeTruthy();
-    expect(container.querySelector('.skel')).toBeNull();
+    expect(container.querySelector('[aria-busy="true"]')).toBeNull();
     expect(screen.getByText('Noch keine Budgetdaten')).toBeTruthy();
   });
 
@@ -1097,7 +1097,7 @@ describe('BudgetDashboardComponent', () => {
     fixture.detectChanges();
     expect(c.loading()).toBe(false);
     expect(c.showSkeleton()).toBe(true);
-    expect(container.querySelector('[aria-busy="true"] .skel')).toBeTruthy();
+    expect(container.querySelector('[aria-busy="true"] .skel-text')).toBeTruthy();
     expect(container.querySelector('.bd__empty')).toBeNull();
     http.expectOne((r) => r.url.endsWith('/budgets/b-vs/fiscal-years')).flush([FY]);
     flushApps(http);

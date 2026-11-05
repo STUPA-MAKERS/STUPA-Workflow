@@ -30,11 +30,44 @@
   </app-page-header>
 
   @if (loading()) {
-    <div class="fe__loading" aria-busy="true">
-      <span class="skel skel--line"></span>
-      <span class="skel skel--line"></span>
-      <span class="skel skel--line"></span>
+    <div class="fe__cols skel-in" aria-busy="true">
       <span class="sr-only" role="status">{{ 'admin.forms.overviewLoading' | t }}</span>
+      <div class="fe__outline" aria-hidden="true">
+        @for (g of skeletonGroups; track $index) {
+          <div class="fe__group">
+            <div class="fe__groupHead">
+              <span class="fe__groupName"><span class="skel-text skel-text--accent fe__skCap"></span></span>
+            </div>
+            <div class="fe__list">
+              @for (w of g; track $index) {
+                <div class="fe__row fe__skRow">
+                  <span class="fe__rowTitle"><span class="skel-text" [style.width.%]="w"></span></span>
+                  <span class="fe__rowSub"><span class="skel-text skel-text--muted fe__skSub"></span></span>
+                </div>
+              }
+            </div>
+          </div>
+        }
+      </div>
+      <div class="fe__main" aria-hidden="true">
+        @for (n of [2, 4, 4]; track $index) {
+          <div class="fe__card">
+            <span class="cap fe__cap"><span class="skel-text skel-text--muted fe__skCap"></span></span>
+            <div class="fe__skFields">
+              @for (f of skeletonFields(n); track $index) {
+                <span class="skel-box fe__skField"></span>
+              }
+            </div>
+          </div>
+        }
+      </div>
+      <div class="fe__side" aria-hidden="true">
+        <div class="fe__card">
+          <span class="cap fe__cap"><span class="skel-text skel-text--muted fe__skCap"></span></span>
+          <span class="skel-box fe__skField"></span>
+          <span class="skel-box fe__skField fe__skField--tall"></span>
+        </div>
+      </div>
     </div>
   } @else {
     <div class="fe__cols" [class.fe__cols--preview]="preview()">

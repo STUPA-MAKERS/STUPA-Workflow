@@ -31,7 +31,6 @@ from app.modules.applications.access import (
     DELETE_PERMISSION,
     EDIT_ANY_PERMISSION,
     MANAGE_PERMISSION,
-    SHARE_PERMISSION,
     Access,
     can_read_pii,
     principal_reads_all,
@@ -39,7 +38,6 @@ from app.modules.applications.access import (
     require_app_edit,
     require_app_read,
 )
-from app.modules.applications.models import ApplicationShare
 from app.modules.applications.schemas import (
     ApplicantCandidateOut,
     ApplicationCreate,
@@ -51,13 +49,10 @@ from app.modules.applications.schemas import (
     CommentOut,
     CommentPatch,
     OnBehalfCreate,
-    ShareCreate,
-    ShareOut,
     TimelineEventOut,
     VersionOut,
 )
 from app.modules.applications.service import ApplicationsService
-from app.modules.applications.share import ShareService
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth import service as auth_service
@@ -659,110 +654,6 @@ async def _principal_reads_pii(
 ) -> bool:
     """Apply the PII rule to a route that gates on a permission only."""
     return await can_read_pii(service.session, Access(application_id, principal, None))
-
-
-def _share_out(row: ApplicationShare, *, url: str | None = None) -> ShareOut:
-    return ShareOut(
-        id=row.id,
-        createdAt=row.created_at,
-        expiresAt=row.expires_at,
-        revokedAt=row.revoked_at,
-        createdBy=row.created_by,
-        label=row.label,
-        url=url,
-    )
-
-
-@router.post(
-    "/applications/{application_id}/shares",
-    response_model=ShareOut,
-    status_code=status.HTTP_201_CREATED,
-    responses=_errors(401, 403, 404),
-)
-async def create_share(
-    application_id: UUID,
-    payload: ShareCreate,
-    session: DbSession,
-    settings: SettingsDep,
-    principal: Annotated[Principal, Depends(require_principal(SHARE_PERMISSION))],
-) -> ShareOut:
-    """Mint a public, read-only link to this application.
-
-    Gated on ``application.share`` and NOT on the read permission. Reading an application
-    and deciding it may be read by anyone holding a URL are different decisions — which is
-    also why an applicant reading through a magic link cannot reach this route at all.
-
-    The plaintext token is in the response and nowhere else. It is never stored and cannot
-    be recovered; a caller who loses it mints a new link.
-
-    The audit entry holds no token, because an entry with the token would be a second copy
-    of the secret, in a table built to be read.
-    """
-    service = ShareService(session, pepper=settings.magic_link_secret)
-    row, token = await service.create(
-        application_id,
-        actor=principal.sub,
-        ttl_days=payload.ttl_days,
-        label=payload.label,
-    )
-    await audit_record(
-        session,
-        actor=principal.sub,
-        action=AuditAction.APPLICATION_SHARE,
-        target_type="application",
-        target_id=str(application_id),
-        data={"shareId": str(row.id), "expiresAt": row.expires_at.isoformat()},
-    )
-    await session.commit()
-    return _share_out(row, url=f"{settings.public_base_url.rstrip('/')}/s/{token}")
-
-
-@router.get(
-    "/applications/{application_id}/shares",
-    response_model=list[ShareOut],
-    responses=_errors(401, 403, 404),
-)
-async def list_shares(
-    application_id: UUID,
-    session: DbSession,
-    settings: SettingsDep,
-    _principal: Annotated[Principal, Depends(require_principal(SHARE_PERMISSION))],
-) -> list[ShareOut]:
-    """List every link ever minted for this application, newest first.
-
-    Revoked and expired ones stay in the list: "revocable" only means something if you can
-    see what you revoked, and a link that once existed is part of the record of who
-    published what. No ``url`` — the server holds a hash, not a token.
-    """
-    service = ShareService(session, pepper=settings.magic_link_secret)
-    return [_share_out(row) for row in await service.list_for(application_id)]
-
-
-@router.delete(
-    "/applications/{application_id}/shares/{share_id}",
-    response_model=ShareOut,
-    responses=_errors(401, 403, 404),
-)
-async def revoke_share(
-    application_id: UUID,
-    share_id: UUID,
-    session: DbSession,
-    settings: SettingsDep,
-    principal: Annotated[Principal, Depends(require_principal(SHARE_PERMISSION))],
-) -> ShareOut:
-    """Stop honouring a link. Idempotent: a second revoke keeps the first timestamp."""
-    service = ShareService(session, pepper=settings.magic_link_secret)
-    row = await service.revoke(share_id, application_id=application_id)
-    await audit_record(
-        session,
-        actor=principal.sub,
-        action=AuditAction.APPLICATION_SHARE_REVOKE,
-        target_type="application",
-        target_id=str(application_id),
-        data={"shareId": str(row.id)},
-    )
-    await session.commit()
-    return _share_out(row)
 
 
 @router.get(

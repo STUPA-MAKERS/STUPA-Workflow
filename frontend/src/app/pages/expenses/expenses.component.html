@@ -52,17 +52,15 @@
               (picked)="selectBudget($event)"
             />
           }
-          @if (tab() === 'bookings') {
-            <app-filter-select
-              class="exp__chip"
-              [label]="'expenses.filter.kind' | t"
-              [options]="kindOptions()"
-              [value]="kind()"
-              (valueChange)="setKind($event)"
-              [text]="kindChipLabel()"
-              filled
-            />
-          }
+          <app-filter-select
+            class="exp__chip"
+            [label]="'expenses.filter.kind' | t"
+            [options]="kindOptions()"
+            [value]="kindValue()"
+            (valueChange)="setKind($event)"
+            [text]="kindChipLabel()"
+            filled
+          />
           <app-range-chip
             kind="date"
             [label]="'expenses.filter.period' | t"
@@ -98,14 +96,6 @@
               <ng-container *ngTemplateOutlet="bulkIcons" />
             }
           </app-selection-bar>
-        } @else if (canManage()) {
-          <app-segmented
-            width="fill"
-            [ariaLabel]="'expenses.views' | t"
-            [options]="tabOptions()"
-            [value]="tab()"
-            (valueChange)="setTab($any($event))"
-          />
         }
         @if (tab() === 'transfers' ? transferReloading() : reloading()) {
           <span class="skel-progress skel-progress--foot" aria-hidden="true"></span>

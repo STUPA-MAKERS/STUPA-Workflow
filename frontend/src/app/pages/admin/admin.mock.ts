@@ -47,7 +47,6 @@ export const MOCK_PERMISSIONS: string[] = [
   'application.edit_any',
   'application.delete',
   'application.archive',
-  'application.share',
   'form.configure',
   'flow.configure',
   'meeting.view_all',
