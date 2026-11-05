@@ -77,7 +77,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/administration/backups/000302](requirements/functional/administration/backups/000302_pre-restore.md) | A restore first saves the current state | draft |
 | [F/administration/backups/000303](requirements/functional/administration/backups/000303_confirm-restore.md) | A restore needs the word RESTORE | draft |
 | [F/administration/backups/000304](requirements/functional/administration/backups/000304_no-token-backup.md) | No agent token reaches a backup | draft |
-| [F/administration/files/000167](requirements/functional/administration/files/000167_ascii-names.md) | File names replace non-ASCII characters | draft |
+| [F/administration/files/000167](requirements/functional/administration/files/000167_ascii-names.md) | Storage names replace non-ASCII characters | draft |
 | [F/administration/files/000168](requirements/functional/administration/files/000168_confirm-delete.md) | Every attachment delete is confirmed | draft |
 | [F/administration/files/000169](requirements/functional/administration/files/000169_drop-files.md) | Attachments can be dropped | draft |
 | [F/administration/files/000339](requirements/functional/administration/files/000339_size-limit.md) | An attachment is at most 10 MiB | draft |
