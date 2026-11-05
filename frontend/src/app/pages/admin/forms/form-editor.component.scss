@@ -409,6 +409,8 @@
   @include f.box-labelled;
   & {
     align-items: stretch;
+    // The label band is padding of the box, so text that scrolls stops below the label.
+    padding-top: 24px;
   }
 }
 .fe__areaLabel {
@@ -422,9 +424,9 @@
   @include f.control;
   & {
     height: auto;
-    min-height: calc(3lh + 32px);
-    max-height: calc(16lh + 32px);
-    padding-top: 24px;
+    min-height: calc(3lh + 8px);
+    max-height: calc(16lh + 8px);
+    padding-top: 0;
     padding-bottom: 8px;
     resize: vertical;
     field-sizing: content;
