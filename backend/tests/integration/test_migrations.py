@@ -814,7 +814,7 @@ def test_meeting_started_at_and_vote_agenda_fk(
         ]
 
     capfd.readouterr()
-    command.upgrade(alembic_cfg, "head")
+    command.upgrade(alembic_cfg, "eff772f93d8e")
     report = capfd.readouterr().err
     assert "2 live or closed meeting(s) without a known start stay NULL" in report
 
@@ -947,7 +947,7 @@ def test_guest_application_settings_and_unlimited_links(
             {"b": json.dumps(_SEED_MAGIC_LINK_BODY)},
         )
 
-    command.upgrade(alembic_cfg, "head")
+    command.upgrade(alembic_cfg, "d5569d5542c6")
     with engine.begin() as conn:
         body = conn.execute(
             text("SELECT body_i18n FROM mail_template WHERE key = 'magic_link'")
@@ -1165,7 +1165,7 @@ def test_attachment_drafts(alembic_cfg: Config, engine: Engine) -> None:
             {"a": app_id},
         ).scalar_one()
 
-    command.upgrade(alembic_cfg, "head")
+    command.upgrade(alembic_cfg, "1ee8a0d3928c")
     with engine.begin() as conn:
         cols = _attachment_columns(conn)
         assert cols["application_id"] == "YES"
@@ -1281,7 +1281,7 @@ def test_protocol_keeper_period_backfill(
         nobody = meeting("closed", protokollant_id=None)
 
     capfd.readouterr()
-    command.upgrade(alembic_cfg, "head")
+    command.upgrade(alembic_cfg, "734556b61a72")
     assert "4 period(s) backfilled" in capfd.readouterr().err
 
     with engine.begin() as conn:
@@ -1934,9 +1934,9 @@ def test_make_open_polls_secret(alembic_cfg: Config, engine: Engine) -> None:
             {"v": secret_poll},
         )
 
-    command.upgrade(alembic_cfg, "head")
+    command.upgrade(alembic_cfg, "334e15ec6ff5")
     command.downgrade(alembic_cfg, "d8a799699d0f")
-    command.upgrade(alembic_cfg, "head")
+    command.upgrade(alembic_cfg, "334e15ec6ff5")
     with engine.begin() as conn:
 
         def _rows(sql: str, vote: uuid.UUID) -> list[str]:
@@ -1963,3 +1963,97 @@ def test_make_open_polls_secret(alembic_cfg: Config, engine: Engine) -> None:
         assert _secret(motion) is False
         for vote in (open_poll, keyless_poll, secret_poll, motion):
             conn.execute(text("DELETE FROM vote WHERE id = :v"), {"v": vote})
+    command.upgrade(alembic_cfg, "head")
+
+
+def test_drop_dead_columns(alembic_cfg: Config, engine: Engine) -> None:
+    """Migration c71e5a0d9f42.
+
+    The extra protocol recipients move from ``mail_list`` into the gremium. A draft hash
+    without a token row gets one. A temporary role assignment, an ended membership and
+    a view link go, the plain rows stay. A ``ballot`` row stops the upgrade.
+    """
+    command.downgrade(alembic_cfg, "b6f901a77cb7")
+    with engine.begin() as conn:
+        gremium = conn.execute(
+            text("INSERT INTO gremium (name, slug) VALUES ('G', 'g-dead') RETURNING id")
+        ).scalar_one()
+        conn.execute(
+            text(
+                "INSERT INTO mail_list (gremium_id, name, recipients, active) VALUES "
+                "(:g, 'protocol', '{b@x,a@x}', true), (:g, 'off', '{z@x}', false)"
+            ),
+            {"g": gremium},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO attachment (filename, mime, size, draft_token_hash, "
+                "draft_expires_at) VALUES ('d', 'a/b', 1, '\\x0f', now() + interval '2 days')"
+            )
+        )
+        principal = conn.execute(
+            text("INSERT INTO principal (sub) VALUES ('dead-sub') RETURNING id")
+        ).scalar_one()
+        role = conn.execute(text("SELECT id FROM role WHERE key = 'member'")).scalar_one()
+        conn.execute(
+            text(
+                "INSERT INTO role_assignment (principal_id, role_id, valid_until) VALUES "
+                "(:p, :r, now() + interval '1 day'), (:p, :r, NULL)"
+            ),
+            {"p": principal, "r": role},
+        )
+        groles = conn.execute(
+            text(
+                "INSERT INTO gremium_role (gremium_id, key) VALUES (:g, 'member') RETURNING id"
+            ),
+            {"g": gremium},
+        ).scalar_one()
+        conn.execute(
+            text(
+                "INSERT INTO gremium_membership (principal_id, gremium_id, gremium_role_id, "
+                "valid_until) VALUES (:p, :g, :r, now() - interval '1 day')"
+            ),
+            {"p": principal, "g": gremium, "r": groles},
+        )
+
+    command.upgrade(alembic_cfg, "head")
+    with engine.begin() as conn:
+        assert conn.execute(
+            text("SELECT protocol_recipients FROM gremium WHERE id = :g"), {"g": gremium}
+        ).scalar_one() == ["b@x", "a@x"]
+        assert conn.execute(text("SELECT to_regclass('mail_list')")).scalar_one() is None
+        assert conn.execute(text("SELECT to_regclass('ballot')")).scalar_one() is None
+        assert conn.execute(
+            text("SELECT count(*) FROM attachment_draft_token WHERE token_hash = '\\x0f'")
+        ).scalar_one() == 1
+        assert conn.execute(
+            text("SELECT count(*) FROM role_assignment WHERE principal_id = :p"),
+            {"p": principal},
+        ).scalar_one() == 1
+        assert conn.execute(
+            text("SELECT count(*) FROM gremium_membership WHERE principal_id = :p"),
+            {"p": principal},
+        ).scalar_one() == 0
+        conn.execute(text("DELETE FROM attachment WHERE draft_token_hash = '\\x0f'"))
+        conn.execute(text("DELETE FROM attachment_draft_token WHERE token_hash = '\\x0f'"))
+        conn.execute(text("DELETE FROM role_assignment WHERE principal_id = :p"), {"p": principal})
+        conn.execute(text("DELETE FROM principal WHERE id = :p"), {"p": principal})
+        conn.execute(text("DELETE FROM gremium WHERE id = :g"), {"g": gremium})
+
+    command.downgrade(alembic_cfg, "b6f901a77cb7")
+    with engine.begin() as conn:
+        vote = conn.execute(
+            text(
+                "INSERT INTO vote (eligible_group, config, status) "
+                "VALUES ('g', '{}'::jsonb, 'closed') RETURNING id"
+            )
+        ).scalar_one()
+        conn.execute(
+            text("INSERT INTO ballot (vote_id, voter_sub, choice) VALUES (:v, 's', 'yes')"),
+            {"v": vote},
+        )
+    with pytest.raises(Exception, match="ballot still holds rows"):
+        command.upgrade(alembic_cfg, "head")
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM vote WHERE id = :v"), {"v": vote})
+    command.upgrade(alembic_cfg, "head")

@@ -105,8 +105,6 @@ def _holds_role(role_cond: str) -> str:
         SELECT 1 FROM role_assignment ra
         JOIN role_permission rp ON rp.role_id = ra.role_id
         WHERE ra.principal_id = p.id AND {role_cond}
-          AND (ra.valid_from IS NULL OR ra.valid_from <= now())
-          AND (ra.valid_until IS NULL OR ra.valid_until > now())
     )
     OR EXISTS (
         SELECT 1 FROM group_mapping gm
@@ -128,8 +126,6 @@ def _affected_principals(perm: str) -> str:
         JOIN gremium_role gr ON gr.id = gm.gremium_role_id
         WHERE gm.principal_id = p.id
           AND COALESCE(gr.permissions, '[]'::jsonb) ? '{perm}'
-          AND (gm.valid_from IS NULL OR gm.valid_from <= now())
-          AND (gm.valid_until IS NULL OR gm.valid_until > now())
       )
     """
 

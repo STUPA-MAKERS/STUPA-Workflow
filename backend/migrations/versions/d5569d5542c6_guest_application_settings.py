@@ -93,14 +93,28 @@ def _rewrite_mail(*, forward: bool) -> None:
 
 
 def upgrade() -> None:
-    """Upgrade the schema to this revision."""
+    """Upgrade the schema to this revision.
+
+    A schema without ``magic_link.scope`` (built from the current models, where every
+    link is an edit link) gets no CHECK on it.
+    """
     op.execute(_CREATE_TABLE)
     op.execute(_SEED)
     op.execute("ALTER TABLE magic_link ALTER COLUMN expires_at DROP NOT NULL")
     op.execute(f"ALTER TABLE magic_link DROP CONSTRAINT IF EXISTS {_CHECK}")
     op.execute(
-        f"ALTER TABLE magic_link ADD CONSTRAINT {_CHECK} "
-        "CHECK (expires_at IS NOT NULL OR scope = 'edit')"
+        f"""
+        DO $$
+        BEGIN
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                 WHERE table_name = 'magic_link' AND column_name = 'scope'
+            ) THEN
+                ALTER TABLE magic_link ADD CONSTRAINT {_CHECK}
+                    CHECK (expires_at IS NOT NULL OR scope = 'edit');
+            END IF;
+        END $$
+        """
     )
     _rewrite_mail(forward=True)
 

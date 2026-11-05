@@ -112,12 +112,22 @@ def downgrade() -> None:
 
     The views go first, because they depend on the tables. ``deadline`` and
     ``deadline_policy`` go before ``drop_all``, because they reference ``application``;
-    e5b16898d639 removed their models, and its downgrade recreates them.
+    e5b16898d639 removed their models, and its downgrade recreates them. ``ballot`` and
+    ``mail_list`` go before ``drop_all`` for the same reason: c71e5a0d9f42 removed their
+    models, and its downgrade recreates them. The foreign key
+    ``role_assignment.gremium_id`` that the same downgrade recreates goes first too,
+    because the models do not know it, so ``drop_all`` would drop ``gremium`` before it.
     """
     bind = op.get_bind()
     op.execute("DROP MATERIALIZED VIEW IF EXISTS mv_status_distribution")
     op.execute("DROP TABLE IF EXISTS deadline")
     op.execute("DROP TABLE IF EXISTS deadline_policy")
+    op.execute("DROP TABLE IF EXISTS ballot")
+    op.execute("DROP TABLE IF EXISTS mail_list")
+    op.execute(
+        "ALTER TABLE IF EXISTS role_assignment "
+        "DROP CONSTRAINT IF EXISTS fk_role_assignment_gremium_id_gremium"
+    )
     Base.metadata.drop_all(bind=bind)
     op.execute("DROP FUNCTION IF EXISTS audit_entry_append_only()")
     op.execute("DROP EXTENSION IF EXISTS btree_gist")
