@@ -13,3 +13,4 @@ scope:
 
 The load bar counts only a foreground GET. It shows after 300 ms and stays at least 400 ms. A
 mutation, a background read, a read-ahead and a read with its own spinner must not count.
+They opt out with `skipLoading()` or `quietly()`.

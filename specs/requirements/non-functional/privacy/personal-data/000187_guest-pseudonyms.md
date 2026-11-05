@@ -2,9 +2,10 @@
 id: "000187"
 title: Guests get pseudonyms
 kind: non-functional
-status: draft
+status: replaced
 owner: frederikbeimgraben
 updated: 2026-11-05
+replaced_by: F/meetings/meetings/000108
 scope:
   - backend/app/modules/livevote
   - backend/app/modules/protocol

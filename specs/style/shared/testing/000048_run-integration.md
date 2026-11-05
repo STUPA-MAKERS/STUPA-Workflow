@@ -1,6 +1,6 @@
 ---
 id: "000048"
-title: A plain pytest skips integration tests
+title: CI runs the full suites
 kind: style
 status: draft
 owner: frederikbeimgraben
@@ -9,7 +9,8 @@ scope:
   - backend/
 ---
 
-# A plain pytest skips integration tests
+# CI runs the full suites
 
-Run `pytest -m integration` before you push backend work that touches the database. A plain
-`pytest` deselects the integration tests.
+Before a push, run only lint, the type check and at most one fast test file. CI runs the full
+suites, the integration tests and the coverage gates. Read a failure from the log of the failed
+job.

@@ -2,9 +2,10 @@
 id: "000077"
 title: Only foreground reads show the load bar
 kind: style
-status: draft
+status: replaced
 owner: frederikbeimgraben
 updated: 2026-11-05
+replaced_by: NF/performance/loading/000189
 scope:
   - frontend/
 ---

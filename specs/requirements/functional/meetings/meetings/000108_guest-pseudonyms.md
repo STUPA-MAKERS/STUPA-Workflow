@@ -14,5 +14,5 @@ scope:
 # Guest names become pseudonyms
 
 A guest who leaves or withdraws becomes "Gast n" at once. All guest names become "Gast 1 … n"
-when the meeting closes. Open and rejected requests are deleted at the close. The audit log
+when the meeting closes and again when the protocol becomes final. Open and rejected requests are deleted at the close. The audit log
 keeps only the guest id.

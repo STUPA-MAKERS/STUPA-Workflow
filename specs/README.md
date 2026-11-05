@@ -10,7 +10,7 @@ specs/
   style/
     backend/         database, functional, python
     frontend/        angular, functional
-    shared/          api, functional, git, testing, writing
+    shared/          agents, api, functional, git, testing, writing
     specs/           content, format, structure
   requirements/
     functional/
@@ -52,6 +52,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/administration/accounts/000270](requirements/functional/administration/accounts/000270_return-to.md) | The login returns to the page | draft |
 | [F/administration/accounts/000271](requirements/functional/administration/accounts/000271_sso-logout.md) | The logout ends the SSO session | draft |
 | [F/administration/accounts/000334](requirements/functional/administration/accounts/000334_avatar-proxy.md) | Avatars come through the platform | draft |
+| [F/administration/accounts/000422](requirements/functional/administration/accounts/000422_erase-account-action.md) | An account can be erased from the user list | draft |
 | [F/administration/admin/000161](requirements/functional/administration/admin/000161_crud-complete.md) | Every entity has create, read, update and delete | draft |
 | [F/administration/admin/000162](requirements/functional/administration/admin/000162_cd-variant-delete.md) | A CD variant in use is not deleted | draft |
 | [F/administration/admin/000163](requirements/functional/administration/admin/000163_audit-revert.md) | The audit revert reverses effects, never entries | draft |
@@ -66,6 +67,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/administration/admin/000373](requirements/functional/administration/admin/000373_cd-logo-download.md) | A CD logo is served only as a download | draft |
 | [F/administration/admin/000383](requirements/functional/administration/admin/000383_revert-forward.md) | A config revert goes forward | draft |
 | [F/administration/admin/000384](requirements/functional/administration/admin/000384_snapshot-no-pii.md) | A config snapshot holds no personal data | draft |
+| [F/administration/admin/000405](requirements/functional/administration/admin/000405_revert-permissions.md) | A revert needs the right of the original change | draft |
+| [F/administration/admin/000421](requirements/functional/administration/admin/000421_dashboard.md) | The start page is a work list with a side bar | draft |
 | [F/administration/audit/000290](requirements/functional/administration/audit/000290_no-pii-in-audit.md) | An audit entry holds no personal data | draft |
 | [F/administration/audit/000291](requirements/functional/administration/audit/000291_record-in-tx.md) | An audit entry is written in the same transaction | draft |
 | [F/administration/audit/000292](requirements/functional/administration/audit/000292_chain-check.md) | The audit chain is checked every night | draft |
@@ -229,6 +232,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/delegations/000365](requirements/functional/meetings/delegations/000365_no-chains.md) | Delegations do not chain | draft |
 | [F/meetings/delegations/000366](requirements/functional/meetings/delegations/000366_deadline.md) | A delegation has a deadline | draft |
 | [F/meetings/delegations/000367](requirements/functional/meetings/delegations/000367_roster-privacy.md) | Roster names are visible only to the Gremium | draft |
+| [F/meetings/delegations/000420](requirements/functional/meetings/delegations/000420_lead-enters-substitute.md) | The lead can enter a pool substitute | draft |
 | [F/meetings/meetings/000092](requirements/functional/meetings/meetings/000092_open-window.md) | A meeting opens in a configured window | draft |
 | [F/meetings/meetings/000093](requirements/functional/meetings/meetings/000093_state-order.md) | Meeting states move only forward | draft |
 | [F/meetings/meetings/000094](requirements/functional/meetings/meetings/000094_close-with-open-vote.md) | A meeting with an open vote does not close | draft |
@@ -255,6 +259,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/meetings/000351](requirements/functional/meetings/meetings/000351_join-code.md) | A join code is short and unambiguous | draft |
 | [F/meetings/meetings/000352](requirements/functional/meetings/meetings/000352_guest-device.md) | A guest joins with one device | draft |
 | [F/meetings/meetings/000353](requirements/functional/meetings/meetings/000353_guest-vote.md) | A vote with guests has no quorum | draft |
+| [F/meetings/meetings/000418](requirements/functional/meetings/meetings/000418_calendar-popover.md) | The calendar subscription is on Sitzungen | draft |
+| [F/meetings/meetings/000419](requirements/functional/meetings/meetings/000419_gremium-delete.md) | A Gremium delete deletes its meetings | draft |
 | [F/meetings/protocols/000115](requirements/functional/meetings/protocols/000115_keeper-permission.md) | The keeper holds protocol.write | draft |
 | [F/meetings/protocols/000116](requirements/functional/meetings/protocols/000116_finalize.md) | Finalize needs a closed meeting and protocol.finalize | draft |
 | [F/meetings/protocols/000117](requirements/functional/meetings/protocols/000117_delete-draft-only.md) | Only a draft protocol is deleted | draft |
@@ -289,18 +295,21 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/accessibility/interaction/000217](requirements/non-functional/accessibility/interaction/000217_keyboard-and-labels.md) | Controls are reachable by keyboard and named | draft |
 | [NF/accessibility/interaction/000218](requirements/non-functional/accessibility/interaction/000218_themes.md) | Light and dark themes are both supported | draft |
 | [NF/accessibility/interaction/000219](requirements/non-functional/accessibility/interaction/000219_reduced-motion.md) | Motion follows the reduced motion setting | draft |
-| [NF/accessibility/language/000216](requirements/non-functional/accessibility/language/000216_i18n-parity.md) | German and English texts are complete | draft |
+| [NF/accessibility/language/000216](requirements/non-functional/accessibility/language/000216_i18n-parity.md) | German and English texts are complete | replaced |
 | [NF/compatibility/deploy/000390](requirements/non-functional/compatibility/deploy/000390_typst-pin.md) | The typst version is pinned in two places | draft |
 | [NF/compatibility/deploy/000394](requirements/non-functional/compatibility/deploy/000394_migrate-first.md) | A deploy runs the migration first | draft |
+| [NF/compatibility/deploy/000434](requirements/non-functional/compatibility/deploy/000434_environments.md) | Dev follows development, production follows tags | draft |
+| [NF/compatibility/deploy/000435](requirements/non-functional/compatibility/deploy/000435_caddy-edge.md) | Caddy is the edge proxy | draft |
 | [NF/compatibility/pwa/000220](requirements/non-functional/compatibility/pwa/000220_zoom.md) | Zoom is blocked only in the installed app | draft |
 | [NF/compatibility/pwa/000221](requirements/non-functional/compatibility/pwa/000221_android-nav-bar.md) | The Android navigation bar has the manifest colour | draft |
 | [NF/compatibility/pwa/000222](requirements/non-functional/compatibility/pwa/000222_update-offline.md) | The app shows update and offline bars | draft |
+| [NF/compatibility/pwa/000411](requirements/non-functional/compatibility/pwa/000411_status-bar-theme.md) | The status bar follows the theme | draft |
 | [NF/performance/loading/000189](requirements/non-functional/performance/loading/000189_load-bar.md) | The load bar shows only for slow foreground reads | draft |
 | [NF/performance/loading/000190](requirements/non-functional/performance/loading/000190_batch-reads.md) | A list reads its rows in one request | draft |
 | [NF/performance/loading/000191](requirements/non-functional/performance/loading/000191_search-as-you-type.md) | Search runs as you type | draft |
 | [NF/privacy/personal-data/000185](requirements/non-functional/privacy/personal-data/000185_no-raw-ids.md) | The UI shows no raw IDs | draft |
 | [NF/privacy/personal-data/000186](requirements/non-functional/privacy/personal-data/000186_no-plain-ip.md) | The login audit has no plain IP address | draft |
-| [NF/privacy/personal-data/000187](requirements/non-functional/privacy/personal-data/000187_guest-pseudonyms.md) | Guests get pseudonyms | draft |
+| [NF/privacy/personal-data/000187](requirements/non-functional/privacy/personal-data/000187_guest-pseudonyms.md) | Guests get pseudonyms | replaced |
 | [NF/privacy/personal-data/000188](requirements/non-functional/privacy/personal-data/000188_anonymize.md) | Personal data can be anonymized | draft |
 | [NF/privacy/personal-data/000404](requirements/non-functional/privacy/personal-data/000404_markdown-images.md) | Markdown images are outside erasure and export | draft |
 | [NF/security/access/000179](requirements/non-functional/security/access/000179_public-allowlist.md) | A public route is on the allowlist | draft |
@@ -338,6 +347,9 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/controls/000399](requirements/non-functional/usability/controls/000399_design-basics.md) | The design has one accent and plain status text | draft |
 | [NF/usability/controls/000400](requirements/non-functional/usability/controls/000400_danger-button.md) | A destructive action is an outlined red button | draft |
 | [NF/usability/controls/000401](requirements/non-functional/usability/controls/000401_error-toast.md) | Errors show as a toast | draft |
+| [NF/usability/controls/000410](requirements/non-functional/usability/controls/000410_tap-tint.md) | A tap tints the whole tile | draft |
+| [NF/usability/controls/000412](requirements/non-functional/usability/controls/000412_ghost-rows-for-lists.md) | Ghost rows are only for lists | draft |
+| [NF/usability/controls/000416](requirements/non-functional/usability/controls/000416_empty-chart.md) | An empty chart is a grey skeleton | draft |
 | [NF/usability/layout/000192](requirements/non-functional/usability/layout/000192_one-geometry.md) | All list and detail pages share one geometry | draft |
 | [NF/usability/layout/000193](requirements/non-functional/usability/layout/000193_scroll-edges.md) | A scroll edge fades, or cuts at a line | draft |
 | [NF/usability/layout/000194](requirements/non-functional/usability/layout/000194_phone-breakpoint.md) | The phone layout starts below 768 px | draft |
@@ -350,6 +362,14 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/layout/000201](requirements/non-functional/usability/layout/000201_fill-or-centre.md) | Content fills its width or is centred | draft |
 | [NF/usability/layout/000202](requirements/non-functional/usability/layout/000202_top-layer.md) | Dialogs and toasts are on the top layer | draft |
 | [NF/usability/layout/000215](requirements/non-functional/usability/layout/000215_comments-beside.md) | Comments sit beside the fields | draft |
+| [NF/usability/layout/000406](requirements/non-functional/usability/layout/000406_desktop-unchanged.md) | The phone layout does not change the desktop | draft |
+| [NF/usability/layout/000407](requirements/non-functional/usability/layout/000407_mehr-and-search.md) | Mehr and Suche are always in reach | draft |
+| [NF/usability/layout/000408](requirements/non-functional/usability/layout/000408_bottom-inset.md) | Fixed bottom elements sit above the bottom bar | draft |
+| [NF/usability/layout/000409](requirements/non-functional/usability/layout/000409_phone-panes.md) | The phone shows one pane and card tables | draft |
+| [NF/usability/layout/000413](requirements/non-functional/usability/layout/000413_card-mode.md) | A table in card mode keeps its controls in the card head | draft |
+| [NF/usability/layout/000414](requirements/non-functional/usability/layout/000414_admin-heading.md) | Admin pages share one heading | draft |
+| [NF/usability/layout/000415](requirements/non-functional/usability/layout/000415_balanced-bars.md) | Bars and headers are vertically balanced | draft |
+| [NF/usability/layout/000417](requirements/non-functional/usability/layout/000417_antraege-pattern.md) | Work lists follow the Anträge pattern | draft |
 | [S/backend/database/000068](style/backend/database/000068_hash-revision.md) | A migration has a hash ID | draft |
 | [S/backend/database/000069](style/backend/database/000069_one-head.md) | Alembic has one head | draft |
 | [S/backend/database/000070](style/backend/database/000070_idempotent-tables.md) | A migration that adds a table is idempotent | draft |
@@ -370,7 +390,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [S/frontend/angular/000074](style/frontend/angular/000074_production-build.md) | Run the production build after style changes | draft |
 | [S/frontend/angular/000075](style/frontend/angular/000075_narrow-with-as.md) | A template narrows a signal with as | draft |
 | [S/frontend/angular/000076](style/frontend/angular/000076_tailwind-borders.md) | A Tailwind border has a style | draft |
-| [S/frontend/angular/000077](style/frontend/angular/000077_load-bar.md) | Only foreground reads show the load bar | draft |
+| [S/frontend/angular/000077](style/frontend/angular/000077_load-bar.md) | Only foreground reads show the load bar | replaced |
 | [S/frontend/angular/000078](style/frontend/angular/000078_after-next-render.md) | Wait for a render with afterNextRender | draft |
 | [S/frontend/angular/000079](style/frontend/angular/000079_ui-kit-parts.md) | Shared UI parts live in the ui-kit | draft |
 | [S/frontend/angular/000080](style/frontend/angular/000080_standalone-components.md) | Components are standalone with own files | draft |
@@ -379,6 +399,14 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [S/frontend/angular/000397](style/frontend/angular/000397_gremium-checks.md) | Gremium rights come from the Gremium API | draft |
 | [S/frontend/angular/000398](style/frontend/angular/000398_mock-dev-only.md) | The mock API runs only in dev builds | draft |
 | [S/frontend/functional/000091](style/frontend/functional/000091_signal-update.md) | A signal update returns a new value | draft |
+| [S/shared/agents/000426](style/shared/agents/000426_ask-with-options.md) | Ask with options | draft |
+| [S/shared/agents/000427](style/shared/agents/000427_report-bugs.md) | Report a possible bug | draft |
+| [S/shared/agents/000428](style/shared/agents/000428_no-unasked-features.md) | Do not build what exists | draft |
+| [S/shared/agents/000429](style/shared/agents/000429_mockup-remark.md) | A mockup remark does not change the ui-kit | draft |
+| [S/shared/agents/000430](style/shared/agents/000430_attach-mockups.md) | Mockup images go into the thread | draft |
+| [S/shared/agents/000431](style/shared/agents/000431_plan-in-main.md) | Plan in the main session | draft |
+| [S/shared/agents/000432](style/shared/agents/000432_no-main-checkout.md) | Do not touch the main checkout | draft |
+| [S/shared/agents/000433](style/shared/agents/000433_no-imitation.md) | No page imitates an organization | draft |
 | [S/shared/api/000039](style/shared/api/000039_same-names.md) | Field names are the same in frontend and backend | draft |
 | [S/shared/api/000040](style/shared/api/000040_camelcase-base-model.md) | Schemas use the shared camelCase base model | draft |
 | [S/shared/api/000041](style/shared/api/000041_one-source.md) | Shared data has one source | draft |
@@ -402,11 +430,14 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [S/shared/git/000057](style/shared/git/000057_release-notes.md) | Release notes list migrations and steps | draft |
 | [S/shared/git/000224](style/shared/git/000224_target-development.md) | An app pull request targets development | draft |
 | [S/shared/git/000225](style/shared/git/000225_found-bugs.md) | A found bug is fixed, a behaviour change is asked | draft |
+| [S/shared/git/000423](style/shared/git/000423_one-pr-per-package.md) | One branch and one pull request per package | draft |
+| [S/shared/git/000424](style/shared/git/000424_sync-main.md) | Sync main back with a merge commit | draft |
+| [S/shared/git/000425](style/shared/git/000425_shared-in-kit.md) | Shared list parts live in the ui-kit | draft |
 | [S/shared/testing/000044](style/shared/testing/000044_test-first.md) | Tests come first | draft |
 | [S/shared/testing/000045](style/shared/testing/000045_coverage-gates.md) | Coverage gates hold | draft |
 | [S/shared/testing/000046](style/shared/testing/000046_critical-modules.md) | Critical modules have full branch coverage | draft |
 | [S/shared/testing/000047](style/shared/testing/000047_own-test-keys.md) | An integration test uses its own keys | draft |
-| [S/shared/testing/000048](style/shared/testing/000048_run-integration.md) | A plain pytest skips integration tests | draft |
+| [S/shared/testing/000048](style/shared/testing/000048_run-integration.md) | CI runs the full suites | draft |
 | [S/shared/testing/000049](style/shared/testing/000049_check-pixels.md) | A visual bug is checked on pixels | draft |
 | [S/shared/testing/000050](style/shared/testing/000050_mockups-from-real-app.md) | UI mockups come from the real app | draft |
 | [S/shared/testing/000223](style/shared/testing/000223_test-refers-to-rule.md) | A test refers back to its rule | draft |
