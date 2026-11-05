@@ -1,5 +1,5 @@
 @if (tiles().length) {
-  <app-section class="ah" [level]="2" [heading]="'admin.health.title' | t">
+  <app-list-group class="ah" [label]="'admin.health.title' | t">
     <ul class="rowgroup ah__list">
       @for (t of tiles(); track t.key) {
         <li>
@@ -29,5 +29,5 @@
         </li>
       }
     </ul>
-  </app-section>
+  </app-list-group>
 }

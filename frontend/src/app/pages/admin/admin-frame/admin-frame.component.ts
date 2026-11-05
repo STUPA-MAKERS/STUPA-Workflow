@@ -40,7 +40,7 @@ import {
   SwipeBackDirective,
   PageFrame,
   PageHeaderComponent,
-  SectionComponent,
+  ListGroupComponent,
 } from '@stupa-makers/ui-kit';
 import { PageFrameService } from '../../../layout/page-frame.service';
 import { AdminHealthComponent } from '../admin-health/admin-health.component';
@@ -149,7 +149,7 @@ const sheetScroll = new Map<number, number>();
   providers: [ListDetailNav],
   imports: [
     NgTemplateOutlet,
-    SectionComponent,
+    ListGroupComponent,
     EmptyStateComponent,
     ListDetailBarComponent,
     PageHeaderComponent,

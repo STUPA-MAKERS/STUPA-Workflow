@@ -8,7 +8,7 @@ import {
   formatBytes,
   IconComponent,
   type IconName,
-  SectionComponent,
+  ListGroupComponent,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import type { AuditChainCheck, AuditVerification, Backup, BackupList } from '../admin.models';
@@ -64,7 +64,7 @@ type ErasureState = { status: 'loading' } | { status: 'ok'; open: number } | { s
   selector: 'app-admin-health',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [SectionComponent, RouterLink, RouterLinkActive, TranslatePipe, IconComponent],
+  imports: [ListGroupComponent, RouterLink, RouterLinkActive, TranslatePipe, IconComponent],
   templateUrl: './admin-health.component.html',
   styleUrl: './admin-health.component.scss',
 })
