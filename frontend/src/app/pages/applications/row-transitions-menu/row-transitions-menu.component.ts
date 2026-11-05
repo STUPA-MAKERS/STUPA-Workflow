@@ -16,12 +16,6 @@ import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@stupa-
 
 type T = (key: Parameters<I18nService['translate']>[0]) => string;
 
-/** "Öffentliche Links" of a row, or null without the permission. */
-function rowShareItem(auth: AuthService, t: T): RowMenuItem | null {
-  if (!auth.can('application.share')) return null;
-  return { id: 'share', label: t('applications.row.share'), icon: 'link' };
-}
-
 /** "Archivieren" or "Aus Archiv holen" of a row, or null without the permission. */
 export function rowArchiveItem(auth: AuthService, t: T, item: ApplicationListItem): RowMenuItem | null {
   if (!auth.can('application.archive')) return null;
@@ -45,7 +39,6 @@ export function rowForceItem(auth: AuthService, t: T): RowMenuItem | null {
 /** What the reader chose in the row menu. The list page carries it out. */
 export type RowAction =
   | { kind: 'open' }
-  | { kind: 'share' }
   | { kind: 'archive' }
   | { kind: 'force' }
   | { kind: 'delete' }
@@ -55,7 +48,7 @@ export type RowAction =
  * The "more" menu of one row of the applications list.
  *
  * "Übergänge" load only when the menu opens (`GET /applications/{id}/transitions`), so a
- * list of fifty rows makes no fifty requests. Then: Öffnen, Öffentliche Links, Archivieren
+ * list of fifty rows makes no fifty requests. Then: Öffnen, Archivieren
  * or Aus Archiv holen, Status setzen, and Löschen in red. Each item shows only with its
  * permission; the server checks again.
  */
@@ -98,8 +91,6 @@ export class RowTransitionsMenuComponent {
       danger: isRejection(tr),
     }));
     const actions: RowMenuItem[] = [{ id: 'open', label: t('applications.row.open'), icon: 'ext' }];
-    const share = rowShareItem(this.auth, t);
-    if (share) actions.push(share);
     const archive = rowArchiveItem(this.auth, t, this.item());
     if (archive) actions.push(archive);
     const force = rowForceItem(this.auth, t);

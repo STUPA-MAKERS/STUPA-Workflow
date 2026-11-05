@@ -537,7 +537,7 @@ describe('mockApiInterceptor', () => {
         expect(paged.offset).toBe(5);
       });
 
-      it('GET the detail, its transitions, attachments, shares and flow states', async () => {
+      it('GET the detail, its transitions, attachments and flow states', async () => {
         const app = await get<{ id: string; data: Record<string, unknown>; applicant: { name: string } }>(
           `/api/applications/${first}`,
         );
@@ -550,7 +550,6 @@ describe('mockApiInterceptor', () => {
         expect(fromReview.map((t) => t.addsToAgenda)).toEqual([true, false, false, false]);
         expect(await get<unknown[]>(`/api/applications/${first}/attachments`)).toHaveLength(3);
         expect(await get<unknown[]>(`/api/applications/${second}/attachments`)).toEqual([]);
-        expect(await get<unknown[]>(`/api/applications/${first}/shares`)).toEqual([]);
         expect((await get<unknown[]>(`/api/applications/${first}/flow-states`)).length).toBe(5);
       });
 

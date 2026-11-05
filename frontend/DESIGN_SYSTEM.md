@@ -149,7 +149,7 @@ These rules are binding for every page.
 - **Long names get an ellipsis and a `title`** with the full text (`.ell`).
 - **Never truncate a copyable value.** A URL, an IBAN, an e-mail address or a reference wraps
   (`overflow-wrap: anywhere`) and stays selectable. A URL that opens is a real
-  `<a target="_blank" rel="noopener">`. A one-time copy value (for example a new share link
+  `<a target="_blank" rel="noopener">`. A one-time copy value (a secret
   that the server shows only once) can be a `<code>` with a copy button. Only that `<code>`
   gets `user-select: all`, never its label. An amount or a tag at the end of the row stays
   aligned on the right.

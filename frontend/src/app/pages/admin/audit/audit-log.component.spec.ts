@@ -150,8 +150,6 @@ const BACKEND_AUDIT_ACTIONS = [
   'application_update',
   'application_archive',
   'application_unarchive',
-  'application_share',
-  'application_share_revoke',
   'application_decision',
   'webhook_config',
   'attachment_upload',

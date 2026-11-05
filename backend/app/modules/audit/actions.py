@@ -64,8 +64,6 @@ class AuditAction(StrEnum):
             the values.
         APPLICATION_ARCHIVE: Archive or unarchive. Both directions are recorded,
             because they change what the working list shows.
-        APPLICATION_SHARE: A public read-only link created or revoked. ``data``
-            carries the share id and the expiry, never the token.
         APPLICATION_DECISION: Approval with deviations from a passed vote with a
             proposal or from a manual transition, or its undo by an audit revert of
             its status change (``reverted: true``). ``data`` carries the requested
@@ -165,8 +163,6 @@ class AuditAction(StrEnum):
     APPLICATION_UPDATE = "application_update"
     APPLICATION_ARCHIVE = "application_archive"
     APPLICATION_UNARCHIVE = "application_unarchive"
-    APPLICATION_SHARE = "application_share"
-    APPLICATION_SHARE_REVOKE = "application_share_revoke"
     APPLICATION_DECISION = "application_decision"
     WEBHOOK_CONFIG = "webhook_config"
     ATTACHMENT_UPLOAD = "attachment_upload"

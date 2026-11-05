@@ -100,7 +100,6 @@ const ALL = [
   'application.read',
   'application.transition',
   'application.export',
-  'application.share',
   'application.archive',
   'application.force_status',
   'application.delete',
@@ -1148,16 +1147,6 @@ describe('ApplicationsListComponent', () => {
       await userEvent.click(screen.getByRole('menuitem', { name: 'Öffnen' }));
       await harness.fixture.whenStable();
       expect(router.url).toBe('/applications/app-2');
-    });
-
-    it('opens the share links of the row', async () => {
-      const { http, harness, cmp } = await start();
-      await openRowMenu(http, 'Flyer für die Hochschulgruppen-Messe', [], () => harness.detectChanges());
-      await userEvent.click(screen.getByRole('menuitem', { name: 'Öffentliche Links' }));
-      harness.detectChanges();
-      expect(cmp.shareFor()).toBe('app-2');
-      http.expectOne((r) => r.url === '/api/applications/app-2/shares').flush([]);
-      expect(screen.getByRole('dialog', { name: 'Öffentlicher Link' })).toBeInTheDocument();
     });
 
     it('opens "Status setzen" for the row and reloads after it', async () => {

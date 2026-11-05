@@ -8,12 +8,12 @@ describe('permissionSections', () => {
       'budget.view',
       'form.configure',
       'meeting.view_all',
-      'application.share',
+      'application.archive',
       'mcp.use',
       'webhook.manage',
     ]);
     expect(out.map((s) => s.key)).toEqual(['applications', 'budget', 'meetings', 'admin', 'security']);
-    expect(out[0].keys).toEqual(['application.read', 'application.share']);
+    expect(out[0].keys).toEqual(['application.read', 'application.archive']);
     expect(out[3].keys).toEqual(['form.configure', 'webhook.manage']);
     expect(out[4].keys).toEqual(['audit.read', 'mcp.use']);
     expect(out[0].title).toBe('admin.roles.section.applications');
