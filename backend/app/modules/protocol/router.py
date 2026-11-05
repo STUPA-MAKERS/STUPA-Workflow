@@ -46,6 +46,7 @@ from app.modules.protocol.schemas import (
 from app.modules.protocol.service import ProtocolService
 from app.settings import Settings
 from app.shared.errors import ProblemDetail
+from app.shared.filenames import content_disposition
 
 router = APIRouter(tags=["protocol"])
 logger = logging.getLogger("app.protocol")
@@ -291,10 +292,11 @@ async def get_protocol_pdf(
     """
     await service.authorize_read(protocol_id, principal)
     data = await service.get_pdf_bytes(protocol_id)
+    name = await service.pdf_filename(protocol_id)
     return Response(
         content=data,
         media_type="application/pdf",
-        headers={"Content-Disposition": "inline; filename=protokoll.pdf"},
+        headers={"Content-Disposition": content_disposition("inline", name)},
     )
 
 
@@ -314,8 +316,9 @@ async def get_protocol_public_pdf(
     """
     await service.authorize_read(protocol_id, principal)
     data = await service.get_public_pdf_bytes(protocol_id)
+    name = await service.pdf_filename(protocol_id, public=True)
     return Response(
         content=data,
         media_type="application/pdf",
-        headers={"Content-Disposition": "inline; filename=protokoll-oeffentlich.pdf"},
+        headers={"Content-Disposition": content_disposition("inline", name)},
     )

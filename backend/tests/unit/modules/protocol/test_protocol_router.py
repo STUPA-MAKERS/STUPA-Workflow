@@ -117,6 +117,16 @@ class _FakeService:
         self.calls.append(f"withheld:{protocol_id}:{withheld}:{actor}")
         return self._out(status=self.status)
 
+    async def get_pdf_bytes(self, protocol_id: UUID) -> bytes:
+        return b"%PDF intern"
+
+    async def get_public_pdf_bytes(self, protocol_id: UUID) -> bytes:
+        return b"%PDF public"
+
+    async def pdf_filename(self, protocol_id: UUID, *, public: bool = False) -> str:
+        suffix = "_oeffentlich" if public else ""
+        return f"Protokoll_Sitzung_Ökonomie_2026-11-05{suffix}.pdf"
+
     async def revert_to_draft(self, protocol_id: UUID) -> None:
         self.calls.append(f"revert:{protocol_id}")
         self.status = "draft"
@@ -450,3 +460,23 @@ async def test_schedule_public_backfill_runs_inline_without_a_pool(
     assert seen == [gid]
     monkeypatch.setattr(router_mod.ProtocolService, "backfill_public", _boom)
     await router_mod.schedule_public_backfill(request, object(), get_settings(), gid)  # type: ignore[arg-type]
+
+
+def test_pdf_streams_are_named_after_the_meeting(
+    app: FastAPI, client: TestClient
+) -> None:
+    """Both PDF streams name the file after the meeting, with an ASCII fallback."""
+    _writer(app)
+    r = client.get(f"/api/protocols/{PROTOCOL_ID}/pdf")
+    assert r.status_code == 200
+    assert r.content == b"%PDF intern"
+    assert r.headers["content-disposition"] == (
+        'inline; filename="Protokoll_Sitzung_Okonomie_2026-11-05.pdf"; '
+        "filename*=UTF-8''Protokoll_Sitzung_%C3%96konomie_2026-11-05.pdf"
+    )
+    r = client.get(f"/api/protocols/{PROTOCOL_ID}/pdf/public")
+    assert r.status_code == 200
+    assert r.content == b"%PDF public"
+    assert "Protokoll_Sitzung_Okonomie_2026-11-05_oeffentlich.pdf" in (
+        r.headers["content-disposition"]
+    )

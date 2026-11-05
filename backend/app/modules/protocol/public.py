@@ -21,7 +21,6 @@ gives 404. There is no public meeting read of any kind.
 from __future__ import annotations
 
 import logging
-import re
 from dataclasses import dataclass
 from datetime import date as _date
 from typing import Any, Literal
@@ -35,6 +34,7 @@ from app.modules.admin.models import Gremium
 from app.modules.files.storage import ObjectStorage, StorageError
 from app.modules.livevote.models import Meeting
 from app.modules.media.refs import image_ids_in
+from app.modules.protocol.filename import protocol_pdf_filename
 from app.modules.protocol.models import Protocol
 from app.shared.config_schemas import ElectionConfig
 from app.shared.errors import NotFoundError, ServiceUnavailableError
@@ -513,20 +513,19 @@ class PublicProtocolService:
     async def get_pdf(self, protocol_id: UUID) -> tuple[bytes, str]:
         """Return the public PDF bytes and the download file name, else 404.
 
-        The file name keeps only safe characters of the slug, because the slug is admin
-        text and goes into a header value.
+        The file name is the meeting title and day (`protocol_pdf_filename`). The
+        meeting title is part of the public protocol already.
 
         Raises:
             NotFoundError: The protocol is not visible or has no public PDF.
             ServiceUnavailableError: The storage failed for a short time (503).
         """
-        protocol, meeting, gremium = await self._visible(protocol_id)
+        protocol, meeting, _ = await self._visible(protocol_id)
         if protocol.public_pdf_storage_key is None or self.storage is None:
             raise NotFoundError("protocol not found")
         try:
             data = await self.storage.get(protocol.public_pdf_storage_key)
         except StorageError as exc:
             raise ServiceUnavailableError("Protocol PDF temporarily unavailable.") from exc
-        slug = re.sub(r"[^A-Za-z0-9_-]", "", gremium.slug) or "gremium"
-        name = f"Protokoll_{slug}_{meeting_day(meeting).isoformat()}_oeffentlich.pdf"
+        name = protocol_pdf_filename(meeting.title, meeting_day(meeting), public=True)
         return data, name
