@@ -1,6 +1,6 @@
 """Organization and config tables of the admin module.
 
-The module owns ``gremium``, ``mail_list``, ``application_type``, ``webhook``
+The module owns ``gremium``, ``application_type``, ``webhook``
 with ``webhook_delivery``, ``site_config_version``, and the corporate-design
 tables ``cd_variant`` with ``cd_variant_logo``.
 
@@ -139,6 +139,10 @@ class Gremium(UUIDPkMixin, CreatedAtMixin, Base):
     #: The final protocols of this gremium appear without login on the public
     #: protocols page, as the public version only. Off by default.
     protocols_public: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    #: Extra addresses that get the final protocol in addition to the members.
+    protocol_recipients: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), server_default="{}"
+    )
 
 
 class GremiumRole(UUIDPkMixin, Base):
@@ -241,19 +245,6 @@ class GremiumRoleMapping(UUIDPkMixin, Base):
         ),
         Index("ix_gremium_role_mapping_oidc_group", "oidc_group"),
     )
-
-
-class MailList(UUIDPkMixin, Base):
-    """Mailing list per gremium."""
-
-    __tablename__ = "mail_list"
-
-    gremium_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("gremium.id", ondelete="CASCADE")
-    )
-    name: Mapped[str] = mapped_column(Text)
-    recipients: Mapped[list[str]] = mapped_column(ARRAY(Text), server_default="{}")
-    active: Mapped[bool] = mapped_column(Boolean, server_default="true")
 
 
 class ApplicationType(UUIDPkMixin, CreatedAtMixin, Base):

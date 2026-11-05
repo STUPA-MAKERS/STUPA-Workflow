@@ -89,6 +89,7 @@ def _gremium(**over: Any) -> SimpleNamespace:
         "name": "StuPa",
         "slug": "stupa",
         "quorum_percent": None,
+        "protocol_recipients": [],
     }
     base.update(over)
     return SimpleNamespace(**base)

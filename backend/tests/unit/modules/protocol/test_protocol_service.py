@@ -53,9 +53,14 @@ def _meeting() -> SimpleNamespace:
     )
 
 
-def _gremium(cd_variant: str = "stupa") -> SimpleNamespace:
+def _gremium(cd_variant: str = "stupa", recipients: list[str] | None = None) -> SimpleNamespace:
     return SimpleNamespace(
-        id=GID, name="STUPA", slug="stupa", cd_variant=cd_variant, protocols_public=False
+        id=GID,
+        name="STUPA",
+        slug="stupa",
+        cd_variant=cd_variant,
+        protocols_public=False,
+        protocol_recipients=recipients or [],
     )
 
 
@@ -470,7 +475,7 @@ async def test_finalize_render_error_raises_503() -> None:
 
 
 async def test_finalize_no_recipients_skips_mail() -> None:
-    """An empty mail list sends no mail."""
+    """No member address and no extra recipient sends no mail."""
     proto = _protocol()
     mail = FakeMailQueue()
     session = FakeSession(
@@ -484,13 +489,12 @@ async def test_finalize_no_recipients_skips_mail() -> None:
     assert mail.sent == []
 
 
-async def test_finalize_members_receive_even_without_maillist() -> None:
-    """An empty mail_list still sends to the active Gremium members.
+async def test_finalize_members_receive_without_extra_recipients() -> None:
+    """A Gremium without extra recipients still sends to the Gremium members.
 
     The members are always the base of the recipient union.
 
-    The fake session serves ``_get``, no agenda items, two members and an empty mail
-    list.
+    The fake session serves ``_get``, no agenda items and two members.
     """
     proto = _protocol()
     mail = FakeMailQueue()
@@ -500,7 +504,6 @@ async def test_finalize_members_receive_even_without_maillist() -> None:
             result(proto),
             result(),
             result("a@x.de", "b@x.de"),
-            result(),
         ],
     )
     out = await _service(
@@ -523,12 +526,12 @@ async def test_finalize_without_mail_queue_skips_send() -> None:
     assert out.pdf_url is not None
 
 
-async def test_finalize_deduplicates_recipients_across_lists() -> None:
+async def test_finalize_deduplicates_the_extra_recipients() -> None:
     proto = _protocol()
     mail = FakeMailQueue()
     session = FakeSession(
-        store={MID: _meeting(), GID: _gremium()},
-        results=[result(proto), result(), result(), result(["a@x", "b@x"], ["b@x", "c@x"])],
+        store={MID: _meeting(), GID: _gremium(recipients=["a@x", "b@x", "b@x", "c@x"])},
+        results=[result(proto), result(), result()],
     )
     await _service(
         session, storage=FakeStorage(), typst=FakeTypst(), mail_queue=mail
@@ -667,22 +670,21 @@ async def test_finalize_from_rendering_completes() -> None:
 
 
 async def test_finalize_recipients_union_members_plus_maillist() -> None:
-    """An extra mail list extends the member list.
+    """The extra recipients of the Gremium extend the member list.
 
-    The result is a deduplicated union. The extra list never replaces the members.
+    The result is a deduplicated union. The extra addresses never replace the members.
 
-    The fake session serves ``_get``, no agenda items, the active members and an extra
-    mail list that repeats a member address.
+    The fake session serves ``_get``, no agenda items and the members. The extra
+    recipients repeat a member address.
     """
     proto = _protocol()
     mail = FakeMailQueue()
     session = FakeSession(
-        store={MID: _meeting(), GID: _gremium()},
+        store={MID: _meeting(), GID: _gremium(recipients=["extra@y.de", "member@x.de"])},
         results=[
             result(proto),
             result(),
             result("member@x.de"),
-            result(["extra@y.de", "member@x.de"]),
         ],
     )
     await _service(

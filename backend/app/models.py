@@ -10,7 +10,6 @@ from app.db import Base
 from app.modules.admin.models import (
     ApplicationType,
     Gremium,
-    MailList,
     SiteConfigVersion,
     Webhook,
     WebhookDelivery,
@@ -109,7 +108,6 @@ __all__ = [
     "GroupMapping",
     "GuestApplicationSettings",
     "MagicLink",
-    "MailList",
     "MailTemplate",
     "MarkdownImage",
     "NotificationPreference",

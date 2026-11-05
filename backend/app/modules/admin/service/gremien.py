@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlalchemy import delete, distinct, func, or_, select
+from sqlalchemy import distinct, func, or_, select
 
 from app.modules.admin.gremium_roles import GremiumRoleService
 from app.modules.admin.models import (
@@ -13,7 +13,6 @@ from app.modules.admin.models import (
     Gremium,
     GremiumMembership,
     GremiumRole,
-    MailList,
 )
 from app.modules.admin.schemas import (
     GremiumAdminOut,
@@ -407,45 +406,26 @@ class GremiumOps(ConfigServiceBase):
     async def get_gremium_mail_recipients(
         self, gremium_id: UUID
     ) -> GremiumMailRecipients:
-        """Return the extra protocol recipients (union of all active mail lists)."""
-        if await self.session.get(Gremium, gremium_id) is None:
+        """Return the extra protocol recipients (``gremium.protocol_recipients``)."""
+        gremium = await self.session.get(Gremium, gremium_id)
+        if gremium is None:
             raise NotFoundError(f"gremium {gremium_id} not found")
-        lists = (
-            await self.session.scalars(
-                select(MailList.recipients).where(
-                    MailList.gremium_id == gremium_id, MailList.active.is_(True)
-                )
-            )
-        ).all()
-        seen: dict[str, None] = {}
-        for recipients in lists:
-            for addr in recipients or []:
-                seen.setdefault(addr, None)
-        return GremiumMailRecipients(recipients=list(seen))
+        return GremiumMailRecipients(
+            recipients=list(dict.fromkeys(gremium.protocol_recipients or []))
+        )
 
     async def set_gremium_mail_recipients(
         self, gremium_id: UUID, payload: GremiumMailRecipients, actor: str
     ) -> GremiumMailRecipients:
         """Replace the extra protocol recipients (idempotent PUT).
 
-        A gremium keeps one canonical ``mail_list`` row with ``name='protocol'``.
-        The method deletes all old rows first. An empty list means no extra
-        recipients. The members still receive the protocol.
+        The list replaces ``gremium.protocol_recipients``. An empty list means no
+        extra recipients. The members still receive the protocol.
         """
-        if await self.session.get(Gremium, gremium_id) is None:
+        gremium = await self.session.get(Gremium, gremium_id)
+        if gremium is None:
             raise NotFoundError(f"gremium {gremium_id} not found")
-        await self.session.execute(
-            delete(MailList).where(MailList.gremium_id == gremium_id)
-        )
-        if payload.recipients:
-            self.session.add(
-                MailList(
-                    gremium_id=gremium_id,
-                    name="protocol",
-                    recipients=payload.recipients,
-                    active=True,
-                )
-            )
+        gremium.protocol_recipients = list(payload.recipients)
         await self._audit(actor, AuditAction.CONFIG_CHANGE, "gremium", gremium_id)
         await self.session.commit()
         return GremiumMailRecipients(recipients=payload.recipients)

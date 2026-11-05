@@ -45,7 +45,7 @@ from app.modules.admin.cd_resolver import (
     cd_variant_key_for_gremium,
     resolve_cd_variant_by_key,
 )
-from app.modules.admin.models import Gremium, MailList
+from app.modules.admin.models import Gremium
 from app.modules.applications.models import Application
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
@@ -1387,9 +1387,10 @@ class ProtocolService:
     async def _recipients(self, gremium_id: UUID) -> list[str]:
         """Build the flat and deduplicated recipient list of the Gremium.
 
-        The list is the union of the Gremium members and the configured extra
-        lists (`mail_list`). A member counts with a non-NULL email. The extra
-        addresses get the protocol in addition to the members, not instead of them.
+        The list is the union of the Gremium members and the extra addresses of
+        the Gremium (`gremium.protocol_recipients`). A member counts with a
+        non-NULL email. The extra addresses get the protocol in addition to the
+        members, not instead of them.
         """
         seen: dict[str, None] = {}
         members = await RecipientResolver(self.session).resolve(
@@ -1397,16 +1398,10 @@ class ProtocolService:
         )
         for addr in members:
             seen.setdefault(addr, None)
-        lists = (
-            await self.session.execute(
-                select(MailList.recipients).where(
-                    MailList.gremium_id == gremium_id, MailList.active.is_(True)
-                )
-            )
-        ).scalars().all()
-        for recipients in lists:
-            for addr in recipients or []:
-                seen.setdefault(addr, None)
+        gremium = await self.session.get(Gremium, gremium_id)
+        extra = gremium.protocol_recipients if gremium is not None else None
+        for addr in extra or []:
+            seen.setdefault(addr, None)
         return list(seen)
 
     @staticmethod

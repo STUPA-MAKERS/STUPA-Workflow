@@ -31,7 +31,6 @@ from app.modules.admin.models import (
     Gremium,
     GremiumMembership,
     GremiumRole,
-    MailList,
 )
 from app.modules.auth.models import Principal
 from app.modules.files.storage import ObjectStorage
@@ -290,20 +289,13 @@ async def test_has_non_public_false_without_secret_top(session: AsyncSession) ->
 async def test_finalize_dual_render(session: AsyncSession) -> None:
     """The finalization mails only the redacted public PDF.
 
-    The mailing list makes the service enqueue the mail. The non-public title, the
+    The extra recipient makes the service enqueue the mail. The non-public title, the
     attendance names and the minute taker stay in the internal PDF and are absent from
     the public PDF. Exactly one mail goes out, and its attachment is the public variant,
     never the internal PDF.
     """
     meeting, gremium = await _seed_meeting(session)
-    session.add(
-        MailList(
-            gremium_id=gremium.id,
-            name="Verteiler",
-            recipients=["verteiler@example.org"],
-            active=True,
-        )
-    )
+    gremium.protocol_recipients = ["verteiler@example.org"]
     protocol = Protocol(
         meeting_id=meeting.id,
         gremium_id=gremium.id,
