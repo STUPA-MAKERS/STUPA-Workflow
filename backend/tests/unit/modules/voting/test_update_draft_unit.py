@@ -97,7 +97,7 @@ def _service(vote: SimpleNamespace, app: Any = None) -> tuple[VotingService, _Se
     async def _get_application(application_id: UUID) -> Any:
         return app
 
-    svc._get_vote = _get_vote  # type: ignore[method-assign]
+    svc._get_vote = _get_vote
     svc._get_application = _get_application  # type: ignore[method-assign]
     return svc, session
 
