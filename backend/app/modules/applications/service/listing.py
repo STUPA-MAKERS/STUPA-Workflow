@@ -270,7 +270,8 @@ class ListingOps(ApplicationsServiceBase):
     async def _committee_read_clauses(self, sub: str) -> list[ColumnElement[bool]]:
         """Build the Gremium read scope as SQL clauses.
 
-        The caller combines these clauses with the owner filter through OR. The three
+        The caller combines these clauses with the owner filter through OR. A member
+        Gremium is a membership or a substitute pool (`gremium_reader_ids`). The three
         paths mirror `access._committee_can_read`, which the detail view uses:
 
         * a cost center (the node or an ancestor) with `view_gremium_id` in a member
@@ -291,9 +292,9 @@ class ListingOps(ApplicationsServiceBase):
             An empty list when the principal holds no active membership. The caller
             then adds no extra scope.
         """
-        from app.modules.admin.gremium_roles import gremium_member_ids
+        from app.modules.admin.gremium_roles import gremium_reader_ids
 
-        member_ids = await gremium_member_ids(self.session, sub)
+        member_ids = await gremium_reader_ids(self.session, sub)
         if not member_ids:
             return []
         clauses: list[ColumnElement[bool]] = []

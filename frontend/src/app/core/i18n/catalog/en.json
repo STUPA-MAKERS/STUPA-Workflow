@@ -2593,8 +2593,6 @@
   "admin.form.visibleIfEmpty": "empty: always visible",
   "budget.loading": "Loading statistics …",
   "budget.error": "The budget statistics could not be loaded.",
-  "budget.breadcrumbs": "Cost-centre path",
-  "budget.crumbs.more": "More levels of the path",
   "budget.usage.bar": "Utilisation",
   "budget.usage.viewExpenses": "View bookings",
   "budget.empty.title": "No budget data yet",

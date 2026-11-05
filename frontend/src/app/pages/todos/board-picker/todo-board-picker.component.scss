@@ -53,7 +53,7 @@
   overflow-y: auto;
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-elevated);
-  @include frosted-pop(var(--color-surface-3));
+  @include frosted-pop(var(--color-pop));
 }
 .bp__sheet {
   display: flex;

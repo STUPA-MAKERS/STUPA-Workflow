@@ -118,6 +118,23 @@ async def gremium_member_ids(
     return {gid for gid, _ in await active_gremium_roles(session, sub, now)}
 
 
+async def gremium_reader_ids(
+    session: AsyncSession, sub: str, now: datetime | None = None
+) -> set[UUID]:
+    """Return the Gremien whose committee read scope the principal holds.
+
+    These are the active memberships (`gremium_member_ids`) and the Gremien in whose
+    substitute pool the principal stands. A pool substitute reads the applications,
+    the cost centers and the meetings of the Gremium like a member. The pool gives no
+    gremium permission (`vote.cast`, `todo.write`, ...): those stay with the roles.
+    """
+    from app.modules.delegations.pool import substitute_gremien_for_sub
+
+    return await gremium_member_ids(session, sub, now) | await substitute_gremien_for_sub(
+        session, sub
+    )
+
+
 def _sanitize_perms(perms: list[str] | None) -> list[str]:
     """Keep only known gremium permissions, deduplicated, in catalog order."""
     given = set(perms or [])

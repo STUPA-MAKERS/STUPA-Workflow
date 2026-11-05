@@ -88,6 +88,7 @@ def test_feed_returns_ics_with_meeting() -> None:
     db = fake_session(
         result(principal_row),
         result((gid, object())),
+        result(),
         result((meeting, "StuPa")),
     )
     resp = _client(db).get("/api/calendar/abctoken.ics")

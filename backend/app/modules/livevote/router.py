@@ -955,7 +955,10 @@ async def set_agenda_body(
     ``not_protokollant``). Two writers in one text overwrite each other, and a reader
     with ``canWrite`` (the meeting lead) once saved the stale text of its own view.
 
-    The live followers learn about the changed text through ``meeting_state``.
+    A save of the text alone sends ``agenda_changed``, because the protokollant saves
+    on every pause in typing and the followers then need the agenda only. A change of
+    the title or of the non-public mark sends ``meeting_state``: the guest channel reads
+    the visibility of the votes again on it.
     """
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_write:
@@ -970,7 +973,10 @@ async def set_agenda_body(
         non_public=payload.non_public,
         actor=principal.sub,
     )
-    await service.broadcast_state(meeting_id, principal)
+    if payload.title is None and payload.non_public is None:
+        await service.broadcast_agenda(meeting_id, item_id)
+    else:
+        await service.broadcast_state(meeting_id, principal)
     return items
 
 
@@ -992,14 +998,14 @@ async def set_agenda_done(
     The gate is the gate of the item text: ``canWrite``, and in a live meeting with a
     protokollant only the protokollant (403 ``not_protokollant``). A closed meeting
     whose protocol is no longer a draft answers 409 ``protocol_locked``. Writes
-    ``agenda_item_done`` or ``agenda_item_reopened`` and sends ``meeting_state``.
+    ``agenda_item_done`` or ``agenda_item_reopened`` and sends ``agenda_changed``.
     """
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_write:
         raise ForbiddenError("not allowed to edit the agenda")
     _assert_live_minutes_writer(meeting)
     items = await agenda.set_done(meeting_id, item_id, done=payload.done, actor=principal.sub)
-    await service.broadcast_state(meeting_id, principal)
+    await service.broadcast_agenda(meeting_id, item_id)
     return items
 
 

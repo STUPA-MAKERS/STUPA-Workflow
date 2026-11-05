@@ -25,7 +25,7 @@ import {
   type Seg,
   SegBarComponent,
   SheetBarComponent,
-  SheetBarKickerDirective,
+  SheetBarTitleDirective,
   SideSheetComponent,
   SkeletonComponent,
   ToastService,
@@ -44,7 +44,6 @@ import {
   type Expense,
   type FiscalYear,
 } from './budget-tree.api';
-import { BudgetCrumbsComponent } from './budget-crumbs.component';
 import { BudgetPieComponent, type PieSlice } from './budget-pie.component';
 import { BudgetSunburstComponent, type SunburstMetric } from './budget-sunburst.component';
 import { nodeColors, resolveNodeColors } from './budget-color.util';
@@ -147,8 +146,7 @@ export const APPS_SHOWN = 5;
     NoteComponent,
     PageHeaderComponent,
     SheetBarComponent,
-    SheetBarKickerDirective,
-    BudgetCrumbsComponent,
+    SheetBarTitleDirective,
     NgTemplateOutlet,
     RouterLink,
     TranslatePipe,
@@ -561,6 +559,20 @@ export class BudgetDashboardComponent {
 
   /** Outstanding fiscal-year requests. See `resolveSelection` and `emptyReason`. */
   private readonly pendingFiscalYears = signal(0);
+  /** The round of fiscal-year reads that the counter belongs to. See `load`. */
+  private fyRound = 0;
+
+  /**
+   * The page shows its skeleton, not the tree, until it knows the year of its figures.
+   *
+   * Every amount belongs to a fiscal year, and the years arrive after the tree. Without a
+   * year every figure reads as zero, so the tree would show 0 € for a round trip and then
+   * jump to the real amounts. When every read is in and still no year is selected, the
+   * page has nothing to wait for, and `emptyReason` says why.
+   */
+  readonly showSkeleton = computed(
+    () => this.loading() || (!this.selectedFyId() && this.pendingFiscalYears() > 0),
+  );
 
   /**
    * The query param map is subscribed, because the router keeps this component alive for a
@@ -617,6 +629,10 @@ export class BudgetDashboardComponent {
   /**
    * The fiscal years of every root load in parallel, so one failure does not stop the others. The
    * counter tells "this root has no years" from "its years have not arrived yet".
+   *
+   * The tree and the years are cached reads, which emit a second time when the fresh answer
+   * differs. A root therefore counts once, and only in the newest round: a second tree answer
+   * starts a new round, and a late answer of the old one must not count against it.
    */
   protected load(): void {
     this.loading.set(true);
@@ -626,16 +642,23 @@ export class BudgetDashboardComponent {
         this.tree.set(tree);
         this.loading.set(false);
         const tops = tree.filter((n) => !n.hiddenInBudget);
+        const round = ++this.fyRound;
         this.pendingFiscalYears.set(tops.length);
         for (const top of tops) {
-          this.api.listFiscalYears(top.id as Uuid).subscribe({
+          let settled = false;
+          const settle = (): void => {
+            if (settled || round !== this.fyRound) return;
+            settled = true;
+            this.pendingFiscalYears.update((n) => n - 1);
+          };
+          this.api.cachedFiscalYears(top.id as Uuid).subscribe({
             next: (fys) => {
               this.fiscalYearsByBudget.update((m) => ({ ...m, [top.id]: fys }));
-              this.pendingFiscalYears.update((n) => n - 1);
+              settle();
               this.restoreOrDefault(tops);
             },
             error: () => {
-              this.pendingFiscalYears.update((n) => n - 1);
+              settle();
               this.restoreOrDefault(tops);
             },
           });

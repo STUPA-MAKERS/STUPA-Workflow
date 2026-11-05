@@ -31,6 +31,7 @@ from app.modules.admin.gremium_roles import (
     active_gremium_roles,
     gremium_ids_with_permission,
     gremium_member_ids,
+    gremium_reader_ids,
 )
 from app.modules.admin.models import GremiumMembership, GremiumRole, SiteConfigVersion
 from app.modules.admin.schemas import (
@@ -131,6 +132,10 @@ async def test_active_gremium_roles_and_permission_helpers() -> None:
 
     db5 = fake_session(result((gid, role)))
     assert await gremium_member_ids(db5, "sub-1") == {gid}
+
+    pool_gid = uuid4()
+    db6 = fake_session(result((gid, role)), result(pool_gid))
+    assert await gremium_reader_ids(db6, "sub-1") == {gid, pool_gid}
 
 
 async def test_active_gremium_roles_default_now() -> None:
