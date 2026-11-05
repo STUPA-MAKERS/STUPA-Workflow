@@ -911,6 +911,60 @@ describe('VoteCastComponent', () => {
       expect(fixture.componentInstance.pollBusy()).toBe(false);
     });
 
+    describe('self-update', () => {
+      const back = () => document.dispatchEvent(new Event('visibilitychange'));
+
+      it('reads an open poll again when the tab comes back, and tells the list about a new status', async () => {
+        const { getVote, page } = await setup({ vote: pollVote(), page: { split: true } });
+        getVote.mockClear();
+        getVote.mockReturnValueOnce(of({ ...pollVote(), tally: { ...pollVote().tally!, voted: 9 } }));
+        back();
+        expect(getVote).toHaveBeenCalledWith('v1', { quiet: true });
+        expect(page?.notify).not.toHaveBeenCalled();
+        getVote.mockReturnValueOnce(of(pollVote({ status: 'closed', result: 'passed' })));
+        back();
+        expect(page?.notify).toHaveBeenCalledWith({ id: 'v1', kind: 'updated' });
+        getVote.mockClear();
+        back();
+        expect(getVote).not.toHaveBeenCalled();
+      });
+
+      it('reads a draft again, keeps the vote on a failure, and works without the list', async () => {
+        const { getVote, fixture } = await setup({ vote: pollVote({ status: 'draft' }) });
+        getVote.mockClear();
+        getVote.mockReturnValueOnce(throwError(() => new Error('boom')));
+        back();
+        expect(getVote).toHaveBeenCalledTimes(1);
+        getVote.mockReturnValueOnce(of(pollVote({ status: 'open' })));
+        back();
+        expect(fixture.componentInstance.vote()?.status).toBe('open');
+      });
+
+      it('leaves a meeting vote to its channel', async () => {
+        const { getVote } = await setup({ vote: vote() });
+        getVote.mockClear();
+        back();
+        expect(getVote).not.toHaveBeenCalled();
+      });
+
+      it('drops the answer of a vote it left', async () => {
+        const { getVote, params, fixture } = await setup({ vote: pollVote() });
+        const late = new Subject<Vote>();
+        getVote.mockReturnValueOnce(late);
+        back();
+        getVote.mockReturnValue(of(pollVote({ id: 'v2', question: 'Andere?' })));
+        params.next(convertToParamMap({ id: 'v2' }));
+        late.next(pollVote({ status: 'closed' }));
+        expect(fixture.componentInstance.vote()?.id).toBe('v2');
+      });
+
+      it('reads nothing without a vote', async () => {
+        const { getVote } = await setup({ routeId: null });
+        back();
+        expect(getVote).not.toHaveBeenCalled();
+      });
+    });
+
     it.each([
       ['in a meeting', { meetingId: 'm1' }, true],
       ['without the right', {}, false],

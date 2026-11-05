@@ -1,12 +1,14 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   type OnDestroy,
   computed,
   effect,
   inject,
   signal,
   untracked,
+  NgZone,
   viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -46,7 +48,7 @@ import {
 import { injectListDetailPage } from '@stupa-makers/ui-kit/shell';
 import { meetingVoteStatus, type StatusView } from '@shared/status-kind.util';
 import { LIVE_MAX_PAGES, LIVE_PAGE_LIMIT } from '../../../layout/rail-status.service';
-import { VotingPageService } from './voting-page.service';
+import { VotingPageService, visibleTicks } from './voting-page.service';
 import { closedStatus } from '../election.util';
 import { pollStatus } from '../poll.util';
 import { NewPollDialogComponent } from '../new-poll-dialog/new-poll-dialog.component';
@@ -56,16 +58,20 @@ import { formatMoment } from '@core/i18n/localized-date.pipe';
 import { groupByMonth } from '@shared/group-by-month';
 import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.directive';
 
-/** The status chip: the server default, the open votes, the ended votes, the drafts. */
+/**
+ * The status chip: every vote, the open votes, the ended votes, the drafts. A cancelled
+ * vote never shows in the list; it stays reachable from its application or meeting.
+ */
 export type VoteStatusFilter = '' | 'open' | 'ended' | 'draft';
 
 /** The kind chip: every kind, the motions, the elections, the polls. */
 export type VoteKindFilter = '' | VoteKind;
 const KINDS: readonly VoteKind[] = ['motion', 'election', 'poll'];
 
-const STATUS_QUERY: Record<Exclude<VoteStatusFilter, ''>, VoteStatus[]> = {
+const STATUS_QUERY: Record<VoteStatusFilter, VoteStatus[]> = {
+  '': ['open', 'closed'],
   open: ['open'],
-  ended: ['closed', 'cancelled'],
+  ended: ['closed'],
   draft: ['draft'],
 };
 
@@ -78,10 +84,10 @@ export const VOTE_LIVE_DEBOUNCE = 300;
 /** The largest page that `GET /votes` gives (`MAX_LIMIT`). A larger limit is a 422. */
 export const VOTE_MAX_LIMIT = 200;
 
-/** A vote that just opened in a followed meeting. */
+/** A vote that just opened: in a followed meeting, or a new open row of a refresh. */
 interface FreshVote {
   id: Uuid;
-  meetingId: Uuid;
+  meetingId: Uuid | null;
 }
 
 /** One row as the template shows it. */
@@ -113,15 +119,18 @@ export interface VoteGroup {
  * of the person as a list beside the open vote, like the applications and the tasks.
  *
  * - Left: `GET /votes`, the open votes first ("Offen"), then the drafts ("Entwürfe", only
- *   with the status chip) and the ended votes by month. A row shows the question, the
- *   status or the result, the meeting with the agenda item (else the gremium), the own
+ *   with the status chip) and the ended votes by month. Cancelled votes stay out. A row
+ *   shows the question, the status or the result, the meeting with the agenda item (else the gremium), the own
  *   ballot ("Abgestimmt" / "Stimme offen") and the time. The search and the chips
  *   (Status, Gremium) live in the query params, so a filtered list is a link.
  * - Right: the child route `/voting/:id` with the vote (`VoteCastComponent`): the
  *   two-step ballot, the proxy ballot, the turnout, the result and the manage actions.
  *   After a cast the detail stays on the vote and the row reads "Abgestimmt".
+ * - Self-update: every `VOTE_POLL_MS` while the tab is visible and when the tab comes
+ *   back, the list reads its rows again and follows the meetings that started since.
  * - Live: the page follows the running meetings over the WebSocket. A vote that opens,
- *   closes or is cancelled reloads the list. The page opens a vote that just opened when
+ *   closes or is cancelled reloads the list. The page opens a vote that just opened and
+ *   that the person can still cast a ballot in (also a new open row of a refresh) when
  *   no vote is open in the detail (also on a phone, from the list), or when the detail
  *   shows an ended vote of the same meeting. A vote that the channel replays on a
  *   connect was open before, so it does not open by itself. On the first load side by
@@ -168,6 +177,7 @@ export class VotingComponent implements OnDestroy {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly page = inject(VotingPageService);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly phone = mediaQuery(MEDIA.phone);
 
@@ -194,6 +204,13 @@ export class VotingComponent implements OnDestroy {
   private fetchSeq = 0;
   /** The first open vote opens by itself once, on the first load side by side. */
   private autoOpened = false;
+  /**
+   * The open votes the list has seen since its last load from the start, or `null` before
+   * the first answer. An open vote that a refresh finds and that is not in here is new.
+   */
+  private seenOpen: Set<Uuid> | null = null;
+  /** The votes that opened by themselves. A vote opens by itself at most once. */
+  private readonly freshOpened = new Set<Uuid>();
 
   /** The search text of the filters, from the query params. */
   readonly q = signal('');
@@ -356,6 +373,10 @@ export class VotingComponent implements OnDestroy {
     });
 
     this.followLive();
+
+    visibleTicks(inject(NgZone))
+      .pipe(takeUntilDestroyed())
+      .subscribe(() => this.poll());
   }
 
   ngOnDestroy(): void {
@@ -402,7 +423,7 @@ export class VotingComponent implements OnDestroy {
     this.q.set((pm.get('q') ?? '').trim());
     this.search.sync(this.q());
     const status = pm.get('status') ?? '';
-    const known = status in STATUS_QUERY && (status !== 'draft' || this.canManage());
+    const known = status !== '' && status in STATUS_QUERY && (status !== 'draft' || this.canManage());
     this.statusFilter.set(known ? (status as VoteStatusFilter) : '');
     this.gremiumId.set(pm.get('gremium') ?? '');
     const kind = pm.get('kind') ?? '';
@@ -450,7 +471,7 @@ export class VotingComponent implements OnDestroy {
     const status = this.statusFilter();
     this.api
       .listVotes({
-        status: status ? STATUS_QUERY[status] : undefined,
+        status: STATUS_QUERY[status],
         gremiumId: this.gremiumId() || undefined,
         q: this.q() || undefined,
         kind: this.kindFilter() || undefined,
@@ -464,9 +485,11 @@ export class VotingComponent implements OnDestroy {
           this.items.update((cur) => (mode === 'more' ? [...cur, ...page.items] : page.items));
           this.collectGremien(page.items);
           this.followOpen(page.items);
+          const fresh = this.trackOpen(mode, page.items);
           this.loading.set(false);
           this.reloading.set(false);
           this.loadingMore.set(false);
+          if (fresh) this.openFresh({ id: fresh.id, meetingId: fresh.meetingId });
         },
         error: () => {
           if (seq !== this.fetchSeq) return;
@@ -480,6 +503,22 @@ export class VotingComponent implements OnDestroy {
           this.loadingMore.set(false);
         },
       });
+  }
+
+  /**
+   * Note the open votes of an answer and give the first new one the person can still
+   * cast a ballot in. A load from the start (a filter changed) only notes them: a vote the
+   * filter hid before is not new. This finds the votes no channel reports, a poll of a
+   * Gremium or a vote of a meeting that started after the page loaded.
+   */
+  private trackOpen(mode: 'initial' | 'refresh' | 'more', items: VoteListItem[]): VoteListItem | null {
+    const known = mode === 'initial' || !this.seenOpen ? null : this.seenOpen;
+    const open = items.filter((i) => i.status === 'open');
+    const fresh = known
+      ? (open.find((i) => !known.has(i.id) && i.canCast && !i.myBallot.cast) ?? null)
+      : null;
+    this.seenOpen = new Set([...(known ?? []), ...open.map((i) => i.id)]);
+    return mode === 'refresh' ? fresh : null;
   }
 
   private collectGremien(items: VoteListItem[]): void {
@@ -497,6 +536,34 @@ export class VotingComponent implements OnDestroy {
   private liveTimer: ReturnType<typeof setTimeout> | null = null;
 
   /**
+   * The page updates itself: every `VOTE_POLL_MS` while the tab is visible, and when the
+   * tab comes back to the front, it reads the loaded rows again and follows the meetings
+   * that started since. A load that runs already is not interrupted.
+   */
+  private poll(): void {
+    if (this.loading() || this.reloading() || this.loadingMore()) return;
+    this.refresh();
+    this.followRunning();
+  }
+
+  /** Follow every live meeting of the upcoming timeline (as the rail finds them). */
+  private followRunning(): void {
+    const page = (cursor: string | null) =>
+      this.api.listMeetingsTimeline({ direction: 'upcoming', limit: LIVE_PAGE_LIMIT, cursor });
+    page(null)
+      .pipe(
+        expand((p, i) => (p.nextCursor && i + 1 < LIVE_MAX_PAGES ? page(p.nextCursor) : EMPTY)),
+        map((p) => p.items.filter((m) => m.status === 'live')),
+        reduce((all, items) => [...all, ...items], [] as Meeting[]),
+        catchError(() => of([] as Meeting[])),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((running) => {
+        for (const m of running) this.page.follow(m.id);
+      });
+  }
+
+  /**
    * Follow the running meetings: the live meetings of the upcoming timeline (as the rail
    * finds them) and the meetings of the open votes in the list. A vote that opens,
    * closes or is cancelled in one of them reloads the list, and a vote that just opened
@@ -506,19 +573,7 @@ export class VotingComponent implements OnDestroy {
    * the channel, not from the rows, so a filter that hides the vote does not make it new.
    */
   private followLive(): void {
-    const page = (cursor: string | null) =>
-      this.api.listMeetingsTimeline({ direction: 'upcoming', limit: LIVE_PAGE_LIMIT, cursor });
-    page(null)
-      .pipe(
-        expand((p, i) => (p.nextCursor && i + 1 < LIVE_MAX_PAGES ? page(p.nextCursor) : EMPTY)),
-        map((p) => p.items.filter((m) => m.status === 'live')),
-        reduce((all, items) => [...all, ...items], [] as Meeting[]),
-        catchError(() => of([] as Meeting[])),
-        takeUntilDestroyed(),
-      )
-      .subscribe((running) => {
-        for (const m of running) this.page.follow(m.id);
-      });
+    this.followRunning();
 
     let last: string | null = null;
     effect(() => {
@@ -548,13 +603,29 @@ export class VotingComponent implements OnDestroy {
     this.liveTimer = setTimeout(() => {
       this.liveTimer = null;
       this.refresh();
-      if (fresh) this.openFresh(fresh);
+      if (fresh) this.openIfEligible(fresh);
     }, VOTE_LIVE_DEBOUNCE);
   }
 
   /**
-   * A vote just opened in a followed meeting. A member in the room must see it at once,
-   * as on the former live page:
+   * A vote opened on a channel. The frame does not say whether the person may vote, so
+   * the page reads the vote and opens it only with a ballot still to cast.
+   */
+  private openIfEligible(fresh: FreshVote): void {
+    this.api
+      .getVote(fresh.id, { quiet: true })
+      .pipe(
+        catchError(() => EMPTY),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((vote) => {
+        if (vote.canCast && !vote.myBallot?.cast) this.openFresh(fresh);
+      });
+  }
+
+  /**
+   * A vote just opened that the person can cast a ballot in. It must show at once, as on
+   * the former live page. A vote opens by itself at most once, so "Zur Liste" stays:
    *
    * - No vote in the detail (the list, also on a phone): open the new vote.
    * - The detail shows an ended vote of the same meeting (the vote before): replace it
@@ -565,8 +636,10 @@ export class VotingComponent implements OnDestroy {
    * not have read the result yet; the channel already has it.
    */
   private openFresh(fresh: FreshVote): void {
+    if (this.freshOpened.has(fresh.id)) return;
     const selected = this.selectedId();
     if (!selected) {
+      this.freshOpened.add(fresh.id);
       this.openRow(fresh.id);
       return;
     }
@@ -574,9 +647,10 @@ export class VotingComponent implements OnDestroy {
     const shown = this.page.shown();
     const vote =
       shown?.id === selected ? shown : this.items().find((i) => i.id === selected);
-    if (!vote || vote.meetingId !== fresh.meetingId) return;
+    if (!vote || !fresh.meetingId || vote.meetingId !== fresh.meetingId) return;
     const closed = this.page.sessions().get(fresh.meetingId)?.result()?.voteId === selected;
     if (vote.status === 'closed' || vote.status === 'cancelled' || closed) {
+      this.freshOpened.add(fresh.id);
       this.openRow(fresh.id, true);
     }
   }

@@ -1,7 +1,41 @@
-import { DestroyRef, Injectable, inject, signal } from '@angular/core';
-import { Subject } from 'rxjs';
+import { DestroyRef, Injectable, NgZone, inject, signal } from '@angular/core';
+import { EMPTY, Observable, Subject, filter, fromEvent, interval, merge } from 'rxjs';
 import type { Uuid, VoteStatus } from '@core/api/models';
 import { LiveVoteService, type LiveVoteSession } from '@core/ws/live-vote.service';
+
+/**
+ * How often the page reads the votes again while the tab is visible. The socket of a
+ * running meeting is faster; the poll catches what has no socket: a poll of a Gremium,
+ * a meeting that started after the page loaded, a draft that someone else made.
+ */
+export const VOTE_POLL_MS = 30_000;
+
+/** The tab is in front (always `true` without a document, a test). */
+export function pageVisible(): boolean {
+  return typeof document === 'undefined' || document.visibilityState !== 'hidden';
+}
+
+/**
+ * One tick every `ms` while the tab is visible, and one at once when the tab comes back
+ * to the front. A hidden tab reads nothing.
+ *
+ * With a zone the timer runs outside Angular and only a tick enters it. A timer inside
+ * the zone keeps the app unstable forever, and a stable app is what the service worker
+ * waits for before it registers.
+ */
+export function visibleTicks(zone?: NgZone, ms: number = VOTE_POLL_MS): Observable<void> {
+  return new Observable<void>((sub) => {
+    const back: Observable<unknown> =
+      typeof document === 'undefined' ? EMPTY : fromEvent(document, 'visibilitychange');
+    const emit = () => (zone ? zone.run(() => sub.next()) : sub.next());
+    const listen = () =>
+      merge(interval(ms), back)
+        .pipe(filter(() => pageVisible()))
+        .subscribe(emit);
+    const inner = zone ? zone.runOutsideAngular(listen) : listen();
+    return () => inner.unsubscribe();
+  });
+}
 
 /** A pane changed a vote: a ballot, a delete, or a new state that the socket reported. */
 export interface VoteChange {
