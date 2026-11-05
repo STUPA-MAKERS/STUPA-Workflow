@@ -6,6 +6,27 @@ Tell the owner. Do not change one of them silently.
 
 ## Folders
 
+The tree sorts first by kind, then by area.
+
+```
+specs/
+  style/
+    shared/          writing, api, testing, git
+    backend/         python, database, functional
+    frontend/        angular, functional
+  requirements/
+    functional/
+      meetings/        meetings, voting, delegations, protocols
+      applications/    applications, forms
+      finance/         budget, invoices
+      collaboration/   todos, tickets, notifications
+      administration/  accounts, admin, files
+      public/          public-pages
+      integrations/    mcp
+    non-functional/
+      security/  privacy/  performance/  usability/  accessibility/  compatibility/
+```
+
 | Folder | Content |
 | --- | --- |
 | `style/` | How code, tests, migrations, commits and texts must look. |
@@ -57,45 +78,4 @@ Every spec file uses the same format. Copy `TEMPLATE.md` to start a new file.
 
 ## Index
 
-### Style
-
-| File | Prefix | Area |
-| --- | --- | --- |
-| [style/writing.md](style/writing.md) | `WRT` | Texts in the repository: docstrings, docs, commits |
-| [style/backend.md](style/backend.md) | `BE` | Python backend code |
-| [style/api.md](style/api.md) | `API` | Contract between frontend and backend |
-| [style/database.md](style/database.md) | `DB` | Schema, Alembic migrations, time values |
-| [style/frontend.md](style/frontend.md) | `FE` | Angular frontend code |
-| [style/testing.md](style/testing.md) | `TST` | Tests and coverage gates |
-| [style/git.md](style/git.md) | `GIT` | Branches, pull requests, merges, releases |
-| [style/functional.md](style/functional.md) | `FUN` | Functional style in backend and frontend |
-
-### Functional requirements
-
-| File | Prefix | Area |
-| --- | --- | --- |
-| [requirements/functional/accounts.md](requirements/functional/accounts.md) | `ACC` | Login, roles, account merge |
-| [requirements/functional/admin.md](requirements/functional/admin.md) | `ADM` | Verwaltung, CRUD, audit revert, texts |
-| [requirements/functional/applications.md](requirements/functional/applications.md) | `APP` | Anträge, Aufgaben, forms |
-| [requirements/functional/meetings.md](requirements/functional/meetings.md) | `MTG` | Sitzungen, TOPs, attendance, QR guests |
-| [requirements/functional/voting.md](requirements/functional/voting.md) | `VOTE` | Votes, elections, polls |
-| [requirements/functional/delegations.md](requirements/functional/delegations.md) | `DEL` | Delegations and substitute pools |
-| [requirements/functional/protocols.md](requirements/functional/protocols.md) | `PROT` | Protocols and the protocol PDF |
-| [requirements/functional/public.md](requirements/functional/public.md) | `PUB` | Public pages |
-| [requirements/functional/budget.md](requirements/functional/budget.md) | `BUD` | Kostenstellen, Haushaltsjahre, Buchungen |
-| [requirements/functional/files.md](requirements/functional/files.md) | `FILE` | Attachments, file names |
-| [requirements/functional/notifications.md](requirements/functional/notifications.md) | `NOT` | Mails and notification settings |
-| [requirements/functional/todos-tickets.md](requirements/functional/todos-tickets.md) | `TODO` | Boards, cards, help tickets |
-| [requirements/functional/integrations.md](requirements/functional/integrations.md) | `INT` | MCP server and external systems |
-
-### Non-functional requirements
-
-| File | Prefix | Area |
-| --- | --- | --- |
-| [requirements/non-functional/security.md](requirements/non-functional/security.md) | `SEC` | Access control, downloads, public endpoints |
-| [requirements/non-functional/privacy.md](requirements/non-functional/privacy.md) | `PRIV` | Personal data, pseudonymization, erasure |
-| [requirements/non-functional/performance.md](requirements/non-functional/performance.md) | `PERF` | Load times, batch reads, loading indicators |
-| [requirements/non-functional/layout.md](requirements/non-functional/layout.md) | `LAY` | Page geometry, panes, phone frame |
-| [requirements/non-functional/controls.md](requirements/non-functional/controls.md) | `CTL` | Buttons, menus, search, lists, empty states |
-| [requirements/non-functional/accessibility.md](requirements/non-functional/accessibility.md) | `A11Y` | Accessibility, languages, themes |
-| [requirements/non-functional/compatibility.md](requirements/non-functional/compatibility.md) | `COMP` | Browsers, installed app (PWA), devices |
+The index lists every file with its ID prefix. It follows when the ID format is decided.
