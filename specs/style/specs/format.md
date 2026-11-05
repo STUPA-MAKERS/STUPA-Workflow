@@ -1,5 +1,5 @@
 ---
-id: S_specs.format
+id: S/specs/format
 title: Spec file format
 kind: style
 status: draft
@@ -11,18 +11,18 @@ updated: 2026-11-05
 
 # Spec file format
 
-## S_specs.format_0001 A new file starts as a copy of the template
+## S/specs/format/000001 A new file starts as a copy of the template
 
 Copy `specs/TEMPLATE.md` to start a new spec file.
 
-## S_specs.format_0002 The file starts with a YAML preamble
+## S/specs/format/000002 The file starts with a YAML preamble
 
 The file must start with a YAML front matter block between two `---` lines. The block has
 these keys, in this order:
 
 | Key | Type | Value |
 | --- | --- | --- |
-| `id` | string | The ID prefix of the file, for example `F_meetings.voting`. |
+| `id` | string | The ID prefix of the file, for example `F/meetings/voting`. |
 | `title` | string | The title of the file. It is the same text as the `#` title. |
 | `kind` | enum | `functional`, `non-functional` or `style`. |
 | `status` | enum | `draft`, `approved` or `replaced`. |
@@ -38,7 +38,7 @@ every file readable by the same tool.
 
 Test: The preamble parses as YAML, has exactly these keys, and `id` matches the file path.
 
-## S_specs.format_0003 The status shows the approval
+## S/specs/format/000003 The status shows the approval
 
 | Status | Meaning |
 | --- | --- |
@@ -48,38 +48,43 @@ Test: The preamble parses as YAML, has exactly these keys, and `id` matches the 
 
 Only the owner sets `approved`.
 
-## S_specs.format_0004 The body has one title and one section per rule
+## S/specs/format/000004 The body has one title and one section per rule
 
 After the preamble comes one `#` title. Then each rule is one `##` section. Do not use other
 headings for rules. Do not put text between the title and the first rule.
 
-## S_specs.format_0005 The rule ID contains kind, path and number
+## S/specs/format/000005 The rule ID has kind, path and number
 
 The heading of a rule is its ID, one space and a short title. The ID has the form
-`(F|NF|S)_<path>_NNNN`:
+`(F|NF|S)/<path>/NNNNNN`:
 
 - `F` is a functional requirement, `NF` a non-functional requirement, `S` a style rule.
-- `<path>` is the path of the file below its kind folder, without `.md`, with `.` between the
-  parts. `requirements/functional/meetings/voting.md` gives `meetings.voting`.
-- `NNNN` is a four-digit number. It counts up in the file and starts at `0001`.
+- `<path>` is the path of the file below its kind folder, without `.md`, with `/` between the
+  parts. `requirements/functional/meetings/voting.md` gives `meetings/voting`.
+- `NNNNNN` is a six-digit number.
 
-Examples: `F_meetings.voting_0003`, `NF_security.downloads_0001`, `S_backend.python_0012`.
+Examples: `F/meetings/voting/000026`, `S/specs/format/000005`.
 
-Test: Every rule heading matches `^## (F|NF|S)_[a-z0-9-]+(\.[a-z0-9-]+)*_[0-9]{4} ` and starts
-with the `id` of the preamble.
+Test: Every rule heading matches `^## (F|NF|S)(/[a-z0-9-]+)+/[0-9]{6} ` and starts with the
+`id` of the preamble.
 
-## S_specs.format_0006 A rule number is never used again
+## S/specs/format/000006 The number is the identity of a rule
 
-A removed rule keeps its heading. Its text is `Removed.` A new rule gets the next free number.
+The number must be unique over all spec files. The number is the real ID. Kind and path only
+make the ID readable and easy to find. A new rule gets the highest number in `specs/` plus
+one. A number is never used again. A removed rule keeps its heading, and its text is
+`Removed.`
 
-Reason: An old reference must not point to a different rule.
+Reason: An old reference must not point to a different rule, also after a file moves.
 
-## S_specs.format_0007 A moved file changes its IDs everywhere
+Test: No number occurs in two rule headings.
 
-The ID contains the path. If a file moves, its `id` and all its rule IDs change. Update every
-reference in the same pull request.
+## S/specs/format/000007 A moved rule keeps its number
 
-## S_specs.format_0008 Labels in a rule are fixed
+If a file moves, its `id` and the path part of its rule IDs change. The numbers do not
+change. Update every reference in the same pull request.
+
+## S/specs/format/000008 Labels in a rule are fixed
 
 A rule section uses only these labels, each at the start of its own paragraph:
 
@@ -87,3 +92,13 @@ A rule section uses only these labels, each at the start of its own paragraph:
 - `Test:` how a person or a tool finds a violation.
 
 Other text in a rule section is the rule text. It comes before the labels.
+
+## S/specs/format/000032 Code refers to a rule with the § sign
+
+A docstring or a code comment refers to a rule with `§` and the full rule ID, for example
+`§F/meetings/voting/000024`. A spec, a commit message or a pull request text refers to a rule
+without `§`.
+
+Reason: The `§` sign makes a reference easy to find with one search in the code.
+
+Test: Every `§` reference in the code names a rule heading that exists.
