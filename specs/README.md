@@ -223,6 +223,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [S/shared/git/000056](style/shared/git/000056_ui-kit-flow.md) | ui-kit changes go to ui-kit development first | draft |
 | [S/shared/git/000057](style/shared/git/000057_release-notes.md) | Release notes list migrations and steps | draft |
 | [S/shared/git/000224](style/shared/git/000224_target-development.md) | An app pull request targets development | draft |
+| [S/shared/git/000225](style/shared/git/000225_found-bugs.md) | A found bug is fixed, a behaviour change is asked | draft |
 | [S/shared/testing/000044](style/shared/testing/000044_test-first.md) | Tests come first | draft |
 | [S/shared/testing/000045](style/shared/testing/000045_coverage-gates.md) | Coverage gates hold | draft |
 | [S/shared/testing/000046](style/shared/testing/000046_critical-modules.md) | Critical modules have full branch coverage | draft |
