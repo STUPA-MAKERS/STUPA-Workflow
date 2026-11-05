@@ -28,7 +28,7 @@
   padding: var(--space-4);
   border-radius: var(--radius-xl, 20px);
   box-shadow: var(--shadow-lg);
-  @include frosted-pop(var(--color-surface-3));
+  @include frosted-pop(var(--color-pop));
 }
 // In the dock at the foot of the page the code opens above the button.
 .jq--up .jq__pop {
