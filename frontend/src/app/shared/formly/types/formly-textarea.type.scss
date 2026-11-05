@@ -1,4 +1,5 @@
 @use 'field' as f;
+@use 'scroll-fade' as fade;
 
 .field {
   display: flex;
@@ -37,6 +38,9 @@
     padding-bottom: 8px;
     resize: vertical;
   }
+  // Text that scrolls fades out at the label band and at the foot, only where text is
+  // hidden, so the first and the last line stay sharp at rest.
+  @include fade.fade-y(var(--space-4));
 }
 .field__hint,
 .field__error {

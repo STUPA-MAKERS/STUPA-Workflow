@@ -431,6 +431,9 @@
     resize: vertical;
     field-sizing: content;
   }
+  // Text that scrolls fades out at the label band and at the foot, only where text is
+  // hidden.
+  @include fade.fade-y(var(--space-4));
 }
 
 .fe__mono ::ng-deep input {
