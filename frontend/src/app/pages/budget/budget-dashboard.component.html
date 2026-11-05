@@ -1,7 +1,7 @@
 @if (error()) {
   <h1 class="bd__title">{{ 'nav.budget' | t }}</h1>
   <app-note kind="error" icon="alert" role="alert" retryable (retry)="load()">{{ 'budget.error' | t }}</app-note>
-} @else if (loading()) {
+} @else if (showSkeleton()) {
   <div class="bd" [class.bd--wide]="wide()" aria-busy="true">
     <section class="bd__pane" aria-hidden="true">
       <h1 class="bd__title">{{ 'nav.budget' | t }}</h1>

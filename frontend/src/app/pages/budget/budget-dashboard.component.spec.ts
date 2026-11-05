@@ -1,4 +1,4 @@
-import { BehaviorSubject } from 'rxjs';
+import { BehaviorSubject, Subject } from 'rxjs';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
@@ -8,6 +8,7 @@ import { axe } from 'jest-axe';
 import { AuthService } from '@core/auth/auth.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { BudgetDashboardComponent, utilisation } from './budget-dashboard.component';
+import { BudgetTreeApi } from './budget-tree.api';
 import type {
   BudgetAllocationView,
   BudgetApplication,
@@ -1091,6 +1092,63 @@ describe('BudgetDashboardComponent', () => {
     expect(container.querySelector('.bd__empty')).toBeTruthy();
     expect(container.querySelector('.skel')).toBeNull();
     expect(screen.getByText('Noch keine Budgetdaten')).toBeTruthy();
+  });
+
+  /** Without a year every figure reads as zero, so the tree would show 0 € for a round trip. */
+  it('keeps the skeleton until the year of the figures is in', async () => {
+    const { c, http, fixture, container } = await bare();
+    http.expectOne((r) => r.url.endsWith('/budgets')).flush(TREE);
+    fixture.detectChanges();
+    expect(c.loading()).toBe(false);
+    expect(c.showSkeleton()).toBe(true);
+    expect(container.querySelector('[aria-busy="true"] .skel')).toBeTruthy();
+    expect(container.querySelector('.bd__empty')).toBeNull();
+    http.expectOne((r) => r.url.endsWith('/budgets/b-vs/fiscal-years')).flush([FY]);
+    flushApps(http);
+    fixture.detectChanges();
+    expect(c.showSkeleton()).toBe(false);
+    expect(container.querySelector('[aria-busy="true"]')).toBeNull();
+  });
+
+  /**
+   * The tree and the years are cached reads, which answer twice when the fresh answer differs. A
+   * root that answers twice must not count as two, and an answer of an older tree round must not
+   * count against the newer one. Either would claim "no fiscal year" while b-qs is still loading.
+   */
+  it('counts each root once per tree answer, however often its years answer', async () => {
+    setViewport(true);
+    const tree$ = new Subject<BudgetTreeNode[]>();
+    const years = new Map<string, Subject<FiscalYear[]>[]>();
+    const api = {
+      tree: () => tree$,
+      cachedFiscalYears: (id: string) => {
+        const s = new Subject<FiscalYear[]>();
+        years.set(id, [...(years.get(id) ?? []), s]);
+        return s;
+      },
+    };
+    const view = await render(BudgetDashboardComponent, {
+      providers: [...providers({}), { provide: BudgetTreeApi, useValue: api }],
+    });
+    const c = view.fixture.componentInstance as unknown as Inst;
+    const roots = [node({ id: 'b-vs', key: 'VS' }), node({ id: 'b-qs', key: 'QS' })];
+
+    tree$.next(roots);
+    const [vsOld] = years.get('b-vs')!;
+    vsOld.next([]);
+    vsOld.next([]);
+    expect(c.emptyReason()).toBeNull();
+    expect(c.showSkeleton()).toBe(true);
+
+    tree$.next(roots);
+    const [, vsNew] = years.get('b-vs')!;
+    const [qsOld, qsNew] = years.get('b-qs')!;
+    vsNew.next([]);
+    qsOld.next([]);
+    expect(c.emptyReason()).toBeNull();
+
+    qsNew.next([]);
+    expect(c.emptyReason()).toBe('noFiscalYear');
   });
 
   it('has no axe violations on the wide layout', async () => {
