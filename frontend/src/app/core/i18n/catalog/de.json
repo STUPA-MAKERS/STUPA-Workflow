@@ -587,6 +587,7 @@
   "applications.share.copy": "Kopieren",
   "applications.share.copied": "Kopiert",
   "applications.share.close": "Schließen",
+  "applications.share.loading": "Links werden geladen …",
   "applications.share.none": "Es gibt noch keinen Link zu diesem Antrag.",
   "applications.share.unlabelled": "Ohne Notiz",
   "applications.share.expiresAt": "Gültig bis {at}",

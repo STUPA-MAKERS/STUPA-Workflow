@@ -26,12 +26,60 @@
 .vc--busy.vc--sheet {
   padding-top: var(--space-6);
 }
-.vc__skelMeta {
-  width: 30%;
+// The first load: the question, its meta line, the options and the cast button of the
+// vote panel, with bars where the text goes.
+.vc__sk {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
 }
-.vc__skelTitle {
-  width: 60%;
-  height: 2rem;
+.vc__skTitle {
+  font-size: 1.5rem;
+  line-height: 2.125rem;
+}
+.vc__skTitle1 {
+  width: min(26em, 90%);
+}
+.vc__skTitle2 {
+  width: min(16em, 60%);
+}
+.vc__skMeta {
+  margin-top: var(--space-2);
+  font-size: var(--fs-body);
+  line-height: 1.5rem;
+}
+.vc__skMetaBar {
+  width: min(16em, 70%);
+}
+.vc__skKicker {
+  margin-top: var(--space-4);
+  font-size: var(--fs-small);
+}
+.vc__skKickerBar {
+  width: 6em;
+}
+.vc__skOption {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 3.5rem;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+  font-size: var(--fs-lg);
+}
+.vc__skRadio {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 999px;
+}
+.vc__skOptionBar {
+  width: 5em;
+}
+.vc__skCast {
+  height: var(--control-height-lg);
+  margin-top: var(--space-3);
+  border-radius: 999px;
 }
 .vc--empty.vc--sheet {
   padding-top: var(--space-6);

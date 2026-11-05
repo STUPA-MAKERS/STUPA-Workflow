@@ -132,6 +132,16 @@ type QPos = QuestionPos;
   styleUrl: './form-editor.component.scss',
 })
 export class FormEditorComponent {
+  /** The groups of the outline the first load draws: the name widths of their rows. */
+  protected readonly skeletonGroups: readonly (readonly number[])[] = [
+    [60, 75, 45, 70, 55],
+    [65, 50, 70, 60],
+  ];
+  /** `n` placeholders for the fields of a skeleton card. */
+  protected skeletonFields(n: number): number[] {
+    return Array.from({ length: n }, (_, i) => i);
+  }
+
   protected readonly contentLang = inject(ContentLangState);
   private readonly api = inject(AdminApiService);
   private readonly route = inject(ActivatedRoute);

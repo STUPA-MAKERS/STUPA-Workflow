@@ -260,7 +260,7 @@ describe('MeetingsCalendarComponent', () => {
     monthReq(view.http).flush([]);
     expect(screen.getByRole('heading', { name: 'August 2026' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Nächster Monat' }));
-    expect(view.container.querySelector('.cal__daySec .skel')).not.toBeNull();
+    expect(view.container.querySelector('.cal__daySec [aria-busy="true"] .skel-text')).not.toBeNull();
     monthReq(view.http).flush([]);
     view.fixture.detectChanges();
     expect(screen.getByRole('heading', { name: 'Mi, 30.09.2026' })).toBeInTheDocument();

@@ -587,6 +587,7 @@
   "applications.share.copy": "Copy",
   "applications.share.copied": "Copied",
   "applications.share.close": "Close",
+  "applications.share.loading": "Loading links …",
   "applications.share.none": "There is no link to this application yet.",
   "applications.share.unlabelled": "No note",
   "applications.share.expiresAt": "Valid until {at}",

@@ -39,10 +39,18 @@
   </div>
 
   @if (loading()) {
-    <div class="sld__list" aria-busy="true">
-      <span class="skel skel--line"></span>
-      <span class="skel skel--line"></span>
-    </div>
+    <ul class="sld__list sld__list--skel rowgroup rowgroup--bg3 skel-in" aria-busy="true">
+      @for (w of [55, 40]; track $index) {
+        <li class="sld__row" aria-hidden="true">
+          <span class="sld__rowMain">
+            <span class="sld__rowLabel"><span class="skel-text sld__skLabel" [style.width.em]="w / 5"></span></span>
+            <span class="sld__rowSub"><span class="skel-text skel-text--muted sld__skSub"></span></span>
+          </span>
+          <span class="skel-box sld__skBtn"></span>
+        </li>
+      }
+      <li class="sr-only" role="status">{{ 'applications.share.loading' | t }}</li>
+    </ul>
   } @else if (shares().length) {
     <ul class="sld__list rowgroup rowgroup--bg3">
       @for (share of shares(); track share.id) {

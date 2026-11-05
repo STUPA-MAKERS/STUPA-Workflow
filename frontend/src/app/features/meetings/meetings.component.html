@@ -1,4 +1,4 @@
-@if (showForbidden() || (detailMode() && !meeting())) {
+@if (showForbidden() || (detailMode() && !meeting() && !loading())) {
 <app-page-header [title]="'meetings.title' | t" [rail]="true" [flush]="true">
   <app-breadcrumbs crumbs />
 </app-page-header>
@@ -7,12 +7,7 @@
 @if (showForbidden()) {
   <p class="mtg__status" role="alert">{{ 'rbac.forbidden' | t }}</p>
 } @else if (loading()) {
-  <div class="mtg__loadShell" aria-busy="true">
-    <span class="skel skel--line"></span>
-    <span class="skel skel--panel"></span>
-    <span class="skel skel--line"></span>
-    <span class="sr-only" role="status">{{ 'meetings.loading' | t }}</span>
-  </div>
+  <app-meeting-page-skeleton />
 } @else if (error()) {
   <app-note class="mtg__loadError" kind="error" icon="alert" role="alert" retryable (retry)="retryMeeting()">{{ 'meetings.error' | t }}</app-note>
 } @else if (meeting(); as m) {

@@ -218,3 +218,33 @@
   flex-direction: column;
   gap: var(--space-4);
 }
+.pm__loading .pm__title,
+.pm__loading .pm__eyebrow,
+.pm__loading .pm__meta {
+  display: block;
+}
+.pm__skEyebrow {
+  width: 7em;
+}
+.pm__skTitle {
+  width: min(16em, 90%);
+}
+.pm__skMeta {
+  width: min(18em, 80%);
+}
+.pm__skIntro {
+  display: block;
+  width: 100%;
+  margin-block: 0.4em;
+}
+.pm__skIntro--short {
+  width: 60%;
+}
+.pm__skInput {
+  height: 3.5rem;
+  border-radius: var(--radius-lg);
+}
+.pm__skButton {
+  height: var(--control-height-lg);
+  border-radius: 999px;
+}
