@@ -1,0 +1,15 @@
+---
+id: F/meetings/voting/000026
+title: A tie rejects a motion
+kind: functional
+status: draft
+scope:
+  - backend/app/modules/voting
+  - frontend/src/app/features/voting
+owner: frederikbeimgraben
+updated: 2026-11-05
+---
+
+# A tie rejects a motion
+
+A tie in a motion must give the result `rejected`. There is no result "Stimmengleichheit".

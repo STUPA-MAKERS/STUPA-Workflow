@@ -1,0 +1,21 @@
+---
+id: S/specs/format/000006
+title: The number is the identity of a rule
+kind: style
+status: draft
+scope:
+  - specs/
+owner: frederikbeimgraben
+updated: 2026-11-05
+---
+
+# The number is the identity of a rule
+
+The number must be unique over all specs. The number is the real ID. Kind and path only make
+the ID readable and easy to find. A new rule gets the highest number in `specs/` plus one. A
+number is never used again. A rule that is not in force keeps its file with
+`status: removed`.
+
+Reason: An old reference must not point to a different rule, also after a file moves.
+
+Test: No number occurs in two file names.

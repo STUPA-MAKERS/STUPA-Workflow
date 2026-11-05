@@ -1,6 +1,6 @@
 ---
-id: F/area/topic
-title: Topic name
+id: F/area/topic/NNNNNN
+title: Short title of the rule
 kind: functional
 status: draft
 scope:
@@ -10,9 +10,7 @@ owner: frederikbeimgraben
 updated: YYYY-MM-DD
 ---
 
-# Topic name
-
-## F/area/topic/NNNNNN Short title of the rule
+# Short title of the rule
 
 The rule in one to three sentences. Use `must` and `must not`. Write one instruction in one
 sentence.
@@ -20,9 +18,3 @@ sentence.
 Reason: The cause of the rule.
 
 Test: The test, lint rule or check that finds a violation.
-
-## F/area/topic/NNNNNN Short title of the next rule
-
-The rule.
-
-Reason: The cause.
