@@ -503,8 +503,8 @@ class MeetingVoteOpenBody(_CamelModel):
     majority_rule: Literal["simple", "absolute", "two_thirds"] = Field(
         default="simple", alias="majorityRule"
     )
-    #: A motion and an election are always secret: ``None`` or true; false gives 422
-    #: ``open_vote_unavailable``. A poll keeps the switch (``None`` = open poll).
+    #: Every vote is always secret (motion, election, poll): ``None`` or true; false
+    #: gives 422 ``open_vote_unavailable``.
     secret: bool | None = None
     #: Personnel elections. ``kind = election`` takes ``seats`` and
     #: ``candidates`` and ignores ``options`` and ``majorityRule``. ``question`` is the

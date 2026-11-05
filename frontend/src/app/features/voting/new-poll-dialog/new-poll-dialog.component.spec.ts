@@ -68,7 +68,7 @@ describe('NewPollDialogComponent', () => {
     expect(screen.getByLabelText('Frage')).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: 'Terminumfrage' })).toBeInTheDocument();
     expect(screen.getByLabelText(/Endet am/)).toBeInTheDocument();
-    expect(screen.getByRole('switch', { name: 'Geheime Umfrage' })).toHaveAttribute('aria-checked', 'false');
+    expect(screen.queryByRole('switch', { name: 'Geheime Umfrage' })).toBeNull();
     for (const name of ['Abbrechen', 'Als Entwurf speichern', 'Starten']) {
       expect(screen.getByRole('button', { name })).toBeInTheDocument();
     }
@@ -104,7 +104,6 @@ describe('NewPollDialogComponent', () => {
     const user = userEvent.setup();
     fill(cmp);
     fixture.detectChanges();
-    await user.click(screen.getByRole('switch', { name: 'Geheime Umfrage' }));
     await user.click(screen.getByRole('button', { name: 'Starten' }));
     expect(createPoll).toHaveBeenCalledWith({
       kind: 'poll',

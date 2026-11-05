@@ -141,7 +141,7 @@ describe('UserMergeComponent', () => {
     expect(api.previewPrincipalMerge).toHaveBeenCalledWith('p-old', 'p-new');
     expect(screen.getByText('Altes Konto')).toBeInTheDocument();
     expect(screen.getByText('Bleibt bestehen')).toBeInTheDocument();
-    expect(screen.getByText('Stimmen (offen und geheim)')).toBeInTheDocument();
+    expect(screen.getByText('Stimmen')).toBeInTheDocument();
     expect(screen.getByText('3 übertragen')).toBeInTheDocument();
     expect(screen.getByText('2 zusammengefasst')).toBeInTheDocument();
     expect(screen.getByText('1 entfernt')).toBeInTheDocument();

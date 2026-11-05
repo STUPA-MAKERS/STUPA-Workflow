@@ -117,13 +117,13 @@ describe('poll in the meeting', () => {
     expect(voteResultResolver([poll()], t, 'de')('Wohin?')?.result).toBeNull();
   });
 
-  it('the rules line names only the secrecy', () => {
+  it('the rules line of a poll names no rule and no secrecy', () => {
     const line = voteMetaLine(
       poll({ majorityRule: 'simple', quorum: { type: 'count', value: 3 }, secret: true, closedAt: null }),
       t,
       'de',
     );
-    expect(line).toBe('geheime Abstimmung');
+    expect(line).toBe('');
   });
 
   it('a live open event carries the poll', () => {

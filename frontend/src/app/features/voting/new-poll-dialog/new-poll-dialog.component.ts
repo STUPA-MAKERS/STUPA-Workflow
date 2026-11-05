@@ -23,7 +23,6 @@ import {
   IconComponent,
   SelectFieldComponent,
   type SelectOption,
-  SwitchComponent,
   TextareaComponent,
   TimeInputComponent,
   ToastService,
@@ -40,9 +39,9 @@ export const POLL_MIN_RUNTIME_MS = 60 * 60 * 1000;
  *
  * The person picks the Gremium (one where they hold `vote.manage`; the admin any), the
  * question, the mode and the options (`app-poll-editor`), the end (date and time, at
- * least one hour ahead) and "Geheime Umfrage". "Als Entwurf speichern" keeps it a draft,
- * "Starten" opens it at once; the members with `vote.cast` then get a mail. A date poll
- * is open by default, like every poll.
+ * least one hour ahead). Every poll is secret, so the dialog has no secrecy switch.
+ * "Als Entwurf speichern" keeps it a draft, "Starten" opens it at once; the members with
+ * `vote.cast` then get a mail.
  */
 @Component({
   selector: 'app-new-poll-dialog',
@@ -56,7 +55,6 @@ export const POLL_MIN_RUNTIME_MS = 60 * 60 * 1000;
     IconComponent,
     PollEditorComponent,
     SelectFieldComponent,
-    SwitchComponent,
     TextareaComponent,
     TimeInputComponent,
     TranslatePipe,
@@ -83,7 +81,6 @@ export class NewPollDialogComponent {
   readonly draft = signal<PollDraft>(emptyPollDraft());
   readonly endDate = signal('');
   readonly endTime = signal('');
-  readonly secret = signal(false);
   readonly submitting = signal(false);
   /** The running submit saves a draft: its button shows the spinner. */
   readonly savingDraft = signal(false);
@@ -117,7 +114,6 @@ export class NewPollDialogComponent {
     this.draft.set(emptyPollDraft());
     this.endDate.set('');
     this.endTime.set('');
-    this.secret.set(false);
     this.submitting.set(false);
     this.savingDraft.set(false);
     this.gremium.set(this.gremiumId());
@@ -167,7 +163,7 @@ export class NewPollDialogComponent {
         eligibleGroup: this.gremium(),
         question: this.question().trim(),
         ...pollInOf(this.draft()),
-        secret: this.secret(),
+        secret: true,
         closesAt: this.closesAt()!,
         draft,
       })

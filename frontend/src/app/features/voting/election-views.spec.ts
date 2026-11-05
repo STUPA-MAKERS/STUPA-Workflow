@@ -120,7 +120,7 @@ describe('election views', () => {
       inputs: { vote: v, caster: () => of({}) },
       providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
     });
-    expect(screen.getByText('Stichwahl (2. Wahlgang) · 1 Posten · geheime Abstimmung')).toBeInTheDocument();
+    expect(screen.getByText('Stichwahl (2. Wahlgang) · 1 Posten')).toBeInTheDocument();
     expect(screen.getByText('Gewählt: Anna')).toBeInTheDocument();
   });
 
@@ -159,7 +159,7 @@ describe('election views', () => {
       secret: false,
     });
     view.fixture.detectChanges();
-    expect(screen.getByText(/Wahl · 1 Posten · offene Abstimmung/)).toBeInTheDocument();
+    expect(screen.getByText(/Wahl · 1 Posten/)).toBeInTheDocument();
   });
 
   it('the vote panel: an open election names no secrecy', async () => {

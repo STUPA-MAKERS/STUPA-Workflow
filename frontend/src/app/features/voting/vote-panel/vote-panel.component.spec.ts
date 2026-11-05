@@ -82,11 +82,11 @@ describe('VotePanelComponent', () => {
     expect(castDone).toHaveBeenCalledWith({ choice: 'yes', asDelegation: false });
   });
 
-  it('names the quorum and a secret vote in the rules', async () => {
+  it('names the quorum but not the secrecy of a vote in the rules', async () => {
     await setup({
       vote: vote({ secret: true, quorum: { type: 'count', value: 12 }, majorityRule: 'absolute' }),
     });
-    expect(screen.getByText('Absolute Mehrheit · Quorum 12 · geheime Abstimmung')).toBeInTheDocument();
+    expect(screen.getByText('Absolute Mehrheit · Quorum 12')).toBeInTheDocument();
     expect(screen.queryByText(/Das Ergebnis zeigt sich nach dem Schließen/)).toBeNull();
   });
 
@@ -112,7 +112,7 @@ describe('VotePanelComponent', () => {
     expect(screen.getByRole('heading', { name: 'Beschlussfrage' })).toBeInTheDocument();
   });
 
-  it('reads a secret vote from the config and survives a tally without attendance', async () => {
+  it('survives a tally without attendance', async () => {
     const t = vote().tally;
     await setup({
       vote: vote({
@@ -121,7 +121,7 @@ describe('VotePanelComponent', () => {
         tally: { ...t, present: undefined, voted: undefined },
       }),
     });
-    expect(screen.getByText('Einfache Mehrheit · geheime Abstimmung')).toBeInTheDocument();
+    expect(screen.getByText('Einfache Mehrheit')).toBeInTheDocument();
     expect(screen.getByText('0 von 0 Anwesenden haben abgestimmt')).toBeInTheDocument();
   });
 
