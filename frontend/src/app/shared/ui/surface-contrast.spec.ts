@@ -87,7 +87,7 @@ describe('text on surface 3', () => {
 
   it('the row menu (on surface 3) gives its section caption the muted text', () => {
     const menu = kit('row-menu/row-menu.component.scss');
-    expect(menu).toMatch(/\.rm__menu \{[^}]*@include frosted-pop\(var\(--color-surface-3\)\);/);
+    expect(menu).toMatch(/\.rm__menu \{[^}]*@include frosted-pop\(var\(--color-pop\)\);/);
     const cap = menu.match(/\.rm__cap \{([^}]*)\}/)?.[1] ?? '';
     expect(cap).toContain('color: var(--color-text-muted);');
     expect(menu).not.toContain('--color-text-subtle');

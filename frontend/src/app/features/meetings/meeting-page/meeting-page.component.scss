@@ -71,7 +71,7 @@
   box-shadow: var(--shadow-lg);
   font-size: var(--fs-body);
   line-height: 1.75rem;
-  @include frosted-pop(var(--color-surface-3));
+  @include frosted-pop(var(--color-pop));
 }
 .mp__beamer {
   flex: none;
