@@ -375,6 +375,10 @@
         </div>
       } @else if (card.descriptionMd) {
         <app-markdown-view class="cd__desc" [src]="card.descriptionMd" />
+      } @else {
+        <button type="button" class="cd__descEmpty" data-testid="cd-desc-empty" (click)="startDesc()">
+          {{ 'todos.card.descriptionEmpty' | t }}
+        </button>
       }
     </app-section>
 

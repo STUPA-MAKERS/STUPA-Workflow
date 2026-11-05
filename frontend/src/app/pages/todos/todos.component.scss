@@ -212,6 +212,16 @@
     border-radius: 0;
     box-shadow: none;
   }
+  // The card is a dialog layer above the bottom bar, so it covers the shadow of the bar. This
+  // box lies over the bar in the layer of the card and casts the same shadow up over the card.
+  .td__barEdge {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: var(--z-dialog);
+    height: var(--app-bottom-inset, 0px);
+    box-shadow: var(--shadow-md-up);
+    pointer-events: none;
+  }
   // The bar is frosted glass in the colour of the card while the card scrolls under it,
   // like the bar of every other phone detail.
   .td__drawer > app-list-detail-bar {

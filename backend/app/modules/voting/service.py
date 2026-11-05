@@ -106,6 +106,28 @@ def guest_voter_sub(guest_id: UUID) -> str:
     return f"{GUEST_VOTER_PREFIX}{guest_id}"
 
 
+def secret_only(secret: bool | None, *, field: str) -> bool:
+    """Return the secrecy of a new motion or election: always True.
+
+    A decision and an election are always secret: the platform has no open vote
+    (user decision 2026-11-05). ``None`` (the client sent no value) gives True. An
+    explicit ``false`` gives 422, so a client that asks for an open vote learns that it
+    does not get one. A poll keeps its own switch and does not use this function.
+    Old open votes stay readable through the ``ballot`` table.
+
+    Raises:
+        ValidationProblem: The client asked for an open vote
+            (``open_vote_unavailable``, 422).
+    """
+    if secret is False:
+        raise ValidationProblem(
+            "A vote is always secret.",
+            code="open_vote_unavailable",
+            errors=[{"field": field, "msg": "open votes are not available"}],
+        )
+    return True
+
+
 def open_tally_revealed(present: int, voted: int, expected: int) -> bool:
     """Return True when an open, non-secret vote can show its running tally.
 
@@ -819,7 +841,8 @@ class VotingService:
         This method does not do that check.
 
         The server sets ``eligible_count`` from the roster of the gremium (members
-        with ``vote.cast``). The client cannot send it.
+        with ``vote.cast``). The client cannot send it. The vote is always secret
+        (``secret_only``): ``config.secret`` false gives 422.
 
         Only a meeting vote of a public meeting has guests. An unconfirmed guest
         application rests in the flow and gets 404 as on the flow routes, because a vote
@@ -832,9 +855,9 @@ class VotingService:
                 (404).
             ForbiddenError: The application has no gremium and the principal is not
                 the admin role (403).
-            ValidationProblem: The gremium does not exist (``eligible_group_invalid``)
-                or is not the gremium of the application
-                (``eligible_group_mismatch``) (422).
+            ValidationProblem: The gremium does not exist (``eligible_group_invalid``),
+                is not the gremium of the application (``eligible_group_mismatch``), or
+                the body asks for an open vote (``open_vote_unavailable``) (422).
         """
         from app.modules.auth.policy import admin_bypass
 
@@ -844,6 +867,10 @@ class VotingService:
                 code="guests_vote_unavailable",
                 errors=[{"field": "config.guestsVote", "msg": "not a public meeting vote"}],
             )
+        sent = payload.config.secret if "secret" in payload.config.model_fields_set else None
+        config = payload.config.model_copy(
+            update={"secret": secret_only(sent, field="config.secret")}
+        )
         gremium_id = payload.eligible_group
         if not await self._gremium_exists(gremium_id):
             raise ValidationProblem(
@@ -868,7 +895,7 @@ class VotingService:
 
         eligible = await MeetingService(self.session).vote_eligible_count(gremium_id)
         internal = VoteCreateInternal(
-            config=payload.config,
+            config=config,
             eligibleGroup=gremium_id,
             question=payload.question,
             eligibleCount=eligible,

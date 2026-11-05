@@ -1,4 +1,5 @@
 @use 'field' as f;
+@use '../textarea-glass' as glass;
 
 .field {
   display: flex;
@@ -9,6 +10,7 @@
 .field__box {
   @include f.box;
   @include f.box-labelled;
+  @include glass.box;
   & {
     align-items: stretch;
   }
@@ -18,6 +20,7 @@
 }
 .field__label {
   @include f.label;
+  @include glass.label;
 }
 .field__box:focus-within .field__label {
   @include f.label-focus;

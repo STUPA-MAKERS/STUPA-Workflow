@@ -62,8 +62,8 @@ export interface CandidateDraft {
 /**
  * "Abstimmung öffnen" for one agenda item.
  *
- * The lead sets the decision question, the majority rule and whether the vote is
- * secret. Everything else comes from the Gremium: the quorum and the eligible voters
+ * The lead sets the decision question and the majority rule. A decision and an
+ * election are always secret: the dialog has no switch for an open vote. Everything else comes from the Gremium: the quorum and the eligible voters
  * (the server counts them from the roster). A meeting vote has no tie break, a tie is
  * a rejection, and a ballot never changes after the cast. The options are
  * always yes, no and abstain, so the result can fire the pass or fail branch.
@@ -74,9 +74,9 @@ export interface CandidateDraft {
  *
  * On a free-text item the lead can open a personnel election instead ("Beschluss |
  * Wahl"): the name of the round, the seats to fill and the candidates (a member of
- * the roster or a free name, in a list the lead can reorder). An election is secret by
- * default, and guests vote only when the lead switches them on. The dialog cannot
- * submit while there are fewer candidates than seats.
+ * the roster or a free name, in a list the lead can reorder). Guests vote only when
+ * the lead switches them on. The dialog cannot submit while there are fewer
+ * candidates than seats.
  *
  * A free-text item also takes a poll ("Umfrage"): a question and two to twenty
  * options in one of three modes. A poll only counts the answers: it has no quorum and
@@ -142,7 +142,6 @@ export class VoteOpenDialogComponent {
 
   readonly question = signal('');
   readonly majorityRule = signal<MajorityRule>('simple');
-  readonly secret = signal(false);
   /** Admitted guests vote too: no quorum, the majority of the cast votes. */
   readonly guestsVote = signal(false);
   readonly submitting = signal(false);
@@ -167,8 +166,6 @@ export class VoteOpenDialogComponent {
   readonly candidates = signal<CandidateDraft[]>([]);
   /** The free name that the lead types for a new candidate. */
   readonly freeName = signal('');
-  /** An election is secret by default. */
-  readonly electionSecret = signal(true);
   /** The poll: its mode and options, and the switch "Geheime Umfrage". */
   readonly poll = signal<PollDraft>(emptyPollDraft());
   readonly pollSecret = signal(false);
@@ -282,14 +279,12 @@ export class VoteOpenDialogComponent {
     this.questionEdited = false;
     this.question.set(it.applicationId ? this.prefill(it) : (it.title ?? ''));
     this.majorityRule.set('simple');
-    this.secret.set(false);
     this.guestsVote.set(this.guestsAllowed() && !it.nonPublic);
     this.submitting.set(false);
     this.kind.set('motion');
     this.seats.set(1);
     this.candidates.set([]);
     this.freeName.set('');
-    this.electionSecret.set(true);
     this.poll.set(emptyPollDraft());
     this.pollSecret.set(false);
   }
@@ -406,14 +401,14 @@ export class VoteOpenDialogComponent {
             name: c.name,
             ...(c.principalId ? { principalId: c.principalId } : {}),
           })),
-          secret: this.electionSecret(),
+          secret: true,
           ...guests,
         }
       : {
           agendaItemId: it.id,
           question: this.question().trim() || null,
           options: [...FIXED_VOTE_OPTIONS],
-          secret: this.secret(),
+          secret: true,
           majorityRule: this.majorityRule(),
           ...guests,
           ...(proposal ? { proposal } : {}),

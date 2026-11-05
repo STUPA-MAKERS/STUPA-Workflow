@@ -128,13 +128,6 @@
       }
     </div>
 
-    <app-switch
-      [id]="'vod-election-secret'"
-      [checked]="electionSecret()"
-      (checkedChange)="electionSecret.set($event)"
-      ><span class="vod__switchLabel">{{ 'election.dialog.secret' | t }}</span></app-switch
-    >
-
     <p class="vod__rule" role="note">
       <app-icon name="info" [size]="16" />
       <span>{{ ruleSentence() }}</span>
@@ -150,13 +143,6 @@
         (valueChange)="setRule($event)"
       />
     </div>
-
-    <app-switch
-      [id]="'vod-secret'"
-      [checked]="secret()"
-      (checkedChange)="secret.set($event)"
-      ><span class="vod__switchLabel">{{ 'meetings.vote.secret' | t }}</span></app-switch
-    >
     }
 
     @if (guestsAllowed()) {

@@ -550,7 +550,7 @@ async def test_guest_votes_without_quorum_and_late_admission(
         me = b.get(f"/api/public/meetings/{code}/me").json()
         assert me["view"]["votes"][0]["myBallot"] == {
             "cast": True,
-            "choice": "yes",
+            "choice": None,
             "choices": None,
             "answers": None,
         }
@@ -574,9 +574,17 @@ async def test_guest_votes_without_quorum_and_late_admission(
         assert row is not None
         assert (row.present_members, row.present_guests, row.eligible_count) == (2, 2, 4)
         voters = set(
-            (await session.scalars(select(Ballot.voter_sub).where(Ballot.vote_id == row.id))).all()
+            (
+                await session.scalars(
+                    select(VotedMarker.voter_sub).where(VotedMarker.vote_id == row.id)
+                )
+            ).all()
         )
+        open_rows = (
+            await session.scalars(select(Ballot.voter_sub).where(Ballot.vote_id == row.id))
+        ).all()
     assert voters == {f"guest:{ga['id']}", f"guest:{gb['id']}"}
+    assert open_rows == []
     casts = [e for e in await audits(maker) if e.action == "vote_cast"]
     assert {e.actor for e in casts} == voters
     assert all("choice" not in e.data for e in casts)

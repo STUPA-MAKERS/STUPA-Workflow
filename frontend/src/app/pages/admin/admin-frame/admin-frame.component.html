@@ -15,7 +15,6 @@
       @if (mode().search) {
         <app-sticky-bar class="ld-pane__filters af__search">
           <app-search-pill
-            [size]="split() ? 'lg' : 'md'"
             [clearable]="true"
             [placeholder]="'admin.frame.search' | t"
             [value]="query()"

@@ -594,7 +594,8 @@ class MeetingVoteOpenBody(WireModel):
     majorityRule: Literal["simple", "absolute", "two_thirds"] = "simple"
     secret: bool | None = Field(
         default=None,
-        description="Secret ballot. Default: off for a motion, on for an election.",
+        description="A motion and an election are always secret. Leave it out; false "
+        "gives 422 `open_vote_unavailable`.",
     )
     seats: int = Field(default=1, ge=1, le=50, description="Election only: posts.")
     candidates: list[ElectionCandidateIn] = Field(
@@ -629,9 +630,10 @@ class VoteCreate(WireModel):
 
     config: dict[str, Any] = Field(
         description=(
-            "Vote config: options, majorityRule, quorum, abstainCountsQuorum, secret, "
-            "tieBreak. A ballot never changes after the cast, so there is no "
-            "`allowChange` (the server refuses the key with 422)."
+            "Vote config: options, majorityRule, quorum, abstainCountsQuorum, "
+            "tieBreak. The vote is always secret: `secret` false gives 422. A ballot "
+            "never changes after the cast, so there is no `allowChange` (the server "
+            "refuses the key with 422)."
         )
     )
     eligibleGroup: str = Field(
