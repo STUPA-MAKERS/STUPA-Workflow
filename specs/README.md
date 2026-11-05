@@ -262,3 +262,4 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [S/specs/structure/000012](style/specs/structure/000012_one-place.md) | A rule is written in one place | draft |
 | [S/specs/structure/000013](style/specs/structure/000013_index.md) | The index lists every rule | draft |
 | [S/specs/structure/000014](style/specs/structure/000014_change-process.md) | A change goes through a pull request | draft |
+| [S/specs/structure/000226](style/specs/structure/000226_spec-first.md) | A change request starts as a spec | draft |
