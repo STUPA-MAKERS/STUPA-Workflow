@@ -289,19 +289,19 @@
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
-// An empty description is a placeholder in the shape of the closed field; a tap opens the editor.
+// An empty description is a muted placeholder line where the text would stand; a tap opens
+// the editor.
 .cd__descEmpty {
   display: block;
   width: 100%;
-  padding: var(--space-3);
+  padding: 0;
   border: 0;
-  border-radius: var(--radius-field);
-  background: var(--color-surface-sunken);
+  border-radius: var(--radius-sm);
+  background: none;
   color: var(--color-text-muted);
   font: inherit;
-  line-height: 1.375rem;
+  line-height: 1.5;
   text-align: start;
-  vertical-align: top;
   cursor: text;
   transition: scale var(--motion-xs) var(--ease-standard);
   @include press.press(row);
