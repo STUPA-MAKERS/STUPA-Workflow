@@ -934,10 +934,27 @@ export class ApiClient {
       poll?: PollIn;
       /** Prepare the question only; it opens later. */
       draft?: boolean;
+      /** Repeat this closed vote of the same agenda item ("Erneut abstimmen"). */
+      repeatOf?: Uuid;
     },
   ): Observable<Meeting> {
     return this.http
       .post<MeetingOutWire>(`${this.base}/meetings/${meetingId}/votes`, body)
+      .pipe(map(mapMeeting));
+  }
+
+  /**
+   * PUT /meetings/{id}/votes/{voteId} — change a prepared (draft) vote: the body of
+   * the create without `draft` and `repeatOf`. The agenda item stays. The response is
+   * the updated meeting.
+   */
+  updateMeetingVote(
+    meetingId: Uuid,
+    voteId: Uuid,
+    body: Omit<Parameters<ApiClient['openMeetingVote']>[1], 'draft' | 'repeatOf'>,
+  ): Observable<Meeting> {
+    return this.http
+      .put<MeetingOutWire>(`${this.base}/meetings/${meetingId}/votes/${voteId}`, body)
       .pipe(map(mapMeeting));
   }
 

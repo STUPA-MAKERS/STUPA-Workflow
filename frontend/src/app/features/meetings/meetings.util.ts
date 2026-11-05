@@ -68,17 +68,21 @@ function countOf(text: string, part: string): number {
 
 /**
  * The question in the head line of the callout. A runoff copies the question of its
- * election, so its head names the round: "Frage (2. Wahlgang)". Each round then has its
- * own head line, as in the backend `build_election_snippet`.
+ * election, so its head names the round: "Frage (2. Wahlgang)". A repeat ("Erneut
+ * abstimmen") copies the question of the vote it repeats, so its head names the attempt:
+ * "Frage (2. Abstimmung)", for an election the next round. Each round and each attempt
+ * then has its own head line, as in the backend `build_election_snippet` and `_snippet`.
  */
 export function voteSnippetQuestion(vote: MeetingVote): string {
-  if (vote.kind === 'poll') return vote.question?.trim() || 'Umfrage';
+  const attempt = vote.attempt ?? 1;
+  const again = (head: string): string => (attempt > 1 ? `${head} (${attempt}. Abstimmung)` : head);
+  if (vote.kind === 'poll') return again(vote.question?.trim() || 'Umfrage');
   if (vote.kind === 'election') {
     const head = vote.question?.trim() || 'Wahlgang';
-    const round = vote.round ?? 1;
+    const round = (vote.round ?? 1) + attempt - 1;
     return round > 1 ? `${head} (${round}. Wahlgang)` : head;
   }
-  return vote.question?.trim() || vote.title?.trim() || 'Beschlussfrage';
+  return again(vote.question?.trim() || vote.title?.trim() || 'Beschlussfrage');
 }
 
 /**

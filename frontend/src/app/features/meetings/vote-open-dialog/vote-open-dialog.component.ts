@@ -11,7 +11,15 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiClient } from '@core/api/api-client.service';
-import type { AgendaItem, Attendance, MajorityRule, Meeting, Uuid, VoteKind } from '@core/api/models';
+import type {
+  AgendaItem,
+  Attendance,
+  MajorityRule,
+  Meeting,
+  MeetingVote,
+  Uuid,
+  VoteKind,
+} from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { DecisionEditorComponent } from '@shared/decision/decision-editor.component';
@@ -19,6 +27,7 @@ import {
   type DecisionDraft,
   decisionQuestion,
   draftError,
+  draftOf,
   emptyDraft,
   toProposal,
 } from '@shared/decision/decision.util';
@@ -42,7 +51,13 @@ import {
 import { FIXED_VOTE_OPTIONS } from '../meetings-display.util';
 import { problemDetail } from '@core/api/problem';
 import { PollEditorComponent } from '../../voting/poll-editor/poll-editor.component';
-import { type PollDraft, emptyPollDraft, pollDraftValid, pollInOf } from '../../voting/poll.util';
+import {
+  type PollDraft,
+  emptyPollDraft,
+  pollDraftOf,
+  pollDraftValid,
+  pollInOf,
+} from '../../voting/poll.util';
 import { personLabel } from '@shared/person-label.util';
 
 const MAJORITY_RULES: readonly MajorityRule[] = ['simple', 'absolute', 'two_thirds'];
@@ -50,6 +65,16 @@ const KINDS: readonly VoteKind[] = ['motion', 'election', 'poll'];
 /** The bounds of the server (`ElectionConfig`). */
 export const MAX_SEATS = 50;
 export const MAX_CANDIDATES = 50;
+
+/**
+ * The vote that the dialog starts from: a prepared vote to change (`edit`), or a closed
+ * vote to vote on again (`repeat`). The dialog takes its question, rules, candidates and
+ * options.
+ */
+export interface VoteDialogSource {
+  mode: 'edit' | 'repeat';
+  vote: MeetingVote;
+}
 
 /** One candidate in the dialog: a member of the roster or a free name. */
 export interface CandidateDraft {
@@ -86,6 +111,11 @@ export interface CandidateDraft {
  * "Vorbereiten" saves the question as a draft without opening it, so the lead can
  * prepare the votes before the meeting starts. The vote card opens the draft later. A
  * planned meeting, or a meeting with another open vote, only prepares (`canOpen`).
+ *
+ * With a `source` the dialog starts from a vote. `edit` changes a prepared vote and saves
+ * it ("Speichern"); the agenda item stays. `repeat` votes on a closed vote again: the
+ * dialog starts with its question and rules, and the new vote repeats it. On an
+ * application item the open of the repeat moves the application back into its vote state.
  */
 @Component({
   selector: 'app-vote-open-dialog',
@@ -126,6 +156,8 @@ export class VoteOpenDialogComponent {
   readonly presentMembers = input(0);
   /** The roster of the meeting: the persons the lead can pick as candidates. */
   readonly members = input<readonly Attendance[]>([]);
+  /** The vote to change or to repeat, or `null` for a new vote. */
+  readonly source = input<VoteDialogSource | null>(null);
   readonly closed = output<void>();
   /** The server opened or prepared the vote. Carries the updated meeting. */
   readonly opened = output<Meeting>();
@@ -137,7 +169,19 @@ export class VoteOpenDialogComponent {
    */
   readonly canOpen = computed(() => {
     const m = this.meeting();
+    if (this.editing()) return false;
     return m.status === 'live' && m.isProtokollant && !m.votes.some((v) => v.status === 'open');
+  });
+  /** The dialog changes a prepared vote. */
+  readonly editing = computed(() => this.source()?.mode === 'edit');
+  /** The dialog votes on a closed vote again. */
+  readonly repeating = computed(() => this.source()?.mode === 'repeat');
+  /** The title: "Abstimmung bearbeiten", "Erneut abstimmen", "… öffnen" or "… vorbereiten". */
+  readonly titleKey = computed(() => {
+    if (this.editing()) return 'meetings.vote.editTitle' as const;
+    if (this.repeating()) return 'meetings.vote.repeatTitle' as const;
+    if (this.isPoll() && this.canOpen()) return 'poll.dialog.title' as const;
+    return this.canOpen() ? ('meetings.vote.dialogTitle' as const) : ('meetings.vote.prepareTitle' as const);
   });
 
   readonly question = signal('');
@@ -258,13 +302,24 @@ export class VoteOpenDialogComponent {
     const it = this.item();
     if (!it) return '';
     const top = this.i18n.translate('meetings.agenda.top', { n: this.topNumber() });
-    return it.title ? `${top} · ${it.title}` : top;
+    const line = it.title ? `${top} · ${it.title}` : top;
+    const src = this.source();
+    if (src?.mode !== 'repeat') return line;
+    const attempt = (src.vote.attempt ?? 1) + 1;
+    const next =
+      src.vote.kind === 'election'
+        ? this.i18n.translate('meetings.vote.attemptElection', {
+            n: (src.vote.round ?? 1) + attempt - 1,
+          })
+        : this.i18n.translate('meetings.vote.attempt', { n: attempt });
+    return `${line} · ${next}`;
   });
 
   constructor() {
     effect(() => {
       const it = this.item();
-      if (it) untracked(() => this.reset(it));
+      const src = this.source();
+      if (it) untracked(() => this.reset(it, src));
     });
   }
 
@@ -273,7 +328,7 @@ export class VoteOpenDialogComponent {
    * whether to fund it. A free-text item starts with its own title. The lead can
    * change both.
    */
-  private reset(it: AgendaItem): void {
+  private reset(it: AgendaItem, src: VoteDialogSource | null): void {
     this.draft.set(emptyDraft(it.amount ?? null));
     this.questionEdited = false;
     this.question.set(it.applicationId ? this.prefill(it) : (it.title ?? ''));
@@ -285,6 +340,31 @@ export class VoteOpenDialogComponent {
     this.candidates.set([]);
     this.freeName.set('');
     this.poll.set(emptyPollDraft());
+    if (src) this.fill(it, src.vote);
+  }
+
+  /** Start from a stored vote: its kind, question, rules, candidates or options. */
+  private fill(it: AgendaItem, vote: MeetingVote): void {
+    const kind = vote.kind ?? 'motion';
+    this.kind.set(kind);
+    this.questionEdited = true;
+    this.question.set(vote.question ?? '');
+    this.majorityRule.set(vote.majorityRule ?? 'simple');
+    this.guestsVote.set(this.guestsAllowed() && !it.nonPublic && !!vote.guestsVote);
+    if (it.applicationId) this.draft.set(draftOf(vote.proposal, it.amount ?? null));
+    if (kind === 'election' && vote.election) {
+      this.seats.set(vote.election.seats);
+      this.candidates.set(
+        vote.election.candidates.map((c) => ({
+          key: this.nextKey++,
+          name: c.name,
+          principalId: c.principalId ?? null,
+        })),
+      );
+    }
+    if (kind === 'poll' && vote.poll) {
+      this.poll.set(pollDraftOf(vote.poll));
+    }
   }
 
   setKind(value: string | null): void {
@@ -411,13 +491,26 @@ export class VoteOpenDialogComponent {
           ...guests,
           ...(proposal ? { proposal } : {}),
         };
-    this.api
-      .openMeetingVote(this.meeting().id, prepare ? { ...body, draft: true } : body)
-      .subscribe({
+    const src = this.source();
+    const request =
+      src?.mode === 'edit'
+        ? this.api.updateMeetingVote(this.meeting().id, src.vote.id, body)
+        : this.api.openMeetingVote(this.meeting().id, {
+            ...body,
+            ...(prepare ? { draft: true } : {}),
+            ...(src?.mode === 'repeat' ? { repeatOf: src.vote.id } : {}),
+          });
+    request.subscribe({
         next: (updated) => {
           this.submitting.set(false);
           this.toast.success(
-            this.i18n.translate(prepare ? 'meetings.toast.votePrepared' : 'meetings.toast.voteOpened'),
+            this.i18n.translate(
+              src?.mode === 'edit'
+                ? 'meetings.toast.voteSaved'
+                : prepare
+                  ? 'meetings.toast.votePrepared'
+                  : 'meetings.toast.voteOpened',
+            ),
           );
           this.opened.emit(updated);
         },

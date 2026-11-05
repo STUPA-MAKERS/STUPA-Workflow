@@ -712,6 +712,19 @@ describe('mapProtocol', () => {
 });
 
 describe('mapMeetingVote', () => {
+  it('keeps the proposal and the repeat link', () => {
+    const v = mapMeetingVote({
+      id: 'v-3',
+      status: 'draft',
+      proposal: { approvedAmount: null, conditions: ['x'] },
+      repeatOfId: 'v-1',
+    } as MeetingVoteOutWire);
+    expect(v.proposal).toEqual({ approvedAmount: null, conditions: ['x'] });
+    expect(v.repeatOfId).toBe('v-1');
+    expect(v.attempt).toBe(2);
+    expect(mapMeetingVote({ id: 'v-4', status: 'draft', repeatOfId: 'v-1', attempt: 3 } as MeetingVoteOutWire).attempt).toBe(3);
+  });
+
   it('maps every field through and normalises the null/0/true defaults', () => {
     const minimal = { id: 'v-1', status: 'draft' } as MeetingVoteOutWire;
     expect(mapMeetingVote(minimal)).toEqual({

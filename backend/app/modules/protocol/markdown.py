@@ -404,6 +404,8 @@ class ElectionSnippet:
     runoff_names: list[str] = field(default_factory=list)
     runoff_seats: int = 0
     closed: bool = True
+    #: The number of a repeat ("erneut abstimmen"); 1 for an election that repeats nothing.
+    attempt: int = 1
 
 
 def build_election_snippet(view: ElectionSnippet, *, public: bool = False) -> str:
@@ -417,12 +419,14 @@ def build_election_snippet(view: ElectionSnippet, *, public: bool = False) -> st
     turns into the tally box (internal only).
 
     A runoff copies the question of its election, so its head line names the round
-    („Frage (2. Wahlgang)“). Each round then has its own head line, which
-    `replace_vote_blocks` and `votes_in_body` match on.
+    („Frage (2. Wahlgang)“). A repeat of an election counts on in the same way
+    (`attempt`), but its kind line names no runoff. Each round then has its own head line,
+    which `replace_vote_blocks` and `votes_in_body` match on.
     """
     head = _md_escape(view.question)
-    if view.round > 1:
-        head += f" ({view.round}. Wahlgang)"
+    number = view.round + view.attempt - 1
+    if number > 1:
+        head += f" ({number}. Wahlgang)"
     lines = [f"> [!abstimmung] **{head}**"]
     meta = f"Wahl · {view.seats} Posten"
     if view.round > 1:
@@ -570,6 +574,39 @@ def replace_vote_blocks(body: str, pairs: list[tuple[str, str]]) -> str:
         i = stop
     out.extend(lines[i:])
     return "\n".join(out)
+
+
+def mark_vote_blocks(body: str, marks: list[tuple[str, str]]) -> str:
+    """Add a mark line to the callout of each vote in `body`.
+
+    Each pair is (the snippet of the vote, the line). The block of a vote is the
+    first block that starts with the head line of its snippet and has no mark yet. The
+    line goes below the last `>` line of that block, so a text that the protokollant
+    changed inside the callout stays. A block that already holds the line stays as it
+    is, and a vote without a block changes nothing.
+    """
+    lines = body.split("\n")
+    for snippet, mark in marks:
+        head = snippet.split("\n", 1)[0].strip()
+        marked = f"> {_md_escape(mark)}"
+        i = 0
+        while i < len(lines):
+            if lines[i].strip() != head:
+                i += 1
+                continue
+            j = i + 1
+            while (
+                j < len(lines)
+                and lines[j].lstrip().startswith(">")
+                and not lines[j].lstrip().startswith("> [!")
+            ):
+                j += 1
+            if any(line.strip() == marked for line in lines[i:j]):
+                i = j
+                continue
+            lines.insert(j, marked)
+            break
+    return "\n".join(lines)
 
 
 def votes_in_body(body: str, snippets: list[str]) -> list[bool]:

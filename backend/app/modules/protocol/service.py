@@ -28,6 +28,7 @@ then rolls back, the protocol stays draft and the caller can repeat the call.
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from datetime import date as _date
@@ -86,6 +87,7 @@ from app.modules.protocol.markdown import (
     build_vote_snippet,
     demote_headings,
     guest_vote_note,
+    mark_vote_blocks,
     protocol_variant_for,
     replace_vote_blocks,
     votes_in_body,
@@ -1134,6 +1136,7 @@ class ProtocolService:
                 )
             ).scalars().all()
             views = [await voting.get(vote.id) for vote in votes]
+            marks = _repeat_marks(votes, views)
             if public:
                 body = replace_vote_blocks(
                     body,
@@ -1146,13 +1149,25 @@ class ProtocolService:
                         if getattr(view, "kind", "motion") == "election"
                     ],
                 )
-            if body:
-                block.append(demote_headings(body))
-            top = PublicTop(number=number, title=heading, markdown=body or None)
             snippets = [
                 _snippet(view, "Beschlussfrage", public=public, tz=self._tz()) for view in views
             ]
             found = votes_in_body(body, snippets)
+            body = mark_vote_blocks(
+                body,
+                [
+                    (snippet, marks[vote.id])
+                    for vote, snippet, in_text in zip(votes, snippets, found, strict=True)
+                    if in_text and vote.id in marks
+                ],
+            )
+            snippets = [
+                f"{snippet}\n> {marks[vote.id]}" if vote.id in marks else snippet
+                for vote, snippet in zip(votes, snippets, strict=True)
+            ]
+            if body:
+                block.append(demote_headings(body))
+            top = PublicTop(number=number, title=heading, markdown=body or None)
             for view, snippet, in_text in zip(views, snippets, found, strict=True):
                 decides = getattr(view, "kind", None) != "poll"
                 if getattr(view, "status", None) == "closed" and decides:
@@ -1427,17 +1442,51 @@ def _snippet(
             poll_snippet_of(
                 view.poll,
                 view.poll_result if view.status == "closed" else None,
-                question=view.question,
+                question=_with_attempt(view.question or "Umfrage", view),
                 tz=tz or ZoneInfo("Europe/Berlin"),
             )
         )
     return build_vote_snippet(
         view.question or fallback,
         view.tally.counts,
-        question=view.question,
+        question=_with_attempt(view.question or fallback, view),
         note=_guest_note(view),
         conditions=passed_conditions(view),
     )
+
+
+def _repeat_marks(votes: Sequence[Vote], views: Sequence[VoteOut]) -> dict[UUID, str]:
+    """Return the mark line of each repeated vote of an agenda item, by vote id.
+
+    A vote counts as repeated once its repeat opened: a prepared repeat can still go
+    away, and then the first result stands alone.
+    """
+    marks: dict[UUID, str] = {}
+    for vote, view in zip(votes, views, strict=True):
+        source = getattr(vote, "repeat_of_id", None)
+        if source is not None and getattr(vote, "status", None) in ("open", "closed"):
+            marks[source] = repeat_mark(view)
+    return marks
+
+
+def _with_attempt(question: str, view: VoteOut) -> str:
+    """Add the number of a repeat to the head of a motion or a poll.
+
+    The repeat has the question of the vote it repeats, so its head names the attempt
+    („Frage (2. Abstimmung)“). Each attempt then has its own head line, which
+    `votes_in_body` and the editor match on.
+    """
+    attempt = getattr(view, "attempt", 1) or 1
+    return f"{question.strip()} ({attempt}. Abstimmung)" if attempt > 1 else question
+
+
+def repeat_mark(repeat: VoteOut) -> str:
+    """Return the line that marks a repeated vote in the protocol."""
+    attempt = getattr(repeat, "attempt", 2) or 2
+    if getattr(repeat, "kind", "motion") == "election":
+        number = (getattr(repeat, "round", 1) or 1) + attempt - 1
+        return f"Wiederholt, siehe {number}. Wahlgang."
+    return f"Wiederholt, siehe {attempt}. Abstimmung."
 
 
 def _election_snippet(view: VoteOut) -> ElectionSnippet:
@@ -1447,7 +1496,11 @@ def _election_snippet(view: VoteOut) -> ElectionSnippet:
     """
     assert view.election is not None
     return election_snippet_of(
-        view.election, view.election_result, question=view.question, round_=view.round
+        view.election,
+        view.election_result,
+        question=view.question,
+        round_=view.round,
+        attempt=getattr(view, "attempt", 1) or 1,
     )
 
 
@@ -1457,6 +1510,7 @@ def election_snippet_of(
     *,
     question: str | None,
     round_: int,
+    attempt: int = 1,
 ) -> ElectionSnippet:
     """Map an election config and its stored result on the protocol view.
 
@@ -1487,6 +1541,7 @@ def election_snippet_of(
         runoff_names=[names.get(cid, cid) for cid in runoff.candidate_ids] if runoff else [],
         runoff_seats=runoff.seats if runoff else 0,
         closed=result is not None,
+        attempt=attempt,
     )
 
 

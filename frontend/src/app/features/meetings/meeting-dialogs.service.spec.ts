@@ -97,8 +97,10 @@ describe('MeetingDialogsService', () => {
     expect(svc.closeOpen()).toBe(false);
     expect(session.meeting()?.status).toBe('closed');
     svc.voteItem.set({ id: 't-1' } as AgendaItem);
+    svc.voteSource.set({ mode: 'edit', vote: { id: 'v-1' } as Meeting['votes'][number] });
     svc.voteOpened(M({ votes: [{ id: 'v-1' } as Meeting['votes'][number]] }));
     expect(svc.voteItem()).toBeNull();
+    expect(svc.voteSource()).toBeNull();
     expect(session.meeting()?.votes.length).toBe(1);
   });
 

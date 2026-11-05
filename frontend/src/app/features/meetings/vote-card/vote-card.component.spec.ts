@@ -5,7 +5,7 @@ import { vote } from '../../../../testing/meeting-fixtures';
 import { liveOpenedVote } from '../meetings-display.util';
 import { VoteCardComponent } from './vote-card.component';
 
-const OUTPUTS = ['close', 'cancel', 'open', 'remove', 'cast', 'insertResult'] as const;
+const OUTPUTS = ['close', 'cancel', 'open', 'remove', 'cast', 'insertResult', 'edit', 'repeat'] as const;
 
 interface Inputs {
   vote: MeetingVote;
@@ -20,6 +20,8 @@ interface Inputs {
   canInsert: boolean;
   inProtocol: boolean;
   otherOpen: boolean;
+  repeated: boolean;
+  canRepeat: boolean;
 }
 
 async function setup(over: Partial<Inputs> = {}) {
@@ -290,6 +292,69 @@ describe('VoteCardComponent', () => {
       expect(sum).toHaveTextContent('nicht erreicht');
       expect(sum).toHaveTextContent('Abgegeben0');
       expect(screen.queryByText(/Gäste anwesend/)).toBeNull();
+    });
+  });
+  describe('edit and repeat', () => {
+    it('lets the manager change a prepared vote', async () => {
+      const draft = vote({ status: 'draft' });
+      const { on } = await setup({ vote: draft, meetingStatus: 'planned' });
+      await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
+      expect(on.edit).toHaveBeenCalledWith(draft);
+    });
+
+    it('offers no edit without the manage right or after the close', async () => {
+      await setup({ vote: vote({ status: 'draft' }), canManage: false });
+      expect(screen.queryByRole('button', { name: 'Bearbeiten' })).toBeNull();
+    });
+
+    it('repeats a closed vote in a live meeting', async () => {
+      const closed = vote({ status: 'closed', result: 'passed', counts: { yes: 3 } });
+      const { on } = await setup({ vote: closed, canRepeat: true });
+      await userEvent.click(screen.getByRole('button', { name: 'Erneut abstimmen' }));
+      expect(on.repeat).toHaveBeenCalledWith(closed);
+    });
+
+    it('offers no repeat while the item waits or in a planned meeting', async () => {
+      const closed = vote({ status: 'closed', result: 'passed' });
+      await setup({ vote: closed, canRepeat: false });
+      expect(screen.queryByRole('button', { name: 'Erneut abstimmen' })).toBeNull();
+    });
+
+    it('names a repeated election "Wahlgang wiederholen"', async () => {
+      await setup({
+        vote: vote({
+          status: 'closed',
+          result: 'elected',
+          kind: 'election',
+          election: { seats: 1, candidates: [{ id: 'c1', name: 'A' }, { id: 'c2', name: 'B' }], secret: true },
+          electionResult: { counts: { c1: 2, c2: 1 }, abstentions: 0, ballots: 3, elected: ['c1'] },
+        }),
+        canRepeat: true,
+      });
+      expect(screen.getByRole('button', { name: 'Wahlgang wiederholen' })).toBeInTheDocument();
+    });
+
+    it('marks the repeated vote and names the attempt of the repeat', async () => {
+      await setup({ vote: vote({ status: 'closed', result: 'passed' }), repeated: true });
+      expect(screen.getByText('Wiederholt')).toBeInTheDocument();
+    });
+
+    it('names the attempt of a repeat', async () => {
+      await setup({ vote: vote({ status: 'open', attempt: 2, repeatOfId: 'v-0' }) });
+      expect(screen.getByText('2. Abstimmung')).toBeInTheDocument();
+    });
+
+    it('names the ballot of a repeated election', async () => {
+      await setup({
+        vote: vote({
+          status: 'draft',
+          attempt: 2,
+          repeatOfId: 'v-0',
+          kind: 'election',
+          election: { seats: 1, candidates: [{ id: 'c1', name: 'A' }, { id: 'c2', name: 'B' }], secret: true },
+        }),
+      });
+      expect(screen.getByText('2. Wahlgang')).toBeInTheDocument();
     });
   });
 });

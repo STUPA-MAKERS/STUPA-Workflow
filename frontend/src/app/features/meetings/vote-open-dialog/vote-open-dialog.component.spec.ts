@@ -2,20 +2,24 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
-import type { AgendaItem, Meeting } from '@core/api/models';
+import type { AgendaItem, Meeting, MeetingVote } from '@core/api/models';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { runAxe } from '../../../../testing/a11y';
-import { VoteOpenDialogComponent } from './vote-open-dialog.component';
+import { type VoteDialogSource, VoteOpenDialogComponent } from './vote-open-dialog.component';
 
 const MEETING = { id: 'm-1', title: '34. Sitzung', status: 'live', isProtokollant: true, votes: [] } as unknown as Meeting;
 const APP_TOP: AgendaItem = { id: 't-3', applicationId: 'a-1', title: 'Zuschuss Party', position: 2 };
 const FREE_TOP: AgendaItem = { id: 't-8', applicationId: null, title: 'Verschiedenes', position: 7 };
 
-async function setup(item: AgendaItem | null = APP_TOP, topNumber = 3) {
+async function setup(
+  item: AgendaItem | null = APP_TOP,
+  topNumber = 3,
+  source: VoteDialogSource | null = null,
+) {
   const closed = jest.fn();
   const opened = jest.fn();
   const view = await render(VoteOpenDialogComponent, {
-    inputs: { meeting: MEETING, item, topNumber },
+    inputs: { meeting: MEETING, item, topNumber, source },
     on: { closed, opened },
     providers: [provideHttpClient(), provideHttpClientTesting()],
   });
@@ -278,6 +282,153 @@ describe('VoteOpenDialogComponent', () => {
       fixture.detectChanges();
       cmp.setDraft({ enabled: true, amount: '1', conditions: [] });
       expect(cmp.question()).toBe('Verschiedenes');
+    });
+  });
+  describe('from a vote', () => {
+    const stored = (over: Partial<MeetingVote> = {}): MeetingVote =>
+      ({
+        id: 'v-5',
+        applicationId: 'a-1',
+        agendaItemId: 't-3',
+        title: null,
+        question: 'Fördern wir die Party?',
+        options: ['yes', 'no', 'abstain'],
+        status: 'draft',
+        result: null,
+        counts: null,
+        leading: null,
+        closesAt: null,
+        voted: 0,
+        present: 0,
+        revealed: false,
+        failedReason: null,
+        majorityRule: 'absolute',
+        proposal: { approvedAmount: '300.00', conditions: ['Belege'] },
+        ...over,
+      }) as MeetingVote;
+
+    it('changes a prepared vote and saves it', async () => {
+      const { http, opened, toasts } = await setup({ ...APP_TOP, amount: '500.00' }, 3, {
+        mode: 'edit',
+        vote: stored(),
+      });
+      expect(screen.getByRole('dialog', { name: 'Abstimmung bearbeiten' })).toBeInTheDocument();
+      expect(screen.getByLabelText('Beschlussfrage')).toHaveValue('Fördern wir die Party?');
+      expect(screen.getByRole('radio', { name: 'Absolut' })).toHaveAttribute('aria-checked', 'true');
+      expect(screen.queryByRole('button', { name: 'Vorbereiten' })).toBeNull();
+      await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+      const req = http.expectOne('/api/meetings/m-1/votes/v-5');
+      expect(req.request.method).toBe('PUT');
+      expect(req.request.body).toEqual({
+        agendaItemId: 't-3',
+        question: 'Fördern wir die Party?',
+        options: ['yes', 'no', 'abstain'],
+        secret: true,
+        majorityRule: 'absolute',
+        proposal: { approvedAmount: '300.00', conditions: ['Belege'] },
+      });
+      req.flush({ ...MEETING, votes: [], createdAt: 'x' });
+      expect(opened).toHaveBeenCalled();
+      expect(toasts()).toContain('Abstimmung gespeichert.');
+    });
+
+    it('repeats a closed vote with its question and rules', async () => {
+      const { http, cmp } = await setup(APP_TOP, 3, {
+        mode: 'repeat',
+        vote: stored({ status: 'closed', result: 'rejected', proposal: null }),
+      });
+      const dialog = screen.getByRole('dialog', { name: 'Erneut abstimmen' });
+      expect(dialog).toHaveAccessibleDescription('TOP 3 · Zuschuss Party · 2. Abstimmung');
+      cmp.submit(false);
+      const req = http.expectOne('/api/meetings/m-1/votes');
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual(
+        expect.objectContaining({ repeatOf: 'v-5', question: 'Fördern wir die Party?', majorityRule: 'absolute' }),
+      );
+      expect(req.request.body).not.toHaveProperty('draft');
+    });
+
+    it('prepares the repeat of an election with its candidates', async () => {
+      const { http, cmp } = await setup(FREE_TOP, 8, {
+        mode: 'repeat',
+        vote: stored({
+          applicationId: null,
+          agendaItemId: 't-8',
+          status: 'closed',
+          kind: 'election',
+          question: 'Vorsitz',
+          round: 1,
+          election: {
+            seats: 1,
+            candidates: [
+              { id: 'c1', name: 'Anna', principalId: 'p-1' },
+              { id: 'c2', name: 'Ben' },
+            ],
+            secret: true,
+          },
+        }),
+      });
+      expect(screen.getByRole('dialog')).toHaveAccessibleDescription('TOP 8 · Verschiedenes · 2. Wahlgang');
+      cmp.submit(true);
+      const req = http.expectOne('/api/meetings/m-1/votes');
+      expect(req.request.body).toEqual(
+        expect.objectContaining({
+          kind: 'election',
+          seats: 1,
+          candidates: [{ name: 'Anna', principalId: 'p-1' }, { name: 'Ben' }],
+          repeatOf: 'v-5',
+          draft: true,
+        }),
+      );
+    });
+
+    it('counts on from a repeat and fills the defaults of a sparse vote', async () => {
+      const { cmp } = await setup(FREE_TOP, 8, {
+        mode: 'repeat',
+        vote: stored({
+          applicationId: null,
+          agendaItemId: 't-8',
+          status: 'closed',
+          kind: 'election',
+          question: null,
+          majorityRule: undefined,
+          attempt: 2,
+          election: { seats: 1, candidates: [], secret: true },
+        }),
+      });
+      expect(screen.getByRole('dialog')).toHaveAccessibleDescription('TOP 8 · Verschiedenes · 3. Wahlgang');
+      expect(cmp.question()).toBe('');
+      expect(cmp.majorityRule()).toBe('simple');
+    });
+
+    it('changes a prepared poll with its options', async () => {
+      const { http, cmp } = await setup(FREE_TOP, 8, {
+        mode: 'edit',
+        vote: stored({
+          applicationId: null,
+          agendaItemId: 't-8',
+          kind: 'poll',
+          question: 'Pizza?',
+          poll: {
+            mode: 'single',
+            options: [
+              { id: 'o1', label: 'Ja' },
+              { id: 'o2', label: 'Nein' },
+            ],
+            secret: true,
+          },
+        }),
+      });
+      cmp.submit(true);
+      const req = http.expectOne('/api/meetings/m-1/votes/v-5');
+      expect(req.request.body).toEqual(
+        expect.objectContaining({
+          kind: 'poll',
+          question: 'Pizza?',
+          poll: { mode: 'single', options: [{ label: 'Ja' }, { label: 'Nein' }] },
+          secret: true,
+        }),
+      );
     });
   });
 });

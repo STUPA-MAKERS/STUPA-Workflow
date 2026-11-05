@@ -30,6 +30,22 @@ export function emptyDraft(requested: string | null | undefined): DecisionDraft 
   return { enabled: false, amount: requested ?? '', conditions: [] };
 }
 
+/**
+ * The draft of a stored proposal, for the edit or the repeat of a vote: switched on,
+ * the approved amount or the requested one ("as requested"), and the conditions.
+ */
+export function draftOf(
+  proposal: DecisionProposal | null | undefined,
+  requested: string | null | undefined,
+): DecisionDraft {
+  if (!proposal) return emptyDraft(requested);
+  return {
+    enabled: true,
+    amount: proposal.approvedAmount ?? requested ?? '',
+    conditions: [...proposal.conditions],
+  };
+}
+
 function toNumber(value: string | null | undefined): number | null {
   if (value === null || value === undefined || value.trim() === '') return null;
   const n = Number(value);
