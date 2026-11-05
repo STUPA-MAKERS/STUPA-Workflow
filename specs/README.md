@@ -30,7 +30,7 @@ specs/
 
 | File | `id` | `status` |
 | --- | --- | --- |
-| [style/specs/format.md](style/specs/format.md) | `S-specs-format` | draft |
-| [style/specs/structure.md](style/specs/structure.md) | `S-specs-structure` | draft |
-| [style/specs/content.md](style/specs/content.md) | `S-specs-content` | draft |
-| [requirements/functional/meetings/voting.md](requirements/functional/meetings/voting.md) | `F-meetings-voting` | draft |
+| [style/specs/format.md](style/specs/format.md) | `S_specs.format` | draft |
+| [style/specs/structure.md](style/specs/structure.md) | `S_specs.structure` | draft |
+| [style/specs/content.md](style/specs/content.md) | `S_specs.content` | draft |
+| [requirements/functional/meetings/voting.md](requirements/functional/meetings/voting.md) | `F_meetings.voting` | draft |
