@@ -1,9 +1,16 @@
-# Voting
+---
+id: F-meetings-voting
+title: Voting
+kind: functional
+status: draft
+scope:
+  - backend/app/modules/voting
+  - frontend/src/app/features/voting
+owner: frederikbeimgraben
+updated: 2026-11-05
+---
 
-Kind: Functional
-Status: Draft
-Scope: backend/app/modules/voting, frontend/src/app/features/voting
-Updated: 2026-11-05
+# Voting
 
 ## F-meetings-voting-0001 Every vote is secret
 

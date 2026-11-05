@@ -1,21 +1,27 @@
-# Area name
+---
+id: F-area-topic
+title: Topic name
+kind: functional
+status: draft
+scope:
+  - backend/app/modules/example
+  - frontend/src/app/features/example
+owner: frederikbeimgraben
+updated: YYYY-MM-DD
+---
 
-Kind: Functional
-Status: Draft
-Scope: backend/app/modules/example, frontend/src/app/features/example
-Updated: YYYY-MM-DD
+# Topic name
 
-## F-area-example-0001 Short title of the rule
+## F-area-topic-0001 Short title of the rule
 
 The rule in one to three sentences. Use `must` and `must not`. Write one instruction in one
 sentence.
 
-Reason: The cause of the rule. Keep the "because".
+Reason: The cause of the rule.
 
-Test: The test, lint rule or check that finds a violation. Leave this line out if only a
-review can find it.
+Test: The test, lint rule or check that finds a violation.
 
-## F-area-example-0002 Short title of the next rule
+## F-area-topic-0002 Short title of the next rule
 
 The rule.
 
