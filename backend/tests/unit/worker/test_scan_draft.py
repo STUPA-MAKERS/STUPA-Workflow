@@ -9,7 +9,6 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -64,7 +63,6 @@ def _draft(session: FakeSession) -> Attachment:
         scanned=False,
         scan_result=None,
         draft_token_hash=b"h",
-        draft_expires_at=datetime.now(UTC) + timedelta(days=7),
     )
     att.id = uuid.uuid4()
     session.add(att)

@@ -24,6 +24,7 @@ from app.modules.files.models import Attachment
 from app.modules.livevote.models import Meeting
 from app.modules.tickets.models import Ticket, TicketEvent, TicketNote
 from app.settings import Settings
+from tests._support.draft_tokens import add_draft_token
 from tests._support.guest_apps import create_guest_application, seed_guest_flow
 from tests.integration.modules.tickets.conftest import (
     ADMIN,
@@ -158,6 +159,7 @@ async def _draft(
 ) -> uuid.UUID:
     draft_id = uuid.uuid4()
     async with maker() as session:
+        await add_draft_token(session, hash_draft_token(token, settings.magic_link_secret))
         session.add(
             Attachment(
                 id=draft_id,
@@ -168,7 +170,6 @@ async def _draft(
                 scanned=True,
                 scan_result="clean",
                 draft_token_hash=hash_draft_token(token, settings.magic_link_secret),
-                draft_expires_at=datetime.now(UTC) + timedelta(days=7),
             )
         )
         await session.commit()
@@ -190,7 +191,6 @@ async def test_a_report_binds_its_draft_attachments(
         assert row.ticket_id == ticket.id
         assert row.application_id is None
         assert row.draft_token_hash is None
-        assert row.draft_expires_at is None
 
 
 async def test_a_report_with_attachments_needs_the_token_and_own_drafts(

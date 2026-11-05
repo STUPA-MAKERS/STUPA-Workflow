@@ -10,11 +10,12 @@ A row is either bound or a draft. A bound row has exactly one of five owners:
 ``application_id``, ``ticket_id`` (the attachment of a ticket report), or one chat
 message: ``ticket_note_id``, ``todo_comment_id`` or ``comment_id`` (an application
 comment). A draft row
-comes from the wizard before the application exists: it has ``draft_token_hash`` and
-``draft_expires_at`` instead, and its object lives under ``drafts/<id>/``. The create of
-the application binds the draft. It sets ``application_id`` and clears both draft
-columns, and the storage key stays. The ticket create binds the same way with
-``ticket_id``, and the send of a chat message with its owner column. Two CHECKs make
+comes from the wizard before the application exists: it has ``draft_token_hash``
+instead, a foreign key to its ``attachment_draft_token`` row, and its object lives under
+``drafts/<id>/``. The end of a draft is the end of its token. The create of the
+application binds the draft. It sets ``application_id`` and clears
+``draft_token_hash``, and the storage key stays. The ticket create binds the same way with
+``ticket_id``, and the send of a chat message with its owner column. A CHECK makes
 this an exclusive choice. Every application-scoped query must filter
 ``application_id IS NOT NULL`` (``BOUND``), so neither a draft, a ticket attachment
 nor the file of a message shows up in an application path. A file of an application
@@ -59,15 +60,15 @@ class Attachment(UUIDPkMixin, Base):
     same way. A soft delete of a message does not cascade; the service removes the
     files of the message then (``delete_for_messages``).
 
-    Two CHECKs hold the owner rule: exactly one owner (an application, a ticket, a message
-    or a draft token), and a draft has both draft columns while a bound row has neither. A
-    partial index on the drafts serves the hourly purge and the token lookup.
+    A CHECK holds the owner rule: exactly one owner (an application, a ticket, a message
+    or a draft token). A partial index on the drafts serves the token lookup and the
+    hourly purge.
 
     Attributes:
         field_key: Optional link to a form field.
-        draft_token_hash: HMAC-SHA256 of the draft token. Set on a draft only.
-        draft_expires_at: End of the draft. Set on a draft only. Each upload with the
-            token moves it for all drafts of the token.
+        draft_token_hash: HMAC-SHA256 of the draft token. Set on a draft only. The
+            foreign key to ``attachment_draft_token`` cascades, and the end of the token
+            is the end of the draft.
         scanned: True after the ClamAV run finishes.
         scan_result: NULL, ``clean``, or the signature of the finding.
         storage_key: NULL after a finding, because the worker removed the object.
@@ -100,9 +101,8 @@ class Attachment(UUIDPkMixin, Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
-    draft_token_hash: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
-    draft_expires_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
+    draft_token_hash: Mapped[bytes | None] = mapped_column(
+        ForeignKey("attachment_draft_token.token_hash", ondelete="CASCADE"), nullable=True
     )
 
     __table_args__ = (
@@ -114,20 +114,11 @@ class Attachment(UUIDPkMixin, Base):
             "comment_id, draft_token_hash) = 1",
             name="draft_xor_application",
         ),
-        CheckConstraint(
-            "(draft_token_hash IS NULL) = (draft_expires_at IS NULL)",
-            name="draft_columns_paired",
-        ),
         Index("ix_attachment_application_id", "application_id"),
         Index("ix_attachment_ticket_id", "ticket_id"),
         Index("ix_attachment_ticket_note_id", "ticket_note_id"),
         Index("ix_attachment_todo_comment_id", "todo_comment_id"),
         Index("ix_attachment_comment_id", "comment_id"),
-        Index(
-            "ix_attachment_draft_expires_at",
-            "draft_expires_at",
-            postgresql_where=text("draft_token_hash IS NOT NULL"),
-        ),
         Index(
             "ix_attachment_draft_token_hash",
             "draft_token_hash",
@@ -145,9 +136,9 @@ class AttachmentDraftToken(Base):
     """The lifetime of one draft token of the wizard.
 
     The token lives on its own, independent of its draft rows. It stays valid until
-    ``expires_at``, also when the owner deletes the last draft. Each upload with the
-    token moves ``expires_at`` to now + ``attachment_draft_ttl_days``. The hourly purge
-    removes the expired rows.
+    ``expires_at``, also when the owner deletes the last draft. ``expires_at`` is also
+    the end of every draft of the token. Each upload with the token moves it to now +
+    ``attachment_draft_ttl_days``. The hourly purge removes the expired rows.
 
     Attributes:
         token_hash: HMAC-SHA256 of the draft token, as in ``Attachment.draft_token_hash``.

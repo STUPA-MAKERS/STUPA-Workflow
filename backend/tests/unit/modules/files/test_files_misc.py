@@ -42,6 +42,7 @@ def test_attachment_fk_cascade() -> None:
         "ticket_note": "CASCADE",
         "todo_comment": "CASCADE",
         "comment": "CASCADE",
+        "attachment_draft_token": "CASCADE",
     }
 
 
