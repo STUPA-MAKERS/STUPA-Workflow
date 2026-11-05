@@ -373,6 +373,7 @@
             <textarea
               id="fe-desc"
               rows="3"
+              appScrollFade="y"
               [ngModel]="description()[code] ?? ''"
               (ngModelChange)="setDescription(code, $event)"
               [attr.placeholder]="descFallback() || ('admin.forms.descPlaceholder' | t)"

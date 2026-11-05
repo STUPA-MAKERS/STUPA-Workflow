@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { ReactiveFormsModule } from '@angular/forms';
 import { FieldType, type FieldTypeConfig } from '@ngx-formly/core';
+import { ScrollFadeDirective } from '@stupa-makers/ui-kit';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 
 /** Formly field type `textarea`: multi-line text field (form definition `textarea`). */
@@ -8,7 +9,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
   selector: 'app-formly-textarea',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, TranslatePipe],
+  imports: [ReactiveFormsModule, ScrollFadeDirective, TranslatePipe],
   template: `
     <div class="field">
       <div class="field__box" [class.field__box--invalid]="showError">
@@ -20,6 +21,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
         </label>
         <textarea
           class="field__control"
+          appScrollFade="y"
           [id]="controlId"
           [formControl]="formControl"
           [attr.placeholder]="props.placeholder || null"

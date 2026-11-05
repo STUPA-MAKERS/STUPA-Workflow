@@ -1,6 +1,7 @@
 @use 'field' as f;
 @use 'breakpoints' as bp;
 @use 'scroll-fade' as fade;
+@use '../../../shared/formly/textarea-glass' as glass;
 @use '../../../shared/ui/surface-card' as sc;
 
 :host {
@@ -407,12 +408,14 @@
 .fe__area {
   @include f.box;
   @include f.box-labelled;
+  @include glass.box;
   & {
     align-items: stretch;
   }
 }
 .fe__areaLabel {
   @include f.label;
+  @include glass.label;
 }
 .fe__area:focus-within .fe__areaLabel {
   @include f.label-focus;
