@@ -13,7 +13,7 @@ scope:
 
 # A test refers back to its rule
 
-A unit test that a spec lists in `tests` must name the rule in its docstring, with `§` and the
+A unit test that a spec lists in `tests` must name the rule in its docstring. Use `§` and the
 full rule ID, for example `§F/meetings/voting/000024`.
 
 Reason: The reader of a test sees which rule it protects. A search finds the link in both

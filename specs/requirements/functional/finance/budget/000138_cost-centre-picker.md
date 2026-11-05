@@ -1,6 +1,6 @@
 ---
 id: "000138"
-title: One cost centre picker
+title: The cost centre pickers are fixed
 kind: functional
 status: draft
 owner: frederikbeimgraben
@@ -10,7 +10,7 @@ scope:
   - frontend/src/app/pages/budget
 ---
 
-# One cost centre picker
+# The cost centre pickers are fixed
 
 The cost centre picker is the search list of `app-cost-centre-select` everywhere. The form
 field "Kostenstelle" uses the tree picker with colour swatches.

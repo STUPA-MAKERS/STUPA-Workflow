@@ -1,6 +1,6 @@
 ---
 id: "000182"
-title: Webhooks cannot reach internal addresses
+title: The webhook SSRF guard runs at send time
 kind: non-functional
 status: draft
 owner: frederikbeimgraben
@@ -9,7 +9,10 @@ scope:
   - backend/app/modules/webhooks
 ---
 
-# Webhooks cannot reach internal addresses
+# The webhook SSRF guard runs at send time
 
-A webhook target must not resolve to a private, loopback or link-local address. Every webhook
-request must carry an HMAC signature.
+The worker resolves all A and AAAA records before each send. One non-public address blocks the
+delivery. The request goes to the checked IP address, follows no redirect and reads at most
+64 KiB of the answer.
+
+Reason: A check at configuration time does not stop DNS rebinding.

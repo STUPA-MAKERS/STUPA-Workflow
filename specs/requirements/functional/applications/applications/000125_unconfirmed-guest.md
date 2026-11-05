@@ -12,5 +12,6 @@ scope:
 
 # An unconfirmed guest Antrag rests
 
-A guest Antrag stays invisible until the applicant confirms the e-mail. Until then it has no
-deadlines, no automatic transitions and no mails.
+A guest Antrag stays invisible until the applicant confirms the e-mail. Until then the flow
+routes answer 404, the cron skips it and no mail goes out for it. The confirmation starts the
+flow exactly once.
