@@ -1,17 +1,15 @@
 # Specs
 
-This folder holds the binding rules of STUPA-Workflow. A rule here wins over a skill, a memory
-file and a code comment. If code and a spec disagree, the code has a bug or the spec is old.
-Tell the owner. Do not change one of them silently.
+The binding rules of STUPA-Workflow. The format of every file is a spec itself:
+[style/shared/specs.md](style/shared/specs.md). Copy [TEMPLATE.md](TEMPLATE.md) to start a
+new file.
 
-## Folders
-
-The tree sorts first by kind, then by area.
+## Tree
 
 ```
 specs/
   style/
-    shared/          writing, api, testing, git
+    shared/          specs, writing, api, testing, git
     backend/         python, database, functional
     frontend/        angular, functional
   requirements/
@@ -27,63 +25,9 @@ specs/
       security/  privacy/  performance/  usability/  accessibility/  compatibility/
 ```
 
-| Folder | Content |
-| --- | --- |
-| `style/` | How code, tests, migrations, commits and texts must look. |
-| `requirements/functional/` | What the application must do: features, states, permissions, results. |
-| `requirements/non-functional/` | How well the application must do it: security, privacy, performance, usability, accessibility, compatibility. |
-
-## File format
-
-Every spec file uses the same format. Copy `TEMPLATE.md` to start a new file.
-
-- Write in ASD-STE100 Simplified Technical English.
-- One file covers one area. The file name is the area in kebab case.
-- The header lists `Kind` (`Functional`, `Non-functional` or `Style`), `Status`, `Scope` and `Updated`.
-- One rule is one `##` section. The heading is the rule ID and a short title.
-- The rule ID has the form `(F|NF|S)-<path>-NNNN`:
-  - `F` is a functional requirement, `NF` a non-functional requirement, `S` a style rule.
-  - `<path>` is the path of the file below its kind folder, without `.md`, with `-` between
-    the parts. `requirements/functional/meetings/voting.md` gives `meetings-voting`.
-  - `NNNN` is a four-digit number. It counts up within the file and starts at `0001`.
-  - Examples: `F-meetings-voting-0003`, `NF-security-downloads-0001`,
-    `S-backend-python-0012`.
-- A number is never used again. A removed rule keeps its heading with the text `Removed.`
-- The ID contains the path. If a file moves, all its IDs change. Update every reference in
-  the same pull request.
-- The rule text comes first. Use `must` for an obligation and `must not` for a prohibition.
-- `Reason:` gives the cause of the rule. Keep it. The reason is the part that prevents a
-  second mistake.
-- `Test:` tells how a person or a tool finds a violation. Leave it out if only a review can
-  find it.
-
-## Status values
-
-| Status | Meaning |
-| --- | --- |
-| `Draft` | Written, not yet approved by the owner. Follow it, but ask when it blocks you. |
-| `Approved` | The owner approved it. Follow it. |
-| `Replaced` | A different file replaces it. The header names that file. |
-
-## Writing rules
-
-- Use short sentences: at most 20 words in an instruction, at most 25 words in a description.
-- Use the active voice and the present tense.
-- Write one instruction in one sentence.
-- Use one word for one thing. Use the UI term in German where the UI shows it, for example
-  `Antrag` or `TOP`.
-- Write STUPA in capitals. AStA keeps its spelling.
-- Do not refer to tickets, pull requests, threads or decision codes. Write the rule itself.
-- Do not write history. Write the current rule. Give a date only if the rule depends on it.
-- Do not write introductions, summaries, "key points" or filler text.
-
-## How an agent adds or changes a spec
-
-1. Find the file for the area. If there is no file, copy `TEMPLATE.md`.
-2. Give a new rule the next free number of the file.
-3. Set `Status: Draft` and `Updated` to the current date.
-4. Open a pull request. The owner sets `Approved`.
-
 ## Index
 
-The index lists every file with its ID prefix. It follows when the ID format is decided.
+| File | ID prefix | Status |
+| --- | --- | --- |
+| [style/shared/specs.md](style/shared/specs.md) | `S-shared-specs` | Draft |
+| [requirements/functional/meetings/voting.md](requirements/functional/meetings/voting.md) | `F-meetings-voting` | Draft |
