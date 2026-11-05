@@ -19,7 +19,6 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "application.edit_any",
     "application.delete",
     "application.archive",
-    "application.share",
     "application.create_on_behalf",
     "form.configure",
     "flow.configure",

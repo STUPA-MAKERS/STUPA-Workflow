@@ -45,9 +45,6 @@ DELETE_PERMISSION = "application.delete"
 #: the delete permission. It decides what everyone else sees by default, so it is not
 #: part of `application.manage` either.
 ARCHIVE_PERMISSION = "application.archive"
-#: Publish a read-only link. It is separate from reading, because the decision that
-#: anyone with a URL may read a record differs from reading it.
-SHARE_PERMISSION = "application.share"
 #: Fire transitions. A creator with this right works on applications as a member.
 TRANSITION_PERMISSION = "application.transition"
 #: The rights that make a creator read the own application as a member and not as the

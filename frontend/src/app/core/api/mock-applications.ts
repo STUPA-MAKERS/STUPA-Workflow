@@ -6,7 +6,6 @@ import type {
   ApplicationCreatedWire,
   ApplicationListItemWire,
   ApplicationOutWire,
-  ApplicationShareLink,
   AttachmentOutWire,
   DecisionProposal,
   EffectiveForm,
@@ -284,7 +283,7 @@ const ATTACHMENTS: AttachmentOutWire[] = [
 ];
 
 const DETAIL_PATH =
-  /\/applications\/(a1000000-[^/]+)(?:\/(transitions|attachments|shares|flow-states|form|timeline|versions))?$/;
+  /\/applications\/(a1000000-[^/]+)(?:\/(transitions|attachments|flow-states|form|timeline|versions))?$/;
 
 /** GET of a demo path. `undefined`: not a path of this module. */
 export function mockApplicationsGet(p: string, params: HttpParams): unknown {
@@ -297,8 +296,6 @@ export function mockApplicationsGet(p: string, params: HttpParams): unknown {
       return transitions(d);
     case 'attachments':
       return d.n % 2 === 1 ? ATTACHMENTS : [];
-    case 'shares':
-      return [] satisfies ApplicationShareLink[];
     case 'flow-states':
       return Object.values(STATES);
     case 'form':

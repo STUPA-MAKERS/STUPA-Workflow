@@ -134,7 +134,6 @@ PUBLIC_ROUTES: Final[frozenset[tuple[str, str]]] = frozenset(
         ("POST", "/api/apply/attachments"),
         ("DELETE", "/api/apply/attachments/{attachment_id}"),
         ("POST", "/api/tickets"),
-        ("GET", "/s/{token}"),
     }
 )
 

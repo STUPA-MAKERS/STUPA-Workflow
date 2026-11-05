@@ -123,14 +123,6 @@
             }
           </app-button>
           @if (!phone()) {
-            @if (canShare()) {
-              <app-button
-                variant="text"
-                [iconOnly]="true"
-                [ariaLabel]="'applications.row.share' | t"
-                (click)="openShareDialog()"
-              ><app-icon name="link" /></app-button>
-            }
             @if (canEditData()) {
               <app-button
                 variant="text"
@@ -440,8 +432,6 @@
   [(open)]="forceDialogOpen"
   (done)="onForced()"
 />
-
-<app-share-links-dialog [applicationId]="app()?.id ?? null" [(open)]="shareDialogOpen" />
 
 <app-agenda-dialog
   [applicationId]="app()?.id ?? null"

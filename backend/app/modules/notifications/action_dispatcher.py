@@ -26,7 +26,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.modules.applications.decision import amount_deviates
 from app.modules.applications.models import Application, ApplicationDecision
-from app.modules.applications.share import format_money
 from app.modules.flow.dispatch import DispatchedAction
 from app.modules.flow.models import State
 from app.modules.notifications.links import application_link, task_link
@@ -37,6 +36,7 @@ from app.modules.notifications.service import (
 )
 from app.settings import Settings
 from app.shared.i18n import resolve_i18n
+from app.shared.money import format_money
 
 logger = logging.getLogger("app.notifications")
 

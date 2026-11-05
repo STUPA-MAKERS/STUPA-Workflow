@@ -2,7 +2,7 @@ import type { Router } from '@angular/router';
 
 /** The paths that the server answers and the app does not. The router has no route for
  *  them, so a click on one stays with the browser. */
-const SERVER_PATH_RE = /^\/(?:api|s|\.well-known)(?:[/?#]|$)/;
+const SERVER_PATH_RE = /^\/(?:api|\.well-known)(?:[/?#]|$)/;
 
 /**
  * Route a click on an internal link of rendered Markdown through the Angular router, so
@@ -10,7 +10,7 @@ const SERVER_PATH_RE = /^\/(?:api|s|\.well-known)(?:[/?#]|$)/;
  * path (`/…`) or an anchor (`#…`). A click with a modifier key or another button, or an
  * event that is already handled, stays with the browser (new tab, new window).
  *
- * A server path (`/api/…`, a share link `/s/…`, `/.well-known/…`) also stays with the
+ * A server path (`/api/…`, `/.well-known/…`) also stays with the
  * browser, because the router has no route for it.
  */
 export function routeInternalLink(event: MouseEvent, router: Router | null): void {
