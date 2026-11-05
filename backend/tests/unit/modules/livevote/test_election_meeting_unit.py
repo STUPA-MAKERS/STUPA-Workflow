@@ -114,7 +114,8 @@ def test_open_election_builds_the_election_config(setup: Any) -> None:
     assert meetings.checked == [[UUID(body["candidates"][1]["principalId"])]]
 
 
-def test_open_election_keeps_an_explicit_secret_switch(setup: Any) -> None:
+def test_open_election_refuses_an_open_election_422(setup: Any) -> None:
+    """An election is always secret: ``secret: false`` gives 422."""
     client, meetings, agenda, voting = setup
     meetings._meeting_out = _meeting(False)
     agenda.item_row = SimpleNamespace(id=uuid4(), application_id=None, non_public=False)
@@ -122,8 +123,26 @@ def test_open_election_keeps_an_explicit_secret_switch(setup: Any) -> None:
         f"/api/meetings/{uuid4()}/votes",
         json=_election_body(secret=False, candidates=[{"name": "A"}, {"name": "B"}]),
     )
-    assert resp.status_code == 200, resp.text
-    assert voting.last_payload.config.secret is False
+    assert resp.status_code == 422, resp.text
+    assert resp.json()["code"] == "open_vote_unavailable"
+    assert voting.created == []
+
+
+@pytest.mark.parametrize(("sent", "status"), [(None, 200), (True, 200), (False, 422)])
+def test_open_motion_is_always_secret(setup: Any, sent: bool | None, status: int) -> None:
+    """A motion is secret without a value; ``secret: false`` gives 422."""
+    client, meetings, agenda, voting = setup
+    meetings._meeting_out = _meeting(False)
+    agenda.item_row = SimpleNamespace(id=uuid4(), application_id=None, non_public=False)
+    body: dict[str, Any] = {"agendaItemId": str(uuid4()), "question": "Machen wir das?"}
+    if sent is not None:
+        body["secret"] = sent
+    resp = client.post(f"/api/meetings/{uuid4()}/votes", json=body)
+    assert resp.status_code == status, resp.text
+    if status == 200:
+        assert voting.last_payload.config.secret is True
+    else:
+        assert resp.json()["code"] == "open_vote_unavailable"
 
 
 def test_open_election_on_an_application_item_422(setup: Any) -> None:

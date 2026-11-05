@@ -77,7 +77,7 @@ def _voter(*, group: str = vote_group_key(GID), sub: str = "v1") -> Principal:
 def _create_body(**over: Any) -> VoteCreate:
     body: dict[str, Any] = {
         "config": VoteConfig.model_validate(
-            {"options": OPTIONS, "majorityRule": "simple"}
+            {"options": OPTIONS, "majorityRule": "simple", "secret": True}
         ).model_dump(by_alias=True),
         "eligibleGroup": str(GID),
     }
@@ -97,7 +97,8 @@ async def test_create_ok() -> None:
     out = await VotingService(db).create(app.id, _create_body(), Principal(sub="m"))
     assert out.status == "draft"
     assert out.eligible_group == str(GID)
-    assert out.tally.counts == {"yes": 0, "no": 0, "abstain": 0}
+    assert out.secret is True
+    assert out.tally.counts == {}
     assert out.tally.eligible == 2
     assert db.committed == 1
 

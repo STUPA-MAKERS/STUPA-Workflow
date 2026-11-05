@@ -69,7 +69,7 @@ from app.modules.todos.live import publish_pings, todo_broker
 from app.modules.todos.service import TodoService
 from app.modules.voting.poll import build_config as build_poll_config
 from app.modules.voting.schemas import VoteCreateInternal
-from app.modules.voting.service import VotingService
+from app.modules.voting.service import VotingService, secret_only
 from app.settings import Settings, get_settings
 from app.shared.config_schemas import ElectionConfig, PollConfig, VoteConfig
 from app.shared.errors import (
@@ -635,6 +635,9 @@ async def open_meeting_vote(
     no ``tieBreak`` to change this. Without an explicit percent, the vote inherits the
     percent quorum of the Gremium; a vote with guests and a poll have no quorum. The other
     managers of the meeting see a prepared question at once.
+
+    A motion and an election are always secret. ``secret`` false gives 422
+    ``open_vote_unavailable``; a poll keeps its own switch.
     """
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_manage_votes:
@@ -682,14 +685,14 @@ async def open_meeting_vote(
         {
             "seats": payload.seats,
             "candidates": payload.election_candidates(),
-            "secret": True if payload.secret is None else payload.secret,
+            "secret": secret_only(payload.secret, field="secret"),
             "guestsVote": guests_vote,
         }
         if election
         else {
             "options": payload.options,
             "majorityRule": payload.majority_rule,
-            "secret": bool(payload.secret),
+            "secret": payload.poll is not None or secret_only(payload.secret, field="secret"),
             "tieBreak": "rejected",
             "guestsVote": guests_vote,
         }
