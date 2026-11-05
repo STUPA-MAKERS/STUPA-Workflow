@@ -142,13 +142,6 @@
 .apps__detail--capture > ::ng-deep :not(app-application-capture) {
   display: none;
 }
-.apps__btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  white-space: nowrap;
-}
-
 .apps__moreForm {
   @include sc.raised-fields($muted-label: false);
   display: flex;

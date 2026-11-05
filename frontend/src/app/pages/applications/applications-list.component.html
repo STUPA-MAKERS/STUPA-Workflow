@@ -10,19 +10,6 @@
               (selected)="onHeaderMenu($event)"
             />
           } @else {
-            @if (canCapture()) {
-              <app-button
-                variant="tonal"
-                size="sm"
-                data-testid="apps-capture"
-                [disabled]="capturing()"
-                (click)="openCapture()"
-              >
-                <span class="apps__btn"
-                  ><app-icon name="plus" />{{ 'applications.capture.title' | t }}</span
-                >
-              </app-button>
-            }
             @if (exportShown()) {
               <app-button
                 variant="text"
@@ -240,7 +227,14 @@
         }
       </div>
 
-      <app-fab [label]="'fab.application' | t" link="/apply" [contained]="split()" />
+      @if (canCapture() && !capturing()) {
+        <app-fab
+          data-testid="apps-capture"
+          [label]="'applications.capture.title' | t"
+          [contained]="split()"
+          (activate)="openCapture()"
+        />
+      }
     </section>
 
     <div detail class="apps__detail" [class.apps__detail--capture]="captureInPane()">

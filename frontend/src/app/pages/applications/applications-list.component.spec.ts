@@ -898,13 +898,13 @@ describe('ApplicationsListComponent', () => {
       expect(router.url).toBe('/applications');
     });
 
-    it('puts the action first into the phone menu and opens a bottom sheet', async () => {
+    it('opens a bottom sheet from the floating button on a phone', async () => {
       const original = window.matchMedia;
       window.matchMedia = ((q: string) => ({ ...original(q), matches: q === '(max-width: 768px)' })) as typeof window.matchMedia;
       try {
         const { cmp, harness } = await start('/applications', { perms: CAPTURE });
-        expect(cmp.phoneMenuSections()[0].items.map((i) => i.id)).toEqual(['capture']);
-        cmp.onHeaderMenu({ id: 'capture', label: 'Antrag erfassen' });
+        expect(cmp.phoneMenuSections().flatMap((s) => s.items.map((i) => i.id))).not.toContain('capture');
+        await userEvent.click(screen.getByRole('button', { name: 'Antrag erfassen' }));
         harness.detectChanges();
         expect(cmp.capturing()).toBe(true);
         expect(cmp.captureInPane()).toBe(false);
@@ -968,11 +968,9 @@ describe('ApplicationsListComponent', () => {
       expect(router.url).toBe('/applications/app-1?type=t1');
     });
 
-    it('opens the wizard from the floating "Antrag stellen"', async () => {
-      const { router } = await start();
-      const nav = jest.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
-      await userEvent.click(screen.getByRole('button', { name: 'Antrag stellen' }));
-      expect(nav).toHaveBeenCalledWith('/apply');
+    it('shows no floating "Antrag stellen"', async () => {
+      await start();
+      expect(screen.queryByRole('button', { name: 'Antrag stellen' })).not.toBeInTheDocument();
     });
 
     /**

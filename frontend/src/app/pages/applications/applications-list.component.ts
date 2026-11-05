@@ -59,7 +59,7 @@ import {
   FabComponent,
   PageHeaderComponent,
 } from '@stupa-makers/ui-kit';
-import { FabLinkDirective, injectListDetailPage } from '@stupa-makers/ui-kit/shell';
+import { injectListDetailPage } from '@stupa-makers/ui-kit/shell';
 import { flowColorKind } from '@shared/ui';
 import { exportDownload } from '@shared/download.util';
 import { RailStatusService } from '../../layout/rail-status.service';
@@ -172,7 +172,6 @@ type FilterSheet = 'more' | null;
     DatepickerComponent,
     EmptyStateComponent,
     FabComponent,
-    FabLinkDirective,
     FilterSelectComponent,
     IconComponent,
     ListDetailLayoutComponent,
@@ -455,11 +454,6 @@ export class ApplicationsListComponent {
   /** Phone: the sort orders and the export in one "more" menu of the header. */
   readonly phoneMenuSections = computed<RowMenuSection[]>(() => {
     const sections: RowMenuSection[] = [];
-    if (this.canCapture()) {
-      sections.push({
-        items: [{ id: 'capture', label: this.i18n.translate('applications.capture.title'), icon: 'plus' }],
-      });
-    }
     sections.push(...this.sortSections());
     if (this.exportShown()) {
       sections.push({
@@ -643,10 +637,6 @@ export class ApplicationsListComponent {
   onHeaderMenu(item: RowMenuItem): void {
     if (item.id === 'export') {
       this.onExport();
-      return;
-    }
-    if (item.id === 'capture') {
-      this.openCapture();
       return;
     }
     const [sort, order] = item.id.split(':');
