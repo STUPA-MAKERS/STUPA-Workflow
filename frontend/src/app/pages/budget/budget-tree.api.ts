@@ -516,6 +516,19 @@ export class BudgetTreeApi {
     });
   }
 
+  /**
+   * The fiscal years of a root, cached like {@link tree}. Every figure of the budget page
+   * belongs to a year, so the page waits for this read before it shows an amount; the
+   * prefetch warms it with the tree, so a visit paints the amounts at once. A cached read
+   * emits twice when the fresh answer differs, so only a caller that takes a second
+   * emission uses it. A write under `/budgets` drops the entry.
+   */
+  cachedFiscalYears(topId: Uuid): Observable<FiscalYear[]> {
+    return this.http.get<FiscalYear[]>(`${this.base}/budgets/${topId}/fiscal-years`, {
+      context: cached(TREE_TTL_MS, skipLoading()),
+    });
+  }
+
   createFiscalYear(topId: Uuid, body: FiscalYearCreate): Observable<FiscalYear> {
     return this.http.post<FiscalYear>(`${this.base}/budgets/${topId}/fiscal-years`, body);
   }

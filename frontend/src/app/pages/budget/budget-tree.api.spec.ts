@@ -103,6 +103,13 @@ describe('BudgetTreeApi', () => {
     req.flush([]);
   });
 
+  it('cachedFiscalYears GETs the same years, opted in to the cache', () => {
+    api.cachedFiscalYears('n-1').subscribe();
+    const req = http.expectOne(`${BASE}/budgets/n-1/fiscal-years`);
+    expect(req.request.method).toBe('GET');
+    req.flush([]);
+  });
+
   it('createFiscalYear POSTs /budgets/:id/fiscal-years', () => {
     api.createFiscalYear('n-1', { year: 2027 }).subscribe();
     const req = http.expectOne(`${BASE}/budgets/n-1/fiscal-years`);
