@@ -17,3 +17,4 @@ scope:
 A vote proposal can approve an Antrag with a different amount and with conditions. The mail to
 the applicant and the Antrag page show the deviation. The budget books only the approved
 amount.
+The approved amount can be 0 €. It must not be negative.

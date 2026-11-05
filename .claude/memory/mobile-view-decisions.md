@@ -34,8 +34,9 @@ Binding rules for mobile work. The frame details are in the `frontend` skill
   element, because the default highlight is a rectangle that ignores the rounded tile. The
   reusable surfaces (clickable data-table rows, `.card--interactive`, list-item rows) tint the
   whole tile on `:active` instead.
-- **PWA bars and zoom:** the viewport meta is `maximum-scale=1, user-scalable=no,
-  viewport-fit=cover` (no pinch zoom). `index.html` has one `theme-color` meta per OS scheme,
+- **PWA bars and zoom:** the viewport meta has `viewport-fit=cover` and no
+  `user-scalable=no`, so the browser tab allows pinch zoom. Only the installed app blocks it
+  (`lockInstalledAppZoom` from `@stupa-makers/ui-kit/pwa`, called in `app.config.ts`). `index.html` has one `theme-color` meta per OS scheme,
   and `ThemeService` sets both to the page background of the chosen theme, so the status bar
   follows the theme. The kit sets `html { background-color: var(--color-bg) }`, because Chrome
   on Android colours its nav bar from the root background under `viewport-fit=cover`. The

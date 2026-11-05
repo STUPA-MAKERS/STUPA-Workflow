@@ -11,4 +11,5 @@ scope:
 
 # A merge needs the go of the owner
 
-Merge a pull request into `main` only after the owner says so.
+Merge a pull request only after the owner says so. After the go, wait for green CI. While CI
+is known to be broken, merge at once after the go.
