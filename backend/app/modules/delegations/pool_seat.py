@@ -17,8 +17,11 @@ blocks the member. A check-in of the member or an own ballot of the member frees
 seat (`release_pool_seat`). A ballot that the substitute already cast for the member
 stays, so the member gets 409 in that vote.
 
-The gates are the gates of the lead entry: the meeting is live, the gremium allows
-delegations, and the global vote transfer switch is on. No chains: a substitute who
+The only gate is a live meeting of the gremium of the vote. The pool entries are the
+rule that the gremium keeps for its substitutes, so the delegation switch of the
+gremium (`allow_vote_delegation`) and the global vote transfer switch
+(`delegation_voting_enabled`) do not apply: they govern the free transfers between
+members. No chains: a substitute who
 delegated the own vote, or who already holds a voting delegation in the meeting,
 claims no further seat. A member who holds or gives a delegation in the meeting has
 no free seat.
@@ -39,14 +42,13 @@ from sqlalchemy import ColumnElement, and_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
-from app.modules.admin.models import Gremium, GremiumMembership, GremiumRole
+from app.modules.admin.models import GremiumMembership, GremiumRole
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.delegations.models import MeetingDelegation
 from app.modules.delegations.pool import members_for_substitute
 from app.modules.livevote.models import Meeting, MeetingAttendance
-from app.settings import get_settings
 
 #: Advisory-lock base key. It serializes the delegation writes per meeting, so a
 #: concurrent insert cannot race the read-then-insert check of the no-chains rule
@@ -86,15 +88,10 @@ def _gremium_of(eligible_group: str) -> UUID | None:
         return None
 
 
-async def _gates_open(session: AsyncSession, meeting_id: UUID, gremium_id: UUID) -> bool:
-    """Tell whether the meeting is live and the gremium and the server allow transfers."""
+async def _meeting_live(session: AsyncSession, meeting_id: UUID, gremium_id: UUID) -> bool:
+    """Tell whether the meeting is live and belongs to the gremium of the vote."""
     meeting = await session.get(Meeting, meeting_id)
-    if meeting is None or meeting.status != "live" or meeting.gremium_id != gremium_id:
-        return False
-    gremium = await session.get(Gremium, gremium_id)
-    if gremium is None or not gremium.allow_vote_delegation:
-        return False
-    return get_settings().delegation_voting_enabled
+    return meeting is not None and meeting.status == "live" and meeting.gremium_id == gremium_id
 
 
 async def _voting_member_ids(session: AsyncSession, gremium_id: UUID, now: datetime) -> set[UUID]:
@@ -128,7 +125,7 @@ async def _find_seat(
     if meeting_id is None:
         return None
     gremium_id = _gremium_of(eligible_group)
-    if gremium_id is None or not await _gates_open(session, meeting_id, gremium_id):
+    if gremium_id is None or not await _meeting_live(session, meeting_id, gremium_id):
         return None
     deputy = await session.scalar(select(PrincipalRow).where(PrincipalRow.sub == sub))
     if deputy is None:

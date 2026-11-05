@@ -111,15 +111,17 @@ _has_full_view = has_budget_read
 
 
 async def _member_gremium_ids(service: BudgetTreeService, sub: str) -> set[UUID]:
-    from app.modules.admin.gremium_roles import gremium_member_ids
+    from app.modules.admin.gremium_roles import gremium_reader_ids
 
-    return await gremium_member_ids(service.session, sub)
+    return await gremium_reader_ids(service.session, sub)
 
 
 async def _require_node_view(
     service: BudgetTreeService, principal: Principal, budget_id: UUID
 ) -> None:
-    """Require the full view, or a node in a subtree of a member Gremium.
+    """Require the full view, or a node in a subtree of a Gremium of the principal.
+
+    The Gremien are the memberships and the substitute pools (`gremium_reader_ids`).
 
     Raises:
         ForbiddenError: The principal has neither the full view nor the gremium

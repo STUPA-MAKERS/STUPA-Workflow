@@ -241,17 +241,18 @@ class SearchService:
         """Cost centres. Scoped the way `GET /api/budgets` scopes its tree.
 
         A holder of a global budget permission sees every node. Anyone else sees the
-        nodes of the Gremien they belong to, through `view_gremium_id`, which is the
+        nodes of the Gremien they belong to as member or pool substitute
+        (`gremium_reader_ids`), through `view_gremium_id`, which is the
         column the tree endpoint filters roots on.
         """
-        from app.modules.admin.gremium_roles import gremium_member_ids
+        from app.modules.admin.gremium_roles import gremium_reader_ids
 
         where, rank = trigram_rank(
             q, [Budget.name, Budget.path_key], dialect=dialect_of(self.session)
         )
         stmt = select(Budget).where(where, Budget.hidden_in_budget.is_(False))
         if not has_budget_read(principal):
-            member = await gremium_member_ids(self.session, principal.sub)
+            member = await gremium_reader_ids(self.session, principal.sub)
             if not member:
                 return []
             stmt = stmt.where(Budget.view_gremium_id.in_(member))
