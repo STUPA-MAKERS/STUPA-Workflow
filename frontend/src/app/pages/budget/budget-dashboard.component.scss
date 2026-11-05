@@ -1,5 +1,6 @@
 @use 'breakpoints' as bp;
 @use 'scroll-fade' as fade;
+@use 'dot-parts' as dots;
 @use 'swatch';
 
 :host {
@@ -241,29 +242,35 @@
   scrollbar-width: thin;
 }
 
-// The bar opens the sheet like the title bar of every other detail: 16px above the 60px line
-// of the actions. The bar sizes its border box, so the padding adds to its minimum height.
-.bd__bar {
-  min-height: calc(60px + var(--space-4));
-  padding: var(--space-4) var(--space-6) 0;
+// The head of the sheet is the shared detail head (`.sheet-head`): the title on the line of the
+// actions, a status line, a rule. It stays above the scrolling body. The rule runs inside the
+// side padding of the sheet, so the head takes it as a margin.
+.bd__head {
+  flex: none;
+  margin-inline: var(--space-6);
 }
-.bd__bar .bd__actions {
+.bd__line {
+  --bd-sep: 24px;
+  overflow-x: clip;
+}
+.bd__parts {
+  @include dots.list(var(--bd-sep));
+}
+.bd__part {
+  @include dots.part(var(--bd-sep));
+}
+.bd__keyPart {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.bd__keySwatch {
+  @include swatch.mark;
+}
+.bd__head .bd__actions {
   flex: none;
   flex-wrap: nowrap;
   margin-inline-start: var(--space-3);
-}
-.bd--wide .bd__sheetBody {
-  padding-top: var(--sheet-head-gap);
-}
-// The title clips its text, so without `flex: none` the scrolling column would shrink it to zero
-// height.
-.bd__name {
-  flex: none;
-  margin: 0;
-  font-size: var(--fs-d2);
-  line-height: 2.25rem;
-  font-weight: var(--fw-semibold);
-  letter-spacing: -0.01em;
 }
 .bd__actions {
   display: flex;
@@ -454,13 +461,6 @@
     padding: var(--space-5);
     border-radius: var(--radius-2xl);
     background: var(--color-surface-1);
-  }
-  .bd__head {
-    align-items: center;
-  }
-  .bd__name {
-    font-size: var(--fs-h2);
-    line-height: 1.5rem;
   }
 }
 

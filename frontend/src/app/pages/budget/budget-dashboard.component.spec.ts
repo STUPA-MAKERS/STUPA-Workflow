@@ -258,7 +258,7 @@ describe('BudgetDashboardComponent', () => {
       const view = await setup();
       const sheet = view.container.querySelector('article.bd__sheet') as HTMLElement;
       const body = sheet.querySelector(':scope > .bd__sheetBody') as HTMLElement;
-      expect(Array.from(sheet.children).map((el) => el.tagName.toLowerCase())).toEqual(['app-sheet-bar', 'div']);
+      expect(Array.from(sheet.children).map((el) => el.tagName.toLowerCase())).toEqual(['header', 'div']);
       expect(body.querySelector('.bd__figs')).toBeTruthy();
       Object.defineProperty(body, 'scrollHeight', { value: 1200, configurable: true });
       Object.defineProperty(body, 'clientHeight', { value: 800, configurable: true });
@@ -427,35 +427,32 @@ describe('BudgetDashboardComponent', () => {
 
   describe('header', () => {
     /**
-     * The bar sits above the scrolling body, so it stays in place. The title is the first line of
-     * the body, below the bar.
+     * The bar sits above the scrolling body, so it stays in place. It opens the sheet with the
+     * name of the cost centre, like the title bar of every other detail. The tree on the left
+     * shows the path, so the bar holds no breadcrumb.
      */
-    it('puts the path in the kicker of the shared sheet bar, the actions at its end', async () => {
+    it('puts the name in the title of the shared sheet bar, the actions at its end', async () => {
       const view = await setup({ queryParams: { ks: 'b-810' } });
-      const bar = view.container.querySelector('article.bd__sheet > app-sheet-bar') as HTMLElement;
-      expect(bar).toBeTruthy();
-      expect(bar.nextElementSibling).toHaveClass('bd__sheetBody');
-      const kicker = bar.querySelector('.sheet-bar__kicker') as HTMLElement;
-      expect(kicker.querySelector('nav.bd__crumbs')).toBeTruthy();
-      expect(kicker.querySelector('nav')?.getAttribute('aria-label')).toBe(
-        view.container.querySelector('nav.bd__crumbs')?.getAttribute('aria-label'),
-      );
+      const head = view.container.querySelector('article.bd__sheet > header.sheet-head') as HTMLElement;
+      expect(head.nextElementSibling).toHaveClass('bd__sheetBody');
+      const bar = head.querySelector(':scope > app-sheet-bar') as HTMLElement;
+      expect(bar).toHaveClass('sheet-bar--title');
+      const title = bar.querySelector('.sheet-bar__title > h2#bd-title') as HTMLElement;
+      expect(title.textContent).toContain('Werkstatt');
+      expect(view.container.querySelector('article.bd__sheet')?.getAttribute('aria-labelledby')).toBe('bd-title');
+      expect(view.container.querySelectorAll('#bd-title')).toHaveLength(1);
+      expect(view.container.querySelector('.sheet-bar__kicker')).toBeNull();
       const actions = bar.querySelector(':scope > .sheet-bar__actions > .bd__actions') as HTMLElement;
       expect(within(actions).getByRole('button', { name: /Exportieren/ })).toBeTruthy();
       expect(within(actions).getByRole('button', { name: 'Buchungen ansehen' })).toBeTruthy();
-      expect(bar.firstElementChild).toBe(kicker);
-      expect(view.container.querySelector('.bd__sheetBody')?.firstElementChild?.id).toBe('bd-title');
+      expect(view.container.querySelector('.bd__sheetBody')?.firstElementChild).toHaveClass('bd__figs');
     });
 
-    it('shows the path with the key and goes up on a click', async () => {
+    it('says the key, the parent and the year in the status line below the title', async () => {
       const view = await setup({ queryParams: { ks: 'b-810' } });
-      const crumbs = within(view.container.querySelector('.bd__crumbs') as HTMLElement);
-      expect(crumbs.getByText('VS-800-810')).toBeTruthy();
-      expect(view.container.querySelector('#bd-title')?.textContent).toContain('Werkstatt');
-      jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
-      crumbs.getByRole('button', { name: 'Dezentrale Einrichtungen' }).click();
-      const c = view.fixture.componentInstance as unknown as Inst;
-      expect(c.selectedKsId()).toBe('b-800');
+      const line = view.container.querySelector('header.sheet-head > p.sheet-line') as HTMLElement;
+      const parts = Array.from(line.querySelectorAll('.bd__part')).map((el) => el.textContent?.trim());
+      expect(parts).toEqual(['VS-800-810', 'Dezentrale Einrichtungen', expect.stringContaining('HHJ')]);
     });
 
     it('stops the path at a node whose parent is not in the tree', async () => {
@@ -978,7 +975,6 @@ describe('BudgetDashboardComponent', () => {
       expect(article?.getAttribute('aria-label')).toBe('VS-Mittel');
       expect(view.container.querySelector('.bd__topRow .bd__actions')).toBeTruthy();
       expect(view.container.querySelector('app-sheet-bar')).toBeNull();
-      expect(view.container.querySelector('.bd__crumbs')).toBeNull();
     });
   });
 

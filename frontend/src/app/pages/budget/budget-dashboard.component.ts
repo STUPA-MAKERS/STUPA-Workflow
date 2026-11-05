@@ -25,7 +25,7 @@ import {
   type Seg,
   SegBarComponent,
   SheetBarComponent,
-  SheetBarKickerDirective,
+  SheetBarTitleDirective,
   SideSheetComponent,
   SkeletonComponent,
   ToastService,
@@ -44,7 +44,6 @@ import {
   type Expense,
   type FiscalYear,
 } from './budget-tree.api';
-import { BudgetCrumbsComponent } from './budget-crumbs.component';
 import { BudgetPieComponent, type PieSlice } from './budget-pie.component';
 import { BudgetSunburstComponent, type SunburstMetric } from './budget-sunburst.component';
 import { nodeColors, resolveNodeColors } from './budget-color.util';
@@ -147,8 +146,7 @@ export const APPS_SHOWN = 5;
     NoteComponent,
     PageHeaderComponent,
     SheetBarComponent,
-    SheetBarKickerDirective,
-    BudgetCrumbsComponent,
+    SheetBarTitleDirective,
     NgTemplateOutlet,
     RouterLink,
     TranslatePipe,
