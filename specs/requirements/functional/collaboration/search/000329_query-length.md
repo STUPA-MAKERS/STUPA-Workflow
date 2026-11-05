@@ -1,0 +1,16 @@
+---
+id: "000329"
+title: Search needs two characters
+kind: functional
+status: approved
+owner: frederikbeimgraben
+updated: 2026-11-05
+scope:
+  - backend/app/modules/search
+  - frontend/src/app/layout
+---
+
+# Search needs two characters
+
+A search with fewer than 2 characters gives an empty result, never an error. The query is at
+most 200 characters long.

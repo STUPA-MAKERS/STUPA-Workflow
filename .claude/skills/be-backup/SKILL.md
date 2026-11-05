@@ -35,7 +35,7 @@ description: Whole-platform backup and restore — age-encrypted archives (pg_du
 
 ## Config
 
-`backup_age_recipient` (empty ⇒ every route answers 503 and the cron does nothing) · `backup_age_identity_file` (absent ⇒ restore and import are off, and the page now says so beside the disabled control rather than leaving it dead) · `backup_bucket` · `backup_retention_count` · `backup_url_ttl_seconds` · `backup_max_upload_bytes` · `backup_subprocess_timeout_seconds`. Setup and the operator callout: `deploy/README.md`.
+`backup_age_recipient` (empty ⇒ every route answers 503 and the cron does nothing) · `backup_age_identity_file` (absent ⇒ restore and import are off, and the page now says so beside the disabled control rather than leaving it dead) · `backup_bucket` · `backup_retention_count` · `backup_max_upload_bytes` · `backup_subprocess_timeout_seconds`. Setup and the operator callout: `deploy/README.md`.
 
 ## Frontend
 
