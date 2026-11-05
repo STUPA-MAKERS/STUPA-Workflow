@@ -298,7 +298,6 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
     async with maker() as session:
         app = await session.get(Application, app_id)
         assert app is not None
-        app.archived_by = old.sub
         app.captured_by = old.sub
         session.add(GuestApplicationSettings(id=1, updated_by=old.sub))
         session.add(MeetingSettings(id=1, updated_by=old.sub))
@@ -333,15 +332,12 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
         second = await _meeting(session, seed.gremium_id, f"Sitzung B {tag}")
         session.add_all(
             [
-                ProtocolKeeperPeriod(
-                    meeting_id=meeting.id, principal_id=old.id, handed_over_by=old.sub
-                ),
+                ProtocolKeeperPeriod(meeting_id=meeting.id, principal_id=old.id),
                 MeetingAgendaItem(
                     meeting_id=meeting.id,
                     title="TOP 1",
                     position=0,
                     done_at=datetime.now(UTC),
-                    done_by=old.sub,
                 ),
                 MeetingGuest(
                     meeting_id=meeting.id,
@@ -404,7 +400,6 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
             start_date=date(2025, 1, 1),
             end_date=date(2025, 12, 31),
             closed_at=datetime.now(UTC),
-            closed_by=old.sub,
         )
         session.add(year)
         await session.flush()

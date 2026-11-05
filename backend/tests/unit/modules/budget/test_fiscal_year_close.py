@@ -43,7 +43,6 @@ _CLOSED_AT = datetime(2026, 3, 1, tzinfo=UTC)
 def _closed_fy(**kw):
     fy = _fy(**kw)
     fy.closed_at = _CLOSED_AT
-    fy.closed_by = "kasse"
     return fy
 
 
@@ -51,17 +50,19 @@ def _is_closed_error(exc: pytest.ExceptionInfo[ConflictError]) -> bool:
     return exc.value.code == "fiscal_year_closed"
 
 
-async def test_close_sets_timestamp_actor_and_audit() -> None:
+async def test_close_sets_timestamp_and_audits_the_actor() -> None:
     top = _budget(id=uuid.uuid4())
     fy = _fy(budget_id=top.id)
     sess = fake_session(result(top), result(fy))
     out = await BudgetTreeService(sess, actor="kasse").set_fiscal_year_closed(
-        top.id, fy.id, closed=True, actor="kasse"
+        top.id, fy.id, closed=True
     )
-    assert fy.closed_at is not None and fy.closed_by == "kasse"
+    assert fy.closed_at is not None
     assert out.closed_at == fy.closed_at
     assert sess.committed == 1
-    assert [a.action for a in sess.added] == [AuditAction.BUDGET_FISCAL_YEAR_CLOSE]
+    assert [(a.action, a.actor) for a in sess.added] == [
+        (AuditAction.BUDGET_FISCAL_YEAR_CLOSE, "kasse")
+    ]
 
 
 async def test_reopen_clears_the_close() -> None:
@@ -69,9 +70,9 @@ async def test_reopen_clears_the_close() -> None:
     fy = _closed_fy(budget_id=top.id)
     sess = fake_session(result(top), result(fy))
     out = await BudgetTreeService(sess, actor="kasse").set_fiscal_year_closed(
-        top.id, fy.id, closed=False, actor="kasse"
+        top.id, fy.id, closed=False
     )
-    assert fy.closed_at is None and fy.closed_by is None
+    assert fy.closed_at is None
     assert out.closed_at is None
     assert [a.action for a in sess.added] == [AuditAction.BUDGET_FISCAL_YEAR_REOPEN]
 
@@ -81,9 +82,9 @@ async def test_close_of_a_closed_year_changes_nothing() -> None:
     fy = _closed_fy(budget_id=top.id)
     sess = fake_session(result(top), result(fy))
     out = await BudgetTreeService(sess).set_fiscal_year_closed(
-        top.id, fy.id, closed=True, actor="other"
+        top.id, fy.id, closed=True
     )
-    assert fy.closed_at == _CLOSED_AT and fy.closed_by == "kasse"
+    assert fy.closed_at == _CLOSED_AT
     assert out.closed_at == _CLOSED_AT
     assert sess.committed == 0 and sess.added == []
 
@@ -93,14 +94,14 @@ async def test_close_of_a_foreign_year_404() -> None:
     foreign = _fy(budget_id=uuid.uuid4())
     svc = BudgetTreeService(fake_session(result(top), result(foreign)))
     with pytest.raises(NotFoundError):
-        await svc.set_fiscal_year_closed(top.id, foreign.id, closed=True, actor="k")
+        await svc.set_fiscal_year_closed(top.id, foreign.id, closed=True)
 
 
 async def test_close_below_top_level_422() -> None:
     child = _budget(id=uuid.uuid4(), parent_id=uuid.uuid4(), path_key="VS-1", key="1")
     svc = BudgetTreeService(fake_session(result(child)))
     with pytest.raises(ValidationProblem):
-        await svc.set_fiscal_year_closed(child.id, uuid.uuid4(), closed=True, actor="k")
+        await svc.set_fiscal_year_closed(child.id, uuid.uuid4(), closed=True)
 
 
 async def test_list_reports_closed_at() -> None:

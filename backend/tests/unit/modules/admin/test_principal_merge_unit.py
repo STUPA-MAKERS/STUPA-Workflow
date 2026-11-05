@@ -184,7 +184,7 @@ def _svc(session: _Session) -> PrincipalMergeService:
 async def test_preview_counts_every_area() -> None:
     """Count every area in the preview.
 
-    The fake count also answers the two open erasure requests. Five sub columns count,
+    The fake count also answers the two open erasure requests. Four sub columns count,
     among them application_decision.decided_by. The notifications have two duplicates of
     two rows, so nothing is left to rewrite. The preview never locks, writes or commits.
     """
@@ -194,7 +194,7 @@ async def test_preview_counts_every_area() -> None:
     assert [c.kind for c in out.conflicts] == ["erasure_open", "erasure_open"]
     areas = {a.area: a for a in out.areas}
     assert list(areas) == list(AREAS)
-    assert areas["applications"].rewritten == 2 * 5
+    assert areas["applications"].rewritten == 2 * 4
     assert areas["notifications"].combined == 2
     assert areas["notifications"].rewritten == 0
     assert areas["sessions"].removed == 2 * 3

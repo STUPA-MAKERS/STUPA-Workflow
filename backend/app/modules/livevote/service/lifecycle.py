@@ -312,7 +312,7 @@ class LifecycleOps(HandoverOps):
                     )
                 previous = meeting.protokollant_id
                 await self.check_keeper(meeting.gremium_id, payload.protokollant_id)
-                await self.switch_now(meeting, payload.protokollant_id, principal.sub, now)
+                await self.switch_now(meeting, payload.protokollant_id, now)
                 await self._audit_handover(
                     meeting,
                     principal.sub,
@@ -331,7 +331,7 @@ class LifecycleOps(HandoverOps):
         if going_live and meeting.started_at is None:
             meeting.started_at = now
         if going_live:
-            await self.open_first_period(meeting, principal.sub, now)
+            await self.open_first_period(meeting, now)
         if closing:
             await self.close_periods(meeting, now)
             meeting.closed_at = now

@@ -210,7 +210,7 @@ class FiscalYearOps(BudgetTreeServiceBase):
         return fy
 
     async def set_fiscal_year_closed(
-        self, budget_id: UUID, fiscal_year_id: UUID, *, closed: bool, actor: str
+        self, budget_id: UUID, fiscal_year_id: UUID, *, closed: bool
     ) -> FiscalYearOut:
         """Close or reopen a fiscal year.
 
@@ -228,7 +228,6 @@ class FiscalYearOps(BudgetTreeServiceBase):
         fy = await self._own_fiscal_year(top, fiscal_year_id)
         if closed != (fy.closed_at is not None):
             fy.closed_at = datetime.now(UTC) if closed else None
-            fy.closed_by = actor if closed else None
             await self._audit(
                 AuditAction.BUDGET_FISCAL_YEAR_CLOSE
                 if closed

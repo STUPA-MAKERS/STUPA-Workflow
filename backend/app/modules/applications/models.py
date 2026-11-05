@@ -73,9 +73,6 @@ class Application(UUIDPkMixin, TimestampMixin, Base):
             NOT a flow state, because an application can be archived from any state.
             It is NOT anonymization either: archiving hides nothing and deletes
             nothing, while ``be-privacy`` erases PII under the DSGVO.
-        archived_by: OIDC ``sub`` of whoever archived it. It is no foreign key,
-            because the record of who archived must survive the removal of the
-            principal, as with ``created_by``.
         captured_by: OIDC ``sub`` of the person with
             ``application.create_on_behalf`` who entered an application that reached
             the platform another way, for example as a PDF or a mail. It is NOT the
@@ -122,7 +119,6 @@ class Application(UUIDPkMixin, TimestampMixin, Base):
     archived_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    archived_by: Mapped[str | None] = mapped_column(Text, nullable=True)
     captured_by: Mapped[str | None] = mapped_column(Text, nullable=True)
     capture_intake: Mapped[str | None] = mapped_column(Text, nullable=True)
     received_on: Mapped[date | None] = mapped_column(Date, nullable=True)

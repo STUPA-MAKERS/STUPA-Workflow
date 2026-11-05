@@ -1595,7 +1595,6 @@ def _agenda_item(
         position=position,
         non_public=non_public,
         done_at=None,
-        done_by=None,
     )
 
 
@@ -3979,7 +3978,6 @@ async def test_set_done_marks_the_item(audit_calls: list[dict[str, Any]]) -> Non
     await AgendaService(sess).set_done(m.id, item.id, done=True, actor="keeper")  # type: ignore[arg-type]
     assert item.done_at is not None
     assert item.done_at.tzinfo is not None
-    assert item.done_by == "keeper"
     assert sess.committed == 1
     [entry] = audit_calls
     assert entry["action"].value == "agenda_item_done"
@@ -3992,11 +3990,9 @@ async def test_set_done_false_reopens_the_item(audit_calls: list[dict[str, Any]]
     m = _meeting(status="planned")
     item = _agenda_item()
     item.done_at = datetime(2026, 6, 8, tzinfo=UTC)
-    item.done_by = "keeper"
     sess = _QueueSession(executes=[res(m), res(item), res(m)], scalars_q=[[]])
     await AgendaService(sess).set_done(m.id, item.id, done=False, actor="mgr")  # type: ignore[arg-type]
     assert item.done_at is None
-    assert item.done_by is None
     [entry] = audit_calls
     assert entry["action"].value == "agenda_item_reopened"
 
@@ -4007,17 +4003,15 @@ async def test_set_done_without_change_writes_nothing(
 ) -> None:
     """Write nothing when the done mark does not change.
 
-    A second tick keeps the time and the person of the first one.
+    A second tick keeps the time of the first one.
     """
     m = _meeting(status="live")
     item = _agenda_item()
     first = datetime(2026, 6, 8, tzinfo=UTC) if done else None
     item.done_at = first
-    item.done_by = "first" if done else None
     sess = _QueueSession(executes=[res(m), res(item), res(m)], scalars_q=[[]])
     await AgendaService(sess).set_done(m.id, item.id, done=done, actor="other")  # type: ignore[arg-type]
     assert item.done_at == first
-    assert item.done_by == ("first" if done else None)
     assert audit_calls == []
 
 
@@ -4028,8 +4022,7 @@ async def test_set_done_after_close_with_draft_protocol_ok(
     item = _agenda_item()
     sess = _QueueSession(executes=[res(m), res(item), res(m)], scalars_q=[[]], scalar_q=["draft"])
     await AgendaService(sess).set_done(m.id, item.id, done=True, actor="mgr")  # type: ignore[arg-type]
-    assert item.done_by == "mgr"
-    assert len(audit_calls) == 1
+    assert [c["actor"] for c in audit_calls] == ["mgr"]
 
 
 @pytest.mark.parametrize("protocol_status", ["rendering", "final"])
