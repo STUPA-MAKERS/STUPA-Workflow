@@ -3701,6 +3701,7 @@
   "todos.card.unlink": "Verknüpfung mit {title} entfernen",
   "todos.card.description": "Beschreibung",
   "todos.card.editDescription": "Beschreibung bearbeiten",
+  "todos.card.descriptionEmpty": "Beschreibung hinzufügen …",
   "todos.card.checklist": "Checkliste",
   "todos.card.hideDone": "Erledigte Punkte ausblenden",
   "todos.card.showDone": "{n} erledigte Punkte zeigen",
