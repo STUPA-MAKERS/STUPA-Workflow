@@ -636,8 +636,8 @@ async def open_meeting_vote(
     percent quorum of the Gremium; a vote with guests and a poll have no quorum. The other
     managers of the meeting see a prepared question at once.
 
-    A motion and an election are always secret. ``secret`` false gives 422
-    ``open_vote_unavailable``; a poll keeps its own switch.
+    Every vote is secret: a motion, an election and a poll. ``secret`` false gives 422
+    ``open_vote_unavailable``.
     """
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_manage_votes:
@@ -692,7 +692,7 @@ async def open_meeting_vote(
         else {
             "options": payload.options,
             "majorityRule": payload.majority_rule,
-            "secret": payload.poll is not None or secret_only(payload.secret, field="secret"),
+            "secret": secret_only(payload.secret, field="secret"),
             "tieBreak": "rejected",
             "guestsVote": guests_vote,
         }
@@ -713,7 +713,9 @@ async def open_meeting_vote(
     config: VoteConfig | ElectionConfig | PollConfig
     if payload.poll is not None:
         config = build_poll_config(
-            payload.poll, secret=bool(payload.secret), guests_vote=guests_vote
+            payload.poll,
+            secret=secret_only(payload.secret, field="secret"),
+            guests_vote=guests_vote,
         )
     elif election:
         config = ElectionConfig.model_validate(config_data)

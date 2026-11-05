@@ -20,7 +20,6 @@ import { VoteProgressComponent } from '../vote-progress/vote-progress.component'
 import { NO_CONTEXT, type VoteContext } from './vote-context';
 import {
   guestComposition,
-  secrecyLabel,
   voteRulesParts,
 } from '../../meetings/meetings-display.util';
 import {
@@ -140,16 +139,12 @@ export class VotePanelComponent {
       : this.i18n.translate('voting.panel.where', { meeting: meeting.title, n: position });
   });
 
-  /** "Einfache Mehrheit · Quorum 12", or a poll with its secrecy. */
+  /** "Einfache Mehrheit · Quorum 12", or the caption of a poll or an election. */
   protected readonly rules = computed(() => {
     const v = this.vote();
     const t: Translate = (key, params) => this.i18n.translate(key, params);
     const poll = this.poll();
-    if (poll) {
-      const parts = [pollCaption(poll, t)];
-      if (this.secret()) parts.push(secrecyLabel(true, t));
-      return parts.join(' · ');
-    }
+    if (poll) return pollCaption(poll, t);
     const election = this.election();
     if (election) {
       return electionCaption(election, v.round, t);

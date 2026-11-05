@@ -165,14 +165,13 @@ export class GuestViewComponent {
     if (!v) return null;
     return v.canCast || v.myBallot.cast ? v.myBallot : null;
   });
-  /** The note above a vote: watch mode, members only, admitted during the vote, or a secret poll. */
-  protected readonly voteNote = computed<{ key: TranslationKey; icon: 'eye' | 'info' | 'lock' } | null>(() => {
+  /** The note above a vote: watch mode, members only, or admitted during the vote. */
+  protected readonly voteNote = computed<{ key: TranslationKey; icon: 'eye' | 'info' } | null>(() => {
     const v = this.pageVote();
     if (!v || v.status !== 'open') return null;
     if (this.watch()) return { key: 'guests.vote.noteWatch', icon: 'eye' };
     if (!v.guestsVote) return { key: 'guests.vote.noteMembersOnly', icon: 'info' };
     if (this.admittedDuringVote() && !v.myBallot.cast) return { key: 'guests.vote.noteLate', icon: 'info' };
-    if (v.kind === 'poll' && v.secret) return { key: 'guests.vote.noteSecret', icon: 'lock' };
     return null;
   });
   /** "TOP 3 · 7. Sitzung der Fachschaft Informatik". */

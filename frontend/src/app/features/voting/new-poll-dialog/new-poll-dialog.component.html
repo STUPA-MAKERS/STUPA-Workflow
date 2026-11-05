@@ -46,13 +46,6 @@
         (ngModelChange)="endTime.set($event)"
       />
     </div>
-
-    <app-switch
-      [id]="'npd-secret'"
-      [checked]="secret()"
-      (checkedChange)="secret.set($event)"
-      ><span class="npd__switchLabel">{{ 'poll.dialog.secret' | t }}</span></app-switch
-    >
   </form>
   <app-button dialog-footer variant="text" (click)="cancel()">{{ 'action.cancel' | t }}</app-button>
   <app-button

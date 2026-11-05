@@ -23,7 +23,6 @@ import {
   guestComposition,
   majorityLabel,
   quorumLabel,
-  secrecyLabel,
   voteRulesParts,
 } from './meetings-display.util';
 
@@ -193,9 +192,9 @@ export class MeetingBeamerComponent {
     };
   }
 
-  /** A poll: "Umfrage · Einzelwahl · offene Abstimmung". It has no result. */
+  /** A poll: "Umfrage · Einzelwahl". It has no result. */
   private describePoll(v: BeamerVote, poll: PollConfig, t: Translate): BeamerText {
-    const rules = [pollCaption(poll, t), secrecyLabel(v.secret, t)].join(' · ');
+    const rules = pollCaption(poll, t);
     return {
       bars: v.counts !== null && (v.status === 'closed' || !v.secret),
       turnout: t('meetings.vote.progress', { voted: v.voted, present: v.present }),

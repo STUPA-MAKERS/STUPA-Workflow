@@ -39,13 +39,6 @@
 
     @if (isPoll()) {
     <app-poll-editor idPrefix="vod-poll" [draft]="poll()" (draftChange)="poll.set($event)" />
-
-    <app-switch
-      [id]="'vod-poll-secret'"
-      [checked]="pollSecret()"
-      (checkedChange)="pollSecret.set($event)"
-      ><span class="vod__switchLabel">{{ 'poll.dialog.secret' | t }}</span></app-switch
-    >
     } @else if (isElection()) {
     <div class="vod__group">
       <span class="vod__cap cap" id="vod-seats-cap">{{ 'election.dialog.seats' | t }}</span>

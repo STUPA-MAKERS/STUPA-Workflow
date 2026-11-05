@@ -59,13 +59,22 @@ def test_open_poll_builds_the_poll_config(setup: Any) -> None:  # noqa: F811
     assert config.guests_vote is True
 
 
-def test_open_poll_without_secret_is_open(setup: Any) -> None:  # noqa: F811
+def test_open_poll_without_secret_is_secret(setup: Any) -> None:  # noqa: F811
     client, meetings, agenda, voting = setup
     meetings._meeting_out = _meeting(False)
     agenda.item_row = SimpleNamespace(id=uuid4(), application_id=None, non_public=False)
     resp = client.post(f"/api/meetings/{uuid4()}/votes", json=_poll_body())
     assert resp.status_code == 200, resp.text
-    assert voting.last_payload.config.secret is False
+    assert voting.last_payload.config.secret is True
+
+
+def test_open_poll_that_is_open_422(setup: Any) -> None:  # noqa: F811
+    client, meetings, agenda, _ = setup
+    meetings._meeting_out = _meeting(False)
+    agenda.item_row = SimpleNamespace(id=uuid4(), application_id=None, non_public=False)
+    resp = client.post(f"/api/meetings/{uuid4()}/votes", json=_poll_body(secret=False))
+    assert resp.status_code == 422
+    assert resp.json()["code"] == "open_vote_unavailable"
 
 
 def test_open_poll_on_an_application_item_422(setup: Any) -> None:  # noqa: F811

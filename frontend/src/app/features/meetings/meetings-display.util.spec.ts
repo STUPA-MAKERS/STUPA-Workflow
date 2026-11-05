@@ -5,7 +5,6 @@ import {
   guestComposition,
   majorityLabel,
   quorumLabel,
-  secrecyLabel,
   assembleProtocolMarkdown,
   meetingDay,
   meetingTimeText,
@@ -192,10 +191,9 @@ describe('voteMetaLine', () => {
     expect(voteMetaLine({ ...base, status: 'cancelled', closedAt: null }, t as never, 'de')).toBe('');
   });
 
-  it('names the secrecy of a poll', () => {
-    expect(voteMetaLine({ ...base, kind: 'poll', status: 'draft', secret: true }, t as never, 'de')).toBe('meetings.vote.secretShort');
-    expect(voteMetaLine({ ...base, kind: 'poll', status: 'draft', secret: false }, t as never, 'de')).toBe('meetings.vote.publicShort');
-    expect(voteMetaLine({ ...base, kind: 'poll', status: 'draft' }, t as never, 'de')).toBe('');
+  it('never names the secrecy of a poll', () => {
+    expect(voteMetaLine({ ...base, kind: 'poll', status: 'draft', secret: true }, t as never, 'de')).toBe('');
+    expect(voteMetaLine({ ...base, kind: 'poll', status: 'draft', secret: false }, t as never, 'de')).toBe('');
   });
 
   it('leaves out what a live event did not bring yet', () => {
@@ -227,7 +225,6 @@ describe('voteRulesParts', () => {
   it('leaves out the parts without data', () => {
     expect(voteRulesParts({}, t as never)).toEqual([]);
     expect(voteRulesParts({ majorityRule: null, quorum: null }, t as never)).toEqual([]);
-    expect(secrecyLabel(false, t as never)).toBe('meetings.vote.publicShort');
     expect(quorumLabel({ type: 'count', value: 3 }, t as never)).toBe('meetings.vote.quorumCount(3)');
   });
 });

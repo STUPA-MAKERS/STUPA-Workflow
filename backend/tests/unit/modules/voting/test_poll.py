@@ -425,6 +425,17 @@ async def test_create_poll_as_draft(manage: set[UUID]) -> None:
     assert out.closes_at == NOW + timedelta(days=2)
     assert out.meeting_id is None
     assert [e.action for e in _audits(db)] == ["poll_created"]
+    assert out.secret is True
+
+
+async def test_create_open_poll_422(manage: set[UUID]) -> None:
+    db = fake_session()
+    db.scalar_results = [GID]
+    with pytest.raises(ValidationProblem) as err:
+        await PollService(VotingService(db)).create(
+            _create_body(secret=False), Principal(sub="mgr"), now=NOW
+        )
+    assert err.value.code == "open_vote_unavailable"
 
 
 async def test_create_poll_opens_at_once(manage: set[UUID]) -> None:

@@ -52,7 +52,7 @@ describe('VoteOpenDialogComponent · poll', () => {
     await user.click(screen.getByRole('radio', { name: 'Umfrage' }));
     expect(screen.getByRole('heading', { name: 'Umfrage öffnen' })).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: 'Einzelwahl' })).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByRole('switch', { name: 'Geheime Umfrage' })).toHaveAttribute('aria-checked', 'false');
+    expect(screen.queryByRole('switch', { name: 'Geheime Umfrage' })).toBeNull();
     expect(screen.queryByText('Höchstens wählbar')).toBeNull();
 
     const question = screen.getByLabelText('Frage');
@@ -76,7 +76,6 @@ describe('VoteOpenDialogComponent · poll', () => {
       expect.stringContaining('Tübingen'),
     ]);
     expect(cmp.canSubmit()).toBe(true);
-    await user.click(screen.getByRole('switch', { name: 'Geheime Umfrage' }));
     expect(await runAxe(container)).toHaveNoViolations();
 
     await user.click(footerButton('Umfrage öffnen'));
@@ -114,7 +113,7 @@ describe('VoteOpenDialogComponent · poll', () => {
       kind: 'poll',
       question: 'Was essen wir?',
       poll: { mode: 'multi', options: [{ label: 'A' }, { label: 'B' }, { label: 'C' }], maxChoices: 1 },
-      secret: false,
+      secret: true,
       draft: true,
     });
   });

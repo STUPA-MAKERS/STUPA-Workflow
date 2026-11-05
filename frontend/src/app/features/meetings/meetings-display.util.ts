@@ -184,14 +184,6 @@ export function majorityLabel(
   return t(`${family}.${rule}` as TranslationKey);
 }
 
-/**
- * "geheime Abstimmung" or "offene Abstimmung". Only a poll names its secrecy, because a
- * motion and an election are always secret.
- */
-export function secrecyLabel(secret: boolean, t: Translate): string {
-  return t(secret ? 'meetings.vote.secretShort' : 'meetings.vote.publicShort');
-}
-
 /** "Quorum 12" or "Quorum 50 %". */
 export function quorumLabel(quorum: Quorum, t: Translate): string {
   return t(quorum.type === 'percent' ? 'meetings.vote.quorumPercent' : 'meetings.vote.quorumCount', {
@@ -212,16 +204,11 @@ export function voteRulesParts(vote: VoteRules, t: Translate): string[] {
 
 /**
  * The rules line of a vote card: "Einfache Mehrheit · Quorum 12 · seit 18:48"
- * ({@link voteRulesParts}, then the time of the open or the end). A poll shows only its
- * secrecy and the time.
+ * ({@link voteRulesParts}, then the time of the open or the end). A poll shows only the
+ * time.
  */
 export function voteMetaLine(vote: MeetingVote, translate: Translate, i18nLocale: string): string {
-  const parts =
-    vote.kind === 'poll'
-      ? vote.secret === undefined
-        ? []
-        : [secrecyLabel(vote.secret, translate)]
-      : voteRulesParts(vote, translate);
+  const parts = vote.kind === 'poll' ? [] : voteRulesParts(vote, translate);
   if (vote.status === 'open') {
     const since = clock(vote.openedAt, toFormatLocale(i18nLocale));
     if (since) parts.push(translate('meetings.vote.since', { time: since }));

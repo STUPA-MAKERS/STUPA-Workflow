@@ -47,7 +47,7 @@ describe('MeetingBeamerComponent', () => {
 
     it('names the kind of the poll while it runs, without a quorum', async () => {
       await setup({ vote: vote({ poll, question: 'Wohin?' }) });
-      expect(screen.getByText('Umfrage · Einzelwahl · offene Abstimmung')).toBeInTheDocument();
+      expect(screen.getByText('Umfrage · Einzelwahl')).toBeInTheDocument();
       expect(screen.queryByText(/Quorum/)).toBeNull();
     });
 

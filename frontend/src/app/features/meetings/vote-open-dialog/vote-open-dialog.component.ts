@@ -62,8 +62,9 @@ export interface CandidateDraft {
 /**
  * "Abstimmung öffnen" for one agenda item.
  *
- * The lead sets the decision question and the majority rule. A decision and an
- * election are always secret: the dialog has no switch for an open vote. Everything else comes from the Gremium: the quorum and the eligible voters
+ * The lead sets the decision question and the majority rule. Every vote is secret (a
+ * decision, an election and a poll), so the dialog has no secrecy switch. Everything
+ * else comes from the Gremium: the quorum and the eligible voters
  * (the server counts them from the roster). A meeting vote has no tie break, a tie is
  * a rejection, and a ballot never changes after the cast. The options are
  * always yes, no and abstain, so the result can fire the pass or fail branch.
@@ -80,8 +81,7 @@ export interface CandidateDraft {
  *
  * A free-text item also takes a poll ("Umfrage"): a question and two to twenty
  * options in one of three modes. A poll only counts the answers: it has no quorum and
- * no majority, and it never fires a branch. It is open unless the lead switches
- * "Geheime Umfrage" on.
+ * no majority, and it never fires a branch.
  *
  * "Vorbereiten" saves the question as a draft without opening it, so the lead can
  * prepare the votes before the meeting starts. The vote card opens the draft later. A
@@ -166,9 +166,8 @@ export class VoteOpenDialogComponent {
   readonly candidates = signal<CandidateDraft[]>([]);
   /** The free name that the lead types for a new candidate. */
   readonly freeName = signal('');
-  /** The poll: its mode and options, and the switch "Geheime Umfrage". */
+  /** The poll: its mode and options. */
   readonly poll = signal<PollDraft>(emptyPollDraft());
-  readonly pollSecret = signal(false);
   private nextKey = 1;
 
   readonly kindOptions = computed<SegmentedOption[]>(() =>
@@ -286,7 +285,6 @@ export class VoteOpenDialogComponent {
     this.candidates.set([]);
     this.freeName.set('');
     this.poll.set(emptyPollDraft());
-    this.pollSecret.set(false);
   }
 
   setKind(value: string | null): void {
@@ -388,7 +386,7 @@ export class VoteOpenDialogComponent {
           kind: 'poll' as const,
           question: this.question().trim(),
           poll: pollInOf(this.poll()),
-          secret: this.pollSecret(),
+          secret: true,
           ...guests,
         }
       : this.isElection()
