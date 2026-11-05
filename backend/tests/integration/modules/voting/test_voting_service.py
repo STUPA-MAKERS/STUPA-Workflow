@@ -472,7 +472,7 @@ async def test_create_hides_an_unconfirmed_application(session: AsyncSession) ->
     app.email_confirmed_at = None
     await session.commit()
     body = VoteCreate.model_validate(
-        {"config": _config(), "eligibleGroup": str(gremium_id)}
+        {"config": _config(secret=True), "eligibleGroup": str(gremium_id)}
     )
     with pytest.raises(NotFoundError):
         await VotingService(session).create(app.id, body, Principal(sub="m"))
@@ -500,7 +500,7 @@ async def test_create_counts_the_roster_and_binds_the_gremium(
     svc = VotingService(session)
     body = VoteCreate.model_validate(
         {
-            "config": _config(quorum={"type": "percent", "value": 50}),
+            "config": _config(secret=True, quorum={"type": "percent", "value": 50}),
             "eligibleGroup": str(gremium_id),
         }
     )
@@ -518,7 +518,7 @@ async def test_create_counts_the_roster_and_binds_the_gremium(
         await svc.create(
             app.id,
             VoteCreate.model_validate(
-                {"config": _config(), "eligibleGroup": str(other.id)}
+                {"config": _config(secret=True), "eligibleGroup": str(other.id)}
             ),
             manager,
         )
@@ -526,7 +526,9 @@ async def test_create_counts_the_roster_and_binds_the_gremium(
     with pytest.raises(ValidationProblem) as err:
         await svc.create(
             app.id,
-            VoteCreate.model_validate({"config": _config(), "eligibleGroup": str(uuid.uuid4())}),
+            VoteCreate.model_validate(
+                {"config": _config(secret=True), "eligibleGroup": str(uuid.uuid4())}
+            ),
             manager,
         )
     assert err.value.code == "eligible_group_invalid"

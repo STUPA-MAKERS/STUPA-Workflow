@@ -298,7 +298,7 @@ async def test_dynamic_vote_state_end_to_end(
         assert locked.value.code == "budget_locked_by_vote"
 
         config = VoteConfig.model_validate(
-            {"options": ["yes", "no", "abstain"], "majorityRule": "simple"}
+            {"options": ["yes", "no", "abstain"], "majorityRule": "simple", "secret": True}
         ).model_dump(by_alias=True)
         voting = VotingService(session)
         with pytest.raises(ValidationProblem) as mismatch:

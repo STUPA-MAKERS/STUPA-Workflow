@@ -27,7 +27,7 @@ from app.modules.admin import gremium_roles as gremium_roles_mod
 from app.modules.auth.principal import Principal
 from app.modules.auth.rbac import vote_group_key
 from app.modules.voting.schemas import VoteCreate
-from app.modules.voting.service import VotingService
+from app.modules.voting.service import VotingService, secret_only
 from app.shared.config_schemas import VoteConfig
 from app.shared.errors import ForbiddenError, ValidationProblem
 from tests._support.flow_fakes import fake_session, result
@@ -40,7 +40,7 @@ ADMIN = Principal(sub="a", roles=["admin"])
 
 
 def _config(**over: Any) -> dict[str, Any]:
-    base: dict[str, Any] = {"options": ["yes", "no"], "majorityRule": "simple"}
+    base: dict[str, Any] = {"options": ["yes", "no"], "majorityRule": "simple", "secret": True}
     base.update(over)
     return VoteConfig.model_validate(base).model_dump(by_alias=True)
 
@@ -338,3 +338,30 @@ async def test_create_in_a_vote_state_without_snapshot_needs_the_admin() -> None
     db.scalar_results = [GID]
     with pytest.raises(ForbiddenError):
         await VotingService(db).create(app.id, _body(), MANAGER)
+
+
+async def test_create_without_secret_stores_a_secret_vote() -> None:
+    """A body without ``secret`` creates a secret vote: there is no open vote."""
+    app = _application()
+    db = fake_session(result(app), result(*_roster(3)))
+    db.scalar_results = [GID]
+    body = _body(config={"options": ["yes", "no"], "majorityRule": "simple"})
+    out = await VotingService(db).create(app.id, body, MANAGER)
+    assert out.config.secret is True
+
+
+async def test_create_open_vote_422() -> None:
+    """``secret: false`` gives 422 ``open_vote_unavailable`` before any read."""
+    db = fake_session()
+    body = _body(config=_config(secret=False))
+    with pytest.raises(ValidationProblem) as err:
+        await VotingService(db).create(uuid4(), body, MANAGER)
+    assert err.value.code == "open_vote_unavailable"
+
+
+def test_secret_only() -> None:
+    """``None`` and true give true; false gives 422."""
+    assert secret_only(None, field="secret") is True
+    assert secret_only(True, field="secret") is True
+    with pytest.raises(ValidationProblem):
+        secret_only(False, field="secret")
