@@ -432,7 +432,6 @@
     resize: vertical;
     field-sizing: content;
   }
-  @include glass.control;
 }
 
 .fe__mono ::ng-deep input {

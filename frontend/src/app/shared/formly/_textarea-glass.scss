@@ -4,12 +4,12 @@
 // rest the box looks like every other field. The glass is solid behind the label and fades
 // to transparent below it, so the text passes under it without a hard edge.
 //
-// Use it on the box; give the textarea `appScrollFade="y"` and the `control` mixin, the label the `label` mixin.
+// Use `box` on the box and `label` on the label; give the textarea `appScrollFade="y"`.
 
-$-glass-height: 42px;
-$-glass-solid: 30px;
+$-glass-height: 34px;
+$-glass-solid: 26px;
 // The layer runs past the end of the fade, so the mask hides the lower side of its edge.
-$-glass-layer: 48px;
+$-glass-layer: 40px;
 
 @mixin box {
   --ta-glass: var(--color-surface-sunken);
@@ -52,12 +52,4 @@ $-glass-layer: 48px;
 // The label above the glass.
 @mixin label {
   z-index: 2;
-}
-
-// The textarea: the foot fades while text is hidden below.
-@mixin control {
-  &.is-fade-end {
-    -webkit-mask-image: linear-gradient(to top, transparent, #000 var(--space-4));
-    mask-image: linear-gradient(to top, transparent, #000 var(--space-4));
-  }
 }
