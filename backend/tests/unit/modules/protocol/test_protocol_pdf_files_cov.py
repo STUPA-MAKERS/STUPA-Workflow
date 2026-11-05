@@ -255,7 +255,9 @@ async def test_finalize_dual_render_with_non_public_top() -> None:
     keys = {k for k, _len, _ct in storage.puts}
     assert keys == {protocol_storage_key(PID), protocol_public_storage_key(PID)}
     assert len(mail.sent) == 1
-    assert [a.filename for a in mail.sent[0].attachments] == ["protokoll.pdf"]
+    assert [a.filename for a in mail.sent[0].attachments] == [
+        "Protokoll_StuPa-Sitzung_2026-06-12.pdf"
+    ]
 
 
 async def test_finalize_dual_render_without_storage_skips_uploads() -> None:
@@ -943,3 +945,24 @@ async def test_upload_with_field_key(
     assert audits[0]["data"]["hasFieldKey"] is True  # type: ignore[index]
     assert "fieldKey" not in audits[0]["data"]  # type: ignore[operator]
     assert "isComparisonOffer" not in audits[0]["data"]  # type: ignore[operator]
+
+
+async def test_pdf_filename_names_the_meeting() -> None:
+    session = FakeSession(store={MID: _meeting()}, results=[result(_protocol())])
+    name = await _service(session).pdf_filename(PID)
+    assert name == "Protokoll_StuPa-Sitzung_2026-06-12.pdf"
+
+
+async def test_pdf_filename_public_variant() -> None:
+    session = FakeSession(
+        store={MID: _meeting(title="3. Sitzung: Haushalt/Finanzen")},
+        results=[result(_protocol())],
+    )
+    name = await _service(session).pdf_filename(PID, public=True)
+    assert name == "Protokoll_3._Sitzung_Haushalt_Finanzen_2026-06-12_oeffentlich.pdf"
+
+
+async def test_pdf_filename_404_without_meeting() -> None:
+    session = FakeSession(store={}, results=[result(_protocol())])
+    with pytest.raises(NotFoundError):
+        await _service(session).pdf_filename(PID)
