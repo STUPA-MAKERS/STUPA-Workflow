@@ -9,6 +9,9 @@ scope:
   - backend/app/
   - backend/worker/
   - frontend/src/app/
+  - ui-kit
+  - mcp/
+  - typst/typst_service/
 ---
 
 # A local is bound once

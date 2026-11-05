@@ -7,7 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-05
 scope:
   - backend/app/modules/notifications
-  - backend/app/worker/mail.py
+  - backend/worker/mail.py
 ---
 
 # Every mail links its element

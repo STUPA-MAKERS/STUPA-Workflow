@@ -7,6 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-05
 scope:
   - frontend/src/app/
+  - ui-kit
 ---
 
 # A signal update returns a new value

@@ -8,6 +8,8 @@ updated: 2026-11-05
 scope:
   - backend/app/
   - backend/worker/
+  - mcp/
+  - typst/typst_service/
 ---
 
 # One AsyncSession is never used concurrently

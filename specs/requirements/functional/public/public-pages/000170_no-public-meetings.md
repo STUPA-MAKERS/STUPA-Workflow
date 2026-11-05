@@ -7,7 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-05
 scope:
   - backend/app/modules/protocol
-  - frontend/src/app/pages/public
+  - frontend/src/app/features/public-protocols
 ---
 
 # Meetings are never public

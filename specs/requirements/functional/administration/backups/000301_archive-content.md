@@ -7,7 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-05
 scope:
   - backend/app/modules/backup
-  - backend/app/worker/backup.py
+  - backend/worker/backup.py
 ---
 
 # A backup holds the database and the attachments, encrypted

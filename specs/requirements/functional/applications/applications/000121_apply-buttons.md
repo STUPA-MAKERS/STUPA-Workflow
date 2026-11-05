@@ -7,7 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-05
 scope:
   - frontend/src/app/pages/applications
-  - frontend/src/app/pages/apply
+  - frontend/src/app/features/apply
 ---
 
 # The apply button is Antrag anlegen

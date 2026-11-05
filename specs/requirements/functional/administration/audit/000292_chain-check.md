@@ -7,7 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-05
 scope:
   - backend/app/modules/audit
-  - backend/app/worker
+  - backend/worker
 ---
 
 # The audit chain is checked every night

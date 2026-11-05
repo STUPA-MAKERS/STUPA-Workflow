@@ -7,7 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-05
 scope:
   - backend/app/modules/tickets
-  - frontend/src/app/features/tickets
+  - frontend/src/app/pages/tickets
 ---
 
 # Anyone can report a help ticket

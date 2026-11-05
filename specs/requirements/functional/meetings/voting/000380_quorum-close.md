@@ -7,7 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-05
 scope:
   - backend/app/modules/voting
-  - backend/app/worker
+  - backend/worker
 ---
 
 # An unmet quorum blocks the manual close

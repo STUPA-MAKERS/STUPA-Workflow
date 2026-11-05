@@ -7,7 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-05
 scope:
   - backend/app/modules/budget
-  - frontend/src/app/features/budget
+  - frontend/src/app/pages/budget
 ---
 
 # The invoice list has three segments

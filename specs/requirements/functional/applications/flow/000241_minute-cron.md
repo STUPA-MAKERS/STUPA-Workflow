@@ -6,7 +6,7 @@ status: draft
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:
-  - backend/app/worker
+  - backend/worker
   - backend/app/modules/flow
   - backend/app/shared/guards.py
   - backend/app/shared/config_schemas.py

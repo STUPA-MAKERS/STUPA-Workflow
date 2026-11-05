@@ -9,7 +9,7 @@ scope:
   - backend/app/modules/todos
   - frontend/src/app/features/todos
   - backend/app/modules/notifications
-  - backend/app/worker/mail.py
+  - backend/worker/mail.py
 ---
 
 # To-do mails go to assignees

@@ -11,7 +11,7 @@ scope:
   - backend/app/shared/config_schemas.py
   - backend/app/modules/voting
   - backend/app/modules/livevote
-  - backend/app/worker
+  - backend/worker
 ---
 
 # Every fire path runs the full action chain

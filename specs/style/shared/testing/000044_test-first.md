@@ -8,7 +8,7 @@ updated: 2026-11-05
 scope:
   - backend/tests/
   - frontend/src/
-  - mcp/tests/
+  - mcp/antragsplattform_mcp/tests
 ---
 
 # Tests come first

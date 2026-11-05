@@ -7,7 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-05
 scope:
   - deploy/
-  - backend/alembic
+  - backend/migrations
 ---
 
 # Database roles are separated

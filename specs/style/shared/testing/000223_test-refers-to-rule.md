@@ -8,7 +8,7 @@ updated: 2026-11-05
 scope:
   - backend/tests
   - frontend/src/app
-  - mcp/tests
+  - mcp/antragsplattform_mcp/tests
 ---
 
 # A test refers back to its rule

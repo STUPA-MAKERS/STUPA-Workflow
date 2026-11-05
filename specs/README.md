@@ -399,6 +399,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [S/frontend/angular/000397](style/frontend/angular/000397_gremium-checks.md) | Gremium rights come from the Gremium API | draft |
 | [S/frontend/angular/000398](style/frontend/angular/000398_mock-dev-only.md) | The mock API runs only in dev builds | draft |
 | [S/frontend/functional/000091](style/frontend/functional/000091_signal-update.md) | A signal update returns a new value | draft |
+| [S/frontend/functional/000438](style/frontend/functional/000438_eslint-functional.md) | eslint-plugin-functional warns on mutation | draft |
 | [S/shared/agents/000426](style/shared/agents/000426_ask-with-options.md) | Ask with options | draft |
 | [S/shared/agents/000427](style/shared/agents/000427_report-bugs.md) | Report a possible bug | draft |
 | [S/shared/agents/000428](style/shared/agents/000428_no-unasked-features.md) | Do not build what exists | draft |
@@ -421,6 +422,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [S/shared/functional/000087](style/shared/functional/000087_frozen-data.md) | Data types are frozen by default | draft |
 | [S/shared/functional/000088](style/shared/functional/000088_effects-at-edge.md) | Effects stay at the edge | draft |
 | [S/shared/functional/000089](style/shared/functional/000089_exceptions.md) | The exceptions are named | draft |
+| [S/shared/functional/000437](style/shared/functional/000437_functional-ratchet.md) | A CI ratchet keeps the functional style from getting worse | draft |
 | [S/shared/git/000051](style/shared/git/000051_commits.md) | Commits are unsigned and have no trailers | draft |
 | [S/shared/git/000052](style/shared/git/000052_no-auto-merge.md) | A pull request is never set to auto-merge | draft |
 | [S/shared/git/000053](style/shared/git/000053_release-tags.md) | Only the owner tags a release | draft |

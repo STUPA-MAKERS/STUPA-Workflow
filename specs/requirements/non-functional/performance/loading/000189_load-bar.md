@@ -6,7 +6,7 @@ status: draft
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:
-  - frontend/src/app/core/loading
+  - ui-kit
 ---
 
 # The load bar shows only for slow foreground reads

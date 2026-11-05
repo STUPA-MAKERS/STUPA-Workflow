@@ -7,8 +7,8 @@ owner: frederikbeimgraben
 updated: 2026-11-05
 scope:
   - backend/app/modules/tickets
-  - frontend/src/app/features/tickets
-  - backend/app/worker/tickets.py
+  - frontend/src/app/pages/tickets
+  - backend/worker/tickets.py
 ---
 
 # Closed tickets are anonymized after the retention time

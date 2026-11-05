@@ -8,7 +8,7 @@ updated: 2026-11-05
 scope:
   - backend/app/modules/forms
   - backend/app/shared/config_schemas.py
-  - frontend/src/app/features/applications
+  - frontend/src/app/pages/applications
 ---
 
 # Section fields make wizard steps

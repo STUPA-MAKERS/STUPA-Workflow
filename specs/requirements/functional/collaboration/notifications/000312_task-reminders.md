@@ -7,8 +7,8 @@ owner: frederikbeimgraben
 updated: 2026-11-05
 scope:
   - backend/app/modules/notifications
-  - backend/app/worker/mail.py
-  - backend/app/worker
+  - backend/worker/mail.py
+  - backend/worker
 ---
 
 # Task reminders follow the admin setting
