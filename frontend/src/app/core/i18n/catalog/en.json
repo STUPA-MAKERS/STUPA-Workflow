@@ -3701,6 +3701,7 @@
   "todos.card.unlink": "Unlink {title}",
   "todos.card.description": "Description",
   "todos.card.editDescription": "Edit the description",
+  "todos.card.descriptionEmpty": "Add a description …",
   "todos.card.checklist": "Checklist",
   "todos.card.hideDone": "Hide the checked items",
   "todos.card.showDone": "Show {n} checked items",

@@ -1,3 +1,4 @@
+@use 'press';
 @use 'scroll-fade' as fade;
 @use '../todo-labels' as lbl;
 
@@ -287,6 +288,26 @@
 .cd__desc {
   line-height: 1.5;
   overflow-wrap: anywhere;
+}
+// An empty description is a muted placeholder line where the text would stand; a tap opens
+// the editor.
+.cd__descEmpty {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-text-muted);
+  font: inherit;
+  line-height: 1.5;
+  text-align: start;
+  cursor: text;
+  transition: scale var(--motion-xs) var(--ease-standard);
+  @include press.press(row);
+}
+.cd__descEmpty:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
 }
 .cd__area {
   display: block;

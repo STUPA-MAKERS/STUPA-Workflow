@@ -290,6 +290,14 @@
       (transferred)="onTransferred($event)"
     />
   </aside>
+  @if (phone()) {
+    <div
+      class="td__barEdge"
+      aria-hidden="true"
+      animate.enter="td__scrim--entering"
+      animate.leave="td__scrim--leaving"
+    ></div>
+  }
 }
 
 @if (phone()) {
