@@ -241,8 +241,11 @@
   scrollbar-width: thin;
 }
 
+// The bar opens the sheet like the title bar of every other detail: 16px above the 60px line
+// of the actions. The bar sizes its border box, so the padding adds to its minimum height.
 .bd__bar {
-  padding-inline: var(--space-6);
+  min-height: calc(60px + var(--space-4));
+  padding: var(--space-4) var(--space-6) 0;
 }
 .bd__bar .bd__actions {
   flex: none;
