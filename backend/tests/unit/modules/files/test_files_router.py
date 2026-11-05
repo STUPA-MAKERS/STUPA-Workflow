@@ -140,6 +140,10 @@ class _EmptyResult:
     def all(self) -> list[object]:
         return []
 
+    def scalars(self) -> _EmptyResult:
+        """Return the same empty result, so no pool entries either."""
+        return self
+
 
 class _NoCreatorDb:
     """Stub a session for the creator check.
