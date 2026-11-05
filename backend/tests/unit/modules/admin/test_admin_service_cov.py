@@ -295,7 +295,7 @@ async def test_list_gremien() -> None:
 
 
 async def test_list_gremien_admin_counts() -> None:
-    """Count only current memberships of active principals.
+    """Count only the memberships of active principals.
 
     Queue: the gremien, then the member counts, then the role counts. B has no member.
     """
@@ -308,8 +308,6 @@ async def test_list_gremien_admin_counts() -> None:
         ("B", 0, 3),
     ]
     member_sql = str(session.statements[1])
-    assert "valid_until" in member_sql
-    assert "valid_from" in member_sql
     assert "principal.active" in member_sql
     assert out[0].model_dump(by_alias=True)["memberCount"] == 3
 

@@ -105,8 +105,6 @@ async def _member(session: AsyncSession, gremium: Gremium) -> PrincipalRow:
             principal_id=p.id,
             gremium_id=gremium.id,
             gremium_role_id=role.id,
-            valid_from=None,
-            valid_until=None,
         )
     )
     await session.flush()
@@ -237,8 +235,6 @@ async def test_list_filter_gremien_visibility(session: AsyncSession) -> None:
             principal_id=member.id,
             gremium_id=g_empty.id,
             gremium_role_id=role2.id,
-            valid_from=None,
-            valid_until=None,
         )
     )
     session.add(Meeting(gremium_id=g_with.id, title="A", date=_date(2026, 7, 1), status="planned"))

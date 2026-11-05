@@ -10,7 +10,7 @@ The IdP is the only source of gremium membership. Two separate mappings apply:
 
 A member without a matching role mapping gets the forced role ``member``. When two
 groups give different roles in one gremium, the role with more permissions wins, then
-the lower key. A (principal, gremium) pair thus has exactly one role, which the EXCLUDE
+the lower key. A (principal, gremium) pair thus has exactly one role, which the unique
 constraint on ``gremium_membership`` requires.
 
 The sync compares the cached ``principal.oidc_groups`` with the mappings and writes
@@ -126,7 +126,7 @@ async def sync_principal_memberships(
 
     A merged principal is a locked reference and holds no membership: its group
     cache stays for the record, but the sync treats it as empty. The deletes flush
-    before the inserts, because the EXCLUDE constraint allows one row per pair only.
+    before the inserts, because the unique constraint allows one row per pair only.
 
     Returns:
         True when the function changed at least one membership.

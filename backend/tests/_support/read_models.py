@@ -99,8 +99,6 @@ async def seed_read_world(maker: async_sessionmaker[AsyncSession]) -> ReadSeed:
                 principal_id=member.id,
                 gremium_id=gremium.id,
                 gremium_role_id=role.id,
-                valid_from=None,
-                valid_until=None,
             )
         )
         budget = Budget(

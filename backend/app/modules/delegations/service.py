@@ -119,9 +119,9 @@ def meeting_start_utc(meeting: Meeting, tz_name: str) -> datetime | None:
 
 
 async def _membership_with_vote_cast(
-    session: AsyncSession, principal_id: UUID, gremium_id: UUID, now: datetime
+    session: AsyncSession, principal_id: UUID, gremium_id: UUID
 ) -> bool:
-    """Report whether an active gremium membership grants `vote.cast`."""
+    """Report whether a gremium membership grants `vote.cast`."""
     rows = (
         (
             await session.execute(
@@ -131,10 +131,6 @@ async def _membership_with_vote_cast(
                 .where(
                     GremiumMembership.principal_id == principal_id,
                     GremiumMembership.gremium_id == gremium_id,
-                    (GremiumMembership.valid_from.is_(None))
-                    | (GremiumMembership.valid_from <= now),
-                    (GremiumMembership.valid_until.is_(None))
-                    | (GremiumMembership.valid_until > now),
                 )
             )
         )
@@ -145,16 +141,16 @@ async def _membership_with_vote_cast(
 
 
 async def _independently_eligible(
-    session: AsyncSession, principal_id: UUID, gremium_id: UUID, now: datetime
+    session: AsyncSession, principal_id: UUID, gremium_id: UUID
 ) -> bool:
     """Report whether the principal can vote without any delegation.
 
-    The check uses the same source as the cast gate of the voting module: an active
+    The check uses the same source as the cast gate of the voting module: a
     gremium membership whose gremium role holds `vote.cast`. The membership comes from
     the OIDC groups through the gremium mappings. A global role or a raw OIDC group
     never gives the voting right in a gremium.
     """
-    return await _membership_with_vote_cast(session, principal_id, gremium_id, now)
+    return await _membership_with_vote_cast(session, principal_id, gremium_id)
 
 
 async def voting_delegation_check(
@@ -286,17 +282,13 @@ class DelegationService:
             raise NotFoundError(f"gremium {gremium_id} not found")
         return gremium
 
-    async def _member_ids(self, gremium_id: UUID, now: datetime) -> set[UUID]:
-        """Return the active gremium members with any role."""
+    async def _member_ids(self, gremium_id: UUID) -> set[UUID]:
+        """Return the gremium members with any role."""
         rows = (
             (
                 await self.session.execute(
                     select(GremiumMembership.principal_id).where(
                         GremiumMembership.gremium_id == gremium_id,
-                        (GremiumMembership.valid_from.is_(None))
-                        | (GremiumMembership.valid_from <= now),
-                        (GremiumMembership.valid_until.is_(None))
-                        | (GremiumMembership.valid_until > now),
                     )
                 )
             )
@@ -470,11 +462,11 @@ class DelegationService:
                 errors=[{"field": "delegateId", "msg": "must differ from delegator"}],
             )
 
-        if not await _independently_eligible(self.session, me.id, gremium.id, now):
+        if not await _independently_eligible(self.session, me.id, gremium.id):
             raise ForbiddenError("Only voting members of the meeting's gremium may delegate.")
 
         pool_ids = await substitutes_for(self.session, gremium.id, me.id)
-        member_ids = await self._member_ids(gremium.id, now)
+        member_ids = await self._member_ids(gremium.id)
         via_pool = delegate.id in pool_ids
         if not via_pool and delegate.id not in member_ids and not gremium.delegation_allow_external:
             raise ForbiddenError("Recipient must be a gremium member or a designated substitute.")
@@ -569,7 +561,7 @@ class DelegationService:
             )
         if delegate.sub == actor.sub:
             raise ForbiddenError("The meeting lead cannot name themselves as the substitute.")
-        if not await _independently_eligible(self.session, delegator.id, gremium.id, now):
+        if not await _independently_eligible(self.session, delegator.id, gremium.id):
             raise ForbiddenError(
                 "Only a voting member of the meeting's gremium can be substituted."
             )
@@ -801,7 +793,7 @@ class DelegationService:
         can_delegate = False
         if me is not None:
             can_delegate = gremium.allow_vote_delegation and await _independently_eligible(
-                self.session, me.id, gremium.id, now
+                self.session, me.id, gremium.id
             )
             rows = await self._joined(
                 MeetingDelegation.meeting_id == meeting.id,
@@ -817,7 +809,7 @@ class DelegationService:
                 else:
                     incoming.append(out)
 
-            member_ids = await self._member_ids(gremium.id, now)
+            member_ids = await self._member_ids(gremium.id)
             pool_ids = await substitutes_for(self.session, gremium.id, me.id)
             ids = (member_ids | pool_ids) - {me.id}
             names = await self._names(ids)
@@ -873,16 +865,16 @@ class DelegationService:
                 manager of the meeting gremium, or the actor sends
                 `delegator_id` and is not the meeting lead (403).
         """
-        now = datetime.now(UTC)
+        datetime.now(UTC)
         meeting = await self._meeting(meeting_id)
         gremium = await self._gremium(meeting.gremium_id)
         await self._assert_can_view_gremium(gremium.id, actor)
         if delegator_id is not None:
-            return await self._lead_recipients(gremium.id, delegator_id, q, actor, now)
+            return await self._lead_recipients(gremium.id, delegator_id, q, actor)
         me = await self._principal_row(sub=actor.sub)
         if me is None:
             return []
-        member_ids = await self._member_ids(gremium.id, now)
+        member_ids = await self._member_ids(gremium.id)
         pool_ids = await substitutes_for(self.session, gremium.id, me.id)
         ids = (member_ids | pool_ids) - {me.id}
         names = await self._names(ids)
@@ -927,7 +919,7 @@ class DelegationService:
         return out[:20]
 
     async def _lead_recipients(
-        self, gremium_id: UUID, delegator_id: UUID, q: str, actor: Principal, now: datetime
+        self, gremium_id: UUID, delegator_id: UUID, q: str, actor: Principal
     ) -> list[RecipientOut]:
         """List the pool substitutes of a member for the lead entry.
 
@@ -945,7 +937,7 @@ class DelegationService:
         excluded = {delegator_id} | ({me.id} if me is not None else set())
         pool_ids = await substitutes_for(self.session, gremium_id, delegator_id)
         ids = pool_ids - excluded
-        member_ids = await self._member_ids(gremium_id, now)
+        member_ids = await self._member_ids(gremium_id)
         names = await self._names(ids)
         needle = q.strip().lower()
         out = [
@@ -1010,7 +1002,7 @@ class DelegationService:
                 delegated_to = d.delegate_principal_id
         if not exercising:
             free = await pool_seat_for(
-                self.session, actor.sub, vote.meeting_id, vote.eligible_group, datetime.now(UTC)
+                self.session, actor.sub, vote.meeting_id, vote.eligible_group
             )
             if free is not None:
                 exercising = True

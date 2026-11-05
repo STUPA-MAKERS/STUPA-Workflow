@@ -32,7 +32,6 @@ from typing import Any
 from sqlalchemy import ColumnElement, Select, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.gremium_roles import membership_active_clause
 from app.modules.admin.models import GremiumMembership
 from app.modules.applications.models import Applicant, Application
 from app.modules.auth.models import (
@@ -176,14 +175,6 @@ async def _candidates_with_transition_permission(
         await session.execute(
             select(GremiumMembership.principal_id, GremiumMembership.gremium_id).where(
                 GremiumMembership.principal_id.in_(ids),
-                or_(
-                    GremiumMembership.valid_from.is_(None),
-                    GremiumMembership.valid_from <= now,
-                ),
-                or_(
-                    GremiumMembership.valid_until.is_(None),
-                    GremiumMembership.valid_until > now,
-                ),
             )
         )
     ).all()
@@ -262,7 +253,7 @@ class RecipientResolver:
             elif kind == "role" and ref:
                 out.update(await self._emails_for_role(str(ref)))
             elif kind == "gremium" and ref:
-                out.update(await self._emails_for_gremium(str(ref), now))
+                out.update(await self._emails_for_gremium(str(ref)))
             elif kind == "applicant" and application_id is not None:
                 email = await self._applicant_email(application_id)
                 if email:
@@ -276,14 +267,14 @@ class RecipientResolver:
                     )
                 )
                 if gid is not None:
-                    out.update(await self._emails_for_gremium(str(gid), now))
+                    out.update(await self._emails_for_gremium(str(gid)))
             elif kind == "budgetGremium" and application_id is not None:
                 budget_id = await self.session.scalar(
                     select(Application.budget_id).where(Application.id == application_id)
                 )
                 gid = await effective_decision_gremium(self.session, budget_id)
                 if gid is not None:
-                    out.update(await self._emails_for_gremium(str(gid), now))
+                    out.update(await self._emails_for_gremium(str(gid)))
             elif kind == "permission" and ref:
                 out.update(await self._emails_for_permission(str(ref)))
         return sorted(e for e in out if e)
@@ -312,8 +303,8 @@ class RecipientResolver:
         rows = (await self.session.scalars(stmt)).all()
         return [e for e in rows if e]
 
-    async def _emails_for_gremium(self, gremium_ref: str, now: datetime) -> list[str]:
-        """Return the addresses of the gremium members whose term window holds ``now``."""
+    async def _emails_for_gremium(self, gremium_ref: str) -> list[str]:
+        """Return the addresses of the gremium members."""
         try:
             gremium_id = uuid.UUID(gremium_ref)
         except (ValueError, AttributeError):
@@ -324,14 +315,6 @@ class RecipientResolver:
             .where(
                 GremiumMembership.gremium_id == gremium_id,
                 Principal.email.is_not(None),
-                or_(
-                    GremiumMembership.valid_from.is_(None),
-                    GremiumMembership.valid_from <= now,
-                ),
-                or_(
-                    GremiumMembership.valid_until.is_(None),
-                    GremiumMembership.valid_until > now,
-                ),
             )
         )
         rows = (await self.session.scalars(stmt)).all()
@@ -489,7 +472,6 @@ async def _open_vote_casters(
         await session.scalars(
             select(GremiumMembership.principal_id).where(
                 GremiumMembership.gremium_id == app.vote_gremium_id,
-                membership_active_clause(now),
             )
         )
     ).all()

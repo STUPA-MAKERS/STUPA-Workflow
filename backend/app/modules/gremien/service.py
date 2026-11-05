@@ -14,8 +14,9 @@ Counting rules of the attendance (``attendance``):
   (``meeting_delegation`` with ``delegate_voting``). Such a meeting does not count as
   excused.
 * A meeting without a row counts as absent and appears in no number.
-* ``member`` tells whether a membership term overlaps the month, so a new or a former
-  member does not show as absent.
+* ``member`` tells whether the principal holds a membership in the gremium. A
+  membership has no term, so the value is the same in each month of a row, and a
+  former member with records shows as no member.
 
 The excuse text (``meeting_attendance.note``) is never read.
 """
@@ -52,7 +53,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from app.modules.admin.cd_logos import ALLOWED_SQUARE_LOGO_MIME
-from app.modules.admin.gremium_roles import membership_active_clause
 from app.modules.admin.models import (
     CdVariantLogo,
     Gremium,
@@ -85,7 +85,6 @@ from app.modules.gremien.schemas import (
 )
 from app.modules.livevote.agenda_service import title_of
 from app.modules.livevote.models import Meeting, MeetingAgendaItem, MeetingAttendance
-from app.modules.livevote.roster import meeting_window
 from app.modules.protocol.models import Protocol
 from app.modules.voting.election import election_config, is_election
 from app.modules.voting.listing import read_scope
@@ -188,23 +187,6 @@ def decode_cursor(cursor: str | None) -> int:
     return offset
 
 
-def _overlaps(
-    valid_from: datetime | None, valid_until: datetime | None, start: datetime, end: datetime
-) -> bool:
-    """Tell if the half-open term ``[valid_from, valid_until)`` overlaps ``[start, end]``.
-
-    This is the rule of ``livevote.roster.roster_filter``.
-    """
-    return (valid_from is None or valid_from <= end) and (
-        valid_until is None or valid_until > start
-    )
-
-
-def _valid_at(valid_from: datetime | None, valid_until: datetime | None, now: datetime) -> bool:
-    """Tell if a membership term holds at ``now``."""
-    return (valid_from is None or valid_from <= now) and (valid_until is None or valid_until > now)
-
-
 def _role_rank(key: str) -> int:
     """Return the place of a role in the member list: Vorstand, Manager, own roles, Mitglied."""
     return _ROLE_ORDER.get(key, 2)
@@ -215,8 +197,6 @@ class _Term:
     """One membership row of a gremium."""
 
     principal_id: UUID
-    valid_from: datetime | None
-    valid_until: datetime | None
     role_key: str
     role_name: dict[str, str]
 
@@ -228,14 +208,9 @@ class GremienService:
         """Bind the service to a session and the local time zone."""
         self.session = session
         self.tz = ZoneInfo(tz_name)
-        self.tz_name = tz_name
 
     def _today(self, now: datetime) -> _date:
         return now.astimezone(self.tz).date()
-
-    def _month_start(self, month: Month) -> datetime:
-        """Return the first moment of a month in the local time zone, as UTC."""
-        return datetime(month[0], month[1], 1, tzinfo=self.tz).astimezone(UTC)
 
     async def overview(self, principal: Principal) -> list[GremiumOverviewOut]:
         """Return the gremien that ``principal`` sees, by name.
@@ -245,7 +220,7 @@ class GremienService:
         gremien, the member counts and the next meetings, plus one for the logos.
         """
         now = datetime.now(UTC)
-        own = await self._own_roles(principal, now)
+        own = await self._own_roles(principal)
         stmt = select(Gremium).order_by(Gremium.name, Gremium.id)
         if not views_all(principal):
             if not own or not principal.scope_allows(GREMIUM_VIEW_ALL):
@@ -255,7 +230,7 @@ class GremienService:
         if not gremien:
             return []
         ids = [g.id for g in gremien]
-        counts = await self._member_counts(ids, now)
+        counts = await self._member_counts(ids)
         upcoming = await self._next_meetings(ids, self._today(now))
         logos = await self._square_logos(ids)
         out: list[GremiumOverviewOut] = []
@@ -281,9 +256,7 @@ class GremienService:
             )
         return out
 
-    async def _own_roles(
-        self, principal: Principal, now: datetime
-    ) -> dict[UUID, tuple[str, dict[str, str]]]:
+    async def _own_roles(self, principal: Principal) -> dict[UUID, tuple[str, dict[str, str]]]:
         """Return the active roles of ``principal``: gremium → (role key, role names)."""
         rows = await self.session.execute(
             select(GremiumMembership.gremium_id, GremiumRole.key, GremiumRole.name_i18n)
@@ -292,12 +265,11 @@ class GremienService:
             .where(
                 PrincipalRow.sub == principal.sub,
                 PrincipalRow.active.is_(True),
-                membership_active_clause(now),
             )
         )
         return {gid: (key, dict(name or {})) for gid, key, name in rows.all()}
 
-    async def _member_counts(self, ids: list[UUID], now: datetime) -> dict[UUID, int]:
+    async def _member_counts(self, ids: list[UUID]) -> dict[UUID, int]:
         """Return the active members per gremium: the rule of the member count of the admin page."""
         rows = await self.session.execute(
             select(
@@ -308,7 +280,6 @@ class GremienService:
             .where(
                 GremiumMembership.gremium_id.in_(ids),
                 PrincipalRow.active.is_(True),
-                membership_active_clause(now),
             )
             .group_by(GremiumMembership.gremium_id)
         )
@@ -380,10 +351,9 @@ class GremienService:
     ) -> list[GremiumMemberOut]:
         """Return the members of a gremium, by role and then by name.
 
-        A membership is active when the principal is active and the term holds now
-        (the rule of the admin page). ``former`` gives the other memberships.
+        A membership is active when the principal is active (the rule of the admin
+        page). ``former`` gives the memberships of inactive principals.
         """
-        now = datetime.now(UTC)
         rows = await self.session.execute(
             select(
                 GremiumMembership,
@@ -400,8 +370,7 @@ class GremienService:
         )
         out: list[GremiumMemberOut] = []
         for m, key, names, display, email, active, sub in rows.all():
-            current = bool(active) and _valid_at(m.valid_from, m.valid_until, now)
-            if current == former:
+            if bool(active) == former:
                 continue
             out.append(
                 GremiumMemberOut(
@@ -411,8 +380,6 @@ class GremienService:
                     role_id=m.gremium_role_id,
                     role_key=key,
                     role_name=dict(names or {}),
-                    valid_from=m.valid_from,
-                    valid_until=m.valid_until,
                     is_self=sub is not None and sub == principal.sub,
                 )
             )
@@ -424,9 +391,9 @@ class GremienService:
     async def meetings(self, gremium_id: UUID) -> list[GremiumMeetingOut]:
         """Return the meetings of a gremium, the newest first.
 
-        ``memberCount`` is the size of the roster of the meeting (the members whose
-        term overlaps the meeting window, plus every principal with an attendance
-        record, see ``livevote.roster``); ``presentCount`` counts the ``present``
+        ``memberCount`` is the size of the roster of the meeting (the members of the
+        gremium, plus every principal with an attendance record, see
+        ``livevote.roster``); ``presentCount`` counts the ``present``
         records. Five queries for any number of meetings.
         """
         meetings = list(
@@ -465,21 +432,19 @@ class GremienService:
         recorded: dict[UUID, dict[UUID, str]] = {}
         for mid, pid, status in records.all():
             recorded.setdefault(mid, {})[pid] = status
-        terms = await self.session.execute(
-            select(
-                GremiumMembership.principal_id,
-                GremiumMembership.valid_from,
-                GremiumMembership.valid_until,
-            ).where(GremiumMembership.gremium_id == gremium_id)
+        members = set(
+            (
+                await self.session.scalars(
+                    select(GremiumMembership.principal_id).where(
+                        GremiumMembership.gremium_id == gremium_id
+                    )
+                )
+            ).all()
         )
-        term_rows = list(terms.all())
-        now = datetime.now(UTC)
         out: list[GremiumMeetingOut] = []
         for m in meetings:
-            start, end = meeting_window(m, self.tz_name, now)
             rows = recorded.get(m.id, {})
-            roster = {pid for pid, vf, vu in term_rows if _overlaps(vf, vu, start, end)}
-            roster |= set(rows)
+            roster = members | set(rows)
             out.append(
                 GremiumMeetingOut(
                     id=m.id,
@@ -515,8 +480,8 @@ class GremienService:
     ) -> AttendanceOut:
         """Return the attendance matrix of a gremium.
 
-        The rows are every principal with a membership that overlaps the range, and
-        every principal with an attendance record or a vote transfer in the range.
+        The rows are every principal with a membership in the gremium, and every
+        principal with an attendance record or a vote transfer in the range.
         One SQL aggregation gives the numbers per principal and month.
         """
         now = datetime.now(UTC)
@@ -539,13 +504,7 @@ class GremienService:
             cells.setdefault(pid, {})[str(month)] = (int(present), int(excused), int(delegated))
 
         terms = await self._terms(gremium_id)
-        range_start = self._month_start(months[0])
-        range_end = self._month_start(after)
-        principal_ids = {
-            t.principal_id
-            for t in terms
-            if _overlaps(t.valid_from, t.valid_until, range_start, range_end)
-        } | set(cells)
+        principal_ids = {t.principal_id for t in terms} | set(cells)
         people = await self._people(principal_ids)
 
         rows: list[AttendanceRowOut] = []
@@ -555,15 +514,11 @@ class GremienService:
             row_cells: list[AttendanceCellOut] = []
             for month in months:
                 key = month_key(month)
-                start = self._month_start(month)
-                stop = self._month_start(shift_month(month, 1))
                 present, excused, delegated = cells.get(pid, {}).get(key, (0, 0, 0))
                 row_cells.append(
                     AttendanceCellOut(
                         month=key,
-                        member=any(
-                            _overlaps(t.valid_from, t.valid_until, start, stop) for t in own_terms
-                        ),
+                        member=bool(own_terms),
                         present=present,
                         excused=excused,
                         delegated=delegated,
@@ -660,8 +615,6 @@ class GremienService:
         rows = await self.session.execute(
             select(
                 GremiumMembership.principal_id,
-                GremiumMembership.valid_from,
-                GremiumMembership.valid_until,
                 GremiumRole.key,
                 GremiumRole.name_i18n,
             )
@@ -669,7 +622,7 @@ class GremienService:
             .where(GremiumMembership.gremium_id == gremium_id)
         )
         return [
-            _Term(pid, vf, vu, key, dict(names or {})) for pid, vf, vu, key, names in rows.all()
+            _Term(pid, key, dict(names or {})) for pid, key, names in rows.all()
         ]
 
     async def _people(self, ids: Iterable[UUID]) -> dict[UUID, tuple[str | None, str]]:

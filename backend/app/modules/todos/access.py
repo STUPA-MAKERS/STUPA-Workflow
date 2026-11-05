@@ -243,7 +243,7 @@ class BoardAccess:
         elif board.kind == "team":
             rows = await permission_holders(self.session, board.permission or "")
         else:
-            now = datetime.now(UTC)
+            datetime.now(UTC)
             rows = (
                 await self.session.execute(
                     select(PrincipalRow.id, PrincipalRow.display_name, PrincipalRow.email)
@@ -251,14 +251,6 @@ class BoardAccess:
                     .join(GremiumRole, GremiumRole.id == GremiumMembership.gremium_role_id)
                     .where(
                         GremiumMembership.gremium_id == board.gremium_id,
-                        or_(
-                            GremiumMembership.valid_from.is_(None),
-                            GremiumMembership.valid_from <= now,
-                        ),
-                        or_(
-                            GremiumMembership.valid_until.is_(None),
-                            GremiumMembership.valid_until > now,
-                        ),
                         GremiumRole.permissions.contains([TODO_WRITE]),
                         PrincipalRow.active.is_(True),
                         PrincipalRow.merged_into.is_(None),

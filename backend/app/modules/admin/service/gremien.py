@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import delete, distinct, func, or_, select
 
-from app.modules.admin.gremium_roles import GremiumRoleService, membership_active_clause
+from app.modules.admin.gremium_roles import GremiumRoleService
 from app.modules.admin.models import (
     ApplicationType,
     CdVariant,
@@ -63,13 +62,11 @@ class GremiumOps(ConfigServiceBase):
         Two grouped counts give the numbers for all gremien at once, so the admin
         list needs no request per gremium.
 
-        The member count holds the current members only: a membership that is valid
-        now (``valid_from``/``valid_until``, the same rule as RBAC) of an active
-        principal. The membership list marks each row with the same rule (``active``),
-        and the members page counts only the active rows.
+        The member count holds the memberships of active principals only. The
+        membership list marks each row with the same rule (``active``), and the
+        members page counts only the active rows.
         """
         rows = (await self.session.scalars(select(Gremium).order_by(Gremium.name))).all()
-        now = datetime.now(UTC)
         member_rows = (
             await self.session.execute(
                 select(
@@ -77,7 +74,7 @@ class GremiumOps(ConfigServiceBase):
                     func.count(distinct(GremiumMembership.principal_id)),
                 )
                 .join(PrincipalRow, PrincipalRow.id == GremiumMembership.principal_id)
-                .where(membership_active_clause(now), PrincipalRow.active.is_(True))
+                .where(PrincipalRow.active.is_(True))
                 .group_by(GremiumMembership.gremium_id)
             )
         ).all()

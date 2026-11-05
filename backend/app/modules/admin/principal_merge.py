@@ -430,14 +430,6 @@ class PrincipalMergeService:
                 .join(GremiumRole, GremiumRole.id == GremiumMembership.gremium_role_id)
                 .where(
                     GremiumMembership.principal_id == row.id,
-                    or_(
-                        GremiumMembership.valid_from.is_(None),
-                        GremiumMembership.valid_from <= now,
-                    ),
-                    or_(
-                        GremiumMembership.valid_until.is_(None),
-                        GremiumMembership.valid_until > now,
-                    ),
                 )
             )
         ).all()

@@ -53,8 +53,6 @@ async def _member(session: AsyncSession, gremium: Gremium) -> PrincipalRow:
             principal_id=p.id,
             gremium_id=gremium.id,
             gremium_role_id=role.id,
-            valid_from=None,
-            valid_until=None,
         )
     )
     await session.flush()

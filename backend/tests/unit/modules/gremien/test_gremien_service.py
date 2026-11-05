@@ -187,17 +187,8 @@ async def test_overview_view_all_marks_foreign_gremien() -> None:
 
 
 #: ------------------------------------------------------------------ members
-NOW = datetime.now(UTC)
-PAST = datetime(2020, 1, 1, tzinfo=UTC)
-
-
-def _membership(valid_until: datetime | None = None, valid_from: datetime | None = None) -> Any:
-    return SimpleNamespace(
-        principal_id=uuid.uuid4(),
-        gremium_role_id=uuid.uuid4(),
-        valid_from=valid_from,
-        valid_until=valid_until,
-    )
+def _membership() -> Any:
+    return SimpleNamespace(principal_id=uuid.uuid4(), gremium_role_id=uuid.uuid4())
 
 
 def _member_rows() -> list[tuple[Any, ...]]:
@@ -207,16 +198,6 @@ def _member_rows() -> list[tuple[Any, ...]]:
         (_membership(), "protokoll", {"de": "Protokoll"}, "Paul", None, True, "p"),
         (_membership(), "vorstand", {"de": "Vorstand"}, "Me", "me@x.de", True, "me"),
         (_membership(), "manager", {"de": "Manager"}, "Max", "m@x.de", False, "m"),
-        (_membership(valid_until=PAST), "member", {}, "Old", "o@x.de", True, "o"),
-        (
-            _membership(valid_from=datetime(2999, 1, 1, tzinfo=UTC)),
-            "member",
-            {},
-            "Next",
-            None,
-            True,
-            "n",
-        ),
         (_membership(), "member", {}, None, None, None, None),
     ]
 
@@ -235,7 +216,7 @@ async def test_members_current_by_role_and_name() -> None:
 
 async def test_members_former() -> None:
     rows = await _svc(result(*_member_rows())).members(G1, ME, former=True)
-    assert [r.display_name for r in rows] == ["Max", None, "Next", "Old"]
+    assert [r.display_name for r in rows] == ["Max", None]
     assert not any(r.is_self for r in rows)
 
 
@@ -244,10 +225,10 @@ async def test_meetings_empty() -> None:
 
 
 async def test_meetings_counts_the_roster() -> None:
-    """Count the roster per meeting.
+    """Count the roster per meeting: the members plus the recorded principals.
 
-    The planned meeting has the window "now", so it counts the member and the one who
-    starts in June.
+    The closed meeting counts both members, the guest and the recorded former member.
+    The planned meeting has no record, so it counts the two members.
     """
     closed = _meeting(
         G1,
@@ -268,28 +249,21 @@ async def test_meetings_counts_the_roster() -> None:
             (closed.id, guest, "present"),
             (closed.id, left, "excused"),
         ),
-        result(
-            (member, None, None),
-            (left, None, datetime(2026, 5, 1, tzinfo=UTC)),
-            (uuid.uuid4(), datetime(2026, 6, 1, tzinfo=UTC), None),
-        ),
+        result(member, uuid.uuid4()),
     )
     first, second = await service.meetings(G1)
-    assert (first.agenda_item_count, first.present_count, first.member_count) == (4, 2, 3)
+    assert (first.agenda_item_count, first.present_count, first.member_count) == (4, 2, 4)
     assert first.protocol_status == "final"
     assert (second.agenda_item_count, second.present_count, second.member_count) == (0, 0, 2)
     assert second.protocol_status is None
 
 
 async def test_attendance_matrix_rows() -> None:
-    me_id, guest_id, old_id = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    me_id, guest_id = uuid.uuid4(), uuid.uuid4()
     service = _svc(
         result(("2026-05", 2)),
         result((me_id, "2026-05", 2, 0, 0), (guest_id, "2026-05", 1, 1, 1)),
-        result(
-            (me_id, None, None, "vorstand", {"de": "Vorstand"}),
-            (old_id, None, datetime(2026, 1, 1, tzinfo=UTC), "member", None),
-        ),
+        result((me_id, "vorstand", {"de": "Vorstand"})),
         result((me_id, "Me", "me"), (guest_id, "Gast", "g")),
     )
     out = await service.attendance(G1, ME, from_month="2026-05", to_month="2026-06")

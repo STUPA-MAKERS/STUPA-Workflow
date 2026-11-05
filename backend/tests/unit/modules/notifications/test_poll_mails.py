@@ -75,7 +75,7 @@ def test_end_text_and_link() -> None:
 
 async def test_eligible_members_keeps_the_voters_with_an_address() -> None:
     session = ScriptedSession(execute=[_members()])
-    out = await polls.eligible_members(session, GID, NOW)  # type: ignore[arg-type]
+    out = await polls.eligible_members(session, GID)  # type: ignore[arg-type]
     assert out == [("a", "a@example.org"), ("b", "b@example.org")]
 
 
@@ -88,7 +88,6 @@ async def test_start_mail_goes_to_every_voter(mails: type[_Mails]) -> None:
         queue=None,
         settings=SETTINGS,
         vote=vote,
-        now=NOW,
         reminder=False,
     )
     assert sent is True
@@ -115,7 +114,6 @@ async def test_reminder_skips_the_members_who_answered(mails: type[_Mails]) -> N
         queue=None,
         settings=SETTINGS,
         vote=vote,
-        now=NOW,
         reminder=True,
     )
     assert sent is True
@@ -134,7 +132,6 @@ async def test_reminder_without_anybody_left_sends_nothing(mails: type[_Mails]) 
         queue=None,
         settings=SETTINGS,
         vote=_poll(),
-        now=NOW,
         reminder=True,
     )
     assert sent is False
@@ -149,7 +146,6 @@ async def test_no_mail_when_every_member_opted_out(mails: type[_Mails]) -> None:
         queue=None,
         settings=SETTINGS,
         vote=_poll(),
-        now=NOW,
         reminder=False,
     )
     assert sent is False
@@ -166,7 +162,6 @@ async def test_no_mail_for_a_meeting_poll_or_a_motion(
         queue=None,
         settings=SETTINGS,
         vote=_poll(**over),
-        now=NOW,
         reminder=False,
     )
     assert sent is False
@@ -195,7 +190,6 @@ async def test_notify_started_sends_for_an_open_poll(mails: type[_Mails]) -> Non
         SETTINGS,
         vote.id,
         None,
-        now=NOW,
         sessionmaker=_Maker(session),  # type: ignore[arg-type]
     )
     assert sent is True
@@ -214,7 +208,6 @@ async def test_notify_started_skips_a_missing_or_closed_poll(
         SETTINGS,
         vote.id,
         object(),
-        now=NOW,
         sessionmaker=_Maker(session),  # type: ignore[arg-type]
     )
     assert sent is False
@@ -226,7 +219,7 @@ async def test_notify_started_never_raises(monkeypatch: pytest.MonkeyPatch) -> N
         raise RuntimeError("db down")
 
     monkeypatch.setattr(polls, "get_sessionmaker", _broken)
-    assert await polls.notify_poll_started(SETTINGS, uuid4(), None, now=NOW) is False
+    assert await polls.notify_poll_started(SETTINGS, uuid4(), None) is False
 
 
 def test_maker_default(monkeypatch: pytest.MonkeyPatch) -> None:

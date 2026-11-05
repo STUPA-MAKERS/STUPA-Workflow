@@ -11,7 +11,6 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
 
 import pytest
 from fastapi import FastAPI
@@ -138,7 +137,6 @@ async def add_member(
                 principal_id=person_id,
                 gremium_id=gremium_id,
                 gremium_role_id=role.id,
-                valid_from=datetime(2020, 1, 1, tzinfo=UTC),
             )
         )
         await session.commit()

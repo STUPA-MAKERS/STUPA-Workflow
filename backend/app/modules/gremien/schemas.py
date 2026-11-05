@@ -66,8 +66,6 @@ class GremiumMemberOut(_Out):
     role_id: UUID
     role_key: str
     role_name: dict[str, str]
-    valid_from: _datetime | None
-    valid_until: _datetime | None
     is_self: bool
 
 
@@ -96,9 +94,9 @@ class AttendanceMonthOut(_Out):
 class AttendanceCellOut(_Out):
     """The attendance of one member in one month.
 
-    ``member`` tells whether a membership overlaps the month. ``delegated`` counts the
-    meetings in which the member transferred the vote. A meeting without a record
-    counts as absent and appears in no number.
+    ``member`` tells whether the principal holds a membership in the gremium.
+    ``delegated`` counts the meetings in which the member transferred the vote. A
+    meeting without a record counts as absent and appears in no number.
     """
 
     month: str

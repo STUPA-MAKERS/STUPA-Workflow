@@ -45,20 +45,16 @@ def _compare_type(field_type: str) -> str:
 
 
 async def committee_ids_for_sub(session: AsyncSession, sub: str | None) -> frozenset[str]:
-    """Return the Gremium ids where `sub` is a member now, inside the term window."""
+    """Return the Gremium ids where `sub` is a member."""
     if not sub:
         return frozenset()
-    now = datetime.now(UTC)
+    datetime.now(UTC)
     rows = (
         await session.execute(
             select(GremiumMembership.gremium_id)
             .join(PrincipalRow, PrincipalRow.id == GremiumMembership.principal_id)
             .where(
                 PrincipalRow.sub == sub,
-                (GremiumMembership.valid_from.is_(None))
-                | (GremiumMembership.valid_from <= now),
-                (GremiumMembership.valid_until.is_(None))
-                | (GremiumMembership.valid_until > now),
             )
         )
     ).scalars().all()

@@ -356,7 +356,7 @@ async def _gremium_permissions(
 ) -> dict[UUID, list[str]]:
     """Return the gremium permissions of the principal per Gremium.
 
-    Only the active memberships count. The OAuth scope cap removes each key that
+    Each membership counts. The OAuth scope cap removes each key that
     the token scope does not let through. A Gremium without a remaining key stays
     in the map with an empty list, because the membership itself still counts.
     """
@@ -372,7 +372,7 @@ async def _gremium_permissions(
 
 
 async def _gremien_for(db: DbSession, sub: str) -> list[GremiumRef]:
-    """Return the Gremien that `sub` is a member of (valid `gremium_membership`).
+    """Return the Gremien that `sub` is a member of (`gremium_membership`).
 
     This reads the same source as the server-side visibility logic
     (`gremium_member_ids`). The frontend gate and the server filters therefore agree.

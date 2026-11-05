@@ -73,9 +73,6 @@
                   <span class="gmb__you">{{ 'gremien.members.you' | t }}</span>
                 }
               </span>
-              @if (row.period) {
-                <span class="gmb__period">{{ row.period }}</span>
-              }
             </span>
             @if (!phone() && row.member.email) {
               <a class="gmb__mail" [href]="'mailto:' + row.member.email">{{ row.member.email }}</a>

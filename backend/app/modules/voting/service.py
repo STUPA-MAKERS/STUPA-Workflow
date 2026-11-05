@@ -1182,7 +1182,7 @@ class VotingService:
         if as_delegation:
             if delegator_sub is None:
                 delegator_sub = await claim_pool_seat(
-                    self.session, principal.sub, vote.meeting_id, vote.eligible_group, now
+                    self.session, principal.sub, vote.meeting_id, vote.eligible_group
                 )
             if delegator_sub is None:
                 raise ForbiddenError("No delegated voting right for this ballot.")
@@ -1349,7 +1349,7 @@ class VotingService:
             return True
         if delegator_sub is None:
             seat = await pool_seat_for(
-                self.session, principal.sub, vote.meeting_id, vote.eligible_group, now
+                self.session, principal.sub, vote.meeting_id, vote.eligible_group
             )
             if seat is None:
                 return False

@@ -103,10 +103,6 @@ async def resolve_principal(db: AsyncSession, row: PrincipalRow, now: datetime) 
             .join(GremiumRole, GremiumRole.id == GremiumMembership.gremium_role_id)
             .where(
                 GremiumMembership.principal_id == row.id,
-                (GremiumMembership.valid_from.is_(None))
-                | (GremiumMembership.valid_from <= now),
-                (GremiumMembership.valid_until.is_(None))
-                | (GremiumMembership.valid_until > now),
             )
         )
     ).all()

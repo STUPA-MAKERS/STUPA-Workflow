@@ -10,7 +10,6 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.orm import aliased
 
-from app.modules.admin.gremium_roles import membership_active_clause
 from app.modules.admin.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.applications.decision import DecisionIn
 from app.modules.auth.models import Principal as PrincipalRow
@@ -406,14 +405,13 @@ class VoteReadOps(MeetingServiceBase):
 
     async def vote_eligible_count(self, gremium_id: UUID) -> int:
         """Return the roster size for the quorum: active members with a `vote.cast` role."""
-        now = datetime.now(UTC)
+        datetime.now(UTC)
         rows = (
             await self.session.execute(
                 select(GremiumMembership.principal_id, GremiumRole.permissions)
                 .join(GremiumRole, GremiumRole.id == GremiumMembership.gremium_role_id)
                 .where(
                     GremiumMembership.gremium_id == gremium_id,
-                    membership_active_clause(now),
                 )
             )
         ).all()

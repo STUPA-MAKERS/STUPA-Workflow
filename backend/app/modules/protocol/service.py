@@ -30,8 +30,8 @@ from __future__ import annotations
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
 from datetime import date as _date
+from datetime import datetime
 from datetime import time as _time
 from uuid import UUID
 from zoneinfo import ZoneInfo
@@ -951,11 +951,10 @@ class ProtocolService:
     ) -> bool | None:
         """Compute the quorum from the attendees and the members of the meeting.
 
-        The members are the roster of the meeting: the members whose membership
-        overlaps the meeting window, plus each principal with an attendance record
-        (see `app.modules.livevote.roster`). A later end of a membership thus does
-        not change the quorum of a closed meeting. Without a meeting the members
-        that are valid now count. The threshold is `gremium.quorum_percent` when
+        The members are the roster of the meeting: the members of the Gremium,
+        plus each principal with an attendance record (see
+        `app.modules.livevote.roster`). Without a meeting the members of the
+        Gremium count. The threshold is `gremium.quorum_percent` when
         that value is set. If not, the threshold is more than half of the members.
 
         Returns:
@@ -965,12 +964,10 @@ class ProtocolService:
         gremium_id = getattr(gremium, "id", None)
         if gremium_id is None:
             return None
-        tz_name = self._tz().key
         if meeting is not None and getattr(meeting, "gremium_id", None) == gremium_id:
-            where = meeting_roster_filter(meeting, tz_name)
+            where = meeting_roster_filter(meeting)
         else:
-            now = datetime.now(UTC)
-            where = roster_filter(gremium_id, now, now)
+            where = roster_filter(gremium_id)
         members = (
             await self.session.scalar(
                 select(func.count()).select_from(PrincipalRow).where(where)
@@ -1390,10 +1387,9 @@ class ProtocolService:
     async def _recipients(self, gremium_id: UUID) -> list[str]:
         """Build the flat and deduplicated recipient list of the Gremium.
 
-        The list is the union of the active Gremium members and the configured extra
-        lists (`mail_list`). A member counts as active inside the term window and with
-        a non-NULL email. The extra addresses get the protocol in addition to the
-        members, not instead of them.
+        The list is the union of the Gremium members and the configured extra
+        lists (`mail_list`). A member counts with a non-NULL email. The extra
+        addresses get the protocol in addition to the members, not instead of them.
         """
         seen: dict[str, None] = {}
         members = await RecipientResolver(self.session).resolve(

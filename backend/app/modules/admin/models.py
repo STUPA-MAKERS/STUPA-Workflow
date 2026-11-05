@@ -27,7 +27,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB, ExcludeConstraint
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, CreatedAtMixin, UUIDPkMixin
@@ -170,16 +170,10 @@ class GremiumMembership(UUIDPkMixin, Base):
 
     ``membership_sync`` is the only writer. It derives the rows from
     ``principal.oidc_groups``, ``GremiumMembershipMapping`` and
-    ``GremiumRoleMapping``. For each (principal,
-    gremium) pair exactly one role is active. The sync leaves ``valid_from`` and
-    ``valid_until`` NULL (open). The readers still filter on them, and the
-    EXCLUDE constraint below keeps the one-row invariant.
-
-    The EXCLUDE constraint backs the overlap invariant in the database: a
-    (principal, gremium) pair must not have overlapping terms. A NULL bound means
-    minus or plus infinity, and the range is half-open ``[from, until)``, so
-    adjacent memberships are allowed. It closes the TOCTOU gap of the Python check
-    on parallel inserts and needs the btree_gist extension.
+    ``GremiumRoleMapping``. A membership has no term: a row exists while the
+    OIDC groups make the principal a member, and the sync deletes it when they
+    stop. The unique constraint keeps one row, and so one role, per
+    (principal, gremium) pair. It closes the TOCTOU gap of parallel inserts.
     """
 
     __tablename__ = "gremium_membership"
@@ -193,29 +187,12 @@ class GremiumMembership(UUIDPkMixin, Base):
     gremium_role_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("gremium_role.id", ondelete="RESTRICT")
     )
-    valid_from: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    valid_until: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
 
     __table_args__ = (
         Index("ix_gremium_membership_principal", "principal_id"),
         Index("ix_gremium_membership_gremium", "gremium_id"),
-        ExcludeConstraint(
-            ("principal_id", "="),
-            ("gremium_id", "="),
-            (
-                text(
-                    "tstzrange("
-                    "coalesce(valid_from, '-infinity'), "
-                    "coalesce(valid_until, 'infinity'), '[)')"
-                ),
-                "&&",
-            ),
-            using="gist",
-            name="ex_gremium_membership_no_overlap",
+        UniqueConstraint(
+            "principal_id", "gremium_id", name="uq_gremium_membership_principal_gremium"
         ),
     )
 
