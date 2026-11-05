@@ -87,13 +87,7 @@ async def _resolve(
     row.id = sub  # type: ignore[assignment]
     queue = []
     if global_perms:
-        queue.append(
-            auth_fakes.result(
-                SimpleNamespace(
-                    role_id="role", valid_from=None, valid_until=None, gremium_id=None
-                )
-            )
-        )
+        queue.append(auth_fakes.result("role"))
         queue.append(auth_fakes.result(*sorted(global_perms)))
         queue.append(auth_fakes.result("global-role"))
     else:
