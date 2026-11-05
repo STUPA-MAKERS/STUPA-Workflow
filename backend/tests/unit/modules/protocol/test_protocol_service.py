@@ -305,7 +305,9 @@ async def test_finalize_renders_stores_and_mails() -> None:
     assert out.pdf_url is not None
     assert len(mail.sent) == 1
     assert mail.sent[0].to == ("a@x.de", "b@x.de")
-    assert [a.filename for a in mail.sent[0].attachments] == ["protokoll.pdf"]
+    assert [a.filename for a in mail.sent[0].attachments] == [
+        "Protokoll_StuPa-Sitzung_2026-06-12.pdf"
+    ]
     assert mail.sent[0].attachments[0].content.startswith(b"%PDF")
     assert f"Protokoll öffnen: {SETTINGS_BASE}/meetings/{MID}" in mail.sent[0].text
     assert f'href="{SETTINGS_BASE}/meetings/{MID}"' in (mail.sent[0].html or "")

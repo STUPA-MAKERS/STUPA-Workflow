@@ -74,6 +74,7 @@ from app.modules.notifications.queue import MailQueue
 from app.modules.notifications.recipients import RecipientResolver
 from app.modules.notifications.service import filter_recipients_by_preference
 from app.modules.pdf.typst_client import TypstClient, TypstError
+from app.modules.protocol.filename import protocol_pdf_filename
 from app.modules.protocol.markdown import (
     ElectionLine,
     ElectionSnippet,
@@ -99,6 +100,7 @@ from app.modules.protocol.public import (
     PublicSnapshot,
     PublicTop,
     apply_public_snapshot,
+    meeting_day,
     passed_conditions,
 )
 from app.modules.protocol.schemas import ProtocolOut
@@ -310,6 +312,22 @@ class ProtocolService:
             raise ServiceUnavailableError(
                 "Protocol PDF temporarily unavailable."
             ) from exc
+
+    async def pdf_filename(self, protocol_id: UUID, *, public: bool = False) -> str:
+        """Return the download name of the protocol PDF: meeting title and day.
+
+        Args:
+            protocol_id: The protocol.
+            public: `True` for the redacted variant (`_oeffentlich`).
+
+        Raises:
+            NotFoundError: The protocol or its meeting is missing (404).
+        """
+        protocol = await self._get(protocol_id)
+        meeting = await self.session.get(Meeting, protocol.meeting_id)
+        if meeting is None:
+            raise NotFoundError(f"protocol {protocol_id} has no meeting")
+        return protocol_pdf_filename(meeting.title, meeting_day(meeting), public=public)
 
     async def get_public_pdf_bytes(self, protocol_id: UUID) -> bytes:
         """Fetch the bytes of the redacted public variant for the `/pdf/public` stream."""
@@ -1337,7 +1355,13 @@ class ProtocolService:
         if pdf is not None:
             attachments = (
                 MailAttachment(
-                    filename="protokoll.pdf", mime="application/pdf", content=pdf
+                    filename=(
+                        protocol_pdf_filename(meeting.title, meeting_day(meeting))
+                        if meeting is not None
+                        else "Protokoll.pdf"
+                    ),
+                    mime="application/pdf",
+                    content=pdf,
                 ),
             )
         html = render_layout(

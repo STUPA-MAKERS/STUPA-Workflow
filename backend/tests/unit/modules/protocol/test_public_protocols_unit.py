@@ -237,10 +237,7 @@ async def test_get_pdf_paths() -> None:
     svc = PublicProtocolService(_Session([[_rows(slug='a"b/c')]]), storage=_Storage())  # type: ignore[arg-type]
     data, name = await svc.get_pdf(PID)
     assert data == b"%PDF-public"
-    assert name == "Protokoll_abc_2026-09-29_oeffentlich.pdf"
-
-    svc = PublicProtocolService(_Session([[_rows(slug="!!")]]), storage=_Storage())  # type: ignore[arg-type]
-    assert (await svc.get_pdf(PID))[1].startswith("Protokoll_gremium_")
+    assert name == "Protokoll_6._Sitzung_2026-09-29_oeffentlich.pdf"
 
     svc = PublicProtocolService(_Session([[_rows(key=None)]]), storage=_Storage())  # type: ignore[arg-type]
     with pytest.raises(NotFoundError):
