@@ -13,6 +13,5 @@ scope:
 
 # An applicant session can edit
 
-Every new magic link and applicant session has the scope `edit`. Each action checks the
-current state: a data edit answers 409 in a state without `edit_allowed`. Applicant
+A magic link opens an applicant session that can edit. Each action checks the current state: a data edit answers 409 in a state without `edit_allowed`. Applicant
 transitions and uploads work in every state.
