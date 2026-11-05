@@ -7,7 +7,7 @@ import { screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { ApiClient } from '@core/api/api-client.service';
 import { AuthService } from '@core/auth/auth.service';
-import type { Meeting, Page, VoteListItem, VoteListQuery } from '@core/api/models';
+import type { Meeting, Page, Vote, VoteListItem, VoteListQuery } from '@core/api/models';
 import { LiveVoteService, type ConnectionState } from '@core/ws/live-vote.service';
 import type { VoteClosedMsg, VoteOpenedMsg, VoteTallyMsg } from '@core/ws/ws-messages';
 import { LIVE_SEARCH_DEBOUNCE_MS, MEDIA } from '@stupa-makers/ui-kit';
@@ -76,6 +76,8 @@ interface Opts {
   timelineError?: boolean;
   manager?: boolean;
   gremien?: { id: string; name: string }[];
+  /** `GET /votes/{id}` of a vote that opened on a channel (default: a ballot to cast). */
+  fresh?: Partial<Vote> | 'error';
 }
 
 const page = (items: VoteListItem[], total = items.length, offset = 0): Page<VoteListItem> => ({
@@ -98,6 +100,11 @@ async function start(url: string, opts: Opts = {}) {
     opts.timelineError
       ? throwError(() => new Error('boom'))
       : of({ items: (opts.live ?? []) as Meeting[], nextCursor: null }),
+  );
+  const getVote = jest.fn((id: string) =>
+    opts.fresh === 'error'
+      ? throwError(() => new Error('boom'))
+      : of({ id, canCast: true, myBallot: { cast: false, choice: null }, ...opts.fresh } as Vote),
   );
   const sessions = new Map<string, FakeSession>();
   const live = {
@@ -124,7 +131,7 @@ async function start(url: string, opts: Opts = {}) {
           ],
         },
       ]),
-      { provide: ApiClient, useValue: { listVotes, listMeetingsTimeline } },
+      { provide: ApiClient, useValue: { listVotes, listMeetingsTimeline, getVote } },
       { provide: AuthService, useValue: auth },
       { provide: LiveVoteService, useValue: live },
     ],
@@ -138,7 +145,7 @@ async function start(url: string, opts: Opts = {}) {
     await harness.fixture.whenStable();
     harness.detectChanges();
   };
-  return { harness, cmp, router, pageService, listVotes, listMeetingsTimeline, sessions, live, settle };
+  return { harness, cmp, router, pageService, listVotes, listMeetingsTimeline, getVote, sessions, live, settle };
 }
 
 describe('VotingComponent', () => {
@@ -417,7 +424,7 @@ describe('VotingComponent', () => {
     it('reads the filters from the URL and sends them', async () => {
       const { listVotes, cmp } = await start('/voting?status=ended&gremium=g2&q=Haushalt');
       expect(listVotes).toHaveBeenCalledWith({
-        status: ['closed', 'cancelled'],
+        status: ['closed'],
         gremiumId: 'g2',
         q: 'Haushalt',
         limit: 30,
@@ -427,10 +434,10 @@ describe('VotingComponent', () => {
       expect(cmp.gremiumChipLabel()).toBe('g2');
     });
 
-    it('ignores an unknown status and sends the default', async () => {
+    it('ignores an unknown status and sends the default without cancelled votes', async () => {
       const { listVotes, cmp } = await start('/voting?status=running');
       expect(cmp.statusFilter()).toBe('');
-      expect(listVotes).toHaveBeenCalledWith(expect.objectContaining({ status: undefined }));
+      expect(listVotes).toHaveBeenCalledWith(expect.objectContaining({ status: ['open', 'closed'] }));
     });
 
     /** An emptied field shows the whole list at once. */
@@ -508,7 +515,7 @@ describe('VotingComponent', () => {
       const { cmp, listVotes } = await start('/voting?status=draft');
       expect(cmp.statusFilter()).toBe('');
       expect(cmp.statusChipLabel()).toBe('Status');
-      expect(listVotes).toHaveBeenCalledWith(expect.objectContaining({ status: undefined }));
+      expect(listVotes).toHaveBeenCalledWith(expect.objectContaining({ status: ['open', 'closed'] }));
     });
 
     /** A member has no draft option, so the chip shows the raw value. */
@@ -862,6 +869,97 @@ describe('VotingComponent', () => {
         jest.useRealTimers();
         restore();
       }
+    });
+
+    describe('opens a new vote by itself only with a ballot to cast', () => {
+      const back = () => document.dispatchEvent(new Event('visibilitychange'));
+      const closed = item('c1', { status: 'closed', result: 'passed' });
+      const at = (id: string) => [['/voting', id], { queryParamsHandling: 'preserve', replaceUrl: false }];
+
+      it.each([
+        ['without a voting right', { canCast: false }],
+        ['after an own ballot', { myBallot: { cast: true, choice: null } }],
+        ['when the vote cannot be read', 'error' as const],
+      ])('keeps the list %s (channel)', async (_name, fresh) => {
+        jest.useFakeTimers({ doNotFake: ['Date'] });
+        try {
+          const { sessions, harness, router, getVote } = await start('/voting', {
+            live: [{ id: 'm1', status: 'live' }],
+            fresh,
+          });
+          const navigate = jest.spyOn(router, 'navigate');
+          sessions.get('m1')!.openVote.set(opened('v7'));
+          harness.detectChanges();
+          jest.advanceTimersByTime(VOTE_LIVE_DEBOUNCE);
+          expect(getVote).toHaveBeenCalledWith('v7', { quiet: true });
+          expect(navigate).not.toHaveBeenCalled();
+        } finally {
+          jest.useRealTimers();
+        }
+      });
+
+      it('opens a poll of a Gremium that a refresh finds, once', async () => {
+        const poll = item('p1', { kind: 'poll', applicationId: null });
+        const { router, listVotes } = await start('/voting', {
+          pages: [page([closed]), page([poll, closed])],
+        });
+        const navigate = jest.spyOn(router, 'navigate');
+        back();
+        expect(navigate).toHaveBeenCalledWith(...at('p1'));
+        expect(listVotes).toHaveBeenCalledTimes(2);
+        navigate.mockClear();
+        back();
+        expect(navigate).not.toHaveBeenCalled();
+      });
+
+      it.each([
+        ['without a voting right', { canCast: false }],
+        ['after an own ballot', { myBallot: { cast: true, choice: null } }],
+      ])('keeps the list %s (refresh)', async (_name, over) => {
+        const { router } = await start('/voting', {
+          pages: [page([closed]), page([item('p1', over), closed])],
+        });
+        const navigate = jest.spyOn(router, 'navigate');
+        back();
+        expect(navigate).not.toHaveBeenCalled();
+      });
+
+      it('takes a filter change as a new start, not as new votes', async () => {
+        const { router, settle } = await start('/voting?status=ended', {
+          pages: [page([closed]), page([item('o1'), closed])],
+        });
+        const navigate = jest.spyOn(router, 'navigate');
+        await router.navigateByUrl('/voting');
+        await settle();
+        expect(navigate).not.toHaveBeenCalledWith(...at('o1'));
+      });
+
+      it('opens a vote that both the channel and the refresh report only once', async () => {
+        jest.useFakeTimers({ doNotFake: ['Date'] });
+        try {
+          const { sessions, harness, router } = await start('/voting', {
+            live: [{ id: 'm1', status: 'live' }],
+            pages: [page([closed]), page([item('v7', { meetingId: 'm1' }), closed])],
+          });
+          const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+          sessions.get('m1')!.openVote.set(opened('v7'));
+          harness.detectChanges();
+          jest.advanceTimersByTime(VOTE_LIVE_DEBOUNCE);
+          expect(navigate).toHaveBeenCalledTimes(1);
+          expect(navigate).toHaveBeenCalledWith(...at('v7'));
+        } finally {
+          jest.useRealTimers();
+        }
+      });
+
+      it('keeps an ended vote in the detail for a new vote without a meeting', async () => {
+        const { router } = await start('/voting/c1', {
+          pages: [page([closed]), page([item('p1', { kind: 'poll' }), closed])],
+        });
+        const navigate = jest.spyOn(router, 'navigate');
+        back();
+        expect(navigate).not.toHaveBeenCalled();
+      });
     });
 
     describe('self-update', () => {
