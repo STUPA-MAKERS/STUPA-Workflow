@@ -1,6 +1,6 @@
 # Voting
 
-Kind: Requirement
+Kind: Functional
 Status: Draft
 Scope: backend/app/modules/voting, frontend/src/app/features/voting
 Updated: 2026-11-05

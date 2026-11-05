@@ -1,11 +1,8 @@
 # Area name
 
-Kind: Requirement
+Kind: Functional
 Status: Draft
 Scope: backend/app/modules/example, frontend/src/app/features/example
-
-<!-- Copy this file to <kind folder>/<area>/<name>.md. The ID part "area-example" is that path
-     with "-" between the parts. Delete this comment. -->
 Updated: YYYY-MM-DD
 
 ## F-area-example-0001 Short title of the rule

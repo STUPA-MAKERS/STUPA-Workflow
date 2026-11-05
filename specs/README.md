@@ -39,7 +39,7 @@ Every spec file uses the same format. Copy `TEMPLATE.md` to start a new file.
 
 - Write in ASD-STE100 Simplified Technical English.
 - One file covers one area. The file name is the area in kebab case.
-- The header lists `Kind` (`Style` or `Requirement`), `Status`, `Scope` and `Updated`.
+- The header lists `Kind` (`Functional`, `Non-functional` or `Style`), `Status`, `Scope` and `Updated`.
 - One rule is one `##` section. The heading is the rule ID and a short title.
 - The rule ID has the form `(F|NF|S)-<path>-NNNN`:
   - `F` is a functional requirement, `NF` a non-functional requirement, `S` a style rule.
