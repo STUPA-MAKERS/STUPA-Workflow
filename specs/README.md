@@ -431,7 +431,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [S/shared/git/000224](style/shared/git/000224_target-development.md) | An app pull request targets development | draft |
 | [S/shared/git/000225](style/shared/git/000225_found-bugs.md) | A found bug is fixed, a behaviour change is asked | draft |
 | [S/shared/git/000423](style/shared/git/000423_one-pr-per-package.md) | One branch and one pull request per package | draft |
-| [S/shared/git/000424](style/shared/git/000424_sync-main.md) | Sync main back with a merge commit | draft |
+| [S/shared/git/000424](style/shared/git/000424_sync-main.md) | Sync main into development first | draft |
 | [S/shared/git/000425](style/shared/git/000425_shared-in-kit.md) | Shared list parts live in the ui-kit | draft |
 | [S/shared/testing/000044](style/shared/testing/000044_test-first.md) | Tests come first | draft |
 | [S/shared/testing/000045](style/shared/testing/000045_coverage-gates.md) | Coverage gates hold | draft |

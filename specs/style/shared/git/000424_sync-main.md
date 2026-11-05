@@ -1,6 +1,6 @@
 ---
 id: "000424"
-title: Sync main back with a merge commit
+title: Sync main into development first
 kind: style
 status: draft
 owner: frederikbeimgraben
@@ -9,6 +9,6 @@ scope:
   - .
 ---
 
-# Sync main back with a merge commit
+# Sync main into development first
 
-After a merge into `main`, sync `main` back into `development` with a merge commit.
+Before a merge into `development`, sync `main` into `development` with a merge commit.
