@@ -31,7 +31,6 @@ from app.modules.auth.bootstrap import (
 )
 from app.modules.auth.models import SESSION_CLIENT_WEB
 from app.modules.auth.models import Principal as PrincipalRow
-from app.modules.auth.principal import ApplicantScope
 from app.modules.auth.session_renewal import session_expiry
 from app.modules.flow.dispatch import ActionDispatcher
 from app.modules.flow.service import FlowService
@@ -96,9 +95,9 @@ async def request_magic_link(
     browser history. The frontend reads the fragment and POSTs the token to
     ``/auth/magic-link/verify``.
 
-    Every new link has `scope = 'edit'` and can be used more than once. The
-    session it opens has no fixed scope: each action checks the current state, so
-    a locked state still allows a transition with `actorIsApplicant` and an upload.
+    A link can be used more than once. The session it opens has no scope: each
+    action checks the current state, so a locked state still allows a transition
+    with `actorIsApplicant` and an upload.
     The data lock stays the 409 of the edit service.
 
     The lifetime comes from `guest_application_settings.link_ttl_days`. NULL gives
@@ -118,9 +117,7 @@ async def request_magic_link(
         MagicLink(
             application_id=app.id,
             token_hash=tokens.hash_token(token, settings.magic_link_secret),
-            scope="edit",
             expires_at=expires_at,
-            single_use=False,
         )
     )
     await db.flush()
@@ -136,13 +133,11 @@ async def verify_magic_link(
     *,
     token: str,
     dispatcher: ActionDispatcher | None = None,
-) -> tuple[str, ApplicantScope, str]:
+) -> tuple[str, str]:
     """Verify a magic-link token.
 
     A link without an expiry (`expires_at` NULL) stays valid until a newer link is
-    redeemed or the application is archived or anonymized. A single-use token (only
-    older rows) gets `used_at` set by an atomic ``UPDATE ... WHERE used_at IS NULL``,
-    so only one concurrent verify wins and a replay gets 410.
+    redeemed or the application is archived or anonymized.
 
     The redeem expires every older link of the same application that is still
     valid (`expires_at = now`). An unlimited link therefore does not collect old
@@ -153,9 +148,6 @@ async def verify_magic_link(
     The applicant session is a server-side row, not a stateless token: the opaque
     ``sid`` is valid only with an ``applicant_session`` row, so a token forged from
     ``SESSION_SECRET`` alone does not work.
-
-    The applicant session always has the scope `edit`, also for an old `view`
-    link. Each action checks the current state.
 
     The first verify of a guest application confirms its email. That makes the
     submission visible and protects it from the discard after ``confirm_ttl_hours``.
@@ -168,12 +160,10 @@ async def verify_magic_link(
     second mail.
 
     Returns:
-        The application id, the scope (always `edit`) and the applicant session
-        token.
+        The application id and the applicant session token.
 
     Raises:
-        GoneError: The token is invalid, expired or already used. The router maps this
-            to 410.
+        GoneError: The token is invalid or expired. The router maps this to 410.
     """
     digest = tokens.hash_token(token, settings.magic_link_secret)
     row = (
@@ -186,17 +176,6 @@ async def verify_magic_link(
     now = _now()
     if row.expires_at is not None and row.expires_at <= now:
         raise GoneError("Magic-Link expired.")
-    if row.single_use:
-        claimed = (
-            await db.execute(
-                update(MagicLink)
-                .where(MagicLink.id == row.id, MagicLink.used_at.is_(None))
-                .values(used_at=now)
-                .returning(MagicLink.id)
-            )
-        ).scalar_one_or_none()
-        if claimed is None:
-            raise GoneError("Magic-Link already used.")
     confirmed = (
         await db.execute(
             update(Application)
@@ -222,19 +201,17 @@ async def verify_magic_link(
         )
         .values(expires_at=now)
     )
-    scope: ApplicantScope = "edit"
     app_id = str(row.application_id)
     expires_at = now + timedelta(hours=settings.applicant_session_ttl_hours)
     session_token = await sessions.create_applicant_session(
         db,
         secret=settings.session_secret,
         application_id=row.application_id,
-        scope=scope,
         expires_at=expires_at,
     )
     if confirmed is not None:
         await FlowService(db, dispatcher).start_confirmed(row.application_id)
-    return app_id, scope, session_token
+    return app_id, session_token
 
 
 async def upsert_principal(db: AsyncSession, claims: oidc.OidcClaims) -> PrincipalRow:

@@ -439,11 +439,7 @@ export interface RoleAssignment {
   id: Uuid;
   principalId: Uuid;
   roleId: Uuid;
-  gremiumId?: Uuid | null;
   grantedBy?: string | null;
-  validFrom?: string | null;
-  validUntil?: string | null;
-  delegateVoting: boolean;
 }
 
 /** OIDC principal (user) incl. its role assignments (admin API `/principals`). */
@@ -491,7 +487,7 @@ export interface RevokePrincipal {
   active: boolean;
 }
 
-/** A manual role assignment. `grantedBy` is a name or `bootstrap`, never a `sub`. */
+/** A global role assignment. `grantedBy` is a name or `bootstrap`, never a `sub`. */
 export interface RevokeAssignment {
   id: Uuid;
   roleId: Uuid;
@@ -500,8 +496,6 @@ export interface RevokeAssignment {
   grantedBy: string | null;
   /** The bootstrap `admin` of a configured bootstrap admin: it comes back by itself. */
   returnsAutomatically?: boolean;
-  validFrom: string | null;
-  validUntil: string | null;
 }
 
 /** A pool entry of the person: as substitute (for a member or the whole Gremium) or as member. */
@@ -530,7 +524,6 @@ export interface RevokeGremium {
   name: string;
   membership: { roleKey: string; roleLabel: I18nMap; groups: string[] } | null;
   groups: string[];
-  assignments: RevokeAssignment[];
   poolEntries: RevokePoolEntry[];
   plannedDelegations: RevokeDelegation[];
   liveDelegations: RevokeDelegation[];

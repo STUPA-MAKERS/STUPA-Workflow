@@ -35,7 +35,9 @@ class MagicLinkVerifyOut(BaseModel):
     """
 
     application_id: UUID
-    scope: Literal["edit", "view"]
+    #: Always `edit`: the applicant session has no scope, and each action checks the
+    #: current state of the application.
+    scope: Literal["edit"] = "edit"
 
 
 class LogoutOut(BaseModel):

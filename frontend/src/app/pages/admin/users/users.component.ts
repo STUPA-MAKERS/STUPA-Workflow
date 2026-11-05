@@ -241,7 +241,7 @@ export class UsersComponent {
    * give nothing.
    */
   protected roleIds(p: AdminPrincipal): string[] {
-    const ids = new Set(p.assignments.filter((a) => !a.gremiumId).map((a) => a.roleId));
+    const ids = new Set(p.assignments.map((a) => a.roleId));
     const groups = new Set(p.oidcGroups.filter((g) => !g.startsWith('vote:')));
     for (const m of this.groupMappings()) {
       if (groups.has(m.oidcGroup)) ids.add(m.roleId);

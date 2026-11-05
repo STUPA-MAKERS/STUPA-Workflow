@@ -71,7 +71,7 @@ def _principal() -> Principal:
 
 
 def _applicant() -> Applicant:
-    return Applicant(application_id=str(uuid.uuid4()), scope="edit")
+    return Applicant(application_id=str(uuid.uuid4()))
 
 
 async def test_ratelimit_key_principal() -> None:

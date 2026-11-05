@@ -43,11 +43,7 @@ def _assignment_out(row: RoleAssignmentRow) -> RoleAssignmentOut:
         id=row.id,
         principal_id=row.principal_id,
         role_id=row.role_id,
-        gremium_id=row.gremium_id,
         granted_by=row.granted_by,
-        valid_from=_iso(row.valid_from),
-        valid_until=_iso(row.valid_until),
-        delegate_voting=row.delegate_voting,
     )
 
 

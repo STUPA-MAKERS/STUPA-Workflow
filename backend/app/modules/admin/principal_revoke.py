@@ -5,19 +5,19 @@ from a group, and who never logs in again, keeps the memberships and the global 
 of that group. An admin with ``admin.users.revoke_groups`` takes them away here:
 
 - ``preview`` lists per Gremium everything that ties the person to it: the derived
-  membership with its gremium role and the SSO groups that cause them, the manual
-  gremium role assignments, the pool entries (as substitute or as member), the
-  delegations in planned meetings and in live meetings, and the open votes. Then it
-  lists each global role with its origin (SSO groups, manual assignments). Each SSO
-  group names every Gremium and global role that it leads to.
+  membership with its gremium role and the SSO groups that cause them, the pool
+  entries (as substitute or as member), the delegations in planned meetings and in
+  live meetings, and the open votes. Then it lists each global role with its origin
+  (SSO groups, manual assignments). Each SSO group names every Gremium and global
+  role that it leads to.
 - ``revoke`` clears the selected Gremien COMPLETELY and removes the selected global
   roles, in ONE transaction. Per Gremium it removes the SSO groups that lead into it
-  from ``principal.oidc_groups``, deletes the manual role assignments of the Gremium
-  and the pool entries of the person, and revokes the delegations of the planned
-  meetings (audit ``delegation_revoke``; the router mails the other side). A delegation
-  of a live meeting stays until the meeting ends. Per global role it removes the SSO
-  groups that grant it and deletes the manual global assignments. Then the membership
-  sync runs for the person. Optionally the account is deactivated.
+  from ``principal.oidc_groups``, deletes the pool entries of the person, and revokes
+  the delegations of the planned meetings (audit ``delegation_revoke``; the router
+  mails the other side). A delegation of a live meeting stays until the meeting
+  ends. Per global role it removes the SSO groups that grant it and deletes the
+  manual global assignments. Then the membership sync runs for the person.
+  Optionally the account is deactivated.
 
 A group that also leads to another Gremium or global role is removed for all of them.
 The request must therefore name every co-affected entry, else 422 ``revoke_incomplete``
@@ -114,10 +114,7 @@ class AssignmentFact:
 
     id: UUID
     role: RoleInfo
-    gremium_id: UUID | None
     granted_by: str | None
-    valid_from: datetime | None
-    valid_until: datetime | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -197,19 +194,17 @@ def held_roles(snap: Snapshot) -> dict[UUID, RoleInfo]:
     for _group, role in snap.group_maps:
         roles[role.id] = role
     for a in snap.assignments:
-        if a.gremium_id is None:
-            roles[a.role.id] = a.role
+        roles[a.role.id] = a.role
     return {rid: r for rid, r in roles.items() if r.key != IMPLICIT_ROLE_KEY}
 
 
 def tied_gremien(snap: Snapshot) -> set[UUID]:
     """Return every Gremium the person is tied to.
 
-    A tie is a membership, a group, an assignment, a pool entry or a delegation.
+    A tie is a membership, a group, a pool entry or a delegation.
     """
     tied = {m.gremium_id for m in snap.memberships}
     tied |= {gid for _group, gid in snap.membership_maps}
-    tied |= {a.gremium_id for a in snap.assignments if a.gremium_id is not None}
     tied |= {p.gremium_id for p in snap.pool}
     tied |= {d.gremium_id for d in snap.delegations}
     return tied
@@ -265,12 +260,9 @@ def _assignment_out(a: AssignmentFact, snap: Snapshot) -> RevokeAssignmentOut:
         role_key=a.role.key,
         role_label=a.role.label,
         granted_by=granted,
-        valid_from=_iso(a.valid_from),
-        valid_until=_iso(a.valid_until),
         returns_automatically=(
             snap.bootstrap_admin
             and a.granted_by == BOOTSTRAP_GRANTOR
-            and a.gremium_id is None
             and a.role.key == BOOTSTRAP_ROLE_KEY
         ),
     )
@@ -328,9 +320,6 @@ def build_preview(
                 groups=_ordered_groups(
                     snap, (g for g, (gs, _rs) in targets.items() if gid in gs)
                 ),
-                assignments=[
-                    _assignment_out(a, snap) for a in snap.assignments if a.gremium_id == gid
-                ],
                 pool_entries=[_pool_out(p, snap) for p in snap.pool if p.gremium_id == gid],
                 planned_delegations=[
                     _delegation_out(d, snap)
@@ -357,7 +346,7 @@ def build_preview(
             assignments=[
                 _assignment_out(a, snap)
                 for a in snap.assignments
-                if a.gremium_id is None and a.role.id == role.id
+                if a.role.id == role.id
             ],
         )
         for role in held_roles(snap).values()
@@ -441,12 +430,7 @@ def plan_revoke(
                 for r in sorted(missing_r, key=str)
             ],
         )
-    assignments = [
-        a
-        for a in snap.assignments
-        if (a.gremium_id is not None and a.gremium_id in chosen_g)
-        or (a.gremium_id is None and a.role.id in chosen_r)
-    ]
+    assignments = [a for a in snap.assignments if a.role.id in chosen_r]
     in_chosen = [d for d in snap.delegations if d.gremium_id in chosen_g]
     return RevokePlan(
         gremium_ids=gremien,
@@ -600,10 +584,7 @@ class PrincipalRevokeService:
                 AssignmentFact(
                     id=assignment.id,
                     role=_role(role),
-                    gremium_id=assignment.gremium_id,
                     granted_by=assignment.granted_by,
-                    valid_from=assignment.valid_from,
-                    valid_until=assignment.valid_until,
                 )
             )
         snap.pool = [

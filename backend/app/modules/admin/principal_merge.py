@@ -202,7 +202,6 @@ SUB_COLUMNS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
     ("config", UiLanguage.updated_by),
     ("config", UiTranslation.updated_by),
     ("roles", RoleAssignment.granted_by),
-    ("roles", RoleAssignment.delegated_by),
     ("privacy", ErasureRequest.requested_by),
     ("privacy", ErasureRequest.handled_by),
     ("backups", Backup.created_by),

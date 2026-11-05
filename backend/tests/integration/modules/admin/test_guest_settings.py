@@ -140,8 +140,7 @@ async def test_link_lifetime_follows_the_setting(
             )
         ).all()
     unlimited, limited = links
-    assert unlimited.scope == "edit" and unlimited.expires_at is None
-    assert limited.scope == "edit" and limited.single_use is False
+    assert unlimited.expires_at is None
     assert limited.expires_at is not None
     assert before + timedelta(days=7) - timedelta(minutes=1) < limited.expires_at
     assert limited.expires_at < before + timedelta(days=7, minutes=1)

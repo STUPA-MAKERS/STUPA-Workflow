@@ -214,11 +214,7 @@ def assignment_row(**kw: Any) -> Any:
         "id": uuid.uuid4(),
         "principal_id": uuid.uuid4(),
         "role_id": uuid.uuid4(),
-        "gremium_id": None,
         "granted_by": "admin",
-        "valid_from": None,
-        "valid_until": None,
-        "delegate_voting": False,
     }
     base.update(kw)
     return Row(**base)
@@ -274,10 +270,8 @@ def test_mappers_roundtrip() -> None:
     t = _type_out(type_row(comparison_offers={"required": True}))
     assert t.comparison_offers == {"required": True}
 
-    a = _assignment_out(
-        assignment_row(valid_from=datetime(2026, 1, 1, tzinfo=UTC))
-    )
-    assert a.valid_from == "2026-01-01T00:00:00+00:00"
+    a = _assignment_out(assignment_row(granted_by="bootstrap"))
+    assert a.granted_by == "bootstrap"
 
     w = _webhook_out(webhook_row())
     assert w.events == ["status_changed"]

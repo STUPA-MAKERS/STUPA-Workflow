@@ -17,10 +17,12 @@ def test_magic_link_token_hash_is_binary_and_indexed() -> None:
     assert "ix_magic_link_token_hash" in index_names
 
 
-def test_magic_link_scope_check_and_cascade() -> None:
+def test_magic_link_has_no_scope_and_cascades() -> None:
     table = Base.metadata.tables["magic_link"]
-    checks = {c.name for c in table.constraints if c.name}
-    assert "ck_magic_link_magic_link_scope" in checks
+    assert "scope" not in table.c
+    assert "single_use" not in table.c
+    checks = {str(c.name) for c in table.constraints if c.name}
+    assert not any(name.startswith("ck_magic_link") for name in checks)
     fk = next(iter(table.c.application_id.foreign_keys))
     assert fk.column.table.name == "application"
     assert fk.ondelete == "CASCADE"

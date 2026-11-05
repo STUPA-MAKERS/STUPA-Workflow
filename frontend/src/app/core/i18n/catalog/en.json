@@ -2713,7 +2713,6 @@
   "admin.users.revoke.groupsRemoved": "The groups are removed from the account.",
   "admin.users.revoke.assignment": "Role {role}, given directly",
   "admin.users.revoke.grantedBy": "given by {name}",
-  "admin.users.revoke.grantedOn": "given by {name} on {date}",
   "admin.users.revoke.bootstrap": "given when the platform was set up",
   "admin.users.revoke.poolFor": "Substitute for {name}",
   "admin.users.revoke.poolWide": "Substitute for the whole committee",

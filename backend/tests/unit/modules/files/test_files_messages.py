@@ -413,7 +413,7 @@ async def test_a_comment_file_follows_the_comment(monkeypatch: pytest.MonkeyPatc
             AttachmentOwner(kind="comment", id=internal.id),
             None,
             db,
-            Applicant(application_id=str(internal.application_id), scope="view"),
+            Applicant(application_id=str(internal.application_id)),
         )
     files = _Files()
     answers.append(_Access(internal=True))

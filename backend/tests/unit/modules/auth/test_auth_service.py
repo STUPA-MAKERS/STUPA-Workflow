@@ -46,8 +46,8 @@ async def test_request_magic_link_no_match_is_silent() -> None:
     assert db.added == []
 
 
-async def test_request_magic_link_edit_scope_unlimited_by_default() -> None:
-    """Issue an edit link without expiry when no settings row exists.
+async def test_request_magic_link_unlimited_by_default() -> None:
+    """Issue a link without expiry when no settings row exists.
 
     The token sits in the URL fragment, not in the query.
     """
@@ -60,8 +60,6 @@ async def test_request_magic_link_edit_scope_unlimited_by_default() -> None:
     assert len(db.added) == 1
     link = sent[0][1]
     assert "/antrag/aid-1#t=" in link
-    assert db.added[0].scope == "edit"
-    assert db.added[0].single_use is False
     assert db.added[0].expires_at is None
 
 
@@ -102,15 +100,11 @@ async def test_request_magic_link_awaits_async_deliver() -> None:
 
 
 def _link(token: str, settings: Settings, **kw: object) -> MagicLink:
-    row = MagicLink(
+    return MagicLink(
         application_id="aid-1",
         token_hash=tokens.hash_token(token, settings.magic_link_secret),
-        scope=kw.get("scope", "edit"),
         expires_at=kw.get("expires_at", NOW + timedelta(days=1)),
-        single_use=kw.get("single_use", False),
     )
-    row.used_at = kw.get("used_at")  # type: ignore[assignment]
-    return row
 
 
 async def test_verify_magic_link_not_found() -> None:
@@ -122,8 +116,8 @@ async def test_verify_magic_link_not_found() -> None:
 
 async def test_verify_magic_link_hash_mismatch() -> None:
     settings = _settings()
-    bad = MagicLink(application_id="aid-1", token_hash=b"\x00" * 32, scope="edit",
-                    expires_at=NOW + timedelta(days=1), single_use=False)
+    bad = MagicLink(application_id="aid-1", token_hash=b"\x00" * 32,
+                    expires_at=NOW + timedelta(days=1))
     db = fake_session(result(bad))
     with pytest.raises(GoneError):
         await service.verify_magic_link(db, settings, token="tok")
@@ -138,40 +132,17 @@ async def test_verify_magic_link_expired(monkeypatch: pytest.MonkeyPatch) -> Non
         await service.verify_magic_link(db, settings, token="tok")
 
 
-async def test_verify_magic_link_already_used(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Atomic redemption: the UPDATE hits 0 rows because the link is used, so 410."""
+async def test_verify_magic_link_ok(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Redeem a valid link more than once: each verify gives a signed applicant token."""
     settings = _settings()
     monkeypatch.setattr(service, "_now", lambda: NOW)
-    row = _link("tok", settings, single_use=True)
-    db = fake_session(result(row), result())
-    with pytest.raises(GoneError):
-        await service.verify_magic_link(db, settings, token="tok")
-
-
-async def test_verify_magic_link_single_use_ok(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Redeem the token when the UPDATE wins and returns the id.
-
-    An old view link opens an edit session too, and the result holds a signed applicant
-    token.
-    """
-    settings = _settings()
-    monkeypatch.setattr(service, "_now", lambda: NOW)
-    row = _link("tok", settings, scope="view", single_use=True)
-    db = fake_session(result(row), result("claimed-id"))
-    app_id, scope, token = await service.verify_magic_link(db, settings, token="tok")
+    row = _link("tok", settings)
+    db = fake_session(result(row), result(), result(), result(row))
+    app_id, token = await service.verify_magic_link(db, settings, token="tok")
     assert app_id == "aid-1"
-    assert scope == "edit"
     assert token
-
-
-async def test_verify_magic_link_edit_not_marked_used(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Run no UPDATE for a link that is not single use."""
-    settings = _settings()
-    monkeypatch.setattr(service, "_now", lambda: NOW)
-    row = _link("tok", settings, scope="edit", single_use=False)
-    db = fake_session(result(row))
-    _, scope, _ = await service.verify_magic_link(db, settings, token="tok")
-    assert scope == "edit"
+    _, again = await service.verify_magic_link(db, settings, token="tok")
+    assert again and again != token
 
 
 class _FakeFlow:
@@ -197,7 +168,7 @@ async def test_verify_magic_link_first_confirmation_starts_the_flow(
     monkeypatch.setattr(service, "_now", lambda: NOW)
     monkeypatch.setattr(service, "FlowService", _FakeFlow)
     _FakeFlow.started = []
-    row = _link("tok", settings, scope="edit", single_use=False)
+    row = _link("tok", settings)
     dispatcher = object()
     db = fake_session(result(row), result("aid-1"))
     await service.verify_magic_link(db, settings, token="tok", dispatcher=dispatcher)  # pyright: ignore[reportArgumentType]
@@ -215,7 +186,7 @@ async def test_verify_magic_link_second_click_starts_nothing(
     monkeypatch.setattr(service, "_now", lambda: NOW)
     monkeypatch.setattr(service, "FlowService", _FakeFlow)
     _FakeFlow.started = []
-    row = _link("tok", settings, scope="edit", single_use=False)
+    row = _link("tok", settings)
     db = fake_session(result(row), result())
     await service.verify_magic_link(db, settings, token="tok")
     assert _FakeFlow.started == []
@@ -235,9 +206,9 @@ async def test_verify_magic_link_survives_a_failed_flow_start(
     still return the session token, else the cookie is lost and a second click starts
     nothing.
 
-    The execute calls follow this order: the magic link, the single-use claim, the
-    confirmation UPDATE, the UPDATE that expires the older links,
-    `FlowService._load_app` and the latest status event of the task mail.
+    The execute calls follow this order: the magic link, the confirmation UPDATE, the
+    UPDATE that expires the older links, `FlowService._load_app` and the latest status
+    event of the task mail.
     """
     from app.modules.flow.service import FlowService
 
@@ -248,21 +219,20 @@ async def test_verify_magic_link_survives_a_failed_flow_start(
         return None
 
     monkeypatch.setattr(FlowService, "auto_advance", _advance)
-    row = _link("tok", settings, scope="view", single_use=True)
+    row = _link("tok", settings)
     app = _app(state_id="s1")
     app.email_confirmed_at = NOW
     db = fake_session(
         result(row),
-        result("claimed-id"),
         result("aid-1"),
         result(),
         result(app),
         result("event-1"),
     )
-    app_id, scope, token = await service.verify_magic_link(
+    app_id, token = await service.verify_magic_link(
         db, settings, token="tok", dispatcher=_FailingDispatcher()  # pyright: ignore[reportArgumentType]
     )
-    assert (app_id, scope) == ("aid-1", "edit")
+    assert app_id == "aid-1"
     assert token
     assert db.rolled_back == 1
 

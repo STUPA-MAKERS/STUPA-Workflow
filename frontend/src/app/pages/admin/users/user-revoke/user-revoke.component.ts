@@ -297,12 +297,7 @@ export class UserRevokeComponent {
     const role = this.label(a.roleLabel, a.roleKey);
     let detail: string;
     if (a.grantedBy === 'bootstrap') detail = this.i18n.translate('admin.users.revoke.bootstrap');
-    else if (a.validFrom) {
-      detail = this.i18n.translate('admin.users.revoke.grantedOn', {
-        name: a.grantedBy ?? '—',
-        date: this.date(a.validFrom),
-      });
-    } else detail = this.i18n.translate('admin.users.revoke.grantedBy', { name: a.grantedBy ?? '—' });
+    else detail = this.i18n.translate('admin.users.revoke.grantedBy', { name: a.grantedBy ?? '—' });
     if (a.returnsAutomatically) {
       detail = `${detail}. ${this.i18n.translate('admin.users.revoke.returnsAutomatically')}`;
     }
@@ -354,7 +349,6 @@ export class UserRevokeComponent {
         detail: this.i18n.translate('admin.users.revoke.groupsRemoved'),
       });
     }
-    lines.push(...g.assignments.map((a) => this.assignmentLine(a)));
     lines.push(...g.poolEntries.map((e) => this.poolLine(e)));
     lines.push(...g.plannedDelegations.map((d) => this.delegationLine(d, false)));
     lines.push(...g.liveDelegations.map((d) => this.delegationLine(d, true)));

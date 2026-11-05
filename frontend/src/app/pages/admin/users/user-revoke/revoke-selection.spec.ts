@@ -16,7 +16,6 @@ function gremium(id: string): RevokeGremium {
     name: id,
     membership: null,
     groups: [],
-    assignments: [],
     poolEntries: [],
     plannedDelegations: [],
     liveDelegations: [],

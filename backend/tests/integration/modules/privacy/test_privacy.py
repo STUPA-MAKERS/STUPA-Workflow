@@ -195,7 +195,6 @@ async def test_anonymize_revokes_applicant_sessions(session: AsyncSession) -> No
         session,
         secret="x" * 16,
         application_id=app.id,
-        scope="edit",
         expires_at=datetime.now(UTC) + timedelta(hours=12),
     )
     await session.commit()
@@ -240,7 +239,6 @@ async def test_anonymize_drops_magic_links_and_attachments(session: AsyncSession
         MagicLink(
             application_id=app.id,
             token_hash=b"x",
-            scope="edit",
             expires_at=datetime.now(UTC) + timedelta(days=1),
         )
     )
@@ -315,7 +313,6 @@ async def test_retention_cron(migrated: tuple[str, str], session: AsyncSession) 
         MagicLink(
             application_id=fresh_terminal.id,
             token_hash=f"used-{uuid.uuid4()}".encode(),
-            scope="edit",
             expires_at=datetime.now(UTC) + timedelta(days=10),
             used_at=datetime.now(UTC) - timedelta(days=1),
         )

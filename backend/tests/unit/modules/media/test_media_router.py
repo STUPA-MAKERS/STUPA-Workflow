@@ -88,7 +88,7 @@ def _as_principal(app: FastAPI) -> None:
 
 def _as_applicant(app: FastAPI) -> None:
     app.dependency_overrides[get_current_applicant] = lambda: Applicant(
-        application_id=str(uuid.uuid4()), scope="view"
+        application_id=str(uuid.uuid4())
     )
 
 

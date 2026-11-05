@@ -14,7 +14,6 @@ from typing import Any
 
 from sqlalchemy import (
     CHAR,
-    Boolean,
     CheckConstraint,
     Date,
     DateTime,
@@ -283,21 +282,19 @@ class MagicLink(UUIDPkMixin, CreatedAtMixin, Base):
     The database holds only `sha256(token||pepper)`. The plaintext token exists
     only in the mail link. The link binds to exactly one `application_id`.
 
-    A new link always has `scope = 'edit'` and `single_use = false`. The
-    session it opens has no fixed scope: each action checks the current state. The
-    `view` scope and `single_use` stay only for the rows written before that change.
+    A link can be used more than once. The session it opens has no scope: each
+    action checks the current state.
 
     `expires_at` NULL means "no expiry" (`guest_application_settings.link_ttl_days`
-    is NULL). Only an `edit` link can be unlimited. A link stops working when it
-    expires, when a newer link of the same application is redeemed, or when the
-    application is archived or anonymized. Archiving ends only the existing links:
-    the applicant can still request a new link for an archived application, because
-    an archived application stays readable. Anonymizing removes the email, so no new
-    link is possible. The verify route answers 410 for a used or expired link.
+    is NULL). A link stops working when it expires, when a newer link of the same
+    application is redeemed, or when the application is archived or anonymized.
+    Archiving ends only the existing links: the applicant can still request a new link
+    for an archived application, because an archived application stays readable.
+    Anonymizing removes the email, so no new link is possible. The verify route
+    answers 410 for an expired link.
 
-    A CHECK allows a link without an expiry only for an edit link. The UNIQUE index on the
-    hash backs the atomic single-use redemption (``UPDATE ... WHERE used_at IS NULL``) and
-    prevents an ambiguous hash collision.
+    The UNIQUE index on the hash serves the lookup at the verify and prevents an
+    ambiguous hash collision.
     """
 
     __tablename__ = "magic_link"
@@ -306,23 +303,14 @@ class MagicLink(UUIDPkMixin, CreatedAtMixin, Base):
         ForeignKey("application.id", ondelete="CASCADE")
     )
     token_hash: Mapped[bytes] = mapped_column(LargeBinary)
-    scope: Mapped[str] = mapped_column(Text)
     expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
     used_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    single_use: Mapped[bool] = mapped_column(Boolean, server_default="false")
 
-    __table_args__ = (
-        CheckConstraint("scope IN ('edit','view')", name="magic_link_scope"),
-        CheckConstraint(
-            "expires_at IS NOT NULL OR scope = 'edit'",
-            name="magic_link_unlimited_edit_only",
-        ),
-        Index("ix_magic_link_token_hash", "token_hash", unique=True),
-    )
+    __table_args__ = (Index("ix_magic_link_token_hash", "token_hash", unique=True),)
 
 
 class GuestApplicationSettings(Base):

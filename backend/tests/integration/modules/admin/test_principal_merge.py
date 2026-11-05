@@ -479,7 +479,6 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
                     principal_id=other.id,
                     role_id=role.id,
                     granted_by=old.sub,
-                    delegated_by=old.sub,
                 ),
                 ErasureRequest(
                     subject_type="applicant",

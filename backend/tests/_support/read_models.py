@@ -248,7 +248,7 @@ def as_principal(api: FastAPI, principal: Principal) -> None:
 def as_applicant(api: FastAPI, app_id: uuid.UUID) -> None:
     api.dependency_overrides[get_current_principal] = lambda: None
     api.dependency_overrides[get_current_applicant] = lambda: Applicant(
-        application_id=str(app_id), scope="edit"
+        application_id=str(app_id)
     )
 
 

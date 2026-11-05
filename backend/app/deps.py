@@ -2,9 +2,10 @@
 
 `get_current_principal` resolves a session cookie or an OAuth bearer token to an
 RBAC-resolved principal. `get_current_applicant` resolves a signed opaque `sid`
-from a bearer header or a cookie to an applicant session and its scope.
+from a bearer header or a cookie to an applicant session.
 `require_principal`, `require_group` and `require_applicant` raise 401 without
-authentication and 403 when the permission, the group or the scope is missing.
+authentication. `require_principal` and `require_group` raise 403 when the
+permission or the group is missing.
 
 `Principal` and `Applicant` come from `app.modules.auth.principal`. That module is
 a leaf, so the re-export avoids an import cycle between `deps` and `auth`.
@@ -23,14 +24,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_session
 from app.modules.auth import oauth, oauth_service, rbac, sessions
 from app.modules.auth.models import Principal as PrincipalRow
-from app.modules.auth.principal import Applicant, ApplicantScope, Principal
+from app.modules.auth.principal import Applicant, Principal
 from app.modules.auth.session_renewal import renew_principal_session
 from app.settings import Settings, get_settings
 from app.shared.errors import ForbiddenError, UnauthorizedError
 
 __all__ = [
     "Applicant",
-    "ApplicantScope",
     "DbSession",
     "Principal",
     "get_current_applicant",
@@ -158,9 +158,8 @@ async def get_current_applicant(
     expired. A token forged from `SESSION_SECRET` alone matches no row and gives
     `None`.
 
-    An applicant session has no fixed scope: each action checks the current state, and the
-    edit service answers 409 in a locked state. So a ``view`` session from before that rule
-    also acts as ``edit``.
+    An applicant session has no scope: each action checks the current state, and the
+    edit service answers 409 in a locked state.
     """
     token = _bearer_token(request, settings)
     if not token:
@@ -172,9 +171,9 @@ async def get_current_applicant(
         now=datetime.now(UTC),
         max_age=settings.applicant_session_ttl_hours * 3600,
     )
-    if row is None or row.scope not in ("edit", "view"):
+    if row is None:
         return None
-    return Applicant(application_id=str(row.application_id), scope="edit")
+    return Applicant(application_id=str(row.application_id))
 
 
 def require_principal(*perms: str) -> Callable[..., Principal]:
@@ -228,16 +227,14 @@ def require_group(group: str) -> Callable[..., Principal]:
     return dependency
 
 
-def require_applicant(scope: ApplicantScope = "view") -> Callable[..., Applicant]:
-    """Return a dependency: 401 without a valid magic-link token, 403 on insufficient scope."""
+def require_applicant() -> Callable[..., Applicant]:
+    """Return a dependency: 401 without a valid magic-link token."""
 
     def dependency(
         applicant: Annotated[Applicant | None, Depends(get_current_applicant)],
     ) -> Applicant:
         if applicant is None:
             raise UnauthorizedError("Valid magic-link required.")
-        if not applicant.allows(scope):
-            raise ForbiddenError(f"Magic-link scope '{applicant.scope}' insufficient.")
         return applicant
 
     return dependency
