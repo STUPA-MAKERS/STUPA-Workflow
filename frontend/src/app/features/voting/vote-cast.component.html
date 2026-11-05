@@ -1,10 +1,20 @@
 @switch (phase()) {
   @case ('loading') {
-    <div class="vc vc--busy" [class.vc--sheet]="split()" aria-busy="true">
-      <span class="skel skel--line vc__skelMeta"></span>
-      <span class="skel skel--line vc__skelTitle"></span>
-      <span class="skel skel--panel"></span>
+    <div class="vc vc--busy skel-in" [class.vc--sheet]="split()" aria-busy="true">
       <span class="sr-only" role="status">{{ 'voting.cast.loading' | t }}</span>
+      <div class="vc__sk" aria-hidden="true">
+        <span class="vc__skTitle"><span class="skel-text vc__skTitle1"></span></span>
+        <span class="vc__skTitle"><span class="skel-text vc__skTitle2"></span></span>
+        <span class="vc__skMeta"><span class="skel-text skel-text--muted vc__skMetaBar"></span></span>
+        <span class="vc__skKicker"><span class="skel-text skel-text--accent vc__skKickerBar"></span></span>
+        @for (o of [0, 1, 2]; track o) {
+          <span class="vc__skOption">
+            <span class="skel-box vc__skRadio"></span>
+            <span class="skel-text vc__skOptionBar"></span>
+          </span>
+        }
+        <span class="skel-box vc__skCast"></span>
+      </div>
     </div>
   }
 

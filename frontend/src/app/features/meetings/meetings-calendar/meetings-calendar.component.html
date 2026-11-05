@@ -108,7 +108,20 @@
         @if (error()) {
           <app-note kind="error" icon="alert" role="alert" retryable (retry)="retry()">{{ 'meetings.overview.calendarError' | t }}</app-note>
         } @else if (loading() && !dayCards().length) {
-          <span class="skel skel--panel"></span>
+          <div class="skel-in cal__skCards" aria-busy="true">
+            @for (w of [70, 55]; track $index) {
+              <div class="cal__card" aria-hidden="true">
+                <div class="cal__cardHead">
+                  <span class="cal__cardTitle"><span class="skel-text" [style.width.%]="w"></span></span>
+                </div>
+                <p class="cal__line"><span class="skel-text skel-text--muted cal__skLine"></span></p>
+                <div class="cal__actions">
+                  <span class="skel-box cal__skBtn"></span>
+                </div>
+              </div>
+            }
+            <span class="sr-only" role="status">{{ 'meetings.loading' | t }}</span>
+          </div>
         } @else if (!dayCards().length) {
           <app-empty-state shape="date" rows="3" [heading]="'meetings.overview.dayEmpty' | t" />
         }

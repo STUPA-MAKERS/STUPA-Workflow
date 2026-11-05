@@ -570,6 +570,18 @@ export class BudgetDashboardComponent {
    * jump to the real amounts. When every read is in and still no year is selected, the
    * page has nothing to wait for, and `emptyReason` says why.
    */
+  /** Depth and name width of the rows the skeleton draws in the tree. */
+  readonly skeletonRows: readonly { depth: number; width: number }[] = [
+    { depth: 0, width: 55 },
+    { depth: 1, width: 70 },
+    { depth: 1, width: 50 },
+    { depth: 2, width: 60 },
+    { depth: 2, width: 45 },
+    { depth: 1, width: 65 },
+    { depth: 0, width: 50 },
+    { depth: 1, width: 60 },
+  ];
+
   readonly showSkeleton = computed(
     () => this.loading() || (!this.selectedFyId() && this.pendingFiscalYears() > 0),
   );

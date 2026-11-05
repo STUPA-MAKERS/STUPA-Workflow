@@ -1,0 +1,37 @@
+<span class="sr-only" role="status">{{ 'meetings.loading' | t }}</span>
+<div class="mps__head" aria-hidden="true">
+  <span class="skel-box mps__back"></span>
+  <span class="mps__titles">
+    <span class="mps__title"><span class="skel-text mps__titleBar"></span></span>
+    <span class="mps__sub"><span class="skel-text skel-text--muted mps__subBar"></span></span>
+  </span>
+  <span class="skel-box mps__menu"></span>
+</div>
+<div class="mps__body" [class.mps__body--wide]="wide()" aria-hidden="true">
+  @if (wide()) {
+    <div class="mps__agenda">
+      <span class="mps__kicker"><span class="skel-text skel-text--accent mps__kickerBar"></span></span>
+      @for (w of rows; track $index) {
+        <span class="mps__row">
+          <span class="skel-box mps__num"></span>
+          <span class="mps__rowName"><span class="skel-text" [style.width.%]="w"></span></span>
+        </span>
+      }
+    </div>
+  }
+  <div class="mps__sheet">
+    <span class="mps__bar"><span class="skel-text skel-text--muted mps__barText"></span></span>
+    <span class="mps__kind"><span class="skel-text skel-text--muted mps__kindBar"></span></span>
+    <span class="mps__topTitle"><span class="skel-text mps__topTitleBar"></span></span>
+    <span class="mps__text"><span class="skel-text mps__textBar"></span></span>
+    <span class="mps__text"><span class="skel-text mps__textBar mps__textBar--short"></span></span>
+  </div>
+</div>
+<div class="mps__dock" aria-hidden="true">
+  <span class="mps__dockText">
+    <span class="skel-text skel-text--muted mps__dockLine"></span>
+    <span class="skel-text mps__dockLine mps__dockLine--short"></span>
+  </span>
+  <span class="mps__grow"></span>
+  <span class="skel-box mps__chip"></span>
+</div>

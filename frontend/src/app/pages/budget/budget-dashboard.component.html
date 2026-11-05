@@ -2,16 +2,73 @@
   <h1 class="bd__title">{{ 'nav.budget' | t }}</h1>
   <app-note kind="error" icon="alert" role="alert" retryable (retry)="load()">{{ 'budget.error' | t }}</app-note>
 } @else if (showSkeleton()) {
-  <div class="bd" [class.bd--wide]="wide()" aria-busy="true">
-    <section class="bd__pane" aria-hidden="true">
-      <h1 class="bd__title">{{ 'nav.budget' | t }}</h1>
-      <span class="skel skel--line"></span>
-      <span class="skel skel--line"></span>
-      <span class="skel skel--line"></span>
-    </section>
-    <div class="bd__sheet bd__sheetBody">
-      <span class="skel skel--panel"></span>
-      <span class="sr-only" role="status">{{ 'budget.loading' | t }}</span>
+  <!-- The skeleton uses the containers of the page, so nothing moves when the figures arrive. -->
+  <div class="bd skel-in" [class.bd--wide]="wide()" aria-busy="true">
+    <span class="sr-only" role="status">{{ 'budget.loading' | t }}</span>
+    @if (wide()) {
+      <section class="ld-pane ld-pane--fill bd__pane" aria-hidden="true">
+        <app-page-header [pane]="true" [title]="'nav.budget' | t" />
+        <div class="bd__paneBody">
+          <span class="skel-box bd__skSearch"></span>
+          <div class="bd__chips">
+            <span class="skel-box bd__skChip"></span>
+            <span class="skel-box bd__skChip"></span>
+          </div>
+          <div class="bd__tree">
+            @for (row of skeletonRows; track $index) {
+              <div class="tn" [style.--tn-depth]="row.depth">
+                <span class="tn__chev"></span>
+                <div class="tn__main">
+                  <span class="tn__line">
+                    <span class="tn__name"><span class="skel-text" [style.width.%]="row.width"></span></span>
+                    <span class="tn__amt"><span class="skel-text bd__skAmt"></span></span>
+                  </span>
+                  <span class="skel-box bd__skBar"></span>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      </section>
+    } @else {
+      <div class="bd__top" aria-hidden="true">
+        <div class="bd__topRow">
+          <h1 class="bd__title">{{ 'nav.budget' | t }}</h1>
+        </div>
+        <div class="bd__chips">
+          <span class="skel-box bd__skChip bd__skChip--wide"></span>
+          <span class="skel-box bd__skChip"></span>
+          <span class="skel-box bd__skChip"></span>
+        </div>
+      </div>
+    }
+    <div class="bd__sheet bd__main" aria-hidden="true">
+      @if (wide()) {
+        <header class="sheet-head bd__head">
+          <app-sheet-bar>
+            <h2 appSheetBarTitle class="sheet-title"><span class="skel-text bd__skTitle"></span></h2>
+          </app-sheet-bar>
+          <p class="sheet-line bd__line"><span class="skel-text skel-text--muted bd__skLine"></span></p>
+        </header>
+      }
+      <div class="bd__sheetBody">
+        <dl class="bd__figs">
+          @for (f of figureList(); track f.key) {
+            <div class="bd__fig" [class.bd__fig--main]="f.key === 'available'">
+              <dt class="bd__figLabel">{{ f.label }}</dt>
+              <dd class="bd__figValue">
+                <span class="skel-text bd__skFig" [class.skel-text--accent]="f.key === 'available'"></span>
+              </dd>
+            </div>
+          }
+        </dl>
+        <app-section class="bd__sec" size="lg" [heading]="'budget.usage.heading' | t">
+          <app-skeleton variant="rows" [count]="4" />
+        </app-section>
+        <app-section class="bd__sec bd__sec--apps" size="lg" [heading]="itemsTitle()">
+          <app-skeleton variant="rows" [count]="3" />
+        </app-section>
+      </div>
     </div>
   </div>
 } @else if (emptyReason() === 'noFiscalYear') {
