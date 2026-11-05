@@ -1,6 +1,6 @@
 ---
 id: "000002"
-title: A spec starts with a YAML preamble
+title: A spec starts with a YAML front matter
 kind: style
 status: draft
 scope:
@@ -9,9 +9,10 @@ owner: frederikbeimgraben
 updated: 2026-11-05
 ---
 
-# A spec starts with a YAML preamble
+# A spec starts with a YAML front matter
 
-The file must start with a YAML front matter block between two `---` lines. The block has
+The file must start with a standard YAML front matter block. The block is the first thing in
+the file and stands between two `---` lines. The block has
 these keys, in this order:
 
 | Key | Type | Value |
@@ -27,9 +28,10 @@ these keys, in this order:
 
 Do not add other keys. Do not put metadata in the Markdown body.
 
-Reason: A tool reads the preamble without a Markdown parser. One fixed set of keys keeps
+Reason: Every Markdown tool reads standard front matter, so a tool reads the metadata without a
+custom parser. One fixed set of keys keeps
 every spec readable by the same tool. The quotes keep the leading zeros, because YAML reads
 an unquoted `000024` as a number.
 
-Test: The preamble parses as YAML, has exactly these keys, and `id` is the number in the
+Test: The front matter parses as YAML, has exactly these keys, and `id` is the number in the
 file name.

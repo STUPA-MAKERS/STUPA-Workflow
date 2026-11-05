@@ -11,7 +11,7 @@ updated: 2026-11-05
 
 # One file holds one rule
 
-One spec file holds exactly one rule. After the preamble comes one `#` title, then the rule
+One spec file holds exactly one rule. After the front matter comes one `#` title, then the rule
 text, then the labels. Do not use other headings.
 
 Reason: The rule ID then points to exactly one file.

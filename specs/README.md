@@ -50,7 +50,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [S/specs/content/000022](style/specs/content/000022_ste.md) | A spec is written in ASD-STE100 | draft |
 | [S/specs/content/000023](style/specs/content/000023_product-terms.md) | Product terms stay as the UI shows them | draft |
 | [S/specs/format/000001](style/specs/format/000001_copy-the-template.md) | A new spec starts as a copy of the template | draft |
-| [S/specs/format/000002](style/specs/format/000002_yaml-preamble.md) | A spec starts with a YAML preamble | draft |
+| [S/specs/format/000002](style/specs/format/000002_front-matter.md) | A spec starts with a YAML front matter | draft |
 | [S/specs/format/000003](style/specs/format/000003_status.md) | The status shows the approval | draft |
 | [S/specs/format/000004](style/specs/format/000004_one-rule-per-file.md) | One file holds one rule | draft |
 | [S/specs/format/000005](style/specs/format/000005_rule-id.md) | The rule ID has kind, path and number | draft |
