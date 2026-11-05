@@ -455,6 +455,8 @@ class AgendaItemOut(_CamelModel):
     #: The requested amount of the application (the decision proposal of the vote
     #: dialog starts with it). None for a free-text item.
     amount: Decimal | None = None
+    #: The number of files of the item (``GET .../agenda/{id}/attachments`` lists them).
+    attachment_count: int = Field(default=0, alias="attachmentCount")
 
 
 class AssignableApplicationOut(_CamelModel):

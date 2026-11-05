@@ -37,7 +37,7 @@ from fastapi.responses import StreamingResponse
 from app.deps import DbSession, SettingsDep, get_current_applicant, get_current_principal
 from app.modules.auth.oauth import SCOPES
 from app.modules.auth.principal import Applicant, Principal
-from app.modules.files.router import _read_capped
+from app.modules.files.router import read_capped
 from app.modules.files.storage import ObjectStorage
 from app.modules.media.schemas import MarkdownImageOut
 from app.modules.media.service import ImageStream, MediaService
@@ -130,7 +130,7 @@ async def upload_image(
     scope = principal.scope_permissions
     if scope is not None and not (scope & _UPLOAD_PERMISSIONS):
         raise ForbiddenError("The token has no write scope for a text with images.")
-    data = await _read_capped(file, service.max_bytes)
+    data = await read_capped(file, service.max_bytes)
     return await service.upload(data)
 
 

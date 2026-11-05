@@ -2113,6 +2113,23 @@ async def test_add_application_already_present() -> None:
     assert sess.committed == 0
 
 
+class _NoFiles:
+    """FilesService double for the agenda remove: the item has no files."""
+
+    async def lock_for_messages(self, owner: str, ids: Any) -> None:
+        return None
+
+    async def drop_for_messages(self, owner: str, ids: Any, *, actor: str) -> list[str]:
+        return []
+
+    async def remove_objects(self, keys: Any) -> None:
+        return None
+
+
+def _no_files() -> Any:
+    return _NoFiles()
+
+
 async def test_remove_existing_and_missing(audit_calls: list[dict[str, Any]]) -> None:
     """Remove an existing item and ignore a missing one.
 
@@ -2126,7 +2143,7 @@ async def test_remove_existing_and_missing(audit_calls: list[dict[str, Any]]) ->
         scalars_q=[[]],
     )
     svc = AgendaService(sess)  # type: ignore[arg-type]
-    await svc.remove(m.id, item.id, actor="mgr", may_delete_votes=True)
+    await svc.remove(m.id, item.id, actor="mgr", may_delete_votes=True, files=_no_files())
     assert sess.deleted == [item]
     assert sess.committed == 1
     [entry] = audit_calls
@@ -2138,7 +2155,7 @@ async def test_remove_existing_and_missing(audit_calls: list[dict[str, Any]]) ->
         scalars_q=[[]],
     )
     svc2 = AgendaService(sess2)  # type: ignore[arg-type]
-    await svc2.remove(m.id, uuid4(), actor="mgr", may_delete_votes=True)
+    await svc2.remove(m.id, uuid4(), actor="mgr", may_delete_votes=True, files=_no_files())
     assert sess2.deleted == []
     assert sess2.committed == 0
 
@@ -2160,7 +2177,8 @@ async def test_remove_deletes_draft_and_cancelled_votes(
         eligible_group=str(m.gremium_id),
     )
     sess = _QueueSession(executes=[res(m), res(item), res(draft), res(m)], scalars_q=[[]])
-    await AgendaService(sess).remove(m.id, item.id, actor="mgr", may_delete_votes=True)  # type: ignore[arg-type]
+    agenda = AgendaService(sess)  # type: ignore[arg-type]
+    await agenda.remove(m.id, item.id, actor="mgr", may_delete_votes=True, files=_no_files())
     assert sess.deleted == [draft, item]
     assert [c["action"].value for c in audit_calls] == ["vote_delete", "agenda_item_remove"]
     assert audit_calls[1]["data"]["deletedVoteIds"] == [str(draft.id)]
@@ -2176,7 +2194,8 @@ async def test_remove_with_open_or_closed_vote_conflicts(vote_status: str) -> No
     vote = SimpleNamespace(id=uuid4(), status=vote_status)
     sess = _QueueSession(executes=[res(m), res(item), res(vote)])
     with pytest.raises(ConflictError) as ei:
-        await AgendaService(sess).remove(m.id, item.id, actor="mgr", may_delete_votes=True)  # type: ignore[arg-type]
+        agenda = AgendaService(sess)  # type: ignore[arg-type]
+        await agenda.remove(m.id, item.id, actor="mgr", may_delete_votes=True, files=_no_files())
     assert ei.value.code == "agenda_item_has_vote"
     assert sess.deleted == []
     assert sess.committed == 0
@@ -2186,7 +2205,8 @@ async def test_remove_after_close_conflicts() -> None:
     m = _meeting(status="closed")
     sess = _QueueSession(executes=[res(m)])
     with pytest.raises(ConflictError) as ei:
-        await AgendaService(sess).remove(m.id, uuid4(), actor="mgr", may_delete_votes=True)  # type: ignore[arg-type]
+        agenda = AgendaService(sess)  # type: ignore[arg-type]
+        await agenda.remove(m.id, uuid4(), actor="mgr", may_delete_votes=True, files=_no_files())
     assert ei.value.code == "meeting_closed"
 
 
@@ -2469,7 +2489,7 @@ class _FakeMeetingService:
         if not self._meeting_out.is_protokollant:
             raise ForbiddenError("only the protokollant may open or close a vote")
 
-    async def delete(self, meeting_id: UUID, principal: Principal) -> None:
+    async def delete(self, meeting_id: UUID, principal: Principal, *, files: Any = None) -> None:
         self.deleted.append(meeting_id)
 
     async def patch(self, meeting_id: UUID, payload: Any, principal: Principal) -> Any:
@@ -2555,7 +2575,13 @@ class _FakeAgendaService:
         return []
 
     async def remove(
-        self, meeting_id: UUID, item_id: UUID, *, actor: str, may_delete_votes: bool
+        self,
+        meeting_id: UUID,
+        item_id: UUID,
+        *,
+        actor: str,
+        may_delete_votes: bool,
+        files: Any = None,
     ) -> list[Any]:
         self.calls.append("remove")
         self.actors.append(actor)

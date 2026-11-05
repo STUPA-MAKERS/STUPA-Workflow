@@ -975,3 +975,56 @@ describe('AttachmentsPanelComponent', () => {
     http.verify();
   });
 });
+
+describe('AttachmentsPanelComponent of an agenda item', () => {
+  beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+
+  const base = '/api/meetings/m-1/agenda/top-1/attachments';
+
+  it('lists, uploads and deletes through the routes of the item and reports each change', async () => {
+    const view = await render(AttachmentsPanelComponent, {
+      inputs: { agendaItem: { meetingId: 'm-1', itemId: 'top-1' }, canUpload: true },
+      providers: [provideHttpClient(), provideHttpClientTesting(), { provide: USE_MOCK_API, useValue: false }],
+    });
+    const http = view.fixture.debugElement.injector.get(HttpTestingController);
+    const changed = jest.fn();
+    view.fixture.componentInstance.changed.subscribe(changed);
+    http.expectOne((r) => r.method === 'GET' && r.url === base).flush([wire({ scanned: true })]);
+    view.detectChanges();
+    expect(screen.getByText('plan.pdf')).toBeInTheDocument();
+
+    await uploadFile('neu.pdf');
+    http.expectOne((r) => r.method === 'POST' && r.url === base).flush(wire({ id: 'att-2', filename: 'neu.pdf' }));
+    view.detectChanges();
+    expect(screen.getByText('neu.pdf')).toBeInTheDocument();
+    expect(changed).toHaveBeenCalledTimes(1);
+
+    view.fixture.componentInstance.remove(view.fixture.componentInstance.attachments()[0]);
+    http.expectOne((r) => r.method === 'DELETE' && r.url === `${base}/att-1`).flush(null);
+    view.detectChanges();
+    expect(screen.queryByText('plan.pdf')).not.toBeInTheDocument();
+    expect(changed).toHaveBeenCalledTimes(2);
+    http.verify();
+  });
+
+  it('lists again for a new reload value and drops the files of the last item at once', async () => {
+    const view = await render(AttachmentsPanelComponent, {
+      inputs: { agendaItem: { meetingId: 'm-1', itemId: 'top-1' }, reload: 1 },
+      providers: [provideHttpClient(), provideHttpClientTesting(), { provide: USE_MOCK_API, useValue: false }],
+    });
+    const http = view.fixture.debugElement.injector.get(HttpTestingController);
+    http.expectOne(base).flush([wire({ scanned: true })]);
+    view.detectChanges();
+    await view.rerender({ inputs: { reload: 2 }, partialUpdate: true });
+    view.detectChanges();
+    http.expectOne(base).flush([wire({ scanned: true }), wire({ id: 'att-2', filename: 'zwei.pdf' })]);
+    view.detectChanges();
+    expect(screen.getByText('zwei.pdf')).toBeInTheDocument();
+
+    await view.rerender({ inputs: { agendaItem: { meetingId: 'm-1', itemId: 'top-2' } }, partialUpdate: true });
+    view.detectChanges();
+    expect(screen.queryByText('plan.pdf')).not.toBeInTheDocument();
+    http.expectOne('/api/meetings/m-1/agenda/top-2/attachments').flush([]);
+    http.verify();
+  });
+});

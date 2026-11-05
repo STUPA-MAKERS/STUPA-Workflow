@@ -42,6 +42,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.applications.models import Application
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
+from app.modules.files.models import Attachment
+from app.modules.files.service import FilesService
 from app.modules.flow.models import State
 from app.modules.livevote.models import Meeting, MeetingAgendaItem
 from app.modules.livevote.schemas import AgendaItemOut, AssignableApplicationOut
@@ -181,12 +183,29 @@ class AgendaService:
             raise NotFoundError(f"agenda item {item_id} not found")
         return row
 
+    async def files_item(self, meeting_id: UUID, item_id: UUID) -> MeetingAgendaItem:
+        """Load an agenda item whose files may change now.
+
+        The window is the window of the item text (``_assert_minutes_open``): a
+        ``planned`` or ``live`` meeting, or a closed meeting whose protocol is still a
+        draft.
+
+        Raises:
+            NotFoundError: The meeting or the agenda item does not exist.
+            ConflictError: The protocol is no longer a draft (``protocol_locked``).
+        """
+        meeting = await self._meeting(meeting_id)
+        row = await self.item(meeting_id, item_id)
+        await self._assert_minutes_open(meeting)
+        return row
+
     async def list(self, meeting_id: UUID) -> list[AgendaItemOut]:
         """List the agenda items of a meeting in their order.
 
         A free-text item has no application and carries its own title. An application
         item shows its own title after a rename, else the application title.
-        `applicationTitle` is always the title of the application.
+        `applicationTitle` is always the title of the application. `attachmentCount`
+        counts the files of each item in one grouped query.
         """
         await self._meeting(meeting_id)
         rows = (
@@ -216,6 +235,17 @@ class AgendaService:
             if state_ids
             else {}
         )
+        file_counts: dict[UUID, int] = {
+            item_id: count
+            for item_id, count in (
+                await self.session.execute(
+                    select(Attachment.agenda_item_id, func.count())
+                    .where(Attachment.agenda_item_id.in_([r.id for r in rows]))
+                    .group_by(Attachment.agenda_item_id)
+                )
+            ).all()
+            if item_id is not None
+        }
         out: list[AgendaItemOut] = []
         for r in rows:
             app = apps.get(r.application_id) if r.application_id is not None else None
@@ -239,6 +269,7 @@ class AgendaService:
                     doneAt=r.done_at,
                     stateLabel=state.label_i18n if state is not None else None,
                     amount=app.amount if app is not None else None,
+                    attachmentCount=file_counts.get(r.id, 0),
                 )
             )
         return out
@@ -634,6 +665,7 @@ class AgendaService:
         *,
         actor: str,
         may_delete_votes: bool,
+        files: FilesService | None = None,
     ) -> list[AgendaItemOut]:
         """Remove an agenda item.
 
@@ -643,6 +675,11 @@ class AgendaService:
         delete a vote of the meeting (`may_delete_votes`, the `canManageVotes` gate of
         `DELETE /meetings/{id}/votes/{voteId}`). The remove writes
         `agenda_item_remove`. An unknown item id changes nothing, as before.
+
+        The files of the item go with it: their rows are locked before the first audit
+        entry (``lock_for_messages``), deleted with ``attachment_delete`` each, and their
+        objects are removed after the commit through ``files``, the service with the
+        storage of the request.
 
         The method locks the meeting row first. The vote open takes the same lock, so
         no vote can open on the item while the remove runs.
@@ -670,9 +707,12 @@ class AgendaService:
             )
         ).scalar_one_or_none()
         if row is not None:
+            files = files or FilesService(self.session)
+            await files.lock_for_messages("agenda_item", [row.id])
             deleted = await VotingService(self.session).delete_for_agenda_item(
                 row.id, actor=actor, may_delete=may_delete_votes
             )
+            storage_keys = await files.drop_for_messages("agenda_item", [row.id], actor=actor)
             await self._audit(
                 AuditAction.AGENDA_ITEM_REMOVE,
                 actor=actor,
@@ -681,4 +721,5 @@ class AgendaService:
             )
             await self.session.delete(row)
             await self.session.commit()
+            await files.remove_objects(storage_keys)
         return await self.list(meeting_id)

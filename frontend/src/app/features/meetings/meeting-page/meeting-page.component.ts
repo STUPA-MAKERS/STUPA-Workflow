@@ -25,6 +25,8 @@ import type {
 } from '@core/api/models';
 import {
   ButtonComponent,
+  DropOverlayComponent,
+  FileDropDirective,
   IconComponent,
   MEDIA,
   mediaQuery,
@@ -56,6 +58,10 @@ import { MeetingHeadComponent } from '../meeting-head/meeting-head.component';
 import { topApplicationLead } from '../top-application-lead.util';
 import { TodoLinkedListComponent } from '../../todos/linked-list/todo-linked-list.component';
 import { clock, weekdayDate } from '@shared/date-format';
+import {
+  type AgendaItemRef,
+  AttachmentsPanelComponent,
+} from '../../../pages/applications/attachments-panel.component';
 
 /** The ids of the session menu. */
 type SessionAction = 'open' | 'agenda' | 'settings' | 'attendance' | 'votes' | 'keeper' | 'beamer' | 'qr' | 'close' | 'delete';
@@ -83,6 +89,10 @@ type SessionAction = 'open' | 'agenda' | 'settings' | 'attendance' | 'votes' | '
  * whose number turns to the accent colour while a vote of the item runs (from the session
  * menu while a planned meeting has no item to write and so no dock).
  *
+ * The files of the open item ("Anhänge") sit above the sheet, below the linked list, and
+ * show only when the item has files. A writer of the text attaches a file with the clip
+ * of the format tools, or drops files anywhere on the item.
+ *
  * The reason for a disabled action is visible text, not only a tooltip, because a disabled button
  * takes no focus and no touch. The agenda sheet stays outside the body, because the scroll fade of
  * the body is a mask, and a mask clips the fixed sheet and its scrim to the box of the body.
@@ -107,6 +117,9 @@ type SessionAction = 'open' | 'agenda' | 'settings' | 'attendance' | 'votes' | '
     VoteCardComponent,
     AttendanceSheetComponent,
     JoinQrComponent,
+    AttachmentsPanelComponent,
+    DropOverlayComponent,
+    FileDropDirective,
   ],
   templateUrl: './meeting-page.component.html',
   styleUrl: './meeting-page.component.scss',
@@ -255,6 +268,31 @@ export class MeetingPageComponent {
       !this.locked() &&
       this.canEdit(),
   );
+
+  /** The open item as the owner of its files; the same item keeps the same reference. */
+  protected readonly filesOwner = computed<AgendaItemRef | null>(
+    () => {
+      const t = this.top();
+      return t ? { meetingId: this.meeting().id, itemId: t.id } : null;
+    },
+    { equal: (a, b) => a?.itemId === b?.itemId && a?.meetingId === b?.meetingId },
+  );
+  /** The files may change: the gate of the item text. */
+  protected readonly canAttach = computed(() => this.editable() && this.top() !== null);
+  /** The number of files the panel listed for the open item. */
+  protected readonly fileCount = signal(0);
+  private readonly files = viewChild(AttachmentsPanelComponent);
+
+  /** The clip of the format tools: the picked files go to the panel of the item. */
+  protected attachFiles(input: HTMLInputElement): void {
+    this.files()?.upload(Array.from(input.files ?? []));
+    input.value = '';
+  }
+
+  /** A drop on the item uploads to its panel. */
+  protected dropFiles(files: File[]): void {
+    this.files()?.upload(files);
+  }
 
   /** "TOP hinzufügen" in the header of the agenda sheet, and the rename by a click on the title. */
   protected readonly canAddTop = computed(() => canChangeAgenda(this.meeting(), this.locked()));

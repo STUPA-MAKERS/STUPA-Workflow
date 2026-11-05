@@ -847,4 +847,42 @@ describe('MeetingPageComponent', () => {
       expect(page.qrOpen()).toBe(true);
     });
   });
+  describe('files of the open item', () => {
+    const files = '/api/meetings/m-1/agenda/t-1/attachments';
+
+    it('shows "Anhänge" only with files, and the clip of the format tools uploads', async () => {
+      const { http, fixture } = await setup(
+        { meeting: meeting({ status: 'planned', canManageVotes: true }), protocol: null },
+        [MEDIA.wide],
+      );
+      http.expectOne(files).flush([]);
+      fixture.detectChanges();
+      expect(screen.queryByRole('heading', { name: 'Anhänge' })).toBeNull();
+
+      const tools = screen.getByRole('toolbar', { name: 'Format' });
+      expect(within(tools).getByRole('button', { name: 'Datei anhängen' })).toBeInTheDocument();
+      const picker = document.querySelector<HTMLInputElement>('input[type=file][aria-label="Datei anhängen"]')!;
+      await userEvent.upload(picker, new File(['%PDF'], 'Haushalt.pdf', { type: 'application/pdf' }));
+      http.expectOne((r) => r.method === 'POST' && r.url === files).flush({
+        id: 'f-1', filename: 'Haushalt.pdf', mime: 'application/pdf', size: 4, scanned: false,
+      });
+      fixture.detectChanges();
+      expect(screen.getByRole('heading', { name: 'Anhänge' })).toBeInTheDocument();
+      expect(screen.getByText('Haushalt.pdf')).toBeInTheDocument();
+    });
+
+    it('lists the files of an item that has some, without a clip for a reader', async () => {
+      const { http, fixture } = await setup(
+        { top: { ...AGENDA[0], attachmentCount: 1 }, canEdit: false },
+        [MEDIA.wide],
+      );
+      http.expectOne(files).flush([
+        { id: 'f-1', filename: 'Vorlage.pdf', mime: 'application/pdf', size: 4, scanned: true },
+      ]);
+      fixture.detectChanges();
+      expect(screen.getByText('Vorlage.pdf')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Datei anhängen' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Löschen' })).toBeNull();
+    });
+  });
 });

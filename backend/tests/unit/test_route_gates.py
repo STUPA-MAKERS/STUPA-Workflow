@@ -107,6 +107,12 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("PATCH", "/api/meetings/{meeting_id}/agenda/{item_id}"): _MEETING_WRITE,
     ("DELETE", "/api/meetings/{meeting_id}/agenda/{item_id}"): _MEETING_WRITE,
     ("PUT", "/api/meetings/{meeting_id}/agenda/{item_id}/done"): _MEETING_WRITE,
+    ("GET", "/api/meetings/{meeting_id}/agenda/{item_id}/attachments"): _LIVE,
+    ("POST", "/api/meetings/{meeting_id}/agenda/{item_id}/attachments"): _MEETING_WRITE,
+    (
+        "DELETE",
+        "/api/meetings/{meeting_id}/agenda/{item_id}/attachments/{attachment_id}",
+    ): _MEETING_WRITE,
     ("GET", "/api/meetings/{meeting_id}/attendance"): _LIVE,
     ("PUT", "/api/meetings/{meeting_id}/attendance/me"): "AttendanceService.set_self (own row)",
     ("PUT", "/api/meetings/{meeting_id}/attendance/{principal_id}"): (

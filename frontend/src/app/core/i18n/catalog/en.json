@@ -1251,6 +1251,7 @@
   "meetings.editor.quote": "Quote",
   "meetings.editor.table": "Insert table",
   "meetings.editor.image": "Insert image",
+  "meetings.editor.attach": "Attach file",
   "meetings.editor.mode": "View of the text",
   "meetings.editor.modeFormatted": "Formatted",
   "meetings.editor.modeRaw": "Markdown",

@@ -207,6 +207,10 @@ async def _assert_owner_reader(
       Gremium read scope, logged-in creator, magic-link applicant); an internal
       comment also needs ``can_see_internal``. An unconfirmed guest submission
       stays hidden unless the caller is its applicant.
+    * ``agenda_item`` (a file of a TOP): a principal who reads the meeting of the item
+      (``MeetingService.assert_can_read``: admin, ``meeting.view_all``, a member or a
+      pool substitute of the Gremium, a delegation recipient of the meeting). Guests
+      and the public protocol never reach these files.
 
     Every "no" is 404, as for an unknown id, so the route is no existence oracle. The
     check runs before any quarantine gate.
@@ -245,6 +249,9 @@ async def _assert_owner_reader(
         if not await BoardAccess(db).can_read(row[1], principal):
             raise missing
         return
+    if owner.kind == "agenda_item":
+        await _assert_agenda_reader(db, principal, owner.id, missing)
+        return
     comment = await db.get(Comment, owner.id)
     if comment is None:
         raise missing
@@ -259,7 +266,37 @@ async def _assert_owner_reader(
     )
 
 
-async def _read_capped(file: UploadFile, max_bytes: int) -> bytes:
+async def _assert_agenda_reader(
+    db: AsyncSession,
+    principal: Principal | None,
+    agenda_item_id: UUID,
+    missing: NotFoundError,
+) -> None:
+    """Apply the read rule of a meeting to a file of one of its agenda items.
+
+    The imports are local, because the livevote module reaches the flow engine, which
+    imports this router through the application module.
+
+    Raises:
+        NotFoundError: No principal, or the principal cannot read the meeting (HTTP 404).
+    """
+    from app.modules.livevote.models import MeetingAgendaItem
+    from app.modules.livevote.service import MeetingService
+
+    if principal is None:
+        raise missing
+    meeting_id = await db.scalar(
+        select(MeetingAgendaItem.meeting_id).where(MeetingAgendaItem.id == agenda_item_id)
+    )
+    if meeting_id is None:
+        raise missing
+    try:
+        await MeetingService(db).assert_can_read(meeting_id, principal)
+    except (ForbiddenError, NotFoundError) as exc:
+        raise missing from exc
+
+
+async def read_capped(file: UploadFile, max_bytes: int) -> bytes:
     """Read the upload in chunks with a size cap.
 
     The function stops as soon as the body passes the cap. It never buffers a body that
@@ -303,7 +340,7 @@ async def upload_attachment(
     that is too large, 415 for a bad type or sniff, 429 at the rate limit and 503 when the
     storage is off.
     """
-    data = await _read_capped(file, service.max_bytes)
+    data = await read_capped(file, service.max_bytes)
     return await service.upload(
         application_id,
         filename=file.filename,
@@ -566,7 +603,7 @@ async def upload_draft_attachment(
             raise BadRequestError(
                 "Altcha verification failed.", code="altcha_failed"
             ) from exc
-    data = await _read_capped(file, drafts.files.max_bytes)
+    data = await read_capped(file, drafts.files.max_bytes)
     return await drafts.upload(
         token=draft_token,
         filename=file.filename,

@@ -590,6 +590,35 @@ export class ApiClient {
     return this.http.delete<void>(`${this.base}/attachments/${attachmentId}`);
   }
 
+  /** GET /meetings/{m}/agenda/{i}/attachments — the files of an agenda item (meeting read rule). */
+  listAgendaAttachments(meetingId: Uuid, itemId: Uuid): Observable<Attachment[]> {
+    return this.http
+      .get<AttachmentOutWire[]>(`${this.base}/meetings/${meetingId}/agenda/${itemId}/attachments`, {
+        context: readContext({ quiet: true, detail: true }),
+      })
+      .pipe(map((list) => list.map(mapAttachment)));
+  }
+
+  /**
+   * POST /meetings/{m}/agenda/{i}/attachments — attach a file to an agenda item (≤10 MB).
+   * The gate is the gate of the item text. Errors: 403, 409 (protocol final), 413, 415,
+   * 429, 503.
+   */
+  uploadAgendaAttachment(meetingId: Uuid, itemId: Uuid, file: File): Observable<Attachment> {
+    const form = new FormData();
+    form.append('file', file);
+    return this.http
+      .post<AttachmentOutWire>(`${this.base}/meetings/${meetingId}/agenda/${itemId}/attachments`, form)
+      .pipe(map(mapAttachment));
+  }
+
+  /** DELETE /meetings/{m}/agenda/{i}/attachments/{id} — remove a file of an agenda item. */
+  deleteAgendaAttachment(meetingId: Uuid, itemId: Uuid, attachmentId: Uuid): Observable<void> {
+    return this.http.delete<void>(
+      `${this.base}/meetings/${meetingId}/agenda/${itemId}/attachments/${attachmentId}`,
+    );
+  }
+
   /**
    * GET /votes/{id} — vote state + tally.
    *

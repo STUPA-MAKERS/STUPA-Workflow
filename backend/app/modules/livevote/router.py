@@ -14,10 +14,22 @@ from datetime import UTC, date, datetime
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, WebSocket
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Query,
+    Request,
+    UploadFile,
+    WebSocket,
+)
 
 from app.deps import DbSession, require_principal
 from app.modules.auth.principal import Principal
+from app.modules.files.router import get_files_service, read_capped
+from app.modules.files.schemas import AttachmentOut
+from app.modules.files.service import FilesService
 from app.modules.flow.dispatch import ActionDispatcher
 from app.modules.flow.router import get_action_dispatcher
 from app.modules.livevote.agenda_service import AgendaService
@@ -75,6 +87,7 @@ from app.modules.todos.live import publish_pings, todo_broker
 from app.modules.todos.service import TodoService
 from app.modules.voting.service import VotingService
 from app.settings import Settings, get_settings
+from app.shared.antiabuse import enforce_attachment_body_cap, rate_limit_attachments
 from app.shared.errors import (
     ConflictError,
     ForbiddenError,
@@ -206,6 +219,7 @@ ServiceDep = Annotated[MeetingService, Depends(get_meeting_service)]
 GuestServiceDep = Annotated[GuestService, Depends(get_guest_service)]
 AttendanceDep = Annotated[AttendanceService, Depends(get_attendance_service)]
 AgendaDep = Annotated[AgendaService, Depends(get_agenda_service)]
+FilesDep = Annotated[FilesService, Depends(get_files_service)]
 VotingDep = Annotated[VotingService, Depends(get_voting_service)]
 BrokerRestDep = Annotated[MeetingBroker, Depends(get_broker_rest)]
 ReaderDep = Annotated[Principal, Depends(require_principal())]
@@ -382,15 +396,18 @@ async def get_meeting(meeting_id: UUID, service: ServiceDep, principal: ReaderDe
 
 
 @router.delete("/meetings/{meeting_id}", status_code=204, responses=_errors(401, 403, 404, 409))
-async def delete_meeting(meeting_id: UUID, service: ServiceDep, principal: ReaderDep) -> None:
+async def delete_meeting(
+    meeting_id: UUID, service: ServiceDep, files: FilesDep, principal: ReaderDep
+) -> None:
     """Delete a meeting.
 
     Only a meeting manager (``session.manage``) or an admin may delete a meeting.
     A meeting with an open vote gives 409 ``open_vote``. A final protocol needs
     ``meeting.delete_finalized`` (403). The delete deletes every vote of the
-    meeting, each with a ``vote_delete`` audit entry.
+    meeting, each with a ``vote_delete`` audit entry, and the files of its agenda
+    items.
     """
-    await service.delete(meeting_id, principal)
+    await service.delete(meeting_id, principal, files=files)
 
 
 @router.patch(
@@ -886,6 +903,7 @@ async def remove_agenda_item(
     item_id: UUID,
     agenda: AgendaDep,
     service: ServiceDep,
+    files: FilesDep,
     principal: ReaderDep,
 ) -> list[AgendaItemOut]:
     """Remove an agenda item.
@@ -894,7 +912,8 @@ async def remove_agenda_item(
     409 ``meeting_closed``. An item with an open or closed vote answers 409
     ``agenda_item_has_vote``. The draft and cancelled votes of the item go with it.
     To delete them the caller also needs ``canManageVotes``, as on
-    ``DELETE /meetings/{id}/votes/{voteId}``, else 403.
+    ``DELETE /meetings/{id}/votes/{voteId}``, else 403. The files of the item go
+    with it.
     """
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_write:
@@ -904,6 +923,7 @@ async def remove_agenda_item(
         item_id,
         actor=principal.sub,
         may_delete_votes=meeting.can_manage_votes,
+        files=files,
     )
 
 
@@ -1023,6 +1043,95 @@ def _assert_live_minutes_writer(meeting: MeetingOut) -> None:
             "only the protokollant writes the minutes of a live meeting",
             code="not_protokollant",
         )
+
+
+@router.get(
+    "/meetings/{meeting_id}/agenda/{item_id}/attachments",
+    response_model=list[AttachmentOut],
+    responses=_errors(401, 403, 404),
+)
+async def list_agenda_attachments(
+    meeting_id: UUID,
+    item_id: UUID,
+    agenda: AgendaDep,
+    service: ServiceDep,
+    files: FilesDep,
+    principal: ReaderDep,
+) -> list[AttachmentOut]:
+    """List the files of an agenda item, oldest first.
+
+    The read rule is the rule of the meeting. Guests and the public protocol never list
+    these files. ``GET /attachments/{id}`` and its ``/download`` route serve one file
+    under the same rule.
+    """
+    await service.assert_can_read(meeting_id, principal)
+    await agenda.item(meeting_id, item_id)
+    return await files.list_for_agenda_item(item_id)
+
+
+@router.post(
+    "/meetings/{meeting_id}/agenda/{item_id}/attachments",
+    response_model=AttachmentOut,
+    status_code=201,
+    dependencies=[Depends(enforce_attachment_body_cap), Depends(rate_limit_attachments)],
+    responses=_errors(401, 403, 404, 409, 413, 415, 429, 503),
+)
+async def upload_agenda_attachment(
+    meeting_id: UUID,
+    item_id: UUID,
+    file: Annotated[UploadFile, File()],
+    agenda: AgendaDep,
+    service: ServiceDep,
+    files: FilesDep,
+    principal: ReaderDep,
+) -> AttachmentOut:
+    """Attach a file to an agenda item.
+
+    The gate is the gate of the item text: ``canWrite``, in a live meeting with a
+    protokollant only the protokollant (403 ``not_protokollant``), and a closed meeting
+    only while its protocol is a draft (409 ``protocol_locked``). Size cap, rate limit,
+    MIME sniff and the scan quarantine work as on the application upload. The route
+    sends ``meeting_state``, so every viewer sees the new count.
+    """
+    meeting = await service.get(meeting_id, principal)
+    if not meeting.can_write:
+        raise ForbiddenError("not allowed to edit the agenda")
+    _assert_live_minutes_writer(meeting)
+    await agenda.files_item(meeting_id, item_id)
+    data = await read_capped(file, files.max_bytes)
+    out = await files.upload_for_agenda_item(
+        item_id, filename=file.filename, data=data, by=principal.sub
+    )
+    await service.broadcast_state(meeting_id, principal)
+    return out
+
+
+@router.delete(
+    "/meetings/{meeting_id}/agenda/{item_id}/attachments/{attachment_id}",
+    status_code=204,
+    responses=_errors(401, 403, 404, 409),
+)
+async def delete_agenda_attachment(
+    meeting_id: UUID,
+    item_id: UUID,
+    attachment_id: UUID,
+    agenda: AgendaDep,
+    service: ServiceDep,
+    files: FilesDep,
+    principal: ReaderDep,
+) -> None:
+    """Remove a file of an agenda item, with the gate of the upload.
+
+    The route answers 404 for a file that belongs to another item, and sends
+    ``meeting_state``.
+    """
+    meeting = await service.get(meeting_id, principal)
+    if not meeting.can_write:
+        raise ForbiddenError("not allowed to edit the agenda")
+    _assert_live_minutes_writer(meeting)
+    await agenda.files_item(meeting_id, item_id)
+    await files.delete_for_agenda_item(item_id, attachment_id, actor=principal.sub)
+    await service.broadcast_state(meeting_id, principal)
 
 
 async def _require_manage(service: MeetingService, meeting_id: UUID, principal: Principal) -> None:

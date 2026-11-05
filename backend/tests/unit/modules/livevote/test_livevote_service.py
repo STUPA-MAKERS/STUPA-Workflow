@@ -515,6 +515,15 @@ class _DeletableSession(_FakeSession):
     async def delete(self, obj: object) -> None:
         self.deleted.append(obj)
 
+    async def scalars(self, _stmt: object) -> _NoRows:
+        """Return no rows: the meeting has no agenda items and no files here."""
+        return _NoRows()
+
+
+class _NoRows:
+    def all(self) -> list[object]:
+        return []
+
 
 def _audit_capture(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
     import app.modules.livevote.service.lifecycle as livevote_lifecycle_mod

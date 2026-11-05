@@ -9,7 +9,7 @@ import {
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { from } from 'rxjs';
+import { from, type Observable } from 'rxjs';
 import { concatMap } from 'rxjs/operators';
 import { ApiClient } from '@core/api/api-client.service';
 import { API_BASE_URL } from '@core/api/api.config';
@@ -43,6 +43,12 @@ import {
 import { chatFileUrl } from '@shared/ui/chat/chat.util';
 import { formatBytes } from './applications.util';
 
+/** An agenda item (TOP) of a meeting, the owner of its files. */
+export interface AgendaItemRef {
+  meetingId: Uuid;
+  itemId: Uuid;
+}
+
 /**
  * Attachments panel.
  *
@@ -66,6 +72,10 @@ import { formatBytes } from './applications.util';
  * Several files upload one after the other (concatMap), so parallel requests do
  * not trip the rate limit (429). Every row carries a checkbox, next to an "all"
  * checkbox, for bulk delete.
+ *
+ * The owner is an application (`applicationId`) or an agenda item of a meeting
+ * (`agendaItem`, `/meetings/{m}/agenda/{i}/attachments`). Both download through the same
+ * gated `/attachments/{id}` route.
  */
 @Component({
   selector: 'app-attachments-panel',
@@ -96,7 +106,12 @@ export class AttachmentsPanelComponent {
   private readonly toast = inject(ToastService);
   private readonly apiBase = inject(API_BASE_URL);
 
-  readonly applicationId = input.required<Uuid>();
+  /** The application that owns the files. */
+  readonly applicationId = input<Uuid | null>(null);
+  /** The agenda item (TOP) that owns the files, in place of an application. */
+  readonly agendaItem = input<AgendaItemRef | null>(null);
+  /** A new value lists the files again, e.g. the file count of the item after a live update. */
+  readonly reload = input(0);
   readonly canUpload = input(false);
   /** Show the heading "Anhänge". A side sheet that has the same title hides it (it stays
    *  for screen readers). */
@@ -112,6 +127,8 @@ export class AttachmentsPanelComponent {
   readonly dropTarget = input(true);
   /** The number of attachments, after the first load and after each change. */
   readonly countChange = output<number>();
+  /** An upload or a delete changed the files. */
+  readonly changed = output<void>();
 
   readonly attachments = signal<Attachment[]>([]);
   readonly uploading = signal(false);
@@ -182,10 +199,17 @@ export class AttachmentsPanelComponent {
 
   constructor() {
     effect(() => {
-      const id = this.applicationId();
-      if (!id) return;
+      this.reload();
+      const key = this.ownerKey();
+      const list$ = this.listCall();
+      if (!list$) return;
       this.selected.set(new Set());
-      this.api.listAttachments(id).subscribe({
+      if (key !== this.listedKey) {
+        // Another owner: the files of the last one must not show while the list loads.
+        this.listedKey = key;
+        this.attachments.set([]);
+      }
+      list$.subscribe({
         next: (list) => {
           this.attachments.set(list);
           this.loaded.set(true);
@@ -199,6 +223,34 @@ export class AttachmentsPanelComponent {
       const count = this.attachments().length;
       if (this.loaded()) this.countChange.emit(count);
     });
+  }
+
+  /** The owner whose files the list shows. */
+  private listedKey = '';
+
+  private ownerKey(): string {
+    const item = this.agendaItem();
+    return item ? `${item.meetingId}/${item.itemId}` : (this.applicationId() ?? '');
+  }
+
+  /** The list request of the owner, or `null` without one. */
+  private listCall(): Observable<Attachment[]> | null {
+    const item = this.agendaItem();
+    if (item) return this.api.listAgendaAttachments(item.meetingId, item.itemId);
+    const id = this.applicationId();
+    return id ? this.api.listAttachments(id) : null;
+  }
+
+  private uploadCall(file: File): Observable<Attachment> {
+    const item = this.agendaItem();
+    if (item) return this.api.uploadAgendaAttachment(item.meetingId, item.itemId, file);
+    return this.api.uploadAttachment(this.applicationId() ?? '', file);
+  }
+
+  private deleteCall(id: Uuid): Observable<void> {
+    const item = this.agendaItem();
+    if (item) return this.api.deleteAgendaAttachment(item.meetingId, item.itemId, id);
+    return this.api.deleteAttachment(id);
   }
 
   size(att: Attachment): string {
@@ -222,7 +274,7 @@ export class AttachmentsPanelComponent {
     let ok = 0;
     let failedStatus: number | undefined;
     from(files)
-      .pipe(concatMap((file) => this.api.uploadAttachment(this.applicationId(), file)))
+      .pipe(concatMap((file) => this.uploadCall(file)))
       .subscribe({
         next: (att) => {
           ok++;
@@ -231,12 +283,18 @@ export class AttachmentsPanelComponent {
         error: (err: { status?: number }) => {
           failedStatus = err.status;
           this.uploading.set(false);
-          if (ok > 0) this.toast.success(this.i18n.translate('applications.attachments.added'));
+          if (ok > 0) {
+            this.toast.success(this.i18n.translate('applications.attachments.added'));
+            this.changed.emit();
+          }
           this.toast.error(this.i18n.translate(this.uploadErrorKey(failedStatus)));
         },
         complete: () => {
           this.uploading.set(false);
-          if (ok > 0) this.toast.success(this.i18n.translate('applications.attachments.added'));
+          if (ok > 0) {
+            this.toast.success(this.i18n.translate('applications.attachments.added'));
+            this.changed.emit();
+          }
         },
       });
   }
@@ -290,7 +348,7 @@ export class AttachmentsPanelComponent {
     this.bulkDeleting.set(true);
     let failed = false;
     from(ids)
-      .pipe(concatMap((id) => this.api.deleteAttachment(id)))
+      .pipe(concatMap((id) => this.deleteCall(id)))
       .subscribe({
         next: () => {},
         error: () => {
@@ -313,8 +371,10 @@ export class AttachmentsPanelComponent {
   /** Drop the deleted attachments from the list and from the selection. DELETE is
    *  idempotent. After a partial failure the rest stays selected for a retry. */
   private refreshAfterBulk(attempted: Uuid[]): void {
-    const id = this.applicationId();
-    this.api.listAttachments(id).subscribe({
+    this.changed.emit();
+    const list$ = this.listCall();
+    if (!list$) return;
+    list$.subscribe({
       next: (list) => {
         const remaining = new Set(list.map((a) => a.id));
         this.attachments.set(list);
@@ -457,9 +517,10 @@ export class AttachmentsPanelComponent {
   remove(att: Attachment): void {
     if (!this.deleteAllowed() || this.removingId()) return;
     this.removingId.set(att.id);
-    this.api.deleteAttachment(att.id).subscribe({
+    this.deleteCall(att.id).subscribe({
       next: () => {
         this.attachments.update((list) => list.filter((a) => a.id !== att.id));
+        this.changed.emit();
         this.removingId.set(null);
         this.confirming.set(null);
         this.toast.success(this.i18n.translate('applications.attachments.deleted'));

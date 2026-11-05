@@ -402,6 +402,8 @@ export interface AgendaItem {
   stateLabel?: I18nMap | null;
   /** The requested amount of the application, for the decision proposal. */
   amount?: string | null;
+  /** The number of files of the item. */
+  attachmentCount?: number;
 }
 
 /** `AssignableApplicationOut`. An application in a vote state that is not on the agenda. */

@@ -92,6 +92,7 @@
   min-width: 0;
 }
 .mp__main {
+  position: relative;
   display: flex;
   flex: 1 0 auto;
   flex-direction: column;
@@ -106,6 +107,15 @@
 .mp__linked {
   flex: none;
   margin-bottom: var(--space-3);
+}
+/* The files of the item: in the flow above the sheet, gone without a file. The panel stays
+   in the DOM, so the clip of the format tools and a drop reach it. */
+.mp__files {
+  flex: none;
+  margin-bottom: var(--space-3);
+}
+.mp__files--none {
+  display: none;
 }
 
 .mp__body--wide {

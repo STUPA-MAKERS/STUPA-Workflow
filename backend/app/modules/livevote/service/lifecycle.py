@@ -23,6 +23,7 @@ from sqlalchemy import select
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth.principal import Principal
+from app.modules.files.service import FilesService
 from app.modules.livevote.agenda_service import AgendaService
 from app.modules.livevote.guests import GuestEvents, GuestService
 from app.modules.livevote.models import Meeting, MeetingAgendaItem
@@ -518,7 +519,9 @@ class LifecycleOps(HandoverOps):
         )
         return status == "final"
 
-    async def delete(self, meeting_id: UUID, principal: Principal) -> None:
+    async def delete(
+        self, meeting_id: UUID, principal: Principal, *, files: FilesService | None = None
+    ) -> None:
         """Delete a meeting.
 
         Only a meeting manager (``session.manage``) or an admin may delete a
@@ -529,6 +532,11 @@ class LifecycleOps(HandoverOps):
         The row lock serializes the delete with the vote open and the close. Without it, a
         vote could open between the check and the delete.
 
+        The files of the agenda items are locked before the first audit entry
+        (``FilesService.lock_keys``). The cascade removes their rows, and their objects
+        go after the commit through ``files``, the service with the storage of the
+        request.
+
         Raises:
             ForbiddenError: The caller does not manage the meeting, or the protocol
                 is final and the caller does not hold ``meeting.delete_finalized``
@@ -538,8 +546,18 @@ class LifecycleOps(HandoverOps):
         meeting = await self._get(meeting_id, for_update=True)
         if not await self.can_manage(meeting.gremium_id, principal):
             raise ForbiddenError("not allowed to delete this meeting")
+        files = files or FilesService(self.session)
+        storage_keys = await files.lock_keys(
+            "agenda_item",
+            (
+                await self.session.scalars(
+                    select(MeetingAgendaItem.id).where(MeetingAgendaItem.meeting_id == meeting.id)
+                )
+            ).all(),
+        )
         await self.delete_locked(meeting, principal)
         await self.session.commit()
+        await files.remove_objects(storage_keys)
 
     async def delete_locked(self, meeting: Meeting, principal: Principal) -> None:
         """Delete a meeting that the caller locked, without a commit.

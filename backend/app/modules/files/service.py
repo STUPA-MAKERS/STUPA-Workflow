@@ -13,8 +13,11 @@ the result. On a finding it deletes the object and writes an audit entry (quaran
 The files of a ticket report and of a chat message (ticket note, to-do comment,
 application comment) have no application. ``owner_of`` names their owner, the router
 checks the read rule of that owner, and ``message_url`` / ``message_download_stream``
-apply the same quarantine gates. ``message_attachments`` lists the files of a set of
-messages in one query, and ``delete_for_messages`` removes them with their message.
+apply the same quarantine gates. The files of a meeting agenda item (a TOP) take the
+same path with the owner ``agenda_item``; ``upload_for_agenda_item`` stores one
+directly, because the item exists before its files. ``message_attachments`` lists the
+files of a set of messages in one query, and ``delete_for_messages`` removes them with
+their message.
 ``drop_for_messages`` removes only the rows and returns the storage keys, and
 ``remove_objects`` removes those objects after the commit of the caller, so a rollback
 never leaves a row whose object is gone.
@@ -72,15 +75,18 @@ logger = logging.getLogger("app.files")
 
 SCAN_RESULT_CLEAN = "clean"
 
-#: The chat messages that own files.
-MessageOwner = Literal["ticket_note", "todo_comment", "comment"]
+#: The owners that hold a group of files: the chat messages and the agenda items (TOPs).
+MessageOwner = Literal["ticket_note", "todo_comment", "comment", "agenda_item"]
 #: Every owner of a bound attachment.
-OwnerKind = Literal["application", "ticket", "ticket_note", "todo_comment", "comment"]
+OwnerKind = Literal[
+    "application", "ticket", "ticket_note", "todo_comment", "comment", "agenda_item"
+]
 
 _OWNER_COLUMNS: dict[MessageOwner, InstrumentedAttribute[uuid.UUID | None]] = {
     "ticket_note": Attachment.ticket_note_id,
     "todo_comment": Attachment.todo_comment_id,
     "comment": Attachment.comment_id,
+    "agenda_item": Attachment.agenda_item_id,
 }
 
 
@@ -415,6 +421,7 @@ class FilesService:
                     Attachment.ticket_note_id,
                     Attachment.todo_comment_id,
                     Attachment.comment_id,
+                    Attachment.agenda_item_id,
                 ).where(Attachment.id == attachment_id)
             )
         ).first()
@@ -426,6 +433,7 @@ class FilesService:
             "ticket_note",
             "todo_comment",
             "comment",
+            "agenda_item",
         )
         for kind, owner_id in zip(kinds, row, strict=True):
             if owner_id is not None:
@@ -433,7 +441,7 @@ class FilesService:
         return None
 
     async def _get_owned(self, attachment_id: uuid.UUID) -> Attachment:
-        """Load an attachment that a ticket or a message owns. Any other row gives 404.
+        """Load an attachment that a ticket, a message or an agenda item owns, else 404.
 
         The router checks the read rule of the owner first, so the route is no
         existence oracle.
@@ -447,6 +455,7 @@ class FilesService:
             and attachment.ticket_note_id is None
             and attachment.todo_comment_id is None
             and attachment.comment_id is None
+            and attachment.agenda_item_id is None
         ):
             raise NotFoundError(f"attachment {attachment_id} not found")
         return attachment
@@ -550,6 +559,98 @@ class FilesService:
             .order_by(Attachment.id)
             .with_for_update()
         )
+
+    async def lock_keys(self, owner: MessageOwner, ids: Sequence[uuid.UUID]) -> list[str]:
+        """Lock the file rows of a set of owners like ``lock_for_messages``, and name their keys.
+
+        A caller whose delete cascades over the owners (a meeting, a Gremium) takes
+        this lock before its first audit entry, lets the foreign key cascade remove the
+        rows and passes the keys to ``remove_objects`` after its commit. A file in the
+        quarantine after a finding has no key and is missing from the result.
+
+        Returns:
+            The storage keys of the locked files.
+        """
+        wanted = list(dict.fromkeys(ids))
+        if not wanted:
+            return []
+        keys = (
+            await self.session.scalars(
+                select(Attachment.storage_key)
+                .where(_OWNER_COLUMNS[owner].in_(wanted))
+                .order_by(Attachment.id)
+                .with_for_update()
+            )
+        ).all()
+        return [key for key in keys if key is not None]
+
+    async def upload_for_agenda_item(
+        self, agenda_item_id: uuid.UUID, *, filename: str | None, data: bytes, by: str
+    ) -> AttachmentOut:
+        """Store a file of an agenda item: validate, put into MinIO, create the row, scan.
+
+        The router checks the agenda item and the right to write it. The object lives
+        under ``agenda/<agenda item id>/``. The upload writes ``attachment_upload``
+        with the agenda item, the MIME type and the size, never the file name.
+        """
+        mime, display_name = self.validate(filename, data)
+        storage_key = (
+            f"agenda/{agenda_item_id}/{uuid.uuid4().hex}/{sanitize_storage_name(display_name)}"
+        )
+        await self.put_object(storage_key, data, mime)
+        attachment = Attachment(
+            id=uuid.uuid4(),
+            agenda_item_id=agenda_item_id,
+            filename=display_name,
+            mime=mime,
+            size=len(data),
+            storage_key=storage_key,
+            scanned=False,
+            scan_result=None,
+        )
+        self.session.add(attachment)
+        await audit_record(
+            self.session,
+            actor=by,
+            action=AuditAction.ATTACHMENT_UPLOAD,
+            target_type="attachment",
+            target_id=str(attachment.id),
+            data=upload_audit_data(attachment),
+        )
+        await self.session.commit()
+        await self._enqueue_scan(attachment.id, actor=by)
+        return _attachment_out(attachment)
+
+    async def list_for_agenda_item(self, agenda_item_id: uuid.UUID) -> list[AttachmentOut]:
+        """Return the files of an agenda item, oldest first."""
+        rows = (
+            await self.session.scalars(
+                select(Attachment)
+                .where(Attachment.agenda_item_id == agenda_item_id)
+                .order_by(Attachment.created_at, Attachment.id)
+            )
+        ).all()
+        return [_attachment_out(a) for a in rows]
+
+    async def delete_for_agenda_item(
+        self, agenda_item_id: uuid.UUID, attachment_id: uuid.UUID, *, actor: str
+    ) -> None:
+        """Remove one file of an agenda item: the row, an audit entry, then the object.
+
+        The row is locked before the audit entry (see ``lock_for_messages``). The object
+        goes after the commit, so a failed commit never leaves a row without its object.
+
+        Raises:
+            NotFoundError: The agenda item has no file with this id (HTTP 404).
+        """
+        rows = await self._locked_rows(
+            (Attachment.id == attachment_id) & (Attachment.agenda_item_id == agenda_item_id)
+        )
+        if not rows:
+            raise NotFoundError(f"attachment {attachment_id} not found")
+        keys = await self._drop_rows(rows, actor=actor)
+        await self.session.commit()
+        await self.remove_objects(keys)
 
     async def remove_objects(self, storage_keys: Sequence[str]) -> None:
         """Remove storage objects as best effort; a failure only logs a warning."""
@@ -839,8 +940,18 @@ def upload_audit_data(attachment: Attachment) -> dict[str, object]:
 
 
 def _owner_data(attachment: Attachment) -> dict[str, object]:
-    """Name the owner of an attachment in an audit entry: application, ticket, message or draft."""
-    for key in ("application_id", "ticket_id", "ticket_note_id", "todo_comment_id", "comment_id"):
+    """Name the owner of an attachment in an audit entry.
+
+    The owner is an application, a ticket, a message, an agenda item or a draft.
+    """
+    for key in (
+        "application_id",
+        "ticket_id",
+        "ticket_note_id",
+        "todo_comment_id",
+        "comment_id",
+        "agenda_item_id",
+    ):
         value = getattr(attachment, key)
         if value is not None:
             return {key: str(value)}

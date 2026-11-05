@@ -38,9 +38,25 @@
     </aside>
   }
 
-  <div class="mp__main">
+  <div
+    class="mp__main"
+    appFileDrop
+    #drop="appFileDrop"
+    [appFileDropEnabled]="canAttach()"
+    (appFileDrop)="dropFiles($event)"
+  >
     @if (top(); as t) {
       <app-todo-linked-list class="mp__linked" kind="agenda_item" headingId="mp-todos" [showTitle]="false" [targetId]="t.id" [lead]="applicationLead()" />
+      <app-attachments-panel
+        class="mp__files"
+        [class.mp__files--none]="!fileCount()"
+        [attr.hidden]="fileCount() ? null : ''"
+        [agendaItem]="filesOwner()"
+        [reload]="t.attachmentCount ?? 0"
+        [canUpload]="canAttach()"
+        [dropTarget]="false"
+        (countChange)="fileCount.set($event)"
+      />
     }
     <app-top-sheet
       class="mp__sheet"
@@ -66,8 +82,21 @@
       (renameTop)="renameTop.emit($event)"
       (doneChange)="setDone.emit($event)"
     />
+    @if (drop.active()) {
+      <app-drop-overlay fit="view" [label]="'applications.attachments.drop' | t" />
+    }
   </div>
 </div>
+
+<input
+  #attachInput
+  type="file"
+  multiple
+  class="sr-only"
+  tabindex="-1"
+  [attr.aria-label]="'meetings.editor.attach' | t"
+  (change)="attachFiles(attachInput)"
+/>
 
 <app-session-dock
   class="mp__dock"
@@ -218,6 +247,11 @@
     <button type="button" class="mp__tool" [attr.aria-label]="'meetings.editor.image' | t" (pointerdown)="$event.preventDefault()" (mousedown)="$event.preventDefault()" (click)="ts.insertImage()">
       <app-icon name="image" [size]="20" />
     </button>
+    @if (canAttach()) {
+      <button type="button" class="mp__tool" [attr.aria-label]="'meetings.editor.attach' | t" [title]="'meetings.editor.attach' | t" (pointerdown)="$event.preventDefault()" (mousedown)="$event.preventDefault()" (click)="attachInput.click()">
+        <app-icon name="clip" [size]="20" />
+      </button>
+    }
   }
 </ng-template>
 

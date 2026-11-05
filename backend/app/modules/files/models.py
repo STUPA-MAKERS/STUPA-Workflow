@@ -6,10 +6,10 @@ result. The file stays quarantined and nobody can download it until ``scanned`` 
 On a finding the worker deletes the object, sets ``storage_key`` to NULL and writes the
 signature into ``scan_result``.
 
-A row is either bound or a draft. A bound row has exactly one of five owners:
-``application_id``, ``ticket_id`` (the attachment of a ticket report), or one chat
+A row is either bound or a draft. A bound row has exactly one of six owners:
+``application_id``, ``ticket_id`` (the attachment of a ticket report), one chat
 message: ``ticket_note_id``, ``todo_comment_id`` or ``comment_id`` (an application
-comment). A draft row
+comment), or ``agenda_item_id`` (a file of a meeting agenda item, a TOP). A draft row
 comes from the wizard before the application exists: it has ``draft_token_hash`` and
 ``draft_expires_at`` instead, and its object lives under ``drafts/<id>/``. The create of
 the application binds the draft. It sets ``application_id`` and clears both draft
@@ -55,13 +55,14 @@ class Attachment(UUIDPkMixin, Base):
 
     ``application_id`` cascades. A deleted application removes its attachments. It is
     NULL for a draft, for the attachment of a ticket and for the file of a message.
-    ``ticket_id``, ``ticket_note_id``, ``todo_comment_id`` and ``comment_id`` cascade the
-    same way. A soft delete of a message does not cascade; the service removes the
-    files of the message then (``delete_for_messages``).
+    ``ticket_id``, ``ticket_note_id``, ``todo_comment_id``, ``comment_id`` and
+    ``agenda_item_id`` cascade the same way. A soft delete of a message does not
+    cascade; the service removes the files of the message then (``delete_for_messages``).
 
-    Two CHECKs hold the owner rule: exactly one owner (an application, a ticket, a message
-    or a draft token), and a draft has both draft columns while a bound row has neither. A
-    partial index on the drafts serves the hourly purge and the token lookup.
+    Two CHECKs hold the owner rule: exactly one owner (an application, a ticket, a
+    message, an agenda item or a draft token), and a draft has both draft columns while a
+    bound row has neither. A partial index on the drafts serves the hourly purge and the
+    token lookup.
 
     Attributes:
         field_key: Optional link to a form field.
@@ -90,6 +91,9 @@ class Attachment(UUIDPkMixin, Base):
     comment_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("comment.id", ondelete="CASCADE"), nullable=True
     )
+    agenda_item_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("meeting_agenda_item.id", ondelete="CASCADE"), nullable=True
+    )
     field_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     filename: Mapped[str] = mapped_column(Text)
     mime: Mapped[str] = mapped_column(Text)
@@ -111,7 +115,7 @@ class Attachment(UUIDPkMixin, Base):
         ),
         CheckConstraint(
             "num_nonnulls(application_id, ticket_id, ticket_note_id, todo_comment_id, "
-            "comment_id, draft_token_hash) = 1",
+            "comment_id, agenda_item_id, draft_token_hash) = 1",
             name="draft_xor_application",
         ),
         CheckConstraint(
@@ -123,6 +127,7 @@ class Attachment(UUIDPkMixin, Base):
         Index("ix_attachment_ticket_note_id", "ticket_note_id"),
         Index("ix_attachment_todo_comment_id", "todo_comment_id"),
         Index("ix_attachment_comment_id", "comment_id"),
+        Index("ix_attachment_agenda_item_id", "agenda_item_id"),
         Index(
             "ix_attachment_draft_expires_at",
             "draft_expires_at",

@@ -535,8 +535,12 @@ class _DeleteSpy:
         async def _write(_self: Any, meeting: Any, _principal: Any, **kw: Any) -> None:
             spy.calls.append(("meeting", meeting.id, kw))
 
+        async def _no_agenda_items(_self: Any, _gremium_id: Any) -> list[Any]:
+            return []
+
         monkeypatch.setattr(MeetingService, "check_deletable", _check)
         monkeypatch.setattr(MeetingService, "write_delete", _write)
+        monkeypatch.setattr(ConfigService, "_gremium_agenda_item_ids", _no_agenda_items)
         monkeypatch.setattr(VotingService, "lock_for_gremium_delete", _lock)
         monkeypatch.setattr(VotingService, "delete_locked_votes", _delete_votes)
 

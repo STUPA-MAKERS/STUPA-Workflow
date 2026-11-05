@@ -252,6 +252,8 @@ class GremiumOps(ConfigServiceBase):
         their objects, which can hold personal data, so the rows go first with an
         audit entry each. The objects go only after the commit, because a failed
         commit brings the rows back and a row without its object is a broken file.
+        The files of the agenda items of its meetings are locked in the same phase;
+        the meeting cascade removes their rows and their objects go after the commit.
 
         The delete locks the gremium row first. A concurrent insert of a meeting
         (or a vote of one) takes a key-share lock on that row through its foreign
@@ -303,6 +305,9 @@ class GremiumOps(ConfigServiceBase):
         comment_ids = await self._lock_gremium_todos(gremium_id)
         files = FilesService(self.session, storage=self.storage)
         await files.lock_for_messages("todo_comment", comment_ids)
+        agenda_keys = await files.lock_keys(
+            "agenda_item", await self._gremium_agenda_item_ids(gremium_id)
+        )
         await self._delete_gremium_votes(gremium_id, principal)
         storage_keys = await files.drop_for_messages(
             "todo_comment", comment_ids, actor=principal.sub
@@ -310,7 +315,26 @@ class GremiumOps(ConfigServiceBase):
         await self.session.delete(row)
         await self._audit(principal.sub, AuditAction.CONFIG_CHANGE, "gremium", gremium_id)
         await self.session.commit()
-        await files.remove_objects(storage_keys)
+        await files.remove_objects([*storage_keys, *agenda_keys])
+
+    async def _gremium_agenda_item_ids(self, gremium_id: UUID) -> list[UUID]:
+        """Return the agenda items of every meeting of a gremium.
+
+        Their files go with the meetings: the cascade removes the rows, and the
+        objects go after the commit. The import is local, because livevote imports the
+        admin models.
+        """
+        from app.modules.livevote.models import Meeting, MeetingAgendaItem
+
+        return list(
+            (
+                await self.session.scalars(
+                    select(MeetingAgendaItem.id)
+                    .join(Meeting, Meeting.id == MeetingAgendaItem.meeting_id)
+                    .where(Meeting.gremium_id == gremium_id)
+                )
+            ).all()
+        )
 
     async def _lock_gremium_todos(self, gremium_id: UUID) -> list[UUID]:
         """Lock the to-do board of a gremium and its cards, and return its comment ids.

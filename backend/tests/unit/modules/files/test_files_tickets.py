@@ -89,12 +89,13 @@ async def test_bind_drafts_needs_exactly_one_target() -> None:
 async def test_owner_of_names_each_owner() -> None:
     owner_id = uuid.uuid4()
     rows = [
-        [(owner_id, None, None, None, None)],
-        [(None, owner_id, None, None, None)],
-        [(None, None, owner_id, None, None)],
-        [(None, None, None, owner_id, None)],
-        [(None, None, None, None, owner_id)],
-        [(None, None, None, None, None)],
+        [(owner_id, None, None, None, None, None)],
+        [(None, owner_id, None, None, None, None)],
+        [(None, None, owner_id, None, None, None)],
+        [(None, None, None, owner_id, None, None)],
+        [(None, None, None, None, owner_id, None)],
+        [(None, None, None, None, None, owner_id)],
+        [(None, None, None, None, None, None)],
         [],
     ]
     session = ScriptedSession(execute=rows)
@@ -105,6 +106,7 @@ async def test_owner_of_names_each_owner() -> None:
         "ticket_note",
         "todo_comment",
         "comment",
+        "agenda_item",
         None,
         None,
     ]
