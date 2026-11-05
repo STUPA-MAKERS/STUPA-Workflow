@@ -991,6 +991,7 @@ class FlowService:
         reverted_audit_id: int,
         reverted_status_event_id: UUID | None = None,
         decision_swap: DecisionSwap | None = None,
+        note: str = "revert",
     ) -> UUID:
         """Undo an audited status change (audit-log revert).
 
@@ -1021,6 +1022,9 @@ class FlowService:
 
         The `UPDATE` uses optimistic locking as in `fire`: when a concurrent transition has
         already moved the state, the row count is 0 and the caller gets 409.
+
+        `note` is the note of the new status event: `revert` for the audit-log revert,
+        `vote:repeat` when a meeting repeats the vote that made the change.
 
         Returns:
             The id of the new status event.
@@ -1057,7 +1061,7 @@ class FlowService:
             to_state_id=from_state_id,
             transition_id=None,
             actor=actor,
-            note="revert",
+            note=note,
         )
         self.session.add(event)
         await self.session.flush()

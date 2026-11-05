@@ -20,6 +20,8 @@ from app.modules.auth.principal import Principal
 from app.modules.livevote.agenda_service import AgendaService
 from app.modules.livevote.schemas import MeetingOut
 from app.modules.livevote.service import MeetingService
+from app.modules.livevote.vote_repeat import reopen_application
+from app.modules.voting.models import Vote
 from app.shared.errors import ConflictError, NotFoundError
 
 
@@ -33,13 +35,24 @@ async def check_draft_open(
     """
     meetings = MeetingService(session)
     meeting = await meetings.get(meeting_id, principal)
-    return await draft_open_checks(meetings, AgendaService(session), meeting, vote_id)
+    return await draft_open_checks(
+        meetings, AgendaService(session), meeting, vote_id, actor=principal.sub
+    )
 
 
 async def draft_open_checks(
-    service: MeetingService, agenda: AgendaService, meeting: MeetingOut, vote_id: UUID
+    service: MeetingService,
+    agenda: AgendaService,
+    meeting: MeetingOut,
+    vote_id: UUID,
+    *,
+    actor: str,
 ) -> int:
     """Refuse the open of a draft that the current state does not allow.
+
+    A prepared repeat of a closed application vote first moves the application back
+    into its vote state (``vote_repeat.reopen_application``, commits), so the repeat
+    can decide it again.
 
     Returns:
         The quorum denominator from the current roster.
@@ -47,8 +60,9 @@ async def draft_open_checks(
     Raises:
         NotFoundError: The meeting has no such vote.
         ConflictError: The meeting is not live, the vote is no longer a draft, guests
-            no longer vote on it (``guests_vote_unavailable``), or its application
-            cannot be decided now.
+            no longer vote on it (``guests_vote_unavailable``), its application
+            cannot be decided now, or the application of a repeat changed its status
+            after the repeated vote (``application_moved_on``).
     """
     assert_vote_window(meeting, draft=False)
     vote = next((v for v in meeting.votes if v.id == vote_id), None)
@@ -68,6 +82,10 @@ async def draft_open_checks(
                 code="guests_vote_unavailable",
             )
     if vote.application_id is not None:
+        if vote.repeat_of_id is not None:
+            source = await service.session.get(Vote, vote.repeat_of_id)
+            if source is not None:
+                await reopen_application(service.session, source, actor=actor)
         await assert_application_votable(service, meeting, vote.application_id)
     return await eligible_count(service, meeting, guests_vote=vote.guests_vote)
 

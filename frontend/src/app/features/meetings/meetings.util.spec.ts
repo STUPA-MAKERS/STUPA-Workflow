@@ -245,3 +245,17 @@ describe('votesInText', () => {
     expect(votesInText(voteSnippetHead(open), [open]).size).toBe(0);
   });
 });
+
+describe('the head of a repeat', () => {
+  it('names the attempt of a motion and a poll, and the next ballot of an election', () => {
+    expect(voteSnippetHead(vote({ question: 'Party?', attempt: 2 }))).toBe(
+      '> [!abstimmung] **Party? (2. Abstimmung)**',
+    );
+    expect(voteSnippetHead(vote({ kind: 'poll', question: 'Pizza?', attempt: 3 }))).toBe(
+      '> [!abstimmung] **Pizza? (3. Abstimmung)**',
+    );
+    expect(voteSnippetHead(vote({ kind: 'election', question: 'Vorsitz', attempt: 2 }))).toBe(
+      '> [!abstimmung] **Vorsitz (2. Wahlgang)**',
+    );
+  });
+});

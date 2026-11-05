@@ -6,6 +6,7 @@ import type { AgendaItem, Attendance, HandoverMode, Meeting, Uuid } from '@core/
 import { ToastService } from '@stupa-makers/ui-kit';
 import { MeetingSessionService } from './meeting-session.service';
 import { MeetingsTimelineService } from './meetings-timeline.service';
+import type { VoteDialogSource } from './vote-open-dialog/vote-open-dialog.component';
 import { problemCode, problemDetail } from '@core/api/problem';
 
 /** The refusals of a handover that the dialog explains in its body. */
@@ -42,6 +43,8 @@ export class MeetingDialogsService {
   readonly agendaOpen = signal(false);
   /** "Abstimmung öffnen" for this agenda item of the loaded meeting. */
   readonly voteItem = signal<AgendaItem | null>(null);
+  /** The vote that the vote dialog changes or repeats, or `null` for a new vote. */
+  readonly voteSource = signal<VoteDialogSource | null>(null);
   /** "Protokollführung übergeben" to this member of the loaded live meeting. */
   readonly handoverTarget = signal<Attendance | null>(null);
   /** The handover request runs. */
@@ -92,8 +95,14 @@ export class MeetingDialogsService {
 
   /** The vote dialog opened a vote. */
   voteOpened(updated: Meeting): void {
-    this.voteItem.set(null);
+    this.closeVoteDialog();
     this.applyUpdated(updated);
+  }
+
+  /** Close the vote dialog and forget the vote it started from. */
+  closeVoteDialog(): void {
+    this.voteItem.set(null);
+    this.voteSource.set(null);
   }
 
   /**

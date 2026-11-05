@@ -156,6 +156,8 @@ class VoteReadOps(MeetingServiceBase):
                     presentMembers=members,
                     presentGuests=guests,
                     proposal=DecisionIn.from_stored(getattr(v, "proposal", None)),
+                    repeatOfId=getattr(v, "repeat_of_id", None),
+                    attempt=getattr(v, "attempt", 1) or 1,
                     **election_fields(v),
                     **poll_fields(
                         v,

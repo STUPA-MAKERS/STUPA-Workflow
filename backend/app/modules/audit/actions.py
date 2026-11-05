@@ -102,6 +102,9 @@ class AuditAction(StrEnum):
             and the application stays in its state.
         VOTE_LOT_DRAWN: The platform drew the lot of an election tie. ``data`` carries
             the candidate ids (``among``, ``seats``, ``drawn``).
+        VOTE_UPDATE: A prepared meeting vote (a draft) changed before it opened:
+            its question, its rules, its candidates or its options. ``data`` carries
+            the kind and the id references, never the question or a candidate name.
         POLL_CREATED: A poll ("Umfrage") was created, or (POLL_UPDATED) its question,
             options or end changed before the first answer. ``data`` carries the mode
             and the number of options. Open, close and cancel of a poll write
@@ -181,6 +184,7 @@ class AuditAction(StrEnum):
     VOTE_CANCEL = "vote_cancel"
     VOTE_BRANCH_BLOCKED = "vote_branch_blocked"
     VOTE_LOT_DRAWN = "vote_lot_drawn"
+    VOTE_UPDATE = "vote_update"
     POLL_CREATED = "poll_created"
     POLL_UPDATED = "poll_updated"
     MEETING_PUBLIC_JOIN_CHANGED = "meeting_public_join_changed"

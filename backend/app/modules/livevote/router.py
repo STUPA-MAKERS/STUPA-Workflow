@@ -54,24 +54,27 @@ from app.modules.livevote.schemas import (
     MeetingOut,
     MeetingPage,
     MeetingPatch,
+    MeetingVoteBody,
     MeetingVoteOpenBody,
     ProtokollantHandoverBody,
 )
 from app.modules.livevote.service import BrokerPublisher, MeetingService
+from app.modules.livevote.vote_build import build_meeting_vote
 from app.modules.livevote.vote_open import (
     assert_application_votable,
     assert_vote_window,
     draft_open_checks,
-    eligible_count,
+)
+from app.modules.livevote.vote_repeat import (
+    assert_reopenable,
+    reopen_application,
+    repeat_source,
 )
 from app.modules.notifications.auto import AutoMailer, get_auto_mailer
 from app.modules.todos.live import publish_pings, todo_broker
 from app.modules.todos.service import TodoService
-from app.modules.voting.poll import build_config as build_poll_config
-from app.modules.voting.schemas import VoteCreateInternal
-from app.modules.voting.service import VotingService, secret_only
+from app.modules.voting.service import VotingService
 from app.settings import Settings, get_settings
-from app.shared.config_schemas import ElectionConfig, PollConfig, VoteConfig
 from app.shared.errors import (
     ConflictError,
     ForbiddenError,
@@ -638,6 +641,12 @@ async def open_meeting_vote(
 
     Every vote is secret: a motion, an election and a poll. ``secret`` false gives 422
     ``open_vote_unavailable``.
+
+    ``repeatOf`` repeats a closed vote of the same agenda item ("erneut abstimmen", see
+    ``vote_repeat``): an application item then takes the new vote too. When the new
+    vote opens at once, the route first moves the application back into its vote
+    state; a prepared repeat does that at its open. 409 ``application_moved_on`` when
+    the application changed its status after the closed vote.
     """
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_manage_votes:
@@ -646,89 +655,31 @@ async def open_meeting_vote(
         await service.assert_can_run_votes(meeting_id, principal)
     assert_vote_window(meeting, draft=payload.draft)
     item = await agenda.item(meeting_id, payload.agenda_item_id)
-    guests_allowed = meeting.public_join and meeting.guests_mode == "vote"
-    if payload.guests_vote and not guests_allowed:
-        raise ValidationProblem(
-            "Guests do not vote in this meeting.",
-            code="guests_vote_unavailable",
-            errors=[{"field": "guestsVote", "msg": "the meeting does not let guests vote"}],
-        )
-    if payload.guests_vote and item.non_public:
-        raise ValidationProblem(
-            "Guests never vote on a non-public agenda item.",
-            code="guests_vote_non_public",
-            errors=[{"field": "guestsVote", "msg": "non-public agenda item"}],
-        )
-    election = payload.kind == "election"
-    if election and item.application_id is not None:
-        raise ValidationProblem(
-            "An election belongs to a free-text agenda item.",
-            code="election_on_application_item",
-            errors=[{"field": "kind", "msg": "an application agenda item"}],
-        )
-    if payload.poll is not None and item.application_id is not None:
-        raise ValidationProblem(
-            "A poll belongs to a free-text agenda item.",
-            code="poll_on_application_item",
-            errors=[{"field": "kind", "msg": "an application agenda item"}],
-        )
-    guests_vote = (
-        payload.guests_vote
-        if payload.guests_vote is not None
-        else guests_allowed and not item.non_public and not election
+    source = (
+        await repeat_source(service.session, meeting_id, item.id, payload.repeat_of)
+        if payload.repeat_of is not None
+        else None
     )
+    if (
+        item.application_id is not None
+        and source is None
+        and await service.agenda_item_has_vote(item.id)
+    ):
+        raise ConflictError("this application TOP already has a decision vote")
+    create = await build_meeting_vote(service, meeting, item, payload)
     if item.application_id is not None:
-        if await service.agenda_item_has_vote(item.id):
-            raise ConflictError("this application TOP already has a decision vote")
-        await assert_application_votable(service, meeting, item.application_id)
-    config_data: dict[str, object] = (
-        {
-            "seats": payload.seats,
-            "candidates": payload.election_candidates(),
-            "secret": secret_only(payload.secret, field="secret"),
-            "guestsVote": guests_vote,
-        }
-        if election
-        else {
-            "options": payload.options,
-            "majorityRule": payload.majority_rule,
-            "secret": secret_only(payload.secret, field="secret"),
-            "tieBreak": "rejected",
-            "guestsVote": guests_vote,
-        }
-    )
-    quorum_percent = (
-        None
-        if guests_vote or payload.poll is not None
-        else payload.quorum_percent
-        if payload.quorum_percent is not None
-        else await service.gremium_quorum_percent(meeting.gremium_id)
-    )
-    if quorum_percent is not None:
-        config_data["quorum"] = {"type": "percent", "value": quorum_percent}
-    if election:
-        await service.assert_candidates_exist(
-            [c.principal_id for c in payload.candidates if c.principal_id is not None]
+        moved_on = (
+            source is not None and await assert_reopenable(service.session, source) is not None
         )
-    config: VoteConfig | ElectionConfig | PollConfig
-    if payload.poll is not None:
-        config = build_poll_config(
-            payload.poll,
-            secret=secret_only(payload.secret, field="secret"),
-            guests_vote=guests_vote,
+        if source is not None and moved_on and not payload.draft:
+            await reopen_application(service.session, source, actor=principal.sub)
+            moved_on = False
+        if not moved_on:
+            await assert_application_votable(service, meeting, item.application_id)
+    if source is not None:
+        create = create.model_copy(
+            update={"repeat_of_id": source.id, "attempt": (source.attempt or 1) + 1}
         )
-    elif election:
-        config = ElectionConfig.model_validate(config_data)
-    else:
-        config = VoteConfig.model_validate(config_data)
-    eligible = await eligible_count(service, meeting, guests_vote=guests_vote)
-    create = VoteCreateInternal(
-        config=config,
-        eligibleGroup=meeting.gremium_id,
-        question=payload.question,
-        eligibleCount=eligible,
-        proposal=payload.proposal,
-    )
     vote = await voting.create_internal(
         item.application_id,
         create,
@@ -775,11 +726,57 @@ async def open_prepared_meeting_vote(
     if not meeting.can_manage_votes:
         raise ForbiddenError("not allowed to open a vote in this meeting")
     await service.assert_can_run_votes(meeting_id, principal)
-    eligible = await draft_open_checks(service, agenda, meeting, vote_id)
+    eligible = await draft_open_checks(
+        service, agenda, meeting, vote_id, actor=principal.sub
+    )
     opened = await voting.open(
         vote_id, now=datetime.now(UTC), actor=principal.sub, eligible_count=eligible
     )
     await BrokerPublisher(broker).vote_opened(opened)
+    return await service.get(meeting_id, principal)
+
+
+@router.put(
+    "/meetings/{meeting_id}/votes/{vote_id}",
+    response_model=MeetingOut,
+    responses=_errors(401, 403, 404, 409, 422),
+)
+async def update_meeting_vote(
+    meeting_id: UUID,
+    vote_id: UUID,
+    payload: MeetingVoteBody,
+    service: ServiceDep,
+    voting: VotingDep,
+    agenda: AgendaDep,
+    principal: ReaderDep,
+) -> MeetingOut:
+    """Change a prepared vote: its question, its rules, its candidates or its options.
+
+    The body is the body of the create without ``draft`` and ``repeatOf``. It
+    replaces the whole vote, with the checks of the create (``build_meeting_vote``).
+    ``agendaItemId`` must name the agenda item of the vote (422
+    ``agenda_item_mismatch``): a vote does not move between items. The caller needs
+    ``canManageVotes``, as for the prepare. Only a draft changes (409
+    ``vote_not_editable``), in a planned or live meeting (409 ``meeting_closed``). The
+    route writes ``vote_update`` and broadcasts ``meeting_state``.
+    """
+    meeting = await service.get(meeting_id, principal)
+    if not meeting.can_manage_votes:
+        raise ForbiddenError("not allowed to change a vote in this meeting")
+    assert_vote_window(meeting, draft=True)
+    current = next((v for v in meeting.votes if v.id == vote_id), None)
+    if current is None:
+        raise NotFoundError(f"vote {vote_id} not found in this meeting")
+    if current.agenda_item_id != payload.agenda_item_id:
+        raise ValidationProblem(
+            "A vote stays on its agenda item.",
+            code="agenda_item_mismatch",
+            errors=[{"field": "agendaItemId", "msg": "not the agenda item of the vote"}],
+        )
+    item = await agenda.item(meeting_id, payload.agenda_item_id)
+    create = await build_meeting_vote(service, meeting, item, payload)
+    await voting.update_draft(vote_id, create, meeting_id=meeting_id, actor=principal.sub)
+    await service.broadcast_state(meeting_id, principal)
     return await service.get(meeting_id, principal)
 
 

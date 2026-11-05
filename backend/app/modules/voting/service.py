@@ -784,6 +784,8 @@ class VotingService:
             tally=tally_out,
             guestsVote=config.guests_vote,
             proposal=DecisionIn.from_stored(getattr(vote, "proposal", None)),
+            repeatOfId=getattr(vote, "repeat_of_id", None),
+            attempt=getattr(vote, "attempt", 1) or 1,
             **election_mod.election_fields(vote),
             **poll_mod.poll_fields(vote, poll_live),
         )
@@ -1023,6 +1025,8 @@ class VotingService:
             kind=kind,
             parent_vote_id=payload.parent_vote_id,
             round=payload.round,
+            repeat_of_id=payload.repeat_of_id,
+            attempt=payload.attempt,
             application_id=application_id,
             meeting_id=meeting_id,
             agenda_item_id=agenda_item_id,
@@ -1063,6 +1067,74 @@ class VotingService:
         return self._to_out(
             vote, config, await self._tally_out(vote, config, empty, vote.eligible_count or 0)
         )
+
+    async def update_draft(
+        self,
+        vote_id: UUID,
+        payload: VoteCreateInternal,
+        *,
+        meeting_id: UUID,
+        actor: str | None = None,
+    ) -> Vote:
+        """Replace the question, the rules and the options of a prepared meeting vote.
+
+        Only a ``draft`` changes, because a draft holds no ballot: an open vote has
+        ballots that were cast against its question, and a closed one is part of the
+        record. The kind can change too (a motion becomes a poll on a free-text item).
+        The agenda item, the application and the repeat link stay. The open counts the
+        roster again, so ``eligible_count`` only keeps the draft consistent. The method
+        writes ``vote_update`` and commits.
+
+        Raises:
+            NotFoundError: The meeting has no such vote.
+            ConflictError: The vote is no longer a draft (``vote_not_editable``).
+            ValidationProblem: A proposal without an application
+                (``decision_not_allowed``) or with a bad amount (422).
+        """
+        vote = await self._get_vote(vote_id, for_update=True)
+        if vote.meeting_id != meeting_id:
+            raise NotFoundError(f"vote {vote_id} not found in this meeting")
+        if vote.status != "draft":
+            raise ConflictError(
+                f"vote is {vote.status}; only a prepared vote can change.",
+                code="vote_not_editable",
+            )
+        if vote.application_id is None and payload.proposal is not None:
+            raise not_allowed_problem("Only an application vote takes a decision proposal.")
+        if vote.application_id is not None:
+            self._check_proposal(
+                await self._get_application(vote.application_id), payload.proposal
+            )
+        config = payload.config
+        kind: VoteKind = "motion"
+        if isinstance(config, ElectionConfig):
+            kind = "election"
+        elif isinstance(config, PollConfig):
+            kind = "poll"
+        vote.kind = kind
+        vote.question = payload.question
+        vote.config = (
+            config.model_dump(mode="json", by_alias=True)
+            if kind != "motion"
+            else config.model_dump(by_alias=True)
+        )
+        vote.eligible_count = payload.eligible_count
+        vote.proposal = payload.proposal.to_json() if payload.proposal is not None else None
+        await audit_record(
+            self.session,
+            actor=actor,
+            action=AuditAction.VOTE_UPDATE,
+            target_type="vote",
+            target_id=str(vote.id),
+            data={
+                "kind": kind,
+                "meetingId": str(meeting_id),
+                "agendaItemId": str(vote.agenda_item_id) if vote.agenda_item_id else None,
+                "applicationId": str(vote.application_id) if vote.application_id else None,
+            },
+        )
+        await self.session.commit()
+        return vote
 
     async def open(
         self,

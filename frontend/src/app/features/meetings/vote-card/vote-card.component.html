@@ -6,7 +6,13 @@
       @if (!folded() && result(); as r) {
         <app-status-text class="vc__result" [kind]="r.kind">{{ r.key | t }}</app-status-text>
       }
+      @if (repeated()) {
+        <app-status-text class="vc__result" kind="muted">{{ 'meetings.vote.repeated' | t }}</app-status-text>
+      }
     </div>
+  }
+  @if (attemptCap(); as cap) {
+    <p class="vc__meta">{{ cap }}</p>
   }
   @if (!folded() && electionCap(); as cap) {
     <p class="vc__meta">{{ cap }}</p>
@@ -108,6 +114,15 @@
     </dl>
   }
 
+  @if (v.status === 'draft' && canEdit()) {
+    <div class="vc__actions">
+      <app-button variant="tonal" [block]="true" (click)="edit.emit(v)">
+        <app-icon name="edit" />
+        {{ 'meetings.vote.edit' | t }}
+      </app-button>
+    </div>
+  }
+
   @if (v.status === 'draft' && canEdit() && meetingStatus() === 'planned') {
     <p class="vc__hint">{{ 'meetings.vote.opensLater' | t }}</p>
   }
@@ -131,6 +146,15 @@
       <app-button variant="tonal" [block]="true" (click)="insertResult.emit(v)">
         <app-icon name="fileplus" />
         {{ 'meetings.dock.insertResult' | t }}
+      </app-button>
+    </div>
+  }
+
+  @if (v.status === 'closed' && canRepeat() && canEdit() && meetingStatus() === 'live') {
+    <div class="vc__actions">
+      <app-button variant="tonal" [block]="true" (click)="repeat.emit(v)">
+        <app-icon name="repeat" />
+        {{ (election() ? 'meetings.vote.repeatElection' : 'meetings.vote.repeat') | t }}
       </app-button>
     </div>
   }

@@ -128,6 +128,14 @@ class Vote(UUIDPkMixin, CreatedAtMixin, Base):
     #: reminder mail 24 h before that end.
     poll_result: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     reminded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    #: A repeat ("erneut abstimmen") of a closed meeting vote on the same agenda item.
+    #: ``repeat_of_id`` points to the vote it repeats, and ``attempt`` counts the votes of
+    #: the chain (1 for a first vote). The repeated vote keeps its result: the protocol
+    #: shows it, marked as repeated.
+    repeat_of_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("vote.id", ondelete="SET NULL"), nullable=True
+    )
+    attempt: Mapped[int] = mapped_column(Integer, server_default="1", default=1)
 
     __table_args__ = (
         CheckConstraint(
@@ -140,6 +148,7 @@ class Vote(UUIDPkMixin, CreatedAtMixin, Base):
         CheckConstraint("kind IN ('motion','election','poll')", name="vote_kind"),
         Index("ix_vote_application_id", "application_id"),
         Index("ix_vote_status_closes_at", "status", "closes_at"),
+        Index("ix_vote_repeat_of_id", "repeat_of_id"),
     )
 
 

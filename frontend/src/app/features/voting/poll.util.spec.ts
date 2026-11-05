@@ -14,6 +14,7 @@ import {
   pollChoiceLabel,
   pollChoiceLimit,
   pollCountText,
+  pollDraftOf,
   pollDraftValid,
   pollInOf,
   pollLabelOf,
@@ -162,5 +163,41 @@ describe('poll.util', () => {
       expect(draftDateLabel(date(2, '2026-11-03', '18:00'), 'de-DE')).toBe('Di, 3.11. · 18:00');
       expect(draftDateLabel(date(3, '2026-11-03', ''), 'de-DE')).toBe('2026-11-03');
     });
+  });
+});
+
+describe('pollDraftOf', () => {
+  it('turns a stored poll back into the editor draft', () => {
+    const draft = pollDraftOf({
+      mode: 'multi',
+      maxChoices: 3,
+      secret: false,
+      options: [{ id: 'o1', label: 'Ja' }, { id: 'o2' }],
+    });
+    expect(draft).toEqual({
+      mode: 'multi',
+      maxChoices: 3,
+      options: [
+        { key: -1, label: 'Ja', date: '', start: '', end: '' },
+        { key: -2, label: '', date: '', start: '', end: '' },
+      ],
+    });
+  });
+
+  it('gives a date option its local day and times', () => {
+    const start = new Date(2026, 10, 3, 18, 5);
+    const end = new Date(2026, 10, 3, 20, 0);
+    const draft = pollDraftOf({
+      mode: 'date',
+      secret: false,
+      options: [
+        { id: 'o1', start: start.toISOString(), end: end.toISOString() },
+        { id: 'o2', start: start.toISOString() },
+      ],
+    });
+    expect(draft.maxChoices).toBe(2);
+    expect(draft.options[0]).toEqual({ key: -1, label: '', date: '2026-11-03', start: '18:05', end: '20:00' });
+    expect(draft.options[1]?.end).toBe('');
+    expect(pollInOf(draft).options[0]).toEqual({ start: start.toISOString(), end: end.toISOString() });
   });
 });

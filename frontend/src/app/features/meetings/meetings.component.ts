@@ -45,7 +45,10 @@ import { MeetingGuestsService } from './meeting-guests.service';
 import { MeetingSettingsDialogComponent } from './meeting-settings-dialog/meeting-settings-dialog.component';
 import { MeetingsOverviewComponent } from './meetings-overview/meetings-overview.component';
 import { MeetingsTimelineService } from './meetings-timeline.service';
-import { VoteOpenDialogComponent } from './vote-open-dialog/vote-open-dialog.component';
+import {
+  type VoteDialogSource,
+  VoteOpenDialogComponent,
+} from './vote-open-dialog/vote-open-dialog.component';
 import {
   countEntries,
   voteOptionLabel,
@@ -331,6 +334,16 @@ export class MeetingsComponent {
 
   /** "Abstimmung öffnen" for an agenda item. */
   openVoteDialog(item: AgendaItem): void {
+    this.dialogs.voteSource.set(null);
+    this.dialogs.voteItem.set(item);
+  }
+
+  /** "Bearbeiten" of a prepared vote or "Erneut abstimmen" of a closed one: the vote dialog
+   *  starts from the vote, on its agenda item. */
+  openVoteSource(source: VoteDialogSource): void {
+    const item = this.agenda().find((a) => a.id === source.vote.agendaItemId);
+    if (!item) return;
+    this.dialogs.voteSource.set(source);
     this.dialogs.voteItem.set(item);
   }
 

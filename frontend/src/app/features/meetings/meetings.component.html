@@ -56,6 +56,7 @@
     (voteCancel)="cancelVote($event)"
     (voteDelete)="deleteVote($event)"
     (voteDialog)="openVoteDialog($event)"
+    (voteSource)="openVoteSource($event)"
     (startSession)="startMeeting()"
     (closeSession)="askCloseMeeting()"
     (finalize)="finalize()"
@@ -143,7 +144,8 @@
     [rosterCount]="attendance().length"
     [members]="attendance()"
     [presentMembers]="presentMembers()"
-    (closed)="dialogs.voteItem.set(null)"
+    [source]="dialogs.voteSource()"
+    (closed)="dialogs.closeVoteDialog()"
     (opened)="dialogs.voteOpened($event)"
   />
 
