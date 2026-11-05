@@ -7,6 +7,7 @@ import {
   inject,
   signal,
   untracked,
+  NgZone,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -37,7 +38,7 @@ import type { BallotCaster, BallotFailure } from './ballot/ballot.component';
 import { VotePhoneHeaderComponent } from './phone-header/phone-header.component';
 import { VotePanelComponent } from './vote-panel/vote-panel.component';
 import { NO_CONTEXT, type VoteContext, loadVoteContext } from './vote-panel/vote-context';
-import { VotingPageService } from './voting-page/voting-page.service';
+import { VotingPageService, visibleTicks } from './voting-page/voting-page.service';
 import { BEAMER_FROM_PARAM } from './beamer-link.util';
 import { TodoLinkedListComponent } from '../todos/linked-list/todo-linked-list.component';
 
@@ -69,6 +70,8 @@ const NOT_CAST: MyBallot = { cast: false, choice: null };
  * - A meeting vote follows its meeting over the WebSocket while it is a draft or open:
  *   the turnout grows with each ballot, an open or a close reads the vote again, so the
  *   result shows as the server has it, and a cancel shows the cancelled vote.
+ * - A draft or an open vote without a channel (a poll of a Gremium) reads itself again
+ *   every `VOTE_POLL_MS` while the tab is visible and when the tab comes back.
  * - A meeting vote names its meeting and agenda item ("34. Sitzung · TOP 3") and links
  *   the beamer for a person who may run the meeting. A vote without a meeting links its
  *   application, and a draft of it can be deleted.
@@ -278,6 +281,9 @@ export class VoteCastComponent implements OnDestroy {
   constructor() {
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((pm) => this.open(pm.get('id')));
     this.followLive();
+    visibleTicks(inject(NgZone))
+      .pipe(takeUntilDestroyed())
+      .subscribe(() => this.poll());
     effect(() => {
       const vote = this.loaded();
       const shown = vote
@@ -509,6 +515,28 @@ export class VoteCastComponent implements OnDestroy {
         this.delegation.set(status);
         if (status.blocked) this.notEligible.set(true);
         else if (was?.blocked && this.loaded()?.canCast === true) this.notEligible.set(false);
+      },
+      error: () => {},
+    });
+  }
+
+  /**
+   * The pane updates itself: a draft or an open vote without a live channel (a poll of a
+   * Gremium) is read again every `VOTE_POLL_MS` while the tab is visible, and when the tab
+   * comes back. The turnout grows, a start or an end shows. A new status tells the list.
+   * A meeting vote has its channel, which is faster.
+   */
+  private poll(): void {
+    const vote = this.loaded();
+    if (!vote || this.session()) return;
+    if (vote.status !== 'open' && vote.status !== 'draft') return;
+    const id = vote.id;
+    this.api.getVote(id, { quiet: true }).subscribe({
+      next: (v) => {
+        if (this.currentId !== id) return;
+        const was = this.loaded()?.status;
+        this.loaded.set(v);
+        if (was && was !== v.status) this.page?.notify({ id, kind: 'updated' });
       },
       error: () => {},
     });

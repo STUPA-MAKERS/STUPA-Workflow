@@ -1,12 +1,14 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   type OnDestroy,
   computed,
   effect,
   inject,
   signal,
   untracked,
+  NgZone,
   viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -46,7 +48,7 @@ import {
 import { injectListDetailPage } from '@stupa-makers/ui-kit/shell';
 import { meetingVoteStatus, type StatusView } from '@shared/status-kind.util';
 import { LIVE_MAX_PAGES, LIVE_PAGE_LIMIT } from '../../../layout/rail-status.service';
-import { VotingPageService } from './voting-page.service';
+import { VotingPageService, visibleTicks } from './voting-page.service';
 import { closedStatus } from '../election.util';
 import { pollStatus } from '../poll.util';
 import { NewPollDialogComponent } from '../new-poll-dialog/new-poll-dialog.component';
@@ -120,6 +122,8 @@ export interface VoteGroup {
  * - Right: the child route `/voting/:id` with the vote (`VoteCastComponent`): the
  *   two-step ballot, the proxy ballot, the turnout, the result and the manage actions.
  *   After a cast the detail stays on the vote and the row reads "Abgestimmt".
+ * - Self-update: every `VOTE_POLL_MS` while the tab is visible and when the tab comes
+ *   back, the list reads its rows again and follows the meetings that started since.
  * - Live: the page follows the running meetings over the WebSocket. A vote that opens,
  *   closes or is cancelled reloads the list. The page opens a vote that just opened when
  *   no vote is open in the detail (also on a phone, from the list), or when the detail
@@ -168,6 +172,7 @@ export class VotingComponent implements OnDestroy {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly page = inject(VotingPageService);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly phone = mediaQuery(MEDIA.phone);
 
@@ -356,6 +361,10 @@ export class VotingComponent implements OnDestroy {
     });
 
     this.followLive();
+
+    visibleTicks(inject(NgZone))
+      .pipe(takeUntilDestroyed())
+      .subscribe(() => this.poll());
   }
 
   ngOnDestroy(): void {
@@ -497,6 +506,34 @@ export class VotingComponent implements OnDestroy {
   private liveTimer: ReturnType<typeof setTimeout> | null = null;
 
   /**
+   * The page updates itself: every `VOTE_POLL_MS` while the tab is visible, and when the
+   * tab comes back to the front, it reads the loaded rows again and follows the meetings
+   * that started since. A load that runs already is not interrupted.
+   */
+  private poll(): void {
+    if (this.loading() || this.reloading() || this.loadingMore()) return;
+    this.refresh();
+    this.followRunning();
+  }
+
+  /** Follow every live meeting of the upcoming timeline (as the rail finds them). */
+  private followRunning(): void {
+    const page = (cursor: string | null) =>
+      this.api.listMeetingsTimeline({ direction: 'upcoming', limit: LIVE_PAGE_LIMIT, cursor });
+    page(null)
+      .pipe(
+        expand((p, i) => (p.nextCursor && i + 1 < LIVE_MAX_PAGES ? page(p.nextCursor) : EMPTY)),
+        map((p) => p.items.filter((m) => m.status === 'live')),
+        reduce((all, items) => [...all, ...items], [] as Meeting[]),
+        catchError(() => of([] as Meeting[])),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((running) => {
+        for (const m of running) this.page.follow(m.id);
+      });
+  }
+
+  /**
    * Follow the running meetings: the live meetings of the upcoming timeline (as the rail
    * finds them) and the meetings of the open votes in the list. A vote that opens,
    * closes or is cancelled in one of them reloads the list, and a vote that just opened
@@ -506,19 +543,7 @@ export class VotingComponent implements OnDestroy {
    * the channel, not from the rows, so a filter that hides the vote does not make it new.
    */
   private followLive(): void {
-    const page = (cursor: string | null) =>
-      this.api.listMeetingsTimeline({ direction: 'upcoming', limit: LIVE_PAGE_LIMIT, cursor });
-    page(null)
-      .pipe(
-        expand((p, i) => (p.nextCursor && i + 1 < LIVE_MAX_PAGES ? page(p.nextCursor) : EMPTY)),
-        map((p) => p.items.filter((m) => m.status === 'live')),
-        reduce((all, items) => [...all, ...items], [] as Meeting[]),
-        catchError(() => of([] as Meeting[])),
-        takeUntilDestroyed(),
-      )
-      .subscribe((running) => {
-        for (const m of running) this.page.follow(m.id);
-      });
+    this.followRunning();
 
     let last: string | null = null;
     effect(() => {

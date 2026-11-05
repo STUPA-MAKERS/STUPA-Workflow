@@ -2,7 +2,7 @@ import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import { of, throwError } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
 import { screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { ApiClient } from '@core/api/api-client.service';
@@ -14,7 +14,7 @@ import { LIVE_SEARCH_DEBOUNCE_MS, MEDIA } from '@stupa-makers/ui-kit';
 import { matchMediaQueries } from '../../../../testing/meeting-fixtures';
 import { VotingComponent, VOTE_LIVE_DEBOUNCE, VOTE_MAX_LIMIT } from './voting.component';
 import { VotingNoneComponent } from './voting-none.component';
-import { VotingPageService } from './voting-page.service';
+import { VOTE_POLL_MS, VotingPageService } from './voting-page.service';
 
 /** The detail of the outlet. The detail has its own spec; here only the route matters. */
 @Component({ standalone: true, template: '<p>detail</p>' })
@@ -862,6 +862,64 @@ describe('VotingComponent', () => {
         jest.useRealTimers();
         restore();
       }
+    });
+
+    describe('self-update', () => {
+      const back = () => document.dispatchEvent(new Event('visibilitychange'));
+      afterEach(() =>
+        Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true }),
+      );
+
+      it('reads the rows again and follows a meeting that started since, when the tab comes back', async () => {
+        const { listVotes, listMeetingsTimeline, live } = await start('/voting', {
+          pages: [page([item('v1')])],
+        });
+        expect(live.open).not.toHaveBeenCalled();
+        listVotes.mockClear();
+        listMeetingsTimeline.mockReturnValue(
+          of({ items: [{ id: 'm9', status: 'live' }] as Meeting[], nextCursor: null }),
+        );
+        back();
+        expect(listVotes).toHaveBeenCalledWith(expect.objectContaining({ offset: 0, limit: 30 }));
+        expect(live.open).toHaveBeenCalledWith('m9');
+      });
+
+      it('reads every VOTE_POLL_MS while the tab is visible', async () => {
+        jest.useFakeTimers({ doNotFake: ['Date'] });
+        try {
+          const { listVotes } = await start('/voting', { pages: [page([item('v1')])] });
+          listVotes.mockClear();
+          jest.advanceTimersByTime(VOTE_POLL_MS);
+          expect(listVotes).toHaveBeenCalledTimes(1);
+        } finally {
+          jest.useRealTimers();
+        }
+      });
+
+      it('reads nothing while the tab is hidden', async () => {
+        const { listVotes } = await start('/voting', { pages: [page([item('v1')])] });
+        listVotes.mockClear();
+        Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+        back();
+        expect(listVotes).not.toHaveBeenCalled();
+      });
+
+      it('does not interrupt a load that runs', async () => {
+        const { cmp, listVotes } = await start('/voting', { pages: [page([item('v1')], 5)] });
+        listVotes.mockReturnValue(NEVER);
+        cmp.loadMore();
+        listVotes.mockClear();
+        back();
+        expect(listVotes).not.toHaveBeenCalled();
+        cmp.loadingMore.set(false);
+        cmp.reloading.set(true);
+        back();
+        expect(listVotes).not.toHaveBeenCalled();
+        cmp.reloading.set(false);
+        cmp.loading.set(true);
+        back();
+        expect(listVotes).not.toHaveBeenCalled();
+      });
     });
 
     it('clears its timers when the page goes away', async () => {
