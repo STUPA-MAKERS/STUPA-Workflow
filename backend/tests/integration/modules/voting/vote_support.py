@@ -140,7 +140,7 @@ async def add_vote(
     meeting_id: uuid.UUID | None = None,
     opens_state: str | None = None,
     opens_at: datetime | None = None,
-    secret: bool = False,
+    secret: bool = True,
 ) -> uuid.UUID:
     config = VoteConfig.model_validate(
         {"options": ["yes", "no", "abstain"], "majorityRule": "simple", "secret": secret}

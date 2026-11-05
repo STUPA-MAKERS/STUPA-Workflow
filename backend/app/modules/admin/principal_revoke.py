@@ -72,7 +72,7 @@ from app.modules.delegations.models import DelegationSubstitute, MeetingDelegati
 from app.modules.delegations.pool import pool_entries_of, pool_principals_stmt
 from app.modules.livevote.models import Meeting
 from app.modules.notifications.auto import DelegationMailInfo, meeting_delegation_mail_info
-from app.modules.voting.models import Ballot, Vote, VotedMarker
+from app.modules.voting.models import Vote, VotedMarker
 from app.settings import Settings
 from app.shared.errors import ConflictError, FieldError, NotFoundError, ValidationProblem
 
@@ -699,7 +699,7 @@ class PrincipalRevokeService:
         """Count the open votes per Gremium that still wait for a ballot of ``sub``.
 
         ``gremien`` are the Gremien where the gremium role of the person holds
-        ``vote.cast``. A vote names its Gremium in ``eligible_group``. A ballot or a voted marker of
+        ``vote.cast``. A vote names its Gremium in ``eligible_group``. A voted marker of
         ``sub`` means the person already voted.
         """
         if not gremien:
@@ -711,7 +711,6 @@ class PrincipalRevokeService:
                 .where(
                     Vote.status == "open",
                     Vote.eligible_group.in_(by_key),
-                    ~exists().where(Ballot.vote_id == Vote.id, Ballot.voter_sub == sub),
                     ~exists().where(VotedMarker.vote_id == Vote.id, VotedMarker.voter_sub == sub),
                 )
                 .group_by(Vote.eligible_group)

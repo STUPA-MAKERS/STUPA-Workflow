@@ -89,7 +89,7 @@ from app.modules.livevote.roster import meeting_window
 from app.modules.protocol.models import Protocol
 from app.modules.voting.election import election_config, is_election
 from app.modules.voting.listing import read_scope
-from app.modules.voting.models import Ballot, SecretBallot, Vote
+from app.modules.voting.models import SecretBallot, Vote
 from app.modules.voting.schemas import ElectionResultOut
 from app.shared.config_schemas import VoteConfig
 from app.shared.errors import BadRequestError, NotFoundError, ValidationProblem
@@ -870,23 +870,20 @@ class GremienService:
         return {aid: (title_of(data), amount) for aid, data, amount in rows.all()}
 
     async def _sums(self, votes: Sequence[Vote]) -> dict[UUID, dict[str, int]]:
-        """Return the sums per option of each motion: ``ballot``, or ``secret_ballot`` when secret.
+        """Return the sums per option of each motion from ``secret_ballot``.
 
-        A ``GROUP BY`` per table; no row ever leaves the database with a voter.
+        One ``GROUP BY``; no row ever leaves the database with a voter.
         """
-        secret = [v.id for v in votes if VoteConfig.from_stored(v.config).secret]
-        plain = [v.id for v in votes if v.id not in secret]
         out: dict[UUID, dict[str, int]] = {}
-        for model, ids in ((Ballot, plain), (SecretBallot, secret)):
-            if not ids:
-                continue
-            rows = await self.session.execute(
-                select(model.vote_id, model.choice, func.count())
-                .where(model.vote_id.in_(ids))
-                .group_by(model.vote_id, model.choice)
-            )
-            for vid, choice, n in rows.all():
-                out.setdefault(vid, {})[str(choice)] = int(n)
+        if not votes:
+            return out
+        rows = await self.session.execute(
+            select(SecretBallot.vote_id, SecretBallot.choice, func.count())
+            .where(SecretBallot.vote_id.in_([v.id for v in votes]))
+            .group_by(SecretBallot.vote_id, SecretBallot.choice)
+        )
+        for vid, choice, n in rows.all():
+            out.setdefault(vid, {})[str(choice)] = int(n)
         return out
 
     @staticmethod

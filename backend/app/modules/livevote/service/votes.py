@@ -19,11 +19,10 @@ from app.modules.delegations.models import MeetingDelegation
 from app.modules.livevote.models import MeetingAttendance, MeetingGuest
 from app.modules.livevote.schemas import MeetingVoteOut
 from app.modules.livevote.service.service_base import MeetingServiceBase
-from app.modules.voting.election import election_config, election_fields, is_election, own_ballot
-from app.modules.voting.models import Ballot, Vote, VotedMarker
+from app.modules.voting.election import election_config, election_fields, is_election
+from app.modules.voting.models import SecretBallot, Vote, VotedMarker
 from app.modules.voting.poll import is_poll, poll_config, poll_fields, result_of
 from app.modules.voting.schemas import MyBallot
-from app.modules.voting.service import open_tally_revealed
 from app.modules.voting.tally import ElectionOutcome, PollOutcome, tally_election, tally_poll
 from app.shared.config_schemas import VoteConfig
 from app.shared.errors import ValidationProblem
@@ -49,15 +48,8 @@ class VoteReadOps(MeetingServiceBase):
         guests who voted and left since then. A closed vote shows the attendance fixed at
         the close; a cancelled vote and an older closed vote have none.
 
-        The substitute ballots of absent delegators per meeting and gremium top up the
-        reveal denominator. The voting service applies the same rule in
-        `open_tally_revealed`, so the two paths cannot drift. The query runs only when an
-        open, non-secret vote exists, because only then does the denominator feed a reveal
-        decision.
-
-        The reveal rule matches the voting service. A closed vote reveals. A non-secret vote
-        reveals when all expected ballots are in: the present members plus the substitutes
-        of absent delegators. In every other case the counts and the leading option stay
+        The reveal rule matches the voting service: only a closed vote reveals. Every
+        vote is secret, so in every other case the counts and the leading option stay
         hidden, to prevent an interim leak.
         """
         if not meeting_ids:
@@ -83,13 +75,6 @@ class VoteReadOps(MeetingServiceBase):
             and bool((v.config if isinstance(v.config, dict) else {}).get("guestsVote"))
         ]
         late_guests = await self._departed_guest_voters(guest_votes) if guest_votes else {}
-        needs_deleg = any(
-            v.meeting_id is not None
-            and v.status not in ("closed", "cancelled")
-            and not bool((v.config if isinstance(v.config, dict) else {}).get("secret"))
-            for v in rows
-        )
-        absent_deleg = await self._absent_delegated_by_meeting(meeting_ids) if needs_deleg else {}
         own: dict[UUID, MyBallot] = {}
         represented: set[UUID] = set()
         if principal is not None and rows:
@@ -100,7 +85,6 @@ class VoteReadOps(MeetingServiceBase):
                 continue
             config = VoteConfig.from_stored(v.config)
             opts = config.options
-            secret = config.secret
             counts, leading, reason = tallies.get(v.id, (None, None, None))
             voted = sum((counts or {}).values())
             ev = elections.get(v.id)
@@ -123,13 +107,7 @@ class VoteReadOps(MeetingServiceBase):
                 extra = late_guests.get(v.id, 0)
                 guests = (guests or 0) + extra
                 present += guests_by_meeting.get(v.meeting_id, 0) + extra
-            if v.status == "closed":
-                revealed = True
-            elif secret:
-                revealed = False
-            else:
-                expected = present + absent_deleg.get((v.meeting_id, v.eligible_group), 0)
-                revealed = open_tally_revealed(present, voted, expected)
+            revealed = v.status == "closed"
             out.setdefault(v.meeting_id, []).append(
                 MeetingVoteOut(
                     id=v.id,
@@ -146,7 +124,7 @@ class VoteReadOps(MeetingServiceBase):
                     revealed=revealed,
                     failedReason=reason,
                     majorityRule=config.majority_rule,
-                    secret=secret,
+                    secret=config.secret,
                     quorum=config.quorum,
                     openedAt=v.opens_at,
                     closedAt=v.closed_at,
@@ -167,38 +145,31 @@ class VoteReadOps(MeetingServiceBase):
             )
         return out
 
+    async def _choices_by_vote(self, votes: Sequence[Vote]) -> dict[UUID, list[str | None]]:
+        """Load the stored choices of the votes from ``secret_ballot`` in one query."""
+        choices: dict[UUID, list[str | None]] = {}
+        for vid, choice in (
+            await self.session.execute(
+                select(SecretBallot.vote_id, SecretBallot.choice).where(
+                    SecretBallot.vote_id.in_([v.id for v in votes])
+                )
+            )
+        ).all():
+            choices.setdefault(vid, []).append(choice)
+        return choices
+
     async def _poll_tallies(self, votes: Sequence[Vote]) -> dict[UUID, PollOutcome]:
-        """Tally the polls of the reload path, one query per ballot table."""
+        """Tally the polls of the reload path in one query."""
         if not votes:
             return {}
-        from app.modules.voting.models import SecretBallot
-
-        ids = [v.id for v in votes]
-        choices: dict[UUID, list[str | None]] = {}
-        for model in (Ballot, SecretBallot):
-            for vid, choice in (
-                await self.session.execute(
-                    select(model.vote_id, model.choice).where(model.vote_id.in_(ids))
-                )
-            ).all():
-                choices.setdefault(vid, []).append(choice)
+        choices = await self._choices_by_vote(votes)
         return {v.id: tally_poll(choices.get(v.id, []), poll_config(v)) for v in votes}
 
     async def _election_tallies(self, votes: Sequence[Vote]) -> dict[UUID, ElectionOutcome]:
-        """Tally the elections of the reload path, one query per ballot table."""
+        """Tally the elections of the reload path in one query."""
         if not votes:
             return {}
-        from app.modules.voting.models import SecretBallot
-
-        ids = [v.id for v in votes]
-        choices: dict[UUID, list[str | None]] = {}
-        for model in (Ballot, SecretBallot):
-            for vid, choice in (
-                await self.session.execute(
-                    select(model.vote_id, model.choice).where(model.vote_id.in_(ids))
-                )
-            ).all():
-                choices.setdefault(vid, []).append(choice)
+        choices = await self._choices_by_vote(votes)
         return {
             v.id: tally_election(
                 choices.get(v.id, []),
@@ -238,11 +209,10 @@ class VoteReadOps(MeetingServiceBase):
     ) -> tuple[dict[UUID, MyBallot], set[UUID]]:
         """Return the own ballots of `sub` and the votes with a represented ballot.
 
-        The own ballot of an open vote carries the choice. A secret vote gives only
-        `cast` from the voted marker, because the choice has no link to the voter. A
-        represented ballot runs under the `sub` of the delegator: the active voting
-        delegation of this meeting and gremium, where `sub` is the delegate. One
-        batched query per table keeps this free of N+1.
+        The own ballot gives only `cast` from the voted marker, because the choice has
+        no link to the voter. A represented ballot runs under the `sub` of the
+        delegator: the active voting delegation of this meeting and gremium, where
+        `sub` is the delegate. One batched query per table keeps this free of N+1.
         """
         ids = [v.id for v in votes]
         meeting_ids = {v.meeting_id for v in votes if v.meeting_id is not None}
@@ -262,16 +232,6 @@ class VoteReadOps(MeetingServiceBase):
         ).all()
         delegator_of = {(mid, str(gid)): d_sub for mid, gid, d_sub in deleg_rows}
         subs = {sub, *delegator_of.values()}
-        choices = {
-            (vid, voter): choice
-            for vid, voter, choice in (
-                await self.session.execute(
-                    select(Ballot.vote_id, Ballot.voter_sub, Ballot.choice).where(
-                        Ballot.vote_id.in_(ids), Ballot.voter_sub.in_(subs)
-                    )
-                )
-            ).all()
-        }
         markers = {
             (vid, voter)
             for vid, voter in (
@@ -283,23 +243,18 @@ class VoteReadOps(MeetingServiceBase):
             ).all()
         }
 
-        def has_cast(vote_id: UUID, voter: str) -> bool:
-            return (vote_id, voter) in choices or (vote_id, voter) in markers
-
         own: dict[UUID, MyBallot] = {}
         represented: set[UUID] = set()
         for v in votes:
-            if (v.id, sub) in choices:
-                own[v.id] = own_ballot(getattr(v, "kind", "motion"), choices[(v.id, sub)])
-            elif (v.id, sub) in markers:
+            if (v.id, sub) in markers:
                 own[v.id] = MyBallot(cast=True)
             d_sub = delegator_of.get((v.meeting_id, v.eligible_group)) if v.meeting_id else None
-            if d_sub is not None and has_cast(v.id, d_sub):
+            if d_sub is not None and (v.id, d_sub) in markers:
                 represented.add(v.id)
         return own, represented
 
     async def _present_by_meeting(self, meeting_ids: list[UUID]) -> dict[UUID, int]:
-        """Return `{meeting_id: number of present members}`, the reveal denominator."""
+        """Return `{meeting_id: number of present members}`."""
         if not meeting_ids:
             return {}
         rows = (
@@ -331,16 +286,15 @@ class VoteReadOps(MeetingServiceBase):
             .all()
         }
         voters: dict[UUID, set[str]] = {}
-        for model in (Ballot, VotedMarker):
-            for vid, sub in (
-                await self.session.execute(
-                    select(model.vote_id, model.voter_sub).where(
-                        model.vote_id.in_(vote_ids),
-                        model.voter_sub.startswith(GUEST_VOTER_PREFIX),
-                    )
+        for vid, sub in (
+            await self.session.execute(
+                select(VotedMarker.vote_id, VotedMarker.voter_sub).where(
+                    VotedMarker.vote_id.in_(vote_ids),
+                    VotedMarker.voter_sub.startswith(GUEST_VOTER_PREFIX),
                 )
-            ).all():
-                voters.setdefault(vid, set()).add(sub)
+            )
+        ).all():
+            voters.setdefault(vid, set()).add(sub)
         return {vid: len(subs - admitted) for vid, subs in voters.items()}
 
     async def admitted_guests_by_meeting(self, meeting_ids: list[UUID]) -> dict[UUID, int]:
@@ -359,45 +313,6 @@ class VoteReadOps(MeetingServiceBase):
         ).all()
         return {mid: n for mid, n in rows}
 
-    async def _absent_delegated_by_meeting(
-        self, meeting_ids: list[UUID]
-    ) -> dict[tuple[UUID, str], int]:
-        """Count the active voting delegations whose delegator is absent.
-
-        The result maps `(meeting_id, str(gremium_id))` to the count and tops up the
-        reveal denominator. The key matches `vote.eligible_group`, which holds the
-        gremium UUID as text. Each such delegation yields one substitute ballot that
-        counts into `voted`. The delegation therefore raises the expected
-        denominator. One batched query keeps this free of N+1.
-        """
-        if not meeting_ids:
-            return {}
-        present_subq = (
-            select(MeetingAttendance.principal_id)
-            .where(
-                MeetingAttendance.meeting_id == MeetingDelegation.meeting_id,
-                MeetingAttendance.status == "present",
-                MeetingAttendance.principal_id == MeetingDelegation.delegator_principal_id,
-            )
-            .exists()
-        )
-        rows = (
-            await self.session.execute(
-                select(
-                    MeetingDelegation.meeting_id,
-                    MeetingDelegation.gremium_id,
-                    func.count(),
-                )
-                .where(
-                    MeetingDelegation.meeting_id.in_(meeting_ids),
-                    MeetingDelegation.delegate_voting.is_(True),
-                    ~present_subq,
-                )
-                .group_by(MeetingDelegation.meeting_id, MeetingDelegation.gremium_id)
-            )
-        ).all()
-        return {(mid, str(gid)): n for mid, gid, n in rows}
-
     async def _vote_tallies(
         self, votes: Sequence[Vote]
     ) -> dict[
@@ -406,44 +321,22 @@ class VoteReadOps(MeetingServiceBase):
     ]:
         """Build `{vote_id: (counts, leading, failedReason)}` from the ballots.
 
-        This is the reload path. The method loads the ballots in one batch. An open
-        vote reads `ballot`. A secret vote reads `secret_ballot`. The method then
-        applies the pure tally logic. It sets `failedReason` for closed, failed votes
-        only.
+        This is the reload path. The method loads the ballots from `secret_ballot` in
+        one batch and then applies the pure tally logic. It sets `failedReason` for
+        closed, failed votes only.
         """
         from app.modules.voting import tally as tally_mod
-        from app.modules.voting.models import Ballot, SecretBallot
 
         if not votes:
             return {}
-        ids = [v.id for v in votes]
-        open_rows = (
-            await self.session.execute(
-                select(Ballot.vote_id, Ballot.choice).where(Ballot.vote_id.in_(ids))
-            )
-        ).all()
-        secret_rows = (
-            await self.session.execute(
-                select(SecretBallot.vote_id, SecretBallot.choice).where(
-                    SecretBallot.vote_id.in_(ids)
-                )
-            )
-        ).all()
-        open_by_vote: dict[UUID, list[str | None]] = {}
-        for vid, choice in open_rows:
-            open_by_vote.setdefault(vid, []).append(choice)
-        secret_by_vote: dict[UUID, list[str | None]] = {}
-        for vid, choice in secret_rows:
-            secret_by_vote.setdefault(vid, []).append(choice)
-
+        by_vote = await self._choices_by_vote(votes)
         out: dict[
             UUID,
             tuple[dict[str, int] | None, str | None, Literal["quorum", "majority"] | None],
         ] = {}
         for v in votes:
             config = VoteConfig.from_stored(v.config)
-            choices = secret_by_vote.get(v.id, []) if config.secret else open_by_vote.get(v.id, [])
-            counts = tally_mod.tally(config.options, choices)
+            counts = tally_mod.tally(config.options, by_vote.get(v.id, []))
             outcome = tally_mod.result(config, counts, v.eligible_count or 0)
             reason: Literal["quorum", "majority"] | None = None
             if v.status == "closed" and v.result is not None:

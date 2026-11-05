@@ -34,7 +34,7 @@ from app.modules.notifications.links import vote_link
 from app.modules.notifications.provider import mail_queue_from_pool
 from app.modules.notifications.queue import MailQueue
 from app.modules.notifications.service import NotificationService
-from app.modules.voting.models import Ballot, Vote, VotedMarker
+from app.modules.voting.models import Vote, VotedMarker
 from app.settings import Settings
 
 logger = logging.getLogger("app.notifications")
@@ -114,16 +114,15 @@ async def eligible_members(
 
 
 async def _answered(session: AsyncSession, vote_id: UUID) -> set[str]:
-    """Return the voter keys with an answer: the open ballots and the secret markers."""
-    subs: set[str] = set()
-    for model in (Ballot, VotedMarker):
-        subs.update(
-            str(sub)
-            for sub in (
-                await session.scalars(select(model.voter_sub).where(model.vote_id == vote_id))
-            ).all()
-        )
-    return subs
+    """Return the voter keys with an answer: the voted markers of the poll."""
+    return {
+        str(sub)
+        for sub in (
+            await session.scalars(
+                select(VotedMarker.voter_sub).where(VotedMarker.vote_id == vote_id)
+            )
+        ).all()
+    }
 
 
 async def send_poll_mail(

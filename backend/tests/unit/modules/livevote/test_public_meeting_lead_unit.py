@@ -517,7 +517,7 @@ async def test_votes_for_counts_guests_of_a_guest_vote() -> None:
         status="open",
         eligible_count=3,
     )
-    session = FakeSession([result(vote), result(), result(), result((mid, 2)), result((mid, 1))])
+    session = FakeSession([result(vote), result(), result((mid, 2)), result((mid, 1))])
     out = await MeetingService(session)._votes_for([mid])  # type: ignore[arg-type]
     [item] = out[mid]
     assert item.guests_vote is True and item.present == 3

@@ -1,14 +1,13 @@
-"""Voting tables: Vote, Ballot, VotedMarker, SecretBallot.
+"""Voting tables: Vote, VotedMarker, SecretBallot.
 
 * Vote - a vote on an application. ``config`` (JSONB) holds a VoteConfig
   (options/majority/quorum/secret/tieBreak). ``eligible_group`` holds the UUID of the
   gremium that votes, as text.
-* Ballot - one cast vote. ``UNIQUE(vote_id, voter_sub)`` blocks a double vote
-  atomically in the DB. A ballot never changes after the cast: a second cast gives
-  409 ``already_voted``.
-* VotedMarker / SecretBallot - the secret path (``secret=true``). The identity goes to
-  ``voted_marker`` and the choice to ``secret_ballot`` without an identity. Nobody can
-  trace ``choice`` back to the voter.
+* VotedMarker / SecretBallot - one cast ballot. Every vote is secret. The identity goes
+  to ``voted_marker`` and the choice to ``secret_ballot`` without an identity, so
+  nobody can trace ``choice`` back to the voter. ``UNIQUE(vote_id, voter_sub)`` on
+  ``voted_marker`` blocks a double vote atomically in the DB. A ballot never changes
+  after the cast: a second cast gives 409 ``already_voted``.
 
 ``eligible_count`` is the authoritative eligible-voter count (roster). The create call
 sets it.
@@ -32,7 +31,6 @@ from sqlalchemy import (
     Integer,
     Text,
     UniqueConstraint,
-    func,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -152,33 +150,14 @@ class Vote(UUIDPkMixin, CreatedAtMixin, Base):
     )
 
 
-class Ballot(UUIDPkMixin, Base):
-    """One (open) ballot. ``choice`` is NULL when ``secret=true`` (see SecretBallot).
+class VotedMarker(UUIDPkMixin, Base):
+    """The 'has voted' marker of a ballot, without ``choice`` (identity kept apart).
 
     A ballot carries no update and no delete route, and that is deliberate. A cast
     vote is a record of a decision. An edit would rewrite the result after the fact,
     and a delete of a single row would break the tally against the voted markers.
     Use ``cancel`` on the vote to void a whole ballot round.
     """
-
-    __tablename__ = "ballot"
-
-    vote_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("vote.id", ondelete="CASCADE")
-    )
-    voter_sub: Mapped[str] = mapped_column(Text)
-    choice: Mapped[str | None] = mapped_column(Text, nullable=True)
-    at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
-
-    __table_args__ = (
-        UniqueConstraint("vote_id", "voter_sub", name="uq_ballot_vote_voter"),
-    )
-
-
-class VotedMarker(UUIDPkMixin, Base):
-    """Secret path: 'has voted' marker without ``choice`` (identity kept apart)."""
 
     __tablename__ = "voted_marker"
 
@@ -193,7 +172,7 @@ class VotedMarker(UUIDPkMixin, Base):
 
 
 class SecretBallot(UUIDPkMixin, Base):
-    """Secret path: only ``choice`` (no identity), not traceable to the voter.
+    """The choice of a ballot, with no identity, so nobody can trace it to the voter.
 
     This table has no timestamp on purpose. A precise ``at`` value would open a
     correlation channel. An attacker with an external source of sub and time could

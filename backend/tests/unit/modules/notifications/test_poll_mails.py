@@ -109,7 +109,7 @@ async def test_start_mail_goes_to_every_voter(mails: type[_Mails]) -> None:
 
 async def test_reminder_skips_the_members_who_answered(mails: type[_Mails]) -> None:
     vote = _poll(question=None)
-    session = ScriptedSession(execute=[_members()], scalars=[["a"], []], scalar=[None])
+    session = ScriptedSession(execute=[_members()], scalars=[["a"]], scalar=[None])
     sent = await polls.send_poll_mail(
         session,  # type: ignore[arg-type]
         queue=None,
@@ -128,7 +128,7 @@ async def test_reminder_skips_the_members_who_answered(mails: type[_Mails]) -> N
 
 
 async def test_reminder_without_anybody_left_sends_nothing(mails: type[_Mails]) -> None:
-    session = ScriptedSession(execute=[_members()], scalars=[["a"], ["b"]])
+    session = ScriptedSession(execute=[_members()], scalars=[["a", "b"]])
     sent = await polls.send_poll_mail(
         session,  # type: ignore[arg-type]
         queue=None,

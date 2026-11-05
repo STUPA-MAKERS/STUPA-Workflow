@@ -30,9 +30,9 @@ G2 = uuid.uuid4()
 ME = Principal(sub="me")
 ADMIN = Principal(sub="admin", roles=["admin"])
 PLAIN = VoteConfig.model_validate(
-    {"options": ["yes", "no", "abstain"], "majorityRule": "simple"}
+    {"options": ["yes", "no", "abstain"], "majorityRule": "simple", "secret": True}
 ).model_dump(by_alias=True)
-SECRET = VoteConfig.model_validate(
+ABSOLUTE = VoteConfig.model_validate(
     {"options": ["yes", "no", "abstain"], "majorityRule": "absolute", "secret": True}
 ).model_dump(by_alias=True)
 ELECTION = {
@@ -402,7 +402,7 @@ async def test_decisions_filters_build(kind: Any, res: Any) -> None:
 async def test_decisions_rows() -> None:
     app_id = uuid.uuid4()
     motion = _vote(application_id=app_id, meeting_id=uuid.uuid4())
-    secret = _vote(config=SECRET, result="rejected")
+    absolute = _vote(config=ABSOLUTE, result="rejected")
     election = _vote(
         kind="election",
         config=ELECTION,
@@ -413,13 +413,17 @@ async def test_decisions_rows() -> None:
     service = _svc(
         result(
             (motion, "33. Sitzung", date(2026, 5, 10)),
-            (secret, None, None),
+            (absolute, None, None),
             (election, None, None),
             (pending, None, None),
         ),
         result((app_id, {"title": " Lastenrad "}, Decimal("2890.00"))),
-        result((motion.id, "yes", 2), (motion.id, "no", 1), (motion.id, None, 1)),
-        result((secret.id, "abstain", 2)),
+        result(
+            (motion.id, "yes", 2),
+            (motion.id, "no", 1),
+            (motion.id, None, 1),
+            (absolute.id, "abstain", 2),
+        ),
     )
     page = await service.decisions(G1, ME, cursor=None, q="Rad", result=None, kind=None, since=None)
     first, second, third, fourth = page.items
@@ -430,7 +434,7 @@ async def test_decisions_rows() -> None:
         first.counts.no,
         first.counts.abstain,
     ) == (2, 1, 0)
-    assert first.ballots == 4 and first.majority_rule == "simple" and not first.secret
+    assert first.ballots == 4 and first.majority_rule == "simple" and first.secret
     assert second.kind == "motion" and second.secret and second.majority_rule == "absolute"
     assert second.counts is not None and second.counts.abstain == 2 and second.ballots == 2
     assert third.kind == "election" and third.elected == ["Jonas", "c9"] and third.ballots == 3

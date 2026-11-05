@@ -92,7 +92,7 @@ from app.modules.todos.models import (
     TodoLink,
 )
 from app.modules.translations.models import UiLanguage, UiTranslation
-from app.modules.voting.models import Ballot, SecretBallot, Vote, VotedMarker
+from app.modules.voting.models import SecretBallot, Vote, VotedMarker
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError, ValidationProblem
 from tests._support.guest_apps import build_api, guest_settings
 from tests._support.read_models import (
@@ -180,7 +180,7 @@ class World:
     app_id: uuid.UUID
     meeting_id: uuid.UUID
     second_meeting_id: uuid.UUID
-    open_vote_id: uuid.UUID
+    first_vote_id: uuid.UUID
     secret_vote_id: uuid.UUID
 
 
@@ -248,13 +248,12 @@ async def _vote(
     gremium_id: uuid.UUID,
     question: str,
     *,
-    secret: bool = False,
     meeting_id: uuid.UUID | None = None,
 ) -> Vote:
     vote = Vote(
         eligible_group=str(gremium_id),
         question=question,
-        config={**_VOTE_CONFIG, "secret": secret},
+        config={**_VOTE_CONFIG, "secret": True},
         status="closed",
         meeting_id=meeting_id,
     )
@@ -270,8 +269,8 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
     version and a comment, and decides by a manual transition. In meetings it is the
     minute-taker with a keeper period, writes the protocol, attends, ticks an agenda item
     and decides on a guest. A third person delegates to it in meeting A, and it delegates
-    its seat in meeting B. It casts an open ballot and a secret vote (marker and
-    anonymous choice), sits in the substitute pool, books, invoices and closes a fiscal
+    its seat in meeting B. It casts two ballots (each a marker and an anonymous
+    choice), sits in the substitute pool, books, invoices and closes a fiscal
     year. It reports, works on, notes and blocks in a ticket and is blocked itself. Its
     personal to-do board holds a card that it created, holds, comments on (with a mention
     of itself), changes and links to the ticket. It also has config, roles, privacy
@@ -374,14 +373,16 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
             ]
         )
 
-        open_vote = await _vote(session, seed.gremium_id, "Offene Frage")
-        secret_vote = await _vote(session, seed.gremium_id, "Geheime Frage", secret=True)
+        first_vote = await _vote(session, seed.gremium_id, "Erste Frage")
+        secret_vote = await _vote(session, seed.gremium_id, "Geheime Frage")
         session.add_all(
             [
-                Ballot(vote_id=open_vote.id, voter_sub=old.sub, choice="yes"),
+                VotedMarker(vote_id=first_vote.id, voter_sub=old.sub),
+                SecretBallot(vote_id=first_vote.id, choice="yes"),
                 VotedMarker(vote_id=secret_vote.id, voter_sub=old.sub),
                 SecretBallot(vote_id=secret_vote.id, choice="no"),
-                Ballot(vote_id=open_vote.id, voter_sub=other.sub, choice="no"),
+                VotedMarker(vote_id=first_vote.id, voter_sub=other.sub),
+                SecretBallot(vote_id=first_vote.id, choice="no"),
             ]
         )
 
@@ -548,7 +549,7 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
             app_id=app_id,
             meeting_id=meeting.id,
             second_meeting_id=second.id,
-            open_vote_id=open_vote.id,
+            first_vote_id=first_vote.id,
             secret_vote_id=secret_vote.id,
         )
 
@@ -844,9 +845,6 @@ async def _conflict_world(
         meeting = await session.get(Meeting, w.second_meeting_id)
         assert meeting is not None
         meeting_title = meeting.title
-    if kind == "ballot_open":
-        await _add(maker, Ballot(vote_id=w.open_vote_id, voter_sub=w.new_sub, choice="no"))
-        return w, "Offene Frage"
     if kind == "ballot_secret":
         await _add(maker, VotedMarker(vote_id=w.secret_vote_id, voter_sub=w.new_sub))
         return w, "Geheime Frage"
@@ -930,7 +928,6 @@ async def _conflict_world(
 
 
 _CONFLICTS = {
-    "ballot_open": "ballot_same_vote",
     "ballot_secret": "ballot_same_vote",
     "delegation_same_meeting": "delegation_same_meeting",
     "delegation_vote_twice": "delegation_vote_twice",
@@ -993,7 +990,7 @@ async def test_failure_inside_the_merge_rolls_back_everything(
         for column in SUB_REFS:
             assert await _count(session, column, w.new_sub) == 0, str(column)
         assert await _count(session, AuthSession.principal_id, w.old_id) == 1
-        assert await _count(session, Ballot.voter_sub, w.old_sub) == 1
+        assert await _count(session, VotedMarker.voter_sub, w.old_sub) == 2
 
 
 async def test_a_clash_written_during_the_merge_gives_409(
@@ -1005,7 +1002,7 @@ async def test_a_clash_written_during_the_merge_gives_409(
     async def no_conflicts(*_args: object, **_kwargs: object) -> list[object]:
         return []
 
-    await _add(maker, Ballot(vote_id=w.open_vote_id, voter_sub=w.new_sub, choice="no"))
+    await _add(maker, VotedMarker(vote_id=w.first_vote_id, voter_sub=w.new_sub))
     monkeypatch.setattr(PrincipalMergeService, "_conflicts", no_conflicts)
     async with maker() as session:
         with pytest.raises(ConflictError) as exc:
@@ -1241,7 +1238,7 @@ async def test_merge_conflict_is_problem_json(
     maker: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    w, label = await _conflict_world(maker, "ballot_open")
+    w, label = await _conflict_world(maker, "ballot_secret")
     api = _api(migrated, monkeypatch, _MERGE_ADMIN)
     with TestClient(api) as client:
         done = client.post(

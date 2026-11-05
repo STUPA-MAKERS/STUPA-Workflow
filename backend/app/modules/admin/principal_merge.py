@@ -137,7 +137,7 @@ from app.modules.todos.models import (
     TodoLink,
 )
 from app.modules.translations.models import UiLanguage, UiTranslation
-from app.modules.voting.models import Ballot, Vote, VotedMarker
+from app.modules.voting.models import Vote, VotedMarker
 from app.shared.errors import ConflictError, FieldError, NotFoundError, ValidationProblem
 
 #: The key of the admin role in an effective-rights set: it holds every right.
@@ -171,10 +171,10 @@ AREAS: tuple[MergeArea, ...] = (
 )
 
 #: Every text column that stores the ``sub`` of a principal, by area. The merge
-#: rewrites each one to the target ``sub``. ``Ballot.voter_sub`` covers the own and the
-#: represented ballots, because a delegate votes under the ``sub`` of the delegator.
-#: ``VotedMarker`` is the identity half of a secret vote; the merge never reads the
-#: choice half. ``audit_entry.actor`` and ``config_revision.created_by`` are NOT here,
+#: rewrites each one to the target ``sub``. ``VotedMarker.voter_sub`` covers the own and
+#: the represented ballots, because a delegate votes under the ``sub`` of the delegator.
+#: ``VotedMarker`` is the identity half of a vote; the merge never reads the choice
+#: half. ``audit_entry.actor`` and ``config_revision.created_by`` are NOT here,
 #: because a trigger keeps their table append-only. Their displays resolve the old
 #: ``sub`` through ``principal.merged_into`` (``auth/identity.py``).
 SUB_COLUMNS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
@@ -185,7 +185,6 @@ SUB_COLUMNS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
     ("versions", SubmissionVersion.changed_by),
     ("timeline", StatusEvent.actor),
     ("comments", Comment.author),
-    ("votes", Ballot.voter_sub),
     ("votes", VotedMarker.voter_sub),
     ("delegations", MeetingDelegation.created_by),
     ("substitutes", DelegationSubstitute.created_by),
@@ -494,8 +493,8 @@ class PrincipalMergeService:
     ) -> list[MergeConflictOut]:
         """Find every real conflict. Each one names the vote or the meeting.
 
-        The conflicts are: two ballots in the same vote (the open ``ballot`` and the
-        secret ``voted_marker`` each count); both accounts delegated their seat, or
+        The conflicts are: two ballots in the same vote (a ``voted_marker`` of each
+        account); both accounts delegated their seat, or
         both received a vote transfer, in the same meeting; one account is delegator
         and the other delegate in the same meeting, because after the merge one person
         would be both, which the no-chain rule forbids; a different attendance in the
@@ -512,19 +511,18 @@ class PrincipalMergeService:
         old, new = source.id, target.id
         vote_label = func.coalesce(Vote.question, Meeting.title)
 
-        for model in (Ballot, VotedMarker):
-            a, b = aliased(model), aliased(model)
-            await add(
-                "ballot_same_vote",
-                select(vote_label)
-                .select_from(Vote)
-                .outerjoin(Meeting, Meeting.id == Vote.meeting_id)
-                .where(
-                    exists().where(a.vote_id == Vote.id, a.voter_sub == old_sub),
-                    exists().where(b.vote_id == Vote.id, b.voter_sub == new_sub),
-                )
-                .order_by(Vote.created_at),
+        a, b = aliased(VotedMarker), aliased(VotedMarker)
+        await add(
+            "ballot_same_vote",
+            select(vote_label)
+            .select_from(Vote)
+            .outerjoin(Meeting, Meeting.id == Vote.meeting_id)
+            .where(
+                exists().where(a.vote_id == Vote.id, a.voter_sub == old_sub),
+                exists().where(b.vote_id == Vote.id, b.voter_sub == new_sub),
             )
+            .order_by(Vote.created_at),
+        )
 
         def meeting_where(*conds: ColumnElement[bool]) -> Select[Any]:
             return select(Meeting.title).where(*conds).order_by(Meeting.date, Meeting.title)

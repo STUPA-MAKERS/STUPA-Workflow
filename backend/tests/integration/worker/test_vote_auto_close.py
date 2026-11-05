@@ -22,7 +22,7 @@ from app.modules.flow.dispatch import DispatchedAction
 from app.modules.flow.models import FlowVersion, State, Transition
 from app.modules.forms.schemas import FormVersionCreate
 from app.modules.forms.service import FormsService
-from app.modules.voting.models import Ballot, Vote
+from app.modules.voting.models import SecretBallot, Vote, VotedMarker
 from app.settings import load_settings
 from app.shared.config_schemas import FormFieldDef, VoteConfig
 from worker.deadlines import process_deadlines
@@ -127,7 +127,7 @@ async def test_vote_auto_close_fires_branch(
         app_type, states = await _seed_flow(s)
         app = await _make_app(s, app_type, states["voting"])
         config = VoteConfig.model_validate(
-            {"options": ["yes", "no"], "majorityRule": "simple"}
+            {"options": ["yes", "no"], "majorityRule": "simple", "secret": True}
         ).model_dump(by_alias=True)
         vote = Vote(
             application_id=app.id, eligible_group="grp", config=config,
@@ -136,7 +136,8 @@ async def test_vote_auto_close_fires_branch(
         )
         s.add(vote)
         await s.flush()
-        s.add(Ballot(vote_id=vote.id, voter_sub="v1", choice="yes"))
+        s.add(VotedMarker(vote_id=vote.id, voter_sub="v1"))
+        s.add(SecretBallot(vote_id=vote.id, choice="yes"))
         await s.commit()
         vote_id = vote.id
 

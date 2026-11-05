@@ -93,25 +93,21 @@ async def test_cancel_sets_closed_at_and_audits(session: AsyncSession) -> None:
 
 
 async def test_get_scoped_returns_own_ballot(session: AsyncSession) -> None:
+    """The own ballot gives `cast` from the voted marker and never the choice."""
     flow = await seed_vote_flow(session)
-    open_id = await add_vote(session, flow, opens_at=OPEN)
-    secret_id = await add_vote(session, flow, opens_at=OPEN, secret=True)
+    vote_id = await add_vote(session, flow, opens_at=OPEN)
     svc = VotingService(session)
     me = voter("me", flow)
-    await svc.cast(open_id, me, "no", now=OPEN)
-    await svc.cast(secret_id, me, "yes", now=OPEN)
+    await svc.cast(vote_id, me, "no", now=OPEN)
 
-    mine = await svc.get_scoped(open_id, me)
+    mine = await svc.get_scoped(vote_id, me)
     assert mine.my_ballot is not None
-    assert (mine.my_ballot.cast, mine.my_ballot.choice) == (True, "no")
+    assert (mine.my_ballot.cast, mine.my_ballot.choice) == (True, None)
     assert mine.opened_at == OPEN
     assert mine.majority_rule == "simple"
+    assert mine.secret is True
     assert mine.represented_cast is False
 
-    secret = await svc.get_scoped(secret_id, me)
-    assert secret.my_ballot is not None
-    assert (secret.my_ballot.cast, secret.my_ballot.choice) == (True, None)
-
-    other = await svc.get_scoped(open_id, voter("other", flow))
+    other = await svc.get_scoped(vote_id, voter("other", flow))
     assert other.my_ballot is not None
     assert other.my_ballot.cast is False

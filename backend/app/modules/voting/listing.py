@@ -29,8 +29,7 @@ from app.modules.admin.models import Gremium
 from app.modules.auth.policy import admin_bypass, held_gremium_ids
 from app.modules.auth.rbac import VOTE_GROUP_PREFIX
 from app.modules.livevote.models import Meeting, MeetingAgendaItem
-from app.modules.voting.election import own_ballot
-from app.modules.voting.models import Ballot, Vote, VotedMarker
+from app.modules.voting.models import Vote, VotedMarker
 from app.modules.voting.schemas import MyBallot, VoteKind, VoteListItem, VoteStatus
 from app.shared.config_schemas import VoteConfig
 from app.shared.paging import Page
@@ -241,27 +240,11 @@ async def _agenda_positions(session: AsyncSession, votes: list[Vote]) -> dict[UU
 async def _own_ballots(session: AsyncSession, sub: str, votes: list[Vote]) -> dict[UUID, MyBallot]:
     """Return the own ballot of ``sub`` per vote of the page.
 
-    An open vote reads the ``ballot`` row with its choice. A secret vote reads only the
-    ``voted_marker``: the choice has no link to the voter.
+    The method reads only the ``voted_marker``: the choice has no link to the voter.
     """
-    secret = [v.id for v in votes if VoteConfig.from_stored(v.config).secret]
-    plain = [v.id for v in votes if v.id not in secret]
-    out: dict[UUID, MyBallot] = {}
-    if plain:
-        found = await session.execute(
-            select(Ballot.vote_id, Ballot.choice).where(
-                Ballot.voter_sub == sub, Ballot.vote_id.in_(plain)
-            )
+    found = await session.execute(
+        select(VotedMarker.vote_id).where(
+            VotedMarker.voter_sub == sub, VotedMarker.vote_id.in_([v.id for v in votes])
         )
-        kinds = {v.id: getattr(v, "kind", "motion") for v in votes}
-        out |= {
-            vote_id: own_ballot(kinds[vote_id], choice) for vote_id, choice in found.all()
-        }
-    if secret:
-        found = await session.execute(
-            select(VotedMarker.vote_id).where(
-                VotedMarker.voter_sub == sub, VotedMarker.vote_id.in_(secret)
-            )
-        )
-        out |= {vote_id: MyBallot(cast=True) for vote_id in found.scalars().all()}
-    return out
+    )
+    return {vote_id: MyBallot(cast=True) for vote_id in found.scalars().all()}

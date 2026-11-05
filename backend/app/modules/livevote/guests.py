@@ -1023,7 +1023,7 @@ class GuestService:
         for vote in rows:
             config = VoteConfig.from_stored(vote.config)
             view = await voting.get(vote.id)
-            mine = await voting.my_ballot(vote, voter, secret=config.secret)
+            mine = await voting.my_ballot(vote, voter)
             can_cast = (
                 vote.status == "open"
                 and config.guests_vote

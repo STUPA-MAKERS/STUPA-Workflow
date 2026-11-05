@@ -580,7 +580,7 @@ def _vote_row(
     *,
     meeting_id: UUID | None,
     status: str = "open",
-    secret: bool = False,
+    secret: bool = True,
     result: str | None = None,
     eligible: int = 0,
 ) -> Any:
@@ -613,20 +613,6 @@ async def test_present_by_meeting_empty() -> None:
     assert await svc._present_by_meeting([]) == {}
 
 
-async def test_absent_delegated_by_meeting_empty() -> None:
-    svc = MeetingService(_QueueSession())  # type: ignore[arg-type]
-    assert await svc._absent_delegated_by_meeting([]) == {}
-
-
-async def test_absent_delegated_by_meeting_groups_rows() -> None:
-    """Count the active vote delegations of absent delegators per meeting and gremium."""
-    mid, gid = uuid4(), uuid4()
-    sess = _QueueSession(executes=[res((mid, gid, 2))])
-    svc = MeetingService(sess)  # type: ignore[arg-type]
-    out = await svc._absent_delegated_by_meeting([mid])
-    assert out == {(mid, str(gid)): 2}
-
-
 async def test_vote_tallies_empty() -> None:
     svc = MeetingService(_QueueSession())  # type: ignore[arg-type]
     assert await svc._vote_tallies([]) == {}
@@ -636,9 +622,9 @@ async def test_votes_for_closed_revealed() -> None:
     """Reveal a closed vote.
 
     The execute order: `_votes_for` selects the votes with `scalars().all()`.
-    `_vote_tallies` then reads the open and the secret ballots, each with one
-    `execute().all()`. `_present_by_meeting` comes last. The fake session returns, in order:
-    the votes, the open ballots, no secret ballots and the present count.
+    `_vote_tallies` then reads the secret ballots with one `execute().all()`.
+    `_present_by_meeting` comes last. The fake session returns, in order: the votes, the
+    secret ballots and the present count.
     """
     mid = uuid4()
     vrow = _vote_row(meeting_id=mid, status="closed", result="passed", eligible=2)
@@ -646,7 +632,6 @@ async def test_votes_for_closed_revealed() -> None:
         executes=[
             res(vrow),
             res((vrow.id, "yes"), (vrow.id, "no")),
-            res(),
             res((mid, 2)),
         ]
     )
@@ -660,18 +645,17 @@ async def test_votes_for_closed_revealed() -> None:
     assert item.present == 2
 
 
-async def test_votes_for_secret_open_hidden() -> None:
-    """Hide the tally of an open secret vote.
+async def test_votes_for_open_hidden() -> None:
+    """Hide the tally of an open vote.
 
-    The fake session returns, in order: the votes, no open ballots (the vote is secret), the
-    secret ballots and the present count.
+    The fake session returns, in order: the votes, the secret ballots and the present
+    count.
     """
     mid = uuid4()
-    vrow = _vote_row(meeting_id=mid, status="open", secret=True, eligible=3)
+    vrow = _vote_row(meeting_id=mid, status="open", eligible=3)
     sess = _QueueSession(
         executes=[
             res(vrow),
-            res(),
             res((vrow.id, "yes")),
             res((mid, 3)),
         ]
@@ -685,50 +669,19 @@ async def test_votes_for_secret_open_hidden() -> None:
     assert item.voted == 1
 
 
-async def test_votes_for_open_all_voted_revealed() -> None:
-    """Reveal an open vote when every present member voted.
+async def test_votes_for_open_all_voted_stays_hidden() -> None:
+    """Keep the tally of an open vote hidden even when every present member voted.
 
-    The fake session returns, in order: the votes, two open ballots, no secret ballots and
-    two present members.
+    The fake session returns, in order: the votes, two secret ballots and two present
+    members.
     """
     mid = uuid4()
-    vrow = _vote_row(meeting_id=mid, status="open", secret=False, eligible=2)
+    vrow = _vote_row(meeting_id=mid, status="open", eligible=2)
     sess = _QueueSession(
         executes=[
             res(vrow),
             res((vrow.id, "yes"), (vrow.id, "yes")),
-            res(),
             res((mid, 2)),
-        ]
-    )
-    svc = MeetingService(sess)  # type: ignore[arg-type]
-    out = await svc._votes_for([mid])
-    item = out[mid][0]
-    assert item.revealed is True
-    assert item.counts == {"yes": 2, "no": 0}
-
-
-async def test_votes_for_open_proxy_denominator_hides_until_proxy_votes() -> None:
-    """Hide the tally until the proxy vote is in.
-
-    Two present members plus one vote delegation of an absent member give an expected count
-    of 3. The two votes of the present members leave the proxy vote open, so the tally stays
-    hidden. The fake session returns, in order: the votes, two open ballots, no secret
-    ballots, two present members, no admitted guests and one proxy vote of an absent
-    delegator.
-    """
-    mid = uuid4()
-    gid = uuid4()
-    vrow = _vote_row(meeting_id=mid, status="open", secret=False, eligible=5)
-    vrow.eligible_group = str(gid)
-    sess = _QueueSession(
-        executes=[
-            res(vrow),
-            res((vrow.id, "yes"), (vrow.id, "yes")),
-            res(),
-            res((mid, 2)),
-            res(),
-            res((mid, gid, 1)),
         ]
     )
     svc = MeetingService(sess)  # type: ignore[arg-type]
@@ -736,29 +689,9 @@ async def test_votes_for_open_proxy_denominator_hides_until_proxy_votes() -> Non
     item = out[mid][0]
     assert item.revealed is False
     assert item.counts == {}
-
-
-async def test_votes_for_open_not_all_voted_hidden() -> None:
-    """Hide the tally of an open vote while not every present member voted.
-
-    The fake session returns, in order: the votes, one open ballot, no secret ballots and
-    three present members.
-    """
-    mid = uuid4()
-    vrow = _vote_row(meeting_id=mid, status="open", secret=False, eligible=5)
-    sess = _QueueSession(
-        executes=[
-            res(vrow),
-            res((vrow.id, "yes")),
-            res(),
-            res((mid, 3)),
-        ]
-    )
-    svc = MeetingService(sess)  # type: ignore[arg-type]
-    out = await svc._votes_for([mid])
-    item = out[mid][0]
-    assert item.revealed is False
-    assert item.counts == {}
+    assert item.leading is None
+    assert item.voted == 2
+    assert item.present == 2
 
 
 async def test_votes_for_skips_unbound_vote() -> None:
@@ -784,8 +717,8 @@ async def test_votes_for_skips_unbound_vote() -> None:
 async def test_votes_for_config_not_dict() -> None:
     """Read a config that is no dict.
 
-    A `VoteConfig` instance takes the `else {}` branch in `_votes_for`, so `opts` stays
-    empty and `secret` stays False. `_vote_tallies` still validates the config, because
+    A `VoteConfig` instance takes the `else {}` branch of the guest check in `_votes_for`,
+    so the vote counts as a members vote. `_vote_tallies` still validates the config, because
     `VoteConfig.from_stored` accepts an instance as it is. Without a principal (a broadcast)
     the vote carries no own ballot.
     """
@@ -797,7 +730,6 @@ async def test_votes_for_config_not_dict() -> None:
     sess = _QueueSession(
         executes=[
             res(vrow),
-            res(),
             res(),
             res((mid, 0)),
         ]
@@ -814,12 +746,7 @@ async def test_vote_tallies_failed_reason_set() -> None:
     """Compute `failed_reason` for a closed vote with a result."""
     mid = uuid4()
     vrow = _vote_row(meeting_id=mid, status="closed", result="rejected", eligible=10)
-    sess = _QueueSession(
-        executes=[
-            res((vrow.id, "no"), (vrow.id, "no")),
-            res(),
-        ]
-    )
+    sess = _QueueSession(executes=[res((vrow.id, "no"), (vrow.id, "no"))])
     svc = MeetingService(sess)  # type: ignore[arg-type]
     out = await svc._vote_tallies([vrow])
     counts, _leading, reason = out[vrow.id]
@@ -3794,9 +3721,9 @@ async def test_assert_can_read_forbidden(monkeypatch: pytest.MonkeyPatch) -> Non
 async def test_get_with_votes_and_protocol() -> None:
     """Read a meeting with its votes and its protocol.
 
-    The fake session returns, in order: the meeting, the votes, the open ballots, no secret
-    ballots, the present count, no admitted guests, no voting delegations of the caller, no
-    own open ballots, no own voted markers and the protocol id.
+    The fake session returns, in order: the meeting, the votes, the secret ballots, the
+    present count, no admitted guests, no voting delegations of the caller, no own voted
+    markers and the protocol id.
     """
     mid = uuid4()
     m = _meeting()
@@ -3807,9 +3734,7 @@ async def test_get_with_votes_and_protocol() -> None:
             res(m),
             res(vrow),
             res((vrow.id, "yes")),
-            res(),
             res((mid, 1)),
-            res(),
             res(),
             res(),
             res(),

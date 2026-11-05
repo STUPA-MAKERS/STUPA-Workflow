@@ -18,7 +18,7 @@ Each one carries the reason in its own model docstring, so an audit does not rai
   and TRUNCATE. `POST /admin/audit/{id}/revert` reverses the EFFECT, never the entry.
 - **`ConfigRevision`** — append-only snapshot chain, same kind of trigger. Restore, never
   delete.
-- **`Ballot` / `SecretBallot`** — a cast vote records a decision. An edit would rewrite the
+- **`VotedMarker` / `SecretBallot`** — a cast vote records a decision. An edit would rewrite the
   result after the fact. `cancel` on the vote voids a whole round.
 - **`FormVersion` / `FlowVersion`** — an application points at the version it was filled in
   under. An editor saves a NEW version. Roll back through a config-revision restore.

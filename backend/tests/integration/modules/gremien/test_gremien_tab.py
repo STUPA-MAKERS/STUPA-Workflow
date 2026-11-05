@@ -37,14 +37,14 @@ from app.modules.auth.principal import Principal
 from app.modules.delegations.models import MeetingDelegation
 from app.modules.livevote.models import Meeting, MeetingAgendaItem, MeetingAttendance
 from app.modules.protocol.models import Protocol
-from app.modules.voting.models import Ballot, SecretBallot, Vote, VotedMarker
+from app.modules.voting.models import SecretBallot, Vote, VotedMarker
 from app.settings import get_settings, load_settings
 from app.shared.config_schemas import VoteConfig
 
 pytestmark = pytest.mark.integration
 
 PLAIN = VoteConfig.model_validate(
-    {"options": ["yes", "no", "abstain"], "majorityRule": "simple"}
+    {"options": ["yes", "no", "abstain"], "majorityRule": "simple", "secret": True}
 ).model_dump(by_alias=True)
 SECRET = VoteConfig.model_validate(
     {"options": ["yes", "no", "abstain"], "majorityRule": "two_thirds", "secret": True}
@@ -263,10 +263,11 @@ async def _world(maker: async_sessionmaker[AsyncSession]) -> World:
         await s.flush()
         s.add_all(
             [
-                Ballot(vote_id=motion.id, voter_sub="a", choice="yes"),
-                Ballot(vote_id=motion.id, voter_sub="b", choice="yes"),
-                Ballot(vote_id=motion.id, voter_sub="c", choice="no"),
-                Ballot(vote_id=motion.id, voter_sub="d", choice="abstain"),
+                *(VotedMarker(vote_id=motion.id, voter_sub=sub) for sub in "abcd"),
+                *(
+                    SecretBallot(vote_id=motion.id, choice=choice)
+                    for choice in ("yes", "yes", "no", "abstain")
+                ),
                 VotedMarker(vote_id=secret.id, voter_sub="a"),
                 VotedMarker(vote_id=secret.id, voter_sub="b"),
                 SecretBallot(vote_id=secret.id, choice="no"),

@@ -35,7 +35,7 @@ def _poll_out(status: str = "open", *, meeting_id: UUID | None = None) -> VoteOu
         eligibleGroup=str(GID),
         config=_POLL.as_vote_config(),
         status=status,  # type: ignore[arg-type]
-        secret=False,
+        secret=True,
         tally=TallyOut(counts={}, eligible=3, quorumMet=True),
         kind="poll",
         poll=_POLL,

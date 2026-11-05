@@ -31,12 +31,10 @@ from app.modules.audit.service import record as audit_record
 from app.modules.auth.principal import Principal
 from app.modules.voting import tally as tally_mod
 from app.modules.voting.models import Vote
-from app.modules.voting.poll import own_ballot as poll_ballot
 from app.modules.voting.schemas import (
     ElectionLotOut,
     ElectionResultOut,
     ElectionRunoffOut,
-    MyBallot,
     VoteCreateInternal,
     VoteOut,
 )
@@ -91,21 +89,6 @@ def stored_choice(config: ElectionConfig, choice: str | list[str]) -> str:
     if not set(choice) <= set(config.candidate_ids):
         raise _invalid_choice("unknown candidate")
     return tally_mod.encode_election_choice(choice)
-
-
-def own_ballot(kind: str, choice: str | None) -> MyBallot:
-    """Build the own ballot of an open vote row (a cast ``ballot`` row).
-
-    An election ballot with several candidates gives the chosen ids in ``choices``,
-    and a poll ballot its option ids or its date answers (``poll.own_ballot``).
-    """
-    if kind == "poll":
-        return poll_ballot(choice)
-    if kind == ELECTION:
-        picks = tally_mod.decode_election_choice(choice)
-        if picks is not None:
-            return MyBallot(cast=True, choices=picks)
-    return MyBallot(cast=True, choice=choice)
 
 
 def outcome_of(

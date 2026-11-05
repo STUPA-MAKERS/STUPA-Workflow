@@ -1,13 +1,10 @@
 """Voting service: create -> open -> cast -> close (or cancel).
 
-Race safety: the DB enforces one ballot per voter. A ballot never changes after the
-cast.
-
-* open (``secret=false``): ``INSERT ... ON CONFLICT (vote_id, voter_sub) DO NOTHING``.
-  An empty ``RETURNING`` means a second cast -> 409 ``already_voted``.
-* secret (``secret=true``): ``voted_marker`` (UNIQUE) records 'has voted'. The ballot
-  lands without an identity in ``secret_ballot``. A second cast gives 409
-  ``already_voted`` too.
+Every vote is secret. Race safety: the DB enforces one ballot per voter. A ballot
+never changes after the cast. ``voted_marker`` (UNIQUE) records 'has voted' with
+``INSERT ... ON CONFLICT (vote_id, voter_sub) DO NOTHING``, and an empty ``RETURNING``
+means a second cast -> 409 ``already_voted``. The choice lands without an identity in
+``secret_ballot``.
 
 Close and cancel set ``closed_at``. Open, close and cancel write an audit entry.
 A close always ends the vote: when the pass or fail transition of the
@@ -59,11 +56,10 @@ from app.modules.protocol.models import ProtocolVoteRef
 from app.modules.voting import election as election_mod
 from app.modules.voting import poll as poll_mod
 from app.modules.voting import tally as tally_mod
-from app.modules.voting.models import Ballot, SecretBallot, Vote, VotedMarker
+from app.modules.voting.models import SecretBallot, Vote, VotedMarker
 from app.modules.voting.schemas import (
     BallotAccepted,
     MyBallot,
-    PollResultOut,
     TallyOut,
     VoteClosed,
     VoteCreate,
@@ -125,21 +121,6 @@ def secret_only(secret: bool | None, *, field: str) -> bool:
             errors=[{"field": field, "msg": "open votes are not available"}],
         )
     return True
-
-
-def open_tally_revealed(present: int, voted: int, expected: int) -> bool:
-    """Return True when an open, non-secret vote can show its running tally.
-
-    The running count becomes visible only after all expected ballots are in.
-    Otherwise the interim tally leaks on the beamer and to the voters. ``expected`` is
-    the denominator. It holds the present members plus the active vote delegations
-    whose delegator is ABSENT. The delegate casts a represented ballot, and ``voted``
-    counts that ballot. Without that add-on ``voted`` could exceed ``present`` before
-    all present members voted, and reveal the tally too early. The live-vote reload
-    path uses this rule too.
-    """
-    return present > 0 and voted >= expected
-
 
 
 async def holds_gremium_vote_role(
@@ -359,7 +340,7 @@ class VotingService:
         The meeting delete calls this under the lock of the meeting row, in its own
         transaction. The method locks the vote rows (meeting row first, vote rows
         after it). It then deletes, in this order, the protocol references, the secret
-        ballots, the voted markers and the ballots of these votes, clears the vote
+        ballots and the voted markers of these votes, clears the vote
         reference of the status events, and deletes each vote with a ``vote_delete``
         audit entry (reason ``meeting_deleted``). The foreign keys would cascade or
         set NULL too, but the explicit deletes keep the order and the audit visible.
@@ -443,7 +424,7 @@ class VotingService:
         """Delete votes that the caller locked, with their rows, without a commit.
 
         The method deletes, in this order, the protocol references, the secret
-        ballots, the voted markers and the ballots of these votes, clears the vote
+        ballots and the voted markers of these votes, clears the vote
         reference of the status events, and deletes each vote with a ``vote_delete``
         audit entry with ``reason`` (``meeting_deleted``).
 
@@ -452,7 +433,7 @@ class VotingService:
         """
         ids = [vote.id for vote in rows]
         if ids:
-            for model in (ProtocolVoteRef, SecretBallot, VotedMarker, Ballot):
+            for model in (ProtocolVoteRef, SecretBallot, VotedMarker):
                 await self.session.execute(delete(model).where(model.vote_id.in_(ids)))
             await self.session.execute(
                 update(StatusEvent).where(StatusEvent.vote_id.in_(ids)).values(vote_id=None)
@@ -491,13 +472,13 @@ class VotingService:
         await self.session.flush()
 
     async def _ballot_count(self, vote_id: UUID) -> int:
-        """Count every recorded participation of a vote, open and secret.
+        """Count every recorded participation of a vote.
 
-        The ``voted_marker`` rows count too. A secret vote splits the identity
-        from the choice, so the marker is the only trace that somebody voted.
+        The ``voted_marker`` rows count too. A vote splits the identity from the
+        choice, so the marker is the only trace that somebody voted.
         """
         total = 0
-        for model in (Ballot, SecretBallot, VotedMarker):
+        for model in (SecretBallot, VotedMarker):
             total += (
                 await self.session.scalar(
                     select(func.count()).select_from(model).where(model.vote_id == vote_id)
@@ -574,11 +555,11 @@ class VotingService:
         }
 
     async def _aggregate(self, vote: Vote, config: VoteConfig) -> dict[str, int]:
-        """Count the votes per option: open from ``ballot``, secret from ``secret_ballot``."""
-        return tally_mod.tally(config.options, await self._choices(vote, config))
+        """Count the votes per option from ``secret_ballot``."""
+        return tally_mod.tally(config.options, await self._choices(vote))
 
     async def _present_count(self, vote: Vote) -> int:
-        """Count the present meeting members (reveal denominator), or 0 without a meeting."""
+        """Count the present meeting members, or 0 without a meeting."""
         if vote.meeting_id is None:
             return 0
         from app.modules.livevote.models import MeetingAttendance
@@ -618,8 +599,8 @@ class VotingService:
         counts the admitted guests plus the guests who left or were removed after
         their ballot: the ballot stays counted, so the guest stays part of the base.
         Without this the turnout could reach the expected ballots before every
-        present person voted and reveal the running tally too early, and the number
-        fixed at the close could be smaller than the cast ballots.
+        present person voted, and the number fixed at the close could be smaller
+        than the cast ballots.
         """
         if not config.guests_vote:
             return await self._admitted_guest_count(vote)
@@ -638,72 +619,28 @@ class VotingService:
             .scalars()
             .all()
         }
-        voters: set[str] = set()
-        for model in (Ballot, VotedMarker):
-            voters.update(
-                (
-                    await self.session.execute(
-                        select(model.voter_sub).where(
-                            model.vote_id == vote.id,
-                            model.voter_sub.startswith(GUEST_VOTER_PREFIX),
-                        )
+        voters = set(
+            (
+                await self.session.execute(
+                    select(VotedMarker.voter_sub).where(
+                        VotedMarker.vote_id == vote.id,
+                        VotedMarker.voter_sub.startswith(GUEST_VOTER_PREFIX),
                     )
                 )
-                .scalars()
-                .all()
             )
-        return len(admitted | voters)
-
-    async def _absent_delegated_count(self, vote: Vote) -> int:
-        """Count the active vote delegations whose delegator is NOT present.
-
-        The scope is this meeting and this gremium. The delegate casts a represented
-        ballot, and ``voted`` counts it even though the delegator is absent. This
-        add-on to the reveal denominator stops ``voted`` from exceeding ``present`` and
-        revealing the tally too early. ``eligible_group`` holds the gremium UUID as
-        text. The method returns 0 when that text is not a UUID, because then no
-        delegation exists.
-        """
-        if vote.meeting_id is None:
-            return 0
-        try:
-            gremium_id = UUID(vote.eligible_group)
-        except (ValueError, TypeError):
-            return 0
-        from app.modules.delegations.models import MeetingDelegation
-        from app.modules.livevote.models import MeetingAttendance
-
-        present_subq = (
-            select(MeetingAttendance.principal_id)
-            .where(
-                MeetingAttendance.meeting_id == vote.meeting_id,
-                MeetingAttendance.status == "present",
-            )
-            .scalar_subquery()
+            .scalars()
+            .all()
         )
-        return (
-            await self.session.scalar(
-                select(func.count())
-                .select_from(MeetingDelegation)
-                .where(
-                    MeetingDelegation.meeting_id == vote.meeting_id,
-                    MeetingDelegation.gremium_id == gremium_id,
-                    MeetingDelegation.delegate_voting.is_(True),
-                    MeetingDelegation.delegator_principal_id.notin_(present_subq),
-                )
-            )
-        ) or 0
+        return len(admitted | voters)
 
     async def _tally_out(
         self, vote: Vote, config: VoteConfig, counts: dict[str, int], eligible: int
     ) -> TallyOut:
         """Build the tally and the turnout progress.
 
-        ``counts`` and ``leading`` are visible only when ``revealed``. That happens
-        when the vote is closed, or when the vote is not secret and all present members
-        have voted. An open non-secret vote without a meeting stays visible, because
-        there is no notion of 'present'. When the tally is hidden, only ``voted`` and
-        ``present`` travel.
+        ``counts`` and ``leading`` are visible only when ``revealed``, and that is the
+        case only for a closed vote. Every vote is secret, so a running vote never
+        shows an interim tally: only ``voted`` and ``present`` travel.
 
         A vote with guests counts the admitted guests as present too: they are
         expected ballots. ``presentMembers`` and ``presentGuests`` give the attendance
@@ -712,11 +649,8 @@ class VotingService:
         An election counts ballots, not votes, and has no leader. A poll only counts: it
         has no quorum and no leader.
 
-        The present denominator is queried only for an open vote with a meeting, because
-        only there it changes the reveal decision. A secret vote without a meeting never
-        reveals a running tally. The expected ballots of a meeting vote are the present
-        members (and guests) plus the represented votes of absent delegators, because
-        without them the interim count leaks too early.
+        The present count is queried only for a running vote with a meeting, because a
+        vote without a meeting has no attendance.
         """
         voted = sum(counts.values())
         outcome = tally_mod.result(config, counts, eligible)
@@ -729,21 +663,15 @@ class VotingService:
             counts, voted, quorum_met, lead = pv.display_counts(), pv.ballots, True, None
         members: int | None = None
         guests: int | None = None
-        if vote.status == "closed":
-            present, revealed = 0, True
+        present = 0
+        revealed = vote.status == "closed"
+        if revealed:
             members = getattr(vote, "present_members", None)
             guests = getattr(vote, "present_guests", None)
-        elif vote.meeting_id is None:
-            present, revealed = 0, not config.secret
-        else:
+        elif vote.meeting_id is not None:
             members = await self._present_count(vote)
             guests = await self._guest_attendance(vote, config)
             present = members + guests if config.guests_vote else members
-            if config.secret:
-                revealed = False
-            else:
-                expected = present + await self._absent_delegated_count(vote)
-                revealed = open_tally_revealed(present, voted, expected)
         return TallyOut(
             counts=counts if revealed else {},
             eligible=eligible,
@@ -757,13 +685,7 @@ class VotingService:
             presentGuests=guests,
         )
 
-    def _to_out(
-        self,
-        vote: Vote,
-        config: VoteConfig,
-        tally_out: TallyOut,
-        poll_live: PollResultOut | None = None,
-    ) -> VoteOut:
+    def _to_out(self, vote: Vote, config: VoteConfig, tally_out: TallyOut) -> VoteOut:
         return VoteOut(
             id=vote.id,
             applicationId=vote.application_id,
@@ -787,7 +709,7 @@ class VotingService:
             repeatOfId=getattr(vote, "repeat_of_id", None),
             attempt=getattr(vote, "attempt", 1) or 1,
             **election_mod.election_fields(vote),
-            **poll_mod.poll_fields(vote, poll_live),
+            **poll_mod.poll_fields(vote),
         )
 
     @staticmethod
@@ -801,11 +723,14 @@ class VotingService:
         if proposal is not None:
             check_approved_amount(application.amount, proposal.approved_amount)
 
-    async def _choices(self, vote: Vote, config: VoteConfig) -> Sequence[str | None]:
-        """Load the stored choices: open from ``ballot``, secret from ``secret_ballot``."""
-        model = SecretBallot if config.secret else Ballot
+    async def _choices(self, vote: Vote) -> Sequence[str]:
+        """Load the stored choices of a vote from ``secret_ballot``."""
         return (
-            (await self.session.execute(select(model.choice).where(model.vote_id == vote.id)))
+            (
+                await self.session.execute(
+                    select(SecretBallot.choice).where(SecretBallot.vote_id == vote.id)
+                )
+            )
             .scalars()
             .all()
         )
@@ -813,13 +738,13 @@ class VotingService:
     async def _election_outcome(self, vote: Vote, eligible: int) -> tally_mod.ElectionOutcome:
         """Tally an election from its stored ballots."""
         config = election_mod.election_config(vote)
-        choices = await self._choices(vote, config.as_vote_config())
+        choices = await self._choices(vote)
         return election_mod.outcome_of(config, choices, eligible, getattr(vote, "round", 1) or 1)
 
     async def _poll_outcome(self, vote: Vote) -> tally_mod.PollOutcome:
         """Tally a poll from its stored ballots."""
         config = poll_mod.poll_config(vote)
-        choices = await self._choices(vote, config.as_vote_config())
+        choices = await self._choices(vote)
         return tally_mod.tally_poll(choices, config)
 
     async def create(
@@ -1286,9 +1211,7 @@ class VotingService:
             await AttendanceService(self.session).mark_present_on_cast(
                 vote.meeting_id, principal.sub
             )
-        if config.secret:
-            return await self._cast_secret(vote.id, voter_sub, stored)
-        return await self._cast_open(vote.id, voter_sub, stored)
+        return await self._cast_secret(vote.id, voter_sub, stored)
 
     @staticmethod
     def _stored_choice(vote: Vote, config: VoteConfig, choice: Choice) -> str:
@@ -1327,10 +1250,10 @@ class VotingService:
         guests vote, and that the vote belongs to a public agenda item of the meeting
         of the guest. This method checks the vote itself: open, in its window, and
         ``guestsVote``. The ballot runs under ``guest:<id>``. The same rules as for a
-        member apply: one ballot, never changed after the cast, and a secret
-        vote keeps the identity (``voted_marker``) apart from the choice
-        (``secret_ballot``). The audit entry ``vote_cast`` names the guest id as the
-        actor and carries no choice.
+        member apply: one ballot, never changed after the cast, and the vote keeps
+        the identity (``voted_marker``) apart from the choice (``secret_ballot``).
+        The audit entry ``vote_cast`` names the guest id as the actor and carries no
+        choice.
 
         The audit entry carries ids only, because a secret vote must not link a choice
         to the guest and the chain is append-only.
@@ -1360,9 +1283,7 @@ class VotingService:
             target_id=str(vote.id),
             data=self._audit_refs(vote),
         )
-        if config.secret:
-            return await self._cast_secret(vote.id, voter_sub, stored)
-        return await self._cast_open(vote.id, voter_sub, stored)
+        return await self._cast_secret(vote.id, voter_sub, stored)
 
     @staticmethod
     def _is_gremium_group(eligible_group: str) -> bool:
@@ -1420,11 +1341,10 @@ class VotingService:
         blocked, delegator_sub = await voting_delegation_check(
             self.session, principal.sub, vote.meeting_id, vote.eligible_group, now
         )
-        secret = self._config(vote).secret
         if (
             not blocked
             and self._may_cast(principal, vote.eligible_group)
-            and not (await self.my_ballot(vote, principal.sub, secret=secret)).cast
+            and not (await self.my_ballot(vote, principal.sub)).cast
         ):
             return True
         if delegator_sub is None:
@@ -1434,35 +1354,17 @@ class VotingService:
             if seat is None:
                 return False
             delegator_sub = seat.sub
-        return not (await self.my_ballot(vote, delegator_sub, secret=secret)).cast
-
-    async def _cast_open(self, vote_id: UUID, voter_sub: str, choice: str) -> BallotAccepted:
-        """Insert the open ballot. A second cast of the same voter gives 409.
-
-        ``ON CONFLICT DO NOTHING`` keeps the first ballot. An empty ``RETURNING``
-        means the voter already voted. A ballot never changes after the cast.
-
-        On a conflict nothing was written, so no rollback is needed: the session
-        dependency ``get_session`` ends the transaction on the exception.
-        """
-        stmt = (
-            pg_insert(Ballot)
-            .values(vote_id=vote_id, voter_sub=voter_sub, choice=choice)
-            .on_conflict_do_nothing(constraint="uq_ballot_vote_voter")
-            .returning(Ballot.id)
-        )
-        inserted = (await self.session.execute(stmt)).first()
-        if inserted is None:
-            raise ConflictError("Already voted.", code=ALREADY_VOTED)
-        await self.session.commit()
-        return BallotAccepted(status="cast")
+        return not (await self.my_ballot(vote, delegator_sub)).cast
 
     async def _cast_secret(self, vote_id: UUID, voter_sub: str, choice: str) -> BallotAccepted:
         """Insert the secret ballot. A second cast of the same voter gives 409.
 
         ``voted_marker`` (UNIQUE) is the "has voted" identity anchor. The method writes
         the identity-less ballot only when the marker is new, so no link from choice to
-        voter exists.
+        voter exists. ``ON CONFLICT DO NOTHING`` keeps the first marker, and an empty
+        ``RETURNING`` means the voter already voted. On a conflict nothing was written,
+        so no rollback is needed: the session dependency ``get_session`` ends the
+        transaction on the exception.
         """
         marker = (
             pg_insert(VotedMarker)
@@ -1535,39 +1437,25 @@ class VotingService:
             update={
                 "can_manage": await self.can_manage(vote, principal),
                 "can_cast": self.can_cast_own(vote, principal),
-                "my_ballot": await self.my_ballot(vote, principal.sub, secret=out.secret),
-                "represented_cast": await self.represented_cast(
-                    vote, principal.sub, secret=out.secret
-                ),
+                "my_ballot": await self.my_ballot(vote, principal.sub),
+                "represented_cast": await self.represented_cast(vote, principal.sub),
             }
         )
 
-    async def my_ballot(self, vote: Vote, voter_sub: str, *, secret: bool) -> MyBallot:
+    async def my_ballot(self, vote: Vote, voter_sub: str) -> MyBallot:
         """Return the ballot that ``voter_sub`` cast in this vote.
 
-        An open vote reads the ``ballot`` row and returns its choice. A secret vote
-        reads only the ``voted_marker``: the choice has no link to the voter, so
-        ``choice`` stays None.
+        The method reads only the ``voted_marker``: the choice has no link to the
+        voter, so ``choice`` stays None.
         """
-        if secret:
-            marker = await self.session.scalar(
-                select(VotedMarker.id).where(
-                    VotedMarker.vote_id == vote.id, VotedMarker.voter_sub == voter_sub
-                )
+        marker = await self.session.scalar(
+            select(VotedMarker.id).where(
+                VotedMarker.vote_id == vote.id, VotedMarker.voter_sub == voter_sub
             )
-            return MyBallot(cast=marker is not None)
-        row = (
-            await self.session.execute(
-                select(Ballot.choice).where(
-                    Ballot.vote_id == vote.id, Ballot.voter_sub == voter_sub
-                )
-            )
-        ).first()
-        if row is None:
-            return MyBallot(cast=False)
-        return election_mod.own_ballot(getattr(vote, "kind", "motion"), row.choice)
+        )
+        return MyBallot(cast=marker is not None)
 
-    async def represented_cast(self, vote: Vote, sub: str, *, secret: bool) -> bool:
+    async def represented_cast(self, vote: Vote, sub: str) -> bool:
         """Tell whether ``sub`` holds a voting delegation and cast the represented ballot.
 
         The represented ballot runs under the ``sub`` of the delegator
@@ -1579,7 +1467,7 @@ class VotingService:
         )
         if delegator_sub is None:
             return False
-        return (await self.my_ballot(vote, delegator_sub, secret=secret)).cast
+        return (await self.my_ballot(vote, delegator_sub)).cast
 
     async def _vote_gremium_id(
         self, *, meeting_id: UUID | None, eligible_group: str
@@ -1779,17 +1667,13 @@ class VotingService:
         scope gate. It is the internal reuse path, for example the tally broadcast
         after ``cast``. The public read endpoint uses ``get_scoped``.
 
-        A revealed open poll shows its running counts, including the "Vielleicht"
-        answers. The stored result is text, cast back to ``VoteResult`` because
-        ``tally.result`` only writes its Literal values.
+        The stored result is text, cast back to ``VoteResult`` because ``tally.result``
+        only writes its Literal values.
         """
         vote = await self._get_vote(vote_id)
         config = self._config(vote)
         counts = await self._aggregate(vote, config)
         tally_out = await self._tally_out(vote, config, counts, vote.eligible_count or 0)
-        poll_live: PollResultOut | None = None
-        if poll_mod.is_poll(vote) and vote.status == "open" and tally_out.revealed:
-            poll_live = poll_mod.result_of(await self._poll_outcome(vote))
         if vote.status == "closed" and vote.result is not None:
             stored_result = cast("tally_mod.VoteResult", vote.result)
             tally_out = tally_out.model_copy(
@@ -1798,7 +1682,7 @@ class VotingService:
                     "failed_reason": tally_mod.failed_reason(stored_result, tally_out.quorum_met),
                 }
             )
-        return self._to_out(vote, config, tally_out, poll_live)
+        return self._to_out(vote, config, tally_out)
 
     async def cancel(
         self, vote_id: UUID, *, now: datetime | None = None, actor: str | None = None

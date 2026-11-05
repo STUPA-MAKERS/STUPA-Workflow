@@ -21,7 +21,7 @@ from app.modules.flow.schemas import TransitionOut, TransitionResult
 from app.modules.voting import service as voting_service
 from app.modules.voting.models import Vote
 from app.modules.voting.schemas import VoteCreate, VoteCreateInternal
-from app.modules.voting.service import VotingService, open_tally_revealed
+from app.modules.voting.service import VotingService
 from app.shared.config_schemas import VoteConfig
 from app.shared.errors import (
     ConflictError,
@@ -43,7 +43,7 @@ def _config(**over: Any) -> dict[str, Any]:
         "majorityRule": "simple",
         "quorum": None,
         "abstainCountsQuorum": True,
-        "secret": False,
+        "secret": True,
         "tieBreak": "rejected",
     }
     base.update(over)
@@ -417,60 +417,37 @@ async def test_cast_unknown_option_422() -> None:
         await VotingService(db).cast(vote.id, _voter(), "maybe", now=NOW)
 
 
-async def test_cast_open_first_vote() -> None:
-    """The first open ballot is inserted. The insert never updates an existing ballot."""
-    vote = _vote()
-    db = fake_session(result(vote), result(SimpleNamespace(id=uuid4())))
-    out = await VotingService(db).cast(vote.id, _voter(), "yes", now=NOW)
-    assert out.status == "cast"
-    assert db.committed == 1
-    insert = str(db.statements[-1])
-    assert "ON CONFLICT" in insert and "DO NOTHING" in insert
-    assert "DO UPDATE" not in insert
+async def test_cast_secret_first_vote_writes_anonymous() -> None:
+    """The first cast adds a secret_ballot without an identity.
 
-
-async def test_cast_open_double_409_already_voted() -> None:
-    """A second cast never changes the ballot. It gives 409 ``already_voted``.
-
-    An empty RETURNING means a conflict. ON CONFLICT DO NOTHING wrote nothing, so there
-    is no commit, and ``get_session`` rolls the transaction back.
+    The voted marker insert never updates an existing marker.
     """
     vote = _vote()
-    db = fake_session(result(vote), result())
-    with pytest.raises(ConflictError, match="Already voted") as ei:
-        await VotingService(db).cast(vote.id, _voter(), "no", now=NOW)
-    assert ei.value.code == "already_voted"
-    assert db.committed == 0
-
-
-async def test_cast_secret_first_vote_writes_anonymous() -> None:
-    """The first secret cast adds a secret_ballot without an identity and no ballot."""
-    vote = _vote(config=_config(secret=True))
     db = fake_session(result(vote), result(SimpleNamespace(id=uuid4())))
     out = await VotingService(db).cast(vote.id, _voter(), "yes", now=NOW)
     assert out.status == "cast"
     assert len(db.added) == 1
     assert type(db.added[0]).__name__ == "SecretBallot"
     assert db.committed == 1
+    insert = str(db.statements[-1])
+    assert "voted_marker" in insert
+    assert "ON CONFLICT" in insert and "DO NOTHING" in insert
+    assert "DO UPDATE" not in insert
 
 
 async def test_cast_secret_double_409() -> None:
-    """A second secret cast finds the voted marker and gives 409."""
-    vote = _vote(config=_config(secret=True))
+    """A second cast finds the voted marker and gives 409 ``already_voted``.
+
+    An empty RETURNING means a conflict. ON CONFLICT DO NOTHING wrote nothing, so there
+    is no commit and no secret ballot, and ``get_session`` rolls the transaction back.
+    """
+    vote = _vote()
     db = fake_session(result(vote), result())
     with pytest.raises(ConflictError, match="Already voted") as ei:
         await VotingService(db).cast(vote.id, _voter(), "yes", now=NOW)
     assert ei.value.code == "already_voted"
     assert db.committed == 0
-
-
-async def test_get_open_aggregates_tally() -> None:
-    """An open vote aggregates the tally but has no final result yet."""
-    vote = _vote()
-    db = fake_session(result(vote), result("yes", "yes", "no"))
-    out = await VotingService(db).get(vote.id)
-    assert out.tally.counts == {"yes": 2, "no": 1, "abstain": 0}
-    assert out.tally.result is None
+    assert db.added == []
 
 
 async def test_get_closed_includes_result() -> None:
@@ -479,16 +456,20 @@ async def test_get_closed_includes_result() -> None:
     out = await VotingService(db).get(vote.id)
     assert out.result == "passed"
     assert out.tally.result == "passed"
+    assert out.tally.revealed is True
+    assert out.tally.counts == {"yes": 2, "no": 1, "abstain": 0}
 
 
 async def test_get_secret_hides_counts_until_close() -> None:
-    """A secret vote shows no choice counts before the close, only the participation."""
-    vote = _vote(config=_config(secret=True))
+    """An open vote shows no choice counts before the close, only the participation."""
+    vote = _vote()
     db = fake_session(result(vote), result("yes", "no", "yes"))
     out = await VotingService(db).get(vote.id)
     assert out.secret is True
     assert out.tally.revealed is False
     assert out.tally.counts == {}
+    assert out.tally.leading is None
+    assert out.tally.result is None
     assert out.tally.voted == 3
 
 
@@ -1137,8 +1118,8 @@ async def test_delete_for_agenda_item_refuses_open_or_closed_vote(blocking: str)
 async def test_delete_for_meeting_deletes_every_vote_in_order() -> None:
     """The meeting delete takes every vote along, in any status, without a commit.
 
-    The order is the lock, the protocol references, the secret ballots, the voted
-    markers and the ballots, then the status events lose the vote reference. The audit
+    The order is the lock, the protocol references, the secret ballots and the voted
+    markers, then the status events lose the vote reference. The audit
     holds id references and the status only, never a choice or a voter.
     """
     mid = uuid4()
@@ -1154,13 +1135,12 @@ async def test_delete_for_meeting_deletes_every_vote_in_order() -> None:
     assert db.deleted == votes
     assert db.committed == 0
     tables = [
-        getattr(getattr(stmt, "table", None), "name", None) for stmt in db.statements[1:6]
+        getattr(getattr(stmt, "table", None), "name", None) for stmt in db.statements[1:5]
     ]
     assert tables == [
         "protocol_vote_ref",
         "secret_ballot",
         "voted_marker",
-        "ballot",
         "status_event",
     ]
     entries = _audits(db)
@@ -1252,25 +1232,22 @@ async def test_delete_locked_votes_without_votes_writes_nothing() -> None:
     assert _audits(db) == []
 
 
-async def test_get_meeting_open_reveals_when_all_present_voted() -> None:
-    """An open meeting vote reveals the tally when both present members voted."""
+async def test_get_meeting_open_stays_hidden_when_all_present_voted() -> None:
+    """An open meeting vote hides the tally even when every present member voted.
+
+    The present count and the admitted guests still travel.
+    """
     vote = _vote(meeting_id=uuid4())
     db = fake_session(result(vote), result("yes", "yes"))
-    db.scalar_results = [2]
-    out = await VotingService(db).get(vote.id)
-    assert out.tally.revealed is True
-    assert out.tally.counts == {"yes": 2, "no": 0, "abstain": 0}
-
-
-async def test_get_meeting_open_hidden_until_all_present_voted() -> None:
-    """3 present and 2 voted keep the tally hidden."""
-    vote = _vote(meeting_id=uuid4())
-    db = fake_session(result(vote), result("yes", "yes"))
-    db.scalar_results = [3]
+    db.scalar_results = [2, 1]
     out = await VotingService(db).get(vote.id)
     assert out.tally.revealed is False
     assert out.tally.counts == {}
+    assert out.tally.leading is None
     assert out.tally.voted == 2
+    assert out.tally.present == 2
+    assert out.tally.present_members == 2
+    assert out.tally.present_guests == 1
 
 
 async def test_get_meeting_open_without_attendance_stays_hidden() -> None:
@@ -1280,70 +1257,6 @@ async def test_get_meeting_open_without_attendance_stays_hidden() -> None:
     db.scalar_results = [0]
     out = await VotingService(db).get(vote.id)
     assert out.tally.revealed is False
-
-
-def test_open_tally_revealed_rule() -> None:
-    """Present must be above 0 AND voted must reach expected."""
-    assert open_tally_revealed(present=2, voted=2, expected=2) is True
-    assert open_tally_revealed(present=2, voted=3, expected=2) is True
-    assert open_tally_revealed(present=2, voted=1, expected=2) is False
-    assert open_tally_revealed(present=0, voted=0, expected=0) is False
-
-
-async def test_get_meeting_open_hidden_until_proxy_voted() -> None:
-    """The tally stays hidden while the proxy ballot of an absent delegator is missing.
-
-    2 present members, no admitted guests and 1 vote delegation of an ABSENT delegator
-    give expected=3. Only the 2 own ballots arrived.
-    """
-    gid = uuid4()
-    vote = _vote(meeting_id=uuid4(), eligible_group=str(gid))
-    db = fake_session(result(vote), result("yes", "yes"))
-    db.scalar_results = [2, 0, 1]
-    out = await VotingService(db).get(vote.id)
-    assert out.tally.revealed is False
-    assert out.tally.counts == {}
-
-
-async def test_get_meeting_open_reveals_when_proxy_also_voted() -> None:
-    """2 present, no guests and 1 proxy give expected=3; voted=3 reveals the tally."""
-    gid = uuid4()
-    vote = _vote(meeting_id=uuid4(), eligible_group=str(gid))
-    db = fake_session(result(vote), result("yes", "yes", "no"))
-    db.scalar_results = [2, 0, 1]
-    out = await VotingService(db).get(vote.id)
-    assert out.tally.revealed is True
-    assert out.tally.counts == {"yes": 2, "no": 1, "abstain": 0}
-
-
-async def test_absent_delegated_count_no_meeting_is_zero() -> None:
-    vote = _vote(meeting_id=None)
-    svc = VotingService(fake_session())
-    assert await svc._absent_delegated_count(vote) == 0  # pyright: ignore[reportArgumentType]
-
-
-async def test_absent_delegated_count_non_uuid_group_is_zero() -> None:
-    """An eligible_group that is not UUID text, "stupa" for example, runs no delegation query."""
-    vote = _vote(meeting_id=uuid4(), eligible_group="stupa")
-    svc = VotingService(fake_session())
-    assert await svc._absent_delegated_count(vote) == 0  # pyright: ignore[reportArgumentType]
-
-
-async def test_absent_delegated_count_queries_when_uuid_group() -> None:
-    gid = uuid4()
-    vote = _vote(meeting_id=uuid4(), eligible_group=str(gid))
-    db = fake_session()
-    db.scalar_results = [4]
-    assert await VotingService(db)._absent_delegated_count(vote) == 4  # pyright: ignore[reportArgumentType]
-
-
-async def test_absent_delegated_count_none_scalar_is_zero() -> None:
-    """A COUNT of None becomes 0 through the or-default."""
-    gid = uuid4()
-    vote = _vote(meeting_id=uuid4(), eligible_group=str(gid))
-    db = fake_session()
-    db.scalar_results = [None]
-    assert await VotingService(db)._absent_delegated_count(vote) == 0  # pyright: ignore[reportArgumentType]
 
 
 async def test_assert_can_read_meeting_vote_goes_through_the_meeting_guard() -> None:
@@ -1421,12 +1334,13 @@ async def test_assert_can_read_meeting_delegates_to_meeting_service(
 
 
 async def test_get_scoped_checks_then_returns_tally() -> None:
-    """The scoped read checks access, then returns the tally. The caller holds no ballot."""
+    """The scoped read checks access, then returns the hidden tally. No own ballot."""
     vote = _vote(meeting_id=None)
     db = fake_session(result(vote), result(vote), result("yes"))
     p = Principal(sub="u", permissions={"application.read"})
     out = await VotingService(db).get_scoped(vote.id, p)
-    assert out.tally.counts == {"yes": 1, "no": 0, "abstain": 0}
+    assert out.tally.counts == {}
+    assert out.tally.voted == 1
     assert out.my_ballot is not None
     assert out.my_ballot.cast is False
     assert out.my_ballot.choice is None
@@ -1435,42 +1349,34 @@ async def test_get_scoped_checks_then_returns_tally() -> None:
     assert out.quorum is None
 
 
-async def test_my_ballot_open_vote_returns_the_choice() -> None:
-    vote = _vote()
-    db = fake_session(result(SimpleNamespace(choice="no")))
-    mine = await VotingService(db).my_ballot(vote, "v1", secret=False)  # pyright: ignore[reportArgumentType]
-    assert mine.cast is True
-    assert mine.choice == "no"
-
-
 async def test_my_ballot_secret_vote_never_returns_a_choice() -> None:
-    """A secret vote never returns the choice, even when the voted marker exists."""
-    vote = _vote(config=_config(secret=True))
+    """The own ballot never returns the choice, even when the voted marker exists."""
+    vote = _vote()
     db = fake_session()
     db.scalar_results = [uuid4()]
-    mine = await VotingService(db).my_ballot(vote, "v1", secret=True)  # pyright: ignore[reportArgumentType]
+    mine = await VotingService(db).my_ballot(vote, "v1")  # pyright: ignore[reportArgumentType]
     assert mine.cast is True
     assert mine.choice is None
+    assert mine.choices is None
+    assert mine.answers is None
     db.scalar_results = [None]
-    mine = await VotingService(db).my_ballot(vote, "v1", secret=True)  # pyright: ignore[reportArgumentType]
+    mine = await VotingService(db).my_ballot(vote, "v1")  # pyright: ignore[reportArgumentType]
     assert mine.cast is False
 
 
 async def test_represented_cast_reads_the_ballot_of_the_delegator() -> None:
-    """The represented flag reads the ballot of the delegator of an incoming delegation."""
+    """The represented flag reads the voted marker of the delegator of a delegation."""
     vote = _vote(meeting_id=uuid4())
-    db = fake_session(
-        result((False, True, "delegator-1")),
-        result(SimpleNamespace(choice="yes")),
-    )
-    assert await VotingService(db).represented_cast(vote, "proxy", secret=False) is True  # pyright: ignore[reportArgumentType]
+    db = fake_session(result((False, True, "delegator-1")))
+    db.scalar_results = [uuid4()]
+    assert await VotingService(db).represented_cast(vote, "proxy") is True  # pyright: ignore[reportArgumentType]
 
 
 async def test_represented_cast_without_delegation_is_false() -> None:
     """Without a delegation row the represented flag is False."""
     vote = _vote(meeting_id=uuid4())
     db = fake_session(result())
-    assert await VotingService(db).represented_cast(vote, "proxy", secret=False) is False  # pyright: ignore[reportArgumentType]
+    assert await VotingService(db).represented_cast(vote, "proxy") is False  # pyright: ignore[reportArgumentType]
 
 
 async def test_delete_standalone_draft_ok() -> None:
@@ -1520,10 +1426,10 @@ async def test_delete_standalone_open_vote_409() -> None:
 
 
 async def test_delete_standalone_with_ballots_409() -> None:
-    """An open ballot blocks the delete at the first count."""
+    """A secret ballot blocks the delete at the first count."""
     vote = _vote(meeting_id=None, status="draft")
     db = fake_session(result(vote))
-    db.scalar_results = [1, 0, 0]
+    db.scalar_results = [1, 0]
     with pytest.raises(ConflictError) as ei:
         await VotingService(db).delete_standalone(vote.id, actor="mgr")
     assert ei.value.code == "vote_has_ballots"
@@ -1531,10 +1437,10 @@ async def test_delete_standalone_with_ballots_409() -> None:
 
 
 async def test_delete_standalone_with_secret_marker_409() -> None:
-    """A secret vote leaves only the voted_marker as a trace, and that blocks too."""
+    """A voted_marker alone blocks too."""
     vote = _vote(meeting_id=None, status="draft")
     db = fake_session(result(vote))
-    db.scalar_results = [0, 0, 2]
+    db.scalar_results = [0, 2]
     with pytest.raises(ConflictError):
         await VotingService(db).delete_standalone(vote.id, actor="mgr")
 

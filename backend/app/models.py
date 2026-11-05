@@ -81,7 +81,7 @@ from app.modules.todos.models import (
     TodoLink,
 )
 from app.modules.translations.models import UiLanguage, UiTranslation
-from app.modules.voting.models import Ballot, SecretBallot, Vote, VotedMarker
+from app.modules.voting.models import SecretBallot, Vote, VotedMarker
 
 __all__ = [
     "Applicant",
@@ -93,7 +93,6 @@ __all__ = [
     "AuditEntry",
     "AuditVerification",
     "AuthSession",
-    "Ballot",
     "Base",
     "Budget",
     "BudgetAllocation",
