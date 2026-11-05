@@ -41,8 +41,16 @@ Every spec file uses the same format. Copy `TEMPLATE.md` to start a new file.
 - One file covers one area. The file name is the area in kebab case.
 - The header lists `Kind` (`Style` or `Requirement`), `Status`, `Scope` and `Updated`.
 - One rule is one `##` section. The heading is the rule ID and a short title.
-- A rule ID is the file prefix and a two-digit number, for example `VOTE-03`. An ID never
-  changes and is never used again. A removed rule keeps its heading with the text `Removed.`
+- The rule ID has the form `(F|NF|S)-<path>-NNNN`:
+  - `F` is a functional requirement, `NF` a non-functional requirement, `S` a style rule.
+  - `<path>` is the path of the file below its kind folder, without `.md`, with `-` between
+    the parts. `requirements/functional/meetings/voting.md` gives `meetings-voting`.
+  - `NNNN` is a four-digit number. It counts up within the file and starts at `0001`.
+  - Examples: `F-meetings-voting-0003`, `NF-security-downloads-0001`,
+    `S-backend-python-0012`.
+- A number is never used again. A removed rule keeps its heading with the text `Removed.`
+- The ID contains the path. If a file moves, all its IDs change. Update every reference in
+  the same pull request.
 - The rule text comes first. Use `must` for an obligation and `must not` for a prohibition.
 - `Reason:` gives the cause of the rule. Keep it. The reason is the part that prevents a
   second mistake.
@@ -72,7 +80,7 @@ Every spec file uses the same format. Copy `TEMPLATE.md` to start a new file.
 ## How an agent adds or changes a spec
 
 1. Find the file for the area. If there is no file, copy `TEMPLATE.md`.
-2. Give a new rule the next free ID of the file.
+2. Give a new rule the next free number of the file.
 3. Set `Status: Draft` and `Updated` to the current date.
 4. Open a pull request. The owner sets `Approved`.
 
