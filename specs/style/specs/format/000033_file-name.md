@@ -3,10 +3,10 @@ id: "000033"
 title: The file name is number and name
 kind: style
 status: draft
-scope:
-  - specs/
 owner: frederikbeimgraben
 updated: 2026-11-05
+scope:
+  - specs/
 ---
 
 # The file name is number and name

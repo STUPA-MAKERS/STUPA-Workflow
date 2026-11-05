@@ -3,11 +3,11 @@ id: "000029"
 title: A vote can be deleted only as draft or cancelled
 kind: functional
 status: draft
+owner: frederikbeimgraben
+updated: 2026-11-05
 scope:
   - backend/app/modules/voting
   - frontend/src/app/features/voting
-owner: frederikbeimgraben
-updated: 2026-11-05
 ---
 
 # A vote can be deleted only as draft or cancelled

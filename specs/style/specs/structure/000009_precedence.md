@@ -3,10 +3,10 @@ id: "000009"
 title: A spec wins over other guidance
 kind: style
 status: draft
-scope:
-  - specs/
 owner: frederikbeimgraben
 updated: 2026-11-05
+scope:
+  - specs/
 ---
 
 # A spec wins over other guidance

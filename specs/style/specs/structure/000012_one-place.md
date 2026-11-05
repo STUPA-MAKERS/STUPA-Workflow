@@ -3,10 +3,10 @@ id: "000012"
 title: A rule is written in one place
 kind: style
 status: draft
-scope:
-  - specs/
 owner: frederikbeimgraben
 updated: 2026-11-05
+scope:
+  - specs/
 ---
 
 # A rule is written in one place

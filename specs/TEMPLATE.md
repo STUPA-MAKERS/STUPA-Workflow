@@ -3,11 +3,13 @@ id: "NNNNNN"
 title: Short title of the rule
 kind: functional
 status: draft
+owner: frederikbeimgraben
+updated: YYYY-MM-DD
+tests:
+  - "backend/tests/unit/test_example.py:test_example_rule"
 scope:
   - backend/app/modules/example
   - frontend/src/app/features/example
-owner: frederikbeimgraben
-updated: YYYY-MM-DD
 ---
 
 # Short title of the rule

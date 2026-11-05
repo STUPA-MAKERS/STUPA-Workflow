@@ -3,11 +3,11 @@ id: "000024"
 title: Every vote is secret
 kind: functional
 status: draft
+owner: frederikbeimgraben
+updated: 2026-11-05
 scope:
   - backend/app/modules/voting
   - frontend/src/app/features/voting
-owner: frederikbeimgraben
-updated: 2026-11-05
 ---
 
 # Every vote is secret

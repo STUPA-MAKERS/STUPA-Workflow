@@ -3,10 +3,10 @@ id: "000023"
 title: Product terms stay as the UI shows them
 kind: style
 status: draft
-scope:
-  - specs/
 owner: frederikbeimgraben
 updated: 2026-11-05
+scope:
+  - specs/
 ---
 
 # Product terms stay as the UI shows them

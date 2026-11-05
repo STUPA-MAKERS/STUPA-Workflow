@@ -3,10 +3,10 @@ id: "000021"
 title: A spec states the current rule
 kind: style
 status: draft
-scope:
-  - specs/
 owner: frederikbeimgraben
 updated: 2026-11-05
+scope:
+  - specs/
 ---
 
 # A spec states the current rule

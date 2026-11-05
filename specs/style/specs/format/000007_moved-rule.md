@@ -3,10 +3,10 @@ id: "000007"
 title: A moved rule keeps its number
 kind: style
 status: draft
-scope:
-  - specs/
 owner: frederikbeimgraben
 updated: 2026-11-05
+scope:
+  - specs/
 ---
 
 # A moved rule keeps its number

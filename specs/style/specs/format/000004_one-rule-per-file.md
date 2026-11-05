@@ -3,10 +3,10 @@ id: "000004"
 title: One file holds one rule
 kind: style
 status: draft
-scope:
-  - specs/
 owner: frederikbeimgraben
 updated: 2026-11-05
+scope:
+  - specs/
 ---
 
 # One file holds one rule

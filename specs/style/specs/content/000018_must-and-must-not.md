@@ -3,10 +3,10 @@ id: "000018"
 title: The rule text uses must and must not
 kind: style
 status: draft
-scope:
-  - specs/
 owner: frederikbeimgraben
 updated: 2026-11-05
+scope:
+  - specs/
 ---
 
 # The rule text uses must and must not

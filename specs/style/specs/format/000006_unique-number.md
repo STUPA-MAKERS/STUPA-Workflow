@@ -3,10 +3,10 @@ id: "000006"
 title: The number is the identity of a rule
 kind: style
 status: draft
-scope:
-  - specs/
 owner: frederikbeimgraben
 updated: 2026-11-05
+scope:
+  - specs/
 ---
 
 # The number is the identity of a rule

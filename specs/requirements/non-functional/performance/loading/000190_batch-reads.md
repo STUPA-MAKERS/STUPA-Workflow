@@ -1,0 +1,15 @@
+---
+id: "000190"
+title: A list reads its rows in one request
+kind: non-functional
+status: draft
+owner: frederikbeimgraben
+updated: 2026-11-05
+scope:
+  - backend/app/
+  - frontend/src/app/
+---
+
+# A list reads its rows in one request
+
+A list must read its rows and their related data in one request, not one request per row.

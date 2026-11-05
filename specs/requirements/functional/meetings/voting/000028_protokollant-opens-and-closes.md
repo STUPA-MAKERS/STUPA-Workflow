@@ -3,11 +3,11 @@ id: "000028"
 title: Only the protokollant opens and closes a meeting vote
 kind: functional
 status: draft
+owner: frederikbeimgraben
+updated: 2026-11-05
 scope:
   - backend/app/modules/voting
   - frontend/src/app/features/voting
-owner: frederikbeimgraben
-updated: 2026-11-05
 ---
 
 # Only the protokollant opens and closes a meeting vote

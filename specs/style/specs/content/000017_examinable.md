@@ -3,10 +3,10 @@ id: "000017"
 title: A rule can be examined
 kind: style
 status: draft
-scope:
-  - specs/
 owner: frederikbeimgraben
 updated: 2026-11-05
+scope:
+  - specs/
 ---
 
 # A rule can be examined

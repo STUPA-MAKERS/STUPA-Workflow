@@ -3,10 +3,10 @@ id: "000016"
 title: One rule controls one thing
 kind: style
 status: draft
-scope:
-  - specs/
 owner: frederikbeimgraben
 updated: 2026-11-05
+scope:
+  - specs/
 ---
 
 # One rule controls one thing

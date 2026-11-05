@@ -3,11 +3,11 @@ id: "000031"
 title: A poll shows only counts
 kind: functional
 status: draft
+owner: frederikbeimgraben
+updated: 2026-11-05
 scope:
   - backend/app/modules/voting/poll.py
   - frontend/src/app/features/voting
-owner: frederikbeimgraben
-updated: 2026-11-05
 ---
 
 # A poll shows only counts

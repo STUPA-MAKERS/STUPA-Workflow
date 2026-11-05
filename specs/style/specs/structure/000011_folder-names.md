@@ -3,10 +3,10 @@ id: "000011"
 title: Folder names are lower case kebab case
 kind: style
 status: draft
-scope:
-  - specs/
 owner: frederikbeimgraben
 updated: 2026-11-05
+scope:
+  - specs/
 ---
 
 # Folder names are lower case kebab case

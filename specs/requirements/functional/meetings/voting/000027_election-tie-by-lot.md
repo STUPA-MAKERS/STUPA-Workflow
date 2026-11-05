@@ -3,11 +3,11 @@ id: "000027"
 title: A tie in an election is decided by lot
 kind: functional
 status: draft
+owner: frederikbeimgraben
+updated: 2026-11-05
 scope:
   - backend/app/modules/voting
   - frontend/src/app/features/voting
-owner: frederikbeimgraben
-updated: 2026-11-05
 ---
 
 # A tie in an election is decided by lot
