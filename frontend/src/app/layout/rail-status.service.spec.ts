@@ -181,6 +181,10 @@ describe('RailStatusService', () => {
     jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
     answer(env, 1, 'live');
     expect(env.svc.live()).toBe(true);
+
+    env.states.next({ type: 'meeting_state', activeApplicationId: 'a-1', status: 'live' });
+    jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
+    env.http.expectNone((r) => r.url === TASKS);
   });
 
   it('polls no faster than once a minute', () => {

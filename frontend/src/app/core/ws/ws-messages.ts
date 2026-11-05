@@ -100,6 +100,15 @@ export interface BodyDraftMsg {
   body: string;
   seq: number;
 }
+/**
+ * The saved text or the done mark of an agenda item changed. The event names the item,
+ * never the content: the page reads the agenda again. The guest channel sends it without
+ * the item.
+ */
+export interface AgendaChangedMsg {
+  type: 'agenda_changed';
+  agendaItemId?: string;
+}
 export interface ErrorMsg {
   type: 'error';
   code: string;
@@ -151,6 +160,7 @@ export type ServerMessage =
   | VoteCancelledMsg
   | ViewersMsg
   | BodyDraftMsg
+  | AgendaChangedMsg
   | ErrorMsg;
 
 export type ClientMessage =
