@@ -55,7 +55,7 @@ describe('VoteOpenDialogComponent · election', () => {
     const { http, cmp, opened, container, fixture } = await setup();
     const user = userEvent.setup();
     await user.click(screen.getByRole('radio', { name: 'Wahl' }));
-    expect(screen.getByRole('switch', { name: 'Geheime Wahl' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.queryByRole('switch', { name: 'Geheime Wahl' })).toBeNull();
     expect(screen.getByRole('switch', { name: 'Gäste stimmen mit ab' })).toHaveAttribute(
       'aria-checked',
       'false',

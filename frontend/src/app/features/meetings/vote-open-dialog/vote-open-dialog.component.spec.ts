@@ -75,7 +75,7 @@ describe('VoteOpenDialogComponent', () => {
       'Soll der Antrag „Zuschuss Party“ wie beschrieben gefördert werden?',
     );
     expect(screen.getByRole('radio', { name: 'Einfach' })).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByRole('switch', { name: 'Geheime Abstimmung' })).toHaveAttribute('aria-checked', 'false');
+    expect(screen.queryByRole('switch', { name: 'Geheime Abstimmung' })).toBeNull();
   });
 
   it('builds no tie break, no ballot change and no eligible count', async () => {
@@ -83,7 +83,6 @@ describe('VoteOpenDialogComponent', () => {
     expect(screen.queryByText(/Stimmengleichheit/)).toBeNull();
     expect(screen.queryByText(/änderbar/)).toBeNull();
     await userEvent.click(screen.getByRole('radio', { name: 'Zwei Drittel' }));
-    await userEvent.click(screen.getByRole('switch', { name: 'Geheime Abstimmung' }));
     const question = screen.getByLabelText('Beschlussfrage');
     await userEvent.clear(question);
     await userEvent.type(question, '  Fördern wir?  ');
