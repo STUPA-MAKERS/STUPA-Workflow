@@ -1,0 +1,63 @@
+// The label band of a labelled textarea box: text scrolls under the label, and a band of
+// frosted glass behind the label keeps the label readable. The glass shows only while text
+// is hidden above (the scroll-fade directive on the textarea sets `is-fade-start`), so at
+// rest the box looks like every other field. The glass is solid behind the label and fades
+// to transparent below it, so the text passes under it without a hard edge.
+//
+// Use it on the box; give the textarea `appScrollFade="y"` and the `control` mixin, the label the `label` mixin.
+
+$-glass-height: 42px;
+$-glass-solid: 30px;
+// The layer runs past the end of the fade, so the mask hides the lower side of its edge.
+$-glass-layer: 48px;
+
+@mixin box {
+  --ta-glass: var(--color-surface-sunken);
+
+  @media (hover: hover) {
+    &:hover {
+      --ta-glass: color-mix(in srgb, var(--color-surface-sunken) 60%, var(--color-surface-3));
+    }
+  }
+
+  // The glass reaches the edges of the box. It covers the focus and error edge of the
+  // box, so it draws the same edge (`box-shadow: inherit`); the mask hides its lower side.
+  &::before {
+    content: '';
+    display: none;
+    position: absolute;
+    z-index: 1;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: $-glass-layer;
+    border-radius: var(--radius-field) var(--radius-field) 0 0;
+    box-shadow: inherit;
+    background: var(--ta-glass);
+    -webkit-mask-image: linear-gradient(to bottom, #000 $-glass-solid, transparent $-glass-height);
+    mask-image: linear-gradient(to bottom, #000 $-glass-solid, transparent $-glass-height);
+    pointer-events: none;
+
+    @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+      background: color-mix(in srgb, var(--ta-glass) 70%, transparent);
+      -webkit-backdrop-filter: blur(8px) saturate(1.8);
+      backdrop-filter: blur(8px) saturate(1.8);
+    }
+  }
+  &:has(.is-fade-start)::before {
+    display: block;
+  }
+}
+
+// The label above the glass.
+@mixin label {
+  z-index: 2;
+}
+
+// The textarea: the foot fades while text is hidden below.
+@mixin control {
+  &.is-fade-end {
+    -webkit-mask-image: linear-gradient(to top, transparent, #000 var(--space-4));
+    mask-image: linear-gradient(to top, transparent, #000 var(--space-4));
+  }
+}

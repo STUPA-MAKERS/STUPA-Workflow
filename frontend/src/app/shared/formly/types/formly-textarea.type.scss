@@ -1,5 +1,5 @@
 @use 'field' as f;
-@use 'scroll-fade' as fade;
+@use '../textarea-glass' as glass;
 
 .field {
   display: flex;
@@ -10,11 +10,9 @@
 .field__box {
   @include f.box;
   @include f.box-labelled;
+  @include glass.box;
   & {
     align-items: stretch;
-    // The label band is padding of the box, not of the textarea, so text that scrolls
-    // stops below the label and never runs under it.
-    padding-top: 24px;
   }
 }
 .field__box--invalid {
@@ -22,6 +20,7 @@
 }
 .field__label {
   @include f.label;
+  @include glass.label;
 }
 .field__box:focus-within .field__label {
   @include f.label-focus;
@@ -33,14 +32,12 @@
   @include f.control;
   & {
     height: auto;
-    min-height: calc(var(--field-height) - 24px);
-    padding-top: 0;
+    min-height: var(--field-height);
+    padding-top: 24px;
     padding-bottom: 8px;
     resize: vertical;
   }
-  // Text that scrolls fades out at the label band and at the foot, only where text is
-  // hidden, so the first and the last line stay sharp at rest.
-  @include fade.fade-y(var(--space-4));
+  @include glass.control;
 }
 .field__hint,
 .field__error {

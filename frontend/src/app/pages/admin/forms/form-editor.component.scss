@@ -1,6 +1,7 @@
 @use 'field' as f;
 @use 'breakpoints' as bp;
 @use 'scroll-fade' as fade;
+@use '../../../shared/formly/textarea-glass' as glass;
 @use '../../../shared/ui/surface-card' as sc;
 
 :host {
@@ -407,14 +408,14 @@
 .fe__area {
   @include f.box;
   @include f.box-labelled;
+  @include glass.box;
   & {
     align-items: stretch;
-    // The label band is padding of the box, so text that scrolls stops below the label.
-    padding-top: 24px;
   }
 }
 .fe__areaLabel {
   @include f.label;
+  @include glass.label;
 }
 .fe__area:focus-within .fe__areaLabel {
   @include f.label-focus;
@@ -424,16 +425,14 @@
   @include f.control;
   & {
     height: auto;
-    min-height: calc(3lh + 8px);
-    max-height: calc(16lh + 8px);
-    padding-top: 0;
+    min-height: calc(3lh + 32px);
+    max-height: calc(16lh + 32px);
+    padding-top: 24px;
     padding-bottom: 8px;
     resize: vertical;
     field-sizing: content;
   }
-  // Text that scrolls fades out at the label band and at the foot, only where text is
-  // hidden.
-  @include fade.fade-y(var(--space-4));
+  @include glass.control;
 }
 
 .fe__mono ::ng-deep input {
