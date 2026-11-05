@@ -2,7 +2,7 @@
 id: "000415"
 title: Bars and headers are vertically balanced
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

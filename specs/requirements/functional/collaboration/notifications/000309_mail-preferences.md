@@ -2,7 +2,7 @@
 id: "000309"
 title: A person controls their mail kinds
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

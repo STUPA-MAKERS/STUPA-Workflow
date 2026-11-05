@@ -2,7 +2,7 @@
 id: "000067"
 title: Commands run in the Nix dev shell
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

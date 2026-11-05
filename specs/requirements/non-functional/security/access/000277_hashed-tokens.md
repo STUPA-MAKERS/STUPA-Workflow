@@ -2,7 +2,7 @@
 id: "000277"
 title: Tokens are stored only as hashes
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

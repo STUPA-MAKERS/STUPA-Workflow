@@ -2,7 +2,7 @@
 id: "000346"
 title: A meeting opens only with a protokollant
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

@@ -2,7 +2,7 @@
 id: "000087"
 title: Data types are frozen by default
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

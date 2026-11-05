@@ -2,7 +2,7 @@
 id: "000379"
 title: The close and its branch commit together
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

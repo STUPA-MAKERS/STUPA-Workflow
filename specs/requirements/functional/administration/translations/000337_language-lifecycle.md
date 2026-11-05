@@ -2,7 +2,7 @@
 id: "000337"
 title: A new language starts inactive
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

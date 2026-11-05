@@ -2,7 +2,7 @@
 id: "000214"
 title: A leading icon is centred on the end cap
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

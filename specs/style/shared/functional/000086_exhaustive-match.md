@@ -2,7 +2,7 @@
 id: "000086"
 title: A branch on one value is an exhaustive match
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

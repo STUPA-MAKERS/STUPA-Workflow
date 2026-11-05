@@ -2,7 +2,7 @@
 id: "000066"
 title: Public endpoints are a fixed list
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

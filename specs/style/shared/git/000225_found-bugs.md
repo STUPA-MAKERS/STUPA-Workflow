@@ -2,7 +2,7 @@
 id: "000225"
 title: A found bug is fixed, a behaviour change is asked
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

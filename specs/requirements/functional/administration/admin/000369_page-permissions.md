@@ -2,7 +2,7 @@
 id: "000369"
 title: Each admin page has its own permission
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

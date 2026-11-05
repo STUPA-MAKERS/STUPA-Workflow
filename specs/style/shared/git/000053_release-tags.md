@@ -2,7 +2,7 @@
 id: "000053"
 title: Only the owner tags a release
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

@@ -2,7 +2,7 @@
 id: "000177"
 title: A link preview uses the access of the viewer
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

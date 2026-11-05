@@ -2,7 +2,7 @@
 id: "000233"
 title: Only the vote result fires a vote branch
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

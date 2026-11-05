@@ -2,7 +2,7 @@
 id: "000189"
 title: The load bar shows only for slow foreground reads
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

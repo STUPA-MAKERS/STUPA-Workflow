@@ -2,7 +2,7 @@
 id: "000089"
 title: The exceptions are named
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

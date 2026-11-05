@@ -2,7 +2,7 @@
 id: "000375"
 title: An edit is versioned and audited without values
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

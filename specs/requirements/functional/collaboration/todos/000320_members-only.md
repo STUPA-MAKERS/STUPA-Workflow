@@ -2,7 +2,7 @@
 id: "000320"
 title: Only members are assigned or mentioned
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

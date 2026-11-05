@@ -2,7 +2,7 @@
 id: "000429"
 title: A mockup remark does not change the ui-kit
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

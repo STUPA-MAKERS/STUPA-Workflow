@@ -2,7 +2,7 @@
 id: "000267"
 title: Gremium rights come only from the membership
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

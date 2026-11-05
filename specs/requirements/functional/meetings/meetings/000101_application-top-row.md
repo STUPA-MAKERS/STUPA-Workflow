@@ -2,7 +2,7 @@
 id: "000101"
 title: A TOP with an Antrag shows the Antrag as its first row
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

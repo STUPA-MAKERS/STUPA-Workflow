@@ -2,7 +2,7 @@
 id: "000002"
 title: A spec starts with a YAML front matter
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

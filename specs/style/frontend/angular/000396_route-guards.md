@@ -2,7 +2,7 @@
 id: "000396"
 title: A route guard is only for the UX
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

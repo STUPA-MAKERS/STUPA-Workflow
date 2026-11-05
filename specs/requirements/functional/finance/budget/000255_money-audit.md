@@ -2,7 +2,7 @@
 id: "000255"
 title: Every money change is audited and revertable
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

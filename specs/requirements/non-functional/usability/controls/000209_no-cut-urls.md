@@ -2,7 +2,7 @@
 id: "000209"
 title: URLs, IBANs and e-mail addresses are never cut
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

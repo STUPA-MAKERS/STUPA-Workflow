@@ -2,7 +2,7 @@
 id: "000171"
 title: Only final protocols of public Gremien are public
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

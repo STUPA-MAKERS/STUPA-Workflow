@@ -2,7 +2,7 @@
 id: "000172"
 title: A public protocol has no names and no internal TOPs
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

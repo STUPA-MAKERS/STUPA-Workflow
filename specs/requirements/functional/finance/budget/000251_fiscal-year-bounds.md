@@ -2,7 +2,7 @@
 id: "000251"
 title: A fiscal year starts on a day from 1 to 28
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

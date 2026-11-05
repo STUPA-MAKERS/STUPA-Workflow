@@ -2,7 +2,7 @@
 id: "000345"
 title: Meeting rights are per Gremium
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

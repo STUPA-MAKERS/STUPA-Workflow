@@ -2,7 +2,7 @@
 id: "000335"
 title: The avatar fetch is fixed and limited
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

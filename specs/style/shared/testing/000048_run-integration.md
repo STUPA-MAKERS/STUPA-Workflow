@@ -2,7 +2,7 @@
 id: "000048"
 title: CI runs the full suites
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

@@ -2,7 +2,7 @@
 id: "000310"
 title: Mail texts are in German and English
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

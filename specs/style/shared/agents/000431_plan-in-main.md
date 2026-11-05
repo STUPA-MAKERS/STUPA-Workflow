@@ -2,7 +2,7 @@
 id: "000431"
 title: Plan in the main session
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

@@ -2,7 +2,7 @@
 id: "000068"
 title: A migration has a hash ID
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

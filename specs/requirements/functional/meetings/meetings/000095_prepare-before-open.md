@@ -2,7 +2,7 @@
 id: "000095"
 title: The protocol and votes can be prepared before the open
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

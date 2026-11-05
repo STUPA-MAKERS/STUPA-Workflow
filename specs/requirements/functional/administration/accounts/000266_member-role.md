@@ -2,7 +2,7 @@
 id: "000266"
 title: Every user holds the member role
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

@@ -2,7 +2,7 @@
 id: "000322"
 title: A transfer keeps what the target supports
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

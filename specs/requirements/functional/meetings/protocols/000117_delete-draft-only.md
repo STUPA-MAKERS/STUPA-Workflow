@@ -2,7 +2,7 @@
 id: "000117"
 title: Only a draft protocol is deleted
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

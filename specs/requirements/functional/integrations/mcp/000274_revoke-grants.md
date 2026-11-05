@@ -2,7 +2,7 @@
 id: "000274"
 title: Tokens can be revoked
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

@@ -2,7 +2,7 @@
 id: "000043"
 title: The MCP version rises with the tool set
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

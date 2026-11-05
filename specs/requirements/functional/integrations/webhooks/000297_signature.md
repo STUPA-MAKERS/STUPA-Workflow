@@ -2,7 +2,7 @@
 id: "000297"
 title: A webhook request is signed with a timestamp
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

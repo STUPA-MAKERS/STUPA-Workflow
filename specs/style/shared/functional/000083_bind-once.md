@@ -2,7 +2,7 @@
 id: "000083"
 title: A local is bound once
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

@@ -2,7 +2,7 @@
 id: "000273"
 title: An agent never casts a ballot or merges accounts
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

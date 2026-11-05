@@ -2,7 +2,7 @@
 id: "000350"
 title: A meeting socket checks the origin
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

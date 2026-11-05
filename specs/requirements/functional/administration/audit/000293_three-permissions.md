@@ -2,7 +2,7 @@
 id: "000293"
 title: Read, check and revert are separate permissions
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

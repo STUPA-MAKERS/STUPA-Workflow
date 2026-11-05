@@ -2,7 +2,7 @@
 id: "000136"
 title: Every i18n text is editable in English too
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

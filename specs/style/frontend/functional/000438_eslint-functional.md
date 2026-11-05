@@ -2,7 +2,7 @@
 id: "000438"
 title: eslint-plugin-functional warns on mutation
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

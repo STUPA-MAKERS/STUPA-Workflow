@@ -2,7 +2,7 @@
 id: "000316"
 title: Closed tickets are anonymized after the retention time
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

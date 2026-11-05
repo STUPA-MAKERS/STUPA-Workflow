@@ -2,7 +2,7 @@
 id: "000312"
 title: Task reminders follow the admin setting
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

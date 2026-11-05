@@ -2,7 +2,7 @@
 id: "000115"
 title: The keeper holds protocol.write
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

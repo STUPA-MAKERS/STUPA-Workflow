@@ -2,7 +2,7 @@
 id: "000106"
 title: Guests vote or only watch
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

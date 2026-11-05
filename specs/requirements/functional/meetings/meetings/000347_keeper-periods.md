@@ -2,7 +2,7 @@
 id: "000347"
 title: A keeper period follows the current TOP
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

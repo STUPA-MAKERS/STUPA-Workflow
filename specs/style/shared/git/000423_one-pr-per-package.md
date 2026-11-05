@@ -2,7 +2,7 @@
 id: "000423"
 title: One branch and one pull request per package
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

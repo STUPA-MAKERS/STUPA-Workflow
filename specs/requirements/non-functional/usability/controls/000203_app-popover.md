@@ -2,7 +2,7 @@
 id: "000203"
 title: Every dropdown uses the app popover
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

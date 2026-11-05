@@ -2,7 +2,7 @@
 id: "000357"
 title: The quorum uses the roster of the meeting
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

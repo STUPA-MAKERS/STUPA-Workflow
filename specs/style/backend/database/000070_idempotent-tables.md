@@ -2,7 +2,7 @@
 id: "000070"
 title: A migration that adds a table is idempotent
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

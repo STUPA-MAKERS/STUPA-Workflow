@@ -2,7 +2,7 @@
 id: "000129"
 title: An Antrag stays open after a transition in Aufgaben
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

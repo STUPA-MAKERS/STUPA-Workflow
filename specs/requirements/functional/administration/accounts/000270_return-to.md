@@ -2,7 +2,7 @@
 id: "000270"
 title: The login returns to the page
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

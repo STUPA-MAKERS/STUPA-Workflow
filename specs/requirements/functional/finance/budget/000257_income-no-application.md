@@ -2,7 +2,7 @@
 id: "000257"
 title: An income never belongs to an Antrag
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

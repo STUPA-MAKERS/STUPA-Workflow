@@ -2,7 +2,7 @@
 id: "000401"
 title: Errors show as a toast
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

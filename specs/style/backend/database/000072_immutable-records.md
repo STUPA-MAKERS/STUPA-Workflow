@@ -2,7 +2,7 @@
 id: "000072"
 title: Five record types are immutable
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

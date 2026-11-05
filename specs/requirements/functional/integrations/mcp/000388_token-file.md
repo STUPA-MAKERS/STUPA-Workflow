@@ -2,7 +2,7 @@
 id: "000388"
 title: The MCP token file is private
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

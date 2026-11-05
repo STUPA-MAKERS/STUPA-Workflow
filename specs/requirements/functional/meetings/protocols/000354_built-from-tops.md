@@ -2,7 +2,7 @@
 id: "000354"
 title: The protocol is built from the TOP texts
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

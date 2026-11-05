@@ -2,7 +2,7 @@
 id: "000259"
 title: Gremium members see their cost centres
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

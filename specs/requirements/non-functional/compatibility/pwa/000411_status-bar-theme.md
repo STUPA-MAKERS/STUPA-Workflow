@@ -2,7 +2,7 @@
 id: "000411"
 title: The status bar follows the theme
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

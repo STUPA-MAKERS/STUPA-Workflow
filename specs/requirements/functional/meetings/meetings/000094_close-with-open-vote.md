@@ -2,7 +2,7 @@
 id: "000094"
 title: A meeting with an open vote does not close
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

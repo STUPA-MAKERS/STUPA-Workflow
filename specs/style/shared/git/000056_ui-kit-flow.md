@@ -2,7 +2,7 @@
 id: "000056"
 title: ui-kit changes go to ui-kit development first
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

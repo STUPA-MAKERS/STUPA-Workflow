@@ -2,7 +2,7 @@
 id: "000159"
 title: An account without a name shows Ohne Namen
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

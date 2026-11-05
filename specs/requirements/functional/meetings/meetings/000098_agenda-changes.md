@@ -2,7 +2,7 @@
 id: "000098"
 title: Agenda changes only while planned or live
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

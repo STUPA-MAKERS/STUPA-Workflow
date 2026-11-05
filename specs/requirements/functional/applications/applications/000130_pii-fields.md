@@ -2,7 +2,7 @@
 id: "000130"
 title: PII fields need application.read
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

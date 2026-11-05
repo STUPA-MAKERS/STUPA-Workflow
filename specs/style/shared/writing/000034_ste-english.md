@@ -2,7 +2,7 @@
 id: "000034"
 title: Repository texts are written in STE English
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

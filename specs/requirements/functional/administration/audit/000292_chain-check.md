@@ -2,7 +2,7 @@
 id: "000292"
 title: The audit chain is checked every night
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

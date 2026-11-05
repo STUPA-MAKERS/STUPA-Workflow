@@ -2,7 +2,7 @@
 id: "000330"
 title: Search shows a fixed number per kind
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

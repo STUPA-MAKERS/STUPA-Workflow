@@ -2,7 +2,7 @@
 id: "000231"
 title: A guard on a field fails closed
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

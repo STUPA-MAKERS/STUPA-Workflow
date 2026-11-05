@@ -2,7 +2,7 @@
 id: "000341"
 title: File access follows the access to the Antrag
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

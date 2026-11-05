@@ -2,7 +2,7 @@
 id: "000049"
 title: A visual bug is checked on pixels
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

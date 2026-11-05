@@ -2,7 +2,7 @@
 id: "000269"
 title: An applicant session can edit
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

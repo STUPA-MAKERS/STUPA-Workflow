@@ -2,7 +2,7 @@
 id: "000389"
 title: The render service has no network egress
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

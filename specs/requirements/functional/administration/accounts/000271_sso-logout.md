@@ -2,7 +2,7 @@
 id: "000271"
 title: The logout ends the SSO session
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

@@ -2,7 +2,7 @@
 id: "000196"
 title: The phone opens pickers as bottom sheets
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

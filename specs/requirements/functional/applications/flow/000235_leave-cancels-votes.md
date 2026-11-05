@@ -2,7 +2,7 @@
 id: "000235"
 title: Leaving a vote state cancels its votes
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

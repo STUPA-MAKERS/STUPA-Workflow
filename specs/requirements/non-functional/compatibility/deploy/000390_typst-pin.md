@@ -2,7 +2,7 @@
 id: "000390"
 title: The typst version is pinned in two places
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

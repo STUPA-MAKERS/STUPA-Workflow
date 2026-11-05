@@ -2,7 +2,7 @@
 id: "000039"
 title: Field names are the same in frontend and backend
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

@@ -2,7 +2,7 @@
 id: "000340"
 title: An unscanned file is not served
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

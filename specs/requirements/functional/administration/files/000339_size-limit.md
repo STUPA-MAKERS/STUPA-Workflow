@@ -2,7 +2,7 @@
 id: "000339"
 title: An attachment is at most 10 MiB
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

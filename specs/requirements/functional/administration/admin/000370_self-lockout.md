@@ -2,7 +2,7 @@
 id: "000370"
 title: An admin cannot deactivate the own account
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

@@ -2,7 +2,7 @@
 id: "000060"
 title: A gate names a permission, not a role
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

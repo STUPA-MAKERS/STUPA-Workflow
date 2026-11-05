@@ -2,7 +2,7 @@
 id: "000202"
 title: Dialogs and toasts are on the top layer
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

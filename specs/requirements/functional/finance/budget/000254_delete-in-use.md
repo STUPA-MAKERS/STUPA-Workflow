@@ -2,7 +2,7 @@
 id: "000254"
 title: A cost centre in use is not deleted
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

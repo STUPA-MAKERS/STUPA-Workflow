@@ -2,7 +2,7 @@
 id: "000395"
 title: Components use semantic colour tokens
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

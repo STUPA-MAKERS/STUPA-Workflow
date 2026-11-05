@@ -2,7 +2,7 @@
 id: "000352"
 title: A guest joins with one device
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

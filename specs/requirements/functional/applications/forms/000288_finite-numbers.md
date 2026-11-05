@@ -2,7 +2,7 @@
 id: "000288"
 title: Numbers are finite decimals
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

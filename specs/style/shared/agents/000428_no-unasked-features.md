@@ -2,7 +2,7 @@
 id: "000428"
 title: Do not build what exists
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

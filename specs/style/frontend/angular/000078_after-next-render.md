@@ -2,7 +2,7 @@
 id: "000078"
 title: Wait for a render with afterNextRender
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

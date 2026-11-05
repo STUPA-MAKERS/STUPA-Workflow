@@ -2,7 +2,7 @@
 id: "000123"
 title: The received date is at most 365 days back
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

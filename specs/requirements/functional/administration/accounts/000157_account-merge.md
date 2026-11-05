@@ -2,7 +2,7 @@
 id: "000157"
 title: An admin merges two accounts
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

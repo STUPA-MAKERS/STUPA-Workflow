@@ -2,7 +2,7 @@
 id: "000061"
 title: Inputs are strictly typed
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

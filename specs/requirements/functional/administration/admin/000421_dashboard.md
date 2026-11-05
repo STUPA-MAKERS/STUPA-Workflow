@@ -2,7 +2,7 @@
 id: "000421"
 title: The start page is a work list with a side bar
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

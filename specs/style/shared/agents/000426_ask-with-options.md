@@ -2,7 +2,7 @@
 id: "000426"
 title: Ask with options
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

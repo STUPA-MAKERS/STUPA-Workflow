@@ -2,7 +2,7 @@
 id: "000279"
 title: OIDC endpoints come from discovery
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

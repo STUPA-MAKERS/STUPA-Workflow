@@ -2,7 +2,7 @@
 id: "000041"
 title: Shared data has one source
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

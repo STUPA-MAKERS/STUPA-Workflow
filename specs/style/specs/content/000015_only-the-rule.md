@@ -2,7 +2,7 @@
 id: "000015"
 title: A spec contains only the rule
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

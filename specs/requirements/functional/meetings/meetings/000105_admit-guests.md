@@ -2,7 +2,7 @@
 id: "000105"
 title: The meeting lead admits each guest
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

@@ -2,7 +2,7 @@
 id: "000387"
 title: Memberships and roles are read-only in the MCP
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

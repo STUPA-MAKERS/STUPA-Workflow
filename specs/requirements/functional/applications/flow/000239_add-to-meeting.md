@@ -2,7 +2,7 @@
 id: "000239"
 title: A transition into a vote state can add the Antrag to a meeting
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

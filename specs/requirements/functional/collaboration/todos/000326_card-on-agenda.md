@@ -2,7 +2,7 @@
 id: "000326"
 title: A card can go on the agenda
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

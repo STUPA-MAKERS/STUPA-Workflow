@@ -2,7 +2,7 @@
 id: "000112"
 title: The substitute pool is the only substitute rule
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

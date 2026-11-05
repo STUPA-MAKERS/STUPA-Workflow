@@ -2,7 +2,7 @@
 id: "000074"
 title: Run the production build after style changes
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

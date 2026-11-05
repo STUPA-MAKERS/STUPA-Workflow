@@ -2,7 +2,7 @@
 id: "000392"
 title: Forwarded headers come only from the proxy
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

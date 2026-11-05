@@ -2,7 +2,7 @@
 id: "000184"
 title: Mail templates run sandboxed
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

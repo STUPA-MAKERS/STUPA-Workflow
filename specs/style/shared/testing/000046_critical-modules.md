@@ -2,7 +2,7 @@
 id: "000046"
 title: Critical modules have full branch coverage
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

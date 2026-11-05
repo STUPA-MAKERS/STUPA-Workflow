@@ -2,7 +2,7 @@
 id: "000394"
 title: A deploy runs the migration first
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

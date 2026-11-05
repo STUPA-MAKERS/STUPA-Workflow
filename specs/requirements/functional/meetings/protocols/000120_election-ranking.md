@@ -2,7 +2,7 @@
 id: "000120"
 title: An election shows a ranking
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

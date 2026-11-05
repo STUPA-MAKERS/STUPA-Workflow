@@ -2,7 +2,7 @@
 id: "000243"
 title: The vote Gremium is a snapshot
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

@@ -2,7 +2,7 @@
 id: "000358"
 title: The protocol mail carries the PDF
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

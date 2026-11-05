@@ -2,7 +2,7 @@
 id: "000321"
 title: A shared card does not move to a personal board
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

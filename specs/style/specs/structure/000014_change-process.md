@@ -2,7 +2,7 @@
 id: "000014"
 title: A change goes through a pull request
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

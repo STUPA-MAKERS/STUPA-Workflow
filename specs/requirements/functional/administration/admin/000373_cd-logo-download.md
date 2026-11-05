@@ -2,7 +2,7 @@
 id: "000373"
 title: A CD logo is served only as a download
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

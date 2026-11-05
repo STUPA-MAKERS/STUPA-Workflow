@@ -2,7 +2,7 @@
 id: "000223"
 title: A test refers back to its rule
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

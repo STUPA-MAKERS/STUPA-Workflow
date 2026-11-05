@@ -2,7 +2,7 @@
 id: "000133"
 title: A positions answer has label and offers
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

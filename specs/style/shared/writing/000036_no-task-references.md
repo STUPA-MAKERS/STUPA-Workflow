@@ -2,7 +2,7 @@
 id: "000036"
 title: Texts do not refer to old tasks
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

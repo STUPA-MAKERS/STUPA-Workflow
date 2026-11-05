@@ -2,7 +2,7 @@
 id: "000371"
 title: A flow save moves Anträge by state key
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

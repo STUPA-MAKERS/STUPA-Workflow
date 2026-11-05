@@ -2,7 +2,7 @@
 id: "000054"
 title: A merge needs the go of the owner
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

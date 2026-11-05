@@ -2,7 +2,7 @@
 id: "000286"
 title: Answer validation reports all errors
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

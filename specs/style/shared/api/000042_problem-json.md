@@ -2,7 +2,7 @@
 id: "000042"
 title: Every error is problem+json
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

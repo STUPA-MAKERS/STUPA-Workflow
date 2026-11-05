@@ -2,7 +2,7 @@
 id: "000404"
 title: Markdown images are outside erasure and export
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

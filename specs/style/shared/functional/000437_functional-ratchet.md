@@ -2,7 +2,7 @@
 id: "000437"
 title: A CI ratchet keeps the functional style from getting worse
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

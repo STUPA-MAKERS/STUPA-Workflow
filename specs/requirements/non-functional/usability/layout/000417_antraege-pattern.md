@@ -2,7 +2,7 @@
 id: "000417"
 title: Work lists follow the Anträge pattern
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

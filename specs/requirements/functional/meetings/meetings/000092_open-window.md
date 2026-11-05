@@ -2,7 +2,7 @@
 id: "000092"
 title: A meeting opens in a configured window
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

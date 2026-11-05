@@ -2,7 +2,7 @@
 id: "000127"
 title: The applicant sees the Gremium as actor
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

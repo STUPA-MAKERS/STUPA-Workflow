@@ -2,7 +2,7 @@
 id: "000427"
 title: Report a possible bug
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

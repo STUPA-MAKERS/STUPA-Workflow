@@ -2,7 +2,7 @@
 id: "000055"
 title: A UI change is approved on screenshots
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

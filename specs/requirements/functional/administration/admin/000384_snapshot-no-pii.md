@@ -2,7 +2,7 @@
 id: "000384"
 title: A config snapshot holds no personal data
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

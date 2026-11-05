@@ -2,7 +2,7 @@
 id: "000399"
 title: The design has one accent and plain status text
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

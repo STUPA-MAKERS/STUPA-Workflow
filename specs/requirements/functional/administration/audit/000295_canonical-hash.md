@@ -2,7 +2,7 @@
 id: "000295"
 title: The hash input is canonical
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

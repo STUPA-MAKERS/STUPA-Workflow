@@ -2,7 +2,7 @@
 id: "000197"
 title: A header has a title, at most one action and a menu
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

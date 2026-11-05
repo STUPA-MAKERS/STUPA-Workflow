@@ -2,7 +2,7 @@
 id: "000355"
 title: A non-public TOP gives a second PDF
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

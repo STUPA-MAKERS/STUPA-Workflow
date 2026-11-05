@@ -2,7 +2,7 @@
 id: "000140"
 title: The default fiscal year holds today
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

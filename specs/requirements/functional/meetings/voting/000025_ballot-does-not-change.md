@@ -2,7 +2,7 @@
 id: "000025"
 title: A cast ballot does not change
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

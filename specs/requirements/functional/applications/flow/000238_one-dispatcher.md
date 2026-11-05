@@ -2,7 +2,7 @@
 id: "000238"
 title: Every fire path runs the full action chain
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

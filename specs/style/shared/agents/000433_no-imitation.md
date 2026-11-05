@@ -2,7 +2,7 @@
 id: "000433"
 title: No page imitates an organization
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

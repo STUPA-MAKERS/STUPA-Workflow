@@ -2,7 +2,7 @@
 id: "000047"
 title: An integration test uses its own keys
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

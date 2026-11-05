@@ -2,7 +2,7 @@
 id: "000248"
 title: The available amount can be negative
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

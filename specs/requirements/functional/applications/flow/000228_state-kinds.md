@@ -2,7 +2,7 @@
 id: "000228"
 title: A state is normal or a vote state
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

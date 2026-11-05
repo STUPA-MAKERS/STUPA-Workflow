@@ -2,7 +2,7 @@
 id: "000397"
 title: Gremium rights come from the Gremium API
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

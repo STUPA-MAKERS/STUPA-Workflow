@@ -2,7 +2,7 @@
 id: "000250"
 title: The deciding Gremium is inherited
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

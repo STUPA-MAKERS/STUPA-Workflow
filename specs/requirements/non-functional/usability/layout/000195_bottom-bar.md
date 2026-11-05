@@ -2,7 +2,7 @@
 id: "000195"
 title: The phone bottom bar is fixed
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

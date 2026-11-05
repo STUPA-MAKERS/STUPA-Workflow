@@ -2,7 +2,7 @@
 id: "000057"
 title: Release notes list migrations and steps
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

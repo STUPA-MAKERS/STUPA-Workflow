@@ -2,7 +2,7 @@
 id: "000194"
 title: The phone layout starts below 768 px
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

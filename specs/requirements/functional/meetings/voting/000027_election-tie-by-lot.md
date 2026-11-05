@@ -2,7 +2,7 @@
 id: "000027"
 title: A tie in an election is decided by lot
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

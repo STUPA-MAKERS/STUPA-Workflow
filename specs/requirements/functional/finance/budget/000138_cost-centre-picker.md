@@ -2,7 +2,7 @@
 id: "000138"
 title: The cost centre pickers are fixed
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

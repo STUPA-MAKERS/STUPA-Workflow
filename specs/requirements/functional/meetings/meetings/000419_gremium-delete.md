@@ -2,7 +2,7 @@
 id: "000419"
 title: A Gremium delete deletes its meetings
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

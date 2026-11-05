@@ -2,7 +2,7 @@
 id: "000125"
 title: An unconfirmed guest Antrag rests
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

@@ -2,7 +2,7 @@
 id: "000258"
 title: A booking can have sub-bookings
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

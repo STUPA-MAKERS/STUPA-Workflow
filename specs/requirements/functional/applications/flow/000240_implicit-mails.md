@@ -2,7 +2,7 @@
 id: "000240"
 title: Every state change sends the implicit mails
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

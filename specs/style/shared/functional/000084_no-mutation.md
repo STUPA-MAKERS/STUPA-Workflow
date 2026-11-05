@@ -2,7 +2,7 @@
 id: "000084"
 title: A value is not mutated
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

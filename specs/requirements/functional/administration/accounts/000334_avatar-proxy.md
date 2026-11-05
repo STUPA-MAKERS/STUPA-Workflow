@@ -2,7 +2,7 @@
 id: "000334"
 title: Avatars come through the platform
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

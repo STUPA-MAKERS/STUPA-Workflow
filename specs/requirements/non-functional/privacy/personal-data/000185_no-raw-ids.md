@@ -2,7 +2,7 @@
 id: "000185"
 title: The UI shows no raw IDs
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

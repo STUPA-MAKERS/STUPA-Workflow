@@ -2,7 +2,7 @@
 id: "000284"
 title: A form definition is checked at save time
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

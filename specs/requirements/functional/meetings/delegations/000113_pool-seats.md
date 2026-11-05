@@ -2,7 +2,7 @@
 id: "000113"
 title: A pool substitute takes a free seat
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

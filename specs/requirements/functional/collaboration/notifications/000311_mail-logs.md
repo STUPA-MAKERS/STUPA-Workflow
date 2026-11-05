@@ -2,7 +2,7 @@
 id: "000311"
 title: Mail logs hold no personal data
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

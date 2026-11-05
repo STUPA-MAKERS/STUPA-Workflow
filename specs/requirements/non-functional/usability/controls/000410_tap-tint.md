@@ -2,7 +2,7 @@
 id: "000410"
 title: A tap tints the whole tile
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

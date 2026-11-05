@@ -2,7 +2,7 @@
 id: "000229"
 title: Guards and actions come from a whitelist
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

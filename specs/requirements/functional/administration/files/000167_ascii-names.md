@@ -2,7 +2,7 @@
 id: "000167"
 title: Storage names replace non-ASCII characters
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

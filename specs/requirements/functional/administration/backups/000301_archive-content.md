@@ -2,7 +2,7 @@
 id: "000301"
 title: A backup holds the database and the attachments, encrypted
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

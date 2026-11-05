@@ -2,7 +2,7 @@
 id: "000096"
 title: There is no preparation page
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

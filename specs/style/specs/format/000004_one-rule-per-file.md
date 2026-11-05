@@ -2,7 +2,7 @@
 id: "000004"
 title: One file holds one rule
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

@@ -2,7 +2,7 @@
 id: "000378"
 title: The database serializes ballots
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

@@ -2,7 +2,7 @@
 id: "000029"
 title: A vote can be deleted only as draft or cancelled
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

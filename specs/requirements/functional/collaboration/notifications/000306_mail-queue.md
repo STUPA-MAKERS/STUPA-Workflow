@@ -2,7 +2,7 @@
 id: "000306"
 title: Mails go through the queue
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

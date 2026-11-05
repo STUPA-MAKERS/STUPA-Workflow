@@ -2,7 +2,7 @@
 id: "000161"
 title: Every entity has create, read, update and delete
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

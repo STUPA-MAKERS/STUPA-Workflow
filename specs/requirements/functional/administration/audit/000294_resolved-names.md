@@ -2,7 +2,7 @@
 id: "000294"
 title: The audit log shows names
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

@@ -2,7 +2,7 @@
 id: "000153"
 title: Mail templates are sandboxed
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

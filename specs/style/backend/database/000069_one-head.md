@@ -2,7 +2,7 @@
 id: "000069"
 title: Alembic has one head
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

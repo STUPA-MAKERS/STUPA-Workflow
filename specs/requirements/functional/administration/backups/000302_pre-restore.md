@@ -2,7 +2,7 @@
 id: "000302"
 title: A restore first saves the current state
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

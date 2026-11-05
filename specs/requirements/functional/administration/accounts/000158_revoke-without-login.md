@@ -2,7 +2,7 @@
 id: "000158"
 title: Role assignments can be revoked without a login
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

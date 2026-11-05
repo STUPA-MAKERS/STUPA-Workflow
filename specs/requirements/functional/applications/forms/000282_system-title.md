@@ -2,7 +2,7 @@
 id: "000282"
 title: Every form has a title field
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

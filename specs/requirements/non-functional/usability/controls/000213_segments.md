@@ -2,7 +2,7 @@
 id: "000213"
 title: Segments have equal width
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

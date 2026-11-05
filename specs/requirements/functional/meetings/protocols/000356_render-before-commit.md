@@ -2,7 +2,7 @@
 id: "000356"
 title: A failed render keeps the draft
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

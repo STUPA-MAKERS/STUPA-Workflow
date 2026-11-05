@@ -2,7 +2,7 @@
 id: "000224"
 title: An app pull request targets development
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

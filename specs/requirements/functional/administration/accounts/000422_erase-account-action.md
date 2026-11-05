@@ -2,7 +2,7 @@
 id: "000422"
 title: An account can be erased from the user list
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

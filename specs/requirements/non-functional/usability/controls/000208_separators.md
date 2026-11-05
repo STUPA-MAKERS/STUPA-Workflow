@@ -2,7 +2,7 @@
 id: "000208"
 title: A separator stands only between two items
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

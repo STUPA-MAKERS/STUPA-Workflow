@@ -2,7 +2,7 @@
 id: "000318"
 title: Board rights depend on the board kind
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

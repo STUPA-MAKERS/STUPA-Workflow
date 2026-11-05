@@ -2,7 +2,7 @@
 id: "000425"
 title: Shared list parts live in the ui-kit
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

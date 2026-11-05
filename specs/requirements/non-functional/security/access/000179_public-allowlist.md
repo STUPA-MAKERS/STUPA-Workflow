@@ -2,7 +2,7 @@
 id: "000179"
 title: A public route is on the allowlist
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

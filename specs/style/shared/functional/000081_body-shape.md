@@ -2,7 +2,7 @@
 id: "000081"
 title: A function body has one shape
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

@@ -2,7 +2,7 @@
 id: "000400"
 title: A destructive action is an outlined red button
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

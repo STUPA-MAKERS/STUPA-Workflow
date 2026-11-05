@@ -2,7 +2,7 @@
 id: "000237"
 title: Actions run after the commit and never undo it
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

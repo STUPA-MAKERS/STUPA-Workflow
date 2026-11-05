@@ -2,7 +2,7 @@
 id: "000118"
 title: The PDF is named after the meeting
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

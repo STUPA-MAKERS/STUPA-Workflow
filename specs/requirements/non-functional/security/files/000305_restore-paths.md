@@ -2,7 +2,7 @@
 id: "000305"
 title: A restore writes only inside the bucket
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

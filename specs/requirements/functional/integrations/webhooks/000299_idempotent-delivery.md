@@ -2,7 +2,7 @@
 id: "000299"
 title: A delivery runs once per key
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

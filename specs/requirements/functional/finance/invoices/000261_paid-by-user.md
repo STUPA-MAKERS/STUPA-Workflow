@@ -2,7 +2,7 @@
 id: "000261"
 title: Only a user sets an invoice to paid
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

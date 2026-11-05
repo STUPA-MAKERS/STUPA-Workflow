@@ -2,7 +2,7 @@
 id: "000212"
 title: A tooltip shows only for cut text
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

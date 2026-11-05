@@ -2,7 +2,7 @@
 id: "000100"
 title: An agenda row has a subtitle only for an Antrag
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

@@ -2,7 +2,7 @@
 id: "000403"
 title: A webhook can be deleted
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

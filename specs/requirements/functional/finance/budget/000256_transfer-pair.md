@@ -2,7 +2,7 @@
 id: "000256"
 title: A transfer is a pair of bookings
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

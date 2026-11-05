@@ -2,7 +2,7 @@
 id: "000405"
 title: A revert needs the right of the original change
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

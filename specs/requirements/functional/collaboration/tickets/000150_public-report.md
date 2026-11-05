@@ -2,7 +2,7 @@
 id: "000150"
 title: Anyone can report a help ticket
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

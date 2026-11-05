@@ -2,7 +2,7 @@
 id: "000327"
 title: A link shows nothing without access
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

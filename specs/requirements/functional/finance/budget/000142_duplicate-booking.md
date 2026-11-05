@@ -2,7 +2,7 @@
 id: "000142"
 title: A booking can be duplicated
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

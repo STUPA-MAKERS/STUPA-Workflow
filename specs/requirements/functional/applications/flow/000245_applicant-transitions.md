@@ -2,7 +2,7 @@
 id: "000245"
 title: Applicant transitions need actorIsApplicant
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

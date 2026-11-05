@@ -2,7 +2,7 @@
 id: "000268"
 title: A magic link is valid until an event ends it
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

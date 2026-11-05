@@ -2,7 +2,7 @@
 id: "000385"
 title: The MCP version moves with its tools
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

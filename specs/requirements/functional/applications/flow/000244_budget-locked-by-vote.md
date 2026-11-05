@@ -2,7 +2,7 @@
 id: "000244"
 title: The cost centre is locked during a budget vote
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

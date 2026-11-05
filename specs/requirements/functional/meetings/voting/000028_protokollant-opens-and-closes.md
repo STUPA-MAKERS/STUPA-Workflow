@@ -2,7 +2,7 @@
 id: "000028"
 title: Only the protokollant opens and closes a meeting vote
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

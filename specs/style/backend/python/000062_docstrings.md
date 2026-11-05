@@ -2,7 +2,7 @@
 id: "000062"
 title: Docstrings instead of comments
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

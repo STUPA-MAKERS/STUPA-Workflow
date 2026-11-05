@@ -2,7 +2,7 @@
 id: "000413"
 title: A table in card mode keeps its controls in the card head
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

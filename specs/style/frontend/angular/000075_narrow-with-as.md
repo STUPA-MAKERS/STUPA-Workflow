@@ -2,7 +2,7 @@
 id: "000075"
 title: A template narrows a signal with as
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

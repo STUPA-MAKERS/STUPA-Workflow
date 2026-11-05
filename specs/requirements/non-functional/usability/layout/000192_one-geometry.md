@@ -2,7 +2,7 @@
 id: "000192"
 title: All list and detail pages share one geometry
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

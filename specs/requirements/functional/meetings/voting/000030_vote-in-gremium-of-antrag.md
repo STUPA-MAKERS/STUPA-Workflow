@@ -2,7 +2,7 @@
 id: "000030"
 title: A vote on an Antrag belongs to the Gremium of the Antrag
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

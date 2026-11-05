@@ -2,7 +2,7 @@
 id: "000276"
 title: Tokens never reach JavaScript
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

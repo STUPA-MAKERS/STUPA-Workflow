@@ -2,7 +2,7 @@
 id: "000166"
 title: A privacy erasure starts from Benutzer
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

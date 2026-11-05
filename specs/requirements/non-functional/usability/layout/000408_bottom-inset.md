@@ -2,7 +2,7 @@
 id: "000408"
 title: Fixed bottom elements sit above the bottom bar
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

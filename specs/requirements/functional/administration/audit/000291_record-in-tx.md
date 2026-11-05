@@ -2,7 +2,7 @@
 id: "000291"
 title: An audit entry is written in the same transaction
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

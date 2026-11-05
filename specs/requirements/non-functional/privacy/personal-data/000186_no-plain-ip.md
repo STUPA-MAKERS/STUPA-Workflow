@@ -2,7 +2,7 @@
 id: "000186"
 title: The login audit has no plain IP address
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:

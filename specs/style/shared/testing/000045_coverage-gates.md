@@ -2,7 +2,7 @@
 id: "000045"
 title: Coverage gates hold
 kind: style
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-05
 scope:
