@@ -1,5 +1,5 @@
 ---
-id: F/meetings/voting/000029
+id: "000029"
 title: A vote can be deleted only as draft or cancelled
 kind: functional
 status: draft

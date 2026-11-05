@@ -1,5 +1,5 @@
 ---
-id: F/meetings/voting/000027
+id: "000027"
 title: A tie in an election is decided by lot
 kind: functional
 status: draft

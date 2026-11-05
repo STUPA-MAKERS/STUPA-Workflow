@@ -1,5 +1,5 @@
 ---
-id: F/meetings/voting/000031
+id: "000031"
 title: A poll shows only counts
 kind: functional
 status: draft

@@ -1,5 +1,5 @@
 ---
-id: F/area/topic/NNNNNN
+id: "NNNNNN"
 title: Short title of the rule
 kind: functional
 status: draft

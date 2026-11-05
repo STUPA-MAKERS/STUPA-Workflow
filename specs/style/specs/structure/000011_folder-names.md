@@ -1,5 +1,5 @@
 ---
-id: S/specs/structure/000011
+id: "000011"
 title: Folder names are lower case kebab case
 kind: style
 status: draft

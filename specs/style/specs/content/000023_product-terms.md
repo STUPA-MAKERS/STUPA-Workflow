@@ -1,5 +1,5 @@
 ---
-id: S/specs/content/000023
+id: "000023"
 title: Product terms stay as the UI shows them
 kind: style
 status: draft

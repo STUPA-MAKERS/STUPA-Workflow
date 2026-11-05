@@ -1,5 +1,5 @@
 ---
-id: S/specs/format/000002
+id: "000002"
 title: A spec starts with a YAML preamble
 kind: style
 status: draft
@@ -16,7 +16,7 @@ these keys, in this order:
 
 | Key | Type | Value |
 | --- | --- | --- |
-| `id` | string | The rule ID, for example `F/meetings/voting/000024`. |
+| `id` | string | The six-digit number of the rule in double quotes, for example `"000024"`. |
 | `title` | string | The title of the rule. It is the same text as the `#` title. |
 | `kind` | enum | `functional`, `non-functional` or `style`. |
 | `status` | enum | `draft`, `approved`, `replaced` or `removed`. |
@@ -28,6 +28,8 @@ these keys, in this order:
 Do not add other keys. Do not put metadata in the Markdown body.
 
 Reason: A tool reads the preamble without a Markdown parser. One fixed set of keys keeps
-every spec readable by the same tool.
+every spec readable by the same tool. The quotes keep the leading zeros, because YAML reads
+an unquoted `000024` as a number.
 
-Test: The preamble parses as YAML, has exactly these keys, and `id` matches the file path.
+Test: The preamble parses as YAML, has exactly these keys, and `id` is the number in the
+file name.

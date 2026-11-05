@@ -1,5 +1,5 @@
 ---
-id: S/specs/format/000032
+id: "000032"
 title: Code refers to a rule with the § sign
 kind: style
 status: draft

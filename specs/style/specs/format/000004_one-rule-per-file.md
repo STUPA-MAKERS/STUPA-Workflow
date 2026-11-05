@@ -1,5 +1,5 @@
 ---
-id: S/specs/format/000004
+id: "000004"
 title: One file holds one rule
 kind: style
 status: draft

@@ -1,5 +1,5 @@
 ---
-id: S/specs/structure/000014
+id: "000014"
 title: A change goes through a pull request
 kind: style
 status: draft

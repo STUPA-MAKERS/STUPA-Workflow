@@ -1,5 +1,5 @@
 ---
-id: S/specs/format/000001
+id: "000001"
 title: A new spec starts as a copy of the template
 kind: style
 status: draft

@@ -1,5 +1,5 @@
 ---
-id: S/specs/content/000015
+id: "000015"
 title: A spec contains only the rule
 kind: style
 status: draft

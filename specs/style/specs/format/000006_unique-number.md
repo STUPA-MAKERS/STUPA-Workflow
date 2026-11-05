@@ -1,5 +1,5 @@
 ---
-id: S/specs/format/000006
+id: "000006"
 title: The number is the identity of a rule
 kind: style
 status: draft

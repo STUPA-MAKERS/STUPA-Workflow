@@ -1,5 +1,5 @@
 ---
-id: S/specs/format/000033
+id: "000033"
 title: The file name is number and name
 kind: style
 status: draft

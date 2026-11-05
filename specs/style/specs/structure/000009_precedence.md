@@ -1,5 +1,5 @@
 ---
-id: S/specs/structure/000009
+id: "000009"
 title: A spec wins over other guidance
 kind: style
 status: draft

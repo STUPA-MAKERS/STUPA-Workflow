@@ -1,5 +1,5 @@
 ---
-id: F/meetings/voting/000025
+id: "000025"
 title: A cast ballot does not change
 kind: functional
 status: draft

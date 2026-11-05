@@ -1,5 +1,5 @@
 ---
-id: F/meetings/voting/000028
+id: "000028"
 title: Only the protokollant opens and closes a meeting vote
 kind: functional
 status: draft

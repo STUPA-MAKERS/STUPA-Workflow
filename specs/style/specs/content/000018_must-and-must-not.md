@@ -1,5 +1,5 @@
 ---
-id: S/specs/content/000018
+id: "000018"
 title: The rule text uses must and must not
 kind: style
 status: draft

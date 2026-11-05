@@ -1,5 +1,5 @@
 ---
-id: S/specs/content/000017
+id: "000017"
 title: A rule can be examined
 kind: style
 status: draft

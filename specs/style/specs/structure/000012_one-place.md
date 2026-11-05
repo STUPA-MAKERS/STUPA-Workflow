@@ -1,5 +1,5 @@
 ---
-id: S/specs/structure/000012
+id: "000012"
 title: A rule is written in one place
 kind: style
 status: draft

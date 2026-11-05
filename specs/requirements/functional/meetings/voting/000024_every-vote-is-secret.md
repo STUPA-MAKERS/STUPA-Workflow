@@ -1,5 +1,5 @@
 ---
-id: F/meetings/voting/000024
+id: "000024"
 title: Every vote is secret
 kind: functional
 status: draft

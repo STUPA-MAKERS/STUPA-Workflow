@@ -1,5 +1,5 @@
 ---
-id: S/specs/content/000016
+id: "000016"
 title: One rule controls one thing
 kind: style
 status: draft

@@ -1,5 +1,5 @@
 ---
-id: F/meetings/voting/000030
+id: "000030"
 title: A vote on an Antrag belongs to the Gremium of the Antrag
 kind: functional
 status: draft

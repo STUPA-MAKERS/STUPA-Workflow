@@ -1,5 +1,5 @@
 ---
-id: F/meetings/voting/000026
+id: "000026"
 title: A tie rejects a motion
 kind: functional
 status: draft
