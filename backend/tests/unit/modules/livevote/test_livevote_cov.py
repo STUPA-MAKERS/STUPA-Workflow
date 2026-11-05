@@ -51,7 +51,7 @@ from app.modules.livevote.router import (
     get_voting_service,
     get_voting_service_ws,
 )
-from app.modules.livevote.service import BrokerPublisher, MeetingService
+from app.modules.livevote.service import BrokerPublisher, MeetingService, meeting_channel
 from app.modules.livevote.service import handover as handover_mod
 from app.modules.livevote.service import lifecycle as lifecycle_mod
 from app.modules.livevote.service import permissions as permissions_mod
@@ -1548,6 +1548,19 @@ async def test_broadcast_state_no_publisher() -> None:
     await svc.broadcast_state(m.id, _admin())
 
 
+async def test_broadcast_agenda_with_and_without_publisher() -> None:
+    """Publish `agenda_changed` for one item, and nothing without a publisher."""
+    broker = InMemoryBroker()
+    meeting_id, item_id = uuid4(), uuid4()
+    async with broker.subscribe(meeting_channel(meeting_id)) as sub:
+        await MeetingService(_QueueSession(), BrokerPublisher(broker)).broadcast_agenda(  # type: ignore[arg-type]
+            meeting_id, item_id
+        )
+        await MeetingService(_QueueSession()).broadcast_agenda(meeting_id, item_id)  # type: ignore[arg-type]
+        message = await anext(aiter(sub))
+    assert message == {"type": "agenda_changed", "agendaItemId": str(item_id)}
+
+
 async def test_protocol_final_true_false() -> None:
     svc = MeetingService(_QueueSession(scalar_q=["final"]))  # type: ignore[arg-type]
     assert await svc._protocol_final(uuid4()) is True
@@ -2430,6 +2443,7 @@ class _FakeMeetingService:
         self.created: list[Any] = []
         self.deleted: list[Any] = []
         self.broadcasts = 0
+        self.agenda_pings: list[UUID] = []
         self.list_calls: list[dict[str, Any]] = []
 
     async def can_manage(self, gremium_id: UUID, principal: Principal) -> bool:
@@ -2477,6 +2491,9 @@ class _FakeMeetingService:
 
     async def broadcast_state(self, meeting_id: UUID, principal: Principal) -> None:
         self.broadcasts += 1
+
+    async def broadcast_agenda(self, meeting_id: UUID, item_id: UUID) -> None:
+        self.agenda_pings.append(item_id)
 
     async def agenda_item_has_vote(self, item_id: UUID) -> bool:
         return False
@@ -2986,6 +3003,25 @@ def test_set_agenda_body_ok_broadcasts(app: FastAPI, client: TestClient, fakes) 
     assert r.status_code == 200
     assert "set_body" in fakes["agenda"].calls
     assert fakes["meeting"].broadcasts == 1
+    assert fakes["meeting"].agenda_pings == []
+
+
+def test_set_agenda_body_text_only_sends_agenda_changed(
+    app: FastAPI, client: TestClient, fakes
+) -> None:
+    """Send `agenda_changed` and no `meeting_state` for a save of the text alone.
+
+    Every follower reads the meeting, the protocol and the navigation counts again on
+    `meeting_state`. The protokollant saves on every pause in typing, so that burst of
+    reads must not follow a text save.
+    """
+    fakes["meeting"]._meeting_out = _meeting_out(status="live", can_write=True)
+    _login(app)
+    item_id = uuid4()
+    r = client.patch(f"/api/meetings/{uuid4()}/agenda/{item_id}", json={"body": "x"})
+    assert r.status_code == 200
+    assert fakes["meeting"].broadcasts == 0
+    assert fakes["meeting"].agenda_pings == [item_id]
 
 
 @pytest.mark.parametrize(
@@ -4244,11 +4280,12 @@ def test_set_agenda_done_live_only_the_protokollant(
     if code == 403:
         assert r.json()["code"] == "not_protokollant"
         assert fakes["agenda"].calls == []
-        assert fakes["meeting"].broadcasts == 0
+        assert fakes["meeting"].agenda_pings == []
     else:
         assert fakes["agenda"].calls == ["set_done:False"]
         assert fakes["agenda"].actors == ["p"]
-        assert fakes["meeting"].broadcasts == 1
+        assert fakes["meeting"].broadcasts == 0
+        assert len(fakes["meeting"].agenda_pings) == 1
 
 
 def test_set_agenda_done_needs_a_bool(app: FastAPI, client: TestClient, fakes) -> None:
@@ -4272,7 +4309,4 @@ def test_can_delete_mirrors_the_delete_gate(
 ) -> None:
     """Report `canDelete` like the delete route: a final protocol needs delete_finalized."""
     principal = Principal(sub="p", permissions=perms)
-    assert (
-        MeetingService._can_delete(principal, can_manage=can_manage, final=final)
-        is expected
-    )
+    assert MeetingService._can_delete(principal, can_manage=can_manage, final=final) is expected

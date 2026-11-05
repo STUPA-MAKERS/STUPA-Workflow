@@ -1,12 +1,16 @@
 import { Injectable, effect, inject } from '@angular/core';
 import { AuthService } from '@core/auth/auth.service';
+import { take } from 'rxjs';
 import { BudgetTreeApi } from '../../pages/budget/budget-tree.api';
 
 /**
  * Warms the caches for reference data, once, after sign-in.
  *
- * Only the cost-centre tree so far, and it earns the place: it is one request for the
- * whole tree, five pages need it, and it changes only when someone edits a cost centre.
+ * Only the cost-centre tree and the fiscal years of its roots so far, and they earn the
+ * place: the tree is one request, five pages need it, and it changes only when someone
+ * edits a cost centre. The budget page shows no amount before the years of its roots are
+ * in, and those reads can start only after the tree, so warming them too saves that page
+ * two round trips in a row.
  * Fetching it while the reader is still looking at the dashboard means the budget,
  * bookings and applications pages paint their filter immediately instead of after a
  * round trip.
@@ -36,7 +40,18 @@ export class PrefetchService {
       if (this.done || !this.auth.isAuthenticated()) return;
       if (!this.canSeeBudgets()) return;
       this.done = true;
-      this.budgets.tree().subscribe({ error: () => undefined });
+      this.budgets
+        .tree()
+        .pipe(take(1))
+        .subscribe({
+          next: (roots) => {
+            for (const root of roots) {
+              if (root.hiddenInBudget) continue;
+              this.budgets.cachedFiscalYears(root.id).subscribe({ error: () => undefined });
+            }
+          },
+          error: () => undefined,
+        });
     });
   }
 

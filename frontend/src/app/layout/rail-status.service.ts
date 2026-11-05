@@ -7,6 +7,7 @@ import {
   Subject,
   catchError,
   debounceTime,
+  distinctUntilChanged,
   expand,
   filter,
   forkJoin,
@@ -64,8 +65,10 @@ export const LIVE_MAX_PAGES = 4;
  * the rail must never cover the page.
  *
  * Refresh: at sign-in, after a navigation, after a `meeting_state` frame of an open
- * meeting channel, and every {@link RAIL_STATUS_POLL_MS} while the tab is visible. A
- * debounce folds a burst into one request.
+ * meeting channel that changes the status, and every {@link RAIL_STATUS_POLL_MS} while the
+ * tab is visible. A debounce folds a burst into one request. A `meeting_state` with the same
+ * status (a TOP switch, a handover, a prepared vote) does not refresh: the live mark follows
+ * the status only, and every viewer of a meeting gets the frame at the same moment.
  */
 @Injectable({ providedIn: 'root' })
 export class RailStatusService {
@@ -95,7 +98,7 @@ export class RailStatusService {
     merge(
       this.manual,
       router.events.pipe(filter((e) => e instanceof NavigationEnd)),
-      ws.meetingStates$,
+      ws.meetingStates$.pipe(distinctUntilChanged((a, b) => a.status === b.status)),
       interval(RAIL_STATUS_POLL_MS).pipe(filter(() => this.pageVisible())),
     )
       .pipe(

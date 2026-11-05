@@ -3,7 +3,11 @@ import { Subject } from 'rxjs';
 import { ApiClient } from '@core/api/api-client.service';
 import type { AgendaItem } from '@core/api/models';
 import { ToastService } from '@stupa-makers/ui-kit';
-import { MeetingAgendaService } from './meeting-agenda.service';
+import {
+  AGENDA_REFRESH_MIN_MS,
+  AGENDA_REFRESH_SPREAD_MS,
+  MeetingAgendaService,
+} from './meeting-agenda.service';
 
 const item = (body: string): AgendaItem => ({
   id: 't-1',
@@ -53,6 +57,30 @@ describe('MeetingAgendaService — text of the minute-taker', () => {
   afterEach(() => jest.useRealTimers());
 
   const body = (): string | null | undefined => svc.agenda()[0]?.body;
+
+  /**
+   * The viewers of a meeting get `agenda_changed` at the same moment. A run of events folds into
+   * one read, which waits a random time, and a page that goes away drops the waiting read.
+   */
+  it('folds agenda_changed events into one late read', () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0.5);
+    const wait = AGENDA_REFRESH_MIN_MS + 0.5 * AGENDA_REFRESH_SPREAD_MS;
+    svc.refreshSoon('m-1');
+    svc.refreshSoon('m-1');
+    jest.advanceTimersByTime(wait - 1);
+    expect(reads).toHaveLength(0);
+    svc.refreshSoon('m-1');
+    jest.advanceTimersByTime(1);
+    expect(reads).toHaveLength(1);
+    reads[0].next([item('gespeichert')]);
+    expect(body()).toBe('gespeichert');
+    svc.refreshSoon('m-1');
+    svc.ngOnDestroy();
+    jest.advanceTimersByTime(AGENDA_REFRESH_MIN_MS + AGENDA_REFRESH_SPREAD_MS);
+    expect(reads).toHaveLength(1);
+    svc.ngOnDestroy();
+    jest.restoreAllMocks();
+  });
 
   /**
    * A text that waits for the autosave stays. While the save runs and the server has not confirmed

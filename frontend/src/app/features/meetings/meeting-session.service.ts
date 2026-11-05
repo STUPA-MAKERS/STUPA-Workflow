@@ -859,6 +859,9 @@ export class MeetingSessionService implements OnDestroy {
       case 'body_draft':
         this.applyBodyDraft(m, msg);
         break;
+      case 'agenda_changed':
+        this.agendaSvc.refreshSoon(m.id);
+        break;
       default:
         break;
     }

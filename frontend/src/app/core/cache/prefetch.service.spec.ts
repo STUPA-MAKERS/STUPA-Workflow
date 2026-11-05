@@ -6,10 +6,11 @@ import { BudgetTreeApi } from '../../pages/budget/budget-tree.api';
 import { PrefetchService } from './prefetch.service';
 
 describe('PrefetchService', () => {
-  function setup(opts: { authed?: boolean; perms?: string[]; scoped?: boolean } = {}) {
+  function setup(opts: { authed?: boolean; perms?: string[]; scoped?: boolean; roots?: unknown[] } = {}) {
     const authed = signal(opts.authed ?? true);
     const perms = new Set(opts.perms ?? ['budget.view']);
-    const tree = jest.fn(() => of([]));
+    const tree = jest.fn(() => of(opts.roots ?? []));
+    const cachedFiscalYears = jest.fn(() => of([]));
     TestBed.configureTestingModule({
       providers: [
         {
@@ -20,10 +21,10 @@ describe('PrefetchService', () => {
             hasScopedBudgetView: () => opts.scoped ?? false,
           },
         },
-        { provide: BudgetTreeApi, useValue: { tree } },
+        { provide: BudgetTreeApi, useValue: { tree, cachedFiscalYears } },
       ],
     });
-    return { authed, tree };
+    return { authed, tree, cachedFiscalYears };
   }
 
   it('warms the cost-centre tree once the caller is signed in', () => {
@@ -31,6 +32,30 @@ describe('PrefetchService', () => {
     TestBed.inject(PrefetchService);
     TestBed.tick();
     expect(tree).toHaveBeenCalledTimes(1);
+  });
+
+  /** The budget page shows no amount before these years are in. */
+  it('warms the fiscal years of every root the budget page shows', () => {
+    const { cachedFiscalYears } = setup({
+      roots: [
+        { id: 'a', hiddenInBudget: false },
+        { id: 'b', hiddenInBudget: true },
+        { id: 'c', hiddenInBudget: false },
+      ],
+    });
+    TestBed.inject(PrefetchService);
+    TestBed.tick();
+    expect(cachedFiscalYears.mock.calls).toEqual([['a'], ['c']]);
+  });
+
+  it('stays silent when a fiscal-year prefetch fails', () => {
+    const { cachedFiscalYears } = setup({ roots: [{ id: 'a', hiddenInBudget: false }] });
+    cachedFiscalYears.mockReturnValue(throwError(() => new Error('down')));
+    expect(() => {
+      TestBed.inject(PrefetchService);
+      TestBed.tick();
+    }).not.toThrow();
+    expect(cachedFiscalYears).toHaveBeenCalledTimes(1);
   });
 
   it('waits until there is a caller at all', () => {

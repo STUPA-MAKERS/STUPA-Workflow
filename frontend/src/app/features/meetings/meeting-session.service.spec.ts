@@ -438,6 +438,23 @@ describe('MeetingSessionService live body draft', () => {
     http.match(() => true).forEach((r) => r.flush({ ...M({ status: 'live' }), createdAt: 'x' }));
   });
 
+  /**
+   * A save of an item text sends `agenda_changed`: the viewer reads the agenda only, late, and not
+   * the meeting and the protocol.
+   */
+  it('reads only the agenda, late, after agenda_changed', () => {
+    const { http, session } = setup();
+    const agenda = TestBed.inject(MeetingAgendaService);
+    session.meeting.set(M({ status: 'live', canWrite: false, isProtokollant: false }));
+    session['onLive']({ type: 'agenda_changed', agendaItemId: 't-1' });
+    session['onLive']({ type: 'agenda_changed', agendaItemId: 't-1' });
+    http.expectNone(() => true);
+    jest.advanceTimersByTime(3000);
+    http.expectOne('/api/meetings/m-1/agenda').flush([{ id: 't-1', body: 'gespeichert' }]);
+    http.expectNone(() => true);
+    expect(agenda.agenda()[0].body).toBe('gespeichert');
+  });
+
   /** A writer of a live meeting without a protokollant edits the text itself. */
   it('never applies a draft on the client of the protokollant or in an editable editor', () => {
     const { session } = setup();
