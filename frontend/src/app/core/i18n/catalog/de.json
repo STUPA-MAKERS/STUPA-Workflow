@@ -2593,8 +2593,6 @@
   "admin.form.visibleIfEmpty": "leer: immer sichtbar",
   "budget.loading": "Statistik wird geladen …",
   "budget.error": "Die Budget-Statistik konnte nicht geladen werden.",
-  "budget.breadcrumbs": "Kostenstellen-Pfad",
-  "budget.crumbs.more": "Weitere Ebenen des Pfads",
   "budget.usage.bar": "Auslastung",
   "budget.usage.viewExpenses": "Buchungen ansehen",
   "budget.empty.title": "Noch keine Budgetdaten",

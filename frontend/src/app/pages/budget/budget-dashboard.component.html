@@ -80,17 +80,38 @@
       [attr.aria-label]="wide() ? null : pathLabel()"
     >
       @if (wide()) {
-        <app-sheet-bar class="bd__bar">
-          <app-budget-crumbs appSheetBarKicker [nodes]="breadcrumbs()" (pick)="selectKs($event)" />
-          <ng-container *ngTemplateOutlet="actions" />
-        </app-sheet-bar>
+        @let ks = current();
+        @let parent = breadcrumbs().at(-2);
+        @let year = selectedYear();
+        <header class="sheet-head bd__head">
+          <app-sheet-bar>
+            <h2 appSheetBarTitle id="bd-title" class="sheet-title">{{ ks?.name }}</h2>
+            <ng-container *ngTemplateOutlet="actions" />
+          </app-sheet-bar>
+          <p class="sheet-line bd__line">
+            <span class="bd__parts">
+              @if (ks?.pathKey) {
+                <span class="bd__part bd__keyPart">
+                  @if (colors().get(ks!.id); as color) {
+                    <span class="bd__keySwatch" aria-hidden="true" [style.background]="color"></span>
+                  }
+                  <span class="mono">{{ ks!.pathKey | simplifyPath }}</span>
+                </span>
+              }
+              @if (parent) {
+                <span class="bd__part ell" [title]="pathLabel()">{{ parent.name }}</span>
+              }
+              @if (year) {
+                <span class="bd__part">{{
+                  (year.closedAt ? 'budget.dash.yearShortClosed' : 'budget.dash.yearShort') | t: { year: year.display }
+                }}</span>
+              }
+            </span>
+          </p>
+        </header>
       }
       <div class="bd__sheetBody" appScrollFade="y">
-        @if (wide()) {
-          <h2 id="bd-title" class="bd__name ell" [title]="current()?.name ?? ''">
-            {{ current()?.name }}
-          </h2>
-        } @else {
+        @if (!wide()) {
           <h2 class="sr-only">{{ current()?.name }}</h2>
         }
 
