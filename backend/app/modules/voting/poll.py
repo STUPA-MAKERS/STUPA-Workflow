@@ -4,7 +4,8 @@ A poll is a ``vote`` row with ``kind = 'poll'``. ``vote.config`` holds a
 ``PollConfig`` (mode, options, ``maxChoices``, secret, guests). A poll only counts the
 answers: no quorum, no majority, no lot, no runoff, no application and no flow branch.
 It shares the life cycle of a vote (draft -> open -> closed / cancelled), the
-race-safe ballot tables, the secret path and the reveal rule. The differences live
+race-safe ballot tables, the secret path and the reveal rule. A new poll is always
+secret (``voting.service.secret_only``). The differences live
 here:
 
 * The ballot: a single poll takes ``[optionId]`` or ``[]`` (abstention), a multi
@@ -215,8 +216,9 @@ class PollService:
         Raises:
             ForbiddenError: The principal lacks ``vote.manage`` in the Gremium (403).
             ValidationProblem: The Gremium does not exist (``eligible_group_invalid``),
-                the end is too soon (``closes_at_too_soon``) or the options do not fit
-                the mode (``poll_invalid``) (422).
+                the end is too soon (``closes_at_too_soon``), the options do not fit
+                the mode (``poll_invalid``) or the body asks for an open poll
+                (``open_vote_unavailable``) (422).
         """
         gremium_id = payload.eligible_group
         if not await self.voting._gremium_exists(gremium_id):
@@ -227,9 +229,11 @@ class PollService:
             )
         if not await self.can_create(gremium_id, principal):
             raise ForbiddenError("not allowed to create a poll in this gremium")
-        _check_end(payload.closes_at, now)
-        config = build_config(payload, secret=payload.secret)
         from app.modules.livevote.service import MeetingService
+        from app.modules.voting.service import secret_only
+
+        _check_end(payload.closes_at, now)
+        config = build_config(payload, secret=secret_only(payload.secret, field="secret"))
 
         eligible = await MeetingService(self.session).vote_eligible_count(gremium_id)
         internal = VoteCreateInternal(

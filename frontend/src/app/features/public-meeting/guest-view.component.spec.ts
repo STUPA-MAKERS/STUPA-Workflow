@@ -103,14 +103,17 @@ describe('GuestViewComponent', () => {
     expect(screen.getByText('Abstimmung läuft')).toBeInTheDocument();
   });
 
-  it('notes a guest admitted during the vote, and a secret vote', async () => {
+  it('notes a guest admitted during the vote, never the secrecy', async () => {
     const { fixture } = await setup(guestMe(), true);
     expect(screen.getByText(/während der Abstimmung zugelassen/)).toBeInTheDocument();
     const me = guestMe();
     fixture.componentRef.setInput('admittedDuringVote', false);
     fixture.componentRef.setInput('me', { ...me, view: { ...me.view!, votes: [guestVote({ secret: true })] } });
     fixture.detectChanges();
-    expect(screen.getByText(/Geheime Abstimmung: Deine Wahl/)).toBeInTheDocument();
+    expect(screen.queryByText(/ohne Namen gezählt/)).toBeNull();
+    fixture.componentRef.setInput('me', { ...me, view: { ...me.view!, votes: [guestVote({ secret: true, kind: 'poll' })] } });
+    fixture.detectChanges();
+    expect(screen.queryByText(/ohne Namen gezählt/)).toBeNull();
   });
 
   it('shows the result of the current item without a quorum', async () => {

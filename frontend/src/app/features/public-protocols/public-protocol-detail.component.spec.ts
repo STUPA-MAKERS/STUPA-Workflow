@@ -61,9 +61,9 @@ describe('PublicProtocolDetailComponent', () => {
     expect(main).toHaveTextContent('Soll der Haushalt beschlossen werden?');
     expect(main.textContent?.replace(/\s+/g, '')).toContain('Ja18Nein3Enthaltung2');
     expect(main).toHaveTextContent('Angenommen');
-    expect(main).toHaveTextContent('Einfache Mehrheit · offene Abstimmung');
+    expect(main).toHaveTextContent('Einfache Mehrheit');
     expect(secret).toHaveTextContent('Abgelehnt');
-    expect(secret).toHaveTextContent('Zweidrittelmehrheit · geheime Abstimmung');
+    expect(secret).toHaveTextContent('Zweidrittelmehrheit');
     expect(open).not.toHaveTextContent('Ergebnis');
     expect(screen.getByRole('heading', { level: 3, name: /Nicht-öffentlicher Tagesordnungspunkt/ })).toBeInTheDocument();
     expect(screen.getByText('Titel, Inhalt und Beschlüsse sind nicht öffentlich.')).toBeInTheDocument();

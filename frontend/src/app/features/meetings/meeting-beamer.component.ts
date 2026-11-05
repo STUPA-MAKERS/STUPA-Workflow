@@ -23,7 +23,6 @@ import {
   guestComposition,
   majorityLabel,
   quorumLabel,
-  secrecyLabel,
   voteRulesParts,
 } from './meetings-display.util';
 
@@ -169,7 +168,7 @@ export class MeetingBeamerComponent {
     const quorumOpen = v.status === 'open' && !!q && !v.quorumMet;
 
     const rules = voteRulesParts(
-      { majorityRule: v.majorityRule, secret: v.secret, quorum: quorumOpen ? null : q, guestsVote: guests },
+      { majorityRule: v.majorityRule, quorum: quorumOpen ? null : q, guestsVote: guests },
       t,
     );
 
@@ -193,9 +192,9 @@ export class MeetingBeamerComponent {
     };
   }
 
-  /** A poll: "Umfrage · Einzelwahl · offene Abstimmung". It has no result. */
+  /** A poll: "Umfrage · Einzelwahl". It has no result. */
   private describePoll(v: BeamerVote, poll: PollConfig, t: Translate): BeamerText {
-    const rules = [pollCaption(poll, t), secrecyLabel(v.secret, t)].join(' · ');
+    const rules = pollCaption(poll, t);
     return {
       bars: v.counts !== null && (v.status === 'closed' || !v.secret),
       turnout: t('meetings.vote.progress', { voted: v.voted, present: v.present }),
@@ -208,13 +207,13 @@ export class MeetingBeamerComponent {
     };
   }
 
-  /** An election: "Wahl · 2 Posten · geheime Abstimmung", then "Gewählt: Anna". */
+  /** An election: "Wahl · 2 Posten", then "Gewählt: Anna". */
   private describeElection(
     v: BeamerVote,
     election: ElectionConfig,
     t: Translate,
   ): BeamerText {
-    const rules = [electionCaption(election, v.round, t), secrecyLabel(v.secret, t)].join(' · ');
+    const rules = electionCaption(election, v.round, t);
     const ballots = v.voted === 1 ? t('beamer.ballotsOne') : t('beamer.ballots', { n: v.voted });
     return {
       bars: v.counts !== null && (v.status === 'closed' || !v.secret),

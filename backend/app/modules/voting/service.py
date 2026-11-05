@@ -107,13 +107,12 @@ def guest_voter_sub(guest_id: UUID) -> str:
 
 
 def secret_only(secret: bool | None, *, field: str) -> bool:
-    """Return the secrecy of a new motion or election: always True.
+    """Return the secrecy of a new vote: always True.
 
-    A decision and an election are always secret: the platform has no open vote
+    A decision, an election and a poll are always secret: the platform has no open vote
     (user decision 2026-11-05). ``None`` (the client sent no value) gives True. An
     explicit ``false`` gives 422, so a client that asks for an open vote learns that it
-    does not get one. A poll keeps its own switch and does not use this function.
-    Old open votes stay readable through the ``ballot`` table.
+    does not get one.
 
     Raises:
         ValidationProblem: The client asked for an open vote

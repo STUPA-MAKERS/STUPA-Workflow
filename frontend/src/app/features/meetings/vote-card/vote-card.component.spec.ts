@@ -79,9 +79,10 @@ describe('VoteCardComponent', () => {
       expect(screen.getByText('Nein')).toBeInTheDocument();
     });
 
-    it('names the rules of a planned secret vote with a percentage quorum', async () => {
+    it('names the rules of a planned vote with a percentage quorum, not its secrecy', async () => {
       await setup({ vote: vote({ status: 'draft', secret: true, quorum: { type: 'percent', value: 50 } }) });
-      expect(screen.getByText(/geheime Abstimmung · Quorum 50 %/)).toBeInTheDocument();
+      expect(screen.getByText(/Quorum 50 %/)).toBeInTheDocument();
+      expect(screen.queryByText(/geheime Abstimmung/)).toBeNull();
       expect(screen.queryByText(/Das Ergebnis zeigt sich nach dem Schließen/)).toBeNull();
     });
 
@@ -204,7 +205,7 @@ describe('VoteCardComponent', () => {
     it('opens and deletes a planned vote while the meeting is live', async () => {
       const { on } = await setup({ vote: vote({ status: 'draft', majorityRule: 'absolute', secret: true }) });
       expect(screen.getByText('Abstimmung vorbereitet')).toBeInTheDocument();
-      expect(screen.getByText('Absolute Mehrheit · geheime Abstimmung')).toBeInTheDocument();
+      expect(screen.getByText('Absolute Mehrheit')).toBeInTheDocument();
       await userEvent.click(screen.getByRole('button', { name: 'Abstimmung öffnen' }));
       expect(on.open).toHaveBeenCalledWith('v-1');
       await userEvent.click(screen.getByRole('button', { name: 'Beschlussfrage löschen' }));

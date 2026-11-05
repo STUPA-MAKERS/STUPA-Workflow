@@ -159,7 +159,9 @@ class PollCreate(PollIn):
     kind: Literal["poll"] = "poll"
     eligible_group: UUID = Field(alias="eligibleGroup")
     question: str = Field(min_length=1, max_length=2000)
-    secret: bool = False
+    #: A poll is always secret: ``None`` or true; false gives 422
+    #: ``open_vote_unavailable``.
+    secret: bool | None = None
     closes_at: datetime = Field(alias="closesAt")
     draft: bool = False
 

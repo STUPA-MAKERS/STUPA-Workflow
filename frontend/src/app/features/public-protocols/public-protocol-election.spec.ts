@@ -45,7 +45,7 @@ describe('PublicProtocolDetailComponent · election', () => {
       byLot: true,
     });
     const figure = screen.getByText('Wahl der Referate').closest('figure') as HTMLElement;
-    expect(figure).toHaveTextContent('Stichwahl (2. Wahlgang) · 2 Posten · geheime Abstimmung');
+    expect(figure).toHaveTextContent('Stichwahl (2. Wahlgang) · 2 Posten');
     expect(figure).toHaveTextContent('Gewählt: Anna, Ben');
     expect(figure).toHaveTextContent('2 weitere Kandidierende');
     expect(figure).toHaveTextContent('Durch Los entschieden.');
@@ -65,7 +65,7 @@ describe('PublicProtocolDetailComponent · election', () => {
       otherCandidates: 0,
     });
     const figure = screen.getByText('Wahl der Kasse').closest('figure') as HTMLElement;
-    expect(figure).toHaveTextContent('Wahl · 1 Posten · offene Abstimmung');
+    expect(figure).toHaveTextContent('Wahl · 1 Posten');
     expect(figure).toHaveTextContent('Niemand gewählt');
     expect(figure).not.toHaveTextContent('weitere');
     expect(figure).not.toHaveTextContent('Los');

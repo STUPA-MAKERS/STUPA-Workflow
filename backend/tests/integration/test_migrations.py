@@ -1851,9 +1851,9 @@ def test_make_open_votes_secret(alembic_cfg: Config, engine: Engine) -> None:
             {"v": secret_motion},
         )
 
-    command.upgrade(alembic_cfg, "head")
+    command.upgrade(alembic_cfg, "d8a799699d0f")
     command.downgrade(alembic_cfg, "4fd514277924")
-    command.upgrade(alembic_cfg, "head")
+    command.upgrade(alembic_cfg, "d8a799699d0f")
     with engine.begin() as conn:
 
         def _rows(sql: str, vote: uuid.UUID) -> list[str]:
@@ -1886,4 +1886,80 @@ def test_make_open_votes_secret(alembic_cfg: Config, engine: Engine) -> None:
         for vote in (
             open_motion, keyless_motion, secret_motion, open_election, keyless_election, poll
         ):
+            conn.execute(text("DELETE FROM vote WHERE id = :v"), {"v": vote})
+    command.upgrade(alembic_cfg, "head")
+
+
+def test_make_open_polls_secret(alembic_cfg: Config, engine: Engine) -> None:
+    """Migration 334e15ec6ff5.
+
+    An open poll loses its ``ballot`` rows: each voter gets a ``voted_marker`` and each
+    answer a ``secret_ballot``, and ``secret`` becomes true. A poll without the key
+    ``secret`` is open and converts. A secret poll and an open motion stay as they are.
+    A second run changes nothing.
+    """
+    command.downgrade(alembic_cfg, "d8a799699d0f")
+    with engine.begin() as conn:
+
+        def _vote(kind: str, config: dict[str, object]) -> uuid.UUID:
+            return conn.execute(
+                text(
+                    "INSERT INTO vote (eligible_group, config, status, kind) "
+                    "VALUES ('g', CAST(:c AS jsonb), 'closed', :k) RETURNING id"
+                ),
+                {"c": json.dumps(config), "k": kind},
+            ).scalar_one()
+
+        def _ballot(vote: uuid.UUID, sub: str, choice: str) -> None:
+            conn.execute(
+                text("INSERT INTO ballot (vote_id, voter_sub, choice) VALUES (:v, :s, :c)"),
+                {"v": vote, "s": sub, "c": choice},
+            )
+
+        poll = {"mode": "single", "options": ["a", "b"]}
+        open_poll = _vote("poll", {**poll, "secret": False})
+        keyless_poll = _vote("poll", poll)
+        secret_poll = _vote("poll", {**poll, "secret": True})
+        motion = _vote("motion", {"options": ["yes", "no"], "secret": False})
+        for sub, choice in (("u1", '["a"]'), ("u2", '["a"]'), ("u3", '["b"]')):
+            _ballot(open_poll, sub, choice)
+        _ballot(keyless_poll, "u1", '["b"]')
+        _ballot(motion, "u1", "yes")
+        conn.execute(
+            text("INSERT INTO voted_marker (vote_id, voter_sub) VALUES (:v, 'u1')"),
+            {"v": secret_poll},
+        )
+        conn.execute(
+            text("INSERT INTO secret_ballot (vote_id, choice) VALUES (:v, '[\"a\"]')"),
+            {"v": secret_poll},
+        )
+
+    command.upgrade(alembic_cfg, "head")
+    command.downgrade(alembic_cfg, "d8a799699d0f")
+    command.upgrade(alembic_cfg, "head")
+    with engine.begin() as conn:
+
+        def _rows(sql: str, vote: uuid.UUID) -> list[str]:
+            return sorted(conn.execute(text(sql), {"v": vote}).scalars())
+
+        def _secret(vote: uuid.UUID) -> object:
+            return conn.execute(
+                text("SELECT config->'secret' FROM vote WHERE id = :v"), {"v": vote}
+            ).scalar_one()
+
+        ballots = "SELECT voter_sub FROM ballot WHERE vote_id = :v"
+        markers = "SELECT voter_sub FROM voted_marker WHERE vote_id = :v"
+        choices = "SELECT choice FROM secret_ballot WHERE vote_id = :v"
+        assert _rows(ballots, open_poll) == []
+        assert _rows(markers, open_poll) == ["u1", "u2", "u3"]
+        assert _rows(choices, open_poll) == ['["a"]', '["a"]', '["b"]']
+        assert _secret(open_poll) is True
+        assert _rows(markers, keyless_poll) == ["u1"]
+        assert _rows(choices, keyless_poll) == ['["b"]']
+        assert _secret(keyless_poll) is True
+        assert _rows(markers, secret_poll) == ["u1"]
+        assert _rows(choices, secret_poll) == ['["a"]']
+        assert _rows(ballots, motion) == ["u1"]
+        assert _secret(motion) is False
+        for vote in (open_poll, keyless_poll, secret_poll, motion):
             conn.execute(text("DELETE FROM vote WHERE id = :v"), {"v": vote})

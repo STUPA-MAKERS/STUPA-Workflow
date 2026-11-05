@@ -18,7 +18,7 @@ import { electionCaption } from '../voting/election.util';
 import { PublicProtocolsService } from './public-protocols.service';
 import { optionKey, orderedCounts, topParts, useNoindex, type TopPart } from './public-protocols.util';
 import { dayMonthYear, weekdayDate } from '@shared/date-format';
-import { secrecyLabel, voteRulesParts } from '../meetings/meetings-display.util';
+import { voteRulesParts } from '../meetings/meetings-display.util';
 
 /**
  * One public protocol (`/protokolle/:id`, no login): the public version of a final
@@ -124,18 +124,15 @@ export class PublicProtocolDetailComponent {
     return d.result ? (`vote.result.${d.result}` as TranslationKey) : null;
   }
 
-  /** "Wahl · 2 Posten · geheime Abstimmung" for a personnel election. */
+  /** "Wahl · 2 Posten" for a personnel election. */
   protected electionLine(d: PublicDecision): string {
     const t: Translate = (key, params) => this.i18n.translate(key, params);
-    return [
-      electionCaption(d.seats ? { seats: d.seats, candidates: [], secret: d.secret } : null, d.round, t),
-      secrecyLabel(d.secret, t),
-    ].join(' · ');
+    return electionCaption(d.seats ? { seats: d.seats, candidates: [], secret: d.secret } : null, d.round, t);
   }
 
-  /** "Einfache Mehrheit · offene Abstimmung". */
+  /** "Einfache Mehrheit". */
   protected ruleLine(d: PublicDecision): string {
     const t: Translate = (key, params) => this.i18n.translate(key, params);
-    return voteRulesParts({ majorityRule: d.majorityRule, secret: d.secret }, t).join(' · ');
+    return voteRulesParts({ majorityRule: d.majorityRule }, t).join(' · ');
   }
 }
