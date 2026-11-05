@@ -36,24 +36,15 @@ def _meeting(status: str = "live", gremium_id: UUID = GREMIUM_ID) -> SimpleNames
     return SimpleNamespace(id=MEETING_ID, status=status, gremium_id=gremium_id)
 
 
-def _gremium(*, allow: bool = True) -> SimpleNamespace:
-    return SimpleNamespace(id=GREMIUM_ID, allow_vote_delegation=allow)
-
-
 @pytest.fixture
 def pool(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
-    """Replace the pool read and the global vote transfer switch."""
-    state = SimpleNamespace(personal=set(), wide=False, enabled=True)
+    """Replace the pool read."""
+    state = SimpleNamespace(personal=set(), wide=False)
 
     async def _members(*_a: Any) -> tuple[set[UUID], bool]:
         return state.personal, state.wide
 
     monkeypatch.setattr(pool_seat, "members_for_substitute", _members)
-    monkeypatch.setattr(
-        pool_seat,
-        "get_settings",
-        lambda: SimpleNamespace(delegation_voting_enabled=state.enabled),
-    )
     return state
 
 
@@ -61,11 +52,10 @@ def _db(
     deputy: Any,
     *executes: Any,
     meeting: Any = None,
-    gremium: Any = None,
 ) -> Any:
-    """Queue the gates, the substitute and the reads of `_find_seat`."""
+    """Queue the meeting, the substitute and the reads of `_find_seat`."""
     db = fake_session(*executes)
-    db.get_results = [meeting or _meeting(), gremium or _gremium()]
+    db.get_results = [meeting or _meeting()]
     db.scalar_results = [deputy]
     return db
 
@@ -89,22 +79,13 @@ async def test_no_meeting_or_free_group_has_no_seat(pool: SimpleNamespace) -> No
 
 
 @pytest.mark.parametrize(
-    ("meeting", "gremium", "enabled"),
-    [
-        (None, _gremium(), True),
-        (_meeting(status="planned"), _gremium(), True),
-        (_meeting(gremium_id=uuid4()), _gremium(), True),
-        (_meeting(), None, True),
-        (_meeting(), _gremium(allow=False), True),
-        (_meeting(), _gremium(), False),
-    ],
+    "meeting",
+    [None, _meeting(status="planned"), _meeting(gremium_id=uuid4())],
 )
-async def test_closed_gates_give_no_seat(
-    pool: SimpleNamespace, meeting: Any, gremium: Any, enabled: bool
-) -> None:
-    pool.enabled = enabled
+async def test_meeting_not_live_gives_no_seat(pool: SimpleNamespace, meeting: Any) -> None:
+    """Only a live meeting of the gremium of the vote has seats."""
     db = fake_session()
-    db.get_results = [meeting, gremium]
+    db.get_results = [meeting]
     assert await pool_seat.pool_seat_for(db, "x", MEETING_ID, GROUP, NOW) is None
 
 

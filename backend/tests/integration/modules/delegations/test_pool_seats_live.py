@@ -6,6 +6,9 @@
 * A substitute holds at most one seat: X gets no second seat.
 * A check-in of A frees the seat of X. The ballot that X cast for A stays.
 * The own ballot of a missing member frees the seat in the next vote.
+* The pool needs no switch: a gremium without `allow_vote_delegation` still gives
+  the seat. `pool_seat.py` reads no server setting, so `delegation_voting_enabled`
+  does not apply either.
 """
 
 from __future__ import annotations
@@ -21,10 +24,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.deps import get_current_principal
 from app.modules.auth.principal import Principal
 from app.modules.auth.rbac import vote_group_key
-from app.modules.delegations import pool_seat
 from app.modules.delegations.models import MeetingDelegation
 from app.modules.voting.models import Ballot, Vote
-from app.settings import load_settings
 from app.shared.config_schemas import VoteConfig
 from tests.integration.modules.delegations.conftest import (
     act,
@@ -42,12 +43,6 @@ CONFIG = VoteConfig.model_validate(
 ).model_dump(by_alias=True)
 
 
-@pytest.fixture(autouse=True)
-def _transfer_on(monkeypatch: pytest.MonkeyPatch) -> None:
-    settings = load_settings(delegation_voting_enabled=True)
-    monkeypatch.setattr(pool_seat, "get_settings", lambda: settings)
-
-
 class _World:
     def __init__(self) -> None:
         self.gremium_id = uuid.uuid4()
@@ -56,9 +51,9 @@ class _World:
         self.ids: dict[str, uuid.UUID] = {}
 
 
-async def _world(maker: async_sessionmaker[AsyncSession]) -> _World:
+async def _world(maker: async_sessionmaker[AsyncSession], *, allow: bool = True) -> _World:
     w = _World()
-    w.gremium_id = await gremium(maker)
+    w.gremium_id = await gremium(maker, allow=allow)
     for name in ("Anna", "Ben"):
         w.subs[name], w.ids[name] = await member(maker, w.gremium_id, name)
     for name in ("Xaver", "Yara"):
@@ -197,3 +192,16 @@ async def test_own_ballot_of_a_missing_member_frees_the_seat(
     assert status_a["blocked"] is False
     assert own == 200
     assert await _voters(maker, second) == {w.subs["Anna"]}
+
+
+async def test_pool_seat_needs_no_delegation_switch(
+    maker: async_sessionmaker[AsyncSession], api: FastAPI
+) -> None:
+    """The gremium switch governs only the free transfers, not the pool."""
+    w = await _world(maker, allow=False)
+    vote_id = await _vote(maker, w)
+    with TestClient(api) as client:
+        act(api, w.subs["Xaver"])
+        x = _cast(client, vote_id, proxy=True)
+    assert x == 200
+    assert await _voters(maker, vote_id) == {w.subs["Anna"]}
