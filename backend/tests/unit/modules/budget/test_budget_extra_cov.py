@@ -397,7 +397,7 @@ def test_list_tree_gremium_scoped(
     async def _members(session: Any, sub: Any, now: Any = None) -> set[uuid.UUID]:
         return {_GID}
 
-    monkeypatch.setattr(gr, "gremium_member_ids", _members)
+    monkeypatch.setattr(gr, "gremium_reader_ids", _members)
     resp = _client(fake, ()).get("/api/budgets")
     assert resp.status_code == 200
     assert fake.calls["scope"] == {_GID}
@@ -528,7 +528,7 @@ def test_list_applications_scoped_allowed(
     async def _members(session: Any, sub: Any, now: Any = None) -> set[uuid.UUID]:
         return {_GID}
 
-    monkeypatch.setattr(gr, "gremium_member_ids", _members)
+    monkeypatch.setattr(gr, "gremium_reader_ids", _members)
     fake.can_view = True
     resp = _client(fake, ()).get(f"/api/budgets/{_BID}/applications")
     assert resp.status_code == 200
@@ -544,7 +544,7 @@ def test_list_expenses_scoped_denied(
     async def _members(session: Any, sub: Any, now: Any = None) -> set[uuid.UUID]:
         return set()
 
-    monkeypatch.setattr(gr, "gremium_member_ids", _members)
+    monkeypatch.setattr(gr, "gremium_reader_ids", _members)
     fake.can_view = False
     resp = _client(fake, ()).get(f"/api/budgets/{_BID}/expenses")
     assert resp.status_code == 403
@@ -559,7 +559,7 @@ def test_list_expenses_scoped_allowed(
     async def _members(session: Any, sub: Any, now: Any = None) -> set[uuid.UUID]:
         return {_GID}
 
-    monkeypatch.setattr(gr, "gremium_member_ids", _members)
+    monkeypatch.setattr(gr, "gremium_reader_ids", _members)
     fake.can_view = True
     resp = _client(fake, ()).get(f"/api/budgets/{_BID}/expenses")
     assert resp.status_code == 200
@@ -574,7 +574,7 @@ def test_list_fiscal_years_scoped_allowed(
     async def _members(session: Any, sub: Any, now: Any = None) -> set[uuid.UUID]:
         return {_GID}
 
-    monkeypatch.setattr(gr, "gremium_member_ids", _members)
+    monkeypatch.setattr(gr, "gremium_reader_ids", _members)
     fake.can_view = True
     resp = _client(fake, ()).get(f"/api/budgets/{_BID}/fiscal-years")
     assert resp.status_code == 200

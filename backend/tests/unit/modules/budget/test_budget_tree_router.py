@@ -470,7 +470,7 @@ def test_tree_without_permission_is_gremium_scoped(
     async def _members(session, sub, now=None):
         return set()
 
-    monkeypatch.setattr(gr, "gremium_member_ids", _members)
+    monkeypatch.setattr(gr, "gremium_reader_ids", _members)
     app = create_app()
     app.dependency_overrides[get_budget_tree_service] = lambda: fake
     app.dependency_overrides[get_current_principal] = lambda: Principal(sub="x", permissions=set())

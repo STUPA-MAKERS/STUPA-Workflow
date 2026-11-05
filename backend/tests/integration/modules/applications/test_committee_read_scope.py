@@ -7,6 +7,9 @@ member. The cost center node itself OR an ancestor may carry that id.
 The member also reads an application in a `vote` state whose snapshot `vote_gremium_id` names
 one of those Gremien.
 
+A pool substitute of the Gremium (`delegation_substitute`) without a membership reads
+the same applications as the member.
+
 The list (`ApplicationsService.list_applications`) and the detail view
 (`access.require_app_read`) give the same view. Both paths keep the applications of
 other Gremien hidden.
@@ -37,6 +40,7 @@ from app.modules.applications.service import ApplicationsService
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.budget.tree_models import Budget
+from app.modules.delegations.models import DelegationSubstitute
 from app.modules.flow.models import FlowVersion, State
 from app.modules.forms.schemas import FormVersionCreate
 from app.modules.forms.service import FormsService
@@ -75,6 +79,7 @@ class _Scenario:
 
     member_sub: str
     other_sub: str
+    substitute_sub: str
     app_cost: uuid.UUID
     app_vote: uuid.UUID
     app_own: uuid.UUID
@@ -99,6 +104,7 @@ async def _seed(session: AsyncSession) -> _Scenario:
     tag = uuid.uuid4().hex[:8]
     sc.member_sub = f"member-{tag}"
     sc.other_sub = f"other-{tag}"
+    sc.substitute_sub = f"substitute-{tag}"
 
     g_member = Gremium(name="Mitglied", slug=f"m-{tag}")
     g_other = Gremium(name="Fremd", slug=f"o-{tag}")
@@ -106,14 +112,22 @@ async def _seed(session: AsyncSession) -> _Scenario:
     await session.flush()
 
     principal = PrincipalRow(sub=sc.member_sub, display_name="Mitglied")
+    substitute = PrincipalRow(sub=sc.substitute_sub, display_name="Vertretung")
     role = GremiumRole(
         gremium_id=g_member.id,
         key="member",
         name_i18n={"de": "Mitglied"},
         permissions=["vote.cast"],
     )
-    session.add_all([principal, role])
+    session.add_all([principal, substitute, role])
     await session.flush()
+    session.add(
+        DelegationSubstitute(
+            gremium_id=g_member.id,
+            member_principal_id=principal.id,
+            substitute_principal_id=substitute.id,
+        )
+    )
     session.add(
         GremiumMembership(
             principal_id=principal.id,
@@ -278,3 +292,20 @@ async def test_detail_guard_denies_foreign_gremium(session: AsyncSession) -> Non
     for app_id in (sc.app_cost_other, sc.app_vote_other, sc.app_unrelated):
         with pytest.raises(ForbiddenError):
             await require_app_read(app_id, session, member, None)
+
+
+async def test_pool_substitute_reads_like_a_member(session: AsyncSession) -> None:
+    """A pool substitute without a membership gets the committee scope of the Gremium."""
+    sc = await _seed(session)
+    svc = ApplicationsService(session)
+
+    page = await svc.list_applications(
+        owner_sub=sc.substitute_sub, committee_sub=sc.substitute_sub, limit=50, offset=0
+    )
+    assert {i.id for i in page.items} == {sc.app_cost, sc.app_vote}
+    substitute = Principal(sub=sc.substitute_sub, permissions=set())
+    for app_id in (sc.app_cost, sc.app_vote):
+        await require_app_read(app_id, session, substitute, None)
+    for app_id in (sc.app_cost_other, sc.app_vote_other, sc.app_unrelated):
+        with pytest.raises(ForbiddenError):
+            await require_app_read(app_id, session, substitute, None)

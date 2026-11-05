@@ -323,12 +323,14 @@ async def _in_substitute_pool(db: DbSession, sub: str) -> bool:
 async def _has_scoped_budget_view(db: DbSession, sub: str) -> bool:
     """Tell if a Gremium of the principal owns a cost center as visibility root.
 
+    The Gremien are the memberships and the substitute pools (`gremium_reader_ids`).
+
     The frontend uses the flag to show the budget tab.
     """
-    from app.modules.admin.gremium_roles import gremium_member_ids
+    from app.modules.admin.gremium_roles import gremium_reader_ids
     from app.modules.budget.tree_models import Budget
 
-    member = await gremium_member_ids(db, sub)
+    member = await gremium_reader_ids(db, sub)
     if not member:
         return False
     hit = await db.scalar(

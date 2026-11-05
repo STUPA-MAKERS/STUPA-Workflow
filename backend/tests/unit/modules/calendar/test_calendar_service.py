@@ -71,6 +71,22 @@ async def test_member_meetings_returns_pairs() -> None:
         end_time=None,
         created_at=datetime(2026, 1, 1, tzinfo=UTC),
     )
-    db = fake_session(result((gid, object())), result((meeting, "StuPa")))
+    db = fake_session(result((gid, object())), result(), result((meeting, "StuPa")))
+    pairs = await service.member_meetings(db, "u1")
+    assert pairs == [(meeting, "StuPa")]
+
+
+async def test_member_meetings_include_the_substitute_pools() -> None:
+    """A pool substitute without a membership gets the meetings of the pool Gremium."""
+    gid = uuid.uuid4()
+    meeting = SimpleNamespace(
+        id=uuid.uuid4(),
+        title="GV",
+        date=date(2026, 7, 1),
+        start_time=time(18, 0),
+        end_time=None,
+        created_at=datetime(2026, 1, 1, tzinfo=UTC),
+    )
+    db = fake_session(result(), result(gid), result((meeting, "StuPa")))
     pairs = await service.member_meetings(db, "u1")
     assert pairs == [(meeting, "StuPa")]

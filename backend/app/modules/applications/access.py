@@ -179,6 +179,9 @@ async def _committee_can_read(
        (the snapshot ``application.vote_gremium_id``).
     3. A meeting of one of those Gremien voted on the application.
 
+    The Gremien of the principal are the memberships and the substitute pools
+    (``gremium_reader_ids``): a pool substitute reads like a member.
+
     This mirrors ``ApplicationsService._committee_read_clauses``, the list query.
     Both must cover the same paths. A listed application must open in the detail
     view, and a readable application must appear in the list. `committee_gremium_ids`
@@ -189,9 +192,9 @@ async def _committee_can_read(
     Case 1 reuses the canonical ancestor logic of the budget tree instead of a second prefix
     query.
     """
-    from app.modules.admin.gremium_roles import gremium_member_ids
+    from app.modules.admin.gremium_roles import gremium_reader_ids
 
-    gremien = await gremium_member_ids(db, principal.sub)
+    gremien = await gremium_reader_ids(db, principal.sub)
     if not gremien:
         return False
 

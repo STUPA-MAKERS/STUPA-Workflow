@@ -13,7 +13,7 @@ import secrets
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.gremium_roles import gremium_member_ids
+from app.modules.admin.gremium_roles import gremium_reader_ids
 from app.modules.admin.models import Gremium
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.livevote.models import Meeting
@@ -77,12 +77,15 @@ async def principal_by_calendar_token(db: AsyncSession, token: str) -> Principal
 async def member_meetings(db: AsyncSession, sub: str) -> list[tuple[Meeting, str]]:
     """List the dated meetings of the Gremien that `sub` is a member of.
 
+    A pool substitute of a Gremium counts as a member (`gremium_reader_ids`), as in
+    the meeting list of the app.
+
     The query drops meetings without a date.
 
     Returns:
         `(Meeting, gremium_name)` pairs sorted by date and start time.
     """
-    gremium_ids = await gremium_member_ids(db, sub)
+    gremium_ids = await gremium_reader_ids(db, sub)
     if not gremium_ids:
         return []
     rows = (
