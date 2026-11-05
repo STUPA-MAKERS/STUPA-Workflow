@@ -105,7 +105,7 @@ describe('GremiumDecisionsComponent', () => {
     expect(motion.parts[0]).toBe('Beschluss');
     expect(motion.status.key).toBe('vote.result.rejected');
     const election = groups[1].rows[0];
-    expect(election.parts).toEqual(['Wahl', 'geheim', '25 Stimmen']);
+    expect(election.parts).toEqual(['Wahl', '25 Stimmen']);
     expect(election.status.key).toBe('election.status.elected');
     expect(election.elected).toBe('Jonas Albrecht, Mia Roth');
     const loose = groups[2].rows[0];

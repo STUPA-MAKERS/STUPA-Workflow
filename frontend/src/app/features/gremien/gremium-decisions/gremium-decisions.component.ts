@@ -289,7 +289,6 @@ export class GremiumDecisionsComponent {
     } else {
       parts.push(t(KIND_KEYS[d.kind]));
     }
-    if (d.secret) parts.push(t('gremien.decisions.secret'));
     if (d.counts) {
       parts.push(
         t('gremien.decisions.counts', { yes: d.counts.yes, no: d.counts.no, abstain: d.counts.abstain }),

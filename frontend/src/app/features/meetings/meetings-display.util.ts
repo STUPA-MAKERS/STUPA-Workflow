@@ -169,8 +169,6 @@ export function meetingDay(m: Meeting): string | null {
 /** The rule fields of a vote that the rules line reads. */
 export interface VoteRules {
   majorityRule?: string | null;
-  /** Unknown (a live vote before the next read) leaves the part out. */
-  secret?: boolean;
   quorum?: Quorum | null;
   /** Admitted guests vote too: no quorum, the majority of the cast votes decides. */
   guestsVote?: boolean;
@@ -186,7 +184,10 @@ export function majorityLabel(
   return t(`${family}.${rule}` as TranslationKey);
 }
 
-/** "geheime Abstimmung" or "offene Abstimmung". */
+/**
+ * "geheime Abstimmung" or "offene Abstimmung". Only a poll names its secrecy, because a
+ * motion and an election are always secret.
+ */
 export function secrecyLabel(secret: boolean, t: Translate): string {
   return t(secret ? 'meetings.vote.secretShort' : 'meetings.vote.publicShort');
 }
@@ -198,41 +199,28 @@ export function quorumLabel(quorum: Quorum, t: Translate): string {
   });
 }
 
-/** The options of {@link voteRulesParts}. */
-export interface VoteRulesOptions {
-  /**
-   * The ballot panel: "Absolute Mehrheit · Quorum 12 · geheime Abstimmung". The quorum
-   * comes before the secrecy, and only a secret vote names it (an open vote is the rule
-   * there, so "offene Abstimmung" says nothing).
-   */
-  ballot?: boolean;
-}
-
 /**
- * The rule parts of a vote: "Einfache Mehrheit · offene Abstimmung · Quorum 12" (the
- * meeting pages, the beamer, the public protocol), or the ballot form of
- * {@link VoteRulesOptions.ballot}. A part without data stays out: a vote that a live event
- * added before the next read has no rules yet, and a vote without a quorum shows none.
+ * The rule parts of a motion: "Einfache Mehrheit · Quorum 12". A part without data stays
+ * out: a vote that a live event added before the next read has no rules yet, and a vote
+ * without a quorum shows none.
  */
-export function voteRulesParts(vote: VoteRules, t: Translate, options: VoteRulesOptions = {}): string[] {
+export function voteRulesParts(vote: VoteRules, t: Translate): string[] {
   const majority = vote.majorityRule ? [majorityLabel(vote.majorityRule, vote.guestsVote, t)] : [];
   const quorum = vote.quorum ? [quorumLabel(vote.quorum, t)] : [];
-  if (options.ballot) {
-    return [...majority, ...quorum, ...(vote.secret ? [secrecyLabel(true, t)] : [])];
-  }
-  const secrecy = vote.secret === undefined ? [] : [secrecyLabel(vote.secret, t)];
-  return [...majority, ...secrecy, ...quorum];
+  return [...majority, ...quorum];
 }
 
 /**
- * The rules line of a vote card: "Einfache Mehrheit · offene Abstimmung · Quorum 12 ·
- * seit 18:48" ({@link voteRulesParts}, then the time of the open or the end). A poll
- * shows only its secrecy and the time.
+ * The rules line of a vote card: "Einfache Mehrheit · Quorum 12 · seit 18:48"
+ * ({@link voteRulesParts}, then the time of the open or the end). A poll shows only its
+ * secrecy and the time.
  */
 export function voteMetaLine(vote: MeetingVote, translate: Translate, i18nLocale: string): string {
   const parts =
     vote.kind === 'poll'
-      ? voteRulesParts({ secret: vote.secret }, translate)
+      ? vote.secret === undefined
+        ? []
+        : [secrecyLabel(vote.secret, translate)]
       : voteRulesParts(vote, translate);
   if (vote.status === 'open') {
     const since = clock(vote.openedAt, toFormatLocale(i18nLocale));

@@ -95,23 +95,23 @@ describe('MeetingBeamerComponent', () => {
     expect(screen.getByText('Zwischenstand sichtbar, sobald alle Anwesenden abgestimmt haben.')).toBeInTheDocument();
     expect(container.querySelector('app-vote-bars')).toBeNull();
     expect(screen.getByText('Offen')).toBeInTheDocument();
-    expect(screen.getByText('Einfache Mehrheit · offene Abstimmung · Quorum 12')).toBeInTheDocument();
+    expect(screen.getByText('Einfache Mehrheit · Quorum 12')).toBeInTheDocument();
     expect(container.querySelector('.bm__warn')).toBeNull();
   });
 
   it('warns while an open vote misses its quorum', async () => {
     const { container } = await setup({ vote: vote({ quorumMet: false, voted: 11 }) });
-    expect(screen.getByText('Einfache Mehrheit · offene Abstimmung')).toBeInTheDocument();
+    expect(screen.getByText('Einfache Mehrheit')).toBeInTheDocument();
     expect(container.querySelector('.bm__warn')?.textContent?.trim()).toBe('Quorum 12 · noch nicht erreicht');
   });
 
-  it('names a secret vote and keeps its counts until the close', async () => {
+  it('keeps the counts of a secret vote until the close, without naming the secrecy', async () => {
     const { container } = await setup({
       vote: vote({ secret: true, quorum: { type: 'percent', value: 50 }, counts: { yes: 3 } }),
     });
     expect(container.querySelector('app-vote-bars')).toBeNull();
-    expect(screen.getByText('Geheime Abstimmung: Das Ergebnis zeigt sich nach dem Schließen.')).toBeInTheDocument();
-    expect(screen.getByText('Einfache Mehrheit · geheime Abstimmung · Quorum 50 %')).toBeInTheDocument();
+    expect(screen.getByText('Das Ergebnis zeigt sich nach dem Schließen.')).toBeInTheDocument();
+    expect(screen.getByText('Einfache Mehrheit · Quorum 50 %')).toBeInTheDocument();
   });
 
   it('shows the revealed counts of an open vote as bars', async () => {

@@ -176,20 +176,26 @@ describe('voteMetaLine', () => {
   const t = (key: string, params?: Record<string, string | number>) =>
     params ? `${key}(${Object.values(params).join(',')})` : key;
 
-  it('joins rule, secrecy, quorum and the open time', () => {
+  it('joins rule, quorum and the open time, and never names the secrecy of a motion', () => {
     const line = voteMetaLine(
-      { ...base, majorityRule: 'two_thirds', secret: false, quorum: { type: 'count', value: 12 }, openedAt: '2026-10-15T16:48:00Z' },
+      { ...base, majorityRule: 'two_thirds', secret: true, quorum: { type: 'count', value: 12 }, openedAt: '2026-10-15T16:48:00Z' },
       t as never,
       'de',
     );
-    expect(line).toMatch(/^vote\.majority\.two_thirds · meetings\.vote\.publicShort · meetings\.vote\.quorumCount\(12\) · meetings\.vote\.since\(\d\d:48\)$/);
+    expect(line).toMatch(/^vote\.majority\.two_thirds · meetings\.vote\.quorumCount\(12\) · meetings\.vote\.since\(\d\d:48\)$/);
   });
 
-  it('names a secret vote, a percentage quorum and the end of a closed or cancelled vote', () => {
+  it('names a percentage quorum and the end of a closed or cancelled vote', () => {
     expect(
       voteMetaLine({ ...base, status: 'closed', secret: true, quorum: { type: 'percent', value: 50 }, closedAt: '2026-10-15T17:02:00Z' }, t as never, 'de'),
-    ).toMatch(/^meetings\.vote\.secretShort · meetings\.vote\.quorumPercent\(50\) · meetings\.vote\.endedAt\(\d\d:02\)$/);
+    ).toMatch(/^meetings\.vote\.quorumPercent\(50\) · meetings\.vote\.endedAt\(\d\d:02\)$/);
     expect(voteMetaLine({ ...base, status: 'cancelled', closedAt: null }, t as never, 'de')).toBe('');
+  });
+
+  it('names the secrecy of a poll', () => {
+    expect(voteMetaLine({ ...base, kind: 'poll', status: 'draft', secret: true }, t as never, 'de')).toBe('meetings.vote.secretShort');
+    expect(voteMetaLine({ ...base, kind: 'poll', status: 'draft', secret: false }, t as never, 'de')).toBe('meetings.vote.publicShort');
+    expect(voteMetaLine({ ...base, kind: 'poll', status: 'draft' }, t as never, 'de')).toBe('');
   });
 
   it('leaves out what a live event did not bring yet', () => {
@@ -202,27 +208,14 @@ describe('voteRulesParts', () => {
   const t = (key: string, params?: Record<string, string | number>) =>
     params ? `${key}(${Object.values(params).join(',')})` : key;
 
-  it('lists majority, secrecy and quorum in the one order', () => {
-    expect(
-      voteRulesParts({ majorityRule: 'simple', secret: false, quorum: { type: 'count', value: 12 } }, t as never),
-    ).toEqual(['vote.majority.simple', 'meetings.vote.publicShort', 'meetings.vote.quorumCount(12)']);
-    expect(voteRulesParts({ majorityRule: 'absolute', secret: true, quorum: { type: 'percent', value: 50 } }, t as never)).toEqual([
+  it('lists majority and quorum in the one order', () => {
+    expect(voteRulesParts({ majorityRule: 'simple', quorum: { type: 'count', value: 12 } }, t as never)).toEqual([
+      'vote.majority.simple',
+      'meetings.vote.quorumCount(12)',
+    ]);
+    expect(voteRulesParts({ majorityRule: 'absolute', quorum: { type: 'percent', value: 50 } }, t as never)).toEqual([
       'vote.majority.absolute',
-      'meetings.vote.secretShort',
       'meetings.vote.quorumPercent(50)',
-    ]);
-  });
-
-  it('gives the ballot form: the quorum first, only a secret vote named', () => {
-    const rules = { majorityRule: 'absolute', secret: true, quorum: { type: 'count' as const, value: 12 } };
-    expect(voteRulesParts(rules, t as never, { ballot: true })).toEqual([
-      'vote.majority.absolute',
-      'meetings.vote.quorumCount(12)',
-      'meetings.vote.secretShort',
-    ]);
-    expect(voteRulesParts({ ...rules, secret: false }, t as never, { ballot: true })).toEqual([
-      'vote.majority.absolute',
-      'meetings.vote.quorumCount(12)',
     ]);
   });
 
@@ -233,9 +226,7 @@ describe('voteRulesParts', () => {
 
   it('leaves out the parts without data', () => {
     expect(voteRulesParts({}, t as never)).toEqual([]);
-    expect(voteRulesParts({ majorityRule: null, quorum: null, secret: true }, t as never)).toEqual([
-      'meetings.vote.secretShort',
-    ]);
+    expect(voteRulesParts({ majorityRule: null, quorum: null }, t as never)).toEqual([]);
     expect(secrecyLabel(false, t as never)).toBe('meetings.vote.publicShort');
     expect(quorumLabel({ type: 'count', value: 3 }, t as never)).toBe('meetings.vote.quorumCount(3)');
   });
