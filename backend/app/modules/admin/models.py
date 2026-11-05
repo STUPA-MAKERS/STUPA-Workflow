@@ -43,23 +43,15 @@ class CdVariant(UUIDPkMixin, CreatedAtMixin, Base):
     ``key`` is the stable slug. It is immutable after the create, because the
     render path and the seed data reference it.
 
-    ``base_variant`` records which document family the design was drawn for. It is
-    DESCRIPTIVE: no render path reads it. The application render pins the report shape
-    and the protocol render pins the protocol shape, because the shape follows the kind
-    of document and not the design of the Gremium that owns it.
+    A variant does not set the document shape. The application render pins the report
+    shape and the protocol render pins the protocol shape, because the shape follows the
+    kind of document and not the design of the Gremium that owns it.
     """
 
     __tablename__ = "cd_variant"
 
     key: Mapped[str] = mapped_column(Text, unique=True)
     name: Mapped[str] = mapped_column(Text)
-    base_variant: Mapped[str] = mapped_column(Text, server_default="report")
-
-    __table_args__ = (
-        CheckConstraint(
-            "base_variant IN ('report','protocol')", name="base_variant"
-        ),
-    )
 
 
 class CdVariantLogo(UUIDPkMixin, CreatedAtMixin, Base):

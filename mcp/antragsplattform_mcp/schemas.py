@@ -266,14 +266,12 @@ class GremiumUpdate(WireModel):
 class CdVariantCreate(WireModel):
     key: str
     name: str
-    baseVariant: str = "report"
 
 
 class CdVariantUpdate(WireModel):
     """Patch of a CD variant. `key` is immutable — a different value gives 409."""
 
     name: str | None = None
-    baseVariant: str | None = None
 
 
 class CdVariantLogoVendoredCreate(WireModel):

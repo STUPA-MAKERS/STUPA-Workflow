@@ -5,7 +5,7 @@ too, but the constraint is the last line: no code path, no migration and no
 manual SQL can write a broken row.
 
 * `ck_cd_variant_logo_source` — a logo is EITHER vendored OR uploaded.
-* `ck_cd_variant_logo_slot` and `ck_cd_variant_base_variant` — closed value sets.
+* `ck_cd_variant_logo_slot` — a closed value set.
 * `uq_cd_variant_logo_square` — at most one square logo per variant.
 * `fk_gremium_cd_variant_id_cd_variant` is RESTRICT — a variant that a Gremium
   still uses cannot be deleted, so the Gremium is never orphaned.
@@ -32,7 +32,7 @@ def _variant_id(conn, key: str) -> str:
 def test_seed_holds_the_five_variants_with_vendored_logos(engine: Engine) -> None:
     with engine.connect() as conn:
         rows = conn.execute(
-            text("SELECT key, base_variant FROM cd_variant ORDER BY key")
+            text("SELECT key FROM cd_variant ORDER BY key")
         ).fetchall()
         logos = conn.execute(
             text(
@@ -41,13 +41,7 @@ def test_seed_holds_the_five_variants_with_vendored_logos(engine: Engine) -> Non
                 'ORDER BY v.key, l.slot, l."position"'
             )
         ).fetchall()
-    assert [tuple(r) for r in rows] == [
-        ("asta", "protocol"),
-        ("echo", "protocol"),
-        ("makers", "report"),
-        ("report", "report"),
-        ("stupa", "protocol"),
-    ]
+    assert [r[0] for r in rows] == ["asta", "echo", "makers", "report", "stupa"]
     assert [tuple(r) for r in logos] == [
         ("asta", "footer", "ASTA", None),
         ("asta", "title", "ASTA", None),
@@ -106,16 +100,6 @@ def test_logo_with_an_unknown_slot_is_rejected(engine: Engine) -> None:
         )
 
 
-def test_variant_with_an_unknown_base_variant_is_rejected(engine: Engine) -> None:
-    with pytest.raises(IntegrityError), engine.begin() as conn:
-        conn.execute(
-            text(
-                "INSERT INTO cd_variant (key, name, base_variant) "
-                "VALUES ('x-bad', 'X', 'letter')"
-            )
-        )
-
-
 def test_variant_key_is_unique(engine: Engine) -> None:
     with pytest.raises(IntegrityError), engine.begin() as conn:
         conn.execute(
@@ -144,8 +128,8 @@ def test_deleting_a_variant_cascades_to_its_logos(engine: Engine) -> None:
     with engine.begin() as conn:
         vid = conn.execute(
             text(
-                "INSERT INTO cd_variant (key, name, base_variant) "
-                "VALUES ('temp-cd', 'Temp', 'report') RETURNING id"
+                "INSERT INTO cd_variant (key, name) "
+                "VALUES ('temp-cd', 'Temp') RETURNING id"
             )
         ).scalar_one()
         conn.execute(

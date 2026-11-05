@@ -18,7 +18,6 @@ from app.modules.admin.cd_resolver import ResolvedCdVariant, cd_render_config
 
 def _resolved(**over: Any) -> ResolvedCdVariant:
     base: dict[str, Any] = {
-        "base_variant": "protocol",
         "title_logos": ("STUPA", "brand.png"),
         "footer_logos": ("brand.png",),
         "assets": {"brand.png": b"\x89PNG\r\n\x1a\n"},

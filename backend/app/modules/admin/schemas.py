@@ -20,7 +20,7 @@ from app.modules.admin.branding import (
     PublicBranding,
     check_http_url,
 )
-from app.modules.admin.cd_logos import CdBaseVariant, LogoSlot, RenderSlot, VendoredLogoName
+from app.modules.admin.cd_logos import LogoSlot, RenderSlot, VendoredLogoName
 from app.modules.applications.models import (
     DEFAULT_CONFIRM_TTL_HOURS,
     MAX_CONFIRM_TTL_HOURS,
@@ -81,7 +81,6 @@ class CdVariantOut(_CamelModel):
     id: UUID
     key: str
     name: str
-    base_variant: CdBaseVariant = Field(serialization_alias="baseVariant")
     logos: list[CdVariantLogoOut] = Field(default_factory=list)
 
 
@@ -98,7 +97,6 @@ class CdVariantCreate(_CamelModel):
 
     key: str = Field(min_length=1, max_length=64, pattern=CD_VARIANT_KEY_PATTERN)
     name: str = Field(min_length=1, max_length=200)
-    base_variant: CdBaseVariant = Field(default="report", alias="baseVariant")
 
 
 class CdVariantUpdate(_CamelModel):
@@ -106,7 +104,6 @@ class CdVariantUpdate(_CamelModel):
 
     key: str | None = Field(default=None, max_length=64)
     name: str | None = Field(default=None, min_length=1, max_length=200)
-    base_variant: CdBaseVariant | None = Field(default=None, alias="baseVariant")
 
 
 class CdVariantLogoVendoredCreate(_CamelModel):

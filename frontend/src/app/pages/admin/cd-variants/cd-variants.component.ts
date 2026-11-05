@@ -28,8 +28,6 @@ import {
   type RowMenuSection,
   SegmentedComponent,
   type SegmentedOption,
-  SelectFieldComponent,
-  type SelectOption,
   SkeletonComponent,
   ToastService,
   PageHeaderComponent,
@@ -37,14 +35,12 @@ import {
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
 import {
-  CD_BASE_VARIANTS,
   CD_LOGO_ACCEPT,
   CD_LOGO_LIST_ORDER,
   CD_LOGO_SLOTS,
   CD_SQUARE_LOGO_ACCEPT,
   CD_VARIANT_KEY_MAX,
   CD_VARIANT_KEY_PATTERN,
-  type CdBaseVariant,
   type CdLogoSlot,
   type CdVariant,
   type CdVariantLogo,
@@ -66,7 +62,6 @@ import {
 interface VariantForm {
   key: string;
   name: string;
-  baseVariant: CdBaseVariant;
 }
 
 /**
@@ -93,7 +88,7 @@ const SQUARE_ERROR_KEYS: Readonly<Record<string, TranslationKey>> = {
 };
 
 function emptyForm(): VariantForm {
-  return { key: '', name: '', baseVariant: 'report' };
+  return { key: '', name: '' };
 }
 
 
@@ -102,10 +97,10 @@ function emptyForm(): VariantForm {
  * renders its documents with, and the square logo the app shows for a Gremium.
  *
  * A variant carries no color and no font. It holds an ordered list of logos per PDF slot
- * (title page, page footer) on top of a base variant, and at most one square 1:1 logo.
+ * (title page, page footer), and at most one square 1:1 logo.
  * A new logo is always an upload; a logo that the render service ships (an older row)
  * still shows until the worker converts it. One row per variant shows the square logo
- * (or an outlined placeholder with the initials), the name, the key, the base and the
+ * (or an outlined placeholder with the initials), the name, the key and the
  * gremien that use it; "Logos anzeigen" opens its logo rows (move, download, remove; the
  * square logo has no move). Create, edit and "add a logo" run in a dialog, which is a
  * bottom sheet on a phone. The key is a slug that the name generates, and it is immutable
@@ -128,7 +123,6 @@ function emptyForm(): VariantForm {
     InputComponent,
     NoteComponent,
     SegmentedComponent,
-    SelectFieldComponent,
     SkeletonComponent,
     PageHeaderComponent,
     BreadcrumbsComponent,
@@ -172,10 +166,6 @@ export class AdminCdVariantsComponent {
 
   /** Ids of square logos whose image failed to load: they show the placeholder. */
   readonly brokenThumbs = signal<ReadonlySet<Uuid>>(new Set());
-
-  readonly baseOptions = computed<SelectOption[]>(() =>
-    CD_BASE_VARIANTS.map((v) => ({ value: v, label: this.baseLabel(v) })),
-  );
 
   readonly slotOptions = computed<SegmentedOption[]>(() =>
     CD_LOGO_SLOTS.map((s) => ({ value: s, label: this.slotLabel(s) })),
@@ -227,10 +217,6 @@ export class AdminCdVariantsComponent {
     });
   }
 
-  baseLabel(base: CdBaseVariant): string {
-    return this.i18n.translate(`admin.cdVariants.base.${base}` as TranslationKey);
-  }
-
   slotLabel(slot: CdLogoSlot): string {
     return this.i18n.translate(`admin.cdVariants.slot.${slot}` as TranslationKey);
   }
@@ -245,14 +231,12 @@ export class AdminCdVariantsComponent {
     return logo.vendoredName ?? logo.fileName ?? '—';
   }
 
-  /** "Basis: Protokoll · genutzt von STUPA, AStA" for the card of a variant. */
+  /** "genutzt von STUPA, AStA" for the card of a variant. */
   usage(variant: CdVariant): string {
-    const base = this.i18n.translate('admin.cdVariants.baseLine', { base: this.baseLabel(variant.baseVariant) });
     const names = this.usedBy().get(variant.id) ?? [];
-    const used = names.length
+    return names.length
       ? this.i18n.translate('admin.cdVariants.usedBy', { names: names.join(', ') })
       : this.i18n.translate('admin.cdVariants.unused');
-    return `${base} · ${used}`;
   }
 
   /** "Dateiname · 3 KB" of an upload, the name of a shipped logo. */
@@ -359,7 +343,7 @@ export class AdminCdVariantsComponent {
     this.editingId.set(variant.id);
     this.keyEdited.set(true);
     this.formError.set(null);
-    this.form.set({ key: variant.key, name: variant.name, baseVariant: variant.baseVariant });
+    this.form.set({ key: variant.key, name: variant.name });
     this.dialogOpen.set(true);
   }
 
@@ -400,12 +384,8 @@ export class AdminCdVariantsComponent {
     this.formError.set(null);
     const id = this.editingId();
     const request = id
-      ? this.api.updateCdVariant(id, { name: f.name.trim(), baseVariant: f.baseVariant })
-      : this.api.createCdVariant({
-          key: f.key,
-          name: f.name.trim(),
-          baseVariant: f.baseVariant,
-        });
+      ? this.api.updateCdVariant(id, { name: f.name.trim() })
+      : this.api.createCdVariant({ key: f.key, name: f.name.trim() });
     request.subscribe({
       next: (saved) => {
         this.saving.set(false);

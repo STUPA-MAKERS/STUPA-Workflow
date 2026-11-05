@@ -274,8 +274,6 @@ export interface GremiumUpdateBody {
  * `admin/cd_logos.py` and the CD schemas. A variant only controls the logos of a rendered
  * document. It carries no color and no font.
  */
-export type CdBaseVariant = 'report' | 'protocol';
-export const CD_BASE_VARIANTS: readonly CdBaseVariant[] = ['report', 'protocol'] as const;
 
 /**
  * Where a logo appears: on the title page or in the page footer of a PDF, or as the
@@ -327,7 +325,6 @@ export interface CdVariant {
   id: Uuid;
   key: string;
   name: string;
-  baseVariant: CdBaseVariant;
   logos: CdVariantLogo[];
 }
 
@@ -342,13 +339,11 @@ export interface CdVariantOption {
 export interface CdVariantCreateBody {
   key: string;
   name: string;
-  baseVariant: CdBaseVariant;
 }
 
 /** Body for `PATCH /admin/cd-variants/{id}`. The key is immutable (409). */
 export interface CdVariantUpdateBody {
   name?: string;
-  baseVariant?: CdBaseVariant;
 }
 
 /** Name → URL slug (auto-generated). */
