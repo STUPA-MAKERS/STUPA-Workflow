@@ -505,6 +505,15 @@ class LifecycleOps(HandoverOps):
         if self.publisher is not None:
             await self.publisher.meeting_state(out)
 
+    async def broadcast_agenda(self, meeting_id: UUID, item_id: UUID) -> None:
+        """Send ``agenda_changed`` for one item without a state change.
+
+        A save of the item text or of the done mark calls this. The followers then read
+        the agenda only, not the meeting and the protocol as on ``meeting_state``.
+        """
+        if self.publisher is not None:
+            await self.publisher.agenda_changed(meeting_id, item_id)
+
     async def _protocol_final(self, meeting_id: UUID) -> bool:
         """Report whether the protocol of the meeting is final.
 

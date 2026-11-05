@@ -8,6 +8,15 @@ import { problemDetail } from '@core/api/problem';
 
 /** Idle time after the last keystroke before the service autosaves the TOP body. */
 const AUTOSAVE_DELAY_MS = 1000;
+/**
+ * Wait before the agenda read after `agenda_changed`: a fixed part plus a random part.
+ * The protokollant saves on every pause in typing, and every viewer of the meeting gets
+ * the event at the same moment. The wait folds a run of saves into one read per viewer,
+ * and the random part spreads the reads of all viewers over time, so the server does not
+ * get them all at once. The live draft shows the text in the meantime.
+ */
+export const AGENDA_REFRESH_MIN_MS = 1500;
+export const AGENDA_REFRESH_SPREAD_MS = 1500;
 
 /**
  * Agenda (TOP) state of the loaded meeting: item CRUD, inline rename, reorder by drag
@@ -32,6 +41,8 @@ export class MeetingAgendaService implements OnDestroy {
   /** Autosave state of the current TOP body. */
   readonly saveState = signal<'idle' | 'saving' | 'saved' | 'error'>('idle');
   private bodyTimer: ReturnType<typeof setTimeout> | null = null;
+  /** The waiting agenda read after `agenda_changed` (see {@link refreshSoon}). */
+  private refreshTimer: ReturnType<typeof setTimeout> | null = null;
   /**
    * The item a link asks for (`?item=` of `/meetings/:id`, from a to-do link). The first
    * read of the agenda that holds it selects it, ahead of the item the room handles now.
@@ -71,7 +82,25 @@ export class MeetingAgendaService implements OnDestroy {
 
   /** Save a pending edit when the page goes away, so that the debounce drops no text. */
   ngOnDestroy(): void {
+    if (this.refreshTimer !== null) clearTimeout(this.refreshTimer);
+    this.refreshTimer = null;
     this.flushPendingBody(this.pendingBody?.meetingId ?? null);
+  }
+
+  /**
+   * Read the agenda again a little later, after `agenda_changed`.
+   *
+   * Events that arrive while a read waits fold into that read. The wait is
+   * {@link AGENDA_REFRESH_MIN_MS} plus a random part of up to
+   * {@link AGENDA_REFRESH_SPREAD_MS}, so the viewers of one meeting do not all read at once.
+   */
+  refreshSoon(meetingId: Uuid): void {
+    if (this.refreshTimer !== null) return;
+    const wait = AGENDA_REFRESH_MIN_MS + Math.random() * AGENDA_REFRESH_SPREAD_MS;
+    this.refreshTimer = setTimeout(() => {
+      this.refreshTimer = null;
+      this.load(meetingId);
+    }, wait);
   }
 
   /**

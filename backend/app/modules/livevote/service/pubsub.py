@@ -11,6 +11,7 @@ from uuid import UUID
 
 from app.modules.livevote.broker import MeetingBroker
 from app.modules.livevote.events import (
+    AgendaChangedEvent,
     GuestCountsEvent,
     GuestEventReason,
     GuestRequestedEvent,
@@ -54,6 +55,11 @@ class BrokerPublisher:
             status=meeting.status,
         )
         await self._broker.publish(meeting_channel(meeting.id), event.dump())
+
+    async def agenda_changed(self, meeting_id: UUID, item_id: UUID) -> None:
+        """Publish that the saved text or the done mark of an agenda item changed."""
+        event = AgendaChangedEvent(agendaItemId=item_id)
+        await self._broker.publish(meeting_channel(meeting_id), event.dump())
 
     async def vote_opened(self, vote: VoteOut) -> None:
         """Publish the open of a meeting vote."""

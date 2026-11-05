@@ -290,6 +290,7 @@ async def test_guest_filter(monkeypatch: pytest.MonkeyPatch) -> None:
     await conn.handle({"type": "guest_updated", "guest": "broken"})
     await conn.handle({"type": "meeting_state", "status": "live"})
     await conn.handle({"type": "viewers", "viewers": ["Anna"]})
+    await conn.handle({"type": "agenda_changed", "agendaItemId": str(uuid4())})
     assert sent == []
     mine = {
         "type": "guest_updated",
@@ -317,6 +318,7 @@ async def test_guest_filter(monkeypatch: pytest.MonkeyPatch) -> None:
             "activeApplicationId": "a",
         }
     )
+    await conn.handle({"type": "agenda_changed", "agendaItemId": str(uuid4())})
     vote = str(uuid4())
     await conn.handle({"type": "vote_tally", "voteId": vote, "cast": 1})
     await conn.handle({"type": "vote_tally", "voteId": vote, "cast": 2})
@@ -324,6 +326,7 @@ async def test_guest_filter(monkeypatch: pytest.MonkeyPatch) -> None:
     assert sent == [
         {"type": "guest_counts", "admittedGuests": 5},
         {"type": "meeting_state", "status": "live", "currentAgendaItemId": None},
+        {"type": "agenda_changed"},
         {"type": "vote_tally", "voteId": vote, "cast": 1},
         {"type": "vote_tally", "voteId": vote, "cast": 2},
     ]

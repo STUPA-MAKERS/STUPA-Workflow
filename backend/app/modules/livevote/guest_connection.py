@@ -9,8 +9,9 @@ but it filters every event:
 * A waiting guest gets nothing else.
 * An admitted guest gets `meeting_state` (status and current agenda item only), the
   vote events of PUBLIC agenda items, and `guest_counts` with the number of admitted
-  guests. Never `viewers` (names), never the lead events, never a vote of a non-public
-  item. A `meeting_state` with `closed` ends the socket.
+  guests. An `agenda_changed` reaches the guest without the item id, so the page reads
+  the public agenda again. Never `viewers` (names), never the lead events, never a vote
+  of a non-public item. A `meeting_state` with `closed` ends the socket.
 
 The client never casts over this socket; it uses the REST ballot route. Its only
 message is `subscribe`, which sends the state again.
@@ -196,7 +197,9 @@ class GuestConnection:
             return
         if self.status != "admitted":
             return
-        if kind == "guest_counts":
+        if kind == "agenda_changed":
+            await self._send({"type": "agenda_changed"})
+        elif kind == "guest_counts":
             admitted = message.get("admittedGuests")
             await self._send({"type": "guest_counts", "admittedGuests": admitted})
         elif kind in _VOTE_EVENTS:

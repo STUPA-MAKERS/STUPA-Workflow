@@ -1,7 +1,7 @@
 """WebSocket message schemas for live voting.
 
-The models from server to client are `meeting_state`, `vote_opened`,
-`vote_tally`, `vote_closed`, `body_draft` and `error`. The models from client to
+The models from server to client are `meeting_state`, `agenda_changed`,
+`vote_opened`, `vote_tally`, `vote_closed`, `body_draft` and `error`. The models from client to
 server are `cast`, `subscribe` and `body_draft`. Every message is JSON of the
 form `{"type": …, …}` with `type` as the discriminator. These models are the
 single source of the WebSocket contract.
@@ -268,14 +268,28 @@ class BodyDraftEvent(_CamelModel):
     """The text of an agenda item while the protokollant types it (not saved yet).
 
     Only the voter channel passes it on. The beamer filter and the guest channel drop
-    it. The next `meeting_state` re-read brings the saved text, which replaces the
-    draft. ``seq`` rises per editor session, so a client drops an older frame.
+    it. The next agenda read after `agenda_changed` brings the saved text, which
+    replaces the draft. ``seq`` rises per editor session, so a client drops an older frame.
     """
 
     type: Literal["body_draft"] = "body_draft"
     agenda_item_id: UUID = Field(alias="agendaItemId")
     body: str
     seq: NonNegativeInt
+
+
+class AgendaChangedEvent(_CamelModel):
+    """The saved text or the done mark of one agenda item changed.
+
+    The event names the item, never the content: a client reads the agenda again
+    through REST. A text save while the protokollant types does not send
+    `meeting_state`, because every client reads the meeting, the protocol and the
+    navigation counts again on `meeting_state`. With many viewers that burst of
+    reads on every autosave slows the server for everybody.
+    """
+
+    type: Literal["agenda_changed"] = "agenda_changed"
+    agenda_item_id: UUID = Field(alias="agendaItemId")
 
 
 class ErrorEvent(_CamelModel):
