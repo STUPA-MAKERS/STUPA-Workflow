@@ -60,6 +60,14 @@ interface SourceRow extends PaletteRow {
   readonly group: string;
 }
 
+/** `groups` with `row` added: to the last group when it has the same label, else in a new one. */
+function appendRow(groups: readonly PaletteGroup[], row: SourceRow): readonly PaletteGroup[] {
+  const last = groups.at(-1);
+  return last?.label === row.group
+    ? [...groups.slice(0, -1), { label: last.label, rows: [...last.rows, row] }]
+    : [...groups, { label: row.group, rows: [row] }];
+}
+
 const EMPTY: SearchResults = { hits: [], truncated: false, failed: [] };
 
 /**
@@ -148,15 +156,9 @@ export class SearchPaletteComponent {
   );
 
   /** Pages first: they are instant and exact, and a record needs a round trip. */
-  readonly groups = computed<PaletteGroup[]>(() => {
-    const out: { label: string; rows: SourceRow[] }[] = [];
-    for (const row of [...this.pageRows(), ...this.recordRows()]) {
-      const last = out[out.length - 1];
-      if (last && last.label === row.group) last.rows.push(row);
-      else out.push({ label: row.group, rows: [row] });
-    }
-    return out;
-  });
+  readonly groups = computed<readonly PaletteGroup[]>(() =>
+    [...this.pageRows(), ...this.recordRows()].reduce<readonly PaletteGroup[]>(appendRow, []),
+  );
 
   /** Each opening starts with an empty field and no answer of the last search. */
   constructor() {

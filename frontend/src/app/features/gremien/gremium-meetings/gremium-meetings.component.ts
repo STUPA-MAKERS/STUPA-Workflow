@@ -35,7 +35,7 @@ import {
 } from '@stupa-makers/ui-kit';
 import { topsLabel } from '../../meetings/meetings-overview.util';
 import { GREMIEN_NOW } from '../gremien.store';
-import { monthKey, shiftMonth } from '../gremien.util';
+import { groupInOrder, monthKey, shiftMonth } from '../gremien.util';
 import { isoDay, monthYear, shortTime, weekdayDate } from '@shared/date-format';
 import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
 
@@ -55,7 +55,7 @@ export interface MeetingGroup {
   readonly key: string;
   readonly label: string;
   readonly upcoming: boolean;
-  readonly rows: MeetingRow[];
+  readonly rows: readonly MeetingRow[];
 }
 
 const PROTOCOL_STATUS: Record<string, StatusView> = {
@@ -156,39 +156,33 @@ export class GremiumMeetingsComponent {
     });
   });
 
-  readonly groups = computed<MeetingGroup[]>(() => {
+  readonly groups = computed<readonly MeetingGroup[]>(() => {
     const locale = this.i18n.formatLocale();
     const rows = this.filtered();
     const coming = rows
       .filter((m) => m.status !== 'closed')
       .sort((a, b) => (a.date ?? '9999').localeCompare(b.date ?? '9999') || (a.startTime ?? '').localeCompare(b.startTime ?? ''));
-    const out: MeetingGroup[] = [];
-    if (coming.length) {
-      out.push({
-        key: 'upcoming',
-        label: this.i18n.translate('gremien.meetings.upcoming'),
-        upcoming: true,
-        rows: coming.map((m) => this.toRow(m)),
-      });
-    }
+    const upcoming: readonly MeetingGroup[] = coming.length
+      ? [
+          {
+            key: 'upcoming',
+            label: this.i18n.translate('gremien.meetings.upcoming'),
+            upcoming: true,
+            rows: coming.map((m) => this.toRow(m)),
+          },
+        ]
+      : [];
     const past = rows
       .filter((m) => m.status === 'closed')
       .sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''));
-    for (const m of past) {
-      const key = m.date ? m.date.slice(0, 7) : 'undated';
-      let group = out.find((g) => g.key === key);
-      if (!group) {
-        group = {
-          key,
-          label: m.date ? monthYear(key, locale) : this.i18n.translate('gremien.meetings.undated'),
-          upcoming: false,
-          rows: [],
-        };
-        out.push(group);
-      }
-      group.rows.push(this.toRow(m));
-    }
-    return out;
+    const byMonth = groupInOrder(past, (m) => (m.date ? m.date.slice(0, 7) : 'undated'));
+    const months = byMonth.map(({ key, first, items }) => ({
+      key,
+      label: first.date ? monthYear(key, locale) : this.i18n.translate('gremien.meetings.undated'),
+      upcoming: false,
+      rows: items.map((m) => this.toRow(m)),
+    }));
+    return [...upcoming, ...months];
   });
 
   readonly filterActive = computed(() => this.range() !== '' || this.protocol() !== '');
@@ -235,16 +229,7 @@ export class GremiumMeetingsComponent {
     const locale = this.i18n.formatLocale();
     const closed = m.status === 'closed';
     const status = closed ? (PROTOCOL_STATUS[m.protocolStatus ?? ''] ?? NO_PROTOCOL) : meetingStatus(m.status);
-    const parts: string[] = [];
-    if (this.phone()) {
-      if (m.date) parts.push(weekdayDate(m.date, locale, { year: false }));
-    } else {
-      const date = weekdayDate(m.date, locale);
-      if (date) parts.push(date);
-      const time = [shortTime(m.startTime), shortTime(m.endTime)].filter(Boolean).join('–');
-      if (time) parts.push(time);
-      parts.push(topsLabel(m.agendaItemCount, (k, p) => this.i18n.translate(k, p)));
-    }
+    const parts = this.phone() ? this.phoneParts(m, locale) : this.wideParts(m, locale);
     return {
       meeting: m,
       sub: parts.join(' · '),
@@ -254,5 +239,20 @@ export class GremiumMeetingsComponent {
         ? this.i18n.translate('gremien.meetings.presentOf', { present: m.presentCount, total: m.memberCount })
         : null,
     };
+  }
+
+  /** The sub line on a phone: only the date without the year. */
+  private phoneParts(m: GremiumMeeting, locale: string): readonly string[] {
+    return m.date ? [weekdayDate(m.date, locale, { year: false })] : [];
+  }
+
+  /** The sub line on a wide screen: the date, the time and the number of agenda items. */
+  private wideParts(m: GremiumMeeting, locale: string): readonly string[] {
+    const date = weekdayDate(m.date, locale);
+    const time = [shortTime(m.startTime), shortTime(m.endTime)].filter(Boolean).join('–');
+    return [
+      ...[date, time].filter(Boolean),
+      topsLabel(m.agendaItemCount, (k, p) => this.i18n.translate(k, p)),
+    ];
   }
 }

@@ -63,6 +63,12 @@ export const TICKET_DRAFT_FILES_KEY = 'ap.ticketDraftFiles';
 /** A plain e-mail check; the server checks again. */
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/** One row of "Wird automatisch mitgeschickt". */
+interface ContextRow {
+  readonly label: TranslationKey;
+  readonly value: string;
+}
+
 const KIND_LABEL: Record<TicketKind, TranslationKey> = {
   bug: 'tickets.kind.bug',
   question: 'tickets.kind.question',
@@ -165,30 +171,34 @@ export class ReportDialogComponent {
   /** The rows of "Wird automatisch mitgeschickt". */
   readonly contextRows = computed(() => {
     const c = this.context();
-    const rows: { label: TranslationKey; value: string }[] = [];
-    if (c.url) rows.push({ label: 'tickets.context.page', value: c.url });
-    if (c.userAgent) rows.push({ label: 'tickets.context.browser', value: browserLabel(c.userAgent) });
-    if (c.viewport) {
-      const lang = c.language === 'en' ? 'English' : 'Deutsch';
-      rows.push({ label: 'tickets.context.window', value: `${viewportLabel(c.viewport)} · ${lang}` });
-    }
+    const lang = c.language === 'en' ? 'English' : 'Deutsch';
     const at = this.openedAt();
-    if (at) {
-      const locale = this.i18n.formatLocale();
-      const weekday = weekdayName(at, locale);
-      const rest = new Intl.DateTimeFormat(locale, {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hourCycle: 'h23',
-      }).format(at);
-      rows.push({ label: 'tickets.context.time', value: `${weekday}, ${rest}` });
-    }
-    return rows;
+    const rows: readonly (ContextRow | null)[] = [
+      c.url ? { label: 'tickets.context.page', value: c.url } : null,
+      c.userAgent ? { label: 'tickets.context.browser', value: browserLabel(c.userAgent) } : null,
+      c.viewport
+        ? { label: 'tickets.context.window', value: `${viewportLabel(c.viewport)} · ${lang}` }
+        : null,
+      at ? { label: 'tickets.context.time', value: this.openedText(at) } : null,
+    ];
+    return rows.filter((row): row is ContextRow => row !== null);
   });
+
+  /** The moment the dialog opened: "Dienstag, 06.10.2026, 14:03:07". */
+  private openedText(at: Date): string {
+    const locale = this.i18n.formatLocale();
+    const weekday = weekdayName(at, locale);
+    const rest = new Intl.DateTimeFormat(locale, {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hourCycle: 'h23',
+    }).format(at);
+    return `${weekday}, ${rest}`;
+  }
 
   readonly valid = computed(() => {
     if (!this.title().trim() || this.title().trim().length > MAX_TITLE) return false;
