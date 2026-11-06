@@ -49,14 +49,19 @@ class FiscalYearOps(BudgetTreeServiceBase):
         A node below the top level resolves to its top-level ancestor. A scoped
         root is often a sub cost center.
         """
-        node = await self._get_node(budget_id)
-        top = node
-        while top.parent_id is not None:
-            top = await self._get_node(top.parent_id)
+        top = await self._root_of(await self._get_node(budget_id))
         return [
             _fy_out(f, top.fiscal_start_month, top.fiscal_start_day)
             for f in await self._fiscal_years_of(top.id)
         ]
+
+    async def _root_of(self, node: Budget) -> Budget:
+        """Walk the parent chain of `node` up to its top-level ancestor."""
+        return (
+            node
+            if node.parent_id is None
+            else await self._root_of(await self._get_node(node.parent_id))
+        )
 
     async def fiscal_year_label_map(self) -> dict[UUID, str]:
         """Map every `fiscal_year_id` to its display label.
@@ -116,9 +121,9 @@ class FiscalYearOps(BudgetTreeServiceBase):
         top = await self._require_top_level(budget_id)
         fy = await self._get_fiscal_year(fiscal_year_id)
         provided = payload.model_dump(exclude_unset=True)
-        if provided.get("year", fy.year) != fy.year:
-            self._refuse_closed(fy)
         new_year = provided.get("year", fy.year)
+        if new_year != fy.year:
+            self._refuse_closed(fy)
         if new_year != fy.year and any(
             f.year == new_year and f.id != fiscal_year_id
             for f in await self._fiscal_years_of(budget_id)
@@ -127,13 +132,21 @@ class FiscalYearOps(BudgetTreeServiceBase):
                 "Fiscal year already exists for this budget.",
                 errors=[{"field": "year", "msg": "fiscal year already exists"}],
             )
-        if "year" in provided:
-            fy.year = new_year
-            fy.start_date, fy.end_date = self._fiscal_year_bounds(
-                new_year, top.fiscal_start_month, top.fiscal_start_day
-            )
-        if "active" in provided:
-            fy.active = provided["active"]
+        bounds = (
+            self._fiscal_year_bounds(new_year, top.fiscal_start_month, top.fiscal_start_day)
+            if "year" in provided
+            else None
+        )
+        changes = {
+            **(
+                {"year": new_year, "start_date": bounds[0], "end_date": bounds[1]}
+                if bounds is not None
+                else {}
+            ),
+            **({"active": provided["active"]} if "active" in provided else {}),
+        }
+        for name, value in changes.items():
+            setattr(fy, name, value)
         await self.session.commit()
         return _fy_out(fy, top.fiscal_start_month, top.fiscal_start_day)
 

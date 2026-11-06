@@ -1,12 +1,13 @@
 """API schemas of the budget tree.
 
-`_CamelModel` supplies the camelCase aliases. Money uses `Decimal`
-(numeric(12,2)) and a date uses `date`. The server maintains `pathKey`. A
+Every model is frozen; `FrozenCamelModel` supplies the camelCase aliases. Money uses
+`Decimal` (numeric(12,2)) and a date uses `date`. The server maintains `pathKey`. A
 request never accepts it. It appears in out DTOs only.
 """
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
@@ -14,8 +15,8 @@ from uuid import UUID
 
 from pydantic import Field, model_validator
 
-from app.modules.budget.schemas import _CamelModel
 from app.shared.paging import Page
+from app.shared.schemas import FrozenCamelModel
 
 #: Money cap that matches the DB column `numeric(12, 2)`. An input field applies
 #: it as `le`, so an oversized amount gives a clean 422 instead of a
@@ -23,7 +24,7 @@ from app.shared.paging import Page
 _MAX_AMOUNT = Decimal("9999999999.99")
 
 
-class BudgetNodeCreate(_CamelModel):
+class BudgetNodeCreate(FrozenCamelModel, frozen=True):
     """Create a cost center.
 
     `parentId=null` means top level, and `gremiumId` is then required.
@@ -48,7 +49,7 @@ class BudgetNodeCreate(_CamelModel):
     fiscal_start_day: int = Field(default=1, ge=1, le=28, alias="fiscalStartDay")
 
 
-class BudgetNodeUpdate(_CamelModel):
+class BudgetNodeUpdate(FrozenCamelModel, frozen=True):
     """Partially update a cost center.
 
     The key and the parent stay immutable to keep the path stable. `None` means
@@ -73,7 +74,7 @@ class BudgetNodeUpdate(_CamelModel):
     fiscal_start_day: int | None = Field(default=None, ge=1, le=28, alias="fiscalStartDay")
 
 
-class BudgetNodeOut(_CamelModel):
+class BudgetNodeOut(FrozenCamelModel, frozen=True):
     """Base data of a node."""
 
     id: UUID
@@ -85,8 +86,8 @@ class BudgetNodeOut(_CamelModel):
     currency: str
     active: bool
     color: str | None = None
-    accepted_state_keys: list[str] = Field(default_factory=list, alias="acceptedStateKeys")
-    denied_state_keys: list[str] = Field(default_factory=list, alias="deniedStateKeys")
+    accepted_state_keys: tuple[str, ...] = Field(default_factory=tuple, alias="acceptedStateKeys")
+    denied_state_keys: tuple[str, ...] = Field(default_factory=tuple, alias="deniedStateKeys")
     hidden_in_budget: bool = Field(default=False, alias="hiddenInBudget")
     view_gremium_id: UUID | None = Field(default=None, alias="viewGremiumId")
     #: The own deciding Gremium, the effective one (own or nearest ancestor) and the
@@ -103,7 +104,7 @@ class BudgetNodeOut(_CamelModel):
     fiscal_start_day: int = Field(default=1, alias="fiscalStartDay")
 
 
-class AllocationView(_CamelModel):
+class AllocationView(FrozenCamelModel, frozen=True):
     """Budget view of a node in ONE fiscal year.
 
     `committed` is `bound + expended`, the total consumption. It stays for
@@ -123,7 +124,7 @@ class AllocationView(_CamelModel):
     available: Decimal
 
 
-class BudgetTreeNodeOut(_CamelModel):
+class BudgetTreeNodeOut(FrozenCamelModel, frozen=True):
     """Tree node with per-fiscal-year sums and recursive children for `GET /budgets`."""
 
     id: UUID
@@ -135,8 +136,8 @@ class BudgetTreeNodeOut(_CamelModel):
     currency: str
     active: bool
     color: str | None = None
-    accepted_state_keys: list[str] = Field(default_factory=list, alias="acceptedStateKeys")
-    denied_state_keys: list[str] = Field(default_factory=list, alias="deniedStateKeys")
+    accepted_state_keys: tuple[str, ...] = Field(default_factory=tuple, alias="acceptedStateKeys")
+    denied_state_keys: tuple[str, ...] = Field(default_factory=tuple, alias="deniedStateKeys")
     hidden_in_budget: bool = Field(default=False, alias="hiddenInBudget")
     view_gremium_id: UUID | None = Field(default=None, alias="viewGremiumId")
     #: The own deciding Gremium, the effective one (own or nearest ancestor) and the
@@ -151,11 +152,14 @@ class BudgetTreeNodeOut(_CamelModel):
     )
     fiscal_start_month: int = Field(default=1, alias="fiscalStartMonth")
     fiscal_start_day: int = Field(default=1, alias="fiscalStartDay")
-    by_fiscal_year: list[AllocationView] = Field(default_factory=list, alias="byFiscalYear")
-    children: list[BudgetTreeNodeOut] = Field(default_factory=list)
+    by_fiscal_year: tuple[AllocationView, ...] = Field(
+        default_factory=tuple, alias="byFiscalYear"
+    )
+    #: Read-only `Sequence`, because a caller builds a node with a list of children.
+    children: Sequence[BudgetTreeNodeOut] = Field(default_factory=tuple)
 
 
-class FiscalYearCreate(_CamelModel):
+class FiscalYearCreate(FrozenCamelModel, frozen=True):
     """Create a fiscal year from the year alone.
 
     The start and the end derive from the budget cutoff.
@@ -165,7 +169,7 @@ class FiscalYearCreate(_CamelModel):
     active: bool = True
 
 
-class FiscalYearUpdate(_CamelModel):
+class FiscalYearUpdate(FrozenCamelModel, frozen=True):
     """Update the year or the active flag of a fiscal year.
 
     The service checks again that the fiscal years stay disjoint.
@@ -175,7 +179,7 @@ class FiscalYearUpdate(_CamelModel):
     active: bool | None = None
 
 
-class FiscalYearOut(_CamelModel):
+class FiscalYearOut(FrozenCamelModel, frozen=True):
     """Fiscal-year base data.
 
     `display` is `YYYY` for a Jan 1 cutoff, else `YYYY/YY`. `closedAt` set means
@@ -192,7 +196,7 @@ class FiscalYearOut(_CamelModel):
     closed_at: datetime | None = Field(default=None, alias="closedAt")
 
 
-class AllocationSet(_CamelModel):
+class AllocationSet(FrozenCamelModel, frozen=True):
     """Set the top-down allocation with `PUT .../allocations/{fiscalYearId}`."""
 
     #: ``le`` keeps the value inside ``Numeric(12, 2)``: a larger one gives 422, not a
@@ -200,7 +204,7 @@ class AllocationSet(_CamelModel):
     allocated: Decimal = Field(ge=0, le=_MAX_AMOUNT, allow_inf_nan=False)
 
 
-class AllocationOut(_CamelModel):
+class AllocationOut(FrozenCamelModel, frozen=True):
     """Result of an allocation."""
 
     budget_id: UUID = Field(alias="budgetId")
@@ -208,7 +212,7 @@ class AllocationOut(_CamelModel):
     allocated: Decimal
 
 
-class AssignBudgetRequest(_CamelModel):
+class AssignBudgetRequest(FrozenCamelModel, frozen=True):
     """Assign an application to a cost center and set the fiscal year.
 
     `budgetId=null` clears the assignment and sets `fiscalYearId` to null too.
@@ -222,13 +226,13 @@ class AssignBudgetRequest(_CamelModel):
     fiscal_year_id: UUID | None = Field(default=None, alias="fiscalYearId")
 
 
-class MoveFiscalYearRequest(_CamelModel):
+class MoveFiscalYearRequest(FrozenCamelModel, frozen=True):
     """Move an application to another fiscal year (of the top budget)."""
 
     fiscal_year_id: UUID = Field(alias="fiscalYearId")
 
 
-class AssignBudgetOut(_CamelModel):
+class AssignBudgetOut(FrozenCamelModel, frozen=True):
     """Result of a cost center and fiscal year assignment."""
 
     application_id: UUID = Field(alias="applicationId")
@@ -236,7 +240,7 @@ class AssignBudgetOut(_CamelModel):
     fiscal_year_id: UUID | None = Field(alias="fiscalYearId")
 
 
-class BudgetApplicationOut(_CamelModel):
+class BudgetApplicationOut(FrozenCamelModel, frozen=True):
     """Application in a cost center and its subtree, for the budget drilldown list.
 
     Money uses `Decimal`.
@@ -253,7 +257,7 @@ class BudgetApplicationOut(_CamelModel):
     currency: str | None = None
     state_id: UUID | None = Field(default=None, alias="stateId")
     #: Current flow state (i18n label + color) for the status column.
-    state_label: dict[str, str] | None = Field(default=None, alias="stateLabel")
+    state_label: Mapping[str, str] | None = Field(default=None, alias="stateLabel")
     state_color: str | None = Field(default=None, alias="stateColor")
     created_at: datetime = Field(alias="createdAt")
 
@@ -263,7 +267,7 @@ ExpenseKind = Literal["expense", "income"]
 PaymentMethod = Literal["ueberweisung", "bar", "lastschrift", "karte", "paypal"]
 
 
-class ExpenseCreate(_CamelModel):
+class ExpenseCreate(FrozenCamelModel, frozen=True):
     """Book an expense or income against a cost center and a fiscal year.
 
     `budgetId` is required for a standalone booking. A bound booking inherits
@@ -297,7 +301,7 @@ class ExpenseCreate(_CamelModel):
         return self
 
 
-class SubBookingCreate(_CamelModel):
+class SubBookingCreate(FrozenCamelModel, frozen=True):
     """Create a sub-booking by hand.
 
     The sub-booking inherits the cost center, the fiscal year and the kind from
@@ -316,7 +320,7 @@ class SubBookingCreate(_CamelModel):
     category: str | None = Field(default=None)
 
 
-class ExpenseUpdate(_CamelModel):
+class ExpenseUpdate(FrozenCamelModel, frozen=True):
     """Update a booked expense or income.
 
     The amount, the description, the cost center and the optional metadata are
@@ -345,7 +349,7 @@ class ExpenseUpdate(_CamelModel):
         return self
 
 
-class ExpenseOut(_CamelModel):
+class ExpenseOut(FrozenCamelModel, frozen=True):
     """Base data of a booked expense or income."""
 
     id: UUID
@@ -384,7 +388,7 @@ class ExpenseOut(_CamelModel):
 InvoiceStatus = Literal["open", "paid"]
 
 
-class InvoiceCreate(_CamelModel):
+class InvoiceCreate(FrozenCamelModel, frozen=True):
     """Create an invoice.
 
     `grossAmount` is required. Every other field is optional.
@@ -406,7 +410,7 @@ class InvoiceCreate(_CamelModel):
     file_mime: str | None = Field(default=None, alias="fileMime")
 
 
-class InvoiceParseResult(_CamelModel):
+class InvoiceParseResult(FrozenCamelModel, frozen=True):
     """Result of `POST /invoices/parse`.
 
     The result holds the parsed header data and a handle to the stored original
@@ -430,7 +434,7 @@ class InvoiceParseResult(_CamelModel):
     duplicate: bool = False
 
 
-class InvoiceFileResult(_CamelModel):
+class InvoiceFileResult(FrozenCamelModel, frozen=True):
     """Result of `POST /invoices/file`.
 
     The result is a handle to the original PDF the server just stored. It also
@@ -443,7 +447,7 @@ class InvoiceFileResult(_CamelModel):
     file_mime: str = Field(alias="fileMime")
 
 
-class InvoiceUpdate(_CamelModel):
+class InvoiceUpdate(FrozenCamelModel, frozen=True):
     """Partially update an invoice.
 
     The server writes the set fields only.
@@ -466,7 +470,7 @@ class InvoiceUpdate(_CamelModel):
         return self
 
 
-class InvoiceBookingOut(_CamelModel):
+class InvoiceBookingOut(FrozenCamelModel, frozen=True):
     """A booking that references the invoice, as the invoice list shows it."""
 
     id: UUID
@@ -483,7 +487,7 @@ class InvoiceBookingOut(_CamelModel):
     created_at: datetime = Field(alias="createdAt")
 
 
-class InvoiceOut(_CamelModel):
+class InvoiceOut(FrozenCamelModel, frozen=True):
     """Invoice base data plus the file flag and the linked bookings.
 
     ``linkedBookings`` holds only the bookings on cost centres that the caller may
@@ -511,7 +515,7 @@ class InvoiceOut(_CamelModel):
     )
 
 
-class InvoiceSegmentCounts(_CamelModel):
+class InvoiceSegmentCounts(FrozenCamelModel, frozen=True):
     """The number of invoices in each segment of the invoice list.
 
     The counts apply every filter of the request except ``status`` and ``booked``,
@@ -532,7 +536,7 @@ class InvoicePage(Page[InvoiceOut]):
     counts: InvoiceSegmentCounts
 
 
-class TransferCreate(_CamelModel):
+class TransferCreate(FrozenCamelModel, frozen=True):
     """Transfer from one cost center to another in the same fiscal year.
 
     The service creates an expense on `fromBudgetId` and an income on
@@ -553,7 +557,7 @@ class TransferCreate(_CamelModel):
         return self
 
 
-class TransferOut(_CamelModel):
+class TransferOut(FrozenCamelModel, frozen=True):
     """Result of a transfer with both booking ids."""
 
     transfer_id: UUID = Field(alias="transferId")
@@ -561,7 +565,7 @@ class TransferOut(_CamelModel):
     income_id: UUID = Field(alias="incomeId")
 
 
-class TransferUpdate(_CamelModel):
+class TransferUpdate(FrozenCamelModel, frozen=True):
     """Update both legs of a transfer at once.
 
     `amount`, `description`, `note`, `invoiceDate` and `paymentDate` apply to
@@ -586,7 +590,7 @@ class TransferUpdate(_CamelModel):
         return self
 
 
-class TransferRowOut(_CamelModel):
+class TransferRowOut(FrozenCamelModel, frozen=True):
     """One transfer as a single row, assembled from its two bookings."""
 
     transfer_id: UUID = Field(alias="transferId")
