@@ -3905,5 +3905,6 @@
   "todos.linkView.referenceNumber": "Receipt number",
   "todos.linkView.paymentMethod": "Payment method",
   "todos.linkView.category": "Category",
-  "todos.linkView.description": "Description"
+  "todos.linkView.description": "Description",
+  "todos.linkView.details": "Details"
 }

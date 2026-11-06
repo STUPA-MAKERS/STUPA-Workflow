@@ -8,7 +8,14 @@ import { dayMonthYear } from '@shared/date-format';
 import { formatMoney } from '@shared/format-money';
 import { resolveI18n } from '@shared/forms/i18n-text';
 import { MarkdownViewComponent } from '@shared/markdown/markdown-view.component';
-import { IconComponent, MEDIA, mediaQuery, SideSheetComponent } from '@stupa-makers/ui-kit';
+import {
+  IconComponent,
+  MEDIA,
+  mediaQuery,
+  NoteComponent,
+  SectionComponent,
+  SideSheetComponent,
+} from '@stupa-makers/ui-kit';
 import { LINK_ICON, linkSub, VOTE_RESULT_LABEL, VOTE_STATUS_LABEL } from '../todos.util';
 
 /** The values of a fact that the sheet translates, by the key of the fact. */
@@ -52,7 +59,7 @@ const ROWS_HEADING: Partial<Record<TodoLink['kind'], TranslationKey>> = {
   selector: 'app-todo-link-view',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, IconComponent, MarkdownViewComponent, SideSheetComponent],
+  imports: [TranslatePipe, IconComponent, MarkdownViewComponent, NoteComponent, SectionComponent, SideSheetComponent],
   templateUrl: './todo-link-view.component.html',
   styleUrl: './todo-link-view.component.scss',
 })

@@ -3905,5 +3905,6 @@
   "todos.linkView.referenceNumber": "Belegnummer",
   "todos.linkView.paymentMethod": "Zahlungsmethode",
   "todos.linkView.category": "Kategorie",
-  "todos.linkView.description": "Beschreibung"
+  "todos.linkView.description": "Beschreibung",
+  "todos.linkView.details": "Details"
 }

@@ -1,32 +1,34 @@
-<app-side-sheet [side]="phone() ? 'bottom' : 'end'" [heading]="heading()" [(open)]="open" [contentScrolls]="true">
-  <div class="lv" data-testid="link-view">
-    <p class="lv__sub">
+<app-side-sheet [side]="phone() ? 'bottom' : 'end'" [heading]="heading()" [(open)]="open">
+  <div class="fd lv" data-testid="link-view">
+    <p class="sheet-line lv__sub">
       <app-icon class="lv__icon" [name]="icon()" [size]="16" />
       <span>{{ sub() }}</span>
     </p>
     @if (failed()) {
-      <p class="lv__empty">{{ 'todos.linkView.failed' | t }}</p>
+      <app-note kind="error" icon="alert" role="alert">{{ 'todos.linkView.failed' | t }}</app-note>
     } @else if (view(); as v) {
       @if (plain().length) {
-        <dl class="lv__facts">
-          @for (f of plain(); track f.key) {
-            <div class="lv__fact">
-              <dt>{{ label(f) }}</dt>
-              <dd [class.num]="f.format === 'money'">{{ value(f) }}</dd>
-            </div>
-          }
-        </dl>
+        <app-section class="fd__sec" [heading]="'todos.linkView.details' | t">
+          <dl class="fd__card fd__grid">
+            @for (f of plain(); track f.key) {
+              <div>
+                <dt>{{ label(f) }}</dt>
+                <dd class="fd__wrap" [class.mono]="f.format === 'money' || f.format === 'date'">{{ value(f) }}</dd>
+              </div>
+            }
+          </dl>
+        </app-section>
       }
       @for (f of texts(); track f.key) {
-        <section class="lv__text">
-          <h3 class="lv__heading">{{ label(f) }}</h3>
-          <app-markdown-view [src]="f.value" />
-        </section>
+        <app-section class="fd__sec" [heading]="label(f)">
+          <div class="fd__card fd__wrap">
+            <app-markdown-view [src]="f.value" />
+          </div>
+        </app-section>
       }
       @if (v.rows.length) {
-        <section class="lv__text">
-          <h3 class="lv__heading">{{ rowsHeading() }}</h3>
-          <ul class="lv__rows">
+        <app-section class="fd__sec" [heading]="rowsHeading()">
+          <ul class="rowgroup lv__rows">
             @for (r of v.rows; track $index) {
               <li class="lv__row">
                 @if (r.done !== null) {
@@ -39,14 +41,19 @@
               </li>
             }
           </ul>
-        </section>
+        </app-section>
       }
     } @else {
-      <div class="lv__facts skel-in" aria-hidden="true">
-        @for (w of ['60%', '40%', '72%']; track $index) {
-          <span class="skel-text lv__skelLabel"></span><span class="skel-text" [style.width]="w"></span>
-        }
-      </div>
+      <app-section class="fd__sec" [heading]="'todos.linkView.details' | t">
+        <div class="fd__card fd__grid skel-in" aria-hidden="true">
+          @for (w of ['60%', '40%', '72%', '50%']; track $index) {
+            <div>
+              <span class="skel-text skel-text--muted lv__skelLabel"></span>
+              <span class="skel-text" [style.width]="w"></span>
+            </div>
+          }
+        </div>
+      </app-section>
     }
   </div>
 </app-side-sheet>

@@ -1,56 +1,22 @@
+// The read sheet takes the finance detail sheet: kit sections, a card of facts.
+@use '../../../pages/budget/finance-sheet';
+
 :host {
   display: contents;
 }
 .lv {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
   padding-bottom: var(--space-4);
 }
 .lv__sub {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
 }
 .lv__icon {
   flex: none;
 }
-.lv__facts {
-  display: grid;
-  grid-template-columns: minmax(5.25rem, max-content) minmax(0, 1fr);
-  gap: var(--space-3) var(--space-5);
-  margin: 0;
-}
-.lv__fact {
-  display: contents;
-}
-.lv__fact dt {
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-}
-.lv__fact dd {
-  margin: 0;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.lv__text {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-.lv__heading {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-  font-weight: var(--fw-medium);
-}
+// The rows take the shared row group; only the layout inside a row is the sheet's own.
 .lv__rows {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -60,16 +26,7 @@
   align-items: center;
   gap: var(--space-3);
   min-height: 44px;
-  padding: 6px var(--space-3);
-  background: var(--color-surface-2);
-}
-.lv__row:first-child {
-  border-top-left-radius: var(--radius-lg);
-  border-top-right-radius: var(--radius-lg);
-}
-.lv__row:last-child {
-  border-bottom-left-radius: var(--radius-lg);
-  border-bottom-right-radius: var(--radius-lg);
+  padding: 6px var(--space-4);
 }
 .lv__check {
   flex: none;
@@ -88,10 +45,8 @@
   color: var(--color-text-muted);
   font-size: var(--fs-small);
 }
-.lv__empty {
-  margin: 0;
-  color: var(--color-text-muted);
-}
 .lv__skelLabel {
+  display: block;
   width: 5rem;
+  margin-bottom: var(--space-1);
 }
