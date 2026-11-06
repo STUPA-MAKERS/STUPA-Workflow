@@ -66,6 +66,18 @@ jobs:
       # Checks the format of every spec, the index and every § reference in the code.
       - run: python3 scripts/check_specs.py
 
+  # Functional style ratchet (specs/style/shared/functional/000437): the count of violations
+  # per Python file must not rise above scripts/functional-baseline/. fe-unit checks the
+  # frontend part with the ESLint report.
+  functional:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: python3 scripts/check_functional.py
+
   be-lint:
     runs-on: ubuntu-latest
     defaults:
@@ -221,6 +233,12 @@ jobs:
       - run: npm ci
       - name: ESLint
         run: npm run lint --if-present
+      - name: Functional style ratchet
+        # specs/style/shared/functional/000437: the functional warnings per file must not
+        # rise above scripts/functional-baseline/frontend-*.json.
+        run: |
+          npx eslint . -f json -o eslint-report.json
+          python3 ../scripts/check_functional.py --eslint eslint-report.json
       - name: Typecheck
         # The root tsconfig.json lists no files, so a bare `tsc --noEmit` checks
         # nothing. `typecheck` runs tsc against tsconfig.app.json.

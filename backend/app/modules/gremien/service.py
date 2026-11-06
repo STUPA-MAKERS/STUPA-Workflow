@@ -421,7 +421,7 @@ class GremienService:
         found = await self.session.execute(
             select(Protocol.meeting_id, Protocol.status).where(Protocol.meeting_id.in_(ids))
         )
-        protocols: dict[UUID, str] = {mid: st for mid, st in found.all()}
+        protocols: dict[UUID, str] = dict(found.all())
         records = await self.session.execute(
             select(
                 MeetingAttendance.meeting_id,
@@ -674,7 +674,7 @@ class GremienService:
                     MeetingAttendance.meeting_id.in_(ids),
                 )
             )
-            records = {mid: st for mid, st in rec.all()}
+            records = dict(rec.all())
             dele = await self.session.execute(
                 select(MeetingDelegation.meeting_id, PrincipalRow.display_name)
                 .join(PrincipalRow, PrincipalRow.id == MeetingDelegation.delegate_principal_id)
@@ -684,7 +684,7 @@ class GremienService:
                     MeetingDelegation.delegate_voting.is_(True),
                 )
             )
-            delegates = {mid: name for mid, name in dele.all()}
+            delegates = dict(dele.all())
         rows: list[MemberMeetingOut] = []
         for mid, title, day, start in meetings:
             state: AttendanceState

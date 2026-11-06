@@ -1,0 +1,7 @@
+{
+  "typst/typst_service/app.py": 7,
+  "typst/typst_service/compiler.py": 1,
+  "typst/typst_service/document.py": 19,
+  "typst/typst_service/frontmatter.py": 10,
+  "typst/typst_service/markdown.py": 72
+}

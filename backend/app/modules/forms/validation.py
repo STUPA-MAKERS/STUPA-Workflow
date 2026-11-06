@@ -281,7 +281,7 @@ def validate_answers(
 
     eval_ctx: dict[str, Any] = {**(context or {}), **result}
 
-    cost_total = Decimal("0")
+    cost_total = Decimal(0)
     funding: tuple[FormFieldDef, Any] | None = None
     for f in fields:
         if f.type in ("computed", "section"):
@@ -295,7 +295,7 @@ def validate_answers(
             continue
         _validate_value(f, value, errors)
         if f.type == "positions":
-            cost_total += positions_total(value) or Decimal("0")
+            cost_total += positions_total(value) or Decimal(0)
         elif f.type == "funding":
             funding = (f, value)
 
@@ -725,7 +725,7 @@ def positions_total(value: object) -> Decimal | None:
     """
     if not isinstance(value, list):
         return None
-    total = Decimal("0")
+    total = Decimal(0)
     found = False
     for pos in value:
         if not isinstance(pos, dict):
@@ -762,7 +762,7 @@ def extract_promoted(
         if f.type == "positions":
             total = positions_total(data.get(f.key))
             if total is not None:
-                out["amount"] = out.get("amount", Decimal("0")) + total
+                out["amount"] = out.get("amount", Decimal(0)) + total
             continue
         if not (f.is_promoted and f.promote_target):
             continue

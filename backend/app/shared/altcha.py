@@ -337,4 +337,4 @@ class NullAltchaVerifier:
 
     async def verify(self, payload_b64: str | None) -> None:
         """Accept every solution."""
-        return None
+        return

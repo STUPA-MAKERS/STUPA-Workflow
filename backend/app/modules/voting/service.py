@@ -995,7 +995,7 @@ class VotingService:
             config = poll.as_vote_config()
         else:
             config = cast(VoteConfig, payload.config)
-        empty = {opt: 0 for opt in config.options}
+        empty = dict.fromkeys(config.options, 0)
         return self._to_out(
             vote, config, await self._tally_out(vote, config, empty, vote.eligible_count or 0)
         )
@@ -1130,7 +1130,7 @@ class VotingService:
         )
         await self.session.flush()
         await self.session.commit()
-        empty = {opt: 0 for opt in config.options}
+        empty = dict.fromkeys(config.options, 0)
         return self._to_out(
             vote, config, await self._tally_out(vote, config, empty, vote.eligible_count or 0)
         )

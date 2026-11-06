@@ -183,7 +183,7 @@ async def _decorate(
         found = await session.execute(
             select(Gremium.id, Gremium.name).where(Gremium.id.in_(gremien))
         )
-        names = {gid: name for gid, name in found.all()}
+        names = dict(found.all())
     positions = await _agenda_positions(session, [v for v, _, _ in rows])
     ballots = await _own_ballots(session, principal.sub, [v for v, _, _ in rows])
     voting = VotingService(session)

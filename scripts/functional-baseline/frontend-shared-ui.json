@@ -1,0 +1,16 @@
+{
+  "frontend/src/app/shared/ui/avatar/avatar.service.ts": 5,
+  "frontend/src/app/shared/ui/chat/chat-mentions.ts": 24,
+  "frontend/src/app/shared/ui/chat/chat-outbox.ts": 9,
+  "frontend/src/app/shared/ui/chat/chat.component.ts": 21,
+  "frontend/src/app/shared/ui/chat/chat.models.ts": 38,
+  "frontend/src/app/shared/ui/chat/chat.util.ts": 47,
+  "frontend/src/app/shared/ui/expand-row/expand-row.component.ts": 1,
+  "frontend/src/app/shared/ui/history/history.component.ts": 35,
+  "frontend/src/app/shared/ui/i18n-input/i18n-input.component.ts": 1,
+  "frontend/src/app/shared/ui/image-thumb/image-thumb.component.ts": 2,
+  "frontend/src/app/shared/ui/pane-form/pane-form-head.component.ts": 1,
+  "frontend/src/app/shared/ui/pull-refresh/pull-refresh-ring.component.ts": 6,
+  "frontend/src/app/shared/ui/pull-refresh/pull-refresh.directive.ts": 5,
+  "frontend/src/app/shared/ui/qr-code/qr-code.component.ts": 3
+}

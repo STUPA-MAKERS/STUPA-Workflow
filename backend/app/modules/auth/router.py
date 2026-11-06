@@ -66,7 +66,7 @@ _TX_MAX_AGE = 600
 
 def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
     """Document problem+json for the given error status codes."""
-    return {code: _PROBLEM for code in codes}
+    return dict.fromkeys(codes, _PROBLEM)
 
 
 @router.get(

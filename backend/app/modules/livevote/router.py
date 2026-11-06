@@ -124,7 +124,7 @@ def _release_slot(meeting_id: UUID, sub: str) -> None:
 
 
 def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
-    return {code: _PROBLEM for code in codes}
+    return dict.fromkeys(codes, _PROBLEM)
 
 
 def get_broker_rest(request: Request) -> MeetingBroker:

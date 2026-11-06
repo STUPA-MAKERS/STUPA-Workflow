@@ -213,7 +213,7 @@ def _map(invoice: MinimumInvoice) -> ParsedInvoice:
     gross = _require_sane_gross(gross)
 
     taxes = getattr(invoice, "tax_total_amounts", None) or []
-    tax = sum((t.amount for t in taxes), Decimal("0")) if taxes else None
+    tax = sum((t.amount for t in taxes), Decimal(0)) if taxes else None
 
     terms = getattr(invoice, "payment_terms", None)
     due = getattr(terms, "due_date", None) if terms is not None else None
@@ -389,7 +389,7 @@ def _parse_cii_header(xml: str | bytes) -> ParsedInvoice:
 
     tax_elems = summation.findall(_qn(_NS_RAM, "TaxTotalAmount")) if summation is not None else []
     tax_values = [_cii_decimal(e.text) for e in tax_elems if e.text and e.text.strip()]
-    tax = sum((v for v in tax_values if v is not None), Decimal("0")) if tax_values else None
+    tax = sum((v for v in tax_values if v is not None), Decimal(0)) if tax_values else None
 
     due = _cii_date(
         _find_text(

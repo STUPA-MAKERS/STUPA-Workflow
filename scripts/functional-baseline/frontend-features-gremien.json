@@ -1,0 +1,10 @@
+{
+  "frontend/src/app/features/gremien/attendance-detail/attendance-detail.component.ts": 3,
+  "frontend/src/app/features/gremien/gremien-page/gremien.component.ts": 6,
+  "frontend/src/app/features/gremien/gremien.util.ts": 12,
+  "frontend/src/app/features/gremien/gremium-attendance/gremium-attendance.component.ts": 10,
+  "frontend/src/app/features/gremien/gremium-decisions/gremium-decisions.component.ts": 11,
+  "frontend/src/app/features/gremien/gremium-detail/gremium-detail.component.ts": 10,
+  "frontend/src/app/features/gremien/gremium-meetings/gremium-meetings.component.ts": 10,
+  "frontend/src/app/features/gremien/gremium-members/gremium-members.component.ts": 6
+}

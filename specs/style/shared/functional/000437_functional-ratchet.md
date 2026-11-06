@@ -5,7 +5,10 @@ kind: style
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
-implementation: null
+implementation:
+  - scripts/check_functional.py
+  - scripts/functional-baseline/
+  - .github/workflows/ci.yml
 scope:
   - backend/
   - frontend/

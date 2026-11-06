@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 
     from app.modules.files.storage import ObjectStorage
 
-_ZERO = Decimal("0")
+_ZERO = Decimal(0)
 
 
 def _json_safe(value: object) -> object:

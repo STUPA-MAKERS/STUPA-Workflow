@@ -1,0 +1,9 @@
+{
+  "frontend/src/app/pages/expenses/booking-detail/booking-detail.component.ts": 4,
+  "frontend/src/app/pages/expenses/expense-dialogs.state.ts": 5,
+  "frontend/src/app/pages/expenses/expense-sub-bookings.state.ts": 2,
+  "frontend/src/app/pages/expenses/expense-transfers.state.ts": 1,
+  "frontend/src/app/pages/expenses/expenses-list.state.ts": 2,
+  "frontend/src/app/pages/expenses/expenses.component.ts": 30,
+  "frontend/src/app/pages/expenses/transfer-form/transfer-form.component.ts": 2
+}

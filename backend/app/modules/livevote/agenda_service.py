@@ -161,7 +161,7 @@ class AgendaService:
         rows = await self.session.execute(
             select(State.id, State.label_i18n).where(State.id.in_(state_ids))
         )
-        return {sid: label for sid, label in rows.all()}
+        return dict(rows.all())
 
     async def item(self, meeting_id: UUID, item_id: UUID) -> MeetingAgendaItem:
         """Load one agenda item of the meeting.

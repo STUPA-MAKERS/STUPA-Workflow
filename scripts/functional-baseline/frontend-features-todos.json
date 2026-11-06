@@ -1,0 +1,13 @@
+{
+  "frontend/src/app/features/todos/card-detail/todo-card-detail.component.ts": 13,
+  "frontend/src/app/features/todos/due-chip/todo-due-chip.component.ts": 1,
+  "frontend/src/app/features/todos/event-link.state.ts": 1,
+  "frontend/src/app/features/todos/kanban-key-drag.ts": 13,
+  "frontend/src/app/features/todos/link-picker/todo-link-picker.component.ts": 10,
+  "frontend/src/app/features/todos/linked-list/todo-linked-list.component.ts": 6,
+  "frontend/src/app/features/todos/move-sheet/todo-move-sheet.component.ts": 9,
+  "frontend/src/app/features/todos/new-dialog/todo-new-dialog.component.ts": 4,
+  "frontend/src/app/features/todos/todo-cache.service.ts": 32,
+  "frontend/src/app/features/todos/todos.util.ts": 45,
+  "frontend/src/app/features/todos/transfer-dialog/todo-transfer-dialog.component.ts": 6
+}
