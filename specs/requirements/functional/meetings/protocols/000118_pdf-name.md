@@ -4,7 +4,7 @@ title: The PDF is named after the meeting
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/protocol
   - frontend/src/app/features/meetings
@@ -13,4 +13,4 @@ scope:
 
 # The PDF is named after the meeting
 
-The protocol PDF file name is the meeting title and the day of the meeting.
+The protocol PDF file name must be the meeting title and the day of the meeting.

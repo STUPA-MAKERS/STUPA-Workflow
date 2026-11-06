@@ -4,7 +4,7 @@ title: The admin role has every permission
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/auth
   - backend/app/modules/admin
@@ -12,5 +12,5 @@ scope:
 
 # The admin role has every permission
 
-The role `admin` has every permission and cannot be edited. The roles `admin` and `member`
-cannot be deleted.
+The role `admin` must have every permission, and an admin must not be able to edit it. The
+roles `admin` and `member` must not be deletable.

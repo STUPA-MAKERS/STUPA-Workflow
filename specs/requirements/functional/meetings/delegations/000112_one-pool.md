@@ -4,7 +4,7 @@ title: The substitute pool is the only substitute rule
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/delegations
   - frontend/src/app/features/meetings
@@ -12,4 +12,4 @@ scope:
 
 # The substitute pool is the only substitute rule
 
-Each Gremium has one substitute pool. There are no faculty substitute groups.
+Each Gremium must have one substitute pool. There must be no faculty substitute groups.

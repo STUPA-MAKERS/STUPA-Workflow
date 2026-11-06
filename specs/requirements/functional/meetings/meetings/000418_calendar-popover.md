@@ -4,11 +4,11 @@ title: The calendar subscription is on Sitzungen
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - frontend/src/app/features/meetings
 ---
 
 # The calendar subscription is on Sitzungen
 
-"Kalender-Abo" is a popover on the Sitzungen page, not in the account area.
+"Kalender-Abo" must be a popover on the Sitzungen page, not in the account area.

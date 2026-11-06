@@ -4,7 +4,7 @@ title: A booking can be duplicated
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/budget
   - frontend/src/app/pages/budget
@@ -12,5 +12,5 @@ scope:
 
 # A booking can be duplicated
 
-A booking has the action "Duplizieren". It opens the booking form with the values of the
-booking.
+A booking must have the action "Duplizieren". It must open the booking form with the values of
+the booking.

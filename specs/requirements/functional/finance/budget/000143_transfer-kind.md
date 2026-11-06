@@ -4,7 +4,7 @@ title: A transfer is a kind in the Art filter
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/budget
   - frontend/src/app/pages/budget
@@ -12,5 +12,5 @@ scope:
 
 # A transfer is a kind in the Art filter
 
-Bookings show "Übertrag" as one value of the "Art" filter. There is no view switch for
-transfers.
+Bookings must show "Übertrag" as one value of the "Art" filter. There must be no view switch
+for transfers.

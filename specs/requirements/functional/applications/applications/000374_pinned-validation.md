@@ -4,7 +4,7 @@ title: Antrag data is checked against its pinned form
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/applications
   - backend/app/modules/forms
@@ -12,5 +12,5 @@ scope:
 
 # Antrag data is checked against its pinned form
 
-Create and edit check the data against the pinned form version before any database write. The
-server keeps only known field keys and drops every other key.
+Create and edit must check the data against the pinned form version before any database write.
+The server must keep only known field keys and must drop every other key.

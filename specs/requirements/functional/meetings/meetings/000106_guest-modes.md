@@ -4,7 +4,7 @@ title: Guests vote or only watch
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/livevote
   - frontend/src/app/features/meetings
@@ -14,6 +14,5 @@ scope:
 
 # Guests vote or only watch
 
-A meeting with guests is in the mode "Gäste dürfen abstimmen" or "nur zuschauen". A vote with
-guests has no quorum and needs a majority of the cast ballots. A non-public TOP has no guest
-vote. The mode cannot change from vote to watch while a vote with guests is open.
+A meeting with guests must be in the mode "Gäste dürfen abstimmen" or "nur zuschauen". The mode
+must not change from vote to watch while a vote with guests is open.

@@ -4,11 +4,11 @@ title: One branch and one pull request per package
 kind: style
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - .
 ---
 
 # One branch and one pull request per package
 
-Make one branch and one pull request for each package of work.
+Each package of work must have one branch and one pull request.

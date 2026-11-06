@@ -4,7 +4,7 @@ title: A form definition is checked at save time
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/forms
   - backend/app/shared/config_schemas.py
@@ -12,7 +12,7 @@ scope:
 
 # A form definition is checked at save time
 
-The save of a form refuses these errors:
+The save of a form must refuse these errors:
 
 - a duplicate key
 - a promoted field that is not numeric

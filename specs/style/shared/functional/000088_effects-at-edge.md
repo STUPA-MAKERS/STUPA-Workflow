@@ -4,17 +4,17 @@ title: Effects stay at the edge
 kind: style
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/
   - backend/worker/
   - frontend/src/app/
-  - ui-kit
+  - frontend/vendor/ui-kit
   - mcp/
   - typst/typst_service/
 ---
 
 # Effects stay at the edge
 
-Database, Redis, S3, mail, audit and WebSocket calls stay in services, routers and Angular
-services. The decision logic is a pure function next to them.
+Database, Redis, S3, mail, audit and WebSocket calls must stay in services, routers and Angular
+services. The decision logic must be a pure function next to them.

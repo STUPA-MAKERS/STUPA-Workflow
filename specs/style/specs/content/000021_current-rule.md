@@ -4,14 +4,15 @@ title: A spec states the current rule
 kind: style
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - specs/
 ---
 
 # A spec states the current rule
 
-Do not write history or stories. Give a date only if the rule depends on it. Do not refer to
-tickets, pull requests, threads or decision codes. Write the rule itself.
+A spec must state the rule that is in force now, without history or stories. A date must show
+only if the rule depends on it. A spec must not refer to tickets, pull requests, threads or
+decision codes.
 
 Reason: A history explains the past. The reader needs the rule that is in force now.

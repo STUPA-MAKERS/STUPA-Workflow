@@ -4,7 +4,7 @@ title: A mail is sent once
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/notifications
   - backend/worker/mail.py
@@ -12,4 +12,4 @@ scope:
 
 # A mail is sent once
 
-Every mail has a stable idempotency key, so a retry does not send it twice.
+Every mail must have a stable idempotency key, so a retry does not send it twice.

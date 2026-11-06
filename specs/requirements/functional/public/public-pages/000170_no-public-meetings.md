@@ -4,7 +4,7 @@ title: Meetings are never public
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/protocol
   - frontend/src/app/features/public-protocols
@@ -12,5 +12,5 @@ scope:
 
 # Meetings are never public
 
-No public page lists or indexes meetings: not upcoming, not live, not past. Guest
-participation by QR creates no public list.
+No public page must list or index meetings: not upcoming, not live, not past. Guest
+participation by QR must create no public list.

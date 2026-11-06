@@ -4,7 +4,7 @@ title: A restore first saves the current state
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/backup
   - backend/worker/backup.py
@@ -12,5 +12,5 @@ scope:
 
 # A restore first saves the current state
 
-A restore first writes a `pre_restore` archive. If that fails, the restore stops. A
-`pre_restore` archive and a pinned archive never count for the retention.
+A restore must first write a `pre_restore` archive. If that fails, the restore must stop. A
+`pre_restore` archive and a pinned archive must never count for the retention.

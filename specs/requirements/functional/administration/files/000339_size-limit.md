@@ -4,7 +4,7 @@ title: An attachment is at most 10 MiB
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/files
   - backend/app/modules/media
@@ -12,5 +12,5 @@ scope:
 
 # An attachment is at most 10 MiB
 
-An attachment is at most 10 MiB. The server checks the size while it reads the stream and
-finds the real MIME type from the bytes.
+An attachment must be at most 10 MiB. The server must check the size while it reads the stream,
+and it must find the real MIME type from the bytes.

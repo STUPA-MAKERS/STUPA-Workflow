@@ -4,7 +4,7 @@ title: The CD variant selects the layout
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/protocol
   - typst/
@@ -12,5 +12,5 @@ scope:
 
 # The CD variant selects the layout
 
-The `cd_variant` of the Gremium (`stupa` or `asta`) selects the protocol layout and its default
-logos.
+The CD variant of the Gremium must select the protocol layout through its `base_variant`, and
+it must supply the logos.

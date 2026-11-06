@@ -4,7 +4,7 @@ title: Finalize needs a closed meeting and protocol.finalize
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/protocol
   - frontend/src/app/features/meetings
@@ -13,6 +13,6 @@ scope:
 
 # Finalize needs a closed meeting and protocol.finalize
 
-A protocol can be finalized only when the meeting is closed. The person needs write access to
-the protocol and the Gremium permission `protocol.finalize`. Every Gremium role with
-`session.manage` also has `protocol.finalize`. The header of the protocol lists all keepers.
+A protocol must be finalizable only when the meeting is closed. The person must have write
+access to the protocol and the Gremium permission `protocol.finalize`. The header of the
+protocol must list all keepers.

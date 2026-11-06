@@ -4,11 +4,11 @@ title: The MCP has no ballot tool
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - mcp/
 ---
 
 # The MCP has no ballot tool
 
-The MCP package has no tool that casts a ballot.
+The MCP package must not have a tool that casts a ballot.

@@ -4,7 +4,7 @@ title: A fiscal year in use is not deleted
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/budget
   - frontend/src/app/pages/budget
@@ -12,4 +12,4 @@ scope:
 
 # A fiscal year in use is not deleted
 
-A fiscal year with bookings or allocations answers 409 to a delete.
+A delete of a fiscal year with bookings or allocations must answer 409.

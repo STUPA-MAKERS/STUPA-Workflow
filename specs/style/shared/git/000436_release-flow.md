@@ -4,12 +4,14 @@ title: A release goes from development to main by pull request
 kind: style
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - .
 ---
 
 # A release goes from development to main by pull request
+
+A release must follow these steps:
 
 1. A feature release is a pull request from `development` into `main` with release notes, the
    migration list and the deploy steps. The owner merges it.

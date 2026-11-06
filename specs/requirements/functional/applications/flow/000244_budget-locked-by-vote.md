@@ -4,7 +4,7 @@ title: The cost centre is locked during a budget vote
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/flow
   - backend/app/shared/guards.py
@@ -14,5 +14,5 @@ scope:
 
 # The cost centre is locked during a budget vote
 
-While an Antrag is in a vote state with `gremiumSource: "budget"`, a cost centre change gives
-409 `budget_locked_by_vote`, and the `assignBudget*` actions do nothing.
+While an Antrag is in a vote state with `gremiumSource: "budget"`, a cost centre change must
+give 409 `budget_locked_by_vote`, and the `assignBudget*` actions must do nothing.

@@ -4,12 +4,12 @@ title: Bars and headers are vertically balanced
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - frontend/src/app/
-  - ui-kit
+  - frontend/vendor/ui-kit
 ---
 
 # Bars and headers are vertically balanced
 
-The content of a bar or a header has equal space above and below.
+The content of a bar or a header must have equal padding above and below.

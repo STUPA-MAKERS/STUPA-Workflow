@@ -4,12 +4,12 @@ title: An audit entry is written in the same transaction
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/audit
 ---
 
 # An audit entry is written in the same transaction
 
-Write an audit entry only through `record()`. It runs in the transaction of the change, so
-the entry and the change commit together.
+An audit entry must be written only through `record()`. `record()` runs in the transaction of
+the change, so the entry and the change commit together.

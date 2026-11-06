@@ -4,7 +4,7 @@ title: A card can go on the agenda
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/todos
   - frontend/src/app/features/todos
@@ -13,5 +13,5 @@ scope:
 
 # A card can go on the agenda
 
-A card of the board of the meeting Gremium can become a TOP. A card is on the agenda at most
-once.
+A card of the board of the meeting Gremium can become a TOP. A card must be on the agenda at
+most once.

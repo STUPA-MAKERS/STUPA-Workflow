@@ -4,15 +4,15 @@ title: A rule is written in one place
 kind: style
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - specs/
 ---
 
 # A rule is written in one place
 
-Put a rule in the topic folder that it controls. If a rule applies to two areas, put it in
-the area that owns the code. Do not write the same rule two times. Refer to the rule ID
-instead.
+A rule must be in the topic folder that it controls. A rule that applies to two areas must be
+in the area that owns the code. A rule must not be written two times. A reference must use the
+rule ID instead.
 
 Reason: Two copies of a rule drift apart.

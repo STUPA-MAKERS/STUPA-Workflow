@@ -4,7 +4,7 @@ title: The protocol and votes can be prepared before the open
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/livevote
   - frontend/src/app/features/meetings
@@ -13,5 +13,5 @@ scope:
 
 # The protocol and votes can be prepared before the open
 
-The protokollant can write the protocol text before the meeting opens. A vote question can be
-prepared without the open of the vote.
+The protokollant must be able to write the protocol text before the meeting opens. A vote
+question must be preparable without the open of the vote.

@@ -4,7 +4,7 @@ title: Each admin page has its own permission
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/admin
   - frontend/src/app/pages/admin
@@ -12,5 +12,5 @@ scope:
 
 # Each admin page has its own permission
 
-Each admin page needs its own `admin.*` permission. A read that several pages share accepts
-any of their permissions.
+Each admin page must need its own `admin.*` permission. A read that several pages share must
+accept any of their permissions.

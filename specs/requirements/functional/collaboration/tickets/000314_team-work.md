@@ -4,7 +4,7 @@ title: The team works on tickets
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/tickets
   - frontend/src/app/pages/tickets
@@ -12,5 +12,6 @@ scope:
 
 # The team works on tickets
 
-Holders of `ticket.manage` set status, assignee and kind and write internal or public notes.
-Only a holder of `ticket.manage` can be the assignee or be mentioned.
+Holders of `ticket.manage` must be able to set status, assignee and kind and to write internal
+or public notes. Only a holder of `ticket.manage` must be able to be the assignee or be
+mentioned.

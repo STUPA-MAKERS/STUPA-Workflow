@@ -4,7 +4,7 @@ title: A form version is never changed
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/forms
   - backend/app/shared/config_schemas.py
@@ -12,5 +12,6 @@ scope:
 
 # A form version is never changed
 
-A save creates a new form version. An Antrag keeps the form version that it started with and
-always renders with it. At most one version per Antrag type is active.
+A save must create a new form version and must never change an old one. An Antrag must keep the
+form version that it started with and must always render with it. At most one version per
+Antrag type must be active.

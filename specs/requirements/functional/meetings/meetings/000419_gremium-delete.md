@@ -4,7 +4,7 @@ title: A Gremium delete deletes its meetings
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/admin
   - backend/app/modules/livevote
@@ -12,5 +12,5 @@ scope:
 
 # A Gremium delete deletes its meetings
 
-The delete of a Gremium runs the meeting delete for each meeting. Votes without a meeting
-stay. An open vote refuses the delete with 409 `open_vote`.
+The delete of a Gremium must run the meeting delete for each meeting. Votes without a meeting
+must stay. An open vote must refuse the delete with 409 `open_vote`.

@@ -106,7 +106,7 @@ def secret_only(secret: bool | None, *, field: str) -> bool:
     """Return the secrecy of a new vote: always True.
 
     A decision, an election and a poll are always secret: the platform has no open vote
-    (§ F/meetings/voting/000024). ``None`` (the client sent no value) gives True. An
+    (§F/meetings/voting/000024). ``None`` (the client sent no value) gives True. An
     explicit ``false`` gives 422, so a client that asks for an open vote learns that it
     does not get one.
 
@@ -489,7 +489,7 @@ class VotingService:
     async def delete_standalone(self, vote_id: UUID, *, actor: str) -> None:
         """Delete a standalone application-bound vote that is a draft or cancelled.
 
-        The rule is the same as for a meeting vote (§ F/meetings/voting/000029): a
+        The rule is the same as for a meeting vote (§F/meetings/voting/000029): a
         ``draft`` or ``cancelled`` vote can be deleted, its ballots go with it (FK
         cascade). An ``open`` or ``closed`` vote is part of the record of the Gremium,
         and its result may already have fired a flow branch, so it gives 409
@@ -766,7 +766,7 @@ class VotingService:
         The server sets ``eligible_count`` from the roster of the gremium (members
         with ``vote.cast``). The client cannot send it. The vote is always secret
         (``secret_only``): ``config.secret`` false gives 422. A tie always rejects a
-        motion (§ F/meetings/voting/000026), so ``tieBreak`` other than ``rejected``
+        motion (§F/meetings/voting/000026), so ``tieBreak`` other than ``rejected``
         gives 422.
 
         Only a meeting vote of a public meeting has guests. An unconfirmed guest

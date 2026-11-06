@@ -4,7 +4,7 @@ title: Every attachment delete is confirmed
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/files
   - frontend/src/app/shared
@@ -12,4 +12,4 @@ scope:
 
 # Every attachment delete is confirmed
 
-Every delete of an attachment needs a confirmation.
+Every delete of an attachment must need a confirmation.

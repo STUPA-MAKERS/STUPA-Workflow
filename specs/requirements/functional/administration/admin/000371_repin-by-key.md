@@ -4,7 +4,7 @@ title: A flow save moves Anträge by state key
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/admin
   - frontend/src/app/pages/admin
@@ -13,5 +13,5 @@ scope:
 
 # A flow save moves Anträge by state key
 
-A save of the flow keeps every Antrag in the state with the same key. An Antrag in a removed
-state goes to the initial state.
+A save of the flow must keep every Antrag in the state with the same key. An Antrag in a
+removed state must go to the initial state.

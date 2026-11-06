@@ -4,18 +4,19 @@ title: A value is not mutated
 kind: style
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/
   - backend/worker/
   - frontend/src/app/
-  - ui-kit
+  - frontend/vendor/ui-kit
   - mcp/
   - typst/typst_service/
 ---
 
 # A value is not mutated
 
-Do not change a value in place: no `.append`, `.add`, `.update`, `x[k] = v` or `del` in
-Python, no `.push`, `.splice`, in-place `.sort()`, `delete` or `Object.assign` onto an existing
-object in TypeScript. Build the new value whole.
+Code must not change a value in place. In Python, it must not use `.append`, `.add`, `.update`,
+`x[k] = v` or `del`. In TypeScript, it must not use `.push`, `.splice`, an in-place `.sort()`
+or `delete`. It must not use `Object.assign` onto an existing object. Code must build the new
+value whole.

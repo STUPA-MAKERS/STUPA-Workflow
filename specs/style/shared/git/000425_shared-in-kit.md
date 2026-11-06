@@ -2,11 +2,12 @@
 id: "000425"
 title: Shared list parts live in the ui-kit
 kind: style
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
+replaced_by: S/frontend/angular/000079
 scope:
-  - ui-kit
+  - frontend/vendor/ui-kit
   - frontend/src/app/
 ---
 

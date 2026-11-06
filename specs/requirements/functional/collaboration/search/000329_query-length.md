@@ -4,7 +4,7 @@ title: Search needs two characters
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/search
   - frontend/src/app/layout
@@ -12,5 +12,5 @@ scope:
 
 # Search needs two characters
 
-A search with fewer than 2 characters gives an empty result, never an error. The query is at
-most 200 characters long.
+A search with fewer than 2 characters must give an empty result, never an error. The query must
+be at most 200 characters long.

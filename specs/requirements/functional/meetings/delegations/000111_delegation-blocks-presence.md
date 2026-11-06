@@ -4,15 +4,15 @@ title: A member with an active delegation is not present
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/delegations
   - frontend/src/app/features/meetings
   - backend/app/modules/livevote
-  - frontend/src/app/features/meetings
 ---
 
 # A member with an active delegation is not present
 
-A member with an active delegation cannot report "present", and the lead cannot set them
-present. Both answer 409 `delegation_active` until the delegation is revoked.
+A member with an active delegation must not be able to report "present", and the lead must not
+be able to set them present. Both must answer 409 `delegation_active` until the delegation is
+revoked.

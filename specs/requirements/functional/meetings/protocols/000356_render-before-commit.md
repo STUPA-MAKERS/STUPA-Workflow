@@ -4,12 +4,13 @@ title: A failed render keeps the draft
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/protocol
 ---
 
 # A failed render keeps the draft
 
-The render runs before the commit. A render error rolls back, and the protocol stays a draft.
-The upload and the mail run only after the commit.
+The finalize must set the protocol to `rendering`, and the worker must render it. A transient
+render error must retry, up to `pdf_max_tries`. A permanent error must set the protocol to
+`draft` again. The upload and the mail must run only after a successful render.

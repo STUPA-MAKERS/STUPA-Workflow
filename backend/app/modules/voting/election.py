@@ -142,7 +142,7 @@ async def release_runoff_link(session: AsyncSession, vote: Vote) -> None:
     """Clear the link of the parent election to a runoff that goes away (no commit).
 
     A cancel or a delete of a runoff calls this. Only results stored before the lot
-    decided every election tie hold a runoff (§ F/meetings/voting/000027). The parent
+    decided every election tie hold a runoff (§F/meetings/voting/000027). The parent
     then shows the runoff as pending again. The method locks the parent row and clears
     the link only while it still names this runoff.
     """

@@ -4,12 +4,13 @@ title: eslint-plugin-functional warns on mutation
 kind: style
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - frontend/
-  - ui-kit
+  - frontend/vendor/ui-kit
 ---
 
 # eslint-plugin-functional warns on mutation
 
-The frontend and the ui-kit run `eslint-plugin-functional`. Its rules are warnings, not errors.
+The frontend and the ui-kit must run `eslint-plugin-functional`. Its rules must be warnings,
+not errors.

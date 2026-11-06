@@ -1418,7 +1418,7 @@ async def test_delete_standalone_meeting_bound_409() -> None:
 
 @pytest.mark.parametrize("status", ["open", "closed"])
 async def test_delete_standalone_open_or_closed_vote_409(status: str) -> None:
-    """An open or closed vote stays in the record (§ F/meetings/voting/000029)."""
+    """An open or closed vote stays in the record (§F/meetings/voting/000029)."""
     vote = _vote(meeting_id=None, status=status)
     db = fake_session(result(vote))
     with pytest.raises(ConflictError) as ei:
@@ -1428,7 +1428,7 @@ async def test_delete_standalone_open_or_closed_vote_409(status: str) -> None:
 
 
 async def test_delete_standalone_cancelled_vote_ok() -> None:
-    """A cancelled vote can be deleted like a draft (§ F/meetings/voting/000029)."""
+    """A cancelled vote can be deleted like a draft (§F/meetings/voting/000029)."""
     vote = _vote(meeting_id=None, status="cancelled")
     db = fake_session(result(vote))
     await VotingService(db).delete_standalone(vote.id, actor="mgr")

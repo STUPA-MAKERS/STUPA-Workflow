@@ -4,7 +4,7 @@ title: The logout ends the SSO session
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/auth
   - backend/app/deps.py
@@ -12,4 +12,5 @@ scope:
 
 # The logout ends the SSO session
 
-The logout ends the local session and returns the logout URL of the IdP, if the IdP has one.
+The logout must end the local session and must return the logout URL of the IdP, if the IdP has
+one.

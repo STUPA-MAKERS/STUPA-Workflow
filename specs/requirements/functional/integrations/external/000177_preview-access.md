@@ -4,7 +4,7 @@ title: A link preview uses the access of the viewer
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/
   - frontend/src/app/
@@ -12,5 +12,5 @@ scope:
 
 # A link preview uses the access of the viewer
 
-A link preview resolves with the access of the person who views it. The platform stores only
-the URL. A preview never goes into a PDF or a public page.
+A link preview must resolve with the access of the person who views it. The platform must store
+only the URL. A preview must never go into a PDF or a public page.

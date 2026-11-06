@@ -4,12 +4,13 @@ title: Surfaces step up
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - frontend/src/app/
-  - ui-kit
+  - frontend/vendor/ui-kit
 ---
 
 # Surfaces step up
 
-Fixed chrome has its own raised surface. A nested surface is one step higher than its parent.
+Fixed chrome must have its own raised surface. A nested surface must use the surface token one
+step above the token of its parent, for example `--color-surface-2` in `--color-surface-1`.

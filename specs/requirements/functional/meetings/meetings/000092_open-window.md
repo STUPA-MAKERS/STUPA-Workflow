@@ -4,7 +4,7 @@ title: A meeting opens in a configured window
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/livevote
   - frontend/src/app/features/meetings
@@ -13,6 +13,6 @@ scope:
 
 # A meeting opens in a configured window
 
-A meeting can be opened at the earliest `open_lead_minutes` before its planned start. Up to
-`confirm_lead_minutes` before the start, the open needs an extra confirmation dialog. Both
-values are admin settings.
+A meeting must open at the earliest `open_lead_minutes` before its planned start. Up to
+`confirm_lead_minutes` before the start, the open must need an extra confirmation dialog. Both
+values must be admin settings.

@@ -8,7 +8,7 @@ again.
 ## What this is
 
 **STUPA-Workflow** (also called *antragsplattform*) — a web platform for the application, meeting,
-and budget work of a student government (StuPa/AStA). Applicants submit through a public form.
+and budget work of a student government (STUPA/AStA). Applicants submit through a public form.
 Gremium members process applications, run meetings with live votes and a protocol, and manage
 cost-center budgets and invoices. The platform versions and audits all of this work. Monorepo, one
 VM, `docker compose`.
@@ -42,7 +42,7 @@ Backend domain modules (`backend/app/modules/<module>`):
 - **be-auth** — OIDC+PKCE / magic-link, sessions, RBAC, OAuth2 tokens for MCP *(critical)*
 - **be-admin** — branding, gremium roles, site-config draft/activate, per-page admin RBAC
 - **be-applications** — application lifecycle, version diff, timeline, comments, anonymization
-- **be-application-types** — bind a form version + flow to an application type
+- **be-application-types** — bind a form version to an application type (one global flow)
 - **be-forms** — versioned form JSON, definition/answer validation, JsonLogic visibleIf/compute
 - **be-flow** — declarative state machine, guard evaluator (no eval), transition actions
   *(critical)*
@@ -60,7 +60,7 @@ Backend domain modules (`backend/app/modules/<module>`):
 - **be-translations** — admin overrides of the UI texts, extra UI languages, public `/i18n` bundle,
   the built-in texts from the frontend catalog JSON
 - **be-config-revision** — versioned config + audit + revert
-- **be-files** — MinIO attachments, ClamAV scan, signed URLs
+- **be-files** — MinIO attachments, ClamAV scan, downloads streamed through the API
 - **be-media** — Markdown images: upload, Pillow re-encode, canonical `/api/media/images/<id>`,
   public protocol images, images in the protocol PDF
 - **be-pdf** — client to the typst render service (protocols only; applications no

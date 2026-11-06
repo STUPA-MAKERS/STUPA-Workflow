@@ -4,7 +4,7 @@ title: Shared UI parts live in the ui-kit
 kind: style
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - frontend/
   - frontend/vendor/ui-kit
@@ -12,5 +12,4 @@ scope:
 
 # Shared UI parts live in the ui-kit
 
-A UI part that two pages or two apps use must be a ui-kit component. Do not change a ui-kit
-component for one mockup remark without asking the owner.
+A UI part that two pages or two apps use must be a ui-kit component.

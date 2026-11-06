@@ -5,7 +5,7 @@ kind: functional
 status: replaced
 owner: frederikbeimgraben
 updated: 2026-11-06
-replaced_by: F/collaboration/todos/000448
+replaced_by: F/collaboration/todos/000487
 scope:
   - backend/app/modules/todos
   - frontend/src/app/features/todos
@@ -13,5 +13,5 @@ scope:
 
 # A link shows nothing without access
 
-A link to an element that the viewer cannot read shows "kein Zugriff" without title, URL or
+A link to an element that the viewer cannot read must show "kein Zugriff" without title, URL or
 detail.
