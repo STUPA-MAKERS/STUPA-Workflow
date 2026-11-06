@@ -172,9 +172,9 @@ class WebhookOps(ConfigServiceBase):
         """Delete a webhook and its delivery history.
 
         The ``webhook_delivery`` rows hang on the webhook with ``ON DELETE
-        CASCADE``, so the delete needs no guard and answers no 409. Until this
-        route existed, the only way to stop a webhook was ``active: false``,
-        which kept the target URL and the secret in the database.
+        CASCADE``, so the delete needs no guard and answers no 409
+        (§F/integrations/webhooks/000403). ``active: false`` only pauses a webhook
+        and keeps the target URL and the secret in the database.
 
         Raises:
             NotFoundError: No webhook has this id (404).
