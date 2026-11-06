@@ -6,8 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - frontend/src/app/
-  - frontend/vendor/ui-kit
+  - frontend/vendor/ui-kit/shell/src/bottom-bar/more-sheet.ts
+  - frontend/vendor/ui-kit/shell/src/nav-rail/nav-rail.component.ts
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

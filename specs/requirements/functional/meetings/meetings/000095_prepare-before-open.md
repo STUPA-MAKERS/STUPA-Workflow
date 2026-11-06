@@ -6,9 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/livevote
-  - frontend/src/app/features/meetings
-  - backend/app/modules/protocol
+  - backend/app/modules/protocol/service.py
+  - backend/app/modules/livevote/vote_build.py
 scope:
   - backend/app/modules/livevote
   - frontend/src/app/features/meetings

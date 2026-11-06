@@ -6,8 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - frontend/src/app/
-  - frontend/vendor/ui-kit
+  - frontend/src/app/features/todos/card-detail/todo-card-detail.component.html
+  - frontend/src/app/pages/applications/applications-detail.component.html
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

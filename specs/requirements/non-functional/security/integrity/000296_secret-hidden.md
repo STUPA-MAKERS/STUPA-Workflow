@@ -6,8 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/webhooks
-  - backend/app/modules/admin
+  - backend/app/modules/admin/service/webhooks.py
 scope:
   - backend/app/modules/webhooks
   - backend/app/modules/admin

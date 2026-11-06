@@ -6,8 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/protocol
-  - frontend/src/app/features/public-protocols
+  - backend/app/modules/protocol/public.py
+  - backend/app/modules/protocol/public_router.py
 scope:
   - backend/app/modules/protocol
   - frontend/src/app/features/public-protocols

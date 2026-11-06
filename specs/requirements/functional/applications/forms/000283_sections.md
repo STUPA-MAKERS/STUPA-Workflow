@@ -6,9 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/forms
-  - backend/app/shared/config_schemas.py
-  - frontend/src/app/pages/applications
+  - frontend/src/app/shared/forms/formly-mapper.ts
+  - frontend/src/app/features/apply/apply-wizard.component.ts
 scope:
   - backend/app/modules/forms
   - backend/app/shared/config_schemas.py

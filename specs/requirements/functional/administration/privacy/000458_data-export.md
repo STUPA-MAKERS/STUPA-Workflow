@@ -6,7 +6,9 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/privacy
+  - backend/app/modules/privacy/router.py
+  - backend/app/modules/privacy/service.py
+  - backend/app/shared/xlsx.py
 scope:
   - backend/app/modules/privacy
 ---

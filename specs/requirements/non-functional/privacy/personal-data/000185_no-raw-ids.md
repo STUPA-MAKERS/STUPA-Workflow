@@ -6,8 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/
-  - frontend/src/app/
+  - backend/app/modules/auth/identity.py
 scope:
   - backend/app/
   - frontend/src/app/

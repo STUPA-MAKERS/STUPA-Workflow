@@ -6,7 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - frontend/src/app/pages/tasks
+  - frontend/src/app/pages/tasks/tasks.component.ts
 scope:
   - frontend/src/app/pages/tasks
 ---

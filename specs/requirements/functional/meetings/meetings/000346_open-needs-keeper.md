@@ -6,7 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/livevote
+  - backend/app/modules/livevote/service/lifecycle.py
 scope:
   - backend/app/modules/livevote
 ---

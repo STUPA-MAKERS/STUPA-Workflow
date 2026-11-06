@@ -6,8 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/files
-  - frontend/src/app/shared
+  - backend/app/shared/filenames.py
 scope:
   - backend/app/modules/files
   - frontend/src/app/shared

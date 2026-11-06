@@ -6,8 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/budget
-  - frontend/src/app/pages/budget
+  - frontend/src/app/pages/expenses/booking-detail/booking-detail.component.ts
+  - frontend/src/app/pages/expenses/expenses.component.ts
 scope:
   - backend/app/modules/budget
   - frontend/src/app/pages/budget

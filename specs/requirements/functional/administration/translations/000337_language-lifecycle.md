@@ -6,8 +6,9 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/translations
-  - frontend/src/app/core/i18n
+  - backend/app/modules/translations/service.py
+  - backend/app/modules/translations/router.py
+  - frontend/src/app/layout/account-menu/account-menu.component.ts
 scope:
   - backend/app/modules/translations
   - frontend/src/app/core/i18n

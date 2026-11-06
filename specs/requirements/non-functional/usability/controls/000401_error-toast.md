@@ -6,7 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - frontend/src/app/
+  - frontend/src/app/core/api/api-client.service.ts
+  - frontend/vendor/ui-kit/src/lib/toast/toast.service.ts
 scope:
   - frontend/src/app/
 ---

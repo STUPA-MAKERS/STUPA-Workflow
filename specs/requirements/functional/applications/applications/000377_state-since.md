@@ -6,7 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/applications
+  - backend/app/modules/applications/service/service_base.py
+  - frontend/src/app/pages/applications/applications-detail.component.ts
 scope:
   - backend/app/modules/applications
 ---

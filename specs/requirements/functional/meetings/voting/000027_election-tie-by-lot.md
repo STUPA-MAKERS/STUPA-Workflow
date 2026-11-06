@@ -6,8 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/voting
-  - frontend/src/app/features/voting
+  - backend/app/modules/voting/election.py
 scope:
   - backend/app/modules/voting
   - frontend/src/app/features/voting

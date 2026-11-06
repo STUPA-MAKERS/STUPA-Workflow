@@ -6,9 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/forms
-  - backend/app/shared/config_schemas.py
-  - backend/app/modules/config_revision
+  - backend/app/modules/forms/service.py
 scope:
   - backend/app/modules/forms
   - backend/app/shared/config_schemas.py

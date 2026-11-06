@@ -6,7 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/
+  - backend/app/shared/permissions.py
+  - backend/app/modules/auth/bootstrap.py
 scope:
   - backend/app/
 ---

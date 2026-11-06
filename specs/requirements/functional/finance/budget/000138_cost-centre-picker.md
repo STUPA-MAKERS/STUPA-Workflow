@@ -6,8 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/budget
-  - frontend/src/app/pages/budget
+  - frontend/src/app/pages/budget/cost-centre-select/cost-centre-select.component.ts
 scope:
   - backend/app/modules/budget
   - frontend/src/app/pages/budget

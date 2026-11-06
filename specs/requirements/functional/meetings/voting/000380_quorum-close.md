@@ -6,8 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/voting
-  - backend/worker
+  - backend/app/modules/voting/service.py
+  - backend/worker/deadlines.py
 scope:
   - backend/app/modules/voting
   - backend/worker

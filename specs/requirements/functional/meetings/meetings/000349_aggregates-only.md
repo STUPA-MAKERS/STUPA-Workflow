@@ -6,8 +6,9 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/livevote
-  - backend/app/modules/voting
+  - backend/app/modules/livevote/events.py
+  - backend/app/modules/livevote/publisher.py
+  - frontend/src/app/features/voting/beamer.component.ts
 scope:
   - backend/app/modules/livevote
   - backend/app/modules/voting

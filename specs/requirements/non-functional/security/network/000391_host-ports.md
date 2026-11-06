@@ -6,7 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - deploy/
+  - deploy/docker-compose.yml
 scope:
   - deploy/
 ---

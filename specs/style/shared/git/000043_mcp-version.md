@@ -6,7 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - mcp/
+  - mcp/pyproject.toml
+  - mcp/antragsplattform_mcp/__init__.py
 scope:
   - mcp/
 ---

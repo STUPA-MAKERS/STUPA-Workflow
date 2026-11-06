@@ -6,8 +6,9 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/
-  - frontend/
+  - backend/pyproject.toml
+  - frontend/jest.config.js
+  - .github/workflows/ci.yml
 scope:
   - backend/
   - frontend/

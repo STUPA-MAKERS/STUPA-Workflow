@@ -6,8 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - typst/
-  - .github/workflows
+  - typst/Dockerfile
+  - .github/workflows/ci.yml
 scope:
   - typst/
   - .github/workflows

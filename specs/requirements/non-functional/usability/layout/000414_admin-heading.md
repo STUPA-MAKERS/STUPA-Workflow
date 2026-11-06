@@ -6,9 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - frontend/src/app/
-  - frontend/vendor/ui-kit
-  - frontend/src/app/pages/admin
+  - frontend/src/app/pages/admin/admin-frame/admin-frame.component.html
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

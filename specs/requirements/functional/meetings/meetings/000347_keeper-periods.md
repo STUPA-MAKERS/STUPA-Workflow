@@ -6,8 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/livevote
-  - backend/app/modules/protocol
+  - backend/app/modules/livevote/keepers.py
+  - backend/app/modules/livevote/service/handover.py
 scope:
   - backend/app/modules/livevote
   - backend/app/modules/protocol

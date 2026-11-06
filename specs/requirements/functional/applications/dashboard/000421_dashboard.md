@@ -6,7 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - frontend/src/app/pages/dashboard
+  - frontend/src/app/pages/dashboard/dashboard.component.ts
 scope:
   - frontend/src/app/pages/dashboard
 ---

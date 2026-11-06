@@ -6,7 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - frontend/src/app/
+  - frontend/src/app/app.routes.ts
+  - frontend/src/app/core/auth/auth.guard.ts
 scope:
   - frontend/src/app/
 ---

@@ -6,8 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - frontend/src/app/
-  - frontend/vendor/ui-kit
+  - frontend/vendor/ui-kit/src/lib/focus
+  - frontend/vendor/ui-kit/src/styles/base.scss
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

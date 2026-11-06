@@ -6,8 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - frontend/src/app/
-  - frontend/vendor/ui-kit
+  - frontend/vendor/ui-kit/src/styles/tokens.scss
+  - frontend/vendor/ui-kit/src/lib/status-text/status-text.component.ts
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

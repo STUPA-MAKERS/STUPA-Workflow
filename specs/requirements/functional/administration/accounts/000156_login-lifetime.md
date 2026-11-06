@@ -6,8 +6,9 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/auth
-  - backend/app/modules/admin
+  - backend/app/modules/auth/login_settings.py
+  - backend/app/modules/auth/sessions.py
+  - frontend/src/app/pages/admin/login-settings/login-settings.component.ts
 scope:
   - backend/app/modules/auth
   - backend/app/modules/admin

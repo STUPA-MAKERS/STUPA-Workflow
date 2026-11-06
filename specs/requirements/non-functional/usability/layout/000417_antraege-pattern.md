@@ -6,8 +6,10 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - frontend/src/app/
-  - frontend/vendor/ui-kit
+  - frontend/vendor/ui-kit/shell/src/list-detail-page.ts
+  - frontend/src/app/pages/expenses/expenses.component.ts
+  - frontend/src/app/pages/invoices/invoices.component.ts
+  - frontend/src/app/pages/tasks/tasks.component.ts
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

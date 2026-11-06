@@ -6,7 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - frontend/src/app/features/meetings
+  - frontend/src/app/features/meetings/meetings-view-switch
+  - frontend/src/app/features/meetings/meetings-calendar
 scope:
   - frontend/src/app/features/meetings
 ---

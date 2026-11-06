@@ -6,9 +6,9 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/protocol
-  - frontend/src/app/features/meetings
-  - typst/
+  - backend/app/modules/protocol/markdown.py
+  - typst/template/protocol.typ
+  - frontend/src/app/features/voting/election-result/election-result.component.ts
 scope:
   - backend/app/modules/protocol
   - frontend/src/app/features/meetings

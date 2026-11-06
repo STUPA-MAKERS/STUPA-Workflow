@@ -6,7 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/webhooks
+  - backend/app/modules/webhooks/signing.py
 scope:
   - backend/app/modules/webhooks
 ---

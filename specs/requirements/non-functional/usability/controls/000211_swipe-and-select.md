@@ -6,8 +6,9 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - frontend/src/app/
-  - frontend/vendor/ui-kit
+  - frontend/vendor/ui-kit/src/lib/row-swipe
+  - frontend/vendor/ui-kit/src/lib/long-press
+  - frontend/vendor/ui-kit/src/lib/selection-bar
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

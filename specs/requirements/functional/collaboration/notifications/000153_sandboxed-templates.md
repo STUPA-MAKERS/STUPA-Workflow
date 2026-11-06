@@ -6,7 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/notifications
+  - backend/app/modules/notifications/templating.py
+  - backend/app/modules/notifications/templates_catalogue.py
 scope:
   - backend/app/modules/notifications
 ---

@@ -6,8 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/auth
-  - backend/app/modules/admin
+  - backend/app/modules/admin/principal_merge.py
 scope:
   - backend/app/modules/auth
   - backend/app/modules/admin

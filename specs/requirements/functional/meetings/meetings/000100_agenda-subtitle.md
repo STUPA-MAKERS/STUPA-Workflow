@@ -6,7 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - frontend/src/app/features/meetings
+  - frontend/src/app/features/meetings/agenda-pane/agenda-pane.component.html
 scope:
   - frontend/src/app/features/meetings
 ---

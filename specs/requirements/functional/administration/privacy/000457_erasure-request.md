@@ -6,8 +6,9 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
+  - backend/app/modules/privacy/router.py
+  - backend/app/modules/privacy/service.py
   - backend/app/modules/applications/router.py
-  - backend/app/modules/privacy
 scope:
   - backend/app/modules/applications/router.py
   - backend/app/modules/privacy
