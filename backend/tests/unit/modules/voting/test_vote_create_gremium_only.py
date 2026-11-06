@@ -359,6 +359,20 @@ async def test_create_open_vote_422() -> None:
     assert err.value.code == "open_vote_unavailable"
 
 
+@pytest.mark.parametrize("tie_break", ["passed", "tie"])
+async def test_create_tie_break_other_than_rejected_422(tie_break: str) -> None:
+    """A tie always rejects a motion (§F/meetings/voting/000026).
+
+    A ``tieBreak`` other than ``rejected`` gives 422 ``tie_break_unavailable``
+    before any read.
+    """
+    db = fake_session()
+    body = _body(config=_config(tieBreak=tie_break))
+    with pytest.raises(ValidationProblem) as err:
+        await VotingService(db).create(uuid4(), body, MANAGER)
+    assert err.value.code == "tie_break_unavailable"
+
+
 def test_secret_only() -> None:
     """``None`` and true give true; false gives 422."""
     assert secret_only(None, field="secret") is True

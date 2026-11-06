@@ -2,9 +2,9 @@
 
 The tests drive the lead routes, the public guest routes and both WebSockets through
 the real app wiring: the join with its cookie, the decisions of the lead, the guest
-view without non-public content, the guest ballot (open and secret), the rules for the
-quorum and the late admission, the switch-off, the close and the protocol finalize
-(privacy), the audit entries without names, ALTCHA, CSRF and the rate limits.
+view without non-public content, the guest ballot with its identity kept apart, the
+rules for the quorum and the late admission, the switch-off, the close and the protocol
+finalize (privacy), the audit entries without names, ALTCHA, CSRF and the rate limits.
 """
 
 from __future__ import annotations
@@ -45,7 +45,7 @@ from app.modules.livevote.router import get_broker_rest, get_broker_ws, get_ws_p
 from app.modules.livevote.service import BrokerPublisher
 from app.modules.protocol.models import Protocol
 from app.modules.protocol.service import ProtocolService
-from app.modules.voting.models import Ballot, SecretBallot, Vote, VotedMarker
+from app.modules.voting.models import SecretBallot, Vote, VotedMarker
 from app.settings import Settings, get_settings, load_settings
 from app.shared.altcha import AltchaVerifier, InMemoryReplayGuard, create_challenge, solve_challenge
 from app.shared.antiabuse import get_altcha_verifier, get_rate_limiter
@@ -580,11 +580,7 @@ async def test_guest_votes_without_quorum_and_late_admission(
                 )
             ).all()
         )
-        open_rows = (
-            await session.scalars(select(Ballot.voter_sub).where(Ballot.vote_id == row.id))
-        ).all()
     assert voters == {f"guest:{ga['id']}", f"guest:{gb['id']}"}
-    assert open_rows == []
     casts = [e for e in await audits(maker) if e.action == "vote_cast"]
     assert {e.actor for e in casts} == voters
     assert all("choice" not in e.data for e in casts)
@@ -621,10 +617,8 @@ async def test_secret_guest_ballot_keeps_identity_apart(
         choices = (
             await session.scalars(select(SecretBallot.choice).where(SecretBallot.vote_id == vid))
         ).all()
-        ballots = (await session.scalars(select(Ballot.id).where(Ballot.vote_id == vid))).all()
     assert list(markers) == [f"guest:{g['id']}"]
     assert list(choices) == ["no"]
-    assert list(ballots) == []
 
 
 async def test_non_public_item_and_watch_mode(

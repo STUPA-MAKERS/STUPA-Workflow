@@ -9,7 +9,7 @@ removes the objects only after its commit.
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -23,6 +23,7 @@ from app.modules.files.service import FilesService
 from app.modules.todos.models import TodoComment
 from app.modules.todos.privacy import erase_todos
 from app.settings import Settings
+from tests._support.draft_tokens import add_draft_token
 from tests._support.memory_storage import MemoryStorage, wire_storage
 from tests.integration.modules.todos.conftest import Api, add_gremium, add_member, add_person
 
@@ -45,6 +46,7 @@ async def _draft(
     key = f"drafts/{draft_id}/{name}"
     await storage.put(key, b"bytes", "application/pdf")
     async with maker() as session:
+        await add_draft_token(session, hash_draft_token(token, settings.magic_link_secret))
         session.add(
             Attachment(
                 id=draft_id,
@@ -55,7 +57,6 @@ async def _draft(
                 scanned=True,
                 scan_result="clean",
                 draft_token_hash=hash_draft_token(token, settings.magic_link_secret),
-                draft_expires_at=datetime.now(UTC) + timedelta(days=7),
             )
         )
         await session.commit()

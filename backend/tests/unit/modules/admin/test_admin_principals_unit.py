@@ -30,11 +30,7 @@ def _assignment(pid: UUID) -> RoleAssignment:
     a = RoleAssignment(
         principal_id=pid,
         role_id=uuid4(),
-        gremium_id=None,
         granted_by="admin",
-        valid_from=None,
-        valid_until=None,
-        delegate_voting=False,
     )
     a.id = uuid4()
     return a

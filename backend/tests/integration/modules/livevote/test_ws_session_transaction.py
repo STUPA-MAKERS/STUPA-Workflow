@@ -24,7 +24,7 @@ from app.modules.livevote.connection import LiveVoteConnection
 from app.modules.livevote.locks import InMemoryLocker
 from app.modules.livevote.models import Meeting
 from app.modules.livevote.service import MeetingService
-from app.modules.voting.models import Ballot
+from app.modules.voting.models import VotedMarker
 from app.modules.voting.service import VotingService
 from tests.integration.modules.livevote.conftest import seed
 
@@ -113,6 +113,6 @@ async def test_cast_ends_the_transaction(maker: async_sessionmaker[AsyncSession]
 
     async with maker() as session:
         count = await session.scalar(
-            select(func.count()).select_from(Ballot).where(Ballot.vote_id == vote_id)
+            select(func.count()).select_from(VotedMarker).where(VotedMarker.vote_id == vote_id)
         )
         assert count == 1

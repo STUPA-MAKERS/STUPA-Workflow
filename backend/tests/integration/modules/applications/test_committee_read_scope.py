@@ -133,8 +133,6 @@ async def _seed(session: AsyncSession) -> _Scenario:
             principal_id=principal.id,
             gremium_id=g_member.id,
             gremium_role_id=role.id,
-            valid_from=None,
-            valid_until=None,
         )
     )
 

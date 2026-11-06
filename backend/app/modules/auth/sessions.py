@@ -71,7 +71,6 @@ async def create_applicant_session(
     *,
     secret: str,
     application_id: UUID,
-    scope: str,
     expires_at: datetime,
 ) -> str:
     """Create an `applicant_session` row and return the signed `sid` cookie.
@@ -84,7 +83,6 @@ async def create_applicant_session(
         ApplicantSession(
             sid=sid,
             application_id=application_id,
-            scope=scope,
             expires_at=expires_at,
         )
     )

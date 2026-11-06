@@ -40,14 +40,16 @@ from app.modules.livevote.locks import RedisLocker
 from app.modules.livevote.models import Meeting, MeetingAgendaItem
 from app.modules.livevote.schemas import MeetingCreate, MeetingPatch
 from app.modules.livevote.service import BrokerPublisher, MeetingService, meeting_channel
-from app.modules.voting.models import Ballot, Vote
+from app.modules.voting.models import SecretBallot, Vote, VotedMarker
 from app.modules.voting.service import VotingService
 from app.shared.config_schemas import VoteConfig
 from app.shared.errors import BadRequestError, ConflictError
 
 pytestmark = pytest.mark.integration
 
-_CONFIG = VoteConfig.model_validate({"options": ["yes", "no"], "majorityRule": "simple"})
+_CONFIG = VoteConfig.model_validate(
+    {"options": ["yes", "no"], "majorityRule": "simple", "secret": True}
+)
 
 
 @pytest.fixture
@@ -103,8 +105,6 @@ async def _member(session: AsyncSession, gremium: Gremium) -> PrincipalRow:
             principal_id=p.id,
             gremium_id=gremium.id,
             gremium_role_id=role.id,
-            valid_from=None,
-            valid_until=None,
         )
     )
     await session.flush()
@@ -235,8 +235,6 @@ async def test_list_filter_gremien_visibility(session: AsyncSession) -> None:
             principal_id=member.id,
             gremium_id=g_empty.id,
             gremium_role_id=role2.id,
-            valid_from=None,
-            valid_until=None,
         )
     )
     session.add(Meeting(gremium_id=g_with.id, title="A", date=_date(2026, 7, 1), status="planned"))
@@ -321,12 +319,13 @@ async def test_parallel_casts_yield_single_ballot(
     assert results.count("ok") == 1
     assert results.count("conflict") == 7
 
-    count = (
-        await session.execute(
-            select(func.count()).select_from(Ballot).where(Ballot.vote_id == vote.id)
-        )
-    ).scalar_one()
-    assert count == 1
+    for model in (VotedMarker, SecretBallot):
+        count = (
+            await session.execute(
+                select(func.count()).select_from(model).where(model.vote_id == vote.id)
+            )
+        ).scalar_one()
+        assert count == 1
 
 
 async def test_redis_pubsub_fanout_two_instances(redis_url: str) -> None:
@@ -400,7 +399,7 @@ async def test_broker_publisher_roundtrip_over_redis(redis_url: str) -> None:
         eligibleGroup="stupa",
         config=_CONFIG,
         status="open",
-        secret=False,
+        secret=True,
         tally=TallyOut(counts={"yes": 2, "no": 0}, eligible=5, quorumMet=False),
     )
     try:

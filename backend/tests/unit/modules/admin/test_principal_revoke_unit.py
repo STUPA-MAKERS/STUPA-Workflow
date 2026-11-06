@@ -76,16 +76,9 @@ def _snap(**kw: Any) -> Snapshot:
         "groups": ["fs-informatik", "fs-informatik-vorsitz", "haushalt", "stray"],
         "memberships": [MembershipFact(G_FS, GR_VORSITZ)],
         "assignments": [
-            AssignmentFact(uuid.UUID(int=40), GR_MEMBER, G_SP, "boss", None, None),
-            AssignmentFact(uuid.UUID(int=41), R_MEMBER, None, "bootstrap", None, None),
-            AssignmentFact(
-                uuid.UUID(int=42),
-                R_ADMIN,
-                None,
-                "bootstrap",
-                datetime(2025, 11, 4, tzinfo=UTC),
-                None,
-            ),
+            AssignmentFact(uuid.UUID(int=40), R_HHB, "boss"),
+            AssignmentFact(uuid.UUID(int=41), R_MEMBER, "bootstrap"),
+            AssignmentFact(uuid.UUID(int=42), R_ADMIN, "bootstrap"),
         ],
         "pool": [
             PoolFact(uuid.UUID(int=50), G_FS, OTHER, PID),
@@ -131,7 +124,7 @@ def _row(**kw: Any) -> PrincipalRow:
     return row
 
 
-def test_held_roles_skip_member_and_gremium_rows() -> None:
+def test_held_roles_skip_member() -> None:
     assert set(held_roles(_snap())) == {R_HHB.id, R_ADMIN.id}
 
 
@@ -160,23 +153,23 @@ def test_group_targets_ignore_untied_role_maps_member_and_foreign_groups() -> No
 
 
 def test_preview_marks_a_bootstrap_admin_that_comes_back() -> None:
-    """Mark a bootstrap admin that comes back; a gremium assignment is no bootstrap."""
+    """Mark a bootstrap admin that comes back; an assignment of a person is no bootstrap."""
     out = build_preview(_snap(bootstrap_admin=True), _row(), is_self=False)
     admin = next(r for r in out.global_roles if r.role_key == "admin")
     assert admin.assignments[0].returns_automatically is True
     assert admin.model_dump(by_alias=True)["assignments"][0]["returnsAutomatically"] is True
-    sp = next(g for g in out.gremien if g.gremium_id == G_SP)
-    assert sp.assignments[0].returns_automatically is False
+    hhb = next(r for r in out.global_roles if r.role_key == "hhb")
+    assert hhb.assignments[0].returns_automatically is False
 
 
 def test_preview_never_shows_the_sub_of_a_grantor() -> None:
     snap = _snap(grantor_names={"boss": None})
     out = build_preview(snap, _row(), is_self=False)
-    sp = next(g for g in out.gremien if g.gremium_id == G_SP)
-    assert sp.assignments[0].granted_by is None
+    hhb = next(r for r in out.global_roles if r.role_key == "hhb")
+    assert hhb.assignments[0].granted_by is None
     out = build_preview(_snap(grantor_names={}), _row(), is_self=False)
-    sp = next(g for g in out.gremien if g.gremium_id == G_SP)
-    assert sp.assignments[0].granted_by is None
+    hhb = next(r for r in out.global_roles if r.role_key == "hhb")
+    assert hhb.assignments[0].granted_by is None
 
 
 @pytest.mark.parametrize(
@@ -225,14 +218,13 @@ def test_build_preview_groups_everything_by_gremium() -> None:
         (True, "Rana Becker", None)
     ]
     assert sp.membership is None and sp.open_tasks == 0
-    assert [a.granted_by for a in sp.assignments] == ["Mara Keller"]
     assert sp.pool_entries[0].gremium_wide is True
     assert [r.role_key for r in out.global_roles] == ["admin", "hhb"]
     admin, hhb = out.global_roles
     assert admin.groups == [] and [a.granted_by for a in admin.assignments] == ["bootstrap"]
-    assert admin.assignments[0].valid_from == "2025-11-04T00:00:00+00:00"
     assert admin.assignments[0].returns_automatically is False
-    assert hhb.groups == ["haushalt"] and hhb.assignments == []
+    assert hhb.groups == ["haushalt"]
+    assert [a.granted_by for a in hhb.assignments] == ["Mara Keller"]
     assert [(g.group, g.gremium_ids, g.global_role_ids) for g in out.groups] == [
         ("fs-informatik", [G_FS], []),
         ("fs-informatik-vorsitz", [G_FS], []),
@@ -415,11 +407,8 @@ def _full_queue(
         id=GR_VORSITZ.id, key="vorsitz", name_i18n={"de": "Vorsitz"},
         permissions=["vote.cast"] if votes else [],
     )
-    assignment = _Obj(
-        id=uuid.UUID(int=40), gremium_id=G_SP, granted_by="boss", valid_from=None,
-        valid_until=None,
-    )
-    role = _Obj(id=GR_MEMBER.id, key="member", name_i18n=None)
+    assignment = _Obj(id=uuid.UUID(int=40), granted_by="boss")
+    role = _Obj(id=R_ADMIN.id, key="admin", name_i18n=None)
     pool = _Obj(
         id=uuid.UUID(int=50), gremium_id=G_FS, member_principal_id=OTHER,
         substitute_principal_id=PID,
@@ -452,7 +441,7 @@ async def test_preview_loads_the_snapshot(lookups: list[set[Any]]) -> None:
     db = _Session(*_full_queue(row))
     out = await PrincipalRevokeService(db).preview(PID, actor="tk")  # type: ignore[arg-type]
     assert out.is_self is True
-    assert [g.name for g in out.gremien] == ["Fachschaft Informatik", "Studierendenparlament"]
+    assert [g.name for g in out.gremien] == ["Fachschaft Informatik"]
     fs = out.gremien[0]
     assert fs.membership is not None and fs.membership.groups == [
         "fs-informatik",
@@ -461,9 +450,10 @@ async def test_preview_loads_the_snapshot(lookups: list[set[Any]]) -> None:
     assert fs.open_tasks == 3
     assert fs.pool_entries[0].member_name == f"P{OTHER.int}"
     assert fs.planned_delegations[0].voting is True
-    assert out.gremien[1].assignments[0].granted_by == "Mara Keller"
-    assert out.gremien[1].assignments[0].role_label == {}
-    assert [r.role_key for r in out.global_roles] == ["hhb"]
+    admin = out.global_roles[0]
+    assert admin.assignments[0].granted_by == "Mara Keller"
+    assert admin.assignments[0].role_label == {}
+    assert [r.role_key for r in out.global_roles] == ["admin", "hhb"]
     assert lookups == [{OTHER}, {"boss"}]
     assert len(db.statements) == 10
 
@@ -557,7 +547,7 @@ async def test_revoke_clears_the_gremium_and_deactivates(writes: list[str]) -> N
     out, mails = await PrincipalRevokeService(db).revoke(  # type: ignore[arg-type]
         PID,
         PrincipalRevokeIn.model_validate(
-            {"gremiumIds": [G_FS, G_SP], "globalRoleIds": [R_HHB.id], "deactivate": True}
+            {"gremiumIds": [G_FS], "globalRoleIds": [R_HHB.id, R_ADMIN.id], "deactivate": True}
         ),
         actor="boss",
     )
@@ -594,7 +584,7 @@ async def test_revoke_of_a_delegator_mails_the_delegate(writes: list[str]) -> No
     await PrincipalRevokeService(db).revoke(  # type: ignore[arg-type]
         PID,
         PrincipalRevokeIn.model_validate(
-            {"gremiumIds": [G_FS, G_SP], "globalRoleIds": [R_HHB.id]}
+            {"gremiumIds": [G_FS], "globalRoleIds": [R_HHB.id, R_ADMIN.id]}
         ),
         actor="boss",
     )

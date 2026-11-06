@@ -1,8 +1,8 @@
 """A meeting delete deletes all votes of the meeting, real Postgres.
 
 The delete takes every vote of the meeting with it, in any status (draft, cancelled,
-closed, secret, with guests), together with the ballots, the secret ballots, the voted
-markers and the protocol references. An open vote blocks the delete (409
+closed, with guests), together with the secret ballots, the voted markers and the
+protocol references. An open vote blocks the delete (409
 ``open_vote``). An application that such a vote decided keeps its status, and its
 timeline shows the vote as deleted. The audit names the votes by id and count, never a
 choice.
@@ -24,7 +24,7 @@ from app.modules.applications.service import ApplicationsService
 from app.modules.livevote.models import Meeting, MeetingGuest
 from app.modules.livevote.service import MeetingService
 from app.modules.protocol.models import Protocol, ProtocolVoteRef
-from app.modules.voting.models import Ballot, SecretBallot, Vote, VotedMarker
+from app.modules.voting.models import SecretBallot, Vote, VotedMarker
 from app.modules.voting.service import VotingService, guest_voter_sub
 from tests.integration.modules.livevote.conftest import CONFIG, admin, audit_actions, seed
 from tests.integration.modules.voting.vote_support import (
@@ -38,7 +38,6 @@ from tests.integration.modules.voting.vote_support import (
 pytestmark = pytest.mark.integration
 
 NOW = datetime(2026, 10, 6, 9, 0, tzinfo=UTC)
-SECRET_CONFIG = {**CONFIG, "secret": True}
 
 
 async def _count(session: AsyncSession, model: type, vote_ids: list[uuid.UUID]) -> int:
@@ -67,7 +66,7 @@ async def test_meeting_delete_deletes_every_vote_with_its_ballots(
             meeting_id=s.meeting_id,
             agenda_item_id=s.item_ids[0],
             eligible_group=str(s.gremium_id),
-            config=SECRET_CONFIG,
+            config=CONFIG,
             status="closed",
             result="rejected",
         )
@@ -76,9 +75,13 @@ async def test_meeting_delete_deletes_every_vote_with_its_ballots(
         session.add(guest)
         await session.flush()
         closed_id = s.vote_ids["closed"]
-        session.add(Ballot(vote_id=closed_id, voter_sub="s1", choice="yes"))
-        session.add(Ballot(vote_id=closed_id, voter_sub="s2", choice="no"))
-        session.add(Ballot(vote_id=closed_id, voter_sub=guest_voter_sub(guest.id), choice="yes"))
+        for voter_sub, choice in (
+            ("s1", "yes"),
+            ("s2", "no"),
+            (guest_voter_sub(guest.id), "yes"),
+        ):
+            session.add(VotedMarker(vote_id=closed_id, voter_sub=voter_sub))
+            session.add(SecretBallot(vote_id=closed_id, choice=choice))
         session.add(VotedMarker(vote_id=secret.id, voter_sub="s1"))
         session.add(SecretBallot(vote_id=secret.id, choice="no"))
         assert s.protocol_id is not None
@@ -97,7 +100,7 @@ async def test_meeting_delete_deletes_every_vote_with_its_ballots(
         assert await session.get(Protocol, s.protocol_id) is None
         for vote_id in vote_ids:
             assert await session.get(Vote, vote_id) is None
-        for model in (Ballot, SecretBallot, VotedMarker, ProtocolVoteRef):
+        for model in (SecretBallot, VotedMarker, ProtocolVoteRef):
             assert await _count(session, model, vote_ids) == 0
 
     [entry] = await audit_actions(maker, target_id=s.meeting_id)

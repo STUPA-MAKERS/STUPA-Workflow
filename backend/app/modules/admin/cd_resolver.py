@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import select
 
-from app.modules.admin.cd_logos import RENDER_SLOTS, CdBaseVariant, asset_file_name
+from app.modules.admin.cd_logos import RENDER_SLOTS, asset_file_name
 from app.modules.admin.models import CdVariant, CdVariantLogo, Gremium
 from app.modules.files.storage import StorageError
 from app.shared.errors import ServiceUnavailableError
@@ -41,10 +41,6 @@ class ResolvedCdVariant:
     the render path, which pins its own.
 
     Attributes:
-        base_variant: Which document family the design was drawn for, ``report`` or
-            ``protocol``. Descriptive only: no render path reads it, because as the
-            document shape it would render every application of a protocol-based
-            design as a meeting protocol, and the reverse.
         title_logos: Title-page logos in order — vendored names AND/OR asset
             file names.
         footer_logos: Footer logos in the same value form.
@@ -52,7 +48,6 @@ class ResolvedCdVariant:
             vendored logo has no entry here.
     """
 
-    base_variant: CdBaseVariant
     title_logos: tuple[str, ...]
     footer_logos: tuple[str, ...]
     assets: Mapping[str, bytes]
@@ -128,7 +123,6 @@ async def _resolve(
         logos[row.slot].append(name)
 
     return ResolvedCdVariant(
-        base_variant=_base_variant(variant.base_variant),
         title_logos=tuple(logos["title"]),
         footer_logos=tuple(logos["footer"]),
         assets=assets,
@@ -148,11 +142,6 @@ def cd_render_config(cd: ResolvedCdVariant) -> dict[str, object]:
     if cd.footer_logos:
         config["footer_logos"] = list(cd.footer_logos)
     return config
-
-
-def _base_variant(value: str) -> CdBaseVariant:
-    """Narrow the stored text to the closed set. The DB check holds the invariant."""
-    return "protocol" if value == "protocol" else "report"
 
 
 async def _load_asset(storage: ObjectStorage | None, object_key: str | None) -> bytes:

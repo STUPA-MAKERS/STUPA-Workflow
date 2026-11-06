@@ -307,7 +307,7 @@ export class AdminApiService {
     return this.http.post<CdVariant>(`${this.base}/admin/cd-variants`, body);
   }
 
-  /** PATCH /admin/cd-variants/{id} — name and base variant only. The key is immutable. */
+  /** PATCH /admin/cd-variants/{id} — name only. The key is immutable. */
   updateCdVariant(id: Uuid, body: CdVariantUpdateBody): Observable<CdVariant> {
     return this.http.patch<CdVariant>(`${this.base}/admin/cd-variants/${id}`, body);
   }

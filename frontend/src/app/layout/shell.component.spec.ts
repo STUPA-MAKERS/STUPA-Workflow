@@ -75,7 +75,7 @@ function brandingStub(
 function phoneViewport(): () => void {
   const original = window.matchMedia;
   window.matchMedia = ((query: string) => ({
-    matches: query === '(max-width: 768px)',
+    matches: query === '(max-width: 767.98px)',
     media: query,
     onchange: null,
     addEventListener: () => undefined,

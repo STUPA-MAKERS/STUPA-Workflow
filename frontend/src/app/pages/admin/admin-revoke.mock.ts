@@ -3,9 +3,8 @@
  *
  * It mirrors `backend/app/modules/admin/principal_revoke.py` on the in-memory store: the
  * Gremien of a person come from the memberships (static, plus the ones that the OIDC
- * groups give through the membership mappings), the manual gremium assignments, the pool
- * entries and the delegations; the global roles from the group mappings and the manual
- * assignments (never `member`). A revoke removes the groups, the assignments and the
+ * groups give through the membership mappings), the pool entries and the delegations; the
+ * global roles from the group mappings and the role assignments (never `member`). A revoke removes the groups, the assignments and the
  * extras of the selected entries, and refuses a half selection of a shared group with
  * 422 `revoke_incomplete`.
  */
@@ -50,11 +49,7 @@ export const MOCK_REVOKE_PRINCIPAL: AdminPrincipal = {
       id: 'a-12',
       principalId: 'p-12',
       roleId: 'r-vorstand',
-      gremiumId: 'g-asta',
       grantedBy: 'Alex Admin',
-      validFrom: '2025-11-04T00:00:00+00:00',
-      validUntil: null,
-      delegateVoting: false,
     },
   ],
 };
@@ -199,14 +194,13 @@ function tiedGremien(t: Ties): Set<Uuid> {
   return new Set([
     ...t.memberships.map((m) => m.gremiumId),
     ...t.membershipMaps.map(([, g]) => g),
-    ...t.assignments.filter((a) => a.gremiumId).map((a) => a.gremiumId as Uuid),
     ...t.pool.map((e) => e.gremiumId),
     ...t.delegations.map((d) => d.gremiumId),
   ]);
 }
 
 function heldRoles(store: RevokeMockStore, t: Ties): Set<Uuid> {
-  const ids = [...t.groupMaps.map(([, r]) => r), ...t.assignments.filter((a) => !a.gremiumId).map((a) => a.roleId)];
+  const ids = [...t.groupMaps.map(([, r]) => r), ...t.assignments.map((a) => a.roleId)];
   return new Set(ids.filter((id) => roleKey(store, id) !== IMPLICIT_ROLE));
 }
 
@@ -237,8 +231,6 @@ function assignmentOut(store: RevokeMockStore, a: RoleAssignment): RevokeAssignm
     roleKey: role?.key ?? a.roleId,
     roleLabel: role?.label ?? {},
     grantedBy: a.grantedBy ?? null,
-    validFrom: a.validFrom ?? null,
-    validUntil: a.validUntil ?? null,
   };
 }
 
@@ -289,7 +281,6 @@ export function mockRevokePreview(store: RevokeMockStore, principalId: Uuid, myS
           }
         : null,
       groups: [...tgt].filter(([, [gs]]) => gs.has(gid)).map(([g]) => g),
-      assignments: t.assignments.filter((a) => a.gremiumId === gid).map((a) => assignmentOut(store, a)),
       poolEntries: pool,
       plannedDelegations: dels.filter((d) => !d.live).map((d) => delegationOut(store, p.id, d)),
       liveDelegations: dels.filter((d) => d.live).map((d) => delegationOut(store, p.id, d)),
@@ -314,9 +305,7 @@ export function mockRevokePreview(store: RevokeMockStore, principalId: Uuid, myS
         roleKey: role?.key ?? rid,
         roleLabel: role?.label ?? {},
         groups: [...tgt].filter(([, [, rs]]) => rs.has(rid)).map(([g]) => g),
-        assignments: t.assignments
-          .filter((a) => !a.gremiumId && a.roleId === rid)
-          .map((a) => assignmentOut(store, a)),
+        assignments: t.assignments.filter((a) => a.roleId === rid).map((a) => assignmentOut(store, a)),
       };
     }),
     groups: [...tgt].map(([group, [gs, rs]]) => ({ group, gremiumIds: [...gs], globalRoleIds: [...rs] })),
@@ -354,7 +343,7 @@ export function mockApplyRevoke(
   ]);
   if (missing.length) return { status: 422, error: { code: 'revoke_incomplete', errors: missing } };
   const gone = new Set(removed.map(([group]) => group));
-  const deletedAssignments = p.assignments.filter((a) => (a.gremiumId ? g.has(a.gremiumId) : r.has(a.roleId)));
+  const deletedAssignments = p.assignments.filter((a) => r.has(a.roleId));
   p.oidcGroups = groupsOf(p).filter((x) => !gone.has(x));
   p.assignments = p.assignments.filter((a) => !deletedAssignments.includes(a));
   store.revoked[p.id] = [...(store.revoked[p.id] ?? []), ...g];

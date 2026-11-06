@@ -33,16 +33,15 @@ group = ToolGroup()
 async def get_vote(vote_id: str) -> dict:
     """Fetch the state and the aggregated tally of a vote.
 
-    A secret vote exposes the counts only. `openedAt` and `closedAt` are the real open
-    and end times; `closesAt` is the planned end of the cast window. `myBallot`
-    (`cast`, `choice`) is the own ballot of the caller; a secret vote gives no choice.
+    Every vote is secret and exposes the counts only. `openedAt` and `closedAt` are the
+    real open and end times; `closesAt` is the planned end of the cast window.
+    `myBallot.cast` tells whether the caller cast the own ballot (never the choice), and
     `representedCast` tells whether the caller cast the ballot of a delegator.
 
     A personnel election has `kind: "election"`, the candidates in `election` and,
     after the close, `electionResult` (`counts` per candidate id, `abstentions`,
     `elected`, and `runoff` or `lot` when a tie stays open). Its `result` is
-    `elected`, `runoff`, `tie` (the lot is pending) or `rejected`. `myBallot.choices`
-    holds the own candidate ids of an open election.
+    `elected`, `runoff`, `tie` (the lot is pending) or `rejected`.
     """
     return await api().get(f"/votes/{vote_id}")
 
@@ -57,18 +56,6 @@ async def vote_draw_lot(vote_id: str) -> dict:
     `vote.manage` or `session.manage` in the gremium of the vote (or admin). Audited.
     """
     return await api().post(f"/votes/{vote_id}/draw-lot")
-
-
-@group.tool
-async def vote_runoff(vote_id: str) -> dict:
-    """Create the runoff (Stichwahl) of a closed personnel election.
-
-    Only when the result is `runoff`: the new draft vote has the tied candidates and the
-    open seats, round + 1 and `parentVoteId`. Open it with `open_vote`. The meeting must
-    be live. 409 `no_runoff_pending` or `runoff_exists`. Requires the gremium
-    permission `vote.manage` or `session.manage` (or admin).
-    """
-    return await api().post(f"/votes/{vote_id}/runoff")
 
 
 @group.tool

@@ -1,10 +1,9 @@
-"""The roster of a meeting does not depend on the memberships that are valid now.
+"""The roster of a meeting holds the members and each recorded principal.
 
-A closed meeting keeps the people who attended it. The roster holds the members
-whose membership overlaps the meeting window, plus each principal with an
-attendance record for the meeting. A member whose membership started after the
-meeting, or ended before it, is not on the roster. The protocol quorum counts the
-same roster.
+A closed meeting keeps the people who attended it. The roster holds the members of
+the Gremium, plus each principal with an attendance record for the meeting, also
+after the OIDC sync removed the membership. A principal without a membership and
+without a record is not on the roster. The protocol quorum counts the same roster.
 """
 
 from __future__ import annotations
@@ -36,8 +35,6 @@ async def _principal(
     name: str,
     *,
     member: bool = True,
-    valid_from: datetime | None = None,
-    valid_until: datetime | None = None,
     status: str | None = None,
     meeting_id: uuid.UUID | None = None,
 ) -> uuid.UUID:
@@ -58,11 +55,7 @@ async def _principal(
             await session.flush()
             session.add(
                 GremiumMembership(
-                    principal_id=row.id,
-                    gremium_id=gremium_id,
-                    gremium_role_id=role.id,
-                    valid_from=valid_from,
-                    valid_until=valid_until,
+                    principal_id=row.id, gremium_id=gremium_id, gremium_role_id=role.id
                 )
             )
         if status is not None and meeting_id is not None:
@@ -80,11 +73,10 @@ async def _closed_meeting(
 ) -> tuple[uuid.UUID, uuid.UUID, dict[str, uuid.UUID]]:
     """Seed a closed meeting with one principal per roster case.
 
-    The cases: a membership that ended after the meeting, or during the meeting with an
-    excuse, is on the roster with the record. A record without any membership, for example
-    after the OIDC sync removed it, is on the roster. An open membership without a record is
-    on the roster with an open status. A membership that started after the meeting, or ended
-    before it, is not on the roster.
+    The cases: a member with a record is on the roster with the record. A record
+    without any membership, for example after the OIDC sync removed it, is on the
+    roster. A member without a record is on the roster with an open status. A
+    principal without a membership and without a record is not on the roster.
     """
     s = await seed(maker, status="closed", items=0)
     async with maker() as session:
@@ -96,31 +88,16 @@ async def _closed_meeting(
         await session.commit()
     g, m = s.gremium_id, s.meeting_id
     ids = {
-        "ended_later": await _principal(
-            maker,
-            g,
-            "Anna",
-            valid_until=datetime(2026, 7, 1, tzinfo=UTC),
-            status="present",
-            meeting_id=m,
+        "member_present": await _principal(
+            maker, g, "Anna", status="present", meeting_id=m
         ),
         "record_only": await _principal(
             maker, g, "Bert", member=False, status="present", meeting_id=m
         ),
         "open_member": await _principal(maker, g, "Carla"),
-        "joined_later": await _principal(
-            maker, g, "Dora", valid_from=datetime(2026, 8, 1, tzinfo=UTC)
-        ),
-        "left_before": await _principal(
-            maker, g, "Emil", valid_until=datetime(2026, 6, 1, tzinfo=UTC)
-        ),
-        "ended_during": await _principal(
-            maker,
-            g,
-            "Fritz",
-            valid_until=datetime(2026, 6, 20, 17, 0, tzinfo=UTC),
-            status="excused",
-            meeting_id=m,
+        "outsider": await _principal(maker, g, "Emil", member=False),
+        "member_excused": await _principal(
+            maker, g, "Fritz", status="excused", meeting_id=m
         ),
     }
     return g, m, ids
@@ -134,11 +111,11 @@ async def test_closed_meeting_roster_keeps_recorded_attendance(
         resp = client.get(f"/api/meetings/{meeting_id}/attendance")
     assert resp.status_code == 200, resp.text
     roster = {r["principalId"]: r for r in resp.json()}
-    want = {"ended_later", "record_only", "open_member", "ended_during"}
+    want = {"member_present", "record_only", "open_member", "member_excused"}
     assert set(roster) == {str(ids[k]) for k in want}
-    assert roster[str(ids["ended_later"])]["status"] == "present"
+    assert roster[str(ids["member_present"])]["status"] == "present"
     assert roster[str(ids["record_only"])]["status"] == "present"
-    assert roster[str(ids["ended_during"])]["status"] == "excused"
+    assert roster[str(ids["member_excused"])]["status"] == "excused"
     assert roster[str(ids["open_member"])]["status"] is None
     statuses = [r["status"] for r in roster.values()]
     assert statuses.count("present") == 2
@@ -148,7 +125,7 @@ async def test_closed_meeting_roster_keeps_recorded_attendance(
 async def test_live_meeting_roster_holds_current_members_and_records(
     maker: async_sessionmaker[AsyncSession], api: FastAPI
 ) -> None:
-    """A live meeting: the current members, plus a recorded principal without one."""
+    """A live meeting: the members, plus a recorded principal without a membership."""
     s = await seed(maker, status="live", items=0)
     async with maker() as session:
         await session.execute(
@@ -159,27 +136,23 @@ async def test_live_meeting_roster_holds_current_members_and_records(
     recorded = await _principal(
         maker, s.gremium_id, "Bert", member=False, status="present", meeting_id=s.meeting_id
     )
-    future = await _principal(
-        maker, s.gremium_id, "Carla", valid_from=datetime(2099, 1, 1, tzinfo=UTC)
-    )
+    outsider = await _principal(maker, s.gremium_id, "Carla", member=False)
     with TestClient(api) as client:
         resp = client.get(f"/api/meetings/{s.meeting_id}/attendance")
     assert resp.status_code == 200, resp.text
     got = {r["principalId"] for r in resp.json()}
     assert str(current) in got
     assert str(recorded) in got
-    assert str(future) not in got
+    assert str(outsider) not in got
 
 
 async def test_protocol_quorum_counts_the_meeting_roster(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
-    """The quorum of a closed meeting counts its roster, not the members of now.
+    """The quorum of a closed meeting counts its roster, not only the members.
 
-    The roster has 4 entries and 2 are present, so a 50 % quorum holds. The members
-    that are valid now are 2 (Carla and Dora), which would give the wrong count.
-
-    Without a meeting the members that are valid now count (Carla, Dora).
+    The roster has 4 entries and 2 are present, so a 50 % quorum holds and 1
+    present does not. Without a meeting the 3 members count (Anna, Carla, Fritz).
     """
     gremium_id, meeting_id, _ = await _closed_meeting(maker)
     async with maker() as session:
@@ -190,4 +163,5 @@ async def test_protocol_quorum_counts_the_meeting_roster(
         svc = ProtocolService(session)
         assert await svc._quorate(gremium, meeting, 2) is True
         assert await svc._quorate(gremium, meeting, 1) is False
-        assert await svc._quorate(gremium, None, 1) is True
+        assert await svc._quorate(gremium, None, 2) is True
+        assert await svc._quorate(gremium, None, 1) is False

@@ -1018,7 +1018,8 @@ export interface EffectiveForm {
  */
 export interface MagicLinkVerifyResult {
   application_id: Uuid;
-  scope: 'edit' | 'view';
+  /** Always `edit`: the applicant session has no scope. */
+  scope: 'edit';
 }
 
 export type MajorityRule = 'simple' | 'absolute' | 'two_thirds';

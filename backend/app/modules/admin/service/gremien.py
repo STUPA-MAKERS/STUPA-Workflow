@@ -2,19 +2,17 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import delete, distinct, func, or_, select
+from sqlalchemy import distinct, func, or_, select
 
-from app.modules.admin.gremium_roles import GremiumRoleService, membership_active_clause
+from app.modules.admin.gremium_roles import GremiumRoleService
 from app.modules.admin.models import (
     ApplicationType,
     CdVariant,
     Gremium,
     GremiumMembership,
     GremiumRole,
-    MailList,
 )
 from app.modules.admin.schemas import (
     GremiumAdminOut,
@@ -63,13 +61,11 @@ class GremiumOps(ConfigServiceBase):
         Two grouped counts give the numbers for all gremien at once, so the admin
         list needs no request per gremium.
 
-        The member count holds the current members only: a membership that is valid
-        now (``valid_from``/``valid_until``, the same rule as RBAC) of an active
-        principal. The membership list marks each row with the same rule (``active``),
-        and the members page counts only the active rows.
+        The member count holds the memberships of active principals only. The
+        membership list marks each row with the same rule (``active``), and the
+        members page counts only the active rows.
         """
         rows = (await self.session.scalars(select(Gremium).order_by(Gremium.name))).all()
-        now = datetime.now(UTC)
         member_rows = (
             await self.session.execute(
                 select(
@@ -77,7 +73,7 @@ class GremiumOps(ConfigServiceBase):
                     func.count(distinct(GremiumMembership.principal_id)),
                 )
                 .join(PrincipalRow, PrincipalRow.id == GremiumMembership.principal_id)
-                .where(membership_active_clause(now), PrincipalRow.active.is_(True))
+                .where(PrincipalRow.active.is_(True))
                 .group_by(GremiumMembership.gremium_id)
             )
         ).all()
@@ -106,7 +102,10 @@ class GremiumOps(ConfigServiceBase):
             ConflictError: The slug exists already.
         """
         if await self._gremium_by_slug(payload.slug) is not None:
-            raise ConflictError(f"gremium slug {payload.slug!r} already exists")
+            raise ConflictError(
+                f"gremium slug {payload.slug!r} already exists",
+                code="gremium_slug_exists",
+            )
         await self._require_cd_variant(payload.cd_variant_id)
         row = Gremium(
             name=payload.name,
@@ -192,7 +191,10 @@ class GremiumOps(ConfigServiceBase):
             raise NotFoundError(f"gremium {gremium_id} not found")
         if payload.slug is not None and payload.slug != row.slug:
             if await self._gremium_by_slug(payload.slug) is not None:
-                raise ConflictError(f"gremium slug {payload.slug!r} already exists")
+                raise ConflictError(
+                    f"gremium slug {payload.slug!r} already exists",
+                    code="gremium_slug_exists",
+                )
             row.slug = payload.slug
         if payload.name is not None:
             row.name = payload.name
@@ -290,7 +292,10 @@ class GremiumOps(ConfigServiceBase):
             .limit(1)
         )
         if in_use is not None:
-            raise ConflictError("gremium has existing applications and cannot be deleted")
+            raise ConflictError(
+                "gremium has existing applications and cannot be deleted",
+                code="gremium_in_use",
+            )
         deciding = await self.session.scalar(
             select(Application.id).where(Application.vote_gremium_id == gremium_id).limit(1)
         )
@@ -410,45 +415,26 @@ class GremiumOps(ConfigServiceBase):
     async def get_gremium_mail_recipients(
         self, gremium_id: UUID
     ) -> GremiumMailRecipients:
-        """Return the extra protocol recipients (union of all active mail lists)."""
-        if await self.session.get(Gremium, gremium_id) is None:
+        """Return the extra protocol recipients (``gremium.protocol_recipients``)."""
+        gremium = await self.session.get(Gremium, gremium_id)
+        if gremium is None:
             raise NotFoundError(f"gremium {gremium_id} not found")
-        lists = (
-            await self.session.scalars(
-                select(MailList.recipients).where(
-                    MailList.gremium_id == gremium_id, MailList.active.is_(True)
-                )
-            )
-        ).all()
-        seen: dict[str, None] = {}
-        for recipients in lists:
-            for addr in recipients or []:
-                seen.setdefault(addr, None)
-        return GremiumMailRecipients(recipients=list(seen))
+        return GremiumMailRecipients(
+            recipients=list(dict.fromkeys(gremium.protocol_recipients or []))
+        )
 
     async def set_gremium_mail_recipients(
         self, gremium_id: UUID, payload: GremiumMailRecipients, actor: str
     ) -> GremiumMailRecipients:
         """Replace the extra protocol recipients (idempotent PUT).
 
-        A gremium keeps one canonical ``mail_list`` row with ``name='protocol'``.
-        The method deletes all old rows first. An empty list means no extra
-        recipients. The members still receive the protocol.
+        The list replaces ``gremium.protocol_recipients``. An empty list means no
+        extra recipients. The members still receive the protocol.
         """
-        if await self.session.get(Gremium, gremium_id) is None:
+        gremium = await self.session.get(Gremium, gremium_id)
+        if gremium is None:
             raise NotFoundError(f"gremium {gremium_id} not found")
-        await self.session.execute(
-            delete(MailList).where(MailList.gremium_id == gremium_id)
-        )
-        if payload.recipients:
-            self.session.add(
-                MailList(
-                    gremium_id=gremium_id,
-                    name="protocol",
-                    recipients=payload.recipients,
-                    active=True,
-                )
-            )
+        gremium.protocol_recipients = list(payload.recipients)
         await self._audit(actor, AuditAction.CONFIG_CHANGE, "gremium", gremium_id)
         await self.session.commit()
         return GremiumMailRecipients(recipients=payload.recipients)

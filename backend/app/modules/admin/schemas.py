@@ -20,7 +20,7 @@ from app.modules.admin.branding import (
     PublicBranding,
     check_http_url,
 )
-from app.modules.admin.cd_logos import CdBaseVariant, LogoSlot, RenderSlot, VendoredLogoName
+from app.modules.admin.cd_logos import LogoSlot, RenderSlot, VendoredLogoName
 from app.modules.applications.models import (
     DEFAULT_CONFIRM_TTL_HOURS,
     MAX_CONFIRM_TTL_HOURS,
@@ -81,7 +81,6 @@ class CdVariantOut(_CamelModel):
     id: UUID
     key: str
     name: str
-    base_variant: CdBaseVariant = Field(serialization_alias="baseVariant")
     logos: list[CdVariantLogoOut] = Field(default_factory=list)
 
 
@@ -98,7 +97,6 @@ class CdVariantCreate(_CamelModel):
 
     key: str = Field(min_length=1, max_length=64, pattern=CD_VARIANT_KEY_PATTERN)
     name: str = Field(min_length=1, max_length=200)
-    base_variant: CdBaseVariant = Field(default="report", alias="baseVariant")
 
 
 class CdVariantUpdate(_CamelModel):
@@ -106,7 +104,6 @@ class CdVariantUpdate(_CamelModel):
 
     key: str | None = Field(default=None, max_length=64)
     name: str | None = Field(default=None, min_length=1, max_length=200)
-    base_variant: CdBaseVariant | None = Field(default=None, alias="baseVariant")
 
 
 class CdVariantLogoVendoredCreate(_CamelModel):
@@ -471,11 +468,7 @@ class RoleAssignmentOut(_CamelModel):
     id: UUID
     principal_id: UUID = Field(serialization_alias="principalId")
     role_id: UUID = Field(serialization_alias="roleId")
-    gremium_id: UUID | None = Field(serialization_alias="gremiumId")
     granted_by: str | None = Field(serialization_alias="grantedBy")
-    valid_from: str | None = Field(serialization_alias="validFrom")
-    valid_until: str | None = Field(serialization_alias="validUntil")
-    delegate_voting: bool = Field(serialization_alias="delegateVoting")
 
 
 class PrincipalOut(_CamelModel):
@@ -633,7 +626,7 @@ class RevokeMembershipOut(_CamelModel):
 
 
 class RevokeAssignmentOut(_CamelModel):
-    """A manual role assignment (a gremium one or a global one)."""
+    """A global role assignment."""
 
     id: UUID
     role_id: UUID = Field(serialization_alias="roleId")
@@ -642,8 +635,6 @@ class RevokeAssignmentOut(_CamelModel):
     #: The name of the account that granted it, or ``bootstrap``. Never a ``sub``:
     #: an unknown or nameless grantor gives None.
     granted_by: str | None = Field(serialization_alias="grantedBy")
-    valid_from: str | None = Field(serialization_alias="validFrom")
-    valid_until: str | None = Field(serialization_alias="validUntil")
     #: The bootstrap `admin` of a person who is still a configured bootstrap admin:
     #: the startup sweep or the next login grants it again.
     returns_automatically: bool = Field(
@@ -687,7 +678,6 @@ class RevokeGremiumOut(_CamelModel):
     membership: RevokeMembershipOut | None = None
     #: Every SSO group of the person that leads into this Gremium. A revoke removes them.
     groups: list[str] = Field(default_factory=list)
-    assignments: list[RevokeAssignmentOut] = Field(default_factory=list)
     pool_entries: list[RevokePoolEntryOut] = Field(
         default_factory=list, serialization_alias="poolEntries"
     )

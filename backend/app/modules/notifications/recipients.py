@@ -3,7 +3,7 @@
 Recipient kinds:
 
 ``{"kind":"group","ref":"stupa"}``: principals in the OIDC group ``ref``.
-``{"kind":"role","ref":"manager"}``: principals with an active assignment of role ``ref``.
+``{"kind":"role","ref":"manager"}``: principals with an assignment of role ``ref``.
 ``{"kind":"gremium","ref":"<id>"}``: current members of Gremium ``ref``.
 ``{"kind":"applicant"}``: applicant mail of the application that triggered the rule.
 ``{"kind":"email","ref":"a@b.c"}``: one fixed literal address.
@@ -32,7 +32,6 @@ from typing import Any
 from sqlalchemy import ColumnElement, Select, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.gremium_roles import membership_active_clause
 from app.modules.admin.models import GremiumMembership
 from app.modules.applications.models import Applicant, Application
 from app.modules.auth.models import (
@@ -54,49 +53,23 @@ from app.shared.guards import GuardContext, GuardError, eval_guard
 ADMIN_ROLE_KEY = "admin"
 
 
-def _active_assignment_window(now: datetime) -> list[ColumnElement[bool]]:
-    """Return the validity window of a ``RoleAssignment`` at ``now``."""
-    return [
-        or_(RoleAssignment.valid_from.is_(None), RoleAssignment.valid_from <= now),
-        or_(RoleAssignment.valid_until.is_(None), RoleAssignment.valid_until > now),
-    ]
-
-
-def _permission_conds(
-    perm: str, now: datetime, gremium_id: uuid.UUID | None
-) -> list[ColumnElement[bool]]:
+def _permission_conds(perm: str) -> list[ColumnElement[bool]]:
     """Build the shared WHERE clauses of the permission-holder queries.
 
     This function mirrors ``Principal.has`` in one place. It applies the admin bypass
     and the RolePermission join, so every resolver builds the identical candidate set.
-    With a ``gremium_id`` the clauses accept a globally valid assignment or an assignment
-    scoped to that Gremium.
     """
-    conds: list[ColumnElement[bool]] = [
+    return [
         Principal.email.is_not(None),
         Principal.active.is_(True),
-        *_active_assignment_window(now),
         or_(RolePermission.permission == perm, Role.key == ADMIN_ROLE_KEY),
     ]
-    if gremium_id is not None:
-        conds.append(
-            or_(
-                RoleAssignment.gremium_id.is_(None),
-                RoleAssignment.gremium_id == gremium_id,
-            )
-        )
-    return conds
 
 
-def principals_with_permission_stmt(
-    perm: str,
-    now: datetime,
-    *,
-    gremium_id: uuid.UUID | None = None,
-) -> Select[str | None]:
+def principals_with_permission_stmt(perm: str) -> Select[str | None]:
     """Select the mails of active principals that hold ``perm``.
 
-    The principal needs a valid role assignment. The admin bypass always counts
+    The principal needs a role assignment. The admin bypass always counts
     (``ADMIN_ROLE_KEY``). The statement builds on ``_permission_conds``, so both
     resolvers stay consistent with ``Principal.has``.
     """
@@ -105,16 +78,13 @@ def principals_with_permission_stmt(
         .join(RoleAssignment, RoleAssignment.principal_id == Principal.id)
         .join(Role, Role.id == RoleAssignment.role_id)
         .outerjoin(RolePermission, RolePermission.role_id == Role.id)
-        .where(*_permission_conds(perm, now, gremium_id))
+        .where(*_permission_conds(perm))
         .distinct()
     )
 
 
 def principal_rows_with_permission_stmt(
     perm: str,
-    now: datetime,
-    *,
-    gremium_id: uuid.UUID | None = None,
 ) -> Select[uuid.UUID, str, str | None, list[str] | None]:
     """Select the identity rows of the permission holders.
 
@@ -129,7 +99,7 @@ def principal_rows_with_permission_stmt(
         .join(RoleAssignment, RoleAssignment.principal_id == Principal.id)
         .join(Role, Role.id == RoleAssignment.role_id)
         .outerjoin(RolePermission, RolePermission.role_id == Role.id)
-        .where(*_permission_conds(perm, now, gremium_id))
+        .where(*_permission_conds(perm))
         .distinct()
     )
 
@@ -146,24 +116,19 @@ class ActionableCandidate:
 
 
 async def _candidates_with_transition_permission(
-    session: AsyncSession,
-    now: datetime,
-    *,
-    gremium_id: uuid.UUID | None,
+    session: AsyncSession, now: datetime
 ) -> list[ActionableCandidate]:
     """Collect the candidates that may fire transitions, with resolved actor facts.
 
-    Roles follow the RBAC resolution of ``resolve_principal``. They combine the active
-    role assignments with the GroupMapping roles of the OIDC groups of the principal.
-    An assignment gremium scope counts as a group key. Committees are the gremium ids
+    Roles follow the RBAC resolution of ``resolve_principal``. They combine the role
+    assignments with the GroupMapping roles of the OIDC groups of the principal.
+    Committees are the gremium ids
     of the active GremiumMembership rows. The function runs a constant number of batch
     queries and makes no per-candidate round trip.
     """
     rows = (
         await session.execute(
-            principal_rows_with_permission_stmt(
-                "application.transition", now, gremium_id=gremium_id
-            )
+            principal_rows_with_permission_stmt("application.transition")
         )
     ).all()
     seeds = [
@@ -181,18 +146,13 @@ async def _candidates_with_transition_permission(
     }
     assignment_rows = (
         await session.execute(
-            select(RoleAssignment.principal_id, Role.key, RoleAssignment.gremium_id)
+            select(RoleAssignment.principal_id, Role.key)
             .join(Role, Role.id == RoleAssignment.role_id)
-            .where(
-                RoleAssignment.principal_id.in_(ids),
-                *_active_assignment_window(now),
-            )
+            .where(RoleAssignment.principal_id.in_(ids))
         )
     ).all()
-    for pid, role_key, assignment_gremium in assignment_rows:
+    for pid, role_key in assignment_rows:
         roles_by_pid[pid].add(role_key)
-        if assignment_gremium is not None:
-            groups_by_pid[pid].add(str(assignment_gremium))
 
     all_groups: set[str] = set().union(*groups_by_pid.values())
     if all_groups:
@@ -215,14 +175,6 @@ async def _candidates_with_transition_permission(
         await session.execute(
             select(GremiumMembership.principal_id, GremiumMembership.gremium_id).where(
                 GremiumMembership.principal_id.in_(ids),
-                or_(
-                    GremiumMembership.valid_from.is_(None),
-                    GremiumMembership.valid_from <= now,
-                ),
-                or_(
-                    GremiumMembership.valid_until.is_(None),
-                    GremiumMembership.valid_until > now,
-                ),
             )
         )
     ).all()
@@ -299,9 +251,9 @@ class RecipientResolver:
             if kind == "group" and ref:
                 out.update(await self._emails_for_group(str(ref)))
             elif kind == "role" and ref:
-                out.update(await self._emails_for_role(str(ref), now))
+                out.update(await self._emails_for_role(str(ref)))
             elif kind == "gremium" and ref:
-                out.update(await self._emails_for_gremium(str(ref), now))
+                out.update(await self._emails_for_gremium(str(ref)))
             elif kind == "applicant" and application_id is not None:
                 email = await self._applicant_email(application_id)
                 if email:
@@ -315,16 +267,16 @@ class RecipientResolver:
                     )
                 )
                 if gid is not None:
-                    out.update(await self._emails_for_gremium(str(gid), now))
+                    out.update(await self._emails_for_gremium(str(gid)))
             elif kind == "budgetGremium" and application_id is not None:
                 budget_id = await self.session.scalar(
                     select(Application.budget_id).where(Application.id == application_id)
                 )
                 gid = await effective_decision_gremium(self.session, budget_id)
                 if gid is not None:
-                    out.update(await self._emails_for_gremium(str(gid), now))
+                    out.update(await self._emails_for_gremium(str(gid)))
             elif kind == "permission" and ref:
-                out.update(await self._emails_for_permission(str(ref), now))
+                out.update(await self._emails_for_permission(str(ref)))
         return sorted(e for e in out if e)
 
     async def _emails_for_group(self, group: str) -> list[str]:
@@ -338,7 +290,7 @@ class RecipientResolver:
         ).all()
         return [e for e in rows if e]
 
-    async def _emails_for_role(self, role_key: str, now: datetime) -> list[str]:
+    async def _emails_for_role(self, role_key: str) -> list[str]:
         stmt = (
             select(Principal.email)
             .join(RoleAssignment, RoleAssignment.principal_id == Principal.id)
@@ -346,18 +298,13 @@ class RecipientResolver:
             .where(
                 Role.key == role_key,
                 Principal.email.is_not(None),
-                or_(RoleAssignment.valid_from.is_(None), RoleAssignment.valid_from <= now),
-                or_(
-                    RoleAssignment.valid_until.is_(None),
-                    RoleAssignment.valid_until > now,
-                ),
             )
         )
         rows = (await self.session.scalars(stmt)).all()
         return [e for e in rows if e]
 
-    async def _emails_for_gremium(self, gremium_ref: str, now: datetime) -> list[str]:
-        """Return the addresses of the gremium members whose term window holds ``now``."""
+    async def _emails_for_gremium(self, gremium_ref: str) -> list[str]:
+        """Return the addresses of the gremium members."""
         try:
             gremium_id = uuid.UUID(gremium_ref)
         except (ValueError, AttributeError):
@@ -368,26 +315,18 @@ class RecipientResolver:
             .where(
                 GremiumMembership.gremium_id == gremium_id,
                 Principal.email.is_not(None),
-                or_(
-                    GremiumMembership.valid_from.is_(None),
-                    GremiumMembership.valid_from <= now,
-                ),
-                or_(
-                    GremiumMembership.valid_until.is_(None),
-                    GremiumMembership.valid_until > now,
-                ),
             )
         )
         rows = (await self.session.scalars(stmt)).all()
         return [e for e in rows if e]
 
-    async def _emails_for_permission(self, perm: str, now: datetime) -> list[str]:
+    async def _emails_for_permission(self, perm: str) -> list[str]:
         """Return the addresses of active principals that hold ``perm``.
 
-        A valid role assignment must grant the permission. The ``admin`` role always
+        A role assignment must grant the permission. The ``admin`` role always
         counts.
         """
-        stmt = principals_with_permission_stmt(perm, now)
+        stmt = principals_with_permission_stmt(perm)
         rows = (await self.session.scalars(stmt)).all()
         return [e for e in rows if e]
 
@@ -451,9 +390,7 @@ async def actionable_principal_emails(
         return []
 
     base_ctx = await build_base_context(session, app, manual=True)
-    candidates = await _candidates_with_transition_permission(
-        session, now, gremium_id=app.gremium_id
-    )
+    candidates = await _candidates_with_transition_permission(session, now)
     firable = firable_candidates(
         candidates, transitions, base_ctx, created_by=app.created_by
     )
@@ -535,7 +472,6 @@ async def _open_vote_casters(
         await session.scalars(
             select(GremiumMembership.principal_id).where(
                 GremiumMembership.gremium_id == app.vote_gremium_id,
-                membership_active_clause(now),
             )
         )
     ).all()

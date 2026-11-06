@@ -105,7 +105,7 @@ async def _locked_elections(session: AsyncSession, principals: frozenset[str]) -
     the decision reads the final result and a later runoff copies the new name. The
     later rounds lock first, in the order of the cancel of a runoff.
 
-    A runoff that a parallel ``create_runoff`` inserted while this select waited for
+    A round that another transaction inserted while this select waited for
     the lock of its parent is not in the snapshot of the select (READ COMMITTED). Its
     transaction has committed once the lock is granted, so a new select sees it. The
     function selects again until a pass finds no new round, at most ``_MAX_PASSES``

@@ -25,7 +25,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import or_, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.models import GremiumMembership
@@ -43,18 +43,16 @@ Row = tuple[UUID, str | None, str | None]
 
 
 async def _committee_members(session: AsyncSession, gremien: set[UUID]) -> list[Row]:
-    """Return the active members (any role) of the Gremien, valid now."""
+    """Return the active members (any role) of the Gremien."""
     if not gremien:
         return []
-    now = datetime.now(UTC)
+    datetime.now(UTC)
     rows = (
         await session.execute(
             select(PrincipalRow.id, PrincipalRow.display_name, PrincipalRow.email)
             .join(GremiumMembership, GremiumMembership.principal_id == PrincipalRow.id)
             .where(
                 GremiumMembership.gremium_id.in_(gremien),
-                or_(GremiumMembership.valid_from.is_(None), GremiumMembership.valid_from <= now),
-                or_(GremiumMembership.valid_until.is_(None), GremiumMembership.valid_until > now),
                 PrincipalRow.active.is_(True),
                 PrincipalRow.merged_into.is_(None),
             )

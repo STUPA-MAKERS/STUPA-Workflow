@@ -31,8 +31,8 @@ from app.shared.guards import GuardContext
 from tests._support.notifications_fakes import FakeSession
 
 
-def _sql(perm: str, **kw: object) -> str:
-    stmt = principals_with_permission_stmt(perm, datetime.now(UTC), **kw)  # type: ignore[arg-type]
+def _sql(perm: str) -> str:
+    stmt = principals_with_permission_stmt(perm)
     return str(stmt.compile(compile_kwargs={"literal_binds": True}))
 
 
@@ -99,22 +99,13 @@ def test_admin_role_key_matches_principal_has_bypass() -> None:
 def test_permission_stmt_includes_admin_bypass_via_constant() -> None:
     """Build the admin bypass from the central constant.
 
-    The bypass checks the active flag and the validity window.
+    The bypass checks the active flag. The recipient set is global: no Gremium filter.
     """
     sql = _sql("application.transition")
     assert f"key = '{ADMIN_ROLE_KEY}'" in sql
     assert "permission = 'application.transition'" in sql
     assert "active" in sql
-    assert "valid_from" in sql and "valid_until" in sql
-
-
-def test_permission_stmt_gremium_scope_optional() -> None:
-    """Add no Gremium filter without ``gremium_id``, so the recipient set is global."""
-    gid = uuid.uuid4()
-    scoped = _sql("application.transition", gremium_id=gid)
-    unscoped = _sql("application.transition")
-    assert "gremium_id" in scoped
-    assert "gremium_id" not in unscoped
+    assert "gremium_id" not in sql
 
 
 def test_both_resolvers_share_one_query_builder() -> None:
@@ -123,8 +114,8 @@ def test_both_resolvers_share_one_query_builder() -> None:
     assert rule_sql.count(f"key = '{ADMIN_ROLE_KEY}'") == 1
 
 
-def _rows_sql(perm: str, **kw: object) -> str:
-    stmt = principal_rows_with_permission_stmt(perm, datetime.now(UTC), **kw)  # type: ignore[arg-type]
+def _rows_sql(perm: str) -> str:
+    stmt = principal_rows_with_permission_stmt(perm)
     return str(stmt.compile(compile_kwargs={"literal_binds": True}))
 
 
@@ -146,13 +137,7 @@ def test_rows_stmt_shares_permission_conds_with_email_stmt() -> None:
     assert f"key = '{ADMIN_ROLE_KEY}'" in sql
     assert "permission = 'application.transition'" in sql
     assert "active" in sql
-    assert "valid_from" in sql and "valid_until" in sql
-
-
-def test_rows_stmt_gremium_scope_optional() -> None:
-    gid = uuid.uuid4()
-    assert "gremium_id" in _rows_sql("application.transition", gremium_id=gid)
-    assert "gremium_id" not in _rows_sql("application.transition")
+    assert "gremium_id" not in sql
 
 
 BASE_CTX = GuardContext(manual=True)
@@ -277,12 +262,9 @@ def test_firable_empty_transitions_empty() -> None:
 
 
 async def test_candidates_batch_resolution_roles_groups_committees() -> None:
-    """Resolve roles, groups and committees in batches.
-
-    An assignment scope counts as a group key, as in ``resolve_principal``.
-    """
+    """Resolve roles, groups and committees in batches, as in ``resolve_principal``."""
     pid1, pid2 = uuid.uuid4(), uuid.uuid4()
-    g_scope, g_member = uuid.uuid4(), uuid.uuid4()
+    g_member = uuid.uuid4()
     session = FakeSession(
         executes=[
             [
@@ -290,31 +272,28 @@ async def test_candidates_batch_resolution_roles_groups_committees() -> None:
                 (pid2, "s2", "two@x.de", None),
             ],
             [
-                (pid1, "chair", None),
-                (pid2, "admin", g_scope),
+                (pid1, "chair"),
+                (pid2, "admin"),
             ],
-            [
-                ("idp-group", "mapped-role"),
-                (str(g_scope), "scope-role"),
-            ],
+            [("idp-group", "mapped-role")],
             [(pid1, g_member)],
         ]
     )
     out = await _candidates_with_transition_permission(
-        cast(AsyncSession, session), datetime.now(UTC), gremium_id=None
+        cast(AsyncSession, session), datetime.now(UTC)
     )
     by_sub = {c.sub: c for c in out}
     assert by_sub["s1"].email == "one@x.de"
     assert by_sub["s1"].roles == frozenset({"chair", "mapped-role"})
     assert by_sub["s1"].committees == frozenset({str(g_member)})
-    assert by_sub["s2"].roles == frozenset({"admin", "scope-role"})
+    assert by_sub["s2"].roles == frozenset({"admin"})
     assert by_sub["s2"].committees == frozenset()
 
 
 async def test_candidates_empty_seed_returns_early() -> None:
     session = FakeSession(executes=[[]])
     out = await _candidates_with_transition_permission(
-        cast(AsyncSession, session), datetime.now(UTC), gremium_id=uuid.uuid4()
+        cast(AsyncSession, session), datetime.now(UTC)
     )
     assert out == []
 
@@ -322,7 +301,7 @@ async def test_candidates_empty_seed_returns_early() -> None:
 async def test_candidates_rows_without_email_skipped() -> None:
     session = FakeSession(executes=[[(uuid.uuid4(), "s1", None, None)]])
     out = await _candidates_with_transition_permission(
-        cast(AsyncSession, session), datetime.now(UTC), gremium_id=None
+        cast(AsyncSession, session), datetime.now(UTC)
     )
     assert out == []
 
@@ -333,12 +312,12 @@ async def test_candidates_no_groups_skips_mapping_query() -> None:
     session = FakeSession(
         executes=[
             [(pid, "s1", "one@x.de", None)],
-            [(pid, "chair", None)],
+            [(pid, "chair")],
             [(pid, gid)],
         ]
     )
     out = await _candidates_with_transition_permission(
-        cast(AsyncSession, session), datetime.now(UTC), gremium_id=None
+        cast(AsyncSession, session), datetime.now(UTC)
     )
     assert out[0].roles == frozenset({"chair"})
     assert out[0].committees == frozenset({str(gid)})
@@ -463,7 +442,7 @@ async def test_actionable_excludes_admin_without_firable_guard(
         scalars=[[SimpleNamespace(guard={"roleIs": "chair"})]],
         executes=[
             [(pid1, "s1", "chair@x.de", None), (pid2, "s2", "admin@x.de", None)],
-            [(pid1, "chair", None), (pid2, ADMIN_ROLE_KEY, None)],
+            [(pid1, "chair"), (pid2, ADMIN_ROLE_KEY)],
             [],
         ],
     )
@@ -476,18 +455,13 @@ async def test_actionable_excludes_admin_without_firable_guard(
     assert captured["base"] == (app, True)
 
 
-async def test_actionable_seeds_with_app_gremium_and_dedups(
+async def test_actionable_dedups(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    seen: dict[str, Any] = {}
-
     async def fake_base(_s: Any, _app: Any, *, manual: bool) -> GuardContext:
         return GuardContext(manual=True)
 
-    async def fake_candidates(
-        _s: Any, _now: Any, *, gremium_id: Any
-    ) -> list[ActionableCandidate]:
-        seen["gremium_id"] = gremium_id
+    async def fake_candidates(_s: Any, _now: Any) -> list[ActionableCandidate]:
         return [
             _candidate(sub="a", email="dup@x.de"),
             _candidate(sub="b", email="dup@x.de"),
@@ -507,4 +481,3 @@ async def test_actionable_seeds_with_app_gremium_and_dedups(
         cast(AsyncSession, session), application_id=app.id, state=None
     )
     assert out == ["a@x.de", "dup@x.de"]
-    assert seen["gremium_id"] == gid

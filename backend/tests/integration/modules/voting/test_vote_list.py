@@ -135,7 +135,7 @@ async def test_list_matches_the_single_read(session: AsyncSession) -> None:
 
     by_id = {item.id: item for item in page.items}
     assert by_id[standalone].my_ballot.cast is True
-    assert by_id[standalone].my_ballot.choice == "yes"
+    assert by_id[standalone].my_ballot.choice is None
     assert by_id[standalone].can_cast is True
     assert by_id[meeting_vote].my_ballot.cast is False
     assert by_id[meeting_vote].meeting_title == "Sitzung"

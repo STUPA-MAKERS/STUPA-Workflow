@@ -16,13 +16,12 @@ MAX_AGE = 3600
 
 
 def _applicant_row(
-    *, sid: str = "as1", scope: str = "edit", expired: bool = False, revoked: bool = False
+    *, sid: str = "as1", expired: bool = False, revoked: bool = False
 ) -> ApplicantSession:
     now = datetime.now(UTC)
     row = ApplicantSession(
         sid=sid,
         application_id="app-1",
-        scope=scope,
         expires_at=now - timedelta(seconds=1) if expired else now + timedelta(hours=1),
     )
     if revoked:
@@ -40,11 +39,10 @@ async def test_create_applicant_session_adds_row_and_signs_sid() -> None:
     db = fake_session()
     exp = datetime.now(UTC) + timedelta(hours=12)
     cookie = await sessions.create_applicant_session(
-        db, secret=SECRET, application_id=uuid4(), scope="edit", expires_at=exp
+        db, secret=SECRET, application_id=uuid4(), expires_at=exp
     )
     assert len(db.added) == 1
     assert isinstance(db.added[0], ApplicantSession)
-    assert db.added[0].scope == "edit"
     assert db.flushed == 1
     assert db.added[0].sid not in cookie
     assert sessions._unsign_applicant_sid(SECRET, cookie, MAX_AGE) == db.added[0].sid

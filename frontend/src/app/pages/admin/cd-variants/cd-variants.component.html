@@ -127,13 +127,6 @@
       [ngModel]="form().key"
       (ngModelChange)="patchKey($event)"
     />
-    <app-select
-      [label]="'admin.cdVariants.base' | t"
-      [options]="baseOptions()"
-      name="baseVariant"
-      [ngModel]="form().baseVariant"
-      (ngModelChange)="patch('baseVariant', $event)"
-    />
     @if (formError(); as err) {
       <app-note kind="error" icon="alert" role="alert">{{ err | t }}</app-note>
     }

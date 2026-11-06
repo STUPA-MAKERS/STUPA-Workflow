@@ -1,10 +1,9 @@
 """Attendance service for a meeting.
 
-The roster of a meeting holds the members whose membership overlaps the meeting
-window, plus each principal with an attendance record for the meeting (see
-`app.modules.livevote.roster`). A closed meeting thus keeps its attendance, also
-when a membership ended later or the OIDC sync removed it. A change of the
-attendance needs a membership that is valid now. Each pair of meeting and member
+The roster of a meeting holds the members of the Gremium, plus each principal
+with an attendance record for the meeting (see `app.modules.livevote.roster`). A
+closed meeting thus keeps its attendance, also when the OIDC sync removed a
+membership later. A change of the attendance needs a membership. Each pair of meeting and member
 has exactly one record. The unique constraint drives the upsert.
 
 The rules:
@@ -31,7 +30,6 @@ The rules:
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
@@ -58,7 +56,6 @@ from app.modules.livevote.schemas import (
     MeetingMemberOut,
     SelfAttendanceStatus,
 )
-from app.settings import get_settings
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError
 
 _DELEGATION_ACTIVE = (
@@ -90,18 +87,9 @@ def _resolve_note(
 class AttendanceService:
     """Read the roster of a meeting and change the attendance records."""
 
-    def __init__(self, session: AsyncSession, *, tz_name: str | None = None) -> None:
-        """Bind the service to a session.
-
-        `tz_name` overrides the local time zone of the settings.
-        """
+    def __init__(self, session: AsyncSession) -> None:
+        """Bind the service to a session."""
         self.session = session
-        self._tz_name = tz_name
-
-    @property
-    def tz_name(self) -> str:
-        """Return the local time zone of the planned meeting start."""
-        return self._tz_name or get_settings().local_timezone
 
     async def _meeting(self, meeting_id: UUID, *, for_write: bool = False) -> Meeting:
         """Load a meeting by id.
@@ -123,11 +111,7 @@ class AttendanceService:
         return meeting
 
     async def _current_members(self, gremium_id: UUID) -> list[PrincipalRow]:
-        """Return each current member of the Gremium once.
-
-        A membership counts when its term window is valid now.
-        """
-        now = datetime.now(UTC)
+        """Return each member of the Gremium once."""
         rows = (
             (
                 await self.session.execute(
@@ -136,13 +120,7 @@ class AttendanceService:
                         GremiumMembership,
                         GremiumMembership.principal_id == PrincipalRow.id,
                     )
-                    .where(
-                        GremiumMembership.gremium_id == gremium_id,
-                        (GremiumMembership.valid_from.is_(None))
-                        | (GremiumMembership.valid_from <= now),
-                        (GremiumMembership.valid_until.is_(None))
-                        | (GremiumMembership.valid_until > now),
-                    )
+                    .where(GremiumMembership.gremium_id == gremium_id)
                     .order_by(PrincipalRow.display_name)
                     .distinct()
                 )
@@ -175,9 +153,9 @@ class AttendanceService:
     ) -> list[AttendanceOut]:
         """Return the members with the attendance they have for this meeting.
 
-        The list holds the members whose membership overlaps the meeting window,
-        plus each principal with a record for the meeting. A closed meeting thus
-        does not depend on the memberships that are valid now. A member without
+        The list holds the members of the Gremium, plus each principal with a
+        record for the meeting, so a former member who attended stays in the
+        list. A member without
         a record gets `status` and `source` as `None`. The `note` goes only to
         the member and to the meeting lead (`can_write`). `canKeepProtocol` marks
         the members who can keep the minutes now, for the keeper picker and
@@ -190,7 +168,7 @@ class AttendanceService:
             (
                 await self.session.execute(
                     select(PrincipalRow)
-                    .where(meeting_roster_filter(meeting, self.tz_name))
+                    .where(meeting_roster_filter(meeting))
                     .order_by(PrincipalRow.display_name, PrincipalRow.id)
                 )
             )

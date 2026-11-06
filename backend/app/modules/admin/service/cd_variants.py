@@ -154,7 +154,6 @@ def _variant_out(row: CdVariant, logos: list[CdVariantLogo]) -> CdVariantOut:
         id=row.id,
         key=row.key,
         name=row.name,
-        base_variant="protocol" if row.base_variant == "protocol" else "report",
         logos=[_logo_out(logo) for logo in logos],
     )
 
@@ -206,8 +205,11 @@ class CdVariantService(ConfigServiceBase):
             ConflictError: The key already exists (409).
         """
         if await self._by_key(payload.key) is not None:
-            raise ConflictError(f"cd variant key {payload.key!r} already exists")
-        row = CdVariant(key=payload.key, name=payload.name, base_variant=payload.base_variant)
+            raise ConflictError(
+                f"cd variant key {payload.key!r} already exists",
+                code="cd_variant_exists",
+            )
+        row = CdVariant(key=payload.key, name=payload.name)
         self.session.add(row)
         await self.session.flush()
         await self._audit(actor, AuditAction.CONFIG_CHANGE, "cd_variant", row.id)
@@ -217,7 +219,7 @@ class CdVariantService(ConfigServiceBase):
     async def update_variant(
         self, variant_id: UUID, payload: CdVariantUpdate, actor: str
     ) -> CdVariantOut:
-        """Patch the display name or the base variant.
+        """Patch the display name.
 
         Raises:
             NotFoundError: No variant has this id (404).
@@ -225,11 +227,9 @@ class CdVariantService(ConfigServiceBase):
         """
         row = await self._get_or_404(variant_id)
         if payload.key is not None and payload.key != row.key:
-            raise ConflictError("cd variant key is immutable")
+            raise ConflictError("cd variant key is immutable", code="cd_variant_key_immutable")
         if payload.name is not None:
             row.name = payload.name
-        if payload.base_variant is not None:
-            row.base_variant = payload.base_variant
         await self._audit(actor, AuditAction.CONFIG_CHANGE, "cd_variant", row.id)
         await self.session.commit()
         return _variant_out(row, await self._logos_of(row.id))
@@ -248,7 +248,10 @@ class CdVariantService(ConfigServiceBase):
             select(Gremium.id).where(Gremium.cd_variant_id == variant_id).limit(1)
         )
         if in_use is not None:
-            raise ConflictError("cd variant is still referenced by a gremium")
+            raise ConflictError(
+                "cd variant is still referenced by a gremium",
+                code="cd_variant_in_use",
+            )
         keys = [
             logo.object_key
             for logo in await self._logos_of(variant_id)

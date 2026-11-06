@@ -39,7 +39,7 @@ from app.shared.config_schemas import VoteConfig
 ADMIN_SUB = "admin-p5a"
 
 CONFIG = VoteConfig.model_validate(
-    {"options": ["yes", "no", "abstain"], "majorityRule": "simple"}
+    {"options": ["yes", "no", "abstain"], "majorityRule": "simple", "secret": True}
 ).model_dump(by_alias=True)
 
 

@@ -227,8 +227,7 @@ async def test_the_due_reminder_skips_a_former_member(
     async with maker() as session:
         await session.execute(
             text(
-                "UPDATE gremium_membership SET valid_until = now() - interval '1 day' "
-                "WHERE principal_id = :p"
+                "DELETE FROM gremium_membership WHERE principal_id = :p"
             ),
             {"p": former_id},
         )

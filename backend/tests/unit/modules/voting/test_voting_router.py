@@ -42,7 +42,7 @@ def _vote_out(status: str = "draft") -> VoteOut:
         eligibleGroup=str(GID),
         config=_CONFIG,
         status=status,  # type: ignore[arg-type]
-        secret=False,
+        secret=True,
         tally=_TALLY,
     )
 
@@ -116,7 +116,7 @@ class _FakeService:
         from app.shared.errors import ConflictError
 
         if str(vote_id).startswith("00000000"):
-            raise ConflictError("not a draft", code="vote_not_draft")
+            raise ConflictError("open", code="vote_not_deletable")
         self.deleted = (vote_id, actor)
 
 

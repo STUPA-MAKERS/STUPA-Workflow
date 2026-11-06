@@ -516,7 +516,7 @@ async def update_cd_variant(
     service: CdVariantServiceDep,
     principal: CdVariantsAdmin,
 ) -> CdVariantOut:
-    """Patch name or base variant. The key is immutable and a change answers 409."""
+    """Patch the name. The key is immutable and a change answers 409."""
     return await service.update_variant(variant_id, payload, principal.sub)
 
 

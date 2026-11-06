@@ -19,7 +19,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.modules.applications.models import Application, MagicLink
 from app.modules.applications.service import ApplicationsService
-from app.modules.auth import tokens
 from app.modules.auth.models import ApplicantSession
 from app.settings import Settings
 from app.shared.errors import GoneError
@@ -85,23 +84,23 @@ async def test_redeem_expires_only_the_older_links(
     newest = await issue_magic_token(maker, settings, app_id)
     assert [link.expires_at for link in await _links(maker, app_id)] == [None] * 3
 
-    assert await redeem(maker, settings, middle) == "edit"
+    await redeem(maker, settings, middle)
     first, second, third = await _links(maker, app_id)
     assert first.expires_at is not None
     assert second.expires_at is None and third.expires_at is None
 
     with pytest.raises(GoneError):
         await redeem(maker, settings, oldest)
-    assert await redeem(maker, settings, middle) == "edit"
-    assert await redeem(maker, settings, newest) == "edit"
+    await redeem(maker, settings, middle)
+    await redeem(maker, settings, newest)
     with pytest.raises(GoneError):
         await redeem(maker, settings, middle)
 
 
-async def test_locked_state_gives_an_edit_session(
+async def test_locked_state_opens_a_session(
     maker: async_sessionmaker[AsyncSession], settings: Settings
 ) -> None:
-    """A link in a locked state opened only `view` before. Now it opens `edit`."""
+    """A link in a locked state opens an applicant session of the application."""
     seed, app_id = await _setup(maker)
     async with maker() as session:
         await session.execute(
@@ -112,56 +111,15 @@ async def test_locked_state_gives_an_edit_session(
         await session.commit()
     token = await issue_magic_token(maker, settings, app_id)
     (link,) = await _links(maker, app_id)
-    assert link.scope == "edit" and link.single_use is False
-    assert await redeem(maker, settings, token) == "edit"
+    assert link.expires_at is None
+    assert await redeem(maker, settings, token) == str(app_id)
     async with maker() as session:
-        scopes = (
+        rows = (
             await session.scalars(
-                select(ApplicantSession.scope).where(ApplicantSession.application_id == app_id)
+                select(ApplicantSession.id).where(ApplicantSession.application_id == app_id)
             )
         ).all()
-    assert scopes == ["edit"]
-
-
-async def test_old_view_link_opens_an_edit_session(
-    maker: async_sessionmaker[AsyncSession], settings: Settings
-) -> None:
-    """An older single-use view link still works once, now with edit."""
-    _, app_id = await _setup(maker)
-    async with maker() as session:
-        session.add(
-            MagicLink(
-                application_id=app_id,
-                token_hash=tokens.hash_token("old-view", settings.magic_link_secret),
-                scope="view",
-                expires_at=datetime.now(UTC) + timedelta(minutes=15),
-                single_use=True,
-            )
-        )
-        await session.commit()
-    assert await redeem(maker, settings, "old-view") == "edit"
-    with pytest.raises(GoneError):
-        await redeem(maker, settings, "old-view")
-
-
-async def test_view_link_without_expiry_violates_the_check(
-    maker: async_sessionmaker[AsyncSession], settings: Settings
-) -> None:
-    from sqlalchemy.exc import IntegrityError
-
-    _, app_id = await _setup(maker)
-    async with maker() as session:
-        session.add(
-            MagicLink(
-                application_id=app_id,
-                token_hash=b"\x01" * 32,
-                scope="view",
-                expires_at=None,
-                single_use=True,
-            )
-        )
-        with pytest.raises(IntegrityError):
-            await session.commit()
+    assert len(rows) == 1
 
 
 async def test_archive_expires_every_link(

@@ -9,7 +9,6 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { switchMap } from 'rxjs/operators';
 import { ApiClient } from '@core/api/api-client.service';
 import type { ElectionConfig, ElectionResult, Uuid, Vote, VoteResult } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -90,7 +89,7 @@ export class ElectionResultComponent {
   /** The lot was drawn or the runoff opened: the caller reads the vote again. */
   readonly changed = output<Vote>();
 
-  protected readonly busy = signal<'lot' | 'runoff' | null>(null);
+  protected readonly busy = signal<'lot' | null>(null);
   /** The first click on "Los ziehen" asks again: the draw cannot be undone. */
   protected readonly lotArmed = signal(false);
   private readonly lotActions = viewChild<ElementRef<HTMLElement>>('lotActions');
@@ -198,28 +197,6 @@ export class ElectionResultComponent {
   cancelLot(): void {
     this.lotArmed.set(false);
     this.lotActions()?.nativeElement.querySelector<HTMLElement>('.er__lot button')?.focus();
-  }
-
-  /** "Stichwahl starten": create the runoff, then open it. */
-  startRunoff(): void {
-    const id = this.voteId();
-    if (!id || this.busy()) return;
-    this.busy.set('runoff');
-    this.api
-      .createElectionRunoff(id)
-      .pipe(
-        switchMap((runoff) =>
-          this.api.openVote(runoff.id).pipe(switchMap(() => this.api.getVote(runoff.id))),
-        ),
-      )
-      .subscribe({
-        next: (vote) => {
-          this.busy.set(null);
-          this.toast.success(this.t('election.runoff.started'));
-          this.changed.emit(vote);
-        },
-        error: (err: unknown) => this.fail(err),
-      });
   }
 
   private fail(err: unknown): void {

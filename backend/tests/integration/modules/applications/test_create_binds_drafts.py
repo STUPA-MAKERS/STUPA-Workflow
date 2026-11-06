@@ -17,7 +17,7 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine, func, select
+from sqlalchemy import Engine, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.deps import DbSession, SettingsDep
@@ -26,8 +26,8 @@ from app.modules.applications.router import get_magic_link_sender
 from app.modules.applications.schemas import ApplicationCreate
 from app.modules.applications.service import ApplicationsService
 from app.modules.audit.models import AuditEntry
-from app.modules.files.drafts import DraftAttachments
-from app.modules.files.models import Attachment
+from app.modules.files.drafts import DraftAttachments, hash_draft_token
+from app.modules.files.models import Attachment, AttachmentDraftToken
 from app.modules.files.router import get_files_service
 from app.modules.files.service import FilesService
 from app.modules.files.storage import ObjectStorage
@@ -170,7 +170,6 @@ async def test_create_binds_the_listed_drafts(
         for aid in (first, second):
             assert rows[aid].application_id == app_id
             assert rows[aid].draft_token_hash is None
-            assert rows[aid].draft_expires_at is None
             assert rows[aid].storage_key == keys[aid]
         assert rows[unlisted].application_id is None
         assert rows[unlisted].draft_token_hash is not None
@@ -196,19 +195,15 @@ async def test_pending_scan_is_allowed_and_stays_quarantined(
         assert row.scanned is False
 
 
-async def test_missing_expired_foreign_and_infected_drafts_give_422(
+async def test_missing_foreign_and_infected_drafts_give_422(
     maker: async_sessionmaker[AsyncSession], settings: Settings
 ) -> None:
     seed = await _seed(maker)
     good, token = await _draft(maker, settings)
-    expired, _ = await _draft(maker, settings, token)
     infected, _ = await _draft(maker, settings, token)
     foreign, _ = await _draft(maker, settings)
     unknown = uuid.uuid4()
     async with maker() as session:
-        row = await session.get(Attachment, expired)
-        assert row is not None
-        row.draft_expires_at = datetime.now(UTC) - timedelta(seconds=1)
         hit = await session.get(Attachment, infected)
         assert hit is not None
         hit.scanned = True
@@ -216,7 +211,7 @@ async def test_missing_expired_foreign_and_infected_drafts_give_422(
         hit.storage_key = None
         await session.commit()
 
-    ids = [good, expired, infected, foreign, unknown]
+    ids = [good, infected, foreign, unknown]
     with pytest.raises(ValidationProblem) as caught:
         await _create(
             maker,
@@ -226,12 +221,42 @@ async def test_missing_expired_foreign_and_infected_drafts_give_422(
     assert caught.value.code == "draft_attachments_missing"
     assert caught.value.errors is not None
     named = {e.field for e in caught.value.errors}
-    assert named == {f"attachmentIds.{i}" for i in (expired, infected, foreign, unknown)}
+    assert named == {f"attachmentIds.{i}" for i in (infected, foreign, unknown)}
     assert await _count_apps(maker) == 0
     async with maker() as session:
         row = await session.get(Attachment, good)
         assert row is not None
         assert row.application_id is None
+
+
+async def test_drafts_of_an_expired_token_give_422(
+    maker: async_sessionmaker[AsyncSession], settings: Settings
+) -> None:
+    """The end of the token is the end of its drafts."""
+    seed = await _seed(maker)
+    first, token = await _draft(maker, settings)
+    second, _ = await _draft(maker, settings, token)
+    async with maker() as session:
+        await session.execute(
+            update(AttachmentDraftToken)
+            .where(
+                AttachmentDraftToken.token_hash
+                == hash_draft_token(token, settings.magic_link_secret)
+            )
+            .values(expires_at=datetime.now(UTC) - timedelta(seconds=1))
+        )
+        await session.commit()
+    with pytest.raises(ValidationProblem) as caught:
+        await _create(
+            maker,
+            settings,
+            _payload(seed, attachmentIds=[str(first), str(second)], draftToken=token),
+        )
+    assert caught.value.code == "draft_attachments_missing"
+    assert caught.value.errors is not None
+    named = {e.field for e in caught.value.errors}
+    assert named == {f"attachmentIds.{i}" for i in (first, second)}
+    assert await _count_apps(maker) == 0
 
 
 async def test_file_field_must_reference_listed_drafts(

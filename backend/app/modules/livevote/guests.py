@@ -14,11 +14,12 @@ Rules that this module enforces:
   the server answers 429 with ``Retry-After``.
 * The guest view never holds the name of another person, the attendance list, a
   delegation, or the content of a non-public agenda item. A non-public item shows its
-  title only (decision 2026-10-06).
+  title only.
 * The audit log stores the guest id only, never the name: the chain is append-only.
 * Privacy: the close of the meeting deletes the requests that never got admitted and
-  every token hash. Leaving or withdrawing replaces the own name with the pseudonym
-  "Gast n" at once. The finalization of the protocol pseudonymizes all guests.
+  every token hash, and pseudonymizes the admitted guests. Leaving or withdrawing
+  replaces the own name with the pseudonym "Gast n" at once. The finalization of the
+  protocol pseudonymizes all guests again.
 
 The lead routes need ``session.manage`` in the gremium of the meeting (the router
 checks it). The public routes authenticate the guest by the token alone.
@@ -355,8 +356,8 @@ class GuestService:
         """The meeting closes: delete the requests and pseudonymize the guests.
 
         The rows that never got admitted go: the rejected, the withdrawn and the still
-        open requests. The names of the admitted guests go too (decision 2026-10-06:
-        at the latest at the close); the numbers stay for the protocol. Every token
+        open requests. The names of the admitted guests go too, at the
+        latest at the close; the numbers stay for the protocol. Every token
         hash goes, because a token has no use after the close. The caller commits and
         then sends the returned events: the lead list drops the deleted rows, and the
         socket of a waiting device ends.
@@ -848,7 +849,7 @@ class GuestService:
     async def leave(self, code: str, token: str | None, *, now: datetime) -> None:
         """Withdraw the request or leave the meeting.
 
-        The own name becomes the pseudonym at once (decision 2026-10-06), and the token
+        The own name becomes the pseudonym at once, and the token
         stops working. The ballots that the guest cast stay counted.
         """
         meeting, guest = await self.resolve(code, token, for_update=True)
@@ -1023,7 +1024,7 @@ class GuestService:
         for vote in rows:
             config = VoteConfig.from_stored(vote.config)
             view = await voting.get(vote.id)
-            mine = await voting.my_ballot(vote, voter, secret=config.secret)
+            mine = await voting.my_ballot(vote, voter)
             can_cast = (
                 vote.status == "open"
                 and config.guests_vote

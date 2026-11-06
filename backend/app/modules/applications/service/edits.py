@@ -76,7 +76,10 @@ class EditOps(ApplicationsServiceBase):
         app = await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
         state = await self._get_state(app.current_state_id)
         if state is not None and not state.edit_allowed and not bypass_state_lock:
-            raise ConflictError("Application is locked for editing in its current state.")
+            raise ConflictError(
+                "Application is locked for editing in its current state.",
+                code="application_locked",
+            )
 
         fields = await self._pinned_fields(app)
         if not any(f.key == SYSTEM_TITLE_KEY for f in fields):
@@ -212,7 +215,6 @@ class EditOps(ApplicationsServiceBase):
                 .values(expires_at=now)
             )
         app.archived_at = now if archived else None
-        app.archived_by = actor if archived else None
         await self.session.commit()
         await self.session.refresh(app)
         return await self._to_out(app, include_pii=False, strip_pii_fields=strip_pii_fields)

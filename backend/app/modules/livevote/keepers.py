@@ -14,7 +14,6 @@ The module holds the queries that more than one part of the meeting module needs
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
@@ -36,22 +35,14 @@ VOTE_PERMISSION = "vote.cast"
 KeeperSummary = tuple[list[KeeperPeriodOut], KeeperPeriodOut | None]
 
 
-async def member_permissions(
-    session: AsyncSession, gremium_id: UUID, now: datetime | None = None
-) -> dict[UUID, frozenset[str]]:
-    """Return the gremium-role permissions of each current member of the gremium.
-
-    A member with more than one active membership gets the union of the roles.
-    """
-    now = now or datetime.now(UTC)
+async def member_permissions(session: AsyncSession, gremium_id: UUID) -> dict[UUID, frozenset[str]]:
+    """Return the gremium-role permissions of each member of the gremium."""
     rows = (
         await session.execute(
             select(GremiumMembership.principal_id, GremiumRole.permissions)
             .join(GremiumRole, GremiumRole.id == GremiumMembership.gremium_role_id)
             .where(
                 GremiumMembership.gremium_id == gremium_id,
-                (GremiumMembership.valid_from.is_(None)) | (GremiumMembership.valid_from <= now),
-                (GremiumMembership.valid_until.is_(None)) | (GremiumMembership.valid_until > now),
             )
         )
     ).all()
@@ -61,11 +52,9 @@ async def member_permissions(
     return {pid: frozenset(perms) for pid, perms in out.items()}
 
 
-async def keeper_principal_ids(
-    session: AsyncSession, gremium_id: UUID, now: datetime | None = None
-) -> set[UUID]:
-    """Return the current members of the gremium whose role grants `protocol.write`."""
-    perms = await member_permissions(session, gremium_id, now)
+async def keeper_principal_ids(session: AsyncSession, gremium_id: UUID) -> set[UUID]:
+    """Return the members of the gremium whose role grants `protocol.write`."""
+    perms = await member_permissions(session, gremium_id)
     return {pid for pid, held in perms.items() if KEEPER_PERMISSION in held}
 
 

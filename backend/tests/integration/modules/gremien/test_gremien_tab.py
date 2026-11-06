@@ -37,14 +37,14 @@ from app.modules.auth.principal import Principal
 from app.modules.delegations.models import MeetingDelegation
 from app.modules.livevote.models import Meeting, MeetingAgendaItem, MeetingAttendance
 from app.modules.protocol.models import Protocol
-from app.modules.voting.models import Ballot, SecretBallot, Vote, VotedMarker
+from app.modules.voting.models import SecretBallot, Vote, VotedMarker
 from app.settings import get_settings, load_settings
 from app.shared.config_schemas import VoteConfig
 
 pytestmark = pytest.mark.integration
 
 PLAIN = VoteConfig.model_validate(
-    {"options": ["yes", "no", "abstain"], "majorityRule": "simple"}
+    {"options": ["yes", "no", "abstain"], "majorityRule": "simple", "secret": True}
 ).model_dump(by_alias=True)
 SECRET = VoteConfig.model_validate(
     {"options": ["yes", "no", "abstain"], "majorityRule": "two_thirds", "secret": True}
@@ -105,7 +105,7 @@ def _client(app: FastAPI, principal: Principal) -> TestClient:
 
 
 async def _world(maker: async_sessionmaker[AsyncSession]) -> World:
-    """Seed the gremium world, in which Bob left at the end of May."""
+    """Seed the gremium world, in which the account of the member Bob is deactivated."""
     tag = uuid.uuid4().hex[:8]
     async with maker() as s:
         g = Gremium(name=f"STUPA {tag}", slug=f"stupa-{tag}", quorum_percent=50)
@@ -126,7 +126,10 @@ async def _world(maker: async_sessionmaker[AsyncSession]) -> World:
         people: dict[str, PrincipalRow] = {}
         for name in ("me", "alice", "bob", "sub", "outsider"):
             row = PrincipalRow(
-                sub=f"{name}-{tag}", display_name=name.title(), email=f"{name}-{tag}@x.de"
+                sub=f"{name}-{tag}",
+                display_name=name.title(),
+                email=f"{name}-{tag}@x.de",
+                active=name != "bob",
             )
             s.add(row)
             people[name] = row
@@ -140,10 +143,7 @@ async def _world(maker: async_sessionmaker[AsyncSession]) -> World:
                     principal_id=people["alice"].id, gremium_id=g.id, gremium_role_id=member.id
                 ),
                 GremiumMembership(
-                    principal_id=people["bob"].id,
-                    gremium_id=g.id,
-                    gremium_role_id=member.id,
-                    valid_until=datetime(2026, 5, 31, 22, 0, tzinfo=UTC),
+                    principal_id=people["bob"].id, gremium_id=g.id, gremium_role_id=member.id
                 ),
                 GremiumMembership(
                     principal_id=people["outsider"].id,
@@ -263,10 +263,11 @@ async def _world(maker: async_sessionmaker[AsyncSession]) -> World:
         await s.flush()
         s.add_all(
             [
-                Ballot(vote_id=motion.id, voter_sub="a", choice="yes"),
-                Ballot(vote_id=motion.id, voter_sub="b", choice="yes"),
-                Ballot(vote_id=motion.id, voter_sub="c", choice="no"),
-                Ballot(vote_id=motion.id, voter_sub="d", choice="abstain"),
+                *(VotedMarker(vote_id=motion.id, voter_sub=sub) for sub in "abcd"),
+                *(
+                    SecretBallot(vote_id=motion.id, choice=choice)
+                    for choice in ("yes", "yes", "no", "abstain")
+                ),
                 VotedMarker(vote_id=secret.id, voter_sub="a"),
                 VotedMarker(vote_id=secret.id, voter_sub="b"),
                 SecretBallot(vote_id=secret.id, choice="no"),
@@ -284,7 +285,7 @@ async def _world(maker: async_sessionmaker[AsyncSession]) -> World:
 async def test_overview_member_and_view_all(
     maker: async_sessionmaker[AsyncSession], app_for: FastAPI
 ) -> None:
-    """List the members for a member and for view-all: me and alice, not bob, who left."""
+    """List the members for a member and for view-all: me and alice, not bob, who is inactive."""
     w = await _world(maker)
     rows = _client(app_for, w.me).get("/api/gremien/overview").json()
     assert [r["id"] for r in rows] == [str(w.gremium_id)]
@@ -374,8 +375,8 @@ async def test_members_and_former(
 async def test_meetings_counts(maker: async_sessionmaker[AsyncSession], app_for: FastAPI) -> None:
     """Count the meetings per person.
 
-    The first meeting counts me, sub and bob. The second counts me, alice, bob, who was a
-    member then, and sub, who is recorded.
+    The first meeting counts me, sub and bob as present. Its roster holds the members me,
+    alice and bob, and sub, who is recorded.
     """
     w = await _world(maker)
     rows = _client(app_for, w.me).get(f"/api/gremien/{w.gremium_id}/meetings").json()
@@ -432,7 +433,7 @@ async def test_attendance_matrix(maker: async_sessionmaker[AsyncSession], app_fo
         "excused": 0,
         "delegated": 0,
     }
-    assert rows["Bob"]["cells"][1]["member"] is False
+    assert rows["Bob"]["cells"][1]["member"] is True
     assert rows["Me"]["cells"][1]["excused"] == 1
     assert rows["Me"]["isSelf"] is True
     assert "note" not in str(body)

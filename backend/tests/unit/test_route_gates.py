@@ -207,7 +207,6 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("POST", "/api/votes/{vote_id}/close"): _RUN_VOTE,
     ("POST", "/api/votes/{vote_id}/draw-lot"): _MANAGE_VOTE,
     ("POST", "/api/votes/{vote_id}/open"): _RUN_VOTE,
-    ("POST", "/api/votes/{vote_id}/runoff"): _MANAGE_VOTE,
     ("WS", "/api/ws/meetings/{meeting_id}"): "livevote.router._authorize (is_participant)",
     ("WS", "/api/ws/meetings/{meeting_id}/beamer"): "livevote.router._authorize (is_participant)",
     ("WS", "/api/ws/todos"): "TodoLiveConnection (BoardAccess.can_read per board)",

@@ -266,14 +266,12 @@ class GremiumUpdate(WireModel):
 class CdVariantCreate(WireModel):
     key: str
     name: str
-    baseVariant: str = "report"
 
 
 class CdVariantUpdate(WireModel):
     """Patch of a CD variant. `key` is immutable — a different value gives 409."""
 
     name: str | None = None
-    baseVariant: str | None = None
 
 
 class CdVariantLogoVendoredCreate(WireModel):
@@ -630,8 +628,9 @@ class VoteCreate(WireModel):
 
     config: dict[str, Any] = Field(
         description=(
-            "Vote config: options, majorityRule, quorum, abstainCountsQuorum, "
-            "tieBreak. The vote is always secret: `secret` false gives 422. A ballot "
+            "Vote config: options, majorityRule, quorum, abstainCountsQuorum. A tie "
+            "always rejects: `tieBreak` other than `rejected` gives 422. The vote is "
+            "always secret: `secret` false gives 422. A ballot "
             "never changes after the cast, so there is no `allowChange` (the server "
             "refuses the key with 422)."
         )

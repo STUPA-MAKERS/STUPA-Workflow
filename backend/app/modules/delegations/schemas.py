@@ -99,7 +99,8 @@ class MeetingDelegationContext(_CamelModel):
 
     meeting_id: UUID = Field(serialization_alias="meetingId")
     gremium_id: UUID = Field(serialization_alias="gremiumId")
-    #: Feature gates: the gremium switch and the global vote-delegation flag.
+    #: Feature gate: the gremium switch. ``votingDelegationEnabled`` mirrors it, because
+    #: no server setting switches the vote transfer any more.
     allow_vote_delegation: bool = Field(serialization_alias="allowVoteDelegation")
     voting_delegation_enabled: bool = Field(serialization_alias="votingDelegationEnabled")
     delegation_allow_external: bool = Field(serialization_alias="delegationAllowExternal")

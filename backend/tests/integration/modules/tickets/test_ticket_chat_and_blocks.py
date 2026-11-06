@@ -9,7 +9,7 @@ Auskunft read).
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
@@ -23,6 +23,7 @@ from app.modules.privacy.service import erase_email
 from app.modules.tickets.models import Ticket, TicketNote, TicketSenderBlock
 from app.modules.tickets.service import erase_sender_blocks, sender_blocks_of
 from app.settings import Settings
+from tests._support.draft_tokens import add_draft_token
 from tests._support.memory_storage import MemoryStorage, wire_storage
 from tests.integration.modules.tickets.conftest import (
     ADMIN,
@@ -50,6 +51,7 @@ async def _draft(
     key = f"drafts/{draft_id}/{name}"
     await storage.put(key, b"%PDF-1.4\n", "application/pdf")
     async with maker() as session:
+        await add_draft_token(session, hash_draft_token(token, settings.magic_link_secret))
         session.add(
             Attachment(
                 id=draft_id,
@@ -60,7 +62,6 @@ async def _draft(
                 scanned=scan is not None,
                 scan_result=scan,
                 draft_token_hash=hash_draft_token(token, settings.magic_link_secret),
-                draft_expires_at=datetime.now(UTC) + timedelta(days=7),
             )
         )
         await session.commit()
@@ -139,7 +140,7 @@ async def test_a_note_binds_its_files_and_a_manager_downloads_them(
         row = await session.get(Attachment, clean)
         assert row is not None
         assert row.ticket_note_id is not None and row.application_id is None
-        assert row.draft_token_hash is None and row.draft_expires_at is None
+        assert row.draft_token_hash is None
 
 
 async def test_a_quarantined_note_file_never_downloads(

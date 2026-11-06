@@ -10,7 +10,6 @@
 * ``GET  /api/votes``                   - the votes the caller can read, with the own
   ballot state (no tally).
 * ``POST /api/votes/{id}/draw-lot``     - draw the lot of a tied election.
-* ``POST /api/votes/{id}/runoff``       - create the runoff of an election.
 * ``POST /api/votes``                   - create the poll of a Gremium (no meeting).
 * ``PATCH /api/votes/{id}``             - change a poll while it holds no ballot.
 
@@ -98,7 +97,7 @@ def _mail_poll_start(
     if vote.kind != "poll" or vote.meeting_id is not None or vote.status != "open":
         return
     pool = getattr(request.app.state, "arq_pool", None)
-    background.add_task(notify_poll_started, settings, vote.id, pool, now=datetime.now(UTC))
+    background.add_task(notify_poll_started, settings, vote.id, pool)
 
 
 @router.post(
@@ -280,11 +279,10 @@ async def delete_vote(
     service: ServiceDep,
     principal: ReaderDep,
 ) -> None:
-    """Delete a standalone application-bound vote that never ran.
+    """Delete a standalone application-bound vote that is a draft or cancelled.
 
-    The vote must still be ``draft`` and must hold no ballot. Everything
-    further along stays with ``cancel``, so the record of the Gremium keeps
-    every vote that ever opened. A meeting-bound vote answers 409 and belongs
+    An open or closed vote answers 409 ``vote_not_deletable``: it stays in the
+    record of the Gremium. A meeting-bound vote answers 409 and belongs
     to ``DELETE /meetings/{meeting_id}/votes/{vote_id}``, which applies the
     meeting-scoped check.
 
@@ -356,28 +354,6 @@ async def draw_lot(
     vote = await ElectionService(service).draw_lot(vote_id, principal, now=datetime.now(UTC))
     await publisher.vote_lot_drawn(vote)
     return vote
-
-
-@router.post(
-    "/votes/{vote_id}/runoff",
-    response_model=VoteOut,
-    responses=_errors(401, 403, 404, 409),
-)
-async def create_runoff(
-    vote_id: UUID,
-    service: ServiceDep,
-    principal: ReaderDep,
-) -> VoteOut:
-    """Create the draft runoff of an election with a tie at the seat boundary.
-
-    The runoff holds the tied candidates and the open seats, on the same agenda item,
-    one round later; the meeting lead opens it with ``POST /votes/{id}/open``. 409
-    ``no_runoff_pending`` when no runoff is due, ``runoff_exists`` when it exists,
-    ``not_an_election`` for a motion; 409 when the meeting is not live.
-    Gremium-scoped manage right.
-    """
-    await service.assert_can_manage_vote(vote_id, principal)
-    return await ElectionService(service).create_runoff(vote_id)
 
 
 @router.get(

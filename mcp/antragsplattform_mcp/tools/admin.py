@@ -285,8 +285,8 @@ async def delete_role(role_id: str) -> dict:
 async def list_role_assignments() -> dict:
     """List the RBAC role assignments (read-only).
 
-    An assignment links a principal to a role. It can also carry a Gremium scope.
-    Only the bootstrap assignments remain. The global roles come from the OIDC
+    An assignment links a principal to a global role. Only the bootstrap writes
+    assignments. The global roles come from the OIDC
     groups through the group mappings. See `list_group_mappings`.
     """
     return await api().get("/admin/role-assignments")

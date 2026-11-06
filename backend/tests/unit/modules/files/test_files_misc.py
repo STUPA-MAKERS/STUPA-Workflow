@@ -42,6 +42,7 @@ def test_attachment_fk_cascade() -> None:
         "ticket_note": "CASCADE",
         "todo_comment": "CASCADE",
         "comment": "CASCADE",
+        "attachment_draft_token": "CASCADE",
     }
 
 
@@ -71,7 +72,7 @@ def _principal() -> Principal:
 
 
 def _applicant() -> Applicant:
-    return Applicant(application_id=str(uuid.uuid4()), scope="edit")
+    return Applicant(application_id=str(uuid.uuid4()))
 
 
 async def test_ratelimit_key_principal() -> None:

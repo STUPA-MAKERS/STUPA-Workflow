@@ -27,7 +27,7 @@ from app.modules.auth import mcp_router as mcp_router_mod
 from app.modules.auth import oauth, oauth_service, rbac, service, sessions
 from app.modules.auth import oauth_router as oauth_router_mod
 from app.modules.auth import router as router_mod
-from app.modules.auth.models import GroupMapping, RoleAssignment
+from app.modules.auth.models import GroupMapping
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.oidc import OidcClaims
 from app.settings import Settings, get_settings, load_settings
@@ -1410,65 +1410,24 @@ async def test_resolve_principal_membership_perms_none() -> None:
 
 
 async def test_resolve_principal_with_assignment_and_group_mappings() -> None:
-    """RoleAssignment and GroupMapping with and without a Gremium run the loop bodies.
+    """RoleAssignment and GroupMapping both add their roles.
 
-    The test covers a valid assignment with a Gremium (groups.add) and a valid assignment
-    without one (no add). It also covers an expired assignment (else branch of
-    `_assignment_valid`). A global GroupMapping adds its role and no Gremium scope.
+    A global GroupMapping adds its role and no Gremium scope.
 
-    Queue: the assignments, the group mappings, the role permissions, the role keys and
-    the membership rows. The groups hold the assignment Gremium and the OIDC group.
+    Queue: the assigned role ids, the group mappings, the role permissions, the role
+    keys and the membership rows. The groups hold only the OIDC group.
     """
     row = PrincipalRow(sub="u12", email=None, display_name=None, oidc_groups=["grpA"])
     row.id = "pid"  # type: ignore[assignment]
-    gid = "77777777-7777-7777-7777-777777777777"
-    valid_g = RoleAssignment(
-        role_id="r1", gremium_id=gid, valid_from=None, valid_until=None
-    )
-    valid_no_g = RoleAssignment(
-        role_id="r2", gremium_id=None, valid_from=None, valid_until=None
-    )
-    expired = RoleAssignment(
-        role_id="rX", gremium_id=None, valid_from=None,
-        valid_until=NOW - timedelta(days=1),
-    )
     map_a = GroupMapping(oidc_group="grpA", role_id="r3")
     map_b = GroupMapping(oidc_group="grpA", role_id="r4")
     db = fake_session(
-        result(valid_g, valid_no_g, expired),
+        result("r1", "r2"),
         result(map_a, map_b),
         result("application.read"),
         result("member"),
         result(),
     )
     p = await rbac.resolve_principal(db, row, NOW)
-    assert p.groups == {str(gid), "grpA"}
+    assert p.groups == {"grpA"}
     assert p.permissions == {"application.read"}
-
-
-async def test_resolve_principal_naive_validity_window() -> None:
-    """Naive `valid_from` and `valid_until` hit the `_as_aware` branch (line 32).
-
-    A database column without a time zone returns naive datetimes.
-
-    Queue: the assignment, no group mappings, the role permissions, the role keys and
-    no membership rows.
-    """
-    row = PrincipalRow(sub="u13", email=None, display_name=None, oidc_groups=None)
-    row.id = "pid"  # type: ignore[assignment]
-    gid = "99999999-9999-9999-9999-999999999999"
-    naive = RoleAssignment(
-        role_id="r1",
-        gremium_id=gid,
-        valid_from=(NOW - timedelta(days=1)).replace(tzinfo=None),
-        valid_until=(NOW + timedelta(days=1)).replace(tzinfo=None),
-    )
-    db = fake_session(
-        result(naive),
-        result(),
-        result("application.read"),
-        result("member"),
-        result(),
-    )
-    p = await rbac.resolve_principal(db, row, NOW)
-    assert str(gid) in p.groups

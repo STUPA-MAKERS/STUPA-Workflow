@@ -1,7 +1,7 @@
-"""An applicant session has no fixed scope.
+"""An applicant session has no scope.
 
-`get_current_applicant` gives every valid session the scope `edit`, also an old
-`view` session from before that change. Each action checks the current state.
+`get_current_applicant` binds every valid session to its application. Each action
+checks the current state.
 """
 
 from __future__ import annotations
@@ -26,12 +26,11 @@ def _settings() -> Any:
     )
 
 
-@pytest.mark.parametrize("stored", ["edit", "view"])
-async def test_every_valid_session_acts_as_edit(
-    monkeypatch: pytest.MonkeyPatch, stored: str
+async def test_valid_session_gives_the_bound_applicant(
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def _load(*_a: Any, **_k: Any) -> Any:
-        return SimpleNamespace(scope=stored, application_id="aid-1")
+        return SimpleNamespace(application_id="aid-1")
 
     monkeypatch.setattr(deps, "_bearer_token", lambda *_a: "sid")
     monkeypatch.setattr(deps.sessions, "load_applicant_session", _load)
@@ -41,12 +40,12 @@ async def test_every_valid_session_acts_as_edit(
         _settings(),
     )
     assert applicant is not None
-    assert (applicant.application_id, applicant.scope) == ("aid-1", "edit")
+    assert applicant.application_id == "aid-1"
 
 
-async def test_unknown_scope_gives_no_applicant(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_missing_session_gives_no_applicant(monkeypatch: pytest.MonkeyPatch) -> None:
     async def _load(*_a: Any, **_k: Any) -> Any:
-        return SimpleNamespace(scope="admin", application_id="aid-1")
+        return None
 
     monkeypatch.setattr(deps, "_bearer_token", lambda *_a: "sid")
     monkeypatch.setattr(deps.sessions, "load_applicant_session", _load)

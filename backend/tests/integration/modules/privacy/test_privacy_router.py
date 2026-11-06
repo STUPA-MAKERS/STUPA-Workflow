@@ -585,7 +585,6 @@ async def test_applicant_self_service_erasure_request(
         session,
         secret=_SECRET,
         application_id=application.id,
-        scope="view",
         expires_at=datetime.now(UTC) + timedelta(hours=1),
     )
     await session.commit()

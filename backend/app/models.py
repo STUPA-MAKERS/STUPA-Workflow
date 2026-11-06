@@ -10,7 +10,6 @@ from app.db import Base
 from app.modules.admin.models import (
     ApplicationType,
     Gremium,
-    MailList,
     SiteConfigVersion,
     Webhook,
     WebhookDelivery,
@@ -81,7 +80,7 @@ from app.modules.todos.models import (
     TodoLink,
 )
 from app.modules.translations.models import UiLanguage, UiTranslation
-from app.modules.voting.models import Ballot, SecretBallot, Vote, VotedMarker
+from app.modules.voting.models import SecretBallot, Vote, VotedMarker
 
 __all__ = [
     "Applicant",
@@ -93,7 +92,6 @@ __all__ = [
     "AuditEntry",
     "AuditVerification",
     "AuthSession",
-    "Ballot",
     "Base",
     "Budget",
     "BudgetAllocation",
@@ -110,7 +108,6 @@ __all__ = [
     "GroupMapping",
     "GuestApplicationSettings",
     "MagicLink",
-    "MailList",
     "MailTemplate",
     "MarkdownImage",
     "NotificationPreference",

@@ -27,6 +27,7 @@ from app.modules.livevote.service import BrokerPublisher, MeetingService
 from app.modules.voting.schemas import (
     ElectionLotOut,
     ElectionResultOut,
+    MyBallot,
     TallyOut,
     VoteClosed,
     VoteOut,
@@ -244,8 +245,8 @@ def _election_row(**over: Any) -> Any:
 async def test_votes_for_reads_an_election() -> None:
     """Read an election in the meeting votes.
 
-    The fake session returns, in order: the votes, the open and the secret ballots of the
-    motion tally, the open and the secret ballots of the election, and the present members.
+    The fake session returns, in order: the votes, the ballots of the motion tally, the
+    ballots of the election and the present members.
     """
     mid = uuid4()
     stored = ElectionResultOut(counts={"c1": 2, "c2": 1}, ballots=3, elected=["c1"])
@@ -257,8 +258,6 @@ async def test_votes_for_reads_an_election() -> None:
     sess = _QueueSession(
         executes=[
             res(row),
-            res(),
-            res(),
             res(),
             res(
                 (row.id, encode_election_choice(["c1"])),
@@ -286,7 +285,7 @@ async def test_votes_for_marks_a_missed_quorum_of_an_election() -> None:
         "quorum": {"type": "count", "value": 5},
     }
     row = _election_row(meeting_id=mid, result="rejected", config=config)
-    sess = _QueueSession(executes=[res(row), res(), res(), res(), res(), res((mid, 3))])
+    sess = _QueueSession(executes=[res(row), res(), res(), res((mid, 3))])
     [item] = (await MeetingService(sess)._votes_for([mid]))[mid]  # type: ignore[arg-type]
     assert item.failed_reason == "quorum"
 
@@ -296,14 +295,13 @@ async def test_election_tallies_without_elections() -> None:
     assert await svc._election_tallies([]) == {}
 
 
-async def test_ballots_of_decodes_an_election_ballot() -> None:
+async def test_ballots_of_gives_an_election_only_cast() -> None:
+    """The own ballot of an election comes from the voted marker, without the choice."""
     mid = uuid4()
     row = _election_row(meeting_id=mid, status="open")
-    sess = _QueueSession(
-        executes=[res(), res((row.id, "me", encode_election_choice(["c2"]))), res()]
-    )
+    sess = _QueueSession(executes=[res(), res((row.id, "me"))])
     own, _ = await MeetingService(sess)._ballots_of("me", [row])  # type: ignore[arg-type]
-    assert own[row.id].choices == ["c2"]
+    assert own[row.id] == MyBallot(cast=True)
 
 
 def _vote_out(**over: Any) -> VoteOut:

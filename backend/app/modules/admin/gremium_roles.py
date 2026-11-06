@@ -6,15 +6,14 @@ only. ``membership_sync`` writes them from the mappings in ``oidc_mappings``. No
 can set one by hand.
 
 Core invariant: for each (principal, gremium) pair exactly one role is active.
-The sync keeps it. The EXCLUDE constraint on the table backs it.
+The sync keeps it. The unique constraint on (principal, gremium) backs it.
 """
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.models import GremiumMembership, GremiumRole, GremiumRoleMapping
@@ -69,36 +68,20 @@ FORCED_ROLE_DEFAULT_PERMS: dict[str, list[str]] = {
 }
 
 
-def membership_active_clause(now: datetime) -> ColumnElement[bool]:
-    """Build the clause: the ``gremium_membership`` is active at ``now`` (half-open term)."""
-    return (
-        (GremiumMembership.valid_from.is_(None))
-        | (GremiumMembership.valid_from <= now)
-    ) & (
-        (GremiumMembership.valid_until.is_(None))
-        | (GremiumMembership.valid_until > now)
-    )
-
-
-async def active_gremium_roles(
-    session: AsyncSession, sub: str, now: datetime | None = None
-) -> list[tuple[UUID, GremiumRole]]:
-    """Return a principal's active (gremium, role) pairs (time-validated)."""
-    now = now or datetime.now(UTC)
+async def active_gremium_roles(session: AsyncSession, sub: str) -> list[tuple[UUID, GremiumRole]]:
+    """Return a principal's (gremium, role) pairs."""
     rows = (
         await session.execute(
             select(GremiumMembership.gremium_id, GremiumRole)
             .join(GremiumRole, GremiumRole.id == GremiumMembership.gremium_role_id)
             .join(PrincipalRow, PrincipalRow.id == GremiumMembership.principal_id)
-            .where(PrincipalRow.sub == sub, membership_active_clause(now))
+            .where(PrincipalRow.sub == sub)
         )
     ).all()
     return [(gid, role) for gid, role in rows]
 
 
-async def gremium_ids_with_permission(
-    session: AsyncSession, sub: str, perm: str, now: datetime | None = None
-) -> set[UUID]:
+async def gremium_ids_with_permission(session: AsyncSession, sub: str, perm: str) -> set[UUID]:
     """Return gremium ids where the principal's active role grants ``perm``.
 
     This is the roster read without a request principal. A request path uses
@@ -106,31 +89,27 @@ async def gremium_ids_with_permission(
     """
     return {
         gid
-        for gid, role in await active_gremium_roles(session, sub, now)
+        for gid, role in await active_gremium_roles(session, sub)
         if perm in (role.permissions or [])
     }
 
 
-async def gremium_member_ids(
-    session: AsyncSession, sub: str, now: datetime | None = None
-) -> set[UUID]:
-    """Return gremium ids where the principal is currently a member (any role)."""
-    return {gid for gid, _ in await active_gremium_roles(session, sub, now)}
+async def gremium_member_ids(session: AsyncSession, sub: str) -> set[UUID]:
+    """Return gremium ids where the principal is a member (any role)."""
+    return {gid for gid, _ in await active_gremium_roles(session, sub)}
 
 
-async def gremium_reader_ids(
-    session: AsyncSession, sub: str, now: datetime | None = None
-) -> set[UUID]:
+async def gremium_reader_ids(session: AsyncSession, sub: str) -> set[UUID]:
     """Return the Gremien whose committee read scope the principal holds.
 
-    These are the active memberships (`gremium_member_ids`) and the Gremien in whose
+    These are the memberships (`gremium_member_ids`) and the Gremien in whose
     substitute pool the principal stands. A pool substitute reads the applications,
     the cost centers and the meetings of the Gremium like a member. The pool gives no
     gremium permission (`vote.cast`, `todo.write`, ...): those stay with the roles.
     """
     from app.modules.delegations.pool import substitute_gremien_for_sub
 
-    return await gremium_member_ids(session, sub, now) | await substitute_gremien_for_sub(
+    return await gremium_member_ids(session, sub) | await substitute_gremien_for_sub(
         session, sub
     )
 
@@ -166,13 +145,6 @@ def _membership_out(
         display_name=display_name,
         email=email,
         active=active,
-    )
-
-
-def _valid_at(row: GremiumMembership, now: datetime) -> bool:
-    """Return True if the membership is valid at ``now`` (see ``membership_active_clause``)."""
-    return (row.valid_from is None or row.valid_from <= now) and (
-        row.valid_until is None or row.valid_until > now
     )
 
 
@@ -255,7 +227,8 @@ class GremiumRoleService:
         ).first()
         if existing is not None:
             raise ConflictError(
-                f"gremium role {payload.key!r} already exists in this gremium"
+                f"gremium role {payload.key!r} already exists in this gremium",
+                code="gremium_role_exists",
             )
         row = GremiumRole(
             gremium_id=gremium_id,
@@ -302,7 +275,7 @@ class GremiumRoleService:
         if row is None:
             raise NotFoundError(f"gremium role {role_id} not found")
         if row.key in FORCED_ROLE_KEYS:
-            raise ConflictError("forced gremium role cannot be deleted")
+            raise ConflictError("forced gremium role cannot be deleted", code="gremium_role_forced")
         in_use = (
             await self.session.scalars(
                 select(GremiumMembership.id).where(
@@ -311,7 +284,10 @@ class GremiumRoleService:
             )
         ).first()
         if in_use is not None:
-            raise ConflictError("gremium role is in use by a membership")
+            raise ConflictError(
+                "gremium role is in use by a membership",
+                code="gremium_role_in_use",
+            )
         mapped = (
             await self.session.scalars(
                 select(GremiumRoleMapping.id).where(
@@ -320,7 +296,10 @@ class GremiumRoleService:
             )
         ).first()
         if mapped is not None:
-            raise ConflictError("gremium role is in use by a group mapping")
+            raise ConflictError(
+                "gremium role is in use by a group mapping",
+                code="gremium_role_mapped",
+            )
         await self.session.delete(row)
         await self._audit(actor, "gremium_role", role_id)
         await self.session.commit()
@@ -328,11 +307,10 @@ class GremiumRoleService:
     async def list_memberships(self, gremium_id: UUID) -> list[GremiumMembershipOut]:
         """List the memberships of a gremium with the name and e-mail of each member.
 
-        Each row tells if it is active: the principal is active and the membership is
-        valid now. This is the rule of the member count in the gremien list. A row
-        without a principal row is not active.
+        Each row tells if it is active: the principal is active. This is the rule of
+        the member count in the gremien list. A row without a principal row is not
+        active.
         """
-        now = datetime.now(UTC)
         rows = (
             await self.session.execute(
                 select(
@@ -343,10 +321,10 @@ class GremiumRoleService:
                 )
                 .outerjoin(PrincipalRow, PrincipalRow.id == GremiumMembership.principal_id)
                 .where(GremiumMembership.gremium_id == gremium_id)
-                .order_by(GremiumMembership.valid_from)
+                .order_by(GremiumMembership.id)
             )
         ).all()
         return [
-            _membership_out(m, name, email, active=bool(active) and _valid_at(m, now))
+            _membership_out(m, name, email, active=bool(active))
             for m, name, email, active in rows
         ]

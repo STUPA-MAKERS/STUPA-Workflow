@@ -53,7 +53,7 @@
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-md);
 }
-@media (max-width: 48rem) {
+@media (max-width: 767.98px) {
   .mtg__voteActions app-button {
     flex: 1 1 auto;
   }

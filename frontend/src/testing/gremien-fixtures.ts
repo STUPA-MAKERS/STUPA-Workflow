@@ -41,8 +41,6 @@ export function member(over: Partial<GremiumMember> = {}): GremiumMember {
     roleId: 'r-member',
     roleKey: 'member',
     roleName: { de: 'Mitglied', en: 'Member' },
-    validFrom: '2025-10-01T00:00:00Z',
-    validUntil: null,
     isSelf: false,
     ...over,
   };

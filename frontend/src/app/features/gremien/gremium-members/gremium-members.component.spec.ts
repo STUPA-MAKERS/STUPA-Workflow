@@ -30,10 +30,9 @@ const MEMBERS = [
     roleId: 'r-board',
     roleKey: 'vorstand',
     roleName: { de: 'Vorstand', en: 'Board' },
-    validUntil: '2026-09-30T00:00:00Z',
     isSelf: true,
   }),
-  member({ principalId: 'p-3', displayName: null, email: 'kai@example.org', validFrom: null }),
+  member({ principalId: 'p-3', displayName: null, email: 'kai@example.org' }),
   member({
     principalId: 'p-4',
     displayName: 'Lea Wolf',
@@ -73,7 +72,6 @@ describe('GremiumMembersComponent', () => {
     const mail = screen.getByText('anna.berg@a-very-long-domain-of-the-student-government.example.org');
     expect(mail.getAttribute('href')).toBe('mailto:anna.berg@a-very-long-domain-of-the-student-government.example.org');
     expect(screen.getByText('Du')).toBeTruthy();
-    expect(screen.getByText('seit 01.10.2025 · bis 30.09.2026')).toBeTruthy();
     expect(view.cmp.searchPlaceholder()).toBe('4 Mitglieder durchsuchen');
     expect(await runAxe(view.container)).toHaveNoViolations();
   });
@@ -127,8 +125,8 @@ describe('GremiumMembersComponent', () => {
     const [blob, name] = (downloadBlob as jest.Mock).mock.calls[0] as [Blob, string];
     expect(name).toBe('studierendenparlament-mitglieder.csv');
     const text = await readBlob(blob);
-    expect(text).toContain('Name;E-Mail;Rolle;Seit;Bis');
-    expect(text).toContain('Anna Berg;anna.berg@a-very-long-domain-of-the-student-government.example.org;Vorstand;01.10.2025;30.09.2026');
+    expect(text).toContain('Name;E-Mail;Rolle');
+    expect(text).toContain('Anna Berg;anna.berg@a-very-long-domain-of-the-student-government.example.org;Vorstand');
   });
 
   it('reports a failed read and reads again', async () => {

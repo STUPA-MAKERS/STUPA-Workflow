@@ -34,11 +34,6 @@ def test_draw_lot(fake_api: _FakeApi) -> None:
     assert fake_api.calls == [("POST", "/votes/v1/draw-lot", None)]
 
 
-def test_runoff(fake_api: _FakeApi) -> None:
-    asyncio.run(meetings.vote_runoff("v1"))
-    assert fake_api.calls == [("POST", "/votes/v1/runoff", None)]
-
-
 def test_create_meeting_election(fake_api: _FakeApi) -> None:
     body = S.MeetingVoteOpenBody(
         agendaItemId="a1",

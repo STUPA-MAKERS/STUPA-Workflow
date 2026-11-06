@@ -362,11 +362,10 @@ def _as_principal(app: FastAPI, *perms: str) -> None:
     app.dependency_overrides[get_current_applicant] = lambda: None
 
 
-def _as_applicant(app: FastAPI, application_id: UUID, scope: str = "edit") -> None:
+def _as_applicant(app: FastAPI, application_id: UUID) -> None:
     app.dependency_overrides[get_current_principal] = lambda: None
     app.dependency_overrides[get_current_applicant] = lambda: Applicant(
         application_id=str(application_id),
-        scope=scope,  # type: ignore[arg-type]
     )
 
 
@@ -489,7 +488,7 @@ def test_get_application_applicant_no_pii(
 ) -> None:
     """Let the applicant read the own isPII fields."""
     app_id = uuid4()
-    _as_applicant(app, app_id, "view")
+    _as_applicant(app, app_id)
     r = client.get(f"/api/applications/{app_id}")
     assert r.status_code == 200
     assert fake_service.last_include_pii is False
@@ -502,23 +501,16 @@ def test_get_application_requires_auth_401(client: TestClient) -> None:
 
 
 def test_get_application_applicant_other_app_403(app: FastAPI, client: TestClient) -> None:
-    _as_applicant(app, uuid4(), "view")
+    _as_applicant(app, uuid4())
     r = client.get(f"/api/applications/{uuid4()}")
     assert r.status_code == 403
 
 
 def test_patch_application_applicant_edit(app: FastAPI, client: TestClient) -> None:
     app_id = uuid4()
-    _as_applicant(app, app_id, "edit")
+    _as_applicant(app, app_id)
     r = client.patch(f"/api/applications/{app_id}", json={"data": {"title": "Neu"}})
     assert r.status_code == 200
-
-
-def test_patch_application_applicant_view_forbidden(app: FastAPI, client: TestClient) -> None:
-    app_id = uuid4()
-    _as_applicant(app, app_id, "view")
-    r = client.patch(f"/api/applications/{app_id}", json={"data": {}})
-    assert r.status_code == 403
 
 
 def test_read_all_reads_any_application(app: FastAPI, client: TestClient) -> None:
@@ -616,7 +608,7 @@ def test_an_applicant_cannot_archive(app: FastAPI, client: TestClient) -> None:
     the working list of the committee.
     """
     app_id = uuid4()
-    _as_applicant(app, app_id, "edit")
+    _as_applicant(app, app_id)
     assert client.post(f"/api/applications/{app_id}/archive").status_code == 401
 
 
@@ -659,7 +651,7 @@ def test_delete_application_manager_forbidden(app: FastAPI, client: TestClient) 
 def test_delete_application_applicant_unauthorized(app: FastAPI, client: TestClient) -> None:
     """Answer 401 without a principal."""
     app_id = uuid4()
-    _as_applicant(app, app_id, "edit")
+    _as_applicant(app, app_id)
     r = client.delete(f"/api/applications/{app_id}")
     assert r.status_code == 401
 
@@ -667,7 +659,7 @@ def test_delete_application_applicant_unauthorized(app: FastAPI, client: TestCli
 def test_timeline_ap(app: FastAPI, client: TestClient, fake_service: _FakeService) -> None:
     """Serve the timeline to the applicant in the applicant view."""
     app_id = uuid4()
-    _as_applicant(app, app_id, "view")
+    _as_applicant(app, app_id)
     r = client.get(f"/api/applications/{app_id}/timeline")
     assert r.status_code == 200
     assert len(r.json()) == 1
@@ -691,7 +683,7 @@ def test_versions_applicant_gets_metadata_view(
 ) -> None:
     """Serve the version metadata of the own application to the applicant."""
     app_id = uuid4()
-    _as_applicant(app, app_id, "edit")
+    _as_applicant(app, app_id)
     r = client.get(f"/api/applications/{app_id}/versions")
     assert r.status_code == 200
     assert fake_service.versions_applicant_view is True
@@ -700,7 +692,7 @@ def test_versions_applicant_gets_metadata_view(
 
 
 def test_versions_foreign_applicant_forbidden(app: FastAPI, client: TestClient) -> None:
-    _as_applicant(app, uuid4(), "edit")
+    _as_applicant(app, uuid4())
     r = client.get(f"/api/applications/{uuid4()}/versions")
     assert r.status_code == 403
 
@@ -950,7 +942,7 @@ def test_comment_needs_a_text_or_a_file(app: FastAPI, client: TestClient) -> Non
 
 def test_comment_applicant_internal_forbidden(app: FastAPI, client: TestClient) -> None:
     app_id = uuid4()
-    _as_applicant(app, app_id, "view")
+    _as_applicant(app, app_id)
     r = client.post(
         f"/api/applications/{app_id}/comments",
         json={"body": "x", "visibility": "internal"},
@@ -962,7 +954,7 @@ def test_comment_applicant_public_ok(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
     app_id = uuid4()
-    _as_applicant(app, app_id, "view")
+    _as_applicant(app, app_id)
     r = client.post(
         f"/api/applications/{app_id}/comments",
         json={"body": "hallo", "visibility": "public"},
@@ -976,7 +968,7 @@ def test_list_comments_applicant_public_only(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
     app_id = uuid4()
-    _as_applicant(app, app_id, "view")
+    _as_applicant(app, app_id)
     r = client.get(f"/api/applications/{app_id}/comments")
     assert r.status_code == 200
     assert fake_service.last_include_internal is False
@@ -1072,7 +1064,7 @@ def test_patch_comment_applicant_identity(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
     app_id = uuid4()
-    _as_applicant(app, app_id, "view")
+    _as_applicant(app, app_id)
     r = client.patch(f"/api/applications/{app_id}/comments/{uuid4()}", json={"body": "y"})
     assert r.status_code == 200
     assert fake_service.comment_write_args is not None
@@ -1083,7 +1075,7 @@ def test_patch_comment_applicant_identity(
 
 def test_patch_comment_requires_read_access_403(app: FastAPI, client: TestClient) -> None:
     """A magic link for ANOTHER application gives no access to these comments."""
-    _as_applicant(app, uuid4(), "view")
+    _as_applicant(app, uuid4())
     r = client.patch(f"/api/applications/{uuid4()}/comments/{uuid4()}", json={"body": "x"})
     assert r.status_code == 403
 
@@ -1112,7 +1104,7 @@ def test_delete_comment_204(
 
 
 def test_delete_comment_requires_read_access_403(app: FastAPI, client: TestClient) -> None:
-    _as_applicant(app, uuid4(), "view")
+    _as_applicant(app, uuid4())
     r = client.delete(f"/api/applications/{uuid4()}/comments/{uuid4()}")
     assert r.status_code == 403
 

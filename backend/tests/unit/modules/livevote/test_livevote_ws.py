@@ -31,7 +31,7 @@ from starlette.websockets import WebSocketDisconnect
 from app.db import get_session
 from app.main import create_app
 from app.modules.auth import sessions
-from app.modules.auth.models import AuthSession, RoleAssignment
+from app.modules.auth.models import AuthSession
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.livevote.broker import InMemoryBroker
@@ -390,16 +390,10 @@ def _signed_cookie() -> tuple[str, str]:
     return settings.session_cookie_name, sessions._sign_sid(settings.session_secret, _SID)
 
 
-def _auth_db(*, naive: bool):
-    """Build a fake session for the real handshake: AuthSession, Principal, then RBAC.
-
-    A naive value is how a `timestamp` column without a time zone comes from the database.
-    """
+def _auth_db():
+    """Build a fake session for the real handshake: AuthSession, Principal, then RBAC."""
     pid = uuid4()
     now = datetime.now(UTC)
-    vf, vu = now - timedelta(days=1), now + timedelta(days=1)
-    if naive:
-        vf, vu = vf.replace(tzinfo=None), vu.replace(tzinfo=None)
     auth_session = AuthSession(
         sid=_SID,
         principal_id=pid,
@@ -408,26 +402,22 @@ def _auth_db(*, naive: bool):
         id_token=None,
         revalidated_at=now,
     )
-    principal_row = PrincipalRow(sub="member", email=None, display_name="M", oidc_groups=[])
-    principal_row.id = pid
-    assignment = RoleAssignment(
-        principal_id=pid,
-        role_id=uuid4(),
-        gremium_id=_GREMIUM,
-        valid_from=vf,
-        valid_until=vu,
+    principal_row = PrincipalRow(
+        sub="member", email=None, display_name="M", oidc_groups=[str(_GREMIUM)]
     )
+    principal_row.id = pid
 
     def factory():
         """Return the scripted session.
 
-        The results, in order: the auth session, the principal row, the role assignment in
-        the meeting Gremium, no group mapping, the role permission and the role key.
+        The results, in order: the auth session, the principal row, the assigned role
+        id, no group mapping, the role permission and the role key. The OIDC group of
+        the meeting Gremium makes the principal a member (`_FakeMeetingService`).
         """
         return fake_session(
             result(auth_session),
             result(principal_row),
-            result(assignment),
+            result(uuid4()),
             result(),
             result("vote.cast"),
             result("member"),
@@ -439,10 +429,10 @@ def _auth_db(*, naive: bool):
     return _override
 
 
-def _build_real_handshake(*, naive: bool):
+def _build_real_handshake():
     meeting = _meeting()
     app = create_app()
-    app.dependency_overrides[get_session] = _auth_db(naive=naive)
+    app.dependency_overrides[get_session] = _auth_db()
     app.dependency_overrides[get_meeting_service_ws] = lambda: _FakeMeetingService(meeting, None)
     app.dependency_overrides[get_voting_service_ws] = lambda: _FakeVotingService(
         _vote_out(meeting.id)
@@ -453,7 +443,7 @@ def _build_real_handshake(*, naive: bool):
 
 
 def test_handshake_with_valid_cookie_opens_socket() -> None:
-    app, meeting = _build_real_handshake(naive=False)
+    app, meeting = _build_real_handshake()
     client = TestClient(app)
     name, value = _signed_cookie()
     client.cookies.set(name, value)
@@ -463,24 +453,9 @@ def test_handshake_with_valid_cookie_opens_socket() -> None:
     assert state["status"] == "live"
 
 
-def test_handshake_with_naive_assignment_does_not_403() -> None:
-    """Regression meeting WS 403: naive `valid_from` and `valid_until` from the database.
-
-    Before the fix, `rbac._assignment_valid` raised `TypeError` inside
-    `resolve_ws_principal`. The `get_ws_principal` dependency then failed and the server
-    rejected the handshake. Now the principal resolves and the socket opens.
-    """
-    app, meeting = _build_real_handshake(naive=True)
-    client = TestClient(app)
-    name, value = _signed_cookie()
-    client.cookies.set(name, value)
-    with client.websocket_connect(_url(meeting)) as ws:
-        assert _recv(ws)["type"] == "meeting_state"
-
-
 def test_handshake_without_cookie_is_rejected() -> None:
     """Without a cookie there is no principal, so the server closes before the accept."""
-    app, meeting = _build_real_handshake(naive=False)
+    app, meeting = _build_real_handshake()
     client = TestClient(app)
     with pytest.raises(WebSocketDisconnect), client.websocket_connect(_url(meeting)):
         pass
@@ -492,7 +467,7 @@ def test_handshake_foreign_origin_is_rejected() -> None:
     The check runs before the cookie path and before the RBAC path. The second close of
     the router passes silently.
     """
-    app, meeting = _build_real_handshake(naive=False)
+    app, meeting = _build_real_handshake()
     client = TestClient(app)
     name, value = _signed_cookie()
     client.cookies.set(name, value)
@@ -516,7 +491,7 @@ def test_real_flow_dispatcher_override_reaches_the_socket(suffix: str) -> None:
     """
     meeting = _meeting()
     app = create_app()
-    app.dependency_overrides[get_session] = _auth_db(naive=False)
+    app.dependency_overrides[get_session] = _auth_db()
     app.dependency_overrides[get_meeting_service_ws] = lambda: _FakeMeetingService(meeting, None)
     app.dependency_overrides[get_broker_ws] = lambda: InMemoryBroker()
     app.dependency_overrides[get_locker_ws] = lambda: InMemoryLocker()
@@ -534,7 +509,7 @@ def test_real_flow_dispatcher_override_opens_the_socket_with_a_cookie() -> None:
     """With a valid cookie the socket opens through the real dispatcher override."""
     meeting = _meeting()
     app = create_app()
-    app.dependency_overrides[get_session] = _auth_db(naive=False)
+    app.dependency_overrides[get_session] = _auth_db()
     app.dependency_overrides[get_meeting_service_ws] = lambda: _FakeMeetingService(meeting, None)
     app.dependency_overrides[get_broker_ws] = lambda: InMemoryBroker()
     app.dependency_overrides[get_locker_ws] = lambda: InMemoryLocker()

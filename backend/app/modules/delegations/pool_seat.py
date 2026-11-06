@@ -19,9 +19,8 @@ stays, so the member gets 409 in that vote.
 
 The only gate is a live meeting of the gremium of the vote. The pool entries are the
 rule that the gremium keeps for its substitutes, so the delegation switch of the
-gremium (`allow_vote_delegation`) and the global vote transfer switch
-(`delegation_voting_enabled`) do not apply: they govern the free transfers between
-members. No chains: a substitute who
+gremium (`allow_vote_delegation`) does not apply: it governs the free transfers
+between members. No chains: a substitute who
 delegated the own vote, or who already holds a voting delegation in the meeting,
 claims no further seat. A member who holds or gives a delegation in the meeting has
 no free seat.
@@ -35,7 +34,6 @@ that member frees it.
 
 from __future__ import annotations
 
-from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import ColumnElement, and_, select, text
@@ -94,16 +92,14 @@ async def _meeting_live(session: AsyncSession, meeting_id: UUID, gremium_id: UUI
     return meeting is not None and meeting.status == "live" and meeting.gremium_id == gremium_id
 
 
-async def _voting_member_ids(session: AsyncSession, gremium_id: UUID, now: datetime) -> set[UUID]:
-    """Return the members with an active membership whose role holds `vote.cast`."""
+async def _voting_member_ids(session: AsyncSession, gremium_id: UUID) -> set[UUID]:
+    """Return the members whose gremium role holds `vote.cast`."""
     rows = (
         await session.execute(
             select(GremiumMembership.principal_id, GremiumRole.permissions)
             .join(GremiumRole, GremiumRole.id == GremiumMembership.gremium_role_id)
             .where(
                 GremiumMembership.gremium_id == gremium_id,
-                (GremiumMembership.valid_from.is_(None)) | (GremiumMembership.valid_from <= now),
-                (GremiumMembership.valid_until.is_(None)) | (GremiumMembership.valid_until > now),
             )
         )
     ).all()
@@ -115,7 +111,6 @@ async def _find_seat(
     sub: str,
     meeting_id: UUID | None,
     eligible_group: str,
-    now: datetime,
 ) -> tuple[PrincipalRow, PrincipalRow] | None:
     """Return the substitute and the first free seat it may take, or None.
 
@@ -147,7 +142,7 @@ async def _find_seat(
         if delegator_id == deputy.id or (voting and delegate_id == deputy.id):
             return None
         taken.update((delegator_id, delegate_id))
-    voters = await _voting_member_ids(session, gremium_id, now)
+    voters = await _voting_member_ids(session, gremium_id)
     pool = voters if gremium_wide else personal & voters
     present = set(
         (
@@ -181,14 +176,13 @@ async def pool_seat_for(
     sub: str,
     meeting_id: UUID | None,
     eligible_group: str,
-    now: datetime,
 ) -> PrincipalRow | None:
     """Return the member whose seat `sub` would take with a represented ballot now.
 
     The read takes no lock and writes nothing. `claim_pool_seat` repeats it under the
     lock.
     """
-    found = await _find_seat(session, sub, meeting_id, eligible_group, now)
+    found = await _find_seat(session, sub, meeting_id, eligible_group)
     return found[1] if found is not None else None
 
 
@@ -197,7 +191,6 @@ async def claim_pool_seat(
     sub: str,
     meeting_id: UUID | None,
     eligible_group: str,
-    now: datetime,
 ) -> str | None:
     """Claim a free seat for the substitute `sub` and return the `sub` of the member.
 
@@ -210,7 +203,7 @@ async def claim_pool_seat(
     """
     if meeting_id is not None:
         await lock_meeting_delegations(session, meeting_id)
-    found = await _find_seat(session, sub, meeting_id, eligible_group, now)
+    found = await _find_seat(session, sub, meeting_id, eligible_group)
     if found is None:
         return None
     deputy, member = found

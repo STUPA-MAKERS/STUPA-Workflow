@@ -26,17 +26,6 @@ function preview(over: Partial<RevokePreview> = {}): RevokePreview {
         name: 'StuPa',
         membership: { roleKey: 'mitglied', roleLabel: { de: 'Mitglied' }, groups: ['stupa-mitglieder'] },
         groups: ['stupa-mitglieder', 'gremien-alle', 'stupa-sitzung'],
-        assignments: [
-          {
-            id: 'a-1',
-            roleId: 'r-sl',
-            roleKey: 'sitzungsleitung',
-            roleLabel: { de: 'Sitzungsleitung' },
-            grantedBy: 'Alex Admin',
-            validFrom: null,
-            validUntil: null,
-          },
-        ],
         poolEntries: [
           { id: 'ds-1', asSubstitute: true, gremiumWide: false, memberName: 'Mia', substituteName: 'Tobias Kern' },
           { id: 'ds-2', asSubstitute: true, gremiumWide: true, memberName: null, substituteName: 'Tobias Kern' },
@@ -71,17 +60,6 @@ function preview(over: Partial<RevokePreview> = {}): RevokePreview {
         name: 'AStA',
         membership: null,
         groups: ['gremien-alle'],
-        assignments: [
-          {
-            id: 'a-2',
-            roleId: 'r-v',
-            roleKey: 'vorstand',
-            roleLabel: { en: 'board' },
-            grantedBy: 'bootstrap',
-            validFrom: null,
-            validUntil: null,
-          },
-        ],
         poolEntries: [],
         plannedDelegations: [],
         liveDelegations: [],
@@ -89,7 +67,15 @@ function preview(over: Partial<RevokePreview> = {}): RevokePreview {
       },
     ],
     globalRoles: [
-      { roleId: 'r-ref', roleKey: 'referent', roleLabel: { de: 'Referent' }, groups: ['stupa-referate'], assignments: [] },
+      {
+        roleId: 'r-ref',
+        roleKey: 'referent',
+        roleLabel: { de: 'Referent' },
+        groups: ['stupa-referate'],
+        assignments: [
+          { id: 'a-2', roleId: 'r-ref', roleKey: 'referent', roleLabel: { en: 'officer' }, grantedBy: 'bootstrap' },
+        ],
+      },
       {
         roleId: 'r-x',
         roleKey: 'extra',
@@ -101,9 +87,7 @@ function preview(over: Partial<RevokePreview> = {}): RevokePreview {
             roleId: 'r-x',
             roleKey: 'extra',
             roleLabel: {},
-            grantedBy: null,
-            validFrom: '2026-01-05T00:00:00+00:00',
-            validUntil: null,
+            grantedBy: 'Alex Admin',
           },
         ],
       },
@@ -185,7 +169,7 @@ describe('UserRevokeComponent', () => {
     expect(screen.getByText('Mitgliedschaft als Mitglied')).toBeInTheDocument();
     expect(screen.getByText('über die SSO-Gruppe stupa-mitglieder')).toBeInTheDocument();
     expect(screen.getByText('SSO-Gruppen gremien-alle, stupa-sitzung')).toBeInTheDocument();
-    expect(screen.getByText('Rolle Sitzungsleitung, direkt vergeben')).toBeInTheDocument();
+    expect(screen.getByText('Rolle extra, direkt vergeben')).toBeInTheDocument();
     expect(screen.getByText('vergeben von Alex Admin')).toBeInTheDocument();
     expect(screen.getByText('Vertretung für Mia')).toBeInTheDocument();
     expect(screen.getByText('Vertretung für das ganze Gremium')).toBeInTheDocument();
@@ -195,9 +179,8 @@ describe('UserRevokeComponent', () => {
     expect(screen.getByText('Bleibt bis zum Ende der Sitzung bestehen.')).toBeInTheDocument();
     expect(screen.getByText('2 offene Abstimmungen')).toBeInTheDocument();
     expect(screen.getByText('1 offene Abstimmung')).toBeInTheDocument();
-    expect(screen.getByText('Rolle vorstand, direkt vergeben')).toBeInTheDocument();
+    expect(screen.getByText('Rolle referent, direkt vergeben')).toBeInTheDocument();
     expect(screen.getByText('beim Einrichten der Plattform vergeben')).toBeInTheDocument();
-    expect(screen.getByText(/^vergeben von — am /)).toBeInTheDocument();
     expect(screen.getByText('über die SSO-Gruppe stupa-referate')).toBeInTheDocument();
     expect(
       screen.getByText('Die SSO-Gruppe gremien-alle gilt auch für AStA. Beides wird zusammen entzogen.'),
@@ -391,9 +374,6 @@ describe('UserRevokeComponent', () => {
       name: 'X',
       membership: { roleKey: 'mitglied', roleLabel: { de: 'Mitglied' }, groups: [] },
       groups: [],
-      assignments: [
-        { id: 'a', roleId: 'r', roleKey: 'k', roleLabel: { de: 'K' }, grantedBy: null, validFrom: null, validUntil: null },
-      ],
       poolEntries: [{ id: 'ds', asSubstitute: true, gremiumWide: false, memberName: null, substituteName: null }],
       plannedDelegations: [
         {
@@ -413,7 +393,14 @@ describe('UserRevokeComponent', () => {
     });
     const texts = lines.map((l: { text: string }) => l.text);
     expect(lines[0]).toEqual({ text: 'Mitgliedschaft als Mitglied', detail: '' });
-    expect(lines[1].detail).toBe('vergeben von —');
+    const unnamed = inst.roleLines({
+      roleId: 'r',
+      roleKey: 'k',
+      roleLabel: {},
+      groups: [],
+      assignments: [{ id: 'a', roleId: 'r', roleKey: 'k', roleLabel: { de: 'K' }, grantedBy: null }],
+    });
+    expect(unnamed[0].detail).toBe('vergeben von —');
     expect(texts).toContain('Vertretung für Konto ohne Namen');
     expect(texts.some((t: string) => /^Stimme von Mia in 6\. Sitzung \(.+2026\)$/.test(t))).toBe(true);
     expect(texts).toContain('Stimme an Ben in der laufenden Sitzung 4. Sitzung');

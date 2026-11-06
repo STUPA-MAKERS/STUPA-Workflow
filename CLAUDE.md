@@ -1,13 +1,14 @@
 # CLAUDE.md — agent guide to STUPA-Workflow
 
 Entry point for any AI agent (Claude Code and other wrappers) that works in this repo. It maps the
-codebase to a set of **skills** (per-module navigation docs) and **memories** (durable conventions,
-specs, traps). Use them to orient fast instead of reading everything again.
+codebase to the **specs** (`specs/`, the binding rules), a set of **skills** (per-module navigation
+docs) and **memories** (pointers to specs). Use them to orient fast instead of reading everything
+again.
 
 ## What this is
 
 **STUPA-Workflow** (also called *antragsplattform*) — a web platform for the application, meeting,
-and budget work of a student government (StuPa/AStA). Applicants submit through a public form.
+and budget work of a student government (STUPA/AStA). Applicants submit through a public form.
 Gremium members process applications, run meetings with live votes and a protocol, and manage
 cost-center budgets and invoices. The platform versions and audits all of this work. Monorepo, one
 VM, `docker compose`.
@@ -21,13 +22,15 @@ Full prose: `README.md`. Workflow & Definition of Done: the `conventions` skill.
 
 ## How to navigate (read in this order)
 
+0. **`specs/`** — the binding rules, one rule per file. `specs/README.md` has the index. A spec
+   wins over a skill or a memory. A change request starts as a spec.
 1. **`.claude/skills/conventions/`** — house rules (problem+json, tz-aware, server-side RBAC, no
    `eval`, i18n parity, coverage gates, alembic policy). Read this before changing any code.
 2. **The relevant `be-*` / component skill** — open the skill for the module you touch. Each
    skill's `description` says when to use it. The body maps key files, the domain model, the API
    surface, and the traps. Skills cross-link siblings (`be-x`) and memories (`[[slug]]`).
-3. **The memory it links** — `.claude/memory/` holds specs, prior decisions, and status. Read a
-   linked `[[memory]]` when it is relevant to your change.
+3. **The memory it links** — `.claude/memory/` points to the specs of a subject. Read a linked
+   `[[memory]]` when it is relevant to your change.
 
 ## Skills (`.claude/skills/<name>/SKILL.md`)
 
@@ -39,7 +42,7 @@ Backend domain modules (`backend/app/modules/<module>`):
 - **be-auth** — OIDC+PKCE / magic-link, sessions, RBAC, OAuth2 tokens for MCP *(critical)*
 - **be-admin** — branding, gremium roles, site-config draft/activate, per-page admin RBAC
 - **be-applications** — application lifecycle, version diff, timeline, comments, anonymization
-- **be-application-types** — bind a form version + flow to an application type
+- **be-application-types** — bind a form version to an application type (one global flow)
 - **be-forms** — versioned form JSON, definition/answer validation, JsonLogic visibleIf/compute
 - **be-flow** — declarative state machine, guard evaluator (no eval), transition actions
   *(critical)*
@@ -57,7 +60,7 @@ Backend domain modules (`backend/app/modules/<module>`):
 - **be-translations** — admin overrides of the UI texts, extra UI languages, public `/i18n` bundle,
   the built-in texts from the frontend catalog JSON
 - **be-config-revision** — versioned config + audit + revert
-- **be-files** — MinIO attachments, ClamAV scan, signed URLs
+- **be-files** — MinIO attachments, ClamAV scan, downloads streamed through the API
 - **be-media** — Markdown images: upload, Pillow re-encode, canonical `/api/media/images/<id>`,
   public protocol images, images in the protocol PDF
 - **be-pdf** — client to the typst render service (protocols only; applications no
@@ -85,8 +88,8 @@ Components:
 
 ## Memory (`.claude/memory/`)
 
-Durable project knowledge: how-to-work preferences, UI/FE conventions, data shapes, feature specs,
-and time-stamped backlogs. Index + per-file links: **`.claude/memory/MEMORY.md`**.
+One file per subject. Each file lists the specs that hold its rules. Index + per-file links:
+**`.claude/memory/MEMORY.md`**.
 
 > This repo intentionally does **not** mirror internal security-audit findings. Do not add them.
 

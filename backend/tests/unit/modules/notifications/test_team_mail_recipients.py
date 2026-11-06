@@ -163,7 +163,7 @@ async def test_actionable_drops_firable_candidate_without_read(
     async def fake_base(_s: Any, _app: Any, *, manual: bool) -> GuardContext:
         return GuardContext(manual=manual)
 
-    async def fake_candidates(_s: Any, _now: Any, *, gremium_id: Any) -> list[Any]:
+    async def fake_candidates(_s: Any, _now: Any) -> list[Any]:
         return [keep, drop]
 
     async def fake_readers(_s: Any, _app_id: Any, _ids: Any, _now: Any) -> set[uuid.UUID]:

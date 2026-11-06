@@ -54,15 +54,13 @@ async def test_application_vote_refuses_guests() -> None:
     assert err.value.code == "guests_vote_unavailable"
 
 
-@pytest.mark.parametrize("secret", [False, True])
-async def test_cast_guest_open_and_secret(secret: bool) -> None:
-    """A guest casts on the open and on the secret path.
+async def test_cast_guest_writes_marker_and_secret_ballot() -> None:
+    """A guest casts a voted marker and an identity-free ballot.
 
     The audit hook reads two statements before the insert, and the RETURNING answers for
-    the ballot or the marker. The secret path adds the identity-free ballot, and the
-    open path inserts directly.
+    the marker.
     """
-    vote = _vote(meeting_id=uuid4(), config=_config(guestsVote=True, secret=secret))
+    vote = _vote(meeting_id=uuid4(), config=_config(guestsVote=True))
     gid = uuid4()
     inserted = result(uuid4())
     db = fake_session(result(vote), result(), result(), inserted)
@@ -72,7 +70,7 @@ async def test_cast_guest_open_and_secret(secret: bool) -> None:
     assert entry.action == "vote_cast" and entry.actor == f"guest:{gid}"
     assert "choice" not in entry.data
     secret_rows = [a for a in db.added if type(a).__name__ == "SecretBallot"]
-    assert len(secret_rows) == (1 if secret else 0)
+    assert len(secret_rows) == 1
 
 
 async def test_cast_guest_twice_409() -> None:
@@ -111,9 +109,8 @@ async def test_cast_guest_unknown_option_422() -> None:
 async def test_tally_counts_admitted_and_departed_guest_voters() -> None:
     """The tally counts the admitted guests and the guests who voted and left.
 
-    The fake session serves the admitted guest, the guest ballots and no guest markers.
-    2 present members, no absent delegators, the admitted guest and the guest who left
-    give the expected count.
+    The fake session serves the admitted guest and the guest markers. 2 present
+    members, the admitted guest and the guest who left give the expected count.
     """
     vote = _vote(meeting_id=uuid4(), config=_config(guestsVote=True))
     stay, gone = uuid4(), uuid4()
@@ -122,9 +119,8 @@ async def test_tally_counts_admitted_and_departed_guest_voters() -> None:
         result("yes", "yes"),
         result(stay),
         result(f"guest:{stay}", f"guest:{gone}"),
-        result(),
     )
-    db.scalar_results = [2, 0]
+    db.scalar_results = [2]
     out = await VotingService(db).get(vote.id)
     assert out.guests_vote is True
     assert out.tally.present == 4 and out.tally.revealed is False
@@ -134,14 +130,14 @@ async def test_tally_counts_admitted_and_departed_guest_voters() -> None:
 async def test_tally_members_vote_shows_guests_but_does_not_wait_for_them() -> None:
     vote = _vote(meeting_id=uuid4())
     db = fake_session(result(vote), result("yes", "yes"))
-    db.scalar_results = [2, 5, 0]
+    db.scalar_results = [2, 5]
     out = await VotingService(db).get(vote.id)
-    assert out.tally.present == 2 and out.tally.revealed is True
+    assert out.tally.present == 2 and out.tally.revealed is False
     assert out.tally.present_guests == 5
 
 
-async def test_secret_vote_without_meeting_stays_hidden() -> None:
-    vote = _vote(config=_config(secret=True))
+async def test_vote_without_meeting_stays_hidden() -> None:
+    vote = _vote()
     db = fake_session(result(vote), result())
     out = await VotingService(db).get(vote.id)
     assert out.tally.revealed is False and out.tally.present_members is None
@@ -172,7 +168,7 @@ async def test_close_fixes_attendance(
         eligible_count=23,
         config=_config(guestsVote=guests_vote),
     )
-    guest_rows = [result(*[uuid4() for _ in range(7)]), result(), result()] if guests_vote else []
+    guest_rows = [result(*[uuid4() for _ in range(7)]), result()] if guests_vote else []
     db = fake_session(result(vote), result("yes", "yes", "no"), *guest_rows)
     db.scalar_results = [19] if guests_vote else [19, 7]
     out = await VotingService(db).close(vote.id, _voter(), now=NOW)
@@ -194,8 +190,8 @@ async def test_close_without_meeting_keeps_attendance_empty(
     assert GID
 
 
-async def test_open_secret_meeting_vote_stays_hidden() -> None:
-    vote = _vote(meeting_id=uuid4(), config=_config(secret=True, guestsVote=True))
+async def test_open_meeting_vote_with_guests_stays_hidden() -> None:
+    vote = _vote(meeting_id=uuid4(), config=_config(guestsVote=True))
     db = fake_session(result(vote), result("yes"))
     db.scalar_results = [1]
     out = await VotingService(db).get(vote.id)

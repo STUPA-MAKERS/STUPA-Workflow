@@ -224,7 +224,10 @@ class LifecycleOps(HandoverOps):
         if wants_now and not await self.can_set_current_item(meeting, principal):
             raise ForbiddenError("only the protokollant may set the current agenda item")
         if wants_now and meeting.status == "closed":
-            raise ConflictError("the session is closed — it has no current agenda item")
+            raise ConflictError(
+                "the session is closed — it has no current agenda item",
+                code="meeting_closed",
+            )
         if wants_now and payload.current_agenda_item_id is not None:
             owner = await self.session.scalar(
                 select(MeetingAgendaItem.meeting_id).where(
@@ -255,7 +258,10 @@ class LifecycleOps(HandoverOps):
             )
 
         if meeting.status == "closed" and wants_manage:
-            raise ConflictError("the session is closed — its settings can no longer be changed")
+            raise ConflictError(
+                "the session is closed — its settings can no longer be changed",
+                code="meeting_closed",
+            )
 
         before = _snapshot(meeting)
         now = datetime.now(UTC)
@@ -304,15 +310,19 @@ class LifecycleOps(HandoverOps):
             and payload.protokollant_id != meeting.protokollant_id
         ):
             if await self._protocol_final(meeting.id):
-                raise ConflictError("protocol is finalized — the protokollant can no longer change")
+                raise ConflictError(
+                    "protocol is finalized — the protokollant can no longer change",
+                    code="protocol_finalized",
+                )
             if meeting.status == "live":
                 if payload.protokollant_id is None:
                     raise ConflictError(
-                        "a live meeting needs a protokollant — hand the minutes over instead"
+                        "a live meeting needs a protokollant — hand the minutes over instead",
+                        code="protokollant_required",
                     )
                 previous = meeting.protokollant_id
                 await self.check_keeper(meeting.gremium_id, payload.protokollant_id)
-                await self.switch_now(meeting, payload.protokollant_id, principal.sub, now)
+                await self.switch_now(meeting, payload.protokollant_id, now)
                 await self._audit_handover(
                     meeting,
                     principal.sub,
@@ -326,12 +336,15 @@ class LifecycleOps(HandoverOps):
                     meeting.gremium_id, payload.protokollant_id
                 )
         if going_live and meeting.protokollant_id is None:
-            raise ConflictError("assign a protokollant before starting the meeting")
+            raise ConflictError(
+                "assign a protokollant before starting the meeting",
+                code="protokollant_missing",
+            )
         cancelled: list[Vote] = []
         if going_live and meeting.started_at is None:
             meeting.started_at = now
         if going_live:
-            await self.open_first_period(meeting, principal.sub, now)
+            await self.open_first_period(meeting, now)
         if closing:
             await self.close_periods(meeting, now)
             meeting.closed_at = now
@@ -429,7 +442,7 @@ class LifecycleOps(HandoverOps):
     async def _assert_public_join_allowed(self, gremium_id: UUID) -> None:
         """Allow public participation only in a gremium without a quorum.
 
-        A gremium with a quorum (StuPa, AStA) decides by the members only; the feature
+        A gremium with a quorum (STUPA, AStA) decides by the members only; the feature
         serves the gremien without a quorum (Fachschaften).
 
         Raises:

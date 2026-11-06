@@ -68,5 +68,5 @@ def test_the_scan_sees_known_columns() -> None:
         for column in table.columns
         if _references_principal(column)
     }
-    assert {"ballot.voter_sub", "meeting.protokollant_id", "audit_entry.actor"} <= found
+    assert {"voted_marker.voter_sub", "meeting.protokollant_id", "audit_entry.actor"} <= found
     assert "principal.merged_into" in found

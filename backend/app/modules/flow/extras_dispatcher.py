@@ -53,8 +53,9 @@ _FLOW_ACTOR = "system:flow"
 class FlowExtrasActionDispatcher:
     """`ActionDispatcher` for the budget and agenda actions.
 
-    It handles `addToNextSession`, `assignBudget` and `assignBudgetFromField`. Every
-    other action type is a no-op.
+    It handles `addToNextSession`, `assignBudget`, `assignBudgetFromField`,
+    `assignBudgetFromApplicantGremium` and `assignBudgetFromMap`. Every other action type is
+    a no-op.
     """
 
     sessionmaker: async_sessionmaker[AsyncSession]

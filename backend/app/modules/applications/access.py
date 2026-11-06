@@ -2,7 +2,7 @@
 
 A principal reaches an application route with a session and a permission. An
 applicant reaches it with a magic-link token. The token binds to exactly one
-``application_id`` and one scope. These dependencies merge both identities into
+``application_id``. These dependencies merge both identities into
 one `Access` object. They raise 401 without an identity and 403 without
 sufficient rights.
 
@@ -28,7 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.deps import DbSession, get_current_applicant, get_current_principal
 from app.modules.applications.models import Application
-from app.modules.auth.principal import Applicant, ApplicantScope, Principal
+from app.modules.auth.principal import Applicant, Principal
 from app.shared.errors import ForbiddenError, UnauthorizedError
 
 READ_PERMISSION = "application.read"
@@ -128,9 +128,8 @@ def resolve_access(
     applicant: Applicant | None,
     *,
     perm: str,
-    scope: ApplicantScope,
 ) -> Access:
-    """Check the principal permission or the applicant scope for the application.
+    """Check the principal permission or the applicant binding for the application.
 
     This function stays public so that adjacent modules reuse the same access
     path. The files module is one example. Its route path carries only the
@@ -146,9 +145,7 @@ def resolve_access(
             return Access(application_id, principal, None)
         raise ForbiddenError(f"Missing permission: {perm}")
     if applicant is not None:
-        if str(applicant.application_id) == str(application_id) and applicant.allows(
-            scope
-        ):
+        if str(applicant.application_id) == str(application_id):
             return Access(application_id, None, applicant, via="applicant")
         raise ForbiddenError("Magic-link does not grant access to this application.")
     raise UnauthorizedError("Authentication required.")
@@ -283,7 +280,6 @@ async def _resolve_with_creator(
     applicant: Applicant | None,
     *,
     perm: str,
-    scope: ApplicantScope,
 ) -> Access:
     """Resolve access like `resolve_access`, and also admit the creator.
 
@@ -291,7 +287,7 @@ async def _resolve_with_creator(
     application without ``perm``.
     """
     try:
-        return resolve_access(application_id, principal, applicant, perm=perm, scope=scope)
+        return resolve_access(application_id, principal, applicant, perm=perm)
     except ForbiddenError:
         if principal is not None and await _is_creator(db, application_id, principal):
             return Access(application_id, principal, None, via="owner")
@@ -306,8 +302,8 @@ async def resolve_app_read(
 ) -> Access:
     """Resolve read access to one application.
 
-    Four identities pass: a principal with ``application.read``, an applicant
-    with ``view`` scope, a member in the Gremium read scope, and the logged-in
+    Four identities pass: a principal with ``application.read``, the magic-link
+    applicant of the application, a member in the Gremium read scope, and the logged-in
     creator. ``application.read_all`` grants global read access. That permission
     ignores the Gremium and the ownership.
 
@@ -325,9 +321,7 @@ async def resolve_app_read(
     if principal is not None and principal.has(READ_ALL_PERMISSION):
         return Access(application_id, principal, None)
     try:
-        return resolve_access(
-            application_id, principal, applicant, perm=READ_PERMISSION, scope="view"
-        )
+        return resolve_access(application_id, principal, applicant, perm=READ_PERMISSION)
     except ForbiddenError:
         if principal is None:
             raise
@@ -356,8 +350,8 @@ async def require_app_edit(
 ) -> Access:
     """Grant write access to one application.
 
-    Three identities pass: a principal with ``application.manage``, an applicant
-    with ``edit`` scope, and the logged-in creator of the own application.
+    Three identities pass: a principal with ``application.manage``, the magic-link
+    applicant of the application, and the logged-in creator of the own application.
 
     The service also checks the edit lock (``state.editAllowed``) for every
     identity and answers 409 when the state locks the application.
@@ -366,7 +360,7 @@ async def require_app_edit(
     if principal is not None and principal.has(EDIT_ANY_PERMISSION):
         return Access(application_id, principal, None)
     return await _resolve_with_creator(
-        db, application_id, principal, applicant, perm=MANAGE_PERMISSION, scope="edit"
+        db, application_id, principal, applicant, perm=MANAGE_PERMISSION
     )
 
 
@@ -378,7 +372,7 @@ async def require_app_applicant(
 ) -> Access:
     """Grant the applicant-transition access to one application.
 
-    Only two identities pass: the applicant with an ``edit`` magic link, and the
+    Only two identities pass: the magic-link applicant of the application, and the
     logged-in creator of the application. A principal with ``application.manage`` or
     ``application.edit_any`` edits the data, but does not act as the applicant. That
     principal gets 403 here, so nobody fires an applicant decision for the applicant.

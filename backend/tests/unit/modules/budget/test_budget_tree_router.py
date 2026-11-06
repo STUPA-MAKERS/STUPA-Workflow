@@ -155,9 +155,9 @@ class _FakeService:
         self.calls["delete_fy"] = (budget_id, fiscal_year_id)
 
     async def set_fiscal_year_closed(
-        self, budget_id: uuid.UUID, fiscal_year_id: uuid.UUID, *, closed: bool, actor: str
+        self, budget_id: uuid.UUID, fiscal_year_id: uuid.UUID, *, closed: bool
     ) -> FiscalYearOut:
-        self.calls["close_fy"] = (budget_id, fiscal_year_id, closed, actor)
+        self.calls["close_fy"] = (budget_id, fiscal_year_id, closed)
         return _fy_out()
 
     async def list_transfers_paged(self, **kwargs: Any) -> Page[TransferRowOut]:
@@ -573,7 +573,7 @@ def test_close_and_reopen_fiscal_year(
 ) -> None:
     resp = client.post(f"/api/budgets/{_BID}/fiscal-years/{_FYID}/{action}")
     assert resp.status_code == 200
-    assert fake.calls["close_fy"] == (_BID, _FYID, closed, "admin")
+    assert fake.calls["close_fy"] == (_BID, _FYID, closed)
 
 
 @pytest.mark.parametrize("action", ["close", "reopen"])

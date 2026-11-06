@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncIterator, Iterator
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, timedelta
 
 import pytest
 from fastapi import FastAPI
@@ -132,13 +132,8 @@ async def member(
     gremium_id: uuid.UUID,
     name: str,
     permissions: tuple[str, ...] = ("vote.cast",),
-    *,
-    ended: bool = False,
 ) -> tuple[str, uuid.UUID]:
-    """Write a gremium member with a role of `permissions` and return sub and id.
-
-    `ended` writes a membership that ended yesterday, so it is not active.
-    """
+    """Write a gremium member with a role of `permissions` and return sub and id."""
     sub, pid = await person(maker, name)
     async with maker() as session:
         role = GremiumRole(
@@ -149,15 +144,8 @@ async def member(
         )
         session.add(role)
         await session.flush()
-        now = datetime.now(UTC)
         session.add(
-            GremiumMembership(
-                principal_id=pid,
-                gremium_id=gremium_id,
-                gremium_role_id=role.id,
-                valid_from=now - timedelta(days=30) if ended else None,
-                valid_until=now - timedelta(days=1) if ended else None,
-            )
+            GremiumMembership(principal_id=pid, gremium_id=gremium_id, gremium_role_id=role.id)
         )
         await session.commit()
     return sub, pid

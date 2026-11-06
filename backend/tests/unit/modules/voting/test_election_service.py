@@ -23,7 +23,6 @@ from app.modules.voting import router as voting_router
 from app.modules.voting.election import (
     ElectionService,
     election_fields,
-    own_ballot,
     result_of,
 )
 from app.modules.voting.listing import _own_ballots
@@ -53,7 +52,7 @@ def _econfig(seats: int = 1, n: int = 3, **over: Any) -> dict[str, Any]:
     data: dict[str, Any] = {
         "seats": seats,
         "candidates": [{"id": f"c{i}", "name": f"Person {i}"} for i in range(1, n + 1)],
-        "secret": False,
+        "secret": True,
     }
     data.update(over)
     return ElectionConfig.model_validate(data).model_dump(mode="json", by_alias=True)
@@ -85,27 +84,32 @@ def _stored(
     return result_of(outcome).model_dump(mode="json", by_alias=True)
 
 
-async def test_cast_open_election_stores_the_sorted_list() -> None:
+def _secret_choice(db: Any) -> str:
+    [secret] = [a for a in db.added if type(a).__name__ == "SecretBallot"]
+    return secret.choice
+
+
+async def test_cast_election_stores_the_sorted_list() -> None:
     vote = _evote(config=_econfig(seats=2))
     db = fake_session(result(vote), result(uuid4()))
     out = await VotingService(db).cast(vote.id, _voter(), ["c2", "c1"], now=NOW)
     assert out.status == "cast"
-    assert db.statements[-1].compile().params["choice"] == '["c1","c2"]'
+    assert _secret_choice(db) == '["c1","c2"]'
 
 
-async def test_cast_secret_election_keeps_the_choice_apart() -> None:
-    vote = _evote(config=_econfig(seats=2, secret=True))
+async def test_cast_election_keeps_the_choice_apart() -> None:
+    vote = _evote(config=_econfig(seats=2))
     db = fake_session(result(vote), result(uuid4()))
     await VotingService(db).cast(vote.id, _voter(), [], now=NOW)
-    [secret] = [a for a in db.added if type(a).__name__ == "SecretBallot"]
-    assert secret.choice == "[]"
+    assert _secret_choice(db) == "[]"
+    assert "choice" not in db.statements[-1].compile().params
 
 
 async def test_cast_single_candidate_takes_yes_no() -> None:
     vote = _evote(config=_econfig(n=1))
     db = fake_session(result(vote), result(uuid4()))
     await VotingService(db).cast(vote.id, _voter(), "abstain", now=NOW)
-    assert db.statements[-1].compile().params["choice"] == "abstain"
+    assert _secret_choice(db) == "abstain"
 
 
 @pytest.mark.parametrize(
@@ -138,11 +142,11 @@ async def test_cast_guest_election() -> None:
     db = fake_session(result(vote), result(), result(), result(uuid4()))
     out = await VotingService(db).cast_guest(vote.id, uuid4(), ["c3"], now=NOW)
     assert out.status == "cast"
-    assert db.statements[-1].compile().params["choice"] == '["c3"]'
+    assert _secret_choice(db) == '["c3"]'
 
 
-async def test_get_open_election_counts_ballots_and_candidates() -> None:
-    vote = _evote(config=_econfig(seats=2))
+async def test_get_closed_election_counts_ballots_and_candidates() -> None:
+    vote = _evote(config=_econfig(seats=2), status="closed", result="elected")
     ballots = result('["c1","c2"]', '["c1"]', "[]")
     db = fake_session(result(vote), result(), ballots)
     out = await VotingService(db).get(vote.id)
@@ -154,8 +158,8 @@ async def test_get_open_election_counts_ballots_and_candidates() -> None:
     assert out.config.options == ["c1", "c2", "c3", "abstain"]
 
 
-async def test_get_open_secret_election_hides_the_counts() -> None:
-    vote = _evote(config=_econfig(secret=True))
+async def test_get_open_election_hides_the_counts() -> None:
+    vote = _evote()
     db = fake_session(result(vote), result(), result('["c1"]'))
     out = await VotingService(db).get(vote.id)
     assert out.tally.revealed is False
@@ -178,25 +182,12 @@ def test_election_fields_of_a_motion_are_empty() -> None:
     assert election_fields(_vote()) == {}  # type: ignore[arg-type]
 
 
-def test_own_ballot_shapes() -> None:
-    assert own_ballot("election", '["c1"]') == MyBallot(cast=True, choices=["c1"])
-    assert own_ballot("election", "yes") == MyBallot(cast=True, choice="yes")
-    assert own_ballot("motion", "no") == MyBallot(cast=True, choice="no")
-
-
-async def test_my_ballot_of_an_open_election() -> None:
-    vote = _evote()
-    db = fake_session(result(SimpleNamespace(choice='["c2"]')))
-    mine = await VotingService(db).my_ballot(vote, "v1", secret=False)  # type: ignore[arg-type]
-    assert mine.choices == ["c2"]
-
-
-async def test_own_ballots_of_the_vote_list_decode_an_election() -> None:
+async def test_own_ballots_of_the_vote_list_give_only_cast() -> None:
+    """The vote list reads the voted markers: an election gives `cast`, never a choice."""
     election, motion = _evote(), _vote()
-    db = fake_session(result((election.id, '["c1"]'), (motion.id, "yes")))
+    db = fake_session(result(election.id))
     out = await _own_ballots(db, "v1", [election, motion])  # type: ignore[list-item]
-    assert out[election.id].choices == ["c1"]
-    assert out[motion.id].choice == "yes"
+    assert out == {election.id: MyBallot(cast=True)}
 
 
 async def test_create_internal_election_writes_kind_and_json_config() -> None:
@@ -430,71 +421,6 @@ def _runoff_parent(**over: Any) -> SimpleNamespace:
     return _evote(**base)
 
 
-async def test_create_runoff_takes_the_tied_candidates() -> None:
-    parent = _runoff_parent()
-    roster = [(uuid4(), ["vote.cast"]), (uuid4(), ["vote.cast"])]
-    db = fake_session(result(parent), result(*roster), result())
-    db.scalar_results = [parent.meeting_id, "live"]
-    out = await ElectionService(VotingService(db)).create_runoff(parent.id)
-    [runoff] = [a for a in db.added if type(a).__name__ == "Vote"]
-    assert runoff.parent_vote_id == parent.id
-    assert runoff.round == 2
-    assert runoff.meeting_id == parent.meeting_id
-    assert runoff.agenda_item_id == parent.agenda_item_id
-    assert runoff.eligible_count == 2
-    assert runoff.config["seats"] == 1
-    assert [c["id"] for c in runoff.config["candidates"]] == ["c2", "c3"]
-    assert parent.election_result["runoff"]["voteId"] == str(runoff.id)
-    assert out.round == 2
-    assert out.parent_vote_id == parent.id
-    assert db.committed == 1
-
-
-async def test_create_runoff_with_guests_keeps_the_count() -> None:
-    parent = _runoff_parent(config_over={"guestsVote": True}, meeting_id=None, eligible_count=7)
-    db = fake_session(result(parent), result())
-    out = await ElectionService(VotingService(db)).create_runoff(parent.id)
-    assert out.tally.eligible == 7
-
-
-async def test_create_runoff_without_a_pending_runoff_409() -> None:
-    config = _econfig()
-    parent = _runoff_parent(meeting_id=None, election_result=_stored(['["c1"]'], config))
-    with pytest.raises(ConflictError) as err:
-        await ElectionService(VotingService(fake_session(result(parent)))).create_runoff(
-            parent.id
-        )
-    assert err.value.code == "no_runoff_pending"
-
-
-@pytest.mark.parametrize("status", ["draft", "open", "closed"])
-async def test_create_runoff_twice_409(status: str) -> None:
-    """A second runoff gives 409 while the first is not cancelled.
-
-    The scalars are the meeting id and the status of the runoff.
-    """
-    parent = _runoff_parent(meeting_id=None)
-    parent.election_result["runoff"]["voteId"] = str(uuid4())
-    db = fake_session(result(parent))
-    db.scalar_results = [None, status]
-    with pytest.raises(ConflictError) as err:
-        await ElectionService(VotingService(db)).create_runoff(parent.id)
-    assert err.value.code == "runoff_exists"
-
-
-@pytest.mark.parametrize("status", ["cancelled", None])
-async def test_create_runoff_after_a_cancelled_or_deleted_runoff(status: str | None) -> None:
-    """A cancelled or deleted runoff does not block a new one."""
-    parent = _runoff_parent(meeting_id=None, config_over={"guestsVote": True}, eligible_count=3)
-    old = str(uuid4())
-    parent.election_result["runoff"]["voteId"] = old
-    db = fake_session(result(parent), result())
-    db.scalar_results = [None, status]
-    await ElectionService(VotingService(db)).create_runoff(parent.id)
-    [runoff] = [a for a in db.added if type(a).__name__ == "Vote"]
-    assert parent.election_result["runoff"]["voteId"] == str(runoff.id) != old
-
-
 def _linked_runoff(parent: SimpleNamespace, **over: Any) -> SimpleNamespace:
     runoff = _evote(parent_vote_id=parent.id, round=2, **over)
     parent.election_result["runoff"]["voteId"] = str(runoff.id)
@@ -552,15 +478,6 @@ async def test_cancel_of_a_first_round_election_touches_no_parent() -> None:
     assert not any("vote.id = " in str(s) and "FOR UPDATE" in str(s) for s in db.statements[1:])
 
 
-async def test_create_runoff_needs_a_live_meeting() -> None:
-    parent = _runoff_parent()
-    db = fake_session(result(parent))
-    db.scalar_results = [parent.meeting_id, "closed"]
-    with pytest.raises(ConflictError) as err:
-        await ElectionService(VotingService(db)).create_runoff(parent.id)
-    assert err.value.code == "meeting_closed"
-
-
 _TALLY = TallyOut(counts={}, eligible=0, quorumMet=True)
 _MANAGER = "fake:manager"
 
@@ -594,10 +511,6 @@ class _FakeElections:
 
     async def draw_lot(self, vote_id: UUID, principal: Principal, *, now: object) -> VoteOut:
         _FakeElections.calls.append(f"lot:{principal.sub}")
-        return _vote_out()
-
-    async def create_runoff(self, vote_id: UUID) -> VoteOut:
-        _FakeElections.calls.append("runoff")
         return _vote_out()
 
 
@@ -639,15 +552,7 @@ def test_route_draw_lot_publishes_the_result(routes: tuple[FastAPI, _Pub]) -> No
     assert _FakeElections.calls == ["lot:p"]
 
 
-def test_route_runoff_creates_the_draft(routes: tuple[FastAPI, _Pub]) -> None:
-    app, _ = routes
-    _login(app, _MANAGER)
-    r = TestClient(app).post(f"/api/votes/{uuid4()}/runoff")
-    assert r.status_code == 200
-    assert _FakeElections.calls == ["runoff"]
-
-
-@pytest.mark.parametrize("path", ["draw-lot", "runoff"])
+@pytest.mark.parametrize("path", ["draw-lot"])
 def test_routes_need_the_manage_right(routes: tuple[FastAPI, _Pub], path: str) -> None:
     app, _ = routes
     _login(app, f"vote:{GID}")
@@ -663,3 +568,11 @@ def test_ballot_body_takes_a_list(routes: tuple[FastAPI, _Pub]) -> None:
     assert BallotIn.model_validate({"choice": ["c1"]}).choice == ["c1"]
     with pytest.raises(ValueError):
         BallotIn.model_validate({"choice": ""})
+
+
+def test_runoff_route_is_gone(routes: tuple[FastAPI, _Pub]) -> None:
+    """There is no runoff: a tie in an election is decided by lot (§F/meetings/voting/000027)."""
+    app, _ = routes
+    _login(app, _MANAGER)
+    r = TestClient(app).post(f"/api/votes/{uuid4()}/runoff")
+    assert r.status_code in (404, 405)

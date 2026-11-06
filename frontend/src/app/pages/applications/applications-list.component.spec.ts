@@ -261,7 +261,7 @@ describe('ApplicationsListComponent', () => {
 
     it('opens the filter sheets from the bottom on a phone', async () => {
       const original = window.matchMedia;
-      window.matchMedia = ((q: string) => ({ ...original(q), matches: q === '(max-width: 768px)' })) as typeof window.matchMedia;
+      window.matchMedia = ((q: string) => ({ ...original(q), matches: q === '(max-width: 767.98px)' })) as typeof window.matchMedia;
       try {
         const { cmp } = await start();
         expect(cmp.sheetSide()).toBe('bottom');
@@ -899,7 +899,7 @@ describe('ApplicationsListComponent', () => {
 
     it('opens a bottom sheet from the floating button on a phone', async () => {
       const original = window.matchMedia;
-      window.matchMedia = ((q: string) => ({ ...original(q), matches: q === '(max-width: 768px)' })) as typeof window.matchMedia;
+      window.matchMedia = ((q: string) => ({ ...original(q), matches: q === '(max-width: 767.98px)' })) as typeof window.matchMedia;
       try {
         const { cmp, harness } = await start('/applications', { perms: CAPTURE });
         expect(cmp.phoneMenuSections().flatMap((s) => s.items.map((i) => i.id))).not.toContain('capture');

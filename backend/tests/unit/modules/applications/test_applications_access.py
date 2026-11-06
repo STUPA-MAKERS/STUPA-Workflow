@@ -90,9 +90,9 @@ def test_read_creator_without_permission_ok() -> None:
     assert access.is_applicant_view is True
 
 
-def test_read_applicant_scoped_view() -> None:
+def test_read_applicant_bound_application() -> None:
     app_id = uuid4()
-    applicant = Applicant(application_id=str(app_id), scope="view")
+    applicant = Applicant(application_id=str(app_id))
     access = asyncio.run(require_app_read(app_id, _db(), None, applicant))
     assert access.applicant is not None
     assert access.can_see_internal is False
@@ -101,7 +101,7 @@ def test_read_applicant_scoped_view() -> None:
 
 
 def test_read_applicant_wrong_application_403() -> None:
-    applicant = Applicant(application_id=str(uuid4()), scope="edit")
+    applicant = Applicant(application_id=str(uuid4()))
     with pytest.raises(ForbiddenError):
         asyncio.run(require_app_read(uuid4(), _db(), None, applicant))
 
@@ -138,16 +138,9 @@ def test_edit_non_creator_without_permission_403() -> None:
         )
 
 
-def test_edit_applicant_view_scope_insufficient_403() -> None:
+def test_edit_applicant_ok() -> None:
     app_id = uuid4()
-    applicant = Applicant(application_id=str(app_id), scope="view")
-    with pytest.raises(ForbiddenError):
-        asyncio.run(require_app_edit(app_id, _db(), None, applicant))
-
-
-def test_edit_applicant_edit_scope_ok() -> None:
-    app_id = uuid4()
-    applicant = Applicant(application_id=str(app_id), scope="edit")
+    applicant = Applicant(application_id=str(app_id))
     access = asyncio.run(require_app_edit(app_id, _db(), None, applicant))
     assert access.applicant is not None
 
@@ -155,7 +148,7 @@ def test_edit_applicant_edit_scope_ok() -> None:
 def test_applicant_access_magic_link_edit_ok() -> None:
     """Admit the magic-link applicant to the applicant transitions."""
     app_id = uuid4()
-    applicant = Applicant(application_id=str(app_id), scope="edit")
+    applicant = Applicant(application_id=str(app_id))
     access = asyncio.run(require_app_applicant(app_id, _db(), None, applicant))
     assert access.applicant is not None
 

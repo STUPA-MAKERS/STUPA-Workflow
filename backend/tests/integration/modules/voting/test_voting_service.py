@@ -2,9 +2,9 @@
 
 The test uses a real Postgres from testcontainers and a real schema.
 
-`UNIQUE(vote,voter)` turns a double vote into a 409 `already_voted`: a ballot never
-changes after the cast. The secret path writes `voted_marker` and
-`secret_ballot` without a link to the identity. The percent quorum comes from the
+`UNIQUE(vote,voter)` of `voted_marker` turns a double vote into a 409 `already_voted`:
+a ballot never changes after the cast. A cast writes `voted_marker` and `secret_ballot`
+without a link to the identity. The percent quorum comes from the
 eligible snapshot. `close` computes the `result` and fires the result branch in the
 same transaction.
 """
@@ -37,7 +37,7 @@ from app.modules.flow.dispatch import DispatchedAction
 from app.modules.flow.models import FlowVersion, State, Transition
 from app.modules.forms.schemas import FormVersionCreate
 from app.modules.forms.service import FormsService
-from app.modules.voting.models import Ballot, SecretBallot, Vote, VotedMarker
+from app.modules.voting.models import SecretBallot, Vote, VotedMarker
 from app.modules.voting.schemas import VoteCreate
 from app.modules.voting.service import VotingService
 from app.shared.config_schemas import FormFieldDef, VoteConfig
@@ -143,7 +143,11 @@ async def _seed(session: AsyncSession) -> tuple[Application, dict[str, State]]:
 
 
 def _config(**over: object) -> dict[str, Any]:
-    base: dict[str, Any] = {"options": ["yes", "no", "abstain"], "majorityRule": "simple"}
+    base: dict[str, Any] = {
+        "options": ["yes", "no", "abstain"],
+        "majorityRule": "simple",
+        "secret": True,
+    }
     base.update(over)
     return VoteConfig.model_validate(base).model_dump(by_alias=True)
 
@@ -177,7 +181,7 @@ async def test_double_vote_conflict_409(session: AsyncSession) -> None:
         await svc.cast(vote.id, _voter("v1", vote), "no", now=NOW)
     assert ei.value.code == "already_voted"
     rows = (await session.execute(
-        select(Ballot.choice).where(Ballot.vote_id == vote.id)
+        select(SecretBallot.choice).where(SecretBallot.vote_id == vote.id)
     )).scalars().all()
     assert rows == ["yes"]
 
@@ -196,14 +200,13 @@ async def test_not_in_group_forbidden(session: AsyncSession) -> None:
 
 
 async def test_secret_vote_unlinks_choice_from_voter(session: AsyncSession) -> None:
-    """A secret vote keeps who voted apart from what they chose.
+    """A vote keeps who voted apart from what they chose.
 
-    The markers name the voters, the secret ballots hold the choices without an
-    identity, and no identifying ballot exists. The secret path also rejects a double
-    vote with 409.
+    The markers name the voters, and the secret ballots hold the choices without an
+    identity. A double vote gives 409.
     """
     app, _ = await _seed(session)
-    vote = await _make_vote(session, app, secret=True)
+    vote = await _make_vote(session, app)
     svc = VotingService(session)
     await svc.open(vote.id, now=NOW)
 
@@ -219,12 +222,8 @@ async def test_secret_vote_unlinks_choice_from_voter(session: AsyncSession) -> N
     secrets = (await session.execute(
         select(SecretBallot.choice).where(SecretBallot.vote_id == vote.id)
     )).scalars().all()
-    ballots = (await session.execute(
-        select(func.count()).select_from(Ballot).where(Ballot.vote_id == vote.id)
-    )).scalar_one()
     assert sorted(markers) == ["v1", "v2"]
     assert sorted(secrets) == ["no", "yes"]
-    assert ballots == 0
 
 
 def test_secret_ballot_has_no_timestamp_column() -> None:
@@ -332,10 +331,11 @@ async def test_concurrent_cast_same_voter_exactly_one_wins(
     accepted = [r for r in (first, second) if not isinstance(r, ConflictError)]
     assert len(conflicts) == 1
     assert len(accepted) == 1
-    count = (await session.execute(
-        select(func.count()).select_from(Ballot).where(Ballot.vote_id == vote.id)
-    )).scalar_one()
-    assert count == 1
+    for model in (VotedMarker, SecretBallot):
+        count = (await session.execute(
+            select(func.count()).select_from(model).where(model.vote_id == vote.id)
+        )).scalar_one()
+        assert count == 1
 
 
 async def _gremium_member_with_vote_manage(

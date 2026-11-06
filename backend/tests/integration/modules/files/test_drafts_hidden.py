@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncIterator
-from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -37,6 +36,7 @@ from app.modules.files.service import FilesService
 from app.modules.files.storage import ObjectStorage
 from app.modules.flow.context import build_base_context
 from app.settings import Settings
+from tests._support.draft_tokens import add_draft_token
 from tests._support.guest_apps import (
     build_api,
     create_guest_application,
@@ -91,6 +91,7 @@ async def _clean_draft(
     key = f"drafts/{draft_id}/geheim.pdf"
     await storage.put(key, b"%PDF-1.4\n", "application/pdf")
     async with maker() as session:
+        await add_draft_token(session, hash_draft_token("tok", settings.magic_link_secret))
         session.add(
             Attachment(
                 id=draft_id,
@@ -102,7 +103,6 @@ async def _clean_draft(
                 scanned=True,
                 scan_result="clean",
                 draft_token_hash=hash_draft_token("tok", settings.magic_link_secret),
-                draft_expires_at=datetime.now(UTC) + timedelta(days=7),
             )
         )
         await session.commit()

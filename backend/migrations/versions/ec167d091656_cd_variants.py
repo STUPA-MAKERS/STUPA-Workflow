@@ -68,9 +68,9 @@ def _seed_statements() -> tuple[str, ...]:
     0002_seed already wrote them.
     """
     stmts: list[str] = [
-        "INSERT INTO cd_variant (key, name, base_variant) "
-        f"VALUES ('{key}', '{name}', '{base}') ON CONFLICT (key) DO NOTHING"
-        for key, name, base, _title, _footer in _SEED
+        "INSERT INTO cd_variant (key, name) "
+        f"VALUES ('{key}', '{name}') ON CONFLICT (key) DO NOTHING"
+        for key, name, _base, _title, _footer in _SEED
     ]
     for key, _name, _base, title, footer in _SEED:
         rows = [

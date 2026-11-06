@@ -28,7 +28,7 @@ from app.modules.protocol.markdown import build_election_snippet
 from app.modules.protocol.models import Protocol
 from app.modules.protocol.service import election_snippet_of
 from app.modules.voting.erasure import ERASED_CANDIDATE_NAME
-from app.modules.voting.models import Ballot, Vote
+from app.modules.voting.models import SecretBallot, Vote, VotedMarker
 from app.modules.voting.schemas import ElectionResultOut
 from app.modules.voting.tally import encode_election_choice
 from app.shared.config_schemas import ElectionConfig
@@ -46,7 +46,7 @@ async def maker(
 ) -> AsyncIterator[async_sessionmaker[AsyncSession]]:
     """Return a session maker on clean tables.
 
-    ``engine`` truncates meeting, vote, ballot, protocol and the audit chain, and the
+    ``engine`` truncates meeting, vote, protocol and the audit chain, and the
     helper truncates the principals.
     """
     clear_privacy_tables(engine)
@@ -59,12 +59,22 @@ def _config(*candidates: tuple[str, str, uuid.UUID]) -> dict[str, Any]:
     return ElectionConfig.model_validate(
         {
             "seats": 1,
-            "secret": False,
+            "secret": True,
             "candidates": [
                 {"id": cid, "name": name, "principalId": str(pid)} for cid, name, pid in candidates
             ],
         }
     ).model_dump(by_alias=True, mode="json")
+
+
+async def _ballots(session: AsyncSession) -> tuple[set[tuple[Any, str]], list[tuple[Any, str]]]:
+    """Return the voted markers and the sorted secret choices of every vote."""
+    markers = {(m.vote_id, m.voter_sub) for m in await session.scalars(select(VotedMarker))}
+    choices = sorted(
+        ((b.vote_id, b.choice) for b in await session.scalars(select(SecretBallot))),
+        key=str,
+    )
+    return markers, choices
 
 
 def _callout(config: dict[str, Any], result: dict[str, Any]) -> str:
@@ -159,14 +169,15 @@ async def test_erase_replaces_only_the_names_of_lost_candidacies(
         merged = election(merged_config, merged_result, True)
         session.add_all([lost, won, merged])
         await session.flush()
-        for n, choice in enumerate(["yes", "no", "no", "no", "no"]):
-            session.add(Ballot(vote_id=lost.id, voter_sub=f"v{n}", choice=choice))
-        for n, choice in enumerate(["yes", "yes", "yes", "yes", "no"]):
-            session.add(Ballot(vote_id=won.id, voter_sub=f"v{n}", choice=choice))
-        for n, cid in enumerate(["c1", "c1", "c2", "c2", "c2"]):
-            session.add(
-                Ballot(vote_id=merged.id, voter_sub=f"v{n}", choice=encode_election_choice([cid]))
-            )
+        stored_choices = [
+            (lost.id, ["yes", "no", "no", "no", "no"]),
+            (won.id, ["yes", "yes", "yes", "yes", "no"]),
+            (merged.id, [encode_election_choice([cid]) for cid in ["c1", "c1", "c2", "c2", "c2"]]),
+        ]
+        for vote_id, choices in stored_choices:
+            for n, choice in enumerate(choices):
+                session.add(VotedMarker(vote_id=vote_id, voter_sub=f"v{n}"))
+                session.add(SecretBallot(vote_id=vote_id, choice=choice))
 
         lost_callout = _callout(single, lost_result)
         won_callout = _callout(single, won_result)
@@ -180,9 +191,7 @@ async def test_erase_replaces_only_the_names_of_lost_candidacies(
         ids = (person.id, lost.id, won.id, merged.id, protocol.id, item.id)
 
     async with maker() as session:
-        before = {
-            (b.vote_id, b.voter_sub, b.choice) for b in (await session.scalars(select(Ballot)))
-        }
+        before = await _ballots(session)
         await PrincipalService(session).erase(ids[0], actor="admin")
 
     async with maker() as session:
@@ -196,11 +205,9 @@ async def test_erase_replaces_only_the_names_of_lost_candidacies(
         assert lost_row.election_result == lost_result
         assert won_row.election_result == won_result
         assert merged_row.election_result == merged_result
-        after = {
-            (b.vote_id, b.voter_sub, b.choice) for b in (await session.scalars(select(Ballot)))
-        }
+        after = await _ballots(session)
         assert after == before
-        assert len(after) == 15
+        assert len(after[0]) == 15 and len(after[1]) == 15
 
         stored = await session.get(Protocol, ids[4])
         assert stored is not None

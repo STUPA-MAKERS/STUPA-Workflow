@@ -616,14 +616,14 @@ async def test_admitted_view_hides_non_public_content(monkeypatch: pytest.Monkey
             eligibleGroup=str(GID),
             config=config,
             status="open",
-            secret=False,
+            secret=True,
             tally=TallyOut(
                 counts={}, eligible=3, voted=1, present=3, revealed=False, quorumMet=True
             ),
             guestsVote=True,
         )
 
-    async def fake_ballot(self: Any, v: Any, voter: str, *, secret: bool) -> MyBallot:
+    async def fake_ballot(self: Any, v: Any, voter: str) -> MyBallot:
         return MyBallot(cast=False)
 
     monkeypatch.setattr(guests_mod.VotingService, "get", fake_get)
@@ -696,7 +696,7 @@ async def test_admitted_view_of_an_election_carries_no_account_ids(
             electionResult=stored,
         )
 
-    async def fake_ballot(self: Any, v: Any, voter: str, *, secret: bool) -> MyBallot:
+    async def fake_ballot(self: Any, v: Any, voter: str) -> MyBallot:
         return MyBallot(cast=False)
 
     monkeypatch.setattr(guests_mod.VotingService, "get", fake_get)

@@ -1,8 +1,8 @@
 """A ballot never changes after the cast.
 
 A second cast of the same voter gives 409 with the code ``already_voted``. This holds
-for an open vote, for a secret vote and for the live-vote WebSocket, which sends the
-same code as an error frame. ``VoteConfig`` has no ``allowChange``.
+for the REST cast and for the live-vote WebSocket, which sends the same code as an
+error frame. ``VoteConfig`` has no ``allowChange``.
 """
 
 from __future__ import annotations
@@ -30,13 +30,13 @@ NOW = datetime(2026, 10, 1, 12, 0, tzinfo=UTC)
 GID = UUID("00000000-0000-0000-0000-0000000011a0")
 
 
-def _vote(*, secret: bool) -> SimpleNamespace:
+def _vote() -> SimpleNamespace:
     return SimpleNamespace(
         id=uuid4(),
         application_id=uuid4(),
         meeting_id=None,
         eligible_group=str(GID),
-        config={"options": ["yes", "no"], "majorityRule": "simple", "secret": secret},
+        config={"options": ["yes", "no"], "majorityRule": "simple", "secret": True},
         eligible_count=3,
         opens_at=NOW,
         closes_at=None,
@@ -70,7 +70,7 @@ def test_stored_config_drops_only_the_legacy_allow_change() -> None:
 
 
 def test_service_reads_a_vote_with_a_legacy_allow_change() -> None:
-    vote: Any = _vote(secret=False)
+    vote: Any = _vote()
     vote.config = {**vote.config, "allowChange": True}
     assert VotingService._config(vote).majority_rule == "simple"
 
@@ -81,14 +81,13 @@ def test_ballot_accepted_has_only_the_cast_status() -> None:
         BallotAccepted.model_validate({"status": "changed"})
 
 
-@pytest.mark.parametrize("secret", [False, True])
-async def test_second_cast_gives_409_already_voted(secret: bool) -> None:
+async def test_second_cast_gives_409_already_voted() -> None:
     """The first cast inserts, and the second cast gives 409 ``already_voted``.
 
-    The second cast finds the unique row and inserts nothing. The open path never
+    The second cast finds the unique voted marker and inserts nothing. No cast ever
     updates a ballot.
     """
-    vote = _vote(secret=secret)
+    vote = _vote()
     db = fake_session(result(vote), result(SimpleNamespace(id=uuid4())))
     first = await VotingService(db).cast(vote.id, _voter(), "yes", now=NOW)
     assert first.status == "cast"
@@ -98,6 +97,7 @@ async def test_second_cast_gives_409_already_voted(secret: bool) -> None:
     assert ei.value.status == 409
     assert ei.value.code == ALREADY_VOTED == "already_voted"
     assert db.committed == 0
+    assert db.added == []
     assert all("DO UPDATE" not in str(stmt) for stmt in db.statements)
 
 

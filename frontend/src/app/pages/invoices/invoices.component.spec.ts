@@ -1577,7 +1577,7 @@ describe('InvoicesComponent (list/detail)', () => {
    * while the form is open.
    */
   it('opens the file picker from the header menu of a phone', async () => {
-    setViewport('max-width: 768px');
+    setViewport('max-width: 767.98px');
     const { c, container } = await setup();
     const input = container.querySelector('input[type=file]') as HTMLInputElement;
     const click = jest.spyOn(input, 'click').mockImplementation(() => undefined);

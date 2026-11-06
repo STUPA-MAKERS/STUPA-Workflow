@@ -53,6 +53,16 @@ jobs:
             echo "frontend=false" >> "$GITHUB_OUTPUT"
           fi
 
+  specs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      # Checks the format of every spec, the index and every § reference in the code.
+      - run: python3 scripts/check_specs.py
+
   be-lint:
     runs-on: ubuntu-latest
     defaults:

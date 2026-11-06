@@ -437,7 +437,7 @@ def test_delete_ok_with_edit_any(
 def _as_applicant(app: FastAPI) -> None:
     app.dependency_overrides[get_current_principal] = lambda: None
     app.dependency_overrides[get_current_applicant] = lambda: Applicant(
-        application_id=str(APP_ID), scope="edit"
+        application_id=str(APP_ID)
     )
 
 
@@ -571,7 +571,7 @@ def test_a_ticket_attachment_needs_ticket_manage(app: FastAPI, client: TestClien
     assert client.get(f"/api/attachments/{TICKET_ATT}/download").status_code == 404
     app.dependency_overrides[get_current_principal] = lambda: None
     app.dependency_overrides[get_current_applicant] = lambda: Applicant(
-        application_id=str(APP_ID), scope="view"
+        application_id=str(APP_ID)
     )
     assert client.get(f"/api/attachments/{TICKET_ATT}").status_code == 404
     assert client.get(f"/api/attachments/{TICKET_ATT}/download").status_code == 404

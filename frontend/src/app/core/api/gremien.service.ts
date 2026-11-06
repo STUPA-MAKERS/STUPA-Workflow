@@ -67,8 +67,6 @@ export interface GremiumMember {
   readonly roleId: Uuid;
   readonly roleKey: string;
   readonly roleName: LocalizedText;
-  readonly validFrom: IsoDateTime | null;
-  readonly validUntil: IsoDateTime | null;
   readonly isSelf: boolean;
 }
 

@@ -7,9 +7,9 @@ transfer is exclusive and never a duplicate.
 
 The server enforces these invariants:
 
-* Feature gates. A meeting delegation needs the gremium flag
-  `allow_vote_delegation`. `delegate_voting` also needs the global vote transfer
-  `delegation_voting_enabled`, else 422.
+* Feature gate. A meeting delegation, with or without the vote, needs the
+  gremium flag `allow_vote_delegation` (§F/meetings/delegations/000110). No
+  server setting switches the vote transfer.
 * Own vote only. The delegator must be a voting member of the meeting gremium.
   The right comes only from an active gremium membership whose gremium role
   holds `vote.cast`. A global role, a role assignment or an OIDC group mapping
@@ -119,9 +119,9 @@ def meeting_start_utc(meeting: Meeting, tz_name: str) -> datetime | None:
 
 
 async def _membership_with_vote_cast(
-    session: AsyncSession, principal_id: UUID, gremium_id: UUID, now: datetime
+    session: AsyncSession, principal_id: UUID, gremium_id: UUID
 ) -> bool:
-    """Report whether an active gremium membership grants `vote.cast`."""
+    """Report whether a gremium membership grants `vote.cast`."""
     rows = (
         (
             await session.execute(
@@ -131,10 +131,6 @@ async def _membership_with_vote_cast(
                 .where(
                     GremiumMembership.principal_id == principal_id,
                     GremiumMembership.gremium_id == gremium_id,
-                    (GremiumMembership.valid_from.is_(None))
-                    | (GremiumMembership.valid_from <= now),
-                    (GremiumMembership.valid_until.is_(None))
-                    | (GremiumMembership.valid_until > now),
                 )
             )
         )
@@ -145,16 +141,16 @@ async def _membership_with_vote_cast(
 
 
 async def _independently_eligible(
-    session: AsyncSession, principal_id: UUID, gremium_id: UUID, now: datetime
+    session: AsyncSession, principal_id: UUID, gremium_id: UUID
 ) -> bool:
     """Report whether the principal can vote without any delegation.
 
-    The check uses the same source as the cast gate of the voting module: an active
+    The check uses the same source as the cast gate of the voting module: a
     gremium membership whose gremium role holds `vote.cast`. The membership comes from
     the OIDC groups through the gremium mappings. A global role or a raw OIDC group
     never gives the voting right in a gremium.
     """
-    return await _membership_with_vote_cast(session, principal_id, gremium_id, now)
+    return await _membership_with_vote_cast(session, principal_id, gremium_id)
 
 
 async def voting_delegation_check(
@@ -286,17 +282,13 @@ class DelegationService:
             raise NotFoundError(f"gremium {gremium_id} not found")
         return gremium
 
-    async def _member_ids(self, gremium_id: UUID, now: datetime) -> set[UUID]:
-        """Return the active gremium members with any role."""
+    async def _member_ids(self, gremium_id: UUID) -> set[UUID]:
+        """Return the gremium members with any role."""
         rows = (
             (
                 await self.session.execute(
                     select(GremiumMembership.principal_id).where(
                         GremiumMembership.gremium_id == gremium_id,
-                        (GremiumMembership.valid_from.is_(None))
-                        | (GremiumMembership.valid_from <= now),
-                        (GremiumMembership.valid_until.is_(None))
-                        | (GremiumMembership.valid_until > now),
                     )
                 )
             )
@@ -439,9 +431,9 @@ class DelegationService:
             NotFoundError: The meeting or the recipient does not exist (404).
             ConflictError: The delegator already delegated for this meeting, or the
                 recipient already carries a delegated vote (409).
-            ValidationProblem: The vote transfer is disabled, the meeting is not
-                planned, the deadline has passed, the delegator picked themselves,
-                or the delegation would build a chain (422).
+            ValidationProblem: The meeting is not planned, the deadline has
+                passed, the delegator picked themselves, or the delegation would
+                build a chain (422).
         """
         if payload.delegator_id is not None:
             return await self._create_by_lead(payload, payload.delegator_id, actor)
@@ -451,7 +443,6 @@ class DelegationService:
 
         if not gremium.allow_vote_delegation:
             raise ForbiddenError("Delegation is not enabled for this gremium.")
-        self._check_voting_enabled(payload)
         if meeting.status != "planned":
             raise ValidationProblem(
                 "Meeting has already started.",
@@ -470,11 +461,11 @@ class DelegationService:
                 errors=[{"field": "delegateId", "msg": "must differ from delegator"}],
             )
 
-        if not await _independently_eligible(self.session, me.id, gremium.id, now):
+        if not await _independently_eligible(self.session, me.id, gremium.id):
             raise ForbiddenError("Only voting members of the meeting's gremium may delegate.")
 
         pool_ids = await substitutes_for(self.session, gremium.id, me.id)
-        member_ids = await self._member_ids(gremium.id, now)
+        member_ids = await self._member_ids(gremium.id)
         via_pool = delegate.id in pool_ids
         if not via_pool and delegate.id not in member_ids and not gremium.delegation_allow_external:
             raise ForbiddenError("Recipient must be a gremium member or a designated substitute.")
@@ -502,14 +493,6 @@ class DelegationService:
         )
         return (await self._out([(row, meeting, gremium)], now, me.id))[0]
 
-    def _check_voting_enabled(self, payload: DelegationCreate) -> None:
-        """Refuse a vote transfer while the global switch is off (422)."""
-        if payload.delegate_voting and not self.settings.delegation_voting_enabled:
-            raise ValidationProblem(
-                "Voting-right delegation is disabled.",
-                errors=[{"field": "delegateVoting", "msg": "disabled by configuration"}],
-            )
-
     async def _create_by_lead(
         self, payload: DelegationCreate, delegator_id: UUID, actor: Principal
     ) -> DelegationOut:
@@ -518,10 +501,9 @@ class DelegationService:
         The meeting lead (`can_manage`) names the missing member A (`delegatorId`)
         and a substitute B from the pool of the gremium for A: a personal entry
         for A or a gremium-wide entry. The checks are the same as before the
-        meeting: the gremium allows delegations, A may vote, the vote
-        transfer switch, and no chains. A is missing when A has no attendance
-        record, or the record is `excused` or `absent`. The lead cannot name
-        themselves as B. The row stores the lead as `created_by` and
+        meeting: the gremium allows delegations, A may vote, and no chains. A is
+        missing when A has no attendance record, or the record is `excused` or
+        `absent`. The lead cannot name themselves as B. The row stores the lead as `created_by` and
         `via_pool = true`.
 
         Lock the meeting row before the status and attendance reads. The attendance writers hold a
@@ -536,9 +518,8 @@ class DelegationService:
             NotFoundError: The meeting, A or B does not exist (404).
             ConflictError: A already has a delegation, or B already carries a
                 delegated vote (409).
-            ValidationProblem: The vote transfer is disabled, the meeting is not
-                live, A and B are the same person, A is present, or the
-                delegation would build a chain (422).
+            ValidationProblem: The meeting is not live, A and B are the same
+                person, A is present, or the delegation would build a chain (422).
         """
         now = datetime.now(UTC)
         meeting = await self._meeting(payload.meeting_id)
@@ -550,7 +531,6 @@ class DelegationService:
         meeting = await self._meeting(payload.meeting_id, lock=True)
         if not gremium.allow_vote_delegation:
             raise ForbiddenError("Delegation is not enabled for this gremium.")
-        self._check_voting_enabled(payload)
         if meeting.status != "live":
             raise ValidationProblem(
                 "The meeting lead enters a substitution only during a live meeting.",
@@ -569,7 +549,7 @@ class DelegationService:
             )
         if delegate.sub == actor.sub:
             raise ForbiddenError("The meeting lead cannot name themselves as the substitute.")
-        if not await _independently_eligible(self.session, delegator.id, gremium.id, now):
+        if not await _independently_eligible(self.session, delegator.id, gremium.id):
             raise ForbiddenError(
                 "Only a voting member of the meeting's gremium can be substituted."
             )
@@ -801,7 +781,7 @@ class DelegationService:
         can_delegate = False
         if me is not None:
             can_delegate = gremium.allow_vote_delegation and await _independently_eligible(
-                self.session, me.id, gremium.id, now
+                self.session, me.id, gremium.id
             )
             rows = await self._joined(
                 MeetingDelegation.meeting_id == meeting.id,
@@ -817,7 +797,7 @@ class DelegationService:
                 else:
                     incoming.append(out)
 
-            member_ids = await self._member_ids(gremium.id, now)
+            member_ids = await self._member_ids(gremium.id)
             pool_ids = await substitutes_for(self.session, gremium.id, me.id)
             ids = (member_ids | pool_ids) - {me.id}
             names = await self._names(ids)
@@ -838,7 +818,7 @@ class DelegationService:
             meeting_id=meeting.id,
             gremium_id=gremium.id,
             allow_vote_delegation=gremium.allow_vote_delegation,
-            voting_delegation_enabled=self.settings.delegation_voting_enabled,
+            voting_delegation_enabled=gremium.allow_vote_delegation,
             delegation_allow_external=gremium.delegation_allow_external,
             deadline=deadline,
             deadline_passed=deadline is not None and now >= deadline,
@@ -873,16 +853,16 @@ class DelegationService:
                 manager of the meeting gremium, or the actor sends
                 `delegator_id` and is not the meeting lead (403).
         """
-        now = datetime.now(UTC)
+        datetime.now(UTC)
         meeting = await self._meeting(meeting_id)
         gremium = await self._gremium(meeting.gremium_id)
         await self._assert_can_view_gremium(gremium.id, actor)
         if delegator_id is not None:
-            return await self._lead_recipients(gremium.id, delegator_id, q, actor, now)
+            return await self._lead_recipients(gremium.id, delegator_id, q, actor)
         me = await self._principal_row(sub=actor.sub)
         if me is None:
             return []
-        member_ids = await self._member_ids(gremium.id, now)
+        member_ids = await self._member_ids(gremium.id)
         pool_ids = await substitutes_for(self.session, gremium.id, me.id)
         ids = (member_ids | pool_ids) - {me.id}
         names = await self._names(ids)
@@ -927,7 +907,7 @@ class DelegationService:
         return out[:20]
 
     async def _lead_recipients(
-        self, gremium_id: UUID, delegator_id: UUID, q: str, actor: Principal, now: datetime
+        self, gremium_id: UUID, delegator_id: UUID, q: str, actor: Principal
     ) -> list[RecipientOut]:
         """List the pool substitutes of a member for the lead entry.
 
@@ -945,7 +925,7 @@ class DelegationService:
         excluded = {delegator_id} | ({me.id} if me is not None else set())
         pool_ids = await substitutes_for(self.session, gremium_id, delegator_id)
         ids = pool_ids - excluded
-        member_ids = await self._member_ids(gremium_id, now)
+        member_ids = await self._member_ids(gremium_id)
         names = await self._names(ids)
         needle = q.strip().lower()
         out = [
@@ -1010,7 +990,7 @@ class DelegationService:
                 delegated_to = d.delegate_principal_id
         if not exercising:
             free = await pool_seat_for(
-                self.session, actor.sub, vote.meeting_id, vote.eligible_group, datetime.now(UTC)
+                self.session, actor.sub, vote.meeting_id, vote.eligible_group
             )
             if free is not None:
                 exercising = True

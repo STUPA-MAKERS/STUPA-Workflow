@@ -254,14 +254,15 @@ class WebhookService:
     ) -> DeliveryOutcome:
         """Map the status code to a final state or to a retry.
 
-        A 4xx is a client or config error that a retry does not change, so it goes to
-        the dead-letter state at once.
+        A 3xx or 4xx goes to the dead-letter state at once, because a retry does not
+        change it: the client follows no redirect, and a 4xx is a client or config
+        error. A 5xx and a 1xx retry (§F/integrations/webhooks/000298).
         """
         if 200 <= status_code < 300:
             return await self._finish(
                 delivery, "ok", moment, response_code=status_code
             )
-        if 400 <= status_code < 500:
+        if 300 <= status_code < 500:
             logger.warning(
                 "webhook delivery %s dead — non-retryable %s",
                 delivery_id,
@@ -286,11 +287,9 @@ class WebhookService:
                 delivery, "dead", moment, response_code=response_code, attempts=attempts
             )
         defer = self.settings.webhook_retry_backoff_seconds * (2 ** (attempts - 1))
-        next_at = moment + dt.timedelta(seconds=defer)
         delivery.attempts = attempts
         delivery.status = "failed"
         delivery.last_at = moment
-        delivery.next_at = next_at
         delivery.response_code = response_code
         await self.session.commit()
         return DeliveryOutcome(
@@ -311,7 +310,6 @@ class WebhookService:
         delivery.attempts = final_attempts
         delivery.status = kind
         delivery.last_at = moment
-        delivery.next_at = None
         delivery.response_code = response_code
         await self.session.commit()
         return DeliveryOutcome(

@@ -68,7 +68,7 @@ pytestmark = pytest.mark.integration
 _VOTE_CONFIG: dict[str, Any] = {
     "options": ["yes", "no", "abstain"],
     "majorityRule": "simple",
-    "secret": False,
+    "secret": True,
 }
 
 

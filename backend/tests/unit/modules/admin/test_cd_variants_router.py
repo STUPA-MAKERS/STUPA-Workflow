@@ -45,7 +45,6 @@ class _FakeCdVariants:
             id=VARIANT_ID,
             key="stupa",
             name="StuPa",
-            base_variant="protocol",
             logos=[
                 CdVariantLogoOut(
                     id=LOGO_ID, slot="title", position=0, vendored_name="STUPA"
@@ -178,7 +177,7 @@ def test_upload_logo_requires_the_permission(app: FastAPI, client: TestClient) -
 def test_list_variants_camel_case(app: FastAPI, client: TestClient) -> None:
     _as(app, "admin.cd_variants")
     body = client.get("/api/admin/cd-variants").json()
-    assert body[0]["baseVariant"] == "protocol"
+    assert body[0]["key"] == "stupa" and "baseVariant" not in body[0]
     assert body[0]["logos"][0]["vendoredName"] == "STUPA"
     assert body[0]["logos"][0]["fileName"] is None
 

@@ -345,7 +345,7 @@ class FilesService:
         if _is_infected(attachment) or attachment.storage_key is None:
             raise GoneError("Attachment removed (failed virus scan).")
         if not attachment.scanned:
-            raise ConflictError("Attachment is still being scanned.")
+            raise ConflictError("Attachment is still being scanned.", code="attachment_scanning")
         if self.storage is None:
             raise ServiceUnavailableError("Object storage unavailable.")
         return attachment
@@ -670,7 +670,10 @@ class FilesService:
             .where(Application.id == application_id)
         )
         if edit_allowed is False:
-            raise ConflictError("Application is locked for editing in its current state.")
+            raise ConflictError(
+                "Application is locked for editing in its current state.",
+                code="application_locked",
+            )
 
     async def delete(self, attachment_id: uuid.UUID, *, actor: str) -> None:
         """Delete an attachment: the database row, the storage object and an audit entry.
