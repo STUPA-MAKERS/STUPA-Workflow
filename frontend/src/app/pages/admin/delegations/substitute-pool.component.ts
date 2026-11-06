@@ -173,17 +173,14 @@ export class SubstitutePoolComponent {
       this.loads.add(
         this.api.listGremiumMemberships(id).subscribe({
           next: (rows) => {
-            const seen = new Set<string>();
-            const list: PoolMember[] = [];
-            for (const m of rows) {
-              if (!isActiveMembership(m) || seen.has(m.principalId)) continue;
-              seen.add(m.principalId);
-              list.push({
+            const active = rows.filter(isActiveMembership);
+            const list: PoolMember[] = active
+              .filter((m, i) => active.findIndex((x) => x.principalId === m.principalId) === i)
+              .map((m) => ({
                 id: m.principalId,
                 name:
                   personLabel(m, this.i18n, { fallback: 'admin.gremien.unknownMember' }),
-              });
-            }
+              }));
             this.loadedMembers.set(list.sort((a, b) => a.name.localeCompare(b.name)));
           },
           error: () => this.loadedMembers.set([]),
@@ -276,10 +273,6 @@ export class SubstitutePoolComponent {
   }
 
   private done(id: string): void {
-    this.removing.update((r) => {
-      const next = new Set(r);
-      next.delete(id);
-      return next;
-    });
+    this.removing.update((r) => new Set([...r].filter((x) => x !== id)));
   }
 }

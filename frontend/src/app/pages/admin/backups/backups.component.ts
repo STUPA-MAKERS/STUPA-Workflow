@@ -256,17 +256,17 @@ export class BackupsComponent implements OnDestroy {
         label: t(row.pinned ? 'admin.backups.unpin' : 'admin.backups.pin'),
         icon: row.pinned ? 'pinslash' : 'pin',
       },
+      ...(this.restoreEnabled()
+        ? [{ id: 'restore', label: t('admin.backups.restore'), icon: 'history' } satisfies RowMenuItem]
+        : []),
+      {
+        id: 'delete',
+        label: t('admin.common.delete'),
+        icon: 'trash',
+        danger: true,
+        disabledReason: row.pinned ? t('admin.backups.pinnedHint') : null,
+      },
     ];
-    if (this.restoreEnabled()) {
-      items.push({ id: 'restore', label: t('admin.backups.restore'), icon: 'history' });
-    }
-    items.push({
-      id: 'delete',
-      label: t('admin.common.delete'),
-      icon: 'trash',
-      danger: true,
-      disabledReason: row.pinned ? t('admin.backups.pinnedHint') : null,
-    });
     return [{ items }];
   }
 

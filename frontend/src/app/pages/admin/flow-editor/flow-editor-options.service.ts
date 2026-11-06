@@ -68,15 +68,12 @@ export class FlowEditorOptionsService {
       .pipe(takeUntilDestroyed())
       .subscribe({
         next: (roots) => {
-          const map = new Map<string, string>();
-          const walk = (nodes: BudgetTreeNode[]): void => {
-            for (const n of nodes) {
-              map.set(n.id, `${n.name} (${n.key})`);
-              if (n.children?.length) walk(n.children);
-            }
-          };
-          walk(roots);
-          this.budgetNameById.set(map);
+          const names = (nodes: readonly BudgetTreeNode[]): readonly (readonly [string, string])[] =>
+            nodes.flatMap((n) => [
+              [n.id, `${n.name} (${n.key})`] as const,
+              ...(n.children?.length ? names(n.children) : []),
+            ]);
+          this.budgetNameById.set(new Map(names(roots)));
           this.budgetTree.set(roots);
         },
         error: () => undefined,

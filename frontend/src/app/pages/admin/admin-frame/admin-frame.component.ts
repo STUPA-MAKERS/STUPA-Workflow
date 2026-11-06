@@ -68,10 +68,18 @@ function pathOf(url: string): string {
  */
 type AdminNavMode = 'always' | 'never';
 
+/** The route and its first children down to the deepest active route. */
+function routeChain(root: ActivatedRouteSnapshot): readonly ActivatedRouteSnapshot[] {
+  return [root, ...(root.firstChild ? routeChain(root.firstChild) : [])];
+}
+
+/** The deepest active route below `root`. */
+function deepest(root: ActivatedRouteSnapshot): ActivatedRouteSnapshot {
+  return root.firstChild ? deepest(root.firstChild) : root;
+}
+
 function navMode(root: ActivatedRouteSnapshot): AdminNavMode {
-  let r: ActivatedRouteSnapshot = root;
-  while (r.firstChild) r = r.firstChild;
-  return r.data['adminNav'] === false ? 'never' : 'always';
+  return deepest(root).data['adminNav'] === false ? 'never' : 'always';
 }
 
 /**
@@ -82,9 +90,7 @@ function navMode(root: ActivatedRouteSnapshot): AdminNavMode {
  * the navigation the page sheet is the scroll container.
  */
 function paneRoute(root: ActivatedRouteSnapshot): boolean {
-  let r: ActivatedRouteSnapshot = root;
-  while (r.firstChild) r = r.firstChild;
-  return r.data['adminPane'] === true;
+  return deepest(root).data['adminPane'] === true;
 }
 
 /**
@@ -371,11 +377,9 @@ export class AdminFrameComponent {
 
 /** The nearest parent path of the active route (`data.parent`), as a URL, or null. */
 function parentOf(root: ActivatedRouteSnapshot): string | null {
-  let parent: string | null = null;
-  for (let node: ActivatedRouteSnapshot | null = root; node; node = node.firstChild) {
-    const list = node.data?.['parent'] as string[] | undefined;
-    const last = list?.at(-1);
-    if (last) parent = `/${last}`;
-  }
-  return parent;
+  const parents = routeChain(root)
+    .map((node) => (node.data?.['parent'] as readonly string[] | undefined)?.at(-1))
+    .filter((last): last is string => !!last);
+  const last = parents.at(-1);
+  return last ? `/${last}` : null;
 }

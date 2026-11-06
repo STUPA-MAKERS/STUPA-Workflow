@@ -332,13 +332,13 @@ export class AuditLogComponent {
       timeStyle: 'short',
     }).format(new Date(checkedAt(check)));
     const parts = [
+      ...(check.brokenAt != null
+        ? [this.i18n.translate('admin.health.audit.brokenAt', { id: check.brokenAt })]
+        : []),
       this.i18n.translate('admin.audit.verify.checkedOn', { when: at }),
       triggerLabel(check.trigger, this.i18n),
       this.i18n.translate('admin.health.entries', { count: formatCount(check.checked, this.i18n) }),
     ];
-    if (check.brokenAt != null) {
-      parts.unshift(this.i18n.translate('admin.health.audit.brokenAt', { id: check.brokenAt }));
-    }
     return check.valid
       ? { kind: 'ok', title: this.i18n.translate('admin.health.audit.ok'), sub: parts.join(' · ') }
       : { kind: 'error', title: this.i18n.translate('admin.health.audit.broken'), sub: parts.join(' · ') };
@@ -452,11 +452,7 @@ export class AuditLogComponent {
     this.api.getConfigRevisionDiff(rid).subscribe({
       next: (d) => this.diffs.update((m) => new Map(m).set(rid, d)),
       error: () =>
-        this.diffs.update((m) => {
-          const next = new Map(m);
-          next.delete(rid);
-          return next;
-        }),
+        this.diffs.update((m) => new Map([...m].filter(([key]) => key !== rid))),
     });
   }
 

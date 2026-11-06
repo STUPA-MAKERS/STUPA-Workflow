@@ -35,6 +35,7 @@ import type {
   GroupMapping,
   Role,
 } from '../admin.models';
+import { assertNever } from '@shared/util/immutable';
 
 /** The three separate mapping kinds. Each has its own table and dialog. */
 export type MappingKind = 'global' | 'membership' | 'role';
@@ -399,22 +400,32 @@ export class GroupMappingsComponent {
     this.dialog.set(null);
   }
 
+  /** The create or update call of the open dialog. */
+  private saveRequest(kind: MappingKind, id: Uuid | null, oidcGroup: string): Observable<unknown> {
+    switch (kind) {
+      case 'global': {
+        const body = { oidcGroup, roleId: this.roleId() as Uuid };
+        return id ? this.api.updateGroupMapping(id, body) : this.api.createGroupMapping(body);
+      }
+      case 'membership': {
+        const body = { oidcGroup, gremiumId: this.gremiumId() as Uuid };
+        return id
+          ? this.api.updateMembershipMapping(id, body)
+          : this.api.createMembershipMapping(body);
+      }
+      case 'role': {
+        const body = { oidcGroup, gremiumRoleId: this.gremiumRoleId() as Uuid };
+        return id ? this.api.updateRoleMapping(id, body) : this.api.createRoleMapping(body);
+      }
+      default:
+        return assertNever(kind);
+    }
+  }
+
   save(): void {
     const kind = this.dialog();
     if (!kind || !this.valid() || this.saving()) return;
-    const id = this.editId() as Uuid | null;
-    const oidcGroup = this.oidcGroup().trim();
-    let req: Observable<unknown>;
-    if (kind === 'global') {
-      const body = { oidcGroup, roleId: this.roleId() as Uuid };
-      req = id ? this.api.updateGroupMapping(id, body) : this.api.createGroupMapping(body);
-    } else if (kind === 'membership') {
-      const body = { oidcGroup, gremiumId: this.gremiumId() as Uuid };
-      req = id ? this.api.updateMembershipMapping(id, body) : this.api.createMembershipMapping(body);
-    } else {
-      const body = { oidcGroup, gremiumRoleId: this.gremiumRoleId() as Uuid };
-      req = id ? this.api.updateRoleMapping(id, body) : this.api.createRoleMapping(body);
-    }
+    const req = this.saveRequest(kind, this.editId() as Uuid | null, this.oidcGroup().trim());
     this.saving.set(true);
     req.subscribe({
       next: () => {

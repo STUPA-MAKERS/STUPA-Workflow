@@ -82,13 +82,11 @@ export class AdminHealthComponent {
   private readonly backup = signal<BackupState>({ status: 'loading' });
   private readonly erasure = signal<ErasureState>({ status: 'loading' });
 
-  readonly tiles = computed<HealthTile[]>(() => {
-    const out: HealthTile[] = [];
-    if (this.canAudit) out.push(this.auditTile(this.audit()));
-    if (this.canBackup) out.push(this.backupTile(this.backup()));
-    if (this.canPrivacy) out.push(this.erasureTile(this.erasure()));
-    return out;
-  });
+  readonly tiles = computed<readonly HealthTile[]>(() => [
+    ...(this.canAudit ? [this.auditTile(this.audit())] : []),
+    ...(this.canBackup ? [this.backupTile(this.backup())] : []),
+    ...(this.canPrivacy ? [this.erasureTile(this.erasure())] : []),
+  ]);
 
   constructor() {
     if (this.canAudit) this.loadAudit();
@@ -168,8 +166,8 @@ export class AdminHealthComponent {
     const parts = [
       this.t(`admin.backups.kind.${shown.kind}` as TranslationKey),
       this.t(`admin.backups.status.${shown.status}` as TranslationKey),
+      ...(shown.sizeBytes != null ? [formatBytes(shown.sizeBytes, this.i18n.formatLocale())] : []),
     ];
-    if (shown.sizeBytes != null) parts.push(formatBytes(shown.sizeBytes, this.i18n.formatLocale()));
     const failed = newestBackup(state.list.items.filter((b) => b.status === 'failed'));
     const alert =
       failed && failed !== shown && time(failed) > time(shown)
@@ -212,11 +210,7 @@ function time(b: Backup): number {
 
 /** The newest archive by creation time. The list order of the server is not relied on. */
 function newestBackup(items: readonly Backup[]): Backup | null {
-  let best: Backup | null = null;
-  for (const b of items) {
-    if (!best || time(b) > time(best)) best = b;
-  }
-  return best;
+  return items.reduce<Backup | null>((best, b) => (!best || time(b) > time(best) ? b : best), null);
 }
 
 /** The newest finished archive (status `done`), or null. */

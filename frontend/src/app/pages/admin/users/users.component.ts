@@ -16,6 +16,7 @@ import {
   liveSearch,
   NoteComponent,
   RowMenuComponent,
+  type IconName,
   type RowMenuItem,
   type RowMenuSection,
   SearchPillComponent,
@@ -31,6 +32,8 @@ import type { AdminPrincipal, GroupMapping, PrincipalFilters, Role } from '../ad
 import { UserMergeComponent } from './user-merge/user-merge.component';
 import { UserRevokeComponent } from './user-revoke/user-revoke.component';
 import { personLabel } from '@shared/person-label.util';
+import type { TranslationKey } from '@core/i18n/translations';
+import { toggled } from '@shared/util/immutable';
 
 /** The choices of the chip "Letzte Anmeldung": older than n days, or never. */
 export const LAST_LOGIN_FILTERS = ['', '90', '180', '365', 'never'] as const;
@@ -107,14 +110,9 @@ function lastLoginFilters(lastLogin: LastLoginFilter, now: number): PrincipalFil
   styleUrl: './users.component.scss',
 })
 export class UsersComponent {
-  protected readonly openIds = signal(new Set<string>());
+  protected readonly openIds = signal<ReadonlySet<string>>(new Set());
   protected toggleOpen(id: string): void {
-    this.openIds.update((s) => {
-      const n = new Set(s);
-      if (n.has(id)) n.delete(id);
-      else n.add(id);
-      return n;
-    });
+    this.openIds.update((s) => toggled(s, id));
   }
 
   private readonly api = inject(AdminApiService);
@@ -249,12 +247,11 @@ export class UsersComponent {
    * give nothing.
    */
   protected roleIds(p: AdminPrincipal): string[] {
-    const ids = new Set(p.assignments.map((a) => a.roleId));
     const groups = new Set(p.oidcGroups.filter((g) => !g.startsWith('vote:')));
-    for (const m of this.groupMappings()) {
-      if (groups.has(m.oidcGroup)) ids.add(m.roleId);
-    }
-    return [...ids];
+    const mapped = this.groupMappings()
+      .filter((m) => groups.has(m.oidcGroup))
+      .map((m) => m.roleId);
+    return [...new Set([...p.assignments.map((a) => a.roleId), ...mapped])];
   }
 
   protected roleLabel(roleId: string): string {
@@ -298,43 +295,47 @@ export class UsersComponent {
               ? this.i18n.translate('admin.users.cannotDeactivateSelf')
               : null,
           };
-    const items: RowMenuItem[] = [];
-    if (this.canMerge()) {
-      items.push({
-        id: 'merge',
-        label: this.i18n.translate('admin.users.merge.action'),
-        icon: 'users',
-        danger: true,
-        disabledReason: this.isSelf(p) ? this.i18n.translate('admin.users.merge.notSelf') : null,
-      });
-    }
-    if (this.canRevoke() && p.hasAccess) {
-      items.push({
-        id: 'revoke',
-        label: this.i18n.translate('admin.users.revoke.action'),
-        icon: 'shield',
-        danger: true,
-        disabledReason: this.isSelf(p) ? this.i18n.translate('admin.users.revoke.notSelf') : null,
-      });
-    }
-    if (this.canErase()) {
-      items.push({
-        id: 'erase',
-        label: this.i18n.translate('admin.users.erase.action'),
-        icon: 'trash',
-        danger: true,
-        disabledReason: this.isSelf(p) ? this.i18n.translate('admin.users.erase.notSelf') : null,
-      });
-    }
+    const action = (
+      id: string,
+      icon: IconName,
+      label: TranslationKey,
+      notSelf: TranslationKey,
+    ): RowMenuItem => ({
+      id,
+      label: this.i18n.translate(label),
+      icon,
+      danger: true,
+      disabledReason: this.isSelf(p) ? this.i18n.translate(notSelf) : null,
+    });
+    const items: readonly RowMenuItem[] = [
+      ...(this.canMerge()
+        ? [action('merge', 'users', 'admin.users.merge.action', 'admin.users.merge.notSelf')]
+        : []),
+      ...(this.canRevoke() && p.hasAccess
+        ? [action('revoke', 'shield', 'admin.users.revoke.action', 'admin.users.revoke.notSelf')]
+        : []),
+      ...(this.canErase()
+        ? [action('erase', 'trash', 'admin.users.erase.action', 'admin.users.erase.notSelf')]
+        : []),
+    ];
     return [{ items: [state] }, { items }];
   }
 
   protected onMenu(item: RowMenuItem, p: AdminPrincipal): void {
-    if (item.id === 'activate') this.setActive(p, true);
-    if (item.id === 'deactivate') this.setActive(p, false);
-    if (item.id === 'merge') this.mergeSource.set(p);
-    if (item.id === 'revoke') this.revokeSource.set(p);
-    if (item.id === 'erase') void this.router.navigate(['/admin/privacy'], { queryParams: { person: p.sub } });
+    switch (item.id) {
+      case 'activate':
+        return this.setActive(p, true);
+      case 'deactivate':
+        return this.setActive(p, false);
+      case 'merge':
+        return this.mergeSource.set(p);
+      case 'revoke':
+        return this.revokeSource.set(p);
+      case 'erase':
+        return void this.router.navigate(['/admin/privacy'], { queryParams: { person: p.sub } });
+      default:
+        return;
+    }
   }
 
   /** The revoke ran: the groups and roles of the row changed. Reload the list. */

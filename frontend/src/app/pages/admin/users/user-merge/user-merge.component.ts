@@ -214,11 +214,15 @@ export class UserMergeComponent {
 
   /** "12 übertragen · 2 zusammengefasst": only the non-zero counts, one separator between. */
   protected counts(a: MergeAreaCount): string {
-    const parts: string[] = [];
-    if (a.rewritten) parts.push(this.i18n.translate('admin.users.merge.count.rewritten', { n: a.rewritten }));
-    if (a.combined) parts.push(this.i18n.translate('admin.users.merge.count.combined', { n: a.combined }));
-    if (a.removed) parts.push(this.i18n.translate('admin.users.merge.count.removed', { n: a.removed }));
-    return parts.join(' · ');
+    const counts = [
+      ['admin.users.merge.count.rewritten', a.rewritten],
+      ['admin.users.merge.count.combined', a.combined],
+      ['admin.users.merge.count.removed', a.removed],
+    ] as const;
+    return counts
+      .filter(([, n]) => n)
+      .map(([key, n]) => this.i18n.translate(key, { n }))
+      .join(' · ');
   }
 
   protected pick(target: AdminPrincipal): void {

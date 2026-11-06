@@ -217,8 +217,9 @@ export class MailTemplatesComponent {
     const d = this.draft();
     if (!d || this.previewing()) return;
     this.previewing.set(true);
-    const context: Record<string, unknown> = {};
-    for (const [key, desc] of Object.entries(d.placeholders)) context[key] = desc || key;
+    const context: Record<string, unknown> = Object.fromEntries(
+      Object.entries(d.placeholders).map(([key, desc]) => [key, desc || key]),
+    );
     this.api
       .previewMailPayload({
         subjectI18n: d.subjectI18n,

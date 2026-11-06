@@ -187,29 +187,34 @@ export class AdminGremienComponent {
       },
       { label: t('admin.gremien.delegation'), value: yesNo(g.allowVoteDelegation) },
       { label: t('admin.gremien.publicShort'), value: yesNo(g.protocolsPublic) },
+      ...(g.allowVoteDelegation
+        ? [
+            {
+              label: t('admin.gremien.delegationLeadShort'),
+              value:
+                lead > 0
+                  ? t('admin.gremien.minutes', { value: lead })
+                  : t('admin.gremien.untilStart'),
+            },
+            {
+              label: t('admin.gremien.delegationExternal'),
+              value: yesNo(g.delegationAllowExternal),
+            },
+          ]
+        : []),
+      {
+        label: t('admin.gremien.mailRecipients'),
+        value:
+          recipients === undefined
+            ? '…'
+            : recipients === null
+              ? t('admin.gremien.recipientsLoadFailed')
+              : recipients.length
+                ? recipients.join(', ')
+                : t('admin.gremien.noRecipients'),
+        copyable: !!recipients?.length,
+      },
     ];
-    if (g.allowVoteDelegation) {
-      list.push(
-        {
-          label: t('admin.gremien.delegationLeadShort'),
-          value:
-            lead > 0 ? t('admin.gremien.minutes', { value: lead }) : t('admin.gremien.untilStart'),
-        },
-        { label: t('admin.gremien.delegationExternal'), value: yesNo(g.delegationAllowExternal) },
-      );
-    }
-    list.push({
-      label: t('admin.gremien.mailRecipients'),
-      value:
-        recipients === undefined
-          ? '…'
-          : recipients === null
-            ? t('admin.gremien.recipientsLoadFailed')
-            : recipients.length
-              ? recipients.join(', ')
-              : t('admin.gremien.noRecipients'),
-      copyable: !!recipients?.length,
-    });
     return list;
   }
 

@@ -154,12 +154,10 @@ export class GremiumRoleDialogComponent {
   }
 
   protected togglePerm(p: string, on: boolean): void {
-    this.draft.update((d) => {
-      const set = new Set(d.permissions);
-      if (on) set.add(p);
-      else set.delete(p);
-      return { ...d, permissions: GREMIUM_PERMISSIONS.filter((x) => set.has(x)) };
-    });
+    this.draft.update((d) => ({
+      ...d,
+      permissions: GREMIUM_PERMISSIONS.filter((x) => (x === p ? on : d.permissions.includes(x))),
+    }));
   }
 
   protected close(): void {
