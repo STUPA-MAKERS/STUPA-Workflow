@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 
 from app.modules.todos import service as svc_mod
+from app.modules.todos.links import LinkResolver
 from app.shared.people import PersonRef
 
 
@@ -22,3 +23,20 @@ def people(monkeypatch: pytest.MonkeyPatch) -> dict[uuid.UUID, PersonRef]:
 
     monkeypatch.setattr(svc_mod, "person_refs", _refs)
     return known
+
+
+@pytest.fixture(autouse=True)
+def grants(monkeypatch: pytest.MonkeyPatch) -> dict[str, set[uuid.UUID]]:
+    """``LinkResolver.granted`` without a query: a test fills the ids per kind.
+
+    Empty by default, so a hidden target stays hidden, as before the card grant.
+    """
+    opened: dict[str, set[uuid.UUID]] = {}
+
+    async def _granted(
+        _self: Any, kind: str, ids: set[uuid.UUID], _principal: Any
+    ) -> set[uuid.UUID]:
+        return ids & opened.get(kind, set())
+
+    monkeypatch.setattr(LinkResolver, "granted", _granted)
+    return opened

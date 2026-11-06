@@ -16,7 +16,7 @@ import type {
 } from '@core/api/todos.service';
 import type { Translate, TranslationKey } from '@core/i18n/translations';
 import { formatMoney } from '@shared/format-money';
-import { daysUntil, parseDay, shortDay, weekdayDate, weekdayName } from '@shared/date-format';
+import { dayMonth, dayMonthYear, daysUntil, parseDay, shortDay, weekdayDate, weekdayName } from '@shared/date-format';
 import { resolveI18n } from '@shared/forms/i18n-text';
 import type { IconName } from '@stupa-makers/ui-kit';
 import { personName } from '@shared/person-label.util';
@@ -58,14 +58,14 @@ export const LINK_KIND_LABEL: Record<TodoLinkKind, TranslationKey> = {
 };
 
 /** The state of a vote link: the result once closed, else the status. */
-const VOTE_STATUS_LABEL: Record<TodoVoteStatus, TranslationKey> = {
+export const VOTE_STATUS_LABEL: Record<TodoVoteStatus, TranslationKey> = {
   draft: 'voting.list.status.draft',
   open: 'meetings.voteStatus.open',
   closed: 'meetings.voteStatus.closed',
   cancelled: 'meetings.voteStatus.cancelled',
 };
 
-const VOTE_RESULT_LABEL: Record<TodoVoteResult, TranslationKey> = {
+export const VOTE_RESULT_LABEL: Record<TodoVoteResult, TranslationKey> = {
   passed: 'vote.result.passed',
   rejected: 'vote.result.rejected',
   tie: 'vote.result.tie',
@@ -256,12 +256,17 @@ export interface BoardFilter {
   labels: readonly string[];
   /** '' all, 'overdue', 'week' (within 7 days, overdue included), 'none' without a date. */
   due: '' | 'overdue' | 'week' | 'none';
+  /**
+   * '' all cards, 'events' only Events, 'archive' the Events with the archived ones
+   * ("Veranstaltungen mit Archiv"); the page reads those from the archive.
+   */
+  kind: '' | 'events' | 'archive';
 }
 
-export const NO_FILTER: BoardFilter = { q: '', assignee: '', labels: [], due: '' };
+export const NO_FILTER: BoardFilter = { q: '', assignee: '', labels: [], due: '', kind: '' };
 
 export function filterActive(f: BoardFilter): boolean {
-  return !!(f.q.trim() || f.assignee || f.labels.length || f.due);
+  return !!(f.q.trim() || f.assignee || f.labels.length || f.due || f.kind);
 }
 
 /** Whether a card passes the filters. `mine` holds the ids of the cards assigned to me. */
@@ -270,6 +275,7 @@ export function matchesFilter(
   f: BoardFilter,
   ctx: { today: string; mine: ReadonlySet<Uuid>; labels: ReadonlyMap<Uuid, TodoLabel> },
 ): boolean {
+  if (f.kind && !card.event) return false;
   if (f.assignee === 'me' && !ctx.mine.has(card.id)) return false;
   if (f.assignee === 'none' && card.assignees.length) return false;
   if (f.assignee && f.assignee !== 'me' && f.assignee !== 'none') {
@@ -481,4 +487,15 @@ export function splitUrl(url: string): { path: string; query: Record<string, str
   const query: Record<string, string> = {};
   new URLSearchParams(search).forEach((value, key) => (query[key] = value));
   return { path, query };
+}
+
+/**
+ * The dates of an Event: "20.11.2026", or "20.11.–21.11.2026" when it lasts several days
+ * ("30.12.2026–02.01.2027" across a year). Null without a start.
+ */
+export function eventDays(start: string | null, end: string | null, locale: string): string | null {
+  if (!start) return null;
+  if (!end || end === start) return dayMonthYear(start, locale);
+  if (start.slice(0, 4) === end.slice(0, 4)) return `${dayMonth(start, locale)}–${dayMonthYear(end, locale)}`;
+  return `${dayMonthYear(start, locale)}–${dayMonthYear(end, locale)}`;
 }

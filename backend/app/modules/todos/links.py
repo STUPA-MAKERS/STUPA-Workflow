@@ -16,6 +16,14 @@ module:
 * ticket — ``ticket.manage``;
 * todo — the board read rule (``BoardAccess``).
 
+A card also gives read access to its links (spec 000487): a target that the viewer
+cannot read by the rule of its kind resolves as ``granted`` when a card on a board
+that the viewer reads links it. A granted target has no url, the card opens it in a
+read-only sheet (``link_view``). The grant stops after one step: it comes only from
+cards that the viewer reads by the board rule, never from a granted card. A ticket and
+a gremium give no grant. The link picker and the link check of ``POST .../links`` use
+the rule of the kind only, so a person links only what the person reads.
+
 A target that the viewer cannot read resolves as not accessible: no title, no url,
 no detail. The frontend shows "<Kind> (kein Zugriff)". The resolver loads each kind
 in one query and caches the rights per request, because a board read resolves one
@@ -49,7 +57,14 @@ from app.modules.tickets.access import TICKET_MANAGE
 from app.modules.tickets.models import Ticket
 from app.modules.tickets.service import format_number
 from app.modules.todos.access import BoardAccess
-from app.modules.todos.models import LINK_KINDS, TodoBoard, TodoCard, TodoColumn
+from app.modules.todos.models import (
+    LINK_COLUMNS,
+    LINK_KINDS,
+    TodoBoard,
+    TodoCard,
+    TodoColumn,
+    TodoLink,
+)
 from app.modules.todos.schemas import TodoLinkDetail, TodoLinkTarget
 from app.modules.voting.listing import read_scope as vote_read_scope
 from app.modules.voting.models import Vote
@@ -62,6 +77,11 @@ PER_KIND = 5
 VOTE_STATUSES = ("open", "draft", "closed", "cancelled")
 
 LinkRef = tuple[str, uuid.UUID]
+#: The kinds that a card opens to its readers (spec 000487): every kind but the ticket,
+#: which holds the report of a person outside the team, and the gremium.
+GRANT_KINDS: frozenset[str] = frozenset(LINK_KINDS) - {"ticket", "gremium"}
+#: No id passes the gate of its kind without the rule.
+NONE: frozenset[uuid.UUID] = frozenset()
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,6 +92,7 @@ class Resolved:
     title: str | None = None
     url: str | None = None
     detail: TodoLinkDetail | None = None
+    granted: bool = False
 
 
 HIDDEN = Resolved(accessible=False)
@@ -136,12 +157,68 @@ class LinkResolver:
         return True
 
     async def resolve(
-        self, refs: Iterable[LinkRef], principal: Principal
+        self, refs: Iterable[LinkRef], principal: Principal, *, grants: bool = True
     ) -> dict[LinkRef, Resolved]:
-        """Resolve every ``(kind, target id)`` pair; a missing target is not accessible."""
+        """Resolve every ``(kind, target id)`` pair; a missing target is not accessible.
+
+        With ``grants`` a target that the rule of its kind hides resolves as ``granted``
+        when a card that the principal reads links it.
+        """
         by_kind: dict[str, set[uuid.UUID]] = {}
         for kind, target_id in refs:
             by_kind.setdefault(kind, set()).add(target_id)
+        out = await self._resolve(by_kind, principal, None)
+        if not grants:
+            return out
+        hidden: dict[str, set[uuid.UUID]] = {}
+        for (kind, target_id), found in out.items():
+            if not found.accessible and kind in GRANT_KINDS:
+                hidden.setdefault(kind, set()).add(target_id)
+        opened = {
+            kind: ids
+            for kind, ids in [(k, await self.granted(k, v, principal)) for k, v in hidden.items()]
+            if ids
+        }
+        if opened:
+            more = await self._resolve(opened, principal, opened)
+            out.update(
+                {
+                    ref: Resolved(
+                        accessible=True,
+                        title=found.title,
+                        detail=found.detail,
+                        granted=True,
+                    )
+                    for ref, found in more.items()
+                    if found.accessible
+                }
+            )
+        return out
+
+    async def granted(
+        self, kind: str, ids: set[uuid.UUID], principal: Principal
+    ) -> set[uuid.UUID]:
+        """The ids of ``ids`` that a card on a board that the principal reads links."""
+        if kind not in GRANT_KINDS or not ids:
+            return set()
+        column = getattr(TodoLink, LINK_COLUMNS[kind])
+        scope = await self.access.scope(principal)
+        rows = await self.session.scalars(
+            select(column)
+            .join(TodoCard, TodoCard.id == TodoLink.card_id)
+            .join(TodoBoard, TodoBoard.id == TodoCard.board_id)
+            .where(column.in_(ids), scope.condition())
+            .distinct()
+        )
+        return set(rows.all())
+
+    async def _resolve(
+        self,
+        by_kind: dict[str, set[uuid.UUID]],
+        principal: Principal,
+        opened: dict[str, set[uuid.UUID]] | None,
+    ) -> dict[LinkRef, Resolved]:
+        """Run the handler of each kind; ``opened`` ids pass the gate of their kind."""
         out: dict[LinkRef, Resolved] = {}
         handlers = {
             "application": self._applications,
@@ -158,14 +235,16 @@ class LinkResolver:
             ids = by_kind.get(kind)
             if not ids:
                 continue
-            found = await handlers[kind](ids, principal)
+            open_ids = frozenset(opened.get(kind, ())) if opened is not None else NONE
+            found = await handlers[kind](ids, principal, open_ids)
             for target_id in ids:
                 out[(kind, target_id)] = found.get(target_id, HIDDEN)
         return out
 
     async def readable(self, kind: str, target_id: uuid.UUID, principal: Principal) -> bool:
         """Tell if the principal reads the target (the rule of ``POST .../links``)."""
-        return (await self.resolve([(kind, target_id)], principal))[(kind, target_id)].accessible
+        resolved = await self.resolve([(kind, target_id)], principal, grants=False)
+        return resolved[(kind, target_id)].accessible
 
     async def _state_labels(self, apps: Iterable[Application]) -> dict[uuid.UUID, dict[str, str]]:
         ids = {a.current_state_id for a in apps if a.current_state_id is not None}
@@ -177,12 +256,17 @@ class LinkResolver:
         return {sid: dict(label or {}) for sid, label in rows}
 
     async def _applications(
-        self, ids: set[uuid.UUID], principal: Principal
+        self, ids: set[uuid.UUID], principal: Principal, open_ids: frozenset[uuid.UUID] = NONE
     ) -> dict[uuid.UUID, Resolved]:
         apps = list(
             (await self.session.scalars(select(Application).where(Application.id.in_(ids)))).all()
         )
-        readable = [a for a in apps if await self._application_readable(a, principal)]
+        readable = [
+            a
+            for a in apps
+            if (a.id in open_ids and a.email_confirmed_at is not None)
+            or await self._application_readable(a, principal)
+        ]
         labels = await self._state_labels(readable)
         return {
             a.id: Resolved(
@@ -199,14 +283,14 @@ class LinkResolver:
         }
 
     async def _meetings(
-        self, ids: set[uuid.UUID], principal: Principal
+        self, ids: set[uuid.UUID], principal: Principal, open_ids: frozenset[uuid.UUID] = NONE
     ) -> dict[uuid.UUID, Resolved]:
         meetings = list(
             (await self.session.scalars(select(Meeting).where(Meeting.id.in_(ids)))).all()
         )
         out: dict[uuid.UUID, Resolved] = {}
         for m in meetings:
-            if await self._meeting_visible(m, principal):
+            if m.id in open_ids or await self._meeting_visible(m, principal):
                 out[m.id] = Resolved(
                     accessible=True,
                     title=m.title,
@@ -216,7 +300,7 @@ class LinkResolver:
         return out
 
     async def _agenda_items(
-        self, ids: set[uuid.UUID], principal: Principal
+        self, ids: set[uuid.UUID], principal: Principal, open_ids: frozenset[uuid.UUID] = NONE
     ) -> dict[uuid.UUID, Resolved]:
         rows = (
             await self.session.execute(
@@ -225,7 +309,11 @@ class LinkResolver:
                 .where(MeetingAgendaItem.id.in_(ids))
             )
         ).all()
-        visible = [(item, m) for item, m in rows if await self._meeting_visible(m, principal)]
+        visible = [
+            (item, m)
+            for item, m in rows
+            if item.id in open_ids or await self._meeting_visible(m, principal)
+        ]
         if not visible:
             return {}
         numbers = await self._agenda_numbers({m.id for _, m in visible})
@@ -294,19 +382,29 @@ class LinkResolver:
             if await self._application_readable(a, principal)
         }
 
-    async def _votes(self, ids: set[uuid.UUID], principal: Principal) -> dict[uuid.UUID, Resolved]:
+    async def _votes(
+        self, ids: set[uuid.UUID], principal: Principal, open_ids: frozenset[uuid.UUID] = NONE
+    ) -> dict[uuid.UUID, Resolved]:
         rows = (
             await self.session.execute(
                 select(Vote, Meeting.title, Meeting.date)
                 .outerjoin(Meeting, Meeting.id == Vote.meeting_id)
-                .where(Vote.id.in_(ids), await vote_read_scope(self.session, principal))
+                .where(
+                    Vote.id.in_(ids),
+                    or_(
+                        await vote_read_scope(self.session, principal),
+                        Vote.id.in_(open_ids),
+                    ),
+                )
             )
         ).all()
         if not rows:
             return {}
-        titles = await self._readable_application_titles(
-            {v.application_id for v, _t, _d in rows if not v.question and v.application_id},
-            principal,
+        untitled = {v.application_id for v, _t, _d in rows if not v.question and v.application_id}
+        titles = (
+            await self._application_titles(untitled)
+            if open_ids
+            else await self._readable_application_titles(untitled, principal)
         )
         out: dict[uuid.UUID, Resolved] = {}
         for vote, meeting_title, meeting_date in rows:
@@ -327,7 +425,7 @@ class LinkResolver:
         return out
 
     async def _gremien(
-        self, ids: set[uuid.UUID], principal: Principal
+        self, ids: set[uuid.UUID], principal: Principal, open_ids: frozenset[uuid.UUID] = NONE
     ) -> dict[uuid.UUID, Resolved]:
         visible = await self._gremien_scope(principal)
         wanted = ids if visible is None else ids & visible
@@ -346,9 +444,11 @@ class LinkResolver:
         }
 
     async def _invoices(
-        self, ids: set[uuid.UUID], principal: Principal
+        self, ids: set[uuid.UUID], principal: Principal, open_ids: frozenset[uuid.UUID] = NONE
     ) -> dict[uuid.UUID, Resolved]:
         if not has_budget_read(principal):
+            ids = ids & open_ids
+        if not ids:
             return {}
         invoices = list(
             (await self.session.scalars(select(Invoice).where(Invoice.id.in_(ids)))).all()
@@ -370,7 +470,7 @@ class LinkResolver:
         }
 
     async def _expenses(
-        self, ids: set[uuid.UUID], principal: Principal
+        self, ids: set[uuid.UUID], principal: Principal, open_ids: frozenset[uuid.UUID] = NONE
     ) -> dict[uuid.UUID, Resolved]:
         """Resolve expense links; a sub-booking links to its parent.
 
@@ -378,6 +478,8 @@ class LinkResolver:
         parent.
         """
         if not has_budget_read(principal):
+            ids = ids & open_ids
+        if not ids:
             return {}
         rows = (
             await self.session.execute(
@@ -404,7 +506,7 @@ class LinkResolver:
         return out
 
     async def _tickets(
-        self, ids: set[uuid.UUID], principal: Principal
+        self, ids: set[uuid.UUID], principal: Principal, open_ids: frozenset[uuid.UUID] = NONE
     ) -> dict[uuid.UUID, Resolved]:
         if not principal.has(TICKET_MANAGE):
             return {}
@@ -419,7 +521,9 @@ class LinkResolver:
             for t in tickets
         }
 
-    async def _todos(self, ids: set[uuid.UUID], principal: Principal) -> dict[uuid.UUID, Resolved]:
+    async def _todos(
+        self, ids: set[uuid.UUID], principal: Principal, open_ids: frozenset[uuid.UUID] = NONE
+    ) -> dict[uuid.UUID, Resolved]:
         rows = (
             await self.session.execute(
                 select(TodoCard, TodoBoard, TodoColumn)
@@ -430,7 +534,7 @@ class LinkResolver:
         ).all()
         out: dict[uuid.UUID, Resolved] = {}
         for card, board, column in rows:
-            if await self.access.can_read(board, principal):
+            if card.id in open_ids or await self.access.can_read(board, principal):
                 out[card.id] = Resolved(
                     accessible=True,
                     title=card.title,
@@ -455,7 +559,7 @@ class LinkResolver:
         found: list[TodoLinkTarget] = []
         for current in kinds:
             ids = await self._candidates(current, term, principal, exclude_card_id)
-            resolved = await self.resolve([(current, i) for i in ids], principal)
+            resolved = await self.resolve([(current, i) for i in ids], principal, grants=False)
             found.extend(
                 TodoLinkTarget(
                     kind=current,  # type: ignore[arg-type]

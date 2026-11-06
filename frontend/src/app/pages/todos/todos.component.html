@@ -129,6 +129,14 @@
           [text]="dueText()"
           filled
         />
+        <app-filter-select
+          [label]="'todos.eventCard.kind' | t"
+          [options]="kindOptions()"
+          [value]="filter().kind"
+          (valueChange)="setKind($event)"
+          [text]="kindText()"
+          filled
+        />
         @if (filtered()) {
           <button type="button" class="td__reset" data-testid="td-reset" (click)="resetFilters()">
             {{ 'todos.filter.reset' | t }}

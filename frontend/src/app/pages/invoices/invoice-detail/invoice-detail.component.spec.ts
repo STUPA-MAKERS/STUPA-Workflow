@@ -104,7 +104,7 @@ describe('InvoiceDetailComponent', () => {
       providers: [provideRouter([]), { provide: TodosApiService, useValue: { linked } }],
     });
     expect(linked).toHaveBeenCalledWith('invoice', INVOICE.id);
-    expect(screen.getByRole('heading', { name: 'To-Dos' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Verknüpft' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Rechnung prüfen' }).getAttribute('href')).toBe('/todos?card=k-1');
   });
 

@@ -21,6 +21,12 @@ there is no audit entry for to-dos.
 
 ``due_reminded_on`` is the due date that the ``todo_due`` reminder went out for. A
 changed due date gets a new reminder.
+
+A card with a ``todo_card_event`` row is an Event (``Veranstaltung``): it has a start,
+an optional end, a place, the expected participants and an optional series
+(``todo_event_series``). A series has a name that is unique in the platform and
+belongs to no board. The row is never deleted while the card exists, so an Event
+does not become a to-do again.
 """
 
 from __future__ import annotations
@@ -197,6 +203,49 @@ class TodoCard(UUIDPkMixin, TimestampMixin, Base):
             "due_date",
             postgresql_where=text("archived_at IS NULL"),
         ),
+    )
+
+
+class TodoEventSeries(UUIDPkMixin, TimestampMixin, Base):
+    """A series of Events (``Reihe``); the name is unique in the platform."""
+
+    __tablename__ = "todo_event_series"
+
+    name: Mapped[str] = mapped_column(Text)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("principal.id", ondelete="SET NULL"), nullable=True
+    )
+
+    __table_args__ = (
+        Index("uq_todo_event_series_name", text("lower(name)"), unique=True),
+        CheckConstraint("length(btrim(name)) BETWEEN 1 AND 200", name="name"),
+    )
+
+
+class TodoCardEvent(Base):
+    """The event data of a card; the card is then an Event."""
+
+    __tablename__ = "todo_card_event"
+
+    card_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("todo_card.id", ondelete="CASCADE"), primary_key=True
+    )
+    starts_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    ends_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    place: Mapped[str | None] = mapped_column(Text, nullable=True)
+    participants: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    series_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("todo_event_series.id", ondelete="SET NULL"), nullable=True
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "ends_on IS NULL OR (starts_on IS NOT NULL AND ends_on >= starts_on)",
+            name="dates",
+        ),
+        CheckConstraint("participants IS NULL OR participants >= 0", name="participants"),
+        Index("ix_todo_card_event_series_id", "series_id"),
+        Index("ix_todo_card_event_starts_on", "starts_on"),
     )
 
 

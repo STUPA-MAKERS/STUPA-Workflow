@@ -12,6 +12,25 @@
         </li>
       }
       @for (card of cards(); track card.id) {
+        @if (card.event; as event) {
+          <li class="tl__row tl__row--event" data-testid="tl-event">
+            <app-icon class="tl__icon" name="cal" [size]="18" />
+            <span class="tl__text">
+              <a class="tl__link" routerLink="/todos" [queryParams]="{ card: card.id }" [state]="{ cardReturn: true }">{{ card.title }}</a>
+              <span class="tl__sub">{{ eventSub(card) }}</span>
+              <span class="tl__sub">
+                @if (event.place) {
+                  {{ event.place }} ·
+                }
+                {{ 'todos.eventCard.balance' | t }}
+                <span class="num" [class.tl__neg]="negative(card.balance)">{{ money(card.balance) }}</span>
+              </span>
+            </span>
+            @if (card.assignees.length) {
+              <app-avatar-stack [size]="avatarSize()" [names]="names(card)" [principalIds]="ids(card)" [max]="3" />
+            }
+          </li>
+        } @else {
         <li class="tl__row" [class.tl__row--done]="card.isDone">
           <app-icon class="tl__icon" [name]="card.isDone ? 'circleok' : 'circle'" [size]="18" />
           <span class="tl__text">
@@ -22,6 +41,7 @@
             <app-avatar-stack [size]="avatarSize()" [names]="names(card)" [principalIds]="ids(card)" [max]="3" />
           }
         </li>
+        }
       }
     </ul>
   </app-section>

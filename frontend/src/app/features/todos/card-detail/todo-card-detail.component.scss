@@ -1,3 +1,5 @@
+@use 'breakpoints' as bp;
+@use 'frosted' as *;
 @use 'press';
 @use 'scroll-fade' as fade;
 @use '../todo-labels' as lbl;
@@ -9,6 +11,14 @@
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+}
+// In the frosted drawer beside the board, the fields, rows and chips are neutral overlays
+// of the glass. Only the article takes them, not the host: a dialog of the card opens in
+// the top layer but inherits the tokens from its host, and its own glass turns transparent.
+@include bp.not-phone {
+  :host-context(.td__drawer) .cd {
+    @include glass-content;
+  }
 }
 
 .cd {
@@ -189,6 +199,15 @@
 .cd__dot {
   @include lbl.dot;
 }
+// "+ Label" has the box and the type of a label chip, with a dashed border.
+.cd__addLabel ::ng-deep .fs__chip {
+  gap: 5px;
+  height: 30px;
+  padding: 1px 10px;
+  border-style: dashed;
+  font-size: 0.8125rem;
+  font-weight: var(--fw-regular);
+}
 .cd__muted {
   color: var(--color-text-muted);
   font-size: var(--fs-small);
@@ -249,8 +268,18 @@
   text-decoration: none;
   overflow-wrap: anywhere;
 }
+button.cd__linkOpen {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-weight: var(--fw-medium);
+  text-align: start;
+  cursor: pointer;
+}
 @media (hover: hover) {
-  a.cd__linkTitle:hover {
+  a.cd__linkTitle:hover,
+  button.cd__linkOpen:hover {
     text-decoration: underline;
   }
 }
@@ -534,4 +563,65 @@
 .cd__skelBox {
   width: 17px;
   height: 17px;
+}
+
+// The event fields Ort and Teilnehmende: plain text on the line of the chips, a button
+// that opens the inline editor where the card is writable.
+.cd__evText {
+  display: flex;
+  align-items: center;
+  min-height: var(--control-height-sm);
+  margin: 0;
+  padding: 0 calc(var(--space-3) + var(--border-width));
+  border: 0;
+  border-radius: var(--radius-field);
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.84375rem;
+  text-align: start;
+}
+button.cd__evText {
+  cursor: pointer;
+}
+@media (hover: hover) {
+  button.cd__evText:hover {
+    background: var(--color-surface-sunken);
+  }
+}
+button.cd__evText:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+}
+.cd__evText .cd__muted {
+  font-size: inherit;
+}
+.cd__evInput {
+  width: 100%;
+  min-height: var(--control-height-sm);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-field);
+  background: var(--color-surface-sunken);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.84375rem;
+}
+.cd__evInput:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+}
+.cd__evNeg {
+  color: var(--color-danger);
+}
+.cd__warn {
+  margin: 0;
+  font-size: var(--fs-md);
+  line-height: 1.5;
+}
+// Finanzen: rows in one group, as the links.
+.cd__moneyRow {
+  min-height: 44px;
+  padding-inline: var(--space-4);
+}
+.cd__moneySum {
+  font-weight: var(--fw-semibold);
 }

@@ -29,6 +29,7 @@ const KIND_ICON: Record<SearchKind, IconName> = {
   principal: 'user',
   ticket: 'ticket',
   todo: 'circleok',
+  event: 'cal',
 };
 
 /**

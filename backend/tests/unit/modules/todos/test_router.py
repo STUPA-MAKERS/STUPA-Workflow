@@ -195,7 +195,9 @@ def test_board_routes(env: _Env) -> None:
     assert c.get(f"/api/todos/boards/{BID}/members").json()[0]["displayName"] == "Ada"
     page = c.get(f"/api/todos/boards/{BID}/archive?q=x&limit=10&offset=5")
     assert page.json()["total"] == 1
-    assert env.last()[2] == {"q": "x", "limit": 10, "offset": 5}
+    assert env.last()[2] == {"q": "x", "limit": 10, "offset": 5, "events_only": False}
+    c.get(f"/api/todos/boards/{BID}/archive?events=true")
+    assert env.last()[2]["events_only"] is True
     assert c.post(f"/api/todos/boards/{BID}/columns", json={"name": "N"}).status_code == 201
     order = c.put(f"/api/todos/boards/{BID}/columns/order", json={"columnIds": [str(XID)]})
     assert order.status_code == 200

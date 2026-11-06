@@ -187,10 +187,8 @@
   .td__drawer {
     @include frosted-pop(var(--color-surface), 85%, 20px, 1.3);
   }
-  // The fields, rows and chips of the card are neutral overlays of the glass.
-  .td__drawer > app-todo-card-detail {
-    @include glass-content;
-  }
+  // The fields, rows and chips of the card are neutral overlays of the glass. The card
+  // detail sets them on its article (`:host-context(.td__drawer)`), not on its host.
   .td__scrim {
     background: color-mix(in srgb, var(--color-scrim) 60%, transparent);
   }
@@ -221,6 +219,11 @@
     height: var(--app-bottom-inset, 0px);
     box-shadow: var(--shadow-md-up);
     pointer-events: none;
+  }
+  // A bottom sheet over the card is glass, so the shadow showed through it as a stray band
+  // across the sheet. The sheet covers the bar, so the shadow goes while one is open.
+  :host-context(body:has(.ss--bottom)) .td__barEdge {
+    box-shadow: none;
   }
   // The bar is frosted glass in the colour of the card while the card scrolls under it,
   // like the bar of every other phone detail.

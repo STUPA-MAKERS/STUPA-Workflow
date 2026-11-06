@@ -22,7 +22,7 @@ specs/
       meetings/        calendar, delegations, meetings, protocols, voting
       public/          public-pages
     non-functional/
-      accessibility/  interaction, language
+      accessibility/  conformance, documents, interaction, language, perception, statement
       compatibility/  deploy, pwa
       performance/    loading
       privacy/        personal-data
@@ -175,10 +175,22 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/todos/000324](requirements/functional/collaboration/todos/000324_live-pings.md) | Boards update live | approved |
 | [F/collaboration/todos/000325](requirements/functional/collaboration/todos/000325_todo-mails.md) | To-do mails go to assignees | approved |
 | [F/collaboration/todos/000326](requirements/functional/collaboration/todos/000326_card-on-agenda.md) | A card can go on the agenda | approved |
-| [F/collaboration/todos/000327](requirements/functional/collaboration/todos/000327_link-access.md) | A link shows nothing without access | approved |
+| [F/collaboration/todos/000327](requirements/functional/collaboration/todos/000327_link-access.md) | A link shows nothing without access | replaced |
 | [F/collaboration/todos/000443](requirements/functional/collaboration/todos/000443_board-columns.md) | A board has one done column | approved |
 | [F/collaboration/todos/000444](requirements/functional/collaboration/todos/000444_boards-tab.md) | The to-do tab is Boards | approved |
 | [F/collaboration/todos/000467](requirements/functional/collaboration/todos/000467_card-version-conflict.md) | Concurrent card edits give 409 | approved |
+| [F/collaboration/todos/000478](requirements/functional/collaboration/todos/000478_event-card.md) | An Event is a card with event data | approved |
+| [F/collaboration/todos/000479](requirements/functional/collaboration/todos/000479_event-totals.md) | An Event shows the totals of its links | approved |
+| [F/collaboration/todos/000480](requirements/functional/collaboration/todos/000480_event-picker.md) | A Buchung can name its Event | approved |
+| [F/collaboration/todos/000481](requirements/functional/collaboration/todos/000481_one-event-per-element.md) | An Antrag or a Buchung belongs to at most one Event | approved |
+| [F/collaboration/todos/000482](requirements/functional/collaboration/todos/000482_event-decisions.md) | An Event lists its decisions | approved |
+| [F/collaboration/todos/000483](requirements/functional/collaboration/todos/000483_event-series.md) | An Event can belong to a series | approved |
+| [F/collaboration/todos/000484](requirements/functional/collaboration/todos/000484_next-edition.md) | Folgeveranstaltung anlegen copies the plan, not the facts | approved |
+| [F/collaboration/todos/000485](requirements/functional/collaboration/todos/000485_events-findable.md) | Archived Events stay findable | approved |
+| [F/collaboration/todos/000486](requirements/functional/collaboration/todos/000486_event-calendar.md) | An Event with a start is in the calendar | approved |
+| [F/collaboration/todos/000487](requirements/functional/collaboration/todos/000487_card-grants-read.md) | A card gives read access to its links | approved |
+| [F/collaboration/todos/000488](requirements/functional/collaboration/todos/000488_to-do-becomes-event-once.md) | A to-do becomes an Event only once | approved |
+| [F/collaboration/todos/000489](requirements/functional/collaboration/todos/000489_links-are-called-linked.md) | The cards of an element are under Verknüpft | approved |
 | [F/finance/budget/000138](requirements/functional/finance/budget/000138_cost-centre-picker.md) | The cost centre pickers are fixed | approved |
 | [F/finance/budget/000139](requirements/functional/finance/budget/000139_close-fiscal-year.md) | A fiscal year closes and reopens | approved |
 | [F/finance/budget/000140](requirements/functional/finance/budget/000140_default-fiscal-year.md) | The default fiscal year holds today | approved |
@@ -300,10 +312,43 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/public/public-pages/000171](requirements/functional/public/public-pages/000171_public-protocols.md) | Only final protocols of public Gremien are public | approved |
 | [F/public/public-pages/000172](requirements/functional/public/public-pages/000172_public-protocol-content.md) | A public protocol has no names and no internal TOPs | approved |
 | [F/public/public-pages/000173](requirements/functional/public/public-pages/000173_noindex.md) | Public pages are not indexed | approved |
+| [NF/accessibility/conformance/000490](requirements/non-functional/accessibility/conformance/000490_wcag-22-aa.md) | Every view meets WCAG 2.2 level AA | approved |
+| [NF/accessibility/conformance/000491](requirements/non-functional/accessibility/conformance/000491_axe-every-route.md) | Every route passes an axe check in both themes | approved |
+| [NF/accessibility/conformance/000492](requirements/non-functional/accessibility/conformance/000492_template-lint.md) | The template lint has the accessibility rules | approved |
+| [NF/accessibility/conformance/000493](requirements/non-functional/accessibility/conformance/000493_axe-unit-per-component.md) | Every shared component has a jest-axe test | approved |
+| [NF/accessibility/documents/000524](requirements/non-functional/accessibility/documents/000524_protocol-pdf-ua.md) | The protocol PDF is tagged as PDF/UA-1 | approved |
+| [NF/accessibility/documents/000525](requirements/non-functional/accessibility/documents/000525_mail-plain-text.md) | Each mail has a plain text part | approved |
 | [NF/accessibility/interaction/000217](requirements/non-functional/accessibility/interaction/000217_keyboard-and-labels.md) | Controls are reachable by keyboard and named | approved |
 | [NF/accessibility/interaction/000218](requirements/non-functional/accessibility/interaction/000218_themes.md) | Light and dark themes are both supported | approved |
 | [NF/accessibility/interaction/000219](requirements/non-functional/accessibility/interaction/000219_reduced-motion.md) | Motion follows the reduced motion setting | approved |
+| [NF/accessibility/interaction/000508](requirements/non-functional/accessibility/interaction/000508_focus-ring.md) | The focus ring is 2 px and has a contrast of 3:1 | approved |
+| [NF/accessibility/interaction/000509](requirements/non-functional/accessibility/interaction/000509_focus-not-hidden.md) | Sticky bars do not hide the focus | approved |
+| [NF/accessibility/interaction/000510](requirements/non-functional/accessibility/interaction/000510_skip-link.md) | A skip link goes to the main content | approved |
+| [NF/accessibility/interaction/000511](requirements/non-functional/accessibility/interaction/000511_page-title.md) | Each page has its own title | approved |
+| [NF/accessibility/interaction/000512](requirements/non-functional/accessibility/interaction/000512_focus-after-navigation.md) | Focus goes to the heading after navigation | approved |
+| [NF/accessibility/interaction/000513](requirements/non-functional/accessibility/interaction/000513_dialog-focus.md) | A dialog keeps the focus inside | approved |
+| [NF/accessibility/interaction/000514](requirements/non-functional/accessibility/interaction/000514_gesture-alternative.md) | Each gesture has a single tap alternative | approved |
+| [NF/accessibility/interaction/000515](requirements/non-functional/accessibility/interaction/000515_drag-alternative.md) | Each drag has an alternative without a drag | approved |
+| [NF/accessibility/interaction/000516](requirements/non-functional/accessibility/interaction/000516_target-size.md) | A target is at least 24 by 24 px | approved |
+| [NF/accessibility/interaction/000517](requirements/non-functional/accessibility/interaction/000517_status-announced.md) | A status message is announced | approved |
+| [NF/accessibility/interaction/000518](requirements/non-functional/accessibility/interaction/000518_live-vote-announced.md) | The live vote announces its changes | approved |
+| [NF/accessibility/interaction/000519](requirements/non-functional/accessibility/interaction/000519_form-errors.md) | A form error is a text next to the field | approved |
+| [NF/accessibility/interaction/000520](requirements/non-functional/accessibility/interaction/000520_landmarks-headings.md) | Each page has landmarks and one h1 | approved |
+| [NF/accessibility/interaction/000521](requirements/non-functional/accessibility/interaction/000521_no-cognitive-test.md) | The login and the captcha need no cognitive test | approved |
 | [NF/accessibility/language/000216](requirements/non-functional/accessibility/language/000216_i18n-parity.md) | German and English texts are complete | replaced |
+| [NF/accessibility/language/000522](requirements/non-functional/accessibility/language/000522_page-language.md) | The page language follows the UI language | approved |
+| [NF/accessibility/language/000523](requirements/non-functional/accessibility/language/000523_content-language.md) | Content in a different language has its lang | approved |
+| [NF/accessibility/perception/000499](requirements/non-functional/accessibility/perception/000499_text-contrast.md) | Text has a contrast of 4.5:1 | approved |
+| [NF/accessibility/perception/000500](requirements/non-functional/accessibility/perception/000500_non-text-contrast.md) | Control edges and icons have a contrast of 3:1 | approved |
+| [NF/accessibility/perception/000501](requirements/non-functional/accessibility/perception/000501_accent-contrast.md) | An admin accent colour keeps the contrast | approved |
+| [NF/accessibility/perception/000502](requirements/non-functional/accessibility/perception/000502_colour-not-alone.md) | Colour is not the only sign of a state | approved |
+| [NF/accessibility/perception/000503](requirements/non-functional/accessibility/perception/000503_reflow-320.md) | Every view works at a width of 320 px | approved |
+| [NF/accessibility/perception/000504](requirements/non-functional/accessibility/perception/000504_text-spacing.md) | User text spacing does not cut text | approved |
+| [NF/accessibility/perception/000506](requirements/non-functional/accessibility/perception/000506_image-alt.md) | A Markdown image has an alternative text | approved |
+| [NF/accessibility/perception/000507](requirements/non-functional/accessibility/perception/000507_chart-text.md) | A chart has a text alternative | approved |
+| [NF/accessibility/statement/000495](requirements/non-functional/accessibility/statement/000495_statement-page.md) | A public page holds the accessibility statement | approved |
+| [NF/accessibility/statement/000496](requirements/non-functional/accessibility/statement/000496_statement-link.md) | Every page links to the accessibility statement | approved |
+| [NF/accessibility/statement/000497](requirements/non-functional/accessibility/statement/000497_barrier-report.md) | A user can report a barrier as a ticket | approved |
 | [NF/compatibility/deploy/000394](requirements/non-functional/compatibility/deploy/000394_migrate-first.md) | A deploy runs the migration first | approved |
 | [NF/compatibility/deploy/000435](requirements/non-functional/compatibility/deploy/000435_caddy-edge.md) | Caddy is the edge proxy | approved |
 | [NF/compatibility/pwa/000220](requirements/non-functional/compatibility/pwa/000220_zoom.md) | Zoom is blocked only in the installed app | approved |
@@ -429,6 +474,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [S/frontend/angular/000396](style/frontend/angular/000396_route-guards.md) | A route guard is only for the UX | approved |
 | [S/frontend/angular/000397](style/frontend/angular/000397_gremium-checks.md) | Gremium rights come from the Gremium API | approved |
 | [S/frontend/angular/000398](style/frontend/angular/000398_mock-dev-only.md) | The mock API runs only in dev builds | approved |
+| [S/frontend/angular/000526](style/frontend/angular/000526_use-shared-parts.md) | A view uses the shared components | approved |
 | [S/frontend/functional/000091](style/frontend/functional/000091_signal-update.md) | A signal update returns a new value | approved |
 | [S/frontend/functional/000438](style/frontend/functional/000438_eslint-functional.md) | eslint-plugin-functional warns on mutation | approved |
 | [S/shared/agents/000175](style/shared/agents/000175_prod-data.md) | Production data changes only on request | approved |

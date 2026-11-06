@@ -1,0 +1,59 @@
+<app-side-sheet [side]="phone() ? 'bottom' : 'end'" [heading]="heading()" [(open)]="open">
+  <div class="fd lv" data-testid="link-view">
+    <p class="sheet-line lv__sub">
+      <app-icon class="lv__icon" [name]="icon()" [size]="16" />
+      <span>{{ sub() }}</span>
+    </p>
+    @if (failed()) {
+      <app-note kind="error" icon="alert" role="alert">{{ 'todos.linkView.failed' | t }}</app-note>
+    } @else if (view(); as v) {
+      @if (plain(v).length) {
+        <app-section class="fd__sec" [heading]="'todos.linkView.details' | t">
+          <dl class="fd__card fd__grid">
+            @for (f of plain(v); track f.key) {
+              <div>
+                <dt>{{ label(f) }}</dt>
+                <dd class="fd__wrap" [class.mono]="f.format === 'money' || f.format === 'date'">{{ value(f) }}</dd>
+              </div>
+            }
+          </dl>
+        </app-section>
+      }
+      @for (f of texts(v); track f.key) {
+        <app-section class="fd__sec" [heading]="label(f)">
+          <div class="fd__card fd__wrap">
+            <app-markdown-view [src]="f.value" />
+          </div>
+        </app-section>
+      }
+      @if (v.rows.length) {
+        <app-section class="fd__sec" [heading]="rowsHeading(v)">
+          <ul class="rowgroup lv__rows">
+            @for (r of v.rows; track $index) {
+              <li class="lv__row">
+                @if (r.done !== null) {
+                  <app-icon class="lv__check" [class.lv__check--on]="r.done" [name]="r.done ? 'circleok' : 'circle'" [size]="18" />
+                }
+                <span class="lv__rowTitle">{{ r.title }}</span>
+                @if (rowMeta($index, r.meta); as meta) {
+                  <span class="lv__rowMeta">{{ meta }}</span>
+                }
+              </li>
+            }
+          </ul>
+        </app-section>
+      }
+    } @else {
+      <app-section class="fd__sec" [heading]="'todos.linkView.details' | t">
+        <div class="fd__card fd__grid skel-in" aria-hidden="true">
+          @for (w of ['60%', '40%', '72%', '50%']; track $index) {
+            <div>
+              <span class="skel-text skel-text--muted lv__skelLabel"></span>
+              <span class="skel-text" [style.width]="w"></span>
+            </div>
+          }
+        </div>
+      </app-section>
+    }
+  </div>
+</app-side-sheet>

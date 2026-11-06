@@ -195,6 +195,7 @@
               }
             }
           </div>
+          <app-todo-linked-list class="bd__todos" kind="expense" headingId="bd-todos" [showTitle]="false" [targetId]="e.id" />
         </app-section>
       }
 
@@ -230,7 +231,9 @@
         </div>
       </app-section>
 
-      <app-todo-linked-list class="bd__todos" kind="expense" headingId="bd-todos" [targetId]="e.id" />
+      @if (!app() && !inv()) {
+        <app-todo-linked-list class="bd__todos" kind="expense" headingId="bd-todos" [targetId]="e.id" />
+      }
     </div>
   </div>
 </article>

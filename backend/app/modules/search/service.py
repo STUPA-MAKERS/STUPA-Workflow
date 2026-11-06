@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping
+from datetime import date
 from decimal import Decimal
 from typing import TYPE_CHECKING
 from urllib.parse import quote
@@ -77,6 +78,7 @@ HIT_URL: Mapping[SearchKind, str] = {
     "principal": "/admin/users?q={id}",
     "ticket": "/tickets/{id}",
     "todo": "/todos?card={id}",
+    "event": "/todos?card={id}",
 }
 
 #: The status of a ticket hit, in the reader's language.
@@ -127,6 +129,7 @@ class SearchService:
             "principal": self._principals,
             "ticket": self._tickets,
             "todo": self._todos,
+            "event": self._events,
         }
         hits: list[SearchHit] = []
         failed: list[str] = []
@@ -352,6 +355,40 @@ class SearchService:
             )
             for card, board, column in rows
         ]
+
+    async def _events(self, q: str, principal: Principal, lang: str) -> list[SearchHit]:
+        """Reuses `TodoService.search_events`, behind the board read rule of the todos module.
+
+        Archived Events are hits too, because the next edition is planned from them
+        (spec 000485).
+        """
+        from app.modules.todos.links import card_url
+        from app.modules.todos.service import TodoService
+
+        rows = await TodoService(self.session).search_events(q, principal, limit=PER_KIND + 1)
+        return [
+            SearchHit(
+                kind="event",
+                id=str(card.id),
+                title=card.title,
+                subtitle=" · ".join(
+                    p for p in (_days(row.starts_on, row.ends_on), board.name) if p
+                ),
+                url=card_url(card.id),
+                archived=card.archived_at is not None,
+            )
+            for card, board, row in rows
+        ]
+
+
+def _days(start: date | None, end: date | None) -> str | None:
+    """The dates of an Event as ``DD.MM.YYYY`` or ``DD.MM.YYYY–DD.MM.YYYY``."""
+    if start is None:
+        return None
+    first = start.strftime("%d.%m.%Y")
+    if end is None or end == start:
+        return first
+    return f"{first}–{end.strftime('%d.%m.%Y')}"
 
 
 def _untitled(lang: str) -> str:

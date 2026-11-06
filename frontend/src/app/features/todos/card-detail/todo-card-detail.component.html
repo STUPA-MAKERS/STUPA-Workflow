@@ -262,6 +262,7 @@
           }
           @if (canWrite()) {
             <app-filter-select
+              class="cd__addLabel"
               icon="plus"
               [chevron]="false"
               [label]="'todos.card.addLabel' | t"
@@ -274,7 +275,145 @@
         </dd>
       </div>
     }
+    @if (card.event; as event) {
+      <div class="cd__field" data-testid="cd-event-start">
+        <dt>{{ 'todos.eventCard.starts' | t }}</dt>
+        <dd class="cd__chips">
+          <app-todo-due-chip [value]="event.startsOn" [disabled]="!canWrite()" (changed)="setEvent({ startsOn: $event })" />
+        </dd>
+      </div>
+      <div class="cd__field">
+        <dt>{{ 'todos.eventCard.ends' | t }}</dt>
+        <dd class="cd__chips">
+          <app-todo-due-chip [value]="event.endsOn" [disabled]="!canWrite()" (changed)="setEvent({ endsOn: $event })" />
+        </dd>
+      </div>
+      <div class="cd__field">
+        <dt>{{ 'todos.eventCard.place' | t }}</dt>
+        @if (eventEdit() === 'place') {
+          <dd>
+            <input
+              class="cd__evInput"
+              name="place"
+              maxlength="200"
+              [attr.aria-label]="'todos.eventCard.place' | t"
+              [ngModel]="draft()"
+              (ngModelChange)="draft.set($event)"
+              (keydown.enter)="$event.preventDefault(); saveEventText()"
+              (keydown.escape)="$event.preventDefault(); $event.stopPropagation(); eventEdit.set(null)"
+              (blur)="saveEventText()"
+            />
+          </dd>
+        } @else if (canWrite()) {
+          <dd>
+            <button type="button" class="cd__evText" (click)="editEventText('place')">
+              @if (event.place) {
+                {{ event.place }}
+              } @else {
+                <span class="cd__muted">{{ 'todos.eventCard.placeEmpty' | t }}</span>
+              }
+            </button>
+          </dd>
+        } @else {
+          <dd class="cd__evText">{{ event.place || '–' }}</dd>
+        }
+      </div>
+      <div class="cd__field">
+        <dt>{{ 'todos.eventCard.participants' | t }}</dt>
+        @if (eventEdit() === 'participants') {
+          <dd>
+            <input
+              class="cd__evInput"
+              name="participants"
+              type="number"
+              inputmode="numeric"
+              min="0"
+              [attr.aria-label]="'todos.eventCard.participants' | t"
+              [ngModel]="draft()"
+              (ngModelChange)="draft.set($event === null ? '' : '' + $event)"
+              (keydown.enter)="$event.preventDefault(); saveEventText()"
+              (keydown.escape)="$event.preventDefault(); $event.stopPropagation(); eventEdit.set(null)"
+              (blur)="saveEventText()"
+            />
+          </dd>
+        } @else if (canWrite()) {
+          <dd>
+            <button type="button" class="cd__evText" (click)="editEventText('participants')">
+              @if (event.participants !== null) {
+                <span class="num">{{ event.participants }}</span>&nbsp;<span class="cd__muted">{{ 'todos.eventCard.expected' | t }}</span>
+              } @else {
+                <span class="cd__muted">{{ 'todos.eventCard.participantsEmpty' | t }}</span>
+              }
+            </button>
+          </dd>
+        } @else {
+          <dd class="cd__evText">
+            @if (event.participants !== null) {
+              <span class="num">{{ event.participants }}</span>&nbsp;<span class="cd__muted">{{ 'todos.eventCard.expected' | t }}</span>
+            } @else {
+              –
+            }
+          </dd>
+        }
+      </div>
+      <div class="cd__field">
+        <dt>{{ 'todos.eventCard.series' | t }}</dt>
+        @if (eventEdit() === 'series') {
+          <dd>
+            <input
+              class="cd__evInput"
+              name="series"
+              maxlength="200"
+              [attr.aria-label]="'todos.eventCard.seriesName' | t"
+              [placeholder]="'todos.eventCard.seriesName' | t"
+              [ngModel]="draft()"
+              (ngModelChange)="draft.set($event)"
+              (keydown.enter)="$event.preventDefault(); saveEventText()"
+              (keydown.escape)="$event.preventDefault(); $event.stopPropagation(); eventEdit.set(null)"
+              (blur)="saveEventText()"
+            />
+          </dd>
+        } @else {
+          <dd>
+            @if (canWrite()) {
+              <app-filter-select
+                [label]="'todos.eventCard.series' | t"
+                [options]="seriesOptions()"
+                [value]="event.seriesId ?? ''"
+                (opened)="loadSeries()"
+                (valueChange)="pickSeries($event)"
+              />
+            } @else {
+              <span class="cd__evText">{{ event.seriesName || '–' }}</span>
+            }
+          </dd>
+        }
+      </div>
+    }
   </dl>
+
+  @if (card.eventFacts; as facts) {
+    <app-section class="cd__sec" [heading]="'todos.eventCard.money' | t">
+      <ul class="cd__links" data-testid="cd-money">
+        <li class="cd__linkRow cd__moneyRow">
+          <span class="cd__linkText">{{ 'todos.eventCard.requested' | t }}</span><span class="num">{{ euro(facts.totals.requested) }}</span>
+        </li>
+        <li class="cd__linkRow cd__moneyRow">
+          <span class="cd__linkText">{{ 'todos.eventCard.approved' | t }}</span><span class="num">{{ euro(facts.totals.approved) }}</span>
+        </li>
+        <li class="cd__linkRow cd__moneyRow">
+          <span class="cd__linkText">{{ 'todos.eventCard.expenses' | t }}</span><span class="num">{{ euro(facts.totals.expenses) }}</span>
+        </li>
+        <li class="cd__linkRow cd__moneyRow">
+          <span class="cd__linkText">{{ 'todos.eventCard.income' | t }}</span><span class="num">{{ euro(facts.totals.income) }}</span>
+        </li>
+        <li class="cd__linkRow cd__moneyRow cd__moneySum">
+          <span class="cd__linkText">{{ 'todos.eventCard.balance' | t }}</span>
+          <span class="num" [class.cd__evNeg]="negative(facts.totals.balance)">{{ euro(facts.totals.balance, true) }}</span>
+        </li>
+      </ul>
+    </app-section>
+  }
 
   @if (canWrite() || card.links.length) {
     <app-section class="cd__sec" [heading]="'todos.card.links' | t">
@@ -301,12 +440,14 @@
               <span class="cd__linkText">
                 @if (link.url) {
                   <a class="cd__linkTitle" [routerLink]="route(link.url).path" [queryParams]="route(link.url).query">{{ linkTitle(link) }}</a>
+                } @else if (link.granted) {
+                  <button type="button" class="cd__linkTitle cd__linkOpen" data-testid="cd-link-view" (click)="viewLink(link)">{{ linkTitle(link) }}</button>
                 } @else {
                   <span class="cd__linkTitle cd__linkTitle--muted">{{ linkTitle(link) }}</span>
                 }
                 <span class="cd__linkSub">{{ linkSub(link) }}</span>
               </span>
-              @if (link.url) {
+              @if (link.url || link.granted) {
                 <app-icon class="cd__linkChev" name="right" [size]="16" />
               }
               @if (canWrite()) {
@@ -328,6 +469,48 @@
     </app-section>
 
   }
+
+  @if (card.eventFacts; as facts) {
+    @if (facts.decisions.length) {
+      <app-section class="cd__sec" [heading]="'todos.eventCard.decisions' | t">
+        <ul class="cd__links" data-testid="cd-decisions">
+          @for (d of facts.decisions; track d.kind + d.targetId) {
+            <li class="cd__linkRow">
+              <app-icon class="cd__linkIcon" [name]="d.kind === 'vote' ? 'vote' : 'file'" [size]="18" />
+              <span class="cd__linkText">
+                <a class="cd__linkTitle" [routerLink]="decisionUrl(d)">{{ decisionTitle(d) }}</a>
+                <span class="cd__linkSub">{{ decisionSub(d) }}</span>
+              </span>
+              <app-icon class="cd__linkChev" name="right" [size]="16" />
+            </li>
+          }
+        </ul>
+      </app-section>
+    }
+    @if (facts.editions.length || facts.hiddenEditions) {
+      <app-section class="cd__sec" [heading]="'todos.eventCard.editions' | t">
+        <ul class="cd__links" data-testid="cd-editions">
+          @for (e of facts.editions; track e.id) {
+            <li class="cd__linkRow">
+              <app-icon class="cd__linkIcon" name="history" [size]="18" />
+              <span class="cd__linkText">
+                <a class="cd__linkTitle" routerLink="/todos" [queryParams]="{ card: e.id }">{{ e.title }}</a>
+                <span class="cd__linkSub">{{ editionSub(e) }}</span>
+              </span>
+              <app-icon class="cd__linkChev" name="right" [size]="16" />
+            </li>
+          }
+          @if (facts.hiddenEditions) {
+            <li class="cd__linkRow">
+              <app-icon class="cd__linkIcon" name="lock" [size]="18" />
+              <span class="cd__linkText cd__muted">{{ 'todos.eventCard.hiddenEditions' | t: { n: facts.hiddenEditions } }}</span>
+            </li>
+          }
+        </ul>
+      </app-section>
+    }
+  }
+
 
   @if (canWrite() || card.descriptionMd) {
     <app-section class="cd__sec" [heading]="'todos.card.description' | t">
@@ -559,3 +742,17 @@
     </ul>
   </app-section>
 </ng-template>
+
+<app-confirm-dialog
+  [open]="makeEventAsk()"
+  [title]="'todos.eventCard.makeEventTitle' | t"
+  [confirmLabel]="'todos.eventCard.makeEventConfirm' | t"
+  [danger]="false"
+  (confirm)="makeEvent()"
+  (cancel)="makeEventAsk.set(false)"
+>
+  <p class="cd__warn">{{ 'todos.eventCard.makeEventText' | t: { title: card()?.title ?? '' } }}</p>
+</app-confirm-dialog>
+@if (card(); as c) {
+  <app-todo-link-view [cardId]="c.id" [link]="viewedLink()" [(open)]="linkViewOpen" />
+}

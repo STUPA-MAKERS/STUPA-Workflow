@@ -24,6 +24,36 @@ const COMMENT: TodoComment = {
   attachments: [{ id: 'f1', filename: 'plan.pdf', mime: 'application/pdf', size: 20, scanState: 'quarantined' }],
 };
 
+const EVENT = { startsOn: '2026-11-20', endsOn: '2026-11-21', place: 'Mensa', participants: 450, seriesId: 's-1', seriesName: 'Erstiparty' };
+const FACTS = {
+  totals: { requested: '800.00', approved: '500.00', expenses: '300.00', income: '75.00', balance: '-225.00' },
+  decisions: [
+    {
+      kind: 'decision' as const,
+      targetId: 'a-1',
+      title: 'Technik',
+      decidedAt: '2026-11-01T19:00:00Z',
+      meetingTitle: 'StuPa 3',
+      result: 'passed',
+      amount: '500.00',
+      conditions: ['Belege bis 31.12.'],
+    },
+  ],
+  editions: [
+    {
+      id: 'k-0',
+      boardId: 'b-1',
+      boardName: 'AStA',
+      title: 'Erstiparty SoSe',
+      startsOn: '2026-04-23',
+      endsOn: null,
+      archived: true,
+      totals: { requested: '0.00', approved: '0.00', expenses: '0.00', income: '312.00', balance: '312.00' },
+    },
+  ],
+  hiddenEditions: 1,
+};
+
 const http = (status: number, code?: string) =>
   throwError(() => new HttpErrorResponse({ status, error: code ? { code } : null }));
 
@@ -31,6 +61,15 @@ function makeApi(card: TodoCardDetail) {
   const answer = (over: Partial<TodoCardDetail> = {}) => jest.fn((): Observable<TodoCardDetail> => of({ ...card, ...over }));
   return {
     card: jest.fn((): Observable<TodoCardDetail> => of(card)),
+    linkView: jest.fn(() =>
+      of({
+        kind: 'expense' as const,
+        title: 'Getränke',
+        detail: {},
+        facts: [{ key: 'amount', label: null, value: '300.00', format: 'money' as const }],
+        rows: [],
+      }),
+    ),
     members: jest.fn(() => of(MEMBERS)),
     board: jest.fn((): Observable<TodoBoard> => of(board())),
     moveCard: jest.fn(() => of(tile({ id: card.id, columnId: 'c-2', rank: 'b' }))),
@@ -45,6 +84,10 @@ function makeApi(card: TodoCardDetail) {
     addLink: answer(),
     removeLink: answer(),
     archiveCard: jest.fn(() => of(undefined)),
+    setEvent: answer({ event: EVENT, eventFacts: FACTS }),
+    followUp: jest.fn((): Observable<TodoCardDetail> => of({ ...card, id: 'k-9', boardId: 'b-1' })),
+    series: jest.fn(() => of([{ id: 's-1', name: 'Erstiparty' }])),
+    createSeries: jest.fn((name: string) => of({ id: 's-2', name })),
     boards: jest.fn(() => of(BOARDS)),
     transferCard: jest.fn(
       (): Observable<TodoCardDetail> => of({ ...card, boardId: 'b-2', boardName: 'Fachschaft Informatik', columnId: 'c-1' }),
@@ -182,6 +225,16 @@ describe('TodoCardDetailComponent', () => {
    * Beside the list the pane is a sheet, and the bar bleeds into its padding. The link sits in the
    * bar, so the menu does not repeat it.
    */
+  it('opens a link that only the card grants in its read sheet', async () => {
+    const granted = link({ id: 'l-9', kind: 'expense', targetId: 'x-1', title: 'Getränke', url: null, granted: true });
+    const { api, detect } = await setup({ card: detail({ links: [granted] }) });
+    expect(screen.queryByRole('link', { name: 'Getränke' })).toBeNull();
+    fireEvent.click(screen.getByTestId('cd-link-view'));
+    detect();
+    expect(api.linkView).toHaveBeenCalledWith(expect.any(String), 'l-9');
+    expect(screen.getByTestId('link-view')).toHaveTextContent('300,00');
+  });
+
   it('shows the board link in the pane and no close or copy button', async () => {
     const { container, cmp } = await setup({ mode: 'pane', split: true });
     expect(screen.getByRole('link', { name: /Im Board öffnen/ })).toHaveAttribute('href', '/todos/b-1?card=k-1');
@@ -687,6 +740,48 @@ describe('TodoCardDetailComponent', () => {
     expect(toast.error).toHaveBeenCalledWith('Die Änderung konnte nicht gespeichert werden.');
   });
 
+  it('makes a to-do an Event after the confirmation, and offers no way back (spec 000488)', async () => {
+    const { cmp, api, detect } = await setup();
+    cmp.onMenu({ id: 'makeEvent', label: '' });
+    detect();
+    expect(screen.getByText('Aus „Raum buchen“ wird eine Veranstaltung. Dies lässt sich nicht rückgängig machen.')).toBeInTheDocument();
+    cmp.makeEvent();
+    expect(api.setEvent).toHaveBeenCalledWith('k-1', {});
+    detect();
+    const items = cmp.menuSections()[0].items.map((i) => i.id);
+    expect(items).toContain('followUp');
+    expect(items).not.toContain('makeEvent');
+  });
+
+  it('shows the event fields, the money, the decisions and the earlier editions of an Event', async () => {
+    const { cmp, api } = await setup({ card: detail({ event: EVENT, eventFacts: FACTS }) });
+    expect(screen.getByText('Beginn')).toBeInTheDocument();
+    expect(screen.getByText('Mensa')).toBeInTheDocument();
+    const money = document.querySelector('[data-testid=cd-money]');
+    expect(money).toHaveTextContent('800,00');
+    expect(money?.querySelector('.cd__evNeg')?.textContent).toContain('−225,00');
+    expect(screen.getByRole('link', { name: 'Technik: Angenommen' })).toHaveAttribute('href', '/applications/a-1');
+    expect(screen.getByText('StuPa 3 · 01.11.2026 · 500,00 € · Auflage: Belege bis 31.12.')).toBeInTheDocument();
+    expect(screen.getByText('23.04.2026 · AStA · archiviert · Saldo +312,00 €')).toBeInTheDocument();
+    expect(screen.getByText('1 weitere ohne Zugriff')).toBeInTheDocument();
+    cmp.editEventText('place');
+    cmp.draft.set('Aula');
+    cmp.saveEventText();
+    expect(api.setEvent).toHaveBeenLastCalledWith('k-1', { ...{ startsOn: '2026-11-20', endsOn: '2026-11-21', participants: 450, seriesId: 's-1' }, place: 'Aula' });
+    cmp.editEventText('participants');
+    cmp.draft.set('');
+    cmp.saveEventText();
+    expect(api.setEvent).toHaveBeenLastCalledWith('k-1', expect.objectContaining({ participants: null }));
+    cmp.pickSeries('__new');
+    expect(cmp.eventEdit()).toBe('series');
+    cmp.draft.set('Erstiparty Nord');
+    cmp.saveEventText();
+    expect(api.createSeries).toHaveBeenCalledWith('Erstiparty Nord');
+    expect(api.setEvent).toHaveBeenLastCalledWith('k-1', expect.objectContaining({ seriesId: 's-2' }));
+    cmp.onMenu({ id: 'followUp', label: '' });
+    expect(api.followUp).toHaveBeenCalledWith('k-1');
+  });
+
   /**
    * Neither the current board nor, for a card of a gremium board, the personal board is a target.
    * The page learns of the transfer first, with the board the card left.
@@ -696,6 +791,7 @@ describe('TodoCardDetailComponent', () => {
     expect(cmp.menuSections()[0].items.map((i) => [i.id, i.icon])).toEqual([
       ['rename', 'edit'],
       ['transfer', 'arrow'],
+      ['makeEvent', 'cal'],
     ]);
     expect(cmp.menuSections()[1].items[0].id).toBe('archive');
     cmp.onMenu({ id: 'transfer', label: '' });

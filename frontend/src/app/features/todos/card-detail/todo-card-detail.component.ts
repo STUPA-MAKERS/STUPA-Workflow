@@ -28,6 +28,10 @@ import {
   type TodoCardPatch,
   type TodoCheckItem,
   type TodoComment,
+  type TodoEventDecision,
+  type TodoEventEdition,
+  type TodoEventIn,
+  type TodoEventSeries,
   type TodoLink,
   type TodoLinkTarget,
   type TodoMember,
@@ -68,14 +72,17 @@ import {
   SkeletonComponent,
   ToastService,
   SectionComponent,
+  ConfirmDialogComponent,
 } from '@stupa-makers/ui-kit';
 import { TodoDueChipComponent } from '../due-chip/todo-due-chip.component';
 import { TodoLinkPickerComponent, linkKey } from '../link-picker/todo-link-picker.component';
+import { TodoLinkViewComponent } from '../link-view/todo-link-view.component';
 import { TodoMoveSheetComponent, type MoveChoice, type MoveColumn } from '../move-sheet/todo-move-sheet.component';
 import { TodoCacheService } from '../todo-cache.service';
 import { TodoTransferDialogComponent, type TodoTransferTarget } from '../transfer-dialog/todo-transfer-dialog.component';
 import {
   LINK_ICON,
+  eventDays,
   eventText,
   linkSub,
   linkTitle,
@@ -83,8 +90,12 @@ import {
   sheetMove,
   splitUrl,
 } from '../todos.util';
-import { isoDay, weekdayDate } from '@shared/date-format';
+import { dayMonthYear, isoDay, weekdayDate } from '@shared/date-format';
+import { formatMoney, moneyNumber } from '@shared/format-money';
 import { personName } from '@shared/person-label.util';
+
+/** The value of the "Neue Reihe …" option of "Reihe". */
+const NEW_SERIES = '__new';
 
 /** The error codes of the card routes and their texts. */
 const ERROR_TEXT: Record<string, TranslationKey> = {
@@ -101,6 +112,9 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
   column_not_on_board: 'todos.error.transfer',
   transfer_to_personal: 'todos.error.transferToPersonal',
   todo_write_required: 'todos.error.readOnly',
+  event_link_taken: 'todos.error.eventLinkTaken',
+  event_dates_invalid: 'todos.error.eventDates',
+  series_exists: 'todos.error.seriesExists',
 };
 
 /**
@@ -136,6 +150,7 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ConfirmDialogComponent,
     SectionComponent,
     ChipComponent,
     FormsModule,
@@ -150,6 +165,7 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
     IconComponent,
     MarkdownImageUploadDirective,
     MarkdownViewComponent,
+    TodoLinkViewComponent,
     NoteComponent,
     RowMenuComponent,
     ScrollFadeDirective,
@@ -255,6 +271,7 @@ export class TodoCardDetailComponent {
       this.editingDesc() ||
       this.addingItem() ||
       this.editingItem() !== null ||
+      this.eventEdit() !== null ||
       this.transferOpen() ||
       this.busy(),
   );
@@ -445,6 +462,7 @@ export class TodoCardDetailComponent {
         items: [
           { id: 'rename', label: this.t('todos.card.rename'), icon: 'edit' },
           { id: 'transfer', label: this.t('todos.card.transfer'), icon: 'arrow' },
+          ...this.eventItems(c),
         ],
       },
       { items: [{ id: 'archive', label: this.t('todos.card.archive'), icon: 'archive', danger: true }] },
@@ -478,6 +496,15 @@ export class TodoCardDetailComponent {
 
   route(url: string) {
     return splitUrl(url);
+  }
+
+  /** The link whose read sheet is open (spec 000487): a link readable only through the card. */
+  readonly viewedLink = signal<TodoLink | null>(null);
+  readonly linkViewOpen = signal(false);
+
+  viewLink(link: TodoLink): void {
+    this.viewedLink.set(link);
+    this.linkViewOpen.set(true);
   }
 
   linkSub(link: TodoLink): string {
@@ -915,6 +942,167 @@ export class TodoCardDetailComponent {
     this.write(this.api.removeLink(c.id, link.id));
   }
 
+  /** The confirmation before a to-do becomes an Event (it cannot be undone). */
+  readonly makeEventAsk = signal(false);
+  /** The event field in inline edit: place, participants or a new series. */
+  readonly eventEdit = signal<'place' | 'participants' | 'series' | null>(null);
+  readonly draft = signal('');
+  readonly series = signal<TodoEventSeries[]>([]);
+  private seriesLoaded = false;
+
+  /** The options of "Reihe": none, the series by name, and "Neue Reihe …". */
+  readonly seriesOptions = computed<FilterSelectOption[]>(() => {
+    const own = this.card()?.event;
+    const list = [...this.series()];
+    if (own?.seriesId && !list.some((s) => s.id === own.seriesId)) {
+      list.unshift({ id: own.seriesId, name: own.seriesName ?? '' });
+    }
+    return [
+      { value: '', label: this.t('todos.eventCard.noSeries') },
+      ...list.map((s) => ({ value: s.id, label: s.name })),
+      { value: NEW_SERIES, label: this.t('todos.eventCard.newSeries') },
+    ];
+  });
+
+  /** "Zur Veranstaltung umwandeln" on a to-do of a shared board, "Folgeveranstaltung anlegen" on an Event. */
+  private eventItems(c: TodoCardDetail): RowMenuItem[] {
+    if (c.event) return [{ id: 'followUp', label: this.t('todos.eventCard.followUp'), icon: 'copy' }];
+    if (c.boardKind === 'personal') return [];
+    return [{ id: 'makeEvent', label: this.t('todos.eventCard.makeEvent'), icon: 'cal' }];
+  }
+
+  /** The event data with one field changed; the rest stays as it is. */
+  setEvent(change: TodoEventIn): void {
+    const c = this.card();
+    if (!c?.event) return;
+    const e = c.event;
+    this.write(
+      this.api.setEvent(c.id, {
+        startsOn: e.startsOn,
+        endsOn: e.endsOn,
+        place: e.place,
+        participants: e.participants,
+        seriesId: e.seriesId,
+        ...change,
+      }),
+    );
+  }
+
+  /** The to-do becomes an Event, after the confirmation. */
+  makeEvent(): void {
+    const c = this.card();
+    this.makeEventAsk.set(false);
+    if (!c || c.event) return;
+    this.write(this.api.setEvent(c.id, {}));
+  }
+
+  /** "Folgeveranstaltung anlegen": the new card opens on its board. */
+  followUp(): void {
+    const c = this.card();
+    if (!c) return;
+    const current = this.current();
+    this.busy.set(true);
+    this.api.followUp(c.id).subscribe({
+      next: (card) => {
+        if (!current()) return;
+        this.busy.set(false);
+        this.toast.success(this.t('todos.eventCard.followUpDone'));
+        void this.router.navigate(['/todos', card.boardId], { queryParams: { card: card.id } });
+      },
+      error: (err: unknown) => {
+        if (current()) this.fail(err, true);
+      },
+    });
+  }
+
+  editEventText(field: 'place' | 'participants'): void {
+    const e = this.card()?.event;
+    if (!e) return;
+    const value = field === 'place' ? e.place : e.participants;
+    this.draft.set(value === null ? '' : String(value));
+    this.eventEdit.set(field);
+    this.focusSoon('.cd__evInput');
+  }
+
+  /** Save the field in edit; an unchanged value only closes the editor. */
+  saveEventText(): void {
+    const field = this.eventEdit();
+    const e = this.card()?.event;
+    if (!field || !e) return;
+    this.eventEdit.set(null);
+    const text = this.draft().trim();
+    if (field === 'place') {
+      if ((e.place ?? '') !== text) this.setEvent({ place: text || null });
+    } else if (field === 'participants') {
+      const n = text === '' ? null : Math.max(0, Math.floor(Number(text)));
+      if (n !== e.participants && (n === null || Number.isFinite(n))) this.setEvent({ participants: n });
+    } else if (text) {
+      this.api.createSeries(text).subscribe({
+        next: (made) => {
+          this.series.update((list) => [...list, made]);
+          this.setEvent({ seriesId: made.id });
+        },
+        error: (err: unknown) => this.fail(err, false),
+      });
+    }
+  }
+
+  loadSeries(): void {
+    if (this.seriesLoaded) return;
+    this.seriesLoaded = true;
+    this.api.series().subscribe({
+      next: (list) => this.series.set(list),
+      error: () => (this.seriesLoaded = false),
+    });
+  }
+
+  pickSeries(value: string): void {
+    if (value === NEW_SERIES) {
+      this.draft.set('');
+      this.eventEdit.set('series');
+      this.focusSoon('.cd__evInput');
+      return;
+    }
+    if (value !== (this.card()?.event?.seriesId ?? '')) this.setEvent({ seriesId: value || null });
+  }
+
+  /** An amount of the totals as money; `signed` puts + or − in front. */
+  euro(value: string, signed = false): string {
+    return formatMoney(value, this.i18n.formatLocale(), { signed });
+  }
+
+  negative(value: string): boolean {
+    return (moneyNumber(value) ?? 0) < 0;
+  }
+
+  decisionUrl(d: TodoEventDecision): string {
+    return d.kind === 'vote' ? `/voting/${d.targetId}` : `/applications/${d.targetId}`;
+  }
+
+  /** "Title: angenommen". */
+  decisionTitle(d: TodoEventDecision): string {
+    const key = `vote.result.${d.result}` as TranslationKey;
+    const result = d.result ? this.t(key) : '';
+    return result ? `${d.title}: ${result}` : d.title;
+  }
+
+  /** "StuPa 3 · 01.11.2026 · 500,00 € · Auflage: …". */
+  decisionSub(d: TodoEventDecision): string {
+    const locale = this.i18n.formatLocale();
+    const parts = [d.meetingTitle, d.decidedAt ? dayMonthYear(d.decidedAt, locale) : null];
+    if (d.amount) parts.push(formatMoney(d.amount, locale));
+    for (const text of d.conditions) parts.push(this.t('todos.eventCard.condition', { text }));
+    return parts.filter(Boolean).join(' · ');
+  }
+
+  /** "20.11.2026 · AStA · Saldo +312,00 €". */
+  editionSub(e: TodoEventEdition): string {
+    const parts = [eventDays(e.startsOn, e.endsOn, this.i18n.formatLocale()), e.boardName];
+    if (e.archived) parts.push(this.t('todos.eventCard.archived'));
+    parts.push(this.t('todos.eventCard.balanceText', { amount: this.euro(e.totals.balance, true) }));
+    return parts.filter(Boolean).join(' · ');
+  }
+
   onMenu(item: RowMenuItem): void {
     if (item.id === 'openInBoard') this.openInBoard();
     else if (item.id === 'done') this.toggleDone();
@@ -923,6 +1111,8 @@ export class TodoCardDetailComponent {
     else if (item.id === 'transfer') this.transferOpen.set(true);
     else if (item.id === 'archive') this.archive();
     else if (item.id === 'restore') this.restore();
+    else if (item.id === 'makeEvent') this.makeEventAsk.set(true);
+    else if (item.id === 'followUp') this.followUp();
   }
 
   /** Open the card in the drawer of its board ("Im Board öffnen" of the phone menu). */

@@ -85,6 +85,7 @@ async def calendar_feed(token: str, db: DbSession, settings: SettingsDep) -> Res
     if principal is None:
         raise NotFoundError("Unknown calendar feed.")
     meetings = await service.member_meetings(db, principal.sub)
+    card_events = await service.readable_events(db, principal)
     events = [
         MeetingEvent(
             uid=str(meeting.id),
@@ -97,7 +98,7 @@ async def calendar_feed(token: str, db: DbSession, settings: SettingsDep) -> Res
         )
         for meeting, gremium_name in meetings
     ]
-    body = build_calendar(events, domain=_uid_domain(settings))
+    body = build_calendar(events, domain=_uid_domain(settings), card_events=card_events)
     return Response(
         content=body,
         status_code=status.HTTP_200_OK,

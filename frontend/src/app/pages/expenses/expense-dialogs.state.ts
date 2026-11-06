@@ -18,6 +18,7 @@ import type { ExpensesListState } from './expenses-list.state';
 import type { ExpenseSubBookingsState } from './expense-sub-bookings.state';
 import type { ExpenseTransfersState } from './expense-transfers.state';
 import { formatMoney } from '@shared/format-money';
+import { EventLinkState } from '../../features/todos/event-link.state';
 
 /** The fiscal year that holds today, else the only active one, else null. */
 export function currentFiscalYear(
@@ -58,6 +59,8 @@ export class ExpenseDialogsState {
   private readonly toast = inject(ToastService);
 
   readonly createOpen = signal(false);
+  /** The `Veranstaltung` picker of the form: it links the Event card after the save. */
+  readonly event = new EventLinkState();
   readonly newKind = signal<ExpenseKind>('expense');
   readonly newAmount = signal('');
   readonly newDescription = signal('');
@@ -273,6 +276,7 @@ export class ExpenseDialogsState {
     this.appCandidates.set([]);
     this.fiscalYearOptions.set([]);
     if (this.list.budgetId()) this.loadFiscalYears(this.list.budgetId());
+    this.event.load(null);
     this.createOpen.set(true);
     if (opts.invoiceId) this.preselectInvoice(opts.invoiceId);
   }
@@ -435,7 +439,10 @@ export class ExpenseDialogsState {
           this.toast.success(this.i18n.translate('expenses.toast.created'));
           this.loadInvoices();
           this.list.refresh();
-          if (created) this.onCreated?.(created);
+          if (created) {
+            this.linkEvent(created.id);
+            this.onCreated?.(created);
+          }
         },
         error: (err) => {
           this.list.saving.set(false);
@@ -455,6 +462,7 @@ export class ExpenseDialogsState {
   openEdit(e: Expense): void {
     this.closeForms();
     this.editing.set(e);
+    this.event.load(e.id);
     this.editAmount.set(e.amount);
     this.editDescription.set(e.description);
     this.editBudgetId.set(e.budgetId);
@@ -512,6 +520,7 @@ export class ExpenseDialogsState {
             this.onSaved?.(merged);
           }
           this.toast.success(this.i18n.translate('expenses.toast.saved'));
+          this.linkEvent(e.id);
           this.loadInvoices();
         },
         error: (err) => {
@@ -519,6 +528,18 @@ export class ExpenseDialogsState {
           this.toast.error(this.failedText(err));
         },
       });
+  }
+
+  /** Move the link of the booking to the picked Event; a refused link says why. */
+  private linkEvent(expenseId: Uuid): void {
+    this.event.apply(expenseId).subscribe({
+      error: (err: unknown) =>
+        this.toast.error(
+          this.i18n.translate(
+            problemCode(err) === 'event_link_taken' ? 'todos.error.eventLinkTaken' : 'todos.error.save',
+          ),
+        ),
+    });
   }
 
   askDelete(e: Expense): void {
