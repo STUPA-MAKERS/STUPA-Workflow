@@ -61,7 +61,6 @@ _cd_variant = sa.table(
     sa.column("id", sa.Uuid),
     sa.column("key", sa.Text),
     sa.column("name", sa.Text),
-    sa.column("base_variant", sa.Text),
 )
 _cd_variant_logo = sa.table(
     "cd_variant_logo",
@@ -385,9 +384,8 @@ def upgrade() -> None:
                 "id": CD_VARIANT_IDS[key],
                 "key": key,
                 "name": name,
-                "base_variant": base,
             }
-            for key, name, base, _title, _footer in CD_VARIANTS
+            for key, name, _base, _title, _footer in CD_VARIANTS
         ],
     )
     op.bulk_insert(

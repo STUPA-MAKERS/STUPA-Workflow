@@ -4,9 +4,8 @@ A poll is a ``vote`` row with ``kind = 'poll'``. ``vote.config`` holds a
 ``PollConfig`` (mode, options, ``maxChoices``, secret, guests). A poll only counts the
 answers: no quorum, no majority, no lot, no runoff, no application and no flow branch.
 It shares the life cycle of a vote (draft -> open -> closed / cancelled), the
-race-safe ballot tables, the secret path and the reveal rule. A new poll is always
-secret (``voting.service.secret_only``). The differences live
-here:
+race-safe ballot tables and the reveal rule. A poll is always secret
+(``voting.service.secret_only``). The differences live here:
 
 * The ballot: a single poll takes ``[optionId]`` or ``[]`` (abstention), a multi
   poll 0 to ``maxChoices`` option ids, a date poll ``yes``/``maybe``/``no`` for every
@@ -35,7 +34,6 @@ from app.modules.auth.principal import Principal
 from app.modules.voting import tally as tally_mod
 from app.modules.voting.models import Vote
 from app.modules.voting.schemas import (
-    MyBallot,
     PollCreate,
     PollIn,
     PollPatch,
@@ -118,17 +116,6 @@ def stored_choice(config: PollConfig, choice: str | list[str] | Mapping[str, str
     return tally_mod.encode_election_choice(choice)
 
 
-def own_ballot(choice: str | None) -> MyBallot:
-    """Build the own ballot of an open poll row (a cast ``ballot`` row)."""
-    picks = tally_mod.decode_election_choice(choice)
-    if picks is not None:
-        return MyBallot(cast=True, choices=picks)
-    answers = tally_mod.decode_poll_answers(choice)
-    if answers is not None:
-        return MyBallot.model_validate({"cast": True, "answers": answers})
-    return MyBallot(cast=True, choice=choice)
-
-
 def result_of(outcome: tally_mod.PollOutcome) -> PollResultOut:
     """Build the result of a poll from its tally."""
     return PollResultOut(
@@ -149,8 +136,8 @@ def dump_result(result: PollResultOut) -> dict[str, Any]:
 def poll_fields(vote: Vote, live: PollResultOut | None = None) -> dict[str, Any]:
     """Return the poll fields of ``VoteOut`` for a vote row (empty for another kind).
 
-    A closed poll carries its stored result; ``live`` is the revealed count of an
-    open poll.
+    A closed poll carries its stored result. ``live`` is the counted result of a
+    revealed (closed) poll and applies only when the row holds no stored result.
     """
     if not is_poll(vote):
         return {}

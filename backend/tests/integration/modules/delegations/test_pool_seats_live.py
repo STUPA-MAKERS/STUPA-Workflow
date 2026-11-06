@@ -25,7 +25,7 @@ from app.deps import get_current_principal
 from app.modules.auth.principal import Principal
 from app.modules.auth.rbac import vote_group_key
 from app.modules.delegations.models import MeetingDelegation
-from app.modules.voting.models import Ballot, Vote
+from app.modules.voting.models import Vote, VotedMarker
 from app.shared.config_schemas import VoteConfig
 from tests.integration.modules.delegations.conftest import (
     act,
@@ -39,7 +39,7 @@ from tests.integration.modules.delegations.conftest import (
 pytestmark = pytest.mark.integration
 
 CONFIG = VoteConfig.model_validate(
-    {"options": ["yes", "no", "abstain"], "majorityRule": "simple"}
+    {"options": ["yes", "no", "abstain"], "majorityRule": "simple", "secret": True}
 ).model_dump(by_alias=True)
 
 
@@ -81,7 +81,11 @@ async def _vote(maker: async_sessionmaker[AsyncSession], w: _World) -> uuid.UUID
 async def _voters(maker: async_sessionmaker[AsyncSession], vote_id: uuid.UUID) -> set[str]:
     async with maker() as session:
         return set(
-            (await session.scalars(select(Ballot.voter_sub).where(Ballot.vote_id == vote_id))).all()
+            (
+                await session.scalars(
+                    select(VotedMarker.voter_sub).where(VotedMarker.vote_id == vote_id)
+                )
+            ).all()
         )
 
 

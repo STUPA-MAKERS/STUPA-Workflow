@@ -23,7 +23,7 @@ from app.modules.admin.service import ConfigService
 from app.modules.auth.principal import Principal
 from app.modules.livevote.models import Meeting
 from app.modules.protocol.models import Protocol
-from app.modules.voting.models import Ballot, Vote
+from app.modules.voting.models import SecretBallot, Vote, VotedMarker
 from app.shared.errors import ForbiddenError
 from tests.integration.modules.livevote.conftest import CONFIG, audit_actions, seed
 
@@ -54,7 +54,8 @@ async def test_gremium_delete_deletes_meetings_and_keeps_votes_without_a_meeting
     s = await seed(maker, status="closed", votes=("draft", "closed"), protocol="final")
     standalone = await _standalone_vote(maker, s.gremium_id, "closed")
     async with maker() as session:
-        session.add(Ballot(vote_id=s.vote_ids["closed"], voter_sub="s1", choice="yes"))
+        session.add(VotedMarker(vote_id=s.vote_ids["closed"], voter_sub="s1"))
+        session.add(SecretBallot(vote_id=s.vote_ids["closed"], choice="yes"))
         await session.commit()
 
     with TestClient(api) as client:
@@ -70,10 +71,11 @@ async def test_gremium_delete_deletes_meetings_and_keeps_votes_without_a_meeting
         kept = await session.get(Vote, standalone)
         assert kept is not None
         assert kept.status == "closed"
-        ballots = await session.scalars(
-            select(Ballot).where(Ballot.vote_id == s.vote_ids["closed"])
-        )
-        assert ballots.all() == []
+        for model in (VotedMarker, SecretBallot):
+            rows = await session.scalars(
+                select(model).where(model.vote_id == s.vote_ids["closed"])
+            )
+            assert rows.all() == []
 
     [meeting_entry] = await audit_actions(maker, target_id=s.meeting_id)
     assert meeting_entry.action == "meeting_delete"

@@ -3,7 +3,7 @@
 This module grants the `admin` role to the first admins. It matches them by the OIDC `sub`
 or by email. It runs idempotently on OIDC login and in a startup sweep. Without it a fresh
 OIDC installation locks itself out. Nobody holds `admin.*`, so nobody can assign a role.
-The assignment is global and has no time limit. `granted_by` holds `"bootstrap"`. The logs
+The assignment is global. `granted_by` holds `"bootstrap"`. The logs
 carry no PII. They record only the fact of an assignment.
 
 All database reads go through `session.execute` and use no `get` or `scalar` helper. This
@@ -13,7 +13,6 @@ keeps the logic fakeable in the unit suite without Docker.
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -54,12 +53,11 @@ async def _admin_role_id(db: AsyncSession) -> object | None:
 async def _has_admin_assignment(
     db: AsyncSession, principal_id: object, role_id: object
 ) -> bool:
-    """Return `True` if the principal already holds the role globally, with no Gremium."""
+    """Return `True` if the principal already holds the role."""
     res = await db.execute(
         select(RoleAssignment.id).where(
             RoleAssignment.principal_id == principal_id,
             RoleAssignment.role_id == role_id,
-            RoleAssignment.gremium_id.is_(None),
         )
     )
     return res.scalar_one_or_none() is not None
@@ -70,7 +68,6 @@ def _new_assignment(principal_id: object, role_id: object) -> RoleAssignment:
         principal_id=principal_id,
         role_id=role_id,
         granted_by="bootstrap",
-        valid_from=datetime.now(UTC),
     )
 
 
@@ -110,7 +107,7 @@ async def ensure_member_for_principal(db: AsyncSession, row: PrincipalRow) -> bo
     """Grant every principal the global `member` role on login.
 
     The call is idempotent. Every user always holds the base role `member`. That role is
-    global and has no Gremium scope. The function does not commit. The caller owns the
+    global. The function does not commit. The caller owns the
     transaction.
     """
     role_id = await _role_id(db, _MEMBER_ROLE_KEY)

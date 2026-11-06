@@ -33,7 +33,7 @@ def _vote(**over: Any) -> Vote:
         "closes_at": None,
         "meeting_id": uuid4(),
         "eligible_group": GID,
-        "config": {"options": ["yes", "no"], "majorityRule": "simple", "secret": False},
+        "config": {"options": ["yes", "no"], "majorityRule": "simple", "secret": True},
     }
     base.update(over)
     return cast(Vote, SimpleNamespace(**base))
@@ -55,8 +55,7 @@ def world(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     async def _check(*_a: Any) -> tuple[bool, str | None]:
         return state.blocked, state.delegator
 
-    async def _my_ballot(_self: Any, _vote: Any, sub: str, *, secret: bool) -> MyBallot:
-        assert secret is False
+    async def _my_ballot(_self: Any, _vote: Any, sub: str) -> MyBallot:
         return MyBallot(cast=sub in state.cast_by)
 
     monkeypatch.setattr(voting_mod, "voting_delegation_check", _check)

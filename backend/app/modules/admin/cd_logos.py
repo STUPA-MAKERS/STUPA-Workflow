@@ -77,9 +77,6 @@ LogoSlot = Literal["title", "footer", "square"]
 RenderSlot = Literal["title", "footer"]
 RENDER_SLOTS: Final[tuple[RenderSlot, ...]] = ("title", "footer")
 
-#: The document shape that the variant builds on.
-CdBaseVariant = Literal["report", "protocol"]
-
 
 ALLOWED_CD_LOGO_MIME: Final[frozenset[str]] = frozenset(
     {

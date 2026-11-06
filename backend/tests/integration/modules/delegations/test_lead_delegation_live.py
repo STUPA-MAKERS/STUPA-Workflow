@@ -33,7 +33,7 @@ from app.modules.delegations.models import MeetingDelegation
 from app.modules.delegations.schemas import DelegationCreate
 from app.modules.delegations.service import DelegationService
 from app.modules.livevote.models import Meeting, MeetingAttendance
-from app.modules.voting.models import Ballot, Vote
+from app.modules.voting.models import Vote, VotedMarker
 from app.settings import load_settings
 from app.shared.config_schemas import VoteConfig
 from app.shared.errors import ValidationProblem
@@ -49,7 +49,7 @@ from tests.integration.modules.delegations.conftest import (
 pytestmark = pytest.mark.integration
 
 CONFIG = VoteConfig.model_validate(
-    {"options": ["yes", "no", "abstain"], "majorityRule": "simple"}
+    {"options": ["yes", "no", "abstain"], "majorityRule": "simple", "secret": True}
 ).model_dump(by_alias=True)
 
 
@@ -171,7 +171,9 @@ async def test_lead_revokes_and_the_cast_ballot_stays(
     assert revoked.status_code == 204, revoked.text
     async with maker() as session:
         ballots = (
-            await session.scalars(select(Ballot.voter_sub).where(Ballot.vote_id == vote_id))
+            await session.scalars(
+                select(VotedMarker.voter_sub).where(VotedMarker.vote_id == vote_id)
+            )
         ).all()
         assert ballots == [s.a_sub]
         assert await session.get(MeetingDelegation, uuid.UUID(created.json()["id"])) is None

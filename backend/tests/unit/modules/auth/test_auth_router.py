@@ -512,8 +512,8 @@ def test_magic_link_verify_ok(
 ) -> None:
     app_uuid = "11111111-1111-1111-1111-111111111111"
 
-    async def _verify(*a: object, **k: object) -> tuple[str, str, str]:
-        return app_uuid, "edit", "applicant-token"
+    async def _verify(*a: object, **k: object) -> tuple[str, str]:
+        return app_uuid, "applicant-token"
 
     monkeypatch.setattr(router_mod.service, "verify_magic_link", _verify)
     resp = enabled_client.post("/api/auth/magic-link/verify", json={"token": "tok"})
@@ -527,7 +527,7 @@ def test_magic_link_verify_ok(
 def test_magic_link_verify_gone(
     enabled_client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    async def _verify(*a: object, **k: object) -> tuple[str, str, str]:
+    async def _verify(*a: object, **k: object) -> tuple[str, str]:
         raise GoneError("expired")
 
     monkeypatch.setattr(router_mod.service, "verify_magic_link", _verify)

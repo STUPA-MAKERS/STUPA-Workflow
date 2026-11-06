@@ -197,7 +197,6 @@ def _app(**over: Any) -> _Obj:
         "created_at": NOW,
         "updated_at": NOW,
         "archived_at": None,
-        "archived_by": None,
         "captured_by": None,
         "capture_intake": None,
         "received_on": None,
@@ -834,11 +833,10 @@ async def test_delete_removes_and_commits() -> None:
     assert session.flushed == 1
 
 
-async def test_archive_stamps_the_time_and_the_actor_and_audits() -> None:
+async def test_archive_stamps_the_time_and_audits_the_actor() -> None:
     """A plain column change writes no timeline entry by itself, so the audit is explicit.
 
-    A flow transition would have recorded itself. Archiving is deliberately not a flow
-    state, so the record of who did it has to be written by hand or it is simply absent.
+    Archiving is no flow state, so the audit entry is the only record of who did it.
     """
     app = _app()
     session = _Session(get_results=[app])
@@ -847,39 +845,33 @@ async def test_archive_stamps_the_time_and_the_actor_and_audits() -> None:
     await svc.set_archived(app.id, archived=True, actor="admin")
 
     assert app.archived_at is not None
-    assert app.archived_by == "admin"
-    assert any(type(o).__name__ == "AuditEntry" for o in session.added)
+    entries = [o for o in session.added if type(o).__name__ == "AuditEntry"]
+    assert [e.actor for e in entries] == ["admin"]
     assert session.committed == 1
 
 
-async def test_unarchive_clears_both_columns_and_audits() -> None:
-    """Clear `archived_at` and `archived_by`, and audit the change.
-
-    The old actor must go too, because it would claim that the person archived an active
-    application.
-    """
-    app = _app(archived_at=NOW, archived_by="someone")
+async def test_unarchive_clears_the_time_and_audits() -> None:
+    """Clear `archived_at` and audit the change."""
+    app = _app(archived_at=NOW)
     session = _Session(get_results=[app])
     svc = ApplicationsService(session)  # type: ignore[arg-type]
 
     await svc.set_archived(app.id, archived=False, actor="admin")
 
     assert app.archived_at is None
-    assert app.archived_by is None
     assert any(type(o).__name__ == "AuditEntry" for o in session.added)
 
 
 async def test_archiving_twice_changes_nothing_and_writes_no_second_entry() -> None:
-    """A second click is not an error, and must not overwrite who archived it first."""
+    """A second click is not an error, and must not overwrite when it was archived first."""
     first = datetime(2026, 1, 1, tzinfo=UTC)
-    app = _app(archived_at=first, archived_by="first-admin")
+    app = _app(archived_at=first)
     session = _Session(get_results=[app])
     svc = ApplicationsService(session)  # type: ignore[arg-type]
 
     await svc.set_archived(app.id, archived=True, actor="second-admin")
 
     assert app.archived_at == first
-    assert app.archived_by == "first-admin"
     assert session.added == []
     assert session.committed == 0
 

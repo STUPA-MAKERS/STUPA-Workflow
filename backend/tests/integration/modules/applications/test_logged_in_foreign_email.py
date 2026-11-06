@@ -126,7 +126,7 @@ async def test_foreign_email_stays_unconfirmed_until_the_link(
     }
 
     token = await issue_magic_token(maker, settings, app_id, "someone-else@example.org")
-    assert await redeem(maker, settings, token) == "edit"
+    assert await redeem(maker, settings, token) == str(app_id)
     assert (await _get(maker, app_id)).email_confirmed_at is not None
 
 

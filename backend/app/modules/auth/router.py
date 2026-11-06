@@ -356,7 +356,7 @@ async def _gremium_permissions(
 ) -> dict[UUID, list[str]]:
     """Return the gremium permissions of the principal per Gremium.
 
-    Only the active memberships count. The OAuth scope cap removes each key that
+    Each membership counts. The OAuth scope cap removes each key that
     the token scope does not let through. A Gremium without a remaining key stays
     in the map with an empty list, because the membership itself still counts.
     """
@@ -372,12 +372,12 @@ async def _gremium_permissions(
 
 
 async def _gremien_for(db: DbSession, sub: str) -> list[GremiumRef]:
-    """Return the Gremien that `sub` is a member of (valid `gremium_membership`).
+    """Return the Gremien that `sub` is a member of (`gremium_membership`).
 
     This reads the same source as the server-side visibility logic
     (`gremium_member_ids`). The frontend gate and the server filters therefore agree.
-    The global `role_assignment` member role has `gremium_id = NULL` and is NOT a
-    gremium membership. A magic-link applicant gets an empty list.
+    The global `role_assignment` member role is NOT a gremium membership. A magic-link
+    applicant gets an empty list.
     """
     from app.modules.admin.gremium_roles import gremium_member_ids
 
@@ -488,7 +488,7 @@ async def verify_magic_link(
     The first verify of a guest application starts its flow (automatic transitions,
     task mail) through the flow action dispatcher.
     """
-    app_id, scope, token = await service.verify_magic_link(
+    app_id, token = await service.verify_magic_link(
         db, settings, token=body.token, dispatcher=dispatcher
     )
     await db.commit()
@@ -498,4 +498,4 @@ async def verify_magic_link(
         max_age=settings.applicant_session_ttl_hours * 3600,
         **sessions.cookie_kwargs(settings),  # type: ignore[arg-type]
     )
-    return MagicLinkVerifyOut(application_id=UUID(app_id), scope=scope)
+    return MagicLinkVerifyOut(application_id=UUID(app_id))

@@ -42,7 +42,7 @@ def _vote_out(status: str = "draft") -> VoteOut:
         eligibleGroup=str(GID),
         config=_CONFIG,
         status=status,  # type: ignore[arg-type]
-        secret=False,
+        secret=True,
         tally=_TALLY,
     )
 

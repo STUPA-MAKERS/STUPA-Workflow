@@ -150,9 +150,7 @@ class MeetingVoteOut(_CamelModel):
     counts: dict[str, int] | None = None
     leading: str | None = None
     #: Participation progress: voted against present. ``revealed`` tells whether
-    #: ``counts`` and ``leading`` are visible. They are visible after the close, or
-    #: when every present member voted and the vote is not secret. Otherwise they
-    #: stay hidden.
+    #: ``counts`` and ``leading`` are visible. They are visible only after the close.
     voted: int = 0
     present: int = 0
     revealed: bool = True
@@ -169,7 +167,7 @@ class MeetingVoteOut(_CamelModel):
     #: The real open time (``opens_at``) and the real end time (close or cancel).
     opened_at: _datetime | None = Field(default=None, alias="openedAt")
     closed_at: _datetime | None = Field(default=None, alias="closedAt")
-    #: The own ballot of the caller. A secret vote gives only ``cast``. None when the
+    #: The own ballot of the caller. It gives only ``cast``. None when the
     #: payload has no caller (a broadcast).
     my_ballot: MyBallot | None = Field(default=None, alias="myBallot")
     #: True when the caller cast the ballot of a delegator in this vote.

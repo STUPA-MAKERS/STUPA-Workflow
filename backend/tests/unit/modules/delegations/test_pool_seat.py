@@ -8,7 +8,6 @@ The integration suite runs the SQL against Postgres.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any
 from uuid import UUID, uuid4
@@ -22,7 +21,6 @@ from app.modules.delegations import pool_seat
 from app.modules.delegations.models import MeetingDelegation
 from tests._support.flow_fakes import fake_session, result
 
-NOW = datetime(2026, 11, 4, 19, 0, tzinfo=UTC)
 GREMIUM_ID = uuid4()
 MEETING_ID = uuid4()
 GROUP = str(GREMIUM_ID)
@@ -74,8 +72,8 @@ async def test_clause_never_null() -> None:
 
 async def test_no_meeting_or_free_group_has_no_seat(pool: SimpleNamespace) -> None:
     db = fake_session()
-    assert await pool_seat.pool_seat_for(db, "x", None, GROUP, NOW) is None
-    assert await pool_seat.pool_seat_for(db, "x", MEETING_ID, "old-key", NOW) is None
+    assert await pool_seat.pool_seat_for(db, "x", None, GROUP) is None
+    assert await pool_seat.pool_seat_for(db, "x", MEETING_ID, "old-key") is None
 
 
 @pytest.mark.parametrize(
@@ -86,17 +84,17 @@ async def test_meeting_not_live_gives_no_seat(pool: SimpleNamespace, meeting: An
     """Only a live meeting of the gremium of the vote has seats."""
     db = fake_session()
     db.get_results = [meeting]
-    assert await pool_seat.pool_seat_for(db, "x", MEETING_ID, GROUP, NOW) is None
+    assert await pool_seat.pool_seat_for(db, "x", MEETING_ID, GROUP) is None
 
 
 async def test_unknown_substitute_has_no_seat(pool: SimpleNamespace) -> None:
     db = _db(None)
-    assert await pool_seat.pool_seat_for(db, "x", MEETING_ID, GROUP, NOW) is None
+    assert await pool_seat.pool_seat_for(db, "x", MEETING_ID, GROUP) is None
 
 
 async def test_substitute_without_pool_entry_has_no_seat(pool: SimpleNamespace) -> None:
     db = _db(_person("x"))
-    assert await pool_seat.pool_seat_for(db, "x", MEETING_ID, GROUP, NOW) is None
+    assert await pool_seat.pool_seat_for(db, "x", MEETING_ID, GROUP) is None
 
 
 async def test_personal_entry_takes_the_missing_member(pool: SimpleNamespace) -> None:
@@ -104,7 +102,7 @@ async def test_personal_entry_takes_the_missing_member(pool: SimpleNamespace) ->
     x, a, b = _person("x"), _person("a", "Anna"), _person("b", "Ben")
     pool.personal = {a.id, b.id}
     db = _db(x, result(), _voters(a.id, b.id), result(b.id), result(a))
-    seat = await pool_seat.pool_seat_for(db, "x", MEETING_ID, GROUP, NOW)
+    seat = await pool_seat.pool_seat_for(db, "x", MEETING_ID, GROUP)
     assert seat is a
 
 
@@ -117,21 +115,21 @@ async def test_gremium_wide_entry_orders_personal_first_then_name(
     pool.personal = {a.id}
     pool.wide = True
     db = _db(x, result(), _voters(a.id, b.id, c.id), result(), result(c, b, a))
-    assert await pool_seat.pool_seat_for(db, "x", MEETING_ID, GROUP, NOW) is a
+    assert await pool_seat.pool_seat_for(db, "x", MEETING_ID, GROUP) is a
 
 
 async def test_member_without_vote_cast_has_no_seat(pool: SimpleNamespace) -> None:
     x, a = _person("x"), _person("a")
     pool.personal = {a.id}
     db = _db(x, result(), _voters(a.id, perms=[]), result())
-    assert await pool_seat.pool_seat_for(db, "x", MEETING_ID, GROUP, NOW) is None
+    assert await pool_seat.pool_seat_for(db, "x", MEETING_ID, GROUP) is None
 
 
 async def test_member_with_null_permissions_has_no_seat(pool: SimpleNamespace) -> None:
     x, a = _person("x"), _person("a")
     pool.personal = {a.id}
     db = _db(x, result(), result((a.id, None)), result())
-    assert await pool_seat.pool_seat_for(db, "x", MEETING_ID, GROUP, NOW) is None
+    assert await pool_seat.pool_seat_for(db, "x", MEETING_ID, GROUP) is None
 
 
 async def test_substitute_never_takes_its_own_seat(pool: SimpleNamespace) -> None:
@@ -139,7 +137,7 @@ async def test_substitute_never_takes_its_own_seat(pool: SimpleNamespace) -> Non
     x = _person("x")
     pool.wide = True
     db = _db(x, result(), _voters(x.id), result())
-    assert await pool_seat.pool_seat_for(db, "x", MEETING_ID, GROUP, NOW) is None
+    assert await pool_seat.pool_seat_for(db, "x", MEETING_ID, GROUP) is None
 
 
 async def test_delegated_members_have_no_free_seat(pool: SimpleNamespace) -> None:
@@ -147,7 +145,7 @@ async def test_delegated_members_have_no_free_seat(pool: SimpleNamespace) -> Non
     x, a, b, c = _person("x"), _person("a"), _person("b"), _person("c")
     pool.personal = {a.id, b.id}
     db = _db(x, result((a.id, c.id, True), (c.id, b.id, False)), _voters(a.id, b.id), result())
-    assert await pool_seat.pool_seat_for(db, "x", MEETING_ID, GROUP, NOW) is None
+    assert await pool_seat.pool_seat_for(db, "x", MEETING_ID, GROUP) is None
 
 
 async def test_substitute_who_delegated_claims_nothing(pool: SimpleNamespace) -> None:
@@ -155,7 +153,7 @@ async def test_substitute_who_delegated_claims_nothing(pool: SimpleNamespace) ->
     x, a, c = _person("x"), _person("a"), _person("c")
     pool.personal = {a.id}
     db = _db(x, result((x.id, c.id, False)))
-    assert await pool_seat.pool_seat_for(db, "x", MEETING_ID, GROUP, NOW) is None
+    assert await pool_seat.pool_seat_for(db, "x", MEETING_ID, GROUP) is None
 
 
 async def test_substitute_holds_at_most_one_seat(pool: SimpleNamespace) -> None:
@@ -163,7 +161,7 @@ async def test_substitute_holds_at_most_one_seat(pool: SimpleNamespace) -> None:
     x, a, b = _person("x"), _person("a"), _person("b")
     pool.personal = {a.id, b.id}
     db = _db(x, result((a.id, x.id, True)))
-    assert await pool_seat.pool_seat_for(db, "x", MEETING_ID, GROUP, NOW) is None
+    assert await pool_seat.pool_seat_for(db, "x", MEETING_ID, GROUP) is None
 
 
 async def test_non_voting_delegation_to_substitute_leaves_a_seat(
@@ -172,7 +170,7 @@ async def test_non_voting_delegation_to_substitute_leaves_a_seat(
     x, a, b = _person("x"), _person("a"), _person("b")
     pool.personal = {a.id, b.id}
     db = _db(x, result((a.id, x.id, False)), _voters(a.id, b.id), result(), result(b))
-    assert await pool_seat.pool_seat_for(db, "x", MEETING_ID, GROUP, NOW) is b
+    assert await pool_seat.pool_seat_for(db, "x", MEETING_ID, GROUP) is b
 
 
 async def test_claim_stores_the_seat_and_audits(pool: SimpleNamespace) -> None:
@@ -180,7 +178,7 @@ async def test_claim_stores_the_seat_and_audits(pool: SimpleNamespace) -> None:
     x, a = _person("x"), _person("a")
     pool.personal = {a.id}
     db = _db(x, result(), result(), _voters(a.id), result(), result(a))
-    assert await pool_seat.claim_pool_seat(db, "x", MEETING_ID, GROUP, NOW) == "a"
+    assert await pool_seat.claim_pool_seat(db, "x", MEETING_ID, GROUP) == "a"
     assert "pg_advisory_xact_lock" in str(db.statements[0])
     row = next(o for o in db.added if isinstance(o, MeetingDelegation))
     assert row.delegator_principal_id == a.id
@@ -194,13 +192,13 @@ async def test_claim_stores_the_seat_and_audits(pool: SimpleNamespace) -> None:
 
 async def test_claim_without_seat_writes_nothing(pool: SimpleNamespace) -> None:
     db = _db(None, result())
-    assert await pool_seat.claim_pool_seat(db, "x", MEETING_ID, GROUP, NOW) is None
+    assert await pool_seat.claim_pool_seat(db, "x", MEETING_ID, GROUP) is None
     assert db.added == []
 
 
 async def test_claim_without_meeting_takes_no_lock(pool: SimpleNamespace) -> None:
     db = fake_session()
-    assert await pool_seat.claim_pool_seat(db, "x", None, GROUP, NOW) is None
+    assert await pool_seat.claim_pool_seat(db, "x", None, GROUP) is None
     assert db.statements == []
 
 

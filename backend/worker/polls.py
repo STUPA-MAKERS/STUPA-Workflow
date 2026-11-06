@@ -87,7 +87,6 @@ async def process_poll_reminders(ctx: dict[str, Any], now: datetime | None = Non
                     queue=queue,
                     settings=settings,
                     vote=vote,
-                    now=moment,
                     reminder=True,
                 ):
                     sent += 1

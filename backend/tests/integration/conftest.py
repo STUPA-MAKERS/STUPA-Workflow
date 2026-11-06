@@ -124,7 +124,6 @@ _DATA_TABLES = (
     "application_type",
     "meeting",
     "vote",
-    "ballot",
     "protocol",
     "task_reminder_log",
     "guest_application_settings",

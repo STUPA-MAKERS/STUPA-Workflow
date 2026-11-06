@@ -5,6 +5,11 @@
 * The purge works in batches until a batch comes back short.
 * A second run finds nothing.
 * An expired draft token goes, a live one stays.
+* A token that still holds a draft stays, so the cascade never drops a draft whose
+  object the purge did not collect.
+
+Each draft gets its own token here, because the end of the token is the end of the
+draft.
 """
 
 from __future__ import annotations
@@ -43,18 +48,33 @@ async def maker(
     await eng.dispose()
 
 
-def _draft(expires_at: datetime, *, key: str | None = "auto") -> Attachment:
+def _draft(
+    expires_at: datetime, *, key: str | None = "auto"
+) -> tuple[AttachmentDraftToken, Attachment]:
+    """Return a token that ends at ``expires_at`` and one draft of it."""
     aid = uuid.uuid4()
-    return Attachment(
+    token = AttachmentDraftToken(token_hash=uuid.uuid4().bytes * 2, expires_at=expires_at)
+    draft = Attachment(
         id=aid,
         application_id=None,
         filename="d.pdf",
         mime="application/pdf",
         size=1,
         storage_key=f"drafts/{aid}/d.pdf" if key == "auto" else key,
-        draft_token_hash=b"\x01" * 32,
-        draft_expires_at=expires_at,
+        draft_token_hash=token.token_hash,
     )
+    return token, draft
+
+
+async def _add(
+    maker: async_sessionmaker[AsyncSession], pairs: list[tuple[AttachmentDraftToken, Attachment]]
+) -> None:
+    """Write the tokens first, because each draft references its token."""
+    async with maker() as session:
+        session.add_all([token for token, _ in pairs])
+        await session.flush()
+        session.add_all([draft for _, draft in pairs])
+        await session.commit()
 
 
 async def test_purge_removes_expired_drafts_only(
@@ -68,9 +88,12 @@ async def test_purge_removes_expired_drafts_only(
     now = datetime.now(UTC)
     seed = await seed_guest_flow(maker)
     app_id = await create_guest_application(maker, seed)
-    expired = [_draft(now - timedelta(minutes=i + 1)) for i in range(5)]
-    infected = _draft(now - timedelta(hours=1), key=None)
-    alive = _draft(now + timedelta(days=1))
+    expired_pairs = [_draft(now - timedelta(minutes=i + 1)) for i in range(5)]
+    infected_pair = _draft(now - timedelta(hours=1), key=None)
+    alive_pair = _draft(now + timedelta(days=1))
+    await _add(maker, [*expired_pairs, infected_pair, alive_pair])
+    expired = [draft for _, draft in expired_pairs]
+    alive = alive_pair[1]
     bound = Attachment(
         application_id=app_id,
         filename="b.pdf",
@@ -79,7 +102,7 @@ async def test_purge_removes_expired_drafts_only(
         storage_key=f"{app_id}/x/b.pdf",
     )
     async with maker() as session:
-        session.add_all([*expired, infected, alive, bound])
+        session.add(bound)
         await session.commit()
 
     monkeypatch.setattr(wfd, "PURGE_BATCH", 2)
@@ -91,8 +114,24 @@ async def test_purge_removes_expired_drafts_only(
     async with maker() as session:
         left = set((await session.scalars(select(Attachment.id))).all())
     assert left == {alive.id, bound.id}
+    async with maker() as session:
+        tokens = set((await session.scalars(select(AttachmentDraftToken.token_hash))).all())
+    assert tokens == {alive_pair[0].token_hash}
 
     assert await wfd.purge_draft_attachments(ctx, now=now) == 0
+
+
+async def test_token_purge_keeps_a_token_that_still_holds_a_draft(
+    maker: async_sessionmaker[AsyncSession],
+) -> None:
+    """The token purge alone never cascades onto a draft."""
+    now = datetime.now(UTC)
+    token, draft = _draft(now - timedelta(minutes=1))
+    await _add(maker, [(token, draft)])
+    assert await wfd._purge_tokens(maker, now) == 0
+    async with maker() as session:
+        assert await session.get(Attachment, draft.id) is not None
+        assert await session.get(AttachmentDraftToken, token.token_hash) is not None
 
 
 async def test_purge_removes_expired_tokens_only(

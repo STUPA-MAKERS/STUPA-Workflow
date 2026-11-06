@@ -27,14 +27,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.db import get_sessionmaker
-from app.modules.admin.gremium_roles import membership_active_clause
 from app.modules.admin.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.notifications.links import vote_link
 from app.modules.notifications.provider import mail_queue_from_pool
 from app.modules.notifications.queue import MailQueue
 from app.modules.notifications.service import NotificationService
-from app.modules.voting.models import Ballot, Vote, VotedMarker
+from app.modules.voting.models import Vote, VotedMarker
 from app.settings import Settings
 
 logger = logging.getLogger("app.notifications")
@@ -84,13 +83,11 @@ def _end_text(closes_at: datetime | None, settings: Settings) -> str:
     return local.strftime("%d.%m.%Y, %H:%M")
 
 
-async def eligible_members(
-    session: AsyncSession, gremium_id: UUID, now: datetime
-) -> list[tuple[str, str]]:
+async def eligible_members(session: AsyncSession, gremium_id: UUID) -> list[tuple[str, str]]:
     """Return ``(sub, email)`` of the active members with ``vote.cast`` in the Gremium.
 
     The rule is the roster of a vote (``MeetingService.vote_eligible_count``): a
-    membership valid now with a gremium role that holds ``vote.cast``. A deactivated
+    membership with a gremium role that holds ``vote.cast``. A deactivated
     account and an account without an address get no mail.
     """
     rows = (
@@ -100,7 +97,6 @@ async def eligible_members(
             .join(GremiumRole, GremiumRole.id == GremiumMembership.gremium_role_id)
             .where(
                 GremiumMembership.gremium_id == gremium_id,
-                membership_active_clause(now),
                 PrincipalRow.active.is_(True),
                 PrincipalRow.email.is_not(None),
             )
@@ -114,16 +110,15 @@ async def eligible_members(
 
 
 async def _answered(session: AsyncSession, vote_id: UUID) -> set[str]:
-    """Return the voter keys with an answer: the open ballots and the secret markers."""
-    subs: set[str] = set()
-    for model in (Ballot, VotedMarker):
-        subs.update(
-            str(sub)
-            for sub in (
-                await session.scalars(select(model.voter_sub).where(model.vote_id == vote_id))
-            ).all()
-        )
-    return subs
+    """Return the voter keys with an answer: the voted markers of the poll."""
+    return {
+        str(sub)
+        for sub in (
+            await session.scalars(
+                select(VotedMarker.voter_sub).where(VotedMarker.vote_id == vote_id)
+            )
+        ).all()
+    }
 
 
 async def send_poll_mail(
@@ -132,7 +127,6 @@ async def send_poll_mail(
     queue: MailQueue | None,
     settings: Settings,
     vote: Vote,
-    now: datetime,
     reminder: bool,
 ) -> bool:
     """Send ``poll_started`` (every eligible member) or ``poll_reminder`` (no answer yet).
@@ -147,7 +141,7 @@ async def send_poll_mail(
     if vote.meeting_id is not None or vote.kind != "poll":
         return False
     gremium_id = UUID(vote.eligible_group)
-    members = await eligible_members(session, gremium_id, now)
+    members = await eligible_members(session, gremium_id)
     if reminder:
         answered = await _answered(session, vote.id)
         members = [(sub, email) for sub, email in members if sub not in answered]
@@ -182,7 +176,6 @@ async def notify_poll_started(
     vote_id: UUID,
     pool: object,
     *,
-    now: datetime,
     sessionmaker: async_sessionmaker[AsyncSession] | None = None,
 ) -> bool:
     """Send ``poll_started`` after the open of a poll of a Gremium (best effort).
@@ -197,7 +190,7 @@ async def notify_poll_started(
             if vote is None or vote.status != "open":
                 return False
             return await send_poll_mail(
-                session, queue=queue, settings=settings, vote=vote, now=now, reminder=False
+                session, queue=queue, settings=settings, vote=vote, reminder=False
             )
     except Exception:
         logger.exception("poll_started mail failed (vote=%s)", vote_id)

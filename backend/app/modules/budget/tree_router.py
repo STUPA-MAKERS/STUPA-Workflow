@@ -866,7 +866,7 @@ async def close_fiscal_year(
     closed on a second call.
     """
     return await service.set_fiscal_year_closed(
-        budget_id, fiscal_year_id, closed=True, actor=principal.sub
+        budget_id, fiscal_year_id, closed=True
     )
 
 
@@ -883,7 +883,7 @@ async def reopen_fiscal_year(
 ) -> FiscalYearOut:
     """Reopen a closed fiscal year. Its money data can change again."""
     return await service.set_fiscal_year_closed(
-        budget_id, fiscal_year_id, closed=False, actor=principal.sub
+        budget_id, fiscal_year_id, closed=False
     )
 
 

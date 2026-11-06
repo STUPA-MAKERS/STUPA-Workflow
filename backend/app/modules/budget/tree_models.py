@@ -119,7 +119,7 @@ class FiscalYear(UUIDPkMixin, CreatedAtMixin, Base):
     ``closed_at`` set means the year is closed ("abgeschlossen"). A closed year
     is frozen: no booking, transfer, allocation or application assignment that
     touches it can change until a ``budget.structure`` holder reopens it.
-    ``closed_by`` holds the subject of the principal who closed it.
+    The audit entry ``budget_fiscal_year_close`` records who closed it.
     """
 
     __tablename__ = "fiscal_year"
@@ -132,7 +132,6 @@ class FiscalYear(UUIDPkMixin, CreatedAtMixin, Base):
     end_date: Mapped[date] = mapped_column(Date)
     active: Mapped[bool] = mapped_column(Boolean, server_default="true")
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    closed_by: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
         UniqueConstraint("budget_id", "year", name="uq_fiscal_year_budget_year"),

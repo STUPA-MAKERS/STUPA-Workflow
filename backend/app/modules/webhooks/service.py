@@ -286,11 +286,9 @@ class WebhookService:
                 delivery, "dead", moment, response_code=response_code, attempts=attempts
             )
         defer = self.settings.webhook_retry_backoff_seconds * (2 ** (attempts - 1))
-        next_at = moment + dt.timedelta(seconds=defer)
         delivery.attempts = attempts
         delivery.status = "failed"
         delivery.last_at = moment
-        delivery.next_at = next_at
         delivery.response_code = response_code
         await self.session.commit()
         return DeliveryOutcome(
@@ -311,7 +309,6 @@ class WebhookService:
         delivery.attempts = final_attempts
         delivery.status = kind
         delivery.last_at = moment
-        delivery.next_at = None
         delivery.response_code = response_code
         await self.session.commit()
         return DeliveryOutcome(

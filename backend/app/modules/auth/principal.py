@@ -7,9 +7,6 @@ between `app.deps` and this package. `app.deps` re-exports `Principal` and `Appl
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Literal
-
-ApplicantScope = Literal["edit", "view"]
 
 
 @dataclass(slots=True)
@@ -64,14 +61,10 @@ class Principal:
 
 @dataclass(slots=True)
 class Applicant:
-    """Magic-link applicant, bound to exactly one `application_id` plus scope."""
+    """Magic-link applicant, bound to exactly one `application_id`.
+
+    The applicant has no scope: each action checks the current state of the
+    application, and the edit service answers 409 in a locked state.
+    """
 
     application_id: str
-    scope: ApplicantScope
-
-    def allows(self, required: ApplicantScope) -> bool:
-        """Check whether the scope of this token covers the required scope.
-
-        An `edit` token also covers `view`. A `view` token covers only `view`.
-        """
-        return self.scope == "edit" or self.scope == required

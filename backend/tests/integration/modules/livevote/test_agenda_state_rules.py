@@ -22,7 +22,7 @@ from app.modules.admin.models import GremiumMembership, GremiumRole
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.livevote.models import Meeting, MeetingAgendaItem
-from app.modules.voting.models import Ballot, Vote
+from app.modules.voting.models import SecretBallot, Vote, VotedMarker
 from tests.integration.modules.livevote.conftest import ADMIN_SUB, audit_actions, seed
 
 pytestmark = pytest.mark.integration
@@ -218,7 +218,8 @@ async def test_protocol_writer_cannot_remove_an_item_with_votes(
     """
     s = await seed(maker, status="live", items=2, votes=("cancelled",))
     async with maker() as session:
-        session.add(Ballot(vote_id=s.vote_ids["cancelled"], voter_sub="voter", choice="yes"))
+        session.add(VotedMarker(vote_id=s.vote_ids["cancelled"], voter_sub="voter"))
+        session.add(SecretBallot(vote_id=s.vote_ids["cancelled"], choice="yes"))
         await session.commit()
     sub = await _protocol_writer(maker, s.gremium_id)
     api.dependency_overrides[get_current_principal] = lambda: Principal(sub=sub)
@@ -232,12 +233,13 @@ async def test_protocol_writer_cannot_remove_an_item_with_votes(
     async with maker() as session:
         assert await session.get(MeetingAgendaItem, s.item_ids[0]) is not None
         assert await session.get(Vote, s.vote_ids["cancelled"]) is not None
-        ballots = await session.scalar(
-            select(func.count())
-            .select_from(Ballot)
-            .where(Ballot.vote_id == s.vote_ids["cancelled"])
-        )
-        assert ballots == 1
+        for model in (VotedMarker, SecretBallot):
+            ballots = await session.scalar(
+                select(func.count())
+                .select_from(model)
+                .where(model.vote_id == s.vote_ids["cancelled"])
+            )
+            assert ballots == 1
     actions = [e.action for e in await audit_actions(maker)]
     assert "vote_delete" not in actions
     assert actions.count("agenda_item_remove") == 1

@@ -197,7 +197,6 @@ async def test_deliver_4xx_is_dead_no_retry() -> None:
     assert outcome.kind == "dead"
     assert delivery.status == "dead"
     assert delivery.response_code == 404
-    assert delivery.next_at is None
 
 
 @respx.mock
@@ -215,7 +214,6 @@ async def test_deliver_5xx_retries_with_backoff() -> None:
     assert outcome.defer == SETTINGS.webhook_retry_backoff_seconds
     assert delivery.status == "failed"
     assert delivery.attempts == 1
-    assert delivery.next_at is not None
 
 
 @respx.mock
@@ -231,7 +229,6 @@ async def test_deliver_dead_after_max_tries() -> None:
         )
     assert outcome.kind == "dead"
     assert delivery.status == "dead"
-    assert delivery.next_at is None
 
 
 @respx.mock

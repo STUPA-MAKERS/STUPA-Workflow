@@ -98,7 +98,7 @@ def _mail_poll_start(
     if vote.kind != "poll" or vote.meeting_id is not None or vote.status != "open":
         return
     pool = getattr(request.app.state, "arq_pool", None)
-    background.add_task(notify_poll_started, settings, vote.id, pool, now=datetime.now(UTC))
+    background.add_task(notify_poll_started, settings, vote.id, pool)
 
 
 @router.post(

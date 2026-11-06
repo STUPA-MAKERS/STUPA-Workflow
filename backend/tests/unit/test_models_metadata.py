@@ -15,7 +15,6 @@ from app.db import Base
 
 EXPECTED_TABLES = {
     "gremium",
-    "mail_list",
     "application_type",
     "form_version",
     "form_field",
@@ -57,7 +56,6 @@ def test_uuid_pk_with_gen_random_uuid_default() -> None:
 @pytest.mark.parametrize(
     ("table", "column", "referred", "ondelete"),
     [
-        ("mail_list", "gremium_id", "gremium", "CASCADE"),
         ("form_field", "form_version_id", "form_version", "CASCADE"),
         ("state", "flow_version_id", "flow_version", "CASCADE"),
         ("transition", "flow_version_id", "flow_version", "CASCADE"),

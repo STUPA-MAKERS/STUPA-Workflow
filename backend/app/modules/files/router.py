@@ -473,7 +473,7 @@ async def delete_attachment(
     """Delete an attachment.
 
     A principal with ``application.manage`` or ``application.edit_any`` may delete it. An
-    applicant with edit scope and the logged-in creator may delete it too. A cross-tenant
+    magic-link applicant and the logged-in creator may delete it too. A cross-tenant
     caller gets 404, so the API is no existence oracle.
 
     This mirrors ``require_app_edit`` on the upload route on purpose.
@@ -501,7 +501,6 @@ async def delete_attachment(
             principal,
             applicant,
             perm=MANAGE_PERMISSION,
-            scope="edit",
         )
     except ForbiddenError as exc:
         raise NotFoundError(f"attachment {attachment_id} not found") from exc

@@ -1,6 +1,6 @@
 """Organization and config tables of the admin module.
 
-The module owns ``gremium``, ``mail_list``, ``application_type``, ``webhook``
+The module owns ``gremium``, ``application_type``, ``webhook``
 with ``webhook_delivery``, ``site_config_version``, and the corporate-design
 tables ``cd_variant`` with ``cd_variant_logo``.
 
@@ -27,7 +27,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB, ExcludeConstraint
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, CreatedAtMixin, UUIDPkMixin
@@ -43,23 +43,15 @@ class CdVariant(UUIDPkMixin, CreatedAtMixin, Base):
     ``key`` is the stable slug. It is immutable after the create, because the
     render path and the seed data reference it.
 
-    ``base_variant`` records which document family the design was drawn for. It is
-    DESCRIPTIVE: no render path reads it. The application render pins the report shape
-    and the protocol render pins the protocol shape, because the shape follows the kind
-    of document and not the design of the Gremium that owns it.
+    A variant does not set the document shape. The application render pins the report
+    shape and the protocol render pins the protocol shape, because the shape follows the
+    kind of document and not the design of the Gremium that owns it.
     """
 
     __tablename__ = "cd_variant"
 
     key: Mapped[str] = mapped_column(Text, unique=True)
     name: Mapped[str] = mapped_column(Text)
-    base_variant: Mapped[str] = mapped_column(Text, server_default="report")
-
-    __table_args__ = (
-        CheckConstraint(
-            "base_variant IN ('report','protocol')", name="base_variant"
-        ),
-    )
 
 
 class CdVariantLogo(UUIDPkMixin, CreatedAtMixin, Base):
@@ -139,6 +131,10 @@ class Gremium(UUIDPkMixin, CreatedAtMixin, Base):
     #: The final protocols of this gremium appear without login on the public
     #: protocols page, as the public version only. Off by default.
     protocols_public: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    #: Extra addresses that get the final protocol in addition to the members.
+    protocol_recipients: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), server_default="{}"
+    )
 
 
 class GremiumRole(UUIDPkMixin, Base):
@@ -170,16 +166,10 @@ class GremiumMembership(UUIDPkMixin, Base):
 
     ``membership_sync`` is the only writer. It derives the rows from
     ``principal.oidc_groups``, ``GremiumMembershipMapping`` and
-    ``GremiumRoleMapping``. For each (principal,
-    gremium) pair exactly one role is active. The sync leaves ``valid_from`` and
-    ``valid_until`` NULL (open). The readers still filter on them, and the
-    EXCLUDE constraint below keeps the one-row invariant.
-
-    The EXCLUDE constraint backs the overlap invariant in the database: a
-    (principal, gremium) pair must not have overlapping terms. A NULL bound means
-    minus or plus infinity, and the range is half-open ``[from, until)``, so
-    adjacent memberships are allowed. It closes the TOCTOU gap of the Python check
-    on parallel inserts and needs the btree_gist extension.
+    ``GremiumRoleMapping``. A membership has no term: a row exists while the
+    OIDC groups make the principal a member, and the sync deletes it when they
+    stop. The unique constraint keeps one row, and so one role, per
+    (principal, gremium) pair. It closes the TOCTOU gap of parallel inserts.
     """
 
     __tablename__ = "gremium_membership"
@@ -193,29 +183,12 @@ class GremiumMembership(UUIDPkMixin, Base):
     gremium_role_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("gremium_role.id", ondelete="RESTRICT")
     )
-    valid_from: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    valid_until: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
 
     __table_args__ = (
         Index("ix_gremium_membership_principal", "principal_id"),
         Index("ix_gremium_membership_gremium", "gremium_id"),
-        ExcludeConstraint(
-            ("principal_id", "="),
-            ("gremium_id", "="),
-            (
-                text(
-                    "tstzrange("
-                    "coalesce(valid_from, '-infinity'), "
-                    "coalesce(valid_until, 'infinity'), '[)')"
-                ),
-                "&&",
-            ),
-            using="gist",
-            name="ex_gremium_membership_no_overlap",
+        UniqueConstraint(
+            "principal_id", "gremium_id", name="uq_gremium_membership_principal_gremium"
         ),
     )
 
@@ -266,19 +239,6 @@ class GremiumRoleMapping(UUIDPkMixin, Base):
     )
 
 
-class MailList(UUIDPkMixin, Base):
-    """Mailing list per gremium."""
-
-    __tablename__ = "mail_list"
-
-    gremium_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("gremium.id", ondelete="CASCADE")
-    )
-    name: Mapped[str] = mapped_column(Text)
-    recipients: Mapped[list[str]] = mapped_column(ARRAY(Text), server_default="{}")
-    active: Mapped[bool] = mapped_column(Boolean, server_default="true")
-
-
 class ApplicationType(UUIDPkMixin, CreatedAtMixin, Base):
     """Application type.
 
@@ -324,7 +284,9 @@ class Webhook(UUIDPkMixin, CreatedAtMixin, Base):
 class WebhookDelivery(UUIDPkMixin, Base):
     """Delivery attempt of a webhook.
 
-    The worker picks the rows up through the index ``(status, next_at)``.
+    No query picks the rows up. Each delivery has its own arq job
+    ``deliver_webhook`` with the job key ``webhook:<id>``, and a retry is the
+    same job, deferred by ``arq.Retry`` with an exponential backoff.
     ``idempotency_key`` decouples the event instance from the dispatch. A flow
     retry of the same status event creates no second delivery, because
     ``(webhook_id, idempotency_key)`` is unique. A ``NULL`` key means no
@@ -344,9 +306,6 @@ class WebhookDelivery(UUIDPkMixin, Base):
     last_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    next_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
     response_code: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
     __table_args__ = (
@@ -354,7 +313,6 @@ class WebhookDelivery(UUIDPkMixin, Base):
             "status IN ('pending','ok','failed','dead')",
             name="webhook_delivery_status",
         ),
-        Index("ix_webhook_delivery_status_next_at", "status", "next_at"),
         UniqueConstraint(
             "webhook_id",
             "idempotency_key",

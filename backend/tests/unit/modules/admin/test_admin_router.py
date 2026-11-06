@@ -218,11 +218,7 @@ class _FakeConfig:
                         id=uuid4(),
                         principal_id=uuid4(),
                         role_id=uuid4(),
-                        gremium_id=None,
                         granted_by="admin",
-                        valid_from=None,
-                        valid_until=None,
-                        delegate_voting=False,
                     )
                 ]
                 if query != "none"

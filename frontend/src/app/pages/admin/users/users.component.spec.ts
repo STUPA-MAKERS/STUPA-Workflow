@@ -28,21 +28,7 @@ const ADMIN_ASSIGN: RoleAssignment = {
   id: 'a-1',
   principalId: 'p-1',
   roleId: 'r-admin',
-  gremiumId: null,
   grantedBy: 'bootstrap',
-  validFrom: null,
-  validUntil: null,
-  delegateVoting: false,
-};
-const SCOPED_ASSIGN: RoleAssignment = {
-  id: 'a-2',
-  principalId: 'p-1',
-  roleId: 'r-ref',
-  gremiumId: 'g-1',
-  grantedBy: 'bootstrap',
-  validFrom: null,
-  validUntil: null,
-  delegateVoting: false,
 };
 
 const PRINCIPALS: AdminPrincipal[] = [
@@ -52,7 +38,7 @@ const PRINCIPALS: AdminPrincipal[] = [
     email: 'alex@x.de',
     displayName: 'Alex Admin',
     lastLogin: '2026-06-06T18:20:00+00:00',
-    assignments: [ADMIN_ASSIGN, SCOPED_ASSIGN],
+    assignments: [ADMIN_ASSIGN],
     oidcGroups: ['stupa-referat', 'vote:g-1', 'unmapped'],
   },
   {
@@ -176,10 +162,7 @@ describe('UsersComponent', () => {
     expect(screen.getByText('Keine Gruppen.')).toBeInTheDocument();
   });
 
-  /**
-   * The scoped assignment is left out, the admin role appears once, and the vote: group gives
-   * nothing.
-   */
+  /** The admin role appears once, and the vote: group gives nothing. */
   it('roleIds merges the global bootstrap roles with the mapped roles', async () => {
     const { inst } = await setup();
     expect(inst.roleIds(PRINCIPALS[0])).toEqual(['r-admin', 'r-ref']);

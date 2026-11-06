@@ -125,8 +125,8 @@ def _poll_row(**over: Any) -> Any:
 async def test_votes_for_reads_a_closed_poll() -> None:
     """Read a closed poll in the meeting votes.
 
-    The fake session returns, in order: the votes, the open and the secret ballots of the
-    motion tally, the poll ballots, the secret poll ballots and the present members.
+    The fake session returns, in order: the votes, the ballots of the motion tally, the
+    poll ballots and the present members.
     """
     mid = uuid4()
     stored = PollResultOut(counts={"o1": 2, "o2": 1}, ballots=3, order=["o1", "o2"], top=["o1"])
@@ -137,9 +137,7 @@ async def test_votes_for_reads_a_closed_poll() -> None:
         executes=[
             res(row),
             res(),
-            res(),
             res((row.id, '["o1"]'), (row.id, '["o1","o2"]'), (row.id, '["o1"]')),
-            res(),
             res((mid, 3)),
         ]
     )
@@ -157,7 +155,7 @@ async def test_votes_for_hides_the_count_of_a_running_poll() -> None:
     mid = uuid4()
     row = _poll_row(meeting_id=mid, status="open", result=None)
     sess = _QueueSession(
-        executes=[res(row), res(), res(), res((row.id, '["o1"]')), res(), res((mid, 3))]
+        executes=[res(row), res(), res((row.id, '["o1"]')), res((mid, 3))]
     )
     [item] = (await MeetingService(sess)._votes_for([mid]))[mid]  # type: ignore[arg-type]
     assert item.voted == 1

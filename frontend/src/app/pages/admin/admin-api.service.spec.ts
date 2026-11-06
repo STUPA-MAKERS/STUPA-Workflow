@@ -236,7 +236,7 @@ describe('AdminApiService — real mode (contract)', () => {
     s.listCdVariants().subscribe();
     expect(http.expectOne('/api/admin/cd-variants').request.method).toBe('GET');
 
-    s.createCdVariant({ key: 'stupa', name: 'StuPa', baseVariant: 'report' }).subscribe();
+    s.createCdVariant({ key: 'stupa', name: 'StuPa' }).subscribe();
     expect(http.expectOne('/api/admin/cd-variants').request.method).toBe('POST');
 
     s.updateCdVariant('cd-1', { name: 'Neu' }).subscribe();

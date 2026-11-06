@@ -184,7 +184,7 @@ def _svc(session: _Session) -> PrincipalMergeService:
 async def test_preview_counts_every_area() -> None:
     """Count every area in the preview.
 
-    The fake count also answers the two open erasure requests. Five sub columns count,
+    The fake count also answers the two open erasure requests. Three sub columns count,
     among them application_decision.decided_by. The notifications have two duplicates of
     two rows, so nothing is left to rewrite. The preview never locks, writes or commits.
     """
@@ -194,7 +194,7 @@ async def test_preview_counts_every_area() -> None:
     assert [c.kind for c in out.conflicts] == ["erasure_open", "erasure_open"]
     areas = {a.area: a for a in out.areas}
     assert list(areas) == list(AREAS)
-    assert areas["applications"].rewritten == 2 * 5
+    assert areas["applications"].rewritten == 2 * 3
     assert areas["notifications"].combined == 2
     assert areas["notifications"].rewritten == 0
     assert areas["sessions"].removed == 2 * 3
@@ -209,7 +209,7 @@ async def test_preview_lists_conflicts_with_labels() -> None:
     session = _Session(
         _pair(),
         count=1,
-        conflict_rows=[[("Frage 1",)], [("Geheim",)], [("Sitzung A",)], [], [], [(None,)]],
+        conflict_rows=[[("Frage 1",), ("Geheim",)], [("Sitzung A",)], [], [], [(None,)]],
     )
     out = await _svc(session).preview(OLD, NEW, actor="admin")
     assert out.can_merge is False
@@ -230,7 +230,7 @@ async def test_merge_applies_audits_and_commits(recorded: list[dict[str, Any]]) 
     assert session.rolled_back == 0
     assert "FOR UPDATE" in str(session.statements[0])
     areas = {a.area: a for a in out.areas}
-    assert areas["votes"].rewritten == 2
+    assert areas["votes"].rewritten == 1
     assert areas["sessions"].removed == 3
     assert areas["calendar"].removed == 0
     assert out.merged_at
@@ -240,7 +240,7 @@ async def test_merge_applies_audits_and_commits(recorded: list[dict[str, Any]]) 
     assert entry["action"] == "principal_merge"
     assert entry["target_id"] == str(OLD)
     assert entry["data"]["sourceId"] == str(OLD)
-    assert entry["data"]["counts"]["votes"] == {"rewritten": 2}
+    assert entry["data"]["counts"]["votes"] == {"rewritten": 1}
     assert "calendar" not in entry["data"]["counts"]
 
 
@@ -258,7 +258,7 @@ async def test_merge_refuses_a_conflict(recorded: list[dict[str, Any]]) -> None:
 
 
 async def test_merge_maps_a_unique_clash_to_409(recorded: list[dict[str, Any]]) -> None:
-    clash = IntegrityError("UPDATE ballot", {}, Exception("duplicate key"))
+    clash = IntegrityError("UPDATE voted_marker", {}, Exception("duplicate key"))
     session = _Session(_pair(), fail_on=3, fail_with=clash)
     with pytest.raises(ConflictError) as exc:
         await _svc(session).merge(OLD, NEW, actor="admin")

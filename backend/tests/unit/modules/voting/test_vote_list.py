@@ -35,7 +35,7 @@ OTHER = UUID("00000000-0000-0000-0000-00000000beef")
 CREATED = datetime(2026, 10, 1, 9, 0, tzinfo=UTC)
 
 
-def _config(*, secret: bool = False) -> dict[str, Any]:
+def _config(*, secret: bool = True) -> dict[str, Any]:
     return VoteConfig.model_validate(
         {"options": ["yes", "no", "abstain"], "majorityRule": "simple", "secret": secret}
     ).model_dump(by_alias=True)
@@ -159,12 +159,11 @@ def test_search_clause_escapes_wildcards() -> None:
 async def test_list_orders_decorates_and_reads_own_ballots(scope: dict[str, Any]) -> None:
     """The list orders the votes, adds names and agenda numbers, and reads the own ballots.
 
-    The fake session serves the gremium names, the agenda numbers, the open ballots and
-    the secret markers.
+    The fake session serves the gremium names, the agenda numbers and the voted markers.
     """
     meeting_id, item_id = uuid4(), uuid4()
     live = _vote(meeting_id=meeting_id, agenda_item_id=item_id)
-    secret = _vote(config=_config(secret=True), status="closed", result="passed")
+    secret = _vote(status="closed", result="passed")
     legacy = _vote(eligible_group="free-key", status="cancelled", question=None)
     db = fake_session(
         result(
@@ -174,8 +173,7 @@ async def test_list_orders_decorates_and_reads_own_ballots(scope: dict[str, Any]
         ),
         result((GID, "Studierendenparlament")),
         result((item_id, 3), (uuid4(), 1)),
-        result((live.id, "yes")),
-        result(secret.id),
+        result(live.id, secret.id),
     )
     db.scalar_results = [3]
     principal = Principal(sub="v", groups={vote_group_key(GID)})
@@ -188,7 +186,7 @@ async def test_list_orders_decorates_and_reads_own_ballots(scope: dict[str, Any]
     assert first.meeting_title == "34. Sitzung"
     assert first.agenda_position == 3
     assert first.gremium_name == "Studierendenparlament"
-    assert first.my_ballot == MyBallot(cast=True, choice="yes")
+    assert first.my_ballot == MyBallot(cast=True)
     assert first.can_cast is True
     assert second.secret is True
     assert second.my_ballot == MyBallot(cast=True, choice=None)
@@ -218,8 +216,8 @@ async def test_list_empty_page_skips_decoration(scope: dict[str, Any]) -> None:
 
 
 async def test_list_without_gremium_or_agenda_skips_those_queries(scope: dict[str, Any]) -> None:
-    """Votes without gremium or agenda item read the rows, then only the secret markers."""
-    legacy = _vote(eligible_group="free-key", config=_config(secret=True))
+    """Votes without gremium or agenda item read the rows, then only the voted markers."""
+    legacy = _vote(eligible_group="free-key")
     db = fake_session(result((legacy, None, None)), result())
     db.scalar_results = [1]
     page = await listing.list_votes(db, Principal(sub="x"), limit=5, offset=0)
@@ -227,8 +225,8 @@ async def test_list_without_gremium_or_agenda_skips_those_queries(scope: dict[st
     assert len(db.statements) == 2
 
 
-async def test_list_plain_votes_skip_the_marker_query(scope: dict[str, Any]) -> None:
-    """Plain votes read the rows, the gremium names, then only the open ballots."""
+async def test_list_votes_without_agenda_skip_the_agenda_query(scope: dict[str, Any]) -> None:
+    """Votes without an agenda item read the rows, the gremium names and the markers."""
     plain = _vote(status="closed", result="rejected")
     db = fake_session(result((plain, None, None)), result((GID, "StuPa")), result())
     db.scalar_results = [1]
@@ -282,7 +280,7 @@ class _ListService:
     async def list_visible(self, principal: Principal, **kw: Any) -> Page[VoteListItem]:
         self.kw = {"sub": principal.sub, **kw}
         item = VoteListItem(
-            id=uuid4(), status="open", secret=False, createdAt=CREATED, canCast=True
+            id=uuid4(), status="open", secret=True, createdAt=CREATED, canCast=True
         )
         return Page[VoteListItem](items=[item], total=1, limit=kw["limit"], offset=kw["offset"])
 

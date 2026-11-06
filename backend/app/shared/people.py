@@ -10,7 +10,6 @@ shows that as "Gelöschte Person".
 from __future__ import annotations
 
 from collections.abc import Iterable
-from datetime import UTC, datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -78,17 +77,14 @@ async def permission_holders(
 ) -> list[tuple[UUID, str | None, str | None]]:
     """Return ``(id, display_name, email)`` of the active holders of a global permission.
 
-    A holder has a valid role assignment or an OIDC group mapped to a role that
+    A holder has a role assignment or an OIDC group mapped to a role that
     carries the permission; the admin role always counts. This mirrors the RBAC
     resolution (``auth/rbac.py``): assignments plus group mappings. A merged or
     inactive account never counts. ``principal_id`` narrows the result to one account.
     """
-    now = datetime.now(UTC)
     roles = _holder_role_ids(perm)
     assigned = select(RoleAssignment.principal_id).where(
-        RoleAssignment.role_id.in_(roles),
-        or_(RoleAssignment.valid_from.is_(None), RoleAssignment.valid_from <= now),
-        or_(RoleAssignment.valid_until.is_(None), RoleAssignment.valid_until >= now),
+        RoleAssignment.role_id.in_(roles)
     )
     groups = list(
         (

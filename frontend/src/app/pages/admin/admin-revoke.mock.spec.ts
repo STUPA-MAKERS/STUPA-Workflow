@@ -73,7 +73,8 @@ describe('Rechte entziehen — mock mode', () => {
     const shared = p.groups.find((g) => g.group === 'gremien-alle')!;
     expect(shared.gremiumIds).toEqual([MOCK_GREMIUM_STUPA_ID, 'g-asta']);
     const asta = p.gremien.find((g) => g.gremiumId === 'g-asta')!;
-    expect(asta.assignments.map((a) => a.id)).toEqual(['a-12']);
+    const board = p.globalRoles.find((r) => r.roleId === 'r-vorstand')!;
+    expect(board.assignments.map((a) => [a.id, a.grantedBy])).toEqual([['a-12', 'Alex Admin']]);
     expect(asta.liveDelegations).toHaveLength(1);
     expect(asta.poolEntries[0]).toMatchObject({ asSubstitute: true, gremiumWide: true });
     const err = await firstValueFrom(s.previewPrincipalRevoke('nope')).catch((e: unknown) => e);
@@ -145,8 +146,8 @@ describe('Rechte entziehen — mock store edge cases', () => {
           sub: 'kc|x',
           oidcGroups: ['grp-a', 'grp-role', 'grp-ghost'],
           assignments: [
-            { id: 'as-1', principalId: 'x-1', roleId: 'r-unknown', delegateVoting: false },
-            { id: 'as-2', principalId: 'x-1', roleId: 'r-known', gremiumId: 'g-ghost', delegateVoting: false },
+            { id: 'as-1', principalId: 'x-1', roleId: 'r-unknown' },
+            { id: 'as-2', principalId: 'x-1', roleId: 'r-known' },
           ],
         },
         { id: 'x-2', sub: 'kc|two', displayName: null, email: 'two@x', oidcGroups: [], assignments: [] },
@@ -189,10 +190,9 @@ describe('Rechte entziehen — mock store edge cases', () => {
     expect(p.principal).toEqual({ id: 'x-1', displayName: null, email: null, lastLogin: null, active: true });
     expect(p.gremien.map((g) => [g.gremiumId, g.name])).toEqual([
       ['g-b', ''],
-      ['g-ghost', ''],
       ['g-a', 'A'],
     ]);
-    const a = p.gremien[2];
+    const a = p.gremien[1];
     expect(a.membership).toEqual({ roleKey: 'member', roleLabel: {}, groups: ['grp-a'] });
     expect(a.groups).toEqual(['grp-a']);
     expect(a.poolEntries).toEqual([
@@ -201,18 +201,6 @@ describe('Rechte entziehen — mock store edge cases', () => {
       { id: 'ds-3', asSubstitute: true, gremiumWide: false, memberName: null, substituteName: null },
     ]);
     expect(p.gremien[0].membership?.roleKey).toBe('member');
-    expect(p.gremien[1].membership).toBeNull();
-    expect(p.gremien[1].assignments).toEqual([
-      {
-        id: 'as-2',
-        roleId: 'r-known',
-        roleKey: 'known',
-        roleLabel: { de: 'Bekannt' },
-        grantedBy: null,
-        validFrom: null,
-        validUntil: null,
-      },
-    ]);
     expect(p.globalRoles).toEqual([
       { roleId: 'r-missing', roleKey: 'r-missing', roleLabel: {}, groups: ['grp-role'], assignments: [] },
       {
@@ -227,9 +215,16 @@ describe('Rechte entziehen — mock store edge cases', () => {
             roleKey: 'r-unknown',
             roleLabel: {},
             grantedBy: null,
-            validFrom: null,
-            validUntil: null,
           },
+        ],
+      },
+      {
+        roleId: 'r-known',
+        roleKey: 'known',
+        roleLabel: { de: 'Bekannt' },
+        groups: [],
+        assignments: [
+          { id: 'as-2', roleId: 'r-known', roleKey: 'known', roleLabel: { de: 'Bekannt' }, grantedBy: null },
         ],
       },
     ]);
@@ -249,12 +244,12 @@ describe('Rechte entziehen — mock store edge cases', () => {
     const res = mockApplyRevoke(
       st,
       'x-1',
-      { gremiumIds: ['g-a', 'g-b', 'g-ghost'], globalRoleIds: ['r-missing', 'r-unknown'], deactivate: false },
+      { gremiumIds: ['g-a', 'g-b'], globalRoleIds: ['r-missing', 'r-unknown', 'r-known'], deactivate: false },
       null,
     );
     expect(res).toEqual({
-      gremiumIds: ['g-a', 'g-b', 'g-ghost'],
-      globalRoleIds: ['r-missing', 'r-unknown'],
+      gremiumIds: ['g-a', 'g-b'],
+      globalRoleIds: ['r-missing', 'r-unknown', 'r-known'],
       removedGroups: ['grp-a', 'grp-role'],
       deletedAssignments: 2,
       deletedPoolEntries: 3,
@@ -268,7 +263,7 @@ describe('Rechte entziehen — mock store edge cases', () => {
     expect(mockHasAccess(st, st.principals[0])).toBe(true);
     const again = mockApplyRevoke(st, 'x-1', { gremiumIds: ['g-c'], globalRoleIds: [], deactivate: true }, null);
     expect(again).toMatchObject({ deactivated: true, removedGroups: [] });
-    expect(st.revoked['x-1']).toEqual(['g-a', 'g-b', 'g-ghost', 'g-c']);
+    expect(st.revoked['x-1']).toEqual(['g-a', 'g-b', 'g-c']);
     expect(st.principals[0].active).toBe(false);
   });
 

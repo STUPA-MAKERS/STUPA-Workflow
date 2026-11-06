@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncIterator
-from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -22,6 +21,7 @@ from app.modules.applications.router import get_comment_mail_sender
 from app.modules.auth.principal import Principal
 from app.modules.files.drafts import hash_draft_token
 from app.modules.files.models import Attachment
+from tests._support.draft_tokens import add_draft_token
 from tests._support.guest_apps import guest_settings
 from tests._support.memory_storage import MemoryStorage, wire_storage
 from tests._support.read_models import (
@@ -57,6 +57,7 @@ async def _draft(
     key = f"drafts/{draft_id}/{name}"
     await storage.put(key, b"data", "application/pdf")
     async with maker() as session:
+        await add_draft_token(session, hash_draft_token("tok", pepper))
         session.add(
             Attachment(
                 id=draft_id,
@@ -67,7 +68,6 @@ async def _draft(
                 scanned=True,
                 scan_result="clean",
                 draft_token_hash=hash_draft_token("tok", pepper),
-                draft_expires_at=datetime.now(UTC) + timedelta(days=7),
             )
         )
         await session.commit()

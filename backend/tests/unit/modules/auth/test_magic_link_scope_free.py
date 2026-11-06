@@ -1,9 +1,8 @@
-"""Magic links without a fixed scope.
+"""Magic links without a scope.
 
-A new link always has the scope `edit`, can be used more than once, and gets its
-lifetime from `guest_application_settings.link_ttl_days` (NULL = no expiry). The
-verify accepts a link without an expiry, opens an edit session for any link, and
-expires the older links of the same application.
+A new link can be used more than once and gets its lifetime from
+`guest_application_settings.link_ttl_days` (NULL = no expiry). The verify accepts a
+link without an expiry and expires the older links of the same application.
 """
 
 from __future__ import annotations
@@ -62,10 +61,10 @@ class _RecordingSession(FakeSession):
 async def test_request_writes_an_edit_link_with_the_configured_lifetime(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Write an edit link with the configured lifetime.
+    """Write a link with the configured lifetime.
 
-    `link_ttl_days` sets the expiry, and a locked state does not change the scope. The
-    request reads no state and expires no other link: only the lookup runs.
+    `link_ttl_days` sets the expiry. The request reads no state and expires no other
+    link: only the lookup runs.
     """
     monkeypatch.setattr(service, "_now", lambda: NOW)
     cfg = GuestApplicationSettings(id=1, confirm_ttl_hours=12, link_ttl_days=30)
@@ -73,8 +72,6 @@ async def test_request_writes_an_edit_link_with_the_configured_lifetime(
     await service.request_magic_link(db, _settings(), email="x@y.de", deliver=lambda _e, _l: None)
     link = db.added[0]
     assert isinstance(link, MagicLink)
-    assert link.scope == "edit"
-    assert link.single_use is False
     assert link.expires_at == NOW + timedelta(days=30)
     assert len(db.statements) == 1
 
@@ -90,9 +87,7 @@ def _link(settings: Settings, *, expires_at: datetime | None) -> MagicLink:
     row = MagicLink(
         application_id="aid-1",
         token_hash=tokens.hash_token("tok", settings.magic_link_secret),
-        scope="edit",
         expires_at=expires_at,
-        single_use=False,
     )
     row.id = "link-1"  # type: ignore[assignment]
     row.created_at = NOW - timedelta(days=3)
@@ -104,8 +99,8 @@ async def test_verify_accepts_a_link_without_expiry(monkeypatch: pytest.MonkeyPa
     monkeypatch.setattr(service, "_now", lambda: NOW)
     settings = _settings()
     db = _session([result(_link(settings, expires_at=None))])
-    app_id, scope, token = await service.verify_magic_link(db, settings, token="tok")
-    assert (app_id, scope) == ("aid-1", "edit")
+    app_id, token = await service.verify_magic_link(db, settings, token="tok")
+    assert app_id == "aid-1"
     assert token
 
 

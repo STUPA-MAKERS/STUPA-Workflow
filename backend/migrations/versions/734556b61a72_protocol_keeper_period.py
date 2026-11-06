@@ -19,7 +19,7 @@ that protokollant, when it has no period yet.
   never goes below `from_at`: a meeting can close before its planned start, and
   the check refuses an end before the start.
 * A live meeting keeps a running period (`to_at` is NULL).
-* `handed_over_by` is `system:migration`. The agenda items stay NULL, because no
+* `handed_over_by` takes its default `system:migration`. The agenda items stay NULL, because no
   record tells which item was current.
 
 The migration logs the number of backfilled periods.
@@ -65,7 +65,7 @@ _CREATE: tuple[str, ...] = (
         to_agenda_item_id uuid
             CONSTRAINT fk_protocol_keeper_period_to_item
             REFERENCES meeting_agenda_item (id) ON DELETE SET NULL,
-        handed_over_by text NOT NULL,
+        handed_over_by text NOT NULL DEFAULT 'system:migration',
         CONSTRAINT ck_protocol_keeper_period_period_range
             CHECK (to_at IS NULL OR (from_at IS NOT NULL AND to_at >= from_at))
     )
@@ -80,12 +80,11 @@ _CREATE: tuple[str, ...] = (
 
 #: One period per live or closed meeting with a protokollant and without a period.
 _BACKFILL = """
-    INSERT INTO protocol_keeper_period (meeting_id, principal_id, from_at, to_at, handed_over_by)
+    INSERT INTO protocol_keeper_period (meeting_id, principal_id, from_at, to_at)
     SELECT m.id, m.protokollant_id, s.from_at,
            CASE WHEN m.status = 'closed'
                 THEN GREATEST(COALESCE(m.closed_at, s.from_at), s.from_at)
-           END,
-           'system:migration'
+           END
     FROM meeting m
     CROSS JOIN LATERAL (
         SELECT COALESCE(

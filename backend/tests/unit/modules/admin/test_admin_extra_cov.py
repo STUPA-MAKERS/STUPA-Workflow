@@ -14,7 +14,6 @@ entries in the queue.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from typing import cast
 from uuid import uuid4
 
@@ -49,10 +48,6 @@ from app.shared.errors import ConflictError, NotFoundError
 from tests._support.auth_fakes import fake_session, result
 
 
-def _dt(s: str) -> datetime:
-    return datetime.fromisoformat(s).replace(tzinfo=UTC)
-
-
 def _role(gremium_id=None, key: str = "vorsitz", perms=None) -> GremiumRole:
     r = GremiumRole(
         gremium_id=gremium_id or uuid4(),
@@ -64,14 +59,8 @@ def _role(gremium_id=None, key: str = "vorsitz", perms=None) -> GremiumRole:
     return r
 
 
-def _membership(pid, gid, frm, until) -> GremiumMembership:
-    m = GremiumMembership(
-        principal_id=pid,
-        gremium_id=gid,
-        gremium_role_id=uuid4(),
-        valid_from=frm,
-        valid_until=until,
-    )
+def _membership(pid, gid) -> GremiumMembership:
+    m = GremiumMembership(principal_id=pid, gremium_id=gid, gremium_role_id=uuid4())
     m.id = uuid4()
     return m
 
@@ -118,7 +107,7 @@ async def test_active_gremium_roles_and_permission_helpers() -> None:
     gid = uuid4()
     role = _role(gid, key="vorstand", perms=["session.manage", "vote.cast"])
     db = fake_session(result((gid, role)))
-    pairs = await active_gremium_roles(db, "sub-1", now=_dt("2026-06-01"))
+    pairs = await active_gremium_roles(db, "sub-1")
     assert pairs == [(gid, role)]
 
     db2 = fake_session(result((gid, role)))
@@ -138,7 +127,7 @@ async def test_active_gremium_roles_and_permission_helpers() -> None:
     assert await gremium_reader_ids(db6, "sub-1") == {gid, pool_gid}
 
 
-async def test_active_gremium_roles_default_now() -> None:
+async def test_active_gremium_roles_without_rows() -> None:
     db = fake_session(result())
     assert await active_gremium_roles(db, "nobody") == []
 
@@ -307,8 +296,8 @@ async def test_delete_role_success() -> None:
 async def test_list_memberships() -> None:
     """A row without a principal row (outer join) gives no name and no e-mail."""
     gid, pid, other = uuid4(), uuid4(), uuid4()
-    m = _membership(pid, gid, _dt("2020-01-01"), None)
-    n = _membership(other, gid, _dt("2020-01-01"), None)
+    m = _membership(pid, gid)
+    n = _membership(other, gid)
     db = fake_session(result((m, "Max", "max@example.org", True), (n, None, None, None)))
     svc = GremiumRoleService(db)
     out = await svc.list_memberships(gid)
@@ -324,22 +313,13 @@ async def test_list_memberships() -> None:
 
 
 async def test_list_memberships_marks_inactive_rows() -> None:
-    """A deactivated principal or a membership outside its dates is not active."""
+    """A deactivated principal is not active."""
     gid = uuid4()
-    expired = _membership(uuid4(), gid, _dt("2020-01-01"), _dt("2020-12-31"))
-    future = _membership(uuid4(), gid, _dt("2999-01-01"), None)
-    deactivated = _membership(uuid4(), gid, None, None)
-    current = _membership(uuid4(), gid, None, None)
-    db = fake_session(
-        result(
-            (expired, "A", None, True),
-            (future, "B", None, True),
-            (deactivated, "C", None, False),
-            (current, "D", None, True),
-        )
-    )
+    deactivated = _membership(uuid4(), gid)
+    current = _membership(uuid4(), gid)
+    db = fake_session(result((deactivated, "C", None, False), (current, "D", None, True)))
     out = await GremiumRoleService(db).list_memberships(gid)
-    assert [r.active for r in out] == [False, False, False, True]
+    assert [r.active for r in out] == [False, True]
 
 
 def _scv(version: int, *, active: bool, branding=None) -> SiteConfigVersion:

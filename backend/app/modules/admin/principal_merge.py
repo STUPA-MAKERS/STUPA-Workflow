@@ -109,7 +109,7 @@ from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.oauth_models import OAuthAuthorizationCode, OAuthToken
 from app.modules.auth.rbac import resolve_principal
 from app.modules.backup.models import Backup
-from app.modules.budget.tree_models import BudgetExpense, FiscalYear, Invoice
+from app.modules.budget.tree_models import BudgetExpense, Invoice
 from app.modules.delegations.models import (
     DelegationSubstitute,
     MeetingDelegation,
@@ -117,7 +117,6 @@ from app.modules.delegations.models import (
 from app.modules.forms.models import FormVersion
 from app.modules.livevote.models import (
     Meeting,
-    MeetingAgendaItem,
     MeetingAttendance,
     MeetingGuest,
     MeetingSettings,
@@ -137,7 +136,7 @@ from app.modules.todos.models import (
     TodoLink,
 )
 from app.modules.translations.models import UiLanguage, UiTranslation
-from app.modules.voting.models import Ballot, Vote, VotedMarker
+from app.modules.voting.models import Vote, VotedMarker
 from app.shared.errors import ConflictError, FieldError, NotFoundError, ValidationProblem
 
 #: The key of the admin role in an effective-rights set: it holds every right.
@@ -171,31 +170,26 @@ AREAS: tuple[MergeArea, ...] = (
 )
 
 #: Every text column that stores the ``sub`` of a principal, by area. The merge
-#: rewrites each one to the target ``sub``. ``Ballot.voter_sub`` covers the own and the
-#: represented ballots, because a delegate votes under the ``sub`` of the delegator.
-#: ``VotedMarker`` is the identity half of a secret vote; the merge never reads the
-#: choice half. ``audit_entry.actor`` and ``config_revision.created_by`` are NOT here,
+#: rewrites each one to the target ``sub``. ``VotedMarker.voter_sub`` covers the own and
+#: the represented ballots, because a delegate votes under the ``sub`` of the delegator.
+#: ``VotedMarker`` is the identity half of a vote; the merge never reads the choice
+#: half. ``audit_entry.actor`` and ``config_revision.created_by`` are NOT here,
 #: because a trigger keeps their table append-only. Their displays resolve the old
 #: ``sub`` through ``principal.merged_into`` (``auth/identity.py``).
 SUB_COLUMNS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
     ("applications", Application.created_by),
-    ("applications", Application.archived_by),
     ("applications", Application.captured_by),
     ("applications", ApplicationDecision.decided_by),
     ("versions", SubmissionVersion.changed_by),
     ("timeline", StatusEvent.actor),
     ("comments", Comment.author),
-    ("votes", Ballot.voter_sub),
     ("votes", VotedMarker.voter_sub),
     ("delegations", MeetingDelegation.created_by),
     ("substitutes", DelegationSubstitute.created_by),
     ("meetings", Meeting.created_by),
-    ("meetings", ProtocolKeeperPeriod.handed_over_by),
-    ("meetings", MeetingAgendaItem.done_by),
     ("meetings", Protocol.author),
     ("budget", BudgetExpense.actor),
     ("budget", Invoice.actor),
-    ("budget", FiscalYear.closed_by),
     ("config", SiteConfigVersion.created_by),
     ("config", GuestApplicationSettings.updated_by),
     ("config", MeetingSettings.updated_by),
@@ -203,7 +197,6 @@ SUB_COLUMNS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
     ("config", UiLanguage.updated_by),
     ("config", UiTranslation.updated_by),
     ("roles", RoleAssignment.granted_by),
-    ("roles", RoleAssignment.delegated_by),
     ("privacy", ErasureRequest.requested_by),
     ("privacy", ErasureRequest.handled_by),
     ("backups", Backup.created_by),
@@ -432,14 +425,6 @@ class PrincipalMergeService:
                 .join(GremiumRole, GremiumRole.id == GremiumMembership.gremium_role_id)
                 .where(
                     GremiumMembership.principal_id == row.id,
-                    or_(
-                        GremiumMembership.valid_from.is_(None),
-                        GremiumMembership.valid_from <= now,
-                    ),
-                    or_(
-                        GremiumMembership.valid_until.is_(None),
-                        GremiumMembership.valid_until > now,
-                    ),
                 )
             )
         ).all()
@@ -494,8 +479,8 @@ class PrincipalMergeService:
     ) -> list[MergeConflictOut]:
         """Find every real conflict. Each one names the vote or the meeting.
 
-        The conflicts are: two ballots in the same vote (the open ``ballot`` and the
-        secret ``voted_marker`` each count); both accounts delegated their seat, or
+        The conflicts are: two ballots in the same vote (a ``voted_marker`` of each
+        account); both accounts delegated their seat, or
         both received a vote transfer, in the same meeting; one account is delegator
         and the other delegate in the same meeting, because after the merge one person
         would be both, which the no-chain rule forbids; a different attendance in the
@@ -512,19 +497,18 @@ class PrincipalMergeService:
         old, new = source.id, target.id
         vote_label = func.coalesce(Vote.question, Meeting.title)
 
-        for model in (Ballot, VotedMarker):
-            a, b = aliased(model), aliased(model)
-            await add(
-                "ballot_same_vote",
-                select(vote_label)
-                .select_from(Vote)
-                .outerjoin(Meeting, Meeting.id == Vote.meeting_id)
-                .where(
-                    exists().where(a.vote_id == Vote.id, a.voter_sub == old_sub),
-                    exists().where(b.vote_id == Vote.id, b.voter_sub == new_sub),
-                )
-                .order_by(Vote.created_at),
+        a, b = aliased(VotedMarker), aliased(VotedMarker)
+        await add(
+            "ballot_same_vote",
+            select(vote_label)
+            .select_from(Vote)
+            .outerjoin(Meeting, Meeting.id == Vote.meeting_id)
+            .where(
+                exists().where(a.vote_id == Vote.id, a.voter_sub == old_sub),
+                exists().where(b.vote_id == Vote.id, b.voter_sub == new_sub),
             )
+            .order_by(Vote.created_at),
+        )
 
         def meeting_where(*conds: ColumnElement[bool]) -> Select[Any]:
             return select(Meeting.title).where(*conds).order_by(Meeting.date, Meeting.title)

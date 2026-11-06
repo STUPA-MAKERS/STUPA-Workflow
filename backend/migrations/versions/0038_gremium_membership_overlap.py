@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+import sqlalchemy as sa
 from alembic import op
 
 revision: str = "0038_gremium_membership_overlap"
@@ -34,7 +35,19 @@ def upgrade() -> None:
     already created the constraint, because ``create_all`` emits it from the model; on an
     existing one 0001 ran before the model change, so this step adds it. ``ADD CONSTRAINT``
     has no ``IF NOT EXISTS``, hence the check over ``pg_constraint``.
+
+    A schema without the term columns (built from the current models, where a
+    membership has no term) has nothing to clean up or constrain, so the step does
+    nothing.
     """
+    has_term = op.get_bind().scalar(
+        sa.text(
+            "SELECT EXISTS (SELECT 1 FROM information_schema.columns "
+            "WHERE table_name = 'gremium_membership' AND column_name = 'valid_from')"
+        )
+    )
+    if not has_term:
+        return
     op.execute(
         """
         DELETE FROM gremium_membership a

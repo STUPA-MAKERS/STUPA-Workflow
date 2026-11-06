@@ -5,7 +5,6 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import type { CdVariant, CdVariantLogo } from '../admin.models';
 import { AdminCdVariantsComponent } from './cd-variants.component';
-import { pickOption } from '../../../../testing/select';
 
 const TITLE_LOGO: CdVariantLogo = {
   id: 'l-1',
@@ -35,7 +34,6 @@ const VARIANT: CdVariant = {
   id: 'cd-1',
   key: 'stupa',
   name: 'StuPa',
-  baseVariant: 'protocol',
   logos: [TITLE_LOGO, TITLE_UPLOAD, FOOTER_LOGO],
 };
 
@@ -90,11 +88,11 @@ describe('AdminCdVariantsComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   /** The first variant starts open. */
-  it('lists the variants with name, key, base and the gremien that use them', async () => {
+  it('lists the variants with name, key and the gremien that use them', async () => {
     const { c } = await setup();
     expect(await screen.findByText('StuPa')).toBeInTheDocument();
     expect(screen.getByText('stupa')).toBeInTheDocument();
-    expect(screen.getByText('Basis: Protokoll · genutzt von Studierendenparlament, Fachschaftenrat')).toBeInTheDocument();
+    expect(screen.getByText('genutzt von Studierendenparlament, Fachschaftenrat')).toBeInTheDocument();
     expect(c.loading()).toBe(false);
     expect(c.loadError()).toBe(false);
     expect(c.isExpanded('cd-1')).toBe(true);
@@ -102,16 +100,16 @@ describe('AdminCdVariantsComponent', () => {
   });
 
   it('names a variant that no gremium uses', async () => {
-    const other: CdVariant = { ...VARIANT, id: 'cd-2', key: 'bericht', name: 'Bericht', baseVariant: 'report', logos: [] };
+    const other: CdVariant = { ...VARIANT, id: 'cd-2', key: 'bericht', name: 'Bericht', logos: [] };
     const { c } = await setup(makeApi({ listCdVariants: jest.fn(() => of([VARIANT, other])) }));
-    expect(c.usage(other)).toBe('Basis: Bericht · von keinem Gremium genutzt');
+    expect(c.usage(other)).toBe('von keinem Gremium genutzt');
   });
 
   it('leaves the gremien out after a failed master-data read', async () => {
     const { c } = await setup(
       makeApi({ listGremienOptions: jest.fn(() => throwError(() => new Error('403'))) }),
     );
-    expect(c.usage(VARIANT)).toBe('Basis: Protokoll · von keinem Gremium genutzt');
+    expect(c.usage(VARIANT)).toBe('von keinem Gremium genutzt');
   });
 
   it('describes a logo: the shipped name, else the file with its size', async () => {
@@ -221,13 +219,8 @@ describe('AdminCdVariantsComponent', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Variante anlegen' }));
     await userEvent.type(screen.getByLabelText(/^Name/), 'AStA Vorstand');
     expect(c.form().key).toBe('asta-vorstand');
-    await pickOption(screen.getByLabelText(/Basis-Variante/), 'Protokoll');
     await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
-    expect(api.createCdVariant).toHaveBeenCalledWith({
-      key: 'asta-vorstand',
-      name: 'AStA Vorstand',
-      baseVariant: 'protocol',
-    });
+    expect(api.createCdVariant).toHaveBeenCalledWith({ key: 'asta-vorstand', name: 'AStA Vorstand' });
     expect(c.variants()).toHaveLength(2);
     expect(c.dialogOpen()).toBe(false);
     expect(toast.success).toHaveBeenCalled();
@@ -277,7 +270,7 @@ describe('AdminCdVariantsComponent', () => {
   });
 
   /** The key is immutable, because a changed key answers 409, so the field stays locked. */
-  it('edits a variant: the key stays read-only and only name/base go out', async () => {
+  it('edits a variant: the key stays read-only and only the name goes out', async () => {
     const { api, c, fixture } = await setup();
     await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten: StuPa' }));
     expect(c.editingId()).toBe('cd-1');
@@ -286,10 +279,7 @@ describe('AdminCdVariantsComponent', () => {
     expect(screen.getByLabelText(/^Schlüssel/)).toBeDisabled();
     c.patch('name', 'StuPa 2026');
     c.submit(new Event('submit'));
-    expect(api.updateCdVariant).toHaveBeenCalledWith('cd-1', {
-      name: 'StuPa 2026',
-      baseVariant: 'protocol',
-    });
+    expect(api.updateCdVariant).toHaveBeenCalledWith('cd-1', { name: 'StuPa 2026' });
     expect(c.variants()[0].name).toBe('StuPa 2026');
   });
 
@@ -606,7 +596,7 @@ describe('AdminCdVariantsComponent', () => {
   /** The square row comes first, and its menu has no move items. */
   it('shows the square logo before the name, else the initials', async () => {
     const square: CdVariantLogo = { id: 'l-sq', slot: 'square', position: 0, fileName: 'q.png' };
-    const other: CdVariant = { id: 'cd-2', key: 'hsrt-inf', name: 'HSRT INF', baseVariant: 'report', logos: [] };
+    const other: CdVariant = { id: 'cd-2', key: 'hsrt-inf', name: 'HSRT INF', logos: [] };
     const { c, container } = await setup(
       makeApi({
         listCdVariants: jest.fn(() => of([{ ...VARIANT, logos: [...VARIANT.logos, square] }, other])),
@@ -703,7 +693,7 @@ describe('AdminCdVariantsComponent', () => {
   });
 
   it('touches only the edited variant when more than one exists', async () => {
-    const other: CdVariant = { id: 'cd-2', key: 'asta', name: 'AStA', baseVariant: 'report', logos: [] };
+    const other: CdVariant = { id: 'cd-2', key: 'asta', name: 'AStA', logos: [] };
     const { c } = await setup(makeApi({ listCdVariants: jest.fn(() => of([other, VARIANT])) }));
 
     c.openEdit(VARIANT);

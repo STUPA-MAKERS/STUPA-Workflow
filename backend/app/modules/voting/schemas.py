@@ -292,9 +292,8 @@ class TallyOut(_CamelModel):
     #: members have already voted.
     voted: int = 0
     present: int = 0
-    #: ``counts`` and ``leading`` are visible only when ``revealed``: the vote is closed,
-    #: or the vote is not secret and all present members have voted. Otherwise they stay
-    #: hidden.
+    #: ``counts`` and ``leading`` are visible only when ``revealed``, that is when the
+    #: vote is closed. Otherwise they stay hidden.
     revealed: bool = True
     quorum_met: bool = Field(alias="quorumMet")
     leading: str | None = None
@@ -316,17 +315,17 @@ class TallyOut(_CamelModel):
 class MyBallot(_CamelModel):
     """The own ballot of the calling principal in one vote.
 
-    ``cast`` tells whether the principal has cast the own ballot. ``choice`` is the
-    chosen option. A secret vote keeps the choice apart from the identity, so there
-    ``choice`` is always None and only ``cast`` (from the voted marker) travels.
+    ``cast`` tells whether the principal has cast the own ballot (from the voted
+    marker). Every vote is secret and keeps the choice apart from the identity, so
+    ``choice``, ``choices`` and ``answers`` are always None.
     """
 
     cast: bool = False
+    #: The chosen option. Always None, because every vote is secret.
     choice: str | None = None
-    #: The chosen candidate ids of an open election ballot, and the chosen option
-    #: ids of an open single or multi poll. None for a motion and for a secret vote.
+    #: The chosen candidate or option ids. Always None, because every vote is secret.
     choices: list[str] | None = None
-    #: The answers of an open date poll ballot. None otherwise.
+    #: The answers of a date poll. Always None, because every vote is secret.
     answers: dict[str, DateAnswer] | None = None
 
 

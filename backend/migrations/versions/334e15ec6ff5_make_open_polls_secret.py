@@ -31,6 +31,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+import sqlalchemy as sa
 from alembic import op
 
 revision: str = "334e15ec6ff5"
@@ -58,7 +59,13 @@ _UPGRADE: tuple[str, ...] = (
 
 
 def upgrade() -> None:
-    """Upgrade the schema to this revision."""
+    """Upgrade the schema to this revision.
+
+    A schema without ``ballot`` (built from the current models, which have no open
+    ballot) holds no open ballot to convert, so the step does nothing.
+    """
+    if op.get_bind().scalar(sa.text("SELECT to_regclass('ballot') IS NULL")):
+        return
     for stmt in _UPGRADE:
         op.execute(stmt)
 

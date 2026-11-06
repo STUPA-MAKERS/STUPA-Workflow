@@ -9,7 +9,6 @@ the flag ``has_reported_tickets`` of ``/auth/me``.
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -23,6 +22,7 @@ from app.modules.files.service import FilesService
 from app.modules.tickets.models import Ticket, TicketNote
 from app.modules.tickets.service import TicketService
 from app.settings import Settings
+from tests._support.draft_tokens import add_draft_token
 from tests._support.memory_storage import MemoryStorage, wire_storage
 from tests.integration.modules.tickets.conftest import MANAGER, Api, add_principal
 
@@ -44,6 +44,7 @@ async def _draft(
     key = f"drafts/{draft_id}/{name}"
     await storage.put(key, b"%PDF-1.4\n", "application/pdf")
     async with maker() as session:
+        await add_draft_token(session, hash_draft_token(token, settings.magic_link_secret))
         session.add(
             Attachment(
                 id=draft_id,
@@ -54,7 +55,6 @@ async def _draft(
                 scanned=True,
                 scan_result="clean",
                 draft_token_hash=hash_draft_token(token, settings.magic_link_secret),
-                draft_expires_at=datetime.now(UTC) + timedelta(days=7),
             )
         )
         await session.commit()

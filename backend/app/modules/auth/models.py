@@ -107,10 +107,12 @@ class RolePermission(Base):
 
 
 class RoleAssignment(UUIDPkMixin, Base):
-    """Role assignment with a Gremium scope and a validity window for a delegation.
+    """Global role of a principal, granted by the bootstrap.
 
-    The index on ``delegated_by`` serves the lookup of the active outgoing voting
-    delegations of a member, which the cast block needs.
+    Only ``bootstrap`` writes rows: the ``admin`` role from the settings and the implicit
+    ``member`` role. ``granted_by`` holds ``"bootstrap"`` for these grants. A row has no
+    gremium scope and no validity window. Gremium rights come from the gremium
+    memberships, and vote delegations live in ``meeting_delegation``.
     """
 
     __tablename__ = "role_assignment"
@@ -119,27 +121,9 @@ class RoleAssignment(UUIDPkMixin, Base):
         ForeignKey("principal.id", ondelete="CASCADE")
     )
     role_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("role.id", ondelete="CASCADE"))
-    gremium_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("gremium.id", ondelete="CASCADE"), nullable=True
-    )
     granted_by: Mapped[str | None] = mapped_column(Text, nullable=True)
-    #: `delegated_by` marks a self-delegation. It holds the `sub` of the member who hands
-    #: over one of their own rights for a time. It is `NULL` for a plain admin assignment.
-    #: It anchors the listing and the revocation of the own delegations. It also anchors
-    #: the double-voting block: a delegator who handed over the voting right must not vote.
-    delegated_by: Mapped[str | None] = mapped_column(Text, nullable=True)
-    valid_from: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    valid_until: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    delegate_voting: Mapped[bool] = mapped_column(Boolean, server_default="false")
 
-    __table_args__ = (
-        Index("ix_role_assignment_principal_id", "principal_id"),
-        Index("ix_role_assignment_delegated_by", "delegated_by"),
-    )
+    __table_args__ = (Index("ix_role_assignment_principal_id", "principal_id"),)
 
 
 class AuthSession(UUIDPkMixin, CreatedAtMixin, Base):
@@ -217,7 +201,7 @@ class ApplicantSession(UUIDPkMixin, CreatedAtMixin, Base):
     """Server session of a magic-link applicant.
 
     This table is the counterpart to `AuthSession`. The browser holds only a signed,
-    opaque `sid`. The `application_id` and the `scope` stay on the server. Nobody can forge
+    opaque `sid`. The `application_id` stays on the server. Nobody can forge
     an applicant token from `SESSION_SECRET` alone, because the token also needs an
     existing row. The server can revoke the token: a logout deletes the row, and the kill
     switch sets `revoked_at`, for example on anonymization. The `application_id` foreign
@@ -230,7 +214,6 @@ class ApplicantSession(UUIDPkMixin, CreatedAtMixin, Base):
     application_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("application.id", ondelete="CASCADE")
     )
-    scope: Mapped[str] = mapped_column(Text)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True

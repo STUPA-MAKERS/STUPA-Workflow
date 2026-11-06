@@ -98,6 +98,7 @@ class _Session:
 
     def add(self, obj: Any) -> None:
         self.added.append(obj)
+        self.statements.append(f"ADD {type(obj).__name__}")
 
     async def flush(self) -> None:
         return None
@@ -141,7 +142,9 @@ async def test_first_upload_issues_a_token() -> None:
     """Issue a token on the first upload.
 
     The new token needs no validity check, but the advisory lock and the quota run. The
-    upload stores the token on its own and moves its end.
+    upload stores the token on its own and moves its end. The token row goes in before
+    the attachment row, because the attachment references it. No other draft row
+    changes: the end of the token is the end of every draft.
     """
     session = _Session()
     storage, queue = FakeStorage(), FakeScanQueue()
@@ -162,6 +165,8 @@ async def test_first_upload_issues_a_token() -> None:
     assert not any("FROM attachment_draft_token" in s for s in session.statements)
     (upsert,) = [s for s in session.statements if "INSERT INTO attachment_draft_token" in s]
     assert "ON CONFLICT (token_hash) DO UPDATE" in upsert
+    assert session.statements.index(upsert) < session.statements.index("ADD Attachment")
+    assert not any(s.startswith("UPDATE attachment") for s in session.statements)
     assert AUDITS[0]["action"] == "attachment_upload"
     assert AUDITS[0]["data"]["draft"] is True
 
@@ -218,7 +223,6 @@ def _draft_row(**over: Any) -> Attachment:
         "scanned": False,
         "scan_result": None,
         "draft_token_hash": b"h",
-        "draft_expires_at": NOW + timedelta(days=1),
     }
     base.update(over)
     return Attachment(**base)
@@ -273,13 +277,11 @@ async def test_check_drafts_names_each_unusable_id() -> None:
     good = _draft_row()
     pending = _draft_row(scanned=False)
     clean = _draft_row(scanned=True, scan_result="clean")
-    expired = _draft_row(draft_expires_at=NOW - timedelta(seconds=1))
-    no_end = _draft_row(draft_expires_at=None)
     infected = _draft_row(scanned=True, scan_result="EICAR", storage_key="k")
     removed = _draft_row(storage_key=None)
     missing = uuid.uuid4()
-    rows = [good, pending, clean, expired, no_end, infected, removed]
-    session = _Session(scalars=[rows])
+    rows = [good, pending, clean, infected, removed]
+    session = _Session(scalars=[rows], scalar=[NOW + timedelta(days=1)])
     ids = [r.id for r in rows] + [missing, good.id]
     with pytest.raises(ValidationProblem) as caught:
         await check_drafts(
@@ -288,15 +290,32 @@ async def test_check_drafts_names_each_unusable_id() -> None:
     assert caught.value.code == DRAFT_ATTACHMENTS_MISSING
     assert caught.value.errors is not None
     assert [e.field for e in caught.value.errors] == [
-        f"attachmentIds.{r.id}" for r in (expired, no_end, infected, removed)
+        f"attachmentIds.{r.id}" for r in (infected, removed)
     ] + [f"attachmentIds.{missing}"]
     assert "FOR UPDATE" in session.statements[0]
+    assert "FROM attachment_draft_token" in session.statements[1]
+
+
+@pytest.mark.parametrize("token_end", [NOW - timedelta(seconds=1), NOW, None])
+async def test_check_drafts_refuses_the_drafts_of_an_ended_token(token_end: Any) -> None:
+    """The end of the token is the end of each draft. A missing token row ends them too."""
+    rows = [_draft_row(), _draft_row(scanned=True, scan_result="clean")]
+    with pytest.raises(ValidationProblem) as caught:
+        await check_drafts(
+            _Session(scalars=[rows], scalar=[token_end]),  # type: ignore[arg-type]
+            attachment_ids=[r.id for r in rows],
+            token="t",
+            pepper="p",
+            now=NOW,
+        )
+    assert caught.value.errors is not None
+    assert [e.field for e in caught.value.errors] == [f"attachmentIds.{r.id}" for r in rows]
 
 
 async def test_check_drafts_passes_usable_drafts() -> None:
     rows = [_draft_row(), _draft_row(scanned=True, scan_result="clean")]
     await check_drafts(
-        _Session(scalars=[rows]),  # type: ignore[arg-type]
+        _Session(scalars=[rows], scalar=[NOW + timedelta(days=1)]),  # type: ignore[arg-type]
         attachment_ids=[r.id for r in rows],
         token="t",
         pepper="p",

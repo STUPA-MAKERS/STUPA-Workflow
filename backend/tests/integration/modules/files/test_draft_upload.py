@@ -159,9 +159,11 @@ async def test_first_upload_issues_a_token_and_later_uploads_extend_it(
         assert row.storage_key.startswith(f"drafts/{row.id}/")
         assert row.draft_token_hash is not None
         assert row.draft_token_hash != token.encode()
-        assert row.draft_expires_at is not None
-        assert row.draft_expires_at > before + timedelta(days=6, hours=23)
-    assert rows[0].draft_expires_at == rows[1].draft_expires_at
+    assert rows[0].draft_token_hash == rows[1].draft_token_hash
+    async with maker() as session:
+        (tok,) = (await session.scalars(select(AttachmentDraftToken))).all()
+    assert tok.token_hash == rows[0].draft_token_hash
+    assert tok.expires_at > before + timedelta(days=6, hours=23)
     assert len(storage.blobs) == 2
 
     audits = await _audits(maker)
@@ -194,8 +196,6 @@ async def test_unknown_or_expired_token_is_rejected(
         token = _upload(client)["draftToken"]
         past = datetime.now(UTC) - timedelta(minutes=1)
         async with maker() as session:
-            for row in (await session.scalars(select(Attachment))).all():
-                row.draft_expires_at = past
             for tok in (await session.scalars(select(AttachmentDraftToken))).all():
                 tok.expires_at = past
             await session.commit()
@@ -352,7 +352,6 @@ async def test_token_stays_valid_after_the_last_draft_is_deleted(
     async with maker() as session:
         (tok,) = (await session.scalars(select(AttachmentDraftToken))).all()
     assert tok.token_hash == row.draft_token_hash
-    assert tok.expires_at == row.draft_expires_at
     assert list(storage.blobs) == [row.storage_key]
 
 

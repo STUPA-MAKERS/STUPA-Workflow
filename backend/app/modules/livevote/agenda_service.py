@@ -343,7 +343,7 @@ class AgendaService:
 
         The mark follows the minutes window: a `planned` or `live` meeting, or a
         closed meeting with a draft protocol. A mark that does not change writes
-        nothing, so a second tick keeps the time and the person of the first one. A
+        nothing, so a second tick keeps the time of the first one. A
         change writes `agenda_item_done` or `agenda_item_reopened`. `via` names the
         path in the audit entry (`next` for the move to the next item).
 
@@ -357,11 +357,9 @@ class AgendaService:
             return
         if done:
             row.done_at = datetime.now(UTC)
-            row.done_by = actor
             action = AuditAction.AGENDA_ITEM_DONE
         else:
             row.done_at = None
-            row.done_by = None
             action = AuditAction.AGENDA_ITEM_REOPENED
         extra = {"via": via} if via is not None else {}
         await self._audit(action, actor=actor, item=row, **extra)

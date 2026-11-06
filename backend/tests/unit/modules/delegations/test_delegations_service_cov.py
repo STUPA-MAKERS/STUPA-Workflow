@@ -174,18 +174,18 @@ async def test_meeting_not_found_raises() -> None:
 async def test_membership_vote_cast_handles_none_perms() -> None:
     """Ignore a role without permissions (None) without a crash."""
     db = fake_session(result(None, ["other"]))
-    assert await _membership_with_vote_cast(db, uuid4(), GREMIUM_ID, NOW) is False
+    assert await _membership_with_vote_cast(db, uuid4(), GREMIUM_ID) is False
 
 
 async def test_membership_vote_cast_true() -> None:
     db = fake_session(result(["vote.cast"]))
-    assert await _membership_with_vote_cast(db, uuid4(), GREMIUM_ID, NOW) is True
+    assert await _membership_with_vote_cast(db, uuid4(), GREMIUM_ID) is True
 
 
 async def test_eligible_via_membership_vote_cast() -> None:
     """Accept a membership with `vote.cast` without a further query."""
     db = fake_session(result(["vote.cast"]))
-    assert await _independently_eligible(db, uuid4(), GREMIUM_ID, NOW) is True
+    assert await _independently_eligible(db, uuid4(), GREMIUM_ID) is True
 
 
 async def test_eligible_needs_a_vote_cast_membership() -> None:
@@ -195,7 +195,7 @@ async def test_eligible_needs_a_vote_cast_membership() -> None:
     in a Gremium. Only the membership query runs.
     """
     db = fake_session(result(), result(SimpleNamespace(id=uuid4())), result(([str(GREMIUM_ID)],)))
-    assert await _independently_eligible(db, uuid4(), GREMIUM_ID, NOW) is False
+    assert await _independently_eligible(db, uuid4(), GREMIUM_ID) is False
     assert len(db.statements) == 1
 
 

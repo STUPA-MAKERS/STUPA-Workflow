@@ -212,7 +212,6 @@ class EditOps(ApplicationsServiceBase):
                 .values(expires_at=now)
             )
         app.archived_at = now if archived else None
-        app.archived_by = actor if archived else None
         await self.session.commit()
         await self.session.refresh(app)
         return await self._to_out(app, include_pii=False, strip_pii_fields=strip_pii_fields)

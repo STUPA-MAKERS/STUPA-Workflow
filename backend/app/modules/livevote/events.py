@@ -124,7 +124,7 @@ class VoteOpenedEvent(_CamelModel):
 class VoteTallyEvent(_CamelModel):
     """Live interim tally with aggregates only and never with names.
 
-    For an open secret vote `counts` stays empty and `leading` stays `null`.
+    For an open vote `counts` stays empty and `leading` stays `null`.
     Only the participation is visible, which is `cast` of `eligible`. Build the
     event with `from_vote`, so that this rule lives in one place.
     """

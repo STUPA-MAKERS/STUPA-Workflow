@@ -39,13 +39,6 @@ def test_principal_defaults_empty() -> None:
     assert p.email is None
 
 
-def test_applicant_edit_scope_covers_view() -> None:
-    a = Applicant(application_id="app-1", scope="edit")
-    assert a.allows("view")
-    assert a.allows("edit")
-
-
-def test_applicant_view_scope_is_view_only() -> None:
-    a = Applicant(application_id="app-1", scope="view")
-    assert a.allows("view")
-    assert not a.allows("edit")
+def test_applicant_binds_one_application() -> None:
+    a = Applicant(application_id="app-1")
+    assert a.application_id == "app-1"

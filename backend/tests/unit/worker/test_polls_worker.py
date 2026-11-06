@@ -50,8 +50,8 @@ async def test_reminds_once_and_skips_a_failing_poll(monkeypatch: pytest.MonkeyP
     ok, quiet, broken = (SimpleNamespace(id=uuid4(), reminded_at=None) for _ in range(3))
     calls: list[Any] = []
 
-    async def _send(_s: Any, *, vote: Any, reminder: bool, now: datetime, **_kw: Any) -> bool:
-        calls.append((vote, reminder, now))
+    async def _send(_s: Any, *, vote: Any, reminder: bool, **_kw: Any) -> bool:
+        calls.append((vote, reminder))
         if vote is broken:
             raise RuntimeError("smtp")
         return vote is ok
@@ -60,7 +60,7 @@ async def test_reminds_once_and_skips_a_failing_poll(monkeypatch: pytest.MonkeyP
     session = ScriptedSession(scalars=[[ok, quiet, broken]])
     assert await wp.process_poll_reminders(_ctx(session), now=NOW) == 1
     assert [c[0] for c in calls] == [ok, quiet, broken]
-    assert all(c[1] is True and c[2] == NOW for c in calls)
+    assert all(c[1] is True for c in calls)
     assert ok.reminded_at == NOW
     assert quiet.reminded_at == NOW
     assert broken.reminded_at is None

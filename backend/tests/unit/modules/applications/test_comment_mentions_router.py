@@ -79,7 +79,7 @@ def test_the_applicant_may_not_mention(
 ) -> None:
     """Pass `may_mention=False` for the applicant; the service refuses a non-empty list."""
     app_id = uuid4()
-    _as_applicant(app, app_id, "view")
+    _as_applicant(app, app_id)
     r = client.post(f"/api/applications/{app_id}/comments", json={"body": "x", "mentions": []})
     assert r.status_code == 201
     assert fake_service.comment_mentions == ([], False)
@@ -121,7 +121,7 @@ def test_the_mentionable_route_is_for_members_only(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
     app_id = uuid4()
-    _as_applicant(app, app_id, "view")
+    _as_applicant(app, app_id)
     r = client.get(f"/api/applications/{app_id}/mentionable")
     assert r.status_code == 403
     assert r.headers["content-type"].startswith("application/problem+json")

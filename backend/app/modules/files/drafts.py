@@ -10,9 +10,10 @@ The flow has four steps:
 1. ``POST /apply/attachments`` without a token: the route checks ALTCHA for an
    anonymous caller, and ``upload`` issues a new token.
 2. ``POST /apply/attachments`` with the token: the route checks the token before it
-   reads the file, and ``upload`` adds a file. Each upload moves the end of the token
-   and of ALL its drafts to now + ``attachment_draft_ttl_days``. One token holds at
-   most ``attachment_draft_max_files`` files and ``attachment_draft_max_bytes`` bytes.
+   reads the file, and ``upload`` adds a file. Each upload moves the end of the
+   token, which is also the end of ALL its drafts, to now +
+   ``attachment_draft_ttl_days``. One token holds at most
+   ``attachment_draft_max_files`` files and ``attachment_draft_max_bytes`` bytes.
 3. ``DELETE /apply/attachments/{id}`` with the token: ``delete`` removes one draft.
 4. ``POST /applications``, ``POST /tickets`` or the send of a chat message with
    ``attachmentIds`` and ``draftToken``: ``bind_drafts`` binds the files in the
@@ -91,13 +92,14 @@ async def _lock_token(session: AsyncSession, token_hash: bytes) -> None:
     )
 
 
-def _is_usable(attachment: Attachment, now: datetime) -> bool:
+def _is_usable(attachment: Attachment, expires_at: datetime | None, now: datetime) -> bool:
     """Tell whether a draft can still be bound: not expired and not infected.
 
-    A draft whose scan is still pending is usable. It stays quarantined after the
-    bind until the scan is clean.
+    ``expires_at`` is the end of the token of the draft, None when the token row is
+    gone. A draft whose scan is still pending is usable. It stays quarantined after
+    the bind until the scan is clean.
     """
-    if attachment.draft_expires_at is None or attachment.draft_expires_at <= now:
+    if expires_at is None or expires_at <= now:
         return False
     if attachment.storage_key is None:
         return False
@@ -153,9 +155,11 @@ class DraftAttachments:
         The token need not own a draft: the owner may have deleted all of them.
 
         The method writes an ``attachment_upload`` audit entry with ``draft: true``
-        and moves the end of the token and of all its drafts.
+        and moves the end of the token. The token row goes in before the attachment
+        row, because the attachment references it.
 
-        All files of the token share one end, so each upload keeps the whole draft alive.
+        All files of the token share the end of the token, so each upload keeps the
+        whole draft alive.
 
         Raises:
             ValidationProblem: The token is unknown or expired (HTTP 422).
@@ -179,6 +183,15 @@ class DraftAttachments:
         )
         await self.files.put_object(storage_key, data, mime)
         expires_at = now + timedelta(days=self.settings.attachment_draft_ttl_days)
+        token_row = insert(AttachmentDraftToken).values(
+            token_hash=token_hash, expires_at=expires_at
+        )
+        await self.session.execute(
+            token_row.on_conflict_do_update(
+                index_elements=[AttachmentDraftToken.token_hash],
+                set_={"expires_at": token_row.excluded.expires_at},
+            )
+        )
         attachment = Attachment(
             id=attachment_id,
             application_id=None,
@@ -190,28 +203,9 @@ class DraftAttachments:
             scanned=False,
             scan_result=None,
             draft_token_hash=token_hash,
-            draft_expires_at=expires_at,
         )
         self.session.add(attachment)
         await self.session.flush()
-        token_row = insert(AttachmentDraftToken).values(
-            token_hash=token_hash, expires_at=expires_at
-        )
-        await self.session.execute(
-            token_row.on_conflict_do_update(
-                index_elements=[AttachmentDraftToken.token_hash],
-                set_={"expires_at": token_row.excluded.expires_at},
-            )
-        )
-        await self.session.execute(
-            update(Attachment)
-            .where(
-                Attachment.application_id.is_(None),
-                Attachment.draft_token_hash == token_hash,
-            )
-            .values(draft_expires_at=expires_at)
-            .execution_options(synchronize_session=False)
-        )
         await audit_record(
             self.session,
             actor=by,
@@ -323,7 +317,7 @@ async def bind_drafts(
     The owner is an application, a ticket or a chat message (ticket note, to-do
     comment, application comment); exactly one is given. The caller runs this in the
     transaction of the create, after ``check_drafts``. The method sets the owner
-    column and clears both draft columns. The storage key stays.
+    column and clears ``draft_token_hash``. The storage key stays.
 
     Raises:
         ValueError: Not exactly one owner is given.
@@ -351,7 +345,7 @@ async def bind_drafts(
             Attachment.comment_id.is_(None),
             Attachment.draft_token_hash == hash_draft_token(token, pepper),
         )
-        .values(**given, draft_token_hash=None, draft_expires_at=None)
+        .values(**given, draft_token_hash=None)
         .execution_options(synchronize_session=False)
     )
 
@@ -399,7 +393,8 @@ async def check_drafts(
 
     The method locks the rows (``FOR UPDATE``) until the end of the transaction, so a
     parallel delete or purge cannot remove a draft between the check and the bind.
-    A draft whose scan is still pending passes.
+    The end of the token is the end of each draft. A draft whose scan is still pending
+    passes.
 
     Raises:
         ValidationProblem: At least one id is missing, expired, owned by another token,
@@ -418,7 +413,12 @@ async def check_drafts(
             .with_for_update()
         )
     ).all()
-    usable = {row.id for row in rows if _is_usable(row, moment)}
+    expires_at = await session.scalar(
+        select(AttachmentDraftToken.expires_at).where(
+            AttachmentDraftToken.token_hash == token_hash
+        )
+    )
+    usable = {row.id for row in rows if _is_usable(row, expires_at, moment)}
     missing = [aid for aid in dict.fromkeys(attachment_ids) if aid not in usable]
     if missing:
         raise ValidationProblem(

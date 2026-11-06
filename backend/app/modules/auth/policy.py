@@ -23,7 +23,6 @@ minutes.
 from __future__ import annotations
 
 from collections.abc import Iterable
-from datetime import datetime
 from typing import Final, final
 from uuid import UUID
 
@@ -79,7 +78,6 @@ async def held_gremium_ids(
     session: AsyncSession,
     principal: Principal,
     perm: str,
-    now: datetime | None = None,
 ) -> set[UUID]:
     """Return the gremien where the own gremium role grants ``perm``, scope-capped.
 
@@ -88,7 +86,7 @@ async def held_gremium_ids(
     """
     if not principal.scope_allows(perm):
         return set()
-    return await gremium_roles.gremium_ids_with_permission(session, principal.sub, perm, now)
+    return await gremium_roles.gremium_ids_with_permission(session, principal.sub, perm)
 
 
 async def holds_gremium_permission(
@@ -96,17 +94,15 @@ async def holds_gremium_permission(
     principal: Principal,
     perm: str,
     gremium_id: UUID,
-    now: datetime | None = None,
 ) -> bool:
     """Tell if the own gremium role grants ``perm`` in ``gremium_id`` (no admin bypass)."""
-    return gremium_id in await held_gremium_ids(session, principal, perm, now)
+    return gremium_id in await held_gremium_ids(session, principal, perm)
 
 
 async def gremium_ids_with(
     session: AsyncSession,
     principal: Principal,
     perm: str,
-    now: datetime | None = None,
 ) -> GremiumScope:
     """Return the gremien where ``principal`` uses ``perm``: bypass or own role.
 
@@ -115,7 +111,7 @@ async def gremium_ids_with(
     """
     if admin_bypass(principal, perm):
         return ALL_GREMIEN
-    return await held_gremium_ids(session, principal, perm, now)
+    return await held_gremium_ids(session, principal, perm)
 
 
 async def has_gremium_permission(
@@ -123,44 +119,41 @@ async def has_gremium_permission(
     principal: Principal,
     perm: str,
     gremium_id: UUID,
-    now: datetime | None = None,
 ) -> bool:
     """Tell if ``principal`` uses ``perm`` in ``gremium_id``: bypass or own role."""
-    return gremium_id in await gremium_ids_with(session, principal, perm, now)
+    return gremium_id in await gremium_ids_with(session, principal, perm)
 
 
 async def can_view_gremium(
     session: AsyncSession,
     principal: Principal,
     gremium_id: UUID,
-    now: datetime | None = None,
 ) -> bool:
     """Tell if ``principal`` may see the Gremium ``gremium_id``.
 
     A principal sees a Gremium when it holds the global permission
     ``gremium.view_all`` (the admin role included, scope-capped through ``has``),
-    or when it is an active member of the Gremium now. The membership path also
+    or when it is a member of the Gremium. The membership path also
     obeys the OAuth scope cap, so a token without the ``read`` scope sees no
     Gremium. A read route that refuses answers 404, not 403, so the answer does
     not tell that the Gremium exists.
     """
-    visible = await gremium_view_scope(session, principal, now)
+    visible = await gremium_view_scope(session, principal)
     return visible is None or gremium_id in visible
 
 
 async def gremium_view_scope(
     session: AsyncSession,
     principal: Principal,
-    now: datetime | None = None,
 ) -> set[UUID] | None:
     """Return the Gremien that ``principal`` may see: ``None`` for every Gremium.
 
     The set form of ``can_view_gremium``, for a reader that checks many Gremien at
     once (the to-do links): ``gremium.view_all`` gives ``None``, a token without the
-    ``read`` scope the empty set, anyone else the active memberships now.
+    ``read`` scope the empty set, anyone else the memberships.
     """
     if principal.has(GREMIUM_VIEW_ALL):
         return None
     if not principal.scope_allows(GREMIUM_VIEW_ALL):
         return set()
-    return await gremium_roles.gremium_member_ids(session, principal.sub, now)
+    return await gremium_roles.gremium_member_ids(session, principal.sub)

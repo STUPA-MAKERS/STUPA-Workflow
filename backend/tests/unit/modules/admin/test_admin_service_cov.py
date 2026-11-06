@@ -183,6 +183,7 @@ def gremium_row(**kw: Any) -> Any:
         "delegation_allow_external": False,
         "quorum_percent": None,
         "protocols_public": False,
+        "protocol_recipients": [],
     }
     base.update(kw)
     return Row(**base)
@@ -214,11 +215,7 @@ def assignment_row(**kw: Any) -> Any:
         "id": uuid.uuid4(),
         "principal_id": uuid.uuid4(),
         "role_id": uuid.uuid4(),
-        "gremium_id": None,
         "granted_by": "admin",
-        "valid_from": None,
-        "valid_until": None,
-        "delegate_voting": False,
     }
     base.update(kw)
     return Row(**base)
@@ -274,10 +271,8 @@ def test_mappers_roundtrip() -> None:
     t = _type_out(type_row(comparison_offers={"required": True}))
     assert t.comparison_offers == {"required": True}
 
-    a = _assignment_out(
-        assignment_row(valid_from=datetime(2026, 1, 1, tzinfo=UTC))
-    )
-    assert a.valid_from == "2026-01-01T00:00:00+00:00"
+    a = _assignment_out(assignment_row(granted_by="bootstrap"))
+    assert a.granted_by == "bootstrap"
 
     w = _webhook_out(webhook_row())
     assert w.events == ["status_changed"]
@@ -301,7 +296,7 @@ async def test_list_gremien() -> None:
 
 
 async def test_list_gremien_admin_counts() -> None:
-    """Count only current memberships of active principals.
+    """Count only the memberships of active principals.
 
     Queue: the gremien, then the member counts, then the role counts. B has no member.
     """
@@ -314,8 +309,6 @@ async def test_list_gremien_admin_counts() -> None:
         ("B", 0, 3),
     ]
     member_sql = str(session.statements[1])
-    assert "valid_until" in member_sql
-    assert "valid_from" in member_sql
     assert "principal.active" in member_sql
     assert out[0].model_dump(by_alias=True)["memberCount"] == 3
 
@@ -619,18 +612,19 @@ async def test_delete_gremium_not_found() -> None:
         await s.delete_gremium(uuid.uuid4(), _ADMIN)
 
 
-async def test_get_gremium_mail_recipients_union_dedup() -> None:
-    """Queue: get returns the Gremium, then the recipient lists.
-
-    One row is ``None``, which covers the ``recipients or []`` branch. One address appears twice.
-    """
+async def test_get_gremium_mail_recipients_dedup() -> None:
+    """Read the column of the Gremium. One address appears twice."""
     gid = uuid.uuid4()
-    s, _ = svc(
-        [res(["a@x.de", "b@x.de"], ["b@x.de"], None)],
-        gets=[gremium_row(id=gid)],
-    )
+    s, _ = svc(gets=[gremium_row(id=gid, protocol_recipients=["a@x.de", "b@x.de", "b@x.de"])])
     out = await s.get_gremium_mail_recipients(gid)
     assert out.recipients == ["a@x.de", "b@x.de"]
+
+
+async def test_get_gremium_mail_recipients_null_column() -> None:
+    """A NULL column of a row that is not flushed yet gives no address."""
+    gid = uuid.uuid4()
+    s, _ = svc(gets=[gremium_row(id=gid, protocol_recipients=None)])
+    assert (await s.get_gremium_mail_recipients(gid)).recipients == []
 
 
 async def test_get_gremium_mail_recipients_not_found() -> None:
@@ -640,28 +634,30 @@ async def test_get_gremium_mail_recipients_not_found() -> None:
 
 
 async def test_set_gremium_mail_recipients_with_addresses() -> None:
-    """Queue: the Gremium from get, the delete execute, then the two audit results.
+    """Queue: the Gremium from get, then the two audit results.
 
-    The service adds one MailList row next to the audit row.
+    The service writes the list into the column of the Gremium.
     """
     gid = uuid.uuid4()
-    s, sess = svc([res(), *audit_results()], gets=[gremium_row(id=gid)])
+    row = gremium_row(id=gid)
+    s, _ = svc([*audit_results()], gets=[row])
     out = await s.set_gremium_mail_recipients(
         gid, GremiumMailRecipients(recipients=["a@x.de"]), "admin"
     )
     assert out.recipients == ["a@x.de"]
-    assert sum(type(o).__name__ == "MailList" for o in sess.added) == 1
+    assert row.protocol_recipients == ["a@x.de"]
 
 
-async def test_set_gremium_mail_recipients_empty_adds_nothing() -> None:
-    """No MailList row, only the audit row."""
+async def test_set_gremium_mail_recipients_empty_clears_the_column() -> None:
+    """An empty list clears the column and writes the audit row."""
     gid = uuid.uuid4()
-    s, sess = svc([res(), *audit_results()], gets=[gremium_row(id=gid)])
+    row = gremium_row(id=gid, protocol_recipients=["old@x.de"])
+    s, _ = svc([*audit_results()], gets=[row])
     out = await s.set_gremium_mail_recipients(
         gid, GremiumMailRecipients(recipients=[]), "admin"
     )
     assert out.recipients == []
-    assert sum(type(o).__name__ == "MailList" for o in sess.added) == 0
+    assert row.protocol_recipients == []
 
 
 async def test_set_gremium_mail_recipients_not_found() -> None:

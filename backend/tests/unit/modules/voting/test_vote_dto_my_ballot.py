@@ -63,33 +63,31 @@ def test_meeting_vote_out_defaults_have_no_ballot() -> None:
     assert out.closed_at is None
 
 
-async def test_ballots_of_reads_own_choice_marker_and_represented() -> None:
-    """The read returns the own choice, the own marker and the represented ballots.
+async def test_ballots_of_reads_own_marker_and_represented() -> None:
+    """The read returns the own markers and the represented ballots, never a choice.
 
-    The caller "me" holds a voting delegation of "boss" in this meeting. "me" cast an
-    open ballot and a secret ballot (a marker without a choice). "boss" voted on the
-    open path and on the secret path. The represented ballot counts from the open ballot
-    and from the voted marker.
+    The caller "me" holds a voting delegation of "boss" in this meeting. "me" cast in
+    two votes; "boss" cast in one of them and in a third. The represented ballot counts
+    from the voted marker of "boss".
     """
     meeting, gremium = uuid4(), uuid4()
-    open_vote = _row(meeting_id=meeting, gremium=gremium)
-    secret_vote = _row(meeting_id=meeting, gremium=gremium)
+    mine = _row(meeting_id=meeting, gremium=gremium)
+    both = _row(meeting_id=meeting, gremium=gremium)
     proxied = _row(meeting_id=meeting, gremium=gremium)
     untouched = _row(meeting_id=None, gremium=gremium)
     sess = _QueueSession(
         executes=[
             res((meeting, gremium, "boss")),
-            res((open_vote.id, "me", "yes"), (proxied.id, "boss", "no")),
-            res((secret_vote.id, "me"), (secret_vote.id, "boss")),
+            res((mine.id, "me"), (both.id, "me"), (both.id, "boss"), (proxied.id, "boss")),
         ]
     )
     svc = MeetingService(sess)  # type: ignore[arg-type]
     own, represented = await svc._ballots_of(
         "me",
-        [open_vote, secret_vote, proxied, untouched],  # type: ignore[list-item]
+        [mine, both, proxied, untouched],  # type: ignore[list-item]
     )
-    assert own[open_vote.id] == MyBallot(cast=True, choice="yes")
-    assert own[secret_vote.id] == MyBallot(cast=True, choice=None)
+    assert own[mine.id] == MyBallot(cast=True)
+    assert own[both.id] == MyBallot(cast=True)
     assert proxied.id not in own
     assert untouched.id not in own
-    assert represented == {proxied.id, secret_vote.id}
+    assert represented == {proxied.id, both.id}

@@ -1,15 +1,15 @@
 """RBAC resolution.
 
 The roles of the application are the truth. The permissions come from the bootstrap
-`role_assignment` rows, which the resolver validates against the current time, and from
-`group_mapping`, which adds a global role for an OIDC group. A global role has no gremium
+`role_assignment` rows and from `group_mapping`, which adds a global role for an OIDC
+group. A global role has no gremium
 scope. The gremium rights come from the active `gremium_membership`, which the resolver
 turns into the namespaced `vote:` key.
 """
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import select
@@ -39,33 +39,6 @@ def vote_group_key(gremium_id: object) -> str:
     return f"{VOTE_GROUP_PREFIX}{gremium_id}"
 
 
-def _as_aware(dt: datetime | None) -> datetime | None:
-    """Treat a naive value as UTC.
-
-    This guard covers legacy data and timestamps without a time zone. The rest of the code
-    uses aware UTC. A naive `valid_from` or `valid_until` from the database would raise
-    `TypeError` against the aware `now`. That would break the whole principal resolution,
-    for REST and for the WebSocket handshake.
-    """
-    if dt is not None and dt.tzinfo is None:
-        return dt.replace(tzinfo=UTC)
-    return dt
-
-
-def _assignment_valid(
-    valid_from: datetime | None, valid_until: datetime | None, now: datetime
-) -> bool:
-    """Check the validity window of a delegation.
-
-    The caller always passes an aware UTC `now`. Only the database columns can be naive.
-    """
-    valid_from = _as_aware(valid_from)
-    valid_until = _as_aware(valid_until)
-    after_start = valid_from is None or valid_from <= now
-    before_end = valid_until is None or valid_until >= now
-    return after_start and before_end
-
-
 async def resolve_principal(db: AsyncSession, row: PrincipalRow, now: datetime) -> Principal:
     """Resolve a `principal` row into a full `Principal` with roles, permissions, groups.
 
@@ -87,18 +60,15 @@ async def resolve_principal(db: AsyncSession, row: PrincipalRow, now: datetime) 
         for g in (str(raw) for raw in (row.oidc_groups or []))
         if not g.startswith(VOTE_GROUP_PREFIX)
     }
-    role_ids: set[UUID] = set()
-
-    assignments = (
-        await db.execute(
-            select(RoleAssignment).where(RoleAssignment.principal_id == row.id)
-        )
-    ).scalars().all()
-    for a in assignments:
-        if _assignment_valid(a.valid_from, a.valid_until, now):
-            role_ids.add(a.role_id)
-            if a.gremium_id is not None:
-                groups.add(str(a.gremium_id))
+    role_ids: set[UUID] = set(
+        (
+            await db.execute(
+                select(RoleAssignment.role_id).where(
+                    RoleAssignment.principal_id == row.id
+                )
+            )
+        ).scalars().all()
+    )
 
     if groups:
         mappings = (
@@ -133,10 +103,6 @@ async def resolve_principal(db: AsyncSession, row: PrincipalRow, now: datetime) 
             .join(GremiumRole, GremiumRole.id == GremiumMembership.gremium_role_id)
             .where(
                 GremiumMembership.principal_id == row.id,
-                (GremiumMembership.valid_from.is_(None))
-                | (GremiumMembership.valid_from <= now),
-                (GremiumMembership.valid_until.is_(None))
-                | (GremiumMembership.valid_until > now),
             )
         )
     ).all()

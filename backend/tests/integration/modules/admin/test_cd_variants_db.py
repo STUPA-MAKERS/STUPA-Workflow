@@ -5,7 +5,7 @@ too, but the constraint is the last line: no code path, no migration and no
 manual SQL can write a broken row.
 
 * `ck_cd_variant_logo_source` — a logo is EITHER vendored OR uploaded.
-* `ck_cd_variant_logo_slot` and `ck_cd_variant_base_variant` — closed value sets.
+* `ck_cd_variant_logo_slot` — a closed value set.
 * `uq_cd_variant_logo_square` — at most one square logo per variant.
 * `fk_gremium_cd_variant_id_cd_variant` is RESTRICT — a variant that a Gremium
   still uses cannot be deleted, so the Gremium is never orphaned.
@@ -32,7 +32,7 @@ def _variant_id(conn, key: str) -> str:
 def test_seed_holds_the_five_variants_with_vendored_logos(engine: Engine) -> None:
     with engine.connect() as conn:
         rows = conn.execute(
-            text("SELECT key, base_variant FROM cd_variant ORDER BY key")
+            text("SELECT key FROM cd_variant ORDER BY key")
         ).fetchall()
         logos = conn.execute(
             text(
@@ -41,13 +41,7 @@ def test_seed_holds_the_five_variants_with_vendored_logos(engine: Engine) -> Non
                 'ORDER BY v.key, l.slot, l."position"'
             )
         ).fetchall()
-    assert [tuple(r) for r in rows] == [
-        ("asta", "protocol"),
-        ("echo", "protocol"),
-        ("makers", "report"),
-        ("report", "report"),
-        ("stupa", "protocol"),
-    ]
+    assert [r[0] for r in rows] == ["asta", "echo", "makers", "report", "stupa"]
     assert [tuple(r) for r in logos] == [
         ("asta", "footer", "ASTA", None),
         ("asta", "title", "ASTA", None),
@@ -106,16 +100,6 @@ def test_logo_with_an_unknown_slot_is_rejected(engine: Engine) -> None:
         )
 
 
-def test_variant_with_an_unknown_base_variant_is_rejected(engine: Engine) -> None:
-    with pytest.raises(IntegrityError), engine.begin() as conn:
-        conn.execute(
-            text(
-                "INSERT INTO cd_variant (key, name, base_variant) "
-                "VALUES ('x-bad', 'X', 'letter')"
-            )
-        )
-
-
 def test_variant_key_is_unique(engine: Engine) -> None:
     with pytest.raises(IntegrityError), engine.begin() as conn:
         conn.execute(
@@ -144,8 +128,8 @@ def test_deleting_a_variant_cascades_to_its_logos(engine: Engine) -> None:
     with engine.begin() as conn:
         vid = conn.execute(
             text(
-                "INSERT INTO cd_variant (key, name, base_variant) "
-                "VALUES ('temp-cd', 'Temp', 'report') RETURNING id"
+                "INSERT INTO cd_variant (key, name) "
+                "VALUES ('temp-cd', 'Temp') RETURNING id"
             )
         ).scalar_one()
         conn.execute(
@@ -230,7 +214,8 @@ def test_upgrade_from_an_installed_database(engine: Engine) -> None:
     An installed database carries the old free text on every Gremium. Both slots of every
     variant survive, which a per-logo guard would not do: it would keep the title row
     only. The rebuild leaves the tables at revision ec167d091656, so the test re-applies
-    the square slot of a3f9c2d71e4b, and the tests that run later see the head schema.
+    the square slot of a3f9c2d71e4b and the drop of ``base_variant`` of c71e5a0d9f42, and
+    the tests that run later see the head schema.
     """
     import importlib.util
     from pathlib import Path
@@ -307,6 +292,10 @@ def test_upgrade_from_an_installed_database(engine: Engine) -> None:
                 "ON cd_variant_logo (variant_id) WHERE slot = 'square'"
             )
         )
+        conn.execute(
+            text("ALTER TABLE cd_variant DROP CONSTRAINT IF EXISTS ck_cd_variant_base_variant")
+        )
+        conn.execute(text("ALTER TABLE cd_variant DROP COLUMN IF EXISTS base_variant"))
 
 
 def test_admin_role_holds_the_new_permission(engine: Engine) -> None:

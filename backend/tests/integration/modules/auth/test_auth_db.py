@@ -1,7 +1,7 @@
 """Integration: the auth tables against a real Postgres 16.
 
-The tests check the schema behavior of the migration: magic_link (scope CHECK, bytea
-hash, FK CASCADE) and auth_session (sid UNIQUE, principal FK CASCADE).
+The tests check the schema behavior of the migration: magic_link (bytea hash, FK
+CASCADE) and auth_session (sid UNIQUE, principal FK CASCADE).
 """
 
 from __future__ import annotations
@@ -32,25 +32,13 @@ def _new_application(conn) -> str:
     ).scalar_one()
 
 
-def test_magic_link_scope_check_rejects_bad_scope(engine: Engine) -> None:
-    with pytest.raises(IntegrityError), engine.begin() as conn:
-        app_id = _new_application(conn)
-        conn.execute(
-            text(
-                "INSERT INTO magic_link (application_id, token_hash, scope, expires_at) "
-                "VALUES (:a, :h, 'bogus', now())"
-            ),
-            {"a": app_id, "h": b"\x00" * 32},
-        )
-
-
 def test_magic_link_cascade_on_application_delete(engine: Engine) -> None:
     with engine.begin() as conn:
         app_id = _new_application(conn)
         conn.execute(
             text(
-                "INSERT INTO magic_link (application_id, token_hash, scope, expires_at) "
-                "VALUES (:a, :h, 'edit', now())"
+                "INSERT INTO magic_link (application_id, token_hash, expires_at) "
+                "VALUES (:a, :h, now())"
             ),
             {"a": app_id, "h": b"\x01" * 32},
         )

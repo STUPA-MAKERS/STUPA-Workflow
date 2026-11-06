@@ -1,7 +1,7 @@
 """Polls ("Umfrage") in the voting module, without a database.
 
 A result-queue fake drives every poll branch: the config rules, the tally of the three
-modes, the ballot shapes, the own ballot, the read with the running count, the create
+modes, the ballot shapes, the read with the hidden count, the create
 of a poll of a Gremium, the open check, the close and the edit.
 """
 
@@ -18,10 +18,8 @@ import pytest
 from app.modules.auth import policy
 from app.modules.auth.principal import Principal
 from app.modules.voting import poll as poll_mod
-from app.modules.voting.election import own_ballot as any_ballot
 from app.modules.voting.poll import PollService
 from app.modules.voting.schemas import (
-    MyBallot,
     PollCreate,
     PollIn,
     PollPatch,
@@ -68,6 +66,7 @@ def _pcfg(mode: str = "single", **over: Any) -> dict[str, Any]:
     data: dict[str, Any] = {
         "mode": mode,
         "options": _dates() if mode == "date" else _options(),
+        "secret": True,
     }
     data.update(over)
     return PollConfig.model_validate(data).model_dump(mode="json", by_alias=True)
@@ -234,7 +233,7 @@ def test_tally_date_with_maybe_only_still_has_a_best_date() -> None:
 def test_build_config_wraps_the_error_in_422() -> None:
     data = PollIn.model_validate({"mode": "single", "options": [{"label": "A"}, {"start": D1}]})
     with pytest.raises(ValidationProblem) as err:
-        poll_mod.build_config(data, secret=False)
+        poll_mod.build_config(data, secret=True)
     assert err.value.code == "poll_invalid"
 
 
@@ -262,15 +261,6 @@ def test_stored_choice_forms() -> None:
     assert poll_mod.stored_choice(_cfg("date"), answers) == '{"o1":"yes","o2":"maybe","o3":"no"}'
 
 
-def test_own_ballot_shapes() -> None:
-    assert poll_mod.own_ballot('["o1"]') == MyBallot(cast=True, choices=["o1"])
-    assert poll_mod.own_ballot('{"o1":"yes"}') == MyBallot.model_validate(
-        {"cast": True, "answers": {"o1": "yes"}}
-    )
-    assert poll_mod.own_ballot("odd") == MyBallot(cast=True, choice="odd")
-    assert any_ballot("poll", '["o2"]') == MyBallot(cast=True, choices=["o2"])
-
-
 def test_poll_fields_and_audit_data() -> None:
     assert poll_mod.poll_fields(_vote()) == {}  # type: ignore[arg-type]
     assert poll_mod.is_poll(SimpleNamespace()) is False
@@ -294,12 +284,17 @@ def test_result_of_keeps_maybe_none_outside_the_date_mode() -> None:
     assert poll_mod.dump_result(out)["counts"] == {"o1": 1, "o2": 0, "o3": 0}
 
 
+def _secret_choice(db: Any) -> str:
+    [secret] = [a for a in db.added if type(a).__name__ == "SecretBallot"]
+    return secret.choice
+
+
 async def test_cast_single_poll_stores_the_list() -> None:
     vote = _pvote()
     db = fake_session(result(vote), result(uuid4()))
     out = await VotingService(db).cast(vote.id, _voter(), ["o2"], now=NOW)
     assert out.status == "cast"
-    assert db.statements[-1].compile().params["choice"] == '["o2"]'
+    assert _secret_choice(db) == '["o2"]'
 
 
 async def test_cast_date_poll_stores_the_answers() -> None:
@@ -307,15 +302,15 @@ async def test_cast_date_poll_stores_the_answers() -> None:
     db = fake_session(result(vote), result(uuid4()))
     answers = {"o1": "yes", "o2": "no", "o3": "maybe"}
     await VotingService(db).cast(vote.id, _voter(), answers, now=NOW)
-    assert db.statements[-1].compile().params["choice"] == '{"o1":"yes","o2":"no","o3":"maybe"}'
+    assert _secret_choice(db) == '{"o1":"yes","o2":"no","o3":"maybe"}'
 
 
-async def test_cast_secret_poll_keeps_the_choice_apart() -> None:
-    vote = _pvote(config=_pcfg("multi", secret=True))
+async def test_cast_poll_keeps_the_choice_apart() -> None:
+    vote = _pvote(config=_pcfg("multi"))
     db = fake_session(result(vote), result(uuid4()))
     await VotingService(db).cast(vote.id, _voter(), [], now=NOW)
-    [secret] = [a for a in db.added if type(a).__name__ == "SecretBallot"]
-    assert secret.choice == "[]"
+    assert _secret_choice(db) == "[]"
+    assert "choice" not in db.statements[-1].compile().params
 
 
 async def test_cast_poll_refuses_a_bad_ballot() -> None:
@@ -332,10 +327,10 @@ async def test_cast_motion_refuses_date_answers() -> None:
         )
 
 
-async def test_get_open_poll_shows_the_running_count() -> None:
-    vote = _pvote(config=_pcfg("date"))
+async def test_get_closed_date_poll_counts_the_yes_answers() -> None:
+    vote = _pvote(config=_pcfg("date"), status="closed", closed_at=NOW)
     ballot = encode_poll_answers({"o1": "yes", "o2": "maybe", "o3": "no"})
-    db = fake_session(result(vote), result(ballot), result(ballot), result(ballot))
+    db = fake_session(result(vote), result(ballot), result(ballot))
     out = await VotingService(db).get(vote.id)
     assert out.kind == "poll"
     assert out.poll is not None and out.poll.mode == "date"
@@ -343,17 +338,15 @@ async def test_get_open_poll_shows_the_running_count() -> None:
     assert out.tally.counts == {"o1": 1, "o2": 0, "o3": 0}
     assert out.tally.voted == 1
     assert out.tally.quorum_met is True
-    assert out.poll_result is not None
-    assert out.poll_result.maybe == {"o1": 0, "o2": 1, "o3": 0}
-    assert out.poll_result.top == ["o1"]
 
 
-async def test_get_open_secret_poll_hides_the_count() -> None:
-    vote = _pvote(config=_pcfg(secret=True))
+async def test_get_open_poll_hides_the_count() -> None:
+    vote = _pvote()
     db = fake_session(result(vote), result('["o1"]'), result('["o1"]'))
     out = await VotingService(db).get(vote.id)
     assert out.tally.revealed is False
     assert out.tally.counts == {}
+    assert out.tally.voted == 1
     assert out.poll_result is None
 
 
@@ -457,7 +450,7 @@ async def test_create_poll_opens_at_once(manage: set[UUID]) -> None:
 _OUT: dict[str, Any] = {
     "eligibleGroup": str(GID),
     "config": _cfg().as_vote_config().model_dump(by_alias=True),
-    "secret": False,
+    "secret": True,
     "tally": {"counts": {}, "eligible": 0, "voted": 0, "quorumMet": True},
 }
 
@@ -680,7 +673,7 @@ async def test_patch_refuses_a_motion_and_an_ended_poll(over: dict[str, Any], co
 async def test_patch_with_answers_409() -> None:
     vote = _pvote()
     db = fake_session(result(vote))
-    db.scalar_results = [0, 0, 1]
+    db.scalar_results = [0, 1]
     with pytest.raises(ConflictError) as err:
         await PollService(VotingService(db)).patch(vote.id, PollPatch(), _voter(), now=NOW)
     assert err.value.code == "poll_has_answers"

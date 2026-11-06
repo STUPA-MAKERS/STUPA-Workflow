@@ -139,7 +139,7 @@ class HandoverOps(PermissionOps, VoteReadOps):
             await self.session.flush()
         return planned
 
-    async def open_first_period(self, meeting: Meeting, actor: str, now: datetime) -> None:
+    async def open_first_period(self, meeting: Meeting, now: datetime) -> None:
         """Open the first period for the protokollant on the start of the meeting.
 
         The method does nothing without a protokollant or when a period runs already.
@@ -154,7 +154,6 @@ class HandoverOps(PermissionOps, VoteReadOps):
                 principal_id=meeting.protokollant_id,
                 from_at=now,
                 from_agenda_item_id=meeting.current_agenda_item_id,
-                handed_over_by=actor,
             )
         )
         await self.session.flush()
@@ -164,9 +163,7 @@ class HandoverOps(PermissionOps, VoteReadOps):
         await self._end_running(meeting, now, meeting.current_agenda_item_id)
         await self._drop_planned(meeting.id)
 
-    async def switch_now(
-        self, meeting: Meeting, principal_id: UUID, actor: str, now: datetime
-    ) -> None:
+    async def switch_now(self, meeting: Meeting, principal_id: UUID, now: datetime) -> None:
         """Hand the minutes over at once: end the running period and open the next one.
 
         A planned handover goes away. The new period starts at the current agenda
@@ -180,7 +177,6 @@ class HandoverOps(PermissionOps, VoteReadOps):
                 principal_id=principal_id,
                 from_at=now,
                 from_agenda_item_id=meeting.current_agenda_item_id,
-                handed_over_by=actor,
             )
         )
         meeting.protokollant_id = principal_id
@@ -315,7 +311,7 @@ class HandoverOps(PermissionOps, VoteReadOps):
         now = datetime.now(UTC)
         previous = meeting.protokollant_id
         if mode == "now":
-            await self.switch_now(meeting, target, principal.sub, now)
+            await self.switch_now(meeting, target, now)
         else:
             order = await self._agenda_ids(meeting.id)
             current = meeting.current_agenda_item_id
@@ -326,9 +322,7 @@ class HandoverOps(PermissionOps, VoteReadOps):
                 )
             await self._drop_planned(meeting.id)
             self.session.add(
-                ProtocolKeeperPeriod(
-                    meeting_id=meeting.id, principal_id=target, handed_over_by=principal.sub
-                )
+                ProtocolKeeperPeriod(meeting_id=meeting.id, principal_id=target)
             )
             await self.session.flush()
         await self._audit_handover(

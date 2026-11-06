@@ -153,7 +153,6 @@ def variant_row(**kw: Any) -> CdVariant:
     row = CdVariant(
         key=kw.pop("key", "stupa"),
         name=kw.pop("name", "StuPa"),
-        base_variant=kw.pop("base_variant", "protocol"),
     )
     row.id = kw.pop("id", uuid.uuid4())
     for key, value in kw.items():
@@ -297,17 +296,12 @@ def test_logo_table_holds_the_exactly_one_of_constraint() -> None:
     assert checks["ck_cd_variant_logo_slot"] == "slot IN ('title','footer','square')"
 
 
-def test_variant_table_holds_the_base_variant_constraint() -> None:
-    checks = _checks(CdVariant)
-    assert checks["ck_cd_variant_base_variant"] == "base_variant IN ('report','protocol')"
-
-
 async def test_create_variant_persists_and_audits() -> None:
     s, sess = svc([res(), *audit_results()])
     out = await s.create_variant(
-        CdVariantCreate(key="senat", name="Senat", baseVariant="protocol"), "admin"
+        CdVariantCreate(key="senat", name="Senat"), "admin"
     )
-    assert out.key == "senat" and out.base_variant == "protocol" and out.logos == []
+    assert out.key == "senat" and out.name == "Senat" and out.logos == []
     assert sess.committed == 1
 
 
@@ -318,13 +312,11 @@ async def test_create_variant_duplicate_key_conflicts() -> None:
     assert sess.committed == 0
 
 
-async def test_update_variant_changes_name_and_base_variant() -> None:
-    row = variant_row(key="stupa", name="StuPa", base_variant="protocol")
+async def test_update_variant_changes_the_name() -> None:
+    row = variant_row(key="stupa", name="StuPa")
     s, sess = svc([*audit_results(), res()], gets=[row])
-    out = await s.update_variant(
-        row.id, CdVariantUpdate(name="StuPa neu", baseVariant="report"), "admin"
-    )
-    assert out.name == "StuPa neu" and out.base_variant == "report"
+    out = await s.update_variant(row.id, CdVariantUpdate(name="StuPa neu"), "admin")
+    assert out.name == "StuPa neu"
     assert sess.committed == 1
 
 
@@ -690,7 +682,7 @@ def _resolver_session(
 
 
 async def test_resolve_vendored_only_variant_loads_no_asset() -> None:
-    variant = variant_row(key="stupa", base_variant="protocol")
+    variant = variant_row(key="stupa")
     logos = [
         logo_row(variant_id=variant.id, slot="title", vendored_name="STUPA"),
         logo_row(variant_id=variant.id, slot="footer", vendored_name="STUPA"),
@@ -700,7 +692,6 @@ async def test_resolve_vendored_only_variant_loads_no_asset() -> None:
         _resolver_session(variant, logos), storage, variant.key  # type: ignore[arg-type]
     )
     assert out is not None
-    assert out.base_variant == "protocol"
     assert out.title_logos == ("STUPA",) and out.footer_logos == ("STUPA",)
     assert out.assets == {}
 
@@ -710,7 +701,7 @@ async def test_resolve_upload_only_variant_returns_names_and_bytes() -> None:
 
     Typst refuses a path separator.
     """
-    variant = variant_row(key="custom", base_variant="report")
+    variant = variant_row(key="custom")
     logo = logo_row(
         variant_id=variant.id,
         slot="title",
@@ -731,7 +722,7 @@ async def test_resolve_upload_only_variant_returns_names_and_bytes() -> None:
 
 
 async def test_resolve_mixed_variant_keeps_the_slot_order() -> None:
-    variant = variant_row(key="mixed", base_variant="report")
+    variant = variant_row(key="mixed")
     uploaded = logo_row(
         variant_id=variant.id,
         slot="title",
@@ -767,14 +758,6 @@ async def test_resolve_without_a_key_is_none() -> None:
 async def test_resolve_unknown_key_is_none() -> None:
     session = FakeSession(scalars=[None])
     assert await resolve_cd_variant_by_key(session, FakeStorage(), "gone") is None  # type: ignore[arg-type]
-
-
-async def test_resolve_unknown_base_variant_falls_back_to_report() -> None:
-    variant = variant_row(key="x", base_variant="something-else")
-    out = await resolve_cd_variant_by_key(
-        _resolver_session(variant, []), FakeStorage(), variant.key  # type: ignore[arg-type]
-    )
-    assert out is not None and out.base_variant == "report"
 
 
 async def test_resolve_without_storage_fails_loudly() -> None:
