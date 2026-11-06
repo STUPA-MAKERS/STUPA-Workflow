@@ -2,7 +2,7 @@
 id: "000529"
 title: A menu row is an inset rounded tile
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:

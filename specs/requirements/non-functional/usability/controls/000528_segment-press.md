@@ -2,7 +2,7 @@
 id: "000528"
 title: A pressed segment shrinks its whole control
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
