@@ -199,6 +199,29 @@ async def test_deliver_4xx_is_dead_no_retry() -> None:
     assert delivery.response_code == 404
 
 
+@pytest.mark.parametrize("status", [301, 302, 307, 308])
+@respx.mock
+async def test_deliver_3xx_is_dead_no_retry(status: int) -> None:
+    """The client follows no redirect, so a retry cannot change a 3xx.
+
+    § F/integrations/webhooks/000298
+    """
+    hook = _hook(url="https://hook.test/h")
+    respx.post(_IP_URL).mock(
+        return_value=httpx.Response(status, headers={"Location": "https://other.test/"})
+    )
+    session = FakeSession()
+    delivery = _delivery(hook.id, attempts=0)
+    session.store.update({delivery.id: delivery, hook.id: hook})
+    async with httpx.AsyncClient() as client:
+        outcome = await _svc(session).deliver(
+            delivery.id, http_client=client, resolver=_public_resolver
+        )
+    assert outcome.kind == "dead"
+    assert delivery.status == "dead"
+    assert delivery.response_code == status
+
+
 @respx.mock
 async def test_deliver_5xx_retries_with_backoff() -> None:
     hook = _hook(url="https://hook.test/h")
