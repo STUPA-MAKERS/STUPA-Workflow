@@ -134,7 +134,7 @@ async def test_cards_keep_the_order_and_leave_out_unknown_and_unreadable() -> No
 
 
 async def test_tile_of_an_archived_card_is_not_found() -> None:
-    session, _b, _col, c, service = _setup(archived_at=SimpleNamespace())
+    _session, _b, _col, c, service = _setup(archived_at=SimpleNamespace())
     with pytest.raises(NotFoundError):
         await service.tile(c.id, USER)
 
