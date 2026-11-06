@@ -481,3 +481,33 @@
     display: block;
   }
 }
+
+// Skeleton: bars in the real containers, sized like the content they stand for.
+.bd__skSearch {
+  height: var(--control-height-lg);
+  border-radius: 999px;
+}
+.bd__skChip {
+  width: 7rem;
+  height: var(--control-height-sm);
+  border-radius: 999px;
+}
+.bd__skChip--wide {
+  width: 11rem;
+}
+.bd__skAmt {
+  width: 4.5em;
+}
+.bd__skBar {
+  height: 4px;
+  border-radius: 999px;
+}
+.bd__skTitle {
+  width: 12em;
+}
+.bd__skLine {
+  width: 16em;
+}
+.bd__skFig {
+  width: 5.5em;
+}

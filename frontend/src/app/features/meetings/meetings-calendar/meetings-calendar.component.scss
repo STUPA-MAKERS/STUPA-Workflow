@@ -334,3 +334,18 @@
   color: var(--color-text-muted);
   font-size: 0.8125rem;
 }
+
+// The first load of the day panel: cards with bars where the text goes.
+.cal__skLine {
+  width: 14em;
+}
+.cal__skBtn {
+  width: 6.5rem;
+  height: var(--control-height-sm);
+  border-radius: 999px;
+}
+.cal__skCards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}

@@ -17,8 +17,9 @@ Rules that this module enforces:
   title only (decision 2026-10-06).
 * The audit log stores the guest id only, never the name: the chain is append-only.
 * Privacy: the close of the meeting deletes the requests that never got admitted and
-  every token hash. Leaving or withdrawing replaces the own name with the pseudonym
-  "Gast n" at once. The finalization of the protocol pseudonymizes all guests.
+  every token hash, and pseudonymizes the admitted guests. Leaving or withdrawing
+  replaces the own name with the pseudonym "Gast n" at once. The finalization of the
+  protocol pseudonymizes all guests again.
 
 The lead routes need ``session.manage`` in the gremium of the meeting (the router
 checks it). The public routes authenticate the guest by the token alone.

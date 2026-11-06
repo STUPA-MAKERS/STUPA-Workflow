@@ -2,7 +2,8 @@
 
 Project-local mirror of the maintainer's working memory for **STUPA-Workflow**. Each entry is
 one file that holds one durable fact (a convention, a decision, a data shape, a gotcha). Read the
-linked file before you start related work. A `[[slug]]` marker inside a file points at a
+linked file before you start related work. The binding rules are specs in `specs/`; each
+memory file here only points to its specs. A `[[slug]]` marker inside a file points at a
 sibling memory here.
 
 > **Note:** this repo deliberately does **not** mirror the internal security-audit findings.

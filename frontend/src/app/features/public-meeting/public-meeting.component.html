@@ -20,10 +20,22 @@
 <div class="pm">
   @switch (st) {
     @case ('loading') {
-      <div class="pm__loading" aria-busy="true">
-        <span class="skel skel--line"></span>
-        <span class="skel skel--line"></span>
+      <!-- The first load draws the join page, the first page a guest sees, with bars where its text goes. -->
+      <div class="pm__loading skel-in" aria-busy="true">
         <span class="sr-only" role="status">{{ 'meetings.loading' | t }}</span>
+        <div class="pm__head" aria-hidden="true">
+          <span class="pm__eyebrow"><span class="skel-text skel-text--accent pm__skEyebrow"></span></span>
+          <span class="pm__title"><span class="skel-text pm__skTitle"></span></span>
+          <span class="pm__meta"><span class="skel-text skel-text--muted pm__skMeta"></span></span>
+        </div>
+        <p class="pm__intro" aria-hidden="true">
+          <span class="skel-text skel-text--muted pm__skIntro"></span>
+          <span class="skel-text skel-text--muted pm__skIntro pm__skIntro--short"></span>
+        </p>
+        <div class="pm__form" aria-hidden="true">
+          <span class="skel-box pm__skInput"></span>
+          <span class="skel-box pm__skButton"></span>
+        </div>
       </div>
     }
     @case ('unknown') {

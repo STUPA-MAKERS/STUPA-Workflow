@@ -1,0 +1,212 @@
+@use 'breakpoints' as bp;
+
+// The frame of `app-meeting-page` (its `:host`, `.mp__head`, `.mp__body`, `.mp__dock`).
+:host {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-height: 0;
+  margin-block: calc(var(--app-top-safe-area, 0px) - var(--main-pad-top, var(--space-8)))
+    calc(-1 * var(--main-pad-bottom, var(--space-8)));
+  margin-inline: calc(-1 * var(--layout-gutter));
+}
+
+.mps__head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 84px;
+  padding: var(--space-3) var(--space-5) var(--space-3) var(--space-3);
+}
+.mps__back,
+.mps__menu {
+  width: var(--control-height);
+  height: var(--control-height);
+  border-radius: 999px;
+}
+.mps__titles {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.mps__title {
+  font-size: var(--fs-h1);
+  line-height: 1.75rem;
+}
+.mps__titleBar {
+  width: min(24em, 90%);
+}
+.mps__sub {
+  font-size: var(--fs-small);
+  line-height: 1.125rem;
+}
+.mps__subBar {
+  width: min(22em, 80%);
+}
+
+.mps__body {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0 var(--space-3);
+}
+.mps__body--wide {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: var(--space-3);
+  padding: 0 var(--space-3) 0 0;
+}
+
+.mps__agenda {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--space-2) var(--space-3);
+}
+.mps__kicker {
+  padding: var(--space-1) var(--space-2) var(--space-2);
+  font-size: var(--fs-small);
+  line-height: 1.125rem;
+}
+.mps__kickerBar {
+  width: 9em;
+}
+.mps__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 3rem;
+  padding: 0 var(--space-2);
+}
+.mps__num {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 999px;
+}
+.mps__rowName {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--fs-body);
+}
+
+.mps__sheet {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 24rem;
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-1);
+  overflow: hidden;
+}
+.mps__bar {
+  display: flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0 var(--space-5);
+  background: var(--color-surface-2);
+  font-size: var(--fs-small);
+}
+.mps__barText {
+  width: 18em;
+}
+.mps__kind {
+  padding: var(--space-5) var(--space-5) 2px;
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+.mps__kindBar {
+  width: 3.5em;
+}
+.mps__topTitle {
+  padding: 0 var(--space-5) var(--space-5);
+  font-size: 1.375rem;
+  line-height: 1.75rem;
+}
+.mps__topTitleBar {
+  width: min(14em, 70%);
+}
+.mps__text {
+  padding: 0 var(--space-5) var(--space-2);
+  font-size: var(--fs-body);
+  line-height: 1.5rem;
+}
+.mps__textBar {
+  width: min(30em, 85%);
+}
+.mps__textBar--short {
+  width: min(18em, 55%);
+}
+
+.mps__dock {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 3.5rem;
+  margin: var(--space-3) var(--space-3) var(--space-3) 0;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-2);
+  box-shadow: var(--shadow-md);
+}
+@include bp.below-wide {
+  .mps__dock {
+    margin-inline-start: var(--space-3);
+  }
+}
+.mps__dockText {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--fs-small);
+}
+.mps__dockLine {
+  width: 8em;
+}
+.mps__dockLine--short {
+  width: 4.5em;
+}
+.mps__grow {
+  flex: 1 1 auto;
+}
+.mps__chip {
+  width: 6rem;
+  height: var(--control-height-sm);
+  border-radius: 999px;
+}
+
+// A phone: the page reaches the screen edges, the protocol fills them, and the dock floats
+// above the navigation bar (`MeetingPageComponent`).
+@include bp.phone {
+  :host {
+    flex: 1 0 auto;
+    min-height: 100dvh;
+    margin-inline: calc(-1 * var(--space-4));
+  }
+  .mps__head {
+    min-height: 64px;
+    padding: var(--space-2) var(--space-3);
+  }
+  .mps__title {
+    font-size: var(--fs-lg);
+    line-height: 1.5rem;
+  }
+  .mps__body {
+    padding-inline: 0;
+  }
+  .mps__sheet {
+    min-height: 60dvh;
+    border-radius: 0;
+  }
+  .mps__dock {
+    position: fixed;
+    inset-inline: var(--space-2);
+    bottom: calc(var(--app-bottom-inset, 0px) + var(--space-2));
+    z-index: var(--z-sticky, 10);
+    margin: 0;
+  }
+}
