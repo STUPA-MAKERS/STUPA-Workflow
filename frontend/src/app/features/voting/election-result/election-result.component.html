@@ -34,11 +34,7 @@
       <app-icon name="repeat" [size]="18" />
       <span>{{ r.text }}</span>
     </p>
-    @if (r.pending && canManage() && voteId()) {
-      <app-button variant="fill" [loading]="busy() === 'runoff'" (click)="startRunoff()">
-        {{ 'election.runoff.start' | t }}
-      </app-button>
-    } @else if (!r.pending) {
+    @if (!r.pending) {
       <p class="er__hint">{{ 'election.runoff.exists' | t }}</p>
     }
   </div>

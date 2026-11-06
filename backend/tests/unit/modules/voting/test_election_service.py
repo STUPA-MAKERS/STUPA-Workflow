@@ -421,71 +421,6 @@ def _runoff_parent(**over: Any) -> SimpleNamespace:
     return _evote(**base)
 
 
-async def test_create_runoff_takes_the_tied_candidates() -> None:
-    parent = _runoff_parent()
-    roster = [(uuid4(), ["vote.cast"]), (uuid4(), ["vote.cast"])]
-    db = fake_session(result(parent), result(*roster), result())
-    db.scalar_results = [parent.meeting_id, "live"]
-    out = await ElectionService(VotingService(db)).create_runoff(parent.id)
-    [runoff] = [a for a in db.added if type(a).__name__ == "Vote"]
-    assert runoff.parent_vote_id == parent.id
-    assert runoff.round == 2
-    assert runoff.meeting_id == parent.meeting_id
-    assert runoff.agenda_item_id == parent.agenda_item_id
-    assert runoff.eligible_count == 2
-    assert runoff.config["seats"] == 1
-    assert [c["id"] for c in runoff.config["candidates"]] == ["c2", "c3"]
-    assert parent.election_result["runoff"]["voteId"] == str(runoff.id)
-    assert out.round == 2
-    assert out.parent_vote_id == parent.id
-    assert db.committed == 1
-
-
-async def test_create_runoff_with_guests_keeps_the_count() -> None:
-    parent = _runoff_parent(config_over={"guestsVote": True}, meeting_id=None, eligible_count=7)
-    db = fake_session(result(parent), result())
-    out = await ElectionService(VotingService(db)).create_runoff(parent.id)
-    assert out.tally.eligible == 7
-
-
-async def test_create_runoff_without_a_pending_runoff_409() -> None:
-    config = _econfig()
-    parent = _runoff_parent(meeting_id=None, election_result=_stored(['["c1"]'], config))
-    with pytest.raises(ConflictError) as err:
-        await ElectionService(VotingService(fake_session(result(parent)))).create_runoff(
-            parent.id
-        )
-    assert err.value.code == "no_runoff_pending"
-
-
-@pytest.mark.parametrize("status", ["draft", "open", "closed"])
-async def test_create_runoff_twice_409(status: str) -> None:
-    """A second runoff gives 409 while the first is not cancelled.
-
-    The scalars are the meeting id and the status of the runoff.
-    """
-    parent = _runoff_parent(meeting_id=None)
-    parent.election_result["runoff"]["voteId"] = str(uuid4())
-    db = fake_session(result(parent))
-    db.scalar_results = [None, status]
-    with pytest.raises(ConflictError) as err:
-        await ElectionService(VotingService(db)).create_runoff(parent.id)
-    assert err.value.code == "runoff_exists"
-
-
-@pytest.mark.parametrize("status", ["cancelled", None])
-async def test_create_runoff_after_a_cancelled_or_deleted_runoff(status: str | None) -> None:
-    """A cancelled or deleted runoff does not block a new one."""
-    parent = _runoff_parent(meeting_id=None, config_over={"guestsVote": True}, eligible_count=3)
-    old = str(uuid4())
-    parent.election_result["runoff"]["voteId"] = old
-    db = fake_session(result(parent), result())
-    db.scalar_results = [None, status]
-    await ElectionService(VotingService(db)).create_runoff(parent.id)
-    [runoff] = [a for a in db.added if type(a).__name__ == "Vote"]
-    assert parent.election_result["runoff"]["voteId"] == str(runoff.id) != old
-
-
 def _linked_runoff(parent: SimpleNamespace, **over: Any) -> SimpleNamespace:
     runoff = _evote(parent_vote_id=parent.id, round=2, **over)
     parent.election_result["runoff"]["voteId"] = str(runoff.id)
@@ -543,15 +478,6 @@ async def test_cancel_of_a_first_round_election_touches_no_parent() -> None:
     assert not any("vote.id = " in str(s) and "FOR UPDATE" in str(s) for s in db.statements[1:])
 
 
-async def test_create_runoff_needs_a_live_meeting() -> None:
-    parent = _runoff_parent()
-    db = fake_session(result(parent))
-    db.scalar_results = [parent.meeting_id, "closed"]
-    with pytest.raises(ConflictError) as err:
-        await ElectionService(VotingService(db)).create_runoff(parent.id)
-    assert err.value.code == "meeting_closed"
-
-
 _TALLY = TallyOut(counts={}, eligible=0, quorumMet=True)
 _MANAGER = "fake:manager"
 
@@ -585,10 +511,6 @@ class _FakeElections:
 
     async def draw_lot(self, vote_id: UUID, principal: Principal, *, now: object) -> VoteOut:
         _FakeElections.calls.append(f"lot:{principal.sub}")
-        return _vote_out()
-
-    async def create_runoff(self, vote_id: UUID) -> VoteOut:
-        _FakeElections.calls.append("runoff")
         return _vote_out()
 
 
@@ -630,15 +552,7 @@ def test_route_draw_lot_publishes_the_result(routes: tuple[FastAPI, _Pub]) -> No
     assert _FakeElections.calls == ["lot:p"]
 
 
-def test_route_runoff_creates_the_draft(routes: tuple[FastAPI, _Pub]) -> None:
-    app, _ = routes
-    _login(app, _MANAGER)
-    r = TestClient(app).post(f"/api/votes/{uuid4()}/runoff")
-    assert r.status_code == 200
-    assert _FakeElections.calls == ["runoff"]
-
-
-@pytest.mark.parametrize("path", ["draw-lot", "runoff"])
+@pytest.mark.parametrize("path", ["draw-lot"])
 def test_routes_need_the_manage_right(routes: tuple[FastAPI, _Pub], path: str) -> None:
     app, _ = routes
     _login(app, f"vote:{GID}")
@@ -654,3 +568,11 @@ def test_ballot_body_takes_a_list(routes: tuple[FastAPI, _Pub]) -> None:
     assert BallotIn.model_validate({"choice": ["c1"]}).choice == ["c1"]
     with pytest.raises(ValueError):
         BallotIn.model_validate({"choice": ""})
+
+
+def test_runoff_route_is_gone(routes: tuple[FastAPI, _Pub]) -> None:
+    """There is no runoff: a tie in an election is decided by lot (§ F/meetings/voting/000027)."""
+    app, _ = routes
+    _login(app, _MANAGER)
+    r = TestClient(app).post(f"/api/votes/{uuid4()}/runoff")
+    assert r.status_code in (404, 405)

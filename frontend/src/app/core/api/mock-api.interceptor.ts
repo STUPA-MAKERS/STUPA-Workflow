@@ -285,41 +285,6 @@ function mockDrawLot(id: string, url: string): Observable<never> | Vote {
   return mockElectionVote(updated);
 }
 
-/** POST /votes/{id}/runoff: a draft runoff with the tied candidates. */
-function mockRunoff(id: string, url: string): Observable<never> | Vote {
-  const row = MOCK_MEETING.votes.find((v) => v.id === id);
-  const runoff = row?.electionResult?.runoff;
-  if (!row || row.kind !== 'election') return mockProblem(409, 'not_an_election', url);
-  if (!runoff || row.result !== 'runoff') return mockProblem(409, 'no_runoff_pending', url);
-  if (runoff.voteId) return mockProblem(409, 'runoff_exists', url);
-  const newId = `v-runoff-${MOCK_MEETING.votes.length + 1}`;
-  const candidates = (row.election?.candidates ?? []).filter((c) => runoff.candidateIds.includes(c.id));
-  const draft: MeetingVoteOutWire = {
-    ...row,
-    id: newId,
-    status: 'draft',
-    result: null,
-    counts: null,
-    voted: 0,
-    closedAt: null,
-    openedAt: null,
-    options: [...candidates.map((c) => c.id), 'abstain'],
-    election: { ...row.election!, seats: runoff.seats, candidates },
-    electionResult: null,
-    round: (row.round ?? 1) + 1,
-    parentVoteId: row.id,
-  };
-  const parent: MeetingVoteOutWire = {
-    ...row,
-    electionResult: { ...row.electionResult!, runoff: { ...runoff, voteId: newId } },
-  };
-  MOCK_MEETING = {
-    ...MOCK_MEETING,
-    votes: [...MOCK_MEETING.votes.map((v) => (v.id === id ? parent : v)), draft],
-  };
-  return mockElectionVote(draft);
-}
-
 /** The ballots of the demo user in this mock session, by vote id. */
 const MOCK_BALLOTS = new Map<string, { own?: string | string[]; proxy?: string | string[] }>();
 
@@ -2136,10 +2101,6 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     if (/\/votes\/[^/]+\/draw-lot$/.test(p)) {
       const res = mockDrawLot(p.split('/').slice(-2)[0], req.url);
       return 'id' in res ? ok(res) : res;
-    }
-    if (/\/votes\/[^/]+\/runoff$/.test(p)) {
-      const res = mockRunoff(p.split('/').slice(-2)[0], req.url);
-      return 'id' in res ? ok(res, 201) : res;
     }
     if (/\/votes\/[^/]+\/open$/.test(p)) {
       setVoteStatus(p.split('/').slice(-2)[0], 'open');
