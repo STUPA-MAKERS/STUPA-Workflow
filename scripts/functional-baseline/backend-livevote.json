@@ -3,7 +3,7 @@
   "backend/app/modules/livevote/attendance_service.py": 4,
   "backend/app/modules/livevote/broker.py": 4,
   "backend/app/modules/livevote/connection.py": 20,
-  "backend/app/modules/livevote/events.py": 18,
+  "backend/app/modules/livevote/events.py": 17,
   "backend/app/modules/livevote/guest_connection.py": 13,
   "backend/app/modules/livevote/guests.py": 39,
   "backend/app/modules/livevote/keepers.py": 9,
