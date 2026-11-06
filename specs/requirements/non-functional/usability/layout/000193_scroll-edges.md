@@ -16,4 +16,4 @@ scope:
 # A scroll edge fades, or cuts at a line
 
 A scrolling pane must fade at its edges. Where a real line exists, for example a tab line on
-the phone, the content must cut hard at that line.
+the phone, the content must cut hard at that line. A list under a glass head (000527) does not fade.
