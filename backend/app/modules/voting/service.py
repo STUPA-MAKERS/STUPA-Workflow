@@ -106,7 +106,7 @@ def secret_only(secret: bool | None, *, field: str) -> bool:
     """Return the secrecy of a new vote: always True.
 
     A decision, an election and a poll are always secret: the platform has no open vote
-    (user decision 2026-11-05). ``None`` (the client sent no value) gives True. An
+    (§ F/meetings/voting/000024). ``None`` (the client sent no value) gives True. An
     explicit ``false`` gives 422, so a client that asks for an open vote learns that it
     does not get one.
 

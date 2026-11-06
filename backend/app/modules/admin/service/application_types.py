@@ -65,7 +65,10 @@ class ApplicationTypeOps(ConfigServiceBase):
             )
         ).first()
         if existing is not None:
-            raise ConflictError(f"application type {payload.key!r} already exists")
+            raise ConflictError(
+                f"application type {payload.key!r} already exists",
+                code="application_type_exists",
+            )
         row = ApplicationType(
             key=payload.key,
             name_i18n=payload.name_i18n,
@@ -127,7 +130,8 @@ class ApplicationTypeOps(ConfigServiceBase):
         )
         if in_use is not None:
             raise ConflictError(
-                "application type still has applications and cannot be deleted"
+                "application type still has applications and cannot be deleted",
+                code="application_type_in_use",
             )
         await self.session.delete(row)
         await self._audit(actor, AuditAction.CONFIG_CHANGE, "application_type", row_id)

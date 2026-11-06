@@ -110,7 +110,7 @@ class RbacOps(ConfigServiceBase):
             await self.session.scalars(select(Role).where(Role.key == payload.key))
         ).first()
         if existing is not None:
-            raise ConflictError(f"role {payload.key!r} already exists")
+            raise ConflictError(f"role {payload.key!r} already exists", code="role_exists")
         role = Role(key=payload.key, name_i18n=payload.label)
         self.session.add(role)
         await self.session.flush()
@@ -171,7 +171,10 @@ class RbacOps(ConfigServiceBase):
         if role is None:
             raise NotFoundError(f"role {role_id} not found")
         if role.key in ("admin", "member"):
-            raise ConflictError(f"role {role.key!r} is protected and cannot be deleted")
+            raise ConflictError(
+                f"role {role.key!r} is protected and cannot be deleted",
+                code="role_protected",
+            )
         await self._audit(actor, AuditAction.ROLE_CHANGE, "role", role.id)
         await self.session.delete(role)
         await self.session.commit()
@@ -272,7 +275,7 @@ class RbacOps(ConfigServiceBase):
         if principal is None:
             raise NotFoundError(f"principal {principal_id} not found")
         if not active and principal.sub == actor:
-            raise ConflictError("you cannot deactivate your own account")
+            raise ConflictError("you cannot deactivate your own account", code="self_deactivation")
         if active and principal.merged_into is not None:
             raise ConflictError(
                 "a merged account cannot be activated", code="principal_merged"

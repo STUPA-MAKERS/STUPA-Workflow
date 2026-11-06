@@ -551,7 +551,10 @@ class AgendaService:
         if app is None:
             raise NotFoundError(f"application {application_id} not found")
         if app.vote_gremium_id is None or app.vote_gremium_id != meeting.gremium_id:
-            raise ConflictError("application is not in a voting state for this committee")
+            raise ConflictError(
+                "application is not in a voting state for this committee",
+                code="application_not_voting",
+            )
         existing = (
             await self.session.execute(
                 select(MeetingAgendaItem.id).where(

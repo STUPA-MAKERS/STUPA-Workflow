@@ -224,7 +224,10 @@ class LifecycleOps(HandoverOps):
         if wants_now and not await self.can_set_current_item(meeting, principal):
             raise ForbiddenError("only the protokollant may set the current agenda item")
         if wants_now and meeting.status == "closed":
-            raise ConflictError("the session is closed — it has no current agenda item")
+            raise ConflictError(
+                "the session is closed — it has no current agenda item",
+                code="meeting_closed",
+            )
         if wants_now and payload.current_agenda_item_id is not None:
             owner = await self.session.scalar(
                 select(MeetingAgendaItem.meeting_id).where(
@@ -255,7 +258,10 @@ class LifecycleOps(HandoverOps):
             )
 
         if meeting.status == "closed" and wants_manage:
-            raise ConflictError("the session is closed — its settings can no longer be changed")
+            raise ConflictError(
+                "the session is closed — its settings can no longer be changed",
+                code="meeting_closed",
+            )
 
         before = _snapshot(meeting)
         now = datetime.now(UTC)
@@ -304,11 +310,15 @@ class LifecycleOps(HandoverOps):
             and payload.protokollant_id != meeting.protokollant_id
         ):
             if await self._protocol_final(meeting.id):
-                raise ConflictError("protocol is finalized — the protokollant can no longer change")
+                raise ConflictError(
+                    "protocol is finalized — the protokollant can no longer change",
+                    code="protocol_finalized",
+                )
             if meeting.status == "live":
                 if payload.protokollant_id is None:
                     raise ConflictError(
-                        "a live meeting needs a protokollant — hand the minutes over instead"
+                        "a live meeting needs a protokollant — hand the minutes over instead",
+                        code="protokollant_required",
                     )
                 previous = meeting.protokollant_id
                 await self.check_keeper(meeting.gremium_id, payload.protokollant_id)
@@ -326,7 +336,10 @@ class LifecycleOps(HandoverOps):
                     meeting.gremium_id, payload.protokollant_id
                 )
         if going_live and meeting.protokollant_id is None:
-            raise ConflictError("assign a protokollant before starting the meeting")
+            raise ConflictError(
+                "assign a protokollant before starting the meeting",
+                code="protokollant_missing",
+            )
         cancelled: list[Vote] = []
         if going_live and meeting.started_at is None:
             meeting.started_at = now

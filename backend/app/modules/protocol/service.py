@@ -422,7 +422,8 @@ class ProtocolService:
             raise NotFoundError(f"meeting {meeting_id} not found")
         if meeting.status == "planned":
             raise ConflictError(
-                "the meeting has not started — its minutes are created on start"
+                "the meeting has not started — its minutes are created on start",
+                code="meeting_not_started",
             )
         gremium = await self.session.get(Gremium, meeting.gremium_id)
         cd_variant = await cd_variant_key_for_gremium(self.session, gremium)
