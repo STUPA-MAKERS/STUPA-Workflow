@@ -42,15 +42,6 @@
                 (selected)="askDelete(h)"
               />
             }
-            @if (h.events.length) {
-              <ul class="wh__events" [attr.aria-label]="'admin.webhook.events' | t">
-                @for (ev of h.events; track ev) {
-                  <li class="code-tag code-tag--outlined wh__event mono">{{ ev }}</li>
-                }
-              </ul>
-            } @else {
-              <p class="wh__noEvents">{{ 'admin.webhook.noEvents' | t }}</p>
-            }
             @if (canManage()) {
               <app-section class="wh__status" [level]="2" [heading]="'admin.webhook.delivery.title' | t">
                 @if (s) {
@@ -128,20 +119,6 @@
       <app-switch [checked]="d.active" (checkedChange)="patch('active', $event)">{{
         'admin.webhook.active' | t
       }}</app-switch>
-      <fieldset class="wh__eventsField">
-        <legend class="wh__legend">{{ 'admin.webhook.events' | t }}</legend>
-        <div class="wh__eventGrid">
-          @for (ev of allEvents; track ev) {
-            <app-checkbox
-              [ngModel]="d.events.includes(ev)"
-              (ngModelChange)="toggleEvent(ev)"
-              [name]="'ev-' + ev"
-            >
-              <span class="mono">{{ ev }}</span>
-            </app-checkbox>
-          }
-        </div>
-      </fieldset>
     </form>
   }
   <div dialog-footer class="wh__foot">

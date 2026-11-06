@@ -146,7 +146,7 @@ class EditOps(ApplicationsServiceBase):
         except IntegrityError as exc:
             await self.session.rollback()
             raise ConflictError(
-                "Concurrent update detected; please retry.", code="conflict"
+                "Concurrent update detected; please retry.", code="concurrent_update"
             ) from exc
         await self.session.refresh(app)
         return await self._to_out(app, include_pii=False, strip_pii_fields=preserve_pii)

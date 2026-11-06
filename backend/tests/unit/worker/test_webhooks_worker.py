@@ -47,7 +47,7 @@ def _ctx(session: FakeSession) -> dict[str, Any]:
 
 
 def _setup(session: FakeSession, *, attempts: int = 0) -> WebhookDelivery:
-    hook = Webhook(name="h", url=_URL, events=["status_changed"], active=True, secret=b"k")
+    hook = Webhook(name="h", url=_URL, active=True, secret=b"k")
     hook.id = uuid.uuid4()
     delivery = WebhookDelivery(
         webhook_id=hook.id,

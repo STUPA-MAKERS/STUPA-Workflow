@@ -310,7 +310,7 @@ async def test_fire_wrong_from_state_conflict(session: AsyncSession) -> None:
     await flow.fire(app.id, t_review.id, _manager())
     with pytest.raises(ConflictError) as exc:
         await flow.fire(app.id, t_review.id, _manager())
-    assert exc.value.code == "conflict"
+    assert exc.value.code == "transition_not_available"
 
 
 async def test_fire_concurrent_race_exactly_one_wins(
@@ -355,7 +355,7 @@ async def test_fire_concurrent_race_exactly_one_wins(
     loser = first if isinstance(first, ConflictError) else second
     assert isinstance(winner, TransitionResult)
     assert isinstance(loser, ConflictError)
-    assert loser.code == "conflict"
+    assert loser.code in {"transition_not_available", "concurrent_state_change"}
     assert winner.new_state_id == states["review"].id
 
     refreshed = await session.get(Application, app.id)

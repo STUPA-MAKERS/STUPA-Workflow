@@ -859,7 +859,6 @@ class WebhookConfig(_CamelModel):
     """Config of one outgoing webhook."""
     name: str
     url: HttpUrl
-    events: list[EventName] = Field(min_length=1)
     active: bool = True
 
 
