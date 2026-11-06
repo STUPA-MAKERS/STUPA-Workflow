@@ -6,8 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/livevote
-  - backend/app/modules/voting
+  - backend/app/modules/livevote/guests.py
+  - backend/app/modules/voting/tally.py
 scope:
   - backend/app/modules/livevote
   - backend/app/modules/voting

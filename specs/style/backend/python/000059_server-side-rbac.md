@@ -6,7 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/
+  - backend/app/deps.py
+  - backend/app/modules/auth/policy.py
 scope:
   - backend/app/
 ---

@@ -7,7 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
   - backend/app/modules/voting/poll.py
-  - frontend/src/app/features/voting
+  - frontend/src/app/features/voting/poll-result
 scope:
   - backend/app/modules/voting/poll.py
   - frontend/src/app/features/voting

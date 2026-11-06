@@ -6,8 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - mcp/
-  - backend/app/modules/auth
+  - mcp/antragsplattform_mcp/auth.py
+  - mcp/antragsplattform_mcp/client.py
 scope:
   - mcp/
   - backend/app/modules/auth

@@ -6,8 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - frontend/public/manifest.webmanifest
-  - backend/app/
+  - backend/app/modules/admin/site_config_service.py
 scope:
   - frontend/public/manifest.webmanifest
   - backend/app/

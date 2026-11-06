@@ -6,7 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/delegations
+  - backend/app/modules/delegations/service.py
+  - backend/app/modules/delegations/models.py
 scope:
   - backend/app/modules/delegations
 ---

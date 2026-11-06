@@ -6,8 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - frontend/src/app/
-  - frontend/vendor/ui-kit
+  - frontend/vendor/ui-kit/src/lib/page-header/page-header.component.ts
+  - frontend/vendor/ui-kit/src/lib/row-menu
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

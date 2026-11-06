@@ -6,8 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/todos
-  - frontend/src/app/features/todos
+  - frontend/src/app/layout/nav.service.ts
+  - frontend/src/app/pages/todos/todos.component.ts
 scope:
   - backend/app/modules/todos
   - frontend/src/app/features/todos

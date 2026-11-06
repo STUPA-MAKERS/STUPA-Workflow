@@ -6,8 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/forms
-  - frontend/src/app/pages/admin
+  - backend/app/modules/forms/validation.py
 scope:
   - backend/app/modules/forms
   - frontend/src/app/pages/admin

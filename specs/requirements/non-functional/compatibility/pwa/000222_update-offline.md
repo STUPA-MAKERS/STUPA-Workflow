@@ -6,8 +6,9 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - frontend/src/app/
-  - frontend/vendor/ui-kit
+  - frontend/vendor/ui-kit/pwa/src/sw-update.service.ts
+  - frontend/vendor/ui-kit/pwa/src/offline.service.ts
+  - frontend/src/app/layout/shell.component.ts
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

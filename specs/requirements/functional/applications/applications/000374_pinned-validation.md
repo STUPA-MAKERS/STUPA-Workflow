@@ -6,8 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/applications
-  - backend/app/modules/forms
+  - backend/app/modules/applications/service/service_base.py
+  - backend/app/modules/forms/validation.py
 scope:
   - backend/app/modules/applications
   - backend/app/modules/forms

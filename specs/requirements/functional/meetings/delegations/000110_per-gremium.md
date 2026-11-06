@@ -6,9 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/delegations
-  - frontend/src/app/features/meetings
-  - backend/app/modules/gremien
+  - backend/app/modules/admin/service/gremien.py
+  - backend/app/modules/delegations/service.py
 scope:
   - backend/app/modules/delegations
   - frontend/src/app/features/meetings

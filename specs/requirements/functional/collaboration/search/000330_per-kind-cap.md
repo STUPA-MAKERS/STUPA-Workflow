@@ -6,8 +6,9 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/search
-  - frontend/src/app/layout
+  - backend/app/modules/search/service.py
+  - backend/app/modules/search/schemas.py
+  - frontend/src/app/features/search/search-palette.component.ts
 scope:
   - backend/app/modules/search
   - frontend/src/app/layout

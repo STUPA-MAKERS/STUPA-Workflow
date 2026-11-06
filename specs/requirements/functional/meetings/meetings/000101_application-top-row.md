@@ -6,7 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - frontend/src/app/features/meetings
+  - frontend/src/app/features/meetings/top-sheet/top-sheet.component.ts
+  - frontend/src/app/features/meetings/top-application-lead.util.ts
 scope:
   - frontend/src/app/features/meetings
 ---

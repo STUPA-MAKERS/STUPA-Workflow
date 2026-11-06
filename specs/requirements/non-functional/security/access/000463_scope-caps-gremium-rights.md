@@ -6,8 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/auth
-  - backend/app/modules/livevote/service/permissions.py
+  - backend/app/modules/auth/principal.py
+  - backend/app/modules/auth/policy.py
 scope:
   - backend/app/modules/auth
   - backend/app/modules/livevote/service/permissions.py

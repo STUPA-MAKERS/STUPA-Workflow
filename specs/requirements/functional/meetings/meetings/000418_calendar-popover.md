@@ -6,7 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - frontend/src/app/features/meetings
+  - frontend/src/app/features/meetings/calendar-subscribe/calendar-subscribe.component.ts
+  - frontend/src/app/features/meetings/meetings-view-actions
 scope:
   - frontend/src/app/features/meetings
 ---

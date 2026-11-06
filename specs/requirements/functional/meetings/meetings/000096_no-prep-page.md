@@ -6,7 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - frontend/src/app/features/meetings
+  - frontend/src/app/features/meetings/meetings-list/meetings-list.component.ts
+  - frontend/src/app/features/meetings/meeting-page/meeting-page.component.ts
 scope:
   - frontend/src/app/features/meetings
 ---

@@ -6,9 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/files
-  - backend/app/modules/media
-  - backend/app/modules/applications
+  - backend/app/modules/files/service.py
+  - backend/app/modules/files/router.py
 scope:
   - backend/app/modules/files
   - backend/app/modules/media

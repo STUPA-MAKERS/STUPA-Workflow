@@ -6,7 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - deploy/
+  - deploy/README.md
+  - deploy/web/nginx.conf
 scope:
   - deploy/
 ---

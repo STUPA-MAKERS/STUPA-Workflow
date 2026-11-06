@@ -6,9 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/todos
-  - frontend/src/app/features/todos
-  - backend/app/modules/tickets
+  - backend/app/modules/todos/hooks.py
+  - backend/app/modules/tickets/service.py
 scope:
   - backend/app/modules/todos
   - frontend/src/app/features/todos

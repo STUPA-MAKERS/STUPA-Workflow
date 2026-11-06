@@ -6,7 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/livevote
+  - backend/app/modules/livevote/public_router.py
+  - backend/app/modules/livevote/guests.py
 scope:
   - backend/app/modules/livevote
 ---

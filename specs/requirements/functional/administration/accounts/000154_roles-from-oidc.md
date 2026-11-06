@@ -6,8 +6,9 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/auth
-  - backend/app/modules/admin
+  - backend/app/modules/admin/oidc_mappings.py
+  - backend/app/modules/admin/membership_sync.py
+  - frontend/src/app/pages/admin/group-mappings/group-mappings.component.ts
 scope:
   - backend/app/modules/auth
   - backend/app/modules/admin

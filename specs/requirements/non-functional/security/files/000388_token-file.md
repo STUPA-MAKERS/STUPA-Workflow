@@ -6,7 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - mcp/
+  - mcp/antragsplattform_mcp/config.py
 scope:
   - mcp/
 ---

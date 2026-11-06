@@ -6,8 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - frontend/src/app/
-  - frontend/vendor/ui-kit
+  - frontend/vendor/ui-kit/src/lib/scroll-fade
+  - frontend/vendor/ui-kit/src/styles/_scroll-fade.scss
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

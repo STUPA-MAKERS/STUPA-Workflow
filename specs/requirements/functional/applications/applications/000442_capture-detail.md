@@ -6,8 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/applications
-  - frontend/src/app/pages/applications
+  - frontend/src/app/pages/applications/applications-detail.component.html
 scope:
   - backend/app/modules/applications
   - frontend/src/app/pages/applications

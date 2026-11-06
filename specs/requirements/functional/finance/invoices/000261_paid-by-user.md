@@ -6,7 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/budget
+  - backend/app/modules/budget/tree/invoices.py
+  - frontend/src/app/pages/invoices/invoice-detail/invoice-detail.component.ts
 scope:
   - backend/app/modules/budget
 ---
