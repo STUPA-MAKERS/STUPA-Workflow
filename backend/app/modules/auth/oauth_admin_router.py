@@ -49,7 +49,7 @@ def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
 UsersAdmin = Annotated[Principal, Depends(require_principal("admin.users"))]
 
 
-class GrantListQuery(PageParams):
+class GrantListQuery(PageParams, frozen=True):
     """Query parameters of the grant list: paging plus a filter by principal.
 
     `extra="forbid"` answers 422 on an unknown parameter instead of ignoring it.
