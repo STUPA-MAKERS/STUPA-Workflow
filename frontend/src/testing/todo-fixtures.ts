@@ -47,6 +47,7 @@ export function tile(over: Partial<TodoCardTile> = {}): TodoCardTile {
     commentCount: 0,
     primaryLink: null,
     linkCount: 0,
+    event: null,
     version: 1,
     createdAt: '2026-10-01T10:00:00Z',
     updatedAt: '2026-10-01T10:00:00Z',
@@ -137,6 +138,7 @@ export function detail(over: Partial<TodoCardDetail> = {}): TodoCardDetail {
     events: [],
     comments: [],
     archivedAt: null,
+    eventFacts: null,
     ...over,
   };
 }

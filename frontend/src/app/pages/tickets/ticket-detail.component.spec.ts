@@ -141,6 +141,8 @@ function card(over: Partial<TodoLinkedCard> = {}): TodoLinkedCard {
     isDone: false,
     dueDate: '2026-10-17',
     assignees: [MARA],
+    event: null,
+    balance: null,
     ...over,
   };
 }

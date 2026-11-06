@@ -31,6 +31,8 @@ async function setup(opts: Opts = {}) {
     members: jest.fn(() => (opts.membersFail ? throwError(() => new Error('x')) : of(MEMBERS))),
     createCard: jest.fn(() => of(detail())),
     linkTargets: jest.fn(() => of([])),
+    series: jest.fn(() => of([{ id: 's-1', name: 'Erstiparty' }])),
+    createSeries: jest.fn((name: string) => of({ id: 's-2', name })),
   };
   const toast = { success: jest.fn(), error: jest.fn() };
   const created = jest.fn();
@@ -52,6 +54,37 @@ async function setup(opts: Opts = {}) {
 
 describe('TodoNewDialogComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+
+  it('creates an Event with the switch: a shared board, the dates, the place and a new series', async () => {
+    const { cmp, api, open, fixture } = await setup({ inputs: { boardId: 'b-0' } });
+    open();
+    expect(screen.getByRole('radio', { name: 'Veranstaltung' })).toBeInTheDocument();
+    cmp.setKind('event');
+    fixture.detectChanges();
+    expect(screen.getByRole('dialog', { name: 'Neue Veranstaltung' })).toBeInTheDocument();
+    expect(cmp.selectedBoard()).toBe('b-1');
+    expect(cmp.boardOptions().map((o) => o.value)).not.toContain('b-0');
+    expect(cmp.seriesOptions().map((o) => o.label)).toEqual(['Keine Reihe', 'Erstiparty', 'Neue Reihe …']);
+    cmp.title.set('Erstiparty WiSe');
+    cmp.startsOn.set('2026-11-21');
+    cmp.endsOn.set('2026-11-20');
+    expect(cmp.datesError()).toBe('Das Ende liegt vor dem Beginn.');
+    expect(cmp.canSave()).toBe(false);
+    cmp.endsOn.set('2026-11-22');
+    cmp.place.set(' Mensa ');
+    cmp.seriesId.set('__new');
+    expect(cmp.canSave()).toBe(false);
+    cmp.seriesName.set('Erstiparty Nord');
+    cmp.save();
+    expect(api.createSeries).toHaveBeenCalledWith('Erstiparty Nord');
+    expect(api.createCard).toHaveBeenCalledWith(
+      expect.objectContaining({
+        boardId: 'b-1',
+        title: 'Erstiparty WiSe',
+        event: { startsOn: '2026-11-21', endsOn: '2026-11-22', place: 'Mensa', seriesId: 's-2' },
+      }),
+    );
+  });
 
   /** Only boards that take cards show, and people get a fallback name. */
   it('starts on the given board and column with the given title and links', async () => {

@@ -89,6 +89,82 @@ export interface TodoLink {
   detail: TodoLinkDetail | null;
 }
 
+/** The event data of a card: the card is an Event (`Veranstaltung`). Dates are `YYYY-MM-DD`. */
+export interface TodoEventBrief {
+  startsOn: string | null;
+  endsOn: string | null;
+  place: string | null;
+  participants: number | null;
+  seriesId: Uuid | null;
+  seriesName: string | null;
+}
+
+/** The money of an Event: decimal strings with two places; balance = income − expenses. */
+export interface TodoEventTotals {
+  requested: string;
+  approved: string;
+  expenses: string;
+  income: string;
+  balance: string;
+}
+
+/** A decision of an Event: the valid decision of a linked Antrag or a closed vote. */
+export interface TodoEventDecision {
+  kind: 'decision' | 'vote';
+  targetId: Uuid | null;
+  title: string;
+  decidedAt: IsoDateTime | null;
+  meetingTitle: string | null;
+  result: string | null;
+  amount: string | null;
+  conditions: string[];
+}
+
+/** Another Event of the series that the caller reads. */
+export interface TodoEventEdition {
+  id: Uuid;
+  boardId: Uuid;
+  boardName: string;
+  title: string;
+  startsOn: string | null;
+  endsOn: string | null;
+  archived: boolean;
+  totals: TodoEventTotals;
+}
+
+/** What an Event gathers: totals, decisions, the other editions of its series. */
+export interface TodoEventFacts {
+  totals: TodoEventTotals;
+  decisions: TodoEventDecision[];
+  editions: TodoEventEdition[];
+  /** The other editions that the caller cannot read. */
+  hiddenEditions: number;
+}
+
+/** The event data to set (`PUT /todos/cards/{id}/event`) or to create a card with. */
+export interface TodoEventIn {
+  startsOn?: string | null;
+  endsOn?: string | null;
+  place?: string | null;
+  participants?: number | null;
+  seriesId?: Uuid | null;
+}
+
+export interface TodoEventSeries {
+  id: Uuid;
+  name: string;
+}
+
+/** An Event on a board that the caller writes: an option of the `Veranstaltung` picker. */
+export interface TodoEventRef {
+  id: Uuid;
+  boardId: Uuid;
+  boardName: string;
+  title: string;
+  startsOn: string | null;
+  endsOn: string | null;
+}
+
 export interface TodoCardTile {
   id: Uuid;
   boardId: Uuid;
@@ -104,6 +180,8 @@ export interface TodoCardTile {
   commentCount: number;
   primaryLink: TodoLink | null;
   linkCount: number;
+  /** Set for an Event. */
+  event: TodoEventBrief | null;
   version: number;
   createdAt: IsoDateTime;
   updatedAt: IsoDateTime;
@@ -176,6 +254,8 @@ export interface TodoCardDetail extends TodoCardTile {
   events: TodoEvent[];
   comments: TodoComment[];
   archivedAt: IsoDateTime | null;
+  /** Set for an Event. */
+  eventFacts: TodoEventFacts | null;
 }
 
 export interface TodoCardCreate {
@@ -188,6 +268,8 @@ export interface TodoCardCreate {
   assigneeIds?: Uuid[];
   labelIds?: Uuid[];
   links?: { kind: TodoLinkKind; targetId: Uuid }[];
+  /** Makes the card an Event. */
+  event?: TodoEventIn | null;
 }
 
 /** Content edits; `version` guards them (409 `card_version_conflict`). */
@@ -284,6 +366,9 @@ export interface TodoLinkedCard {
   isDone: boolean;
   dueDate: string | null;
   assignees: PersonRef[];
+  /** Set for an Event; then `balance` is its balance. */
+  event: TodoEventBrief | null;
+  balance: string | null;
 }
 
 /** An assignable person of a board; also the @-mention list. */
@@ -392,9 +477,10 @@ export class TodosApiService {
   }
 
   /** The archived cards of a board, newest first. */
-  archive(boardId: Uuid, q = '', offset = 0, limit = 50): Observable<Page<TodoCardTile>> {
+  archive(boardId: Uuid, q = '', offset = 0, limit = 50, eventsOnly = false): Observable<Page<TodoCardTile>> {
     let params = new HttpParams().set('limit', limit).set('offset', offset);
     if (q) params = params.set('q', q);
+    if (eventsOnly) params = params.set('events', 'true');
     return this.http.get<Page<TodoCardTile>>(`${this.base}/todos/boards/${boardId}/archive`, {
       params,
       context: skipLoading(),
@@ -611,5 +697,34 @@ export class TodosApiService {
       params,
       context: detailContext(),
     });
+  }
+
+  /** Set the event data; a to-do becomes an Event for good. */
+  setEvent(cardId: Uuid, body: TodoEventIn): Observable<TodoCardDetail> {
+    return this.http.put<TodoCardDetail>(`${this.base}/todos/cards/${cardId}/event`, body, {
+      context: skipLoading(),
+    });
+  }
+
+  /** `Folgeveranstaltung anlegen`: the next edition in the first column. */
+  followUp(cardId: Uuid): Observable<TodoCardDetail> {
+    return this.http.post<TodoCardDetail>(`${this.base}/todos/cards/${cardId}/follow-up`, null);
+  }
+
+  series(q = ''): Observable<TodoEventSeries[]> {
+    let params = new HttpParams();
+    if (q) params = params.set('q', q);
+    return this.http.get<TodoEventSeries[]>(`${this.base}/todos/series`, { params, context: skipLoading() });
+  }
+
+  createSeries(name: string): Observable<TodoEventSeries> {
+    return this.http.post<TodoEventSeries>(`${this.base}/todos/series`, { name }, { context: skipLoading() });
+  }
+
+  /** The live Events on boards that the caller writes (the `Veranstaltung` picker). */
+  writableEvents(q = ''): Observable<TodoEventRef[]> {
+    let params = new HttpParams();
+    if (q) params = params.set('q', q);
+    return this.http.get<TodoEventRef[]>(`${this.base}/todos/events`, { params, context: skipLoading() });
   }
 }

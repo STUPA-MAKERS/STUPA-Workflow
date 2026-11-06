@@ -6,6 +6,8 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { Translate } from '@core/i18n/translations';
 import { dayMonth } from '@shared/date-format';
+import { formatMoney, moneyNumber } from '@shared/format-money';
+import { eventDays } from '../todos.util';
 import {
   type AvatarSize,
   AvatarStackComponent,
@@ -99,6 +101,23 @@ export class TodoLinkedListComponent {
       },
       error: () => undefined,
     });
+  }
+
+  /** "Veranstaltung · 20.11.–21.11.2026 · AStA": the server puts a linked Event first. */
+  eventSub(card: TodoLinkedCard): string {
+    const days = eventDays(card.event?.startsOn ?? null, card.event?.endsOn ?? null, this.i18n.formatLocale());
+    return days
+      ? this.t('todos.eventCard.linkedSub', { dates: days, board: card.boardName })
+      : this.t('todos.eventCard.linkedSubNoDate', { board: card.boardName });
+  }
+
+  /** The balance of an Event with its sign. */
+  money(value: string | null): string {
+    return formatMoney(value, this.i18n.formatLocale(), { signed: true });
+  }
+
+  negative(value: string | null): boolean {
+    return (moneyNumber(value) ?? 0) < 0;
   }
 
   sub(card: TodoLinkedCard): string {

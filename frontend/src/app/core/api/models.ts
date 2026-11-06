@@ -1791,7 +1791,8 @@ export type SearchKind =
   | 'gremium'
   | 'principal'
   | 'ticket'
-  | 'todo';
+  | 'todo'
+  | 'event';
 
 /**
  * One row of the global search (`GET /api/search`).

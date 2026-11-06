@@ -64,6 +64,7 @@ function todo(id: string, extra: Partial<TodoMineItem> = {}): TodoMineItem {
     commentCount: 0,
     primaryLink: null,
     linkCount: 0,
+    event: null,
     version: 1,
     createdAt: '2026-09-01T10:00:00Z',
     updatedAt: '2026-09-01T10:00:00Z',
