@@ -5,6 +5,9 @@ kind: non-functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
+implementation:
+  - frontend/public/manifest.webmanifest
+  - backend/app/
 scope:
   - frontend/public/manifest.webmanifest
   - backend/app/

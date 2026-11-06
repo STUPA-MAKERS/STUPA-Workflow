@@ -4,7 +4,10 @@ title: The UI shows no raw IDs
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
+implementation:
+  - backend/app/
+  - frontend/src/app/
 scope:
   - backend/app/
   - frontend/src/app/

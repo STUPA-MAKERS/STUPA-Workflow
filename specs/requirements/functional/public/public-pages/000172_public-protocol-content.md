@@ -5,6 +5,9 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
+implementation:
+  - backend/app/modules/protocol
+  - frontend/src/app/features/public-protocols
 scope:
   - backend/app/modules/protocol
   - frontend/src/app/features/public-protocols

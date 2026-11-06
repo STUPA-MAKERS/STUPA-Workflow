@@ -4,7 +4,11 @@ title: A magic link is valid until an event ends it
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
+implementation:
+  - backend/app/modules/auth
+  - backend/app/deps.py
+  - backend/app/modules/applications
 scope:
   - backend/app/modules/auth
   - backend/app/deps.py

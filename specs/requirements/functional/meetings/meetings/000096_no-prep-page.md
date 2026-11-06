@@ -5,6 +5,8 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
+implementation:
+  - frontend/src/app/features/meetings
 scope:
   - frontend/src/app/features/meetings
 ---

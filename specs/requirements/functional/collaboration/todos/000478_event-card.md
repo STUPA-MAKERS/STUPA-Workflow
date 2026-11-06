@@ -5,6 +5,7 @@ kind: functional
 status: draft
 owner: frederikbeimgraben
 updated: 2026-11-06
+implementation: null
 scope:
   - backend/app/modules/todos
   - frontend/src/app/features/todos

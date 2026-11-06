@@ -4,7 +4,9 @@ title: Inputs are strictly typed
 kind: style
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
+implementation:
+  - backend/
 scope:
   - backend/
 ---

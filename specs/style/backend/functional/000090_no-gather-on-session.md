@@ -5,6 +5,11 @@ kind: style
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
+implementation:
+  - backend/app/
+  - backend/worker/
+  - mcp/
+  - typst/typst_service/
 scope:
   - backend/app/
   - backend/worker/

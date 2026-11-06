@@ -5,6 +5,9 @@ kind: non-functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
+implementation:
+  - deploy/
+  - backend/app/settings.py
 scope:
   - deploy/
   - backend/app/settings.py

@@ -7,6 +7,8 @@ owner: frederikbeimgraben
 updated: YYYY-MM-DD
 tests:
   - "backend/tests/unit/test_example.py:test_example_rule"
+implementation:
+  - backend/app/modules/example
 scope:
   - backend/app/modules/example
   - frontend/src/app/features/example
