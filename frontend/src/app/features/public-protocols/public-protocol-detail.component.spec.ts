@@ -72,13 +72,23 @@ describe('PublicProtocolDetailComponent', () => {
 
   /** A PDF without a known size shows no size line. */
   it('names guests as a count and an unknown option as it is', async () => {
-    const p = detailFixture({
+    const base = detailFixture({
       attendance: { present: 5, excused: 0, absent: 0, guests: 7 },
       pdfSize: null,
     });
-    p.tops[1].decisions = [
-      { question: 'Q', counts: { vielleicht: 1 }, result: 'tie', majorityRule: 'simple', secret: false },
-    ];
+    const p = {
+      ...base,
+      tops: base.tops.map((top, i) =>
+        i === 1
+          ? {
+              ...top,
+              decisions: [
+                { question: 'Q', counts: { vielleicht: 1 }, result: 'tie' as const, majorityRule: 'simple' as const, secret: false },
+              ],
+            }
+          : top,
+      ),
+    };
     await setup(of(p));
     expect(screen.getByRole('heading', { name: 'Anwesenheit' }).closest('section')).toHaveTextContent('Gäste7');
     expect(screen.getByText('vielleicht')).toBeInTheDocument();
@@ -88,12 +98,22 @@ describe('PublicProtocolDetailComponent', () => {
 
   /** There is no raw tally line and no second callout; the note of the callout stays as text. */
   it('shows a vote callout of the text as the decision box, in its place', async () => {
-    const p = detailFixture();
-    p.tops[1].markdown = 'Vorher.\n\n> [!abstimmung] **Im Text?**\n> ja: 4, nein: 1\n> Gäste stimmten mit.\n\nNachher.';
-    p.tops[1].decisions = [
-      { question: 'Im Text?', counts: { ja: 4, nein: 1 }, result: 'passed', majorityRule: 'simple', secret: false, inText: true },
-      { question: 'Separat?', counts: { ja: 2 }, result: 'passed', majorityRule: 'simple', secret: false },
-    ];
+    const base = detailFixture();
+    const p = {
+      ...base,
+      tops: base.tops.map((top, i) =>
+        i === 1
+          ? {
+              ...top,
+              markdown: 'Vorher.\n\n> [!abstimmung] **Im Text?**\n> ja: 4, nein: 1\n> Gäste stimmten mit.\n\nNachher.',
+              decisions: [
+                { question: 'Im Text?', counts: { ja: 4, nein: 1 }, result: 'passed' as const, majorityRule: 'simple' as const, secret: false, inText: true },
+                { question: 'Separat?', counts: { ja: 2 }, result: 'passed' as const, majorityRule: 'simple' as const, secret: false },
+              ],
+            }
+          : top,
+      ),
+    };
     await setup(of(p));
     const second = screen.getByRole('heading', { level: 3, name: /Haushalt 2027/ }).closest('li') as HTMLElement;
     const figures = within(second).getAllByRole('figure');

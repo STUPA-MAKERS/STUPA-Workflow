@@ -22,7 +22,7 @@ import { AvatarComponent, ButtonComponent, IconComponent, ToastService } from '@
 import { DelegationDialogComponent } from './delegation-dialog/delegation-dialog.component';
 
 /** A change of the own delegation: a new one, or a revoked one with its delegator. */
-export type DelegationCardChange = { kind: 'created' } | { kind: 'revoked'; delegation: Delegation };
+export type DelegationCardChange = { readonly kind: 'created' } | { readonly kind: 'revoked'; readonly delegation: Delegation };
 
 /**
  * The own delegations of a meeting ("Vertretung").

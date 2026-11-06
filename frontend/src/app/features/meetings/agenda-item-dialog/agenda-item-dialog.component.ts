@@ -53,10 +53,10 @@ export type AgendaEmptyCase = 'none' | 'noMatch';
 
 /** An open card of the gremium board, as a row of the to-do list. */
 export interface AgendaTodoOption {
-  id: Uuid;
-  title: string;
+  readonly id: Uuid;
+  readonly title: string;
   /** "In Arbeit · fällig 03.11." */
-  sub: string;
+  readonly sub: string;
 }
 
 /**

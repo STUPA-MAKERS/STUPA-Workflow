@@ -104,7 +104,7 @@ export function currentPosition(m: Meeting, agenda: readonly AgendaItem[]): numb
 export function handoverPreview(
   m: Meeting,
   agenda: readonly AgendaItem[],
-  next: { principalId: string; name: string },
+  next: { readonly principalId: string; readonly name: string },
   mode: HandoverMode,
   now: Date,
   t: Translate,
@@ -113,8 +113,8 @@ export function handoverPreview(
   const pos = currentPosition(m, agenda);
   const nowIso = now.toISOString();
   const started = m.keeperPeriods.filter((p) => p.fromAt !== null);
-  const periods: KeeperPeriod[] = started.length
-    ? started.map((p) => ({ ...p }))
+  const periods: readonly KeeperPeriod[] = started.length
+    ? started
     : m.protokollantId
       ? [
           {
@@ -130,8 +130,10 @@ export function handoverPreview(
         ]
       : [];
   const running = periods.findIndex((p) => p.toAt === null);
-  if (running >= 0) periods[running] = { ...periods[running], toAt: nowIso, toPosition: pos };
-  periods.push({
+  const ended = periods.map((p, i) =>
+    i === running ? { ...p, toAt: nowIso, toPosition: pos } : p,
+  );
+  const opened: KeeperPeriod = {
     principalId: next.principalId,
     name: next.name,
     fromAt: nowIso,
@@ -140,6 +142,6 @@ export function handoverPreview(
     toAgendaItemId: null,
     fromPosition: mode === 'now' ? pos : pos !== null ? pos + 1 : null,
     toPosition: null,
-  });
-  return line(periods, t, locale, mode === 'next_item');
+  };
+  return line([...ended, opened], t, locale, mode === 'next_item');
 }

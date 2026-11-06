@@ -292,9 +292,9 @@ export class MeetingSettingsDialogComponent {
   /** The changed public participation fields of the PATCH. */
   private publicChanges(m: Meeting): { publicJoin?: boolean; guestsMode?: GuestsMode } {
     if (this.publicLocked()) return {};
-    const out: { publicJoin?: boolean; guestsMode?: GuestsMode } = {};
-    if (this.publicJoin() !== m.publicJoin) out.publicJoin = this.publicJoin();
-    if (this.publicJoin() && this.guestsMode() !== m.guestsMode) out.guestsMode = this.guestsMode();
-    return out;
+    const join = this.publicJoin() !== m.publicJoin ? { publicJoin: this.publicJoin() } : {};
+    const modeChanged = this.publicJoin() && this.guestsMode() !== m.guestsMode;
+    const mode = modeChanged ? { guestsMode: this.guestsMode() } : {};
+    return { ...join, ...mode };
   }
 }

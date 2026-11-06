@@ -11,6 +11,7 @@
 
 import type { MeetingVote, PollConfig, PollOption } from '@core/api/models';
 import { escapeHtml, markdownToSafeHtml } from '@shared/markdown/markdown.util';
+import { withEntry } from '@shared/util/immutable';
 import { dateOptionLabel } from '../voting/poll.util';
 
 export { escapeHtml };
@@ -31,39 +32,61 @@ export function voteSnippetHead(vote: MeetingVote): string {
  * The other head lines go to the remaining votes in the given order (oldest first). The
  * backend matches the same way in `votes_in_body`.
  */
-export function votesInText(body: string, votes: readonly MeetingVote[]): Set<string> {
+export function votesInText(body: string, votes: readonly MeetingVote[]): ReadonlySet<string> {
   const closed = votes.filter((v) => v.status === 'closed');
-  const heads = new Map<string, number>();
-  for (const line of body.split('\n')) {
-    const key = line.trim();
-    heads.set(key, (heads.get(key) ?? 0) + 1);
-  }
-  const exact = new Map<string, number>();
-  const found = new Set<string>();
-  const take = (vote: MeetingVote): void => {
-    const head = voteSnippetHead(vote);
-    heads.set(head, (heads.get(head) ?? 0) - 1);
-    found.add(vote.id);
+  const lines = body.split('\n').map((line) => line.trim());
+  const heads: ReadonlyMap<string, number> = new Map(
+    closed.map((v) => voteSnippetHead(v)).map((head) => [head, countLines(lines, head)]),
+  );
+  const start: HeadMatch = { heads, exact: new Map(), found: new Set() };
+  const byText = closed.reduce((state, vote) => matchExact(state, vote, body), start);
+  const byHead = closed.reduce(
+    (state, vote) =>
+      !state.found.has(vote.id) && headsLeft(state, vote) > 0 ? takeVote(state, vote) : state,
+    byText,
+  );
+  return byHead.found;
+}
+
+/** The state of `votesInText`: the head lines left, the exact snippets left, the votes found. */
+interface HeadMatch {
+  readonly heads: ReadonlyMap<string, number>;
+  readonly exact: ReadonlyMap<string, number>;
+  readonly found: ReadonlySet<string>;
+}
+
+function countLines(lines: readonly string[], line: string): number {
+  return lines.filter((l) => l === line).length;
+}
+
+function headsLeft(state: HeadMatch, vote: MeetingVote): number {
+  return state.heads.get(voteSnippetHead(vote)) ?? 0;
+}
+
+/** Gives `vote` one of the head lines left. */
+function takeVote(state: HeadMatch, vote: MeetingVote): HeadMatch {
+  const head = voteSnippetHead(vote);
+  return {
+    ...state,
+    heads: withEntry(state.heads, head, (state.heads.get(head) ?? 0) - 1),
+    found: new Set([...state.found, vote.id]),
   };
-  for (const vote of closed) {
-    const snippet = voteSnippet(vote);
-    if (!exact.has(snippet)) exact.set(snippet, countOf(body, snippet));
-    const left = exact.get(snippet) ?? 0;
-    if (left > 0 && (heads.get(voteSnippetHead(vote)) ?? 0) > 0) {
-      exact.set(snippet, left - 1);
-      take(vote);
-    }
-  }
-  for (const vote of closed) {
-    if (!found.has(vote.id) && (heads.get(voteSnippetHead(vote)) ?? 0) > 0) take(vote);
-  }
-  return found;
+}
+
+/** Gives `vote` its head line when a callout with the whole text of its snippet is left. */
+function matchExact(state: HeadMatch, vote: MeetingVote, body: string): HeadMatch {
+  const snippet = voteSnippet(vote);
+  const exact = state.exact.has(snippet)
+    ? state.exact
+    : withEntry(state.exact, snippet, countOf(body, snippet));
+  const left = exact.get(snippet) ?? 0;
+  return left > 0 && headsLeft(state, vote) > 0
+    ? takeVote({ ...state, exact: withEntry(exact, snippet, left - 1) }, vote)
+    : { ...state, exact };
 }
 
 function countOf(text: string, part: string): number {
-  let n = 0;
-  for (let i = text.indexOf(part); i >= 0; i = text.indexOf(part, i + part.length)) n++;
-  return n;
+  return text.split(part).length - 1;
 }
 
 /**
@@ -94,12 +117,11 @@ export function voteSnippetQuestion(vote: MeetingVote): string {
 export function voteSnippet(vote: MeetingVote): string {
   if (vote.kind === 'election' && vote.election) return electionSnippet(vote);
   if (vote.kind === 'poll' && vote.poll) return pollSnippet(vote, vote.poll);
-  const lines = [voteSnippetHead(vote)];
   const counts = Object.entries(vote.counts ?? {});
-  if (counts.length) {
-    lines.push(`> ${counts.map(([option, n]) => `${option}: ${n}`).join(', ')}`);
-  }
-  return lines.join('\n');
+  const tally = counts.length
+    ? [`> ${counts.map(([option, n]) => `${option}: ${n}`).join(', ')}`]
+    : [];
+  return [voteSnippetHead(vote), ...tally].join('\n');
 }
 
 /**
@@ -116,28 +138,38 @@ export function electionSnippet(vote: MeetingVote): string {
   if (!election || !result) return lines.join('\n');
   const names = new Map(election.candidates.map((c) => [c.id, c.name]));
   const yesNo = typeof result.yes === 'number' && typeof result.no === 'number';
-  const rows = election.candidates.map((c) => ({
+  const unsorted = election.candidates.map((c) => ({
     name: c.name,
     votes: result.counts[c.id] ?? 0,
     elected: result.elected.includes(c.id),
   }));
-  if (!yesNo) rows.sort((a, b) => b.votes - a.votes);
-  if (yesNo) {
-    lines.push(`> Kandidatur: ${election.candidates[0]?.name ?? ''}`);
-    lines.push(`> ja: ${result.yes}, nein: ${result.no}, enthaltung: ${result.abstentions}`);
-  } else {
-    const votes = rows.map((r) => `${r.name}: ${r.votes}`).join(' · ');
-    lines.push(`> ${votes} · Enthaltungen: ${result.abstentions}`);
-  }
+  const rows = yesNo ? unsorted : [...unsorted].sort((a, b) => b.votes - a.votes);
+  const tally = yesNo
+    ? [
+        `> Kandidatur: ${election.candidates[0]?.name ?? ''}`,
+        `> ja: ${result.yes}, nein: ${result.no}, enthaltung: ${result.abstentions}`,
+      ]
+    : [
+        `> ${rows.map((r) => `${r.name}: ${r.votes}`).join(' · ')} · Enthaltungen: ${result.abstentions}`,
+      ];
   const elected = rows.filter((r) => r.elected).map((r) => r.name);
-  lines.push(`> Gewählt: ${elected.length ? elected.join(', ') : 'niemand'}`);
-  if (result.lot?.drawn) lines.push('> Durch Los entschieden.');
-  if (result.lot && !result.lot.drawn) lines.push('> Gleichstand: das Los steht aus.');
-  if (result.runoff?.seats) {
-    const who = result.runoff.candidateIds.map((id) => names.get(id) ?? id).join(', ');
-    lines.push(`> Stichwahl (${round + 1}. Wahlgang) um ${result.runoff.seats} Posten: ${who}`);
-  }
-  return lines.join('\n');
+  const lot = result.lot
+    ? [result.lot.drawn ? '> Durch Los entschieden.' : '> Gleichstand: das Los steht aus.']
+    : [];
+  const runoff = result.runoff?.seats
+    ? [
+        `> Stichwahl (${round + 1}. Wahlgang) um ${result.runoff.seats} Posten: ${result.runoff.candidateIds
+          .map((id) => names.get(id) ?? id)
+          .join(', ')}`,
+      ]
+    : [];
+  return [
+    ...lines,
+    ...tally,
+    `> Gewählt: ${elected.length ? elected.join(', ') : 'niemand'}`,
+    ...lot,
+    ...runoff,
+  ].join('\n');
 }
 
 /**
@@ -156,17 +188,18 @@ export function pollSnippet(vote: MeetingVote, poll: PollConfig): string {
   const known = result.order.filter((id) => labels.has(id));
   const order = known.length ? known : [...labels.keys()];
   const top = new Set(result.top);
-  for (const id of order) {
+  const rows = order.map((id) => {
     const count = result.counts[id] ?? 0;
     const text = date ? `${count} (+${result.maybe?.[id] ?? 0})` : `${count}`;
-    lines.push(`> ${oneLine(labels.get(id) ?? id)}: ${text}`);
-  }
-  if (!date) lines.push(`> Enthaltungen: ${result.abstentions}`);
-  else lines.push('> Zahl = Ja, (+n) = Vielleicht');
+    return `> ${oneLine(labels.get(id) ?? id)}: ${text}`;
+  });
+  const legend = date ? '> Zahl = Ja, (+n) = Vielleicht' : `> Enthaltungen: ${result.abstentions}`;
   const best = order.filter((id) => top.has(id)).map((id) => oneLine(labels.get(id) ?? id));
-  if (best.length) lines.push(`> ${date ? 'Bester Termin' : 'Meiste Stimmen'}: ${best.join(', ')}`);
-  lines.push(`> ${result.ballots} ${result.ballots === 1 ? 'Antwort' : 'Antworten'}`);
-  return lines.join('\n');
+  const bestLine = best.length
+    ? [`> ${date ? 'Bester Termin' : 'Meiste Stimmen'}: ${best.join(', ')}`]
+    : [];
+  const answers = `> ${result.ballots} ${result.ballots === 1 ? 'Antwort' : 'Antworten'}`;
+  return [...lines, ...rows, legend, ...bestLine, answers].join('\n');
 }
 
 /** The kind line of an election callout: "Wahl · 2 Posten", a runoff names its round. */
