@@ -140,6 +140,13 @@
                 (cleared)="s.clearApp()"
               />
             }
+            <app-select
+              name="event"
+              [label]="'todos.eventCard.name' | t"
+              [options]="s.event.options()"
+              [ngModel]="s.event.value()"
+              (ngModelChange)="s.event.value.set($event ?? '')"
+            />
           } @else if (e) {
             @if (editOwnsCostCentre()) {
               <app-cost-centre-select
@@ -176,6 +183,13 @@
                 e.applicationTitle || ('expenses.col.application' | t)
               }}</app-locked-field>
             }
+            <app-select
+              name="event"
+              [label]="'todos.eventCard.name' | t"
+              [options]="s.event.options()"
+              [ngModel]="s.event.value()"
+              (ngModelChange)="s.event.value.set($event ?? '')"
+            />
           }
         </app-section>
 

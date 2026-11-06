@@ -1,11 +1,20 @@
 <app-dialog
   [open]="open()"
-  [title]="heading() | t"
+  [title]="(kind() === 'event' ? 'todos.eventCard.newTitle' : heading()) | t"
   [closeLabel]="'action.close' | t"
   size="form"
   (closed)="cancel()"
 >
   <form class="tn" (submit)="$event.preventDefault(); save()">
+    @if (canEvent()) {
+      <app-segmented
+        width="fill"
+        [ariaLabel]="'todos.eventCard.kind' | t"
+        [options]="kindOptions()"
+        [value]="kind()"
+        (valueChange)="setKind($any($event))"
+      />
+    }
     <app-input
       name="title"
       [label]="'todos.new.cardTitle' | t"
@@ -49,6 +58,47 @@
           (ngModelChange)="due.set($event ?? '')"
         />
       </div>
+      @if (kind() === 'event') {
+        <div class="tn__pair">
+          <app-datepicker
+            name="start"
+            [label]="'todos.eventCard.starts' | t"
+            [ngModel]="startsOn()"
+            (ngModelChange)="startsOn.set($event ?? '')"
+          />
+          <app-datepicker
+            name="end"
+            [label]="'todos.eventCard.ends' | t"
+            [error]="datesError()"
+            [ngModel]="endsOn()"
+            (ngModelChange)="endsOn.set($event ?? '')"
+          />
+        </div>
+        <div class="tn__pair">
+          <app-input
+            name="place"
+            [label]="'todos.eventCard.place' | t"
+            [ngModel]="place()"
+            (ngModelChange)="place.set($event)"
+          />
+          <app-select
+            name="series"
+            [label]="'todos.eventCard.series' | t"
+            [options]="seriesOptions()"
+            [ngModel]="seriesId()"
+            (ngModelChange)="seriesId.set($event)"
+          />
+        </div>
+        @if (seriesId() === newSeries) {
+          <app-input
+            name="seriesName"
+            [label]="'todos.eventCard.seriesName' | t"
+            [required]="true"
+            [ngModel]="seriesName()"
+            (ngModelChange)="seriesName.set($event)"
+          />
+        }
+      }
     }
 
     <div class="tn__links" role="group" aria-labelledby="tn-links">

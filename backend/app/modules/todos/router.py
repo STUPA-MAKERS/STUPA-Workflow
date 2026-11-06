@@ -52,15 +52,19 @@ from app.modules.todos.schemas import (
     ColumnPatch,
     CommentCreate,
     CommentIn,
+    EventIn,
     LabelCreate,
     LabelPatch,
     LinkIn,
+    SeriesCreate,
     TodoAssignedBoard,
     TodoBoardOut,
     TodoBoardSummary,
     TodoCardDetail,
     TodoCardTile,
     TodoCommentOut,
+    TodoEventRef,
+    TodoEventSeriesOut,
     TodoLabelOut,
     TodoLinkedCard,
     TodoLinkedKind,
@@ -232,9 +236,12 @@ async def board_archive(
     principal: Member,
     page: Annotated[PageParams, Depends()],
     q: Annotated[str | None, Query(max_length=200)] = None,
+    events: bool = False,
 ) -> Page[TodoCardTile]:
-    """The archived cards of the board, newest archive first."""
-    return await service.archive(board_id, principal, q=q, limit=page.limit, offset=page.offset)
+    """The archived cards of the board, newest archive first; ``events`` keeps the Events."""
+    return await service.archive(
+        board_id, principal, q=q, limit=page.limit, offset=page.offset, events_only=events
+    )
 
 
 @router.post(
@@ -628,6 +635,74 @@ async def add_link(
     """Link the card to a target that the caller reads."""
     kind: TodoLinkKind = payload.kind
     return await service.add_link(card_id, kind, payload.target_id, principal)
+
+
+@router.put(
+    "/cards/{card_id}/event",
+    response_model=TodoCardDetail,
+    responses=_errors(401, 403, 404, 409, 422),
+)
+async def set_event(
+    card_id: UUID, payload: EventIn, service: ServiceDep, principal: Member
+) -> TodoCardDetail:
+    """Set the event data of a card; a to-do becomes an Event for good."""
+    return await service.set_event(card_id, payload, principal)
+
+
+@router.delete(
+    "/cards/{card_id}/event",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    responses=_errors(401, 403, 404, 409),
+)
+async def remove_event(card_id: UUID, service: ServiceDep, principal: Member) -> Response:
+    """Always 409 ``event_permanent``: an Event never becomes a to-do again."""
+    await service.remove_event(card_id, principal)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)  # pragma: no cover - always raises
+
+
+@router.post(
+    "/cards/{card_id}/follow-up",
+    response_model=TodoCardDetail,
+    status_code=status.HTTP_201_CREATED,
+    responses=_errors(401, 403, 404, 422),
+)
+async def follow_up(card_id: UUID, service: ServiceDep, principal: Member) -> TodoCardDetail:
+    """Create the next edition of an Event (``Folgeveranstaltung anlegen``)."""
+    return await service.follow_up(card_id, principal)
+
+
+@router.get("/series", response_model=list[TodoEventSeriesOut], responses=_errors(401))
+async def list_series(
+    service: ServiceDep,
+    principal: Member,
+    q: Annotated[str | None, Query(max_length=200)] = None,
+) -> list[TodoEventSeriesOut]:
+    """The series of Events by name (at most 50)."""
+    return await service.series(q, principal)
+
+
+@router.post(
+    "/series",
+    response_model=TodoEventSeriesOut,
+    status_code=status.HTTP_201_CREATED,
+    responses=_errors(401, 403, 409, 422),
+)
+async def create_series(
+    payload: SeriesCreate, service: ServiceDep, principal: Member
+) -> TodoEventSeriesOut:
+    """Create a series; the name is unique, case ignored (409 ``series_exists``)."""
+    return await service.create_series(payload.name, principal)
+
+
+@router.get("/events", response_model=list[TodoEventRef], responses=_errors(401))
+async def writable_events(
+    service: ServiceDep,
+    principal: Member,
+    q: Annotated[str | None, Query(max_length=200)] = None,
+) -> list[TodoEventRef]:
+    """The live Events on boards that the caller writes: the ``Veranstaltung`` picker."""
+    return await service.writable_events(q, principal)
 
 
 @router.delete(

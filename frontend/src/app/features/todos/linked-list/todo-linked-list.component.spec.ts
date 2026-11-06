@@ -16,6 +16,8 @@ function card(over: Partial<TodoLinkedCard> = {}): TodoLinkedCard {
     isDone: false,
     dueDate: '2026-10-17',
     assignees: [{ principalId: 'p-1', displayName: 'Mara Keller' }, { principalId: null, displayName: null }],
+    event: null,
+    balance: null,
     ...over,
   };
 }
@@ -35,7 +37,7 @@ describe('TodoLinkedListComponent', () => {
   it('lists the linked cards with board, column, due date and people, each a link to its card', async () => {
     const { api, cmp } = await setup(() => of([card(), card({ id: 'k-2', title: 'Erledigt', isDone: true, dueDate: null, assignees: [] })]));
     expect(api.linked).toHaveBeenCalledWith('application', 'a-1');
-    expect(screen.getByRole('heading', { name: 'To-Dos' })).toHaveAttribute('id', 'ad-todos');
+    expect(screen.getByRole('heading', { name: 'Verknüpft' })).toHaveAttribute('id', 'ad-todos');
     expect(screen.getByRole('link', { name: 'Raum buchen' })).toHaveAttribute('href', '/todos?card=k-1');
     expect(screen.getByText('Studierendenparlament · In Arbeit · fällig 17.10.')).toBeInTheDocument();
     expect(screen.getByText('Studierendenparlament · In Arbeit')).toBeInTheDocument();
@@ -47,9 +49,9 @@ describe('TodoLinkedListComponent', () => {
 
   it('leaves out the heading on request and keeps the name of the section', async () => {
     await setup(() => of([card()]), { showTitle: false });
-    const heading = screen.getByRole('heading', { name: 'To-Dos' });
+    const heading = screen.getByRole('heading', { name: 'Verknüpft' });
     expect(heading.closest('.section__head')).toHaveClass('section__head--hidden');
-    expect(screen.getByRole('group', { name: 'To-Dos' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Verknüpft' })).toBeInTheDocument();
   });
 
   it('shows the cards of the page without a read of its own', async () => {
@@ -65,6 +67,17 @@ describe('TodoLinkedListComponent', () => {
     fixture.detectChanges();
     expect(api.linked).not.toHaveBeenCalled();
     expect(screen.getByRole('link', { name: 'Zweite' })).toBeInTheDocument();
+  });
+
+  it('shows a linked Event with its dates, board, place and balance (spec 000489)', async () => {
+    const event = { startsOn: '2026-11-20', endsOn: '2026-11-21', place: 'Mensa', participants: null, seriesId: null, seriesName: null };
+    await setup(() => of([card({ id: 'ev', title: 'Erstiparty', event, balance: '-725.40' }), card()]));
+    const rows = [...document.querySelectorAll('.tl__row')];
+    expect(rows[0]).toHaveClass('tl__row--event');
+    expect(rows[0]).toHaveTextContent('Erstiparty');
+    expect(screen.getByText('Veranstaltung · 20.11.–21.11.2026 · Studierendenparlament')).toBeInTheDocument();
+    expect(rows[0].querySelector('.tl__neg')?.textContent).toContain('−725,40');
+    expect(rows[0]).toHaveTextContent('Mensa');
   });
 
   it('shows nothing without linked cards', async () => {

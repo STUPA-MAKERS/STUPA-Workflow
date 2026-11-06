@@ -36,6 +36,7 @@ def _svc(**sources: Any) -> SearchService:
         "_principals",
         "_tickets",
         "_todos",
+        "_events",
     ):
 
         async def _empty(*_a: object, **_kw: object) -> list[SearchHit]:

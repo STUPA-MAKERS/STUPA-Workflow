@@ -136,8 +136,82 @@ class ChecklistCount(_Out):
     total: int = 0
 
 
+class TodoEventBrief(_Out):
+    """The event data of a card: start, end, place, participants and series."""
+
+    starts_on: date | None = Field(default=None, serialization_alias="startsOn")
+    ends_on: date | None = Field(default=None, serialization_alias="endsOn")
+    place: str | None = None
+    participants: int | None = None
+    series_id: UUID | None = Field(default=None, serialization_alias="seriesId")
+    series_name: str | None = Field(default=None, serialization_alias="seriesName")
+
+
+class TodoEventTotals(_Out):
+    """The money of an Event as decimal strings with two places (spec 000479)."""
+
+    requested: str = "0.00"
+    approved: str = "0.00"
+    expenses: str = "0.00"
+    income: str = "0.00"
+    balance: str = "0.00"
+
+
+class TodoEventDecision(_Out):
+    """A decision of an Event: the valid decision of an Antrag or a closed vote."""
+
+    kind: Literal["decision", "vote"]
+    target_id: UUID | None = Field(default=None, serialization_alias="targetId")
+    title: str
+    decided_at: datetime | None = Field(default=None, serialization_alias="decidedAt")
+    meeting_title: str | None = Field(default=None, serialization_alias="meetingTitle")
+    result: str | None = None
+    amount: str | None = None
+    conditions: list[str] = Field(default_factory=list)
+
+
+class TodoEventEdition(_Out):
+    """Another Event of the series that the viewer reads."""
+
+    id: UUID
+    board_id: UUID = Field(serialization_alias="boardId")
+    board_name: str = Field(serialization_alias="boardName")
+    title: str
+    starts_on: date | None = Field(default=None, serialization_alias="startsOn")
+    ends_on: date | None = Field(default=None, serialization_alias="endsOn")
+    archived: bool = False
+    totals: TodoEventTotals = Field(default_factory=TodoEventTotals)
+
+
+class TodoEventFacts(_Out):
+    """What an Event gathers: its totals, decisions and the other Events of its series."""
+
+    totals: TodoEventTotals = Field(default_factory=TodoEventTotals)
+    decisions: list[TodoEventDecision] = Field(default_factory=list)
+    editions: list[TodoEventEdition] = Field(default_factory=list)
+    hidden_editions: int = Field(default=0, serialization_alias="hiddenEditions")
+
+
+class TodoEventSeriesOut(_Out):
+    """A series of Events (``Reihe``)."""
+
+    id: UUID
+    name: str
+
+
+class TodoEventRef(_Out):
+    """An Event that the caller can write: an option of the ``Veranstaltung`` picker."""
+
+    id: UUID
+    board_id: UUID = Field(serialization_alias="boardId")
+    board_name: str = Field(serialization_alias="boardName")
+    title: str
+    starts_on: date | None = Field(default=None, serialization_alias="startsOn")
+    ends_on: date | None = Field(default=None, serialization_alias="endsOn")
+
+
 class TodoCardTile(_Out):
-    """A card as a tile on the board."""
+    """A card as a tile on the board; ``event`` is set for an Event."""
 
     id: UUID
     board_id: UUID = Field(serialization_alias="boardId")
@@ -152,6 +226,7 @@ class TodoCardTile(_Out):
     comment_count: int = Field(default=0, serialization_alias="commentCount")
     primary_link: TodoLinkOut | None = Field(default=None, serialization_alias="primaryLink")
     link_count: int = Field(default=0, serialization_alias="linkCount")
+    event: TodoEventBrief | None = None
     version: int = 1
     created_at: datetime = Field(serialization_alias="createdAt")
     updated_at: datetime = Field(serialization_alias="updatedAt")
@@ -240,6 +315,7 @@ class TodoCardDetail(TodoCardTile):
     events: list[TodoEventOut] = Field(default_factory=list)
     comments: list[TodoCommentOut] = Field(default_factory=list)
     archived_at: datetime | None = Field(default=None, serialization_alias="archivedAt")
+    event_facts: TodoEventFacts | None = Field(default=None, serialization_alias="eventFacts")
 
 
 class TodoMineItem(TodoCardTile):
@@ -299,6 +375,8 @@ class TodoLinkedCard(_Out):
     is_done: bool = Field(serialization_alias="isDone")
     due_date: date | None = Field(default=None, serialization_alias="dueDate")
     assignees: list[PersonRef] = Field(default_factory=list)
+    event: TodoEventBrief | None = None
+    balance: str | None = None
 
 
 class BoardPatch(_In):
@@ -348,6 +426,22 @@ class LinkIn(_In):
     target_id: UUID = Field(alias="targetId")
 
 
+class EventIn(_In):
+    """The event data of a card (spec 000478)."""
+
+    starts_on: date | None = Field(default=None, alias="startsOn")
+    ends_on: date | None = Field(default=None, alias="endsOn")
+    place: str | None = Field(default=None, max_length=200)
+    participants: int | None = Field(default=None, ge=0, le=1_000_000)
+    series_id: UUID | None = Field(default=None, alias="seriesId")
+
+
+class SeriesCreate(_In):
+    """A new series."""
+
+    name: str = Field(min_length=1, max_length=200)
+
+
 class CardCreate(_In):
     """A new card."""
 
@@ -359,6 +453,7 @@ class CardCreate(_In):
     assignee_ids: list[UUID] = Field(default_factory=list, alias="assigneeIds", max_length=50)
     label_ids: list[UUID] = Field(default_factory=list, alias="labelIds", max_length=50)
     links: list[LinkIn] = Field(default_factory=list, max_length=20)
+    event: EventIn | None = None
 
 
 class CardPatch(_In):

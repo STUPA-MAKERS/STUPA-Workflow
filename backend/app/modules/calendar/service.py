@@ -1,14 +1,17 @@
-"""Calendar feed: token management plus meeting data access.
+"""Calendar feed: token management plus meeting and Event data access.
 
 The feed token authenticates the `.ics` URL without a session or OIDC. Plaintext
 storage is acceptable here. The token only exposes the meeting titles and times
-of the Gremien of the principal, which is low-sensitivity data. Every function
+of the Gremien of the principal, and the title, dates, place and board of the Events
+that the principal reads, which is low-sensitivity data. Every function
 binds to `principal.sub` and never commits.
 """
 
 from __future__ import annotations
 
 import secrets
+from datetime import UTC, date, datetime
+from typing import cast
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.admin.gremium_roles import gremium_reader_ids
 from app.modules.admin.models import Gremium
 from app.modules.auth.models import Principal as PrincipalRow
+from app.modules.calendar.ics import CardEvent
 from app.modules.livevote.models import Meeting
 
 #: 32 bytes give about 43 URL-safe characters. An unguessable token needs no rate limit.
@@ -100,3 +104,28 @@ async def member_meetings(db: AsyncSession, sub: str) -> list[tuple[Meeting, str
         )
     ).all()
     return [(meeting, name) for meeting, name in rows]
+
+
+async def readable_events(db: AsyncSession, row: PrincipalRow) -> list[CardEvent]:
+    """The Events with a start on the boards that the person reads (spec 000486).
+
+    The feed has no session, so the person's rights come from the `principal` row,
+    as at a login.
+    """
+    from app.modules.auth.rbac import resolve_principal
+    from app.modules.todos.service import TodoService
+
+    principal = await resolve_principal(db, row, datetime.now(UTC))
+    rows = await TodoService(db).calendar_events(principal)
+    return [
+        CardEvent(
+            uid=str(card.id),
+            title=card.title,
+            start=cast(date, event.starts_on),
+            end=event.ends_on,
+            stamp=card.created_at,
+            place=event.place,
+            board_name=board.name,
+        )
+        for card, board, event in rows
+    ]

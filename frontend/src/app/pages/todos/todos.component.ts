@@ -434,8 +434,16 @@ export class TodosComponent implements OnDestroy {
     for (const card of board.cards) {
       if (matchesFilter(card, f, ctx)) out.get(card.columnId)?.push(card);
     }
+    if (f.kind === 'archive') {
+      for (const card of this.archivedEvents()) {
+        if (card.boardId === board.id && matchesFilter(card, f, ctx)) out.get(card.columnId)?.push(card);
+      }
+    }
     return out;
   });
+
+  /** The archived Events of the board, for "Veranstaltungen mit Archiv" (spec 000485). */
+  readonly archivedEvents = signal<readonly TodoCardTile[]>([]);
 
   readonly filtered = computed(() => filterActive(this.filter()));
   readonly noMatch = computed(() => {
@@ -487,6 +495,16 @@ export class TodosComponent implements OnDestroy {
     return this.i18n.translate('todos.filter.labels', { n: ids.length });
   });
   readonly dueText = computed(() => this.i18n.translate(DUE_TEXT[this.filter().due]));
+  readonly kindOptions = computed<FilterSelectOption[]>(() => [
+    { value: '', label: this.i18n.translate('todos.filter.kindAll') },
+    { value: 'events', label: this.i18n.translate('todos.filter.kindEvents') },
+    { value: 'archive', label: this.i18n.translate('todos.filter.kindArchive') },
+  ]);
+  readonly kindText = computed(() =>
+    this.filter().kind
+      ? (this.kindOptions().find((o) => o.value === this.filter().kind)?.label ?? '')
+      : this.i18n.translate('todos.eventCard.kind'),
+  );
 
   readonly phoneMenu = computed<RowMenuSection[]>(() => {
     const items: RowMenuItem[] = [
@@ -939,7 +957,22 @@ export class TodosComponent implements OnDestroy {
     this.filter.update((f) => ({ ...f, due }));
   }
 
+  setKind(value: string): void {
+    const kind = (['events', 'archive'] as const).find((k) => k === value) ?? '';
+    this.filter.update((f) => ({ ...f, kind }));
+    const board = this.board();
+    this.archivedEvents.set([]);
+    if (kind !== 'archive' || !board) return;
+    this.api.archive(board.id, '', 0, 200, true).subscribe({
+      next: (page) => {
+        if (this.filter().kind === 'archive' && this.board()?.id === board.id) this.archivedEvents.set(page.items);
+      },
+      error: () => this.archivedEvents.set([]),
+    });
+  }
+
   resetFilters(): void {
+    this.archivedEvents.set([]);
     this.search.clear();
     this.filter.set(NO_FILTER);
   }

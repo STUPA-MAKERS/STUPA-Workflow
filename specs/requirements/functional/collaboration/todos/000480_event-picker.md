@@ -1,6 +1,6 @@
 ---
 id: "000480"
-title: Antrag and Buchung can name their Event
+title: A Buchung can name its Event
 kind: functional
 status: approved
 owner: frederikbeimgraben
@@ -13,13 +13,13 @@ scope:
   - frontend/src/app/pages/expenses
 ---
 
-# Antrag and Buchung can name their Event
+# A Buchung can name its Event
 
-The detail of an Antrag and the form of a Buchung must have an `Event` picker. The picker
-must create or delete the link of the Event card to that element. The picker must list only
-Events on boards that the person can write.
+The form of a Buchung must have a `Veranstaltung` picker. The picker must create or delete the
+link of the Event card to the Buchung. The picker must list only Events on boards that the
+person can write. An Antrag is linked from the Event card.
 
-Reason: The person who captures an Antrag or a Buchung knows the Event. The link must not
+Reason: The person who captures a Buchung knows the Event. The link must not
 need a second step on the board.
 
 Test: A frontend unit test checks that the picker creates the card link.

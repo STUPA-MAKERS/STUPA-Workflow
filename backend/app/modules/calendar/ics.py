@@ -1,4 +1,4 @@
-"""iCal feed builder: meetings to an RFC5545 `VCALENDAR` (pure functions, no DB).
+"""iCal feed builder: meetings and Events to an RFC5545 `VCALENDAR` (pure functions, no DB).
 
 The module imports `icalendar` lazily, on the feed path only. This keeps the
 module import cheap.
@@ -6,7 +6,9 @@ module import cheap.
 Time zones: meetings carry local times (Europe/Berlin). The builder converts a
 timed event to UTC and writes it with `Z`. This avoids the error-prone
 `VTIMEZONE` block. `zoneinfo` resolves DST per date. A meeting without a time
-becomes an all-day event (`VALUE=DATE`).
+becomes an all-day event (`VALUE=DATE`). An Event (a to-do card with event data) is
+always all-day: `DTEND` is the day after its end, because RFC5545 makes the end of
+a `VALUE=DATE` event exclusive. An Event without an end lasts one day.
 """
 
 from __future__ import annotations
@@ -48,6 +50,22 @@ class MeetingEvent:
     end_time: _time | None
     stamp: datetime
     gremium_name: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class CardEvent:
+    """An Event card as an all-day calendar event (spec 000486).
+
+    `uid` is the card id. `end` is the last day, or `None` for one day.
+    """
+
+    uid: str
+    title: str
+    start: _date
+    end: _date | None
+    stamp: datetime
+    place: str | None = None
+    board_name: str | None = None
 
 
 def _as_utc(value: datetime) -> datetime:
@@ -101,10 +119,29 @@ def _build_event(event: MeetingEvent, *, domain: str, default_duration: timedelt
     return ical
 
 
+def _build_card_event(event: CardEvent, *, domain: str) -> Event:
+    """Build one all-day VEVENT for an Event card."""
+    from icalendar import Event
+
+    ical = Event()
+    ical.add("uid", f"event-{event.uid}@{domain}")
+    ical.add("dtstamp", _as_utc(event.stamp))
+    ical.add("summary", event.title)
+    if event.place:
+        ical.add("location", event.place)
+    if event.board_name:
+        ical.add("description", f"Board: {event.board_name}")
+    last = event.end if event.end is not None and event.end > event.start else event.start
+    ical.add("dtstart", event.start)
+    ical.add("dtend", last + timedelta(days=1))
+    return ical
+
+
 def build_calendar(
     events: list[MeetingEvent],
     *,
     domain: str,
+    card_events: list[CardEvent] | None = None,
     calendar_name: str = "STUPA — Sitzungen",
     default_duration: timedelta = DEFAULT_DURATION,
 ) -> bytes:
@@ -124,4 +161,6 @@ def build_calendar(
     cal.add("x-wr-timezone", "Europe/Berlin")
     for event in events:
         cal.add_component(_build_event(event, domain=domain, default_duration=default_duration))
+    for card_event in card_events or []:
+        cal.add_component(_build_card_event(card_event, domain=domain))
     return cal.to_ical()
