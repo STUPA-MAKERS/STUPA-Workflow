@@ -628,8 +628,9 @@ class VoteCreate(WireModel):
 
     config: dict[str, Any] = Field(
         description=(
-            "Vote config: options, majorityRule, quorum, abstainCountsQuorum, "
-            "tieBreak. The vote is always secret: `secret` false gives 422. A ballot "
+            "Vote config: options, majorityRule, quorum, abstainCountsQuorum. A tie "
+            "always rejects: `tieBreak` other than `rejected` gives 422. The vote is "
+            "always secret: `secret` false gives 422. A ballot "
             "never changes after the cast, so there is no `allowChange` (the server "
             "refuses the key with 422)."
         )
