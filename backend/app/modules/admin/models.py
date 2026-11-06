@@ -268,15 +268,15 @@ class Webhook(UUIDPkMixin, CreatedAtMixin, Base):
     """Outbound webhook config (`webhook.manage`).
 
     The server generates ``secret`` and never exposes it through the API. The
-    worker signs the deliveries with it (HMAC). ``events`` is a whitelist from
-    `app.shared.config_schemas.EventName`.
+    worker signs the deliveries with it (HMAC). A webhook has no event list: it
+    sends only when a flow transition runs its ``webhook`` action
+    (§F/integrations/webhooks/000402).
     """
 
     __tablename__ = "webhook"
 
     name: Mapped[str] = mapped_column(Text)
     url: Mapped[str] = mapped_column(Text)
-    events: Mapped[list[str]] = mapped_column(ARRAY(Text), server_default="{}")
     secret: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, server_default="true")
 

@@ -67,7 +67,7 @@ class OidcMappingService:
             await self.session.flush()
         except IntegrityError as exc:
             await self.session.rollback()
-            raise ConflictError(message, code="conflict") from exc
+            raise ConflictError(message, code="group_mapping_exists") from exc
 
     async def _audit_sync_commit(self, actor: str, target_type: str, target_id: UUID) -> None:
         """Audit the mapping change, sync all memberships to it and commit."""

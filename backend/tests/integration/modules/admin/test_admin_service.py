@@ -413,7 +413,6 @@ async def test_webhook_crud_secret_not_exposed(session: AsyncSession, engine: En
             {
                 "name": "n8n",
                 "url": "https://hooks.x/abc",
-                "events": ["status_changed", "vote_closed"],
             }
         ),
         _ACTOR,

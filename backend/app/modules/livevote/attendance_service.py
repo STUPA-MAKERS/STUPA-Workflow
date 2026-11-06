@@ -264,7 +264,7 @@ class AttendanceService:
             await self.session.rollback()
             raise ConflictError(
                 "Another change of this attendance ran at the same time. Try again.",
-                code="conflict",
+                code="concurrent_attendance_change",
             ) from exc
 
     @staticmethod
@@ -279,7 +279,7 @@ class AttendanceService:
         """
         if meeting.status == "closed":
             raise ConflictError(
-                "Attendance is read-only once the meeting is closed.", code="conflict"
+                "Attendance is read-only once the meeting is closed.", code="meeting_closed"
             )
 
     async def _audit(
