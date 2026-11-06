@@ -1,7 +1,0 @@
-{
-  "backend/app/modules/config_revision/reapply.py": 1,
-  "backend/app/modules/config_revision/revert.py": 2,
-  "backend/app/modules/config_revision/router.py": 1,
-  "backend/app/modules/config_revision/schemas.py": 3,
-  "backend/app/modules/config_revision/service.py": 14
-}

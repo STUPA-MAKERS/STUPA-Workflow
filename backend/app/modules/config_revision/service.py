@@ -45,38 +45,65 @@ def _lock_key(entity_type: str, entity_id: str) -> int:
     return int.from_bytes(digest, "big", signed=True)
 
 
+def _as_uuid(raw: UUID | str) -> UUID | None:
+    """Return ``raw`` as a UUID, or None for a malformed string."""
+    if not isinstance(raw, str):
+        return raw
+    try:
+        return UUID(raw)
+    except ValueError:
+        return None
+
+
+def _form_entries(snapshot: dict[str, Any]) -> dict[str, Any]:
+    """Map a form snapshot to one entry per keyed field plus the description."""
+    fields = {
+        f"field:{field['key']}": field
+        for field in snapshot.get("fields", []) or []
+        if isinstance(field, dict) and field.get("key")
+    }
+    description = snapshot.get("description")
+    return fields if description is None else {**fields, "meta:description": description}
+
+
+def _transition_ident(transition: dict[str, Any]) -> str:
+    """Return the identity of a transition: ``from->to``, plus ``:branch`` when it has one."""
+    base = f"{transition.get('from')}->{transition.get('to')}"
+    return f"{base}:{transition['branch']}" if transition.get("branch") else base
+
+
+def _flow_entries(snapshot: dict[str, Any]) -> dict[str, Any]:
+    """Map a flow snapshot to one entry per keyed state and transition plus the layout."""
+    states = {
+        f"state:{state['key']}": state
+        for state in snapshot.get("states", []) or []
+        if isinstance(state, dict) and state.get("key")
+    }
+    transitions = {
+        f"transition:{_transition_ident(tr)}": tr
+        for tr in snapshot.get("transitions", []) or []
+        if isinstance(tr, dict)
+    }
+    layout = snapshot.get("layout")
+    meta = {"meta:layout": layout} if layout else {}
+    return {**states, **transitions, **meta}
+
+
 def _flatten(entity_type: str, snapshot: dict[str, Any]) -> dict[str, Any]:
     """Flatten a snapshot into an ``{identity: value}`` map for the field diff.
 
     The function maps the natural snapshot shape to stable identity keys. That shape
     is a field list, a ``FlowGraph`` or a branding dict. ``compute_diff`` can then
     report added, removed and changed per field instead of comparing opaque lists.
+    A site config (branding dict) and an unknown entity are already flat.
     """
-    if entity_type == ENTITY_FORM:
-        flat: dict[str, Any] = {}
-        for field in snapshot.get("fields", []) or []:
-            if isinstance(field, dict) and field.get("key"):
-                flat[f"field:{field['key']}"] = field
-        if snapshot.get("description") is not None:
-            flat["meta:description"] = snapshot["description"]
-        return flat
-    if entity_type == ENTITY_FLOW:
-        flat = {}
-        for state in snapshot.get("states", []) or []:
-            if isinstance(state, dict) and state.get("key"):
-                flat[f"state:{state['key']}"] = state
-        for tr in snapshot.get("transitions", []) or []:
-            if isinstance(tr, dict):
-                ident = f"{tr.get('from')}->{tr.get('to')}"
-                if tr.get("branch"):
-                    ident += f":{tr['branch']}"
-                flat[f"transition:{ident}"] = tr
-        if snapshot.get("layout"):
-            flat["meta:layout"] = snapshot["layout"]
-        return flat
-    if entity_type == ENTITY_SITE_CONFIG:
-        return dict(snapshot)
-    return dict(snapshot)
+    match entity_type:
+        case "form":
+            return _form_entries(snapshot)
+        case "flow":
+            return _flow_entries(snapshot)
+        case _:
+            return dict(snapshot)
 
 
 class ConfigRevisionService:
@@ -100,12 +127,8 @@ class ConfigRevisionService:
 
     async def get(self, revision_id: UUID | str) -> ConfigRevision | None:
         """Return a revision by id, or None for an unknown or malformed id."""
-        if isinstance(revision_id, str):
-            try:
-                revision_id = UUID(revision_id)
-            except ValueError:
-                return None
-        return await self.session.get(ConfigRevision, revision_id)
+        key = _as_uuid(revision_id)
+        return None if key is None else await self.session.get(ConfigRevision, key)
 
     async def list_for(
         self, entity_type: str, entity_id: str
@@ -174,11 +197,12 @@ class ConfigRevisionService:
 
     async def diff(self, revision: ConfigRevision) -> DataDiff:
         """Diff this snapshot against its predecessor, empty for the first state."""
-        prev_snapshot: dict[str, Any] = {}
-        if revision.prev_revision_id is not None:
-            prev = await self.session.get(ConfigRevision, revision.prev_revision_id)
-            if prev is not None:
-                prev_snapshot = prev.snapshot or {}
+        prev = (
+            await self.session.get(ConfigRevision, revision.prev_revision_id)
+            if revision.prev_revision_id is not None
+            else None
+        )
+        prev_snapshot: dict[str, Any] = (prev.snapshot or {}) if prev is not None else {}
         return compute_diff(
             _flatten(revision.entity_type, prev_snapshot),
             _flatten(revision.entity_type, revision.snapshot or {}),
