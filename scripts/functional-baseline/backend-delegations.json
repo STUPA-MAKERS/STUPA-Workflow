@@ -1,5 +1,5 @@
 {
   "backend/app/modules/delegations/pool_seat.py": 1,
-  "backend/app/modules/delegations/schemas.py": 8,
+  "backend/app/modules/delegations/schemas.py": 6,
   "backend/app/modules/delegations/service.py": 34
 }

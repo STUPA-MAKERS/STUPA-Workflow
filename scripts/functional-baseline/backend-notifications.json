@@ -8,7 +8,7 @@
   "backend/app/modules/notifications/polls.py": 4,
   "backend/app/modules/notifications/queue.py": 3,
   "backend/app/modules/notifications/recipients.py": 15,
-  "backend/app/modules/notifications/schemas.py": 12,
+  "backend/app/modules/notifications/schemas.py": 11,
   "backend/app/modules/notifications/service.py": 29,
   "backend/app/modules/notifications/templating.py": 1,
   "backend/app/modules/notifications/tickets.py": 1,
