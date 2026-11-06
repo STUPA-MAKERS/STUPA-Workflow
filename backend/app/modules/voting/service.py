@@ -768,7 +768,9 @@ class VotingService:
 
         The server sets ``eligible_count`` from the roster of the gremium (members
         with ``vote.cast``). The client cannot send it. The vote is always secret
-        (``secret_only``): ``config.secret`` false gives 422.
+        (``secret_only``): ``config.secret`` false gives 422. A tie always rejects a
+        motion (§ F/meetings/voting/000026), so ``tieBreak`` other than ``rejected``
+        gives 422.
 
         Only a meeting vote of a public meeting has guests. An unconfirmed guest
         application rests in the flow and gets 404 as on the flow routes, because a vote
@@ -783,7 +785,9 @@ class VotingService:
                 the admin role (403).
             ValidationProblem: The gremium does not exist (``eligible_group_invalid``),
                 is not the gremium of the application (``eligible_group_mismatch``), or
-                the body asks for an open vote (``open_vote_unavailable``) (422).
+                the body asks for an open vote (``open_vote_unavailable``), or the
+                body sets a ``tieBreak`` other than ``rejected``
+                (``tie_break_unavailable``) (422).
         """
         from app.modules.auth.policy import admin_bypass
 
@@ -792,6 +796,12 @@ class VotingService:
                 "Only a vote of a public meeting can include guests.",
                 code="guests_vote_unavailable",
                 errors=[{"field": "config.guestsVote", "msg": "not a public meeting vote"}],
+            )
+        if payload.config.tie_break != "rejected":
+            raise ValidationProblem(
+                "A tie always rejects a motion.",
+                code="tie_break_unavailable",
+                errors=[{"field": "config.tieBreak", "msg": "only rejected is allowed"}],
             )
         sent = payload.config.secret if "secret" in payload.config.model_fields_set else None
         config = payload.config.model_copy(
