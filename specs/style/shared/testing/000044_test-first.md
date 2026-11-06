@@ -5,6 +5,10 @@ kind: style
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
+implementation:
+  - backend/tests/
+  - frontend/src/
+  - mcp/antragsplattform_mcp/tests
 scope:
   - backend/tests/
   - frontend/src/

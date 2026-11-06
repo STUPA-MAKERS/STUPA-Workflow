@@ -5,6 +5,8 @@ kind: non-functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
+implementation:
+  - backend/app/modules/livevote
 scope:
   - backend/app/modules/livevote
 ---

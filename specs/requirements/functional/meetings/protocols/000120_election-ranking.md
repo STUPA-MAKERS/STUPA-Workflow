@@ -5,6 +5,10 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
+implementation:
+  - backend/app/modules/protocol
+  - frontend/src/app/features/meetings
+  - typst/
 scope:
   - backend/app/modules/protocol
   - frontend/src/app/features/meetings

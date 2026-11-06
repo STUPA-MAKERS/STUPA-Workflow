@@ -5,6 +5,9 @@ kind: non-functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
+implementation:
+  - backend/worker/retention.py
+  - backend/app/modules/privacy
 scope:
   - backend/worker/retention.py
   - backend/app/modules/privacy

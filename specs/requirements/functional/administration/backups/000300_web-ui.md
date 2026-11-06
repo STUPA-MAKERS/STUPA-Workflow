@@ -5,6 +5,10 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
+implementation:
+  - backend/app/modules/backup
+  - backend/worker/backup.py
+  - frontend/src/app/pages/admin/backups
 scope:
   - backend/app/modules/backup
   - backend/worker/backup.py

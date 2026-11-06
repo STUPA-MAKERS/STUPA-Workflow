@@ -5,6 +5,11 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
+implementation:
+  - backend/app/modules/livevote
+  - frontend/src/app/features/meetings
+  - backend/app/modules/voting
+  - frontend/src/app/features/voting
 scope:
   - backend/app/modules/livevote
   - frontend/src/app/features/meetings

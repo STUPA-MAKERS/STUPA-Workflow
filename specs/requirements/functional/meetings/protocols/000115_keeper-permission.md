@@ -4,7 +4,10 @@ title: The keeper holds protocol.write
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
+implementation:
+  - backend/app/modules/protocol
+  - frontend/src/app/features/meetings
 scope:
   - backend/app/modules/protocol
   - frontend/src/app/features/meetings
