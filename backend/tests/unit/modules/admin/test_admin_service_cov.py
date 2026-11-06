@@ -274,6 +274,7 @@ def test_mappers_roundtrip() -> None:
     assert a.granted_by == "bootstrap"
 
     w = _webhook_out(webhook_row())
+    assert w.active is True
 
     m = _mapping_out(mapping_row())
     assert m.oidc_group == "grp"

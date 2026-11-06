@@ -19,7 +19,9 @@ revision removes what the database still holds of them.
      it is.
 
 2. ``state.config`` and the snapshot states lose ``deadlinePolicyKey``.
-3. ``webhook.events`` loses ``deadline_approaching`` and ``deadline_passed``.
+3. ``webhook.events`` loses ``deadline_approaching`` and ``deadline_passed``. The
+   update runs only when the column exists, because the baseline builds the schema
+   from the current models, which have no ``events`` column.
 4. The ``notification_preference`` rows of kind ``deadline`` are deleted. The
    ``mail_template`` row ``deadline_approaching`` is deleted only when no
    ``transition.actions`` names it as ``templateKey``, because a flow can send a
@@ -205,9 +207,12 @@ def _rewrite_snapshots(conn: sa.Connection) -> None:
 _UPGRADE: tuple[str, ...] = (
     f"UPDATE state SET config = config - '{_POLICY_KEY}' "
     f"WHERE strpos(config::text, '{_POLICY_KEY}') > 0",
+    "DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns "
+    "WHERE table_name = 'webhook' AND column_name = 'events') THEN "
     "UPDATE webhook SET events = array_remove(array_remove(events, "
     "'deadline_approaching'), 'deadline_passed') "
-    "WHERE events && ARRAY['deadline_approaching', 'deadline_passed']::text[]",
+    "WHERE events && ARRAY['deadline_approaching', 'deadline_passed']::text[]; "
+    "END IF; END $$",
     "DELETE FROM mail_template WHERE key = 'deadline_approaching' AND NOT EXISTS "
     "(SELECT 1 FROM transition WHERE actions @> "
     "'[{\"templateKey\": \"deadline_approaching\"}]'::jsonb OR actions @> "
