@@ -62,5 +62,5 @@ def test_allocation_set_rejects_over_cap_amount() -> None:
 def test_budget_node_create_accepts_only_eur() -> None:
     """A currency other than EUR gives 422, not a 500 (§ F/finance/budget/000253)."""
     with pytest.raises(ValidationError):
-        BudgetNodeCreate(key="k", name="n", currency="USD")
+        BudgetNodeCreate.model_validate({"key": "k", "name": "n", "currency": "USD"})
     assert BudgetNodeCreate(key="k", name="n").currency == "EUR"
