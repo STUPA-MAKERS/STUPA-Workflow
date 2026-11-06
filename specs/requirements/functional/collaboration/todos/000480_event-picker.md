@@ -8,8 +8,8 @@ updated: 2026-11-06
 scope:
   - backend/app/modules/todos
   - frontend/src/app/features/todos
-  - frontend/src/app/features/applications
-  - frontend/src/app/features/budget
+  - frontend/src/app/pages/applications
+  - frontend/src/app/pages/expenses
 ---
 
 # Antrag and Buchung can name their Event
