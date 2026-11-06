@@ -111,7 +111,10 @@ class NodeOps(BudgetTreeServiceBase):
             gremium_id = parent.gremium_id
 
         if await self._sibling_exists(payload.parent_id, payload.key):
-            raise ConflictError(f"budget key {payload.key!r} already exists under this parent")
+            raise ConflictError(
+                f"budget key {payload.key!r} already exists under this parent",
+                code="budget_key_exists",
+            )
         await self._check_decision_gremium(payload.decision_gremium_id)
 
         node = Budget(
@@ -229,7 +232,10 @@ class NodeOps(BudgetTreeServiceBase):
                 errors=[{"field": "key", "msg": "must be alphanumeric (no '-')"}],
             )
         if await self._sibling_exists(node.parent_id, new_key):
-            raise ConflictError(f"budget key {new_key!r} already exists under this parent")
+            raise ConflictError(
+                f"budget key {new_key!r} already exists under this parent",
+                code="budget_key_exists",
+            )
         parent_path: str | None = None
         if node.parent_id is not None:
             parent_path = (await self._get_node(node.parent_id)).path_key
@@ -268,14 +274,20 @@ class NodeOps(BudgetTreeServiceBase):
             )
         ).scalar_one_or_none()
         if child is not None:
-            raise ConflictError("budget has child cost-centers; delete them first")
+            raise ConflictError(
+                "budget has child cost-centers; delete them first",
+                code="budget_has_children",
+            )
         booking = (
             await self.session.execute(
                 select(BudgetExpense.id).where(BudgetExpense.budget_id == budget_id).limit(1)
             )
         ).scalar_one_or_none()
         if booking is not None:
-            raise ConflictError("budget has bookings; remove them first")
+            raise ConflictError(
+                "budget has bookings; remove them first",
+                code="budget_has_bookings",
+            )
         assigned = (
             await self.session.execute(
                 select(Application.id).where(Application.budget_id == budget_id).limit(1)
@@ -283,7 +295,8 @@ class NodeOps(BudgetTreeServiceBase):
         ).scalar_one_or_none()
         if assigned is not None:
             raise ConflictError(
-                "budget has assigned applications; reassign them first"
+                "budget has assigned applications; reassign them first",
+                code="budget_has_applications",
             )
         await self._audit(
             AuditAction.BUDGET_NODE_DELETE,

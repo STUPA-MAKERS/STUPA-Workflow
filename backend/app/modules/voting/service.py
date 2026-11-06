@@ -106,7 +106,7 @@ def secret_only(secret: bool | None, *, field: str) -> bool:
     """Return the secrecy of a new vote: always True.
 
     A decision, an election and a poll are always secret: the platform has no open vote
-    (user decision 2026-11-05). ``None`` (the client sent no value) gives True. An
+    (§ F/meetings/voting/000024). ``None`` (the client sent no value) gives True. An
     explicit ``false`` gives 422, so a client that asks for an open vote learns that it
     does not get one.
 
@@ -487,23 +487,24 @@ class VotingService:
         return total
 
     async def delete_standalone(self, vote_id: UUID, *, actor: str) -> None:
-        """Delete a standalone application-bound vote that never ran.
+        """Delete a standalone application-bound vote that is a draft or cancelled.
 
-        The vote must still be ``draft`` and must hold no ballot. Anything
-        further along stays with ``cancel``: an opened vote is part of the
-        record of the Gremium, and its result may already have fired a flow
-        branch. A vote that belongs to a meeting is not reachable here. That
-        one has its own route, ``DELETE /meetings/{id}/votes/{id}``, with the
-        meeting-scoped ``canManageVotes`` check. Duplicating it here would give
-        a second, weaker path to the same row.
+        The rule is the same as for a meeting vote (§ F/meetings/voting/000029): a
+        ``draft`` or ``cancelled`` vote can be deleted, its ballots go with it (FK
+        cascade). An ``open`` or ``closed`` vote is part of the record of the Gremium,
+        and its result may already have fired a flow branch, so it gives 409
+        ``vote_not_deletable``. A vote that belongs to a meeting is not reachable here.
+        That one has its own route, ``DELETE /meetings/{id}/votes/{id}``, with the
+        meeting-scoped ``canManageVotes`` check. Duplicating it here would give a
+        second, weaker path to the same row.
 
         The caller (router) runs the gremium-scoped manage check
         (``assert_can_manage_vote``), like open, close and cancel.
 
         Raises:
             NotFoundError: No vote has this id (404).
-            ConflictError: The vote belongs to a meeting, is no longer a draft,
-                or already holds ballots (409).
+            ConflictError: The vote belongs to a meeting (``vote_meeting_bound``), or
+                it is open or closed (``vote_not_deletable``) (409).
         """
         vote = await self._get_vote(vote_id)
         if vote.meeting_id is not None:
@@ -511,15 +512,11 @@ class VotingService:
                 "This vote belongs to a meeting; delete it through the meeting.",
                 code="vote_meeting_bound",
             )
-        if vote.status != "draft":
+        if vote.status in ("open", "closed"):
             raise ConflictError(
-                "Only a vote that never opened can be deleted; cancel it instead.",
-                code="vote_not_draft",
-            )
-        if await self._ballot_count(vote_id) > 0:
-            raise ConflictError(
-                "This vote already holds ballots and cannot be deleted.",
-                code="vote_has_ballots",
+                "An open or closed vote is part of the record and cannot be deleted. "
+                "Cancel an open vote instead.",
+                code="vote_not_deletable",
             )
         await self._delete_audited(vote, actor=actor)
         await self.session.commit()
@@ -768,7 +765,9 @@ class VotingService:
 
         The server sets ``eligible_count`` from the roster of the gremium (members
         with ``vote.cast``). The client cannot send it. The vote is always secret
-        (``secret_only``): ``config.secret`` false gives 422.
+        (``secret_only``): ``config.secret`` false gives 422. A tie always rejects a
+        motion (§ F/meetings/voting/000026), so ``tieBreak`` other than ``rejected``
+        gives 422.
 
         Only a meeting vote of a public meeting has guests. An unconfirmed guest
         application rests in the flow and gets 404 as on the flow routes, because a vote
@@ -783,7 +782,9 @@ class VotingService:
                 the admin role (403).
             ValidationProblem: The gremium does not exist (``eligible_group_invalid``),
                 is not the gremium of the application (``eligible_group_mismatch``), or
-                the body asks for an open vote (``open_vote_unavailable``) (422).
+                the body asks for an open vote (``open_vote_unavailable``), or the
+                body sets a ``tieBreak`` other than ``rejected``
+                (``tie_break_unavailable``) (422).
         """
         from app.modules.auth.policy import admin_bypass
 
@@ -792,6 +793,12 @@ class VotingService:
                 "Only a vote of a public meeting can include guests.",
                 code="guests_vote_unavailable",
                 errors=[{"field": "config.guestsVote", "msg": "not a public meeting vote"}],
+            )
+        if payload.config.tie_break != "rejected":
+            raise ValidationProblem(
+                "A tie always rejects a motion.",
+                code="tie_break_unavailable",
+                errors=[{"field": "config.tieBreak", "msg": "only rejected is allowed"}],
             )
         sent = payload.config.secret if "secret" in payload.config.model_fields_set else None
         config = payload.config.model_copy(

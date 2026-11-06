@@ -227,7 +227,8 @@ class GremiumRoleService:
         ).first()
         if existing is not None:
             raise ConflictError(
-                f"gremium role {payload.key!r} already exists in this gremium"
+                f"gremium role {payload.key!r} already exists in this gremium",
+                code="gremium_role_exists",
             )
         row = GremiumRole(
             gremium_id=gremium_id,
@@ -274,7 +275,7 @@ class GremiumRoleService:
         if row is None:
             raise NotFoundError(f"gremium role {role_id} not found")
         if row.key in FORCED_ROLE_KEYS:
-            raise ConflictError("forced gremium role cannot be deleted")
+            raise ConflictError("forced gremium role cannot be deleted", code="gremium_role_forced")
         in_use = (
             await self.session.scalars(
                 select(GremiumMembership.id).where(
@@ -283,7 +284,10 @@ class GremiumRoleService:
             )
         ).first()
         if in_use is not None:
-            raise ConflictError("gremium role is in use by a membership")
+            raise ConflictError(
+                "gremium role is in use by a membership",
+                code="gremium_role_in_use",
+            )
         mapped = (
             await self.session.scalars(
                 select(GremiumRoleMapping.id).where(
@@ -292,7 +296,10 @@ class GremiumRoleService:
             )
         ).first()
         if mapped is not None:
-            raise ConflictError("gremium role is in use by a group mapping")
+            raise ConflictError(
+                "gremium role is in use by a group mapping",
+                code="gremium_role_mapped",
+            )
         await self.session.delete(row)
         await self._audit(actor, "gremium_role", role_id)
         await self.session.commit()

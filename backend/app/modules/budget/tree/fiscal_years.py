@@ -184,7 +184,8 @@ class FiscalYearOps(BudgetTreeServiceBase):
         )
         if blocker is not None:
             raise ConflictError(
-                f"fiscal year still has {blocker}; remove them first"
+                f"fiscal year still has {blocker}; remove them first",
+                code="fiscal_year_in_use",
             )
         await self._audit(
             AuditAction.BUDGET_FISCAL_YEAR_DELETE,

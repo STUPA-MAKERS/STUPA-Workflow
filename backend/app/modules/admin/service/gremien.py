@@ -102,7 +102,10 @@ class GremiumOps(ConfigServiceBase):
             ConflictError: The slug exists already.
         """
         if await self._gremium_by_slug(payload.slug) is not None:
-            raise ConflictError(f"gremium slug {payload.slug!r} already exists")
+            raise ConflictError(
+                f"gremium slug {payload.slug!r} already exists",
+                code="gremium_slug_exists",
+            )
         await self._require_cd_variant(payload.cd_variant_id)
         row = Gremium(
             name=payload.name,
@@ -188,7 +191,10 @@ class GremiumOps(ConfigServiceBase):
             raise NotFoundError(f"gremium {gremium_id} not found")
         if payload.slug is not None and payload.slug != row.slug:
             if await self._gremium_by_slug(payload.slug) is not None:
-                raise ConflictError(f"gremium slug {payload.slug!r} already exists")
+                raise ConflictError(
+                    f"gremium slug {payload.slug!r} already exists",
+                    code="gremium_slug_exists",
+                )
             row.slug = payload.slug
         if payload.name is not None:
             row.name = payload.name
@@ -286,7 +292,10 @@ class GremiumOps(ConfigServiceBase):
             .limit(1)
         )
         if in_use is not None:
-            raise ConflictError("gremium has existing applications and cannot be deleted")
+            raise ConflictError(
+                "gremium has existing applications and cannot be deleted",
+                code="gremium_in_use",
+            )
         deciding = await self.session.scalar(
             select(Application.id).where(Application.vote_gremium_id == gremium_id).limit(1)
         )

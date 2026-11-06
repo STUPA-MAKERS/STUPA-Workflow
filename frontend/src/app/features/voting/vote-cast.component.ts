@@ -47,8 +47,7 @@ type Phase = 'loading' | 'error' | 'ready';
 /** 409 codes of `DELETE /votes/{id}`, mapped to their explanation. */
 const DELETE_CONFLICT_KEYS: Record<string, TranslationKey> = {
   vote_meeting_bound: 'voting.delete.conflict.meetingBound',
-  vote_not_draft: 'voting.delete.conflict.notDraft',
-  vote_has_ballots: 'voting.delete.conflict.hasBallots',
+  vote_not_deletable: 'voting.delete.conflict.notDeletable',
 };
 
 const NOT_CAST: MyBallot = { cast: false, choice: null };
@@ -160,14 +159,19 @@ export class VoteCastComponent implements OnDestroy {
 
   /**
    * The confirmation to delete a standalone vote. The route accepts the delete only while
-   * the vote is a draft with no ballots. It refuses a meeting-bound vote, because that one
-   * goes through its meeting.
+   * the vote is a draft or cancelled (§ F/meetings/voting/000029). It refuses a
+   * meeting-bound vote, because that one goes through its meeting.
    */
   readonly confirmDelete = signal(false);
   readonly deleting = signal(false);
   readonly canDelete = computed(() => {
     const vote = this.loaded();
-    return !!vote && vote.status === 'draft' && !vote.meetingId && vote.canManage === true;
+    return (
+      !!vote &&
+      (vote.status === 'draft' || vote.status === 'cancelled') &&
+      !vote.meetingId &&
+      vote.canManage === true
+    );
   });
 
   /** The own ballot for the ballot, or `null` without an own voting right. */

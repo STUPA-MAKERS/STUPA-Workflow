@@ -19,9 +19,8 @@ stays, so the member gets 409 in that vote.
 
 The only gate is a live meeting of the gremium of the vote. The pool entries are the
 rule that the gremium keeps for its substitutes, so the delegation switch of the
-gremium (`allow_vote_delegation`) and the global vote transfer switch
-(`delegation_voting_enabled`) do not apply: they govern the free transfers between
-members. No chains: a substitute who
+gremium (`allow_vote_delegation`) does not apply: it governs the free transfers
+between members. No chains: a substitute who
 delegated the own vote, or who already holds a voting delegation in the meeting,
 claims no further seat. A member who holds or gives a delegation in the meeting has
 no free seat.

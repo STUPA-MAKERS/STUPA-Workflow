@@ -1416,33 +1416,24 @@ async def test_delete_standalone_meeting_bound_409() -> None:
     assert db.deleted == []
 
 
-async def test_delete_standalone_open_vote_409() -> None:
-    vote = _vote(meeting_id=None, status="open")
+@pytest.mark.parametrize("status", ["open", "closed"])
+async def test_delete_standalone_open_or_closed_vote_409(status: str) -> None:
+    """An open or closed vote stays in the record (§ F/meetings/voting/000029)."""
+    vote = _vote(meeting_id=None, status=status)
     db = fake_session(result(vote))
     with pytest.raises(ConflictError) as ei:
         await VotingService(db).delete_standalone(vote.id, actor="mgr")
-    assert ei.value.code == "vote_not_draft"
+    assert ei.value.code == "vote_not_deletable"
     assert db.deleted == []
 
 
-async def test_delete_standalone_with_ballots_409() -> None:
-    """A secret ballot blocks the delete at the first count."""
-    vote = _vote(meeting_id=None, status="draft")
+async def test_delete_standalone_cancelled_vote_ok() -> None:
+    """A cancelled vote can be deleted like a draft (§ F/meetings/voting/000029)."""
+    vote = _vote(meeting_id=None, status="cancelled")
     db = fake_session(result(vote))
-    db.scalar_results = [1, 0]
-    with pytest.raises(ConflictError) as ei:
-        await VotingService(db).delete_standalone(vote.id, actor="mgr")
-    assert ei.value.code == "vote_has_ballots"
-    assert db.deleted == []
-
-
-async def test_delete_standalone_with_secret_marker_409() -> None:
-    """A voted_marker alone blocks too."""
-    vote = _vote(meeting_id=None, status="draft")
-    db = fake_session(result(vote))
-    db.scalar_results = [0, 2]
-    with pytest.raises(ConflictError):
-        await VotingService(db).delete_standalone(vote.id, actor="mgr")
+    await VotingService(db).delete_standalone(vote.id, actor="mgr")
+    assert vote in db.deleted
+    assert db.committed == 1
 
 
 async def test_vote_gremium_mismatch_rules() -> None:
