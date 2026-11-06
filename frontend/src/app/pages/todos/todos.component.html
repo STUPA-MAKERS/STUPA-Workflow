@@ -1,4 +1,4 @@
-<div class="td" [class.td--phone]="phone()">
+<div class="td ld-pane" [class.td--phone]="phone()">
   <app-page-header [flush]="true" [pane]="phone()" [title]="'nav.todos' | t">
     <app-breadcrumbs crumbs />
     <ng-container ngProjectAs="[actions]">
@@ -52,7 +52,7 @@
     </ng-container>
   </app-page-header>
 
-  <app-sticky-bar class="td__bar">
+  <app-sticky-bar class="td__bar ld-pane__filters">
     <div class="td__barRow">
       <app-todo-board-picker
         [boards]="boards()"
@@ -150,9 +150,8 @@
   <div
     class="td__body"
     cdkScrollable
-    appScrollFade="y"
     [class.td__body--fab]="canAdd()"
-    [class.td__body--rows]="all() || phoneList() || (loading() ? skeleton().natural : rowsBelow())">
+    [class.td__body--rows]="all() || phoneList() || view() === 'list' || (loading() ? skeleton().natural : rowsBelow())">
     @if (all()) {
       @if (rowMatches() === null) {
         <app-todo-board-skeleton

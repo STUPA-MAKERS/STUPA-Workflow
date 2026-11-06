@@ -112,11 +112,9 @@
   min-width: 0;
   min-height: 0;
 }
-// Only the rows body scrolls as a whole. Elsewhere the directive sets no class, and a mask would
-// cut off the list view or a tall state.
-.td__body--rows {
-  @include fade.fade-y(var(--space-5));
-}
+// The rows body scrolls by itself. The search bar then makes the head of the page one glass
+// surface over it, and the rows run to the bottom edge of the screen without a fade
+// (`.ld-pane--glass`, ui-kit `list-detail.scss`).
 .td__body--rows {
   gap: var(--space-4);
   overflow-y: auto;
@@ -124,7 +122,8 @@
 }
 .td__body--rows > app-todo-board-view,
 .td__body--rows > app-todo-board-skeleton,
-.td__body--rows > app-todo-board-rows {
+.td__body--rows > app-todo-board-rows,
+.td__body--rows > app-todo-list-view {
   flex: none;
 }
 // Only a body that scrolls as a whole gets room for the 56px button at its end, because there

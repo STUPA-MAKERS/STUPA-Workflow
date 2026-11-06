@@ -1522,7 +1522,10 @@ describe('TodosComponent', () => {
         expect(screen.getByRole('list', { name: 'Meine To-Dos' })).toHaveTextContent('Privat');
         expect(root.querySelector('.td__body')).toHaveClass('td__body--rows');
         expect(root.querySelector('.td__body')).toHaveClass('td__body--fab');
-        expect(root.querySelector('.td__body')).toHaveAttribute('appScrollFade', 'y');
+        // The body runs under the glass head of the column, without a fade (spec 000527).
+        expect(root.querySelector('.td__body')).not.toHaveAttribute('appScrollFade');
+        expect(root.querySelector('.td')).toHaveClass('ld-pane');
+        expect(root.querySelector('.td__bar')).toHaveClass('ld-pane__filters');
       });
 
       it('shows one muted line for an empty personal board and no lead while nothing matches', async () => {
