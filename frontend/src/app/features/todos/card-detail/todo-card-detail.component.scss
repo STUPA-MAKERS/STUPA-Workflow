@@ -1,3 +1,5 @@
+@use 'breakpoints' as bp;
+@use 'frosted' as *;
 @use 'press';
 @use 'scroll-fade' as fade;
 @use '../todo-labels' as lbl;
@@ -9,6 +11,14 @@
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+}
+// In the frosted drawer beside the board, the fields, rows and chips are neutral overlays
+// of the glass. Only the article takes them, not the host: a dialog of the card opens in
+// the top layer but inherits the tokens from its host, and its own glass turns transparent.
+@include bp.not-phone {
+  :host-context(.td__drawer) .cd {
+    @include glass-content;
+  }
 }
 
 .cd {
