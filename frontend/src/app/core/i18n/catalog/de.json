@@ -941,7 +941,7 @@
   "decision.conditionDown": "Auflage {n} nach unten",
   "decision.conditionCount.one": "1 Auflage",
   "decision.conditionCount.other": "{n} Auflagen",
-  "decision.error.amountInvalid": "Der Förderbetrag muss größer als 0 sein und höchstens zwei Nachkommastellen haben.",
+  "decision.error.amountInvalid": "Der Förderbetrag darf nicht negativ sein und höchstens zwei Nachkommastellen haben.",
   "decision.error.amountExceeds": "Der Förderbetrag darf den beantragten Betrag nicht übersteigen.",
   "decision.error.conditionLength": "Eine Auflage hat höchstens {max} Zeichen.",
   "decision.error.conditionCount": "Höchstens {count} Auflagen.",

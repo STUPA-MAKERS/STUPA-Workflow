@@ -941,7 +941,7 @@
   "decision.conditionDown": "Move condition {n} down",
   "decision.conditionCount.one": "1 condition",
   "decision.conditionCount.other": "{n} conditions",
-  "decision.error.amountInvalid": "The funding amount must be greater than 0 with at most two decimals.",
+  "decision.error.amountInvalid": "The funding amount must not be negative and must have at most two decimals.",
   "decision.error.amountExceeds": "The funding amount must not exceed the requested amount.",
   "decision.error.conditionLength": "A condition has at most {max} characters.",
   "decision.error.conditionCount": "At most {count} conditions.",
