@@ -141,7 +141,7 @@ export class MeetingPageComponent {
   readonly saveState = input.required<SaveState>();
   readonly attendance = input.required<Attendance[]>();
   readonly savingAttendance = input.required<boolean>();
-  readonly viewers = input.required<string[]>();
+  readonly viewers = input.required<readonly string[]>();
   readonly casting = input.required<Uuid | null>();
   readonly deletingVote = input.required<Uuid | null>();
   readonly finalizing = input.required<boolean>();

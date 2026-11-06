@@ -821,11 +821,14 @@ export interface FieldChange {
  * Version diff, frontend view. The backend sends the maps `added`, `removed` and
  * `changed`. This shape turns them into lists that carry the key. A template can
  * then render them directly with `@for`.
+ *
+ * The lists stay mutable arrays, because `ConfigDiffData` of the ui-kit, which the diff view
+ * takes as input, declares mutable arrays.
  */
 export interface DataDiff {
-  readonly added: readonly { readonly key: string; readonly value: unknown }[];
-  readonly removed: readonly { readonly key: string; readonly value: unknown }[];
-  readonly changed: readonly FieldChange[];
+  readonly added: { readonly key: string; readonly value: unknown }[];
+  readonly removed: { readonly key: string; readonly value: unknown }[];
+  readonly changed: FieldChange[];
 }
 
 /** A submission version, frontend view, for the history and diff view. */

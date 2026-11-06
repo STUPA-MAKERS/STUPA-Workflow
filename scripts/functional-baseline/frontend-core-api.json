@@ -4,5 +4,5 @@
   "frontend/src/app/core/api/mock-applications.ts": 1,
   "frontend/src/app/core/api/mock-meetings-closed.ts": 1,
   "frontend/src/app/core/api/mock-public-meeting.ts": 3,
-  "frontend/src/app/core/api/models.ts": 2
+  "frontend/src/app/core/api/models.ts": 5
 }

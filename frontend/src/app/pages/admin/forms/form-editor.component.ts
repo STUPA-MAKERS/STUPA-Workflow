@@ -765,6 +765,19 @@ export class FormEditorComponent {
     this.patchQuestion(pos, (f) => ({ ...f, options: [...(f.options ?? []), blankOption()] }));
   }
 
+  /** Set fields of one question; the template binds its edits here instead of writing in place. */
+  protected setQuestion(pos: QPos, patch: Partial<FormFieldDef>): void {
+    this.patchQuestion(pos, (f) => ({ ...f, ...patch }));
+  }
+
+  /** Set the label of one option of a question. */
+  protected setOptionLabel(pos: QPos, oi: number, label: I18nMap): void {
+    this.patchQuestion(pos, (f) => ({
+      ...f,
+      options: (f.options ?? []).map((o, k) => (k === oi ? { ...o, label } : o)),
+    }));
+  }
+
   protected removeOption(pos: QPos, oi: number): void {
     this.patchQuestion(pos, (f) => ({
       ...f,

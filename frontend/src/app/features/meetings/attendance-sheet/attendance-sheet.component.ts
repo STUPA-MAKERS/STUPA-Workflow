@@ -167,7 +167,7 @@ export class AttendanceSheetComponent {
   readonly attendance = input.required<Attendance[]>();
   readonly saving = input(false);
   /** Names of the people who have the meeting open (WS presence). */
-  readonly viewers = input<string[]>([]);
+  readonly viewers = input<readonly string[]>([]);
   /** The member whose "present" the server refused with 409 `delegation_active`. */
   readonly conflictId = input<Uuid | null>(null);
 
