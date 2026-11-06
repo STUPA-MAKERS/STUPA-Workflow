@@ -59,18 +59,6 @@ async def vote_draw_lot(vote_id: str) -> dict:
 
 
 @group.tool
-async def vote_runoff(vote_id: str) -> dict:
-    """Create the runoff (Stichwahl) of a closed personnel election.
-
-    Only when the result is `runoff`: the new draft vote has the tied candidates and the
-    open seats, round + 1 and `parentVoteId`. Open it with `open_vote`. The meeting must
-    be live. 409 `no_runoff_pending` or `runoff_exists`. Requires the gremium
-    permission `vote.manage` or `session.manage` (or admin).
-    """
-    return await api().post(f"/votes/{vote_id}/runoff")
-
-
-@group.tool
 async def create_application_vote(application_id: str, vote: S.VoteCreate) -> dict:
     """Create a vote bound to an application.
 
