@@ -5,6 +5,10 @@ kind: non-functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
+implementation:
+  - frontend/src/app/
+  - frontend/vendor/ui-kit
+  - frontend/src/index.html
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

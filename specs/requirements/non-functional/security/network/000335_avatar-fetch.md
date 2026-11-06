@@ -4,7 +4,9 @@ title: The avatar fetch is fixed and limited
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
+implementation:
+  - backend/app/modules/avatars
 scope:
   - backend/app/modules/avatars
 ---

@@ -4,7 +4,10 @@ title: Downloads stream through the API
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
+implementation:
+  - backend/app/modules/files
+  - backend/app/modules/media
 scope:
   - backend/app/modules/files
   - backend/app/modules/media

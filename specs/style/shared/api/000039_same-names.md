@@ -4,7 +4,11 @@ title: Field names are the same in frontend and backend
 kind: style
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
+implementation:
+  - backend/app/
+  - frontend/src/app/core/api/
+  - mcp/
 scope:
   - backend/app/
   - frontend/src/app/core/api/

@@ -4,7 +4,9 @@ title: Permissions are checked on the server
 kind: style
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
+implementation:
+  - backend/app/
 scope:
   - backend/app/
 ---

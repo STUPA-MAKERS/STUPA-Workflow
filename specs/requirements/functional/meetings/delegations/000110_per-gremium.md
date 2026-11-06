@@ -5,6 +5,10 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
+implementation:
+  - backend/app/modules/delegations
+  - frontend/src/app/features/meetings
+  - backend/app/modules/gremien
 scope:
   - backend/app/modules/delegations
   - frontend/src/app/features/meetings

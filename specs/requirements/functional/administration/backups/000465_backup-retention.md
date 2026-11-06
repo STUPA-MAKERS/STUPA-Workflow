@@ -5,6 +5,10 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
+implementation:
+  - backend/app/settings.py
+  - backend/worker/main.py
+  - backend/app/modules/backup
 scope:
   - backend/app/settings.py
   - backend/worker/main.py

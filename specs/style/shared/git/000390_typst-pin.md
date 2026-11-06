@@ -5,6 +5,9 @@ kind: style
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
+implementation:
+  - typst/
+  - .github/workflows
 scope:
   - typst/
   - .github/workflows

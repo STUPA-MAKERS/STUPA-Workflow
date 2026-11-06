@@ -5,6 +5,9 @@ kind: non-functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
+implementation:
+  - backend/app/modules/admin
+  - frontend/src/app/pages/admin
 scope:
   - backend/app/modules/admin
   - frontend/src/app/pages/admin

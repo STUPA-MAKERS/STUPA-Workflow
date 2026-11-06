@@ -5,6 +5,9 @@ kind: style
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
+implementation:
+  - deploy/
+  - README.md
 scope:
   - deploy/
   - README.md

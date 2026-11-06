@@ -5,6 +5,8 @@ kind: style
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
+implementation:
+  - specs/
 scope:
   - specs/
 ---
@@ -24,6 +26,7 @@ the file and stands between two `---` lines. The block has these keys, in this o
 | `updated` | date | The date of the last change, as `YYYY-MM-DD`. |
 | `replaced_by` | string | Only with `status: replaced`: the full rule ID of the new rule, for example `F/meetings/voting/000024`. |
 | `tests` | list of strings | Optional: the unit tests that check the rule, as `"<path>:<function>"`. |
+| `implementation` | list of strings or `null` | Only with `status: draft` or `approved`: the paths of the code that implements the rule. `null` while the rule is not implemented. Each path must exist. |
 | `scope` | list of strings | The paths that the rule applies to. Each entry must be an existing path from the repository root. |
 
 The block must not have other keys. The Markdown body must not hold metadata. `scope` must be
@@ -38,4 +41,4 @@ custom parser. One fixed set of keys keeps every spec readable by the same tool.
 keep the leading zeros, because YAML reads an unquoted `000024` as a number.
 
 Test: `scripts/check_specs.py` checks the keys, their order, `id`, the dates, `replaced_by`,
-the `tests` files and the `scope` paths.
+the `tests` files, the `implementation` paths and the `scope` paths.
