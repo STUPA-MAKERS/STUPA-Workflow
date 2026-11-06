@@ -316,7 +316,6 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/accessibility/conformance/000491](requirements/non-functional/accessibility/conformance/000491_axe-every-route.md) | Every route passes an axe check in both themes | draft |
 | [NF/accessibility/conformance/000492](requirements/non-functional/accessibility/conformance/000492_template-lint.md) | The template lint has the accessibility rules | draft |
 | [NF/accessibility/conformance/000493](requirements/non-functional/accessibility/conformance/000493_axe-unit-per-component.md) | Every shared component has a jest-axe test | draft |
-| [NF/accessibility/conformance/000494](requirements/non-functional/accessibility/conformance/000494_manual-check.md) | Each release has a manual screen reader check | draft |
 | [NF/accessibility/documents/000524](requirements/non-functional/accessibility/documents/000524_protocol-pdf-ua.md) | The protocol PDF is tagged as PDF/UA-1 | draft |
 | [NF/accessibility/documents/000525](requirements/non-functional/accessibility/documents/000525_mail-plain-text.md) | Each mail has a plain text part | draft |
 | [NF/accessibility/interaction/000217](requirements/non-functional/accessibility/interaction/000217_keyboard-and-labels.md) | Controls are reachable by keyboard and named | approved |
