@@ -31,6 +31,7 @@ from __future__ import annotations
 import logging
 import uuid
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import delete, func, select, text, update
@@ -48,6 +49,7 @@ from app.modules.files.service import (
     upload_audit_data,
 )
 from app.modules.files.storage import StorageError
+from app.settings import Settings
 from app.shared.errors import (
     NotFoundError,
     PayloadTooLargeError,
@@ -108,14 +110,24 @@ def _is_usable(attachment: Attachment, expires_at: datetime | None, now: datetim
     )
 
 
+@dataclass(frozen=True, slots=True)
 class DraftAttachments:
-    """Draft upload, delete and bind, on top of ``FilesService``."""
+    """Draft upload, delete and bind, on top of ``FilesService``.
 
-    def __init__(self, files: FilesService) -> None:
-        """Bind the draft operations to a files service, its session and its settings."""
-        self.files = files
-        self.session = files.session
-        self.settings = files.settings
+    The operations use the session and the settings of the files service.
+    """
+
+    files: FilesService
+
+    @property
+    def session(self) -> AsyncSession:
+        """Return the session of the files service."""
+        return self.files.session
+
+    @property
+    def settings(self) -> Settings:
+        """Return the settings of the files service."""
+        return self.files.settings
 
     def _hash(self, token: str) -> bytes:
         return hash_draft_token(token, self.settings.magic_link_secret)
@@ -292,10 +304,9 @@ class DraftAttachments:
             data={"draft": True},
         )
         await self.session.commit()
-        storage = self.files.storage
-        if storage is not None and storage_key is not None:
+        if self.files.storage is not None and storage_key is not None:
             try:
-                await storage.remove(storage_key)
+                await self.files.storage.remove(storage_key)
             except StorageError:
                 logger.warning("could not remove object for deleted draft %s", attachment_id)
 

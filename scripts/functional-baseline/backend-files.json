@@ -1,9 +1,4 @@
 {
-  "backend/app/modules/files/drafts.py": 3,
-  "backend/app/modules/files/queue.py": 1,
-  "backend/app/modules/files/router.py": 9,
-  "backend/app/modules/files/scanner.py": 1,
-  "backend/app/modules/files/schemas.py": 8,
-  "backend/app/modules/files/service.py": 10,
-  "backend/app/modules/files/storage.py": 1
+  "backend/app/modules/files/schemas.py": 1,
+  "backend/app/modules/files/service.py": 2
 }
