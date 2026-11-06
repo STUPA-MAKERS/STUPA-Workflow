@@ -487,23 +487,24 @@ class VotingService:
         return total
 
     async def delete_standalone(self, vote_id: UUID, *, actor: str) -> None:
-        """Delete a standalone application-bound vote that never ran.
+        """Delete a standalone application-bound vote that is a draft or cancelled.
 
-        The vote must still be ``draft`` and must hold no ballot. Anything
-        further along stays with ``cancel``: an opened vote is part of the
-        record of the Gremium, and its result may already have fired a flow
-        branch. A vote that belongs to a meeting is not reachable here. That
-        one has its own route, ``DELETE /meetings/{id}/votes/{id}``, with the
-        meeting-scoped ``canManageVotes`` check. Duplicating it here would give
-        a second, weaker path to the same row.
+        The rule is the same as for a meeting vote (§ F/meetings/voting/000029): a
+        ``draft`` or ``cancelled`` vote can be deleted, its ballots go with it (FK
+        cascade). An ``open`` or ``closed`` vote is part of the record of the Gremium,
+        and its result may already have fired a flow branch, so it gives 409
+        ``vote_not_deletable``. A vote that belongs to a meeting is not reachable here.
+        That one has its own route, ``DELETE /meetings/{id}/votes/{id}``, with the
+        meeting-scoped ``canManageVotes`` check. Duplicating it here would give a
+        second, weaker path to the same row.
 
         The caller (router) runs the gremium-scoped manage check
         (``assert_can_manage_vote``), like open, close and cancel.
 
         Raises:
             NotFoundError: No vote has this id (404).
-            ConflictError: The vote belongs to a meeting, is no longer a draft,
-                or already holds ballots (409).
+            ConflictError: The vote belongs to a meeting (``vote_meeting_bound``), or
+                it is open or closed (``vote_not_deletable``) (409).
         """
         vote = await self._get_vote(vote_id)
         if vote.meeting_id is not None:
@@ -511,15 +512,11 @@ class VotingService:
                 "This vote belongs to a meeting; delete it through the meeting.",
                 code="vote_meeting_bound",
             )
-        if vote.status != "draft":
+        if vote.status in ("open", "closed"):
             raise ConflictError(
-                "Only a vote that never opened can be deleted; cancel it instead.",
-                code="vote_not_draft",
-            )
-        if await self._ballot_count(vote_id) > 0:
-            raise ConflictError(
-                "This vote already holds ballots and cannot be deleted.",
-                code="vote_has_ballots",
+                "An open or closed vote is part of the record and cannot be deleted. "
+                "Cancel an open vote instead.",
+                code="vote_not_deletable",
             )
         await self._delete_audited(vote, actor=actor)
         await self.session.commit()
