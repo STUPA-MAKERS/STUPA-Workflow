@@ -2,7 +2,7 @@
 id: "000514"
 title: Each gesture has a single tap alternative
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation: null

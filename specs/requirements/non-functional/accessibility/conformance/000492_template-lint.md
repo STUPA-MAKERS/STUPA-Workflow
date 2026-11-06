@@ -2,7 +2,7 @@
 id: "000492"
 title: The template lint has the accessibility rules
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation: null

@@ -2,7 +2,7 @@
 id: "000515"
 title: Each drag has an alternative without a drag
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation: null

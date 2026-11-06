@@ -2,7 +2,7 @@
 id: "000512"
 title: Focus goes to the heading after navigation
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation: null

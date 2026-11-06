@@ -2,7 +2,7 @@
 id: "000510"
 title: A skip link goes to the main content
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation: null

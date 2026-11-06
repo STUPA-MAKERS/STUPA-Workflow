@@ -2,7 +2,7 @@
 id: "000513"
 title: A dialog keeps the focus inside
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation: null

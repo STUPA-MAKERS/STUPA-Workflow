@@ -2,7 +2,7 @@
 id: "000497"
 title: A user can report a barrier as a ticket
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation: null

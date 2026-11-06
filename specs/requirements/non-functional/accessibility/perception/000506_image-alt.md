@@ -2,7 +2,7 @@
 id: "000506"
 title: A Markdown image has an alternative text
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation: null

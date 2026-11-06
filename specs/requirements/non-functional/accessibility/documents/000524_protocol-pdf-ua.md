@@ -2,7 +2,7 @@
 id: "000524"
 title: The protocol PDF is tagged as PDF/UA-1
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation: null

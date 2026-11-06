@@ -2,7 +2,7 @@
 id: "000522"
 title: The page language follows the UI language
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:

@@ -2,7 +2,7 @@
 id: "000502"
 title: Colour is not the only sign of a state
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation: null

@@ -2,7 +2,7 @@
 id: "000491"
 title: Every route passes an axe check in both themes
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation: null

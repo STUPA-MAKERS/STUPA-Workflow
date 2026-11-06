@@ -2,7 +2,7 @@
 id: "000520"
 title: Each page has landmarks and one h1
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation: null

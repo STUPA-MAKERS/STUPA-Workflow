@@ -2,7 +2,7 @@
 id: "000507"
 title: A chart has a text alternative
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation: null

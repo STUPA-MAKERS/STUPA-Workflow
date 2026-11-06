@@ -2,7 +2,7 @@
 id: "000493"
 title: Every shared component has a jest-axe test
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation: null

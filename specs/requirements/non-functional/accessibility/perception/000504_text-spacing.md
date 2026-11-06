@@ -2,7 +2,7 @@
 id: "000504"
 title: User text spacing does not cut text
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation: null

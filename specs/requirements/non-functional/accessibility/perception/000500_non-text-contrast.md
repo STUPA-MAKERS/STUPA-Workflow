@@ -2,7 +2,7 @@
 id: "000500"
 title: Control edges and icons have a contrast of 3:1
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation: null

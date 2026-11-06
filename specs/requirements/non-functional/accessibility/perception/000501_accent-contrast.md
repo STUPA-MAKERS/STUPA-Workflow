@@ -2,7 +2,7 @@
 id: "000501"
 title: An admin accent colour keeps the contrast
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation: null

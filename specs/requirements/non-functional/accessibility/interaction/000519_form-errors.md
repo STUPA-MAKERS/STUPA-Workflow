@@ -2,7 +2,7 @@
 id: "000519"
 title: A form error is a text next to the field
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation: null

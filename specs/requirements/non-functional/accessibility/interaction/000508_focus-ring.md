@@ -2,7 +2,7 @@
 id: "000508"
 title: The focus ring is 2 px and has a contrast of 3:1
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation: null

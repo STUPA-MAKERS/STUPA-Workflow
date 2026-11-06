@@ -2,7 +2,7 @@
 id: "000523"
 title: Content in a different language has its lang
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation: null

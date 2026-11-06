@@ -2,7 +2,7 @@
 id: "000499"
 title: Text has a contrast of 4.5:1
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation: null

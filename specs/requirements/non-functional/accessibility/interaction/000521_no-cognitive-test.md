@@ -2,7 +2,7 @@
 id: "000521"
 title: The login and the captcha need no cognitive test
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:

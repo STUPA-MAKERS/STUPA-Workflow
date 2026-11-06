@@ -2,7 +2,7 @@
 id: "000509"
 title: Sticky bars do not hide the focus
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation: null

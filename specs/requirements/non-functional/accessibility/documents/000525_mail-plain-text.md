@@ -2,7 +2,7 @@
 id: "000525"
 title: Each mail has a plain text part
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
