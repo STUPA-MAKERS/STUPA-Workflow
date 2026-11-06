@@ -39,6 +39,7 @@ from app.modules.files.drafts import bind_drafts, check_message_drafts
 from app.modules.files.schemas import MessageAttachmentOut
 from app.modules.files.service import FilesService
 from app.modules.tickets.models import TicketEvent
+from app.modules.todos import events as todo_events
 from app.modules.todos.access import BoardAccess, token_reads
 from app.modules.todos.boards import ensure_personal_board
 from app.modules.todos.lexorank import MAX_LENGTH, RankError, between, spread
@@ -49,11 +50,13 @@ from app.modules.todos.models import (
     TodoAssignee,
     TodoBoard,
     TodoCard,
+    TodoCardEvent,
     TodoCardLabel,
     TodoCheckItem,
     TodoColumn,
     TodoComment,
     TodoEvent,
+    TodoEventSeries,
     TodoLabel,
     TodoLink,
 )
@@ -66,6 +69,7 @@ from app.modules.todos.schemas import (
     CheckItemPatch,
     ChecklistCount,
     ColumnPatch,
+    EventIn,
     LabelCreate,
     LabelPatch,
     TodoAssignedBoard,
@@ -77,7 +81,14 @@ from app.modules.todos.schemas import (
     TodoColumnOut,
     TodoColumnRef,
     TodoCommentOut,
+    TodoEventBrief,
+    TodoEventDecision,
+    TodoEventEdition,
+    TodoEventFacts,
     TodoEventOut,
+    TodoEventRef,
+    TodoEventSeriesOut,
+    TodoEventTotals,
     TodoLabelOut,
     TodoLinkedCard,
     TodoLinkOut,
@@ -146,6 +157,31 @@ class _Facts:
     links: dict[uuid.UUID, list[TodoLink]] = field(default_factory=dict)
     people: dict[uuid.UUID, PersonRef] = field(default_factory=dict)
     resolved: dict[tuple[str, uuid.UUID], Resolved] = field(default_factory=dict)
+    events: dict[uuid.UUID, TodoCardEvent] = field(default_factory=dict)
+    series: dict[uuid.UUID, str] = field(default_factory=dict)
+
+
+def _event_brief(row: TodoCardEvent | None, series: dict[uuid.UUID, str]) -> TodoEventBrief | None:
+    if row is None:
+        return None
+    return TodoEventBrief(
+        starts_on=row.starts_on,
+        ends_on=row.ends_on,
+        place=row.place,
+        participants=row.participants,
+        series_id=row.series_id,
+        series_name=series.get(row.series_id) if row.series_id is not None else None,
+    )
+
+
+def _totals_out(value: todo_events.Totals) -> TodoEventTotals:
+    return TodoEventTotals(
+        requested=todo_events.balance_text(value.requested),
+        approved=todo_events.balance_text(value.approved),
+        expenses=todo_events.balance_text(value.expenses),
+        income=todo_events.balance_text(value.income),
+        balance=todo_events.balance_text(value.balance),
+    )
 
 
 def _link_out(link: TodoLink, resolved: dict[tuple[str, uuid.UUID], Resolved]) -> TodoLinkOut:
@@ -410,6 +446,10 @@ class TodoService:
         facts.resolved = await self.links.resolve(
             [(link.kind, link.target_id) for link in primaries], principal
         )
+        facts.events = await todo_events.event_rows(self.session, ids)
+        facts.series = await todo_events.series_names(
+            self.session, (row.series_id for row in facts.events.values())
+        )
         return facts
 
     @staticmethod
@@ -434,6 +474,7 @@ class TodoService:
             comment_count=facts.comments.get(card.id, 0),
             primary_link=_link_out(links[0], facts.resolved) if links else None,
             link_count=len(links),
+            event=_event_brief(facts.events.get(card.id), facts.series),
             version=card.version,
             created_at=card.created_at,
             updated_at=card.updated_at,
@@ -577,10 +618,16 @@ class TodoService:
         q: str | None = None,
         limit: int = 50,
         offset: int = 0,
+        events_only: bool = False,
     ) -> Page[TodoCardTile]:
-        """Page through the archived cards of a board, newest archive first."""
+        """Page through the archived cards of a board, newest archive first.
+
+        ``events_only`` keeps the Events: the filter ``Veranstaltungen mit Archiv``.
+        """
         board = await self._board(board_id, principal)
         conds = [TodoCard.board_id == board.id, TodoCard.archived_at.is_not(None)]
+        if events_only:
+            conds.append(TodoCard.id.in_(select(TodoCardEvent.card_id)))
         term = (q or "").strip()
         if term:
             conds.append(TodoCard.title.ilike(f"%{escape_like(term)}%", escape="\\"))
@@ -947,6 +994,9 @@ class TodoService:
         files = await self.files.message_attachments(
             "todo_comment", [c.id for card in cards for c in comments.get(card.id, [])]
         )
+        gathered = await self._event_facts(
+            [card for card in cards if card.id in facts.events], facts, principal
+        )
         out: list[TodoCardDetail] = []
         for card, board in pairs:
             tile = self._tile(card, facts)
@@ -977,7 +1027,60 @@ class TodoService:
                         for c in comments.get(card.id, [])
                     ],
                     archived_at=card.archived_at,
+                    event_facts=gathered.get(card.id),
                 )
+            )
+        return out
+
+    async def _event_facts(
+        self, cards: Sequence[TodoCard], facts: _Facts, principal: Principal
+    ) -> dict[uuid.UUID, TodoEventFacts]:
+        """The totals, decisions and other editions of the Events among ``cards``."""
+        if not cards:
+            return {}
+        readable = (await self.access.scope(principal)).condition()
+        found = {
+            card.id: await todo_events.editions(
+                self.session, card, facts.events[card.id].series_id, readable
+            )
+            for card in cards
+        }
+        ids = [card.id for card in cards]
+        ids += [other.id for rows, _hidden in found.values() for other, _b, _e in rows]
+        sums = await todo_events.totals(self.session, list(dict.fromkeys(ids)))
+        out: dict[uuid.UUID, TodoEventFacts] = {}
+        for card in cards:
+            rows, hidden = found[card.id]
+            decided = await todo_events.decisions(self.session, card.id)
+            out[card.id] = TodoEventFacts(
+                totals=_totals_out(sums[card.id]),
+                decisions=[
+                    TodoEventDecision(
+                        kind=d.kind,  # pyright: ignore[reportArgumentType]
+                        target_id=d.target_id,
+                        title=d.title,
+                        decided_at=d.decided_at,
+                        meeting_title=d.meeting_title,
+                        result=d.result,
+                        amount=todo_events.balance_text(d.amount) if d.amount is not None else None,
+                        conditions=d.conditions,
+                    )
+                    for d in decided
+                ],
+                editions=[
+                    TodoEventEdition(
+                        id=other.id,
+                        board_id=board.id,
+                        board_name=board.name,
+                        title=other.title,
+                        starts_on=row.starts_on,
+                        ends_on=row.ends_on,
+                        archived=other.archived_at is not None,
+                        totals=_totals_out(sums[other.id]),
+                    )
+                    for other, board, row in rows
+                ],
+                hidden_editions=hidden,
             )
         return out
 
@@ -991,10 +1094,14 @@ class TodoService:
     async def create(self, payload: CardCreate, principal: Principal) -> TodoCardDetail:
         """Create a card at the end of its column (default: the first column).
 
+        ``event`` makes the card an Event (spec 000478).
+
         Raises:
             NotFoundError: The board is unknown or not readable (HTTP 404).
             ValidationProblem: ``column_not_on_board``, ``assignee_not_allowed``,
-                ``label_not_on_board`` or ``link_target_not_found`` (HTTP 422).
+                ``label_not_on_board``, ``link_target_not_found`` or an event error of
+                ``_check_event`` (HTTP 422).
+            ConflictError: ``event_link_taken`` (HTTP 409).
         """
         actor = await self._actor(principal)
         board = await self._board(payload.board_id, principal, write=True)
@@ -1018,6 +1125,9 @@ class TodoService:
         for kind, target_id in links:
             if not await self.links.readable(kind, target_id, principal):
                 raise _invalid("The link target was not found.", "link_target_not_found", "links")
+        if payload.event is not None:
+            await self._check_event(board, payload.event)
+            await todo_events.check_one_event(self.session, uuid.uuid4(), links)
         live = await self._column_cards(column.id)
         now = _now()
         card = TodoCard(
@@ -1043,6 +1153,8 @@ class TodoService:
             self.session.add(TodoCardLabel(card_id=card.id, label_id=label_id))
         for kind, target_id in links:
             self.session.add(_new_link(card.id, kind, target_id, actor))
+        if payload.event is not None:
+            self.session.add(_event_row(card.id, payload.event))
         self._event(card, "created", actor)
         await self.session.flush()
         if column.is_done:
@@ -1567,7 +1679,9 @@ class TodoService:
 
         Raises:
             ValidationProblem: ``link_self`` or ``link_target_not_found`` (HTTP 422).
-            ConflictError: The link exists (HTTP 409, ``link_exists``).
+            ConflictError: The link exists (``link_exists``), or the card is an Event and
+                another Event links the Antrag, Buchung or invoice (``event_link_taken``)
+                (HTTP 409).
         """
         actor = await self._actor(principal)
         card, board = await self._card(card_id, principal, lock=True, write=True)
@@ -1581,11 +1695,260 @@ class TodoService:
         )
         if present is not None:
             raise ConflictError("The card has this link.", code="link_exists")
+        if await self.session.get(TodoCardEvent, card.id) is not None:
+            await todo_events.check_one_event(self.session, card.id, [(kind, target_id)])
         self.session.add(_new_link(card.id, kind, target_id, actor))
         self._event(card, "linked", actor, {"linkKind": kind, "targetId": str(target_id)})
         self._touch(board, card)
         await self.session.commit()
         return await self._detail(card, board, principal)
+
+    async def _check_event(self, board: TodoBoard, payload: EventIn) -> None:
+        """Check the event data of a card on ``board``.
+
+        Raises:
+            ValidationProblem: ``event_personal_board`` (a personal board has no Events),
+                ``event_dates_invalid`` (an end without a start or before the start) or
+                ``series_not_found`` (HTTP 422).
+        """
+        if board.kind == "personal":
+            raise _invalid(
+                "A card on a personal board cannot be an Event.", "event_personal_board", "event"
+            )
+        if payload.ends_on is not None and (
+            payload.starts_on is None or payload.ends_on < payload.starts_on
+        ):
+            raise _invalid("The end is before the start.", "event_dates_invalid", "endsOn")
+        if (
+            payload.series_id is not None
+            and await self.session.get(TodoEventSeries, payload.series_id) is None
+        ):
+            raise _invalid("The series was not found.", "series_not_found", "seriesId")
+
+    async def set_event(
+        self, card_id: uuid.UUID, payload: EventIn, principal: Principal
+    ) -> TodoCardDetail:
+        """Set the event data of a card; a to-do becomes an Event (spec 000488).
+
+        Raises:
+            ValidationProblem: An error of ``_check_event`` (HTTP 422).
+            ConflictError: ``event_link_taken`` when a to-do becomes an Event and another
+                Event links one of its Anträge, Buchungen or invoices (HTTP 409).
+        """
+        await self._actor(principal)
+        card, board = await self._card(card_id, principal, lock=True, write=True)
+        await self._check_event(board, payload)
+        row = await self.session.get(TodoCardEvent, card.id)
+        if row is None:
+            refs = [
+                (link.kind, link.target_id)
+                for link in (
+                    await self.session.scalars(select(TodoLink).where(TodoLink.card_id == card.id))
+                ).all()
+            ]
+            await todo_events.check_one_event(self.session, card.id, refs)
+            self.session.add(_event_row(card.id, payload))
+        else:
+            row.starts_on = payload.starts_on
+            row.ends_on = payload.ends_on
+            row.place = _clean(payload.place)
+            row.participants = payload.participants
+            row.series_id = payload.series_id
+        card.updated_at = _now()
+        self._touch(board, card)
+        await self.session.commit()
+        return await self._detail(card, board, principal)
+
+    async def remove_event(self, card_id: uuid.UUID, principal: Principal) -> None:
+        """Refuse to remove the event data: an Event never becomes a to-do again.
+
+        Raises:
+            NotFoundError: The card is not an Event (HTTP 404).
+            ConflictError: ``event_permanent`` (HTTP 409, spec 000488).
+        """
+        card, _board = await self._card(card_id, principal, write=True)
+        if await self.session.get(TodoCardEvent, card.id) is None:
+            raise NotFoundError(f"card {card_id} is not an Event")
+        raise ConflictError("An Event cannot become a to-do again.", code="event_permanent")
+
+    async def follow_up(self, card_id: uuid.UUID, principal: Principal) -> TodoCardDetail:
+        """Create the next edition of an Event in the first column (spec 000484).
+
+        The new card gets the title, the description, the labels, the place, the series
+        and the checklist with every item open. It gets no links, assignees, comments,
+        dates or history.
+
+        An archived Event can be the source, because the previous edition is usually
+        archived.
+
+        Raises:
+            ValidationProblem: ``not_an_event`` (HTTP 422).
+        """
+        actor = await self._actor(principal)
+        source, board = await self._card(card_id, principal, lock=True, write=True)
+        row = await self.session.get(TodoCardEvent, source.id)
+        if row is None:
+            raise _invalid("The card is not an Event.", "not_an_event", "cardId")
+        column = (await self._columns(board.id))[0]
+        label_ids = list(
+            (
+                await self.session.scalars(
+                    select(TodoCardLabel.label_id).where(TodoCardLabel.card_id == source.id)
+                )
+            ).all()
+        )
+        items = list(
+            (
+                await self.session.scalars(
+                    select(TodoCheckItem)
+                    .where(TodoCheckItem.card_id == source.id)
+                    .order_by(TodoCheckItem.position, TodoCheckItem.id)
+                )
+            ).all()
+        )
+        live = await self._column_cards(column.id)
+        now = _now()
+        card = TodoCard(
+            id=uuid.uuid4(),
+            board_id=board.id,
+            column_id=column.id,
+            rank="",
+            title=source.title,
+            description_md=source.description_md,
+            due_date=None,
+            created_by=actor,
+            completed_at=now if column.is_done else None,
+            version=1,
+            created_at=now,
+            updated_at=now,
+        )
+        _append(live, [card])
+        self.session.add(card)
+        await self.session.flush()
+        for label_id in label_ids:
+            self.session.add(TodoCardLabel(card_id=card.id, label_id=label_id))
+        for item in items:
+            self.session.add(
+                TodoCheckItem(
+                    id=uuid.uuid4(),
+                    card_id=card.id,
+                    text=item.text,
+                    done=False,
+                    position=item.position,
+                )
+            )
+        self.session.add(TodoCardEvent(card_id=card.id, place=row.place, series_id=row.series_id))
+        self._event(card, "created", actor)
+        self._touch(board, card)
+        await self.session.commit()
+        return await self._detail(card, board, principal)
+
+    async def series(self, q: str | None, principal: Principal) -> list[TodoEventSeriesOut]:
+        """List the series by name (at most 50), filtered by ``q``."""
+        await self._actor(principal)
+        stmt = select(TodoEventSeries)
+        term = (q or "").strip()
+        if term:
+            stmt = stmt.where(TodoEventSeries.name.ilike(f"%{escape_like(term)}%", escape="\\"))
+        rows = (
+            await self.session.scalars(stmt.order_by(func.lower(TodoEventSeries.name)).limit(50))
+        ).all()
+        return [TodoEventSeriesOut(id=row.id, name=row.name) for row in rows]
+
+    async def create_series(self, name: str, principal: Principal) -> TodoEventSeriesOut:
+        """Create a series; its name is unique in the platform, case ignored.
+
+        Each person who writes a shared board can create a series (spec 000483).
+
+        Raises:
+            ForbiddenError: ``todo_write_required`` (HTTP 403).
+            ValidationProblem: ``series_name_blank`` (HTTP 422).
+            ConflictError: ``series_exists`` (HTTP 409).
+        """
+        actor = await self._actor(principal)
+        if not await self._writes_shared_board(principal):
+            raise ForbiddenError(
+                "Creating a series needs todo.write on a shared board.",
+                code="todo_write_required",
+            )
+        value = name.strip()
+        if not value:
+            raise _invalid("The name is empty.", "series_name_blank", "name")
+        taken = await self.session.scalar(
+            select(TodoEventSeries.id).where(func.lower(TodoEventSeries.name) == value.lower())
+        )
+        if taken is not None:
+            raise ConflictError("A series with this name exists.", code="series_exists")
+        row = TodoEventSeries(id=uuid.uuid4(), name=value, created_by=actor)
+        self.session.add(row)
+        await self.session.commit()
+        return TodoEventSeriesOut(id=row.id, name=row.name)
+
+    async def _shared_boards(self, principal: Principal) -> list[TodoBoard]:
+        """The live gremium and team boards that the principal reads."""
+        if not token_reads(principal):
+            return []
+        scope = await self.access.scope(principal)
+        return list(
+            (
+                await self.session.scalars(
+                    select(TodoBoard).where(
+                        scope.condition(),
+                        TodoBoard.kind != "personal",
+                        TodoBoard.archived_at.is_(None),
+                    )
+                )
+            ).all()
+        )
+
+    async def _writes_shared_board(self, principal: Principal) -> bool:
+        for board in await self._shared_boards(principal):
+            if await self.access.can_write(board, principal):
+                return True
+        return False
+
+    async def writable_events(self, q: str | None, principal: Principal) -> list[TodoEventRef]:
+        """The live Events on boards that the caller writes: the options of the picker.
+
+        Spec 000480: the ``Veranstaltung`` picker of a Buchung lists only these.
+        """
+        boards = {
+            board.id: board
+            for board in await self._shared_boards(principal)
+            if await self.access.can_write(board, principal)
+        }
+        if not boards:
+            return []
+        stmt = (
+            select(TodoCard, TodoCardEvent)
+            .join(TodoCardEvent, TodoCardEvent.card_id == TodoCard.id)
+            .where(TodoCard.board_id.in_(boards), TodoCard.archived_at.is_(None))
+        )
+        term = (q or "").strip()
+        if term:
+            stmt = stmt.where(TodoCard.title.ilike(f"%{escape_like(term)}%", escape="\\"))
+        rows = (
+            (
+                await self.session.execute(
+                    stmt.order_by(
+                        TodoCardEvent.starts_on.desc().nulls_first(), TodoCard.created_at.desc()
+                    ).limit(100)
+                )
+            )
+            .tuples()
+            .all()
+        )
+        return [
+            TodoEventRef(
+                id=card.id,
+                board_id=card.board_id,
+                board_name=boards[card.board_id].name,
+                title=card.title,
+                starts_on=row.starts_on,
+                ends_on=row.ends_on,
+            )
+            for card, row in rows
+        ]
 
     async def remove_link(
         self, card_id: uuid.UUID, link_id: uuid.UUID, principal: Principal
@@ -1924,7 +2287,11 @@ class TodoService:
     async def linked(
         self, kind: str, target_id: uuid.UUID, principal: Principal
     ) -> list[TodoLinkedCard]:
-        """The readable live cards that link to a target: open first, then by due date."""
+        """The readable live cards that link to a target.
+
+        A linked Event is first and carries its dates, its place and its balance (spec
+        000489). Then come the open cards, then the done cards, each by due date.
+        """
         if not token_reads(principal):
             return []
         scope = await self.access.scope(principal)
@@ -1941,6 +2308,9 @@ class TodoService:
         if not rows:
             return []
         facts = await self._facts([card for card, _b, _c in rows], principal)
+        sums = await todo_events.totals(
+            self.session, [card.id for card, _b, _c in rows if card.id in facts.events]
+        )
         out = [
             TodoLinkedCard(
                 id=card.id,
@@ -1951,10 +2321,22 @@ class TodoService:
                 is_done=col.is_done,
                 due_date=card.due_date,
                 assignees=self._tile(card, facts).assignees,
+                event=_event_brief(facts.events.get(card.id), facts.series),
+                balance=(
+                    todo_events.balance_text(sums[card.id].balance) if card.id in sums else None
+                ),
             )
             for card, board, col in rows
         ]
-        out.sort(key=lambda c: (c.is_done, c.due_date is None, c.due_date or date.max, c.title))
+        out.sort(
+            key=lambda c: (
+                c.event is None,
+                c.is_done,
+                c.due_date is None,
+                c.due_date or date.max,
+                c.title,
+            )
+        )
         return out
 
     async def search(
@@ -1981,6 +2363,58 @@ class TodoService:
             )
         ).all()
         return [(card, board, column) for card, board, column in rows]
+
+    async def search_events(
+        self, q: str, principal: Principal, *, limit: int
+    ) -> list[tuple[TodoCard, TodoBoard, TodoCardEvent]]:
+        """Find Events by title on the boards that the principal reads, archived ones too.
+
+        Spec 000485: the palette source ``Veranstaltungen`` finds archived Events.
+        """
+        if not token_reads(principal):
+            return []
+        scope = await self.access.scope(principal)
+        where, rank = trigram_rank(q, [TodoCard.title], dialect=dialect_of(self.session))
+        rows = (
+            (
+                await self.session.execute(
+                    select(TodoCard, TodoBoard, TodoCardEvent)
+                    .join(TodoBoard, TodoBoard.id == TodoCard.board_id)
+                    .join(TodoCardEvent, TodoCardEvent.card_id == TodoCard.id)
+                    .where(where, scope.condition())
+                    .order_by(rank.desc(), TodoCardEvent.starts_on.desc().nulls_last(), TodoCard.id)
+                    .limit(limit)
+                )
+            )
+            .tuples()
+            .all()
+        )
+        return list(rows)
+
+    async def calendar_events(
+        self, principal: Principal
+    ) -> list[tuple[TodoCard, TodoBoard, TodoCardEvent]]:
+        """The Events with a start on the boards that the principal reads (spec 000486).
+
+        Archived Events stay in the feed, because an archived Event still took place.
+        """
+        if not token_reads(principal):
+            return []
+        scope = await self.access.scope(principal)
+        rows = (
+            (
+                await self.session.execute(
+                    select(TodoCard, TodoBoard, TodoCardEvent)
+                    .join(TodoBoard, TodoBoard.id == TodoCard.board_id)
+                    .join(TodoCardEvent, TodoCardEvent.card_id == TodoCard.id)
+                    .where(scope.condition(), TodoCardEvent.starts_on.is_not(None))
+                    .order_by(TodoCardEvent.starts_on, TodoCard.id)
+                )
+            )
+            .tuples()
+            .all()
+        )
+        return list(rows)
 
     async def card_for_agenda(
         self, card_id: uuid.UUID, gremium_id: uuid.UUID, principal: Principal
@@ -2123,6 +2557,22 @@ def _slot(
     if after_id is not None:
         return at(after_id, "afterId") + 1
     return len(siblings)
+
+
+def _clean(value: str | None) -> str | None:
+    text = (value or "").strip()
+    return text or None
+
+
+def _event_row(card_id: uuid.UUID, payload: EventIn) -> TodoCardEvent:
+    return TodoCardEvent(
+        card_id=card_id,
+        starts_on=payload.starts_on,
+        ends_on=payload.ends_on,
+        place=_clean(payload.place),
+        participants=payload.participants,
+        series_id=payload.series_id,
+    )
 
 
 def _new_link(card_id: uuid.UUID, kind: str, target_id: uuid.UUID, actor: uuid.UUID) -> TodoLink:

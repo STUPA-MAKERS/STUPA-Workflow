@@ -8,11 +8,14 @@ from collections.abc import AsyncIterator
 from datetime import UTC, date, datetime, time
 from types import SimpleNamespace
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.db import get_session
 from app.deps import Principal, get_current_principal
 from app.main import create_app
+from app.modules.calendar import service as calendar_service
+from app.modules.calendar.ics import CardEvent
 from app.settings import get_settings, load_settings
 from tests._support.auth_fakes import fake_session, result
 
@@ -73,8 +76,22 @@ def test_feed_unknown_token_is_404() -> None:
     assert resp.status_code == 404
 
 
-def test_feed_returns_ics_with_meeting() -> None:
+def test_feed_returns_ics_with_meeting(monkeypatch: pytest.MonkeyPatch) -> None:
     """Serve the ICS body: 18:00 CEST is 16:00Z, 20:00 CEST is 18:00Z."""
+    event = CardEvent(
+        uid="c1",
+        title="Erstiparty",
+        start=date(2026, 11, 20),
+        end=date(2026, 11, 21),
+        stamp=datetime(2026, 1, 1, tzinfo=UTC),
+        place="Mensa",
+        board_name="Kultur",
+    )
+
+    async def _events(_db: object, _row: object) -> list[CardEvent]:
+        return [event]
+
+    monkeypatch.setattr(calendar_service, "readable_events", _events)
     principal_row = SimpleNamespace(sub="u1")
     gid = uuid.uuid4()
     meeting = SimpleNamespace(
@@ -100,3 +117,7 @@ def test_feed_returns_ics_with_meeting() -> None:
     assert "SUMMARY:Vollversammlung" in body
     assert "DTSTART:20260701T160000Z" in body
     assert "DTEND:20260701T180000Z" in body
+    assert "SUMMARY:Erstiparty" in body
+    assert "DTSTART;VALUE=DATE:20261120" in body
+    assert "DTEND;VALUE=DATE:20261122" in body
+    assert "LOCATION:Mensa" in body

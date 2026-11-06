@@ -21,6 +21,7 @@ from app.modules.todos.links import HIDDEN, LinkRef, Resolved
 from app.modules.todos.models import (
     TodoBoard,
     TodoCard,
+    TodoCardEvent,
     TodoColumn,
     TodoComment,
     TodoEvent,
@@ -47,6 +48,12 @@ class Rows:
 
     def first(self) -> Any:
         return self._items[0] if self._items else None
+
+
+def _selects(stmt: Any, model: type) -> bool:
+    """Tell if ``stmt`` selects whole rows of ``model`` (the event rows of ``_facts``)."""
+    descriptions = getattr(stmt, "column_descriptions", None) or []
+    return len(descriptions) == 1 and descriptions[0].get("type") is model
 
 
 class ScriptedSession:
@@ -108,6 +115,8 @@ class ScriptedSession:
 
     async def scalars(self, stmt: Any) -> Rows:
         self.statements.append(stmt)
+        if _selects(stmt, TodoCardEvent):
+            return Rows([o for o in self.store.values() if isinstance(o, TodoCardEvent)])
         return Rows(self.scalars_q.pop(0))
 
     async def execute(self, stmt: Any, *_a: Any) -> Rows:
