@@ -34,10 +34,8 @@ import {
 /** Unique state key (`state`, `state2`, …). */
 export function uniqueStateKey(base: string, states: readonly StateDef[]): string {
   const used = new Set(states.map((s) => s.key));
-  if (!used.has(base)) return base;
-  let i = 2;
-  while (used.has(`${base}${i}`)) i++;
-  return `${base}${i}`;
+  const free = (i: number): string => (used.has(`${base}${i}`) ? free(i + 1) : `${base}${i}`);
+  return used.has(base) ? free(2) : base;
 }
 
 /** Add a state. Inside an open group it becomes a member, else it stays invisible there. */
@@ -60,8 +58,7 @@ export function addState(g: FlowGraph, key: string, groupCtx: string | null): Fl
 
 /** Remove a state with its transitions, position and group membership. Empty groups go. */
 export function removeState(g: FlowGraph, key: string): FlowGraph {
-  const positions = { ...(g.layout?.positions ?? {}) };
-  delete positions[key];
+  const positions = withoutKey(g.layout?.positions ?? {}, key);
   const groups = (g.layout?.groups ?? [])
     .map((gr) => ({ ...gr, stateKeys: gr.stateKeys.filter((k) => k !== key) }))
     .filter((gr) => gr.stateKeys.length > 0 || (gr.groupIds ?? []).length > 0);
@@ -80,11 +77,11 @@ export function setInitial(g: FlowGraph, key: string): FlowGraph {
 
 /** Rename a state key. Transitions, positions and group memberships follow. */
 export function renameState(g: FlowGraph, oldKey: string, key: string): FlowGraph {
-  const positions = { ...(g.layout?.positions ?? {}) };
-  if (positions[oldKey] && key) {
-    positions[key] = positions[oldKey];
-    if (key !== oldKey) delete positions[oldKey];
-  }
+  const old = g.layout?.positions ?? {};
+  const positions =
+    old[oldKey] && key && key !== oldKey
+      ? { ...withoutKey(old, oldKey), [key]: old[oldKey] }
+      : { ...old };
   const groups = (g.layout?.groups ?? []).map((gr) => ({
     ...gr,
     stateKeys: gr.stateKeys.map((k) => (k === oldKey ? key : k)),
@@ -212,14 +209,9 @@ export function setTransitionAutomatic(g: FlowGraph, index: number, on: boolean)
 
 /** `requiresAction: true` is the default. The editor does not persist it. */
 export function setTransitionRequiresAction(g: FlowGraph, index: number, on: boolean): FlowGraph {
-  return patchTransition(g, index, (t) => {
-    if (on) {
-      const next = { ...t };
-      delete next.requiresAction;
-      return next;
-    }
-    return { ...t, requiresAction: false };
-  });
+  return patchTransition(g, index, (t) =>
+    on ? withoutKey(t, 'requiresAction') : { ...t, requiresAction: false },
+  );
 }
 
 export function setTransitionBranch(g: FlowGraph, index: number, branch: string): FlowGraph {
@@ -231,26 +223,14 @@ export function setTransitionBranch(g: FlowGraph, index: number, branch: string)
 
 
 export function setGuard(g: FlowGraph, index: number, guard: Guard | null): FlowGraph {
-  return patchTransition(g, index, (t) => {
-    if (!guard) {
-      const next = { ...t };
-      delete next.guard;
-      return next;
-    }
-    return { ...t, guard };
-  });
+  return patchTransition(g, index, (t) => (guard ? { ...t, guard } : withoutKey(t, 'guard')));
 }
 
 /** Choose an operator to seed the guard with a default. An empty operator drops the guard. */
 export function setGuardOp(g: FlowGraph, index: number, op: string): FlowGraph {
-  return patchTransition(g, index, (t) => {
-    if (!op) {
-      const next = { ...t };
-      delete next.guard;
-      return next;
-    }
-    return { ...t, guard: defaultGuard(op as GuardLeafOperator) };
-  });
+  return patchTransition(g, index, (t) =>
+    op ? { ...t, guard: defaultGuard(op as GuardLeafOperator) } : withoutKey(t, 'guard'),
+  );
 }
 
 export function setGuardValue(g: FlowGraph, index: number, value: string): FlowGraph {
@@ -275,10 +255,11 @@ export function setCompare(
   return patchTransition(g, index, (t) => {
     const cur = compareSpecOf(t);
     const op = patch.op ?? cur.op;
-    let value: unknown = patch.value ?? cur.value;
-    if (op === 'in' && typeof value === 'string') {
-      value = value.split(',').map((s) => s.trim()).filter(Boolean);
-    }
+    const raw: unknown = patch.value ?? cur.value;
+    const value =
+      op === 'in' && typeof raw === 'string'
+        ? raw.split(',').map((s) => s.trim()).filter(Boolean)
+        : raw;
     return {
       ...t,
       guard: { compare: { field: patch.field ?? cur.field, op: op as CompareOp, value } },
@@ -473,20 +454,20 @@ export function dissolveGroup(g: FlowGraph, id: string, parent: string | null): 
   const all = g.layout?.groups ?? [];
   const me = all.find((gr) => gr.id === id);
   if (!me) return g;
-  let groups = all.filter((gr) => gr.id !== id);
-  if (parent) {
-    groups = groups.map((gr) =>
-      gr.id === parent
-        ? {
-            ...gr,
-            stateKeys: [...gr.stateKeys, ...me.stateKeys],
-            groupIds: [...(gr.groupIds ?? []).filter((cid) => cid !== id), ...(me.groupIds ?? [])],
-          }
-        : gr,
-    );
-  }
-  const layout = { ...(g.layout ?? {}) };
-  if (groups.length) layout.groups = groups;
-  else delete layout.groups;
+  const rest = all.filter((gr) => gr.id !== id);
+  const groups = parent
+    ? rest.map((gr) =>
+        gr.id === parent
+          ? {
+              ...gr,
+              stateKeys: [...gr.stateKeys, ...me.stateKeys],
+              groupIds: [...(gr.groupIds ?? []).filter((cid) => cid !== id), ...(me.groupIds ?? [])],
+            }
+          : gr,
+      )
+    : rest;
+  const layout = groups.length
+    ? { ...(g.layout ?? {}), groups }
+    : withoutKey(g.layout ?? {}, 'groups');
   return { ...g, layout };
 }

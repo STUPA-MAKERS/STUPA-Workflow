@@ -14,36 +14,33 @@ export function buildGroupById(groups: readonly FlowGroup[]): ReadonlyMap<string
 
 /** Parent relation of groups (child id → parent id) derived from `groupIds`. */
 export function buildParentGroupId(groups: readonly FlowGroup[]): ReadonlyMap<string, string> {
-  const map = new Map<string, string>();
-  for (const g of groups) {
-    for (const child of g.groupIds ?? []) map.set(child, g.id);
-  }
-  return map;
+  return new Map(groups.flatMap((g) => (g.groupIds ?? []).map((child) => [child, g.id] as const)));
 }
 
 /** Direct owner of a state (group id). An absent entry means the top level. */
 export function buildStateOwnerId(groups: readonly FlowGroup[]): ReadonlyMap<string, string> {
-  const map = new Map<string, string>();
-  for (const g of groups) {
-    for (const k of g.stateKeys) map.set(k, g.id);
-  }
-  return map;
+  return new Map(groups.flatMap((g) => g.stateKeys.map((k) => [k, g.id] as const)));
 }
 
 /** Transitively contained state keys of a group (including sub-groups). */
 export function deepStateKeys(groupById: ReadonlyMap<string, FlowGroup>, groupId: string): readonly string[] {
-  const out: string[] = [];
-  const seen = new Set<string>();
-  const walk = (id: string): void => {
-    if (seen.has(id)) return;
-    seen.add(id);
+  const walk = (id: string, seen: ReadonlySet<string>): KeyWalk => {
+    if (seen.has(id)) return { keys: [], seen };
+    const marked = new Set([...seen, id]);
     const g = groupById.get(id);
-    if (!g) return;
-    out.push(...g.stateKeys);
-    for (const child of g.groupIds ?? []) walk(child);
+    if (!g) return { keys: [], seen: marked };
+    return (g.groupIds ?? []).reduce<KeyWalk>((acc, child) => {
+      const sub = walk(child, acc.seen);
+      return { keys: [...acc.keys, ...sub.keys], seen: sub.seen };
+    }, { keys: g.stateKeys, seen: marked });
   };
-  walk(groupId);
-  return out;
+  return walk(groupId, new Set()).keys;
+}
+
+/** The state keys found so far and the groups already walked. */
+interface KeyWalk {
+  readonly keys: readonly string[];
+  readonly seen: ReadonlySet<string>;
 }
 
 /**
@@ -57,16 +54,12 @@ function resolveAt(
   ctx: string | null,
 ): LevelRef {
   const owner = stateOwnerId.get(stateKey) ?? null;
-  if (owner === ctx) return { kind: 'state' };
-  let g: string | null = owner;
-  const guard = new Set<string>();
-  while (g !== null && !guard.has(g)) {
-    guard.add(g);
-    const parent: string | null = parentGroupId.get(g) ?? null;
-    if (parent === ctx) return { kind: 'group', id: g };
-    g = parent;
-  }
-  return null;
+  const climb = (g: string | null, guard: ReadonlySet<string>): LevelRef => {
+    if (g === null || guard.has(g)) return null;
+    const parent = parentGroupId.get(g) ?? null;
+    return parent === ctx ? { kind: 'group', id: g } : climb(parent, new Set([...guard, g]));
+  };
+  return owner === ctx ? { kind: 'state' } : climb(owner, new Set());
 }
 
 /**

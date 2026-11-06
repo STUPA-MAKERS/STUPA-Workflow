@@ -83,33 +83,21 @@ export interface FieldValidationResult {
 }
 
 export function validateFormField(field: FormFieldDef): FieldValidationResult {
-  const errors: string[] = [];
-
-  if (!KEY_PATTERN.test(field.key)) {
-    errors.push(`invalid field key: ${JSON.stringify(field.key)}`);
-  }
-  if (!FIELD_TYPES.includes(field.type)) {
-    errors.push(`unknown field type: ${JSON.stringify(field.type)}`);
-  }
-  if (!field.label || !field.label['de']?.trim()) {
-    errors.push('label (de) is required');
-  }
-  if ((field.type === 'select' || field.type === 'multiselect') && !field.options?.length) {
-    errors.push(`options are required for type '${field.type}'`);
-  }
-  if (field.type === 'computed' && !field.compute) {
-    errors.push("compute is required for type 'computed'");
-  }
-  if (field.isPromoted && !field.promoteTarget) {
-    errors.push('promoteTarget is required when isPromoted is true');
-  }
-  if (field.visibleIf && !validateJsonLogic(field.visibleIf)) {
-    errors.push('visibleIf is not a valid JsonLogic expression');
-  }
-  if (field.compute && !validateJsonLogic(field.compute)) {
-    errors.push('compute is not a valid JsonLogic expression');
-  }
-
+  const isChoice = field.type === 'select' || field.type === 'multiselect';
+  const checks: readonly (readonly [boolean, string])[] = [
+    [!KEY_PATTERN.test(field.key), `invalid field key: ${JSON.stringify(field.key)}`],
+    [!FIELD_TYPES.includes(field.type), `unknown field type: ${JSON.stringify(field.type)}`],
+    [!field.label || !field.label['de']?.trim(), 'label (de) is required'],
+    [isChoice && !field.options?.length, `options are required for type '${field.type}'`],
+    [field.type === 'computed' && !field.compute, "compute is required for type 'computed'"],
+    [!!field.isPromoted && !field.promoteTarget, 'promoteTarget is required when isPromoted is true'],
+    [
+      !!field.visibleIf && !validateJsonLogic(field.visibleIf),
+      'visibleIf is not a valid JsonLogic expression',
+    ],
+    [!!field.compute && !validateJsonLogic(field.compute), 'compute is not a valid JsonLogic expression'],
+  ];
+  const errors = checks.filter(([failed]) => failed).map(([, message]) => message);
   return { valid: errors.length === 0, errors };
 }
 
