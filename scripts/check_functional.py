@@ -10,7 +10,9 @@ per file:
 - `chain` (000086): an `if`/`elif` chain with three or more branches.
 - `dataclass` (000087): a `@dataclass` without `frozen=True`.
 - `pydantic` (000087): a Pydantic model that is not frozen, neither by its own `frozen=True`
-  nor by a frozen base.
+  nor by a frozen base. A base name resolves to the class of the same file first, because
+  several modules define a private base with the same name (`_CamelModel`), and only then to a
+  class of that name anywhere else.
 
 The exceptions of 000089 are skipped: tests, migrations, SQLAlchemy ORM rows (a class with a
 base `Base`) and Pydantic validators. A parameter is not a local, so a write through a parameter
@@ -272,6 +274,7 @@ def _file_counts(tree: ast.Module, classes: Mapping[str, list[ClassInfo]]) -> Co
         and not _validator(node)
     )
     class_nodes = tuple(n for n in ast.walk(tree) if isinstance(n, ast.ClassDef))
+    scoped = {**classes, **_classes({Path(): tree})}
     dataclasses = sum(
         1
         for node in class_nodes
@@ -282,9 +285,9 @@ def _file_counts(tree: ast.Module, classes: Mapping[str, list[ClassInfo]]) -> Co
     pydantic = sum(
         1
         for node in class_nodes
-        if _is_pydantic(node.name, classes, frozenset())
+        if _is_pydantic(node.name, scoped, frozenset())
         and node.name not in PYDANTIC_ROOTS
-        and not _is_frozen(node.name, classes, frozenset())
+        and not _is_frozen(node.name, scoped, frozenset())
     )
     return sum(
         (_function_counts(f) for f in functions),
