@@ -174,6 +174,15 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/todos/000325](requirements/functional/collaboration/todos/000325_todo-mails.md) | To-do mails go to assignees | approved |
 | [F/collaboration/todos/000326](requirements/functional/collaboration/todos/000326_card-on-agenda.md) | A card can go on the agenda | approved |
 | [F/collaboration/todos/000327](requirements/functional/collaboration/todos/000327_link-access.md) | A link shows nothing without access | approved |
+| [F/collaboration/todos/000439](requirements/functional/collaboration/todos/000439_event-card.md) | An Event is a card with event data | draft |
+| [F/collaboration/todos/000440](requirements/functional/collaboration/todos/000440_event-totals.md) | An Event shows the totals of its links | draft |
+| [F/collaboration/todos/000441](requirements/functional/collaboration/todos/000441_event-picker.md) | Antrag and Buchung can name their Event | draft |
+| [F/collaboration/todos/000442](requirements/functional/collaboration/todos/000442_one-event-per-element.md) | An Antrag or a Buchung belongs to at most one Event | draft |
+| [F/collaboration/todos/000443](requirements/functional/collaboration/todos/000443_event-decisions.md) | An Event lists its decisions | draft |
+| [F/collaboration/todos/000444](requirements/functional/collaboration/todos/000444_event-series.md) | An Event can belong to a series | draft |
+| [F/collaboration/todos/000445](requirements/functional/collaboration/todos/000445_next-edition.md) | Nächste Ausgabe anlegen copies the plan, not the facts | draft |
+| [F/collaboration/todos/000446](requirements/functional/collaboration/todos/000446_events-findable.md) | Archived Events stay findable | draft |
+| [F/collaboration/todos/000447](requirements/functional/collaboration/todos/000447_event-calendar.md) | An Event with a start is in the calendar | draft |
 | [F/finance/budget/000138](requirements/functional/finance/budget/000138_cost-centre-picker.md) | The cost centre pickers are fixed | approved |
 | [F/finance/budget/000139](requirements/functional/finance/budget/000139_close-fiscal-year.md) | A fiscal year closes and reopens | approved |
 | [F/finance/budget/000140](requirements/functional/finance/budget/000140_default-fiscal-year.md) | The default fiscal year holds today | approved |
