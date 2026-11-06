@@ -2,9 +2,10 @@
 id: "000327"
 title: A link shows nothing without access
 kind: functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
+replaced_by: F/collaboration/todos/000448
 scope:
   - backend/app/modules/todos
   - frontend/src/app/features/todos
