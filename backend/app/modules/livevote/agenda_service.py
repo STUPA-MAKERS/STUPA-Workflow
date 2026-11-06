@@ -74,6 +74,32 @@ def agenda_order() -> tuple[ColumnElement[Any], ...]:
     )
 
 
+def _item_out(
+    row: MeetingAgendaItem, apps: dict[UUID, Application], states: dict[UUID, State]
+) -> AgendaItemOut:
+    """Build one agenda item; an own title wins over the title of the application."""
+    app = apps.get(row.application_id) if row.application_id is not None else None
+    state = (
+        states.get(app.current_state_id)
+        if app is not None and app.current_state_id is not None
+        else None
+    )
+    app_title = title_of(app.data) if app is not None else None
+    return AgendaItemOut(
+        id=row.id,
+        applicationId=row.application_id,
+        todoId=row.todo_id,
+        title=row.title or app_title,
+        applicationTitle=app_title,
+        body=row.body,
+        position=row.position,
+        nonPublic=row.non_public,
+        doneAt=row.done_at,
+        stateLabel=state.label_i18n if state is not None else None,
+        amount=app.amount if app is not None else None,
+    )
+
+
 class AgendaService:
     """Manage the agenda of a meeting: assign, remove and list applications."""
 
@@ -219,32 +245,7 @@ class AgendaService:
             if state_ids
             else {}
         )
-        out: list[AgendaItemOut] = []
-        for r in rows:
-            app = apps.get(r.application_id) if r.application_id is not None else None
-            state = (
-                states.get(app.current_state_id)
-                if app is not None and app.current_state_id is not None
-                else None
-            )
-            app_title = title_of(app.data) if app is not None else None
-            title = r.title or app_title
-            out.append(
-                AgendaItemOut(
-                    id=r.id,
-                    applicationId=r.application_id,
-                    todoId=r.todo_id,
-                    title=title,
-                    applicationTitle=app_title,
-                    body=r.body,
-                    position=r.position,
-                    nonPublic=r.non_public,
-                    doneAt=r.done_at,
-                    stateLabel=state.label_i18n if state is not None else None,
-                    amount=app.amount if app is not None else None,
-                )
-            )
-        return out
+        return [_item_out(r, apps, states) for r in rows]
 
     async def set_body(
         self,
@@ -283,24 +284,30 @@ class AgendaService:
             self._assert_agenda_open(meeting)
         if body is not None or non_public is not None:
             await self._assert_minutes_open(meeting)
-        changed: list[str] = []
-        if body is not None and body != row.body:
+        new_body = body is not None and body != row.body
+        if body is not None and new_body:
             row.body = body
-            if meeting.status == "closed":
-                changed.append("body")
-        if title is not None:
-            own = await self._own_title(row, title.strip())
-            if own != row.title:
-                row.title = own
-                changed.append("title")
-        if non_public is not None and non_public != row.non_public:
+        own = await self._own_title(row, title.strip()) if title is not None else row.title
+        new_title = own != row.title
+        if new_title:
+            row.title = own
+        new_public = non_public is not None and non_public != row.non_public
+        if non_public is not None and new_public:
             if non_public and await self._has_guest_vote(row.id):
                 raise ConflictError(
                     "Guests voted on this agenda item; it cannot become non-public.",
                     code="guests_vote_on_item",
                 )
             row.non_public = non_public
-            changed.append("nonPublic")
+        changed = [
+            name
+            for name, hit in (
+                ("body", new_body and meeting.status == "closed"),
+                ("title", new_title),
+                ("nonPublic", new_public),
+            )
+            if hit
+        ]
         if changed:
             await self._audit(AuditAction.AGENDA_ITEM_UPDATE, actor=actor, item=row, fields=changed)
         await self.session.flush()
@@ -358,12 +365,8 @@ class AgendaService:
         await self._assert_minutes_open(meeting)
         if done == (row.done_at is not None):
             return
-        if done:
-            row.done_at = datetime.now(UTC)
-            action = AuditAction.AGENDA_ITEM_DONE
-        else:
-            row.done_at = None
-            action = AuditAction.AGENDA_ITEM_REOPENED
+        row.done_at = datetime.now(UTC) if done else None
+        action = AuditAction.AGENDA_ITEM_DONE if done else AuditAction.AGENDA_ITEM_REOPENED
         extra = {"via": via} if via is not None else {}
         await self._audit(action, actor=actor, item=row, **extra)
         await self.session.flush()
@@ -405,14 +408,10 @@ class AgendaService:
                 )
             ).all()
         }
-        position = 0
-        ordered: list[str] = []
-        for item_id in item_ids:
-            row = rows.get(item_id)
-            if row is not None:
-                row.position = position
-                position += 1
-                ordered.append(str(row.id))
+        known = [rows[item_id] for item_id in item_ids if item_id in rows]
+        for position, row in enumerate(known):
+            row.position = position
+        ordered = [str(row.id) for row in known]
         await audit_record(
             self.session,
             actor=actor,
@@ -447,22 +446,17 @@ class AgendaService:
         labels = await self._state_labels(
             {a.current_state_id for a in apps if a.current_state_id is not None}
         )
-        out: list[AssignableApplicationOut] = []
-        for app in apps:
-            if app.id in existing:
-                continue
-            out.append(
-                AssignableApplicationOut(
-                    applicationId=app.id,
-                    title=title_of(app.data),
-                    stateLabel=(
-                        labels.get(app.current_state_id)
-                        if app.current_state_id is not None
-                        else None
-                    ),
-                )
+        return [
+            AssignableApplicationOut(
+                applicationId=app.id,
+                title=title_of(app.data),
+                stateLabel=(
+                    labels.get(app.current_state_id) if app.current_state_id is not None else None
+                ),
             )
-        return out
+            for app in apps
+            if app.id not in existing
+        ]
 
     async def _next_position(self, meeting_id: UUID) -> int:
         max_pos = (
@@ -536,18 +530,7 @@ class AgendaService:
         meeting = await self._meeting(meeting_id, for_update=True)
         self._assert_agenda_open(meeting)
         if title is not None:
-            item = MeetingAgendaItem(
-                meeting_id=meeting_id,
-                application_id=None,
-                title=title.strip(),
-                position=await self._next_position(meeting_id),
-                non_public=non_public,
-            )
-            self.session.add(item)
-            await self.session.flush()
-            await self._audit(
-                AuditAction.AGENDA_ITEM_ADD, actor=actor, item=item, nonPublic=non_public
-            )
+            await self._add_freetext(meeting_id, title.strip(), non_public, actor)
             return True
 
         app = await self.session.get(Application, application_id, populate_existing=True)
@@ -578,6 +561,21 @@ class AgendaService:
         await self.session.flush()
         await self._audit(AuditAction.AGENDA_ITEM_ADD, actor=actor, item=item, nonPublic=non_public)
         return True
+
+    async def _add_freetext(
+        self, meeting_id: UUID, title: str, non_public: bool, actor: str | None
+    ) -> None:
+        """Add a free-text item with its own title and write ``agenda_item_add``."""
+        item = MeetingAgendaItem(
+            meeting_id=meeting_id,
+            application_id=None,
+            title=title,
+            position=await self._next_position(meeting_id),
+            non_public=non_public,
+        )
+        self.session.add(item)
+        await self.session.flush()
+        await self._audit(AuditAction.AGENDA_ITEM_ADD, actor=actor, item=item, nonPublic=non_public)
 
     async def add_todo_in_tx(
         self,
