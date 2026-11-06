@@ -339,7 +339,7 @@ class ListingOps(ApplicationsServiceBase):
             for tid, n in type_rows
         }
         gremium_rows = (await self.session.execute(select(Gremium.id, Gremium.name))).all()
-        gremium_names = {gid: name for gid, name in gremium_rows}
+        gremium_names = dict(gremium_rows)
         return type_names, gremium_names
 
     async def list_tasks(self, principal: Principal) -> list[ApplicationListItem]:

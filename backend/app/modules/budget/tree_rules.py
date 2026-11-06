@@ -20,7 +20,7 @@ from typing import Any
 #: reserves the separator `-`, so a segment must not contain it.
 _KEY_RE = re.compile(r"^[A-Za-z0-9]+$")
 _SEP = "-"
-_ZERO = Decimal("0")
+_ZERO = Decimal(0)
 #: Length cap per path segment. It matches `max_length` in the schemas and bounds
 #: the free text in the `path_key` prefix comparisons.
 _KEY_MAX = 64

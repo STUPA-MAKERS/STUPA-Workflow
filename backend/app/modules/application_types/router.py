@@ -30,7 +30,7 @@ _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 
 def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
     """Map the given error status codes to `ProblemDetail` responses."""
-    return {code: _PROBLEM for code in codes}
+    return dict.fromkeys(codes, _PROBLEM)
 
 
 def get_application_types_service(session: DbSession) -> ApplicationTypesService:

@@ -459,14 +459,11 @@ class PrincipalMergeService:
         gremium_ids = {UUID(k.split("@", 1)[1]) for k in extra if "@" in k}
         names: dict[UUID, str] = {}
         if gremium_ids:
-            names = {
-                gid: name
-                for gid, name in (
+            names = dict((
                     await self.session.execute(
                         select(Gremium.id, Gremium.name).where(Gremium.id.in_(gremium_ids))
                     )
-                ).all()
-            }
+                ).all())
         out: list[MergePermissionOut] = []
         for key in extra:
             if "@" in key:

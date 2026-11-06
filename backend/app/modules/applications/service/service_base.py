@@ -325,7 +325,7 @@ class ApplicationsServiceBase:
         rows = (
             await self.session.execute(select(sq.c.app_id, sq.c.since).where(sq.c.app_id.in_(ids)))
         ).all()
-        return {app_id: since for app_id, since in rows}
+        return dict(rows)
 
     async def _gremium_actor(self, app: Application) -> str | None:
         """Return the name of the Gremium of the application.

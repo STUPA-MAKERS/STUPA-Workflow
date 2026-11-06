@@ -77,7 +77,7 @@ SettingsDep = Annotated[Settings, Depends(get_settings)]
 
 
 def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
-    return {code: _PROBLEM for code in codes}
+    return dict.fromkeys(codes, _PROBLEM)
 
 
 def get_public_guest_service(

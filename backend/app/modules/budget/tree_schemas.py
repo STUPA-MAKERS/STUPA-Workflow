@@ -113,13 +113,13 @@ class AllocationView(_CamelModel):
     fiscal_year_id: UUID = Field(alias="fiscalYearId")
     allocated: Decimal
     #: Bound: accepted applications, reduced pro rata by the expenses bound to them.
-    bound: Decimal = Decimal("0")
+    bound: Decimal = Decimal(0)
     #: Expended: actual expenses, kind='expense'.
-    expended: Decimal = Decimal("0")
+    expended: Decimal = Decimal(0)
     #: Income, kind='income'. It raises the available budget.
-    income: Decimal = Decimal("0")
+    income: Decimal = Decimal(0)
     committed: Decimal
-    requested: Decimal = Decimal("0")
+    requested: Decimal = Decimal(0)
     available: Decimal
 
 

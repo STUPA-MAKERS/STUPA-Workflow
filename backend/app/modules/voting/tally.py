@@ -86,7 +86,7 @@ def tally(options: Iterable[str], choices: Iterable[str | None]) -> dict[str, in
 
     A choice of None and a choice outside the option list do not count.
     """
-    counts = {opt: 0 for opt in options}
+    counts = dict.fromkeys(options, 0)
     for choice in choices:
         if choice is not None and choice in counts:
             counts[choice] += 1
@@ -275,7 +275,7 @@ def tally_election(
     if config.yes_no:
         return _yes_no_outcome(config, raw, eligible)
     known = config.candidate_ids
-    counts = {cid: 0 for cid in known}
+    counts = dict.fromkeys(known, 0)
     abstentions = 0
     full_abstentions = 0
     for item in raw:

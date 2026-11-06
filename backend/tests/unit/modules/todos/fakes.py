@@ -49,6 +49,13 @@ class Rows:
     def first(self) -> Any:
         return self._items[0] if self._items else None
 
+    def tuples(self) -> Rows:
+        """The same rows: an ``execute`` answer is already a list of tuples."""
+        return self
+
+    def __iter__(self) -> Any:
+        return iter(self._items)
+
 
 def _selects(stmt: Any, model: type) -> bool:
     """Tell if ``stmt`` selects whole rows of ``model`` (the event rows of ``_facts``)."""

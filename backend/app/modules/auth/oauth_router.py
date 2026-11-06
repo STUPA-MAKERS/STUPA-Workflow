@@ -46,7 +46,7 @@ _REDIRECT = {"description": "Redirect (protocol error back to the loopback redir
 
 
 def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
-    return {code: _PROBLEM for code in codes}
+    return dict.fromkeys(codes, _PROBLEM)
 
 
 class OAuthError(BaseModel):

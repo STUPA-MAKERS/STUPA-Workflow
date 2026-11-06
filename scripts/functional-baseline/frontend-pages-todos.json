@@ -1,0 +1,9 @@
+{
+  "frontend/src/app/pages/todos/board-picker/todo-board-picker.component.ts": 5,
+  "frontend/src/app/pages/todos/board-rows/todo-board-rows.component.ts": 58,
+  "frontend/src/app/pages/todos/board-settings/todo-board-settings.component.ts": 4,
+  "frontend/src/app/pages/todos/board-skeleton/todo-board-skeleton.component.ts": 13,
+  "frontend/src/app/pages/todos/board-view/todo-board-view.component.ts": 11,
+  "frontend/src/app/pages/todos/list-view/todo-list-view.component.ts": 14,
+  "frontend/src/app/pages/todos/todos.component.ts": 21
+}

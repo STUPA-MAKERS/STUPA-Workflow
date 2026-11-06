@@ -1,0 +1,20 @@
+{
+  "backend/app/modules/admin/branding.py": 8,
+  "backend/app/modules/admin/cd_builtin/convert.py": 8,
+  "backend/app/modules/admin/cd_resolver.py": 7,
+  "backend/app/modules/admin/gremium_roles.py": 3,
+  "backend/app/modules/admin/image_size.py": 5,
+  "backend/app/modules/admin/membership_sync.py": 11,
+  "backend/app/modules/admin/oidc_mappings.py": 4,
+  "backend/app/modules/admin/principal_merge.py": 22,
+  "backend/app/modules/admin/principal_revoke.py": 27,
+  "backend/app/modules/admin/schemas.py": 74,
+  "backend/app/modules/admin/service/application_types.py": 5,
+  "backend/app/modules/admin/service/cd_variants.py": 6,
+  "backend/app/modules/admin/service/flow.py": 12,
+  "backend/app/modules/admin/service/gremien.py": 11,
+  "backend/app/modules/admin/service/rbac.py": 9,
+  "backend/app/modules/admin/service/service_base.py": 1,
+  "backend/app/modules/admin/service/webhooks.py": 7,
+  "backend/app/modules/admin/site_config_service.py": 1
+}

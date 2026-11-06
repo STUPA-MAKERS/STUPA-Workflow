@@ -1,0 +1,11 @@
+{
+  "mcp/antragsplattform_mcp/auth.py": 12,
+  "mcp/antragsplattform_mcp/client.py": 12,
+  "mcp/antragsplattform_mcp/graphops.py": 46,
+  "mcp/antragsplattform_mcp/schemas.py": 50,
+  "mcp/antragsplattform_mcp/tools/_chat_files.py": 2,
+  "mcp/antragsplattform_mcp/tools/applications.py": 2,
+  "mcp/antragsplattform_mcp/tools/flow_forms.py": 4,
+  "mcp/antragsplattform_mcp/tools/meetings.py": 17,
+  "mcp/antragsplattform_mcp/tools/tickets.py": 4
+}

@@ -89,14 +89,14 @@ async def _budget_fits(session: AsyncSession, app: Application) -> bool:
                         else_=-BudgetExpense.amount,
                     )
                 ),
-                Decimal("0"),
+                Decimal(0),
             )
         ).where(
             BudgetExpense.budget_id == app.budget_id,
             BudgetExpense.fiscal_year_id == app.fiscal_year_id,
         )
     )
-    available = (allocated or Decimal("0")) + (flow or Decimal("0"))
+    available = (allocated or Decimal(0)) + (flow or Decimal(0))
     return amount <= available
 
 

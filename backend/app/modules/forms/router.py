@@ -43,7 +43,7 @@ def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
 
     A response hook sets the content type to problem+json.
     """
-    return {code: _PROBLEM for code in codes}
+    return dict.fromkeys(codes, _PROBLEM)
 
 
 def get_forms_service(session: DbSession) -> FormsService:

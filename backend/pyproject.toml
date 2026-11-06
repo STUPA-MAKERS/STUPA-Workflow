@@ -100,15 +100,20 @@ target-version = "py313"
 line-length = 100
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM", "ANN", "RUF100", "D"]
+select = [
+    "E", "F", "I", "UP", "B", "SIM", "ANN", "RUF100", "D",
+    # Functional style (specs/style/shared/functional): comprehensions, no appending loop,
+    # conditional expressions, no superfluous else after return, no rebound loop variable.
+    "C4", "PERF401", "PERF402", "SIM108", "RET", "PLW2901", "FURB",
+]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
 # Tests type fixtures and fakes loosely. Migrations use the dynamic alembic op API.
-"tests/**" = ["ANN", "D100", "D101", "D102", "D103", "D104", "D105", "D106", "D107"]
-"migrations/**" = ["ANN"]
+"tests/**" = ["C4", "PERF", "SIM108", "RET", "PLW2901", "FURB", "ANN", "D100", "D101", "D102", "D103", "D104", "D105", "D106", "D107"]
+"migrations/**" = ["C4", "PERF", "SIM108", "RET", "PLW2901", "FURB", "ANN"]
 
 [tool.basedpyright]
 pythonVersion = "3.13"
@@ -121,6 +126,8 @@ reportUnusedVariable = "error"
 reportConstantRedefinition = "error"
 reportMissingTypeArgument = "error"
 reportMissingParameterType = "error"
+# Functional style (specs/style/shared/functional/000086): a match must cover every case.
+reportMatchNotExhaustive = "error"
 # Alembic migrations use the dynamic op and context API, so the strict type check skips
 # them. The check still covers the models and the logic. env.py stays typed on its own.
 exclude = ["migrations/versions", ".venv"]

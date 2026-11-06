@@ -130,7 +130,7 @@ class TransferOps(ExpenseOps):
                 select(Budget.id, Budget.path_key).where(Budget.id.in_(budget_ids))
             )
         ).all()
-        return {bid: path for bid, path in rows}
+        return dict(rows)
 
     @staticmethod
     def _row_out(

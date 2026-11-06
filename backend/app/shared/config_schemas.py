@@ -528,7 +528,7 @@ def _assert_no_automatic_cycle(
             auto_adj[t.from_].append(t.to)
 
     WHITE, GREY, BLACK = 0, 1, 2
-    color: dict[str, int] = {k: WHITE for k in key_set}
+    color: dict[str, int] = dict.fromkeys(key_set, WHITE)
 
     def _visit(node: str, path: list[str]) -> None:
         color[node] = GREY

@@ -195,10 +195,14 @@ class NotificationService:
                         source="builtin",
                     )
                 )
-        for key in sorted(rows):
-            if key not in CATALOGUE_BY_KEY:
-                out.append(_template_out(rows[key], source="override"))
-        return out
+        return [
+            *out,
+            *(
+                _template_out(rows[key], source="override")
+                for key in sorted(rows)
+                if key not in CATALOGUE_BY_KEY
+            ),
+        ]
 
     async def upsert_template(self, payload: MailTemplateUpsert) -> MailTemplateOut:
         """Create or update an override by key.
@@ -403,7 +407,7 @@ class NotificationService:
                     ).where(NotificationPreference.principal_id == principal_id)
                 )
             ).all()
-            stored = {kind: enabled for kind, enabled in rows}
+            stored = dict(rows)
         return [(k, stored.get(k, kind_default(k))) for k in NOTIFICATION_KINDS]
 
     async def set_preferences(

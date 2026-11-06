@@ -507,26 +507,20 @@ class AuskunftService:
                 ).all()
             )
             type_ids = {a.type_id for a in apps}
-            type_names = {
-                tid: name
-                for tid, name in (
+            type_names = dict((
                     await self.session.execute(
                         select(ApplicationType.id, ApplicationType.name_i18n).where(
                             ApplicationType.id.in_(type_ids)
                         )
                     )
-                ).all()
-            }
+                ).all())
             state_ids = {a.current_state_id for a in apps if a.current_state_id}
             state_labels = (
-                {
-                    sid: label
-                    for sid, label in (
+                dict((
                         await self.session.execute(
                             select(State.id, State.label_i18n).where(State.id.in_(state_ids))
                         )
-                    ).all()
-                }
+                    ).all())
                 if state_ids
                 else {}
             )

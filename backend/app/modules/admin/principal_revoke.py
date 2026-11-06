@@ -310,9 +310,8 @@ def build_preview(
 ) -> RevokePreviewOut:
     """Build the preview of the dialog from the snapshot. Writes nothing."""
     targets = group_targets(snap)
-    gremien: list[RevokeGremiumOut] = []
-    for gid in tied_gremien(snap):
-        gremien.append(
+    gremien = sorted(
+        (
             RevokeGremiumOut(
                 gremium_id=gid,
                 name=snap.gremium_names.get(gid, ""),
@@ -333,8 +332,10 @@ def build_preview(
                 ],
                 open_tasks=snap.open_tasks.get(gid, 0),
             )
-        )
-    gremien.sort(key=lambda g: (g.name.casefold(), str(g.gremium_id)))
+            for gid in tied_gremien(snap)
+        ),
+        key=lambda g: (g.name.casefold(), str(g.gremium_id)),
+    )
     roles = [
         RevokeGlobalRoleOut(
             role_id=role.id,
@@ -619,12 +620,9 @@ class PrincipalRevokeService:
             await self._load_mappings(snap)
         tied = tied_gremien(snap)
         if tied:
-            snap.gremium_names = {
-                gid: name
-                for gid, name in (
+            snap.gremium_names = dict((
                     await s.execute(select(Gremium.id, Gremium.name).where(Gremium.id.in_(tied)))
-                ).all()
-            }
+                ).all())
         others = {p.substitute_id for p in snap.pool} | {
             p.member_id for p in snap.pool if p.member_id is not None
         }

@@ -174,8 +174,7 @@ def sanitize_user_markdown(markdown: str) -> str:
         if not _has_eval_refdef(cleaned):
             break
         cleaned = _strip_eval_refdefs(cleaned)
-    cleaned = _UNSAFE_IMAGE_RE.sub(_neutralize_unsafe_image, cleaned)
-    return cleaned
+    return _UNSAFE_IMAGE_RE.sub(_neutralize_unsafe_image, cleaned)
 
 #: Gremium `cd_variant` values that select a protocol render variant.
 _PROTOCOL_VARIANTS = {"stupa", "asta"}
@@ -660,7 +659,8 @@ def demote_headings(markdown: str) -> str:
         elif not in_fence and stripped.startswith("#"):
             hashes = len(stripped) - len(stripped.lstrip("#"))
             if 1 <= hashes <= 5 and stripped[hashes : hashes + 1] in (" ", "\t"):
-                line = line.replace("#", "##", 1)
+                out.append(line.replace("#", "##", 1))
+                continue
         out.append(line)
     return "\n".join(out)
 

@@ -266,7 +266,7 @@ class VoteReadOps(MeetingServiceBase):
                 .group_by(MeetingAttendance.meeting_id)
             )
         ).all()
-        return {mid: n for mid, n in rows}
+        return dict(rows)
 
     async def _departed_guest_voters(self, vote_ids: list[UUID]) -> dict[UUID, int]:
         """Count per vote the guests with a ballot who are no longer admitted."""
@@ -310,7 +310,7 @@ class VoteReadOps(MeetingServiceBase):
                 .group_by(MeetingGuest.meeting_id)
             )
         ).all()
-        return {mid: n for mid, n in rows}
+        return dict(rows)
 
     async def _vote_tallies(
         self, votes: Sequence[Vote]
