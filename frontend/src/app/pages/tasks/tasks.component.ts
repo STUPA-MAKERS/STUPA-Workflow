@@ -68,21 +68,21 @@ const DUE_TEXT: Record<TasksDue, TranslationKey> = {
 
 /** One To-Do as the template shows it. */
 interface TodoRow {
-  item: TodoMineItem;
-  due: string | null;
-  tone: DueTone;
+  readonly item: TodoMineItem;
+  readonly due: string | null;
+  readonly tone: DueTone;
 }
 
 /** One row as the template shows it. */
 interface TaskRow {
-  item: ApplicationListItem;
-  createdAt: string;
-  title: string;
-  typeLabel: string;
-  stateLabel: string | null;
-  stateKind: StatusKind;
-  amount: string | null;
-  since: IsoDateTime;
+  readonly item: ApplicationListItem;
+  readonly createdAt: string;
+  readonly title: string;
+  readonly typeLabel: string;
+  readonly stateLabel: string | null;
+  readonly stateKind: StatusKind;
+  readonly amount: string | null;
+  readonly since: IsoDateTime;
 }
 
 /**
