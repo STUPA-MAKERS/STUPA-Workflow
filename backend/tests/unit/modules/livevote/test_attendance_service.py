@@ -180,7 +180,7 @@ async def test_parallel_first_write_gives_conflict(
             await svc.set_for(meeting.id, me.id, "absent", "lead")
         else:
             await svc.set_self(meeting.id, "excused", "me")
-    assert ei.value.code == "conflict"
+    assert ei.value.code == "concurrent_attendance_change"
     assert db.rolled_back == 1
     assert db.committed == 0
     assert audit_calls == []

@@ -84,8 +84,8 @@ async def test_cast_guest_twice_409() -> None:
 @pytest.mark.parametrize(
     ("over", "error", "code"),
     [
-        ({"status": "closed"}, ConflictError, "conflict"),
-        ({"closes_at": NOW}, ConflictError, "conflict"),
+        ({"status": "closed"}, ConflictError, "vote_not_open"),
+        ({"closes_at": NOW}, ConflictError, "vote_window_closed"),
         ({"config": _config()}, ForbiddenError, "vote_members_only"),
     ],
 )

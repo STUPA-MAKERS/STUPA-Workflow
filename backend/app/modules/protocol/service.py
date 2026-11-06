@@ -1418,11 +1418,11 @@ class ProtocolService:
         """
         if protocol.status == "final":
             raise ConflictError(
-                "Protocol is finalized and read-only.", code="conflict"
+                "Protocol is finalized and read-only.", code="protocol_finalized"
             )
         if protocol.status == "rendering":
             raise ConflictError(
-                "Protocol is being rendered and is read-only.", code="conflict"
+                "Protocol is being rendered and is read-only.", code="protocol_rendering"
             )
 
     async def _get_vote(self, vote_id: UUID, *, meeting_id: UUID) -> Vote:

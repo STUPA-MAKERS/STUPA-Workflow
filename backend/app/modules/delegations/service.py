@@ -615,7 +615,7 @@ class DelegationService:
         for delegator_id, delegate_id, voting in existing:
             if delegator_id == delegator.id:
                 raise ConflictError(
-                    "The member already delegated for this meeting.", code="conflict"
+                    "The member already delegated for this meeting.", code="delegation_exists"
                 )
             if delegate_id == delegator.id:
                 raise ValidationProblem(
@@ -630,7 +630,7 @@ class DelegationService:
             if delegate_voting and voting and delegate_id == delegate.id:
                 raise ConflictError(
                     "Recipient already carries a delegated vote for this meeting.",
-                    code="conflict",
+                    code="delegate_already_voting",
                 )
 
         row = MeetingDelegation(
@@ -1085,7 +1085,7 @@ class DelegationService:
             )
         ).first()
         if dup is not None:
-            raise ConflictError("Substitute entry already exists.", code="conflict")
+            raise ConflictError("Substitute entry already exists.", code="substitute_exists")
         row = DelegationSubstitute(
             gremium_id=payload.gremium_id,
             member_principal_id=payload.member_id,

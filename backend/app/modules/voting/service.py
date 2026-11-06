@@ -1108,7 +1108,7 @@ class VotingService:
             await self._lock_live_meeting(meeting_id)
         vote = await self._get_vote(vote_id, for_update=True)
         if vote.status != "draft":
-            raise ConflictError(f"vote is {vote.status}, cannot open.", code="conflict")
+            raise ConflictError(f"vote is {vote.status}, cannot open.", code="vote_not_draft")
         if await self.vote_gremium_mismatch(vote):
             raise vote_gremium_mismatch_error()
         await poll_mod.PollService(self).check_open(vote, now)
@@ -1178,9 +1178,9 @@ class VotingService:
         """
         vote = await self._get_vote(vote_id, for_update=True)
         if vote.status != "open":
-            raise ConflictError("vote is not open.", code="conflict")
+            raise ConflictError("vote is not open.", code="vote_not_open")
         if vote.closes_at is not None and now >= vote.closes_at:
-            raise ConflictError("voting window has closed.", code="conflict")
+            raise ConflictError("voting window has closed.", code="vote_window_closed")
         if principal.scope_permissions is not None:
             raise ForbiddenError("Only a human session can cast a ballot.")
         blocked, delegator_sub = await voting_delegation_check(
@@ -1272,9 +1272,9 @@ class VotingService:
         """
         vote = await self._get_vote(vote_id, for_update=True)
         if vote.status != "open":
-            raise ConflictError("vote is not open.", code="conflict")
+            raise ConflictError("vote is not open.", code="vote_not_open")
         if vote.closes_at is not None and now >= vote.closes_at:
-            raise ConflictError("voting window has closed.", code="conflict")
+            raise ConflictError("voting window has closed.", code="vote_window_closed")
         config = self._config(vote)
         if not config.guests_vote:
             raise ForbiddenError(
@@ -1706,7 +1706,7 @@ class VotingService:
         """
         vote = await self._get_vote(vote_id, for_update=True)
         if vote.status != "open":
-            raise ConflictError(f"vote is {vote.status}, cannot cancel.", code="conflict")
+            raise ConflictError(f"vote is {vote.status}, cannot cancel.", code="vote_not_open")
         await self._mark_cancelled(
             vote, now=now or datetime.now(UTC), actor=actor, reason="manual"
         )
@@ -1902,7 +1902,7 @@ class VotingService:
         """
         vote = await self._get_vote(vote_id, for_update=True)
         if vote.status != "open":
-            raise ConflictError(f"vote is {vote.status}, cannot close.", code="conflict")
+            raise ConflictError(f"vote is {vote.status}, cannot close.", code="vote_not_open")
         if election_mod.is_election(vote):
             return await self._close_election(vote, principal, now=now)
         if poll_mod.is_poll(vote):
@@ -1920,7 +1920,7 @@ class VotingService:
             raise ConflictError(
                 "quorum not met — the vote cannot be closed; collect more ballots "
                 "or cancel the vote.",
-                code="conflict",
+                code="quorum_not_met",
             )
 
         result_value: tally_mod.VoteResult = (
@@ -2052,7 +2052,7 @@ class VotingService:
             raise ConflictError(
                 "quorum not met — the vote cannot be closed; collect more ballots "
                 "or cancel the vote.",
-                code="conflict",
+                code="quorum_not_met",
             )
         closed_at = now or datetime.now(UTC)
         if vote.meeting_id is not None:
