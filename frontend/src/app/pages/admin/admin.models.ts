@@ -763,7 +763,6 @@ export interface WebhookConfig {
   id: Uuid;
   name: string;
   url: string;
-  events: EventName[];
   active: boolean;
 }
 

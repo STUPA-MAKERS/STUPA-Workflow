@@ -289,7 +289,7 @@ async def test_fire_wrong_from_state_409() -> None:
     db = fake_session(result(app), result(transition))
     with pytest.raises(ConflictError) as exc:
         await FlowService(db).fire(app.id, transition.id, _principal())
-    assert exc.value.code == "conflict"
+    assert exc.value.code == "transition_not_available"
 
 
 async def test_fire_guard_failed_409() -> None:
@@ -312,7 +312,7 @@ async def test_fire_concurrent_transition_409_rolls_back() -> None:
     svc = FlowService(db)
     with pytest.raises(ConflictError) as exc:
         await svc.fire(app.id, transition.id, _principal())
-    assert exc.value.code == "conflict"
+    assert exc.value.code == "concurrent_state_change"
     assert db.rolled_back == 1
     assert db.committed == 0
 
@@ -606,7 +606,7 @@ async def test_force_status_no_current_state_conflicts() -> None:
     db = fake_session(result(app))
     with pytest.raises(ConflictError) as ei:
         await FlowService(db).force_status(app.id, uuid4(), _principal(), note="x")
-    assert ei.value.code == "conflict"
+    assert ei.value.code == "no_current_state"
     assert db.committed == 0
 
 
@@ -641,7 +641,7 @@ async def test_force_status_same_state_conflicts() -> None:
     db = fake_session(result(app), result(target))
     with pytest.raises(ConflictError) as ei:
         await FlowService(db).force_status(app.id, cur, _principal(), note="x")
-    assert ei.value.code == "conflict"
+    assert ei.value.code == "already_in_state"
     assert db.committed == 0
 
 
@@ -653,7 +653,7 @@ async def test_force_status_concurrent_change_409_rolls_back() -> None:
     db = fake_session(result(app), result(target), result(rowcount=0))
     with pytest.raises(ConflictError) as ei:
         await FlowService(db).force_status(app.id, target_id, _principal(), note="x")
-    assert ei.value.code == "conflict"
+    assert ei.value.code == "concurrent_state_change"
     assert db.rolled_back == 1
     assert db.committed == 0
 

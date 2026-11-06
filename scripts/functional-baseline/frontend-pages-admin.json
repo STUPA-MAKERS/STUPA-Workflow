@@ -6,7 +6,7 @@
   "frontend/src/app/pages/admin/admin-health/admin-health.component.ts": 30,
   "frontend/src/app/pages/admin/admin-revoke.mock.ts": 93,
   "frontend/src/app/pages/admin/admin.mock.ts": 21,
-  "frontend/src/app/pages/admin/admin.models.ts": 460,
+  "frontend/src/app/pages/admin/admin.models.ts": 458,
   "frontend/src/app/pages/admin/audit/audit-log.component.ts": 12,
   "frontend/src/app/pages/admin/backups/backups.component.ts": 3,
   "frontend/src/app/pages/admin/branding.util.ts": 1,

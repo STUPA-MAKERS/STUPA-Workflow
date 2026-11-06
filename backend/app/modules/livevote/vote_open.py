@@ -69,7 +69,7 @@ async def draft_open_checks(
     if vote is None:
         raise NotFoundError(f"vote {vote_id} not found in this meeting")
     if vote.status != "draft":
-        raise ConflictError(f"vote is {vote.status}, cannot open.", code="conflict")
+        raise ConflictError(f"vote is {vote.status}, cannot open.", code="vote_not_draft")
     if vote.guests_vote:
         guests_allowed = meeting.public_join and meeting.guests_mode == "vote"
         non_public = (
@@ -130,7 +130,7 @@ async def assert_application_votable(
         raise ConflictError(
             "The application is not in a vote state — move it into its "
             "decision state before opening the vote.",
-            code="conflict",
+            code="application_not_in_vote_state",
         )
     if await service.application_vote_gremium(application_id) != meeting.gremium_id:
         raise ConflictError(

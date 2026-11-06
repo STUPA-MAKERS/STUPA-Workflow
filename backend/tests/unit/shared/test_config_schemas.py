@@ -436,18 +436,15 @@ def test_notification_unknown_event_rejected() -> None:
 
 def test_webhook_config_ok() -> None:
     w = WebhookConfig.model_validate(
-        {"name": "buchhaltung", "url": "https://example.org/hook",
-         "events": ["application_approved", "budget_booked"]}
+        {"name": "buchhaltung", "url": "https://example.org/hook"}
     )
     assert w.active is True
     assert str(w.url).startswith("https://")
 
 
-def test_webhook_requires_event_and_url() -> None:
+def test_webhook_requires_url() -> None:
     with pytest.raises(ValidationError):
-        WebhookConfig(name="x", url="https://e.org", events=[])  # type: ignore[arg-type]
-    with pytest.raises(ValidationError):
-        WebhookConfig(name="x", url="not-a-url", events=["budget_booked"])  # type: ignore[arg-type]
+        WebhookConfig(name="x", url="not-a-url")  # type: ignore[arg-type]
 
 
 def test_comparison_offers_alias() -> None:

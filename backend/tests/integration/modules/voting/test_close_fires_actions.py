@@ -82,7 +82,7 @@ async def _seed(
         )
         budget = Budget(parent_id=None, key=f"K{tag}", path_key=f"K{tag}", name="Topf")
         hook = Webhook(
-            name=f"h-{tag}", url="https://hook.test/h", events=[], active=True,
+            name=f"h-{tag}", url="https://hook.test/h", active=True,
             secret=b"k",
         )
         session.add_all([app_type, budget, hook])

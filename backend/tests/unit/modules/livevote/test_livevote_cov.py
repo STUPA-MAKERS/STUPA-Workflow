@@ -3310,7 +3310,7 @@ def test_open_prepared_vote_application_left_vote_state(
     _login(app)
     r = client.post(f"/api/meetings/{out.id}/votes/{vote_id}/open")
     assert r.status_code == 409
-    assert r.json()["code"] == "conflict"
+    assert r.json()["code"] == "application_not_in_vote_state"
 
 
 @pytest.mark.parametrize(

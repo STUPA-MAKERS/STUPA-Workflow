@@ -176,11 +176,17 @@ def test_check_approved_amount_accepts_none_and_equal() -> None:
     check_approved_amount(Decimal("10"), Decimal("0.01"))
 
 
+def test_check_approved_amount_accepts_zero() -> None:
+    """§F/finance/budget/000253: a 0 € approval is valid."""
+    check_approved_amount(Decimal("10"), Decimal("0"))
+    check_approved_amount(Decimal("10"), Decimal("0.00"))
+
+
 @pytest.mark.parametrize(
     ("requested", "approved"),
     [
-        (Decimal("10"), Decimal("0")),
         (Decimal("10"), Decimal("-1")),
+        (Decimal("10"), Decimal("-0.01")),
         (Decimal("10"), Decimal("1.001")),
         (Decimal("1e12"), Decimal("1e11")),
         (None, Decimal("5")),

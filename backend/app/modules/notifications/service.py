@@ -158,7 +158,7 @@ class NotificationService:
         except IntegrityError as exc:
             await self.session.rollback()
             raise ConflictError(
-                f"mail template {payload.key!r} already exists", code="conflict"
+                f"mail template {payload.key!r} already exists", code="mail_template_exists"
             ) from exc
         return _template_out(tpl)
 
@@ -245,7 +245,7 @@ class NotificationService:
             if inserting:
                 raise ConflictError(
                     f"mail template {payload.key!r} already exists",
-                    code="conflict",
+                    code="mail_template_exists",
                 ) from exc
             raise
         return _template_out(existing, source="override")

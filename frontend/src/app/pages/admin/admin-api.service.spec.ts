@@ -26,7 +26,7 @@ describe('AdminApiService — mock mode', () => {
     const s = svc();
     s.listWebhooks().subscribe((hooks) => {
       expect(hooks.length).toBeGreaterThan(0);
-      const fresh: WebhookConfig = { id: '', name: 'X', url: 'https://x', events: ['vote_opened'], active: true };
+      const fresh: WebhookConfig = { id: '', name: 'X', url: 'https://x', active: true };
       s.saveWebhook(fresh).subscribe((saved) => {
         expect(saved.id).toBeTruthy();
         s.listWebhooks().subscribe((after) => {
@@ -133,10 +133,10 @@ describe('AdminApiService — real mode (contract)', () => {
   });
 
   it('POSTs a new webhook and PATCHes an existing one', () => {
-    s.saveWebhook({ id: '', name: 'n', url: 'https://h', events: ['vote_opened'], active: true }).subscribe();
+    s.saveWebhook({ id: '', name: 'n', url: 'https://h', active: true }).subscribe();
     expect(http.expectOne('/api/admin/webhooks').request.method).toBe('POST');
 
-    s.saveWebhook({ id: 'wh-9', name: 'n', url: 'https://h', events: ['vote_opened'], active: true }).subscribe();
+    s.saveWebhook({ id: 'wh-9', name: 'n', url: 'https://h', active: true }).subscribe();
     expect(http.expectOne('/api/admin/webhooks/wh-9').request.method).toBe('PATCH');
   });
 

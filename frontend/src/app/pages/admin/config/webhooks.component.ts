@@ -34,28 +34,27 @@ import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { type StatusView, webhookDeliveryStatus } from '@shared/status-kind.util';
 import { AdminApiService } from '../admin-api.service';
 import {
-  EVENT_NAMES,
-  type EventName,
   type WebhookConfig,
   type WebhookDeliveryState,
   type WebhookDeliveryStatus,
 } from '../admin.models';
 
 function emptyHook(): WebhookConfig {
-  return { id: '', name: '', url: '', events: [], active: true };
+  return { id: '', name: '', url: '', active: true };
 }
 
 /**
  * Webhook config UI at `/admin/webhooks`. One expand row per webhook: the name with the
  * state of its newest delivery as status text (Zugestellt, Fehlgeschlagen, Läuft, Noch nie),
  * the whole target URL as the sub line, the "Aktiv" switch (it saves at once) and the ⋮
- * menu with delete. A press on the row opens the edit. The chevron opens the body: the real
- * event keys as tags and "Zustellstatus" (state, HTTP code, attempts, last attempt, failure
+ * menu with delete. A press on the row opens the edit. The chevron opens the body:
+ * "Zustellstatus" (state, HTTP code, attempts, last attempt, failure
  * class and the dead-letter note). An inactive webhook carries "Inaktiv" beside its name.
  * Without P(`webhook.manage`) a press on the row opens the body, because there is no edit.
  *
  * Create and edit run in a dialog. The client validation asks for a valid http or https
- * URL. The event selection stays optional. Delete runs through a confirm dialog. Every
+ * URL. A webhook has no event list: it sends only through the `webhook` action of a flow
+ * transition (§F/integrations/webhooks/000402). Delete runs through a confirm dialog. Every
  * change needs P(`webhook.manage`), which the backend enforces.
  */
 @Component({
@@ -97,7 +96,6 @@ export class WebhooksComponent {
    */
   protected readonly loading = signal(true);
 
-  protected readonly allEvents = EVENT_NAMES;
   protected readonly hooks = signal<WebhookConfig[]>([]);
   protected readonly draft = signal<WebhookConfig | null>(null);
   protected readonly editingIndex = signal<number | null>(null);
@@ -186,7 +184,7 @@ export class WebhooksComponent {
 
   protected openEdit(i: number): void {
     this.editingIndex.set(i);
-    this.draft.set({ ...this.hooks()[i], events: [...this.hooks()[i].events] });
+    this.draft.set({ ...this.hooks()[i] });
   }
 
   protected close(): void {
@@ -196,16 +194,6 @@ export class WebhooksComponent {
 
   protected patch<K extends keyof WebhookConfig>(key: K, value: WebhookConfig[K]): void {
     this.draft.update((d) => (d ? { ...d, [key]: value } : d));
-  }
-
-  protected toggleEvent(ev: EventName): void {
-    this.draft.update((d) => {
-      if (!d) return d;
-      const events = d.events.includes(ev)
-        ? d.events.filter((e) => e !== ev)
-        : [...d.events, ev];
-      return { ...d, events };
-    });
   }
 
   protected save(): void {
@@ -265,7 +253,7 @@ export class WebhooksComponent {
     const before = hook.active;
     this.setToggling(hook.id, true);
     this.hooks.update((list) => list.map((h) => (h.id === hook.id ? { ...h, active } : h)));
-    this.api.saveWebhook({ ...hook, events: [...hook.events], active }).subscribe({
+    this.api.saveWebhook({ ...hook, active }).subscribe({
       next: (saved) => {
         this.setToggling(hook.id, false);
         this.hooks.update((list) => list.map((h) => (h.id === saved.id ? saved : h)));
