@@ -116,7 +116,7 @@ class _FakeService:
         from app.shared.errors import ConflictError
 
         if str(vote_id).startswith("00000000"):
-            raise ConflictError("not a draft", code="vote_not_draft")
+            raise ConflictError("open", code="vote_not_deletable")
         self.deleted = (vote_id, actor)
 
 

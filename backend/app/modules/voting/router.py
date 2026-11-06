@@ -280,11 +280,10 @@ async def delete_vote(
     service: ServiceDep,
     principal: ReaderDep,
 ) -> None:
-    """Delete a standalone application-bound vote that never ran.
+    """Delete a standalone application-bound vote that is a draft or cancelled.
 
-    The vote must still be ``draft`` and must hold no ballot. Everything
-    further along stays with ``cancel``, so the record of the Gremium keeps
-    every vote that ever opened. A meeting-bound vote answers 409 and belongs
+    An open or closed vote answers 409 ``vote_not_deletable``: it stays in the
+    record of the Gremium. A meeting-bound vote answers 409 and belongs
     to ``DELETE /meetings/{meeting_id}/votes/{vote_id}``, which applies the
     meeting-scoped check.
 
