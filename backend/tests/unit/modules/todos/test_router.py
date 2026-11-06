@@ -38,14 +38,19 @@ from app.modules.todos.schemas import (
     TodoCardDetail,
     TodoCardTile,
     TodoCommentOut,
+    TodoEventRef,
+    TodoEventSeriesOut,
     TodoLabelOut,
+    TodoLinkDetail,
     TodoLinkedCard,
     TodoLinkTarget,
+    TodoLinkView,
     TodoMember,
     TodoMine,
 )
 from app.modules.todos.service import TodoMail, TodoService
 from app.settings import load_settings
+from app.shared.errors import ConflictError
 from app.shared.paging import Page
 from app.shared.people import PersonRef
 
@@ -345,6 +350,53 @@ def test_card_routes(env: _Env) -> None:
     assert c.post(f"/api/todos/cards/{CID}/comments", json={"body": " "}).status_code == 422
     assert c.patch(f"/api/todos/cards/{CID}/comments/{XID}", json={"body": ""}).status_code == 422
     assert env.sent == []
+
+
+def _event_permanent() -> Any:
+    raise ConflictError("An Event cannot become a to-do again.", code="event_permanent")
+
+
+def test_event_routes(env: _Env, monkeypatch: pytest.MonkeyPatch) -> None:
+    series = TodoEventSeriesOut(id=XID, name="Sommerfest")
+    answers: dict[str, Callable[[], Any]] = {
+        "cards": lambda: [_detail()],
+        "link_view": lambda: TodoLinkView(kind="vote", title="Abstimmung", detail=TodoLinkDetail()),
+        "set_event": _detail,
+        "remove_event": _event_permanent,
+        "follow_up": _detail,
+        "series": lambda: [series],
+        "create_series": lambda: series,
+        "writable_events": lambda: [
+            TodoEventRef(id=CID, board_id=BID, board_name="B", title="Fest")
+        ],
+    }
+    for name, answer in answers.items():
+        monkeypatch.setitem(_ANSWERS, name, answer)
+    c = env.client
+    got = c.get(f"/api/todos/cards?ids={CID}&ids={XID}")
+    assert [card["id"] for card in got.json()] == [str(CID)]
+    assert env.last()[0:2] == ("cards", ([CID, XID], USER))
+    assert c.get("/api/todos/cards").status_code == 422
+    view = c.get(f"/api/todos/cards/{CID}/links/{XID}/view")
+    assert view.json()["title"] == "Abstimmung"
+    assert env.last()[1][:2] == (CID, XID)
+    event = c.put(f"/api/todos/cards/{CID}/event", json={"startsOn": "2026-06-01"})
+    assert event.status_code == 200
+    assert str(env.last()[1][1].starts_on) == "2026-06-01"
+    assert c.put(f"/api/todos/cards/{CID}/event", json={"participants": -1}).status_code == 422
+    removed = c.delete(f"/api/todos/cards/{CID}/event")
+    assert removed.status_code == 409
+    assert removed.json()["code"] == "event_permanent"
+    assert c.post(f"/api/todos/cards/{CID}/follow-up").status_code == 201
+    assert c.get("/api/todos/series?q=Som").json() == [{"id": str(XID), "name": "Sommerfest"}]
+    assert env.last()[1][0] == "Som"
+    created = c.post("/api/todos/series", json={"name": "Sommerfest"})
+    assert created.status_code == 201
+    assert env.last()[1][0] == "Sommerfest"
+    assert c.post("/api/todos/series", json={"name": ""}).status_code == 422
+    picker = c.get("/api/todos/events?q=Fe")
+    assert picker.json()[0]["boardName"] == "B"
+    assert env.last()[0:2] == ("writable_events", ("Fe", USER))
 
 
 @pytest.mark.parametrize(
