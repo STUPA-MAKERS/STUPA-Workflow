@@ -441,7 +441,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [S/frontend/angular/000396](style/frontend/angular/000396_route-guards.md) | A route guard is only for the UX | approved |
 | [S/frontend/angular/000397](style/frontend/angular/000397_gremium-checks.md) | Gremium rights come from the Gremium API | approved |
 | [S/frontend/angular/000398](style/frontend/angular/000398_mock-dev-only.md) | The mock API runs only in dev builds | approved |
-| [S/frontend/angular/000526](style/frontend/angular/000526_use-shared-parts.md) | A view uses the shared components | draft |
+| [S/frontend/angular/000526](style/frontend/angular/000526_use-shared-parts.md) | A view uses the shared components | approved |
 | [S/frontend/functional/000091](style/frontend/functional/000091_signal-update.md) | A signal update returns a new value | approved |
 | [S/frontend/functional/000438](style/frontend/functional/000438_eslint-functional.md) | eslint-plugin-functional warns on mutation | approved |
 | [S/shared/agents/000175](style/shared/agents/000175_prod-data.md) | Production data changes only on request | approved |
