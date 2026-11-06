@@ -7,10 +7,10 @@
     @if (failed()) {
       <app-note kind="error" icon="alert" role="alert">{{ 'todos.linkView.failed' | t }}</app-note>
     } @else if (view(); as v) {
-      @if (plain().length) {
+      @if (plain(v).length) {
         <app-section class="fd__sec" [heading]="'todos.linkView.details' | t">
           <dl class="fd__card fd__grid">
-            @for (f of plain(); track f.key) {
+            @for (f of plain(v); track f.key) {
               <div>
                 <dt>{{ label(f) }}</dt>
                 <dd class="fd__wrap" [class.mono]="f.format === 'money' || f.format === 'date'">{{ value(f) }}</dd>
@@ -19,7 +19,7 @@
           </dl>
         </app-section>
       }
-      @for (f of texts(); track f.key) {
+      @for (f of texts(v); track f.key) {
         <app-section class="fd__sec" [heading]="label(f)">
           <div class="fd__card fd__wrap">
             <app-markdown-view [src]="f.value" />
@@ -27,7 +27,7 @@
         </app-section>
       }
       @if (v.rows.length) {
-        <app-section class="fd__sec" [heading]="rowsHeading()">
+        <app-section class="fd__sec" [heading]="rowsHeading(v)">
           <ul class="rowgroup lv__rows">
             @for (r of v.rows; track $index) {
               <li class="lv__row">

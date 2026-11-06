@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, model, signal, untracked } from '@angular/core';
+import type { Subscription } from 'rxjs';
 import type { Uuid } from '@core/api/models';
 import { TodosApiService, type TodoLink, type TodoLinkView, type TodoViewFact } from '@core/api/todos.service';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -73,22 +74,18 @@ export class TodoLinkViewComponent {
   readonly link = input<TodoLink | null>(null);
 
   readonly phone = mediaQuery(MEDIA.phone);
-  protected readonly view = signal<TodoLinkView | null>(null);
+  readonly view = signal<TodoLinkView | null>(null);
   protected readonly failed = signal(false);
 
-  protected readonly icon = computed(() => LINK_ICON[this.link()?.kind ?? 'todo']);
-  protected readonly heading = computed(() => this.view()?.title ?? this.link()?.title ?? '');
-  protected readonly sub = computed(() => {
+  readonly icon = computed(() => LINK_ICON[this.link()?.kind ?? 'todo']);
+  readonly heading = computed(() => this.view()?.title ?? this.link()?.title ?? '');
+  readonly sub = computed(() => {
     const link = this.link();
     return link ? linkSub(link, this.i18n.formatLocale(), this.i18n.uiLocale(), this.t) : '';
   });
-  protected readonly plain = computed(() => (this.view()?.facts ?? []).filter((f) => f.format !== 'markdown'));
-  protected readonly texts = computed(() => (this.view()?.facts ?? []).filter((f) => f.format === 'markdown'));
-  protected readonly rowsHeading = computed(() => {
-    const kind = this.view()?.kind;
-    const key = kind ? ROWS_HEADING[kind] : undefined;
-    return key ? this.t(key) : '';
-  });
+
+  /** The read of the open link; a read for another link drops it. */
+  private request: Subscription | null = null;
 
   constructor() {
     effect(() => {
@@ -96,27 +93,33 @@ export class TodoLinkViewComponent {
       const open = this.open();
       const cardId = this.cardId();
       untracked(() => {
-        if (!open || !link) return;
-        if (this.view() && this.loadedFor === link.id) return;
-        this.load(cardId, link.id);
+        if (open && link) this.load(cardId, link.id);
       });
     });
   }
 
-  private loadedFor: Uuid | null = null;
-
   private load(cardId: Uuid, linkId: Uuid): void {
-    this.loadedFor = linkId;
+    this.request?.unsubscribe();
     this.view.set(null);
     this.failed.set(false);
-    this.api.linkView(cardId, linkId).subscribe({
-      next: (view) => {
-        if (this.loadedFor === linkId) this.view.set(view);
-      },
-      error: () => {
-        if (this.loadedFor === linkId) this.failed.set(true);
-      },
+    this.request = this.api.linkView(cardId, linkId).subscribe({
+      next: (view) => this.view.set(view),
+      error: () => this.failed.set(true),
     });
+  }
+
+  plain(view: TodoLinkView): TodoViewFact[] {
+    return view.facts.filter((f) => f.format !== 'markdown');
+  }
+
+  texts(view: TodoLinkView): TodoViewFact[] {
+    return view.facts.filter((f) => f.format === 'markdown');
+  }
+
+  /** The heading of the rows: the agenda, the votes of a TOP, the checklist of a card. */
+  rowsHeading(view: TodoLinkView): string {
+    const key = ROWS_HEADING[view.kind];
+    return key ? this.t(key) : '';
   }
 
   /** The label of a fact: the field label of a form answer, else `todos.linkView.<key>`. */
