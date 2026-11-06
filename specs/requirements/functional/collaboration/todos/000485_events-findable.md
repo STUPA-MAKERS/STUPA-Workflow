@@ -14,9 +14,9 @@ scope:
 
 # Archived Events stay findable
 
-The ⌘K search must have the source `Events`. The source and the board filter `Events` must
-include archived Events. An Event in the done column means that the Event is settled
-(`abgerechnet`).
+The ⌘K search must have the source `Veranstaltungen`. The source and the board filter
+`Veranstaltungen mit Archiv` must include archived Events. An Event in the done column means
+that the Event is settled (`abgerechnet`).
 
 Reason: A recurring Event is planned from the data of earlier editions, and these cards are
 archived.

@@ -1,6 +1,6 @@
 ---
 id: "000484"
-title: Nächste Ausgabe anlegen copies the plan, not the facts
+title: Folgeveranstaltung anlegen copies the plan, not the facts
 kind: functional
 status: approved
 owner: frederikbeimgraben
@@ -11,9 +11,9 @@ scope:
   - frontend/src/app/features/todos
 ---
 
-# Nächste Ausgabe anlegen copies the plan, not the facts
+# Folgeveranstaltung anlegen copies the plan, not the facts
 
-`Nächste Ausgabe anlegen` on an Event must create a new card in the first column of the same
+`Folgeveranstaltung anlegen` on an Event must create a new card in the first column of the same
 board. The new card must get the title, the description, the labels, the place, the series and
 the checklist with all items open. The new card must not get links, assignees, comments,
 dates or the history.
