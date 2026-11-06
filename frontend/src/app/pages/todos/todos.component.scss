@@ -220,6 +220,11 @@
     box-shadow: var(--shadow-md-up);
     pointer-events: none;
   }
+  // A bottom sheet over the card is glass, so the shadow showed through it as a stray band
+  // across the sheet. The sheet covers the bar, so the shadow goes while one is open.
+  :host-context(body:has(.ss--bottom)) .td__barEdge {
+    box-shadow: none;
+  }
   // The bar is frosted glass in the colour of the card while the card scrolls under it,
   // like the bar of every other phone detail.
   .td__drawer > app-list-detail-bar {

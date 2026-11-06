@@ -58,14 +58,14 @@ export const LINK_KIND_LABEL: Record<TodoLinkKind, TranslationKey> = {
 };
 
 /** The state of a vote link: the result once closed, else the status. */
-const VOTE_STATUS_LABEL: Record<TodoVoteStatus, TranslationKey> = {
+export const VOTE_STATUS_LABEL: Record<TodoVoteStatus, TranslationKey> = {
   draft: 'voting.list.status.draft',
   open: 'meetings.voteStatus.open',
   closed: 'meetings.voteStatus.closed',
   cancelled: 'meetings.voteStatus.cancelled',
 };
 
-const VOTE_RESULT_LABEL: Record<TodoVoteResult, TranslationKey> = {
+export const VOTE_RESULT_LABEL: Record<TodoVoteResult, TranslationKey> = {
   passed: 'vote.result.passed',
   rejected: 'vote.result.rejected',
   tie: 'vote.result.tie',

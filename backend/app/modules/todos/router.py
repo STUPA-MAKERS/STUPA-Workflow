@@ -70,6 +70,7 @@ from app.modules.todos.schemas import (
     TodoLinkedKind,
     TodoLinkKind,
     TodoLinkTarget,
+    TodoLinkView,
     TodoMember,
     TodoMine,
 )
@@ -465,6 +466,18 @@ async def get_cards(
 async def get_card(card_id: UUID, service: ServiceDep, principal: Member) -> TodoCardDetail:
     """The whole card with links, checklist, events and comments (archived too)."""
     return await service.card(card_id, principal)
+
+
+@router.get(
+    "/cards/{card_id}/links/{link_id}/view",
+    response_model=TodoLinkView,
+    responses=_errors(401, 404),
+)
+async def get_link_view(
+    card_id: UUID, link_id: UUID, service: ServiceDep, principal: Member
+) -> TodoLinkView:
+    """The read sheet of a link: a card reader reads what the card links (spec 000487)."""
+    return await service.link_view(card_id, link_id, principal)
 
 
 @router.get("/cards/{card_id}/tile", response_model=TodoCardTile, responses=_errors(401, 404))

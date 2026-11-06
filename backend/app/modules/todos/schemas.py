@@ -127,6 +127,43 @@ class TodoLinkOut(_Out):
     title: str | None = None
     url: str | None = None
     detail: TodoLinkDetail | None = None
+    #: Readable only through a card (spec 000487): no url, the card opens a read sheet.
+    granted: bool = False
+
+
+class TodoViewFact(_Out):
+    """One fact of a link target in the read sheet.
+
+    ``key`` names the label (``todos.linkView.<key>``); a form answer carries the label of
+    its field in ``label`` instead. ``format`` tells the sheet how to show ``value``.
+    """
+
+    key: str
+    label: dict[str, str] | None = None
+    value: str
+    format: Literal["text", "money", "date", "markdown"] = "text"
+
+
+class TodoViewRow(_Out):
+    """One row of a list in the read sheet.
+
+    A TOP of a meeting (in agenda order), a vote of a TOP (``meta`` is its result or
+    status) or a checklist item.
+    """
+
+    title: str
+    meta: str | None = None
+    done: bool | None = None
+
+
+class TodoLinkView(_Out):
+    """A link target as a card reader sees it: read only, without PII and without links."""
+
+    kind: TodoLinkKind
+    title: str
+    detail: TodoLinkDetail
+    facts: list[TodoViewFact] = Field(default_factory=list)
+    rows: list[TodoViewRow] = Field(default_factory=list)
 
 
 class ChecklistCount(_Out):

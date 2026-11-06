@@ -440,12 +440,14 @@
               <span class="cd__linkText">
                 @if (link.url) {
                   <a class="cd__linkTitle" [routerLink]="route(link.url).path" [queryParams]="route(link.url).query">{{ linkTitle(link) }}</a>
+                } @else if (link.granted) {
+                  <button type="button" class="cd__linkTitle cd__linkOpen" data-testid="cd-link-view" (click)="viewLink(link)">{{ linkTitle(link) }}</button>
                 } @else {
                   <span class="cd__linkTitle cd__linkTitle--muted">{{ linkTitle(link) }}</span>
                 }
                 <span class="cd__linkSub">{{ linkSub(link) }}</span>
               </span>
-              @if (link.url) {
+              @if (link.url || link.granted) {
                 <app-icon class="cd__linkChev" name="right" [size]="16" />
               }
               @if (canWrite()) {
@@ -751,3 +753,6 @@
 >
   <p class="cd__warn">{{ 'todos.eventCard.makeEventText' | t: { title: card()?.title ?? '' } }}</p>
 </app-confirm-dialog>
+@if (card(); as c) {
+  <app-todo-link-view [cardId]="c.id" [link]="viewedLink()" [(open)]="linkViewOpen" />
+}

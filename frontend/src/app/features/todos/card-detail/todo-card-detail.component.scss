@@ -268,8 +268,18 @@
   text-decoration: none;
   overflow-wrap: anywhere;
 }
+button.cd__linkOpen {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-weight: var(--fw-medium);
+  text-align: start;
+  cursor: pointer;
+}
 @media (hover: hover) {
-  a.cd__linkTitle:hover {
+  a.cd__linkTitle:hover,
+  button.cd__linkOpen:hover {
     text-decoration: underline;
   }
 }

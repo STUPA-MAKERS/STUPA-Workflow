@@ -87,6 +87,32 @@ export interface TodoLink {
   title: string | null;
   url: string | null;
   detail: TodoLinkDetail | null;
+  /** Readable only through this card (spec 000487): no url, the card opens a read sheet. */
+  granted?: boolean;
+}
+
+/** One fact of a link target in the read sheet; `label` is the label of a form field. */
+export interface TodoViewFact {
+  key: string;
+  label: Record<string, string> | null;
+  value: string;
+  format: 'text' | 'money' | 'date' | 'markdown';
+}
+
+/** A TOP of a meeting, a vote of a TOP (`meta`: result or status) or a checklist item. */
+export interface TodoViewRow {
+  title: string;
+  meta: string | null;
+  done: boolean | null;
+}
+
+/** A link target as a card reader sees it: read only, without PII and without links. */
+export interface TodoLinkView {
+  kind: TodoLinkKind;
+  title: string;
+  detail: TodoLinkDetail;
+  facts: TodoViewFact[];
+  rows: TodoViewRow[];
 }
 
 /** The event data of a card: the card is an Event (`Veranstaltung`). Dates are `YYYY-MM-DD`. */
@@ -517,6 +543,13 @@ export class TodosApiService {
   /** The tile of a live card, as the board read has it: what a live ping reads (404 when archived). */
   cardTile(cardId: Uuid): Observable<TodoCardTile> {
     return this.http.get<TodoCardTile>(`${this.base}/todos/cards/${cardId}/tile`, { context: skipLoading() });
+  }
+
+  /** The read sheet of a link of the card (spec 000487). */
+  linkView(cardId: Uuid, linkId: Uuid): Observable<TodoLinkView> {
+    return this.http.get<TodoLinkView>(`${this.base}/todos/cards/${cardId}/links/${linkId}/view`, {
+      context: skipLoading(),
+    });
   }
 
   patchCard(cardId: Uuid, body: TodoCardPatch): Observable<TodoCardDetail> {

@@ -1,0 +1,52 @@
+// The read sheet takes the finance detail sheet: kit sections, a card of facts.
+@use '../../../pages/budget/finance-sheet';
+
+:host {
+  display: contents;
+}
+.lv {
+  padding-bottom: var(--space-4);
+}
+.lv__sub {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.lv__icon {
+  flex: none;
+}
+// The rows take the shared row group; only the layout inside a row is the sheet's own.
+.lv__rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lv__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 44px;
+  padding: 6px var(--space-4);
+}
+.lv__check {
+  flex: none;
+  color: var(--color-text-muted);
+}
+.lv__check--on {
+  color: var(--color-success);
+}
+.lv__rowTitle {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.lv__rowMeta {
+  flex: none;
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+.lv__skelLabel {
+  display: block;
+  width: 5rem;
+  margin-bottom: var(--space-1);
+}

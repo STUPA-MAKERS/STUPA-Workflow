@@ -76,6 +76,7 @@ import {
 } from '@stupa-makers/ui-kit';
 import { TodoDueChipComponent } from '../due-chip/todo-due-chip.component';
 import { TodoLinkPickerComponent, linkKey } from '../link-picker/todo-link-picker.component';
+import { TodoLinkViewComponent } from '../link-view/todo-link-view.component';
 import { TodoMoveSheetComponent, type MoveChoice, type MoveColumn } from '../move-sheet/todo-move-sheet.component';
 import { TodoCacheService } from '../todo-cache.service';
 import { TodoTransferDialogComponent, type TodoTransferTarget } from '../transfer-dialog/todo-transfer-dialog.component';
@@ -164,6 +165,7 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
     IconComponent,
     MarkdownImageUploadDirective,
     MarkdownViewComponent,
+    TodoLinkViewComponent,
     NoteComponent,
     RowMenuComponent,
     ScrollFadeDirective,
@@ -494,6 +496,15 @@ export class TodoCardDetailComponent {
 
   route(url: string) {
     return splitUrl(url);
+  }
+
+  /** The link whose read sheet is open (spec 000487): a link readable only through the card. */
+  readonly viewedLink = signal<TodoLink | null>(null);
+  readonly linkViewOpen = signal(false);
+
+  viewLink(link: TodoLink): void {
+    this.viewedLink.set(link);
+    this.linkViewOpen.set(true);
   }
 
   linkSub(link: TodoLink): string {
