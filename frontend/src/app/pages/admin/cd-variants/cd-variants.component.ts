@@ -259,7 +259,13 @@ export class AdminCdVariantsComponent {
     const movable = slot !== 'square';
     const move: readonly RowMenuItem[] = [
       ...(movable && index > 0
-        ? [{ id: 'up', label: this.i18n.translate('admin.common.moveUp'), icon: 'up' } satisfies RowMenuItem]
+        ? [
+            {
+              id: 'up',
+              label: this.i18n.translate('admin.common.moveUp'),
+              icon: 'up',
+            } satisfies RowMenuItem,
+          ]
         : []),
       ...(movable && !last
         ? [

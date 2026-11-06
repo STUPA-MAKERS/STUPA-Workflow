@@ -153,6 +153,8 @@ function mapOf(act: ActionDef): Record<string, string> {
 }
 
 /** Rows back to a map. Two rows with the same value keep the later cost center. */
-function fromRows(rows: readonly { readonly value: string; readonly budgetId: string }[]): Record<string, string> {
+function fromRows(
+  rows: readonly { readonly value: string; readonly budgetId: string }[],
+): Record<string, string> {
   return Object.fromEntries(rows.map((r) => [r.value, r.budgetId]));
 }

@@ -21,7 +21,10 @@ import type { GuardGroup, Point } from './flow-editor.models';
  * The function skips branch transitions, the pass and fail edges of a vote state. They
  * have their own dots and no guard priority.
  */
-export function groupsOf(transitions: readonly TransitionDef[], fromKey: string): readonly GuardGroup[] {
+export function groupsOf(
+  transitions: readonly TransitionDef[],
+  fromKey: string,
+): readonly GuardGroup[] {
   const sigOf = (t: TransitionDef): string => (t.guard ? JSON.stringify(t.guard) : '');
   const own = transitions
     .map((t, index) => ({ t, index, sig: sigOf(t) }))
@@ -43,7 +46,10 @@ export function groupsOf(transitions: readonly TransitionDef[], fromKey: string)
  * Connector dots of a normal node: one dot per guard group. The function adds a
  * default catch-all dot for new guard-less edges when no such group exists.
  */
-export function outDots(fromKey: string, transitions: readonly TransitionDef[]): readonly GuardGroup[] {
+export function outDots(
+  fromKey: string,
+  transitions: readonly TransitionDef[],
+): readonly GuardGroup[] {
   const groups = groupsOf(transitions, fromKey);
   return groups.some((g) => g.sig === '')
     ? groups
@@ -94,7 +100,11 @@ export function guardBoolOf(t: TransitionDef): boolean {
   return !!(t.guard && Object.values(t.guard)[0] === true);
 }
 
-export function compareSpecOf(t: TransitionDef): { readonly field: string; readonly op: string; readonly value: unknown } {
+export function compareSpecOf(t: TransitionDef): {
+  readonly field: string;
+  readonly op: string;
+  readonly value: unknown;
+} {
   const c = t.guard?.['compare'];
   return typeof c === 'object' && c !== null
     ? (c as { field: string; op: string; value: unknown })

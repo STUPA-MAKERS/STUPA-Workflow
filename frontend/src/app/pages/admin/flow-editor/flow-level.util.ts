@@ -6,7 +6,10 @@ import type { FlowGraph, FlowGroup } from '../admin.models';
 import type { EdgeEnds, EndRef } from './flow-editor.models';
 
 /** Resolution of a state on a level: directly visible, inside a sub-group box, or external. */
-export type LevelRef = { readonly kind: 'state' } | { readonly kind: 'group'; readonly id: string } | null;
+export type LevelRef =
+  | { readonly kind: 'state' }
+  | { readonly kind: 'group'; readonly id: string }
+  | null;
 
 export function buildGroupById(groups: readonly FlowGroup[]): ReadonlyMap<string, FlowGroup> {
   return new Map(groups.map((g) => [g.id, g]));
@@ -23,16 +26,22 @@ export function buildStateOwnerId(groups: readonly FlowGroup[]): ReadonlyMap<str
 }
 
 /** Transitively contained state keys of a group (including sub-groups). */
-export function deepStateKeys(groupById: ReadonlyMap<string, FlowGroup>, groupId: string): readonly string[] {
+export function deepStateKeys(
+  groupById: ReadonlyMap<string, FlowGroup>,
+  groupId: string,
+): readonly string[] {
   const walk = (id: string, seen: ReadonlySet<string>): KeyWalk => {
     if (seen.has(id)) return { keys: [], seen };
     const marked = new Set([...seen, id]);
     const g = groupById.get(id);
     if (!g) return { keys: [], seen: marked };
-    return (g.groupIds ?? []).reduce<KeyWalk>((acc, child) => {
-      const sub = walk(child, acc.seen);
-      return { keys: [...acc.keys, ...sub.keys], seen: sub.seen };
-    }, { keys: g.stateKeys, seen: marked });
+    return (g.groupIds ?? []).reduce<KeyWalk>(
+      (acc, child) => {
+        const sub = walk(child, acc.seen);
+        return { keys: [...acc.keys, ...sub.keys], seen: sub.seen };
+      },
+      { keys: g.stateKeys, seen: marked },
+    );
   };
   return walk(groupId, new Set()).keys;
 }

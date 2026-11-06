@@ -257,7 +257,13 @@ export class BackupsComponent implements OnDestroy {
         icon: row.pinned ? 'pinslash' : 'pin',
       },
       ...(this.restoreEnabled()
-        ? [{ id: 'restore', label: t('admin.backups.restore'), icon: 'history' } satisfies RowMenuItem]
+        ? [
+            {
+              id: 'restore',
+              label: t('admin.backups.restore'),
+              icon: 'history',
+            } satisfies RowMenuItem,
+          ]
         : []),
       {
         id: 'delete',

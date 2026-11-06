@@ -152,7 +152,10 @@ export function setStateGremiumSource(
     states: g.states.map((s) => {
       if (s.key !== key) return s;
       const gremiumId = s.config?.gremiumId;
-      const rest: StateConfig = withoutKey(withoutKey(s.config ?? {}, 'gremiumId'), 'gremiumSource');
+      const rest: StateConfig = withoutKey(
+        withoutKey(s.config ?? {}, 'gremiumId'),
+        'gremiumSource',
+      );
       const config: StateConfig =
         source === 'budget'
           ? { ...rest, gremiumSource: 'budget' }
@@ -397,7 +400,10 @@ export function setRecipientRef(
 }
 
 /** First free `grpN` id. */
-export function freshGroupId(groups: readonly FlowGroup[]): { readonly id: string; readonly n: number } {
+export function freshGroupId(groups: readonly FlowGroup[]): {
+  readonly id: string;
+  readonly n: number;
+} {
   const used = new Set(groups.map((g) => g.id));
   const firstFree = (n: number): number => (used.has(`grp${n}`) ? firstFree(n + 1) : n);
   const n = firstFree(groups.length + 1);
@@ -461,7 +467,10 @@ export function dissolveGroup(g: FlowGraph, id: string, parent: string | null): 
           ? {
               ...gr,
               stateKeys: [...gr.stateKeys, ...me.stateKeys],
-              groupIds: [...(gr.groupIds ?? []).filter((cid) => cid !== id), ...(me.groupIds ?? [])],
+              groupIds: [
+                ...(gr.groupIds ?? []).filter((cid) => cid !== id),
+                ...(me.groupIds ?? []),
+              ],
             }
           : gr,
       )

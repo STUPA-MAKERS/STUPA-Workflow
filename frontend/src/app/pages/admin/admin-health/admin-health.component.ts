@@ -39,9 +39,15 @@ type AuditState =
   | { readonly status: 'never' }
   | { readonly status: 'error' };
 
-type BackupState = { readonly status: 'loading' } | { readonly status: 'ok'; readonly list: BackupList } | { readonly status: 'error' };
+type BackupState =
+  | { readonly status: 'loading' }
+  | { readonly status: 'ok'; readonly list: BackupList }
+  | { readonly status: 'error' };
 
-type ErasureState = { readonly status: 'loading' } | { readonly status: 'ok'; readonly open: number } | { readonly status: 'error' };
+type ErasureState =
+  | { readonly status: 'loading' }
+  | { readonly status: 'ok'; readonly open: number }
+  | { readonly status: 'error' };
 
 /**
  * "Zustand" at the top of the admin navigation: three tiles that each

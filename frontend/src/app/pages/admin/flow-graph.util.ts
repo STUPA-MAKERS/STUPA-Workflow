@@ -191,9 +191,10 @@ function voteStateErrors(
       'admin.flow.err.voteNoAutomatic',
     ],
   ];
-  return [...(gremiumError ? [gremiumError] : []), ...checks.filter(([hit]) => hit).map(([, key]) => key)].map(
-    (key) => ({ key, params: { key: s.key } }),
-  );
+  return [
+    ...(gremiumError ? [gremiumError] : []),
+    ...checks.filter(([hit]) => hit).map(([, key]) => key),
+  ].map((key) => ({ key, params: { key: s.key } }));
 }
 
 /** The error of the gremium source of a vote state, or null when it is sound. */

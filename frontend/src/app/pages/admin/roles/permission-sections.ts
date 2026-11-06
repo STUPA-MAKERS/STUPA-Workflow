@@ -9,12 +9,28 @@ export interface PermissionSection {
 }
 
 /** The sections in display order, each with the key prefixes it takes. */
-const SECTIONS: readonly { readonly key: PermissionSection['key']; readonly title: TranslationKey; readonly prefixes: readonly string[] }[] = [
+const SECTIONS: readonly {
+  readonly key: PermissionSection['key'];
+  readonly title: TranslationKey;
+  readonly prefixes: readonly string[];
+}[] = [
   { key: 'applications', title: 'admin.roles.section.applications', prefixes: ['application.'] },
   { key: 'budget', title: 'admin.roles.section.budget', prefixes: ['budget.'] },
-  { key: 'meetings', title: 'admin.roles.section.meetings', prefixes: ['meeting.', 'gremium.', 'vote.', 'protocol.', 'session.'] },
-  { key: 'admin', title: 'admin.roles.section.admin', prefixes: ['admin.', 'form.', 'flow.', 'webhook.', 'ticket.'] },
-  { key: 'security', title: 'admin.roles.section.security', prefixes: ['audit.', 'privacy.', 'backup.', 'mcp.'] },
+  {
+    key: 'meetings',
+    title: 'admin.roles.section.meetings',
+    prefixes: ['meeting.', 'gremium.', 'vote.', 'protocol.', 'session.'],
+  },
+  {
+    key: 'admin',
+    title: 'admin.roles.section.admin',
+    prefixes: ['admin.', 'form.', 'flow.', 'webhook.', 'ticket.'],
+  },
+  {
+    key: 'security',
+    title: 'admin.roles.section.security',
+    prefixes: ['audit.', 'privacy.', 'backup.', 'mcp.'],
+  },
 ];
 
 /**

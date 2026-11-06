@@ -136,7 +136,10 @@ export interface FlowCanvasView {
   readonly childGroups: Signal<readonly FlowGroup[]>;
   readonly edgeEnds: Signal<readonly (EdgeEnds | null)[]>;
   readonly groupBoxes: Signal<readonly GroupBox[]>;
-  readonly proxies: Signal<{ readonly left: readonly ProxyBox[]; readonly right: readonly ProxyBox[] }>;
+  readonly proxies: Signal<{
+    readonly left: readonly ProxyBox[];
+    readonly right: readonly ProxyBox[];
+  }>;
   readonly nodes: Signal<readonly CanvasNode[]>;
   readonly edges: Signal<readonly CanvasEdge[]>;
   /** What the automatic layout needs to place the level. */
@@ -286,15 +289,17 @@ export function createFlowCanvasView(deps: FlowCanvasViewDeps): FlowCanvasView {
   });
 
   /** The outside ends while drilled in: sources (left column) and targets (right). */
-  const proxyIds = computed((): { readonly left: readonly string[]; readonly right: readonly string[] } => {
-    if (deps.currentGroupId() === null) return { left: [], right: [] };
-    const ends = edgeEnds().filter((e): e is EdgeEnds => !!e);
-    const proxyPid = (end: EndRef): readonly string[] => (end.type === 'proxy' ? [end.pid] : []);
-    return {
-      left: [...new Set(ends.flatMap((e) => proxyPid(e.src)))],
-      right: [...new Set(ends.flatMap((e) => proxyPid(e.dst)))],
-    };
-  });
+  const proxyIds = computed(
+    (): { readonly left: readonly string[]; readonly right: readonly string[] } => {
+      if (deps.currentGroupId() === null) return { left: [], right: [] };
+      const ends = edgeEnds().filter((e): e is EdgeEnds => !!e);
+      const proxyPid = (end: EndRef): readonly string[] => (end.type === 'proxy' ? [end.pid] : []);
+      return {
+        left: [...new Set(ends.flatMap((e) => proxyPid(e.src)))],
+        right: [...new Set(ends.flatMap((e) => proxyPid(e.dst)))],
+      };
+    },
+  );
 
   /**
    * Every visible transition with its source box, its dot and its target box. A state
@@ -328,7 +333,12 @@ export function createFlowCanvasView(deps: FlowCanvasViewDeps): FlowCanvasView {
           const b = groupsBy.get(end.id);
           if (!b) return null;
           const j = groupOutRank(index, end.id);
-          return { src: groupBox(end.id), port: `o${j}`, sx: GROUP_W, sy: dotY(j, b.outCount, b.h) };
+          return {
+            src: groupBox(end.id),
+            port: `o${j}`,
+            sx: GROUP_W,
+            sy: dotY(j, b.outCount, b.h),
+          };
         }
         case 'proxy':
           return { src: proxyBox('l', end.pid), port: 'out', sx: PROXY_W, sy: PROXY_H / 2 };

@@ -130,9 +130,7 @@ export class UserMergeComponent {
     run: (q) => this.api.listPrincipals(q),
     result: (list) => {
       const own = this.source()?.id;
-      this.candidates.set(
-        list.filter((p) => p.id !== own && !p.mergedIntoId).slice(0, PICK_LIMIT),
-      );
+      this.candidates.set(list.filter((p) => p.id !== own && !p.mergedIntoId).slice(0, PICK_LIMIT));
       this.searched.set(true);
     },
     error: () => {
@@ -155,7 +153,9 @@ export class UserMergeComponent {
   /** The areas with at least one row, in the order of the server. */
   protected readonly previewAreas = computed(() => withRows(this.preview()?.areas ?? []));
   protected readonly resultAreas = computed(() => withRows(this.result()?.areas ?? []));
-  protected readonly conflicts = computed<readonly MergeConflict[]>(() => this.preview()?.conflicts ?? []);
+  protected readonly conflicts = computed<readonly MergeConflict[]>(
+    () => this.preview()?.conflicts ?? [],
+  );
   protected readonly canMerge = computed(
     () => !!this.preview()?.canMerge && this.understood() && !this.merging(),
   );

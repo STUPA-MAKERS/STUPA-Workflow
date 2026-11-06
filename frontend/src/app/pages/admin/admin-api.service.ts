@@ -1547,14 +1547,22 @@ function withParams(
 let mockSeq = 0;
 
 /** Mock store: add a row with a fresh id. */
-function mockInsert<T extends { readonly id: Uuid }>(rows: T[], prefix: string, body: Omit<T, 'id'>): Observable<T> {
+function mockInsert<T extends { readonly id: Uuid }>(
+  rows: T[],
+  prefix: string,
+  body: Omit<T, 'id'>,
+): Observable<T> {
   const row = { ...body, id: `${prefix}-new-${++mockSeq}` } as T;
   rows.push(row);
   return of(structuredCopy(row));
 }
 
 /** Mock store: change one row. An unknown id answers 404 like the backend. */
-function mockPatch<T extends { readonly id: Uuid }>(rows: T[], id: Uuid, patch: Partial<NoInfer<T>>): Observable<T> {
+function mockPatch<T extends { readonly id: Uuid }>(
+  rows: T[],
+  id: Uuid,
+  patch: Partial<NoInfer<T>>,
+): Observable<T> {
   const row = rows.find((r) => r.id === id);
   if (!row) return throwError(() => ({ status: 404 }));
   Object.assign(row, patch);

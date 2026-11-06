@@ -68,7 +68,9 @@ export class FlowEditorOptionsService {
       .pipe(takeUntilDestroyed())
       .subscribe({
         next: (roots) => {
-          const names = (nodes: readonly BudgetTreeNode[]): readonly (readonly [string, string])[] =>
+          const names = (
+            nodes: readonly BudgetTreeNode[],
+          ): readonly (readonly [string, string])[] =>
             nodes.flatMap((n) => [
               [n.id, `${n.name} (${n.key})`] as const,
               ...(n.children?.length ? names(n.children) : []),

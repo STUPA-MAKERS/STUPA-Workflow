@@ -350,7 +350,9 @@ export class UserRevokeComponent {
       ...(extra.length
         ? [
             {
-              text: this.i18n.translate('admin.users.revoke.groupsOnly', { groups: extra.join(', ') }),
+              text: this.i18n.translate('admin.users.revoke.groupsOnly', {
+                groups: extra.join(', '),
+              }),
               detail: this.i18n.translate('admin.users.revoke.groupsRemoved'),
             },
           ]

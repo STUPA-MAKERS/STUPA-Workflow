@@ -90,7 +90,10 @@ export function toggleEntry(
  * each checked together with the entries that now share a group with it. A new entry
  * stays unchecked, so a stale request never widens the choice of the admin.
  */
-export function keptSelection(preview: RevokePreview, kept: ReadonlySet<RevokeEntry>): ReadonlySet<RevokeEntry> {
+export function keptSelection(
+  preview: RevokePreview,
+  kept: ReadonlySet<RevokeEntry>,
+): ReadonlySet<RevokeEntry> {
   const known = new Set(allEntries(preview));
   return [...kept]
     .filter((e) => known.has(e))

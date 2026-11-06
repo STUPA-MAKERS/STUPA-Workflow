@@ -224,7 +224,11 @@ export function readLayout(input: LayoutInput, out: ElkNode, many: (n: number) =
     const lab = j === 0 ? e.labels?.[0] : undefined;
     const label =
       lab && lab.x !== undefined && lab.y !== undefined
-        ? { x: lab.x + (lab.width ?? 0) / 2, y: lab.y + (lab.height ?? 0) / 2, text: bundleLabel(b, many) }
+        ? {
+            x: lab.x + (lab.width ?? 0) / 2,
+            y: lab.y + (lab.height ?? 0) / 2,
+            text: bundleLabel(b, many),
+          }
         : null;
     return [[l.index, { d: roundedPath(pts), label, bundle: members }]];
   };

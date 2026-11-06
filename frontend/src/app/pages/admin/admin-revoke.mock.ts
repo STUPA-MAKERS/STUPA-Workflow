@@ -165,7 +165,9 @@ function ties(store: RevokeMockStore, p: AdminPrincipal): Ties {
   const fromGroups = new Map(
     membershipMaps.map(([, gid]) => {
       const mapped = roleMaps.find(([, g]) => g === gid);
-      const fallback = store.gremiumRoles.find((r) => r.gremiumId === gid && r.key === IMPLICIT_ROLE);
+      const fallback = store.gremiumRoles.find(
+        (r) => r.gremiumId === gid && r.key === IMPLICIT_ROLE,
+      );
       return [gid, mapped?.[2] ?? fallback?.id ?? ''] as const;
     }),
   );
@@ -212,7 +214,11 @@ function heldRoles(store: RevokeMockStore, t: Ties): ReadonlySet<Uuid> {
   return new Set(ids.filter((id) => roleKey(store, id) !== IMPLICIT_ROLE));
 }
 
-function targets(store: RevokeMockStore, p: AdminPrincipal, t: Ties): ReadonlyMap<string, readonly [ReadonlySet<Uuid>, ReadonlySet<Uuid>]> {
+function targets(
+  store: RevokeMockStore,
+  p: AdminPrincipal,
+  t: Ties,
+): ReadonlyMap<string, readonly [ReadonlySet<Uuid>, ReadonlySet<Uuid>]> {
   const tied = tiedGremien(t);
   const gremienOf = (g: string): ReadonlySet<Uuid> =>
     new Set([
@@ -331,7 +337,10 @@ export function mockRevokePreview(store: RevokeMockStore, principalId: Uuid, myS
 /** A refusal of the mock revoke, shaped like the problem body of the server. */
 export interface MockProblem {
   readonly status: number;
-  readonly error: { readonly code: string; readonly errors?: readonly { readonly field: string; readonly msg: string }[] };
+  readonly error: {
+    readonly code: string;
+    readonly errors?: readonly { readonly field: string; readonly msg: string }[];
+  };
 }
 
 /** The mock of `POST /admin/principals/{id}/revoke`: apply it to the store or refuse. */

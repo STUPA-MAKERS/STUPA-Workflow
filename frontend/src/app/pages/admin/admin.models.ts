@@ -517,7 +517,11 @@ export interface RevokeDelegation {
 export interface RevokeGremium {
   readonly gremiumId: Uuid;
   readonly name: string;
-  readonly membership: { readonly roleKey: string; readonly roleLabel: I18nMap; readonly groups: readonly string[] } | null;
+  readonly membership: {
+    readonly roleKey: string;
+    readonly roleLabel: I18nMap;
+    readonly groups: readonly string[];
+  } | null;
   readonly groups: readonly string[];
   readonly poolEntries: readonly RevokePoolEntry[];
   readonly plannedDelegations: readonly RevokeDelegation[];
@@ -827,7 +831,10 @@ export const MEMBER_GREMIUM_ROLE_KEY = 'member';
  * Sort the roles of one gremium for display: the forced roles first, in the order of
  * {@link FORCED_GREMIUM_ROLE_KEYS}, then the other roles by name.
  */
-export function sortGremiumRoles(roles: readonly GremiumRole[], label: (r: GremiumRole) => string): readonly GremiumRole[] {
+export function sortGremiumRoles(
+  roles: readonly GremiumRole[],
+  label: (r: GremiumRole) => string,
+): readonly GremiumRole[] {
   const rank = (r: GremiumRole): number => {
     const i = (FORCED_GREMIUM_ROLE_KEYS as readonly string[]).indexOf(r.key);
     return i < 0 ? FORCED_GREMIUM_ROLE_KEYS.length : i;

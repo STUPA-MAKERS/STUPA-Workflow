@@ -29,7 +29,10 @@ export interface AdminPage {
 }
 
 /** The groups of the admin navigation, in order. */
-export const ADMIN_GROUPS: readonly { readonly key: AdminGroupKey; readonly title: TranslationKey }[] = [
+export const ADMIN_GROUPS: readonly {
+  readonly key: AdminGroupKey;
+  readonly title: TranslationKey;
+}[] = [
   { key: 'people', title: 'admin.nav.group.people' },
   { key: 'gremien', title: 'admin.nav.group.gremien' },
   { key: 'applications', title: 'admin.nav.group.applications' },

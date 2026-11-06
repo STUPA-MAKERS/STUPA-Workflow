@@ -90,12 +90,18 @@ export function validateFormField(field: FormFieldDef): FieldValidationResult {
     [!field.label || !field.label['de']?.trim(), 'label (de) is required'],
     [isChoice && !field.options?.length, `options are required for type '${field.type}'`],
     [field.type === 'computed' && !field.compute, "compute is required for type 'computed'"],
-    [!!field.isPromoted && !field.promoteTarget, 'promoteTarget is required when isPromoted is true'],
+    [
+      !!field.isPromoted && !field.promoteTarget,
+      'promoteTarget is required when isPromoted is true',
+    ],
     [
       !!field.visibleIf && !validateJsonLogic(field.visibleIf),
       'visibleIf is not a valid JsonLogic expression',
     ],
-    [!!field.compute && !validateJsonLogic(field.compute), 'compute is not a valid JsonLogic expression'],
+    [
+      !!field.compute && !validateJsonLogic(field.compute),
+      'compute is not a valid JsonLogic expression',
+    ],
   ];
   const errors = checks.filter(([failed]) => failed).map(([, message]) => message);
   return { valid: errors.length === 0, errors };
@@ -161,7 +167,10 @@ export function blankField(type: FieldType = 'text', key = ''): FormFieldDef {
   };
 }
 
-export function blankOption(): { readonly value: string; readonly label: { readonly de: string; readonly en: string } } {
+export function blankOption(): {
+  readonly value: string;
+  readonly label: { readonly de: string; readonly en: string };
+} {
   return { value: '', label: { de: '', en: '' } };
 }
 

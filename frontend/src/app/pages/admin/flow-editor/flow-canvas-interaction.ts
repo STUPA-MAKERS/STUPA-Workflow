@@ -25,7 +25,13 @@ export interface FlowCanvasHost {
   svg(): SVGSVGElement | undefined;
   graph(): FlowGraph;
   updateGraph(fn: (g: FlowGraph) => FlowGraph): void;
-  nodes(): ReadonlyArray<{ readonly key: string; readonly x: number; readonly y: number; readonly w: number; readonly h: number }>;
+  nodes(): ReadonlyArray<{
+    readonly key: string;
+    readonly x: number;
+    readonly y: number;
+    readonly w: number;
+    readonly h: number;
+  }>;
   contentBounds(): ViewRect;
   openGroup(id: string): void;
   readonly selection: WritableSignal<Selection>;
