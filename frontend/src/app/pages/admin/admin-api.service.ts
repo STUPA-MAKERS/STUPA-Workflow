@@ -692,11 +692,12 @@ export class AdminApiService {
         })),
       );
     }
-    let params = new HttpParams();
-    if (query) params = params.set('q', query);
-    if (filters?.lastLoginBefore) params = params.set('lastLoginBefore', filters.lastLoginBefore);
-    if (filters?.includeNever) params = params.set('includeNever', 'true');
-    if (filters?.hasGroups != null) params = params.set('hasGroups', String(filters.hasGroups));
+    const params = withParams(new HttpParams(), [
+      ['q', query || null],
+      ['lastLoginBefore', filters?.lastLoginBefore || null],
+      ['includeNever', filters?.includeNever ? 'true' : null],
+      ['hasGroups', filters?.hasGroups != null ? String(filters.hasGroups) : null],
+    ]);
     return this.http.get<AdminPrincipal[]>(`${this.base}/admin/principals`, { params });
   }
 
@@ -765,8 +766,10 @@ export class AdminApiService {
         offset,
       });
     }
-    let params = new HttpParams().set('limit', String(limit)).set('offset', String(offset));
-    if (query.principalId) params = params.set('principalId', query.principalId);
+    const params = withParams(
+      new HttpParams().set('limit', String(limit)).set('offset', String(offset)),
+      [['principalId', query.principalId || null]],
+    );
     return this.http.get<Page<OAuthGrantAdmin>>(`${this.base}/admin/oauth-grants`, {
       params,
       context: skipLoading(),
@@ -847,10 +850,11 @@ export class AdminApiService {
       }
       return of(void 0);
     }
-    const payload: Record<string, unknown> = {};
-    if (body.name) payload['nameI18n'] = body.name;
-    if (body.gremiumId !== undefined) payload['gremiumId'] = body.gremiumId;
-    if (body.hasBudget !== undefined) payload['hasBudget'] = body.hasBudget;
+    const payload: Record<string, unknown> = {
+      ...(body.name ? { nameI18n: body.name } : {}),
+      ...(body.gremiumId !== undefined ? { gremiumId: body.gremiumId } : {}),
+      ...(body.hasBudget !== undefined ? { hasBudget: body.hasBudget } : {}),
+    };
     return this.http
       .patch<unknown>(`${this.base}/admin/application-types/${id}`, payload)
       .pipe(map(() => void 0));
@@ -1057,12 +1061,13 @@ export class AdminApiService {
         hasMore,
       });
     }
-    let params = new HttpParams().set('limit', String(limit));
-    if (opts.before != null) params = params.set('before', String(opts.before));
-    if (opts.action) params = params.set('action', opts.action);
-    if (opts.actor) params = params.set('actor', opts.actor);
-    if (opts.since) params = params.set('since', opts.since);
-    if (opts.until) params = params.set('until', opts.until);
+    const params = withParams(new HttpParams().set('limit', String(limit)), [
+      ['before', opts.before != null ? String(opts.before) : null],
+      ['action', opts.action || null],
+      ['actor', opts.actor || null],
+      ['since', opts.since || null],
+      ['until', opts.until || null],
+    ]);
     return this.http.get<AuditPage>(`${this.base}/admin/audit`, {
       params,
       context: skipLoading(),
@@ -1328,8 +1333,7 @@ export class AdminApiService {
         : this.store.erasures;
       return of(structuredCopy(rows));
     }
-    let params = new HttpParams();
-    if (status) params = params.set('status', status);
+    const params = withParams(new HttpParams(), [['status', status || null]]);
     return this.http.get<ErasureRequest[]>(`${this.base}/admin/privacy/erasures`, {
       params,
       context: opts.quiet ? skipLoading() : undefined,
@@ -1529,6 +1533,14 @@ export class AdminApiService {
     list.push(created);
     return structuredCopy(created);
   }
+}
+
+/** `params` with each pair set whose value is not null, in order. */
+function withParams(
+  params: HttpParams,
+  pairs: readonly (readonly [string, string | null])[],
+): HttpParams {
+  return pairs.reduce((acc, [key, value]) => (value === null ? acc : acc.set(key, value)), params);
 }
 
 /** Deep copy without assuming `structuredClone` is available (jsdom-safe). */

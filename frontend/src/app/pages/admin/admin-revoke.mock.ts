@@ -162,18 +162,23 @@ function ties(store: RevokeMockStore, p: AdminPrincipal): Ties {
   const roleMaps = store.roleMappings
     .filter((m) => groups.has(m.oidcGroup))
     .map((m): [string, Uuid, Uuid] => [m.oidcGroup, m.gremiumId, m.gremiumRoleId]);
-  const derived = new Map<Uuid, Uuid>();
-  for (const [, gid] of membershipMaps) {
-    const mapped = roleMaps.find(([, g]) => g === gid);
-    const fallback = store.gremiumRoles.find((r) => r.gremiumId === gid && r.key === IMPLICIT_ROLE);
-    derived.set(gid, mapped?.[2] ?? fallback?.id ?? '');
-  }
+  const fromGroups = new Map(
+    membershipMaps.map(([, gid]) => {
+      const mapped = roleMaps.find(([, g]) => g === gid);
+      const fallback = store.gremiumRoles.find((r) => r.gremiumId === gid && r.key === IMPLICIT_ROLE);
+      return [gid, mapped?.[2] ?? fallback?.id ?? ''] as const;
+    }),
+  );
   const cleared = new Set(store.revoked[p.id] ?? []);
-  for (const m of store.memberships) {
-    if (m.principalId === p.id && !cleared.has(m.gremiumId) && !derived.has(m.gremiumId)) {
-      derived.set(m.gremiumId, m.gremiumRoleId);
-    }
-  }
+  const statics = store.memberships.filter(
+    (m) => m.principalId === p.id && !cleared.has(m.gremiumId) && !fromGroups.has(m.gremiumId),
+  );
+  const derived = new Map([
+    ...fromGroups,
+    ...statics
+      .filter((m, i) => statics.findIndex((x) => x.gremiumId === m.gremiumId) === i)
+      .map((m) => [m.gremiumId, m.gremiumRoleId] as const),
+  ]);
   return {
     memberships: [...derived].map(([gremiumId, roleId]) => ({ gremiumId, roleId })),
     membershipMaps,
@@ -209,15 +214,22 @@ function heldRoles(store: RevokeMockStore, t: Ties): ReadonlySet<Uuid> {
 
 function targets(store: RevokeMockStore, p: AdminPrincipal, t: Ties): ReadonlyMap<string, readonly [ReadonlySet<Uuid>, ReadonlySet<Uuid>]> {
   const tied = tiedGremien(t);
-  const out = new Map<string, [Set<Uuid>, Set<Uuid>]>();
-  const entry = (g: string) => {
-    if (!out.has(g)) out.set(g, [new Set(), new Set()]);
-    return out.get(g)!;
-  };
-  for (const [g, gid] of t.membershipMaps) entry(g)[0].add(gid);
-  for (const [g, gid] of t.roleMaps) if (tied.has(gid)) entry(g)[0].add(gid);
-  for (const [g, rid] of t.groupMaps) if (roleKey(store, rid) !== IMPLICIT_ROLE) entry(g)[1].add(rid);
-  return new Map(groupsOf(p).filter((g) => out.has(g)).map((g) => [g, out.get(g)!]));
+  const gremienOf = (g: string): ReadonlySet<Uuid> =>
+    new Set([
+      ...t.membershipMaps.filter(([x]) => x === g).map(([, gid]) => gid),
+      ...t.roleMaps.filter(([x, gid]) => x === g && tied.has(gid)).map(([, gid]) => gid),
+    ]);
+  const rolesOf = (g: string): ReadonlySet<Uuid> =>
+    new Set(
+      t.groupMaps
+        .filter(([x, rid]) => x === g && roleKey(store, rid) !== IMPLICIT_ROLE)
+        .map(([, rid]) => rid),
+    );
+  return new Map(
+    groupsOf(p)
+      .map((g) => [g, [gremienOf(g), rolesOf(g)]] as const)
+      .filter(([, [gs, rs]]) => gs.size > 0 || rs.size > 0),
+  );
 }
 
 function name(store: RevokeMockStore, id: Uuid | null): string | null {
@@ -256,7 +268,7 @@ export function mockRevokePreview(store: RevokeMockStore, principalId: Uuid, myS
   if (!p) return null;
   const t = ties(store, p);
   const tgt = targets(store, p, t);
-  const gremien: RevokeGremium[] = [...tiedGremien(t)].map((gid) => {
+  const unsorted: readonly RevokeGremium[] = [...tiedGremien(t)].map((gid) => {
     const membership = t.memberships.find((m) => m.gremiumId === gid);
     const grole = membership ? store.gremiumRoles.find((r) => r.id === membership.roleId) : undefined;
     const causes = new Set([
@@ -290,7 +302,7 @@ export function mockRevokePreview(store: RevokeMockStore, principalId: Uuid, myS
       openTasks: membership && gid === MOCK_GREMIUM_STUPA_ID ? 1 : 0,
     };
   });
-  gremien.sort((a, b) => a.name.localeCompare(b.name));
+  const gremien = [...unsorted].sort((a, b) => a.name.localeCompare(b.name));
   const held = heldRoles(store, t);
   return {
     principal: {
