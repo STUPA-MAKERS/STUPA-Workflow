@@ -3,7 +3,6 @@
   "backend/app/main.py": 5,
   "backend/app/middleware.py": 3,
   "backend/app/settings.py": 1,
-  "backend/worker/backup.py": 6,
   "backend/worker/deadlines.py": 5,
   "backend/worker/files_drafts.py": 2,
   "backend/worker/mail.py": 3,
