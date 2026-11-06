@@ -11,22 +11,6 @@
   padding: 0;
   list-style: none;
 }
-.wh__events {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.wh__event {
-  --code-tag-padding: 2px var(--space-2);
-}
-.wh__noEvents {
-  margin: 0;
-  font-size: var(--fs-sm);
-  color: var(--color-text-muted);
-}
 
 .wh__status {
   padding: var(--space-4);
@@ -50,24 +34,6 @@
 }
 .wh__urlField ::ng-deep input {
   font-family: var(--font-mono);
-}
-.wh__eventsField {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  margin: var(--space-2) 0 0;
-  padding: 0;
-  border: 0;
-  min-width: 0;
-}
-.wh__legend {
-  padding: 0;
-  font-weight: var(--fw-semibold);
-}
-.wh__eventGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
-  gap: var(--space-2) var(--space-4);
 }
 .wh__foot {
   --dialog-footer-gap: var(--space-2);

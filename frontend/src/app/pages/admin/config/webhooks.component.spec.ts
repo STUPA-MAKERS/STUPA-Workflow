@@ -68,8 +68,8 @@ async function setup(seed: WebhookConfig[] = [], opts: Opts = {}) {
 }
 
 const HOOKS: WebhookConfig[] = [
-  { id: 'wh-1', name: 'A', url: 'https://a', events: [], active: true },
-  { id: 'wh-2', name: 'B', url: 'https://b', events: [], active: true },
+  { id: 'wh-1', name: 'A', url: 'https://a', active: true },
+  { id: 'wh-2', name: 'B', url: 'https://b', active: true },
 ];
 
 describe('WebhooksComponent', () => {
@@ -81,10 +81,10 @@ describe('WebhooksComponent', () => {
   });
 
   /**
-   * An empty field is not yet wrong, but the save stays off. A valid URL is enough, and the save
-   * works even without a single event.
+   * An empty field is not yet wrong, but the save stays off. A valid URL is enough. The saved
+   * webhook has no event list, because only a flow action fires it.
    */
-  it('validates the URL but allows saving without any event (triggers optional)', async () => {
+  it('validates the URL and saves a webhook without an event list', async () => {
     const { saveWebhook } = await setup();
     await userEvent.click(screen.getByRole('button', { name: 'Webhook anlegen' }));
 
@@ -101,7 +101,7 @@ describe('WebhooksComponent', () => {
     expect(save).toBeEnabled();
     await userEvent.click(save);
     expect(saveWebhook).toHaveBeenCalledTimes(1);
-    expect(saveWebhook.mock.calls[0][0].events).toEqual([]);
+    expect(saveWebhook.mock.calls[0][0]).not.toHaveProperty('events');
   });
 
   /**
@@ -109,19 +109,17 @@ describe('WebhooksComponent', () => {
    */
   it('edits an existing webhook via the dialog', async () => {
     const seed = [
-      { id: 'wh-1', name: 'A', url: 'https://a', events: ['vote_opened' as const], active: true },
+      { id: 'wh-1', name: 'A', url: 'https://a', active: true },
     ];
     const { c, saveWebhook } = await setup(seed);
     c.openEdit(0);
     expect(c.draft().url).toBe('https://a');
-    c.toggleEvent('vote_opened');
-    expect(c.draft().events).toEqual([]);
-    c.toggleEvent('vote_closed');
-    expect(c.draft().events).toEqual(['vote_closed']);
-    expect(c.hooks()[0].events).toEqual(['vote_opened']);
+    c.patch('name', 'B');
+    expect(c.draft().name).toBe('B');
+    expect(c.hooks()[0].name).toBe('A');
     c.save();
     expect(saveWebhook).toHaveBeenCalledTimes(1);
-    expect(c.hooks()[0].events).toEqual(['vote_closed']);
+    expect(c.hooks()[0].name).toBe('B');
     expect(c.draft()).toBeNull();
   });
 
@@ -189,11 +187,9 @@ describe('WebhooksComponent', () => {
     expect(c.errors()).toEqual([]);
   });
 
-  it('patch and toggleEvent are no-ops without a draft', async () => {
+  it('patch is a no-op without a draft', async () => {
     const { c } = await setup();
     c.patch('name', 'x');
-    expect(c.draft()).toBeNull();
-    c.toggleEvent('vote_opened');
     expect(c.draft()).toBeNull();
   });
 
@@ -300,18 +296,6 @@ describe('WebhooksComponent', () => {
     expect(c.deliveryStatus('never').kind).toBe('neutral');
   });
 
-  it('shows the real event keys of a hook, or the flow note without fixed events', async () => {
-    await setup([
-      { id: 'wh-1', name: 'A', url: 'https://a', events: ['status_changed', 'vote_closed'], active: true },
-      { id: 'wh-2', name: 'B', url: 'https://b', events: [], active: false },
-    ]);
-    const [first, second] = screen.getAllByRole('button', { name: /^Zustellstatus/ });
-    await userEvent.click(first);
-    expect(screen.getByText('status_changed')).toBeInTheDocument();
-    expect(screen.getByText('vote_closed')).toBeInTheDocument();
-    await userEvent.click(second);
-    expect(screen.getByText('Keine festen Ereignisse · Trigger aus dem Flow')).toBeInTheDocument();
-  });
 
   it('saves the active switch at once and puts it back after a failure', async () => {
     const { c, saveWebhook } = await setup(HOOKS);

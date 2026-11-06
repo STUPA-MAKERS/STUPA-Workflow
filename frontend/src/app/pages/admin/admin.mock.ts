@@ -347,18 +347,16 @@ export const MOCK_WEBHOOKS: WebhookConfig[] = [
     id: 'wh-1',
     name: 'Matrix-Bridge',
     url: 'https://hooks.example.org/matrix',
-    events: ['application_created', 'status_changed'],
     active: true,
   },
   {
     id: 'wh-2',
     name: 'Archiv-Export',
     url: 'https://archive.example.org/api/hooks/protocols/receive-and-store-every-final-protocol',
-    events: ['protocol_finalized', 'vote_closed', 'budget_booked'],
     active: true,
   },
-  { id: 'wh-3', name: 'Kalender', url: 'https://calendar.example.org/hook', events: ['vote_opened'], active: true },
-  { id: 'wh-4', name: 'Test-Endpunkt', url: 'https://test.example.org/hook', events: [], active: false },
+  { id: 'wh-3', name: 'Kalender', url: 'https://calendar.example.org/hook', active: true },
+  { id: 'wh-4', name: 'Test-Endpunkt', url: 'https://test.example.org/hook', active: false },
 ];
 
 /** The delivery state of the mock webhooks: one of each state. */

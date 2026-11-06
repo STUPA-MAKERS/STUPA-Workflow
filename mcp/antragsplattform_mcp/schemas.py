@@ -383,14 +383,12 @@ class UiLanguageUpdate(WireModel):
 class WebhookCreate(WireModel):
     name: str
     url: str
-    events: list[str] = Field(default_factory=list)
     active: bool = True
 
 
 class WebhookUpdate(WireModel):
     name: str | None = None
     url: str | None = None
-    events: list[str] | None = None
     active: bool | None = None
 
 
