@@ -770,17 +770,17 @@ class FlowService:
         if transition.from_state_id != app.current_state_id:
             raise ConflictError(
                 "Transition is not available from the current state.",
-                code="conflict",
+                code="transition_not_available",
             )
         if manual and transition.branch is not None:
             raise ConflictError(
                 "Branch transitions are fired by the vote outcome, not manually.",
-                code="conflict",
+                code="branch_transition_manual",
             )
         if manual and transition.automatic:
             raise ConflictError(
                 "Automatic transitions are fired by the system, not manually.",
-                code="conflict",
+                code="automatic_transition_manual",
             )
 
         old_approved: Decimal | None = None
@@ -823,7 +823,7 @@ class FlowService:
                 await self.session.rollback()
             raise ConflictError(
                 "Concurrent transition detected; application state changed.",
-                code="conflict",
+                code="concurrent_state_change",
             )
 
         event = StatusEvent(
@@ -1185,7 +1185,7 @@ class FlowService:
         from_state_id = app.current_state_id
         if from_state_id is None:
             raise ConflictError(
-                "Application has no current state to change.", code="conflict"
+                "Application has no current state to change.", code="no_current_state"
             )
         target = await self._load_state(target_state_id)
         if target is None or target.flow_version_id != app.flow_version_id:
@@ -1194,7 +1194,7 @@ class FlowService:
             )
         if target_state_id == from_state_id:
             raise ConflictError(
-                "Application is already in the target state.", code="conflict"
+                "Application is already in the target state.", code="already_in_state"
             )
         vote_gremium = await self._entry_snapshot(app, from_state_id, target)
         result = cast(
@@ -1212,7 +1212,7 @@ class FlowService:
         if result.rowcount != 1:
             await self.session.rollback()
             raise ConflictError(
-                "Concurrent status change detected; try again.", code="conflict"
+                "Concurrent status change detected; try again.", code="concurrent_state_change"
             )
         event = StatusEvent(
             application_id=app.id,

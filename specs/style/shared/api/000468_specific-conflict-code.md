@@ -5,6 +5,8 @@ kind: style
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
+tests:
+  - "backend/tests/unit/shared/test_conflict_codes.py:test_no_conflict_error_uses_the_generic_code"
 implementation:
   - backend/app/shared/errors.py
 scope:
