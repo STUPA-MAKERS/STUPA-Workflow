@@ -179,16 +179,16 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/todos/000443](requirements/functional/collaboration/todos/000443_board-columns.md) | A board has one done column | approved |
 | [F/collaboration/todos/000444](requirements/functional/collaboration/todos/000444_boards-tab.md) | The to-do tab is Boards | approved |
 | [F/collaboration/todos/000467](requirements/functional/collaboration/todos/000467_card-version-conflict.md) | Concurrent card edits give 409 | approved |
-| [F/collaboration/todos/000478](requirements/functional/collaboration/todos/000478_event-card.md) | An Event is a card with event data | draft |
-| [F/collaboration/todos/000479](requirements/functional/collaboration/todos/000479_event-totals.md) | An Event shows the totals of its links | draft |
-| [F/collaboration/todos/000480](requirements/functional/collaboration/todos/000480_event-picker.md) | Antrag and Buchung can name their Event | draft |
-| [F/collaboration/todos/000481](requirements/functional/collaboration/todos/000481_one-event-per-element.md) | An Antrag or a Buchung belongs to at most one Event | draft |
-| [F/collaboration/todos/000482](requirements/functional/collaboration/todos/000482_event-decisions.md) | An Event lists its decisions | draft |
-| [F/collaboration/todos/000483](requirements/functional/collaboration/todos/000483_event-series.md) | An Event can belong to a series | draft |
-| [F/collaboration/todos/000484](requirements/functional/collaboration/todos/000484_next-edition.md) | Nächste Ausgabe anlegen copies the plan, not the facts | draft |
-| [F/collaboration/todos/000485](requirements/functional/collaboration/todos/000485_events-findable.md) | Archived Events stay findable | draft |
-| [F/collaboration/todos/000486](requirements/functional/collaboration/todos/000486_event-calendar.md) | An Event with a start is in the calendar | draft |
-| [F/collaboration/todos/000487](requirements/functional/collaboration/todos/000487_card-grants-read.md) | A card gives read access to its links | draft |
+| [F/collaboration/todos/000478](requirements/functional/collaboration/todos/000478_event-card.md) | An Event is a card with event data | approved |
+| [F/collaboration/todos/000479](requirements/functional/collaboration/todos/000479_event-totals.md) | An Event shows the totals of its links | approved |
+| [F/collaboration/todos/000480](requirements/functional/collaboration/todos/000480_event-picker.md) | Antrag and Buchung can name their Event | approved |
+| [F/collaboration/todos/000481](requirements/functional/collaboration/todos/000481_one-event-per-element.md) | An Antrag or a Buchung belongs to at most one Event | approved |
+| [F/collaboration/todos/000482](requirements/functional/collaboration/todos/000482_event-decisions.md) | An Event lists its decisions | approved |
+| [F/collaboration/todos/000483](requirements/functional/collaboration/todos/000483_event-series.md) | An Event can belong to a series | approved |
+| [F/collaboration/todos/000484](requirements/functional/collaboration/todos/000484_next-edition.md) | Nächste Ausgabe anlegen copies the plan, not the facts | approved |
+| [F/collaboration/todos/000485](requirements/functional/collaboration/todos/000485_events-findable.md) | Archived Events stay findable | approved |
+| [F/collaboration/todos/000486](requirements/functional/collaboration/todos/000486_event-calendar.md) | An Event with a start is in the calendar | approved |
+| [F/collaboration/todos/000487](requirements/functional/collaboration/todos/000487_card-grants-read.md) | A card gives read access to its links | approved |
 | [F/finance/budget/000138](requirements/functional/finance/budget/000138_cost-centre-picker.md) | The cost centre pickers are fixed | approved |
 | [F/finance/budget/000139](requirements/functional/finance/budget/000139_close-fiscal-year.md) | A fiscal year closes and reopens | approved |
 | [F/finance/budget/000140](requirements/functional/finance/budget/000140_default-fiscal-year.md) | The default fiscal year holds today | approved |

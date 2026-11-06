@@ -2,7 +2,7 @@
 id: "000480"
 title: Antrag and Buchung can name their Event
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation: null

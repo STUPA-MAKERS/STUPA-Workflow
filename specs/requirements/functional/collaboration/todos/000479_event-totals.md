@@ -2,7 +2,7 @@
 id: "000479"
 title: An Event shows the totals of its links
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation: null

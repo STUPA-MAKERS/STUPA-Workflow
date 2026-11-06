@@ -2,7 +2,7 @@
 id: "000486"
 title: An Event with a start is in the calendar
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation: null

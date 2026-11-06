@@ -2,7 +2,7 @@
 id: "000484"
 title: Nächste Ausgabe anlegen copies the plan, not the facts
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation: null

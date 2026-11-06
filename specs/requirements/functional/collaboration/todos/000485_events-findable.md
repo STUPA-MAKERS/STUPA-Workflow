@@ -2,7 +2,7 @@
 id: "000485"
 title: Archived Events stay findable
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation: null

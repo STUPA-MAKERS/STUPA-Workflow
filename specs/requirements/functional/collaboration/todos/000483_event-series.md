@@ -2,7 +2,7 @@
 id: "000483"
 title: An Event can belong to a series
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation: null

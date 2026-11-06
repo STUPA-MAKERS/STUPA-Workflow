@@ -2,7 +2,7 @@
 id: "000478"
 title: An Event is a card with event data
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation: null

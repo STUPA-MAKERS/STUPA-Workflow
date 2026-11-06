@@ -2,7 +2,7 @@
 id: "000482"
 title: An Event lists its decisions
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation: null

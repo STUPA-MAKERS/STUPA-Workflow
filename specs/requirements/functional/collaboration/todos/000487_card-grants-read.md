@@ -2,7 +2,7 @@
 id: "000487"
 title: A card gives read access to its links
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation: null
