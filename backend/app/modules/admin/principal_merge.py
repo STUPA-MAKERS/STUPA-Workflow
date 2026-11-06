@@ -133,6 +133,7 @@ from app.modules.todos.models import (
     TodoCard,
     TodoComment,
     TodoEvent,
+    TodoEventSeries,
     TodoLink,
 )
 from app.modules.translations.models import UiLanguage, UiTranslation
@@ -222,6 +223,7 @@ ID_COLUMNS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
     ("todos", TodoComment.author_id),
     ("todos", TodoEvent.actor_id),
     ("todos", TodoLink.created_by),
+    ("todos", TodoEventSeries.created_by),
 )
 
 #: The rows of the source that the merge deletes, by area. Rights never move to the
