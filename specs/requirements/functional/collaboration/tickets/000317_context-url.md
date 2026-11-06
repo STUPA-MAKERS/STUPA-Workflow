@@ -6,8 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/tickets
-  - frontend/src/app/pages/tickets
+  - backend/app/modules/tickets/schemas.py
 scope:
   - backend/app/modules/tickets
   - frontend/src/app/pages/tickets

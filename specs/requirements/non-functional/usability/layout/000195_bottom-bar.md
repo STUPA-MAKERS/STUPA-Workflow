@@ -6,7 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - frontend/src/app/layout
+  - frontend/vendor/ui-kit/shell/src/bottom-bar/bottom-bar.component.ts
+  - frontend/src/app/layout/nav.service.ts
 scope:
   - frontend/src/app/layout
 ---

@@ -6,10 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/worker
-  - backend/app/modules/flow
-  - backend/app/shared/guards.py
-  - backend/app/shared/config_schemas.py
+  - backend/worker/deadlines.py
+  - backend/worker/main.py
 scope:
   - backend/worker
   - backend/app/modules/flow

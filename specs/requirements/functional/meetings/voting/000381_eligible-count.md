@@ -6,8 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/voting
-  - backend/app/modules/livevote
+  - backend/app/modules/voting/service.py
+  - backend/app/modules/livevote/roster.py
 scope:
   - backend/app/modules/voting
   - backend/app/modules/livevote

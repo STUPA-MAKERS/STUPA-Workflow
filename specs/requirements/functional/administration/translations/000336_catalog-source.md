@@ -6,8 +6,9 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/translations
-  - frontend/src/app/core/i18n
+  - frontend/src/app/core/i18n/translations.ts
+  - backend/app/modules/translations/catalog.py
+  - backend/app/modules/translations/service.py
 scope:
   - backend/app/modules/translations
   - frontend/src/app/core/i18n

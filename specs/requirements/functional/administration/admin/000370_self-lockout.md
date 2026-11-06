@@ -6,9 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/admin
-  - frontend/src/app/pages/admin
-  - backend/app/modules/auth
+  - backend/app/modules/admin/principal_revoke.py
+  - backend/app/modules/auth/bootstrap.py
 scope:
   - backend/app/modules/admin
   - frontend/src/app/pages/admin

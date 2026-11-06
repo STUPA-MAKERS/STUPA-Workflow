@@ -6,7 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/
+  - backend/app/modules/auth/principal.py
 scope:
   - backend/app/
 ---

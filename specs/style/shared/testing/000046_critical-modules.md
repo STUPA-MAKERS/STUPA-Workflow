@@ -6,7 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/
+  - backend/scripts/coverage_critical.py
+  - .github/workflows/ci.yml
 scope:
   - backend/app/modules/
 ---

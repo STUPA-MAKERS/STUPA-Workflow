@@ -6,8 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - frontend/src/app/
-  - frontend/vendor/ui-kit
+  - frontend/vendor/ui-kit/src/lib/fab
+  - frontend/vendor/ui-kit/shell/src/fab-link.directive.ts
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

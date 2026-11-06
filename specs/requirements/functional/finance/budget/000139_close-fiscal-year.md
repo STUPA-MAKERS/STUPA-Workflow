@@ -6,8 +6,9 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/budget
-  - frontend/src/app/pages/budget
+  - backend/app/modules/budget/tree/fiscal_years.py
+  - backend/app/modules/budget/tree_router.py
+  - frontend/src/app/pages/budget/budget-dashboard.component.ts
 scope:
   - backend/app/modules/budget
   - frontend/src/app/pages/budget

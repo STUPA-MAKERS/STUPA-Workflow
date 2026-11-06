@@ -6,9 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/backup
-  - backend/worker/backup.py
-  - frontend/src/app/pages/admin/backups
+  - backend/app/modules/backup/schemas.py
+  - frontend/src/app/pages/admin/backups/backups.component.ts
 scope:
   - backend/app/modules/backup
   - backend/worker/backup.py

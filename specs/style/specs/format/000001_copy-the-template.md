@@ -6,7 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - specs/
+  - specs/TEMPLATE.md
 scope:
   - specs/
 ---

@@ -6,9 +6,9 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/notifications
-  - backend/worker/mail.py
-  - frontend/src/app/pages/account
+  - backend/app/modules/notifications/service.py
+  - backend/app/modules/notifications/router.py
+  - frontend/src/app/pages/account/notifications.component.ts
 scope:
   - backend/app/modules/notifications
   - backend/worker/mail.py

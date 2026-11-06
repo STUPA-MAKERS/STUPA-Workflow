@@ -6,8 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - deploy/
-  - backend/migrations
+  - deploy/db/roles.sql
+  - deploy/docker-compose.yml
 scope:
   - deploy/
   - backend/migrations

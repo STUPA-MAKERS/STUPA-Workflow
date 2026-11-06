@@ -6,7 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/avatars
+  - backend/app/modules/avatars/gravatar.py
 scope:
   - backend/app/modules/avatars
 ---

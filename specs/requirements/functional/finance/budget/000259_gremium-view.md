@@ -6,7 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/budget
+  - backend/app/modules/budget/access.py
+  - backend/app/modules/budget/tree/view.py
 scope:
   - backend/app/modules/budget
 ---

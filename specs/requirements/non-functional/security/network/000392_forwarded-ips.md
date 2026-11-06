@@ -6,8 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - deploy/
-  - backend/app/settings.py
+  - deploy/docker-compose.yml
+  - deploy/.env.example
 scope:
   - deploy/
   - backend/app/settings.py

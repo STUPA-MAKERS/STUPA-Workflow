@@ -6,9 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/protocol
-  - frontend/src/app/features/meetings
-  - backend/app/modules/gremien
+  - backend/app/modules/protocol/service.py
+  - frontend/src/app/features/meetings/finalize-protocol-dialog
 scope:
   - backend/app/modules/protocol
   - frontend/src/app/features/meetings

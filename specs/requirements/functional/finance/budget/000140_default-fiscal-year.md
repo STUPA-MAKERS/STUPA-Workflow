@@ -6,8 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/budget
-  - frontend/src/app/pages/budget
+  - backend/app/modules/budget/tree_rules.py
+  - backend/app/modules/budget/tree/service_base.py
 scope:
   - backend/app/modules/budget
   - frontend/src/app/pages/budget

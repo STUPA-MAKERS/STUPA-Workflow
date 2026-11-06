@@ -6,8 +6,9 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/todos
-  - frontend/src/app/features/todos
+  - backend/app/modules/todos/boards.py
+  - backend/app/modules/todos/access.py
+  - backend/app/modules/todos/models.py
 scope:
   - backend/app/modules/todos
   - frontend/src/app/features/todos

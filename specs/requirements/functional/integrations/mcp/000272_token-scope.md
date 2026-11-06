@@ -6,9 +6,9 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/auth
-  - backend/app/deps.py
-  - mcp/
+  - backend/app/modules/auth/oauth.py
+  - backend/app/modules/auth/oauth_router.py
+  - frontend/src/app/pages/account/consent.component.ts
 scope:
   - backend/app/modules/auth
   - backend/app/deps.py

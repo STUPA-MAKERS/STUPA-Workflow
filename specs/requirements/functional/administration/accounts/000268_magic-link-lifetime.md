@@ -6,9 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/auth
-  - backend/app/deps.py
-  - backend/app/modules/applications
+  - backend/app/modules/auth/service.py
+  - backend/app/modules/applications/guest_settings.py
 scope:
   - backend/app/modules/auth
   - backend/app/deps.py

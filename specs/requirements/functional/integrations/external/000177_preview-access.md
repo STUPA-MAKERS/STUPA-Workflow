@@ -5,9 +5,7 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
-implementation:
-  - backend/app/
-  - frontend/src/app/
+implementation: null
 scope:
   - backend/app/
   - frontend/src/app/

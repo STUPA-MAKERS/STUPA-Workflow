@@ -6,9 +6,9 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/files
-  - backend/app/modules/media
-  - backend/app/modules/admin
+  - backend/app/modules/files/scanner.py
+  - backend/app/modules/files/queue.py
+  - backend/worker/scan.py
 scope:
   - backend/app/modules/files
   - backend/app/modules/media

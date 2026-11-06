@@ -6,8 +6,10 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/avatars
-  - frontend/src/app/shared
+  - backend/app/modules/avatars/router.py
+  - backend/app/modules/avatars/service.py
+  - backend/app/modules/avatars/gravatar.py
+  - frontend/vendor/ui-kit/src/lib/avatar/avatar.component.ts
 scope:
   - backend/app/modules/avatars
   - frontend/src/app/shared

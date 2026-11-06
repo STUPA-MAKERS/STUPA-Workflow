@@ -6,8 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/backup
-  - backend/worker/backup.py
+  - backend/app/modules/backup/archive.py
+  - backend/app/modules/backup/service.py
 scope:
   - backend/app/modules/backup
   - backend/worker/backup.py

@@ -6,9 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - frontend/src/app/
-  - frontend/vendor/ui-kit
   - frontend/src/index.html
+  - frontend/vendor/ui-kit/src/lib/theme/theme.service.ts
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

@@ -6,10 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/flow
-  - backend/app/shared/guards.py
-  - backend/app/shared/config_schemas.py
-  - backend/app/modules/notifications
+  - backend/app/modules/notifications/auto.py
+  - backend/app/modules/flow/dispatch.py
 scope:
   - backend/app/modules/flow
   - backend/app/shared/guards.py

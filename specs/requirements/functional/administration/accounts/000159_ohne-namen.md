@@ -6,9 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/auth
-  - backend/app/modules/admin
-  - frontend/src/app/pages/admin
+  - frontend/src/app/shared/person-label.util.ts
 scope:
   - backend/app/modules/auth
   - backend/app/modules/admin

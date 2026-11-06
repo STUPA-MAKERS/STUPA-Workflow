@@ -7,6 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
   - backend/app/middleware.py
+  - backend/app/main.py
 scope:
   - backend/app/middleware.py
 ---

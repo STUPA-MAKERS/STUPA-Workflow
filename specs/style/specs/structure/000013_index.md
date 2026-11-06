@@ -6,7 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - specs/
+  - scripts/check_specs.py
 scope:
   - specs/
 ---

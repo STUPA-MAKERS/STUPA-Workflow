@@ -6,8 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/protocol
-  - typst/
+  - typst/typst_service/document.py
+  - typst/typst_service/markdown.py
 scope:
   - backend/app/modules/protocol
   - typst/

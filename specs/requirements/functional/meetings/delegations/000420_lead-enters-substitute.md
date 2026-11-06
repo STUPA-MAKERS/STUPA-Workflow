@@ -6,8 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/delegations
-  - backend/app/modules/livevote
+  - backend/app/modules/delegations/pool_seat.py
+  - frontend/src/app/features/meetings/lead-substitute-dialog/lead-substitute-dialog.component.ts
 scope:
   - backend/app/modules/delegations
   - backend/app/modules/livevote

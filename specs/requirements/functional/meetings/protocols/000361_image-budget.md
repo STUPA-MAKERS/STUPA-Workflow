@@ -6,8 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/protocol
-  - backend/app/modules/media
+  - backend/app/modules/media/service.py
 scope:
   - backend/app/modules/protocol
   - backend/app/modules/media

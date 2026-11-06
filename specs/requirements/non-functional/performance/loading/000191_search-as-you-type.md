@@ -6,7 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - frontend/src/app/
+  - frontend/vendor/ui-kit/src/lib/live-search/live-search.ts
 scope:
   - frontend/src/app/
 ---

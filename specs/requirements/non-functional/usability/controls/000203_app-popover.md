@@ -6,8 +6,9 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - frontend/src/app/
-  - frontend/vendor/ui-kit
+  - frontend/vendor/ui-kit/src/lib/filter-select/filter-select.component.ts
+  - frontend/vendor/ui-kit/src/lib/popover
+  - frontend/vendor/ui-kit/src/lib/select
 scope:
   - frontend/src/app/
   - frontend/vendor/ui-kit

@@ -6,8 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/search
-  - frontend/src/app/layout
+  - backend/app/modules/search/service.py
 scope:
   - backend/app/modules/search
   - frontend/src/app/layout

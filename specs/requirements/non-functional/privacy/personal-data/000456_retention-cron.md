@@ -7,7 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
   - backend/worker/retention.py
-  - backend/app/modules/privacy
+  - backend/worker/main.py
 scope:
   - backend/worker/retention.py
   - backend/app/modules/privacy

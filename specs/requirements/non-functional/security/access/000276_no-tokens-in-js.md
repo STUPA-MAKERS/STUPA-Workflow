@@ -6,9 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/auth
-  - backend/app/deps.py
-  - frontend/src/app/core/auth
+  - backend/app/modules/auth/sessions.py
+  - backend/app/modules/auth/router.py
 scope:
   - backend/app/modules/auth
   - backend/app/deps.py

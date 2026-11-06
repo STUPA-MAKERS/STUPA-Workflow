@@ -6,8 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/protocol
-  - backend/app/modules/notifications
+  - backend/app/modules/protocol/service.py
+  - backend/worker/protocol.py
 scope:
   - backend/app/modules/protocol
   - backend/app/modules/notifications

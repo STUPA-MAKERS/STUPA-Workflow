@@ -6,8 +6,9 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/applications
-  - frontend/src/app/pages/applications
+  - backend/app/modules/applications/access.py
+  - backend/app/modules/applications/service/listing.py
+  - backend/app/modules/applications/service/reads.py
 scope:
   - backend/app/modules/applications
   - frontend/src/app/pages/applications

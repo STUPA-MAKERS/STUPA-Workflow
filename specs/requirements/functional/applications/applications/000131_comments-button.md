@@ -6,7 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - frontend/src/app/pages/applications
+  - frontend/src/app/pages/applications/applications-detail.component.html
+  - frontend/src/app/pages/applications/applications-detail.component.ts
 scope:
   - frontend/src/app/pages/applications
 ---

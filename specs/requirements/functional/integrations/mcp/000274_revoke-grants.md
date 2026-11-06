@@ -6,8 +6,10 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/auth
-  - backend/app/deps.py
+  - backend/app/modules/auth/oauth_service.py
+  - backend/app/modules/auth/oauth_router.py
+  - backend/app/modules/auth/oauth_admin_router.py
+  - frontend/src/app/pages/account/grants.component.ts
 scope:
   - backend/app/modules/auth
   - backend/app/deps.py

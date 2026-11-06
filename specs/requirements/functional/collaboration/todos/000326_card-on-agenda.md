@@ -6,9 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/todos
-  - frontend/src/app/features/todos
-  - backend/app/modules/livevote
+  - backend/app/modules/livevote/agenda_service.py
+  - backend/app/modules/todos/links.py
 scope:
   - backend/app/modules/todos
   - frontend/src/app/features/todos

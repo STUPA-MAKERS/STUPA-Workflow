@@ -6,8 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - frontend/src/app/pages/applications
-  - frontend/src/app/features/apply
+  - frontend/src/app/features/apply/apply-wizard.component.html
+  - frontend/src/app/pages/applications/applications-list.component.html
 scope:
   - frontend/src/app/pages/applications
   - frontend/src/app/features/apply
