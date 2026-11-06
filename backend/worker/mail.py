@@ -40,8 +40,7 @@ def build_sender(settings: Settings) -> MailSender:
 async def on_startup(ctx: dict[str, Any]) -> None:
     """Load the settings and build the mail sender into the worker context."""
     settings = load_settings()
-    ctx["settings"] = settings
-    ctx["mail_sender"] = build_sender(settings)
+    ctx.update(settings=settings, mail_sender=build_sender(settings))
 
 
 async def send_mail(ctx: dict[str, Any], payload: dict[str, object]) -> str:
