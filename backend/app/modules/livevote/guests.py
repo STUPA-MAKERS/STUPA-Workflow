@@ -164,9 +164,12 @@ class GuestService:
         self.base_url = base_url.rstrip("/")
 
     async def _meeting(self, meeting_id: UUID, *, for_update: bool = False) -> Meeting:
-        stmt = select(Meeting).where(Meeting.id == meeting_id)
-        if for_update:
-            stmt = stmt.with_for_update().execution_options(populate_existing=True)
+        query = select(Meeting).where(Meeting.id == meeting_id)
+        stmt = (
+            query.with_for_update().execution_options(populate_existing=True)
+            if for_update
+            else query
+        )
         meeting = (await self.session.execute(stmt)).scalar_one_or_none()
         if meeting is None:
             raise NotFoundError(f"meeting {meeting_id} not found")
@@ -175,11 +178,14 @@ class GuestService:
     async def _guest(
         self, meeting_id: UUID, guest_id: UUID, *, for_update: bool = False
     ) -> MeetingGuest:
-        stmt = select(MeetingGuest).where(
+        query = select(MeetingGuest).where(
             MeetingGuest.id == guest_id, MeetingGuest.meeting_id == meeting_id
         )
-        if for_update:
-            stmt = stmt.with_for_update().execution_options(populate_existing=True)
+        stmt = (
+            query.with_for_update().execution_options(populate_existing=True)
+            if for_update
+            else query
+        )
         guest = (await self.session.execute(stmt)).scalar_one_or_none()
         if guest is None:
             raise NotFoundError(f"guest {guest_id} not found", code="guest_not_found")
@@ -644,13 +650,16 @@ class GuestService:
             NotFoundError: ``join_code_unknown``.
         """
         normalized = normalize_code(code)
-        stmt = select(Meeting).where(
+        query = select(Meeting).where(
             Meeting.join_code == normalized,
             Meeting.status != "closed",
             Meeting.public_join.is_(True),
         )
-        if for_update:
-            stmt = stmt.with_for_update().execution_options(populate_existing=True)
+        stmt = (
+            query.with_for_update().execution_options(populate_existing=True)
+            if for_update
+            else query
+        )
         meeting = (await self.session.execute(stmt)).scalar_one_or_none()
         if meeting is None:
             raise NotFoundError("Unknown join code.", code="join_code_unknown")
@@ -700,9 +709,12 @@ class GuestService:
     ) -> MeetingGuest | None:
         if not token:
             return None
-        stmt = select(MeetingGuest).where(MeetingGuest.token_hash == token_hash(token))
-        if for_update:
-            stmt = stmt.with_for_update().execution_options(populate_existing=True)
+        query = select(MeetingGuest).where(MeetingGuest.token_hash == token_hash(token))
+        stmt = (
+            query.with_for_update().execution_options(populate_existing=True)
+            if for_update
+            else query
+        )
         return (await self.session.execute(stmt)).scalar_one_or_none()
 
     @staticmethod

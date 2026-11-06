@@ -91,9 +91,12 @@ class AgendaService:
         Raises:
             NotFoundError: No meeting has this id.
         """
-        stmt = select(Meeting).where(Meeting.id == meeting_id)
-        if for_update:
-            stmt = stmt.with_for_update().execution_options(populate_existing=True)
+        query = select(Meeting).where(Meeting.id == meeting_id)
+        stmt = (
+            query.with_for_update().execution_options(populate_existing=True)
+            if for_update
+            else query
+        )
         meeting = (await self.session.execute(stmt)).scalar_one_or_none()
         if meeting is None:
             raise NotFoundError(f"meeting {meeting_id} not found")
