@@ -16,8 +16,7 @@ scope:
 
 An Event must list the valid decisions of its linked Anträge and the closed votes of its
 linked TOPs and votes. Each row must show the date, the meeting, the result, the approved
-amount and the conditions. The newest row must be first. A row that the viewer cannot read
-follows the rule for a link without access.
+amount and the conditions. The newest row must be first.
 
 Reason: The decisions about an Event are in different meetings. The Gremium must find them in
 one place.

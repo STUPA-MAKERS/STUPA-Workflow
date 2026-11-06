@@ -183,6 +183,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/todos/000445](requirements/functional/collaboration/todos/000445_next-edition.md) | Nächste Ausgabe anlegen copies the plan, not the facts | draft |
 | [F/collaboration/todos/000446](requirements/functional/collaboration/todos/000446_events-findable.md) | Archived Events stay findable | draft |
 | [F/collaboration/todos/000447](requirements/functional/collaboration/todos/000447_event-calendar.md) | An Event with a start is in the calendar | draft |
+| [F/collaboration/todos/000448](requirements/functional/collaboration/todos/000448_event-grants-read.md) | An Event gives read access to its links | draft |
 | [F/finance/budget/000138](requirements/functional/finance/budget/000138_cost-centre-picker.md) | The cost centre pickers are fixed | approved |
 | [F/finance/budget/000139](requirements/functional/finance/budget/000139_close-fiscal-year.md) | A fiscal year closes and reopens | approved |
 | [F/finance/budget/000140](requirements/functional/finance/budget/000140_default-fiscal-year.md) | The default fiscal year holds today | approved |

@@ -15,11 +15,10 @@ scope:
 # An Event shows the totals of its links
 
 An Event must show these totals of its linked Anträge and Buchungen: requested amount,
-approved amount, expenses, income and balance. The totals must count only the elements that
-the viewer can read. The totals must show the number of linked elements that they do not
-count.
+approved amount, expenses, income and balance. The totals must count all linked elements,
+because each reader of the Event can read them.
 
 Reason: The Gremium sees the money of an Event in one place, across Kostenstellen and fiscal
-years. A total must not show a sum that the viewer cannot read item by item.
+years.
 
-Test: A backend unit test computes the totals for a viewer without `budget.read`.
+Test: A backend unit test computes the totals for a board reader without `budget.read`.
