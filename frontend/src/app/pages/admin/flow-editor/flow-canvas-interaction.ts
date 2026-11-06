@@ -8,6 +8,7 @@
  * truth.
  */
 import type { WritableSignal } from '@angular/core';
+import { toggled } from '@shared/util/immutable';
 import type { FlowGraph, TransitionBranch, TransitionDef } from '../admin.models';
 import { blankTransition } from '../flow-graph.util';
 import type { Point, Selection, ViewRect } from './flow-editor.models';
@@ -50,10 +51,7 @@ export class FlowCanvasInteraction {
   nodePointerDown(event: PointerEvent, key: string): void {
     event.stopPropagation();
     if (event.shiftKey) {
-      const next = new Set(this.host.multiSel());
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      this.host.multiSel.set(next);
+      this.host.multiSel.set(toggled(this.host.multiSel(), key));
       return;
     }
     this.host.selection.set({ kind: 'state', key });
@@ -64,10 +62,7 @@ export class FlowCanvasInteraction {
   groupPointerDown(event: PointerEvent, id: string): void {
     event.stopPropagation();
     if (event.shiftKey) {
-      const next = new Set(this.host.multiSelGroups());
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      this.host.multiSelGroups.set(next);
+      this.host.multiSelGroups.set(toggled(this.host.multiSelGroups(), id));
       return;
     }
     this.host.openGroup(id);
@@ -218,11 +213,9 @@ export class FlowCanvasInteraction {
   /** State whose node rect contains the point, that is, the connect target. Only
    *  nodes of the current level count. To connect into a group, drill down first. */
   private nodeAt(p: Point): string | null {
-    for (const n of this.host.nodes()) {
-      if (p.x >= n.x && p.x <= n.x + n.w && p.y >= n.y && p.y <= n.y + n.h) {
-        return n.key;
-      }
-    }
-    return null;
+    const hit = this.host
+      .nodes()
+      .find((n) => p.x >= n.x && p.x <= n.x + n.w && p.y >= n.y && p.y <= n.y + n.h);
+    return hit ? hit.key : null;
   }
 }

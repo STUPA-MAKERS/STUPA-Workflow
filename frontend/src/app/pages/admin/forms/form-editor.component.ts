@@ -226,20 +226,17 @@ export class FormEditorComponent {
 
   /** The ⋮ menu of the header on a phone: activate or deactivate, and the preview. */
   protected readonly headerMenu = computed<RowMenuSection[]>(() => {
-    const items: RowMenuItem[] = [];
-    if (this.hasVersion()) {
-      items.push({
-        id: 'toggleActive',
-        label: this.i18n.translate(this.active() ? 'admin.forms.deactivate' : 'admin.forms.activate'),
-        icon: 'power',
-      });
-    }
-    items.push({
+    const toggle: RowMenuItem = {
+      id: 'toggleActive',
+      label: this.i18n.translate(this.active() ? 'admin.forms.deactivate' : 'admin.forms.activate'),
+      icon: 'power',
+    };
+    const preview: RowMenuItem = {
       id: 'preview',
       label: this.i18n.translate(this.preview() ? 'admin.forms.modeEdit' : 'admin.forms.modeView'),
       icon: this.preview() ? 'edit' : 'eye',
-    });
-    return [{ items }];
+    };
+    return [{ items: [...(this.hasVersion() ? [toggle] : []), preview] }];
   });
 
   /** Original type state. A save patches the type only after a change. */
@@ -445,12 +442,7 @@ export class FormEditorComponent {
     const len = this.groups().length;
     if (to < 0 || to >= len || from === to) return;
     this.restructure(() =>
-      this.groups.update((list) => {
-        const next = [...list];
-        const [moved] = next.splice(from, 1);
-        next.splice(to, 0, moved);
-        return next;
-      }),
+      this.groups.update((list) => movedTo(list, from, to)),
     );
     const place = (i: number): number => {
       if (i === from) return to;
@@ -534,29 +526,13 @@ export class FormEditorComponent {
   protected onMenuKeydown(event: KeyboardEvent): void {
     const items = this.menuItems();
     const at = items.indexOf(document.activeElement as HTMLElement);
-    let next: number | null = null;
-    switch (event.key) {
-      case 'ArrowDown':
-      case 'ArrowRight':
-        next = at < 0 ? 0 : (at + 1) % items.length;
-        break;
-      case 'ArrowUp':
-      case 'ArrowLeft':
-        next = at <= 0 ? items.length - 1 : at - 1;
-        break;
-      case 'Home':
-        next = 0;
-        break;
-      case 'End':
-        next = items.length - 1;
-        break;
-      case 'Tab':
-        event.preventDefault();
-        this.closeTypeMenu(true);
-        return;
-      default:
-        return;
+    if (event.key === 'Tab') {
+      event.preventDefault();
+      this.closeTypeMenu(true);
+      return;
     }
+    const next = menuTarget(event.key, at, items.length);
+    if (next === null) return;
     event.preventDefault();
     items[next]?.focus({ preventScroll: true });
   }
@@ -607,13 +583,17 @@ export class FormEditorComponent {
   /** The ⋮ menu of a group: move it up or down (not past an edge) and delete it. */
   protected groupMenu(gi: number): RowMenuSection[] {
     const last = this.groups().length - 1;
-    const move: RowMenuItem[] = [];
-    if (gi > 0) {
-      move.push({ id: 'up', label: this.i18n.translate('admin.form.moveGroupUp'), icon: 'up' });
-    }
-    if (gi < last) {
-      move.push({ id: 'down', label: this.i18n.translate('admin.form.moveGroupDown'), icon: 'down' });
-    }
+    const up: RowMenuItem = {
+      id: 'up',
+      label: this.i18n.translate('admin.form.moveGroupUp'),
+      icon: 'up',
+    };
+    const down: RowMenuItem = {
+      id: 'down',
+      label: this.i18n.translate('admin.form.moveGroupDown'),
+      icon: 'down',
+    };
+    const move = [...(gi > 0 ? [up] : []), ...(gi < last ? [down] : [])];
     return [
       { items: move },
       {
@@ -626,8 +606,14 @@ export class FormEditorComponent {
 
   /** An action of the ⋮ menu of the header (phone). */
   protected onHeaderMenu(item: RowMenuItem): void {
-    if (item.id === 'toggleActive') this.toggleActive();
-    else if (item.id === 'preview') this.preview.set(!this.preview());
+    switch (item.id) {
+      case 'toggleActive':
+        return this.toggleActive();
+      case 'preview':
+        return this.preview.set(!this.preview());
+      default:
+        return;
+    }
   }
 
   /** The heading of a group in the outline and on its card: "Abschnitt 2 · Kosten". */
@@ -679,12 +665,7 @@ export class FormEditorComponent {
     const target = pos.qi + dir;
     if (target >= 0 && target < group.fields.length) {
       this.restructure(() =>
-        this.patchGroup(pos.gi, (g) => {
-          const next = [...g.fields];
-          const [moved] = next.splice(pos.qi, 1);
-          next.splice(target, 0, moved);
-          return { ...g, fields: next };
-        }),
+        this.patchGroup(pos.gi, (g) => ({ ...g, fields: movedTo(g.fields, pos.qi, target) })),
       );
       this.follow(pos, { gi: pos.gi, qi: target });
       return;
@@ -693,11 +674,12 @@ export class FormEditorComponent {
     if (ngi < 0 || ngi >= groups.length) return;
     this.restructure(() =>
       this.groups.update((list) => {
-        const next = list.map((g) => ({ ...g, fields: [...g.fields] }));
-        const [moved] = next[pos.gi].fields.splice(pos.qi, 1);
-        if (dir === -1) next[ngi].fields.push(moved);
-        else next[ngi].fields.unshift(moved);
-        return next;
+        const moved = list[pos.gi].fields[pos.qi];
+        return list.map((g, gi) => {
+          if (gi === pos.gi) return { ...g, fields: g.fields.filter((_, qi) => qi !== pos.qi) };
+          if (gi !== ngi) return { ...g, fields: [...g.fields] };
+          return { ...g, fields: dir === -1 ? [...g.fields, moved] : [moved, ...g.fields] };
+        });
       }),
     );
     this.follow(pos, { gi: ngi, qi: dir === -1 ? groups[ngi].fields.length : 0 });
@@ -713,18 +695,21 @@ export class FormEditorComponent {
   private restructure(change: () => void): void {
     const before = this.groups();
     change();
-    const now = new Map<FormFieldDef, string>();
-    this.groups().forEach((g, gi) => g.fields.forEach((f, qi) => now.set(f, `${gi}:${qi}`)));
-    const rekey = <T>(map: Record<string, T>): Record<string, T> => {
-      const next: Record<string, T> = {};
-      for (const [key, value] of Object.entries(map)) {
-        const [gi, qi] = key.split(':').map(Number);
-        const field = before[gi]?.fields[qi];
-        const to = field ? now.get(field) : undefined;
-        if (to !== undefined) next[to] = value;
-      }
-      return next;
+    const now = new Map(
+      this.groups().flatMap((g, gi) => g.fields.map((f, qi) => [f, `${gi}:${qi}`] as const)),
+    );
+    const placeOf = (key: string): string | undefined => {
+      const [gi, qi] = key.split(':').map(Number);
+      const field = before[gi]?.fields[qi];
+      return field ? now.get(field) : undefined;
     };
+    const rekey = <T>(map: Record<string, T>): Record<string, T> =>
+      Object.fromEntries(
+        Object.entries(map).flatMap(([key, value]) => {
+          const to = placeOf(key);
+          return to !== undefined ? [[to, value] as const] : [];
+        }),
+      );
     this.expanded.update(rekey);
     this.rawLogic.update(rekey);
   }
@@ -754,9 +739,8 @@ export class FormEditorComponent {
   protected onPromotedToggle(pos: QPos, checked: boolean): void {
     this.patchQuestion(pos, (f) => {
       const next = { ...f, isPromoted: checked };
-      if (checked && !next.promoteTarget) next.promoteTarget = PROMOTE_TARGETS[0];
-      if (!checked) delete next.promoteTarget;
-      return next;
+      if (!checked) return withoutKey(next, 'promoteTarget');
+      return next.promoteTarget ? next : { ...next, promoteTarget: PROMOTE_TARGETS[0] };
     });
   }
 
@@ -887,9 +871,11 @@ export class FormEditorComponent {
   ): void {
     const numeric = key !== 'pattern';
     this.patchQuestion(pos, (f) => {
-      const validation: Record<string, unknown> = { ...(f.validation ?? {}) };
-      if (value === '') delete validation[key];
-      else validation[key] = numeric ? Number(value) : value;
+      const current = f.validation ?? {};
+      const validation =
+        value === ''
+          ? withoutKey(current, key)
+          : { ...current, [key]: numeric ? Number(value) : value };
       return { ...f, validation: validation as FormFieldDef['validation'] };
     });
   }
@@ -897,9 +883,10 @@ export class FormEditorComponent {
   /** Opt-out of comparison offers. Allowed is the default, so only `false` is stored. */
   protected setAllowNoOffers(pos: QPos, allowed: boolean): void {
     this.patchQuestion(pos, (f) => {
-      const validation: Record<string, unknown> = { ...(f.validation ?? {}) };
-      if (allowed) delete validation['allowNoOffers'];
-      else validation['allowNoOffers'] = false;
+      const current = f.validation ?? {};
+      const validation = allowed
+        ? withoutKey(current, 'allowNoOffers')
+        : { ...current, allowNoOffers: false };
       return { ...f, validation: validation as FormFieldDef['validation'] };
     });
   }
@@ -909,11 +896,7 @@ export class FormEditorComponent {
     this.rawLogic.update((m) => ({ ...m, [k]: { ...m[k], [kind]: raw } }));
     const trimmed = raw.trim();
     this.patchQuestion(pos, (f) => {
-      if (trimmed === '') {
-        const next = { ...f };
-        delete next[kind];
-        return next;
-      }
+      if (trimmed === '') return withoutKey(f, kind);
       try {
         return { ...f, [kind]: JSON.parse(trimmed) as Record<string, unknown> };
       } catch {
@@ -986,4 +969,28 @@ export class FormEditorComponent {
       },
     });
   }
+}
+
+/** The index the arrow, Home or End key moves the type menu focus to, or null for another key. */
+function menuTarget(key: string, at: number, length: number): number | null {
+  switch (key) {
+    case 'ArrowDown':
+    case 'ArrowRight':
+      return at < 0 ? 0 : (at + 1) % length;
+    case 'ArrowUp':
+    case 'ArrowLeft':
+      return at <= 0 ? length - 1 : at - 1;
+    case 'Home':
+      return 0;
+    case 'End':
+      return length - 1;
+    default:
+      return null;
+  }
+}
+
+/** The list with the item at `from` moved to `to`. */
+function movedTo<T>(list: readonly T[], from: number, to: number): readonly T[] {
+  const rest = list.filter((_, i) => i !== from);
+  return [...rest.slice(0, to), list[from], ...rest.slice(to)];
 }

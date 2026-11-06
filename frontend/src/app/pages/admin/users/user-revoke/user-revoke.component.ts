@@ -295,12 +295,13 @@ export class UserRevokeComponent {
 
   private assignmentLine(a: RevokeAssignment): RevokeLine {
     const role = this.label(a.roleLabel, a.roleKey);
-    let detail: string;
-    if (a.grantedBy === 'bootstrap') detail = this.i18n.translate('admin.users.revoke.bootstrap');
-    else detail = this.i18n.translate('admin.users.revoke.grantedBy', { name: a.grantedBy ?? '—' });
-    if (a.returnsAutomatically) {
-      detail = `${detail}. ${this.i18n.translate('admin.users.revoke.returnsAutomatically')}`;
-    }
+    const granted =
+      a.grantedBy === 'bootstrap'
+        ? this.i18n.translate('admin.users.revoke.bootstrap')
+        : this.i18n.translate('admin.users.revoke.grantedBy', { name: a.grantedBy ?? '—' });
+    const detail = a.returnsAutomatically
+      ? `${granted}. ${this.i18n.translate('admin.users.revoke.returnsAutomatically')}`
+      : granted;
     return { text: this.i18n.translate('admin.users.revoke.assignment', { role }), detail };
   }
 
@@ -333,45 +334,58 @@ export class UserRevokeComponent {
 
   /** Everything the person has in one Gremium, as lines under its checkbox. */
   protected gremiumLines(g: RevokeGremium): RevokeLine[] {
-    const lines: RevokeLine[] = [];
-    if (g.membership) {
-      lines.push({
-        text: this.i18n.translate('admin.users.revoke.membership', {
-          role: this.label(g.membership.roleLabel, g.membership.roleKey),
-        }),
-        detail: g.membership.groups.length ? this.groupsText(g.membership.groups) : '',
-      });
-    }
-    const extra = g.groups.filter((x) => !g.membership?.groups.includes(x));
-    if (extra.length) {
-      lines.push({
-        text: this.i18n.translate('admin.users.revoke.groupsOnly', { groups: extra.join(', ') }),
-        detail: this.i18n.translate('admin.users.revoke.groupsRemoved'),
-      });
-    }
-    lines.push(...g.poolEntries.map((e) => this.poolLine(e)));
-    lines.push(...g.plannedDelegations.map((d) => this.delegationLine(d, false)));
-    lines.push(...g.liveDelegations.map((d) => this.delegationLine(d, true)));
-    if (g.openTasks) {
-      lines.push({
-        text:
-          g.openTasks === 1
-            ? this.i18n.translate('admin.users.revoke.openTask')
-            : this.i18n.translate('admin.users.revoke.openTasks', { n: g.openTasks }),
-        detail: this.i18n.translate('admin.users.revoke.openTasksDetail'),
-      });
-    }
-    return lines;
+    const membership = g.membership;
+    const extra = g.groups.filter((x) => !membership?.groups.includes(x));
+    return [
+      ...(membership
+        ? [
+            {
+              text: this.i18n.translate('admin.users.revoke.membership', {
+                role: this.label(membership.roleLabel, membership.roleKey),
+              }),
+              detail: membership.groups.length ? this.groupsText(membership.groups) : '',
+            },
+          ]
+        : []),
+      ...(extra.length
+        ? [
+            {
+              text: this.i18n.translate('admin.users.revoke.groupsOnly', { groups: extra.join(', ') }),
+              detail: this.i18n.translate('admin.users.revoke.groupsRemoved'),
+            },
+          ]
+        : []),
+      ...g.poolEntries.map((e) => this.poolLine(e)),
+      ...g.plannedDelegations.map((d) => this.delegationLine(d, false)),
+      ...g.liveDelegations.map((d) => this.delegationLine(d, true)),
+      ...(g.openTasks ? [this.openTasksLine(g.openTasks)] : []),
+    ];
+  }
+
+  /** The line of the open tasks in one Gremium. */
+  private openTasksLine(n: number): RevokeLine {
+    return {
+      text:
+        n === 1
+          ? this.i18n.translate('admin.users.revoke.openTask')
+          : this.i18n.translate('admin.users.revoke.openTasks', { n }),
+      detail: this.i18n.translate('admin.users.revoke.openTasksDetail'),
+    };
   }
 
   /** The origin of one global role: its SSO groups and its manual assignments. */
   protected roleLines(r: RevokeGlobalRole): RevokeLine[] {
-    const lines: RevokeLine[] = [];
-    if (r.groups.length) {
-      lines.push({ text: this.groupsText(r.groups), detail: this.i18n.translate('admin.users.revoke.groupsRemoved') });
-    }
-    lines.push(...r.assignments.map((a) => this.assignmentLine(a)));
-    return lines;
+    return [
+      ...(r.groups.length
+        ? [
+            {
+              text: this.groupsText(r.groups),
+              detail: this.i18n.translate('admin.users.revoke.groupsRemoved'),
+            },
+          ]
+        : []),
+      ...r.assignments.map((a) => this.assignmentLine(a)),
+    ];
   }
 
   protected submit(): void {
