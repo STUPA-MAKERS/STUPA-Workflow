@@ -141,7 +141,10 @@ class NotificationService:
         """
         existing = await self._get_template_by_key(payload.key)
         if existing is not None:
-            raise ConflictError(f"mail template {payload.key!r} already exists")
+            raise ConflictError(
+                f"mail template {payload.key!r} already exists",
+                code="mail_template_exists",
+            )
         tpl = MailTemplate(
             key=payload.key,
             subject_i18n=payload.subject_i18n,

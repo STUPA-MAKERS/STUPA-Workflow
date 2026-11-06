@@ -664,7 +664,10 @@ async def open_meeting_vote(
         and source is None
         and await service.agenda_item_has_vote(item.id)
     ):
-        raise ConflictError("this application TOP already has a decision vote")
+        raise ConflictError(
+            "this application TOP already has a decision vote",
+            code="agenda_decision_vote_exists",
+        )
     create = await build_meeting_vote(service, meeting, item, payload)
     if item.application_id is not None:
         moved_on = (
