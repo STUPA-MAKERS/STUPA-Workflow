@@ -41,9 +41,10 @@ export function langFieldLabel(label: string, lang: Lang): string {
  * an empty text. DE and EN keep an empty entry, as the editors always wrote them.
  */
 export function setI18n(map: I18nMap | null | undefined, lang: Lang, text: string): I18nMap {
-  const next: I18nMap = { ...map, [lang]: text };
-  if (text === '' && lang !== 'de' && lang !== 'en') delete next[lang];
-  return next;
+  const drop = text === '' && lang !== 'de' && lang !== 'en';
+  return drop
+    ? Object.fromEntries(Object.entries(map ?? {}).filter(([code]) => code !== lang))
+    : { ...map, [lang]: text };
 }
 
 /** The two maps have the same text in every language. A missing entry equals an empty one. */
@@ -54,9 +55,9 @@ export function sameI18n(a: I18nMap | null | undefined, b: I18nMap | null | unde
 
 /** The map with each text trimmed and without the empty ones. */
 export function trimI18n(map: I18nMap | null | undefined): I18nMap {
-  const out: I18nMap = {};
-  for (const [code, text] of Object.entries(map ?? {})) {
-    if (text.trim()) out[code] = text.trim();
-  }
-  return out;
+  return Object.fromEntries(
+    Object.entries(map ?? {})
+      .filter(([, text]) => text.trim())
+      .map(([code, text]) => [code, text.trim()]),
+  );
 }

@@ -250,7 +250,7 @@ export class TicketDetailComponent {
   readonly loading = signal(true);
   readonly notFound = signal(false);
   readonly error = signal(false);
-  readonly notes = signal<TicketNote[]>([]);
+  readonly notes = signal<readonly TicketNote[]>([]);
   readonly todos = signal<TodoLinkedCard[]>([]);
   readonly assignees = signal<PersonRef[]>([]);
   /** A change in flight: the state, the assignee or the kind. */
@@ -665,8 +665,11 @@ export class TicketDetailComponent {
     const duplicateOfId = this.closingDuplicateOf;
     this.closing.set(null);
     this.closingDuplicateOf = null;
-    const body: TicketPatch = { status, completeTodos: this.completeTodos() };
-    if (duplicateOfId) body.duplicateOfId = duplicateOfId;
+    const body: TicketPatch = {
+      status,
+      completeTodos: this.completeTodos(),
+      ...(duplicateOfId ? { duplicateOfId } : {}),
+    };
     this.patch(body, 'status', true);
   }
 

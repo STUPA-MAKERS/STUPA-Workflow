@@ -76,7 +76,7 @@ export class BrandingService {
    * defaults.
    */
   private readonly _copyright = signal<I18nMap | null>(null);
-  private readonly _legalLinks = signal<PublicFooterLink[]>([]);
+  private readonly _legalLinks = signal<readonly PublicFooterLink[]>([]);
 
   /** Default confirmation window of a guest application, in hours. */
   static readonly DEFAULT_CONFIRM_TTL_HOURS = 12;
@@ -201,11 +201,8 @@ export class BrandingService {
     effect(() => {
       const upload = this._logos().favicon;
       document.querySelectorAll<HTMLLinkElement>('link[rel="icon"]').forEach((link) => {
-        let original = builtIn.get(link);
-        if (original === undefined) {
-          original = link.getAttribute('href') ?? '';
-          builtIn.set(link, original);
-        }
+        const original = builtIn.get(link) ?? link.getAttribute('href') ?? '';
+        if (!builtIn.has(link)) builtIn.set(link, original);
         link.setAttribute('href', upload ?? original);
         if (upload) link.removeAttribute('type');
       });
@@ -230,11 +227,13 @@ export class BrandingService {
     const accent = normalizeHex(branding?.accentColor);
     this._accent.set(accent);
     storeAccent(accent);
-    const logos: Partial<Record<BrandLogoSlot, string>> = {};
-    for (const slot of ['wordmark', 'imagemark', 'favicon'] as const) {
-      const url = branding?.logos?.[slot]?.url;
-      if (url) logos[slot] = url;
-    }
+    const slots = ['wordmark', 'imagemark', 'favicon'] as const;
+    const logos: Partial<Record<BrandLogoSlot, string>> = Object.fromEntries(
+      slots.flatMap((slot) => {
+        const url = branding?.logos?.[slot]?.url;
+        return url ? [[slot, url]] : [];
+      }),
+    );
     this._logos.set(logos);
   }
 

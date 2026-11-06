@@ -229,8 +229,9 @@ export class BrandingEditorComponent {
   protected setText(map: I18nMap, value: string): void {
     this.patch(() => {
       const next = setI18n(map, this.lang(), value);
-      for (const code of Object.keys(map)) if (!(code in next)) delete map[code];
-      Object.assign(map, next);
+      const draft = map as Record<string, string>;
+      for (const code of Object.keys(draft)) if (!(code in next)) delete draft[code];
+      Object.assign(draft, next);
     });
   }
 

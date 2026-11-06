@@ -43,7 +43,7 @@ export class TodoArchiveSheetComponent {
   readonly restored = output<TodoCardDetail>();
 
   readonly phone = mediaQuery(MEDIA.phone);
-  readonly items = signal<TodoCardTile[]>([]);
+  readonly items = signal<readonly TodoCardTile[]>([]);
   readonly total = signal(0);
   readonly loading = signal(false);
   readonly failed = signal(false);

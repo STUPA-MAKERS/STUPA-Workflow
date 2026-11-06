@@ -111,8 +111,8 @@ export function demoVote(id: string, own: MyBallot | null): Vote | undefined {
  */
 function row(
   v: Vote,
-  gremium: { id: string; name: string },
-  meeting: { title: string; position: number } | null = null,
+  gremium: { readonly id: string; readonly name: string },
+  meeting: { readonly title: string; readonly position: number } | null = null,
 ): VoteListItem {
   const openedAt = v.openedAt ?? null;
   const closedAt = v.closedAt ?? null;

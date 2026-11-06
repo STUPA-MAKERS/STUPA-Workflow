@@ -58,9 +58,9 @@ export class MeetingsTimelineService {
   private listSeq = 0;
 
   /** Upcoming meetings, chronologically forward (earliest on top). */
-  readonly upcomingItems = signal<Meeting[]>([]);
+  readonly upcomingItems = signal<readonly Meeting[]>([]);
   /** Past meetings, chronological (oldest on top, newest next to "now"). */
-  readonly pastItems = signal<Meeting[]>([]);
+  readonly pastItems = signal<readonly Meeting[]>([]);
   private upcomingCursor: string | null = null;
   private pastCursor: string | null = null;
   readonly upcomingHasMore = signal(false);
@@ -99,7 +99,7 @@ export class MeetingsTimelineService {
   /** Active search query (empty = normal past/upcoming timeline). */
   readonly searchQuery = signal('');
   readonly searchActive = computed(() => this.searchQuery().trim().length > 0);
-  readonly searchItems = signal<Meeting[]>([]);
+  readonly searchItems = signal<readonly Meeting[]>([]);
   private searchCursor: string | null = null;
   readonly searchHasMore = signal(false);
   readonly loadingSearch = signal(false);
@@ -267,7 +267,7 @@ export class MeetingsTimelineService {
 
   /** Replace an updated meeting in both directions and in the search hits. */
   replaceInTimeline(updated: Meeting): void {
-    const repl = (list: Meeting[]): Meeting[] =>
+    const repl = (list: readonly Meeting[]): readonly Meeting[] =>
       list.map((x) => (x.id === updated.id ? updated : x));
     this.upcomingItems.update(repl);
     this.pastItems.update(repl);
@@ -277,7 +277,7 @@ export class MeetingsTimelineService {
 
   /** Remove a deleted meeting from both directions and from the search hits. */
   removeFromTimeline(id: Uuid): void {
-    const rm = (list: Meeting[]): Meeting[] => list.filter((x) => x.id !== id);
+    const rm = (list: readonly Meeting[]): readonly Meeting[] => list.filter((x) => x.id !== id);
     this.upcomingItems.update(rm);
     this.pastItems.update(rm);
     this.searchItems.update(rm);

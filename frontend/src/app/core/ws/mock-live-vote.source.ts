@@ -38,27 +38,13 @@ export class MockLiveVoteSource implements LiveVoteSource {
       options: ['yes', 'no', 'abstain'],
       closesAt: null,
     };
-    const tally: VoteTallyMsg = {
+    let tally: VoteTallyMsg = {
       type: 'vote_tally',
       voteId: 'vote-demo',
       counts: { yes: 5, no: 2, abstain: 1 },
       eligible: 12,
       quorumMet: true,
       leading: 'yes',
-    };
-
-    const recompute = (): void => {
-      let leading: string | null = null;
-      let max = -1;
-      for (const [opt, n] of Object.entries(tally.counts)) {
-        if (n > max) {
-          max = n;
-          leading = opt;
-        }
-      }
-      const cast = Object.values(tally.counts).reduce((a, b) => a + b, 0);
-      tally.leading = leading;
-      tally.quorumMet = cast * 2 >= tally.eligible;
     };
 
     const emitTally = (): void => {
@@ -78,8 +64,7 @@ export class MockLiveVoteSource implements LiveVoteSource {
       if (!vote.options.includes(choice)) return;
       const cast = Object.values(tally.counts).reduce((a, b) => a + b, 0);
       if (cast >= tally.eligible) return;
-      tally.counts[choice] = (tally.counts[choice] ?? 0) + 1;
-      recompute();
+      tally = withBallot(tally, choice);
       emitTally();
     };
 
@@ -121,4 +106,29 @@ export class MockLiveVoteSource implements LiveVoteSource {
       },
     };
   }
+}
+
+/** The sum of all counts of a tally. */
+function castOf(counts: Readonly<Record<string, number>>): number {
+  return Object.values(counts).reduce((a, b) => a + b, 0);
+}
+
+/** The first option with the most ballots, or `null` without counts. */
+function leadingOf(counts: Readonly<Record<string, number>>): string | null {
+  const [leading] = Object.entries(counts).reduce<readonly [string | null, number]>(
+    ([best, max], [opt, n]) => (n > max ? [opt, n] : [best, max]),
+    [null, -1],
+  );
+  return leading;
+}
+
+/** The tally after one more ballot for `choice`, with the leading option and the quorum. */
+function withBallot(tally: VoteTallyMsg, choice: string): VoteTallyMsg {
+  const counts = { ...tally.counts, [choice]: (tally.counts[choice] ?? 0) + 1 };
+  return {
+    ...tally,
+    counts,
+    leading: leadingOf(counts),
+    quorumMet: castOf(counts) * 2 >= tally.eligible,
+  };
 }

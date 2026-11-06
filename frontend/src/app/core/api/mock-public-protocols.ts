@@ -12,7 +12,7 @@ import type {
 
 const GREMIUM = { id: 'g-public-1', name: 'Studierendenparlament', slug: 'stupa' };
 
-const PROTOCOLS: PublicProtocolDetail[] = [
+const PROTOCOLS: readonly PublicProtocolDetail[] = [
   {
     id: 'pp-0001',
     title: '34. Sitzung des Studierendenparlaments',
@@ -64,7 +64,7 @@ const PROTOCOLS: PublicProtocolDetail[] = [
 export function mockPublicProtocols(
   method: string,
   path: string,
-): { body: unknown } | undefined {
+): { readonly body: unknown } | undefined {
   if (method !== 'GET') return undefined;
   if (path.endsWith('/public/gremien')) {
     const body: PublicGremium[] = [{ ...GREMIUM, protocolCount: PROTOCOLS.length }];

@@ -113,7 +113,7 @@ export class SearchPaletteComponent {
   });
   readonly loading = this.search.pending;
 
-  private readonly hits = signal<SearchHit[]>([]);
+  private readonly hits = signal<readonly SearchHit[]>([]);
   readonly truncated = signal(false);
 
   /** Pages that match, filtered to what this user may actually open. */

@@ -14,6 +14,7 @@ import { messageFiles } from '@core/api/mappers';
 import { skipLoading } from '@stupa-makers/ui-kit';
 import { detailContext } from '@core/cache/cache.interceptor';
 import type { TicketStatus } from './tickets.service';
+import { httpParams } from './http-params';
 
 export type TodoBoardKind = 'gremium' | 'personal' | 'team';
 export type TodoLabelColor = 'green' | 'blue' | 'violet' | 'amber' | 'red' | 'gray';
@@ -31,207 +32,207 @@ export type TodoVoteStatus = 'draft' | 'open' | 'closed' | 'cancelled';
 export type TodoVoteResult = 'passed' | 'rejected' | 'tie' | 'elected' | 'runoff';
 
 export interface TodoBoardSummary {
-  id: Uuid;
-  name: string;
-  kind: TodoBoardKind;
-  gremiumId: Uuid | null;
-  canWrite: boolean;
-  canConfigure: boolean;
+  readonly id: Uuid;
+  readonly name: string;
+  readonly kind: TodoBoardKind;
+  readonly gremiumId: Uuid | null;
+  readonly canWrite: boolean;
+  readonly canConfigure: boolean;
   /** Not archived, not in the done column. */
-  openCount: number;
+  readonly openCount: number;
 }
 
 export interface TodoColumn {
-  id: Uuid;
-  name: string;
-  position: number;
-  isDone: boolean;
-  cardCount: number;
+  readonly id: Uuid;
+  readonly name: string;
+  readonly position: number;
+  readonly isDone: boolean;
+  readonly cardCount: number;
 }
 
 export interface TodoLabel {
-  id: Uuid;
-  name: string;
-  color: TodoLabelColor;
+  readonly id: Uuid;
+  readonly name: string;
+  readonly color: TodoLabelColor;
 }
 
 /** The facts of a link target; only the fields of its kind are set. */
 export interface TodoLinkDetail {
-  stateLabel?: I18nMap | null;
-  date?: string | null;
-  meetingTitle?: string | null;
-  position?: number | null;
-  number?: string | null;
-  status?: TicketStatus | null;
-  boardName?: string | null;
-  columnName?: string | null;
-  isDone?: boolean | null;
+  readonly stateLabel?: I18nMap | null;
+  readonly date?: string | null;
+  readonly meetingTitle?: string | null;
+  readonly position?: number | null;
+  readonly number?: string | null;
+  readonly status?: TicketStatus | null;
+  readonly boardName?: string | null;
+  readonly columnName?: string | null;
+  readonly isDone?: boolean | null;
   /** Invoice (gross) or booking amount, a decimal string in EUR. */
-  amount?: string | null;
+  readonly amount?: string | null;
   /** The supplier of an invoice, the correspondent of a booking. */
-  counterparty?: string | null;
+  readonly counterparty?: string | null;
   /** The path key of the cost centre of a booking ("VS-800-04"). */
-  costCentre?: string | null;
-  invoiceStatus?: 'open' | 'paid' | null;
-  bookingKind?: 'expense' | 'income' | null;
-  voteStatus?: TodoVoteStatus | null;
-  voteResult?: TodoVoteResult | null;
+  readonly costCentre?: string | null;
+  readonly invoiceStatus?: 'open' | 'paid' | null;
+  readonly bookingKind?: 'expense' | 'income' | null;
+  readonly voteStatus?: TodoVoteStatus | null;
+  readonly voteResult?: TodoVoteResult | null;
 }
 
 export interface TodoLink {
-  id: Uuid;
-  kind: TodoLinkKind;
-  targetId: Uuid;
+  readonly id: Uuid;
+  readonly kind: TodoLinkKind;
+  readonly targetId: Uuid;
   /** false: title, url and detail are null ("<Kind> (kein Zugriff)"). */
-  accessible: boolean;
-  title: string | null;
-  url: string | null;
-  detail: TodoLinkDetail | null;
+  readonly accessible: boolean;
+  readonly title: string | null;
+  readonly url: string | null;
+  readonly detail: TodoLinkDetail | null;
   /** Readable only through this card (spec 000487): no url, the card opens a read sheet. */
-  granted?: boolean;
+  readonly granted?: boolean;
 }
 
 /** One fact of a link target in the read sheet; `label` is the label of a form field. */
 export interface TodoViewFact {
-  key: string;
-  label: Record<string, string> | null;
-  value: string;
-  format: 'text' | 'money' | 'date' | 'markdown';
+  readonly key: string;
+  readonly label: Readonly<Record<string, string>> | null;
+  readonly value: string;
+  readonly format: 'text' | 'money' | 'date' | 'markdown';
 }
 
 /** A TOP of a meeting, a vote of a TOP (`meta`: result or status) or a checklist item. */
 export interface TodoViewRow {
-  title: string;
-  meta: string | null;
-  done: boolean | null;
+  readonly title: string;
+  readonly meta: string | null;
+  readonly done: boolean | null;
 }
 
 /** A link target as a card reader sees it: read only, without PII and without links. */
 export interface TodoLinkView {
-  kind: TodoLinkKind;
-  title: string;
-  detail: TodoLinkDetail;
-  facts: TodoViewFact[];
-  rows: TodoViewRow[];
+  readonly kind: TodoLinkKind;
+  readonly title: string;
+  readonly detail: TodoLinkDetail;
+  readonly facts: readonly TodoViewFact[];
+  readonly rows: readonly TodoViewRow[];
 }
 
 /** The event data of a card: the card is an Event (`Veranstaltung`). Dates are `YYYY-MM-DD`. */
 export interface TodoEventBrief {
-  startsOn: string | null;
-  endsOn: string | null;
-  place: string | null;
-  participants: number | null;
-  seriesId: Uuid | null;
-  seriesName: string | null;
+  readonly startsOn: string | null;
+  readonly endsOn: string | null;
+  readonly place: string | null;
+  readonly participants: number | null;
+  readonly seriesId: Uuid | null;
+  readonly seriesName: string | null;
 }
 
 /** The money of an Event: decimal strings with two places; balance = income − expenses. */
 export interface TodoEventTotals {
-  requested: string;
-  approved: string;
-  expenses: string;
-  income: string;
-  balance: string;
+  readonly requested: string;
+  readonly approved: string;
+  readonly expenses: string;
+  readonly income: string;
+  readonly balance: string;
 }
 
 /** A decision of an Event: the valid decision of a linked Antrag or a closed vote. */
 export interface TodoEventDecision {
-  kind: 'decision' | 'vote';
-  targetId: Uuid | null;
-  title: string;
-  decidedAt: IsoDateTime | null;
-  meetingTitle: string | null;
-  result: string | null;
-  amount: string | null;
-  conditions: string[];
+  readonly kind: 'decision' | 'vote';
+  readonly targetId: Uuid | null;
+  readonly title: string;
+  readonly decidedAt: IsoDateTime | null;
+  readonly meetingTitle: string | null;
+  readonly result: string | null;
+  readonly amount: string | null;
+  readonly conditions: readonly string[];
 }
 
 /** Another Event of the series that the caller reads. */
 export interface TodoEventEdition {
-  id: Uuid;
-  boardId: Uuid;
-  boardName: string;
-  title: string;
-  startsOn: string | null;
-  endsOn: string | null;
-  archived: boolean;
-  totals: TodoEventTotals;
+  readonly id: Uuid;
+  readonly boardId: Uuid;
+  readonly boardName: string;
+  readonly title: string;
+  readonly startsOn: string | null;
+  readonly endsOn: string | null;
+  readonly archived: boolean;
+  readonly totals: TodoEventTotals;
 }
 
 /** What an Event gathers: totals, decisions, the other editions of its series. */
 export interface TodoEventFacts {
-  totals: TodoEventTotals;
-  decisions: TodoEventDecision[];
-  editions: TodoEventEdition[];
+  readonly totals: TodoEventTotals;
+  readonly decisions: readonly TodoEventDecision[];
+  readonly editions: readonly TodoEventEdition[];
   /** The other editions that the caller cannot read. */
-  hiddenEditions: number;
+  readonly hiddenEditions: number;
 }
 
 /** The event data to set (`PUT /todos/cards/{id}/event`) or to create a card with. */
 export interface TodoEventIn {
-  startsOn?: string | null;
-  endsOn?: string | null;
-  place?: string | null;
-  participants?: number | null;
-  seriesId?: Uuid | null;
+  readonly startsOn?: string | null;
+  readonly endsOn?: string | null;
+  readonly place?: string | null;
+  readonly participants?: number | null;
+  readonly seriesId?: Uuid | null;
 }
 
 export interface TodoEventSeries {
-  id: Uuid;
-  name: string;
+  readonly id: Uuid;
+  readonly name: string;
 }
 
 /** An Event on a board that the caller writes: an option of the `Veranstaltung` picker. */
 export interface TodoEventRef {
-  id: Uuid;
-  boardId: Uuid;
-  boardName: string;
-  title: string;
-  startsOn: string | null;
-  endsOn: string | null;
+  readonly id: Uuid;
+  readonly boardId: Uuid;
+  readonly boardName: string;
+  readonly title: string;
+  readonly startsOn: string | null;
+  readonly endsOn: string | null;
 }
 
 export interface TodoCardTile {
-  id: Uuid;
-  boardId: Uuid;
-  columnId: Uuid;
-  rank: string;
-  title: string;
+  readonly id: Uuid;
+  readonly boardId: Uuid;
+  readonly columnId: Uuid;
+  readonly rank: string;
+  readonly title: string;
   /** `YYYY-MM-DD`. */
-  dueDate: string | null;
-  completedAt: IsoDateTime | null;
-  labelIds: Uuid[];
-  assignees: PersonRef[];
-  checklist: { done: number; total: number };
-  commentCount: number;
-  primaryLink: TodoLink | null;
-  linkCount: number;
+  readonly dueDate: string | null;
+  readonly completedAt: IsoDateTime | null;
+  readonly labelIds: readonly Uuid[];
+  readonly assignees: readonly PersonRef[];
+  readonly checklist: { readonly done: number; readonly total: number };
+  readonly commentCount: number;
+  readonly primaryLink: TodoLink | null;
+  readonly linkCount: number;
   /** Set for an Event. */
-  event: TodoEventBrief | null;
-  version: number;
-  createdAt: IsoDateTime;
-  updatedAt: IsoDateTime;
+  readonly event: TodoEventBrief | null;
+  readonly version: number;
+  readonly createdAt: IsoDateTime;
+  readonly updatedAt: IsoDateTime;
 }
 
 export interface TodoBoard {
-  id: Uuid;
-  name: string;
-  kind: TodoBoardKind;
-  gremiumId: Uuid | null;
-  archiveAfterDays: number | null;
-  canWrite: boolean;
-  canConfigure: boolean;
-  columns: TodoColumn[];
-  labels: TodoLabel[];
-  cards: TodoCardTile[];
-  archivedCount: number;
+  readonly id: Uuid;
+  readonly name: string;
+  readonly kind: TodoBoardKind;
+  readonly gremiumId: Uuid | null;
+  readonly archiveAfterDays: number | null;
+  readonly canWrite: boolean;
+  readonly canConfigure: boolean;
+  readonly columns: readonly TodoColumn[];
+  readonly labels: readonly TodoLabel[];
+  readonly cards: readonly TodoCardTile[];
+  readonly archivedCount: number;
 }
 
 export interface TodoCheckItem {
-  id: Uuid;
-  text: string;
-  done: boolean;
-  position: number;
+  readonly id: Uuid;
+  readonly text: string;
+  readonly done: boolean;
+  readonly position: number;
 }
 
 export type TodoEventKind =
@@ -247,71 +248,75 @@ export type TodoEventKind =
   | 'restored';
 
 export interface TodoEvent {
-  id: Uuid;
-  kind: TodoEventKind;
-  actor: PersonRef | null;
-  at: IsoDateTime;
-  payload: Record<string, unknown>;
+  readonly id: Uuid;
+  readonly kind: TodoEventKind;
+  readonly actor: PersonRef | null;
+  readonly at: IsoDateTime;
+  readonly payload: Readonly<Record<string, unknown>>;
 }
 
 export interface TodoComment {
-  id: Uuid;
-  author: PersonRef;
-  body: string;
-  mentions: PersonRef[];
-  at: IsoDateTime;
-  editedAt: IsoDateTime | null;
-  isOwn: boolean;
+  readonly id: Uuid;
+  readonly author: PersonRef;
+  readonly body: string;
+  readonly mentions: readonly PersonRef[];
+  readonly at: IsoDateTime;
+  readonly editedAt: IsoDateTime | null;
+  readonly isOwn: boolean;
   /** The files of the comment, oldest first. */
-  attachments: MessageAttachment[];
+  readonly attachments: readonly MessageAttachment[];
 }
 
 export interface TodoCardDetail extends TodoCardTile {
-  descriptionMd: string | null;
-  boardName: string;
-  boardKind: TodoBoardKind;
-  canWrite: boolean;
-  columns: { id: Uuid; name: string; isDone: boolean }[];
-  labels: TodoLabel[];
-  boardLabels: TodoLabel[];
-  createdBy: PersonRef;
-  links: TodoLink[];
-  checklistItems: TodoCheckItem[];
-  events: TodoEvent[];
-  comments: TodoComment[];
-  archivedAt: IsoDateTime | null;
+  readonly descriptionMd: string | null;
+  readonly boardName: string;
+  readonly boardKind: TodoBoardKind;
+  readonly canWrite: boolean;
+  readonly columns: readonly {
+    readonly id: Uuid;
+    readonly name: string;
+    readonly isDone: boolean;
+  }[];
+  readonly labels: readonly TodoLabel[];
+  readonly boardLabels: readonly TodoLabel[];
+  readonly createdBy: PersonRef;
+  readonly links: readonly TodoLink[];
+  readonly checklistItems: readonly TodoCheckItem[];
+  readonly events: readonly TodoEvent[];
+  readonly comments: readonly TodoComment[];
+  readonly archivedAt: IsoDateTime | null;
   /** Set for an Event. */
-  eventFacts: TodoEventFacts | null;
+  readonly eventFacts: TodoEventFacts | null;
 }
 
 export interface TodoCardCreate {
-  boardId: Uuid;
+  readonly boardId: Uuid;
   /** Default: the first column by position. */
-  columnId?: Uuid;
-  title: string;
-  descriptionMd?: string | null;
-  dueDate?: string | null;
-  assigneeIds?: Uuid[];
-  labelIds?: Uuid[];
-  links?: { kind: TodoLinkKind; targetId: Uuid }[];
+  readonly columnId?: Uuid;
+  readonly title: string;
+  readonly descriptionMd?: string | null;
+  readonly dueDate?: string | null;
+  readonly assigneeIds?: readonly Uuid[];
+  readonly labelIds?: readonly Uuid[];
+  readonly links?: readonly { readonly kind: TodoLinkKind; readonly targetId: Uuid }[];
   /** Makes the card an Event. */
-  event?: TodoEventIn | null;
+  readonly event?: TodoEventIn | null;
 }
 
 /** Content edits; `version` guards them (409 `card_version_conflict`). */
 export interface TodoCardPatch {
-  version: number;
-  title?: string;
-  descriptionMd?: string | null;
-  dueDate?: string | null;
+  readonly version: number;
+  readonly title?: string;
+  readonly descriptionMd?: string | null;
+  readonly dueDate?: string | null;
 }
 
 /** A move: `beforeId` places the card directly above that card, `afterId` directly
  *  below it; neither puts it at the end of the column. */
 export interface TodoCardMove {
-  columnId: Uuid;
-  beforeId?: Uuid | null;
-  afterId?: Uuid | null;
+  readonly columnId: Uuid;
+  readonly beforeId?: Uuid | null;
+  readonly afterId?: Uuid | null;
 }
 
 /**
@@ -319,24 +324,24 @@ export interface TodoCardMove {
  * `afterId` (above) and `beforeId` (below) as in a move, else at the end.
  */
 export interface TodoCardTransfer {
-  boardId: Uuid;
-  columnId?: Uuid | null;
-  beforeId?: Uuid | null;
-  afterId?: Uuid | null;
+  readonly boardId: Uuid;
+  readonly columnId?: Uuid | null;
+  readonly beforeId?: Uuid | null;
+  readonly afterId?: Uuid | null;
 }
 
 export interface TodoMineItem extends TodoCardTile {
-  boardName: string;
-  boardKind: TodoBoardKind;
-  columnName: string;
-  labels: TodoLabel[];
+  readonly boardName: string;
+  readonly boardKind: TodoBoardKind;
+  readonly columnName: string;
+  readonly labels: readonly TodoLabel[];
 }
 
 /** The open cards assigned to the caller over all boards. */
 export interface TodoMine {
-  items: TodoMineItem[];
+  readonly items: readonly TodoMineItem[];
   /** Cards due within 7 days, overdue included. */
-  dueSoonCount: number;
+  readonly dueSoonCount: number;
 }
 
 /**
@@ -346,61 +351,61 @@ export interface TodoMine {
  * "all" every one. `cardCount` of a column counts those cards.
  */
 export interface TodoAssignedBoard {
-  id: Uuid;
-  name: string;
-  kind: TodoBoardKind;
-  gremiumId: Uuid | null;
-  canWrite: boolean;
-  columns: TodoColumn[];
-  labels: TodoLabel[];
-  cards: TodoCardTile[];
+  readonly id: Uuid;
+  readonly name: string;
+  readonly kind: TodoBoardKind;
+  readonly gremiumId: Uuid | null;
+  readonly canWrite: boolean;
+  readonly columns: readonly TodoColumn[];
+  readonly labels: readonly TodoLabel[];
+  readonly cards: readonly TodoCardTile[];
 }
 
 /** The answer of a poll of the rows: the boards and their ETag, or `boards: null` for 304. */
 export interface TodoAssignedPoll {
-  boards: TodoAssignedBoard[] | null;
-  etag: string | null;
+  readonly boards: readonly TodoAssignedBoard[] | null;
+  readonly etag: string | null;
 }
 
 /** A hit of the link picker. */
 export interface TodoLinkTarget {
-  kind: TodoLinkKind;
-  targetId: Uuid;
-  title: string;
-  detail: TodoLinkDetail;
+  readonly kind: TodoLinkKind;
+  readonly targetId: Uuid;
+  readonly title: string;
+  readonly detail: TodoLinkDetail;
 }
 
 /** The board settings a configurer may change. */
 export interface TodoBoardPatch {
-  name?: string;
-  archiveAfterDays?: number | null;
+  readonly name?: string;
+  readonly archiveAfterDays?: number | null;
 }
 
 /** The answer of a poll: a new board and its ETag, or `board: null` for 304. */
 export interface TodoBoardPoll {
-  board: TodoBoard | null;
-  etag: string | null;
+  readonly board: TodoBoard | null;
+  readonly etag: string | null;
 }
 
 /** A card that links an application, a meeting, an agenda item or a ticket. */
 export interface TodoLinkedCard {
-  id: Uuid;
-  boardId: Uuid;
-  boardName: string;
-  title: string;
-  columnName: string;
-  isDone: boolean;
-  dueDate: string | null;
-  assignees: PersonRef[];
+  readonly id: Uuid;
+  readonly boardId: Uuid;
+  readonly boardName: string;
+  readonly title: string;
+  readonly columnName: string;
+  readonly isDone: boolean;
+  readonly dueDate: string | null;
+  readonly assignees: readonly PersonRef[];
   /** Set for an Event; then `balance` is its balance. */
-  event: TodoEventBrief | null;
-  balance: string | null;
+  readonly event: TodoEventBrief | null;
+  readonly balance: string | null;
 }
 
 /** An assignable person of a board; also the @-mention list. */
 export interface TodoMember {
-  principalId: Uuid;
-  displayName: string | null;
+  readonly principalId: Uuid;
+  readonly displayName: string | null;
 }
 
 /** The most cards that one `cards()` read asks for (`CARD_BATCH` of the API). */
@@ -413,8 +418,7 @@ export class TodosApiService {
 
   /** The boards of the caller: personal, the gremium boards by name, team. */
   boards(gremiumId?: Uuid | null): Observable<TodoBoardSummary[]> {
-    let params = new HttpParams();
-    if (gremiumId) params = params.set('gremiumId', gremiumId);
+    const params = httpParams({ gremiumId: gremiumId || undefined });
     return this.http.get<TodoBoardSummary[]>(`${this.base}/todos/boards`, {
       params,
       context: skipLoading(),
@@ -430,8 +434,7 @@ export class TodosApiService {
    * keeps its state.
    */
   pollBoard(boardId: Uuid, etag: string | null): Observable<TodoBoardPoll> {
-    let headers = new HttpHeaders();
-    if (etag) headers = headers.set('If-None-Match', etag);
+    const headers = etag ? new HttpHeaders().set('If-None-Match', etag) : new HttpHeaders();
     return this.http
       .get<TodoBoard>(`${this.base}/todos/boards/${boardId}`, {
         headers,
@@ -476,8 +479,7 @@ export class TodosApiService {
 
   /** Delete a column; `moveTo` takes its cards. */
   deleteColumn(boardId: Uuid, columnId: Uuid, moveTo?: Uuid | null): Observable<TodoBoard> {
-    let params = new HttpParams();
-    if (moveTo) params = params.set('moveTo', moveTo);
+    const params = httpParams({ moveTo: moveTo || undefined });
     return this.http.delete<TodoBoard>(`${this.base}/todos/boards/${boardId}/columns/${columnId}`, {
       params,
       context: skipLoading(),
@@ -504,9 +506,12 @@ export class TodosApiService {
 
   /** The archived cards of a board, newest first. */
   archive(boardId: Uuid, q = '', offset = 0, limit = 50, eventsOnly = false): Observable<Page<TodoCardTile>> {
-    let params = new HttpParams().set('limit', limit).set('offset', offset);
-    if (q) params = params.set('q', q);
-    if (eventsOnly) params = params.set('events', 'true');
+    const params = httpParams({
+      limit,
+      offset,
+      q: q || undefined,
+      events: eventsOnly ? 'true' : undefined,
+    });
     return this.http.get<Page<TodoCardTile>>(`${this.base}/todos/boards/${boardId}/archive`, {
       params,
       context: skipLoading(),
@@ -535,8 +540,7 @@ export class TodosApiService {
    * of the board page. A card the caller cannot read is left out.
    */
   cards(ids: readonly Uuid[]): Observable<TodoCardDetail[]> {
-    let params = new HttpParams();
-    for (const id of ids) params = params.append('ids', id);
+    const params = httpParams({ ids });
     return this.http.get<TodoCardDetail[]>(`${this.base}/todos/cards`, { params, context: skipLoading() });
   }
 
@@ -695,8 +699,7 @@ export class TodosApiService {
   }
 
   private pollRows(source: 'mine' | 'all', etag: string | null): Observable<TodoAssignedPoll> {
-    let headers = new HttpHeaders();
-    if (etag) headers = headers.set('If-None-Match', etag);
+    const headers = etag ? new HttpHeaders().set('If-None-Match', etag) : new HttpHeaders();
     return this.http
       .get<TodoAssignedBoard[]>(`${this.base}/todos/${source}/boards`, {
         headers,
@@ -715,8 +718,7 @@ export class TodosApiService {
 
   /** The link picker: what the caller may read, at most five per kind. */
   linkTargets(q: string, kind: TodoLinkKind | 'all', excludeCardId?: Uuid | null): Observable<TodoLinkTarget[]> {
-    let params = new HttpParams().set('q', q).set('kind', kind);
-    if (excludeCardId) params = params.set('excludeCardId', excludeCardId);
+    const params = httpParams({ q, kind, excludeCardId: excludeCardId || undefined });
     return this.http.get<TodoLinkTarget[]>(`${this.base}/todos/link-targets`, {
       params,
       context: skipLoading(),
@@ -745,8 +747,7 @@ export class TodosApiService {
   }
 
   series(q = ''): Observable<TodoEventSeries[]> {
-    let params = new HttpParams();
-    if (q) params = params.set('q', q);
+    const params = httpParams({ q: q || undefined });
     return this.http.get<TodoEventSeries[]>(`${this.base}/todos/series`, { params, context: skipLoading() });
   }
 
@@ -756,8 +757,7 @@ export class TodosApiService {
 
   /** The live Events on boards that the caller writes (the `Veranstaltung` picker). */
   writableEvents(q = ''): Observable<TodoEventRef[]> {
-    let params = new HttpParams();
-    if (q) params = params.set('q', q);
+    const params = httpParams({ q: q || undefined });
     return this.http.get<TodoEventRef[]>(`${this.base}/todos/events`, { params, context: skipLoading() });
   }
 }

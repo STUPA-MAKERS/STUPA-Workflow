@@ -59,6 +59,7 @@ import {
 import { I18nInputComponent } from '@shared/ui/i18n-input/i18n-input.component';
 import { ContentLangSwitchComponent } from '@shared/ui/content-lang-switch/content-lang-switch.component';
 import { ContentLangState } from '@shared/ui/content-lang-switch/content-lang.state';
+import { withoutKey } from '@shared/util/immutable';
 
 /**
  * Visible order of the question types in the "add question" menu. `section` is **not** a
@@ -660,8 +661,8 @@ export class FormEditorComponent {
   protected duplicateQuestion(pos: QPos): void {
     this.restructure(() =>
       this.patchGroup(pos.gi, (g) => {
-        const copy: FormFieldDef = structuredClone(g.fields[pos.qi]);
-        copy.key = copy.key ? `${copy.key}_copy` : '';
+        const clone: FormFieldDef = structuredClone(g.fields[pos.qi]);
+        const copy: FormFieldDef = { ...clone, key: clone.key ? `${clone.key}_copy` : '' };
         return {
           ...g,
           fields: [...g.fields.slice(0, pos.qi + 1), copy, ...g.fields.slice(pos.qi + 1)],
@@ -739,16 +740,15 @@ export class FormEditorComponent {
   }
 
   private adaptToType(field: FormFieldDef, type: FieldType): FormFieldDef {
-    const next: FormFieldDef = { ...field, type };
-    if ((type === 'select' || type === 'multiselect') && !next.options?.length) {
-      next.options = [blankOption()];
-    }
-    if (type === 'computed' && !next.compute) next.compute = { var: '' };
-    if (type !== 'number' && type !== 'currency') {
-      delete next.isPromoted;
-      delete next.promoteTarget;
-    }
-    return next;
+    const needsOption = (type === 'select' || type === 'multiselect') && !field.options?.length;
+    const next: FormFieldDef = {
+      ...field,
+      type,
+      ...(needsOption ? { options: [blankOption()] } : {}),
+      ...(type === 'computed' && !field.compute ? { compute: { var: '' } } : {}),
+    };
+    if (type === 'number' || type === 'currency') return next;
+    return withoutKey(withoutKey(next, 'isPromoted'), 'promoteTarget');
   }
 
   /** Metric toggle: prefill a valid promote target when the user turns it on. */

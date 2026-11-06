@@ -241,7 +241,7 @@ export class ApplicationsDetailComponent {
   /** The status changes of the application, oldest first. */
   readonly timeline = signal<TimelineEntry[]>([]);
   /** The sections of the pinned form. Empty until it loaded, and on an error. */
-  readonly sections = signal<FormSection[]>([]);
+  readonly sections = signal<readonly FormSection[]>([]);
   /** The form is on its way; the answers wait for it, so no raw keys flash. */
   readonly formLoading = signal(true);
   /** The type of the application has a budget: drives `visibleIf: has_budget`. */

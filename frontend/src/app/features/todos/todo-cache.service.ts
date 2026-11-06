@@ -147,7 +147,7 @@ export class TodoCacheService {
         const read = source === 'all' ? this.api.pollAllBoards(null) : this.api.pollMineBoards(null);
         return read.pipe(
           tap(({ boards, etag }) => {
-            if (boards && !this.rowReads.has(source)) this.putRows(source, boards, etag);
+            if (boards && !this.rowReads.has(source)) this.putRows(source, [...boards], etag);
           }),
         );
       });

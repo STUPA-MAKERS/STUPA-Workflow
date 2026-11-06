@@ -74,7 +74,7 @@ export class MeetingSessionService implements OnDestroy {
 
   readonly attendance = signal<Attendance[]>([]);
   /** Live viewers of the meeting page (WS `viewers`). */
-  readonly viewers = signal<string[]>([]);
+  readonly viewers = signal<readonly string[]>([]);
   readonly savingAttendance = signal(false);
   /**
    * The member whose "present" the server refused with 409 `delegation_active`. The

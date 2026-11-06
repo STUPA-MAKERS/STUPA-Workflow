@@ -26,6 +26,7 @@ import type {
   MeetingGuest,
   PublicMeetingHead,
 } from './models';
+import { assertNever } from '@shared/util/immutable';
 
 /** A real QR matrix of `https://workflow.reutlingen.university/j/7KQ4MP` (segno, level M). */
 export const MOCK_QR_ROWS = [
@@ -75,7 +76,7 @@ function guest(
 }
 
 /** The requests and guests of the live mock meeting (mutable: the lead decides). */
-let GUESTS: MeetingGuest[] = [
+let GUESTS: readonly MeetingGuest[] = [
   guest(1, 'Malte Krüger', 'admitted', '16:15', '16:16'),
   guest(2, 'Selin Aydın', 'admitted', '16:16', '16:17'),
   guest(3, 'Finn Berger', 'admitted', '16:17', '16:17'),
@@ -89,7 +90,7 @@ let GUESTS: MeetingGuest[] = [
 ];
 let LINK = mockJoinLink();
 
-export function mockGuestCounts(): { pending: number; admitted: number } {
+export function mockGuestCounts(): { readonly pending: number; readonly admitted: number } {
   return {
     pending: GUESTS.filter((g) => g.status === 'pending').length,
     admitted: GUESTS.filter((g) => g.status === 'admitted').length,
@@ -98,8 +99,8 @@ export function mockGuestCounts(): { pending: number; admitted: number } {
 
 /** A reply of the mock: the body, or a problem with its status. */
 export type MockReply =
-  | { status: number; body: unknown }
-  | { status: number; problem: { code: string; detail?: string; retryAfter?: number } };
+  | { readonly status: number; readonly body: unknown }
+  | { readonly status: number; readonly problem: { readonly code: string; readonly detail?: string; readonly retryAfter?: number } };
 
 const problem = (status: number, code: string): MockReply => ({ status, problem: { code } });
 
@@ -136,25 +137,46 @@ export function mockLeadGuests(method: string, p: string, body: unknown): MockRe
   if (method === 'POST' && m) {
     const g = GUESTS.find((x) => x.id === m[1]);
     if (!g) return problem(404, 'not_found');
-    const now = new Date().toISOString();
-    let next: MeetingGuest;
-    if (m[2] === 'rename') {
-      const name = (body as { displayName?: string } | null)?.displayName?.trim() ?? '';
-      next = { ...g, displayName: name || g.displayName };
-    } else if (m[2] === 'remove') {
-      if (g.status !== 'admitted') return problem(409, 'guest_not_admitted');
-      next = { ...g, status: 'removed', decidedAt: now, decidedByName: LEAD };
-    } else {
-      if (g.status !== 'pending') return problem(409, 'guest_not_pending');
-      next =
-        m[2] === 'admit'
-          ? { ...g, status: 'admitted', decidedAt: now, admittedAt: now, decidedByName: LEAD }
-          : { ...g, status: 'rejected', decidedAt: now, decidedByName: LEAD };
-    }
-    GUESTS = GUESTS.map((x) => (x.id === g.id ? next : x));
-    return { status: 200, body: next };
+    const outcome = guestAction(m[2] as GuestAction, g, body, new Date().toISOString());
+    if ('fail' in outcome) return outcome.fail;
+    GUESTS = GUESTS.map((x) => (x.id === g.id ? outcome.guest : x));
+    return { status: 200, body: outcome.guest };
   }
   return null;
+}
+
+/** A decision of the lead on one guest. */
+type GuestAction = 'admit' | 'reject' | 'remove' | 'rename';
+
+/** The guest after a lead action, or the problem that blocks the action. */
+function guestAction(
+  action: GuestAction,
+  g: MeetingGuest,
+  body: unknown,
+  now: string,
+): { readonly guest: MeetingGuest } | { readonly fail: MockReply } {
+  switch (action) {
+    case 'rename': {
+      const name = (body as { displayName?: string } | null)?.displayName?.trim() ?? '';
+      return { guest: { ...g, displayName: name || g.displayName } };
+    }
+    case 'remove':
+      return g.status !== 'admitted'
+        ? { fail: problem(409, 'guest_not_admitted') }
+        : { guest: { ...g, status: 'removed', decidedAt: now, decidedByName: LEAD } };
+    case 'admit':
+      return g.status !== 'pending'
+        ? { fail: problem(409, 'guest_not_pending') }
+        : {
+            guest: { ...g, status: 'admitted', decidedAt: now, admittedAt: now, decidedByName: LEAD },
+          };
+    case 'reject':
+      return g.status !== 'pending'
+        ? { fail: problem(409, 'guest_not_pending') }
+        : { guest: { ...g, status: 'rejected', decidedAt: now, decidedByName: LEAD } };
+    default:
+      return assertNever(action);
+  }
 }
 
 const TITLE = '7. Sitzung der Fachschaft Informatik';
@@ -174,7 +196,7 @@ function head(code: string, over: Partial<PublicMeetingHead> = {}): PublicMeetin
   };
 }
 
-const AGENDA: GuestAgendaItem[] = [
+const AGENDA: readonly GuestAgendaItem[] = [
   { id: 'pa-1', position: 1, title: 'Begrüßung und Beschlussfähigkeit', kind: 'freetext', nonPublic: false, body: 'Die Sitzungsleitung eröffnet die Sitzung um 18:15. 19 von 23 Mitgliedern sind anwesend.', done: true },
   { id: 'pa-2', position: 2, title: 'Protokoll der 6. Sitzung', kind: 'freetext', nonPublic: false, body: 'Das Protokoll der 6. Sitzung wird ohne Änderungen genehmigt.', done: true },
   {
@@ -225,11 +247,11 @@ const MEMBERS_ONLY = vote({
 });
 
 interface GuestMock {
-  me: GuestMe | null;
-  head: PublicMeetingHead | null;
-  problem?: string;
+  readonly me: GuestMe | null;
+  readonly head: PublicMeetingHead | null;
+  readonly problem?: string;
   /** The problem of the head when it differs from the one of `/me`. */
-  headProblem?: string;
+  readonly headProblem?: string;
 }
 
 function me(code: string, over: Partial<GuestMe>, view: Partial<NonNullable<GuestMe['view']>> | null): GuestMe {
@@ -290,13 +312,14 @@ function initial(code: string): GuestMock {
   }
 }
 
-function stateOf(code: string): GuestMock {
-  let s = STATES.get(code);
-  if (!s) {
-    s = initial(code);
-    STATES.set(code, s);
-  }
+/** Store the state of a join code and return it. */
+function putState(code: string, s: GuestMock): GuestMock {
+  STATES.set(code, s);
   return s;
+}
+
+function stateOf(code: string): GuestMock {
+  return STATES.get(code) ?? putState(code, initial(code));
 }
 
 /** The public routes `/public/meetings/…` of a guest. */
@@ -306,8 +329,9 @@ export function mockPublicMeeting(method: string, p: string, body: unknown): Moc
     const s = stateOf(join[1]);
     if (s.problem) return problem(404, s.problem);
     const name = (body as { displayName?: string } | null)?.displayName?.trim() ?? '';
-    s.me = me(join[1], { status: 'pending', displayName: name, number: 11, ...(s.head ? { meeting: s.head } : {}) }, null);
-    return { status: 201, body: s.me };
+    const seen = { status: 'pending', displayName: name, number: 11 } as const;
+    const joined = me(join[1], { ...seen, ...(s.head ? { meeting: s.head } : {}) }, null);
+    return { status: 201, body: putState(join[1], { ...s, me: joined }).me };
   }
   const m = /\/public\/meetings\/([^/]+)(\/me|\/votes\/([^/]+)\/ballot)?$/.exec(p);
   if (!m) return null;
@@ -321,11 +345,11 @@ export function mockPublicMeeting(method: string, p: string, body: unknown): Moc
     if (method === 'GET') return { status: 200, body: s.me };
     if (method === 'PATCH') {
       const name = (body as { displayName?: string } | null)?.displayName?.trim() ?? '';
-      s.me = { ...s.me, displayName: name || s.me.displayName };
-      return { status: 200, body: s.me };
+      const renamed = { ...s.me, displayName: name || s.me.displayName };
+      return { status: 200, body: putState(code, { ...s, me: renamed }).me };
     }
     if (method === 'DELETE') {
-      s.me = null;
+      putState(code, { ...s, me: null });
       return { status: 204, body: null };
     }
     return null;
@@ -342,6 +366,6 @@ export function mockPublicMeeting(method: string, p: string, body: unknown): Moc
         }
       : v,
   );
-  s.me = { ...s.me, view: { ...s.me.view, votes } };
+  putState(code, { ...s, me: { ...s.me, view: { ...s.me.view, votes } } });
   return { status: 200, body: { status: 'cast' } };
 }

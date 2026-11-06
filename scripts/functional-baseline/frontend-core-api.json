@@ -1,18 +1,8 @@
 {
-  "frontend/src/app/core/api/api-client.service.ts": 12,
-  "frontend/src/app/core/api/delegations.service.ts": 7,
-  "frontend/src/app/core/api/gremien.service.ts": 8,
-  "frontend/src/app/core/api/mock-account.ts": 7,
-  "frontend/src/app/core/api/mock-api.interceptor.ts": 65,
-  "frontend/src/app/core/api/mock-applications.ts": 61,
-  "frontend/src/app/core/api/mock-bookings.ts": 19,
-  "frontend/src/app/core/api/mock-budget.ts": 21,
-  "frontend/src/app/core/api/mock-meetings-closed.ts": 15,
-  "frontend/src/app/core/api/mock-meetings-member.ts": 7,
-  "frontend/src/app/core/api/mock-public-meeting.ts": 24,
-  "frontend/src/app/core/api/mock-public-protocols.ts": 2,
-  "frontend/src/app/core/api/mock-votes.ts": 4,
-  "frontend/src/app/core/api/models.ts": 912,
-  "frontend/src/app/core/api/tickets.service.ts": 139,
-  "frontend/src/app/core/api/todos.service.ts": 256
+  "frontend/src/app/core/api/mock-account.ts": 2,
+  "frontend/src/app/core/api/mock-api.interceptor.ts": 13,
+  "frontend/src/app/core/api/mock-applications.ts": 1,
+  "frontend/src/app/core/api/mock-meetings-closed.ts": 1,
+  "frontend/src/app/core/api/mock-public-meeting.ts": 3,
+  "frontend/src/app/core/api/models.ts": 2
 }

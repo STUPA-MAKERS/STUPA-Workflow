@@ -60,14 +60,22 @@ const STATES = {
 
 type StateKey = keyof typeof STATES;
 
+/** One manual transition of the demo flow. */
+interface FlowStep {
+  readonly id: string;
+  readonly to: StateKey;
+  readonly de: string;
+  readonly en: string;
+  readonly color?: string;
+  readonly agenda?: boolean;
+  readonly decision?: boolean;
+}
+
 /**
  * The manual transitions out of each state, as the flow of the demo defines them. A
  * transition into an accepted state takes a decision (approval with deviations).
  */
-const FLOW: Record<
-  StateKey,
-  { id: string; to: StateKey; de: string; en: string; color?: string; agenda?: boolean; decision?: boolean }[]
-> = {
+const FLOW: Readonly<Record<StateKey, readonly FlowStep[]>> = {
   submitted: [
     { id: '77777777-7777-7777-7777-777777777781', to: 'review', de: 'Prüfung beginnen', en: 'Start review' },
     { id: '77777777-7777-7777-7777-777777777782', to: 'rejected', de: 'Ablehnen', en: 'Reject', color: '#c0392b' },
@@ -84,26 +92,26 @@ const FLOW: Record<
 };
 
 interface DemoApp {
-  n: number;
-  title: string;
-  type: string;
-  state: StateKey;
-  amount: number | null;
-  created: string;
-  archived?: string;
+  readonly n: number;
+  readonly title: string;
+  readonly type: string;
+  readonly state: StateKey;
+  readonly amount: number | null;
+  readonly created: string;
+  readonly archived?: string;
   /** The answers after an edit. Until then `answers(d)` builds them. */
-  data?: Record<string, unknown>;
+  readonly data?: Record<string, unknown>;
   /** The versions after the first edit of this session. */
-  versions?: VersionOutWire[];
+  readonly versions?: readonly VersionOutWire[];
   /** Status changes fired in this session. */
-  events?: TimelineEventOutWire[];
+  readonly events?: readonly TimelineEventOutWire[];
   /** Captured on behalf of the applicant. */
-  capture?: ApplicationCapture;
+  readonly capture?: ApplicationCapture;
   /** The decision (approval with deviations). `approved` null means as requested. */
-  decision?: { approved: number | null; conditions: string[]; at: string; viaVote?: boolean };
+  readonly decision?: { readonly approved: number | null; readonly conditions: readonly string[]; readonly at: string; readonly viaVote?: boolean };
 }
 
-const DEMO: DemoApp[] = [
+const DEMO: readonly DemoApp[] = [
   { n: 1, title: 'Zuschuss Kennenlernwochenende der Fachschaft Wirtschaft', type: TYPE_FUND, state: 'agenda', amount: 1340, created: '2026-09-29T10:25:00Z' },
   {
     n: 2,
@@ -152,10 +160,17 @@ const DEMO: DemoApp[] = [
 ];
 
 /** The demo rows as they stand now. Transitions, archive and delete change them. */
-let rows: DemoApp[] = DEMO.map((d) => ({ ...d }));
+let rows: readonly DemoApp[] = DEMO.map((d) => ({ ...d }));
 
 const idOf = (n: number): string => `${DEMO_APP_PREFIX}0000-0000-0000-${String(n).padStart(12, '0')}`;
 const byId = (id: string): DemoApp | undefined => rows.find((r) => idOf(r.n) === id);
+
+/** Replace a demo row with a changed copy and return the copy. */
+function replaceRow(d: DemoApp, patch: Partial<DemoApp>): DemoApp {
+  const next = { ...d, ...patch };
+  rows = rows.map((r) => (r === d ? next : r));
+  return next;
+}
 
 function listItem(d: DemoApp): ApplicationListItemWire {
   return {
@@ -263,7 +278,7 @@ function list(params: HttpParams): Page<ApplicationListItemWire> {
   };
 }
 
-function transitions(d: DemoApp): TransitionOutWire[] {
+function transitions(d: DemoApp): readonly TransitionOutWire[] {
   return FLOW[d.state].map((t) => ({
     id: t.id,
     fromStateId: STATES[d.state].id,
@@ -276,7 +291,7 @@ function transitions(d: DemoApp): TransitionOutWire[] {
   }));
 }
 
-const ATTACHMENTS: AttachmentOutWire[] = [
+const ATTACHMENTS: readonly AttachmentOutWire[] = [
   { id: 'att10000-0000-0000-0000-000000000001', filename: 'Angebot_Jugendherberge.pdf', mime: 'application/pdf', size: 236_000, scanned: true },
   { id: 'att10000-0000-0000-0000-000000000002', filename: 'Angebot_Busunternehmen.pdf', mime: 'application/pdf', size: 171_000, scanned: true },
   { id: 'att10000-0000-0000-0000-000000000003', filename: 'Programm_Wochenende.png', mime: 'image/png', size: 127_000, scanned: false },
@@ -326,25 +341,22 @@ export function mockApplicationsWrite(method: string, p: string, body: unknown):
     if (errors.length) return { status: 422, problem: problem422(errors) } satisfies MockFailure;
     const before = answers(d);
     const versions = versionsOf(d);
-    d.data = { ...data };
-    d.versions = [
-      ...versions,
-      {
-        version: versions.length + 1,
-        data: d.data,
-        diff: diffOf(before, d.data),
-        changedBy: 'Demo Mitglied',
-        changedByInfo: { kind: 'principal', displayName: 'Demo Mitglied' },
-        at: new Date().toISOString(),
-      },
-    ];
+    const nextData = { ...data };
+    const version: VersionOutWire = {
+      version: versions.length + 1,
+      data: nextData,
+      diff: diffOf(before, nextData),
+      changedBy: 'Demo Mitglied',
+      changedByInfo: { kind: 'principal', displayName: 'Demo Mitglied' },
+      at: new Date().toISOString(),
+    };
     const title = data['title'];
-    if (typeof title === 'string' && title.trim()) d.title = title.trim();
-    return detail(d);
+    const retitled = typeof title === 'string' && title.trim() ? { title: title.trim() } : {};
+    return detail(replaceRow(d, { data: nextData, versions: [...versions, version], ...retitled }));
   }
   if (m[2] === 'archive') {
-    d.archived = method === 'POST' ? new Date().toISOString() : undefined;
-    return detail(d);
+    const archived = method === 'POST' ? new Date().toISOString() : undefined;
+    return detail(replaceRow(d, { archived }));
   }
   if (method === 'POST' && m[2] === 'transition') {
     const req =
@@ -364,33 +376,9 @@ export function mockApplicationsWrite(method: string, p: string, body: unknown):
         },
       } satisfies MockFailure;
     }
-    if (t) {
-      const meeting = agendaMeetings().find((mt) => mt.id === req.meetingId);
-      if (t.decision && req.decision) {
-        d.decision = {
-          approved: req.decision.approvedAmount !== null ? Number(req.decision.approvedAmount) : null,
-          conditions: req.decision.conditions,
-          at: new Date().toISOString(),
-        };
-      }
-      d.events = [
-        ...(d.events ?? []),
-        {
-          fromStateId: STATES[d.state].id,
-          toStateId: STATES[t.to].id,
-          toState: STATES[t.to],
-          transitionLabel: { de: t.de, en: t.en },
-          actor: 'Demo Mitglied',
-          actorInfo: { kind: 'principal', displayName: 'Demo Mitglied' },
-          at: new Date().toISOString(),
-          note: [meeting?.title, req.note].filter(Boolean).join(' · ') || null,
-          decision: t.decision && req.decision ? timelineDecision(d) : null,
-        },
-      ];
-      d.state = t.to;
-    }
+    const after = t ? fireTransition(d, t, req) : d;
     const result: TransitionResult = {
-      newStateId: STATES[d.state].id,
+      newStateId: STATES[after.state].id,
       statusEventId: 'e1000000-0000-0000-0000-000000000001',
       dispatchedActions: [],
     };
@@ -399,21 +387,60 @@ export function mockApplicationsWrite(method: string, p: string, body: unknown):
   if (method === 'POST' && m[2] === 'force-status') {
     const stateId = (body as { stateId?: string } | null)?.stateId;
     const key = (Object.keys(STATES) as StateKey[]).find((k) => STATES[k].id === stateId);
-    if (key) d.state = key;
-    return { newStateId: STATES[d.state].id, statusEventId: 'e1000000-0000-0000-0000-000000000002', dispatchedActions: [] };
+    const after = key ? replaceRow(d, { state: key }) : d;
+    return {
+      newStateId: STATES[after.state].id,
+      statusEventId: 'e1000000-0000-0000-0000-000000000002',
+      dispatchedActions: [],
+    };
   }
   return undefined;
 }
 
+/** Fire transition `t` on a demo row: record the decision and the event, move the state. */
+function fireTransition(
+  d: DemoApp,
+  t: FlowStep,
+  req: {
+    readonly meetingId?: string | null;
+    readonly note?: string | null;
+    readonly decision?: DecisionProposal | null;
+  },
+): DemoApp {
+  const meeting = agendaMeetings().find((mt) => mt.id === req.meetingId);
+  const proposal = t.decision ? req.decision : null;
+  const decided = proposal
+    ? replaceRow(d, {
+        decision: {
+          approved: proposal.approvedAmount !== null ? Number(proposal.approvedAmount) : null,
+          conditions: proposal.conditions,
+          at: new Date().toISOString(),
+        },
+      })
+    : d;
+  const event: TimelineEventOutWire = {
+    fromStateId: STATES[decided.state].id,
+    toStateId: STATES[t.to].id,
+    toState: STATES[t.to],
+    transitionLabel: { de: t.de, en: t.en },
+    actor: 'Demo Mitglied',
+    actorInfo: { kind: 'principal', displayName: 'Demo Mitglied' },
+    at: new Date().toISOString(),
+    note: [meeting?.title, req.note].filter(Boolean).join(' · ') || null,
+    decision: proposal ? timelineDecision(decided) : null,
+  };
+  return replaceRow(decided, { events: [...(decided.events ?? []), event], state: t.to });
+}
+
 /** The accounts that the capture search knows. */
-const ACCOUNTS: ApplicantCandidate[] = [
+const ACCOUNTS: readonly ApplicantCandidate[] = [
   { id: 'p1000000-0000-0000-0000-000000000001', displayName: 'Anna Antrag', email: 'anna.antrag@example.org' },
   { id: 'p1000000-0000-0000-0000-000000000002', displayName: 'Anton Albers', email: 'anton.albers@example.org' },
   { id: 'p1000000-0000-0000-0000-000000000003', displayName: 'Bea Beispiel', email: 'bea@example.org' },
 ];
 
 /** `GET /applications/on-behalf/applicants`: the accounts whose name or e-mail holds `q`. */
-export function mockApplicantSearch(q: string): ApplicantCandidate[] {
+export function mockApplicantSearch(q: string): readonly ApplicantCandidate[] {
   const needle = q.trim().toLowerCase();
   return ACCOUNTS.filter((a) => `${a.displayName} ${a.email}`.toLowerCase().includes(needle));
 }
@@ -422,7 +449,7 @@ export function mockApplicantSearch(q: string): ApplicantCandidate[] {
 export function mockCapture(body: OnBehalfApplication): ApplicationCreatedWire {
   const n = Math.max(...rows.map((r) => r.n)) + 1;
   const now = new Date().toISOString();
-  rows.unshift({
+  const row: DemoApp = {
     n,
     title: String(body.data['title']),
     type: body.typeId,
@@ -436,7 +463,8 @@ export function mockCapture(body: OnBehalfApplication): ApplicationCreatedWire {
       receivedOn: body.receivedOn ?? null,
       intake: body.intake ?? null,
     },
-  });
+  };
+  rows = [row, ...rows];
   return { applicationId: idOf(n) };
 }
 
@@ -447,8 +475,8 @@ export function resetMockApplications(): void {
 
 /** A refused write: the interceptor answers with this status and problem. */
 export interface MockFailure {
-  status: number;
-  problem: ProblemDetail;
+  readonly status: number;
+  readonly problem: ProblemDetail;
 }
 
 /** True for a refused write of this module. */
@@ -456,14 +484,14 @@ export function isMockFailure(body: unknown): body is MockFailure {
   return typeof body === 'object' && body !== null && 'problem' in body && 'status' in body;
 }
 
-function problem422(errors: { field: string; msg: string }[]): ProblemDetail {
+function problem422(errors: readonly { readonly field: string; readonly msg: string }[]): ProblemDetail {
   return {
     type: 'about:blank',
     title: 'Unprocessable Entity',
     status: 422,
     code: 'validation_error',
     detail: 'Invalid application data.',
-    errors,
+    errors: [...errors],
   };
 }
 
@@ -537,7 +565,7 @@ export function demoForm(): EffectiveForm {
 }
 
 /** The cost positions of a demo amount: three positions, the last without offers. */
-function positionsFor(amount: number): Record<string, unknown>[] {
+function positionsFor(amount: number): readonly Record<string, unknown>[] {
   const a = Math.round(amount * 45) / 100;
   const b = Math.round(amount * 35) / 100;
   const c = Math.round((amount - a - b) * 100) / 100;
@@ -586,7 +614,7 @@ function answers(d: DemoApp): Record<string, unknown> {
 }
 
 /** The versions: one, or two when the applicant changed the participants once. */
-function versionsOf(d: DemoApp): VersionOutWire[] {
+function versionsOf(d: DemoApp): readonly VersionOutWire[] {
   if (d.versions) return d.versions;
   const first: VersionOutWire = {
     version: 1,
@@ -612,7 +640,7 @@ function versionsOf(d: DemoApp): VersionOutWire[] {
 }
 
 /** The way of a state through the demo flow, from the submission on. */
-const PATH: Record<StateKey, StateKey[]> = {
+const PATH: Record<StateKey, readonly StateKey[]> = {
   submitted: ['submitted'],
   review: ['submitted', 'review'],
   agenda: ['submitted', 'review', 'agenda'],
@@ -631,7 +659,7 @@ function actorOf(i: number): Pick<TimelineEventOutWire, 'actor' | 'actorInfo'> {
 }
 
 /** The status changes: the submission, the way to the start state, then this session. */
-function timelineOf(d: DemoApp): TimelineEventOutWire[] {
+function timelineOf(d: DemoApp): readonly TimelineEventOutWire[] {
   const start = (d.events ?? []).length ? PATH[stateBefore(d)] : PATH[d.state];
   const base = new Date(d.created).getTime();
   const events: TimelineEventOutWire[] = start.map((key, i) => {
@@ -662,17 +690,19 @@ function diffOf(
   before: Record<string, unknown>,
   after: Record<string, unknown>,
 ): NonNullable<VersionOutWire['diff']> {
-  const diff: NonNullable<VersionOutWire['diff']> = { added: {}, removed: {}, changed: {} };
-  for (const [k, v] of Object.entries(after)) {
-    if (!(k in before)) diff.added[k] = v;
-    else if (JSON.stringify(before[k]) !== JSON.stringify(v)) diff.changed[k] = { old: before[k], new: v };
-  }
-  for (const [k, v] of Object.entries(before)) if (!(k in after)) diff.removed[k] = v;
-  return diff;
+  const afterEntries = Object.entries(after);
+  const changed = afterEntries.filter(
+    ([k, v]) => k in before && JSON.stringify(before[k]) !== JSON.stringify(v),
+  );
+  return {
+    added: Object.fromEntries(afterEntries.filter(([k]) => !(k in before))),
+    removed: Object.fromEntries(Object.entries(before).filter(([k]) => !(k in after))),
+    changed: Object.fromEntries(changed.map(([k, v]) => [k, { old: before[k], new: v }])),
+  };
 }
 
 /** The server's rule for a position without comparison offers: still one offer. */
-function positionErrors(raw: unknown): { field: string; msg: string }[] {
+function positionErrors(raw: unknown): readonly { readonly field: string; readonly msg: string }[] {
   if (!Array.isArray(raw)) return [];
   return raw.flatMap((p: { noOffers?: boolean; offers?: unknown[] }, i) =>
     p?.noOffers === true && (!Array.isArray(p.offers) || p.offers.length < 1)
@@ -690,7 +720,7 @@ function dayFromToday(days: number): string {
 }
 
 /** The planned meetings of the demo Gremium, for the agenda dialog. */
-export function agendaMeetings(): MeetingOutWire[] {
+export function agendaMeetings(): readonly MeetingOutWire[] {
   const meeting = (n: number, title: string, days: number, items: number): MeetingOutWire => ({
     id: `d1000000-0000-0000-0000-00000000000${n}`,
     title,

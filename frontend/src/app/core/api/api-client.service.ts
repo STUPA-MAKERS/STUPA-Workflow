@@ -5,6 +5,7 @@ import { detailContext, listContext } from '@core/cache/cache.interceptor';
 import { I18nService } from '@core/i18n/i18n.service';
 import { skipLoading } from '@stupa-makers/ui-kit';
 import { API_BASE_URL } from './api.config';
+import { type ParamValue, httpParams } from './http-params';
 import {
   mapApplication,
   mapApplicationCreated,
@@ -119,7 +120,10 @@ export const DRAFT_TOKEN_HEADER = 'X-Draft-Token';
  * that its list reads ahead (`prefetchDetails`). A refresh after a write leaves `detail`
  * off, so it never paints an older answer first.
  */
-function readContext(opts: { quiet?: boolean; detail?: boolean }): HttpContext | undefined {
+function readContext(opts: {
+  readonly quiet?: boolean;
+  readonly detail?: boolean;
+}): HttpContext | undefined {
   if (opts.detail) return detailContext();
   return opts.quiet ? skipLoading() : undefined;
 }
@@ -378,8 +382,12 @@ export class ApiClient {
     files: MessageFiles = {},
     mentions?: Uuid[],
   ): Observable<ApplicationComment> {
-    const payload: CommentCreateBody = { body, visibility, ...messageFiles(files) };
-    if (mentions?.length) payload.mentions = mentions;
+    const payload: CommentCreateBody = {
+      body,
+      visibility,
+      ...messageFiles(files),
+      ...(mentions?.length ? { mentions } : {}),
+    };
     return this.http
       .post<CommentOutWire>(`${this.base}/applications/${id}/comments`, payload)
       .pipe(map(mapComment));
@@ -576,13 +584,14 @@ export class ApiClient {
    * overlay.
    */
   listVotes(query: VoteListQuery = {}): Observable<Page<VoteListItem>> {
-    let params = new HttpParams();
-    for (const status of query.status ?? []) params = params.append('status', status);
-    if (query.gremiumId) params = params.set('gremiumId', query.gremiumId);
-    if (query.q) params = params.set('q', query.q);
-    if (query.kind) params = params.set('kind', query.kind);
-    if (query.limit !== undefined) params = params.set('limit', String(query.limit));
-    if (query.offset !== undefined) params = params.set('offset', String(query.offset));
+    const params = httpParams({
+      status: query.status ?? [],
+      gremiumId: query.gremiumId || undefined,
+      q: query.q || undefined,
+      kind: query.kind || undefined,
+      limit: query.limit,
+      offset: query.offset,
+    });
     return this.http.get<Page<VoteListItem>>(`${this.base}/votes`, {
       params,
       context: skipLoading(),
@@ -633,9 +642,11 @@ export class ApiClient {
    * meeting without a date is then not in the list.
    */
   listMeetings(gremiumId?: Uuid, range?: { from: string; to: string }): Observable<Meeting[]> {
-    let params = new HttpParams();
-    if (gremiumId) params = params.set('gremiumId', gremiumId);
-    if (range) params = params.set('dateFrom', range.from).set('dateTo', range.to);
+    const params = httpParams({
+      gremiumId: gremiumId || undefined,
+      dateFrom: range?.from,
+      dateTo: range?.to,
+    });
     return this.http
       .get<MeetingOutWire[]>(`${this.base}/meetings`, { params, context: skipLoading() })
       .pipe(map((items) => items.map(mapMeeting)));
@@ -671,11 +682,13 @@ export class ApiClient {
     gremiumId?: Uuid;
     q?: string;
   }): Observable<MeetingPage> {
-    let params = new HttpParams().set('direction', opts.direction);
-    if (opts.cursor) params = params.set('cursor', opts.cursor);
-    if (opts.limit) params = params.set('limit', String(opts.limit));
-    if (opts.gremiumId) params = params.set('gremiumId', opts.gremiumId);
-    if (opts.q && opts.q.trim()) params = params.set('q', opts.q.trim());
+    const params = httpParams({
+      direction: opts.direction,
+      cursor: opts.cursor || undefined,
+      limit: opts.limit || undefined,
+      gremiumId: opts.gremiumId || undefined,
+      q: opts.q?.trim() || undefined,
+    });
     return this.http
       .get<MeetingPageWire>(`${this.base}/meetings/timeline`, { params, context: skipLoading() })
       .pipe(map(mapMeetingPage));
@@ -1207,7 +1220,7 @@ export class ApiClient {
 function attendanceBody(
   status: AttendanceStatus,
   note: string | null | undefined,
-): { status: AttendanceStatus; note?: string | null } {
+): { readonly status: AttendanceStatus; readonly note?: string | null } {
   return note === undefined ? { status } : { status, note };
 }
 
@@ -1219,15 +1232,9 @@ function attendanceBody(
  * paging keys, because the file holds every matching row.
  */
 function listParams(query: ApplicationListQuery, forExport: boolean): HttpParams {
-  let params = new HttpParams();
-  for (const [key, value] of Object.entries(query)) {
-    if (value === undefined || value === null) continue;
-    if (forExport && (key === 'limit' || key === 'offset')) continue;
-    if (Array.isArray(value)) {
-      for (const entry of value) params = params.append(key, String(entry));
-    } else {
-      params = params.set(key, String(value));
-    }
-  }
-  return params;
+  const kept = Object.entries(query).filter(
+    ([key]) => !(forExport && (key === 'limit' || key === 'offset')),
+  );
+  return httpParams(Object.fromEntries(kept) as Readonly<Record<string, ParamValue>>);
 }
+

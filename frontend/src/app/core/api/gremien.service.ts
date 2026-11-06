@@ -15,6 +15,7 @@ import { API_BASE_URL } from '@core/api/api.config';
 import type { IsoDateTime, Uuid } from '@core/api/models';
 import { detailContext } from '@core/cache/cache.interceptor';
 import { skipLoading } from '@stupa-makers/ui-kit';
+import { httpParams } from './http-params';
 
 /** A text per locale, for example the name of a gremium role (`{ de, en }`). */
 export type LocalizedText = Readonly<Record<string, string>>;
@@ -180,12 +181,12 @@ export interface GremiumDecisionPage {
 
 /** The filters of `GET /gremien/{id}/decisions`. An empty value is no filter. */
 export interface GremiumDecisionQuery {
-  cursor?: string | null;
-  q?: string | null;
-  result?: GremiumDecisionResultFilter | null;
-  kind?: GremiumDecisionKind | null;
+  readonly cursor?: string | null;
+  readonly q?: string | null;
+  readonly result?: GremiumDecisionResultFilter | null;
+  readonly kind?: GremiumDecisionKind | null;
   /** `YYYY-MM-DD`: only votes closed on this day or later. */
-  since?: string | null;
+  readonly since?: string | null;
 }
 
 /**
@@ -220,9 +221,7 @@ export class GremienApiService {
 
   /** The months `from` to `to` (`YYYY-MM`). Without them the server gives the last six. */
   attendance(gremiumId: Uuid, range: { from?: string; to?: string } = {}): Observable<GremiumAttendance> {
-    let params = new HttpParams();
-    if (range.from) params = params.set('from', range.from);
-    if (range.to) params = params.set('to', range.to);
+    const params = httpParams({ from: range.from || undefined, to: range.to || undefined });
     return this.http.get<GremiumAttendance>(`${this.base}/gremien/${gremiumId}/attendance`, {
       params,
       context: skipLoading(),
@@ -241,10 +240,9 @@ export class GremienApiService {
   }
 
   decisions(gremiumId: Uuid, query: GremiumDecisionQuery = {}): Observable<GremiumDecisionPage> {
-    let params = new HttpParams();
-    for (const [key, value] of Object.entries(query)) {
-      if (value) params = params.set(key, value);
-    }
+    const params = httpParams(
+      Object.fromEntries(Object.entries(query).map(([key, value]) => [key, value || undefined])),
+    );
     return this.http.get<GremiumDecisionPage>(`${this.base}/gremien/${gremiumId}/decisions`, {
       params,
       context: skipLoading(),
