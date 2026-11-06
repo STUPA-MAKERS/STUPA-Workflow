@@ -107,7 +107,7 @@ async function setup(opts: Opts = {}) {
   if (opts.phone) {
     window.matchMedia = ((q: string) => ({
       ...originalMatch(q),
-      matches: q.includes('max-width: 768px'),
+      matches: q.includes('max-width: 767.98px'),
     })) as typeof window.matchMedia;
   }
   const view = await render(ApplicationsDetailComponent, {

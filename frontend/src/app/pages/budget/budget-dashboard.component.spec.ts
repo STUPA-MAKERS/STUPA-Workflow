@@ -136,7 +136,7 @@ function authStub(perms: string[] = ALL_PERMS): AuthService {
 function setViewport(wide: boolean, phone = false): void {
   window.matchMedia = ((query: string) => ({
     matches:
-      (wide && query.includes('min-width: 1200px')) || (phone && query === '(max-width: 768px)'),
+      (wide && query.includes('min-width: 1200px')) || (phone && query === '(max-width: 767.98px)'),
     media: query,
     onchange: null,
     addEventListener: () => undefined,

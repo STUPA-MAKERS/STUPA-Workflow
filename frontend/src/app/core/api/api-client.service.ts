@@ -1068,12 +1068,6 @@ export class ApiClient {
     return this.http.post<Vote>(`${this.base}/votes/${voteId}/draw-lot`, {});
   }
 
-  /** POST /votes/{id}/runoff — create the draft runoff of an election. The
-   *  answer is the new vote; open it with `openVote`. */
-  createElectionRunoff(voteId: Uuid): Observable<Vote> {
-    return this.http.post<Vote>(`${this.base}/votes/${voteId}/runoff`, {});
-  }
-
   /** POST /votes/{id}/cancel — cancel a vote: no result, no branch. */
   cancelVote(voteId: Uuid): Observable<void> {
     return this.http.post<void>(`${this.base}/votes/${voteId}/cancel`, {});

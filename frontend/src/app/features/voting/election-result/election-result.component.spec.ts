@@ -91,14 +91,9 @@ describe('ElectionResultComponent', () => {
     }
   });
 
-  it('starts the runoff: create, open, read', async () => {
-    const { http, changed, toasts } = await setup({});
-    await userEvent.click(screen.getByRole('button', { name: 'Stichwahl starten' }));
-    http.expectOne({ method: 'POST', url: '/api/votes/e1/runoff' }).flush({ id: 'e2' });
-    http.expectOne({ method: 'POST', url: '/api/votes/e2/open' }).flush(null);
-    http.expectOne({ method: 'GET', url: '/api/votes/e2' }).flush({ id: 'e2', status: 'open' });
-    expect(changed).toHaveBeenCalledWith({ id: 'e2', status: 'open' });
-    expect(toasts()).toContain('Die Stichwahl ist offen.');
+  it('offers no runoff start: there is no runoff route', async () => {
+    await setup({});
+    expect(screen.queryByRole('button', { name: 'Stichwahl starten' })).toBeNull();
   });
 
   it('says the runoff exists and offers no second one', async () => {
@@ -217,16 +212,13 @@ describe('ElectionResultComponent', () => {
   it('sends one action at a time, none without a vote id, and reports a bare refusal', async () => {
     const { http, fixture, toasts, changed } = await setup({});
     const cmp = fixture.componentInstance;
-    cmp.startRunoff();
-    cmp.startRunoff();
     cmp.drawLot();
     cmp.drawLot();
-    http.expectOne({ method: 'POST', url: '/api/votes/e1/runoff' }).flush(null, { status: 500, statusText: 'Error' });
+    http.expectOne({ method: 'POST', url: '/api/votes/e1/draw-lot' }).flush(null, { status: 500, statusText: 'Error' });
     http.verify();
     expect(toasts()).toContain('Aktion fehlgeschlagen.');
     expect(changed).not.toHaveBeenCalled();
     fixture.componentRef.setInput('voteId', null);
-    cmp.startRunoff();
     cmp.drawLot();
     http.verify();
   });

@@ -21,7 +21,7 @@ import secrets
 from collections.abc import Callable, Sequence
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -35,7 +35,6 @@ from app.modules.voting.schemas import (
     ElectionLotOut,
     ElectionResultOut,
     ElectionRunoffOut,
-    VoteCreateInternal,
     VoteOut,
 )
 from app.shared.config_schemas import ElectionConfig
@@ -46,12 +45,10 @@ if TYPE_CHECKING:
 
 ELECTION = "election"
 
-#: 409 codes of the lot and the runoff.
+#: 409 codes of the lot.
 NOT_AN_ELECTION = "not_an_election"
 NO_LOT_PENDING = "no_lot_pending"
 LOT_ALREADY_DRAWN = "lot_already_drawn"
-NO_RUNOFF_PENDING = "no_runoff_pending"
-RUNOFF_EXISTS = "runoff_exists"
 
 
 def is_election(vote: object) -> bool:
@@ -144,10 +141,10 @@ def election_fields(vote: Vote) -> dict[str, Any]:
 async def release_runoff_link(session: AsyncSession, vote: Vote) -> None:
     """Clear the link of the parent election to a runoff that goes away (no commit).
 
-    A cancel or a delete of a runoff calls this. The parent then shows the runoff as
-    pending again, and ``POST /votes/{parent}/runoff`` creates a new one. The method
-    locks the parent row, as ``create_runoff`` does, and clears the link only while it
-    still names this runoff.
+    A cancel or a delete of a runoff calls this. Only results stored before the lot
+    decided every election tie hold a runoff (§ F/meetings/voting/000027). The parent
+    then shows the runoff as pending again. The method locks the parent row and clears
+    the link only while it still names this runoff.
     """
     parent_id = getattr(vote, "parent_vote_id", None)
     if not is_election(vote) or parent_id is None:
@@ -243,75 +240,3 @@ class ElectionService:
         )
         await self.session.commit()
         return await self.voting.get(vote.id)
-
-    async def _runoff_alive(self, runoff_id: UUID) -> bool:
-        """Tell whether a linked runoff still exists and is not cancelled.
-
-        A cancelled or deleted runoff no longer blocks a new one.
-        """
-        status = await self.session.scalar(select(Vote.status).where(Vote.id == runoff_id))
-        return status is not None and status != "cancelled"
-
-    async def create_runoff(self, vote_id: UUID) -> VoteOut:
-        """Create the draft runoff of an election with a tie at the seat boundary.
-
-        The runoff takes the tied candidates and the open seats, the rules of its
-        parent (secret, quorum, guests), the same meeting and agenda item, and round
-        ``parent + 1``. The eligible count comes from the roster again. The meeting
-        lead opens it with ``POST /votes/{id}/open``. The caller checks the manage
-        right.
-
-        The method locks the meeting row first and the vote row after it, as the meeting
-        close and delete do. The link to the runoff joins the commit of the insert, so a
-        second call sees it under the row lock and gets 409.
-
-        Raises:
-            ConflictError: The vote is no closed election (``not_an_election``), no
-                runoff is pending (``no_runoff_pending``), a runoff exists that is
-                not cancelled (``runoff_exists``) or the meeting is not live.
-        """
-        meeting_id = await self.session.scalar(select(Vote.meeting_id).where(Vote.id == vote_id))
-        if meeting_id is not None:
-            await self.voting._lock_live_meeting(meeting_id)
-        vote, result = await self._closed_election(vote_id)
-        runoff = result.runoff
-        if runoff is None:
-            raise ConflictError(
-                "No runoff is pending for this election.", code=NO_RUNOFF_PENDING
-            )
-        if runoff.vote_id is not None and await self._runoff_alive(runoff.vote_id):
-            raise ConflictError("The runoff of this election exists.", code=RUNOFF_EXISTS)
-        parent = election_config(vote)
-        tied = set(runoff.candidate_ids)
-        config = parent.model_copy(
-            update={
-                "seats": runoff.seats,
-                "candidates": [c for c in parent.candidates if c.id in tied],
-            }
-        )
-        eligible = vote.eligible_count
-        if not parent.guests_vote:
-            from app.modules.livevote.service import MeetingService
-
-            eligible = await MeetingService(self.session).vote_eligible_count(
-                UUID(vote.eligible_group)
-            )
-        payload = VoteCreateInternal(
-            config=ElectionConfig.model_validate(config.model_dump(by_alias=True)),
-            eligibleGroup=UUID(vote.eligible_group),
-            question=vote.question,
-            eligibleCount=eligible,
-            parentVoteId=vote.id,
-            round=(getattr(vote, "round", 1) or 1) + 1,
-        )
-        runoff_id = uuid4()
-        vote.election_result = dump_result(
-            result.model_copy(update={"runoff": runoff.model_copy(update={"vote_id": runoff_id})})
-        )
-        return await self.voting._insert(
-            None,
-            payload,
-            meeting_id=vote.meeting_id,
-            agenda_item_id=vote.agenda_item_id,
-            vote_id=runoff_id,
-        )

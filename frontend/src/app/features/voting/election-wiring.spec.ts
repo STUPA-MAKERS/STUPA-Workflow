@@ -194,7 +194,7 @@ describe('election wiring', () => {
       return TestBed.inject(ApiClient);
     }
 
-    it('reads the demo election, draws its lot once and refuses a runoff', async () => {
+    it('reads the demo election, draws its lot once', async () => {
       const client = api();
       const id = 'a0000000-0000-0000-0000-0000000000e1';
       const before = await firstValueFrom(client.getVote(id));
@@ -204,9 +204,6 @@ describe('election wiring', () => {
       expect(after.electionResult?.lot?.drawn).toEqual(['c1']);
       await expect(firstValueFrom(client.drawElectionLot(id))).rejects.toMatchObject({
         error: { code: 'no_lot_pending' },
-      });
-      await expect(firstValueFrom(client.createElectionRunoff(id))).rejects.toMatchObject({
-        error: { code: 'no_runoff_pending' },
       });
       await expect(firstValueFrom(client.drawElectionLot('nope'))).rejects.toMatchObject({
         error: { code: 'not_an_election' },

@@ -65,17 +65,9 @@ describe('mockApiInterceptor — elections', () => {
     expect(v.electionResult?.lot).toMatchObject({ among: ['c1', 'c2'], seats: 1, drawn: null });
   });
 
-  it('refuses a runoff for a tie and the lot for a motion or an unknown vote', async () => {
-    await expect(post(`/api/votes/${ELECTION}/runoff`)).rejects.toMatchObject({
-      status: 409,
-      error: expect.objectContaining({ code: 'no_runoff_pending' }),
-    });
+  it('refuses the lot for a motion or an unknown vote', async () => {
     for (const id of [MOTION, 'nope']) {
       await expect(post(`/api/votes/${id}/draw-lot`)).rejects.toMatchObject({
-        status: 409,
-        error: expect.objectContaining({ code: 'not_an_election' }),
-      });
-      await expect(post(`/api/votes/${id}/runoff`)).rejects.toMatchObject({
         status: 409,
         error: expect.objectContaining({ code: 'not_an_election' }),
       });

@@ -89,7 +89,7 @@ function setViewport(...parts: string[]): void {
   })) as unknown as typeof window.matchMedia;
 }
 const WIDE = 'min-width: 1200px';
-const PHONE = 'max-width: 768px';
+const PHONE = 'max-width: 767.98px';
 const realMatchMedia = window.matchMedia;
 afterEach(() => {
   window.matchMedia = realMatchMedia;

@@ -1076,8 +1076,6 @@
   "poll.action.close": "Umfrage beenden",
   "election.tag.tie": "Gleichstand",
   "election.runoff.banner": "Gleichstand an der Grenze: Stichwahl um {seats} zwischen {names}.",
-  "election.runoff.start": "Stichwahl starten",
-  "election.runoff.started": "Die Stichwahl ist offen.",
   "election.runoff.exists": "Die Stichwahl ist angelegt.",
   "election.lot.pending": "Gleichstand zwischen {names}. Das Los entscheidet.",
   "election.lot.draw": "Los ziehen",

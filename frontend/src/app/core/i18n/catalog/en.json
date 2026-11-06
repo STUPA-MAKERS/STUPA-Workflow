@@ -1076,8 +1076,6 @@
   "poll.action.close": "End poll",
   "election.tag.tie": "tie",
   "election.runoff.banner": "Tie at the boundary: runoff for {seats} between {names}.",
-  "election.runoff.start": "Start runoff",
-  "election.runoff.started": "The runoff is open.",
   "election.runoff.exists": "The runoff exists.",
   "election.lot.pending": "Tie between {names}. The lot decides.",
   "election.lot.draw": "Draw lot",
