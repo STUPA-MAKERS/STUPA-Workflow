@@ -23,7 +23,7 @@ SETTINGS = load_settings()
 
 def _hook() -> Webhook:
     hook = Webhook(
-        name="h", url="https://hook.test/h", events=["status_changed"],
+        name="h", url="https://hook.test/h",
         active=True, secret=b"k",
     )
     hook.id = uuid.uuid4()

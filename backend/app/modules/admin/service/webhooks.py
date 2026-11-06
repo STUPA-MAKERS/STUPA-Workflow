@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import secrets
-from typing import cast
 from uuid import UUID
 
 from sqlalchemy import select
@@ -18,7 +17,6 @@ from app.modules.admin.schemas import (
 from app.modules.admin.service.service_base import ConfigServiceBase, _iso
 from app.modules.audit.actions import AuditAction
 from app.settings import get_settings
-from app.shared.config_schemas import EventName
 from app.shared.errors import BadRequestError, NotFoundError
 from app.shared.ssrf import SsrfError, assert_allowed_url
 
@@ -28,7 +26,6 @@ def _webhook_out(row: Webhook) -> WebhookOut:
         id=row.id,
         name=row.name,
         url=row.url,
-        events=cast("list[EventName]", list(row.events)),
         active=row.active,
     )
 
@@ -134,7 +131,6 @@ class WebhookOps(ConfigServiceBase):
         row = Webhook(
             name=payload.name,
             url=payload.url,
-            events=list(payload.events),
             active=payload.active,
             secret=secrets.token_bytes(32),
         )
@@ -160,8 +156,6 @@ class WebhookOps(ConfigServiceBase):
         if payload.url is not None:
             self._assert_webhook_url_advisory(payload.url)
             row.url = payload.url
-        if payload.events is not None:
-            row.events = list(payload.events)
         if payload.active is not None:
             row.active = payload.active
         await self._audit(actor, AuditAction.WEBHOOK_CONFIG, "webhook", row.id)

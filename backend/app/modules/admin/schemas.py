@@ -27,7 +27,7 @@ from app.modules.applications.models import (
 )
 from app.modules.auth.models import MAX_SESSION_DAYS
 from app.modules.livevote.models import MAX_LEAD_MINUTES
-from app.shared.config_schemas import ComparisonOffers, EventName, FlowGraph
+from app.shared.config_schemas import ComparisonOffers, FlowGraph
 from app.shared.i18n import I18nMap, Lang
 from app.shared.permissions import PERMISSION_CATALOGUE
 
@@ -786,7 +786,6 @@ class WebhookOut(_CamelModel):
     id: UUID
     name: str
     url: str
-    events: list[EventName]
     active: bool
 
 
@@ -795,8 +794,6 @@ class WebhookCreate(_CamelModel):
 
     name: str = Field(min_length=1)
     url: str = Field(min_length=1)
-    #: Triggers are optional — they usually come from the flow graph.
-    events: list[EventName] = Field(default_factory=list)
     active: bool = True
 
     @field_validator("url")
@@ -812,7 +809,6 @@ class WebhookUpdate(_CamelModel):
 
     name: str | None = None
     url: str | None = None
-    events: list[EventName] | None = None
     active: bool | None = None
 
     @field_validator("url")

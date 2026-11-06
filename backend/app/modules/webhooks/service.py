@@ -6,8 +6,8 @@ The service has two strictly separated jobs.
   webhook. The method creates one `webhook_delivery` row in state `pending` and
   enqueues a `deliver_webhook` job. It is idempotent over
   `(webhook_id, idempotency_key)`. A flow retry of the same status event creates no
-  duplicate delivery. No other caller fans a domain event out to the `events`
-  subscriptions of the webhooks.
+  duplicate delivery. A webhook has no event subscriptions, so no other caller
+  sends to it (§F/integrations/webhooks/000402).
 * `deliver` runs on the worker side. It sends one delivery: SSRF guard at send time,
   HMAC signature, POST without redirects, and a write-back of status, attempts and
   backoff. It returns a `DeliveryOutcome`. The worker translates `retry` into
