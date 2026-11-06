@@ -69,7 +69,7 @@ export class FlowEditorOptionsService {
       .subscribe({
         next: (roots) => {
           const map = new Map<string, string>();
-          const walk = (nodes: BudgetTreeNode[]): void => {
+          const walk = (nodes: readonly BudgetTreeNode[]): void => {
             for (const n of nodes) {
               map.set(n.id, `${n.name} (${n.key})`);
               if (n.children?.length) walk(n.children);

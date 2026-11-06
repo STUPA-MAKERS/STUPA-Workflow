@@ -21,6 +21,7 @@ import type { Application, Uuid } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
+import type { TranslationKey } from '@core/i18n/translations';
 import {
   ButtonComponent,
   CheckboxComponent,
@@ -63,6 +64,7 @@ import {
   type Expense,
   type ExpenseKind,
   type ExpenseUpdate,
+  type FiscalYear,
   type Invoice,
 } from '../budget/budget-tree.api';
 import {
@@ -98,7 +100,11 @@ export type ExpensesTab = 'bookings' | 'transfers';
 export type ExpenseFormMode = 'create' | 'edit' | 'transfer-create' | 'transfer-edit';
 
 /** The sort orders of the header menu, as `field:order`. */
-const SORTS: readonly { field: ExpenseSortField; order: 'asc' | 'desc'; key: string }[] = [
+const SORTS: readonly {
+  readonly field: ExpenseSortField;
+  readonly order: 'asc' | 'desc';
+  readonly key: string;
+}[] = [
   { field: 'paymentDate', order: 'desc', key: 'expenses.sort.paymentDesc' },
   { field: 'paymentDate', order: 'asc', key: 'expenses.sort.paymentAsc' },
   { field: 'invoiceDate', order: 'desc', key: 'expenses.sort.invoiceDesc' },
@@ -354,24 +360,38 @@ export class ExpensesComponent implements OnDestroy {
   /** The page actions in the ⋮ menu of the header. On a phone the sort and the export
    *  join them. */
   readonly headerMenu = computed<RowMenuSection[]>(() => {
-    const items: RowMenuItem[] = [];
-    if (this.canManage()) {
-      items.push({ id: 'transfer', label: this.i18n.translate('expenses.transferNew'), icon: 'repeat' });
-      if (this.tab() === 'bookings') {
-        items.push({ id: 'select', label: this.i18n.translate('expenses.bulk.start'), icon: 'check' });
-      }
-    }
-    const sections: RowMenuSection[] = items.length ? [{ items }] : [];
-    if (this.phone()) {
-      if (this.tab() === 'bookings') sections.push(...this.sortSections());
-      if (this.canExport()) {
-        sections.push({
-          items: [{ id: 'export', label: this.i18n.translate('expenses.export'), icon: 'download' }],
-        });
-      }
-    }
-    return sections;
+    const manage = this.canManage();
+    const bookings = this.tab() === 'bookings';
+    const transfer: RowMenuItem = {
+      id: 'transfer',
+      label: this.i18n.translate('expenses.transferNew'),
+      icon: 'repeat',
+    };
+    const select: RowMenuItem = {
+      id: 'select',
+      label: this.i18n.translate('expenses.bulk.start'),
+      icon: 'check',
+    };
+    const items: RowMenuItem[] = [
+      ...(manage ? [transfer] : []),
+      ...(manage && bookings ? [select] : []),
+    ];
+    return [
+      ...(items.length ? [{ items }] : []),
+      ...(this.phone() ? this.phoneSections(bookings) : []),
+    ];
   });
+
+  /** The sections only a phone adds to the header menu: the sort and the export. */
+  private phoneSections(bookings: boolean): RowMenuSection[] {
+    const exportSection: RowMenuSection = {
+      items: [{ id: 'export', label: this.i18n.translate('expenses.export'), icon: 'download' }],
+    };
+    return [
+      ...(bookings ? this.sortSections() : []),
+      ...(this.canExport() ? [exportSection] : []),
+    ];
+  }
 
   onHeaderMenu(item: RowMenuItem): void {
     if (item.id === 'transfer') this.openTransfer();
@@ -495,13 +515,18 @@ export class ExpensesComponent implements OnDestroy {
       items: this.items,
       key: (e) => e.id,
       reads: (e) => {
-        const reads: Observable<unknown>[] = [inject(TodosApiService).linked('expense', e.id)];
+        const todos = inject(TodosApiService).linked('expense', e.id);
         const invoiceId = e.invoiceId;
-        if (invoiceId && !this.invoices().some((i) => i.id === invoiceId)) {
-          reads.push(this.api.getInvoice(invoiceId, { detail: true }));
-        }
-        if (e.applicationId) reads.push(this.apps.getApplication(e.applicationId, { quiet: true, detail: true }));
-        if ((e.childCount ?? 0) > 0) reads.push(this.api.listSubBookings(e.id, { detail: true }));
+        const invoice =
+          invoiceId && !this.invoices().some((i) => i.id === invoiceId)
+            ? [this.api.getInvoice(invoiceId, { detail: true })]
+            : [];
+        const app = e.applicationId
+          ? [this.apps.getApplication(e.applicationId, { quiet: true, detail: true })]
+          : [];
+        const subs =
+          (e.childCount ?? 0) > 0 ? [this.api.listSubBookings(e.id, { detail: true })] : [];
+        const reads: Observable<unknown>[] = [todos, ...invoice, ...app, ...subs];
         return reads;
       },
       when: () => this.tab() === 'bookings',
@@ -596,19 +621,10 @@ export class ExpensesComponent implements OnDestroy {
     const kind: '' | ExpenseKind = raw === 'expense' || raw === 'income' ? raw : '';
     const budgetId = qp.get('budget') ?? '';
     const q = qp.get('q') ?? '';
-    let changed = false;
-    if (budgetId !== this.budgetId()) {
-      this.budgetId.set(budgetId);
-      changed = true;
-    }
-    if (kind !== this.kind()) {
-      this.kind.set(kind);
-      changed = true;
-    }
-    if (q !== this.q()) {
-      this.q.set(q);
-      changed = true;
-    }
+    const changed = budgetId !== this.budgetId() || kind !== this.kind() || q !== this.q();
+    this.budgetId.set(budgetId);
+    this.kind.set(kind);
+    this.q.set(q);
     const view: ExpensesTab =
       qp.get('view') === 'transfers' && this.canManage() ? 'transfers' : 'bookings';
     if (view !== this.tab()) {
@@ -719,19 +735,8 @@ export class ExpensesComponent implements OnDestroy {
     this.fyRequested.add(top.id);
     this.api.listFiscalYears(top.id).subscribe({
       next: (fys) => {
-        this.fyLabels.update((m) => {
-          const next = new Map(m);
-          for (const f of fys) next.set(f.id, f.display);
-          return next;
-        });
-        this.closedFys.update((c) => {
-          const next = new Set(c);
-          for (const f of fys) {
-            if (f.closedAt) next.add(f.id);
-            else next.delete(f.id);
-          }
-          return next;
-        });
+        this.fyLabels.update((m) => new Map([...m, ...fys.map((f) => [f.id, f.display] as const)]));
+        this.closedFys.update((c) => withClosedYears(c, fys));
       },
       error: () => this.fyRequested.delete(top.id),
     });
@@ -960,31 +965,30 @@ export class ExpensesComponent implements OnDestroy {
    * it can be duplicated, because the copy goes into an open year.
    */
   rowMenu(e: Expense): RowMenuSection[] {
-    const main: RowMenuItem[] = [];
     const canChange = this.canChange(e.fiscalYearId);
-    if (canChange) {
-      main.push({ id: 'edit', label: this.i18n.translate('action.edit'), icon: 'edit' });
-    }
-    if (this.canManage() && !e.parentExpenseId) {
-      main.push({ id: 'duplicate', label: this.i18n.translate('expenses.action.duplicate'), icon: 'copy' });
-    }
-    if (canChange) {
-      main.push({ id: 'sub', label: this.i18n.translate('expenses.sub.add'), icon: 'plus' });
-    }
-    if (e.invoiceId) {
-      main.push({
-        id: 'invoice',
-        label: this.i18n.translate('expenses.action.viewInvoice'),
-        icon: 'receipt',
-      });
-    }
-    const sections: RowMenuSection[] = main.length ? [{ items: main }] : [];
-    if (canChange) {
-      sections.push({
-        items: [{ id: 'delete', label: this.i18n.translate('action.delete'), icon: 'trash', danger: true }],
-      });
-    }
-    return sections;
+    const t = (key: TranslationKey): string => this.i18n.translate(key);
+    const edit: RowMenuItem = { id: 'edit', label: t('action.edit'), icon: 'edit' };
+    const duplicate: RowMenuItem = {
+      id: 'duplicate',
+      label: t('expenses.action.duplicate'),
+      icon: 'copy',
+    };
+    const sub: RowMenuItem = { id: 'sub', label: t('expenses.sub.add'), icon: 'plus' };
+    const invoice: RowMenuItem = {
+      id: 'invoice',
+      label: t('expenses.action.viewInvoice'),
+      icon: 'receipt',
+    };
+    const main: RowMenuItem[] = [
+      ...(canChange ? [edit] : []),
+      ...(this.canManage() && !e.parentExpenseId ? [duplicate] : []),
+      ...(canChange ? [sub] : []),
+      ...(e.invoiceId ? [invoice] : []),
+    ];
+    const remove: RowMenuSection = {
+      items: [{ id: 'delete', label: t('action.delete'), icon: 'trash', danger: true }],
+    };
+    return [...(main.length ? [{ items: main }] : []), ...(canChange ? [remove] : [])];
   }
 
   onRowMenu(item: RowMenuItem, e: Expense): void {
@@ -1059,12 +1063,9 @@ export class ExpensesComponent implements OnDestroy {
   }
 
   toggleSelect(id: Uuid, checked: boolean): void {
-    this.selected.update((cur) => {
-      const next = new Set(cur);
-      if (checked) next.add(id);
-      else next.delete(id);
-      return next;
-    });
+    this.selected.update((cur) =>
+      checked ? new Set([...cur, id]) : new Set([...cur].filter((x) => x !== id)),
+    );
   }
 
   toggleSelectAll(checked: boolean): void {
@@ -1129,11 +1130,11 @@ export class ExpensesComponent implements OnDestroy {
       .pipe(
         concatMap((id) => {
           const e = byId.get(id);
-          const patch: ExpenseUpdate = {};
-          if (category) patch.category = category;
-          if (budgetId && e && !e.applicationId && !e.parentExpenseId) {
-            patch.budgetId = budgetId as Uuid;
-          }
+          const rebook = !!budgetId && !!e && !e.applicationId && !e.parentExpenseId;
+          const patch: ExpenseUpdate = {
+            ...(category ? { category } : {}),
+            ...(rebook ? { budgetId: budgetId as Uuid } : {}),
+          };
           return this.api.updateExpense(id, patch);
         }),
       )
@@ -1166,4 +1167,14 @@ export class ExpensesComponent implements OnDestroy {
   onRowActivate(e: Expense): void {
     if (this.selecting()) this.toggleSelect(e.id, !this.isSelected(e.id));
   }
+}
+
+/** `closed` with the closed years of `fys` added and their open years removed. */
+function withClosedYears(
+  closed: ReadonlySet<string>,
+  fys: readonly FiscalYear[],
+): ReadonlySet<string> {
+  const open = new Set(fys.filter((f) => !f.closedAt).map((f) => f.id));
+  const now = fys.filter((f) => f.closedAt).map((f) => f.id);
+  return new Set([...[...closed].filter((id) => !open.has(id)), ...now]);
 }

@@ -53,7 +53,7 @@ export function invoiceFieldsValid(number: string, supplier: string, gross: stri
 export interface InvoiceFormHost {
   readonly saving: Signal<boolean>;
   readonly attaching: Signal<boolean>;
-  readonly statusOptions: Signal<SelectOption[]>;
+  readonly statusOptions: Signal<readonly SelectOption[]>;
 
   readonly createOpen: WritableSignal<boolean>;
   readonly newNumber: WritableSignal<string>;

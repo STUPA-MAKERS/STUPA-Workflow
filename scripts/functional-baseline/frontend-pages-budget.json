@@ -1,14 +1,5 @@
 {
-  "frontend/src/app/pages/budget/budget-color.util.ts": 12,
-  "frontend/src/app/pages/budget/budget-dashboard.component.ts": 52,
-  "frontend/src/app/pages/budget/budget-items/budget-item-list.component.ts": 13,
-  "frontend/src/app/pages/budget/budget-items/budget-items-dialog.component.ts": 4,
-  "frontend/src/app/pages/budget/budget-items/budget-items.fixtures.ts": 2,
-  "frontend/src/app/pages/budget/budget-items/budget-items.ts": 1,
-  "frontend/src/app/pages/budget/budget-pie.component.ts": 11,
-  "frontend/src/app/pages/budget/budget-sunburst.component.ts": 12,
-  "frontend/src/app/pages/budget/budget-tree.api.ts": 306,
-  "frontend/src/app/pages/budget/budget-tree.component.ts": 27,
-  "frontend/src/app/pages/budget/cost-centre-select/cost-centre-select.component.ts": 28,
-  "frontend/src/app/pages/budget/expense-display.util.ts": 13
+  "frontend/src/app/pages/budget/budget-dashboard.component.ts": 3,
+  "frontend/src/app/pages/budget/budget-tree.component.ts": 2,
+  "frontend/src/app/pages/budget/cost-centre-select/cost-centre-select.component.ts": 1
 }

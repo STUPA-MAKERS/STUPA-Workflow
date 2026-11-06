@@ -17,15 +17,15 @@ export type SunburstMetric = 'allocated' | 'available' | 'expended';
 
 /** An annular segment: one cost center at its depth. */
 interface SunSeg {
-  id: string;
-  name: string;
-  pathKey: string;
-  depth: number;
-  d: string;
-  color: string;
-  opacity: number;
-  value: number;
-  percent: number;
+  readonly id: string;
+  readonly name: string;
+  readonly pathKey: string;
+  readonly depth: number;
+  readonly d: string;
+  readonly color: string;
+  readonly opacity: number;
+  readonly value: number;
+  readonly percent: number;
 }
 
 const SIZE = 480;
@@ -73,7 +73,7 @@ export class BudgetSunburstComponent {
   protected readonly W_EMPTY = R_MAX - R_CENTER;
 
   protected readonly hovered = signal<SunSeg | null>(null);
-  protected readonly tip = signal<{ x: number; y: number }>({ x: 0, y: 0 });
+  protected readonly tip = signal<{ readonly x: number; readonly y: number }>({ x: 0, y: 0 });
 
   private metricOf(node: BudgetTreeNode): number {
     const a = node.byFiscalYear.find((x) => x.fiscalYearId === this.fyId());
@@ -97,40 +97,58 @@ export class BudgetSunburstComponent {
     return node.children.length ? 1 + Math.max(...node.children.map((c) => this.maxDepth(c))) : 0;
   }
 
-  protected readonly segments = computed<SunSeg[]>(() => {
+  protected readonly segments = computed<readonly SunSeg[]>(() => {
     const r = this.root();
     const total = this.total();
     if (!r || total <= 0) return [];
     const depthMax = Math.max(1, this.maxDepth(r));
     const ringW = (R_MAX - R_CENTER) / depthMax;
     const colors = this.colors() ?? nodeColors([r]);
-    const out: SunSeg[] = [];
-    const layout = (node: BudgetTreeNode, start: number, span: number, depth: number): void => {
-      const nodeVal = this.subtree(node);
-      if (nodeVal <= 0) return;
-      let angle = start;
-      for (const c of node.children) {
-        const v = this.subtree(c);
-        if (v <= 0) continue;
-        const childSpan = span * (v / nodeVal);
-        const r0 = R_CENTER + (depth - 1) * ringW;
-        out.push({
-          id: c.id,
-          name: c.name,
-          pathKey: c.pathKey,
-          depth,
-          d: annular(angle, angle + childSpan, r0, r0 + ringW - 2),
-          color: colors.get(c.id) ?? '',
-          opacity: Math.max(0.35, 1 - 0.16 * (depth - 1)),
-          value: v,
-          percent: Math.round((v / total) * 100),
-        });
-        layout(c, angle, childSpan, depth + 1);
-        angle += childSpan;
-      }
+    const segment = (
+      c: BudgetTreeNode,
+      v: number,
+      depth: number,
+      start: number,
+      span: number,
+    ): SunSeg => {
+      const r0 = R_CENTER + (depth - 1) * ringW;
+      return {
+        id: c.id,
+        name: c.name,
+        pathKey: c.pathKey,
+        depth,
+        d: annular(start, start + span, r0, r0 + ringW - 2),
+        color: colors.get(c.id) ?? '',
+        opacity: Math.max(0.35, 1 - 0.16 * (depth - 1)),
+        value: v,
+        percent: Math.round((v / total) * 100),
+      };
     };
-    layout(r, -Math.PI / 2, Math.PI * 2, 1);
-    return out;
+    const layout = (
+      node: BudgetTreeNode,
+      start: number,
+      span: number,
+      depth: number,
+    ): readonly SunSeg[] => {
+      const nodeVal = this.subtree(node);
+      const kids = node.children
+        .map((c) => ({ c, v: this.subtree(c) }))
+        .filter((k) => k.v > 0);
+      const angles = kids.reduce<readonly number[]>(
+        (acc, k) => [...acc, acc[acc.length - 1] + span * (k.v / nodeVal)],
+        [start],
+      );
+      return nodeVal <= 0
+        ? []
+        : kids.flatMap(({ c, v }, i) => {
+            const childSpan = span * (v / nodeVal);
+            return [
+              segment(c, v, depth, angles[i], childSpan),
+              ...layout(c, angles[i], childSpan, depth + 1),
+            ];
+          });
+    };
+    return layout(r, -Math.PI / 2, Math.PI * 2, 1);
   });
 
   protected rootClick(): void {

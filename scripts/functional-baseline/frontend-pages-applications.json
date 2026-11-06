@@ -2,7 +2,7 @@
   "frontend/src/app/pages/applications/agenda-dialog/agenda-dialog.component.ts": 7,
   "frontend/src/app/pages/applications/application-reads.ts": 1,
   "frontend/src/app/pages/applications/applications-detail.component.ts": 29,
-  "frontend/src/app/pages/applications/applications-list.component.ts": 31,
+  "frontend/src/app/pages/applications/applications-list.component.ts": 30,
   "frontend/src/app/pages/applications/applications-page.service.ts": 3,
   "frontend/src/app/pages/applications/applications.util.ts": 6,
   "frontend/src/app/pages/applications/attachments-panel.component.ts": 10,

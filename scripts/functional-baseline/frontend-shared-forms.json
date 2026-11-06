@@ -1,7 +1,6 @@
 {
   "frontend/src/app/shared/forms/answer-format.ts": 3,
   "frontend/src/app/shared/forms/answer-view/answer-view.component.ts": 42,
-  "frontend/src/app/shared/forms/budget-options.ts": 7,
   "frontend/src/app/shared/forms/formly-mapper.ts": 35,
   "frontend/src/app/shared/forms/i18n-text.ts": 2,
   "frontend/src/app/shared/forms/jsonlogic.ts": 6,

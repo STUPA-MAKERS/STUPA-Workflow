@@ -122,7 +122,7 @@ export class BookingFormComponent {
 
   readonly state = input.required<ExpenseDialogsState>();
   readonly mode = input<BookingFormMode>('create');
-  readonly tree = input<BudgetTreeNode[]>([]);
+  readonly tree = input<readonly BudgetTreeNode[]>([]);
   readonly costCentres = input<ReadonlyMap<string, CostCentreLabel>>(new Map());
   readonly saving = input(false);
   readonly layout = input<FinanceFormLayout>('pane');

@@ -317,8 +317,15 @@ describe('BookingDetailComponent', () => {
   });
 
   it('shows an overdrawn cost centre in the error tone', async () => {
-    const over = JSON.parse(JSON.stringify(TREE)) as BudgetTreeNode[];
-    over[0].children[0].children[0].byFiscalYear[0].available = '-50';
+    const [top, ...otherTops] = TREE;
+    const [mid, ...otherMids] = top.children;
+    const [leaf, ...otherLeaves] = mid.children;
+    const [fy, ...otherFys] = leaf.byFiscalYear;
+    const overLeaf = { ...leaf, byFiscalYear: [{ ...fy, available: '-50' }, ...otherFys] };
+    const over: BudgetTreeNode[] = [
+      { ...top, children: [{ ...mid, children: [overLeaf, ...otherLeaves] }, ...otherMids] },
+      ...otherTops,
+    ];
     await setup({ tree: over });
     expect(screen.getByText(/-50,00/).classList.contains('fd__neg')).toBe(true);
   });

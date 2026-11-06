@@ -3,11 +3,11 @@ import type { Invoice, InvoiceBooking } from '../budget/budget-tree.api';
 /** How much of an invoice is booked. */
 export interface InvoiceBooked {
   /** The sum of the expense bookings on the invoice. */
-  booked: number;
+  readonly booked: number;
   /** The gross amount of the invoice. */
-  gross: number;
+  readonly gross: number;
   /** The rest, never below 0. */
-  open: number;
+  readonly open: number;
 }
 
 /**
@@ -15,7 +15,7 @@ export interface InvoiceBooked {
  * invoice too. A parent and its sub-bookings carry the same amount twice (the parent is the
  * sum of its children), so only the outer one counts.
  */
-export function countedBookings(bookings: readonly InvoiceBooking[]): InvoiceBooking[] {
+export function countedBookings(bookings: readonly InvoiceBooking[]): readonly InvoiceBooking[] {
   const ids = new Set(bookings.map((b) => b.id));
   return bookings.filter((b) => !b.parentExpenseId || !ids.has(b.parentExpenseId));
 }

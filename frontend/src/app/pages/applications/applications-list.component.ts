@@ -1004,7 +1004,7 @@ export class ApplicationsListComponent {
 }
 
 /** Remove the cost centres hidden in the budget tab, and their subtrees. */
-function pruneHidden(nodes: BudgetTreeNode[]): BudgetTreeNode[] {
+function pruneHidden(nodes: readonly BudgetTreeNode[]): BudgetTreeNode[] {
   return nodes
     .filter((n) => !n.hiddenInBudget)
     .map((n) => ({ ...n, children: pruneHidden(n.children) }));
