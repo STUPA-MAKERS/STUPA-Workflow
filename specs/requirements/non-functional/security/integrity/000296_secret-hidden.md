@@ -5,6 +5,9 @@ kind: non-functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
+implementation:
+  - backend/app/modules/webhooks
+  - backend/app/modules/admin
 scope:
   - backend/app/modules/webhooks
   - backend/app/modules/admin

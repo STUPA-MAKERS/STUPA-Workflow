@@ -5,6 +5,9 @@ kind: non-functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
+implementation:
+  - backend/app/middleware.py
+  - backend/app/settings.py
 scope:
   - backend/app/middleware.py
   - backend/app/settings.py

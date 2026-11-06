@@ -5,6 +5,9 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
+implementation:
+  - mcp/
+  - backend/app/modules/auth
 scope:
   - mcp/
   - backend/app/modules/auth

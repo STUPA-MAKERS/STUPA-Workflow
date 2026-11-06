@@ -4,7 +4,13 @@ title: Shared data has one source
 kind: style
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
+implementation:
+  - backend/
+  - frontend/
+  - mcp/
+  - typst/
+  - deploy/
 scope:
   - backend/
   - frontend/

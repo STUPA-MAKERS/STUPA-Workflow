@@ -4,7 +4,8 @@ title: An approval can deviate
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
+implementation: null
 scope:
   - backend/app/modules/applications
   - frontend/src/app/pages/applications

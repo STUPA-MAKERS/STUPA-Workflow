@@ -4,7 +4,10 @@ title: A meeting with an open vote does not close
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
+implementation:
+  - backend/app/modules/livevote
+  - frontend/src/app/features/meetings
 scope:
   - backend/app/modules/livevote
   - frontend/src/app/features/meetings

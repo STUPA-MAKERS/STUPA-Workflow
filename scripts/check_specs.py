@@ -2,7 +2,7 @@
 """Check the spec files in `specs/` and keep the index in `specs/README.md` current.
 
 The script checks the rules for specs (`specs/style/specs/`): the file name, the
-place in the tree, the front matter, the heading, the labels, `must` in the rule
+place in the tree, the front matter (also `implementation`), the heading, the labels, `must` in the rule
 text, the scope paths, `replaced_by`, unique numbers, the index, and every `§`
 reference in the code. It needs only the Python standard library.
 
@@ -27,7 +27,18 @@ KINDS = {
     "requirements/functional": ("F", "functional"),
     "requirements/non-functional": ("NF", "non-functional"),
 }
-KEYS = ["id", "title", "kind", "status", "owner", "updated", "replaced_by", "tests", "scope"]
+KEYS = [
+    "id",
+    "title",
+    "kind",
+    "status",
+    "owner",
+    "updated",
+    "replaced_by",
+    "tests",
+    "implementation",
+    "scope",
+]
 REQUIRED = {"id", "title", "kind", "status", "owner", "updated", "scope"}
 STATUSES = {"draft", "approved", "replaced", "removed"}
 FILE_NAME = re.compile(r"^[0-9]{6}_[a-z0-9]+(-[a-z0-9]+)*\.md$")
@@ -149,6 +160,18 @@ def _check_meta(spec: Spec, ids: dict[str, Spec]) -> list[str]:
     for entry in tests if isinstance(tests, list) else [tests]:
         if not TEST_ENTRY.match(entry) or not (ROOT / entry.split(":")[0]).is_file():
             errors.append(f"{rel}: tests entry {entry!r} names no test file (000002)")
+    implementation = meta.get("implementation")
+    if status in ("draft", "approved"):
+        if implementation != "null" and (not isinstance(implementation, list) or not implementation):
+            errors.append(f"{rel}: implementation must be a list of paths or null (000002)")
+        elif isinstance(implementation, list):
+            errors += [
+                f"{rel}: implementation path {entry!r} does not exist (000002)"
+                for entry in implementation
+                if not (ROOT / entry).exists()
+            ]
+    elif implementation is not None:
+        errors.append(f"{rel}: implementation goes with status draft or approved only (000002)")
     scope = meta.get("scope")
     if not isinstance(scope, list) or not scope:
         errors.append(f"{rel}: scope must be a list of paths (000002)")

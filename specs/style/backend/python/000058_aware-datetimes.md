@@ -4,7 +4,9 @@ title: Datetimes are timezone-aware
 kind: style
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
+implementation:
+  - backend/
 scope:
   - backend/
 ---

@@ -5,6 +5,10 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
+implementation:
+  - backend/app/modules/notifications
+  - backend/worker/mail.py
+  - backend/worker
 scope:
   - backend/app/modules/notifications
   - backend/worker/mail.py

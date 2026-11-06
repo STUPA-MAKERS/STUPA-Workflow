@@ -4,7 +4,8 @@ title: A test refers back to its rule
 kind: style
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
+implementation: null
 scope:
   - backend/tests
   - frontend/src/app

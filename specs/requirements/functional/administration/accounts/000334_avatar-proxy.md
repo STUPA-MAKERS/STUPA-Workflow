@@ -5,6 +5,9 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
+implementation:
+  - backend/app/modules/avatars
+  - frontend/src/app/shared
 scope:
   - backend/app/modules/avatars
   - frontend/src/app/shared
