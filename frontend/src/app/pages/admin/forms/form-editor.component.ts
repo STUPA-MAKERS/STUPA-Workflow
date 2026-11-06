@@ -740,7 +740,7 @@ export class FormEditorComponent {
     this.patchQuestion(pos, (f) => {
       const next = { ...f, isPromoted: checked };
       if (!checked) return withoutKey(next, 'promoteTarget');
-      return next.promoteTarget ? next : { ...next, promoteTarget: PROMOTE_TARGETS[0] };
+      return { ...next, promoteTarget: next.promoteTarget || PROMOTE_TARGETS[0] };
     });
   }
 

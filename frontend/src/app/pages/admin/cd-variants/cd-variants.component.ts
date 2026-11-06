@@ -296,8 +296,6 @@ export class AdminCdVariantsComponent {
         return this.download(logo);
       case 'remove':
         return this.removeLogo(variant, logo);
-      default:
-        return;
     }
   }
 

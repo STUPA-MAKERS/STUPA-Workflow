@@ -12,7 +12,6 @@
  * input waits for its layout, a line without a route is left out, so no curve flashes up.
  */
 import { type Signal, computed } from '@angular/core';
-import { assertNever } from '@shared/util/immutable';
 import type { FlowGraph, FlowGroup, StateDef, TransitionDef } from '../admin.models';
 import {
   DOT_GAP,
@@ -342,8 +341,6 @@ export function createFlowCanvasView(deps: FlowCanvasViewDeps): FlowCanvasView {
         }
         case 'proxy':
           return { src: proxyBox('l', end.pid), port: 'out', sx: PROXY_W, sy: PROXY_H / 2 };
-        default:
-          return assertNever(end);
       }
     };
     const target = (t: TransitionDef, end: EndRef): string | null => {
@@ -354,8 +351,6 @@ export function createFlowCanvasView(deps: FlowCanvasViewDeps): FlowCanvasView {
           return groupsBy.has(end.id) ? groupBox(end.id) : null;
         case 'proxy':
           return proxyBox('r', end.pid);
-        default:
-          return assertNever(end);
       }
     };
     return transitions.flatMap((t, index): readonly LevelLink[] => {

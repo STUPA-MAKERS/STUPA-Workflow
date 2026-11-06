@@ -35,7 +35,6 @@ import type {
   GroupMapping,
   Role,
 } from '../admin.models';
-import { assertNever } from '@shared/util/immutable';
 
 /** The three separate mapping kinds. Each has its own table and dialog. */
 export type MappingKind = 'global' | 'membership' | 'role';
@@ -417,8 +416,6 @@ export class GroupMappingsComponent {
         const body = { oidcGroup, gremiumRoleId: this.gremiumRoleId() as Uuid };
         return id ? this.api.updateRoleMapping(id, body) : this.api.createRoleMapping(body);
       }
-      default:
-        return assertNever(kind);
     }
   }
 
