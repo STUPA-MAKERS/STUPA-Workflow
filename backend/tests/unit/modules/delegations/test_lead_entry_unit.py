@@ -158,12 +158,6 @@ async def test_lead_entry_needs_the_gremium_gate() -> None:
         await _svc(db).create(_lead_payload(_person("a"), _person("b")), _actor())
 
 
-async def test_lead_entry_needs_the_voting_switch() -> None:
-    db = _lead_db()
-    with pytest.raises(ValidationProblem, match="disabled"):
-        await _svc(db, voting=False).create(_lead_payload(_person("a"), _person("b")), _actor())
-
-
 @pytest.mark.parametrize("status", ["planned", "closed"])
 async def test_lead_entry_only_while_live(status: str) -> None:
     db = _lead_db(meeting=_meeting(status))

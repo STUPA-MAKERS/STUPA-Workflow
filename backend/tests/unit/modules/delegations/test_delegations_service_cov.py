@@ -904,16 +904,6 @@ async def test_create_gremium_gate_forbidden() -> None:
         await _svc(db).create(DelegationCreate(meetingId=MEETING_ID, delegateId=uuid4()), _actor())
 
 
-async def test_create_voting_disabled_validation() -> None:
-    db = fake_session()
-    db.get_results = [_meeting(), _gremium()]
-    with pytest.raises(ValidationProblem, match="disabled"):
-        await _svc(db, voting=False).create(
-            DelegationCreate(meetingId=MEETING_ID, delegateId=uuid4(), delegateVoting=True),
-            _actor(),
-        )
-
-
 async def test_create_meeting_already_started_validation() -> None:
     db = fake_session()
     db.get_results = [_meeting(status="live"), _gremium()]

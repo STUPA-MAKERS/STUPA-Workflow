@@ -7,9 +7,9 @@ transfer is exclusive and never a duplicate.
 
 The server enforces these invariants:
 
-* Feature gates. A meeting delegation needs the gremium flag
-  `allow_vote_delegation`. `delegate_voting` also needs the global vote transfer
-  `delegation_voting_enabled`, else 422.
+* Feature gate. A meeting delegation, with or without the vote, needs the
+  gremium flag `allow_vote_delegation` (§ F/meetings/delegations/000110). No
+  server setting switches the vote transfer.
 * Own vote only. The delegator must be a voting member of the meeting gremium.
   The right comes only from an active gremium membership whose gremium role
   holds `vote.cast`. A global role, a role assignment or an OIDC group mapping
@@ -431,9 +431,9 @@ class DelegationService:
             NotFoundError: The meeting or the recipient does not exist (404).
             ConflictError: The delegator already delegated for this meeting, or the
                 recipient already carries a delegated vote (409).
-            ValidationProblem: The vote transfer is disabled, the meeting is not
-                planned, the deadline has passed, the delegator picked themselves,
-                or the delegation would build a chain (422).
+            ValidationProblem: The meeting is not planned, the deadline has
+                passed, the delegator picked themselves, or the delegation would
+                build a chain (422).
         """
         if payload.delegator_id is not None:
             return await self._create_by_lead(payload, payload.delegator_id, actor)
@@ -443,7 +443,6 @@ class DelegationService:
 
         if not gremium.allow_vote_delegation:
             raise ForbiddenError("Delegation is not enabled for this gremium.")
-        self._check_voting_enabled(payload)
         if meeting.status != "planned":
             raise ValidationProblem(
                 "Meeting has already started.",
@@ -494,14 +493,6 @@ class DelegationService:
         )
         return (await self._out([(row, meeting, gremium)], now, me.id))[0]
 
-    def _check_voting_enabled(self, payload: DelegationCreate) -> None:
-        """Refuse a vote transfer while the global switch is off (422)."""
-        if payload.delegate_voting and not self.settings.delegation_voting_enabled:
-            raise ValidationProblem(
-                "Voting-right delegation is disabled.",
-                errors=[{"field": "delegateVoting", "msg": "disabled by configuration"}],
-            )
-
     async def _create_by_lead(
         self, payload: DelegationCreate, delegator_id: UUID, actor: Principal
     ) -> DelegationOut:
@@ -510,10 +501,9 @@ class DelegationService:
         The meeting lead (`can_manage`) names the missing member A (`delegatorId`)
         and a substitute B from the pool of the gremium for A: a personal entry
         for A or a gremium-wide entry. The checks are the same as before the
-        meeting: the gremium allows delegations, A may vote, the vote
-        transfer switch, and no chains. A is missing when A has no attendance
-        record, or the record is `excused` or `absent`. The lead cannot name
-        themselves as B. The row stores the lead as `created_by` and
+        meeting: the gremium allows delegations, A may vote, and no chains. A is
+        missing when A has no attendance record, or the record is `excused` or
+        `absent`. The lead cannot name themselves as B. The row stores the lead as `created_by` and
         `via_pool = true`.
 
         Lock the meeting row before the status and attendance reads. The attendance writers hold a
@@ -528,9 +518,8 @@ class DelegationService:
             NotFoundError: The meeting, A or B does not exist (404).
             ConflictError: A already has a delegation, or B already carries a
                 delegated vote (409).
-            ValidationProblem: The vote transfer is disabled, the meeting is not
-                live, A and B are the same person, A is present, or the
-                delegation would build a chain (422).
+            ValidationProblem: The meeting is not live, A and B are the same
+                person, A is present, or the delegation would build a chain (422).
         """
         now = datetime.now(UTC)
         meeting = await self._meeting(payload.meeting_id)
@@ -542,7 +531,6 @@ class DelegationService:
         meeting = await self._meeting(payload.meeting_id, lock=True)
         if not gremium.allow_vote_delegation:
             raise ForbiddenError("Delegation is not enabled for this gremium.")
-        self._check_voting_enabled(payload)
         if meeting.status != "live":
             raise ValidationProblem(
                 "The meeting lead enters a substitution only during a live meeting.",
@@ -830,7 +818,7 @@ class DelegationService:
             meeting_id=meeting.id,
             gremium_id=gremium.id,
             allow_vote_delegation=gremium.allow_vote_delegation,
-            voting_delegation_enabled=self.settings.delegation_voting_enabled,
+            voting_delegation_enabled=gremium.allow_vote_delegation,
             delegation_allow_external=gremium.delegation_allow_external,
             deadline=deadline,
             deadline_passed=deadline is not None and now >= deadline,
