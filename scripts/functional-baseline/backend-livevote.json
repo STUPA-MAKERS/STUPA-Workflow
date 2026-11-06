@@ -13,7 +13,7 @@
   "backend/app/modules/livevote/public_schemas.py": 9,
   "backend/app/modules/livevote/roster.py": 1,
   "backend/app/modules/livevote/router.py": 7,
-  "backend/app/modules/livevote/schemas.py": 29,
+  "backend/app/modules/livevote/schemas.py": 30,
   "backend/app/modules/livevote/service/handover.py": 6,
   "backend/app/modules/livevote/service/lifecycle.py": 23,
   "backend/app/modules/livevote/service/listing.py": 21,

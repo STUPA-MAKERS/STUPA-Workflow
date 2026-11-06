@@ -4,7 +4,7 @@
   "backend/app/modules/applications/guest_settings.py": 5,
   "backend/app/modules/applications/mentions.py": 6,
   "backend/app/modules/applications/router.py": 2,
-  "backend/app/modules/applications/schemas.py": 18,
+  "backend/app/modules/applications/schemas.py": 19,
   "backend/app/modules/applications/service/anonymize.py": 7,
   "backend/app/modules/applications/service/comments.py": 4,
   "backend/app/modules/applications/service/edits.py": 7,
