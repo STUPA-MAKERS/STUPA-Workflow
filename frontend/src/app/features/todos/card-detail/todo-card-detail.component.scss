@@ -574,8 +574,10 @@
 button.cd__evText {
   cursor: pointer;
 }
-button.cd__evText:hover {
-  background: var(--color-surface-sunken);
+@media (hover: hover) {
+  button.cd__evText:hover {
+    background: var(--color-surface-sunken);
+  }
 }
 button.cd__evText:focus-visible {
   outline: 2px solid var(--color-focus-ring);
