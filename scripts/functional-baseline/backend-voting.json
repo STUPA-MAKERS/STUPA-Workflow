@@ -4,7 +4,7 @@
   "backend/app/modules/voting/listing.py": 7,
   "backend/app/modules/voting/poll.py": 9,
   "backend/app/modules/voting/router.py": 1,
-  "backend/app/modules/voting/schemas.py": 17,
+  "backend/app/modules/voting/schemas.py": 18,
   "backend/app/modules/voting/service.py": 72,
   "backend/app/modules/voting/tally.py": 14
 }

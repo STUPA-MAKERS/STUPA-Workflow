@@ -1,7 +1,7 @@
 {
   "backend/app/shared/altcha.py": 5,
   "backend/app/shared/antiabuse.py": 11,
-  "backend/app/shared/config_schemas.py": 20,
+  "backend/app/shared/config_schemas.py": 23,
   "backend/app/shared/errors.py": 15,
   "backend/app/shared/filenames.py": 4,
   "backend/app/shared/guards.py": 1,

@@ -8,7 +8,7 @@
   "backend/app/modules/admin/oidc_mappings.py": 4,
   "backend/app/modules/admin/principal_merge.py": 22,
   "backend/app/modules/admin/principal_revoke.py": 27,
-  "backend/app/modules/admin/schemas.py": 53,
+  "backend/app/modules/admin/schemas.py": 74,
   "backend/app/modules/admin/service/application_types.py": 5,
   "backend/app/modules/admin/service/cd_variants.py": 6,
   "backend/app/modules/admin/service/flow.py": 12,
