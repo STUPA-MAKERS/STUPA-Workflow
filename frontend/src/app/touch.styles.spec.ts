@@ -50,7 +50,7 @@ describe('touch styles', () => {
   it('finds a hover outside the hover media query, also nested and in a list', () => {
     expect(unguardedHovers('.a:hover { color: red; }')).toEqual(['.a:hover']);
     expect(unguardedHovers('.a { &:hover { color: red; } }')).toEqual(['&:hover']);
-    expect(unguardedHovers('@media (max-width: 768px) { .a:hover, .b { x: y; } }')).toEqual([
+    expect(unguardedHovers('@media (max-width: 767.98px) { .a:hover, .b { x: y; } }')).toEqual([
       '.a:hover, .b',
     ]);
     expect(unguardedHovers('@media (hover: hover) { .a:hover { x: y; } }')).toEqual([]);

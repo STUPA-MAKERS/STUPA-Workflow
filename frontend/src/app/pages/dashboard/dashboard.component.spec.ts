@@ -157,7 +157,7 @@ async function setup(principal: Principal, opts: SetupOpts = {}) {
   const original = window.matchMedia;
   window.matchMedia = ((query: string) => ({
     matches:
-      (!!opts.phone && query === '(max-width: 768px)') ||
+      (!!opts.phone && query === '(max-width: 767.98px)') ||
       (!!opts.wide && query === '(min-width: 1200px)') ||
       (!!opts.extraWide && query === '(min-width: 1680px)'),
     media: query,
