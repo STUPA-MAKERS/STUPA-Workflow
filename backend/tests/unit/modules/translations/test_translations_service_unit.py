@@ -277,4 +277,4 @@ def test_catalog_reads_the_configured_directory(
         catalog_mod.builtin_texts.cache_clear()
         catalog_mod.catalog.cache_clear()
     monkeypatch.setattr(catalog_mod, "get_settings", lambda: SimpleNamespace(ui_catalog_dir=None))
-    assert catalog_mod.catalog_dir() == catalog_mod._REPO_DIR  # pyright: ignore[reportPrivateUsage]
+    assert catalog_mod.catalog_dir() == catalog_mod._REPO_DIR

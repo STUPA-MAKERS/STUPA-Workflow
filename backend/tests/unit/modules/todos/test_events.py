@@ -6,6 +6,7 @@ import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 from sqlalchemy import true
@@ -26,24 +27,24 @@ T3 = datetime(2026, 7, 1, tzinfo=UTC)
 
 
 async def test_event_rows_by_card() -> None:
-    session = ScriptedSession()
+    session: Any = ScriptedSession()
     assert await events.event_rows(session, []) == {}
     assert session.statements == []
     row = TodoCardEvent(card_id=CARD, series_id=None)
-    row.id = CARD
+    row.id = CARD  # pyright: ignore[reportAttributeAccessIssue]
     session.put(row)
     assert await events.event_rows(session, [CARD]) == {CARD: row}
 
 
 async def test_series_names_skip_none_and_map_ids() -> None:
-    session = ScriptedSession(execute=[[(V1, "Sommerfest")]])
+    session: Any = ScriptedSession(execute=[[(V1, "Sommerfest")]])
     assert await events.series_names(session, [None]) == {}
     assert session.statements == []
     assert await events.series_names(session, [V1, None, V1]) == {V1: "Sommerfest"}
 
 
 async def test_totals_without_cards_or_links() -> None:
-    session = ScriptedSession(scalars=[[]])
+    session: Any = ScriptedSession(scalars=[[]])
     assert await events.totals(session, []) == {}
     out = await events.totals(session, [EMPTY])
     assert out[EMPTY] == events.Totals()
@@ -62,7 +63,7 @@ async def test_totals_sum_applications_and_bookings() -> None:
         link(CARD, expense_id=E3),
         link(CARD, expense_id=E4),
     ]
-    session = ScriptedSession(
+    session: Any = ScriptedSession(
         scalars=[links, [A1, A3]],
         execute=[
             [
@@ -88,7 +89,7 @@ async def test_totals_sum_applications_and_bookings() -> None:
 
 
 async def test_totals_approved_falls_back_to_the_requested_amount() -> None:
-    session = ScriptedSession(
+    session: Any = ScriptedSession(
         scalars=[[link(CARD, application_id=A1)], [A1]],
         execute=[[(A1, Decimal("40.00"), None)]],
     )
@@ -97,7 +98,7 @@ async def test_totals_approved_falls_back_to_the_requested_amount() -> None:
 
 
 async def test_totals_count_a_sub_booking_alone_when_its_parent_is_not_linked() -> None:
-    session = ScriptedSession(
+    session: Any = ScriptedSession(
         scalars=[[link(CARD, expense_id=E2)]],
         execute=[[(E2, "expense", Decimal("5.00"), E1)]],
     )
@@ -141,7 +142,7 @@ def _vote(
 
 
 async def test_decisions_without_links() -> None:
-    session = ScriptedSession(scalars=[[]])
+    session: Any = ScriptedSession(scalars=[[]])
     assert await events.decisions(session, CARD) == []
     assert len(session.statements) == 1
 
@@ -154,7 +155,7 @@ async def test_decisions_merge_votes_and_order_newest_first() -> None:
         link(CARD, vote_id=V2),
     ]
     v2 = _vote(V2, application_id=A4, closed_at=T3, result="passed")
-    session = ScriptedSession(
+    session: Any = ScriptedSession(
         scalars=[links],
         execute=[
             [
@@ -204,7 +205,7 @@ async def test_decisions_merge_votes_and_order_newest_first() -> None:
 
 
 async def test_decisions_of_votes_only_use_question_and_skip_title_query() -> None:
-    session = ScriptedSession(
+    session: Any = ScriptedSession(
         scalars=[[link(CARD, vote_id=V1)]],
         execute=[[(_vote(V1, question="Budget?", closed_at=T1), None, None)]],
     )
@@ -214,7 +215,7 @@ async def test_decisions_of_votes_only_use_question_and_skip_title_query() -> No
 
 
 async def test_decisions_vote_without_any_title() -> None:
-    session = ScriptedSession(
+    session: Any = ScriptedSession(
         scalars=[[link(CARD, agenda_item_id=uuid.uuid4())]],
         execute=[[(_vote(V1), None, None)]],
     )
@@ -223,7 +224,7 @@ async def test_decisions_vote_without_any_title() -> None:
 
 
 async def test_editions_without_series() -> None:
-    session = ScriptedSession()
+    session: Any = ScriptedSession()
     b = board()
     c = card(b, column(b.id))
     assert await events.editions(session, c, None, true()) == ([], 0)
@@ -235,7 +236,7 @@ async def test_editions_count_the_hidden_rest() -> None:
     col = column(b.id)
     c = card(b, col)
     others = [(card(b, col), b, TodoCardEvent()), (card(b, col), b, TodoCardEvent())]
-    session = ScriptedSession(scalar=[5], execute=[others])
+    session: Any = ScriptedSession(scalar=[5], execute=[others])
     rows, rest = await events.editions(session, c, uuid.uuid4(), true())
     assert rows == others
     assert rest == 3
@@ -245,26 +246,26 @@ async def test_editions_rest_never_negative() -> None:
     b = board()
     col = column(b.id)
     c = card(b, col)
-    session = ScriptedSession(scalar=[None], execute=[[(card(b, col), b, TodoCardEvent())]])
+    session: Any = ScriptedSession(scalar=[None], execute=[[(card(b, col), b, TodoCardEvent())]])
     rows, rest = await events.editions(session, c, uuid.uuid4(), true())
     assert len(rows) == 1
     assert rest == 0
 
 
 async def test_check_one_event_ignores_kinds_without_the_rule() -> None:
-    session = ScriptedSession()
+    session: Any = ScriptedSession()
     await events.check_one_event(session, CARD, [("meeting", V1), ("vote", V2)])
     assert session.statements == []
 
 
 async def test_check_one_event_passes_a_free_element() -> None:
-    session = ScriptedSession(scalar=[None])
+    session: Any = ScriptedSession(scalar=[None])
     await events.check_one_event(session, CARD, [("application", A1), ("expense", E1)])
     assert len(session.statements) == 1
 
 
 async def test_check_one_event_refuses_a_taken_element() -> None:
-    session = ScriptedSession(scalar=[uuid.uuid4()])
+    session: Any = ScriptedSession(scalar=[uuid.uuid4()])
     with pytest.raises(ConflictError) as err:
         await events.check_one_event(session, CARD, [("invoice", E3), ("todo", CARD)])
     assert err.value.code == "event_link_taken"
