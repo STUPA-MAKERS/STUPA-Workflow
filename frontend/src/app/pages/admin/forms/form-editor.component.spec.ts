@@ -223,7 +223,7 @@ describe('FormEditorComponent', () => {
     c.setOptionLabel({ gi: 0, qi: 1 }, 0, { de: 'X', en: '' });
     const [pick, note] = c.groups()[0].fields;
     expect(pick.help).toEqual({ de: 'Hilfe', en: '' });
-    expect(pick.options.map((o: { label: I18nMap }) => o.label.de)).toEqual(['A', 'Bé']);
+    expect(pick.options.map((o: { label: I18nMap }) => o.label['de'])).toEqual(['A', 'Bé']);
     expect(note.options).toEqual([]);
     expect(c.groups()[0].fields[1]).not.toBe(before);
   });
