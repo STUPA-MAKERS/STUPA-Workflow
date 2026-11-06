@@ -68,7 +68,7 @@ function takeVote(state: HeadMatch, vote: MeetingVote): HeadMatch {
   const head = voteSnippetHead(vote);
   return {
     ...state,
-    heads: withEntry(state.heads, head, (state.heads.get(head) ?? 0) - 1),
+    heads: withEntry(state.heads, head, headsLeft(state, vote) - 1),
     found: new Set([...state.found, vote.id]),
   };
 }

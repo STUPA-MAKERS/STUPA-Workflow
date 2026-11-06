@@ -43,7 +43,7 @@ function toggleMark({ text, start, end }: RawText, mark: string): RawText {
 }
 
 function starsBefore(text: string, at: number): number {
-  return at > text.length ? 0 : (/\*+$/.exec(text.slice(0, Math.max(0, at)))?.[0].length ?? 0);
+  return /\*+$/.exec(text.slice(0, Math.max(0, at)))?.[0].length ?? 0;
 }
 
 function starsAfter(text: string, at: number): number {

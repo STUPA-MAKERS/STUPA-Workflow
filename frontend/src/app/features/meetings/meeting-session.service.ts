@@ -707,11 +707,19 @@ export class MeetingSessionService implements OnDestroy {
     this.draftPending = null;
     if (!draft) return;
     this.draftSentAt = Date.now();
-    const channel = this.channel;
-    if (!channel) return;
+    this.channel?.send({
+      type: 'body_draft',
+      agendaItemId: draft.itemId,
+      body: draft.body,
+      seq: this.takeDraftSeq(),
+    });
+  }
+
+  /** The sequence number of the next draft frame. Only a frame that goes out takes one. */
+  private takeDraftSeq(): number {
     const seq = this.draftSeq;
     this.draftSeq = seq + 1;
-    channel.send({ type: 'body_draft', agendaItemId: draft.itemId, body: draft.body, seq });
+    return seq;
   }
 
   /** Drop the waiting draft, for example when the channel goes away. */

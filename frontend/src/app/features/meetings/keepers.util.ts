@@ -130,9 +130,14 @@ export function handoverPreview(
         ]
       : [];
   const running = periods.findIndex((p) => p.toAt === null);
-  const ended = periods.map((p, i) =>
-    i === running ? { ...p, toAt: nowIso, toPosition: pos } : p,
-  );
+  const ended =
+    running >= 0
+      ? [
+          ...periods.slice(0, running),
+          { ...periods[running], toAt: nowIso, toPosition: pos },
+          ...periods.slice(running + 1),
+        ]
+      : periods;
   const opened: KeeperPeriod = {
     principalId: next.principalId,
     name: next.name,

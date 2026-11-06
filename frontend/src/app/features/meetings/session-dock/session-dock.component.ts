@@ -183,7 +183,7 @@ export class SessionDockComponent {
     );
     const need = el.scrollWidth + cut;
     if (need > el.clientWidth) {
-      this.need = this.need.map((n, i) => (i === fold ? need : n));
+      this.need = [...this.need.slice(0, fold), need, ...this.need.slice(fold + 1)];
       this.fold.set((fold + 1) as 1 | 2);
     }
   }
