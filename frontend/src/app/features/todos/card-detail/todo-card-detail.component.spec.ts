@@ -61,6 +61,15 @@ function makeApi(card: TodoCardDetail) {
   const answer = (over: Partial<TodoCardDetail> = {}) => jest.fn((): Observable<TodoCardDetail> => of({ ...card, ...over }));
   return {
     card: jest.fn((): Observable<TodoCardDetail> => of(card)),
+    linkView: jest.fn(() =>
+      of({
+        kind: 'expense' as const,
+        title: 'Getränke',
+        detail: {},
+        facts: [{ key: 'amount', label: null, value: '300.00', format: 'money' as const }],
+        rows: [],
+      }),
+    ),
     members: jest.fn(() => of(MEMBERS)),
     board: jest.fn((): Observable<TodoBoard> => of(board())),
     moveCard: jest.fn(() => of(tile({ id: card.id, columnId: 'c-2', rank: 'b' }))),
@@ -216,6 +225,16 @@ describe('TodoCardDetailComponent', () => {
    * Beside the list the pane is a sheet, and the bar bleeds into its padding. The link sits in the
    * bar, so the menu does not repeat it.
    */
+  it('opens a link that only the card grants in its read sheet', async () => {
+    const granted = link({ id: 'l-9', kind: 'expense', targetId: 'x-1', title: 'Getränke', url: null, granted: true });
+    const { api, detect } = await setup({ card: detail({ links: [granted] }) });
+    expect(screen.queryByRole('link', { name: 'Getränke' })).toBeNull();
+    fireEvent.click(screen.getByTestId('cd-link-view'));
+    detect();
+    expect(api.linkView).toHaveBeenCalledWith(expect.any(String), 'l-9');
+    expect(screen.getByTestId('link-view')).toHaveTextContent('300,00');
+  });
+
   it('shows the board link in the pane and no close or copy button', async () => {
     const { container, cmp } = await setup({ mode: 'pane', split: true });
     expect(screen.getByRole('link', { name: /Im Board öffnen/ })).toHaveAttribute('href', '/todos/b-1?card=k-1');

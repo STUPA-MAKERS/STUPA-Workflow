@@ -329,8 +329,9 @@ async def test_votes_gremien_invoices_and_bookings_as_link_targets(
 ) -> None:
     """Link votes, Gremien, invoices and bookings.
 
-    Without a budget permission the invoice and the booking redact, and the picker offers
-    neither. A delete of the target removes the link (ON DELETE CASCADE). The budget rows
+    Without a budget permission the reader of the card reads the invoice and the booking
+    through the card only (spec 000487): no url, and the picker offers neither. A delete
+    of the target removes the link (ON DELETE CASCADE). The budget rows
     are cleaned up by the test, because they are no part of the to-do cleanup and other
     tests count invoices.
     """
@@ -409,8 +410,9 @@ async def test_votes_gremien_invoices_and_bookings_as_link_targets(
             link["kind"]: link
             for link in _ok(client.get(f"/api/todos/cards/{card['id']}"))["links"]
         }
-        assert by_kind["invoice"]["accessible"] is False and by_kind["invoice"]["title"] is None
-        assert by_kind["expense"]["accessible"] is False and by_kind["expense"]["url"] is None
+        assert by_kind["invoice"]["granted"] is True and by_kind["invoice"]["title"] == "RE-77"
+        assert by_kind["invoice"]["url"] is None
+        assert by_kind["expense"]["granted"] is True and by_kind["expense"]["url"] is None
         assert by_kind["vote"]["accessible"] is True and by_kind["gremium"]["accessible"] is True
         assert _ok(client.get("/api/todos/link-targets?q=RE-77&kind=invoice")) == []
         bad = client.post(

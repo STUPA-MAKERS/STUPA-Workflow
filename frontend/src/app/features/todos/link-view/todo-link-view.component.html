@@ -1,0 +1,52 @@
+<app-side-sheet [side]="phone() ? 'bottom' : 'end'" [heading]="heading()" [(open)]="open" [contentScrolls]="true">
+  <div class="lv" data-testid="link-view">
+    <p class="lv__sub">
+      <app-icon class="lv__icon" [name]="icon()" [size]="16" />
+      <span>{{ sub() }}</span>
+    </p>
+    @if (failed()) {
+      <p class="lv__empty">{{ 'todos.linkView.failed' | t }}</p>
+    } @else if (view(); as v) {
+      @if (plain().length) {
+        <dl class="lv__facts">
+          @for (f of plain(); track f.key) {
+            <div class="lv__fact">
+              <dt>{{ label(f) }}</dt>
+              <dd [class.num]="f.format === 'money'">{{ value(f) }}</dd>
+            </div>
+          }
+        </dl>
+      }
+      @for (f of texts(); track f.key) {
+        <section class="lv__text">
+          <h3 class="lv__heading">{{ label(f) }}</h3>
+          <app-markdown-view [src]="f.value" />
+        </section>
+      }
+      @if (v.rows.length) {
+        <section class="lv__text">
+          <h3 class="lv__heading">{{ rowsHeading() }}</h3>
+          <ul class="lv__rows">
+            @for (r of v.rows; track $index) {
+              <li class="lv__row">
+                @if (r.done !== null) {
+                  <app-icon class="lv__check" [class.lv__check--on]="r.done" [name]="r.done ? 'circleok' : 'circle'" [size]="18" />
+                }
+                <span class="lv__rowTitle">{{ r.title }}</span>
+                @if (rowMeta($index, r.meta); as meta) {
+                  <span class="lv__rowMeta">{{ meta }}</span>
+                }
+              </li>
+            }
+          </ul>
+        </section>
+      }
+    } @else {
+      <div class="lv__facts skel-in" aria-hidden="true">
+        @for (w of ['60%', '40%', '72%']; track $index) {
+          <span class="skel-text lv__skelLabel"></span><span class="skel-text" [style.width]="w"></span>
+        }
+      </div>
+    }
+  </div>
+</app-side-sheet>

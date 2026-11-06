@@ -35,6 +35,8 @@ G2 = uuid.UUID(int=22)
 USER = Principal(sub="u")
 READER = Principal(sub="r", permissions={"application.read", "ticket.manage"})
 BOOKER = Principal(sub="b", permissions={"budget.view"})
+#: The real grant query, saved before the autouse fixture replaces it.
+REAL_GRANTED = LinkResolver.granted
 
 
 @pytest.fixture
@@ -456,6 +458,38 @@ async def test_expenses_need_a_budget_read_permission() -> None:
     session = ScriptedSession()
     resolver = LinkResolver(session, FakeAccess())  # type: ignore[arg-type]
     assert not await resolver.readable("expense", EXPENSE, USER)
+    assert session.statements == []
+
+
+async def test_a_card_reader_reads_a_linked_booking_without_budget_read(
+    grants: dict[str, set[uuid.UUID]],
+) -> None:
+    """Spec 000487: a board reader without ``budget.read`` reads the linked Buchung.
+
+    The target resolves as granted and without url: the card opens it in its read
+    sheet. The link check stays on the rule of the kind.
+    """
+    grants["expense"] = {EXPENSE}
+    session = ScriptedSession(execute=[[(_expense(), "VS-800")]])
+    resolver = LinkResolver(session, FakeAccess())  # type: ignore[arg-type]
+    seen = (await resolver.resolve([("expense", EXPENSE)], USER))[("expense", EXPENSE)]
+    assert seen.accessible and seen.granted
+    assert (seen.title, seen.url) == ("Plakate", None)
+    assert seen.detail is not None and seen.detail.amount == "42.50"
+    assert len(session.statements) == 1
+
+    session = ScriptedSession()
+    resolver = LinkResolver(session, FakeAccess())  # type: ignore[arg-type]
+    assert not await resolver.readable("expense", EXPENSE, USER)
+    assert session.statements == []
+
+
+async def test_a_ticket_and_a_gremium_get_no_grant() -> None:
+    """Spec 000487: a ticket link gives no access, and a gremium link neither."""
+    session = ScriptedSession()
+    resolver = LinkResolver(session, FakeAccess())  # type: ignore[arg-type]
+    assert await REAL_GRANTED(resolver, "ticket", {TICKET}, USER) == set()
+    assert await REAL_GRANTED(resolver, "gremium", {G1}, USER) == set()
     assert session.statements == []
 
 

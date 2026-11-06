@@ -43,6 +43,7 @@ from app.modules.todos import events as todo_events
 from app.modules.todos.access import BoardAccess, token_reads
 from app.modules.todos.boards import ensure_personal_board
 from app.modules.todos.lexorank import MAX_LENGTH, RankError, between, spread
+from app.modules.todos.link_view import LinkViewer
 from app.modules.todos.links import HIDDEN, LinkResolver, Resolved
 from app.modules.todos.live import BoardPings
 from app.modules.todos.models import (
@@ -92,6 +93,7 @@ from app.modules.todos.schemas import (
     TodoLabelOut,
     TodoLinkedCard,
     TodoLinkOut,
+    TodoLinkView,
     TodoMember,
     TodoMine,
     TodoMineItem,
@@ -194,6 +196,7 @@ def _link_out(link: TodoLink, resolved: dict[tuple[str, uuid.UUID], Resolved]) -
         title=target.title if target.accessible else None,
         url=target.url if target.accessible else None,
         detail=target.detail if target.accessible else None,
+        granted=target.granted,
     )
 
 
@@ -878,6 +881,26 @@ class TodoService:
         """
         card, board = await self._card(card_id, principal)
         return await self._detail(card, board, principal)
+
+    async def link_view(
+        self, card_id: uuid.UUID, link_id: uuid.UUID, principal: Principal
+    ) -> TodoLinkView:
+        """Return the read sheet of one link of a card (spec 000487).
+
+        A reader of the card reads its links, also those that the rule of their kind
+        hides. A ticket and a gremium have no sheet.
+
+        Raises:
+            NotFoundError: The card is not readable, the link is not on the card, or the
+                target has no sheet (HTTP 404).
+        """
+        card, _board = await self._card(card_id, principal)
+        link = await self.session.get(TodoLink, link_id)
+        if link is None or link.card_id != card.id:
+            raise NotFoundError(f"link {link_id} not found")
+        return await LinkViewer(self.session, self.links).view(
+            link.kind, link.target_id, principal
+        )
 
     async def cards(
         self, card_ids: Sequence[uuid.UUID], principal: Principal
