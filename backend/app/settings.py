@@ -159,9 +159,8 @@ class Settings(BaseSettings):
         are set. The per-webhook `secret` never reaches the log.
 
     Delegation:
-        Vote delegation needs bylaws approval and defaults to OFF. The server
-        accepts `delegateVoting=true` only when `delegation_voting_enabled` is on and
-        answers 422 otherwise; pure rights delegation stays free. `local_timezone`
+        The gremium flag `allow_vote_delegation` alone switches vote delegation; no
+        server setting does. `local_timezone`
         is the zone of the naive `meeting.date` and `start_time` and the basis of the
         delegation deadline.
 
@@ -363,7 +362,6 @@ class Settings(BaseSettings):
         """Accept a comma-separated list, as `deploy/.env.example` documents it."""
         return _split_csv(value)
 
-    delegation_voting_enabled: bool = False
     local_timezone: str = "Europe/Berlin"
 
     @property

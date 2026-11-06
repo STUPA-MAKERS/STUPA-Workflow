@@ -270,15 +270,6 @@ async def test_create_gremium_gate_403() -> None:
         await _svc(db).create(_payload(uuid4()), _actor())
 
 
-async def test_create_voting_disabled_422() -> None:
-    db = fake_session()
-    db.get_results = [_meeting(), _gremium()]
-    with pytest.raises(ValidationProblem) as ei:
-        await _svc(db, voting=False).create(_payload(uuid4(), voting=True), _actor())
-    assert ei.value.status == 422
-    assert db.committed == 0
-
-
 async def test_create_meeting_started_422() -> None:
     db = fake_session()
     db.get_results = [_meeting(status="live"), _gremium()]
