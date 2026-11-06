@@ -37,7 +37,9 @@ class BudgetNodeCreate(_CamelModel):
     gremium_id: UUID | None = Field(default=None, alias="gremiumId")
     #: Deciding Gremium of the node and its subtree (flow variant B). Optional.
     decision_gremium_id: UUID | None = Field(default=None, alias="decisionGremiumId")
-    currency: str = Field(default="EUR", min_length=3, max_length=3)
+    #: EUR is the only currency (DB CHECK ``budget_currency_eur``). Another code gives
+    #: 422, not a 500 from the CHECK.
+    currency: Literal["EUR"] = "EUR"
     active: bool = True
     color: str | None = None
     fiscal_start_month: int = Field(default=1, ge=1, le=12, alias="fiscalStartMonth")
@@ -193,7 +195,9 @@ class FiscalYearOut(_CamelModel):
 class AllocationSet(_CamelModel):
     """Set the top-down allocation with `PUT .../allocations/{fiscalYearId}`."""
 
-    allocated: Decimal = Field(ge=0, allow_inf_nan=False)
+    #: ``le`` keeps the value inside ``Numeric(12, 2)``: a larger one gives 422, not a
+    #: 500 from the database.
+    allocated: Decimal = Field(ge=0, le=_MAX_AMOUNT, allow_inf_nan=False)
 
 
 class AllocationOut(_CamelModel):
