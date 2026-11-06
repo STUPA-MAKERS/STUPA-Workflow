@@ -32,9 +32,9 @@ export const ALL_ICON: IconName = 'grid';
 let nextId = 0;
 
 interface PickerSection {
-  kind: TodoBoardKind;
-  label: TranslationKey;
-  boards: TodoBoardSummary[];
+  readonly kind: TodoBoardKind;
+  readonly label: TranslationKey;
+  readonly boards: readonly TodoBoardSummary[];
 }
 
 /**

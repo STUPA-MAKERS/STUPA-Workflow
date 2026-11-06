@@ -16,6 +16,7 @@ import { FormsModule } from '@angular/forms';
 import type { Uuid } from '@core/api/models';
 import type { TodoBoard, TodoCardMove, TodoCardTile, TodoColumn, TodoLabel } from '@core/api/todos.service';
 import { I18nService } from '@core/i18n/i18n.service';
+import type { TranslationKey } from '@core/i18n/translations';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
@@ -32,7 +33,14 @@ import {
 } from '@stupa-makers/ui-kit';
 import { TodoCardTileComponent } from '../../../features/todos/card-tile/todo-card-tile.component';
 import type { TileMenuRequest } from '../../../features/todos/move-sheet/todo-move-sheet.component';
-import { DROP_ENTER, dropMove, moveRequest, sortedColumns } from '../../../features/todos/todos.util';
+import {
+  DROP_ENTER,
+  dropMove,
+  insertAt,
+  moveRequest,
+  sortedColumns,
+  withHeld,
+} from '../../../features/todos/todos.util';
 import { KanbanKeyDrag, type KeyDragPosition } from '../../../features/todos/kanban-key-drag';
 
 /** The done column shows this many cards until "n weitere" opens the rest. */
@@ -45,8 +53,8 @@ export function boardDropId(columnId: Uuid): string {
 
 /** A move of the board: the card and the request for the server. */
 export interface BoardMove {
-  cardId: Uuid;
-  move: TodoCardMove;
+  readonly cardId: Uuid;
+  readonly move: TodoCardMove;
 }
 
 /** The keyboard drag: the held card and its place now. */
@@ -169,23 +177,12 @@ export class TodoBoardViewComponent {
   /** The cards of each column as shown: the filters, the keyboard drag, the done preview. */
   readonly shown = computed(() => {
     const cols = this.columns();
-    const lists = cols.map((c) => [...(this.cards().get(c.id) ?? [])]);
+    const cards = cols.map((c) => this.cards().get(c.id) ?? []);
     const kb = this.kb();
-    if (kb) {
-      let held: TodoCardTile | undefined;
-      for (const list of lists) {
-        const i = list.findIndex((c) => c.id === kb.cardId);
-        if (i >= 0) held = list.splice(i, 1)[0];
-      }
-      if (held) lists[kb.col]?.splice(kb.index, 0, held);
-    }
-    const out = new Map<Uuid, TodoCardTile[]>();
-    cols.forEach((col, i) => {
-      const list = lists[i];
-      const limit = col.isDone && !this.expanded().has(col.id) && !kb ? DONE_PREVIEW : list.length;
-      out.set(col.id, list.slice(0, limit));
-    });
-    return out;
+    const lists = kb ? withHeld(cards, kb) : cards;
+    const limit = (col: TodoColumn, list: readonly TodoCardTile[]): number =>
+      col.isDone && !this.expanded().has(col.id) && !kb ? DONE_PREVIEW : list.length;
+    return new Map(cols.map((col, i) => [col.id, lists[i].slice(0, limit(col, lists[i]))]));
   });
 
   readonly tabs = computed<TabItem[]>(() =>
@@ -237,7 +234,7 @@ export class TodoBoardViewComponent {
     this.ptr.update((p) => (p ? { ...p, over } : p));
   }
 
-  list(col: TodoColumn): TodoCardTile[] {
+  list(col: TodoColumn): readonly TodoCardTile[] {
     return this.shown().get(col.id) ?? [];
   }
 
@@ -246,21 +243,33 @@ export class TodoBoardViewComponent {
   }
 
   columnMenu(col: TodoColumn): RowMenuSection[] {
-    const items: RowMenuItem[] = [];
-    if (this.canWrite()) items.push({ id: 'add', label: this.i18n.translate('todos.column.add'), icon: 'plus' });
-    if (this.board().canConfigure) {
-      items.push({ id: 'settings', label: this.i18n.translate('todos.column.settings'), icon: 'tune' });
-    }
-    if (col.isDone && this.board().archivedCount) {
-      items.push({ id: 'archive', label: this.i18n.translate('todos.column.archive'), icon: 'archive' });
-    }
+    const t = (key: TranslationKey): string => this.i18n.translate(key);
+    const archive = col.isDone && !!this.board().archivedCount;
+    const items: RowMenuItem[] = [
+      ...(this.canWrite()
+        ? [{ id: 'add', label: t('todos.column.add'), icon: 'plus' } as const]
+        : []),
+      ...(this.board().canConfigure
+        ? [{ id: 'settings', label: t('todos.column.settings'), icon: 'tune' } as const]
+        : []),
+      ...(archive
+        ? [{ id: 'archive', label: t('todos.column.archive'), icon: 'archive' } as const]
+        : []),
+    ];
     return items.length ? [{ items }] : [];
   }
 
   onColumnMenu(col: TodoColumn, item: RowMenuItem): void {
-    if (item.id === 'add') this.addIn.emit(col.id);
-    else if (item.id === 'settings') this.settings.emit();
-    else if (item.id === 'archive') this.archive.emit();
+    switch (item.id) {
+      case 'add':
+        return this.addIn.emit(col.id);
+      case 'settings':
+        return this.settings.emit();
+      case 'archive':
+        return this.archive.emit();
+      default:
+        return;
+    }
   }
 
   startAdd(col: TodoColumn): void {
@@ -298,8 +307,8 @@ export class TodoBoardViewComponent {
       this.dropIn.emit({ cardId, move: dropMove(target, event.currentIndex, toCol) });
       return;
     }
-    target.splice(event.currentIndex, 0, held);
-    this.moveCard.emit({ cardId, move: moveRequest(target, event.currentIndex, toCol) });
+    const placed = insertAt(target, event.currentIndex, held);
+    this.moveCard.emit({ cardId, move: moveRequest(placed, event.currentIndex, toCol) });
   }
 
   onTileKeyUp(event: KeyboardEvent): void {

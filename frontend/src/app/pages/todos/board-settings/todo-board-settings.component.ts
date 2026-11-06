@@ -179,10 +179,15 @@ export class TodoBoardSettingsComponent {
 
   columnMenu(col: TodoColumn, index: number): RowMenuSection[] {
     const t = (key: TranslationKey) => this.i18n.translate(key);
-    const items: RowMenuItem[] = [{ id: 'rename', label: t('todos.settings.renameColumn'), icon: 'edit' }];
-    if (!col.isDone) items.push({ id: 'done', label: t('todos.settings.makeDone'), icon: 'check' });
-    if (index > 0) items.push({ id: 'up', label: t('todos.settings.moveUp'), icon: 'up' });
-    if (index < this.columns().length - 1) items.push({ id: 'down', label: t('todos.settings.moveDown'), icon: 'down' });
+    const last = index >= this.columns().length - 1;
+    const items: RowMenuItem[] = [
+      { id: 'rename', label: t('todos.settings.renameColumn'), icon: 'edit' },
+      ...(col.isDone
+        ? []
+        : [{ id: 'done', label: t('todos.settings.makeDone'), icon: 'check' } as const]),
+      ...(index > 0 ? [{ id: 'up', label: t('todos.settings.moveUp'), icon: 'up' } as const] : []),
+      ...(last ? [] : [{ id: 'down', label: t('todos.settings.moveDown'), icon: 'down' } as const]),
+    ];
     return [
       { items },
       {
@@ -310,7 +315,8 @@ export class TodoBoardSettingsComponent {
         this.busy.set(false);
         const now = this.board();
         const labels = id ? now.labels.map((l) => (l.id === id ? label : l)) : [...now.labels, label];
-        this.changed.emit({ ...now, labels: labels.sort((a, b) => a.name.localeCompare(b.name)) });
+        const sorted = [...labels].sort((a, b) => a.name.localeCompare(b.name));
+        this.changed.emit({ ...now, labels: sorted });
         this.labelEdit.set(null);
       },
       error: (err: unknown) => this.fail(err),
