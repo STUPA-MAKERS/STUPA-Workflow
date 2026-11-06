@@ -4,13 +4,13 @@ title: A pull request is never set to auto-merge
 kind: style
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - .
 ---
 
 # A pull request is never set to auto-merge
 
-Do not use `gh pr merge --auto`.
+An agent must not use `gh pr merge --auto`.
 
 Reason: The branches have no protection, so `--auto` merges at once.

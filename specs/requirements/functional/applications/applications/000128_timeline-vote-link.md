@@ -4,7 +4,7 @@ title: The timeline links the deciding vote
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/applications
   - frontend/src/app/pages/applications
@@ -12,4 +12,4 @@ scope:
 
 # The timeline links the deciding vote
 
-A status event links the vote that decided it. The detail shows "Zur Abstimmung".
+A status event must link the vote that decided it. The detail must show "Zur Abstimmung".

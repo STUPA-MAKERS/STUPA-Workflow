@@ -4,7 +4,7 @@ title: Every vote is secret
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/voting
   - frontend/src/app/features/voting
@@ -17,4 +17,5 @@ Every motion, election and poll must be secret. The API must refuse `secret: fal
 
 Reason: An open ballot shows how each member voted.
 
-Test: `backend/tests/unit/modules/voting/`
+Test:
+`backend/tests/unit/modules/voting/test_vote_create_gremium_only.py:test_create_open_vote_422`.

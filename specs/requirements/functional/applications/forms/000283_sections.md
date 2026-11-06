@@ -4,7 +4,7 @@ title: Section fields make wizard steps
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/forms
   - backend/app/shared/config_schemas.py
@@ -13,5 +13,5 @@ scope:
 
 # Section fields make wizard steps
 
-A field of type `section` starts a new wizard step. It holds no answer. A form without a
-section has one step.
+A field of type `section` must start a new wizard step and must hold no answer. A form without
+a section has one step.

@@ -4,7 +4,7 @@ title: Markdown images are outside erasure and export
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/media
   - backend/app/modules/privacy
@@ -13,4 +13,4 @@ scope:
 # Markdown images are outside erasure and export
 
 An uploaded Markdown image has no uploader. The erasure, the anonymization and the data export
-do not touch it.
+must not touch it.

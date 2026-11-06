@@ -8,26 +8,26 @@ The binding rules of STUPA-Workflow. One file holds one rule. The rules for spec
 ```
 specs/
   style/
-    backend/         database, functional, python
-    frontend/        angular, functional
-    shared/          agents, api, functional, git, testing, writing
-    specs/           content, format, structure
+    backend/   database, functional, python
+    frontend/  angular, functional
+    shared/    agents, api, functional, git, testing, tooling, writing
+    specs/     content, format, structure
   requirements/
     functional/
-      administration/  accounts, admin, audit, backups, files, translations
-      applications/    applications, flow, forms
+      administration/  accounts, admin, audit, backups, files, privacy, translations
+      applications/    applications, dashboard, flow, forms
       collaboration/   notifications, search, tickets, todos
       finance/         budget, invoices
       integrations/    external, mcp, webhooks
       meetings/        calendar, delegations, meetings, protocols, voting
       public/          public-pages
     non-functional/
-      accessibility/   interaction, language
-      compatibility/   deploy, pwa
-      performance/     loading
-      privacy/         personal-data
-      security/        access, files, integrity, network
-      usability/       controls, layout
+      accessibility/  interaction, language
+      compatibility/  deploy, pwa
+      performance/    loading
+      privacy/        personal-data
+      security/       access, files, integrity, network
+      usability/      controls, layout
 ```
 
 The second level is the area, the third level is the topic. A topic folder holds the rule
@@ -43,7 +43,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/administration/accounts/000157](requirements/functional/administration/accounts/000157_account-merge.md) | An admin merges two accounts | approved |
 | [F/administration/accounts/000158](requirements/functional/administration/accounts/000158_revoke-without-login.md) | Role assignments can be revoked without a login | approved |
 | [F/administration/accounts/000159](requirements/functional/administration/accounts/000159_ohne-namen.md) | An account without a name shows Ohne Namen | approved |
-| [F/administration/accounts/000160](requirements/functional/administration/accounts/000160_membership-sync.md) | Membership sync deletes without history | approved |
+| [F/administration/accounts/000160](requirements/functional/administration/accounts/000160_membership-sync.md) | Membership sync deletes rows without history | approved |
 | [F/administration/accounts/000265](requirements/functional/administration/accounts/000265_refused-logins.md) | A deactivated or merged account cannot log in | approved |
 | [F/administration/accounts/000266](requirements/functional/administration/accounts/000266_member-role.md) | Every user holds the member role | approved |
 | [F/administration/accounts/000267](requirements/functional/administration/accounts/000267_gremium-rights.md) | Gremium rights come only from the membership | approved |
@@ -52,34 +52,31 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/administration/accounts/000270](requirements/functional/administration/accounts/000270_return-to.md) | The login returns to the page | approved |
 | [F/administration/accounts/000271](requirements/functional/administration/accounts/000271_sso-logout.md) | The logout ends the SSO session | approved |
 | [F/administration/accounts/000334](requirements/functional/administration/accounts/000334_avatar-proxy.md) | Avatars come through the platform | approved |
-| [F/administration/accounts/000422](requirements/functional/administration/accounts/000422_erase-account-action.md) | An account can be erased from the user list | approved |
+| [F/administration/accounts/000422](requirements/functional/administration/accounts/000422_erase-account-action.md) | An account can be erased from the user list | replaced |
+| [F/administration/accounts/000439](requirements/functional/administration/accounts/000439_merge-conflicts.md) | A merge combines duplicates and stops at a conflict | approved |
+| [F/administration/accounts/000440](requirements/functional/administration/accounts/000440_merged-account-row.md) | A merged account stays as a locked row | approved |
+| [F/administration/accounts/000455](requirements/functional/administration/accounts/000455_session-idp-check.md) | A long session is checked at the IdP again | approved |
 | [F/administration/admin/000161](requirements/functional/administration/admin/000161_crud-complete.md) | Every entity has create, read, update and delete | approved |
 | [F/administration/admin/000162](requirements/functional/administration/admin/000162_cd-variant-delete.md) | A CD variant in use is not deleted | approved |
 | [F/administration/admin/000163](requirements/functional/administration/admin/000163_audit-revert.md) | The audit revert reverses effects, never entries | approved |
-| [F/administration/admin/000164](requirements/functional/administration/admin/000164_translations.md) | Admins edit UI texts and add languages | approved |
-| [F/administration/admin/000165](requirements/functional/administration/admin/000165_admin-start.md) | Verwaltung starts with an empty state | approved |
+| [F/administration/admin/000164](requirements/functional/administration/admin/000164_translations.md) | Admins edit UI texts and add languages | replaced |
+| [F/administration/admin/000165](requirements/functional/administration/admin/000165_admin-start.md) | Verwaltung keeps its frame widths | approved |
 | [F/administration/admin/000166](requirements/functional/administration/admin/000166_dsgvo-delete.md) | A privacy erasure starts from Benutzer | approved |
 | [F/administration/admin/000368](requirements/functional/administration/admin/000368_role-keys.md) | Role keys are fixed lower case | approved |
 | [F/administration/admin/000369](requirements/functional/administration/admin/000369_page-permissions.md) | Each admin page has its own permission | approved |
 | [F/administration/admin/000370](requirements/functional/administration/admin/000370_self-lockout.md) | An admin cannot deactivate the own account | approved |
 | [F/administration/admin/000371](requirements/functional/administration/admin/000371_repin-by-key.md) | A flow save moves Anträge by state key | approved |
-| [F/administration/admin/000372](requirements/functional/administration/admin/000372_branding-checks.md) | Branding logos are checked by their bytes | approved |
-| [F/administration/admin/000373](requirements/functional/administration/admin/000373_cd-logo-download.md) | A CD logo is served only as a download | approved |
 | [F/administration/admin/000383](requirements/functional/administration/admin/000383_revert-forward.md) | A config revert goes forward | approved |
-| [F/administration/admin/000384](requirements/functional/administration/admin/000384_snapshot-no-pii.md) | A config snapshot holds no personal data | approved |
 | [F/administration/admin/000405](requirements/functional/administration/admin/000405_revert-permissions.md) | A revert needs the right of the original change | approved |
-| [F/administration/admin/000421](requirements/functional/administration/admin/000421_dashboard.md) | The start page is a work list with a side bar | approved |
-| [F/administration/audit/000290](requirements/functional/administration/audit/000290_no-pii-in-audit.md) | An audit entry holds no personal data | approved |
 | [F/administration/audit/000291](requirements/functional/administration/audit/000291_record-in-tx.md) | An audit entry is written in the same transaction | approved |
 | [F/administration/audit/000292](requirements/functional/administration/audit/000292_chain-check.md) | The audit chain is checked every night | approved |
 | [F/administration/audit/000293](requirements/functional/administration/audit/000293_three-permissions.md) | Read, check and revert are separate permissions | approved |
 | [F/administration/audit/000294](requirements/functional/administration/audit/000294_resolved-names.md) | The audit log shows names | approved |
-| [F/administration/audit/000295](requirements/functional/administration/audit/000295_canonical-hash.md) | The hash input is canonical | approved |
 | [F/administration/backups/000300](requirements/functional/administration/backups/000300_web-ui.md) | Backups run from the web UI | approved |
 | [F/administration/backups/000301](requirements/functional/administration/backups/000301_archive-content.md) | A backup holds the database and the attachments, encrypted | approved |
 | [F/administration/backups/000302](requirements/functional/administration/backups/000302_pre-restore.md) | A restore first saves the current state | approved |
 | [F/administration/backups/000303](requirements/functional/administration/backups/000303_confirm-restore.md) | A restore needs the word RESTORE | approved |
-| [F/administration/backups/000304](requirements/functional/administration/backups/000304_no-token-backup.md) | No agent token reaches a backup | approved |
+| [F/administration/backups/000465](requirements/functional/administration/backups/000465_backup-retention.md) | Backups keep a fixed count and cap uploads | approved |
 | [F/administration/files/000167](requirements/functional/administration/files/000167_ascii-names.md) | Storage names replace non-ASCII characters | approved |
 | [F/administration/files/000168](requirements/functional/administration/files/000168_confirm-delete.md) | Every attachment delete is confirmed | approved |
 | [F/administration/files/000169](requirements/functional/administration/files/000169_drop-files.md) | Attachments can be dropped | approved |
@@ -87,12 +84,14 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/administration/files/000340](requirements/functional/administration/files/000340_quarantine.md) | An unscanned file is not served | approved |
 | [F/administration/files/000341](requirements/functional/administration/files/000341_file-access.md) | File access follows the access to the Antrag | approved |
 | [F/administration/files/000342](requirements/functional/administration/files/000342_drafts.md) | Wizard uploads are drafts | approved |
-| [F/administration/files/000343](requirements/functional/administration/files/000343_display-name.md) | A file name is cleaned | approved |
-| [F/administration/files/000344](requirements/functional/administration/files/000344_image-reencode.md) | Markdown images are re-encoded | approved |
+| [F/administration/files/000464](requirements/functional/administration/files/000464_draft-caps.md) | Wizard drafts are capped and expire | approved |
+| [F/administration/privacy/000457](requirements/functional/administration/privacy/000457_erasure-request.md) | An applicant can request the erasure of an Antrag | approved |
+| [F/administration/privacy/000458](requirements/functional/administration/privacy/000458_data-export.md) | The data export is an audited XLSX | approved |
+| [F/administration/translations/000136](requirements/functional/administration/translations/000136_all-languages-editable.md) | Every i18n text is editable in English too | approved |
 | [F/administration/translations/000336](requirements/functional/administration/translations/000336_catalog-source.md) | The frontend catalog is the source of UI texts | approved |
 | [F/administration/translations/000337](requirements/functional/administration/translations/000337_language-lifecycle.md) | A new language starts inactive | approved |
 | [F/administration/translations/000338](requirements/functional/administration/translations/000338_extra-language-scope.md) | Extra languages cover only UI texts | approved |
-| [F/applications/applications/000121](requirements/functional/applications/applications/000121_apply-buttons.md) | The apply button is Antrag anlegen | approved |
+| [F/applications/applications/000121](requirements/functional/applications/applications/000121_apply-buttons.md) | The wizard submit button is Antrag anlegen | approved |
 | [F/applications/applications/000122](requirements/functional/applications/applications/000122_on-behalf-capture.md) | An Antrag can be captured on behalf of a person | approved |
 | [F/applications/applications/000123](requirements/functional/applications/applications/000123_received-on.md) | The received date is at most 365 days back | approved |
 | [F/applications/applications/000124](requirements/functional/applications/applications/000124_match-by-email.md) | A guest e-mail of an active account becomes that account | approved |
@@ -108,6 +107,10 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/applications/000375](requirements/functional/applications/applications/000375_versioned-edit.md) | An edit is versioned and audited without values | approved |
 | [F/applications/applications/000376](requirements/functional/applications/applications/000376_anonymize-all.md) | An anonymization removes every copy of personal data | approved |
 | [F/applications/applications/000377](requirements/functional/applications/applications/000377_state-since.md) | The time in a state is shown | approved |
+| [F/applications/applications/000441](requirements/functional/applications/applications/000441_capture-mail.md) | The applicant gets a mail about a captured Antrag | approved |
+| [F/applications/applications/000442](requirements/functional/applications/applications/000442_capture-detail.md) | The detail names who captured the Antrag | approved |
+| [F/applications/dashboard/000421](requirements/functional/applications/dashboard/000421_dashboard.md) | The start page is a work list with a side sheet | approved |
+| [F/applications/flow/000137](requirements/functional/applications/flow/000137_flow-auto-layout.md) | The flow editor lays out automatically | approved |
 | [F/applications/flow/000227](requirements/functional/applications/flow/000227_one-active-flow.md) | There is one active flow | approved |
 | [F/applications/flow/000228](requirements/functional/applications/flow/000228_state-kinds.md) | A state is normal or a vote state | approved |
 | [F/applications/flow/000229](requirements/functional/applications/flow/000229_guard-whitelist.md) | Guards and actions come from a whitelist | approved |
@@ -127,11 +130,10 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/flow/000243](requirements/functional/applications/flow/000243_vote-gremium-snapshot.md) | The vote Gremium is a snapshot | approved |
 | [F/applications/flow/000244](requirements/functional/applications/flow/000244_budget-locked-by-vote.md) | The cost centre is locked during a budget vote | approved |
 | [F/applications/flow/000245](requirements/functional/applications/flow/000245_applicant-transitions.md) | Applicant transitions need actorIsApplicant | approved |
+| [F/applications/flow/000459](requirements/functional/applications/flow/000459_vote-state-branches.md) | A vote state has exactly one pass and one fail branch | approved |
 | [F/applications/forms/000133](requirements/functional/applications/forms/000133_positions-shape.md) | A positions answer has label and offers | approved |
 | [F/applications/forms/000134](requirements/functional/applications/forms/000134_offer-limits.md) | Offer counts have limits | approved |
 | [F/applications/forms/000135](requirements/functional/applications/forms/000135_funding-field.md) | The requested funding is separate from the costs | approved |
-| [F/applications/forms/000136](requirements/functional/applications/forms/000136_all-languages-editable.md) | Every i18n text is editable in English too | approved |
-| [F/applications/forms/000137](requirements/functional/applications/forms/000137_flow-auto-layout.md) | The flow editor lays out automatically | approved |
 | [F/applications/forms/000280](requirements/functional/applications/forms/000280_pin-not-mutate.md) | A form version is never changed | approved |
 | [F/applications/forms/000281](requirements/functional/applications/forms/000281_inactive-type.md) | A type without an active form is closed | approved |
 | [F/applications/forms/000282](requirements/functional/applications/forms/000282_system-title.md) | Every form has a title field | approved |
@@ -142,19 +144,19 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/forms/000287](requirements/functional/applications/forms/000287_pattern-limits.md) | A pattern check cannot hang | approved |
 | [F/applications/forms/000288](requirements/functional/applications/forms/000288_finite-numbers.md) | Numbers are finite decimals | approved |
 | [F/applications/forms/000289](requirements/functional/applications/forms/000289_form-revision.md) | A form change is versioned and audited | approved |
+| [F/applications/forms/000471](requirements/functional/applications/forms/000471_type-retention.md) | Antrag types can keep their own retention | approved |
 | [F/collaboration/notifications/000151](requirements/functional/collaboration/notifications/000151_task-mail-recipients.md) | Task mails go only to who can act | approved |
 | [F/collaboration/notifications/000152](requirements/functional/collaboration/notifications/000152_team-mails-opt-in.md) | Team mails about Anträge are off by default | approved |
-| [F/collaboration/notifications/000153](requirements/functional/collaboration/notifications/000153_sandboxed-templates.md) | Mail templates are sandboxed | approved |
+| [F/collaboration/notifications/000153](requirements/functional/collaboration/notifications/000153_sandboxed-templates.md) | Mail placeholders use camelCase | approved |
 | [F/collaboration/notifications/000306](requirements/functional/collaboration/notifications/000306_mail-queue.md) | Mails go through the queue | approved |
 | [F/collaboration/notifications/000307](requirements/functional/collaboration/notifications/000307_mail-once.md) | A mail is sent once | approved |
 | [F/collaboration/notifications/000308](requirements/functional/collaboration/notifications/000308_mail-link.md) | Every mail links its element | approved |
 | [F/collaboration/notifications/000309](requirements/functional/collaboration/notifications/000309_mail-preferences.md) | A person controls their mail kinds | approved |
 | [F/collaboration/notifications/000310](requirements/functional/collaboration/notifications/000310_mail-languages.md) | Mail texts are in German and English | approved |
-| [F/collaboration/notifications/000311](requirements/functional/collaboration/notifications/000311_mail-logs.md) | Mail logs hold no personal data | approved |
 | [F/collaboration/notifications/000312](requirements/functional/collaboration/notifications/000312_task-reminders.md) | Task reminders follow the admin setting | approved |
 | [F/collaboration/search/000328](requirements/functional/collaboration/search/000328_reuse-gates.md) | Search reuses the gate of each module | approved |
 | [F/collaboration/search/000329](requirements/functional/collaboration/search/000329_query-length.md) | Search needs two characters | approved |
-| [F/collaboration/search/000330](requirements/functional/collaboration/search/000330_per-kind-cap.md) | Search shows a fixed number per kind | approved |
+| [F/collaboration/search/000330](requirements/functional/collaboration/search/000330_per-kind-cap.md) | Search shows 5 hits per kind | approved |
 | [F/collaboration/tickets/000150](requirements/functional/collaboration/tickets/000150_public-report.md) | Anyone can report a help ticket | approved |
 | [F/collaboration/tickets/000313](requirements/functional/collaboration/tickets/000313_reporter-view.md) | A reporter account follows its tickets | approved |
 | [F/collaboration/tickets/000314](requirements/functional/collaboration/tickets/000314_team-work.md) | The team works on tickets | approved |
@@ -174,6 +176,9 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/todos/000325](requirements/functional/collaboration/todos/000325_todo-mails.md) | To-do mails go to assignees | approved |
 | [F/collaboration/todos/000326](requirements/functional/collaboration/todos/000326_card-on-agenda.md) | A card can go on the agenda | approved |
 | [F/collaboration/todos/000327](requirements/functional/collaboration/todos/000327_link-access.md) | A link shows nothing without access | approved |
+| [F/collaboration/todos/000443](requirements/functional/collaboration/todos/000443_board-columns.md) | A board has one done column | approved |
+| [F/collaboration/todos/000444](requirements/functional/collaboration/todos/000444_boards-tab.md) | The to-do tab is Boards | approved |
+| [F/collaboration/todos/000467](requirements/functional/collaboration/todos/000467_card-version-conflict.md) | Concurrent card edits give 409 | approved |
 | [F/finance/budget/000138](requirements/functional/finance/budget/000138_cost-centre-picker.md) | The cost centre pickers are fixed | approved |
 | [F/finance/budget/000139](requirements/functional/finance/budget/000139_close-fiscal-year.md) | A fiscal year closes and reopens | approved |
 | [F/finance/budget/000140](requirements/functional/finance/budget/000140_default-fiscal-year.md) | The default fiscal year holds today | approved |
@@ -181,7 +186,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/budget/000142](requirements/functional/finance/budget/000142_duplicate-booking.md) | A booking can be duplicated | approved |
 | [F/finance/budget/000143](requirements/functional/finance/budget/000143_transfer-kind.md) | A transfer is a kind in the Art filter | approved |
 | [F/finance/budget/000144](requirements/functional/finance/budget/000144_cost-centre-items.md) | The cost centre card lists Anträge and bookings | approved |
-| [F/finance/budget/000145](requirements/functional/finance/budget/000145_revert-keeps-invoice.md) | A reverted booking keeps the invoice status | approved |
+| [F/finance/budget/000145](requirements/functional/finance/budget/000145_revert-keeps-invoice.md) | A reverted booking keeps the invoice status | replaced |
 | [F/finance/budget/000146](requirements/functional/finance/budget/000146_legend.md) | The budget legend matches the drawing | approved |
 | [F/finance/budget/000246](requirements/functional/finance/budget/000246_path-key.md) | A cost centre has a stable path key | approved |
 | [F/finance/budget/000247](requirements/functional/finance/budget/000247_roll-up.md) | Allocation flows down, consumption flows up | approved |
@@ -204,16 +209,13 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/integrations/external/000176](requirements/functional/integrations/external/000176_optional.md) | Integrations are optional | approved |
 | [F/integrations/external/000177](requirements/functional/integrations/external/000177_preview-access.md) | A link preview uses the access of the viewer | approved |
 | [F/integrations/mcp/000174](requirements/functional/integrations/mcp/000174_acts-as-user.md) | The MCP server acts as the logged-in user | approved |
-| [F/integrations/mcp/000175](requirements/functional/integrations/mcp/000175_prod-data.md) | Production data changes only on request | approved |
 | [F/integrations/mcp/000272](requirements/functional/integrations/mcp/000272_token-scope.md) | An agent token has a scope and a lifetime | approved |
 | [F/integrations/mcp/000273](requirements/functional/integrations/mcp/000273_forbidden-permissions.md) | An agent never casts a ballot or merges accounts | approved |
 | [F/integrations/mcp/000274](requirements/functional/integrations/mcp/000274_revoke-grants.md) | Tokens can be revoked | approved |
-| [F/integrations/mcp/000385](requirements/functional/integrations/mcp/000385_version-bump.md) | The MCP version moves with its tools | approved |
+| [F/integrations/mcp/000385](requirements/functional/integrations/mcp/000385_version-bump.md) | The MCP version moves with its tools | replaced |
 | [F/integrations/mcp/000386](requirements/functional/integrations/mcp/000386_no-ballot-tool.md) | The MCP has no ballot tool | approved |
 | [F/integrations/mcp/000387](requirements/functional/integrations/mcp/000387_idp-roles-read-only.md) | Memberships and roles are read-only in the MCP | approved |
-| [F/integrations/mcp/000388](requirements/functional/integrations/mcp/000388_token-file.md) | The MCP token file is private | approved |
-| [F/integrations/webhooks/000296](requirements/functional/integrations/webhooks/000296_secret-hidden.md) | A webhook secret is never shown | approved |
-| [F/integrations/webhooks/000297](requirements/functional/integrations/webhooks/000297_signature.md) | A webhook request is signed with a timestamp | approved |
+| [F/integrations/mcp/000462](requirements/functional/integrations/mcp/000462_forbidden-permissions.md) | No agent token gets a human-only permission | approved |
 | [F/integrations/webhooks/000298](requirements/functional/integrations/webhooks/000298_retry.md) | A failed delivery is retried with backoff | approved |
 | [F/integrations/webhooks/000299](requirements/functional/integrations/webhooks/000299_idempotent-delivery.md) | A delivery runs once per key | approved |
 | [F/integrations/webhooks/000402](requirements/functional/integrations/webhooks/000402_flow-action-only.md) | A webhook fires only through a flow action | approved |
@@ -233,6 +235,10 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/delegations/000366](requirements/functional/meetings/delegations/000366_deadline.md) | A delegation has a deadline | approved |
 | [F/meetings/delegations/000367](requirements/functional/meetings/delegations/000367_roster-privacy.md) | Roster names are visible only to the Gremium | approved |
 | [F/meetings/delegations/000420](requirements/functional/meetings/delegations/000420_lead-enters-substitute.md) | The lead can enter a pool substitute | approved |
+| [F/meetings/delegations/000445](requirements/functional/meetings/delegations/000445_pool-seat-cap.md) | Pool seats never exceed the member seats | approved |
+| [F/meetings/delegations/000446](requirements/functional/meetings/delegations/000446_pool-seat-free.md) | The member frees the pool seat | approved |
+| [F/meetings/delegations/000447](requirements/functional/meetings/delegations/000447_pool-seat-live.md) | Pool seats need only a live meeting | approved |
+| [F/meetings/delegations/000461](requirements/functional/meetings/delegations/000461_external-delegates.md) | External delegates need a Gremium switch | approved |
 | [F/meetings/meetings/000092](requirements/functional/meetings/meetings/000092_open-window.md) | A meeting opens in a configured window | approved |
 | [F/meetings/meetings/000093](requirements/functional/meetings/meetings/000093_state-order.md) | Meeting states move only forward | approved |
 | [F/meetings/meetings/000094](requirements/functional/meetings/meetings/000094_close-with-open-vote.md) | A meeting with an open vote does not close | approved |
@@ -257,10 +263,12 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/meetings/000348](requirements/functional/meetings/meetings/000348_vote-needs-state.md) | A vote on an Antrag needs the matching vote state | approved |
 | [F/meetings/meetings/000349](requirements/functional/meetings/meetings/000349_aggregates-only.md) | Live data shows only aggregates | approved |
 | [F/meetings/meetings/000351](requirements/functional/meetings/meetings/000351_join-code.md) | A join code is short and unambiguous | approved |
-| [F/meetings/meetings/000352](requirements/functional/meetings/meetings/000352_guest-device.md) | A guest joins with one device | approved |
 | [F/meetings/meetings/000353](requirements/functional/meetings/meetings/000353_guest-vote.md) | A vote with guests has no quorum | approved |
 | [F/meetings/meetings/000418](requirements/functional/meetings/meetings/000418_calendar-popover.md) | The calendar subscription is on Sitzungen | approved |
 | [F/meetings/meetings/000419](requirements/functional/meetings/meetings/000419_gremium-delete.md) | A Gremium delete deletes its meetings | approved |
+| [F/meetings/meetings/000448](requirements/functional/meetings/meetings/000448_vote-deleted-timeline.md) | The timeline shows a vote deleted with its meeting | approved |
+| [F/meetings/meetings/000449](requirements/functional/meetings/meetings/000449_delete-vote-count.md) | A meeting delete names the vote count | approved |
+| [F/meetings/meetings/000450](requirements/functional/meetings/meetings/000450_no-global-meeting-key.md) | No global key manages meetings | approved |
 | [F/meetings/protocols/000115](requirements/functional/meetings/protocols/000115_keeper-permission.md) | The keeper holds protocol.write | approved |
 | [F/meetings/protocols/000116](requirements/functional/meetings/protocols/000116_finalize.md) | Finalize needs a closed meeting and protocol.finalize | approved |
 | [F/meetings/protocols/000117](requirements/functional/meetings/protocols/000117_delete-draft-only.md) | Only a draft protocol is deleted | approved |
@@ -296,9 +304,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/accessibility/interaction/000218](requirements/non-functional/accessibility/interaction/000218_themes.md) | Light and dark themes are both supported | approved |
 | [NF/accessibility/interaction/000219](requirements/non-functional/accessibility/interaction/000219_reduced-motion.md) | Motion follows the reduced motion setting | approved |
 | [NF/accessibility/language/000216](requirements/non-functional/accessibility/language/000216_i18n-parity.md) | German and English texts are complete | replaced |
-| [NF/compatibility/deploy/000390](requirements/non-functional/compatibility/deploy/000390_typst-pin.md) | The typst version is pinned in two places | approved |
 | [NF/compatibility/deploy/000394](requirements/non-functional/compatibility/deploy/000394_migrate-first.md) | A deploy runs the migration first | approved |
-| [NF/compatibility/deploy/000434](requirements/non-functional/compatibility/deploy/000434_environments.md) | Dev follows development, production follows tags | approved |
 | [NF/compatibility/deploy/000435](requirements/non-functional/compatibility/deploy/000435_caddy-edge.md) | Caddy is the edge proxy | approved |
 | [NF/compatibility/pwa/000220](requirements/non-functional/compatibility/pwa/000220_zoom.md) | Zoom is blocked only in the installed app | approved |
 | [NF/compatibility/pwa/000221](requirements/non-functional/compatibility/pwa/000221_android-nav-bar.md) | The Android navigation bar has the manifest colour | approved |
@@ -311,7 +317,11 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/privacy/personal-data/000186](requirements/non-functional/privacy/personal-data/000186_no-plain-ip.md) | The login audit has no plain IP address | approved |
 | [NF/privacy/personal-data/000187](requirements/non-functional/privacy/personal-data/000187_guest-pseudonyms.md) | Guests get pseudonyms | replaced |
 | [NF/privacy/personal-data/000188](requirements/non-functional/privacy/personal-data/000188_anonymize.md) | Personal data can be anonymized | approved |
+| [NF/privacy/personal-data/000290](requirements/non-functional/privacy/personal-data/000290_no-pii-in-audit.md) | An audit entry holds no personal data | approved |
+| [NF/privacy/personal-data/000311](requirements/non-functional/privacy/personal-data/000311_mail-logs.md) | Mail logs hold no personal data | approved |
+| [NF/privacy/personal-data/000384](requirements/non-functional/privacy/personal-data/000384_snapshot-no-pii.md) | A config snapshot holds no personal data | approved |
 | [NF/privacy/personal-data/000404](requirements/non-functional/privacy/personal-data/000404_markdown-images.md) | Markdown images are outside erasure and export | approved |
+| [NF/privacy/personal-data/000456](requirements/non-functional/privacy/personal-data/000456_retention-cron.md) | Terminal Anträge are anonymized after the retention time | approved |
 | [NF/security/access/000179](requirements/non-functional/security/access/000179_public-allowlist.md) | A public route is on the allowlist | approved |
 | [NF/security/access/000180](requirements/non-functional/security/access/000180_public-abuse-guard.md) | Public input is protected against abuse | approved |
 | [NF/security/access/000275](requirements/non-functional/security/access/000275_oauth-pkce.md) | The OAuth flow needs PKCE and a loopback redirect | approved |
@@ -319,19 +329,37 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/security/access/000277](requirements/non-functional/security/access/000277_hashed-tokens.md) | Tokens are stored only as hashes | approved |
 | [NF/security/access/000278](requirements/non-functional/security/access/000278_anti-enumeration.md) | A magic-link request does not reveal accounts | approved |
 | [NF/security/access/000279](requirements/non-functional/security/access/000279_oidc-discovery.md) | OIDC endpoints come from discovery | approved |
+| [NF/security/access/000304](requirements/non-functional/security/access/000304_no-token-backup.md) | No agent token reaches a backup | approved |
 | [NF/security/access/000350](requirements/non-functional/security/access/000350_socket-origin.md) | A meeting socket checks the origin | approved |
+| [NF/security/access/000352](requirements/non-functional/security/access/000352_guest-device.md) | A guest joins with one device | approved |
+| [NF/security/access/000453](requirements/non-functional/security/access/000453_csrf-token.md) | Cookie writes need the CSRF token | approved |
+| [NF/security/access/000460](requirements/non-functional/security/access/000460_default-write-limit.md) | Writes have a default rate limit | approved |
+| [NF/security/access/000463](requirements/non-functional/security/access/000463_scope-caps-gremium-rights.md) | A scope caps every gremium right of a token | approved |
+| [NF/security/access/000470](requirements/non-functional/security/access/000470_audit-read-global.md) | The audit read is global | approved |
+| [NF/security/access/000472](requirements/non-functional/security/access/000472_public-application-post.md) | The public Antrag POST is protected | approved |
 | [NF/security/files/000178](requirements/non-functional/security/files/000178_stream-downloads.md) | Downloads stream through the API | approved |
 | [NF/security/files/000181](requirements/non-functional/security/files/000181_scan-uploads.md) | Uploaded files are scanned | approved |
 | [NF/security/files/000264](requirements/non-functional/security/files/000264_invoice-download.md) | An invoice file is served as a download | approved |
 | [NF/security/files/000305](requirements/non-functional/security/files/000305_restore-paths.md) | A restore writes only inside the bucket | approved |
+| [NF/security/files/000343](requirements/non-functional/security/files/000343_display-name.md) | A file name is cleaned | approved |
+| [NF/security/files/000344](requirements/non-functional/security/files/000344_image-reencode.md) | Markdown images are re-encoded | approved |
+| [NF/security/files/000372](requirements/non-functional/security/files/000372_branding-checks.md) | Branding logos are checked by their bytes | approved |
+| [NF/security/files/000373](requirements/non-functional/security/files/000373_cd-logo-download.md) | A CD logo is served as a download | approved |
+| [NF/security/files/000388](requirements/non-functional/security/files/000388_token-file.md) | The MCP token file is private | approved |
+| [NF/security/files/000469](requirements/non-functional/security/files/000469_invoice-xml-no-entities.md) | The ZUGFeRD XML parser resolves no entities | approved |
 | [NF/security/integrity/000183](requirements/non-functional/security/integrity/000183_audit-chain.md) | The audit log is append-only | approved |
 | [NF/security/integrity/000184](requirements/non-functional/security/integrity/000184_sandboxed-mail.md) | Mail templates run sandboxed | approved |
+| [NF/security/integrity/000295](requirements/non-functional/security/integrity/000295_canonical-hash.md) | The hash input is canonical | approved |
+| [NF/security/integrity/000296](requirements/non-functional/security/integrity/000296_secret-hidden.md) | A webhook secret is never shown | approved |
+| [NF/security/integrity/000297](requirements/non-functional/security/integrity/000297_signature.md) | A webhook request is signed with a timestamp | approved |
 | [NF/security/integrity/000393](requirements/non-functional/security/integrity/000393_db-roles.md) | Database roles are separated | approved |
 | [NF/security/network/000182](requirements/non-functional/security/network/000182_webhook-ssrf.md) | The webhook SSRF guard runs at send time | approved |
 | [NF/security/network/000335](requirements/non-functional/security/network/000335_avatar-fetch.md) | The avatar fetch is fixed and limited | approved |
 | [NF/security/network/000389](requirements/non-functional/security/network/000389_typst-isolated.md) | The render service has no network egress | approved |
 | [NF/security/network/000391](requirements/non-functional/security/network/000391_host-ports.md) | Only two ports are bound on the host | approved |
 | [NF/security/network/000392](requirements/non-functional/security/network/000392_forwarded-ips.md) | Forwarded headers come only from the proxy | approved |
+| [NF/security/network/000454](requirements/non-functional/security/network/000454_api-security-headers.md) | The API sends strict security headers and no CORS | approved |
+| [NF/security/network/000466](requirements/non-functional/security/network/000466_webhook-host-allowlist.md) | Webhook targets can be limited to a host list | approved |
 | [NF/usability/controls/000203](requirements/non-functional/usability/controls/000203_app-popover.md) | Every dropdown uses the app popover | approved |
 | [NF/usability/controls/000204](requirements/non-functional/usability/controls/000204_whole-control.md) | The whole control is clickable | approved |
 | [NF/usability/controls/000205](requirements/non-functional/usability/controls/000205_empty-state.md) | Empty states use one component | approved |
@@ -365,11 +393,13 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/layout/000406](requirements/non-functional/usability/layout/000406_desktop-unchanged.md) | The phone layout does not change the desktop | approved |
 | [NF/usability/layout/000407](requirements/non-functional/usability/layout/000407_mehr-and-search.md) | Mehr and Suche are always in reach | approved |
 | [NF/usability/layout/000408](requirements/non-functional/usability/layout/000408_bottom-inset.md) | Fixed bottom elements sit above the bottom bar | approved |
-| [NF/usability/layout/000409](requirements/non-functional/usability/layout/000409_phone-panes.md) | The phone shows one pane and card tables | approved |
+| [NF/usability/layout/000409](requirements/non-functional/usability/layout/000409_phone-panes.md) | The phone shows tables as cards | approved |
 | [NF/usability/layout/000413](requirements/non-functional/usability/layout/000413_card-mode.md) | A table in card mode keeps its controls in the card head | approved |
 | [NF/usability/layout/000414](requirements/non-functional/usability/layout/000414_admin-heading.md) | Admin pages share one heading | approved |
 | [NF/usability/layout/000415](requirements/non-functional/usability/layout/000415_balanced-bars.md) | Bars and headers are vertically balanced | approved |
 | [NF/usability/layout/000417](requirements/non-functional/usability/layout/000417_antraege-pattern.md) | Work lists follow the Anträge pattern | approved |
+| [NF/usability/layout/000451](requirements/non-functional/usability/layout/000451_phone-one-pane.md) | The phone shows one pane at a time | approved |
+| [NF/usability/layout/000452](requirements/non-functional/usability/layout/000452_phone-dialog-sheet.md) | A phone dialog is a near-fullscreen sheet | approved |
 | [S/backend/database/000068](style/backend/database/000068_hash-revision.md) | A migration has a hash ID | approved |
 | [S/backend/database/000069](style/backend/database/000069_one-head.md) | Alembic has one head | approved |
 | [S/backend/database/000070](style/backend/database/000070_idempotent-tables.md) | A migration that adds a table is idempotent | approved |
@@ -382,10 +412,11 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [S/backend/python/000061](style/backend/python/000061_strict-types.md) | Inputs are strictly typed | approved |
 | [S/backend/python/000062](style/backend/python/000062_docstrings.md) | Docstrings instead of comments | approved |
 | [S/backend/python/000063](style/backend/python/000063_no-eval.md) | No eval | approved |
-| [S/backend/python/000064](style/backend/python/000064_resolve-names.md) | Names are resolved on the server | approved |
+| [S/backend/python/000064](style/backend/python/000064_resolve-names.md) | Names are resolved on the server | replaced |
 | [S/backend/python/000065](style/backend/python/000065_merge-columns.md) | A principal column is known to the account merge | approved |
-| [S/backend/python/000066](style/backend/python/000066_public-routes.md) | Public endpoints are a fixed list | approved |
-| [S/backend/python/000067](style/backend/python/000067_nix-dev-shell.md) | Commands run in the Nix dev shell | approved |
+| [S/backend/python/000066](style/backend/python/000066_public-routes.md) | Public endpoints are a fixed list | replaced |
+| [S/backend/python/000473](style/backend/python/000473_no-role-check.md) | A permission check never reads principal.roles | approved |
+| [S/backend/python/000474](style/backend/python/000474_services-do-not-commit.md) | Service functions do not commit | approved |
 | [S/frontend/angular/000073](style/frontend/angular/000073_i18n-parity.md) | Every UI text is in both catalogs | approved |
 | [S/frontend/angular/000074](style/frontend/angular/000074_production-build.md) | Run the production build after style changes | approved |
 | [S/frontend/angular/000075](style/frontend/angular/000075_narrow-with-as.md) | A template narrows a signal with as | approved |
@@ -400,6 +431,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [S/frontend/angular/000398](style/frontend/angular/000398_mock-dev-only.md) | The mock API runs only in dev builds | approved |
 | [S/frontend/functional/000091](style/frontend/functional/000091_signal-update.md) | A signal update returns a new value | approved |
 | [S/frontend/functional/000438](style/frontend/functional/000438_eslint-functional.md) | eslint-plugin-functional warns on mutation | approved |
+| [S/shared/agents/000175](style/shared/agents/000175_prod-data.md) | Production data changes only on request | approved |
 | [S/shared/agents/000426](style/shared/agents/000426_ask-with-options.md) | Ask with options | approved |
 | [S/shared/agents/000427](style/shared/agents/000427_report-bugs.md) | Report a possible bug | approved |
 | [S/shared/agents/000428](style/shared/agents/000428_no-unasked-features.md) | Do not build what exists | approved |
@@ -412,7 +444,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [S/shared/api/000040](style/shared/api/000040_camelcase-base-model.md) | Schemas use the shared camelCase base model | approved |
 | [S/shared/api/000041](style/shared/api/000041_one-source.md) | Shared data has one source | approved |
 | [S/shared/api/000042](style/shared/api/000042_problem-json.md) | Every error is problem+json | approved |
-| [S/shared/api/000043](style/shared/api/000043_mcp-version.md) | The MCP version rises with the tool set | approved |
+| [S/shared/api/000468](style/shared/api/000468_specific-conflict-code.md) | A conflict names a specific code | approved |
+| [S/shared/api/000475](style/shared/api/000475_oauth-error-shape.md) | The OAuth token endpoint uses the RFC 6749 error shape | approved |
 | [S/shared/functional/000081](style/shared/functional/000081_body-shape.md) | A function body has one shape | approved |
 | [S/shared/functional/000082](style/shared/functional/000082_readability-limit.md) | Readability limits the single expression | approved |
 | [S/shared/functional/000083](style/shared/functional/000083_bind-once.md) | A local is bound once | approved |
@@ -423,6 +456,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [S/shared/functional/000088](style/shared/functional/000088_effects-at-edge.md) | Effects stay at the edge | approved |
 | [S/shared/functional/000089](style/shared/functional/000089_exceptions.md) | The exceptions are named | approved |
 | [S/shared/functional/000437](style/shared/functional/000437_functional-ratchet.md) | A CI ratchet keeps the functional style from getting worse | approved |
+| [S/shared/git/000043](style/shared/git/000043_mcp-version.md) | The MCP version rises with the tool set | approved |
 | [S/shared/git/000051](style/shared/git/000051_commits.md) | Commits are unsigned and have no trailers | approved |
 | [S/shared/git/000052](style/shared/git/000052_no-auto-merge.md) | A pull request is never set to auto-merge | approved |
 | [S/shared/git/000053](style/shared/git/000053_release-tags.md) | Only the owner tags a release | approved |
@@ -432,10 +466,13 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [S/shared/git/000057](style/shared/git/000057_release-notes.md) | Release notes list migrations and steps | approved |
 | [S/shared/git/000224](style/shared/git/000224_target-development.md) | An app pull request targets development | approved |
 | [S/shared/git/000225](style/shared/git/000225_found-bugs.md) | A found bug is fixed, a behaviour change is asked | approved |
+| [S/shared/git/000390](style/shared/git/000390_typst-pin.md) | The typst version is pinned in two places | approved |
 | [S/shared/git/000423](style/shared/git/000423_one-pr-per-package.md) | One branch and one pull request per package | approved |
 | [S/shared/git/000424](style/shared/git/000424_sync-main.md) | Sync main into development first | approved |
-| [S/shared/git/000425](style/shared/git/000425_shared-in-kit.md) | Shared list parts live in the ui-kit | approved |
+| [S/shared/git/000425](style/shared/git/000425_shared-in-kit.md) | Shared list parts live in the ui-kit | replaced |
+| [S/shared/git/000434](style/shared/git/000434_environments.md) | Dev follows development, production follows tags | approved |
 | [S/shared/git/000436](style/shared/git/000436_release-flow.md) | A release goes from development to main by pull request | approved |
+| [S/shared/git/000477](style/shared/git/000477_readme-links-git-specs.md) | The README links to the git specs | approved |
 | [S/shared/testing/000044](style/shared/testing/000044_test-first.md) | Tests come first | approved |
 | [S/shared/testing/000045](style/shared/testing/000045_coverage-gates.md) | Coverage gates hold | approved |
 | [S/shared/testing/000046](style/shared/testing/000046_critical-modules.md) | Critical modules have full branch coverage | approved |
@@ -444,6 +481,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [S/shared/testing/000049](style/shared/testing/000049_check-pixels.md) | A visual bug is checked on pixels | approved |
 | [S/shared/testing/000050](style/shared/testing/000050_mockups-from-real-app.md) | UI mockups come from the real app | approved |
 | [S/shared/testing/000223](style/shared/testing/000223_test-refers-to-rule.md) | A test refers back to its rule | approved |
+| [S/shared/testing/000476](style/shared/testing/000476_fake-principal.md) | Test doubles of Principal model the admin bypass | approved |
+| [S/shared/tooling/000067](style/shared/tooling/000067_nix-dev-shell.md) | Commands run in the Nix dev shell | approved |
 | [S/shared/writing/000034](style/shared/writing/000034_ste-english.md) | Repository texts are written in STE English | approved |
 | [S/shared/writing/000035](style/shared/writing/000035_stupa-in-capitals.md) | STUPA is written in capitals | approved |
 | [S/shared/writing/000036](style/shared/writing/000036_no-task-references.md) | Texts do not refer to old tasks | approved |

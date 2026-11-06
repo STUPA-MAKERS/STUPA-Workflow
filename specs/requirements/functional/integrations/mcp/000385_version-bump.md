@@ -2,9 +2,10 @@
 id: "000385"
 title: The MCP version moves with its tools
 kind: functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
+replaced_by: S/shared/git/000043
 scope:
   - mcp/
 ---

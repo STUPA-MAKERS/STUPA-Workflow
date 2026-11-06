@@ -4,7 +4,7 @@ title: A restore needs the word RESTORE
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/backup
   - backend/worker/backup.py
@@ -13,4 +13,4 @@ scope:
 
 # A restore needs the word RESTORE
 
-The restore dialog and the API need the literal text `RESTORE`.
+The restore dialog and the API must require the literal text `RESTORE`.

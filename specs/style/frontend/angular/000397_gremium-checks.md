@@ -4,12 +4,12 @@ title: Gremium rights come from the Gremium API
 kind: style
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - frontend/src/app/
 ---
 
 # Gremium rights come from the Gremium API
 
-Check a gremium right with `auth.canInGremium` or `auth.canInAnyGremium`, or with the server
-flags of the object. `auth.can` never sees a gremium right.
+A gremium right must be checked with `auth.canInGremium` or `auth.canInAnyGremium`, or with the
+server flags of the object. `auth.can` never sees a gremium right.

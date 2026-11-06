@@ -4,10 +4,10 @@ title: The phone opens pickers as bottom sheets
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - frontend/src/app/
-  - ui-kit
+  - frontend/vendor/ui-kit
 ---
 
 # The phone opens pickers as bottom sheets

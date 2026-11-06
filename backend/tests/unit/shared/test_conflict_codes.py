@@ -1,4 +1,4 @@
-"""Every ``ConflictError`` in ``app/`` names its own ``code`` (§ S/shared/api/000042).
+"""Every ``ConflictError`` in ``app/`` names its own ``code`` (§S/shared/api/000042).
 
 Without ``code=`` the error answers with the generic ``conflict``, and a client cannot
 tell one 409 from another.

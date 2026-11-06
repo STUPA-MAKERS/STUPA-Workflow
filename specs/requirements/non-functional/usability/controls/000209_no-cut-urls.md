@@ -4,13 +4,13 @@ title: URLs, IBANs and e-mail addresses are never cut
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - frontend/src/app/
-  - ui-kit
+  - frontend/vendor/ui-kit
 ---
 
 # URLs, IBANs and e-mail addresses are never cut
 
-A URL, an IBAN and an e-mail address wrap and stay selectable. They are never cut with an
-ellipsis. A URL is a real link that opens in a new tab with `rel="noopener"`.
+A URL, an IBAN and an e-mail address must wrap and stay selectable. They must never be cut with
+an ellipsis. A URL must be a real link that opens in a new tab with `rel="noopener"`.

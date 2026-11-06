@@ -442,7 +442,7 @@ class LifecycleOps(HandoverOps):
     async def _assert_public_join_allowed(self, gremium_id: UUID) -> None:
         """Allow public participation only in a gremium without a quorum.
 
-        A gremium with a quorum (StuPa, AStA) decides by the members only; the feature
+        A gremium with a quorum (STUPA, AStA) decides by the members only; the feature
         serves the gremien without a quorum (Fachschaften).
 
         Raises:

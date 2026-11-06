@@ -4,7 +4,7 @@ title: A privacy erasure starts from Benutzer
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/admin
   - frontend/src/app/pages/admin
@@ -13,5 +13,5 @@ scope:
 
 # A privacy erasure starts from Benutzer
 
-Verwaltung → Benutzer has the row action "Konto löschen (DSGVO)". The privacy page has a
-person picker with name and e-mail search.
+Verwaltung → Benutzer must have the row action "Konto löschen (DSGVO)". The privacy page must
+have a person picker with name and e-mail search.

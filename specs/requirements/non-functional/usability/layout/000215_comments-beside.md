@@ -4,13 +4,13 @@ title: Comments sit beside the fields
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - frontend/src/app/
-  - ui-kit
+  - frontend/vendor/ui-kit
 ---
 
 # Comments sit beside the fields
 
-A detail view with comments shows the conversation as its own column beside the fields. On the
-phone, it is a tab "Aktivität". Anträge open their comments from the "Kommentare" button.
+A detail view with comments must show the conversation as its own column beside the fields. On
+the phone, it must be a tab "Aktivität".

@@ -4,7 +4,7 @@ title: A status change is recorded
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/flow
   - backend/app/shared/guards.py
@@ -14,5 +14,5 @@ scope:
 
 # A status change is recorded
 
-Every fired transition writes a status event and a `status_change` audit entry in the same
+Every fired transition must write a status event and a `status_change` audit entry in the same
 transaction as the state change.

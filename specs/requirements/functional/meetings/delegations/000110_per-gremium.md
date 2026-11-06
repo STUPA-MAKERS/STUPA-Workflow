@@ -4,7 +4,7 @@ title: Vote delegation is a Gremium setting
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/delegations
   - frontend/src/app/features/meetings
@@ -13,5 +13,5 @@ scope:
 
 # Vote delegation is a Gremium setting
 
-Vote delegation is on or off per Gremium (`allowVoteDelegation`). It is not a setting of a
-person or a role.
+Vote delegation must be on or off only per Gremium (`allowVoteDelegation`). It must not be a
+setting of the instance, a person or a role.

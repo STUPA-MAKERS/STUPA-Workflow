@@ -4,7 +4,7 @@ title: Memberships and roles come from OIDC groups
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/auth
   - backend/app/modules/admin
@@ -12,6 +12,7 @@ scope:
 
 # Memberships and roles come from OIDC groups
 
-Gremium memberships and roles come only from OIDC groups. A group links in three separate
-ways on `/admin/group-mappings`: to a global role, to a Gremium membership, to a Gremium role.
-Do not combine them in one mapping. Do not add a manual write path.
+Gremium memberships and roles must come only from OIDC groups. On `/admin/group-mappings`, a
+group links in three separate ways: to a global role, to a Gremium membership or to a Gremium
+role. One mapping must not combine them. The platform must not have a manual write path for a
+membership or a role.

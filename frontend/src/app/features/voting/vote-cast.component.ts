@@ -159,7 +159,7 @@ export class VoteCastComponent implements OnDestroy {
 
   /**
    * The confirmation to delete a standalone vote. The route accepts the delete only while
-   * the vote is a draft or cancelled (§ F/meetings/voting/000029). It refuses a
+   * the vote is a draft or cancelled (§F/meetings/voting/000029). It refuses a
    * meeting-bound vote, because that one goes through its meeting.
    */
   readonly confirmDelete = signal(false);

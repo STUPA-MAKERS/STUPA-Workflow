@@ -4,7 +4,7 @@ title: STUPA is written in capitals
 kind: style
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/
   - frontend/
@@ -13,10 +13,9 @@ scope:
   - deploy/
   - .claude/
   - specs/
-  - platform configuration
 ---
 
 # STUPA is written in capitals
 
-Write STUPA in capitals, never "StuPa". This also applies to platform configuration, for
-example flow labels, Gremium names and mail texts. AStA keeps its spelling.
+STUPA must be written in capitals in repository texts, never "StuPa". AStA keeps its spelling.
+A Gremium name is content of the platform, not a repository text.

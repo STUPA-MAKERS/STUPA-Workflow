@@ -2,9 +2,10 @@
 id: "000064"
 title: Names are resolved on the server
 kind: style
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
+replaced_by: NF/privacy/personal-data/000185
 scope:
   - backend/app/
 ---

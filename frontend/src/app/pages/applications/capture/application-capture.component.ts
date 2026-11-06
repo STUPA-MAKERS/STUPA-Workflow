@@ -289,8 +289,8 @@ export class ApplicationCaptureComponent {
 
   /**
    * The e-mail of a new person. When it belongs to an active account (compared without
-   * case), the form switches to that account (user decision 2026-10-06; the server
-   * does the same).
+   * case), the form switches to that account. The server
+   * does the same.
    */
   onGuestEmail(value: string): void {
     this.guestEmail.set(value);

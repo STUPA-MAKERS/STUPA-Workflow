@@ -4,7 +4,7 @@ title: Tokens can be revoked
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/auth
   - backend/app/deps.py
@@ -12,5 +12,5 @@ scope:
 
 # Tokens can be revoked
 
-A user can list and revoke their own grants. A holder of `admin.users` can revoke the grant
-of any person. Both use the same revocation path.
+A user must be able to list and revoke their own grants. A holder of `admin.users` must be able
+to revoke the grant of any person. Both must use the same revocation path.

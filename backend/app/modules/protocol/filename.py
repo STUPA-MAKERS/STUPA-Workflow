@@ -55,7 +55,7 @@ def protocol_pdf_filename(title: str | None, day: date, *, public: bool = False)
         public: `True` for the redacted public variant, which ends in `_oeffentlich`.
 
     Returns:
-        For example `Protokoll_3._ordentliche_Sitzung_StuPa_2026-11-05.pdf`, or
+        For example `Protokoll_3._ordentliche_Sitzung_STUPA_2026-11-05.pdf`, or
         `Protokoll_2026-11-05_oeffentlich.pdf` without a title.
     """
     parts = ["Protokoll"]

@@ -4,11 +4,11 @@ title: A booking can have sub-bookings
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/budget
 ---
 
 # A booking can have sub-bookings
 
-A booking can have sub-bookings. The amount of the parent is the sum of its sub-bookings.
+A booking can have sub-bookings. The amount of the parent must be the sum of its sub-bookings.

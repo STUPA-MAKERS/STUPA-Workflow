@@ -1,15 +1,14 @@
 ---
 id: "000165"
-title: Verwaltung starts with an empty state
+title: Verwaltung keeps its frame widths
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - frontend/src/app/pages/admin
 ---
 
-# Verwaltung starts with an empty state
+# Verwaltung keeps its frame widths
 
-`/admin` without a selection shows an empty state in the right pane. The frame widths do not
-change between `/admin` and `/admin/*`.
+The frame widths must not change between `/admin` and `/admin/*`.

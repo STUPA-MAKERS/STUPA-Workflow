@@ -4,7 +4,7 @@ title: The lead can enter a pool substitute
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/delegations
   - backend/app/modules/livevote
@@ -12,4 +12,4 @@ scope:
 
 # The lead can enter a pool substitute
 
-During a live meeting, the lead can enter a pool substitute for an absent member.
+During a live meeting, the lead must be able to enter a pool substitute for an absent member.

@@ -4,7 +4,7 @@ title: The OAuth flow needs PKCE and a loopback redirect
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/auth
   - backend/app/deps.py
@@ -12,6 +12,6 @@ scope:
 
 # The OAuth flow needs PKCE and a loopback redirect
 
-The OAuth server accepts only the `S256` PKCE method and an `http` loopback `redirect_uri`.
-A code is single-use. A refresh rotates the token pair. An invalid redirect answers 400 and
-never redirects.
+The OAuth server must accept only the `S256` PKCE method and an `http` loopback `redirect_uri`.
+A code must be single-use. A refresh must rotate the token pair. An invalid redirect must
+answer 400 and must never redirect.

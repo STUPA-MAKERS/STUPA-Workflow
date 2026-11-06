@@ -4,7 +4,7 @@ title: The cost centre pickers are fixed
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/budget
   - frontend/src/app/pages/budget
@@ -12,5 +12,5 @@ scope:
 
 # The cost centre pickers are fixed
 
-The cost centre picker is the search list of `app-cost-centre-select` everywhere. The form
-field "Kostenstelle" uses the tree picker with colour swatches.
+Every cost centre picker must be the search list of `app-cost-centre-select`. The one exception
+is the form field "Kostenstelle": it must use the tree picker with colour swatches.

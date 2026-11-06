@@ -4,7 +4,7 @@ title: A CD variant in use is not deleted
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/admin
   - frontend/src/app/pages/admin
@@ -12,4 +12,4 @@ scope:
 
 # A CD variant in use is not deleted
 
-A CD variant that a Gremium uses answers 409 to a delete.
+A delete of a CD variant that a Gremium uses must answer 409.

@@ -4,7 +4,7 @@ title: A vote on an Antrag needs the matching vote state
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/livevote
   - backend/app/modules/voting
@@ -12,7 +12,7 @@ scope:
 
 # A vote on an Antrag needs the matching vote state
 
-A vote on an Antrag TOP opens only when the Antrag is in a vote state of the Gremium of the
+A vote on an Antrag TOP must open only when the Antrag is in a vote state of the Gremium of the
 vote.
 
 Reason: Else the members cast ballots on a vote that cannot close.
