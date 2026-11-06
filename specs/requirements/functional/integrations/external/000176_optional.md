@@ -4,7 +4,7 @@ title: Integrations are optional
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/
   - frontend/src/app/
@@ -12,6 +12,7 @@ scope:
 
 # Integrations are optional
 
-Every integration with an external system, for example Nextcloud or a wiki, is optional. It is
-off without settings, it has a switch per feature, and its outage does not show in the
-platform.
+Every integration with an external system, for example Nextcloud or a wiki, must be optional.
+It must be off without settings and must have a switch per feature. An outage of the external
+system must not make a page of the platform fail: the page must show without the data of the
+integration.

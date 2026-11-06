@@ -4,11 +4,11 @@ title: No page imitates an organization
 kind: style
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - .
 ---
 
 # No page imitates an organization
 
-Do not publish a page that imitates a real organization.
+An agent must not publish a page that imitates a real organization.

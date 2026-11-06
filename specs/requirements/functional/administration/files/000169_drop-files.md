@@ -4,7 +4,7 @@ title: Attachments can be dropped
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/files
   - frontend/src/app/shared
@@ -12,4 +12,4 @@ scope:
 
 # Attachments can be dropped
 
-Every attachment target accepts drag and drop through `appFileDrop` and `app-drop-overlay`.
+Every attachment target must accept drag and drop through `appFileDrop` and `app-drop-overlay`.

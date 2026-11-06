@@ -4,7 +4,7 @@ title: The protocol mail carries the PDF
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/protocol
   - backend/app/modules/notifications
@@ -12,5 +12,5 @@ scope:
 
 # The protocol mail carries the PDF
 
-The protocol mail goes to the active Gremium members and the extra mailing addresses, filtered
-by the protocol mail setting. The PDF is an attachment, not a link.
+The protocol mail must go to the active Gremium members and the extra mailing addresses,
+filtered by the protocol mail setting. The PDF must be an attachment, not a link.

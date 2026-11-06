@@ -2,9 +2,10 @@
 id: "000145"
 title: A reverted booking keeps the invoice status
 kind: functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
+replaced_by: F/finance/invoices/000261
 scope:
   - backend/app/modules/budget
   - frontend/src/app/pages/budget

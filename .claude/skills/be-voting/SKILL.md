@@ -5,7 +5,7 @@ description: Standalone vote lifecycle (Vote/VotedMarker/SecretBallot) with quor
 
 # Voting — `backend/app/modules/voting`
 
-**Does:** Runs the full lifecycle of a vote attached to an application (and optionally a meeting or agenda item): create → open → cast → close. On close it tallies, applies quorum + majority + tie-break, persists the result, and fires the `pass`/`fail` branch of the application flow.
+**Does:** Runs the full lifecycle of a vote attached to an application (and optionally a meeting or agenda item): create → open → cast → close. On close it tallies, applies quorum + majority (a tie rejects a motion), persists the result, and fires the `pass`/`fail` branch of the application flow.
 
 **Key files:**
 - `models.py` — SQLAlchemy tables `Vote`, `VotedMarker`, `SecretBallot`, plus status/result CHECK constraints and the unique-per-voter constraint of `voted_marker`.

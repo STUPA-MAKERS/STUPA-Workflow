@@ -4,7 +4,7 @@ title: The minute cron advances and cleans up
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/worker
   - backend/app/modules/flow
@@ -14,6 +14,6 @@ scope:
 
 # The minute cron advances and cleans up
 
-Every minute the worker closes overdue votes, fires automatic transitions, deletes unconfirmed
-guest Anträge after `confirm_ttl_hours` and sends to-do and poll reminders. Each step is
-idempotent and locks each row with `FOR UPDATE SKIP LOCKED`.
+Every minute the worker must close overdue votes, fire automatic transitions, delete
+unconfirmed guest Anträge after `confirm_ttl_hours` and send to-do and poll reminders. Each
+step must be idempotent and must lock each row with `FOR UPDATE SKIP LOCKED`.

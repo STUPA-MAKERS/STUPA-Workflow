@@ -4,7 +4,7 @@ title: A status revert works only from the reverted state
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/flow
   - backend/app/shared/guards.py
@@ -14,5 +14,5 @@ scope:
 
 # A status revert works only from the reverted state
 
-A revert of a status change works only while the Antrag is still in the target state of that
-change, else 409 `stale_revert`. Sent mails and webhooks stay sent.
+A revert of a status change must work only while the Antrag is still in the target state of
+that change, else it must answer 409 `stale_revert`. Sent mails and webhooks stay sent.

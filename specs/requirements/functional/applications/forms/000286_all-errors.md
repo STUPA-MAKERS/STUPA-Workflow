@@ -4,7 +4,7 @@ title: Answer validation reports all errors
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/forms
   - backend/app/shared/config_schemas.py
@@ -12,5 +12,5 @@ scope:
 
 # Answer validation reports all errors
 
-The answer check collects the errors of all fields and returns them together. Computed fields
-are evaluated first, in field order.
+The answer check must collect the errors of all fields and must return them together. Computed
+fields must be evaluated first, in field order.

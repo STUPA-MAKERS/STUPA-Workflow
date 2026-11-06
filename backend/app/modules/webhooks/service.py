@@ -256,7 +256,7 @@ class WebhookService:
 
         A 3xx or 4xx goes to the dead-letter state at once, because a retry does not
         change it: the client follows no redirect, and a 4xx is a client or config
-        error. A 5xx and a 1xx retry (§ F/integrations/webhooks/000298).
+        error. A 5xx and a 1xx retry (§F/integrations/webhooks/000298).
         """
         if 200 <= status_code < 300:
             return await self._finish(

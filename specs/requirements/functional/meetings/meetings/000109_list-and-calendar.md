@@ -4,12 +4,11 @@ title: The meeting list has a list and a calendar
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - frontend/src/app/features/meetings
 ---
 
 # The meeting list has a list and a calendar
 
-Sitzungen has the switch "Liste | Kalender". The phone shows only the list. The calendar
-subscription is a popover on Sitzungen, not in the account area.
+Sitzungen must have the switch "Liste | Kalender". The phone must show only the list.

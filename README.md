@@ -1,7 +1,7 @@
 # STUPA-Workflow
 
 Web platform for the application, meeting and budget work of a student Gremium
-(StuPa/AStA). Applicants submit through a public form. Gremium members process
+(STUPA/AStA). Applicants submit through a public form. Gremium members process
 applications, run meetings with live votes and a protocol, and manage cost center
 budgets and invoices. The platform versions and audits all of it.
 
@@ -29,7 +29,7 @@ It implements:
 
 - **Auth & RBAC** — OIDC against any IdP with a discovery document, such as authentik or
   Keycloak (authorization code + PKCE, server session), and a magic link for applicants
-  (HMAC-hashed single-use token). Global roles and permissions come from OIDC groups. Meeting,
+  (HMAC-hashed token, valid until a newer link, the archive or the anonymization ends it). Global roles and permissions come from OIDC groups. Meeting,
   protocol and vote rights are Gremium permissions of a Gremium role. Each `/admin/` page has its own
   permission. An admin can merge an old account into a new one (`admin.users.merge`).
 - **Forms** — forms as versioned JSON. The backend validates the definition and the
@@ -44,7 +44,7 @@ It implements:
   a dispatch table, **no `eval`**) and transition actions
   (`notify`, `webhook`, `addToNextSession`, `assignBudget`, `assignBudgetFromField`).
 - **Voting** — quorum (count or percent), majorities (simple, absolute, two thirds),
-  tie-break, secret ballot (the choice stays separate from the identity). The platform
+  a tie rejects a motion, a lot decides an election tie, secret ballot (the choice stays separate from the identity). The platform
   scopes read access to the Gremium.
 - **Meetings / LiveVote** — meetings with an agenda, attendance and a live vote over
   WebSocket (voter channel plus read-only beamer stream). The protocol starts with the
@@ -130,51 +130,23 @@ secrets in `deploy/.env` only, which `.gitignore` blocks. Never commit a secret.
 
 ## Branching and releases
 
-A protected `main`, one integration branch `development` and tag-based delivery. Feature
-PRs go to `development`. Each merge to `development` deploys the dev site. A release merges
-`development` into `main` and tags it. There is no other long-lived branch.
+The specs hold the rules for branches, pull requests, releases and migrations. This
+section only links to them:
 
-| Branch | Purpose | Rules |
-|---|---|---|
-| `main` | always green, always deployable | **protected**: PR + green CI + 1 review, no direct push, linear history |
-| `development` | integration branch, deploys the dev site on each merge | PR + green CI, no direct push |
-| `feat/*`, `fix/*`, `chore/*`, `docs/*` | short-lived branches off `development` | merge by PR (squash) into `development`, delete after the merge |
-| `hotfix/*` | urgent production fix off the running release tag | PR → `main`, then a new patch tag |
-
-**Releases.** Production runs on a **tag**, not on the HEAD of `main`. To make a
-release:
-
-1. Open a pull request from `development` to `main`.
-2. Make sure that CI is green, then merge the pull request.
-3. Tag the new head of `main` with the next version (`vMAJOR.MINOR.PATCH`) and
-   publish a GitHub release for the tag with the release notes. The notes list the
-   changes since the previous tag, the migrations and any step that the operator must
-   do by hand.
-
-   ```bash
-   git fetch origin && git switch main && git pull --ff-only
-   git tag -a v1.2.0 -m "v1.2.0"
-   git push origin v1.2.0
-   gh release create v1.2.0 --title "v1.2.0" --notes-file release-notes.md
-   ```
-
-Versions follow SemVer: `vMAJOR.MINOR.PATCH`. After the tag, CI builds the images, marks
-them with the tag and deploys them. This keeps the production state reproducible at any
-time. A rollback is a re-deploy of the previous tag.
-
-```
-feat/x ──PR──▶ development ──PR──▶ main ──tag v1.2.0──▶ Build+Deploy
-                                    ▲
-hotfix/y ──PR───────────────────────┘  (from v1.2.0)  ──tag v1.2.1──▶ Deploy
-```
-
-**DB migrations** belong to the release. Prefer additive, backward-compatible Alembic
-steps: first add the column, remove the old one later. A rollback of the app then does
-not fail on the database. Revision ids are 32 characters or shorter.
-
-Recommended branch protection for `main`: "Require a pull request before merging" (1
-approval), "Require status checks to pass" (CI: ruff + basedpyright + pytest + ng build
-+ jest), "Require linear history", "Require branches to be up to date".
+- [S/shared/git/000224](specs/style/shared/git/000224_target-development.md): An app pull request targets development
+- [S/shared/git/000423](specs/style/shared/git/000423_one-pr-per-package.md): One branch and one pull request per package
+- [S/shared/git/000424](specs/style/shared/git/000424_sync-main.md): Sync main into development first
+- [S/shared/git/000054](specs/style/shared/git/000054_merge-go.md): A merge needs the go of the owner
+- [S/shared/git/000052](specs/style/shared/git/000052_no-auto-merge.md): A pull request is never set to auto-merge
+- [S/shared/git/000056](specs/style/shared/git/000056_ui-kit-flow.md): ui-kit changes go to ui-kit development first
+- [S/shared/git/000436](specs/style/shared/git/000436_release-flow.md): A release goes from development to main by pull request
+- [S/shared/git/000053](specs/style/shared/git/000053_release-tags.md): Only the owner tags a release
+- [S/shared/git/000057](specs/style/shared/git/000057_release-notes.md): Release notes list migrations and steps
+- [S/shared/git/000434](specs/style/shared/git/000434_environments.md): Dev follows development, production follows tags
+- [S/shared/git/000390](specs/style/shared/git/000390_typst-pin.md): The typst version is pinned in two places
+- [S/backend/database/000068](specs/style/backend/database/000068_hash-revision.md): A migration has a hash ID
+- [S/backend/database/000069](specs/style/backend/database/000069_one-head.md): Alembic has one head
+- [S/backend/database/000071](specs/style/backend/database/000071_data-revision.md): A data change has its own revision
 
 ## Security (short)
 

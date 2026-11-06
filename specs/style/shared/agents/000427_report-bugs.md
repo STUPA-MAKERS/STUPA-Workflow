@@ -4,12 +4,12 @@ title: Report a possible bug
 kind: style
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - .
 ---
 
 # Report a possible bug
 
-Report everything that can be a bug, and let the owner decide. Check it first. Do not drop a
-borderline finding as intended.
+An agent must report everything that can be a bug, and the owner decides. The agent must check
+it first. It must not drop a borderline finding as intended.

@@ -1,8 +1,8 @@
 """Separate coverage gate for the critical modules.
 
-`auth`, `voting`, `flow`, `budget`, `webhooks` and `audit` must reach 100 % branch
-coverage. This gate is stricter than the overall gate. The overall gate uses
-`--cov-fail-under` at 85 %.
+`auth`, `voting`, `flow`, `budget`, `webhooks`, `audit` and `backup`, `shared/ssrf.py`
+and `worker/backup.py` must reach 100 % branch coverage. This gate is stricter than the
+overall gate, which uses `fail_under` at 97 %.
 
 The script reads `coverage.xml` and the module list from `[tool.coverage_critical]` in
 `pyproject.toml`. Run `coverage xml` first to write the report. A module whose path has

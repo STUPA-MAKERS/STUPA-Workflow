@@ -4,7 +4,7 @@ title: A magic-link request does not reveal accounts
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/auth
   - backend/app/deps.py
@@ -12,5 +12,5 @@ scope:
 
 # A magic-link request does not reveal accounts
 
-A magic-link request always answers 202 with the same body and the same time. The lookup and
-the mail run in the background.
+A magic-link request must always answer 202 with the same body and the same time. The lookup
+and the mail must run in the background.

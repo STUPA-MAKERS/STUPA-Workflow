@@ -4,7 +4,7 @@ title: A form change is versioned and audited
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/forms
   - backend/app/shared/config_schemas.py
@@ -13,4 +13,4 @@ scope:
 
 # A form change is versioned and audited
 
-Every new form version writes a config revision and an audit entry.
+Every new form version must write a config revision and an audit entry.

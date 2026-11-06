@@ -361,7 +361,7 @@ async def test_create_open_vote_422() -> None:
 
 @pytest.mark.parametrize("tie_break", ["passed", "tie"])
 async def test_create_tie_break_other_than_rejected_422(tie_break: str) -> None:
-    """A tie always rejects a motion (§ F/meetings/voting/000026).
+    """A tie always rejects a motion (§F/meetings/voting/000026).
 
     A ``tieBreak`` other than ``rejected`` gives 422 ``tie_break_unavailable``
     before any read.

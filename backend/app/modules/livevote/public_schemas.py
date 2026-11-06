@@ -87,7 +87,7 @@ class PublicMeetingHead(_CamelModel):
 class GuestAgendaItem(_CamelModel):
     """One agenda item in the guest view.
 
-    A non-public item keeps its title (decision 2026-10-06) but never its text.
+    A non-public item keeps its title but never its text.
     """
 
     id: UUID

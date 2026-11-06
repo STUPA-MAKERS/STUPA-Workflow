@@ -4,13 +4,13 @@ title: A table in card mode keeps its controls in the card head
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - frontend/src/app/
-  - ui-kit
+  - frontend/vendor/ui-kit
 ---
 
 # A table in card mode keeps its controls in the card head
 
-In card mode, the checkbox and the ⋮ menu are in the card head. A selection highlights the
-whole card.
+In card mode, the checkbox and the ⋮ menu must be in the card head. A selection must highlight
+the whole card.

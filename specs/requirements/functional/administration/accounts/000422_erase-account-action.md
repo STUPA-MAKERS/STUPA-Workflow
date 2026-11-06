@@ -2,9 +2,10 @@
 id: "000422"
 title: An account can be erased from the user list
 kind: functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
+replaced_by: F/administration/admin/000166
 scope:
   - frontend/src/app/pages/admin
 ---

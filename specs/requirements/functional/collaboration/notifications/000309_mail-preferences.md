@@ -4,7 +4,7 @@ title: A person controls their mail kinds
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/notifications
   - backend/worker/mail.py
@@ -13,5 +13,5 @@ scope:
 
 # A person controls their mail kinds
 
-Each person can switch each mail kind on or off. The magic-link mail cannot be switched off.
-A mail to an address without an account is never filtered.
+Each person must be able to switch each mail kind on or off. The magic-link mail must not be
+switchable. A mail to an address without an account must never be filtered.

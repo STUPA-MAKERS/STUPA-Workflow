@@ -4,12 +4,12 @@ title: A tooltip shows only for cut text
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - frontend/src/app/
-  - ui-kit
+  - frontend/vendor/ui-kit
 ---
 
 # A tooltip shows only for cut text
 
-A row whose text is fully visible has no title tooltip.
+A row whose text is fully visible must not have a title tooltip.

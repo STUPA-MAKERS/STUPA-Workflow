@@ -4,7 +4,7 @@ title: A TOP text is editable until the protocol is final
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/livevote
   - frontend/src/app/features/meetings
@@ -13,5 +13,5 @@ scope:
 
 # A TOP text is editable until the protocol is final
 
-The protokollant can edit a TOP text while the meeting is live or closed and the protocol is
-a draft.
+The protokollant must be able to edit a TOP text while the meeting is live or closed and the
+protocol is a draft.

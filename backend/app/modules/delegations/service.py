@@ -8,7 +8,7 @@ transfer is exclusive and never a duplicate.
 The server enforces these invariants:
 
 * Feature gate. A meeting delegation, with or without the vote, needs the
-  gremium flag `allow_vote_delegation` (§ F/meetings/delegations/000110). No
+  gremium flag `allow_vote_delegation` (§F/meetings/delegations/000110). No
   server setting switches the vote transfer.
 * Own vote only. The delegator must be a voting member of the meeting gremium.
   The right comes only from an active gremium membership whose gremium role

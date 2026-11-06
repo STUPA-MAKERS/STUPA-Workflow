@@ -4,7 +4,7 @@ title: A webhook can be deleted
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/webhooks
   - backend/app/modules/admin
@@ -13,4 +13,4 @@ scope:
 
 # A webhook can be deleted
 
-A holder of `webhook.manage` can delete a webhook. Its deliveries go with it.
+A holder of `webhook.manage` must be able to delete a webhook. Its deliveries must go with it.

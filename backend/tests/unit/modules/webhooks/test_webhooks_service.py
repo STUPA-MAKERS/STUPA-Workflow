@@ -204,7 +204,7 @@ async def test_deliver_4xx_is_dead_no_retry() -> None:
 async def test_deliver_3xx_is_dead_no_retry(status: int) -> None:
     """The client follows no redirect, so a retry cannot change a 3xx.
 
-    § F/integrations/webhooks/000298
+    §F/integrations/webhooks/000298
     """
     hook = _hook(url="https://hook.test/h")
     respx.post(_IP_URL).mock(

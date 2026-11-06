@@ -4,11 +4,11 @@ title: Memberships and roles are read-only in the MCP
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - mcp/
 ---
 
 # Memberships and roles are read-only in the MCP
 
-No MCP tool writes a membership or a role assignment. They come from the IdP.
+No MCP tool must write a membership or a role assignment. They come from the IdP.

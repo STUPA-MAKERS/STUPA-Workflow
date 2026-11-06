@@ -2,9 +2,10 @@
 id: "000066"
 title: Public endpoints are a fixed list
 kind: style
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
+replaced_by: NF/security/access/000179
 scope:
   - backend/app/
 ---

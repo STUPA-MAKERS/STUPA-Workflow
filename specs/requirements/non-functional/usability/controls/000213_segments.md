@@ -4,12 +4,12 @@ title: Segments have equal width
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - frontend/src/app/
-  - ui-kit
+  - frontend/vendor/ui-kit
 ---
 
 # Segments have equal width
 
-A segmented control has segments of equal width that fill the control.
+The segments of a segmented control must have equal width and must fill the control.

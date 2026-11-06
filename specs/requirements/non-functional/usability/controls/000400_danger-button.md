@@ -4,12 +4,12 @@ title: A destructive action is an outlined red button
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - frontend/src/app/
-  - ui-kit
+  - frontend/vendor/ui-kit
 ---
 
 # A destructive action is an outlined red button
 
-A destructive action uses the outlined red button (`variant="danger"`).
+A destructive action must use the outlined red button (`variant="danger"`).

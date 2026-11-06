@@ -571,7 +571,7 @@ def test_ballot_body_takes_a_list(routes: tuple[FastAPI, _Pub]) -> None:
 
 
 def test_runoff_route_is_gone(routes: tuple[FastAPI, _Pub]) -> None:
-    """There is no runoff: a tie in an election is decided by lot (§ F/meetings/voting/000027)."""
+    """There is no runoff: a tie in an election is decided by lot (§F/meetings/voting/000027)."""
     app, _ = routes
     _login(app, _MANAGER)
     r = TestClient(app).post(f"/api/votes/{uuid4()}/runoff")

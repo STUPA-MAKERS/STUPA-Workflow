@@ -4,7 +4,7 @@ title: Roster names are visible only to the Gremium
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/delegations
 ---
@@ -12,4 +12,4 @@ scope:
 # Roster names are visible only to the Gremium
 
 Only an admin, `admin.delegations`, `meeting.view_all`, members, pool members and
-`session.manage` of the Gremium see the roster and pool names.
+`session.manage` of the Gremium must see the roster and pool names.

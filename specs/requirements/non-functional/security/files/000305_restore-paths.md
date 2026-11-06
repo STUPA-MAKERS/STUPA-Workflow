@@ -4,7 +4,7 @@ title: A restore writes only inside the bucket
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/backup
   - backend/worker/backup.py
@@ -12,4 +12,4 @@ scope:
 
 # A restore writes only inside the bucket
 
-A restore skips an object key that is absolute, empty or contains a path traversal.
+A restore must skip an object key that is absolute, empty or contains a path traversal.

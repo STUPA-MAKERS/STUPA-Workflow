@@ -4,7 +4,7 @@ title: A transition fires only from the current state
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/flow
   - backend/app/shared/guards.py
@@ -13,5 +13,5 @@ scope:
 
 # A transition fires only from the current state
 
-A transition changes the state only if the Antrag is still in its source state. A concurrent
-change gives 409.
+A transition must change the state only if the Antrag is still in its source state. A
+concurrent change must give 409.

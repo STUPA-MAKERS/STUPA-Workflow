@@ -4,12 +4,12 @@ title: An invoice is a document with many bookings
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/budget
 ---
 
 # An invoice is a document with many bookings
 
-One invoice can have many bookings. The delete of an invoice keeps its bookings and removes
-the link.
+One invoice can have many bookings. The delete of an invoice must keep its bookings and must
+remove the link.

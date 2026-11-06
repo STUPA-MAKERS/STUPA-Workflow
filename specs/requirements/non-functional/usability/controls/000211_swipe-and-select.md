@@ -4,10 +4,10 @@ title: A swipe never deletes
 kind: non-functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - frontend/src/app/
-  - ui-kit
+  - frontend/vendor/ui-kit
 ---
 
 # A swipe never deletes

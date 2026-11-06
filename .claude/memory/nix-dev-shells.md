@@ -9,4 +9,4 @@ metadata:
 The rules are specs in `specs/` of the STUPA-Workflow repository. Read the spec, not this
 file:
 
-- `S/backend/python/000067` Commands run in the Nix dev shell
+- `S/shared/tooling/000067` Commands run in the Nix dev shell

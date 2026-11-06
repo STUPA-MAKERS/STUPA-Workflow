@@ -1,14 +1,14 @@
 ---
 id: "000153"
-title: Mail templates are sandboxed
+title: Mail placeholders use camelCase
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/notifications
 ---
 
-# Mail templates are sandboxed
+# Mail placeholders use camelCase
 
-Mail templates render in the sandboxed Jinja2 environment with camelCase placeholders.
+A placeholder in a mail template must use camelCase. 000184 holds the sandbox rule.

@@ -4,7 +4,7 @@ title: Only the vote result fires a vote branch
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-05
+updated: 2026-11-06
 scope:
   - backend/app/modules/flow
   - backend/app/shared/guards.py
@@ -14,7 +14,7 @@ scope:
 
 # Only the vote result fires a vote branch
 
-A transition with the branch `pass` or `fail` fires only from the result of a vote. A manual
-fire of a branch transition or of an automatic transition gives 409.
+A transition with the branch `pass` or `fail` must fire only from the result of a vote. A
+manual fire of a branch transition or of an automatic transition must give 409.
 
 Reason: Nobody can set a vote result by hand.
