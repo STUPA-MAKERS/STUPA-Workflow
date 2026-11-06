@@ -116,9 +116,7 @@ class PollIn(FrozenStrictCamelModel, frozen=True):
     """The options of a poll as the creator types them (create and edit)."""
 
     mode: PollMode
-    options: tuple[PollOptionIn, ...] = Field(
-        min_length=POLL_MIN_OPTIONS, max_length=POLL_MAX_OPTIONS
-    )
+    options: list[PollOptionIn] = Field(min_length=POLL_MIN_OPTIONS, max_length=POLL_MAX_OPTIONS)
     max_choices: int | None = Field(default=None, alias="maxChoices", ge=1)
 
     def config(self, *, secret: bool, guests_vote: bool = False) -> PollConfig:
@@ -177,7 +175,7 @@ class PollPatch(FrozenStrictCamelModel, frozen=True):
     """
 
     question: str | None = Field(default=None, min_length=1, max_length=2000)
-    options: tuple[PollOptionIn, ...] | None = Field(
+    options: list[PollOptionIn] | None = Field(
         default=None, min_length=POLL_MIN_OPTIONS, max_length=POLL_MAX_OPTIONS
     )
     max_choices: int | None = Field(default=None, alias="maxChoices", ge=1)
