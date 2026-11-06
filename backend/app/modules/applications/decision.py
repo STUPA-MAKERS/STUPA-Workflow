@@ -101,8 +101,9 @@ def _amount_problem(code: str, msg: str) -> ValidationProblem:
 def check_approved_amount(requested: Decimal | None, approved: Decimal | None) -> None:
     """Check the approved amount against the requested amount (pure).
 
-    None ("as requested") always passes. Otherwise the amount must be greater than 0,
-    have at most two decimals and an application amount must exist.
+    None ("as requested") always passes. Otherwise the amount must be at least 0, have
+    at most two decimals and an application amount must exist. A 0 € approval is valid
+    and binds nothing in the budget (§F/finance/budget/000253).
 
     Raises:
         ValidationProblem: `approved_amount_invalid` for a bad amount or an application
@@ -112,14 +113,14 @@ def check_approved_amount(requested: Decimal | None, approved: Decimal | None) -
     if approved is None:
         return
     if (
-        approved <= 0
+        approved < 0
         or approved > MAX_AMOUNT
         or approved != approved.quantize(_CENT)
         or requested is None
     ):
         raise _amount_problem(
             CODE_AMOUNT_INVALID,
-            "The approved amount must be greater than 0 and the application needs an amount.",
+            "The approved amount must be at least 0 and the application needs an amount.",
         )
     if approved > requested:
         raise _amount_problem(
