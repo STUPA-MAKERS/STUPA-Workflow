@@ -12,7 +12,7 @@ import { AuthService } from '@core/auth/auth.service';
  * to-dos. It injects its services, so it runs in an injection context, as the `reads` of
  * `prefetchDetails` do.
  */
-export function applicationReads(id: Uuid): Observable<unknown>[] {
+export function applicationReads(id: Uuid): readonly Observable<unknown>[] {
   const api = inject(ApiClient);
   const todos = inject(TodosApiService);
   return [

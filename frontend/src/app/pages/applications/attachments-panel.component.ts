@@ -41,6 +41,7 @@ import {
   isThumbImage,
 } from '@shared/ui/image-thumb/image-thumb.component';
 import { chatFileUrl } from '@shared/ui/chat/chat.util';
+import { withEntry } from '@shared/util/immutable';
 import { formatBytes } from './applications.util';
 
 /**
@@ -125,7 +126,7 @@ export class AttachmentsPanelComponent {
   /** The inline URLs the viewer fetched since it opened, by attachment. */
   private readonly previewUrls = signal<ReadonlyMap<Uuid, string>>(new Map());
   /** The URL requests in flight while the viewer moves. */
-  private readonly fetching = new Set<Uuid>();
+  private fetching: ReadonlySet<Uuid> = new Set<Uuid>();
   /** False on a coarse pointer: there a PDF goes to the system viewer, not into the frame. */
   private readonly pdfInViewer = signal(true);
   /** The files the viewer steps through, in the order of the list. */
@@ -220,7 +221,6 @@ export class AttachmentsPanelComponent {
     if (!this.canUpload() || this.uploading() || !files.length) return;
     this.uploading.set(true);
     let ok = 0;
-    let failedStatus: number | undefined;
     from(files)
       .pipe(concatMap((file) => this.api.uploadAttachment(this.applicationId(), file)))
       .subscribe({
@@ -229,10 +229,9 @@ export class AttachmentsPanelComponent {
           this.attachments.update((list) => [...list, att]);
         },
         error: (err: { status?: number }) => {
-          failedStatus = err.status;
           this.uploading.set(false);
           if (ok > 0) this.toast.success(this.i18n.translate('applications.attachments.added'));
-          this.toast.error(this.i18n.translate(this.uploadErrorKey(failedStatus)));
+          this.toast.error(this.i18n.translate(this.uploadErrorKey(err.status)));
         },
         complete: () => {
           this.uploading.set(false);
@@ -250,12 +249,9 @@ export class AttachmentsPanelComponent {
   }
 
   toggleSelect(id: Uuid, checked: boolean): void {
-    this.selected.update((cur) => {
-      const next = new Set(cur);
-      if (checked) next.add(id);
-      else next.delete(id);
-      return next;
-    });
+    this.selected.update((cur) =>
+      checked ? new Set([...cur, id]) : new Set([...cur].filter((x) => x !== id)),
+    );
   }
 
   /** The trash button of a row: ask before the delete. */
@@ -288,20 +284,17 @@ export class AttachmentsPanelComponent {
     const ids = [...this.selected()];
     if (!this.deleteAllowed() || !ids.length || this.bulkDeleting()) return;
     this.bulkDeleting.set(true);
-    let failed = false;
     from(ids)
       .pipe(concatMap((id) => this.api.deleteAttachment(id)))
       .subscribe({
         next: () => {},
         error: () => {
-          failed = true;
           this.bulkDeleting.set(false);
           this.confirming.set(null);
           this.refreshAfterBulk(ids);
           this.toast.error(this.i18n.translate('applications.attachments.deleteError'));
         },
         complete: () => {
-          if (failed) return;
           this.bulkDeleting.set(false);
           this.confirming.set(null);
           this.refreshAfterBulk(ids);
@@ -403,21 +396,28 @@ export class AttachmentsPanelComponent {
   closePreview(): void {
     this.viewerOpen.set(false);
     this.previewUrls.set(new Map());
-    this.fetching.clear();
+    this.fetching = new Set();
+  }
+
+  /** Ends the fetch of `id`; false when it no longer runs (the viewer closed meanwhile). */
+  private settle(id: Uuid): boolean {
+    const running = this.fetching.has(id);
+    this.fetching = new Set([...this.fetching].filter((x) => x !== id));
+    return running;
   }
 
   /** A failed request closes the viewer with the toast of a failed download. */
   private fetchViewerUrl(): void {
     const att = this.viewerFile();
     if (!att || this.previewUrls().has(att.id) || this.fetching.has(att.id)) return;
-    this.fetching.add(att.id);
+    this.fetching = new Set([...this.fetching, att.id]);
     this.api.attachmentUrl(att.id).subscribe({
       next: (signed) => {
-        if (!this.fetching.delete(att.id)) return;
-        this.previewUrls.update((urls) => new Map(urls).set(att.id, inlineUrl(signed.url)));
+        if (!this.settle(att.id)) return;
+        this.previewUrls.update((urls) => withEntry(urls, att.id, inlineUrl(signed.url)));
       },
       error: (err: { status?: number }) => {
-        if (!this.fetching.delete(att.id)) return;
+        if (!this.settle(att.id)) return;
         this.closePreview();
         this.urlFailed(att, err.status);
       },
