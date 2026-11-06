@@ -60,8 +60,8 @@ import {
 
 /** Dialog state of the create/edit form. */
 interface VariantForm {
-  key: string;
-  name: string;
+  readonly key: string;
+  readonly name: string;
 }
 
 /**
@@ -69,13 +69,13 @@ interface VariantForm {
  * dialog also holds an object URL of the file (the preview) and its pixel size.
  */
 interface LogoDraft {
-  variantId: Uuid;
-  variantName: string;
-  slot: CdLogoSlot;
-  file: File | null;
-  previewUrl: string | null;
-  size: ImageSize | null;
-  checking: boolean;
+  readonly variantId: Uuid;
+  readonly variantName: string;
+  readonly slot: CdLogoSlot;
+  readonly file: File | null;
+  readonly previewUrl: string | null;
+  readonly size: ImageSize | null;
+  readonly checking: boolean;
 }
 
 /** Message per server error code of a square upload (`check_square_logo`). */

@@ -2,14 +2,14 @@ import type { TranslationKey } from '@core/i18n/translations';
 
 /** A section of the permission list of a global role. */
 export interface PermissionSection {
-  key: 'applications' | 'budget' | 'meetings' | 'admin' | 'security' | 'other';
-  title: TranslationKey;
+  readonly key: 'applications' | 'budget' | 'meetings' | 'admin' | 'security' | 'other';
+  readonly title: TranslationKey;
   /** The permission keys of the section, in the order of the catalogue. */
-  keys: string[];
+  readonly keys: readonly string[];
 }
 
 /** The sections in display order, each with the key prefixes it takes. */
-const SECTIONS: readonly { key: PermissionSection['key']; title: TranslationKey; prefixes: readonly string[] }[] = [
+const SECTIONS: readonly { readonly key: PermissionSection['key']; readonly title: TranslationKey; readonly prefixes: readonly string[] }[] = [
   { key: 'applications', title: 'admin.roles.section.applications', prefixes: ['application.'] },
   { key: 'budget', title: 'admin.roles.section.budget', prefixes: ['budget.'] },
   { key: 'meetings', title: 'admin.roles.section.meetings', prefixes: ['meeting.', 'gremium.', 'vote.', 'protocol.', 'session.'] },
@@ -25,12 +25,18 @@ const SECTIONS: readonly { key: PermissionSection['key']; title: TranslationKey;
  * with an unknown prefix goes into "Weitere", so no key is ever lost. Empty sections
  * are left out.
  */
-export function permissionSections(catalogue: readonly string[]): PermissionSection[] {
-  const out: PermissionSection[] = SECTIONS.map((s) => ({ key: s.key, title: s.title, keys: [] }));
-  const other: PermissionSection = { key: 'other', title: 'admin.roles.section.other', keys: [] };
-  for (const perm of catalogue) {
-    const index = SECTIONS.findIndex((s) => s.prefixes.some((p) => perm.startsWith(p)));
-    (index >= 0 ? out[index] : other).keys.push(perm);
-  }
-  return [...out, other].filter((s) => s.keys.length > 0);
+export function permissionSections(catalogue: readonly string[]): readonly PermissionSection[] {
+  const sectionOf = (perm: string): number =>
+    SECTIONS.findIndex((s) => s.prefixes.some((p) => perm.startsWith(p)));
+  const known = SECTIONS.map((s, index) => ({
+    key: s.key,
+    title: s.title,
+    keys: catalogue.filter((perm) => sectionOf(perm) === index),
+  }));
+  const other: PermissionSection = {
+    key: 'other',
+    title: 'admin.roles.section.other',
+    keys: catalogue.filter((perm) => sectionOf(perm) < 0),
+  };
+  return [...known, other].filter((s) => s.keys.length > 0);
 }

@@ -21,42 +21,36 @@ import type { GuardGroup, Point } from './flow-editor.models';
  * The function skips branch transitions, the pass and fail edges of a vote state. They
  * have their own dots and no guard priority.
  */
-export function groupsOf(transitions: readonly TransitionDef[], fromKey: string): GuardGroup[] {
-  const bySig = new Map<string, GuardGroup>();
-  const order: GuardGroup[] = [];
-  transitions.forEach((t, index) => {
-    if (t.from !== fromKey || t.branch) return;
-    const sig = t.guard ? JSON.stringify(t.guard) : '';
-    let g = bySig.get(sig);
-    if (!g) {
-      g = {
-        sig,
-        guard: t.guard ?? null,
-        op: t.guard ? Object.keys(t.guard)[0] : '',
-        value: t.guard ? String(Object.values(t.guard)[0] ?? '') : '',
-        indices: [],
-      };
-      bySig.set(sig, g);
-      order.push(g);
-    }
-    g.indices.push(index);
+export function groupsOf(transitions: readonly TransitionDef[], fromKey: string): readonly GuardGroup[] {
+  const sigOf = (t: TransitionDef): string => (t.guard ? JSON.stringify(t.guard) : '');
+  const own = transitions
+    .map((t, index) => ({ t, index, sig: sigOf(t) }))
+    .filter(({ t }) => t.from === fromKey && !t.branch);
+  return [...new Set(own.map((x) => x.sig))].map((sig) => {
+    const members = own.filter((x) => x.sig === sig);
+    const { guard } = members[0].t;
+    return {
+      sig,
+      guard: guard ?? null,
+      op: guard ? Object.keys(guard)[0] : '',
+      value: guard ? String(Object.values(guard)[0] ?? '') : '',
+      indices: members.map((x) => x.index),
+    };
   });
-  return order;
 }
 
 /**
  * Connector dots of a normal node: one dot per guard group. The function adds a
  * default catch-all dot for new guard-less edges when no such group exists.
  */
-export function outDots(fromKey: string, transitions: readonly TransitionDef[]): GuardGroup[] {
+export function outDots(fromKey: string, transitions: readonly TransitionDef[]): readonly GuardGroup[] {
   const groups = groupsOf(transitions, fromKey);
-  if (!groups.some((g) => g.sig === '')) {
-    groups.push({ sig: '', guard: null, op: '', value: '', indices: [] });
-  }
-  return groups;
+  return groups.some((g) => g.sig === '')
+    ? groups
+    : [...groups, { sig: '', guard: null, op: '', value: '', indices: [] }];
 }
 
-function branchDotsFor(kind: string | null | undefined): string[] {
+function branchDotsFor(kind: string | null | undefined): readonly string[] {
   return kind === 'vote' ? ['pass', 'fail'] : [];
 }
 
@@ -69,7 +63,7 @@ export function sortedBranchDots(
   kind: string | null | undefined,
   transitions: readonly TransitionDef[],
   pos: Record<string, Point>,
-): string[] {
+): readonly string[] {
   const branches = branchDotsFor(kind);
   if (branches.length < 2) return branches;
   const avgTargetY = (branch: string): number | null => {
@@ -100,7 +94,7 @@ export function guardBoolOf(t: TransitionDef): boolean {
   return !!(t.guard && Object.values(t.guard)[0] === true);
 }
 
-export function compareSpecOf(t: TransitionDef): { field: string; op: string; value: unknown } {
+export function compareSpecOf(t: TransitionDef): { readonly field: string; readonly op: string; readonly value: unknown } {
   const c = t.guard?.['compare'];
   return typeof c === 'object' && c !== null
     ? (c as { field: string; op: string; value: unknown })
@@ -131,7 +125,7 @@ export function guardValueKind(op: string): 'none' | 'role' | 'committee' | 'com
   return 'text';
 }
 
-export function recipientsOf(act: ActionDef): NotifyRecipient[] {
+export function recipientsOf(act: ActionDef): readonly NotifyRecipient[] {
   return Array.isArray(act['recipients']) ? (act['recipients'] as NotifyRecipient[]) : [];
 }
 

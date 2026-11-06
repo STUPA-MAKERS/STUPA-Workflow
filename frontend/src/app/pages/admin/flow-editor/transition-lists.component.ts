@@ -23,7 +23,7 @@ export class TransitionListsComponent {
 
   /** The two lists with their headings, incoming first. */
   protected readonly columns = computed<
-    { key: string; title: TranslationKey; rows: TransitionListRow[] }[]
+    readonly { readonly key: string; readonly title: TranslationKey; readonly rows: readonly TransitionListRow[] }[]
   >(() => [
     { key: 'in', title: 'admin.flow.list.incoming', rows: this.lists().incoming },
     { key: 'out', title: 'admin.flow.list.outgoing', rows: this.lists().outgoing },

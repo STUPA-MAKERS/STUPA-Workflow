@@ -6,14 +6,14 @@ import type { FlowGraph, FlowGroup } from '../admin.models';
 import type { EdgeEnds, EndRef } from './flow-editor.models';
 
 /** Resolution of a state on a level: directly visible, inside a sub-group box, or external. */
-export type LevelRef = { kind: 'state' } | { kind: 'group'; id: string } | null;
+export type LevelRef = { readonly kind: 'state' } | { readonly kind: 'group'; readonly id: string } | null;
 
-export function buildGroupById(groups: readonly FlowGroup[]): Map<string, FlowGroup> {
+export function buildGroupById(groups: readonly FlowGroup[]): ReadonlyMap<string, FlowGroup> {
   return new Map(groups.map((g) => [g.id, g]));
 }
 
 /** Parent relation of groups (child id → parent id) derived from `groupIds`. */
-export function buildParentGroupId(groups: readonly FlowGroup[]): Map<string, string> {
+export function buildParentGroupId(groups: readonly FlowGroup[]): ReadonlyMap<string, string> {
   const map = new Map<string, string>();
   for (const g of groups) {
     for (const child of g.groupIds ?? []) map.set(child, g.id);
@@ -22,7 +22,7 @@ export function buildParentGroupId(groups: readonly FlowGroup[]): Map<string, st
 }
 
 /** Direct owner of a state (group id). An absent entry means the top level. */
-export function buildStateOwnerId(groups: readonly FlowGroup[]): Map<string, string> {
+export function buildStateOwnerId(groups: readonly FlowGroup[]): ReadonlyMap<string, string> {
   const map = new Map<string, string>();
   for (const g of groups) {
     for (const k of g.stateKeys) map.set(k, g.id);
@@ -31,7 +31,7 @@ export function buildStateOwnerId(groups: readonly FlowGroup[]): Map<string, str
 }
 
 /** Transitively contained state keys of a group (including sub-groups). */
-export function deepStateKeys(groupById: Map<string, FlowGroup>, groupId: string): string[] {
+export function deepStateKeys(groupById: ReadonlyMap<string, FlowGroup>, groupId: string): readonly string[] {
   const out: string[] = [];
   const seen = new Set<string>();
   const walk = (id: string): void => {
@@ -51,8 +51,8 @@ export function deepStateKeys(groupById: Map<string, FlowGroup>, groupId: string
  * sub-group box ('group'), or outside the level (null → proxy).
  */
 function resolveAt(
-  stateOwnerId: Map<string, string>,
-  parentGroupId: Map<string, string>,
+  stateOwnerId: ReadonlyMap<string, string>,
+  parentGroupId: ReadonlyMap<string, string>,
   stateKey: string,
   ctx: string | null,
 ): LevelRef {
@@ -74,11 +74,11 @@ function resolveAt(
  * of that state on the closest enclosing level: the state itself or its group.
  */
 function proxyRefFor(
-  stateOwnerId: Map<string, string>,
-  parentGroupId: Map<string, string>,
+  stateOwnerId: ReadonlyMap<string, string>,
+  parentGroupId: ReadonlyMap<string, string>,
   stateKey: string,
   currentGroupId: string | null,
-): { pid: string; isGroup: boolean; entityId: string } {
+): { readonly pid: string; readonly isGroup: boolean; readonly entityId: string } {
   let ctx = currentGroupId;
   while (ctx !== null) {
     ctx = parentGroupId.get(ctx) ?? null;
@@ -99,9 +99,9 @@ function proxyRefFor(
 export function computeEdgeEnds(
   graph: FlowGraph,
   ctx: string | null,
-  stateOwnerId: Map<string, string>,
-  parentGroupId: Map<string, string>,
-): (EdgeEnds | null)[] {
+  stateOwnerId: ReadonlyMap<string, string>,
+  parentGroupId: ReadonlyMap<string, string>,
+): readonly (EdgeEnds | null)[] {
   return (graph.transitions ?? []).map((t) => {
     const src = resolveAt(stateOwnerId, parentGroupId, t.from, ctx);
     const dst = resolveAt(stateOwnerId, parentGroupId, t.to, ctx);
@@ -122,10 +122,10 @@ export function computeEdgeEnds(
 
 /** Breadcrumb path: top level … current group. */
 export function breadcrumbPath(
-  groupById: Map<string, FlowGroup>,
-  parentGroupId: Map<string, string>,
+  groupById: ReadonlyMap<string, FlowGroup>,
+  parentGroupId: ReadonlyMap<string, string>,
   currentGroupId: string | null,
-): FlowGroup[] {
+): readonly FlowGroup[] {
   const path: FlowGroup[] = [];
   let id = currentGroupId;
   while (id) {

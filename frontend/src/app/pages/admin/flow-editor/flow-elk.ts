@@ -25,53 +25,53 @@ import type { Point } from './flow-editor.models';
 
 /** A port on the east side of a box: one connector dot. */
 export interface LayoutPort {
-  id: string;
+  readonly id: string;
   /** Y of the dot, from the top of the box. */
-  y: number;
+  readonly y: number;
   /** The text beside the dot (a guard or a branch); empty for none. */
-  label: string;
+  readonly label: string;
 }
 
 /** One box of the level: a state, a group box or a proxy. */
 export interface LayoutBox {
-  id: string;
-  w: number;
-  h: number;
-  ports: LayoutPort[];
+  readonly id: string;
+  readonly w: number;
+  readonly h: number;
+  readonly ports: readonly LayoutPort[];
   /** A proxy of an outside source goes first, of an outside target last. */
-  layer?: 'first' | 'last';
+  readonly layer?: 'first' | 'last';
 }
 
 /** One visible transition: from a port of a box to the west side of a box. */
 export interface LayoutLink {
-  index: number;
-  src: string;
-  port: string;
-  dst: string;
-  label: string;
-  automatic: boolean;
+  readonly index: number;
+  readonly src: string;
+  readonly port: string;
+  readonly dst: string;
+  readonly label: string;
+  readonly automatic: boolean;
 }
 
 /** The input of one level. Two equal inputs give the same layout. */
 export interface LayoutInput {
-  boxes: LayoutBox[];
-  links: LayoutLink[];
+  readonly boxes: readonly LayoutBox[];
+  readonly links: readonly LayoutLink[];
 }
 
 /** The line of one transition. A bundle has the label on its first member only. */
 export interface LayoutRoute {
-  d: string;
+  readonly d: string;
   /** Centre of the label box, or null when the line has no label. */
-  label: { x: number; y: number; text: string } | null;
+  readonly label: { readonly x: number; readonly y: number; readonly text: string } | null;
   /** The transitions of the bundle this line draws (the same for every member). */
-  bundle: number[];
+  readonly bundle: readonly number[];
 }
 
 export interface LevelLayout {
   /** Top-left corner per box id. */
-  pos: Map<string, Point>;
+  readonly pos: ReadonlyMap<string, Point>;
   /** Line per transition index. */
-  routes: Map<number, LayoutRoute>;
+  readonly routes: ReadonlyMap<number, LayoutRoute>;
 }
 
 /** Fonts of the canvas texts (flow-editor.component.scss), for the text widths. */
@@ -103,7 +103,7 @@ function bundleKey(l: LayoutLink): string {
 }
 
 /** The transitions of each bundle, in the order of their first member. */
-export function bundles(links: readonly LayoutLink[]): LayoutLink[][] {
+export function bundles(links: readonly LayoutLink[]): readonly (readonly LayoutLink[])[] {
   const by = new Map<string, LayoutLink[]>();
   for (const l of links) {
     const k = bundleKey(l);

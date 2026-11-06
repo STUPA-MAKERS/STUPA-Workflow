@@ -39,12 +39,12 @@ import { personLabel } from '@shared/person-label.util';
 
 /** One row of the member list. */
 interface Member {
-  id: string;
-  name: string;
-  email: string | null;
-  role: string;
+  readonly id: string;
+  readonly name: string;
+  readonly email: string | null;
+  readonly role: string;
   /** Sort rank of the role: board and manager first, `member` last. */
-  rank: number;
+  readonly rank: number;
 }
 
 /** The rows the list shows before "Alle n anzeigen". */

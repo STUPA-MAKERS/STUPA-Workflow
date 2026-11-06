@@ -48,10 +48,10 @@ function deleteErrorKey(err: unknown): TranslationKey {
 
 /** One setting of a gremium in the read-out of an open row. */
 interface Setting {
-  label: string;
-  value: string;
+  readonly label: string;
+  readonly value: string;
   /** The value is a list of e-mail addresses: it wraps and never gets cut. */
-  copyable?: boolean;
+  readonly copyable?: boolean;
 }
 
 /**

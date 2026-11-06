@@ -14,22 +14,22 @@ export type AdminGroupKey =
 /** One page of the admin area: an entry of the admin navigation. */
 export interface AdminPage {
   /** The path below `/admin`. */
-  link: string;
-  title: TranslationKey;
+  readonly link: string;
+  readonly title: TranslationKey;
   /** One functional line under the title (the home page and the settings search). */
-  desc: TranslationKey;
-  icon: IconName;
-  group: AdminGroupKey;
+  readonly desc: TranslationKey;
+  readonly icon: IconName;
+  readonly group: AdminGroupKey;
   /**
    * Visible when the principal holds at least ONE of these permissions. The list is the
    * same as the gate of the route in `app.routes.ts`, so an entry never leads to the
    * 403 page. This is UX only; the server stays authoritative.
    */
-  permissions: readonly string[];
+  readonly permissions: readonly string[];
 }
 
 /** The groups of the admin navigation, in order. */
-export const ADMIN_GROUPS: readonly { key: AdminGroupKey; title: TranslationKey }[] = [
+export const ADMIN_GROUPS: readonly { readonly key: AdminGroupKey; readonly title: TranslationKey }[] = [
   { key: 'people', title: 'admin.nav.group.people' },
   { key: 'gremien', title: 'admin.nav.group.gremien' },
   { key: 'applications', title: 'admin.nav.group.applications' },

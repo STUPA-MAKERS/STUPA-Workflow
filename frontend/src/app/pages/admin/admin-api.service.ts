@@ -120,6 +120,7 @@ import {
   MOCK_SITE_REVISIONS,
   MOCK_WEBHOOK_STATUS,
   MOCK_WEBHOOKS,
+  type MockRow,
 } from './admin.mock';
 
 /** Backend JSON-schema export (`export_json_schemas`). */
@@ -127,19 +128,19 @@ export type ConfigSchemas = Record<string, Record<string, unknown>>;
 
 /** Application type as a selection source (id + display name). */
 export interface ApplicationTypeOption {
-  id: Uuid;
-  name: string;
+  readonly id: Uuid;
+  readonly name: string;
 }
 
 /** Raw shape of `GET /admin/application-types` (`ApplicationTypeOut`). */
 interface ApplicationTypeOutWire {
-  id: Uuid;
-  nameI18n?: Record<string, string> | null;
-  gremiumId?: Uuid | null;
-  hasBudget?: boolean;
-  retentionMonths?: number | null;
-  activeFormVersionId?: Uuid | null;
-  activeFormVersion?: number | null;
+  readonly id: Uuid;
+  readonly nameI18n?: Record<string, string> | null;
+  readonly gremiumId?: Uuid | null;
+  readonly hasBudget?: boolean;
+  readonly retentionMonths?: number | null;
+  readonly activeFormVersionId?: Uuid | null;
+  readonly activeFormVersion?: number | null;
 }
 
 /**
@@ -157,7 +158,7 @@ export class AdminApiService {
    */
   private readonly i18n = inject(I18nService);
 
-  private readonly store = {
+  private readonly store = mockTable({
     gremien: structuredCopy(MOCK_GREMIEN),
     appTypes: structuredCopy(MOCK_APP_TYPES),
     formDrafts: structuredCopy(MOCK_FORM_DRAFTS) as Record<string, FormDraft>,
@@ -189,7 +190,7 @@ export class AdminApiService {
       version: 1,
       branding: structuredCopy(MOCK_BRANDING),
     },
-  };
+  });
 
   configSchemas(): Observable<ConfigSchemas> {
     if (this.mock) return of(MOCK_CONFIG_SCHEMAS);
@@ -229,11 +230,11 @@ export class AdminApiService {
   createGremium(body: GremiumCreateBody): Observable<Gremium> {
     if (this.mock) {
       const created: Gremium = { id: `g-${this.store.gremien.length + 1}`, allowVoteDelegation: false, ...body };
-      this.store.gremien.push(created);
+      this.store.gremien.push(mockRow(created));
       this.store.gremiumRoles = [
         ...this.store.gremiumRoles,
         ...MOCK_GREMIUM_ROLES.filter((r) => r.gremiumId === MOCK_GREMIUM_STUPA_ID && r.forced).map((r) => ({
-          ...structuredCopy(r),
+          ...mockTable(r),
           id: `${created.id}-${r.key}`,
           gremiumId: created.id,
         })),
@@ -278,10 +279,13 @@ export class AdminApiService {
   }
 
   /** PUT /admin/gremien/{id}/mail-recipients — replace extra recipients (idempotent). */
-  setGremiumMailRecipients(id: Uuid, recipients: string[]): Observable<{ recipients: string[] }> {
+  setGremiumMailRecipients(
+    id: Uuid,
+    recipients: readonly string[],
+  ): Observable<{ recipients: string[] }> {
     if (this.mock) {
       this.store.mailRecipients[id] = [...recipients];
-      return of({ recipients });
+      return of({ recipients: [...recipients] });
     }
     return this.http.put<{ recipients: string[] }>(
       `${this.base}/admin/gremien/${id}/mail-recipients`,
@@ -357,7 +361,7 @@ export class AdminApiService {
    * dropdown. `admin.gremien` is enough for it, `admin.cd_variants` is not needed.
    */
   listCdVariantOptions(): Observable<CdVariantOption[]> {
-    if (this.mock) return of(structuredCopy(MOCK_CD_VARIANT_OPTIONS));
+    if (this.mock) return of(mockTable(MOCK_CD_VARIANT_OPTIONS));
     return this.http.get<CdVariantOption[]>(`${this.base}/cd-variants`, {
       context: skipLoading(),
     });
@@ -444,8 +448,9 @@ export class AdminApiService {
     body: Partial<GremiumRoleMappingBody>,
   ): Observable<GremiumRoleMapping> {
     if (this.mock) {
-      const patch: Partial<GremiumRoleMapping> = { ...body };
-      if (body.gremiumRoleId) patch.gremiumId = this.mockRoleGremium(body.gremiumRoleId);
+      const patch: Partial<GremiumRoleMapping> = body.gremiumRoleId
+        ? { ...body, gremiumId: this.mockRoleGremium(body.gremiumRoleId) }
+        : { ...body };
       return mockPatch(this.store.roleMappings, id, patch);
     }
     return this.http.patch<GremiumRoleMapping>(
@@ -525,7 +530,7 @@ export class AdminApiService {
    * which keeps the map and resolves it client-side, and needs no `lang`.
    */
   listApplicationTypes(): Observable<ApplicationTypeOption[]> {
-    if (this.mock) return of(structuredCopy(MOCK_APP_TYPE_OPTIONS));
+    if (this.mock) return of(mockTable(MOCK_APP_TYPE_OPTIONS));
     const params = new HttpParams().set('lang', this.i18n.uiLocale());
     return this.http
       .get<{ items: ApplicationTypeOption[] }>(`${this.base}/application-types`, { params })
@@ -539,7 +544,7 @@ export class AdminApiService {
    * mapped instead of cast; after a raw cast the table shows an empty name and `status.undefined`.
    */
   listForms(): Observable<FormOverviewItem[]> {
-    if (this.mock) return of(structuredCopy(MOCK_FORMS));
+    if (this.mock) return of(mockTable(MOCK_FORMS));
     return this.http
       .get<ApplicationTypeOutWire[]>(`${this.base}/admin/application-types`)
       .pipe(
@@ -584,7 +589,7 @@ export class AdminApiService {
         label: { ...body.label },
         permissions: [...(body.permissions ?? [])],
       };
-      this.store.roles.push(role);
+      this.store.roles.push(mockRow(role));
       return of(structuredCopy(role));
     }
     return this.http.post<Role>(`${this.base}/admin/roles`, body);
@@ -889,7 +894,7 @@ export class AdminApiService {
         version: (this.store.formDrafts[typeId]?.version ?? 0) + 1,
         active: true,
         description: description ?? null,
-        fields: structuredCopy(fields),
+        fields: mockTable(fields),
       };
       const t = this.store.appTypes.find((x) => x.id === typeId);
       if (t) t.activeFormVersionId = id;
@@ -925,7 +930,7 @@ export class AdminApiService {
   /** Create the global flow as a new version. */
   createGlobalFlowVersion(graph: FlowGraph): Observable<{ id: Uuid }> {
     if (this.mock) {
-      this.store.flow = structuredCopy(graph);
+      this.store.flow = mockTable(graph);
       return of({ id: `gflow-${graph.states.length}` });
     }
     return this.http.post<{ id: Uuid }>(`${this.base}/admin/flow-versions/global`, { graph });
@@ -955,7 +960,7 @@ export class AdminApiService {
   /** Latest delivery state per webhook. Needs P(`webhook.manage`). The overlay stays
    *  off, because the call only decorates the list. */
   listWebhookDeliveryStatus(): Observable<WebhookDeliveryStatus[]> {
-    if (this.mock) return of(structuredCopy(MOCK_WEBHOOK_STATUS));
+    if (this.mock) return of(mockTable(MOCK_WEBHOOK_STATUS));
     return this.http.get<WebhookDeliveryStatus[]>(
       `${this.base}/admin/webhooks/delivery-status`,
       { context: skipLoading() },
@@ -1066,7 +1071,7 @@ export class AdminApiService {
 
   /** Distinct audit-log actors (for the actor filter). */
   listAuditActors(): Observable<AuditActor[]> {
-    if (this.mock) return of(structuredCopy(MOCK_AUDIT_ACTORS));
+    if (this.mock) return of(mockTable(MOCK_AUDIT_ACTORS));
     return this.http.get<AuditActor[]>(`${this.base}/admin/audit/actors`);
   }
 
@@ -1507,7 +1512,7 @@ export class AdminApiService {
   /** Save the branding as the new active version — PUT /admin/site-config. */
   saveSiteConfig(branding: Branding): Observable<SiteConfig> {
     if (this.mock) {
-      this.store.site.branding = structuredCopy(branding);
+      this.store.site.branding = mockTable(branding);
       this.store.site.version += 1;
       return of(structuredCopy(this.store.site));
     }
@@ -1530,14 +1535,14 @@ export class AdminApiService {
 let mockSeq = 0;
 
 /** Mock store: add a row with a fresh id. */
-function mockInsert<T extends { id: Uuid }>(rows: T[], prefix: string, body: Omit<T, 'id'>): Observable<T> {
+function mockInsert<T extends { readonly id: Uuid }>(rows: T[], prefix: string, body: Omit<T, 'id'>): Observable<T> {
   const row = { ...body, id: `${prefix}-new-${++mockSeq}` } as T;
   rows.push(row);
   return of(structuredCopy(row));
 }
 
 /** Mock store: change one row. An unknown id answers 404 like the backend. */
-function mockPatch<T extends { id: Uuid }>(rows: T[], id: Uuid, patch: Partial<NoInfer<T>>): Observable<T> {
+function mockPatch<T extends { readonly id: Uuid }>(rows: T[], id: Uuid, patch: Partial<NoInfer<T>>): Observable<T> {
   const row = rows.find((r) => r.id === id);
   if (!row) return throwError(() => ({ status: 404 }));
   Object.assign(row, patch);
@@ -1545,10 +1550,20 @@ function mockPatch<T extends { id: Uuid }>(rows: T[], id: Uuid, patch: Partial<N
 }
 
 /** Mock store: remove one row. An unknown id is a no-op. */
-function mockRemove<T extends { id: Uuid }>(rows: T[], id: Uuid): Observable<void> {
+function mockRemove<T extends { readonly id: Uuid }>(rows: T[], id: Uuid): Observable<void> {
   const i = rows.findIndex((r) => r.id === id);
   if (i >= 0) rows.splice(i, 1);
   return of(void 0);
+}
+
+/** Types a value as a mock-store row. It copies nothing. */
+function mockRow<T>(value: T): MockRow<T> {
+  return value as MockRow<T>;
+}
+
+/** A deep copy of `value` for the mock store, whose rows can change. */
+function mockTable<T>(value: T): MockRow<T> {
+  return mockRow(structuredCopy(value));
 }
 
 function structuredCopy<T>(value: T): T {
@@ -1559,7 +1574,7 @@ function structuredCopy<T>(value: T): T {
  * Agent-token stubs for mock mode, with the real scope keys. The second row has no owner
  * name, so the placeholder is visible without a backend.
  */
-const MOCK_OAUTH_GRANTS: OAuthGrantAdmin[] = [
+const MOCK_OAUTH_GRANTS: readonly OAuthGrantAdmin[] = [
   {
     id: 'grant-1',
     principalId: 'p-1',
@@ -1596,13 +1611,13 @@ const MOCK_OAUTH_GRANTS: OAuthGrantAdmin[] = [
 ];
 
 /** CD-variant stubs for mock mode — the real list comes from the backend. */
-const MOCK_CD_VARIANT_OPTIONS: CdVariantOption[] = [
+const MOCK_CD_VARIANT_OPTIONS: readonly CdVariantOption[] = [
   { id: 'cd-stupa', key: 'stupa', name: 'STUPA' },
   { id: 'cd-asta', key: 'asta', name: 'AStA' },
 ];
 
 /** Application-type stubs for mock mode — real types come from the backend. */
-const MOCK_APP_TYPE_OPTIONS: ApplicationTypeOption[] = [
+const MOCK_APP_TYPE_OPTIONS: readonly ApplicationTypeOption[] = [
   { id: '11111111-1111-1111-1111-111111111111', name: 'Finanzantrag' },
   { id: '22222222-2222-2222-2222-222222222222', name: 'Sonstiger Antrag' },
 ];

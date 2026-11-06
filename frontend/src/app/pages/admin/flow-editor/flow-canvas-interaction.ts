@@ -14,24 +14,24 @@ import type { Point, Selection, ViewRect } from './flow-editor.models';
 import { addTransition } from './flow-graph-ops.util';
 
 export interface TempEdge {
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
+  readonly x1: number;
+  readonly y1: number;
+  readonly x2: number;
+  readonly y2: number;
 }
 
 export interface FlowCanvasHost {
   svg(): SVGSVGElement | undefined;
   graph(): FlowGraph;
   updateGraph(fn: (g: FlowGraph) => FlowGraph): void;
-  nodes(): ReadonlyArray<{ key: string; x: number; y: number; w: number; h: number }>;
+  nodes(): ReadonlyArray<{ readonly key: string; readonly x: number; readonly y: number; readonly w: number; readonly h: number }>;
   contentBounds(): ViewRect;
   openGroup(id: string): void;
-  selection: WritableSignal<Selection>;
-  multiSel: WritableSignal<ReadonlySet<string>>;
-  multiSelGroups: WritableSignal<ReadonlySet<string>>;
-  tempEdge: WritableSignal<TempEdge | null>;
-  view: WritableSignal<ViewRect | null>;
+  readonly selection: WritableSignal<Selection>;
+  readonly multiSel: WritableSignal<ReadonlySet<string>>;
+  readonly multiSelGroups: WritableSignal<ReadonlySet<string>>;
+  readonly tempEdge: WritableSignal<TempEdge | null>;
+  readonly view: WritableSignal<ViewRect | null>;
 }
 
 export class FlowCanvasInteraction {
@@ -119,9 +119,11 @@ export class FlowCanvasInteraction {
         const from = this.connectFrom;
         const branch = this.connectBranch as TransitionBranch | null;
         const guard = this.connectGuard;
-        const t: TransitionDef = blankTransition(from, target);
-        if (branch) t.branch = branch;
-        if (guard) t.guard = guard;
+        const t: TransitionDef = {
+          ...blankTransition(from, target),
+          ...(branch ? { branch } : {}),
+          ...(guard ? { guard } : {}),
+        };
         this.host.updateGraph((g) => addTransition(g, t));
         this.host.selection.set({
           kind: 'transition',

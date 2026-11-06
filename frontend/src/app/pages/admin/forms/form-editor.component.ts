@@ -170,7 +170,7 @@ export class FormEditorComponent {
   private cmpThreshold: string | null = null;
   private cmpAs: 'file' | 'field' | 'both' = 'file';
   /** Editor state: questions grouped into titled containers, one per wizard step. */
-  protected readonly groups = signal<QuestionGroup[]>([]);
+  protected readonly groups = signal<readonly QuestionGroup[]>([]);
   protected readonly loading = signal(true);
   protected readonly saving = signal(false);
   /** Is the current form version active? An active version accepts new applications. */
@@ -290,15 +290,14 @@ export class FormEditorComponent {
   /** The form-level problem of the requested funding field, or null. */
   protected readonly fundingIssue = computed(() => fundingProblem(this.flatQuestions()));
   /** Validation errors per question, indexed by "gi:qi". */
-  protected readonly fieldErrors = computed(() => {
-    const map: Record<string, string[]> = {};
-    this.groups().forEach((g, gi) =>
-      g.fields.forEach((f, qi) => {
-        map[`${gi}:${qi}`] = validateFormField(f).errors;
-      }),
-    );
-    return map;
-  });
+  protected readonly fieldErrors = computed(
+    (): Readonly<Record<string, readonly string[]>> =>
+      Object.fromEntries(
+        this.groups().flatMap((g, gi) =>
+          g.fields.map((f, qi) => [`${gi}:${qi}`, validateFormField(f).errors]),
+        ),
+      ),
+  );
   protected readonly formValid = computed(
     () =>
       this.flatQuestions().length > 0 &&
@@ -799,7 +798,7 @@ export class FormEditorComponent {
     return !!this.expanded()[`${pos.gi}:${pos.qi}`];
   }
 
-  protected errorsFor(gi: number, qi: number): string[] {
+  protected errorsFor(gi: number, qi: number): readonly string[] {
     return this.fieldErrors()[`${gi}:${qi}`] ?? [];
   }
 

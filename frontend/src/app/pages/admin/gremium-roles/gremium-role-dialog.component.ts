@@ -32,9 +32,9 @@ import { ContentLangState } from '@shared/ui/content-lang-switch/content-lang.st
 
 /** The form state of the dialog. */
 interface RoleDraft {
-  key: string;
-  label: I18nMap;
-  permissions: string[];
+  readonly key: string;
+  readonly label: I18nMap;
+  readonly permissions: readonly string[];
 }
 
 /** The rights of a new role: a new role can vote. */

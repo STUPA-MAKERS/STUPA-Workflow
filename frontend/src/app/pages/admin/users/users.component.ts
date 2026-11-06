@@ -52,14 +52,22 @@ export function principalFilters(
   groups: GroupFilter,
   now = Date.now(),
 ): PrincipalFilters | undefined {
-  const f: PrincipalFilters = {};
-  if (lastLogin === 'never') f.includeNever = true;
-  else if (lastLogin) {
-    f.lastLoginBefore = new Date(now - Number(lastLogin) * DAY_MS).toISOString().slice(0, 10);
-    f.includeNever = true;
-  }
-  if (groups) f.hasGroups = groups === 'yes';
+  const f: PrincipalFilters = {
+    ...lastLoginFilters(lastLogin, now),
+    ...(groups ? { hasGroups: groups === 'yes' } : {}),
+  };
   return Object.keys(f).length ? f : undefined;
+}
+
+/** The server filters of the last-login chip; none for "all". */
+function lastLoginFilters(lastLogin: LastLoginFilter, now: number): PrincipalFilters {
+  if (lastLogin === 'never') return { includeNever: true };
+  return lastLogin
+    ? {
+        lastLoginBefore: new Date(now - Number(lastLogin) * DAY_MS).toISOString().slice(0, 10),
+        includeNever: true,
+      }
+    : {};
 }
 
 /**

@@ -71,8 +71,8 @@ function isMergeErrorCode(code: string | undefined): code is MergeErrorCode {
 
 /** The problem body of a 409 `merge_conflict`. */
 interface ConflictProblem {
-  code?: string;
-  errors?: { field: string; msg: string }[] | null;
+  readonly code?: string;
+  readonly errors?: readonly { readonly field: string; readonly msg: string }[] | null;
 }
 
 /**
@@ -155,7 +155,7 @@ export class UserMergeComponent {
   /** The areas with at least one row, in the order of the server. */
   protected readonly previewAreas = computed(() => withRows(this.preview()?.areas ?? []));
   protected readonly resultAreas = computed(() => withRows(this.result()?.areas ?? []));
-  protected readonly conflicts = computed<MergeConflict[]>(() => this.preview()?.conflicts ?? []);
+  protected readonly conflicts = computed<readonly MergeConflict[]>(() => this.preview()?.conflicts ?? []);
   protected readonly canMerge = computed(
     () => !!this.preview()?.canMerge && this.understood() && !this.merging(),
   );
@@ -314,6 +314,6 @@ export class UserMergeComponent {
   }
 }
 
-function withRows(areas: readonly MergeAreaCount[]): MergeAreaCount[] {
+function withRows(areas: readonly MergeAreaCount[]): readonly MergeAreaCount[] {
   return areas.filter((a) => a.rewritten || a.combined || a.removed);
 }

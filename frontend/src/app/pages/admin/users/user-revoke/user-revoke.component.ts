@@ -55,10 +55,10 @@ import { personLabel } from '@shared/person-label.util';
 
 /** One line under an entry: what the person has there and what the revoke does with it. */
 export interface RevokeLine {
-  text: string;
-  detail: string;
+  readonly text: string;
+  readonly detail: string;
   /** A tie that the revoke keeps (a delegation of a live meeting). */
-  kept?: boolean;
+  readonly kept?: boolean;
 }
 
 /**

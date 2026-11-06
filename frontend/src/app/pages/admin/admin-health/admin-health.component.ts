@@ -20,28 +20,28 @@ export type HealthKind = 'ok' | 'warn' | 'error' | 'muted';
 
 /** One tile of "Zustand". */
 export interface HealthTile {
-  key: 'audit' | 'backup' | 'erasure';
-  link: string;
-  icon: IconName;
-  kind: HealthKind;
+  readonly key: 'audit' | 'backup' | 'erasure';
+  readonly link: string;
+  readonly icon: IconName;
+  readonly kind: HealthKind;
   /** Null while the data loads: the tile shows a placeholder line. */
-  title: string | null;
-  sub: string;
+  readonly title: string | null;
+  readonly sub: string;
   /** A second line in the danger colour, for example a failed newer backup. */
-  alert?: string;
+  readonly alert?: string;
 }
 
 /** The state of the audit tile. */
 type AuditState =
-  | { status: 'loading' }
-  | { status: 'stored'; check: AuditVerification }
-  | { status: 'live'; check: AuditChainCheck }
-  | { status: 'never' }
-  | { status: 'error' };
+  | { readonly status: 'loading' }
+  | { readonly status: 'stored'; readonly check: AuditVerification }
+  | { readonly status: 'live'; readonly check: AuditChainCheck }
+  | { readonly status: 'never' }
+  | { readonly status: 'error' };
 
-type BackupState = { status: 'loading' } | { status: 'ok'; list: BackupList } | { status: 'error' };
+type BackupState = { readonly status: 'loading' } | { readonly status: 'ok'; readonly list: BackupList } | { readonly status: 'error' };
 
-type ErasureState = { status: 'loading' } | { status: 'ok'; open: number } | { status: 'error' };
+type ErasureState = { readonly status: 'loading' } | { readonly status: 'ok'; readonly open: number } | { readonly status: 'error' };
 
 /**
  * "Zustand" at the top of the admin navigation: three tiles that each
@@ -211,7 +211,7 @@ function time(b: Backup): number {
 }
 
 /** The newest archive by creation time. The list order of the server is not relied on. */
-function newestBackup(items: Backup[]): Backup | null {
+function newestBackup(items: readonly Backup[]): Backup | null {
   let best: Backup | null = null;
   for (const b of items) {
     if (!best || time(b) > time(best)) best = b;
@@ -220,6 +220,6 @@ function newestBackup(items: Backup[]): Backup | null {
 }
 
 /** The newest finished archive (status `done`), or null. */
-function lastFinished(items: Backup[]): Backup | null {
+function lastFinished(items: readonly Backup[]): Backup | null {
   return newestBackup(items.filter((b) => b.status === 'done'));
 }

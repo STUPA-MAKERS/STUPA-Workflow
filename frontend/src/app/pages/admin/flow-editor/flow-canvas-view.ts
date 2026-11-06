@@ -45,102 +45,102 @@ import {
 } from './flow-level.util';
 
 export interface CanvasNodeDot {
-  id: string;
-  branch: string | null;
-  guard: TransitionDef['guard'] | null;
-  cy: number;
-  label: string;
+  readonly id: string;
+  readonly branch: string | null;
+  readonly guard: TransitionDef['guard'] | null;
+  readonly cy: number;
+  readonly label: string;
 }
 
 export interface CanvasNode {
-  key: string;
-  label: string;
-  kind: string;
-  color: string | null;
-  isInitial: boolean;
+  readonly key: string;
+  readonly label: string;
+  readonly kind: string;
+  readonly color: string | null;
+  readonly isInitial: boolean;
   /** A terminal state: the node carries the tag "Endzustand" under its label. */
-  isTerminal: boolean;
+  readonly isTerminal: boolean;
   /** A vote state that takes its gremium from the cost center: the node carries the
    *  tag "Gremium: aus Kostenstelle" under its label. */
-  gremiumFromBudget: boolean;
-  selected: boolean;
-  multi: boolean;
+  readonly gremiumFromBudget: boolean;
+  readonly selected: boolean;
+  readonly multi: boolean;
   /** Not related to the focused state or transition: drawn faint. */
-  dim: boolean;
-  x: number;
-  y: number;
+  readonly dim: boolean;
+  readonly x: number;
+  readonly y: number;
   /** The width fits the label. */
-  w: number;
-  h: number;
-  dots: CanvasNodeDot[];
+  readonly w: number;
+  readonly h: number;
+  readonly dots: readonly CanvasNodeDot[];
 }
 
 export interface CanvasEdge {
-  index: number;
-  d: string;
+  readonly index: number;
+  readonly d: string;
   /** Centre of the label. */
-  mx: number;
-  my: number;
+  readonly mx: number;
+  readonly my: number;
   /** The label text; empty for a line without a label (a later member of a bundle). */
-  label: string;
+  readonly label: string;
   /** The line carries a label (a name or the bolt of an automatic transition). */
-  labeled: boolean;
-  automatic: boolean;
-  color: string | null;
-  selected: boolean;
+  readonly labeled: boolean;
+  readonly automatic: boolean;
+  readonly color: string | null;
+  readonly selected: boolean;
   /** Not related to the focused state or transition: drawn faint. */
-  dim: boolean;
+  readonly dim: boolean;
 }
 
 export interface FlowCanvasViewDeps {
-  graph: Signal<FlowGraph>;
-  currentGroupId: Signal<string | null>;
-  selection: Signal<Selection>;
-  multiSel: Signal<ReadonlySet<string>>;
-  multiSelGroups: Signal<ReadonlySet<string>>;
+  readonly graph: Signal<FlowGraph>;
+  readonly currentGroupId: Signal<string | null>;
+  readonly selection: Signal<Selection>;
+  readonly multiSel: Signal<ReadonlySet<string>>;
+  readonly multiSelGroups: Signal<ReadonlySet<string>>;
   /** The state under the pointer: it has the focus while no transition is selected. */
-  hover: Signal<string | null>;
+  readonly hover: Signal<string | null>;
   /**
    * The automatic layout of the level, once it answers. While a newer `layoutInput`
    * waits for its layout, the places of the last one stay and the lines are left out
    * (`routes` is empty): the transition indices of the old routes may be stale.
    */
-  layout: Signal<LevelLayout | null>;
-  stateLabel: (s: StateDef) => string;
-  guardDotLabel: (g: GuardGroup) => string;
+  readonly layout: Signal<LevelLayout | null>;
+  readonly stateLabel: (s: StateDef) => string;
+  readonly guardDotLabel: (g: GuardGroup) => string;
 }
 
 /** One visible transition between two boxes of the level. */
 interface LevelLink {
-  index: number;
-  t: TransitionDef;
-  src: string;
-  port: string;
+  readonly index: number;
+  readonly t: TransitionDef;
+  readonly src: string;
+  readonly port: string;
   /** Start of the line relative to the source box. */
-  sx: number;
-  sy: number;
-  dst: string;
+  readonly sx: number;
+  readonly sy: number;
+  readonly dst: string;
 }
 
 export interface FlowCanvasView {
-  positions: Signal<Record<string, Point>>;
-  groups: Signal<FlowGroup[]>;
-  groupById: Signal<Map<string, FlowGroup>>;
-  parentGroupId: Signal<Map<string, string>>;
-  stateOwnerId: Signal<Map<string, string>>;
-  currentGroup: Signal<FlowGroup | undefined>;
-  breadcrumbs: Signal<FlowGroup[]>;
-  visibleStates: Signal<StateDef[]>;
-  childGroups: Signal<FlowGroup[]>;
-  edgeEnds: Signal<(EdgeEnds | null)[]>;
-  groupBoxes: Signal<GroupBox[]>;
-  proxies: Signal<{ left: ProxyBox[]; right: ProxyBox[] }>;
-  nodes: Signal<CanvasNode[]>;
-  edges: Signal<CanvasEdge[]>;
+  readonly positions: Signal<Record<string, Point>>;
+  readonly groups: Signal<readonly FlowGroup[]>;
+  readonly groupById: Signal<ReadonlyMap<string, FlowGroup>>;
+  readonly parentGroupId: Signal<ReadonlyMap<string, string>>;
+  readonly stateOwnerId: Signal<ReadonlyMap<string, string>>;
+  readonly currentGroup: Signal<FlowGroup | undefined>;
+  readonly breadcrumbs: Signal<readonly FlowGroup[]>;
+  readonly visibleStates: Signal<readonly StateDef[]>;
+  readonly childGroups: Signal<readonly FlowGroup[]>;
+  readonly edgeEnds: Signal<readonly (EdgeEnds | null)[]>;
+  readonly groupBoxes: Signal<readonly GroupBox[]>;
+  readonly proxies: Signal<{ readonly left: readonly ProxyBox[]; readonly right: readonly ProxyBox[] }>;
+  readonly nodes: Signal<readonly CanvasNode[]>;
+  readonly edges: Signal<readonly CanvasEdge[]>;
   /** What the automatic layout needs to place the level. */
-  layoutInput: Signal<LayoutInput>;
-  contentBounds: Signal<ViewRect>;
-  deepKeys: (groupId: string) => string[];
+  readonly layoutInput: Signal<LayoutInput>;
+  readonly contentBounds: Signal<ViewRect>;
+  readonly deepKeys: (groupId: string) => readonly string[];
 }
 
 /** Node height grows once the dots no longer fit the base height at fixed spacing. */
@@ -213,11 +213,11 @@ export function createFlowCanvasView(deps: FlowCanvasViewDeps): FlowCanvasView {
     return id ? groupById().get(id) : undefined;
   });
 
-  const breadcrumbs = computed<FlowGroup[]>(() =>
+  const breadcrumbs = computed<readonly FlowGroup[]>(() =>
     breadcrumbPath(groupById(), parentGroupId(), deps.currentGroupId()),
   );
 
-  const deepKeys = (groupId: string): string[] => deepStateKeys(groupById(), groupId);
+  const deepKeys = (groupId: string): readonly string[] => deepStateKeys(groupById(), groupId);
 
   const visibleStates = computed(() => {
     const ctx = deps.currentGroupId();

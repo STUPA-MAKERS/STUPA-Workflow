@@ -48,9 +48,9 @@ import { FRAME_MODES, type FrameModeKey, type FramePage } from './frame-modes';
 
 /** One group of the navigation with the pages the principal may open. */
 interface NavGroup {
-  key: string;
-  title: TranslationKey | null;
-  pages: readonly FramePage[];
+  readonly key: string;
+  readonly title: TranslationKey | null;
+  readonly pages: readonly FramePage[];
 }
 
 /** The path of a URL without the query string and the fragment. */

@@ -37,7 +37,7 @@ import { type TranslationKey, de, loadCatalog } from '@core/i18n/translations';
 import { type AdminUiLanguage, TranslationsApiService } from './translations-api.service';
 
 /** Every key of the catalog, in catalog order. */
-const ALL_KEYS = Object.keys(de) as TranslationKey[];
+const ALL_KEYS = Object.keys(de) as readonly TranslationKey[];
 
 /** The rows that the list shows at first and adds each time the end of the list comes into view. */
 export const PAGE_SIZE = 50;
@@ -56,9 +56,9 @@ export function areaOf(key: string): string {
 
 /** The draft of the language dialog. `code` is null when the dialog renames a language. */
 interface LanguageDraft {
-  code: string | null;
-  newCode: string;
-  name: string;
+  readonly code: string | null;
+  readonly newCode: string;
+  readonly name: string;
 }
 
 /**

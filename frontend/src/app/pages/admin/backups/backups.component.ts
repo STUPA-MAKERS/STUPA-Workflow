@@ -93,7 +93,7 @@ export class BackupsComponent implements OnDestroy {
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
 
-  protected readonly rows = signal<Backup[]>([]);
+  protected readonly rows = signal<readonly Backup[]>([]);
   /** False without an age recipient: this installation cannot create an archive. */
   protected readonly enabled = signal(true);
   /** False without the private key: it cannot read one either, so no restore, no import. */

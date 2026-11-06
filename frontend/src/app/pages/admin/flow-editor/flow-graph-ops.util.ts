@@ -3,6 +3,7 @@
  * input. Signal consumers and the undo history therefore see distinct snapshots.
  */
 import type { I18nMap } from '@core/api/models';
+import { withoutKey } from '@shared/util/immutable';
 import type {
   ActionDef,
   ActionType,
@@ -153,10 +154,8 @@ export function setStateGremiumSource(
     ...g,
     states: g.states.map((s) => {
       if (s.key !== key) return s;
-      const rest: StateConfig = { ...(s.config ?? {}) };
-      const gremiumId = rest.gremiumId;
-      delete rest.gremiumId;
-      delete rest.gremiumSource;
+      const gremiumId = s.config?.gremiumId;
+      const rest: StateConfig = withoutKey(withoutKey(s.config ?? {}, 'gremiumId'), 'gremiumSource');
       const config: StateConfig =
         source === 'budget'
           ? { ...rest, gremiumSource: 'budget' }
@@ -271,7 +270,7 @@ export function setGuardBool(g: FlowGraph, index: number, on: boolean): FlowGrap
 export function setCompare(
   g: FlowGraph,
   index: number,
-  patch: { field?: string; op?: string; value?: string },
+  patch: { readonly field?: string; readonly op?: string; readonly value?: string },
 ): FlowGraph {
   return patchTransition(g, index, (t) => {
     const cur = compareSpecOf(t);
@@ -303,8 +302,8 @@ export function reorderGuardGroup(
   const gi = groups.findIndex((x) => x.sig === sig);
   const ni = gi + dir;
   if (gi < 0 || ni < 0 || ni >= groups.length) return g;
-  [groups[gi], groups[ni]] = [groups[ni], groups[gi]];
-  const outgoing = groups.flatMap((grp) => grp.indices.map((i) => all[i]));
+  const swapped = groups.map((grp, i) => (i === gi ? groups[ni] : i === ni ? groups[gi] : grp));
+  const outgoing = swapped.flatMap((grp) => grp.indices.map((i) => all[i]));
   const others = all.filter((t) => t.from !== fromKey || t.branch);
   const next = [...others, ...outgoing].map((t, i) => ({ ...t, order: i }));
   return { ...g, transitions: next };
@@ -343,10 +342,9 @@ export function setActionParam(
     ...t,
     actions: (t.actions ?? []).map((a, k) => {
       if (k !== ai) return a;
-      if (value) return { ...a, [key]: value };
-      const rest: ActionDef = { ...a };
-      delete rest[key];
-      return rest;
+      return value
+        ? { ...a, [key]: value }
+        : (Object.fromEntries(Object.entries(a).filter(([k2]) => k2 !== key)) as ActionDef);
     }),
   }));
 }
@@ -368,7 +366,7 @@ function patchRecipients(
   g: FlowGraph,
   index: number,
   ai: number,
-  fn: (list: NotifyRecipient[]) => NotifyRecipient[],
+  fn: (list: readonly NotifyRecipient[]) => readonly NotifyRecipient[],
 ): FlowGraph {
   return patchTransition(g, index, (t) => ({
     ...t,
@@ -418,10 +416,10 @@ export function setRecipientRef(
 }
 
 /** First free `grpN` id. */
-export function freshGroupId(groups: readonly FlowGroup[]): { id: string; n: number } {
+export function freshGroupId(groups: readonly FlowGroup[]): { readonly id: string; readonly n: number } {
   const used = new Set(groups.map((g) => g.id));
-  let n = groups.length + 1;
-  while (used.has(`grp${n}`)) n++;
+  const firstFree = (n: number): number => (used.has(`grp${n}`) ? firstFree(n + 1) : n);
+  const n = firstFree(groups.length + 1);
   return { id: `grp${n}`, n };
 }
 
@@ -433,26 +431,22 @@ export function createGroup(
   g: FlowGraph,
   id: string,
   name: string,
-  stateKeys: string[],
-  groupIds: string[],
+  stateKeys: readonly string[],
+  groupIds: readonly string[],
   ctx: string | null,
 ): FlowGraph {
   const selStates = new Set(stateKeys);
   const selGroups = new Set(groupIds);
-  let groups: FlowGroup[] = (g.layout?.groups ?? []).map((gr) => ({
+  const left: readonly FlowGroup[] = (g.layout?.groups ?? []).map((gr) => ({
     ...gr,
     stateKeys: gr.stateKeys.filter((k) => !selStates.has(k)),
     groupIds: (gr.groupIds ?? []).filter((cid) => !selGroups.has(cid)),
   }));
-  const created: FlowGroup = { id, name, stateKeys };
-  if (groupIds.length) created.groupIds = groupIds;
-  groups.push(created);
-  if (ctx) {
-    groups = groups.map((gr) =>
-      gr.id === ctx ? { ...gr, groupIds: [...(gr.groupIds ?? []), id] } : gr,
-    );
-  }
-  groups = groups.filter((gr) => gr.stateKeys.length > 0 || (gr.groupIds ?? []).length > 0);
+  const created: FlowGroup = { id, name, stateKeys, ...(groupIds.length ? { groupIds } : {}) };
+  const placed = [...left, created].map((gr) =>
+    ctx && gr.id === ctx ? { ...gr, groupIds: [...(gr.groupIds ?? []), id] } : gr,
+  );
+  const groups = placed.filter((gr) => gr.stateKeys.length > 0 || (gr.groupIds ?? []).length > 0);
   return { ...g, layout: { ...(g.layout ?? {}), groups } };
 }
 

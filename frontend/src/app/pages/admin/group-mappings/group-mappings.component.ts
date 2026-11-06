@@ -40,38 +40,38 @@ import type {
 export type MappingKind = 'global' | 'membership' | 'role';
 
 interface GlobalRow {
-  id: string;
-  oidcGroup: string;
-  roleLabel: string;
+  readonly id: string;
+  readonly oidcGroup: string;
+  readonly roleLabel: string;
 }
 
 interface MembershipRow {
-  id: string;
-  oidcGroup: string;
-  gremiumLabel: string;
+  readonly id: string;
+  readonly oidcGroup: string;
+  readonly gremiumLabel: string;
 }
 
 interface RoleRow {
-  id: string;
-  oidcGroup: string;
-  gremiumLabel: string;
-  roleLabel: string;
+  readonly id: string;
+  readonly oidcGroup: string;
+  readonly gremiumLabel: string;
+  readonly roleLabel: string;
 }
 
 /** One row of a section: "group → target", for a gremium role "gremium · role". */
 export interface MappingRow {
-  id: string;
-  oidcGroup: string;
-  target: string;
+  readonly id: string;
+  readonly oidcGroup: string;
+  readonly target: string;
   /** The gremium role, set in bold after the gremium. */
-  role: string | null;
+  readonly role: string | null;
 }
 
 /** One section of the page. */
 export interface MappingSection {
-  kind: MappingKind;
-  rows: MappingRow[];
-  loading: boolean;
+  readonly kind: MappingKind;
+  readonly rows: readonly MappingRow[];
+  readonly loading: boolean;
 }
 
 /** The RBAC resolver reserves this group prefix. The backend refuses it with 422. */

@@ -58,28 +58,28 @@ export const MOCK_REVOKE_PRINCIPAL: AdminPrincipal = {
  * A group that only this mock maps into BOTH Gremien. It shows how the dialog selects
  * a co-affected Gremium.
  */
-const SHARED_GROUP: { oidcGroup: string; gremiumIds: Uuid[] } = {
+const SHARED_GROUP: { readonly oidcGroup: string; readonly gremiumIds: readonly Uuid[] } = {
   oidcGroup: 'gremien-alle',
   gremiumIds: [MOCK_GREMIUM_STUPA_ID, 'g-asta'],
 };
 
 interface PoolFact {
-  id: Uuid;
-  gremiumId: Uuid;
-  memberId: Uuid | null;
-  substituteId: Uuid;
+  readonly id: Uuid;
+  readonly gremiumId: Uuid;
+  readonly memberId: Uuid | null;
+  readonly substituteId: Uuid;
 }
 
 interface DelegationFact {
-  id: Uuid;
-  gremiumId: Uuid;
-  meetingId: Uuid;
-  meetingTitle: string;
-  meetingDate: string | null;
-  live: boolean;
-  delegatorId: Uuid;
-  delegateId: Uuid;
-  voting: boolean;
+  readonly id: Uuid;
+  readonly gremiumId: Uuid;
+  readonly meetingId: Uuid;
+  readonly meetingTitle: string;
+  readonly meetingDate: string | null;
+  readonly live: boolean;
+  readonly delegatorId: Uuid;
+  readonly delegateId: Uuid;
+  readonly voting: boolean;
 }
 
 /** The pool entries and delegations of the mock (the revoke deletes from these lists). */
@@ -116,33 +116,36 @@ export function mockRevokeExtras(): { pool: PoolFact[]; delegations: DelegationF
   };
 }
 
+/** A principal row of the mock store: the revoke changes its groups, roles and state. */
+type WritablePrincipal = { -readonly [K in keyof AdminPrincipal]: AdminPrincipal[K] };
+
 /** The parts of the admin mock store that the revoke reads and writes. */
 export interface RevokeMockStore {
-  principals: AdminPrincipal[];
-  gremien: Gremium[];
-  gremiumRoles: GremiumRole[];
-  roles: Role[];
-  groupMappings: GroupMapping[];
-  membershipMappings: GremiumMembershipMapping[];
-  roleMappings: GremiumRoleMapping[];
-  memberships: readonly GremiumMembership[];
+  readonly principals: readonly WritablePrincipal[];
+  readonly gremien: readonly Gremium[];
+  readonly gremiumRoles: readonly GremiumRole[];
+  readonly roles: readonly Role[];
+  readonly groupMappings: readonly GroupMapping[];
+  readonly membershipMappings: readonly GremiumMembershipMapping[];
+  readonly roleMappings: readonly GremiumRoleMapping[];
+  readonly memberships: readonly GremiumMembership[];
   /** The Gremien cleared per principal: their static memberships no longer count. */
-  revoked: Record<Uuid, Uuid[]>;
-  extras: { pool: PoolFact[]; delegations: DelegationFact[] };
+  readonly revoked: Record<Uuid, readonly Uuid[]>;
+  readonly extras: { pool: readonly PoolFact[]; delegations: readonly DelegationFact[] };
 }
 
 interface Ties {
-  memberships: { gremiumId: Uuid; roleId: Uuid }[];
-  membershipMaps: [string, Uuid][];
-  roleMaps: [string, Uuid, Uuid][];
-  groupMaps: [string, Uuid][];
-  assignments: RoleAssignment[];
-  pool: PoolFact[];
-  delegations: DelegationFact[];
+  readonly memberships: readonly { readonly gremiumId: Uuid; readonly roleId: Uuid }[];
+  readonly membershipMaps: readonly (readonly [string, Uuid])[];
+  readonly roleMaps: readonly (readonly [string, Uuid, Uuid])[];
+  readonly groupMaps: readonly (readonly [string, Uuid])[];
+  readonly assignments: readonly RoleAssignment[];
+  readonly pool: readonly PoolFact[];
+  readonly delegations: readonly DelegationFact[];
 }
 
 /** The SSO groups of a mock row. A row that the dev data leaves without groups has none. */
-function groupsOf(p: AdminPrincipal): string[] {
+function groupsOf(p: AdminPrincipal): readonly string[] {
   return Array.isArray(p.oidcGroups) ? p.oidcGroups : [];
 }
 
@@ -190,7 +193,7 @@ function roleKey(store: RevokeMockStore, roleId: Uuid): string {
   return store.roles.find((r) => r.id === roleId)?.key ?? roleId;
 }
 
-function tiedGremien(t: Ties): Set<Uuid> {
+function tiedGremien(t: Ties): ReadonlySet<Uuid> {
   return new Set([
     ...t.memberships.map((m) => m.gremiumId),
     ...t.membershipMaps.map(([, g]) => g),
@@ -199,12 +202,12 @@ function tiedGremien(t: Ties): Set<Uuid> {
   ]);
 }
 
-function heldRoles(store: RevokeMockStore, t: Ties): Set<Uuid> {
+function heldRoles(store: RevokeMockStore, t: Ties): ReadonlySet<Uuid> {
   const ids = [...t.groupMaps.map(([, r]) => r), ...t.assignments.map((a) => a.roleId)];
   return new Set(ids.filter((id) => roleKey(store, id) !== IMPLICIT_ROLE));
 }
 
-function targets(store: RevokeMockStore, p: AdminPrincipal, t: Ties): Map<string, [Set<Uuid>, Set<Uuid>]> {
+function targets(store: RevokeMockStore, p: AdminPrincipal, t: Ties): ReadonlyMap<string, readonly [ReadonlySet<Uuid>, ReadonlySet<Uuid>]> {
   const tied = tiedGremien(t);
   const out = new Map<string, [Set<Uuid>, Set<Uuid>]>();
   const entry = (g: string) => {
@@ -315,8 +318,8 @@ export function mockRevokePreview(store: RevokeMockStore, principalId: Uuid, myS
 
 /** A refusal of the mock revoke, shaped like the problem body of the server. */
 export interface MockProblem {
-  status: number;
-  error: { code: string; errors?: { field: string; msg: string }[] };
+  readonly status: number;
+  readonly error: { readonly code: string; readonly errors?: readonly { readonly field: string; readonly msg: string }[] };
 }
 
 /** The mock of `POST /admin/principals/{id}/revoke`: apply it to the store or refuse. */

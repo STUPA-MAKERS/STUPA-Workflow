@@ -131,7 +131,7 @@ export class TransitionDetailComponent {
     this.actionMapChange.emit({ ai, map: fromRows(rows) });
   }
 
-  protected recipientsOf(act: ActionDef): NotifyRecipient[] {
+  protected recipientsOf(act: ActionDef): readonly NotifyRecipient[] {
     return recipientsOf(act);
   }
 
@@ -153,7 +153,7 @@ function mapOf(act: ActionDef): Record<string, string> {
 }
 
 /** Rows back to a map. Two rows with the same value keep the later cost center. */
-function fromRows(rows: readonly { value: string; budgetId: string }[]): Record<string, string> {
+function fromRows(rows: readonly { readonly value: string; readonly budgetId: string }[]): Record<string, string> {
   const out: Record<string, string> = {};
   for (const r of rows) out[r.value] = r.budgetId;
   return out;

@@ -40,8 +40,8 @@ import { personLabel } from '@shared/person-label.util';
 
 /** A member of the gremium: a choice of "Vertritt". */
 export interface PoolMember {
-  id: string;
-  name: string;
+  readonly id: string;
+  readonly name: string;
 }
 
 /** The most persons the search shows. */

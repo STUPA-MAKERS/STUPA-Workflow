@@ -37,8 +37,8 @@ import { ContentLangState } from '@shared/ui/content-lang-switch/content-lang.st
 
 /** Draft for a new global role. */
 interface RoleDraft {
-  key: string;
-  label: I18nMap;
+  readonly key: string;
+  readonly label: I18nMap;
 }
 
 /** The fixed global roles: the server refuses to delete them (409). */
