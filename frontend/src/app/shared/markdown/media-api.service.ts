@@ -5,13 +5,13 @@ import { API_BASE_URL } from '@core/api/api.config';
 
 /** An uploaded Markdown image (`POST /api/media/images`, 201). */
 export interface MediaImage {
-  id: string;
+  readonly id: string;
   /** The canonical path `/api/media/images/<id>`. Markdown stores this path. */
-  url: string;
-  mime: string;
-  width: number;
-  height: number;
-  size: number;
+  readonly url: string;
+  readonly mime: string;
+  readonly width: number;
+  readonly height: number;
+  readonly size: number;
 }
 
 /** The raster types that the media upload accepts. SVG is never one of them. */

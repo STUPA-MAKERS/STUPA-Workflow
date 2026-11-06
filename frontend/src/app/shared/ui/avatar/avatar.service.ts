@@ -2,6 +2,7 @@ import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core'
 import { API_BASE_URL } from '@core/api/api.config';
 import { BrandingService } from '@core/branding/branding.service';
 import type { UiKitAvatarSource } from '@stupa-makers/ui-kit';
+import { withEntry, withoutEntry } from '@shared/util/immutable';
 
 /** The principal of an avatar: a principal id, or `'me'` for the logged-in user. */
 export type AvatarPrincipal = string;
@@ -39,12 +40,12 @@ export class AvatarService implements UiKitAvatarSource {
 
   private readonly failed = signal<ReadonlySet<string>>(new Set());
   /** One timer per failed id. It removes the id when `AVATAR_RETRY_MS` is over. */
-  private readonly retryTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private retryTimers: ReadonlyMap<string, ReturnType<typeof setTimeout>> = new Map();
 
   constructor() {
     inject(DestroyRef).onDestroy(() => {
       for (const timer of this.retryTimers.values()) clearTimeout(timer);
-      this.retryTimers.clear();
+      this.retryTimers = new Map();
     });
   }
 
@@ -70,18 +71,15 @@ export class AvatarService implements UiKitAvatarSource {
   markFailed(principal: AvatarPrincipal): void {
     if (this.failed().has(principal)) return;
     this.failed.update((set) => new Set([...set, principal]));
-    this.retryTimers.set(
+    this.retryTimers = withEntry(
+      this.retryTimers,
       principal,
       setTimeout(() => this.retry(principal), AVATAR_RETRY_MS),
     );
   }
 
   private retry(principal: AvatarPrincipal): void {
-    this.retryTimers.delete(principal);
-    this.failed.update((set) => {
-      const next = new Set(set);
-      next.delete(principal);
-      return next;
-    });
+    this.retryTimers = withoutEntry(this.retryTimers, principal);
+    this.failed.update((set) => new Set([...set].filter((p) => p !== principal)));
   }
 }

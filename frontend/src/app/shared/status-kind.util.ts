@@ -26,8 +26,8 @@ import type {
 
 /** A status as the UI shows it: the colour and the translation key of the label. */
 export interface StatusView {
-  kind: StatusKind;
-  key: TranslationKey;
+  readonly kind: StatusKind;
+  readonly key: TranslationKey;
 }
 
 /**
@@ -138,23 +138,24 @@ export function scanStatus(state: ScanState): StatusView {
   return SCAN[state];
 }
 
-type Rgb = [number, number, number];
+type Rgb = readonly [number, number, number];
 
 function parseHex(hex: string | null | undefined): Rgb | null {
   if (!hex) return null;
-  let h = hex.trim().replace(/^#/, '');
-  if (h.length === 3) {
-    h = h
-      .split('')
-      .map((c) => c + c)
-      .join('');
-  }
+  const raw = hex.trim().replace(/^#/, '');
+  const h =
+    raw.length === 3
+      ? raw
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : raw;
   if (!/^[0-9a-fA-F]{6}$/.test(h)) return null;
   return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
 }
 
 /** Hue in degrees (0..360) and HSL saturation (0..1) of an sRGB colour. */
-function hueSaturation([r8, g8, b8]: Rgb): { h: number; s: number } {
+function hueSaturation([r8, g8, b8]: Rgb): { readonly h: number; readonly s: number } {
   const r = r8 / 255;
   const g = g8 / 255;
   const b = b8 / 255;
@@ -164,11 +165,12 @@ function hueSaturation([r8, g8, b8]: Rgb): { h: number; s: number } {
   if (d === 0) return { h: 0, s: 0 };
   const l = (max + min) / 2;
   const s = d / (1 - Math.abs(2 * l - 1));
-  let h: number;
-  if (max === r) h = ((g - b) / d) % 6;
-  else if (max === g) h = (b - r) / d + 2;
-  else h = (r - g) / d + 4;
-  h *= 60;
-  if (h < 0) h += 360;
-  return { h, s };
+  const deg = hueSector(r, g, b, max, d) * 60;
+  return { h: deg < 0 ? deg + 360 : deg, s };
+}
+
+/** The hue in sixths of the circle (may be below 0) from the largest channel. */
+function hueSector(r: number, g: number, b: number, max: number, d: number): number {
+  if (max === r) return ((g - b) / d) % 6;
+  return max === g ? (b - r) / d + 2 : (r - g) / d + 4;
 }
