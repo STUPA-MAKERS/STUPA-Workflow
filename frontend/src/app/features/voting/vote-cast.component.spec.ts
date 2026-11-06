@@ -531,14 +531,18 @@ describe('VoteCastComponent', () => {
       expect(screen.queryByRole('button', { name: 'Weitere Aktionen' })).not.toBeInTheDocument();
     });
 
+    it('offers the delete for a cancelled standalone vote', async () => {
+      await setup({ vote: draftVote({ status: 'cancelled' }), canManage: true });
+      expect(screen.getByRole('button', { name: 'Weitere Aktionen' })).toBeInTheDocument();
+    });
+
     it('offers no delete for a meeting-bound draft', async () => {
       await setup({ vote: draftVote({ meetingId: 'm1' }), canManage: true });
       expect(screen.queryByRole('button', { name: 'Weitere Aktionen' })).not.toBeInTheDocument();
     });
 
     it.each([
-      ['vote_not_draft', 'Die Abstimmung war bereits geöffnet. Statt zu löschen, brich sie ab.'],
-      ['vote_has_ballots', 'Es liegen bereits Stimmen vor. Die Abstimmung lässt sich nicht mehr löschen.'],
+      ['vote_not_deletable', 'Eine offene oder geschlossene Abstimmung bleibt erhalten. Brich eine offene Abstimmung ab.'],
       ['vote_meeting_bound', 'Diese Abstimmung gehört zu einer Sitzung. Sie wird dort gelöscht.'],
       ['something_else', 'Die Abstimmung ist in einem Zustand, der das Löschen ausschließt.'],
     ])('explains the 409 code %s and reloads the vote', async (code, message) => {
