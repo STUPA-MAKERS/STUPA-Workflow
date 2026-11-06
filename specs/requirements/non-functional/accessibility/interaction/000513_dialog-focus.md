@@ -1,0 +1,20 @@
+---
+id: "000513"
+title: A dialog keeps the focus inside
+kind: non-functional
+status: draft
+owner: frederikbeimgraben
+updated: 2026-11-06
+implementation: null
+scope:
+  - frontend/src/app/
+  - frontend/vendor/ui-kit
+---
+
+# A dialog keeps the focus inside
+
+A dialog and a sheet must move the focus into themselves when they open. The focus must not
+leave them while they are open. Escape must close them, and the focus must go back to the
+control that opened them.
+
+Reason: WCAG 2.1.2 and 2.4.3.
