@@ -16,16 +16,16 @@ from __future__ import annotations
 
 import logging
 import math
-from collections import defaultdict, deque
 from collections.abc import Callable
 from dataclasses import dataclass
+from itertools import dropwhile
 from typing import Protocol, runtime_checkable
 from uuid import uuid4
 
 logger = logging.getLogger("app.ratelimit")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RateLimitResult:
     """Outcome of one hit.
 
@@ -68,23 +68,22 @@ class InMemoryRateLimiter:
 
     def __init__(self, *, now: Callable[[], float] | None = None) -> None:
         """Start empty windows; ``now`` replaces the wall clock in tests."""
-        self._hits: defaultdict[str, deque[float]] = defaultdict(deque)
+        self._hits: dict[str, tuple[float, ...]] = {}
         self._now = now or _wall_clock
 
     async def hit(self, key: str, *, limit: int, window_seconds: int) -> RateLimitResult:
         """Count one attempt for ``key`` in the window of the process."""
         now = self._now()
         window_start = now - window_seconds
-        bucket = self._hits[key]
-        while bucket and bucket[0] <= window_start:
-            bucket.popleft()
-        if len(bucket) >= limit:
-            retry_after = (
-                math.ceil(bucket[0] + window_seconds - now) if bucket else window_seconds
-            )
-            return RateLimitResult(allowed=False, retry_after=max(1, retry_after))
-        bucket.append(now)
-        return RateLimitResult(allowed=True, retry_after=0)
+        recent = tuple(dropwhile(lambda t: t <= window_start, self._hits.get(key, ())))
+        blocked = len(recent) >= limit
+        self._hits[key] = recent if blocked else (*recent, now)
+        retry_after = math.ceil(recent[0] + window_seconds - now) if recent else window_seconds
+        return (
+            RateLimitResult(allowed=False, retry_after=max(1, retry_after))
+            if blocked
+            else RateLimitResult(allowed=True, retry_after=0)
+        )
 
 
 class RedisRateLimiter:

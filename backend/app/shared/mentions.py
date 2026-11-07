@@ -61,13 +61,16 @@ def stored_mentions(ids: Sequence[UUID]) -> list[str]:
 
 def mention_ids(raw: Iterable[Any] | None) -> list[UUID]:
     """Return the ids of a stored ``mentions`` value; a value that is no UUID drops out."""
-    out: list[UUID] = []
-    for item in raw or ():
-        try:
-            out.append(UUID(str(item)))
-        except ValueError:
-            continue
-    return out
+    parsed = (_uuid_or_none(item) for item in raw or ())
+    return [pid for pid in parsed if pid is not None]
+
+
+def _uuid_or_none(item: object) -> UUID | None:
+    """Return ``item`` as a UUID, or ``None`` when it is no UUID."""
+    try:
+        return UUID(str(item))
+    except ValueError:
+        return None
 
 
 def new_mentions(wanted: Sequence[UUID], before: Iterable[UUID]) -> list[UUID]:

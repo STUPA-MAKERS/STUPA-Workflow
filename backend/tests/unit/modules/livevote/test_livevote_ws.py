@@ -227,8 +227,7 @@ def test_connect_sends_meeting_state() -> None:
     The initial state carries the item the room handles now, so a follower who connects late
     lands on the right item.
     """
-    meeting = _meeting()
-    meeting.current_agenda_item_id = uuid4()
+    meeting = _meeting().model_copy(update={"current_agenda_item_id": uuid4()})
     app, _, _ = _build(meeting=meeting, principal=_voter())
     client = TestClient(app)
     with client.websocket_connect(_url(meeting)) as ws:

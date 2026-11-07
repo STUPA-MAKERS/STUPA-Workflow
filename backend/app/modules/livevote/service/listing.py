@@ -6,7 +6,7 @@ from datetime import UTC, date, datetime
 from typing import Literal
 from uuid import UUID
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import ColumnElement, and_, or_, select
 
 from app.modules.admin.models import Gremium
 from app.modules.auth.models import Principal as PrincipalRow
@@ -26,6 +26,30 @@ from app.modules.livevote.service.permissions import PermissionOps
 from app.modules.livevote.service.votes import VoteReadOps
 from app.modules.protocol.models import Protocol
 from app.shared.search import dialect_of, trigram_rank
+
+#: A tuple of SQL filters that a query applies with `where(*filters)`.
+_Filters = tuple[ColumnElement[bool], ...]
+
+
+def _gremium_filter(gremium_id: UUID | None) -> _Filters:
+    """Return the filter to one gremium, or none without a gremium."""
+    return () if gremium_id is None else (Meeting.gremium_id == gremium_id,)
+
+
+def _after_cursor(
+    cursor: tuple[datetime, UUID] | None, sort_ts: ColumnElement[datetime], *, upcoming: bool
+) -> _Filters:
+    """Return the keyset filter behind the cursor in the sort direction of the bucket."""
+    if cursor is None:
+        return ()
+    cts, cid = cursor
+    return (
+        (
+            or_(sort_ts > cts, and_(sort_ts == cts, Meeting.id > cid))
+            if upcoming
+            else or_(sort_ts < cts, and_(sort_ts == cts, Meeting.id < cid))
+        ),
+    )
 
 
 class ListingOps(PermissionOps, VoteReadOps):
@@ -62,17 +86,13 @@ class ListingOps(PermissionOps, VoteReadOps):
 
         Delegation recipients see their meetings even without a membership.
         """
-        stmt = select(Meeting).order_by(Meeting.created_at.desc())
-        if gremium_id is not None:
-            stmt = stmt.where(Meeting.gremium_id == gremium_id)
-        if date_from is not None:
-            stmt = stmt.where(Meeting.date >= date_from)
-        if date_to is not None:
-            stmt = stmt.where(Meeting.date <= date_to)
-        visible = await self._visible_gremium_ids(principal)
-        if visible is not None:
-            delegated = await self._delegated_meeting_ids(principal.sub)
-            stmt = stmt.where(or_(Meeting.gremium_id.in_(visible), Meeting.id.in_(delegated)))
+        filters = (
+            *_gremium_filter(gremium_id),
+            *(() if date_from is None else (Meeting.date >= date_from,)),
+            *(() if date_to is None else (Meeting.date <= date_to,)),
+            *await self._visibility(principal),
+        )
+        stmt = select(Meeting).order_by(Meeting.created_at.desc()).where(*filters)
         meetings = list((await self.session.execute(stmt)).scalars().all())
         return await self._decorate(meetings, principal)
 
@@ -87,17 +107,27 @@ class ListingOps(PermissionOps, VoteReadOps):
         Delegation recipients see their meetings even without a membership, so their Gremium
         also belongs in the filter.
         """
-        stmt = select(Meeting.gremium_id, Gremium.name).join(
-            Gremium, Gremium.id == Meeting.gremium_id
+        stmt = (
+            select(Meeting.gremium_id, Gremium.name)
+            .join(Gremium, Gremium.id == Meeting.gremium_id)
+            .where(*await self._visibility(principal))
         )
-        visible = await self._visible_gremium_ids(principal)
-        if visible is not None:
-            delegated = await self._delegated_meeting_ids(principal.sub)
-            stmt = stmt.where(or_(Meeting.gremium_id.in_(visible), Meeting.id.in_(delegated)))
         rows = (await self.session.execute(stmt.distinct())).all()
-        items = [MeetingGremiumOut(id=gid, name=name) for gid, name in rows]
-        items.sort(key=lambda g: g.name.casefold())
-        return items
+        return sorted(
+            (MeetingGremiumOut(id=gid, name=name) for gid, name in rows),
+            key=lambda g: g.name.casefold(),
+        )
+
+    async def _visibility(self, principal: Principal) -> _Filters:
+        """Return the visibility filter: the visible gremien plus the delegated meetings.
+
+        A principal who sees every gremium gets no filter.
+        """
+        visible = await self._visible_gremium_ids(principal)
+        if visible is None:
+            return ()
+        delegated = await self._delegated_meeting_ids(principal.sub)
+        return (or_(Meeting.gremium_id.in_(visible), Meeting.id.in_(delegated)),)
 
     async def list_timeline(
         self,
@@ -143,28 +173,20 @@ class ListingOps(PermissionOps, VoteReadOps):
             Meeting.status != "live",
             or_(Meeting.status == "closed", sort_ts < now_ts),
         )
-        stmt = select(Meeting, sort_ts)
-        if gremium_id is not None:
-            stmt = stmt.where(Meeting.gremium_id == gremium_id)
-        visible = await self._visible_gremium_ids(principal)
-        if visible is not None:
-            delegated = await self._delegated_meeting_ids(principal.sub)
-            stmt = stmt.where(or_(Meeting.gremium_id.in_(visible), Meeting.id.in_(delegated)))
-        if direction == "upcoming":
-            stmt = stmt.where(is_upcoming)
-            if cur is not None:
-                cts, cid = cur
-                stmt = stmt.where(or_(sort_ts > cts, and_(sort_ts == cts, Meeting.id > cid)))
-            stmt = stmt.order_by(sort_ts.asc(), Meeting.id.asc())
-        else:
-            stmt = stmt.where(is_past)
-            if cur is not None:
-                cts, cid = cur
-                stmt = stmt.where(or_(sort_ts < cts, and_(sort_ts == cts, Meeting.id < cid)))
-            stmt = stmt.order_by(sort_ts.desc(), Meeting.id.desc())
-        rows = (await self.session.execute(stmt.limit(limit + 1))).all()
-        has_more = len(rows) > limit
-        rows = rows[:limit]
+        upcoming = direction == "upcoming"
+        filters = (
+            *_gremium_filter(gremium_id),
+            *await self._visibility(principal),
+            is_upcoming if upcoming else is_past,
+            *_after_cursor(cur, sort_ts, upcoming=upcoming),
+        )
+        order = (
+            (sort_ts.asc(), Meeting.id.asc()) if upcoming else (sort_ts.desc(), Meeting.id.desc())
+        )
+        stmt = select(Meeting, sort_ts).where(*filters).order_by(*order)
+        fetched = (await self.session.execute(stmt.limit(limit + 1))).all()
+        has_more = len(fetched) > limit
+        rows = fetched[:limit]
         items = await self._decorate([row[0] for row in rows], principal)
         next_cursor = _encode_cursor(rows[-1][1], rows[-1][0].id) if has_more and rows else None
         return MeetingPage(items=items, nextCursor=next_cursor)
@@ -196,19 +218,15 @@ class ListingOps(PermissionOps, VoteReadOps):
             [Meeting.title, Gremium.name, PrincipalRow.display_name],
             dialect=dialect_of(self.session),
         )
+        filters = (where, *_gremium_filter(gremium_id), *await self._visibility(principal))
         stmt = (
             select(Meeting)
             .join(Gremium, Gremium.id == Meeting.gremium_id)
             .outerjoin(PrincipalRow, PrincipalRow.id == Meeting.protokollant_id)
-            .where(where)
+            .where(*filters)
+            .order_by(rank.desc(), Meeting.id.desc())
+            .offset(offset)
         )
-        if gremium_id is not None:
-            stmt = stmt.where(Meeting.gremium_id == gremium_id)
-        visible = await self._visible_gremium_ids(principal)
-        if visible is not None:
-            delegated = await self._delegated_meeting_ids(principal.sub)
-            stmt = stmt.where(or_(Meeting.gremium_id.in_(visible), Meeting.id.in_(delegated)))
-        stmt = stmt.order_by(rank.desc(), Meeting.id.desc()).offset(offset)
         rows = (await self.session.execute(stmt.limit(limit + 1))).scalars().all()
         has_more = len(rows) > limit
         page_rows = list(rows[:limit])
@@ -297,35 +315,34 @@ class ListingOps(PermissionOps, VoteReadOps):
         keepers_by_meeting = await keeper_summaries(self.session, [m.id for m in meetings])
         guests_by_meeting = await self._guest_counts([m.id for m in meetings])
         windows = await self._open_windows(meetings)
-        out: list[MeetingOut] = []
-        for m in meetings:
+
+        def decorated(m: Meeting) -> MeetingOut:
             is_prot = m.protokollant_id is not None and m.protokollant_id == my_id
             can_write = (m.gremium_id in write_ids) or (is_prot and prot_writes)
-            out.append(
-                self._to_out(
-                    m,
-                    proto_by_meeting.get(m.id),
+            return self._to_out(
+                m,
+                proto_by_meeting.get(m.id),
+                can_manage=m.gremium_id in manage_ids,
+                can_delete=self._can_delete(
+                    principal,
                     can_manage=m.gremium_id in manage_ids,
-                    can_delete=self._can_delete(
-                        principal,
-                        can_manage=m.gremium_id in manage_ids,
-                        final=m.id in final_ids,
-                    ),
-                    can_write=can_write,
-                    can_manage_votes=(m.gremium_id in votes_mgmt_ids) or (is_prot and prot_votes),
-                    can_vote=m.gremium_id in vote_ids,
-                    can_finalize=can_write and m.gremium_id in finalize_ids,
-                    is_protokollant=is_prot,
-                    gremium_name=gremium_names.get(m.gremium_id),
-                    protokollant_name=(
-                        prot_names.get(m.protokollant_id) if m.protokollant_id is not None else None
-                    ),
-                    votes=votes_by_meeting.get(m.id, []),
-                    agenda=agenda_by_meeting[m.id],
-                    keepers=keepers_by_meeting[m.id],
-                    guests=guests_by_meeting.get(m.id, (0, 0)),
-                    public_join_allowed=m.gremium_id not in quorum_gids,
-                    window=windows[m.id],
-                )
+                    final=m.id in final_ids,
+                ),
+                can_write=can_write,
+                can_manage_votes=(m.gremium_id in votes_mgmt_ids) or (is_prot and prot_votes),
+                can_vote=m.gremium_id in vote_ids,
+                can_finalize=can_write and m.gremium_id in finalize_ids,
+                is_protokollant=is_prot,
+                gremium_name=gremium_names.get(m.gremium_id),
+                protokollant_name=(
+                    prot_names.get(m.protokollant_id) if m.protokollant_id is not None else None
+                ),
+                votes=votes_by_meeting.get(m.id, []),
+                agenda=agenda_by_meeting[m.id],
+                keepers=keepers_by_meeting[m.id],
+                guests=guests_by_meeting.get(m.id, (0, 0)),
+                public_join_allowed=m.gremium_id not in quorum_gids,
+                window=windows[m.id],
             )
-        return out
+
+        return [decorated(m) for m in meetings]

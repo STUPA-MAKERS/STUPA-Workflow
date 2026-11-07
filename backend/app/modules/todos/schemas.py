@@ -6,14 +6,16 @@ sent" from ``null`` through ``model_fields_set``.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, JsonValue
+from pydantic import ConfigDict, Field, JsonValue
 
 from app.modules.files.schemas import MessageAttachmentOut, MessageFilesIn
 from app.shared.people import PersonRef
+from app.shared.schemas import FrozenCamelModel, FrozenStrictCamelModel
 
 TodoBoardKind = Literal["gremium", "personal", "team"]
 TodoLabelColor = Literal["green", "blue", "violet", "amber", "red", "gray"]
@@ -58,15 +60,7 @@ InvoiceStatus = Literal["open", "paid"]
 BookingKind = Literal["expense", "income"]
 
 
-class _Out(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
-
-
-class _In(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
-
-
-class TodoBoardSummary(_Out):
+class TodoBoardSummary(FrozenCamelModel, frozen=True):
     """A board in the board list, with the rights of the caller and the open cards."""
 
     id: UUID
@@ -78,7 +72,7 @@ class TodoBoardSummary(_Out):
     open_count: int = Field(default=0, serialization_alias="openCount")
 
 
-class TodoColumnOut(_Out):
+class TodoColumnOut(FrozenCamelModel, frozen=True):
     """A column of a board."""
 
     id: UUID
@@ -88,7 +82,7 @@ class TodoColumnOut(_Out):
     card_count: int = Field(default=0, serialization_alias="cardCount")
 
 
-class TodoLabelOut(_Out):
+class TodoLabelOut(FrozenCamelModel, frozen=True):
     """A label of a board."""
 
     id: UUID
@@ -96,10 +90,10 @@ class TodoLabelOut(_Out):
     color: TodoLabelColor
 
 
-class TodoLinkDetail(_Out):
+class TodoLinkDetail(FrozenCamelModel, frozen=True):
     """The extra facts of a link target; only the fields of its kind are set."""
 
-    state_label: dict[str, str] | None = Field(default=None, serialization_alias="stateLabel")
+    state_label: Mapping[str, str] | None = Field(default=None, serialization_alias="stateLabel")
     date: str | None = None
     meeting_title: str | None = Field(default=None, serialization_alias="meetingTitle")
     position: int | None = None
@@ -117,7 +111,7 @@ class TodoLinkDetail(_Out):
     vote_result: VoteResult | None = Field(default=None, serialization_alias="voteResult")
 
 
-class TodoLinkOut(_Out):
+class TodoLinkOut(FrozenCamelModel, frozen=True):
     """A link of a card; ``accessible`` is false when the caller cannot read the target."""
 
     id: UUID
@@ -131,7 +125,7 @@ class TodoLinkOut(_Out):
     granted: bool = False
 
 
-class TodoViewFact(_Out):
+class TodoViewFact(FrozenCamelModel, frozen=True):
     """One fact of a link target in the read sheet.
 
     ``key`` names the label (``todos.linkView.<key>``); a form answer carries the label of
@@ -139,12 +133,12 @@ class TodoViewFact(_Out):
     """
 
     key: str
-    label: dict[str, str] | None = None
+    label: Mapping[str, str] | None = None
     value: str
     format: Literal["text", "money", "date", "markdown"] = "text"
 
 
-class TodoViewRow(_Out):
+class TodoViewRow(FrozenCamelModel, frozen=True):
     """One row of a list in the read sheet.
 
     A TOP of a meeting (in agenda order), a vote of a TOP (``meta`` is its result or
@@ -156,24 +150,24 @@ class TodoViewRow(_Out):
     done: bool | None = None
 
 
-class TodoLinkView(_Out):
+class TodoLinkView(FrozenCamelModel, frozen=True):
     """A link target as a card reader sees it: read only, without PII and without links."""
 
     kind: TodoLinkKind
     title: str
     detail: TodoLinkDetail
-    facts: list[TodoViewFact] = Field(default_factory=list)
+    facts: tuple[TodoViewFact, ...] = Field(default_factory=tuple)
     rows: list[TodoViewRow] = Field(default_factory=list)
 
 
-class ChecklistCount(_Out):
+class ChecklistCount(FrozenCamelModel, frozen=True):
     """Done and total items of a checklist."""
 
     done: int = 0
     total: int = 0
 
 
-class TodoEventBrief(_Out):
+class TodoEventBrief(FrozenCamelModel, frozen=True):
     """The event data of a card: start, end, place, participants and series."""
 
     starts_on: date | None = Field(default=None, serialization_alias="startsOn")
@@ -184,7 +178,7 @@ class TodoEventBrief(_Out):
     series_name: str | None = Field(default=None, serialization_alias="seriesName")
 
 
-class TodoEventTotals(_Out):
+class TodoEventTotals(FrozenCamelModel, frozen=True):
     """The money of an Event as decimal strings with two places (spec 000479)."""
 
     requested: str = "0.00"
@@ -194,7 +188,7 @@ class TodoEventTotals(_Out):
     balance: str = "0.00"
 
 
-class TodoEventDecision(_Out):
+class TodoEventDecision(FrozenCamelModel, frozen=True):
     """A decision of an Event: the valid decision of an Antrag or a closed vote."""
 
     kind: Literal["decision", "vote"]
@@ -207,7 +201,7 @@ class TodoEventDecision(_Out):
     conditions: list[str] = Field(default_factory=list)
 
 
-class TodoEventEdition(_Out):
+class TodoEventEdition(FrozenCamelModel, frozen=True):
     """Another Event of the series that the viewer reads."""
 
     id: UUID
@@ -220,23 +214,23 @@ class TodoEventEdition(_Out):
     totals: TodoEventTotals = Field(default_factory=TodoEventTotals)
 
 
-class TodoEventFacts(_Out):
+class TodoEventFacts(FrozenCamelModel, frozen=True):
     """What an Event gathers: its totals, decisions and the other Events of its series."""
 
     totals: TodoEventTotals = Field(default_factory=TodoEventTotals)
-    decisions: list[TodoEventDecision] = Field(default_factory=list)
+    decisions: tuple[TodoEventDecision, ...] = Field(default_factory=tuple)
     editions: list[TodoEventEdition] = Field(default_factory=list)
     hidden_editions: int = Field(default=0, serialization_alias="hiddenEditions")
 
 
-class TodoEventSeriesOut(_Out):
+class TodoEventSeriesOut(FrozenCamelModel, frozen=True):
     """A series of Events (``Reihe``)."""
 
     id: UUID
     name: str
 
 
-class TodoEventRef(_Out):
+class TodoEventRef(FrozenCamelModel, frozen=True):
     """An Event that the caller can write: an option of the ``Veranstaltung`` picker."""
 
     id: UUID
@@ -247,7 +241,7 @@ class TodoEventRef(_Out):
     ends_on: date | None = Field(default=None, serialization_alias="endsOn")
 
 
-class TodoCardTile(_Out):
+class TodoCardTile(FrozenCamelModel, frozen=True):
     """A card as a tile on the board; ``event`` is set for an Event."""
 
     id: UUID
@@ -258,7 +252,7 @@ class TodoCardTile(_Out):
     due_date: date | None = Field(default=None, serialization_alias="dueDate")
     completed_at: datetime | None = Field(default=None, serialization_alias="completedAt")
     label_ids: list[UUID] = Field(default_factory=list, serialization_alias="labelIds")
-    assignees: list[PersonRef] = Field(default_factory=list)
+    assignees: tuple[PersonRef, ...] = Field(default_factory=tuple)
     checklist: ChecklistCount = Field(default_factory=ChecklistCount)
     comment_count: int = Field(default=0, serialization_alias="commentCount")
     primary_link: TodoLinkOut | None = Field(default=None, serialization_alias="primaryLink")
@@ -269,7 +263,7 @@ class TodoCardTile(_Out):
     updated_at: datetime = Field(serialization_alias="updatedAt")
 
 
-class TodoBoardOut(_Out):
+class TodoBoardOut(FrozenCamelModel, frozen=True):
     """A board with its columns, labels and live cards."""
 
     id: UUID
@@ -279,20 +273,20 @@ class TodoBoardOut(_Out):
     archive_after_days: int | None = Field(default=None, serialization_alias="archiveAfterDays")
     can_write: bool = Field(default=True, serialization_alias="canWrite")
     can_configure: bool = Field(default=False, serialization_alias="canConfigure")
-    columns: list[TodoColumnOut] = Field(default_factory=list)
-    labels: list[TodoLabelOut] = Field(default_factory=list)
+    columns: tuple[TodoColumnOut, ...] = Field(default_factory=tuple)
+    labels: tuple[TodoLabelOut, ...] = Field(default_factory=tuple)
     cards: list[TodoCardTile] = Field(default_factory=list)
     archived_count: int = Field(default=0, serialization_alias="archivedCount")
 
 
-class TodoMember(_Out):
+class TodoMember(FrozenCamelModel, frozen=True):
     """A member of a board."""
 
     principal_id: UUID = Field(serialization_alias="principalId")
     display_name: str | None = Field(default=None, serialization_alias="displayName")
 
 
-class TodoCheckItemOut(_Out):
+class TodoCheckItemOut(FrozenCamelModel, frozen=True):
     """A checklist item."""
 
     id: UUID
@@ -301,7 +295,7 @@ class TodoCheckItemOut(_Out):
     position: int
 
 
-class TodoEventOut(_Out):
+class TodoEventOut(FrozenCamelModel, frozen=True):
     """An event of the card history."""
 
     id: UUID
@@ -311,20 +305,20 @@ class TodoEventOut(_Out):
     payload: dict[str, JsonValue] = Field(default_factory=dict)
 
 
-class TodoCommentOut(_Out):
+class TodoCommentOut(FrozenCamelModel, frozen=True):
     """A comment of a card."""
 
     id: UUID
     author: PersonRef
     body: str
-    mentions: list[PersonRef] = Field(default_factory=list)
+    mentions: tuple[PersonRef, ...] = Field(default_factory=tuple)
     at: datetime
     edited_at: datetime | None = Field(default=None, serialization_alias="editedAt")
     is_own: bool = Field(default=False, serialization_alias="isOwn")
     attachments: list[MessageAttachmentOut] = Field(default_factory=list)
 
 
-class TodoColumnRef(_Out):
+class TodoColumnRef(FrozenCamelModel, frozen=True):
     """A column of the board of a card."""
 
     id: UUID
@@ -332,30 +326,30 @@ class TodoColumnRef(_Out):
     is_done: bool = Field(serialization_alias="isDone")
 
 
-class TodoCardDetail(TodoCardTile):
+class TodoCardDetail(TodoCardTile, frozen=True):
     """A card with its description, links, checklist, history and comments."""
 
     description_md: str | None = Field(default=None, serialization_alias="descriptionMd")
     board_name: str = Field(serialization_alias="boardName")
     board_kind: TodoBoardKind = Field(serialization_alias="boardKind")
     can_write: bool = Field(default=True, serialization_alias="canWrite")
-    columns: list[TodoColumnRef] = Field(default_factory=list)
-    labels: list[TodoLabelOut] = Field(default_factory=list)
-    board_labels: list[TodoLabelOut] = Field(
-        default_factory=list, serialization_alias="boardLabels"
+    columns: tuple[TodoColumnRef, ...] = Field(default_factory=tuple)
+    labels: tuple[TodoLabelOut, ...] = Field(default_factory=tuple)
+    board_labels: tuple[TodoLabelOut, ...] = Field(
+        default_factory=tuple, serialization_alias="boardLabels"
     )
     created_by: PersonRef = Field(serialization_alias="createdBy")
-    links: list[TodoLinkOut] = Field(default_factory=list)
-    checklist_items: list[TodoCheckItemOut] = Field(
-        default_factory=list, serialization_alias="checklistItems"
+    links: tuple[TodoLinkOut, ...] = Field(default_factory=tuple)
+    checklist_items: tuple[TodoCheckItemOut, ...] = Field(
+        default_factory=tuple, serialization_alias="checklistItems"
     )
-    events: list[TodoEventOut] = Field(default_factory=list)
-    comments: list[TodoCommentOut] = Field(default_factory=list)
+    events: tuple[TodoEventOut, ...] = Field(default_factory=tuple)
+    comments: tuple[TodoCommentOut, ...] = Field(default_factory=tuple)
     archived_at: datetime | None = Field(default=None, serialization_alias="archivedAt")
     event_facts: TodoEventFacts | None = Field(default=None, serialization_alias="eventFacts")
 
 
-class TodoMineItem(TodoCardTile):
+class TodoMineItem(TodoCardTile, frozen=True):
     """A card of ``GET /todos/mine``, with its board and column names."""
 
     board_name: str = Field(serialization_alias="boardName")
@@ -364,14 +358,14 @@ class TodoMineItem(TodoCardTile):
     labels: list[TodoLabelOut] = Field(default_factory=list)
 
 
-class TodoMine(_Out):
+class TodoMine(FrozenCamelModel, frozen=True):
     """The cards assigned to the caller."""
 
     items: list[TodoMineItem] = Field(default_factory=list)
     due_soon_count: int = Field(default=0, serialization_alias="dueSoonCount")
 
 
-class TodoAssignedBoard(_Out):
+class TodoAssignedBoard(FrozenCamelModel, frozen=True):
     """A board of ``GET /todos/mine/boards`` or ``GET /todos/all/boards``.
 
     ``columns`` are all columns of the board in their order; ``cardCount`` counts the
@@ -387,12 +381,12 @@ class TodoAssignedBoard(_Out):
     kind: TodoBoardKind
     gremium_id: UUID | None = Field(default=None, serialization_alias="gremiumId")
     can_write: bool = Field(default=True, serialization_alias="canWrite")
-    columns: list[TodoColumnOut] = Field(default_factory=list)
+    columns: tuple[TodoColumnOut, ...] = Field(default_factory=tuple)
     labels: list[TodoLabelOut] = Field(default_factory=list)
     cards: list[TodoCardTile] = Field(default_factory=list)
 
 
-class TodoLinkTarget(_Out):
+class TodoLinkTarget(FrozenCamelModel, frozen=True):
     """A target that a link can point at, found by the link search."""
 
     kind: TodoLinkKind
@@ -401,7 +395,7 @@ class TodoLinkTarget(_Out):
     detail: TodoLinkDetail = Field(default_factory=TodoLinkDetail)
 
 
-class TodoLinkedCard(_Out):
+class TodoLinkedCard(FrozenCamelModel, frozen=True):
     """A card that links a given target."""
 
     id: UUID
@@ -411,59 +405,59 @@ class TodoLinkedCard(_Out):
     column_name: str = Field(serialization_alias="columnName")
     is_done: bool = Field(serialization_alias="isDone")
     due_date: date | None = Field(default=None, serialization_alias="dueDate")
-    assignees: list[PersonRef] = Field(default_factory=list)
+    assignees: tuple[PersonRef, ...] = Field(default_factory=tuple)
     event: TodoEventBrief | None = None
     balance: str | None = None
 
 
-class BoardPatch(_In):
+class BoardPatch(FrozenStrictCamelModel, frozen=True):
     """A change of the board name or the archive delay."""
 
     name: str | None = Field(default=None, min_length=1, max_length=120)
     archive_after_days: int | None = Field(default=None, alias="archiveAfterDays", ge=1, le=365)
 
 
-class ColumnCreate(_In):
+class ColumnCreate(FrozenStrictCamelModel, frozen=True):
     """A new column."""
 
     name: str = Field(min_length=1, max_length=60)
 
 
-class ColumnPatch(_In):
+class ColumnPatch(FrozenStrictCamelModel, frozen=True):
     """A change of the column name, or ``isDone: true`` to make it the done column."""
 
     name: str | None = Field(default=None, min_length=1, max_length=60)
     is_done: Literal[True] | None = Field(default=None, alias="isDone")
 
 
-class ColumnOrder(_In):
+class ColumnOrder(FrozenStrictCamelModel, frozen=True):
     """The new order of all columns."""
 
     column_ids: list[UUID] = Field(alias="columnIds", min_length=1, max_length=50)
 
 
-class LabelCreate(_In):
+class LabelCreate(FrozenStrictCamelModel, frozen=True):
     """A new label."""
 
     name: str = Field(min_length=1, max_length=40)
     color: TodoLabelColor
 
 
-class LabelPatch(_In):
+class LabelPatch(FrozenStrictCamelModel, frozen=True):
     """A change of a label."""
 
     name: str | None = Field(default=None, min_length=1, max_length=40)
     color: TodoLabelColor | None = None
 
 
-class LinkIn(_In):
+class LinkIn(FrozenStrictCamelModel, frozen=True):
     """A new link of a card."""
 
     kind: TodoLinkKind
     target_id: UUID = Field(alias="targetId")
 
 
-class EventIn(_In):
+class EventIn(FrozenStrictCamelModel, frozen=True):
     """The event data of a card (spec 000478)."""
 
     starts_on: date | None = Field(default=None, alias="startsOn")
@@ -473,13 +467,13 @@ class EventIn(_In):
     series_id: UUID | None = Field(default=None, alias="seriesId")
 
 
-class SeriesCreate(_In):
+class SeriesCreate(FrozenStrictCamelModel, frozen=True):
     """A new series."""
 
     name: str = Field(min_length=1, max_length=200)
 
 
-class CardCreate(_In):
+class CardCreate(FrozenStrictCamelModel, frozen=True):
     """A new card."""
 
     board_id: UUID = Field(alias="boardId")
@@ -487,13 +481,15 @@ class CardCreate(_In):
     title: str = Field(min_length=1, max_length=300)
     description_md: str | None = Field(default=None, alias="descriptionMd", max_length=20000)
     due_date: date | None = Field(default=None, alias="dueDate")
-    assignee_ids: list[UUID] = Field(default_factory=list, alias="assigneeIds", max_length=50)
-    label_ids: list[UUID] = Field(default_factory=list, alias="labelIds", max_length=50)
-    links: list[LinkIn] = Field(default_factory=list, max_length=20)
+    assignee_ids: tuple[UUID, ...] = Field(
+        default_factory=tuple, alias="assigneeIds", max_length=50
+    )
+    label_ids: tuple[UUID, ...] = Field(default_factory=tuple, alias="labelIds", max_length=50)
+    links: tuple[LinkIn, ...] = Field(default_factory=tuple, max_length=20)
     event: EventIn | None = None
 
 
-class CardPatch(_In):
+class CardPatch(FrozenStrictCamelModel, frozen=True):
     """A change of the card fields; ``version`` guards against a lost update."""
 
     version: int = Field(ge=1)
@@ -502,7 +498,7 @@ class CardPatch(_In):
     due_date: date | None = Field(default=None, alias="dueDate")
 
 
-class CardMove(_In):
+class CardMove(FrozenStrictCamelModel, frozen=True):
     """A move inside the board, between ``afterId`` (above) and ``beforeId`` (below)."""
 
     column_id: UUID = Field(alias="columnId")
@@ -510,7 +506,7 @@ class CardMove(_In):
     after_id: UUID | None = Field(default=None, alias="afterId")
 
 
-class CardTransfer(_In):
+class CardTransfer(FrozenStrictCamelModel, frozen=True):
     """The target of a transfer; ``beforeId``/``afterId`` as in ``CardMove`` (default: the end)."""
 
     board_id: UUID = Field(alias="boardId")
@@ -519,25 +515,25 @@ class CardTransfer(_In):
     after_id: UUID | None = Field(default=None, alias="afterId")
 
 
-class AssigneeIn(_In):
+class AssigneeIn(FrozenStrictCamelModel, frozen=True):
     """An assignee to add."""
 
     principal_id: UUID = Field(alias="principalId")
 
 
-class CardLabelIn(_In):
+class CardLabelIn(FrozenStrictCamelModel, frozen=True):
     """A label to add to a card."""
 
     label_id: UUID = Field(alias="labelId")
 
 
-class CheckItemCreate(_In):
+class CheckItemCreate(FrozenStrictCamelModel, frozen=True):
     """A new checklist item."""
 
     text: str = Field(min_length=1, max_length=500)
 
 
-class CheckItemPatch(_In):
+class CheckItemPatch(FrozenStrictCamelModel, frozen=True):
     """A change of a checklist item."""
 
     text: str | None = Field(default=None, min_length=1, max_length=500)
@@ -545,15 +541,17 @@ class CheckItemPatch(_In):
     position: int | None = Field(default=None, ge=0, le=1000)
 
 
-class CommentIn(_In):
+class CommentIn(FrozenStrictCamelModel, frozen=True):
     """The edit of a comment: text and mentions; the files stay."""
 
     body: str = Field(min_length=1, max_length=10000)
-    mentions: list[UUID] = Field(default_factory=list, max_length=50)
+    mentions: tuple[UUID, ...] = Field(default_factory=tuple, max_length=50)
 
 
-class CommentCreate(MessageFilesIn, _In):
+class CommentCreate(MessageFilesIn):
     """A new comment. The body may be empty only with at least one file."""
 
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
     body: str = Field(max_length=10000)
-    mentions: list[UUID] = Field(default_factory=list, max_length=50)
+    mentions: tuple[UUID, ...] = Field(default_factory=tuple, max_length=50)
