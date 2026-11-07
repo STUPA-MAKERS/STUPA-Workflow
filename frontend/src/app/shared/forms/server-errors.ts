@@ -1,10 +1,12 @@
+import type { AbstractControl } from '@angular/forms';
 import type { FormlyFieldConfig } from '@ngx-formly/core';
 import type { TranslationKey } from '@core/i18n/translations';
+import { withEntry } from '@shared/util/immutable';
 
 /** One entry of `errors` in a 422 problem+json answer. */
 export interface ServerFieldError {
-  field: string;
-  msg: string;
+  readonly field: string;
+  readonly msg: string;
 }
 
 /** The answer key of an error path: `positions[1].offers[0]` gives `positions`. */
@@ -43,12 +45,36 @@ export function findFieldByKey(
   fields: readonly FormlyFieldConfig[],
   key: string,
 ): FormlyFieldConfig | undefined {
-  for (const f of fields) {
-    if (f.key === key) return f;
-    const inner = f.fieldGroup ? findFieldByKey(f.fieldGroup, key) : undefined;
-    if (inner) return inner;
-  }
-  return undefined;
+  return fields.reduce<FormlyFieldConfig | undefined>(
+    (hit, f) =>
+      hit ?? (f.key === key ? f : f.fieldGroup ? findFieldByKey(f.fieldGroup, key) : undefined),
+    undefined,
+  );
+}
+
+/** A server error, the field it names and the control of that field. */
+interface PlacedError {
+  readonly error: ServerFieldError;
+  readonly field: FormlyFieldConfig;
+  readonly control: AbstractControl;
+}
+
+/** The messages of each `positions` field, index → text; the first error of a position wins. */
+function positionMessages(
+  placed: readonly PlacedError[],
+  translate: (key: TranslationKey) => string,
+): ReadonlyMap<FormlyFieldConfig, Readonly<Record<number, string>>> {
+  return placed.reduce<ReadonlyMap<FormlyFieldConfig, Readonly<Record<number, string>>>>(
+    (acc, { error, field }) => {
+      const index = errorPositionIndex(error.field);
+      const map = acc.get(field) ?? {};
+      const at = index ?? -1;
+      const text =
+        map[at] ?? translate(index === null ? 'forms.errors.server' : positionErrorKey(error));
+      return withEntry(acc, field, { ...map, [at]: text });
+    },
+    new Map(),
+  );
 }
 
 /**
@@ -66,21 +92,16 @@ export function applyServerErrors(
   errors: readonly ServerFieldError[],
   translate: (key: TranslationKey) => string,
 ): number {
-  let placed = 0;
-  const byPosition = new Map<FormlyFieldConfig, Record<number, string>>();
-  for (const error of errors) {
+  const placed = errors.flatMap((error): PlacedError[] => {
     const field = findFieldByKey(fields, errorRootKey(error.field));
     const control = field?.formControl;
-    if (!field || !control) continue;
-    placed++;
-    if (field.type === 'positions') {
-      const index = errorPositionIndex(error.field);
-      const map = byPosition.get(field) ?? {};
-      const at = index ?? -1;
-      map[at] ??= translate(index === null ? 'forms.errors.server' : positionErrorKey(error));
-      byPosition.set(field, map);
-      continue;
-    }
+    return field && control ? [{ error, field, control }] : [];
+  });
+  const byPosition = positionMessages(
+    placed.filter(({ field }) => field.type === 'positions'),
+    translate,
+  );
+  for (const { field, control } of placed.filter(({ field }) => field.type !== 'positions')) {
     field.props ??= {};
     field.props['errorText'] = translate('forms.errors.server');
     control.setErrors({ ...(control.errors ?? {}), server: true });
@@ -93,12 +114,12 @@ export function applyServerErrors(
   }
   for (const [field, map] of byPosition) {
     field.props ??= {};
-    field.props['serverErrors'] = map;
+    field.props['serverErrors'] = { ...map };
     field.formControl?.setErrors({ ...(field.formControl.errors ?? {}), server: true });
     field.formControl?.markAsTouched();
     field.options?.detectChanges?.(field);
   }
-  return placed;
+  return placed.length;
 }
 
 /** Remove the server messages of an earlier save from every field. */

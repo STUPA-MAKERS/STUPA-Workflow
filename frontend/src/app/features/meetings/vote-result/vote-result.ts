@@ -22,10 +22,12 @@ import { clock } from '@shared/date-format';
 export function voteResultInfo(vote: MeetingVote, t: Translate, locale: string): VoteCalloutInfo {
   if (vote.kind === 'election') return electionResultInfo(vote, t, locale);
   if (vote.kind === 'poll') return pollResultInfo(vote, t, locale);
-  const parts = [t('meetings.voteResult.caption')];
   const time = clock(vote.closedAt, toFormatLocale(locale));
-  if (time) parts.push(time);
-  if (vote.majorityRule) parts.push(t(`vote.majority.${vote.majorityRule}` as TranslationKey));
+  const parts = [
+    t('meetings.voteResult.caption'),
+    ...(time ? [time] : []),
+    ...(vote.majorityRule ? [t(`vote.majority.${vote.majorityRule}` as TranslationKey)] : []),
+  ];
   const passed = vote.result === 'passed';
   return {
     caption: parts.join(' · '),
@@ -47,9 +49,8 @@ export function voteResultInfo(vote: MeetingVote, t: Translate, locale: string):
 
 /** The card of a personnel election: "Wahl · 2 Posten · 18:52" and "Gewählt". */
 function electionResultInfo(vote: MeetingVote, t: Translate, locale: string): VoteCalloutInfo {
-  const parts = [electionCaption(vote.election ?? null, vote.round, t)];
   const time = clock(vote.closedAt, toFormatLocale(locale));
-  if (time) parts.push(time);
+  const parts = [electionCaption(vote.election ?? null, vote.round, t), ...(time ? [time] : [])];
   const elected = vote.result === 'elected';
   return {
     caption: parts.join(' · '),
@@ -68,9 +69,9 @@ function electionResultInfo(vote: MeetingVote, t: Translate, locale: string): Vo
 
 /** The card of a poll: "Umfrage · Einzelwahl · 18:52". A poll has no result. */
 function pollResultInfo(vote: MeetingVote, t: Translate, locale: string): VoteCalloutInfo {
-  const parts = vote.poll ? [pollCaption(vote.poll, t)] : [t('meetings.vote.kind.poll')];
+  const kind = vote.poll ? pollCaption(vote.poll, t) : t('meetings.vote.kind.poll');
   const time = clock(vote.closedAt, toFormatLocale(locale));
-  if (time) parts.push(time);
+  const parts = [kind, ...(time ? [time] : [])];
   return {
     caption: parts.join(' · '),
     result: null,
@@ -111,13 +112,15 @@ export function voteResultResolver(
   t: Translate,
   locale: string,
 ): VoteCalloutResolver {
-  const byQuestion = new Map<string, MeetingVote[]>();
-  for (const v of votes) {
-    if (v.status !== 'closed') continue;
-    if (v.kind !== 'election' && v.kind !== 'poll' && !(v.question?.trim() || v.title?.trim())) continue;
-    const key = normalizeQuestion(voteSnippetQuestion(v));
-    byQuestion.set(key, [...(byQuestion.get(key) ?? []), v]);
-  }
+  const cards = votes.filter(
+    (v) =>
+      v.status === 'closed' &&
+      (v.kind === 'election' || v.kind === 'poll' || !!(v.question?.trim() || v.title?.trim())),
+  );
+  const keyOf = (v: MeetingVote): string => normalizeQuestion(voteSnippetQuestion(v));
+  const byQuestion: ReadonlyMap<string, readonly MeetingVote[]> = new Map(
+    [...new Set(cards.map(keyOf))].map((key) => [key, cards.filter((v) => keyOf(v) === key)]),
+  );
   return (question, lines) => {
     const found = byQuestion.get(normalizeQuestion(question)) ?? [];
     const kind = lines?.[0]?.trim();

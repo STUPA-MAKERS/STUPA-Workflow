@@ -251,7 +251,6 @@ class _FakeConfig:
                 id=uuid4(),
                 name="n8n",
                 url="https://h/x",
-                events=["status_changed"],
                 active=True,
             )
         ]
@@ -263,7 +262,6 @@ class _FakeConfig:
             id=uuid4(),
             name=payload.name,
             url=payload.url,
-            events=payload.events,
             active=payload.active,
         )
 
@@ -274,7 +272,6 @@ class _FakeConfig:
             id=webhook_id,
             name="n8n",
             url="https://h/x",
-            events=["status_changed"],
             active=False,
         )
 
@@ -733,12 +730,12 @@ def test_webhooks_crud_and_validation(app: FastAPI, client: TestClient) -> None:
     assert client.get("/api/admin/webhooks").json()[0]["name"] == "n8n"
     ok = client.post(
         "/api/admin/webhooks",
-        json={"name": "h", "url": "https://h/x", "events": ["status_changed"]},
+        json={"name": "h", "url": "https://h/x"},
     )
     assert ok.status_code == 201
     bad = client.post(
         "/api/admin/webhooks",
-        json={"name": "h", "url": "ftp://h/x", "events": ["status_changed"]},
+        json={"name": "h", "url": "ftp://h/x"},
     )
     assert bad.status_code == 422
     withid = client.post(
@@ -747,7 +744,6 @@ def test_webhooks_crud_and_validation(app: FastAPI, client: TestClient) -> None:
             "id": "",
             "name": "h",
             "url": "https://h/y",
-            "events": ["vote_closed"],
             "active": True,
         },
     )

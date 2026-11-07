@@ -152,7 +152,7 @@ export const AUDIT_ACTIONS = [
 ] as const;
 
 /** Target type to router target: the detail page or the admin list that owns the target. */
-const TARGET_ROUTES: Record<string, (id: string) => string[]> = {
+const TARGET_ROUTES: Record<string, (id: string) => readonly string[]> = {
   application: (id) => ['/applications', id],
   vote: (id) => ['/voting', id],
   meeting: (id) => ['/meetings', id],
@@ -200,18 +200,18 @@ const TARGET_KEYS = new Set(['revisionId']);
 
 /** One data row of the details. A known key has a label; any other key shows as code. */
 export interface AuditDataRow {
-  key: string;
-  label: string;
-  value: string;
-  known: boolean;
+  readonly key: string;
+  readonly label: string;
+  readonly value: string;
+  readonly known: boolean;
 }
 
 /** The state of the chain check at the top of the page. */
 type VerifyState =
-  | { status: 'loading' }
-  | { status: 'stored'; check: AuditVerification }
-  | { status: 'never' }
-  | { status: 'error' };
+  | { readonly status: 'loading' }
+  | { readonly status: 'stored'; readonly check: AuditVerification }
+  | { readonly status: 'never' }
+  | { readonly status: 'error' };
 
 /**
  * The audit log.
@@ -262,8 +262,8 @@ export class AuditLogComponent {
   private readonly auth = inject(AuthService);
   private readonly toast = inject(ToastService);
 
-  protected readonly entries = signal<AuditEntry[]>([]);
-  protected readonly actors = signal<AuditActor[]>([]);
+  protected readonly entries = signal<readonly AuditEntry[]>([]);
+  protected readonly actors = signal<readonly AuditActor[]>([]);
   protected readonly cursor = signal<number | null>(null);
   protected readonly hasMore = signal(false);
   protected readonly loading = signal(false);
@@ -332,13 +332,13 @@ export class AuditLogComponent {
       timeStyle: 'short',
     }).format(new Date(checkedAt(check)));
     const parts = [
+      ...(check.brokenAt != null
+        ? [this.i18n.translate('admin.health.audit.brokenAt', { id: check.brokenAt })]
+        : []),
       this.i18n.translate('admin.audit.verify.checkedOn', { when: at }),
       triggerLabel(check.trigger, this.i18n),
       this.i18n.translate('admin.health.entries', { count: formatCount(check.checked, this.i18n) }),
     ];
-    if (check.brokenAt != null) {
-      parts.unshift(this.i18n.translate('admin.health.audit.brokenAt', { id: check.brokenAt }));
-    }
     return check.valid
       ? { kind: 'ok', title: this.i18n.translate('admin.health.audit.ok'), sub: parts.join(' · ') }
       : { kind: 'error', title: this.i18n.translate('admin.health.audit.broken'), sub: parts.join(' · ') };
@@ -452,11 +452,7 @@ export class AuditLogComponent {
     this.api.getConfigRevisionDiff(rid).subscribe({
       next: (d) => this.diffs.update((m) => new Map(m).set(rid, d)),
       error: () =>
-        this.diffs.update((m) => {
-          const next = new Map(m);
-          next.delete(rid);
-          return next;
-        }),
+        this.diffs.update((m) => new Map([...m].filter(([key]) => key !== rid))),
     });
   }
 
@@ -575,7 +571,7 @@ export class AuditLogComponent {
   }
 
   /** Router target for the target of the entry, if a page exists for it. */
-  protected targetLink(e: AuditEntry): string[] | null {
+  protected targetLink(e: AuditEntry): readonly string[] | null {
     if (!e.targetType || !e.targetId) return null;
     return TARGET_ROUTES[e.targetType]?.(e.targetId) ?? null;
   }

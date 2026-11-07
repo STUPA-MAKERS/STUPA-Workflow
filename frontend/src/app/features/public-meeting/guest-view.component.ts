@@ -37,10 +37,10 @@ import { TopBadgeComponent } from '../meetings/top-badge/top-badge.component';
 
 /** One agenda row of the guest view. */
 interface AgendaRow {
-  item: GuestAgendaItem;
-  done: boolean;
-  now: boolean;
-  sub: string;
+  readonly item: GuestAgendaItem;
+  readonly done: boolean;
+  readonly now: boolean;
+  readonly sub: string;
 }
 
 /**
@@ -89,7 +89,7 @@ export class GuestViewComponent {
   /** The vote on its own page, or `null` for the overview. */
   protected readonly openVoteId = signal<string | null>(null);
   /** The votes that opened their page once by themselves. */
-  private readonly autoOpened = new Set<string>();
+  private autoOpened: ReadonlySet<string> = new Set();
 
   protected readonly view = computed(() => this.me().view);
   protected readonly watch = computed(() => this.me().meeting.guestsMode === 'watch');
@@ -112,12 +112,14 @@ export class GuestViewComponent {
     () => this.ordered().find((i) => i.id === this.view()?.currentAgendaItemId) ?? null,
   );
 
-  protected readonly rows = computed<AgendaRow[]>(() =>
+  protected readonly rows = computed<readonly AgendaRow[]>(() =>
     this.ordered().map((item) => {
       const now = item.position === this.currentPos();
-      let sub = '';
-      if (item.nonPublic) sub = this.i18n.translate('guests.view.membersOnly');
-      else if (item.kind === 'application') sub = this.i18n.translate('guests.view.application');
+      const sub = item.nonPublic
+        ? this.i18n.translate('guests.view.membersOnly')
+        : item.kind === 'application'
+          ? this.i18n.translate('guests.view.application')
+          : '';
       return { item, done: item.done, now, sub };
     }),
   );
@@ -126,11 +128,12 @@ export class GuestViewComponent {
   protected readonly currentLine = computed(() => {
     const c = this.current();
     if (!c) return '';
-    const parts = [
+    const application = c.kind === 'application' && !c.nonPublic;
+    const kind = application ? [this.i18n.translate('guests.view.application')] : [];
+    return [
       this.i18n.translate('guests.view.topOf', { n: c.position, m: this.ordered().length }),
-    ];
-    if (c.kind === 'application' && !c.nonPublic) parts.push(this.i18n.translate('guests.view.application'));
-    return parts.join(' · ');
+      ...kind,
+    ].join(' · ');
   });
 
   /** The protocol excerpts: the public items with text, the newest first. */
@@ -194,7 +197,7 @@ export class GuestViewComponent {
       const v = this.focusVote();
       untracked(() => {
         if (v && v.status === 'open' && v.canCast && !this.autoOpened.has(v.id)) {
-          this.autoOpened.add(v.id);
+          this.autoOpened = new Set([...this.autoOpened, v.id]);
           this.openVoteId.set(v.id);
         }
       });

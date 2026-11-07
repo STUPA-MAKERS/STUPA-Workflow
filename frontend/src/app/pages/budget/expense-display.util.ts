@@ -5,7 +5,7 @@ import { nodeColors } from './budget-color.util';
 
 /** Top-level node whose subtree contains `targetId` (fiscal years live at the top). */
 export function findTopBudgetNode(
-  nodes: BudgetTreeNode[],
+  nodes: readonly BudgetTreeNode[],
   targetId: string,
 ): BudgetTreeNode | null {
   const contains = (n: BudgetTreeNode): boolean =>
@@ -15,28 +15,27 @@ export function findTopBudgetNode(
 
 /** How a booking row names its cost centre: the name, the path and the swatch colour. */
 export interface CostCentreLabel {
-  name: string;
-  path: string;
+  readonly name: string;
+  readonly path: string;
   /** The display colour of the budget page. `null` for an unknown cost centre. */
-  color: string | null;
+  readonly color: string | null;
 }
 
 /** The label of every cost centre of a forest, by id. */
-export function costCentreIndex(roots: readonly BudgetTreeNode[]): Map<string, CostCentreLabel> {
+export function costCentreIndex(
+  roots: readonly BudgetTreeNode[],
+): ReadonlyMap<string, CostCentreLabel> {
   const colors = nodeColors(roots);
-  const out = new Map<string, CostCentreLabel>();
-  const walk = (nodes: readonly BudgetTreeNode[]): void => {
-    for (const n of nodes) {
-      out.set(n.id, {
-        name: n.name,
-        path: simplifyPathKey(n.pathKey),
-        color: colors.get(n.id) ?? null,
-      });
-      walk(n.children);
-    }
-  };
-  walk(roots);
-  return out;
+  const label = (n: BudgetTreeNode): CostCentreLabel => ({
+    name: n.name,
+    path: simplifyPathKey(n.pathKey),
+    color: colors.get(n.id) ?? null,
+  });
+  const entries = (
+    nodes: readonly BudgetTreeNode[],
+  ): readonly (readonly [string, CostCentreLabel])[] =>
+    nodes.flatMap((n) => [[n.id, label(n)] as const, ...entries(n.children)]);
+  return new Map(entries(roots));
 }
 
 /**
@@ -65,12 +64,10 @@ export function signedEur(kind: ExpenseKind, amount: string, locale: string): st
 
 /** A node of the forest by id, or null. */
 export function findBudgetNode(nodes: readonly BudgetTreeNode[], id: string): BudgetTreeNode | null {
-  for (const n of nodes) {
-    if (n.id === id) return n;
-    const hit = findBudgetNode(n.children, id);
-    if (hit) return hit;
-  }
-  return null;
+  return nodes.reduce<BudgetTreeNode | null>(
+    (hit, n) => hit ?? (n.id === id ? n : findBudgetNode(n.children, id)),
+    null,
+  );
 }
 
 /**
@@ -79,26 +76,24 @@ export function findBudgetNode(nodes: readonly BudgetTreeNode[], id: string): Bu
  * itself. Null for a cost centre outside the forest.
  */
 export function costCentreTrail(nodes: readonly BudgetTreeNode[], id: string): string | null {
-  const walk = (list: readonly BudgetTreeNode[], trail: string[]): string[] | null => {
-    for (const n of list) {
+  const walk = (
+    list: readonly BudgetTreeNode[],
+    trail: readonly string[],
+  ): readonly string[] | null =>
+    list.reduce<readonly string[] | null>((hit, n) => {
       const next = [...trail, n.name];
-      if (n.id === id) return next;
-      const hit = walk(n.children, next);
-      if (hit) return hit;
-    }
-    return null;
-  };
+      return hit ?? (n.id === id ? next : walk(n.children, next));
+    }, null);
   const names = walk(nodes, []);
-  if (!names) return null;
-  return (names.length > 1 ? names.slice(1) : names).join(' › ');
+  return names ? (names.length > 1 ? names.slice(1) : names).join(' › ') : null;
 }
 
 /** The figures of a cost centre in one fiscal year, as numbers. */
 export interface CostCentreFigures {
-  allocated: number;
-  expended: number;
-  bound: number;
-  available: number;
+  readonly allocated: number;
+  readonly expended: number;
+  readonly bound: number;
+  readonly available: number;
 }
 
 /** The figures of a node in a fiscal year, or null when the year has no allocation row. */
@@ -119,7 +114,7 @@ export function costCentreFigures(
 }
 
 /** The common VAT rates in percent. Only these show as a rate. */
-const VAT_RATES = [0, 5, 7, 16, 19];
+const VAT_RATES: readonly number[] = [0, 5, 7, 16, 19];
 
 /**
  * The VAT rate of an invoice in percent, when tax / net gives one of the common rates

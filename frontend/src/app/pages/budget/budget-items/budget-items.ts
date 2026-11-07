@@ -20,7 +20,7 @@ export function mergeBudgetItems(
   apps: readonly BudgetApplication[],
   bookings: readonly Expense[],
   bookingsDone: boolean,
-): BudgetItem[] {
+): readonly BudgetItem[] {
   const items: BudgetItem[] = [
     ...apps.map((app): BudgetItem => ({ type: 'application', at: app.createdAt, app })),
     ...bookings.map((booking): BudgetItem => ({ type: 'booking', at: booking.createdAt, booking })),

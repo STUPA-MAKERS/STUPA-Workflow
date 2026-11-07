@@ -36,22 +36,14 @@ export class ExpenseSubBookingsState {
 
   /** `detail`: the first read of an opened booking, which takes what the list read ahead. */
   loadSub(id: string, detail = false): void {
-    this.loadingSub.update((s) => new Set(s).add(id));
+    this.loadingSub.update((s) => new Set([...s, id]));
     this.api.listSubBookings(id as Uuid, { detail }).subscribe({
       next: (rows) => {
         this.subRows.update((m) => new Map(m).set(id, rows));
-        this.loadingSub.update((s) => {
-          const n = new Set(s);
-          n.delete(id);
-          return n;
-        });
+        this.loadingSub.update((s) => withoutItem(s, id));
       },
       error: () => {
-        this.loadingSub.update((s) => {
-          const n = new Set(s);
-          n.delete(id);
-          return n;
-        });
+        this.loadingSub.update((s) => withoutItem(s, id));
         this.toast.error(this.i18n.translate('expenses.sub.loadError'));
       },
     });
@@ -100,4 +92,9 @@ export class ExpenseSubBookingsState {
         },
       });
   }
+}
+
+/** `set` without `item`. */
+function withoutItem(set: ReadonlySet<string>, item: string): ReadonlySet<string> {
+  return new Set([...set].filter((x) => x !== item));
 }

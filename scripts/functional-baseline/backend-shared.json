@@ -1,0 +1,6 @@
+{
+  "backend/app/shared/altcha.py": 4,
+  "backend/app/shared/errors.py": 3,
+  "backend/app/shared/ratelimit.py": 2,
+  "backend/app/shared/xlsx.py": 2
+}

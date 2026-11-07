@@ -57,6 +57,7 @@ import { clock, dayMonthYear, weekdayDate } from '@shared/date-format';
 import { formatMoment } from '@core/i18n/localized-date.pipe';
 import { groupByMonth } from '@shared/group-by-month';
 import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.directive';
+import { withEntry } from '@shared/util/immutable';
 
 /**
  * The status chip: every vote, the open votes, the ended votes, the drafts. A cancelled
@@ -68,7 +69,7 @@ export type VoteStatusFilter = '' | 'open' | 'ended' | 'draft';
 export type VoteKindFilter = '' | VoteKind;
 const KINDS: readonly VoteKind[] = ['motion', 'election', 'poll'];
 
-const STATUS_QUERY: Record<VoteStatusFilter, VoteStatus[]> = {
+const STATUS_QUERY: Readonly<Record<VoteStatusFilter, readonly VoteStatus[]>> = {
   '': ['open', 'closed'],
   open: ['open'],
   ended: ['closed'],
@@ -86,32 +87,56 @@ export const VOTE_MAX_LIMIT = 200;
 
 /** A vote that just opened: in a followed meeting, or a new open row of a refresh. */
 interface FreshVote {
-  id: Uuid;
-  meetingId: Uuid | null;
+  readonly id: Uuid;
+  readonly meetingId: Uuid | null;
 }
 
 /** One row as the template shows it. */
 export interface VoteRow {
-  item: VoteListItem;
+  readonly item: VoteListItem;
   /** The month key of `groupByMonth`: the end of an ended vote, else its start. */
-  createdAt: string;
-  title: string;
-  status: StatusView;
+  readonly createdAt: string;
+  readonly title: string;
+  readonly status: StatusView;
   /** "TOP 3 · 34. Sitzung …", else the gremium. */
-  where: string | null;
+  readonly where: string | null;
   /** "Abgestimmt", "Stimme offen" or nothing. */
-  ballot: 'cast' | 'pending' | null;
+  readonly ballot: 'cast' | 'pending' | null;
   /** "seit 18:48", "bis 07.10., 22:00", "12.06.2026". */
-  when: string | null;
+  readonly when: string | null;
   /** The exact moment, for the tooltip of `when`. */
-  whenTitle: string | null;
+  readonly whenTitle: string | null;
 }
 
 /** A group of rows: the open votes, the drafts, or one month of the ended votes. */
 export interface VoteGroup {
-  key: string;
-  label: string;
-  rows: VoteRow[];
+  readonly key: string;
+  readonly label: string;
+  readonly rows: readonly VoteRow[];
+}
+
+/**
+ * The time of a row as a translation key and a moment. Open: "bis <end>" when the vote
+ * has a planned end, else "seit <start>". Ended: the day it ended. Draft: the day it was
+ * made.
+ */
+function whenSource(
+  item: VoteListItem,
+  endInWhere: boolean,
+): readonly [TranslationKey | null, string | null] {
+  switch (item.status) {
+    case 'open':
+      return item.closesAt && !endInWhere
+        ? ['voting.list.until', item.closesAt]
+        : item.openedAt
+          ? ['voting.list.since', item.openedAt]
+          : [null, null];
+    case 'draft':
+      return [null, item.createdAt];
+    case 'closed':
+    case 'cancelled':
+      return [null, item.closedAt ?? item.openedAt];
+  }
 }
 
 /**
@@ -198,7 +223,7 @@ export class VotingComponent implements OnDestroy {
    */
   readonly reloading = signal(false);
   readonly error = signal(false);
-  readonly items = signal<VoteListItem[]>([]);
+  readonly items = signal<readonly VoteListItem[]>([]);
   readonly total = signal(0);
   /** Fetch sequence number. The handler drops a late answer of an older request. */
   private fetchSeq = 0;
@@ -208,9 +233,11 @@ export class VotingComponent implements OnDestroy {
    * The open votes the list has seen since its last load from the start, or `null` before
    * the first answer. An open vote that a refresh finds and that is not in here is new.
    */
-  private seenOpen: Set<Uuid> | null = null;
+  private seenOpen: ReadonlySet<Uuid> | null = null;
+  /** The meetings whose reads the list read ahead already, once per meeting. */
+  private prefetchedMeetings: ReadonlySet<Uuid> = new Set<Uuid>();
   /** The votes that opened by themselves. A vote opens by itself at most once. */
-  private readonly freshOpened = new Set<Uuid>();
+  private freshOpened: ReadonlySet<Uuid> = new Set<Uuid>();
 
   /** The search text of the filters, from the query params. */
   readonly q = signal('');
@@ -241,7 +268,7 @@ export class VotingComponent implements OnDestroy {
   readonly pollDialog = signal(false);
 
   /** "Art": Alle, Beschluss, Wahl, Umfrage. */
-  readonly kindOptions = computed<FilterSelectOption[]>(() => [
+  readonly kindOptions = computed<readonly FilterSelectOption[]>(() => [
     { value: '', label: this.i18n.translate('voting.list.filter.all') },
     ...KINDS.map((k) => ({ value: k, label: this.i18n.translate(`meetings.vote.kind.${k}`) })),
   ]);
@@ -260,17 +287,14 @@ export class VotingComponent implements OnDestroy {
       this.auth.canInAnyGremium('session.manage'),
   );
 
-  readonly statusOptions = computed<FilterSelectOption[]>(() => {
-    const opts: FilterSelectOption[] = [
-      { value: '', label: this.i18n.translate('voting.list.filter.all') },
-      { value: 'open', label: this.i18n.translate('voting.list.filter.open') },
-      { value: 'ended', label: this.i18n.translate('voting.list.filter.ended') },
-    ];
-    if (this.canManage()) {
-      opts.push({ value: 'draft', label: this.i18n.translate('voting.list.filter.draft') });
-    }
-    return opts;
-  });
+  readonly statusOptions = computed<readonly FilterSelectOption[]>(() => [
+    { value: '', label: this.i18n.translate('voting.list.filter.all') },
+    { value: 'open', label: this.i18n.translate('voting.list.filter.open') },
+    { value: 'ended', label: this.i18n.translate('voting.list.filter.ended') },
+    ...(this.canManage()
+      ? [{ value: 'draft', label: this.i18n.translate('voting.list.filter.draft') }]
+      : []),
+  ]);
   readonly statusChipLabel = computed(() => {
     const value = this.statusFilter();
     if (!value) return this.i18n.translate('voting.list.filter.status');
@@ -279,11 +303,10 @@ export class VotingComponent implements OnDestroy {
 
   /** The gremien of the person, plus the gremien of the loaded rows. */
   private readonly seenGremien = signal<ReadonlyMap<string, string>>(new Map());
-  readonly gremiumOptions = computed<FilterSelectOption[]>(() => {
-    const names = new Map<string, string>();
-    for (const g of this.auth.gremien()) names.set(g.id, g.name);
-    for (const [id, name] of this.seenGremien()) if (!names.has(id)) names.set(id, name);
-    const sorted = [...names].sort((a, b) => a[1].localeCompare(b[1], this.i18n.locale()));
+  readonly gremiumOptions = computed<readonly FilterSelectOption[]>(() => {
+    const own = new Map(this.auth.gremien().map((g) => [g.id, g.name] as const));
+    const seen = [...this.seenGremien()].filter(([id]) => !own.has(id));
+    const sorted = [...own, ...seen].sort((a, b) => a[1].localeCompare(b[1], this.i18n.locale()));
     return [
       { value: '', label: this.i18n.translate('voting.list.filter.all') },
       ...sorted.map(([value, label]) => ({ value, label })),
@@ -303,45 +326,46 @@ export class VotingComponent implements OnDestroy {
   /** The open votes among the loaded rows. They come first, so the count is exact. */
   readonly openCount = computed(() => this.items().filter((i) => i.status === 'open').length);
 
-  readonly rows = computed<VoteRow[]>(() => this.items().map((item) => this.toRow(item)));
+  readonly rows = computed<readonly VoteRow[]>(() => this.items().map((item) => this.toRow(item)));
 
   /** "Offen", "Entwürfe", then the ended votes by month. */
-  readonly groups = computed<VoteGroup[]>(() => {
+  readonly groups = computed<readonly VoteGroup[]>(() => {
     const rows = this.rows();
-    const out: VoteGroup[] = [];
     const open = rows.filter((r) => r.item.status === 'open');
     const drafts = rows.filter((r) => r.item.status === 'draft');
     const ended = rows.filter((r) => r.item.status === 'closed' || r.item.status === 'cancelled');
-    if (open.length) {
-      out.push({ key: 'open', label: this.i18n.translate('voting.list.group.open'), rows: open });
-    }
-    if (drafts.length) {
-      out.push({ key: 'draft', label: this.i18n.translate('voting.list.group.draft'), rows: drafts });
-    }
-    for (const g of groupByMonth(ended, (r) => r.createdAt, this.i18n.formatLocale())) {
-      out.push({ key: `m-${g.key}`, label: g.label, rows: g.items });
-    }
-    return out;
+    const months = groupByMonth(ended, (r) => r.createdAt, this.i18n.formatLocale());
+    return [
+      ...(open.length
+        ? [{ key: 'open', label: this.i18n.translate('voting.list.group.open'), rows: open }]
+        : []),
+      ...(drafts.length
+        ? [{ key: 'draft', label: this.i18n.translate('voting.list.group.draft'), rows: drafts }]
+        : []),
+      ...months.map((g) => ({ key: `m-${g.key}`, label: g.label, rows: g.items })),
+    ];
   });
 
   constructor() {
-    const meetings = new Set<Uuid>();
     prefetchDetails({
       items: this.items,
       key: (v) => v.id,
       reads: (v) => {
-        const reads: Observable<unknown>[] = [
+        const base: readonly Observable<unknown>[] = [
           this.api.getVote(v.id, { detail: true }),
           inject(DelegationsApiService).voteStatus(v.id, { detail: true }),
           inject(TodosApiService).linked('vote', v.id),
         ];
         const meetingId = v.meetingId;
-        if (meetingId && !meetings.has(meetingId)) {
-          meetings.add(meetingId);
-          reads.push(this.api.getMeeting(meetingId, { quiet: true, detail: true }));
-          if (v.agendaItemId) reads.push(this.api.listAgenda(meetingId, { quiet: true, detail: true }));
-        }
-        return reads;
+        if (!meetingId || this.prefetchedMeetings.has(meetingId)) return base;
+        this.prefetchedMeetings = new Set([...this.prefetchedMeetings, meetingId]);
+        return [
+          ...base,
+          this.api.getMeeting(meetingId, { quiet: true, detail: true }),
+          ...(v.agendaItemId
+            ? [this.api.listAgenda(meetingId, { quiet: true, detail: true })]
+            : []),
+        ];
       },
     });
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((pm) => {
@@ -467,7 +491,8 @@ export class VotingComponent implements OnDestroy {
   }
 
   private fetch(mode: 'initial' | 'refresh' | 'more', offset: number, limit: number): void {
-    const seq = ++this.fetchSeq;
+    const seq = this.fetchSeq + 1;
+    this.fetchSeq = seq;
     const status = this.statusFilter();
     this.api
       .listVotes({
@@ -511,7 +536,10 @@ export class VotingComponent implements OnDestroy {
    * filter hid before is not new. This finds the votes no channel reports, a poll of a
    * Gremium or a vote of a meeting that started after the page loaded.
    */
-  private trackOpen(mode: 'initial' | 'refresh' | 'more', items: VoteListItem[]): VoteListItem | null {
+  private trackOpen(
+    mode: 'initial' | 'refresh' | 'more',
+    items: readonly VoteListItem[],
+  ): VoteListItem | null {
     const known = mode === 'initial' || !this.seenOpen ? null : this.seenOpen;
     const open = items.filter((i) => i.status === 'open');
     const fresh = known
@@ -521,19 +549,21 @@ export class VotingComponent implements OnDestroy {
     return mode === 'refresh' ? fresh : null;
   }
 
-  private collectGremien(items: VoteListItem[]): void {
-    const next = new Map(this.seenGremien());
-    let changed = false;
-    for (const item of items) {
-      if (item.gremiumId && item.gremiumName && !next.has(item.gremiumId)) {
-        next.set(item.gremiumId, item.gremiumName);
-        changed = true;
-      }
-    }
-    if (changed) this.seenGremien.set(next);
+  private collectGremien(items: readonly VoteListItem[]): void {
+    const seen = this.seenGremien();
+    const next = items.reduce<ReadonlyMap<string, string>>(
+      (names, item) =>
+        item.gremiumId && item.gremiumName && !names.has(item.gremiumId)
+          ? withEntry(names, item.gremiumId, item.gremiumName)
+          : names,
+      seen,
+    );
+    if (next !== seen) this.seenGremien.set(next);
   }
 
   private liveTimer: ReturnType<typeof setTimeout> | null = null;
+  /** The open and the closed vote of each channel at the last live check, or `null` before it. */
+  private liveSignature: string | null = null;
 
   /**
    * The page updates itself: every `VOTE_POLL_MS` while the tab is visible, and when the
@@ -575,7 +605,6 @@ export class VotingComponent implements OnDestroy {
   private followLive(): void {
     this.followRunning();
 
-    let last: string | null = null;
     effect(() => {
       const sessions = [...this.page.sessions()];
       const opened = sessions.map(([, s]) => s.openVote());
@@ -583,13 +612,10 @@ export class VotingComponent implements OnDestroy {
         .map(([, s], i) => `${opened[i]?.voteId ?? '-'}:${s.result()?.voteId ?? '-'}`)
         .join('|');
       untracked(() => {
-        if (last === null) {
-          last = signature;
-          return;
-        }
-        if (signature === last) return;
+        const last = this.liveSignature;
+        this.liveSignature = signature;
+        if (last === null || signature === last) return;
         const known = new Set(last.split('|').map((part) => part.split(':')[0]));
-        last = signature;
         const at = this.loading()
           ? -1
           : opened.findIndex((msg) => !!msg && msg.replay !== true && !known.has(msg.voteId));
@@ -639,7 +665,7 @@ export class VotingComponent implements OnDestroy {
     if (this.freshOpened.has(fresh.id)) return;
     const selected = this.selectedId();
     if (!selected) {
-      this.freshOpened.add(fresh.id);
+      this.freshOpened = new Set([...this.freshOpened, fresh.id]);
       this.openRow(fresh.id);
       return;
     }
@@ -650,13 +676,13 @@ export class VotingComponent implements OnDestroy {
     if (!vote || !fresh.meetingId || vote.meetingId !== fresh.meetingId) return;
     const closed = this.page.sessions().get(fresh.meetingId)?.result()?.voteId === selected;
     if (vote.status === 'closed' || vote.status === 'cancelled' || closed) {
-      this.freshOpened.add(fresh.id);
+      this.freshOpened = new Set([...this.freshOpened, fresh.id]);
       this.openRow(fresh.id, true);
     }
   }
 
   /** Follow the meeting of every open meeting vote of the list. */
-  private followOpen(items: VoteListItem[]): void {
+  private followOpen(items: readonly VoteListItem[]): void {
     for (const item of items) {
       if (item.status === 'open' && item.meetingId) this.page.follow(item.meetingId);
     }
@@ -670,24 +696,15 @@ export class VotingComponent implements OnDestroy {
       (item.status === 'closed' && item.result
         ? closedStatus(item.kind, item.result)
         : this.statusOf(item.status));
-    let where: string | null = null;
-    if (item.meetingTitle) {
-      where =
-        item.agendaPosition === null
-          ? item.meetingTitle
-          : this.i18n.translate('voting.panel.wherePhone', {
-              meeting: item.meetingTitle,
-              n: item.agendaPosition,
-            });
-    }
-    if (poll && !item.meetingId && item.gremiumName) {
-      const until =
-        !ended && item.closesAt ? this.i18n.translate('voting.list.until', { time: this.endOf(item.closesAt) }) : null;
-      where = until ? `${item.gremiumName} · ${until}` : item.gremiumName;
-    }
-    let ballot: VoteRow['ballot'] = null;
-    if (item.myBallot.cast) ballot = 'cast';
-    else if (item.status === 'open' && item.canCast) ballot = 'pending';
+    const where =
+      poll && !item.meetingId && item.gremiumName
+        ? this.gremiumWhere(item.gremiumName, ended ? null : item.closesAt)
+        : this.meetingWhere(item);
+    const ballot: VoteRow['ballot'] = item.myBallot.cast
+      ? 'cast'
+      : item.status === 'open' && item.canCast
+        ? 'pending'
+        : null;
     const [when, whenTitle] = this.whenOf(item, poll && !item.meetingId);
     return {
       item,
@@ -701,14 +718,34 @@ export class VotingComponent implements OnDestroy {
     };
   }
 
+  /** "TOP 3 · 34. Sitzung …" or the meeting title, or `null` without a meeting. */
+  private meetingWhere(item: VoteListItem): string | null {
+    if (!item.meetingTitle) return null;
+    return item.agendaPosition === null
+      ? item.meetingTitle
+      : this.i18n.translate('voting.panel.wherePhone', {
+          meeting: item.meetingTitle,
+          n: item.agendaPosition,
+        });
+  }
+
+  /** "Vorstand · bis Fr, 30.10., 12:00": the gremium of a poll and its planned end. */
+  private gremiumWhere(gremiumName: string, closesAt: string | null | undefined): string {
+    const until = closesAt
+      ? this.i18n.translate('voting.list.until', { time: this.endOf(closesAt) })
+      : null;
+    return until ? `${gremiumName} · ${until}` : gremiumName;
+  }
+
   /** "Fr, 30.10., 12:00": the end of a poll of a Gremium. */
   private endOf(at: string): string {
     return weekdayDate(at, this.i18n.formatLocale(), { year: false, time: true });
   }
 
   private statusOf(status: VoteStatus): StatusView {
-    if (status === 'draft') return { kind: 'neutral', key: 'voting.list.status.draft' };
-    return meetingVoteStatus(status);
+    return status === 'draft'
+      ? { kind: 'neutral', key: 'voting.list.status.draft' }
+      : meetingVoteStatus(status);
   }
 
   /**
@@ -716,22 +753,8 @@ export class VotingComponent implements OnDestroy {
    * <start>". Ended: the day it ended. Draft: the day it was made. A time of today shows
    * only the clock.
    */
-  private whenOf(item: VoteListItem, endInWhere = false): [string | null, string | null] {
-    let key: TranslationKey | null = null;
-    let at: string | null = null;
-    if (item.status === 'open') {
-      if (item.closesAt && !endInWhere) {
-        key = 'voting.list.until';
-        at = item.closesAt;
-      } else if (item.openedAt) {
-        key = 'voting.list.since';
-        at = item.openedAt;
-      }
-    } else if (item.status === 'draft') {
-      at = item.createdAt;
-    } else {
-      at = item.closedAt ?? item.openedAt;
-    }
+  private whenOf(item: VoteListItem, endInWhere = false): readonly [string | null, string | null] {
+    const [key, at] = whenSource(item, endInWhere);
     if (!at) return [null, null];
     const date = new Date(at);
     if (Number.isNaN(date.getTime())) return [null, null];

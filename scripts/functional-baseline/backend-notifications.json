@@ -1,0 +1,5 @@
+{
+  "backend/app/modules/notifications/mail.py": 6,
+  "backend/app/modules/notifications/queue.py": 1,
+  "backend/app/modules/notifications/service.py": 13
+}

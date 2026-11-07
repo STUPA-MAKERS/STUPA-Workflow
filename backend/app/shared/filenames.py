@@ -80,26 +80,34 @@ def _drop_char(char: str) -> bool:
 
 def _drop_loose_joiners(name: str) -> str:
     """Remove a ZWJ or ZWNJ that does not sit between two visible characters."""
-    out: list[str] = []
-    for i, char in enumerate(name):
-        if char in _JOINERS:
-            before = name[i - 1] if i > 0 else ""
-            after = name[i + 1] if i + 1 < len(name) else ""
-            if not before or not after or {before, after} & set(" ."):
-                continue
-            if before in _JOINERS or after in _JOINERS:
-                continue
-        out.append(char)
-    return "".join(out)
+    return "".join(
+        char
+        for i, char in enumerate(name)
+        if char not in _JOINERS or not _loose_joiner(name, i)
+    )
+
+
+def _loose_joiner(name: str, i: int) -> bool:
+    """Tell whether the joiner at ``i`` lacks a visible character on one side."""
+    before = name[i - 1] if i > 0 else ""
+    after = name[i + 1] if i + 1 < len(name) else ""
+    return (
+        not before
+        or not after
+        or bool({before, after} & set(" ."))
+        or before in _JOINERS
+        or after in _JOINERS
+    )
 
 
 def _trim(name: str) -> str:
-    """Strip spaces and dots at both ends, and joiners that the strip exposed."""
-    previous = None
-    while previous != name:
-        previous = name
-        name = _drop_loose_joiners(name.strip(" ."))
-    return name
+    """Strip spaces and dots at both ends, and joiners that the strip exposed.
+
+    The function repeats until nothing changes, because a removed joiner can expose a
+    space or a dot at an edge.
+    """
+    trimmed = _drop_loose_joiners(name.strip(" ."))
+    return name if trimmed == name else _trim(trimmed)
 
 
 def _cap(name: str, limit: int) -> str:
@@ -132,8 +140,7 @@ def sanitize_display_name(filename: str | None, *, default: str = DEFAULT_NAME) 
         " " if unicodedata.category(c) == "Zs" else c for c in raw if not _drop_char(c)
     )
     name = _trim(_basename("".join(chars)))
-    name = _trim(_cap(name, DISPLAY_NAME_MAX))
-    return name or default
+    return _trim(_cap(name, DISPLAY_NAME_MAX)) or default
 
 
 def _ascii_fold(name: str) -> str:
@@ -152,8 +159,7 @@ def sanitize_storage_name(filename: str | None) -> str:
     """
     base = _basename(_ascii_fold(filename or "")).strip()
     cleaned = "".join(c if c in _STORAGE_SAFE else "_" for c in base).strip(" .")
-    cleaned = _cap(cleaned, STORAGE_NAME_MAX).strip(" .")
-    return cleaned or DEFAULT_NAME
+    return _cap(cleaned, STORAGE_NAME_MAX).strip(" .") or DEFAULT_NAME
 
 
 def _ascii_fallback(name: str) -> str:

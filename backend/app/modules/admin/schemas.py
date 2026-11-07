@@ -12,7 +12,7 @@ from datetime import datetime
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from app.modules.admin.branding import (
     DEFAULT_WIKI_URL,
@@ -27,9 +27,10 @@ from app.modules.applications.models import (
 )
 from app.modules.auth.models import MAX_SESSION_DAYS
 from app.modules.livevote.models import MAX_LEAD_MINUTES
-from app.shared.config_schemas import ComparisonOffers, EventName, FlowGraph
+from app.shared.config_schemas import ComparisonOffers, FlowGraph
 from app.shared.i18n import I18nMap, Lang
 from app.shared.permissions import PERMISSION_CATALOGUE
+from app.shared.schemas import FrozenCamelModel, FrozenStrictCamelModel
 
 #: A CD-variant key is a slug. It is the stable handle of the variant and never
 #: changes after the create.
@@ -53,17 +54,10 @@ def _validate_permissions(perms: list[str] | None) -> list[str] | None:
     unknown = [p for p in perms if p not in catalogue]
     if unknown:
         raise ValueError(f"unknown permission(s): {', '.join(sorted(set(unknown)))}")
-    seen: set[str] = set()
-    return [p for p in perms if not (p in seen or seen.add(p))]
+    return list(dict.fromkeys(perms))
 
 
-class _CamelModel(BaseModel):
-    """Base model with camelCase JSON aliases and population by field name."""
-
-    model_config = ConfigDict(populate_by_name=True)
-
-
-class CdVariantLogoOut(_CamelModel):
+class CdVariantLogoOut(FrozenCamelModel, frozen=True):
     """One logo of a CD variant. Exactly one of vendoredName / fileName is set."""
 
     id: UUID
@@ -75,7 +69,7 @@ class CdVariantLogoOut(_CamelModel):
     size: int | None = None
 
 
-class CdVariantOut(_CamelModel):
+class CdVariantOut(FrozenCamelModel, frozen=True):
     """A CD variant with its logos, ordered by slot and position."""
 
     id: UUID
@@ -84,7 +78,7 @@ class CdVariantOut(_CamelModel):
     logos: list[CdVariantLogoOut] = Field(default_factory=list)
 
 
-class CdVariantOptionOut(_CamelModel):
+class CdVariantOptionOut(FrozenCamelModel, frozen=True):
     """Slim option for the Gremium dropdown."""
 
     id: UUID
@@ -92,21 +86,21 @@ class CdVariantOptionOut(_CamelModel):
     name: str
 
 
-class CdVariantCreate(_CamelModel):
+class CdVariantCreate(FrozenCamelModel, frozen=True):
     """New CD variant."""
 
     key: str = Field(min_length=1, max_length=64, pattern=CD_VARIANT_KEY_PATTERN)
     name: str = Field(min_length=1, max_length=200)
 
 
-class CdVariantUpdate(_CamelModel):
+class CdVariantUpdate(FrozenCamelModel, frozen=True):
     """Patch of a CD variant. ``key`` is immutable — a different value gives 409."""
 
     key: str | None = Field(default=None, max_length=64)
     name: str | None = Field(default=None, min_length=1, max_length=200)
 
 
-class CdVariantLogoVendoredCreate(_CamelModel):
+class CdVariantLogoVendoredCreate(FrozenCamelModel, frozen=True):
     """Add a logo that the render service ships. No upload and no object storage involved.
 
     Deprecated: the admin UI offers only the upload. A vendored logo goes to a
@@ -117,14 +111,14 @@ class CdVariantLogoVendoredCreate(_CamelModel):
     vendored_name: VendoredLogoName = Field(alias="vendoredName")
 
 
-class CdVariantLogoReorder(_CamelModel):
+class CdVariantLogoReorder(FrozenCamelModel, frozen=True):
     """Full new order of one slot. The list must name every logo of that slot."""
 
     slot: LogoSlot
     logo_ids: list[UUID] = Field(alias="logoIds")
 
 
-class GremiumOut(_CamelModel):
+class GremiumOut(FrozenCamelModel, frozen=True):
     """A gremium with its delegation, quorum and publication settings."""
 
     id: UUID
@@ -151,7 +145,7 @@ class GremiumOut(_CamelModel):
     protocols_public: bool = Field(default=False, serialization_alias="protocolsPublic")
 
 
-class GremiumAdminOut(GremiumOut):
+class GremiumAdminOut(GremiumOut, frozen=True):
     """A gremium in the admin list (``GET /admin/gremien``), with its counts.
 
     ``memberCount`` is the number of persons with a membership in the gremium.
@@ -163,7 +157,7 @@ class GremiumAdminOut(GremiumOut):
     role_count: int = Field(default=0, serialization_alias="roleCount")
 
 
-class GremiumCreate(_CamelModel):
+class GremiumCreate(FrozenCamelModel, frozen=True):
     """New gremium."""
 
     name: str = Field(min_length=1)
@@ -183,7 +177,7 @@ class GremiumCreate(_CamelModel):
     protocols_public: bool = Field(default=False, alias="protocolsPublic")
 
 
-class GremiumUpdate(_CamelModel):
+class GremiumUpdate(FrozenCamelModel, frozen=True):
     """Partial update of a gremium."""
 
     name: str | None = None
@@ -204,7 +198,7 @@ class GremiumUpdate(_CamelModel):
     protocols_public: bool | None = Field(default=None, alias="protocolsPublic")
 
 
-class GremiumPublicPreview(_CamelModel):
+class GremiumPublicPreview(FrozenCamelModel, frozen=True):
     """The counts for the confirm dialog before the protocols of a gremium go public.
 
     ``finalCount`` is the number of final protocols that are not held back.
@@ -216,7 +210,7 @@ class GremiumPublicPreview(_CamelModel):
     missing_count: int = Field(serialization_alias="missingCount")
 
 
-class GremiumMailRecipients(_CamelModel):
+class GremiumMailRecipients(FrozenCamelModel, frozen=True):
     """Additional protocol recipients of a gremium.
 
     These addresses receive the finalized protocols in addition to the active
@@ -241,7 +235,7 @@ class GremiumMailRecipients(_CamelModel):
         return [a for a in cleaned if not (a.lower() in seen or seen.add(a.lower()))]
 
 
-class GremiumRoleOut(_CamelModel):
+class GremiumRoleOut(FrozenCamelModel, frozen=True):
     """A role of a gremium."""
 
     id: UUID
@@ -256,7 +250,7 @@ class GremiumRoleOut(_CamelModel):
     permissions: list[str] = Field(default_factory=list)
 
 
-class GremiumRoleCreate(_CamelModel):
+class GremiumRoleCreate(FrozenCamelModel, frozen=True):
     """New gremium role."""
 
     key: str = Field(min_length=1, pattern=ROLE_KEY_PATTERN)
@@ -264,14 +258,14 @@ class GremiumRoleCreate(_CamelModel):
     permissions: list[str] = Field(default_factory=list)
 
 
-class GremiumRoleUpdate(_CamelModel):
+class GremiumRoleUpdate(FrozenCamelModel, frozen=True):
     """Partial update of a gremium role."""
 
     name: I18nMap | None = None
     permissions: list[str] | None = None
 
 
-class GremiumMembershipOut(_CamelModel):
+class GremiumMembershipOut(FrozenCamelModel, frozen=True):
     """A membership that the sync derived from the OIDC groups (read-only).
 
     The display name and the e-mail address of the member come with the row, so the
@@ -299,7 +293,7 @@ def _check_oidc_group(value: str) -> str:
     return value
 
 
-class _OidcGroupField(_CamelModel):
+class _OidcGroupField(FrozenCamelModel, frozen=True):
     """The OIDC group name of a mapping, outside the reserved ``vote:`` namespace."""
 
     @field_validator("oidc_group", check_fields=False)
@@ -308,7 +302,7 @@ class _OidcGroupField(_CamelModel):
         return None if value is None else _check_oidc_group(value)
 
 
-class GremiumMembershipMappingOut(_CamelModel):
+class GremiumMembershipMappingOut(FrozenCamelModel, frozen=True):
     """OIDC group → membership in one gremium."""
 
     id: UUID
@@ -316,14 +310,14 @@ class GremiumMembershipMappingOut(_CamelModel):
     oidc_group: str = Field(serialization_alias="oidcGroup")
 
 
-class GremiumMembershipMappingCreate(_OidcGroupField):
+class GremiumMembershipMappingCreate(_OidcGroupField, frozen=True):
     """New OIDC group to gremium membership mapping."""
 
     oidc_group: str = Field(alias="oidcGroup", min_length=1, max_length=256)
     gremium_id: UUID = Field(alias="gremiumId")
 
 
-class GremiumMembershipMappingUpdate(_OidcGroupField):
+class GremiumMembershipMappingUpdate(_OidcGroupField, frozen=True):
     """Change the group or the gremium of one membership mapping."""
 
     oidc_group: str | None = Field(default=None, alias="oidcGroup", min_length=1, max_length=256)
@@ -336,7 +330,7 @@ class GremiumMembershipMappingUpdate(_OidcGroupField):
         return self
 
 
-class GremiumRoleMappingOut(_CamelModel):
+class GremiumRoleMappingOut(FrozenCamelModel, frozen=True):
     """OIDC group → role in a gremium. ``gremiumId`` is the gremium of the role."""
 
     id: UUID
@@ -345,14 +339,14 @@ class GremiumRoleMappingOut(_CamelModel):
     oidc_group: str = Field(serialization_alias="oidcGroup")
 
 
-class GremiumRoleMappingCreate(_OidcGroupField):
+class GremiumRoleMappingCreate(_OidcGroupField, frozen=True):
     """New OIDC group to gremium role mapping."""
 
     oidc_group: str = Field(alias="oidcGroup", min_length=1, max_length=256)
     gremium_role_id: UUID = Field(alias="gremiumRoleId")
 
 
-class GremiumRoleMappingUpdate(_OidcGroupField):
+class GremiumRoleMappingUpdate(_OidcGroupField, frozen=True):
     """Change the group or the gremium role of one role mapping."""
 
     oidc_group: str | None = Field(default=None, alias="oidcGroup", min_length=1, max_length=256)
@@ -365,7 +359,7 @@ class GremiumRoleMappingUpdate(_OidcGroupField):
         return self
 
 
-class ApplicationTypeOut(_CamelModel):
+class ApplicationTypeOut(FrozenCamelModel, frozen=True):
     """An application type."""
 
     id: UUID
@@ -384,7 +378,7 @@ class ApplicationTypeOut(_CamelModel):
     )
 
 
-class ApplicationTypeCreate(_CamelModel):
+class ApplicationTypeCreate(FrozenCamelModel, frozen=True):
     """New application type."""
 
     key: str = Field(min_length=1)
@@ -399,7 +393,7 @@ class ApplicationTypeCreate(_CamelModel):
     )
 
 
-class ApplicationTypeUpdate(_CamelModel):
+class ApplicationTypeUpdate(FrozenCamelModel, frozen=True):
     """Partial update of an application type."""
 
     name_i18n: I18nMap | None = Field(default=None, alias="nameI18n")
@@ -413,14 +407,14 @@ class ApplicationTypeUpdate(_CamelModel):
     )
 
 
-class FlowVersionCreate(_CamelModel):
+class FlowVersionCreate(FrozenCamelModel, frozen=True):
     """Create a new flow version (graph checked via ``validate_flow_graph``)."""
 
     graph: FlowGraph
     activate: bool = True
 
 
-class FlowVersionOut(_CamelModel):
+class FlowVersionOut(FrozenCamelModel, frozen=True):
     """The single global flow. There are no per-type flows."""
 
     id: UUID
@@ -428,7 +422,7 @@ class FlowVersionOut(_CamelModel):
     active: bool
 
 
-class RoleOut(_CamelModel):
+class RoleOut(FrozenCamelModel, frozen=True):
     """A global role with its permissions."""
 
     id: UUID
@@ -437,7 +431,7 @@ class RoleOut(_CamelModel):
     permissions: list[str]
 
 
-class RoleCreate(_CamelModel):
+class RoleCreate(FrozenCamelModel, frozen=True):
     """New global role."""
 
     key: str = Field(min_length=1, pattern=ROLE_KEY_PATTERN)
@@ -450,7 +444,7 @@ class RoleCreate(_CamelModel):
         return _validate_permissions(value) or []
 
 
-class RoleUpdate(_CamelModel):
+class RoleUpdate(FrozenCamelModel, frozen=True):
     """Partial update of a global role."""
 
     label: I18nMap | None = None
@@ -462,7 +456,7 @@ class RoleUpdate(_CamelModel):
         return _validate_permissions(value)
 
 
-class RoleAssignmentOut(_CamelModel):
+class RoleAssignmentOut(FrozenCamelModel, frozen=True):
     """A role assignment."""
 
     id: UUID
@@ -471,7 +465,7 @@ class RoleAssignmentOut(_CamelModel):
     granted_by: str | None = Field(serialization_alias="grantedBy")
 
 
-class PrincipalOut(_CamelModel):
+class PrincipalOut(FrozenCamelModel, frozen=True):
     """OIDC principal plus its role assignments (roles/permissions UI)."""
 
     id: UUID
@@ -540,13 +534,13 @@ MergeConflictKind = Literal[
 ]
 
 
-class PrincipalMergeIn(_CamelModel):
+class PrincipalMergeIn(FrozenCamelModel, frozen=True):
     """Body of ``POST /admin/principals/{id}/merge``: the account that stays."""
 
     target_id: UUID = Field(alias="targetId")
 
 
-class MergePrincipalOut(_CamelModel):
+class MergePrincipalOut(FrozenCamelModel, frozen=True):
     """One side of a merge: the old account (source) or the account that stays."""
 
     id: UUID
@@ -555,7 +549,7 @@ class MergePrincipalOut(_CamelModel):
     last_login: str | None = Field(serialization_alias="lastLogin")
 
 
-class MergeAreaOut(_CamelModel):
+class MergeAreaOut(FrozenCamelModel, frozen=True):
     """The counts of one area of a merge."""
 
     area: MergeArea
@@ -564,14 +558,14 @@ class MergeAreaOut(_CamelModel):
     removed: int = 0
 
 
-class MergeConflictOut(_CamelModel):
+class MergeConflictOut(FrozenCamelModel, frozen=True):
     """One real conflict. ``label`` names the vote or the meeting, never an id."""
 
     kind: MergeConflictKind
     label: str | None = None
 
 
-class MergePermissionOut(_CamelModel):
+class MergePermissionOut(FrozenCamelModel, frozen=True):
     """A right of the old account that the target lacks.
 
     ``key`` is a permission key, or ``admin`` for the admin role (every right).
@@ -582,7 +576,7 @@ class MergePermissionOut(_CamelModel):
     gremium: str | None = None
 
 
-class MergePreviewOut(_CamelModel):
+class MergePreviewOut(FrozenCamelModel, frozen=True):
     """``GET /admin/principals/{id}/merge-preview``: what a merge would do."""
 
     source: MergePrincipalOut
@@ -598,7 +592,7 @@ class MergePreviewOut(_CamelModel):
     can_merge: bool = Field(serialization_alias="canMerge")
 
 
-class MergeResultOut(_CamelModel):
+class MergeResultOut(FrozenCamelModel, frozen=True):
     """``POST /admin/principals/{id}/merge``: what the merge did."""
 
     source: MergePrincipalOut
@@ -607,7 +601,7 @@ class MergeResultOut(_CamelModel):
     merged_at: str = Field(serialization_alias="mergedAt")
 
 
-class RevokePrincipalOut(_CamelModel):
+class RevokePrincipalOut(FrozenCamelModel, frozen=True):
     """The person of a revoke: the header of the dialog."""
 
     id: UUID
@@ -617,7 +611,7 @@ class RevokePrincipalOut(_CamelModel):
     active: bool = True
 
 
-class RevokeMembershipOut(_CamelModel):
+class RevokeMembershipOut(FrozenCamelModel, frozen=True):
     """The derived membership in one Gremium and the SSO groups that cause it."""
 
     role_key: str = Field(serialization_alias="roleKey")
@@ -625,7 +619,7 @@ class RevokeMembershipOut(_CamelModel):
     groups: list[str]
 
 
-class RevokeAssignmentOut(_CamelModel):
+class RevokeAssignmentOut(FrozenCamelModel, frozen=True):
     """A global role assignment."""
 
     id: UUID
@@ -642,7 +636,7 @@ class RevokeAssignmentOut(_CamelModel):
     )
 
 
-class RevokePoolEntryOut(_CamelModel):
+class RevokePoolEntryOut(FrozenCamelModel, frozen=True):
     """A pool entry of the person in one Gremium.
 
     ``asSubstitute`` true: the person substitutes for ``memberName`` (null with
@@ -657,7 +651,7 @@ class RevokePoolEntryOut(_CamelModel):
     substitute_name: str | None = Field(serialization_alias="substituteName")
 
 
-class RevokeDelegationOut(_CamelModel):
+class RevokeDelegationOut(FrozenCamelModel, frozen=True):
     """A delegation of the person in a planned or a live meeting."""
 
     id: UUID
@@ -670,7 +664,7 @@ class RevokeDelegationOut(_CamelModel):
     voting: bool
 
 
-class RevokeGremiumOut(_CamelModel):
+class RevokeGremiumOut(FrozenCamelModel, frozen=True):
     """Everything that ties the person to one Gremium. A revoke clears all of it."""
 
     gremium_id: UUID = Field(serialization_alias="gremiumId")
@@ -693,7 +687,7 @@ class RevokeGremiumOut(_CamelModel):
     open_tasks: int = Field(default=0, serialization_alias="openTasks")
 
 
-class RevokeGlobalRoleOut(_CamelModel):
+class RevokeGlobalRoleOut(FrozenCamelModel, frozen=True):
     """A global role of the person and its origin (SSO groups, manual assignments)."""
 
     role_id: UUID = Field(serialization_alias="roleId")
@@ -703,7 +697,7 @@ class RevokeGlobalRoleOut(_CamelModel):
     assignments: list[RevokeAssignmentOut] = Field(default_factory=list)
 
 
-class RevokeGroupOut(_CamelModel):
+class RevokeGroupOut(FrozenCamelModel, frozen=True):
     """One SSO group of the person and every entry of the preview it leads to."""
 
     group: str
@@ -711,7 +705,7 @@ class RevokeGroupOut(_CamelModel):
     global_role_ids: list[UUID] = Field(serialization_alias="globalRoleIds")
 
 
-class RevokePreviewOut(_CamelModel):
+class RevokePreviewOut(FrozenCamelModel, frozen=True):
     """``GET /admin/principals/{id}/revoke-preview``: what the person has, per Gremium.
 
     The preview groups everything by Gremium, then by global role. Each SSO group
@@ -727,10 +721,8 @@ class RevokePreviewOut(_CamelModel):
     is_self: bool = Field(serialization_alias="isSelf")
 
 
-class PrincipalRevokeIn(_CamelModel):
+class PrincipalRevokeIn(FrozenStrictCamelModel, frozen=True):
     """Body of ``POST /admin/principals/{id}/revoke``."""
-
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     gremium_ids: list[UUID] = Field(default_factory=list, alias="gremiumIds", max_length=500)
     global_role_ids: list[UUID] = Field(
@@ -739,7 +731,7 @@ class PrincipalRevokeIn(_CamelModel):
     deactivate: bool = False
 
 
-class RevokeResultOut(_CamelModel):
+class RevokeResultOut(FrozenCamelModel, frozen=True):
     """``POST /admin/principals/{id}/revoke``: what the revoke did."""
 
     gremium_ids: list[UUID] = Field(serialization_alias="gremiumIds")
@@ -752,13 +744,13 @@ class RevokeResultOut(_CamelModel):
     deactivated: bool
 
 
-class PrincipalUpdate(_CamelModel):
+class PrincipalUpdate(FrozenCamelModel, frozen=True):
     """Body of ``PATCH /admin/principals/{id}``: activate or deactivate a user."""
 
     active: bool
 
 
-class GroupMappingOut(_CamelModel):
+class GroupMappingOut(FrozenCamelModel, frozen=True):
     """OIDC group → global role. A global role has no gremium scope."""
 
     id: UUID
@@ -766,37 +758,34 @@ class GroupMappingOut(_CamelModel):
     role_id: UUID = Field(serialization_alias="roleId")
 
 
-class GroupMappingCreate(_OidcGroupField):
+class GroupMappingCreate(_OidcGroupField, frozen=True):
     """New OIDC group to global role mapping."""
 
     oidc_group: str = Field(alias="oidcGroup", min_length=1, max_length=256)
     role_id: UUID = Field(alias="roleId")
 
 
-class GroupMappingUpdate(_OidcGroupField):
+class GroupMappingUpdate(_OidcGroupField, frozen=True):
     """Partial update of a group mapping."""
 
     oidc_group: str | None = Field(default=None, alias="oidcGroup", min_length=1, max_length=256)
     role_id: UUID | None = Field(default=None, alias="roleId")
 
 
-class WebhookOut(_CamelModel):
+class WebhookOut(FrozenCamelModel, frozen=True):
     """A webhook."""
 
     id: UUID
     name: str
     url: str
-    events: list[EventName]
     active: bool
 
 
-class WebhookCreate(_CamelModel):
+class WebhookCreate(FrozenCamelModel, frozen=True):
     """New webhook. The model ignores an empty ``id`` from the frontend."""
 
     name: str = Field(min_length=1)
     url: str = Field(min_length=1)
-    #: Triggers are optional — they usually come from the flow graph.
-    events: list[EventName] = Field(default_factory=list)
     active: bool = True
 
     @field_validator("url")
@@ -807,12 +796,11 @@ class WebhookCreate(_CamelModel):
         return v
 
 
-class WebhookUpdate(_CamelModel):
+class WebhookUpdate(FrozenCamelModel, frozen=True):
     """Partial update of a webhook."""
 
     name: str | None = None
     url: str | None = None
-    events: list[EventName] | None = None
     active: bool | None = None
 
     @field_validator("url")
@@ -823,7 +811,7 @@ class WebhookUpdate(_CamelModel):
         return v
 
 
-class WebhookDeliveryStatusOut(_CamelModel):
+class WebhookDeliveryStatusOut(FrozenCamelModel, frozen=True):
     """Diagnostic view of the latest delivery state per webhook.
 
     The model exposes no resolved IP or host topology and no response body. It
@@ -841,14 +829,14 @@ class WebhookDeliveryStatusOut(_CamelModel):
     last_at: str | None = Field(default=None, serialization_alias="lastAt")
 
 
-class SiteConfigOut(_CamelModel):
+class SiteConfigOut(FrozenCamelModel, frozen=True):
     """The active branding config and its version (0 without one)."""
 
     version: int
     branding: Branding
 
 
-class AttachmentLimitsOut(_CamelModel):
+class AttachmentLimitsOut(FrozenCamelModel, frozen=True):
     """Upload limits of the wizard, for the text below the drop zone.
 
     ``maxFileBytes`` is the cap of one file. ``maxDraftFiles`` and
@@ -862,26 +850,24 @@ class AttachmentLimitsOut(_CamelModel):
     max_draft_bytes: int = Field(serialization_alias="maxDraftBytes")
 
 
-class PublicHelpOut(_CamelModel):
+class PublicHelpOut(FrozenCamelModel, frozen=True):
     """The public part of the help settings: the handbook link."""
 
     wiki_url: str = Field(serialization_alias="wikiUrl")
 
 
-class PublicTicketsOut(_CamelModel):
+class PublicTicketsOut(FrozenCamelModel, frozen=True):
     """The public part of the ticket settings: may a person without a session report."""
 
     public_enabled: bool = Field(serialization_alias="publicEnabled")
 
 
-class HelpTicketsSettings(BaseModel):
+class HelpTicketsSettings(FrozenStrictCamelModel, frozen=True):
     """The admin page "Hilfe & Tickets" (``GET``/``PUT /admin/help-tickets``).
 
     ``wikiUrl`` takes http(s) only. ``retentionMonths`` is 1..120 or null (never
     anonymize).
     """
-
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     wiki_url: str = Field(default=DEFAULT_WIKI_URL, alias="wikiUrl", max_length=2048)
     public_enabled: bool = Field(default=True, alias="publicEnabled")
@@ -894,7 +880,7 @@ class HelpTicketsSettings(BaseModel):
         return check_http_url(v)
 
 
-class PublicSiteConfigOut(_CamelModel):
+class PublicSiteConfigOut(FrozenCamelModel, frozen=True):
     """Public (auth-free) active branding config for frontend rendering.
 
     ``confirmTtlHours`` is the time a guest has to confirm the email. The
@@ -923,7 +909,7 @@ class PublicSiteConfigOut(_CamelModel):
 MAX_LINK_TTL_DAYS = 3650
 
 
-class LoginSettingsOut(_CamelModel):
+class LoginSettingsOut(FrozenCamelModel, frozen=True):
     """Lifetimes of an OIDC login in days after the last use (browser and app)."""
 
     web_session_days: int = Field(serialization_alias="webSessionDays")
@@ -932,16 +918,14 @@ class LoginSettingsOut(_CamelModel):
     updated_by: str | None = Field(default=None, serialization_alias="updatedBy")
 
 
-class LoginSettingsUpdate(_CamelModel):
+class LoginSettingsUpdate(FrozenStrictCamelModel, frozen=True):
     """Full replacement of both lifetimes, each 1 to 400 days."""
-
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     web_session_days: int = Field(alias="webSessionDays", ge=1, le=MAX_SESSION_DAYS)
     pwa_session_days: int = Field(alias="pwaSessionDays", ge=1, le=MAX_SESSION_DAYS)
 
 
-class GuestSettingsOut(_CamelModel):
+class GuestSettingsOut(FrozenCamelModel, frozen=True):
     """Settings for applications without an account.
 
     ``linkTtlDays`` null means: a new magic link has no expiry.
@@ -953,7 +937,7 @@ class GuestSettingsOut(_CamelModel):
     updated_by: str | None = Field(default=None, serialization_alias="updatedBy")
 
 
-class MeetingSettingsOut(_CamelModel):
+class MeetingSettingsOut(FrozenCamelModel, frozen=True):
     """The open window of meetings, in minutes before the planned start."""
 
     open_lead_minutes: int = Field(serialization_alias="openLeadMinutes")
@@ -962,22 +946,18 @@ class MeetingSettingsOut(_CamelModel):
     updated_by: str | None = Field(default=None, serialization_alias="updatedBy")
 
 
-class MeetingSettingsUpdate(_CamelModel):
+class MeetingSettingsUpdate(FrozenStrictCamelModel, frozen=True):
     """Full replacement of the meeting settings.
 
     ``confirmLeadMinutes`` must not be larger than ``openLeadMinutes`` (422).
     """
 
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
-
     open_lead_minutes: int = Field(alias="openLeadMinutes", ge=0, le=MAX_LEAD_MINUTES)
     confirm_lead_minutes: int = Field(alias="confirmLeadMinutes", ge=0, le=MAX_LEAD_MINUTES)
 
 
-class GuestSettingsUpdate(_CamelModel):
+class GuestSettingsUpdate(FrozenStrictCamelModel, frozen=True):
     """Full replacement of the guest settings. Send ``linkTtlDays: null`` for no expiry."""
-
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     confirm_ttl_hours: int = Field(
         alias="confirmTtlHours", ge=1, le=MAX_CONFIRM_TTL_HOURS

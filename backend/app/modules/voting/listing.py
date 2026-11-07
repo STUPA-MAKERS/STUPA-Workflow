@@ -18,7 +18,7 @@ vote comes from ``GET /votes/{id}``.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
@@ -66,31 +66,50 @@ async def read_scope(session: AsyncSession, principal: Principal) -> ColumnEleme
     from app.modules.livevote.service import MeetingService
 
     visible, delegated = await MeetingService(session).meeting_read_scope(principal)
-    if visible is None:
-        meeting_ok: ColumnElement[bool] = Vote.meeting_id.is_not(None)
-    else:
-        meeting_ok = and_(
+    meeting_ok: ColumnElement[bool] = (
+        Vote.meeting_id.is_not(None)
+        if visible is None
+        else and_(
             Vote.meeting_id.is_not(None),
             or_(Meeting.gremium_id.in_(visible), Vote.meeting_id.in_(delegated)),
         )
-    if admin_bypass(principal, "application.read"):
-        return or_(meeting_ok, Vote.meeting_id.is_(None))
-    global_ok: ColumnElement[bool] = false()
-    if principal.has("application.read") or principal.has("application.read_all"):
-        global_ok = and_(Vote.meeting_id.is_(None), Vote.kind != "poll")
-    keys = {
+    )
+    return (
+        or_(meeting_ok, Vote.meeting_id.is_(None))
+        if admin_bypass(principal, "application.read")
+        else or_(meeting_ok, *await _standalone_scope(session, principal))
+    )
+
+
+async def _standalone_scope(
+    session: AsyncSession, principal: Principal
+) -> tuple[ColumnElement[bool], ColumnElement[bool]]:
+    """Build the clauses of the read scope for the votes without a meeting (no admin).
+
+    The global application rights reach the application votes. The ``vote:<gremium>``
+    groups and the gremien with ``vote.manage`` or ``session.manage`` reach every vote of
+    their Gremium.
+    """
+    global_ok: ColumnElement[bool] = (
+        and_(Vote.meeting_id.is_(None), Vote.kind != "poll")
+        if principal.has("application.read") or principal.has("application.read_all")
+        else false()
+    )
+    held = [
+        await held_gremium_ids(session, principal, perm)
+        for perm in ("vote.manage", "session.manage")
+    ]
+    keys = frozenset(
         g.removeprefix(VOTE_GROUP_PREFIX)
         for g in principal.groups
         if g.startswith(VOTE_GROUP_PREFIX)
-    }
-    for perm in ("vote.manage", "session.manage"):
-        keys |= {str(gid) for gid in await held_gremium_ids(session, principal, perm)}
+    ) | {str(gid) for ids in held for gid in ids}
     standalone_ok = (
         and_(Vote.meeting_id.is_(None), Vote.eligible_group.in_(sorted(keys)))
         if keys
         else false()
     )
-    return or_(meeting_ok, global_ok, standalone_ok)
+    return global_ok, standalone_ok
 
 
 def _search_clause(q: str | None) -> ColumnElement[bool]:
@@ -128,15 +147,13 @@ async def list_votes(
     ``kind`` keeps the motions, the elections or the polls.
     """
     wanted = list(dict.fromkeys(statuses or DEFAULT_STATUSES))
-    where = [
+    where = (
         Vote.status.in_(wanted),
         await read_scope(session, principal),
         _search_clause(q),
-    ]
-    if gremium_id is not None:
-        where.append(_gremium_text() == str(gremium_id))
-    if kind is not None:
-        where.append(Vote.kind == kind)
+        *((_gremium_text() == str(gremium_id),) if gremium_id is not None else ()),
+        *((Vote.kind == kind,) if kind is not None else ()),
+    )
     base = (
         select(Vote, Meeting.title, Meeting.gremium_id)
         .outerjoin(Meeting, Meeting.id == Vote.meeting_id)
@@ -178,43 +195,63 @@ async def _decorate(
     from app.modules.voting.service import VotingService
 
     gremien = {_gremium_of(v, g) for v, _, g in rows} - {None}
-    names: dict[UUID, str] = {}
-    if gremien:
-        found = await session.execute(
-            select(Gremium.id, Gremium.name).where(Gremium.id.in_(gremien))
-        )
-        names = {gid: name for gid, name in found.all()}
+    found = (
+        (
+            await session.execute(select(Gremium.id, Gremium.name).where(Gremium.id.in_(gremien)))
+        ).all()
+        if gremien
+        else ()
+    )
+    names: dict[UUID, str] = dict(found)
     positions = await _agenda_positions(session, [v for v, _, _ in rows])
     ballots = await _own_ballots(session, principal.sub, [v for v, _, _ in rows])
     voting = VotingService(session)
-    items: list[VoteListItem] = []
-    for vote, meeting_title, meeting_gremium in rows:
-        gid = _gremium_of(vote, meeting_gremium)
-        config = VoteConfig.from_stored(vote.config)
-        items.append(
-            VoteListItem(
-                id=vote.id,
-                question=vote.question,
-                status=vote.status,  # type: ignore[arg-type]
-                result=vote.result,  # type: ignore[arg-type]
-                secret=config.secret,
-                kind=getattr(vote, "kind", "motion"),
-                applicationId=vote.application_id,
-                meetingId=vote.meeting_id,
-                meetingTitle=meeting_title,
-                agendaItemId=vote.agenda_item_id,
-                agendaPosition=positions.get(vote.agenda_item_id) if vote.agenda_item_id else None,
-                gremiumId=gid,
-                gremiumName=names.get(gid) if gid is not None else None,
-                createdAt=vote.created_at,
-                openedAt=vote.opens_at,
-                closedAt=vote.closed_at,
-                closesAt=vote.closes_at,
-                canCast=voting.can_cast_own(vote, principal),
-                myBallot=ballots.get(vote.id, MyBallot()),
-            )
+    return [
+        _list_item(
+            vote,
+            meeting_title,
+            _gremium_of(vote, meeting_gremium),
+            names=names,
+            positions=positions,
+            ballot=ballots.get(vote.id, MyBallot()),
+            can_cast=voting.can_cast_own(vote, principal),
         )
-    return items
+        for vote, meeting_title, meeting_gremium in rows
+    ]
+
+
+def _list_item(
+    vote: Vote,
+    meeting_title: str | None,
+    gid: UUID | None,
+    *,
+    names: Mapping[UUID, str],
+    positions: Mapping[UUID, int],
+    ballot: MyBallot,
+    can_cast: bool,
+) -> VoteListItem:
+    """Build one row of the vote list from the vote and the page lookups."""
+    return VoteListItem(
+        id=vote.id,
+        question=vote.question,
+        status=vote.status,  # type: ignore[arg-type]
+        result=vote.result,  # type: ignore[arg-type]
+        secret=VoteConfig.from_stored(vote.config).secret,
+        kind=getattr(vote, "kind", "motion"),
+        applicationId=vote.application_id,
+        meetingId=vote.meeting_id,
+        meetingTitle=meeting_title,
+        agendaItemId=vote.agenda_item_id,
+        agendaPosition=positions.get(vote.agenda_item_id) if vote.agenda_item_id else None,
+        gremiumId=gid,
+        gremiumName=names.get(gid) if gid is not None else None,
+        createdAt=vote.created_at,
+        openedAt=vote.opens_at,
+        closedAt=vote.closed_at,
+        closesAt=vote.closes_at,
+        canCast=can_cast,
+        myBallot=ballot,
+    )
 
 
 async def _agenda_positions(session: AsyncSession, votes: list[Vote]) -> dict[UUID, int]:

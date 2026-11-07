@@ -82,6 +82,7 @@ import { groupByMonth, type MonthGroup } from '@shared/group-by-month';
 import { formatMoney } from '@shared/format-money';
 import { applicationReads } from './application-reads';
 import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.directive';
+import { withEntry, withoutKey } from '@shared/util/immutable';
 
 /**
  * One filter of the list.
@@ -107,7 +108,7 @@ type SortKey = 'createdAt:desc' | 'createdAt:asc' | 'amount:desc' | 'amount:asc'
 /** The largest page the list endpoint answers (`MAX_LIMIT` of the backend paging). */
 const MAX_PAGE = 200;
 
-const SORTS: readonly { key: SortKey; label: TranslationKey }[] = [
+const SORTS: readonly { readonly key: SortKey; readonly label: TranslationKey }[] = [
   { key: 'createdAt:desc', label: 'applications.list.sort.newest' },
   { key: 'createdAt:asc', label: 'applications.list.sort.oldest' },
   { key: 'amount:desc', label: 'applications.list.sort.amountDesc' },
@@ -116,18 +117,18 @@ const SORTS: readonly { key: SortKey; label: TranslationKey }[] = [
 
 /** One row as the template shows it. */
 interface ListRow {
-  item: ApplicationListItem;
-  createdAt: string;
-  title: string;
-  typeLabel: string;
-  stateLabel: string | null;
-  stateKind: StatusKind;
-  amount: string | null;
+  readonly item: ApplicationListItem;
+  readonly createdAt: string;
+  readonly title: string;
+  readonly typeLabel: string;
+  readonly stateLabel: string | null;
+  readonly stateKind: StatusKind;
+  readonly amount: string | null;
   /** The approved amount when it deviates; the row then strikes `amount` through. */
-  approved: string | null;
+  readonly approved: string | null;
   /** The swipe of a phone: "Status setzen" to the right, archive to the left. */
-  swipeRight: RowSwipeAction | null;
-  swipeLeft: RowSwipeAction | null;
+  readonly swipeRight: RowSwipeAction | null;
+  readonly swipeLeft: RowSwipeAction | null;
 }
 
 /** Which filter sheet is open. */
@@ -239,7 +240,7 @@ export class ApplicationsListComponent {
   readonly reloading = signal(false);
   readonly error = signal(false);
   /** Accumulated applications across all loaded pages so far (infinite scroll). */
-  readonly items = signal<ApplicationListItem[]>([]);
+  readonly items = signal<readonly ApplicationListItem[]>([]);
   readonly total = signal(0);
   private nextOffset = 0;
   /** Fetch sequence number. The fetch handler drops late responses from old filters. */
@@ -303,7 +304,7 @@ export class ApplicationsListComponent {
    * states of the flow for every reader, so the map keeps every state seen once; the
    * filter therefore does not collapse to the states of the current result.
    */
-  private readonly seenStates = signal<Map<string, string>>(new Map());
+  private readonly seenStates = signal<ReadonlyMap<string, string>>(new Map());
   readonly stateOptions = computed(() =>
     [...this.seenStates()].map(([value, label]) => ({ value, label })),
   );
@@ -451,14 +452,12 @@ export class ApplicationsListComponent {
 
   /** Phone: the sort orders and the export in one "more" menu of the header. */
   readonly phoneMenuSections = computed<RowMenuSection[]>(() => {
-    const sections: RowMenuSection[] = [];
-    sections.push(...this.sortSections());
-    if (this.exportShown()) {
-      sections.push({
-        items: [{ id: 'export', label: this.i18n.translate('applications.list.export'), icon: 'download' }],
-      });
-    }
-    return sections;
+    const exportItem: RowMenuItem = {
+      id: 'export',
+      label: this.i18n.translate('applications.list.export'),
+      icon: 'download',
+    };
+    return [...this.sortSections(), ...(this.exportShown() ? [{ items: [exportItem] }] : [])];
   });
 
   /** The row the force-status dialog acts on. */
@@ -648,10 +647,8 @@ export class ApplicationsListComponent {
       this.exporting,
       () => {
         const query = this.buildQuery(0);
-        delete query.limit;
-        delete query.offset;
-        delete query.mine;
-        return this.api.exportApplicationsXlsx(query);
+        const unpaged = withoutKey(withoutKey(withoutKey(query, 'limit'), 'offset'), 'mine');
+        return this.api.exportApplicationsXlsx(unpaged);
       },
       'applications.xlsx',
       () => this.toast.error(this.i18n.translate('applications.list.exportError')),
@@ -759,12 +756,9 @@ export class ApplicationsListComponent {
   }
 
   private setSwipedAway(id: Uuid, away: boolean): void {
-    this.swipedAway.update((cur) => {
-      const next = new Set(cur);
-      if (away) next.add(id);
-      else next.delete(id);
-      return next;
-    });
+    this.swipedAway.update((cur) =>
+      away ? new Set([...cur, id]) : new Set([...cur].filter((x) => x !== id)),
+    );
   }
 
   private toggleArchived(item: ApplicationListItem): void {
@@ -898,13 +892,13 @@ export class ApplicationsListComponent {
 
   /** Every filter as query params; `toDefaults` clears them all. */
   private filterParams(toDefaults = false): Record<string, string | number | null> {
-    const out: Record<string, string | number | null> = {};
-    for (const f of this.filters) {
-      const raw = toDefaults ? f.empty : f.signal();
-      const value = f.trim ? raw.trim() : raw;
-      out[f.param] = value === f.empty ? null : f.numeric ? Number(value) : value;
-    }
-    return out;
+    return Object.fromEntries(
+      this.filters.map((f) => {
+        const raw = toDefaults ? f.empty : f.signal();
+        const value = f.trim ? raw.trim() : raw;
+        return [f.param, value === f.empty ? null : f.numeric ? Number(value) : value];
+      }),
+    );
   }
 
   /**
@@ -943,17 +937,20 @@ export class ApplicationsListComponent {
    * (`readFilters`), so every page and the export send what the URL and the chips show.
    */
   private buildQuery(offset: number, limit = this.limit): ApplicationListQuery {
-    const query = { limit, offset } as Record<string, unknown>;
-    for (const f of this.filters) {
+    const filters = this.filters.flatMap((f) => {
       const raw = f.signal();
       const value = f.trim ? raw.trim() : raw;
-      if (value === f.empty) continue;
-      query[f.param] = f.numeric ? Number(value) : value;
-    }
-    if (this.states().length) query['state'] = [...this.states()];
-    query['sort'] = this.sortField();
-    query['order'] = this.sortOrder();
-    return query as ApplicationListQuery;
+      return value === f.empty ? [] : [[f.param, f.numeric ? Number(value) : value] as const];
+    });
+    const states = this.states().length ? { state: [...this.states()] } : {};
+    return {
+      limit,
+      offset,
+      ...Object.fromEntries(filters),
+      ...states,
+      sort: this.sortField(),
+      order: this.sortOrder(),
+    } as ApplicationListQuery;
   }
 
   /**
@@ -967,7 +964,8 @@ export class ApplicationsListComponent {
    * refresh does not load the first page a second time on the next scroll.
    */
   private fetch(mode: 'initial' | 'refresh' | 'more', limit = this.limit): void {
-    const seq = ++this.fetchSeq;
+    this.fetchSeq = this.fetchSeq + 1;
+    const seq = this.fetchSeq;
     const offset = mode === 'refresh' ? 0 : this.nextOffset;
     this.api.listApplications(this.buildQuery(offset, limit)).subscribe({
       next: (page) => {
@@ -991,21 +989,19 @@ export class ApplicationsListComponent {
   }
 
   /** Merge the real states of the loaded applications into the status options. */
-  private collectStates(items: ApplicationListItem[]): void {
-    const next = new Map(this.seenStates());
-    let changed = false;
-    for (const item of items) {
-      if (item.state && !next.has(item.state.id)) {
-        next.set(item.state.id, item.state.label);
-        changed = true;
-      }
-    }
-    if (changed) this.seenStates.set(next);
+  private collectStates(items: readonly ApplicationListItem[]): void {
+    const seen = this.seenStates();
+    const next = items.reduce(
+      (acc, { state }) =>
+        state && !acc.has(state.id) ? withEntry(acc, state.id, state.label) : acc,
+      seen,
+    );
+    if (next !== seen) this.seenStates.set(next);
   }
 }
 
 /** Remove the cost centres hidden in the budget tab, and their subtrees. */
-function pruneHidden(nodes: BudgetTreeNode[]): BudgetTreeNode[] {
+function pruneHidden(nodes: readonly BudgetTreeNode[]): BudgetTreeNode[] {
   return nodes
     .filter((n) => !n.hiddenInBudget)
     .map((n) => ({ ...n, children: pruneHidden(n.children) }));

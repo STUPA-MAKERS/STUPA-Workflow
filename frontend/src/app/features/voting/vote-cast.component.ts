@@ -27,6 +27,7 @@ import {
   MEDIA,
   mediaQuery,
   RowMenuComponent,
+  type RowMenuItem,
   type RowMenuSection,
   ScrollFadeDirective,
   ToastService,
@@ -134,6 +135,8 @@ export class VoteCastComponent implements OnDestroy {
   /** A channel this pane opened itself (no list page around it), and its meeting. */
   private ownSession: LiveVoteSession | null = null;
   private ownMeetingId: string | null = null;
+  /** The vote the channel showed open at the last check, so a close of it reloads. */
+  private lastOpened: string | null = null;
   /** The id of the shown vote. A late answer for another vote is dropped. */
   private currentId: string | null = null;
 
@@ -257,23 +260,20 @@ export class VoteCastComponent implements OnDestroy {
   readonly pollBusy = signal(false);
 
   /** The ⋮ menu: the poll action, then the delete. */
-  readonly menu = computed<RowMenuSection[]>(() => {
-    const items: RowMenuSection['items'][number][] = [];
+  readonly menu = computed<readonly RowMenuSection[]>(() => {
     const action = this.pollAction();
-    if (action === 'start') {
-      items.push({ id: 'start', label: this.i18n.translate('poll.action.start'), icon: 'play' });
-    } else if (action === 'close') {
-      items.push({ id: 'close', label: this.i18n.translate('poll.action.close'), icon: 'square' });
-    }
-    if (this.canDelete()) {
-      items.push({
-        id: 'delete',
-        label: this.i18n.translate('voting.delete.action'),
-        icon: 'trash',
-        danger: true,
-      });
-    }
-    return [{ items }];
+    const pollItems: readonly RowMenuItem[] = action ? [this.pollMenuItem(action)] : [];
+    const deleteItems: readonly RowMenuItem[] = this.canDelete()
+      ? [
+          {
+            id: 'delete',
+            label: this.i18n.translate('voting.delete.action'),
+            icon: 'trash',
+            danger: true,
+          },
+        ]
+      : [];
+    return [{ items: [...pollItems, ...deleteItems] }];
   });
   /** The ⋮ menu has an item. */
   readonly hasMenu = computed(() => this.menu()[0]!.items.length > 0);
@@ -309,8 +309,27 @@ export class VoteCastComponent implements OnDestroy {
   }
 
   onMenu(id: string): void {
-    if (id === 'delete') this.confirmDelete.set(true);
-    else if (id === 'start' || id === 'close') this.runPoll(id);
+    switch (id) {
+      case 'delete':
+        this.confirmDelete.set(true);
+        return;
+      case 'start':
+      case 'close':
+        this.runPoll(id);
+        return;
+      default:
+        return;
+    }
+  }
+
+  /** The menu item of a poll action: "Starten" or "Umfrage beenden". */
+  private pollMenuItem(action: 'start' | 'close'): RowMenuItem {
+    switch (action) {
+      case 'start':
+        return { id: 'start', label: this.i18n.translate('poll.action.start'), icon: 'play' };
+      case 'close':
+        return { id: 'close', label: this.i18n.translate('poll.action.close'), icon: 'square' };
+    }
   }
 
   /** "Starten" opens the draft of a poll, "Umfrage beenden" closes it before its end. */
@@ -489,15 +508,14 @@ export class VoteCastComponent implements OnDestroy {
       });
     });
 
-    let lastOpened: string | null = null;
     effect(() => {
       const session = this.session();
       const opened = session?.openVote()?.voteId ?? null;
       const closed = session?.result()?.voteId ?? null;
       untracked(() => {
         const vote = this.loaded();
-        const before = lastOpened;
-        lastOpened = opened;
+        const before = this.lastOpened;
+        this.lastOpened = opened;
         if (!vote) return;
         if (vote.status === 'draft' && opened === vote.id) this.reload();
         else if (vote.status === 'open' && closed === vote.id) this.reload();

@@ -96,7 +96,7 @@ EXPORT_MAX_ROWS = 10_000
 
 
 def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
-    return {code: _PROBLEM for code in codes}
+    return dict.fromkeys(codes, _PROBLEM)
 
 
 def get_applications_service(session: DbSession) -> ApplicationsService:
@@ -205,9 +205,12 @@ async def create_application(
             "Applicant email required.",
             errors=[{"field": "applicantEmail", "msg": "required for anonymous submissions"}],
         )
-    payload.applicant_email = email
-    if not payload.applicant_name and principal:
-        payload.applicant_name = principal.display_name
+    name = (
+        principal.display_name
+        if principal and not payload.applicant_name
+        else payload.applicant_name
+    )
+    filled = payload.model_copy(update={"applicant_email": email, "applicant_name": name})
     actor = principal.sub if principal else "applicant"
     email_confirmed = (
         principal is not None
@@ -215,15 +218,15 @@ async def create_application(
         and principal.email.casefold() == email.casefold()
     )
 
-    app, email = await service.create(
-        payload,
+    app, link_email = await service.create(
+        filled,
         actor=actor,
         dispatcher=dispatcher,
         email_confirmed=email_confirmed,
         draft_pepper=settings.magic_link_secret,
     )
     pool = getattr(request.app.state, "arq_pool", None)
-    background.add_task(send_magic_link, settings, email, app.id, pool)
+    background.add_task(send_magic_link, settings, link_email, app.id, pool)
     return ApplicationCreated(applicationId=app.id)
 
 

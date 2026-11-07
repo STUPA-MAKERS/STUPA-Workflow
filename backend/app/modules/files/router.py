@@ -16,7 +16,7 @@ quarantined.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 from typing import Annotated, Any
 from uuid import UUID
 
@@ -93,7 +93,7 @@ _PREVIEW_HEADERS = {
 
 
 def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
-    return {code: _PROBLEM for code in codes}
+    return dict.fromkeys(codes, _PROBLEM)
 
 
 def get_files_service(
@@ -156,19 +156,24 @@ async def _pii_attachment_filter(
     if not keys:
         return None
     data = await db.scalar(select(Application.data).where(Application.id == access.application_id))
-    refs: set[str] = set()
-    if isinstance(data, dict):
-        for key in keys:
-            value = data.get(key)
-            if isinstance(value, str):
-                refs.add(value)
-            elif isinstance(value, list):
-                refs.update(v for v in value if isinstance(v, str))
+    answers = tuple(data.get(key) for key in keys) if isinstance(data, dict) else ()
+    refs = frozenset(ref for answer in answers for ref in _answer_refs(answer))
 
     def hidden(attachment: Attachment) -> bool:
         return attachment.field_key in keys or str(attachment.id) in refs
 
     return hidden
+
+
+def _answer_refs(answer: object) -> tuple[str, ...]:
+    """Return the attachment ids that a form answer refers to: a string or a list of them."""
+    match answer:
+        case str():
+            return (answer,)
+        case list():
+            return tuple(v for v in answer if isinstance(v, str))
+        case _:
+            return ()
 
 
 async def _assert_not_pii_hidden(db: AsyncSession, access: Access, attachment: Attachment) -> None:
@@ -215,36 +220,78 @@ async def _assert_owner_reader(
         NotFoundError: The caller may not read the message (HTTP 404).
     """
     missing = NotFoundError(f"attachment {attachment_id} not found")
-    if owner.kind in ("ticket", "ticket_note"):
-        if principal is None:
+    match owner.kind:
+        case "ticket" | "ticket_note":
+            await _assert_ticket_reader(db, owner, principal, missing)
+        case "todo_comment":
+            await _assert_todo_comment_reader(db, owner, principal, missing)
+        case "comment" | "application":
+            await _assert_comment_reader(db, service, owner, principal, applicant, missing)
+
+
+async def _assert_ticket_reader(
+    db: AsyncSession, owner: AttachmentOwner, principal: Principal | None, missing: NotFoundError
+) -> None:
+    """Apply the read rule of a ticket or a ticket note (see ``_assert_owner_reader``).
+
+    Raises:
+        NotFoundError: ``missing``, when the caller may not read the ticket or the note.
+    """
+    if principal is None:
+        raise missing
+    if not principal.has(TICKET_MANAGE) and not await reporter_reads_file(
+        db, principal, kind=owner.kind, owner_id=owner.id
+    ):
+        raise missing
+    if owner.kind == "ticket_note":
+        deleted = await db.scalar(
+            select(TicketNote.deleted_at).where(TicketNote.id == owner.id)
+        )
+        if deleted is not None:
             raise missing
-        if not principal.has(TICKET_MANAGE) and not await reporter_reads_file(
-            db, principal, kind=owner.kind, owner_id=owner.id
-        ):
-            raise missing
-        if owner.kind == "ticket_note":
-            deleted = await db.scalar(
-                select(TicketNote.deleted_at).where(TicketNote.id == owner.id)
-            )
-            if deleted is not None:
-                raise missing
-        return
-    if owner.kind == "todo_comment":
-        if principal is None:
-            raise missing
-        row = (
-            await db.execute(
-                select(TodoComment.deleted_at, TodoBoard)
-                .join(TodoCard, TodoCard.id == TodoComment.card_id)
-                .join(TodoBoard, TodoBoard.id == TodoCard.board_id)
-                .where(TodoComment.id == owner.id)
-            )
-        ).first()
-        if row is None or row[0] is not None:
-            raise missing
-        if not await BoardAccess(db).can_read(row[1], principal):
-            raise missing
-        return
+
+
+async def _assert_todo_comment_reader(
+    db: AsyncSession, owner: AttachmentOwner, principal: Principal | None, missing: NotFoundError
+) -> None:
+    """Apply the read rule of a to-do comment (see ``_assert_owner_reader``).
+
+    Raises:
+        NotFoundError: ``missing``, when the comment is deleted or the caller may not
+            read its board.
+    """
+    if principal is None:
+        raise missing
+    row = (
+        await db.execute(
+            select(TodoComment.deleted_at, TodoBoard)
+            .join(TodoCard, TodoCard.id == TodoComment.card_id)
+            .join(TodoBoard, TodoBoard.id == TodoCard.board_id)
+            .where(TodoComment.id == owner.id)
+        )
+    ).first()
+    if row is None or row[0] is not None:
+        raise missing
+    if not await BoardAccess(db).can_read(row[1], principal):
+        raise missing
+
+
+async def _assert_comment_reader(
+    db: AsyncSession,
+    service: FilesService,
+    owner: AttachmentOwner,
+    principal: Principal | None,
+    applicant: Applicant | None,
+    missing: NotFoundError,
+) -> None:
+    """Apply the read rule of an application comment (see ``_assert_owner_reader``).
+
+    The routes never pass an ``application`` owner here. Such an id names no comment,
+    so it would fail closed with 404.
+
+    Raises:
+        NotFoundError: ``missing``, when the caller may not read the comment.
+    """
     comment = await db.get(Comment, owner.id)
     if comment is None:
         raise missing
@@ -259,6 +306,68 @@ async def _assert_owner_reader(
     )
 
 
+async def _application_access(
+    db: AsyncSession,
+    service: FilesService,
+    attachment_id: UUID,
+    principal: Principal | None,
+    applicant: Applicant | None,
+) -> Access:
+    """Resolve the read access to the application file of a URL or download route.
+
+    A caller without read access to the application, or without the PII right for a
+    file of an ``isPII`` field, gets 404, so the route is no existence oracle.
+
+    Raises:
+        NotFoundError: The file is unknown, a draft, or hidden from the caller (HTTP 404).
+    """
+    attachment = await service.get_attachment(attachment_id)
+    try:
+        access = await _resolve_attachment_read(
+            db, application_id_of(attachment), principal, applicant
+        )
+    except ForbiddenError as exc:
+        raise NotFoundError(f"attachment {attachment_id} not found") from exc
+    await _assert_not_pii_hidden(db, access, attachment)
+    return access
+
+
+async def _open_download(
+    db: AsyncSession,
+    service: FilesService,
+    attachment_id: UUID,
+    principal: Principal | None,
+    applicant: Applicant | None,
+) -> tuple[AsyncIterator[bytes], str, str, int]:
+    """Check the read rule of the owner of a file and open its stream.
+
+    Returns:
+        The chunk iterator, the filename, the MIME type and the size.
+    """
+    owner = await service.owner_of(attachment_id)
+    if owner is not None and owner.kind != "application":
+        await _assert_owner_reader(db, service, owner, principal, applicant, attachment_id)
+        return await service.message_download_stream(attachment_id)
+    access = await _application_access(db, service, attachment_id, principal, applicant)
+    return await service.download_stream(
+        attachment_id, allow_unconfirmed=access.is_owning_applicant
+    )
+
+
+async def _read_chunks(file: UploadFile, budget: int, max_bytes: int) -> tuple[bytes, ...]:
+    """Read the rest of the upload while at most ``budget`` more bytes fit the cap.
+
+    Raises:
+        PayloadTooLargeError: The body is larger than ``max_bytes`` (HTTP 413).
+    """
+    chunk = await file.read(_CHUNK)
+    if not chunk:
+        return ()
+    if len(chunk) > budget:
+        raise PayloadTooLargeError(f"Attachment exceeds {max_bytes} bytes.")
+    return (chunk, *await _read_chunks(file, budget - len(chunk), max_bytes))
+
+
 async def _read_capped(file: UploadFile, max_bytes: int) -> bytes:
     """Read the upload in chunks with a size cap.
 
@@ -268,17 +377,7 @@ async def _read_capped(file: UploadFile, max_bytes: int) -> bytes:
     Raises:
         PayloadTooLargeError: The body is larger than ``max_bytes`` (HTTP 413).
     """
-    chunks: list[bytes] = []
-    total = 0
-    while True:
-        chunk = await file.read(_CHUNK)
-        if not chunk:
-            break
-        total += len(chunk)
-        if total > max_bytes:
-            raise PayloadTooLargeError(f"Attachment exceeds {max_bytes} bytes.")
-        chunks.append(chunk)
-    return b"".join(chunks)
+    return b"".join(await _read_chunks(file, max_bytes, max_bytes))
 
 
 @router.post(
@@ -375,14 +474,7 @@ async def get_attachment_url(
     if owner is not None and owner.kind != "application":
         await _assert_owner_reader(db, service, owner, principal, applicant, attachment_id)
         return await service.message_url(attachment_id)
-    attachment = await service.get_attachment(attachment_id)
-    try:
-        access = await _resolve_attachment_read(
-            db, application_id_of(attachment), principal, applicant
-        )
-    except ForbiddenError as exc:
-        raise NotFoundError(f"attachment {attachment_id} not found") from exc
-    await _assert_not_pii_hidden(db, access, attachment)
+    access = await _application_access(db, service, attachment_id, principal, applicant)
     return await service.signed_url(
         attachment_id, allow_unconfirmed=access.is_owning_applicant
     )
@@ -430,31 +522,18 @@ async def download_attachment(
     """
     if principal is None and applicant is None:
         raise UnauthorizedError("Authentication required.")
-    owner = await service.owner_of(attachment_id)
-    if owner is not None and owner.kind != "application":
-        await _assert_owner_reader(db, service, owner, principal, applicant, attachment_id)
-        stream, filename, mime, size = await service.message_download_stream(attachment_id)
-    else:
-        attachment = await service.get_attachment(attachment_id)
-        try:
-            access = await _resolve_attachment_read(
-                db, application_id_of(attachment), principal, applicant
-            )
-        except ForbiddenError as exc:
-            raise NotFoundError(f"attachment {attachment_id} not found") from exc
-        await _assert_not_pii_hidden(db, access, attachment)
-        stream, filename, mime, size = await service.download_stream(
-            attachment_id, allow_unconfirmed=access.is_owning_applicant
-        )
+    stream, filename, mime, size = await _open_download(
+        db, service, attachment_id, principal, applicant
+    )
     preview = inline and mime in _INLINE_MIMES
-    kind = "inline" if preview else "attachment"
     headers = {
-        "Content-Disposition": content_disposition(kind, filename),
+        "Content-Disposition": content_disposition(
+            "inline" if preview else "attachment", filename
+        ),
         "Content-Length": str(size),
         "X-Content-Type-Options": "nosniff",
+        **(_PREVIEW_HEADERS if preview else {}),
     }
-    if preview:
-        headers.update(_PREVIEW_HEADERS)
     return StreamingResponse(stream, media_type=mime, headers=headers)
 
 

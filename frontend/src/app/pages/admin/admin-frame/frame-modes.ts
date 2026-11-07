@@ -6,24 +6,24 @@ import { ADMIN_GROUPS, ADMIN_PAGES } from './admin-pages';
 /** One entry of a frame navigation: a page below the home path of the frame. */
 export interface FramePage {
   /** The path below the home path of the frame. */
-  link: string;
-  title: TranslationKey;
+  readonly link: string;
+  readonly title: TranslationKey;
   /** One functional line under the title (the home page and the search). */
-  desc: TranslationKey;
-  icon: IconName;
-  group: string;
+  readonly desc: TranslationKey;
+  readonly icon: IconName;
+  readonly group: string;
   /**
    * Visible when the principal holds at least ONE of these permissions. An empty list
    * makes the entry visible to every signed-in person. This is UX only; the route gate
    * and the server stay authoritative.
    */
-  permissions: readonly string[];
+  readonly permissions: readonly string[];
 }
 
 /** A group of a frame navigation. A group without a title shows its entries only. */
 export interface FrameGroup {
-  key: string;
-  title: TranslationKey | null;
+  readonly key: string;
+  readonly title: TranslationKey | null;
 }
 
 /** The areas that use the frame: the administration and the account. */
@@ -35,17 +35,17 @@ export type FrameModeKey = 'admin' | 'account';
  */
 export interface FrameMode {
   /** The home path of the area, for example `/admin`. */
-  home: string;
+  readonly home: string;
   /** The title above the navigation ("Verwaltung", "Konto"). */
-  title: TranslationKey;
+  readonly title: TranslationKey;
   /** The accessible name of the navigation. */
-  navLabel: TranslationKey;
-  groups: readonly FrameGroup[];
-  pages: readonly FramePage[];
+  readonly navLabel: TranslationKey;
+  readonly groups: readonly FrameGroup[];
+  readonly pages: readonly FramePage[];
   /** Show "Einstellungen durchsuchen" above the entries. */
-  search: boolean;
+  readonly search: boolean;
   /** Show the "Zustand" tiles above the entries. */
-  health: boolean;
+  readonly health: boolean;
 }
 
 /** The modes of the frame. A route picks one with `data: { frame: '<key>' }`. */

@@ -1,0 +1,6 @@
+{
+  "frontend/src/app/core/cache/cache.interceptor.ts": 3,
+  "frontend/src/app/core/cache/detail-prefetch.ts": 14,
+  "frontend/src/app/core/cache/http-cache.service.ts": 5,
+  "frontend/src/app/core/cache/prefetch.service.ts": 1
+}

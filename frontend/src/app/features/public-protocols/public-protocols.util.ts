@@ -6,8 +6,8 @@ import type { PublicDecision, PublicTopSummary, PublicVoteResult } from './publi
 
 /** The parts of a semester key: `ws-2026` → winter 2026/27, `ss-2026` → summer 2026. */
 export interface SemesterParts {
-  kind: 'ws' | 'ss';
-  year: number;
+  readonly kind: 'ws' | 'ss';
+  readonly year: number;
 }
 
 /** Read a semester key. An unknown key gives `null`. */
@@ -38,14 +38,12 @@ export function resultKey(result: PublicVoteResult): TranslationKey {
 }
 
 /** The number of decisions and of skipped non-public items of a protocol. */
-export function topCounts(tops: readonly PublicTopSummary[]): { decisions: number; nonPublic: number } {
-  let decisions = 0;
-  let nonPublic = 0;
-  for (const top of tops) {
-    if (top.nonPublic) nonPublic++;
-    else decisions += top.results.length;
-  }
-  return { decisions, nonPublic };
+export function topCounts(tops: readonly PublicTopSummary[]): { readonly decisions: number; readonly nonPublic: number } {
+  const hidden = tops.filter((top) => top.nonPublic);
+  const decisions = tops
+    .filter((top) => !top.nonPublic)
+    .reduce((sum, top) => sum + top.results.length, 0);
+  return { decisions, nonPublic: hidden.length };
 }
 
 /** The order of the vote options in a decision: yes, no, abstain, then the rest. */
@@ -69,7 +67,7 @@ export function optionKey(option: string): TranslationKey | null {
 }
 
 /** The counts of a decision in a stable order. */
-export function orderedCounts(counts: Record<string, number>): { option: string; count: number }[] {
+export function orderedCounts(counts: Record<string, number>): readonly { readonly option: string; readonly count: number }[] {
   const rank = (o: string) => {
     const at = OPTION_ORDER.indexOf(o.toLocaleLowerCase());
     return at === -1 ? OPTION_ORDER.length : at;
@@ -81,8 +79,8 @@ export function orderedCounts(counts: Record<string, number>): { option: string;
 
 /** A part of the text of an agenda item: Markdown, or a decision that stood in it. */
 export type TopPart =
-  | { kind: 'text'; markdown: string }
-  | { kind: 'decision'; decision: PublicDecision };
+  | { readonly kind: 'text'; readonly markdown: string }
+  | { readonly kind: 'decision'; readonly decision: PublicDecision };
 
 /** The head line of a vote callout; group 1 is the question. */
 const CALLOUT_HEAD = /^>\s?\[!abstimmung\]\s*(.*)$/i;
@@ -110,48 +108,79 @@ function headQuestion(d: PublicDecision): string {
  * raw tally line. A callout line that the box does not show (a note) stays as text below
  * the box. A callout without a matching decision stays Markdown.
  */
-export function topParts(markdown: string, decisions: readonly PublicDecision[]): TopPart[] {
-  const open = decisions.filter((d) => d.inText);
-  const parts: TopPart[] = [];
-  let text: string[] = [];
-  const flush = (): void => {
-    const md = text.join('\n').trim();
-    if (md) parts.push({ kind: 'text', markdown: md });
-    text = [];
-  };
+export function topParts(markdown: string, decisions: readonly PublicDecision[]): readonly TopPart[] {
   const lines = markdown.split('\n');
-  let fence = false;
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (line.startsWith('```')) fence = !fence;
-    const head = fence ? null : CALLOUT_HEAD.exec(line);
-    if (!head) {
-      text.push(lines[i]);
-      continue;
-    }
-    let end = i + 1;
-    while (end < lines.length && lines[end].trim().startsWith('>')) end++;
-    const question = normalizeQuestion(head[1]);
-    const at = open.findIndex((d) => normalizeQuestion(headQuestion(d)) === question);
-    if (at === -1) {
-      text.push(...lines.slice(i, end));
-    } else {
-      const [decision] = open.splice(at, 1);
-      flush();
-      parts.push({ kind: 'decision', decision });
-      if (decision.kind !== 'election') {
-        const rest = lines
-          .slice(i + 1, end)
+  const start: TopScan = { fence: false, skip: 0, blocks: [] };
+  const { blocks } = lines.reduce((scan, _, i) => scanLine(scan, lines, i), start);
+  const begin: TopSplit = { parts: [], text: [], open: decisions.filter((d) => d.inText) };
+  const done = blocks.reduce(splitBlock, begin);
+  return withText(done.parts, done.text);
+}
+
+/** A line of the text of an agenda item, or a vote callout with all its lines. */
+type TopBlock =
+  | { readonly kind: 'line'; readonly line: string }
+  | { readonly kind: 'callout'; readonly question: string; readonly lines: readonly string[] };
+
+/** The state of the line scan of `topParts`. A callout skips its lines up to `skip`. */
+interface TopScan {
+  readonly fence: boolean;
+  readonly skip: number;
+  readonly blocks: readonly TopBlock[];
+}
+
+/** The state of the split of `topParts`: the parts, the text not yet a part, the decisions left. */
+interface TopSplit {
+  readonly parts: readonly TopPart[];
+  readonly text: readonly string[];
+  readonly open: readonly PublicDecision[];
+}
+
+/**
+ * Reads line `i`. A code fence (```) turns the callout detection off up to its end, and a
+ * callout takes all the `>` lines that follow its head.
+ */
+function scanLine(scan: TopScan, lines: readonly string[], i: number): TopScan {
+  if (i < scan.skip) return scan;
+  const line = lines[i].trim();
+  const fence = line.startsWith('```') ? !scan.fence : scan.fence;
+  const head = fence ? null : CALLOUT_HEAD.exec(line);
+  if (!head) return { ...scan, fence, blocks: [...scan.blocks, { kind: 'line', line: lines[i] }] };
+  const after = lines.slice(i + 1).findIndex((l) => !l.trim().startsWith('>'));
+  const end = after === -1 ? lines.length : i + 1 + after;
+  const callout: TopBlock = { kind: 'callout', question: head[1], lines: lines.slice(i, end) };
+  return { fence, skip: end, blocks: [...scan.blocks, callout] };
+}
+
+/**
+ * Adds a block to the split. A callout of a decision left becomes a decision part; the
+ * callout lines that the box does not show stay as text below it.
+ */
+function splitBlock(split: TopSplit, block: TopBlock): TopSplit {
+  if (block.kind === 'line') return { ...split, text: [...split.text, block.line] };
+  const question = normalizeQuestion(block.question);
+  const at = split.open.findIndex((d) => normalizeQuestion(headQuestion(d)) === question);
+  if (at === -1) return { ...split, text: [...split.text, ...block.lines] };
+  const decision = split.open[at];
+  const open = split.open.filter((_, k) => k !== at);
+  const parts: readonly TopPart[] = [
+    ...withText(split.parts, split.text),
+    { kind: 'decision', decision },
+  ];
+  const rest =
+    decision.kind === 'election'
+      ? []
+      : block.lines
+          .slice(1)
           .map((l) => l.trim().replace(/^>\s?/, ''))
           .filter((l) => l && !TALLY_LINE.test(l) && !CONDITION_LINE.test(l));
-        text.push(...rest);
-        if (rest.length) flush();
-      }
-    }
-    i = end - 1;
-  }
-  flush();
-  return parts;
+  return { parts: withText(parts, rest), text: [], open };
+}
+
+/** The parts with the text as one more Markdown part, unless the text is blank. */
+function withText(parts: readonly TopPart[], text: readonly string[]): readonly TopPart[] {
+  const markdown = text.join('\n').trim();
+  return markdown ? [...parts, { kind: 'text', markdown }] : parts;
 }
 
 /**

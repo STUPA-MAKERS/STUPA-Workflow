@@ -37,6 +37,8 @@ The server enforces these invariants:
 
 from __future__ import annotations
 
+from collections.abc import Set as AbstractSet
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
@@ -103,6 +105,11 @@ def _escape_like(needle: str) -> str:
     `.ilike(pattern, escape=...)` and pass a single backslash as the escape.
     """
     return needle.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def _lead_data(delegator_id: UUID, *, by_lead: bool) -> dict[str, str | bool]:
+    """Return the audit fields that mark a delegation write of the meeting lead."""
+    return {"delegatorId": str(delegator_id), "byLead": True} if by_lead else {}
 
 
 def meeting_start_utc(meeting: Meeting, tz_name: str) -> datetime | None:
@@ -225,26 +232,25 @@ async def voting_delegation_check(
     return blocked, delegator_sub
 
 
+@dataclass(frozen=True, slots=True)
 class DelegationService:
-    """Delegation service bound to an `AsyncSession` and a `Settings` object."""
+    """Delegation service bound to an `AsyncSession` and a `Settings` object.
 
-    def __init__(self, session: AsyncSession, settings: Settings) -> None:
-        """Bind the service to a session and the settings."""
-        self.session = session
-        self.settings = settings
+    Attributes:
+        session: The database session of the request.
+        settings: The application settings.
+    """
+
+    session: AsyncSession
+    settings: Settings
 
     async def _principal_row(
         self, *, sub: str | None = None, pid: UUID | None = None
     ) -> PrincipalRow | None:
-        stmt = select(PrincipalRow)
-        stmt = (
-            stmt.where(PrincipalRow.sub == sub)
-            if sub is not None
-            else stmt.where(PrincipalRow.id == pid)
-        )
-        return (await self.session.execute(stmt)).scalar_one_or_none()
+        clause = PrincipalRow.sub == sub if sub is not None else PrincipalRow.id == pid
+        return (await self.session.execute(select(PrincipalRow).where(clause))).scalar_one_or_none()
 
-    async def _names(self, ids: set[UUID]) -> dict[UUID, str | None]:
+    async def _names(self, ids: AbstractSet[UUID]) -> dict[UUID, str | None]:
         if not ids:
             return {}
         rows = (
@@ -266,12 +272,13 @@ class DelegationService:
         Raises:
             NotFoundError: No meeting has this id (404).
         """
-        if lock:
-            meeting = await self.session.get(
+        meeting = (
+            await self.session.get(
                 Meeting, meeting_id, with_for_update=True, populate_existing=True
             )
-        else:
-            meeting = await self.session.get(Meeting, meeting_id)
+            if lock
+            else await self.session.get(Meeting, meeting_id)
+        )
         if meeting is None:
             raise NotFoundError(f"meeting {meeting_id} not found")
         return meeting
@@ -360,7 +367,7 @@ class DelegationService:
         rows: list[tuple[MeetingDelegation, Meeting, Gremium]],
         now: datetime,
         me_id: UUID | None = None,
-        lead_gremien: set[UUID] | None = None,
+        lead_gremien: AbstractSet[UUID] = frozenset(),
         *,
         admin: bool = False,
     ) -> list[DelegationOut]:
@@ -372,11 +379,9 @@ class DelegationService:
         A fresh row gets `created_at` from the database default only on the next select, so the view
         uses the creation time until then.
         """
-        lead_gremien = lead_gremien or set()
-        ids: set[UUID] = set()
-        for d, _, _ in rows:
-            ids.add(d.delegator_principal_id)
-            ids.add(d.delegate_principal_id)
+        ids = {
+            pid for d, _, _ in rows for pid in (d.delegator_principal_id, d.delegate_principal_id)
+        }
         names = await self._names(ids)
         return [
             DelegationOut(
@@ -522,8 +527,8 @@ class DelegationService:
                 person, A is present, or the delegation would build a chain (422).
         """
         now = datetime.now(UTC)
-        meeting = await self._meeting(payload.meeting_id)
-        gremium = await self._gremium(meeting.gremium_id)
+        unlocked = await self._meeting(payload.meeting_id)
+        gremium = await self._gremium(unlocked.gremium_id)
         if not await self._can_manage(gremium.id, actor):
             raise ForbiddenError(
                 "Only the meeting lead may enter a substitution for another member."
@@ -615,7 +620,7 @@ class DelegationService:
         for delegator_id, delegate_id, voting in existing:
             if delegator_id == delegator.id:
                 raise ConflictError(
-                    "The member already delegated for this meeting.", code="conflict"
+                    "The member already delegated for this meeting.", code="delegation_exists"
                 )
             if delegate_id == delegator.id:
                 raise ValidationProblem(
@@ -630,7 +635,7 @@ class DelegationService:
             if delegate_voting and voting and delegate_id == delegate.id:
                 raise ConflictError(
                     "Recipient already carries a delegated vote for this meeting.",
-                    code="conflict",
+                    code="delegate_already_voting",
                 )
 
         row = MeetingDelegation(
@@ -650,10 +655,8 @@ class DelegationService:
             "delegateId": str(delegate.id),
             "delegateVoting": delegate_voting,
             "viaPool": via_pool,
+            **_lead_data(delegator.id, by_lead=by_lead),
         }
-        if by_lead:
-            data["delegatorId"] = str(delegator.id)
-            data["byLead"] = True
         await audit_record(
             self.session,
             actor=actor.sub,
@@ -674,30 +677,35 @@ class DelegationService:
         """
         now = datetime.now(UTC)
         me = await self._principal_row(sub=actor.sub)
-        where = []
-        lead_gremien: set[UUID] = set()
-        sees_all = actor.has(_ADMIN_PERM)
-        if meeting_id is not None:
-            where.append(MeetingDelegation.meeting_id == meeting_id)
-            meeting = await self.session.get(Meeting, meeting_id)
-            if meeting is not None and await self._can_manage(meeting.gremium_id, actor):
-                lead_gremien.add(meeting.gremium_id)
-                sees_all = True
-        if not sees_all:
-            if me is None:
-                return []
-            where.append(
+        admin = actor.has(_ADMIN_PERM)
+        meeting = await self.session.get(Meeting, meeting_id) if meeting_id is not None else None
+        lead_gremien = (
+            frozenset({meeting.gremium_id})
+            if meeting is not None and await self._can_manage(meeting.gremium_id, actor)
+            else frozenset[UUID]()
+        )
+        sees_all = admin or bool(lead_gremien)
+        if not sees_all and me is None:
+            return []
+        meeting_clause = (
+            (MeetingDelegation.meeting_id == meeting_id,) if meeting_id is not None else ()
+        )
+        own_clause = (
+            ()
+            if sees_all or me is None
+            else (
                 or_(
                     MeetingDelegation.delegator_principal_id == me.id,
                     MeetingDelegation.delegate_principal_id == me.id,
-                )
+                ),
             )
+        )
         return await self._out(
-            await self._joined(*where),
+            await self._joined(*meeting_clause, *own_clause),
             now,
             me.id if me else None,
             lead_gremien,
-            admin=actor.has(_ADMIN_PERM),
+            admin=admin,
         )
 
     async def revoke(self, delegation_id: UUID, actor: Principal) -> None:
@@ -718,26 +726,11 @@ class DelegationService:
         row = await self.session.get(MeetingDelegation, delegation_id)
         if row is None:
             raise NotFoundError(f"delegation {delegation_id} not found")
-        by_lead = False
-        if not actor.has(_ADMIN_PERM):
-            meeting = await self._meeting(row.meeting_id)
-            by_lead = meeting.status == "live" and await self._can_manage(meeting.gremium_id, actor)
-            if not by_lead:
-                me = await self._principal_row(sub=actor.sub)
-                if me is None or row.delegator_principal_id != me.id:
-                    raise ForbiddenError(
-                        "Only the delegator, the meeting lead of a live meeting, "
-                        "or an admin may revoke."
-                    )
-                if not self._revocable(meeting, datetime.now(UTC)):
-                    raise ValidationProblem(
-                        "Meeting has already started; delegation can no longer be revoked.",
-                        errors=[{"field": "id", "msg": "meeting started"}],
-                    )
-        data: dict[str, str | bool] = {"meetingId": str(row.meeting_id)}
-        if by_lead:
-            data["delegatorId"] = str(row.delegator_principal_id)
-            data["byLead"] = True
+        by_lead = not actor.has(_ADMIN_PERM) and await self._revoke_as_lead(row, actor)
+        data: dict[str, str | bool] = {
+            "meetingId": str(row.meeting_id),
+            **_lead_data(row.delegator_principal_id, by_lead=by_lead),
+        }
         await self.session.delete(row)
         await audit_record(
             self.session,
@@ -748,6 +741,75 @@ class DelegationService:
             data=data,
         )
         await self.session.commit()
+
+    async def _revoke_as_lead(self, row: MeetingDelegation, actor: Principal) -> bool:
+        """Check the revoke of a caller without `admin.delegations`.
+
+        Returns:
+            True when the meeting lead revokes during a live meeting, False when the
+            delegator revokes their own delegation in time.
+
+        Raises:
+            ForbiddenError: The actor is not the delegator and not the meeting lead of
+                a live meeting (403).
+            ValidationProblem: The meeting already started (422).
+        """
+        meeting = await self._meeting(row.meeting_id)
+        if meeting.status == "live" and await self._can_manage(meeting.gremium_id, actor):
+            return True
+        me = await self._principal_row(sub=actor.sub)
+        if me is None or row.delegator_principal_id != me.id:
+            raise ForbiddenError(
+                "Only the delegator, the meeting lead of a live meeting, or an admin may revoke."
+            )
+        if not self._revocable(meeting, datetime.now(UTC)):
+            raise ValidationProblem(
+                "Meeting has already started; delegation can no longer be revoked.",
+                errors=[{"field": "id", "msg": "meeting started"}],
+            )
+        return False
+
+    async def _candidates(
+        self, gremium_id: UUID, me_id: UUID, needle: str = ""
+    ) -> list[RecipientOut]:
+        """Return the members and the pool of the caller as recipients, without the caller.
+
+        A non-empty `needle` keeps only the names that contain it.
+        """
+        member_ids = await self._member_ids(gremium_id)
+        pool_ids = await substitutes_for(self.session, gremium_id, me_id)
+        ids = (member_ids | pool_ids) - {me_id}
+        names = await self._names(ids)
+        return [
+            RecipientOut(
+                principal_id=pid,
+                display_name=names.get(pid),
+                via_pool=pid in pool_ids,
+                is_member=pid in member_ids,
+            )
+            for pid in ids
+            if not needle or needle in (names.get(pid) or "").lower()
+        ]
+
+    async def _own_delegations(
+        self, meeting_id: UUID, me_id: UUID, now: datetime
+    ) -> tuple[DelegationOut | None, list[DelegationOut]]:
+        """Return the outgoing delegation and the incoming delegations of the caller.
+
+        A meeting has at most one outgoing delegation per delegator; the last one wins.
+        """
+        rows = await self._joined(
+            MeetingDelegation.meeting_id == meeting_id,
+            or_(
+                MeetingDelegation.delegator_principal_id == me_id,
+                MeetingDelegation.delegate_principal_id == me_id,
+            ),
+        )
+        outs = await self._out(rows, now, me_id)
+        pairs = tuple(zip(rows, outs, strict=True))
+        outgoing = [out for (d, _, _), out in pairs if d.delegator_principal_id == me_id]
+        incoming = [out for (d, _, _), out in pairs if d.delegator_principal_id != me_id]
+        return (outgoing[-1] if outgoing else None), incoming
 
     async def meeting_context(self, meeting_id: UUID, actor: Principal) -> MeetingDelegationContext:
         """Build the context for the set-up-delegation dialog of a meeting.
@@ -775,44 +837,18 @@ class DelegationService:
         )
         meeting_started = meeting.status != "planned" or (start is not None and now >= start)
 
-        my_delegation: DelegationOut | None = None
-        incoming: list[DelegationOut] = []
-        recipients: list[RecipientOut] = []
-        can_delegate = False
-        if me is not None:
-            can_delegate = gremium.allow_vote_delegation and await _independently_eligible(
-                self.session, me.id, gremium.id
-            )
-            rows = await self._joined(
-                MeetingDelegation.meeting_id == meeting.id,
-                or_(
-                    MeetingDelegation.delegator_principal_id == me.id,
-                    MeetingDelegation.delegate_principal_id == me.id,
-                ),
-            )
-            outs = await self._out(rows, now, me.id)
-            for (d, _, _), out in zip(rows, outs, strict=True):
-                if d.delegator_principal_id == me.id:
-                    my_delegation = out
-                else:
-                    incoming.append(out)
-
-            member_ids = await self._member_ids(gremium.id)
-            pool_ids = await substitutes_for(self.session, gremium.id, me.id)
-            ids = (member_ids | pool_ids) - {me.id}
-            names = await self._names(ids)
-            recipients = sorted(
-                (
-                    RecipientOut(
-                        principal_id=pid,
-                        display_name=names.get(pid),
-                        via_pool=pid in pool_ids,
-                        is_member=pid in member_ids,
-                    )
-                    for pid in ids
-                ),
-                key=lambda r: (not r.via_pool, (r.display_name or "").lower()),
-            )
+        can_delegate = (
+            me is not None
+            and gremium.allow_vote_delegation
+            and await _independently_eligible(self.session, me.id, gremium.id)
+        )
+        my_delegation, incoming = (
+            await self._own_delegations(meeting.id, me.id, now) if me is not None else (None, [])
+        )
+        candidates = await self._candidates(gremium.id, me.id) if me is not None else []
+        recipients = sorted(
+            candidates, key=lambda r: (not r.via_pool, (r.display_name or "").lower())
+        )
 
         return MeetingDelegationContext(
             meeting_id=meeting.id,
@@ -862,49 +898,47 @@ class DelegationService:
         me = await self._principal_row(sub=actor.sub)
         if me is None:
             return []
-        member_ids = await self._member_ids(gremium.id)
-        pool_ids = await substitutes_for(self.session, gremium.id, me.id)
-        ids = (member_ids | pool_ids) - {me.id}
-        names = await self._names(ids)
         needle = q.strip().lower()
-        out = [
+        local = await self._candidates(gremium.id, me.id, needle)
+        seen = {r.principal_id for r in local} | {me.id}
+        external = (
+            await self._external_recipients(needle, seen)
+            if gremium.delegation_allow_external and needle
+            else []
+        )
+        return sorted(
+            (*local, *external),
+            key=lambda r: (not r.via_pool, not r.is_member, (r.display_name or "").lower()),
+        )[:20]
+
+    async def _external_recipients(
+        self, needle: str, seen: AbstractSet[UUID]
+    ) -> list[RecipientOut]:
+        """Search active principals by name and email, without the ones in `seen`."""
+        pattern = f"%{_escape_like(needle)}%"
+        rows = (
+            await self.session.execute(
+                select(PrincipalRow.id, PrincipalRow.display_name, PrincipalRow.email)
+                .where(
+                    PrincipalRow.active.is_(True),
+                    or_(
+                        PrincipalRow.display_name.ilike(pattern, escape="\\"),
+                        PrincipalRow.email.ilike(pattern, escape="\\"),
+                    ),
+                )
+                .limit(10)
+            )
+        ).all()
+        return [
             RecipientOut(
                 principal_id=pid,
-                display_name=names.get(pid),
-                via_pool=pid in pool_ids,
-                is_member=pid in member_ids,
+                display_name=name or email,
+                via_pool=False,
+                is_member=False,
             )
-            for pid in ids
-            if not needle or needle in (names.get(pid) or "").lower()
+            for pid, name, email in rows
+            if pid not in seen
         ]
-        if gremium.delegation_allow_external and needle:
-            pattern = f"%{_escape_like(needle)}%"
-            rows = (
-                await self.session.execute(
-                    select(PrincipalRow.id, PrincipalRow.display_name, PrincipalRow.email)
-                    .where(
-                        PrincipalRow.active.is_(True),
-                        or_(
-                            PrincipalRow.display_name.ilike(pattern, escape="\\"),
-                            PrincipalRow.email.ilike(pattern, escape="\\"),
-                        ),
-                    )
-                    .limit(10)
-                )
-            ).all()
-            seen = {r.principal_id for r in out} | {me.id}
-            out.extend(
-                RecipientOut(
-                    principal_id=pid,
-                    display_name=name or email,
-                    via_pool=False,
-                    is_member=False,
-                )
-                for pid, name, email in rows
-                if pid not in seen
-            )
-        out.sort(key=lambda r: (not r.via_pool, not r.is_member, (r.display_name or "").lower()))
-        return out[:20]
 
     async def _lead_recipients(
         self, gremium_id: UUID, delegator_id: UUID, q: str, actor: Principal
@@ -928,18 +962,19 @@ class DelegationService:
         member_ids = await self._member_ids(gremium_id)
         names = await self._names(ids)
         needle = q.strip().lower()
-        out = [
-            RecipientOut(
-                principal_id=pid,
-                display_name=names.get(pid),
-                via_pool=True,
-                is_member=pid in member_ids,
-            )
-            for pid in ids
-            if not needle or needle in (names.get(pid) or "").lower()
-        ]
-        out.sort(key=lambda r: (r.display_name or "").lower())
-        return out
+        return sorted(
+            (
+                RecipientOut(
+                    principal_id=pid,
+                    display_name=names.get(pid),
+                    via_pool=True,
+                    is_member=pid in member_ids,
+                )
+                for pid in ids
+                if not needle or needle in (names.get(pid) or "").lower()
+            ),
+            key=lambda r: (r.display_name or "").lower(),
+        )
 
     async def vote_status(self, vote_id: UUID, actor: Principal) -> VoteDelegationStatus:
         """Return the delegation view of one vote for the frontend banner.
@@ -977,29 +1012,24 @@ class DelegationService:
                 )
             )
         ).all()
-        blocked = False
-        exercising = False
-        delegated_to: UUID | None = None
-        delegated_by: UUID | None = None
-        for d, seat in rows:
-            if d.delegator_principal_id != me.id:
-                exercising = True
-                delegated_by = d.delegator_principal_id
-            elif not seat:
-                blocked = True
-                delegated_to = d.delegate_principal_id
-        if not exercising:
-            free = await pool_seat_for(
-                self.session, actor.sub, vote.meeting_id, vote.eligible_group
-            )
-            if free is not None:
-                exercising = True
-                delegated_by = free.id
+        incoming = [d.delegator_principal_id for d, _ in rows if d.delegator_principal_id != me.id]
+        outgoing = [
+            d.delegate_principal_id
+            for d, seat in rows
+            if d.delegator_principal_id == me.id and not seat
+        ]
+        free = (
+            None
+            if incoming
+            else await pool_seat_for(self.session, actor.sub, vote.meeting_id, vote.eligible_group)
+        )
+        delegated_to = outgoing[-1] if outgoing else None
+        delegated_by = incoming[-1] if incoming else (free.id if free is not None else None)
         names = await self._names({i for i in (delegated_to, delegated_by) if i})
         return VoteDelegationStatus(
-            blocked=blocked,
+            blocked=bool(outgoing),
             delegated_to_name=names.get(delegated_to) if delegated_to else None,
-            exercising=exercising,
+            exercising=bool(incoming) or free is not None,
             delegated_by_name=names.get(delegated_by) if delegated_by else None,
         )
 
@@ -1036,11 +1066,12 @@ class DelegationService:
             .scalars()
             .all()
         )
-        ids: set[UUID] = set()
-        for r in rows:
-            ids.add(r.substitute_principal_id)
-            if r.member_principal_id is not None:
-                ids.add(r.member_principal_id)
+        ids = {
+            pid
+            for r in rows
+            for pid in (r.substitute_principal_id, r.member_principal_id)
+            if pid is not None
+        }
         names = await self._names(ids)
         return [
             SubstituteOut(
@@ -1085,7 +1116,7 @@ class DelegationService:
             )
         ).first()
         if dup is not None:
-            raise ConflictError("Substitute entry already exists.", code="conflict")
+            raise ConflictError("Substitute entry already exists.", code="substitute_exists")
         row = DelegationSubstitute(
             gremium_id=payload.gremium_id,
             member_principal_id=payload.member_id,

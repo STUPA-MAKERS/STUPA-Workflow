@@ -62,12 +62,12 @@ export function canReportOwn(member: Attendance, status: AttendanceStatus): bool
   return member.isSelf && member.source !== 'lead' && status !== 'absent';
 }
 
-export function countEntries(vote: MeetingVote): { key: string; value: number }[] {
+export function countEntries(vote: MeetingVote): readonly { readonly key: string; readonly value: number }[] {
   return Object.entries(vote.counts ?? {}).map(([key, value]) => ({ key, value }));
 }
 
 /** Selectable options of a vote. The fallback is the set of tally keys. */
-export function voteOptionsFor(vote: MeetingVote): string[] {
+export function voteOptionsFor(vote: MeetingVote): readonly string[] {
   return vote.options.length ? vote.options : Object.keys(vote.counts ?? {});
 }
 
@@ -87,7 +87,7 @@ export function voteOptionLabel(
  * as "TOP n" on its own. Do not add a manual prefix and do not use `##`, because
  * that doubles the numbering.
  */
-export function assembleProtocolMarkdown(agenda: AgendaItem[]): string {
+export function assembleProtocolMarkdown(agenda: readonly AgendaItem[]): string {
   return agenda
     .map((t) => {
       const heading = `# ${t.title?.trim() || 'Tagesordnungspunkt'}`;
@@ -107,7 +107,7 @@ export function meetingLine(m: Meeting, formatLocale: string): string {
 
 /** Placeholder vote for a live `vote_opened` that was not loaded yet (follower). */
 export function liveOpenedVote(
-  msg: Extract<ServerMessage, { type: 'vote_opened' }>,
+  msg: Extract<ServerMessage, { readonly type: 'vote_opened' }>,
 ): MeetingVote {
   return {
     id: msg.voteId,
@@ -137,9 +137,9 @@ export function liveOpenedVote(
 /** The time line of a meeting row: a running meeting shows its start (`since`). */
 export interface MeetingTimeText {
   /** `HH:MM` or `HH:MM–HH:MM`. Empty when the meeting has no time at all. */
-  text: string;
+  readonly text: string;
   /** True for a live meeting with a known start: the row reads "seit HH:MM". */
-  since: boolean;
+  readonly since: boolean;
 }
 
 /**
@@ -168,10 +168,10 @@ export function meetingDay(m: Meeting): string | null {
 
 /** The rule fields of a vote that the rules line reads. */
 export interface VoteRules {
-  majorityRule?: string | null;
-  quorum?: Quorum | null;
+  readonly majorityRule?: string | null;
+  readonly quorum?: Quorum | null;
   /** Admitted guests vote too: no quorum, the majority of the cast votes decides. */
-  guestsVote?: boolean;
+  readonly guestsVote?: boolean;
 }
 
 /** "Einfache Mehrheit", or "Einfache Mehrheit der abgegebenen Stimmen" for a vote with guests. */
@@ -196,7 +196,7 @@ export function quorumLabel(quorum: Quorum, t: Translate): string {
  * out: a vote that a live event added before the next read has no rules yet, and a vote
  * without a quorum shows none.
  */
-export function voteRulesParts(vote: VoteRules, t: Translate): string[] {
+export function voteRulesParts(vote: VoteRules, t: Translate): readonly string[] {
   const majority = vote.majorityRule ? [majorityLabel(vote.majorityRule, vote.guestsVote, t)] : [];
   const quorum = vote.quorum ? [quorumLabel(vote.quorum, t)] : [];
   return [...majority, ...quorum];
@@ -208,15 +208,25 @@ export function voteRulesParts(vote: VoteRules, t: Translate): string[] {
  * time.
  */
 export function voteMetaLine(vote: MeetingVote, translate: Translate, i18nLocale: string): string {
-  const parts = vote.kind === 'poll' ? [] : voteRulesParts(vote, translate);
-  if (vote.status === 'open') {
-    const since = clock(vote.openedAt, toFormatLocale(i18nLocale));
-    if (since) parts.push(translate('meetings.vote.since', { time: since }));
-  } else if (vote.status === 'closed' || vote.status === 'cancelled') {
-    const ended = clock(vote.closedAt, toFormatLocale(i18nLocale));
-    if (ended) parts.push(translate('meetings.vote.endedAt', { time: ended }));
-  }
-  return parts.join(' · ');
+  const rules = vote.kind === 'poll' ? [] : voteRulesParts(vote, translate);
+  return [...rules, ...voteTimePart(vote, translate, i18nLocale)].join(' · ');
+}
+
+/** The time part of {@link voteMetaLine}: "seit 18:48" while open, "beendet 19:02" after. */
+function voteTimePart(
+  vote: MeetingVote,
+  translate: Translate,
+  i18nLocale: string,
+): readonly string[] {
+  const locale = toFormatLocale(i18nLocale);
+  const since = vote.status === 'open' ? clock(vote.openedAt, locale) : null;
+  const ended =
+    vote.status === 'closed' || vote.status === 'cancelled' ? clock(vote.closedAt, locale) : null;
+  return since
+    ? [translate('meetings.vote.since', { time: since })]
+    : ended
+      ? [translate('meetings.vote.endedAt', { time: ended })]
+      : [];
 }
 
 /**

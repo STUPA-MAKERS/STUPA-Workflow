@@ -286,7 +286,7 @@ function mockDrawLot(id: string, url: string): Observable<never> | Vote {
 }
 
 /** The ballots of the demo user in this mock session, by vote id. */
-const MOCK_BALLOTS = new Map<string, { own?: string | string[]; proxy?: string | string[] }>();
+const MOCK_BALLOTS = new Map<string, { readonly own?: string | readonly string[]; readonly proxy?: string | readonly string[] }>();
 
 /** The closed votes of the closed demo meetings (`mock-meetings-closed.ts`). */
 const CLOSED_VOTE_ID = /^a0000000-0000-0000-0000-0000000001(\d\d)$/;
@@ -507,7 +507,7 @@ const MOCK_EFFECTIVE_FORM: EffectiveForm = {
 };
 
 /** A select option with the same German and English text. */
-function opt(value: string, de: string, en = de): { value: string; label: { de: string; en: string } } {
+function opt(value: string, de: string, en = de): { readonly value: string; readonly label: { readonly de: string; readonly en: string } } {
   return { value, label: { de, en } };
 }
 
@@ -632,7 +632,7 @@ const MOCK_APP_DATA: Record<string, unknown> = {
 };
 
 /** The attachments of the demo application (`GET …/attachments`). */
-const MOCK_APP_ATTACHMENTS: AttachmentOutWire[] = [
+const MOCK_APP_ATTACHMENTS: readonly AttachmentOutWire[] = [
   {
     id: 'att00000-0000-0000-0000-000000000011',
     filename: 'Kostenaufstellung.pdf',
@@ -719,7 +719,7 @@ const MOCK_APPLICATIONS: Page<ApplicationOutWire> = {
  * approval row carries an inline accept and reject. A vote row opens the detail
  * page.
  */
-const MOCK_TASKS: ApplicationListItemWire[] = [
+const MOCK_TASKS: readonly ApplicationListItemWire[] = [
   {
     id: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
     typeId: '11111111-1111-1111-1111-111111111111',
@@ -765,7 +765,7 @@ const MOCK_TASKS: ApplicationListItemWire[] = [
  * The status history of the demo application. The server names the applicant
  * `applicant` (the status page shows "Du") and a member by the Gremium.
  */
-const MOCK_TIMELINE: TimelineEventOutWire[] = [
+const MOCK_TIMELINE: readonly TimelineEventOutWire[] = [
   {
     fromStateId: null,
     toStateId: SUBMITTED_STATE.id,
@@ -798,7 +798,7 @@ const MOCK_TIMELINE: TimelineEventOutWire[] = [
   },
 ];
 
-const MOCK_COMMENTS: CommentOutWire[] = [
+let MOCK_COMMENTS: readonly CommentOutWire[] = [
   {
     id: 'c0000000-0000-0000-0000-000000000001',
     author: 'Finanzreferat',
@@ -819,7 +819,7 @@ const MOCK_COMMENTS: CommentOutWire[] = [
   },
 ];
 
-const MOCK_VERSIONS: VersionOutWire[] = [
+const MOCK_VERSIONS: readonly VersionOutWire[] = [
   {
     version: 1,
     data: { title: 'Förderung Ersti-Wochenende', amount: '200.00' },
@@ -845,7 +845,7 @@ const MOCK_VERSIONS: VersionOutWire[] = [
   },
 ];
 
-const MOCK_TRANSITIONS: TransitionOutWire[] = [
+const MOCK_TRANSITIONS: readonly TransitionOutWire[] = [
   {
     id: '77777777-7777-7777-7777-777777777771',
     fromStateId: SUBMITTED_STATE.id,
@@ -1000,7 +1000,7 @@ const MOCK_PLANNED_AGENDA = [
  * delegations of upcoming meetings feed the admin overview: one with the vote, one to a pool
  * substitute.
  */
-let MOCK_DELEGATIONS: Delegation[] = [
+let MOCK_DELEGATIONS: readonly Delegation[] = [
   {
     id: 'f0000000-0000-0000-0000-000000000001',
     meetingId: MOCK_PLANNED_MEETING.id,
@@ -1177,7 +1177,7 @@ function mockTimelineMeeting(
  * The meeting timeline of the mock: past meetings newest first, then the coming ones
  * in date order. The live demo meeting leads the coming ones.
  */
-function mockTimeline(): { past: MeetingOutWire[]; upcoming: MeetingOutWire[] } {
+function mockTimeline(): { readonly past: readonly MeetingOutWire[]; readonly upcoming: readonly MeetingOutWire[] } {
   const past = [
     mockTimelineMeeting(1, -9, '33. Sitzung des Studierendenparlaments', 'closed', {
       startedAt: `${mockDay(-9)}T16:04:00Z`,
@@ -1237,17 +1237,17 @@ function mockTimeline(): { past: MeetingOutWire[]; upcoming: MeetingOutWire[] } 
 }
 
 interface MockAttendance {
-  principalId: string;
-  displayName: string | null;
-  email: string | null;
-  status: 'present' | 'excused' | 'absent' | null;
-  source: 'self' | 'lead' | null;
-  note: string | null;
-  isSelf: boolean;
+  readonly principalId: string;
+  readonly displayName: string | null;
+  readonly email: string | null;
+  readonly status: 'present' | 'excused' | 'absent' | null;
+  readonly source: 'self' | 'lead' | null;
+  readonly note: string | null;
+  readonly isSelf: boolean;
   /** The member holds `protocol.write` and can keep the minutes. */
-  canKeepProtocol: boolean;
+  readonly canKeepProtocol: boolean;
   /** The member has an own vote (`vote.cast`) and can be substituted. */
-  canVote: boolean;
+  readonly canVote: boolean;
 }
 
 /**
@@ -1255,7 +1255,7 @@ interface MockAttendance {
  * Vera Vertretung has a delegation for the live meeting, so "present" gives 409. Olga Offen
  * is a member without a vote, so the lead cannot enter a substitute for her.
  */
-let MOCK_ATTENDANCE: MockAttendance[] = [
+let MOCK_ATTENDANCE: readonly MockAttendance[] = [
   { principalId: MOCK_PRINCIPAL.sub, displayName: MOCK_PRINCIPAL.display_name ?? null, email: MOCK_PRINCIPAL.email ?? null, status: null, source: null, note: null, isSelf: true, canKeepProtocol: true, canVote: true },
   { principalId: 'p-2', displayName: 'Max Mustermann', email: 'max@example.com', status: 'present', source: 'lead', note: null, isSelf: false, canKeepProtocol: true, canVote: true },
   { principalId: 'p-3', displayName: 'Erika Beispiel', email: 'erika@example.com', status: 'excused', source: 'self', note: 'Prüfung', isSelf: false, canKeepProtocol: false, canVote: true },
@@ -1268,21 +1268,21 @@ let MOCK_ATTENDANCE: MockAttendance[] = [
 ];
 
 interface MockAgendaItem {
-  id: string;
-  applicationId: string | null;
-  title: string | null;
-  body?: string | null;
-  position: number;
-  nonPublic?: boolean;
+  readonly id: string;
+  readonly applicationId: string | null;
+  readonly title: string | null;
+  readonly body?: string | null;
+  readonly position: number;
+  readonly nonPublic?: boolean;
   /** The done mark ("TOP abhaken"), or `null`. */
-  doneAt?: string | null;
-  stateLabel?: Record<string, string> | null;
+  readonly doneAt?: string | null;
+  readonly stateLabel?: Record<string, string> | null;
   /** The requested amount of an application item, for the decision proposal. */
-  amount?: string | null;
+  readonly amount?: string | null;
 }
 
 /** The agenda of the live meeting: freetext items, two applications and a non-public item. */
-let MOCK_AGENDA: MockAgendaItem[] = [
+let MOCK_AGENDA: readonly MockAgendaItem[] = [
   {
     id: 'ag-s1',
     applicationId: null,
@@ -1321,7 +1321,7 @@ let MOCK_AGENDA: MockAgendaItem[] = [
   { id: 'ag-s6', applicationId: null, title: 'Verschiedenes', body: '', position: 5 },
 ];
 let MOCK_AGENDA_SEQ = 0;
-const MOCK_ASSIGNABLE: { applicationId: string; title: string; stateLabel: Record<string, string> }[] = [
+const MOCK_ASSIGNABLE: readonly { readonly applicationId: string; readonly title: string; readonly stateLabel: Record<string, string> }[] = [
   { applicationId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', title: 'Förderung Ersti-Wochenende', stateLabel: { de: 'Abstimmung', en: 'Vote' } },
   { applicationId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', title: 'Anschaffung Beamer', stateLabel: { de: 'Abstimmung', en: 'Vote' } },
 ];
@@ -1354,7 +1354,6 @@ function setVoteStatus(voteId: string, status: 'open' | 'closed'): void {
  */
 function mockSearch(q: string): SearchResults {
   const needle = q.trim().toLowerCase();
-  const hits: SearchHit[] = [];
   const apps = [
     ...MOCK_APPLICATIONS.items.map((a) => ({
       id: a.id,
@@ -1363,23 +1362,36 @@ function mockSearch(q: string): SearchResults {
     })),
     ...MOCK_TASKS.map((t) => ({ id: t.id, title: t.title ?? '', state: t.state?.label['de'] ?? '' })),
   ];
-  for (const a of apps) {
-    if (a.title.toLowerCase().includes(needle)) {
-      hits.push({ kind: 'application', id: a.id, title: a.title, subtitle: a.state, url: `/applications/${a.id}` });
-    }
-  }
-  if (MOCK_MEETING.title.toLowerCase().includes(needle)) {
-    hits.push({
-      kind: 'meeting',
-      id: MOCK_MEETING.id,
-      title: MOCK_MEETING.title,
-      subtitle: MOCK_MEETING.gremiumName ?? null,
-      url: `/meetings/${MOCK_MEETING.id}`,
-    });
-  }
-  if ('demo mitglied'.includes(needle)) {
-    hits.push({ kind: 'principal', id: MOCK_PRINCIPAL.sub, title: 'Demo Mitglied', subtitle: MOCK_PRINCIPAL.email ?? null, url: '/admin/users' });
-  }
+  const appHits: readonly SearchHit[] = apps
+    .filter((a) => a.title.toLowerCase().includes(needle))
+    .map(
+      (a): SearchHit => ({
+        kind: 'application',
+        id: a.id,
+        title: a.title,
+        subtitle: a.state,
+        url: `/applications/${a.id}`,
+      }),
+    );
+  const meetingHit: SearchHit = {
+    kind: 'meeting',
+    id: MOCK_MEETING.id,
+    title: MOCK_MEETING.title,
+    subtitle: MOCK_MEETING.gremiumName ?? null,
+    url: `/meetings/${MOCK_MEETING.id}`,
+  };
+  const principalHit: SearchHit = {
+    kind: 'principal',
+    id: MOCK_PRINCIPAL.sub,
+    title: 'Demo Mitglied',
+    subtitle: MOCK_PRINCIPAL.email ?? null,
+    url: '/admin/users',
+  };
+  const hits = [
+    ...appHits,
+    ...(MOCK_MEETING.title.toLowerCase().includes(needle) ? [meetingHit] : []),
+    ...('demo mitglied'.includes(needle) ? [principalHit] : []),
+  ];
   return { hits, truncated: false, failed: [] };
 }
 
@@ -1428,7 +1440,7 @@ function mockProblem(status: number, code: string, url: string): Observable<neve
  * POST /meetings/{id}/protokollant-handover of the live mock meeting: `now`
  * ends the running period and starts one for the new keeper; `next_item` plans it.
  */
-function mockHandover(body: { principalId?: string; mode?: string } | null, url: string): Observable<HttpEvent<unknown>> | MeetingOutWire {
+function mockHandover(body: { readonly principalId?: string; readonly mode?: string } | null, url: string): Observable<HttpEvent<unknown>> | MeetingOutWire {
   const target = MOCK_ATTENDANCE.find((a) => a.principalId === body?.principalId);
   if (!target?.canKeepProtocol) return mockProblem(422, 'protokollant_needs_protocol_write', url);
   if (target.principalId === MOCK_MEETING.protokollantId) {
@@ -1757,7 +1769,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     return from(import('./mock-votes')).pipe(
       mergeMap((m) => {
         if (DEMO_VOTE_PATH.test(p)) {
-          const id = p.split('/').pop() ?? '';
+          const id = p.split('/').at(-1) ?? '';
           const found = m.demoVote(id, mockOwnBallot(id));
           if (!found) return throwError(() => new HttpErrorResponse({ status: 404, url: req.url }));
           return ok(found);
@@ -1800,12 +1812,12 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       const q = (req.params.get('q') ?? '').trim().toLowerCase();
       const gremiumId = req.params.get('gremiumId');
       const direction = req.params.get('direction') ?? 'upcoming';
-      let rows = q
+      const found = q
         ? [...upcoming, ...past].filter((m) => m.title.toLowerCase().includes(q))
         : direction === 'upcoming'
           ? upcoming
           : past;
-      if (gremiumId) rows = rows.filter((m) => m.gremiumId === gremiumId);
+      const rows = gremiumId ? found.filter((m) => m.gremiumId === gremiumId) : found;
       const offset = Number(req.params.get('cursor') ?? '0') || 0;
       const limit = Number(req.params.get('limit') ?? '15') || 15;
       const page: MeetingPageWire = {
@@ -1861,7 +1873,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     if (/\/delegations\/votes\/[^/]+\/status$/.test(p)) {
       return ok({ blocked: false, delegatedToName: null, exercising: true, delegatedByName: 'Erika Beispiel' });
     }
-    if (/\/votes\/[^/]+$/.test(p)) return ok(mockVote(p.split('/').pop() ?? MOCK_VOTE.id));
+    if (/\/votes\/[^/]+$/.test(p)) return ok(mockVote(p.split('/').at(-1) ?? MOCK_VOTE.id));
     const dateFrom = req.params.get('dateFrom');
     const dateTo = req.params.get('dateTo');
     if (p.endsWith('/meetings') && dateFrom && dateTo) {
@@ -2056,7 +2068,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
         isOwn: true,
         mentions: MOCK_MENTIONABLE.filter((m) => mentions.includes(m.principalId)),
       };
-      MOCK_COMMENTS.push(created);
+      MOCK_COMMENTS = [...MOCK_COMMENTS, created];
       return ok(created, 201);
     }
     if (p.endsWith('/attachments')) {

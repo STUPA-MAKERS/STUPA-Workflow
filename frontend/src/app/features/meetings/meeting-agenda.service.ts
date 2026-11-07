@@ -219,10 +219,10 @@ export class MeetingAgendaService implements OnDestroy {
    * at once; a refused save reloads the agenda.
    */
   moveTop(meetingId: Uuid | null, from: number, to: number): void {
-    const items = [...this.agenda()];
-    if (!meetingId || from === to || !items[from] || to < 0 || to >= items.length) return;
-    const [moved] = items.splice(from, 1);
-    items.splice(to, 0, moved);
+    const agenda = this.agenda();
+    if (!meetingId || from === to || !agenda[from] || to < 0 || to >= agenda.length) return;
+    const rest = agenda.filter((_, i) => i !== from);
+    const items = [...rest.slice(0, to), agenda[from], ...rest.slice(to)];
     this.agenda.set(items);
     this.api.reorderAgenda(meetingId, items.map((i) => i.id)).subscribe({
       next: (rows) => this.setRows(rows),

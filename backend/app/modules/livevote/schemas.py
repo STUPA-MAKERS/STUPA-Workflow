@@ -9,7 +9,7 @@ from decimal import Decimal
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import Field, StringConstraints, model_validator
 
 from app.modules.applications.decision import DecisionIn
 from app.modules.voting.schemas import (
@@ -25,6 +25,7 @@ from app.shared.config_schemas import (
     PollConfig,
     Quorum,
 )
+from app.shared.schemas import FrozenCamelModel, FrozenStrictCamelModel
 
 MeetingStatus = Literal["planned", "live", "closed"]
 #: Admitted guests of a public meeting vote (`vote`) or only follow it (`watch`).
@@ -37,16 +38,7 @@ MeetingTitle = Annotated[
 ]
 
 
-class _CamelModel(BaseModel):
-    """Base model with camelCase aliases in JSON.
-
-    Code can also set the fields by their Python name.
-    """
-
-    model_config = ConfigDict(populate_by_name=True)
-
-
-class MeetingCreate(_CamelModel):
+class MeetingCreate(FrozenCamelModel, frozen=True):
     """``POST /api/meetings`` — create a meeting (status ``planned``)."""
 
     gremium_id: UUID = Field(alias="gremiumId")
@@ -68,7 +60,7 @@ class MeetingCreate(_CamelModel):
         return self
 
 
-class MeetingPatch(_CamelModel):
+class MeetingPatch(FrozenCamelModel, frozen=True):
     """``PATCH /api/meetings/{id}`` — control or plan a meeting.
 
     At least one field must be set. Any change publishes ``meeting_state``.
@@ -130,7 +122,7 @@ class MeetingPatch(_CamelModel):
         return self
 
 
-class MeetingVoteOut(_CamelModel):
+class MeetingVoteOut(FrozenCamelModel, frozen=True):
     """A vote bound to the meeting (for meeting control)."""
 
     id: UUID
@@ -197,7 +189,7 @@ class MeetingVoteOut(_CamelModel):
     poll_result: PollResultOut | None = Field(default=None, alias="pollResult")
 
 
-class CurrentAgendaItemOut(_CamelModel):
+class CurrentAgendaItemOut(FrozenCamelModel, frozen=True):
     """The agenda item the room handles now, for the start page and the timeline."""
 
     #: The 1-based number of the item in the agenda order ("TOP 3").
@@ -206,7 +198,7 @@ class CurrentAgendaItemOut(_CamelModel):
     title: str | None = None
 
 
-class KeeperPeriodOut(_CamelModel):
+class KeeperPeriodOut(FrozenCamelModel, frozen=True):
     """One period of a protocol keeper.
 
     ``fromAt`` is ``None`` for the planned handover. ``toAt`` is ``None`` while the
@@ -228,7 +220,7 @@ class KeeperPeriodOut(_CamelModel):
 HandoverMode = Literal["now", "next_item"]
 
 
-class ProtokollantHandoverBody(_CamelModel):
+class ProtokollantHandoverBody(FrozenCamelModel, frozen=True):
     """``POST /meetings/{id}/protokollant-handover`` — hand the minutes over.
 
     ``now`` hands over at once. ``next_item`` plans the handover for the next
@@ -239,7 +231,7 @@ class ProtokollantHandoverBody(_CamelModel):
     mode: HandoverMode = "now"
 
 
-class MeetingOut(_CamelModel):
+class MeetingOut(FrozenCamelModel, frozen=True):
     """Meeting state (``GET /api/meetings/{id}``)."""
 
     id: UUID
@@ -312,7 +304,7 @@ class MeetingOut(_CamelModel):
 TimelineDirection = Literal["past", "upcoming"]
 
 
-class MeetingPage(_CamelModel):
+class MeetingPage(FrozenCamelModel, frozen=True):
     """Cursor page of the meeting timeline.
 
     The page is keyset-paginated around *now*. ``upcoming`` runs forward (earliest
@@ -324,7 +316,7 @@ class MeetingPage(_CamelModel):
     next_cursor: str | None = Field(default=None, alias="nextCursor")
 
 
-class MeetingGremiumOut(_CamelModel):
+class MeetingGremiumOut(FrozenCamelModel, frozen=True):
     """Gremium (id and name) for the meeting-overview filter.
 
     The source is visibility, not membership. A Gremium appears exactly when the
@@ -345,7 +337,7 @@ SelfAttendanceStatus = Literal["present", "excused"]
 ATTENDANCE_NOTE_MAX = 500
 
 
-class AttendanceOut(_CamelModel):
+class AttendanceOut(FrozenCamelModel, frozen=True):
     """Attendance of a Gremium member for a meeting."""
 
     principal_id: UUID = Field(alias="principalId")
@@ -367,7 +359,7 @@ class AttendanceOut(_CamelModel):
     can_vote: bool = Field(default=False, alias="canVote")
 
 
-class MeetingMemberOut(_CamelModel):
+class MeetingMemberOut(FrozenCamelModel, frozen=True):
     """Current Gremium member, as a protokollant candidate for a new meeting."""
 
     principal_id: UUID = Field(alias="principalId")
@@ -378,7 +370,7 @@ class MeetingMemberOut(_CamelModel):
     can_keep_protocol: bool = Field(default=False, alias="canKeepProtocol")
 
 
-class _AttendanceNoteBody(_CamelModel):
+class _AttendanceNoteBody(FrozenCamelModel, frozen=True):
     """Shared ``note`` field of the attendance bodies.
 
     ``note`` is the reason of an excuse. It is allowed only with ``excused``, else
@@ -405,7 +397,7 @@ def _note_only_when_excused(status: str, note: str | None) -> None:
         raise ValueError("note is allowed only with status 'excused'")
 
 
-class AttendanceSetBody(_AttendanceNoteBody):
+class AttendanceSetBody(_AttendanceNoteBody, frozen=True):
     """``PUT …/attendance/{principalId}`` — the meeting lead sets the attendance."""
 
     status: AttendanceStatus
@@ -416,7 +408,7 @@ class AttendanceSetBody(_AttendanceNoteBody):
         return self
 
 
-class AttendanceSelfBody(_AttendanceNoteBody):
+class AttendanceSelfBody(_AttendanceNoteBody, frozen=True):
     """``PUT …/attendance/me`` — a member reports the own attendance.
 
     Only ``present`` and ``excused`` are allowed. ``absent`` gives 422.
@@ -430,7 +422,7 @@ class AttendanceSelfBody(_AttendanceNoteBody):
         return self
 
 
-class AgendaItemOut(_CamelModel):
+class AgendaItemOut(FrozenCamelModel, frozen=True):
     """Agenda item: an assigned application or a free-text item."""
 
     id: UUID
@@ -455,7 +447,7 @@ class AgendaItemOut(_CamelModel):
     amount: Decimal | None = None
 
 
-class AssignableApplicationOut(_CamelModel):
+class AssignableApplicationOut(FrozenCamelModel, frozen=True):
     """Application of the meeting Gremium in a vote state, not yet on the agenda."""
 
     application_id: UUID = Field(alias="applicationId")
@@ -472,20 +464,18 @@ def _same_name(name: str) -> str:
     return " ".join(name.split()).lower()
 
 
-class ElectionCandidateIn(_CamelModel):
+class ElectionCandidateIn(FrozenStrictCamelModel, frozen=True):
     """One candidate of a new election: an account or a name only.
 
     An unknown key gives 422: the client sets neither the id nor the erasure marker
     (``erased``) of a candidate.
     """
 
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
-
     name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
     principal_id: UUID | None = Field(default=None, alias="principalId")
 
 
-class MeetingVoteBody(_CamelModel):
+class MeetingVoteBody(FrozenCamelModel, frozen=True):
     """The question, the rules and the options of a meeting vote.
 
     ``POST /meetings/{id}/votes`` creates a vote from it (``MeetingVoteOpenBody``),
@@ -567,7 +557,7 @@ class MeetingVoteBody(_CamelModel):
         ]
 
 
-class MeetingVoteOpenBody(MeetingVoteBody):
+class MeetingVoteOpenBody(MeetingVoteBody, frozen=True):
     """``POST /meetings/{id}/votes`` — open a live vote on an agenda item.
 
     The route binds a new vote to the agenda item (``agendaItemId``) and opens it at
@@ -585,7 +575,7 @@ class MeetingVoteOpenBody(MeetingVoteBody):
     repeat_of: UUID | None = Field(default=None, alias="repeatOf")
 
 
-class AgendaAddBody(_CamelModel):
+class AgendaAddBody(FrozenCamelModel, frozen=True):
     """``POST /meetings/{id}/agenda`` — add an agenda item: application, free text or to-do.
 
     Supply exactly one of ``applicationId``, ``title`` and ``todoId``.
@@ -610,7 +600,7 @@ class AgendaAddBody(_CamelModel):
 AGENDA_BODY_MAX = 512_000
 
 
-class AgendaBodyBody(_CamelModel):
+class AgendaBodyBody(FrozenCamelModel, frozen=True):
     """``PATCH …/agenda/{itemId}`` — set the markdown body or the title of an item.
 
     ``title`` renames the item. An application item shows the title of its
@@ -623,13 +613,13 @@ class AgendaBodyBody(_CamelModel):
     non_public: bool | None = Field(default=None, alias="nonPublic")
 
 
-class AgendaDoneBody(_CamelModel):
+class AgendaDoneBody(FrozenCamelModel, frozen=True):
     """``PUT …/agenda/{itemId}/done`` — set or remove the done mark of an item."""
 
     done: bool
 
 
-class AgendaReorderBody(_CamelModel):
+class AgendaReorderBody(FrozenCamelModel, frozen=True):
     """``PUT …/agenda/order`` — order the agenda items as supplied."""
 
     item_ids: list[UUID] = Field(alias="itemIds")
@@ -659,20 +649,19 @@ def clean_guest_name(value: str) -> str:
     return name
 
 
-class GuestNameBody(_CamelModel):
+class GuestNameBody(FrozenStrictCamelModel, frozen=True):
     """``…/rename`` and ``PATCH /public/meetings/{code}/me`` — set the guest name."""
-
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     display_name: str = Field(alias="displayName", max_length=400)
 
     @model_validator(mode="after")
     def _clean(self) -> GuestNameBody:
-        self.display_name = clean_guest_name(self.display_name)
+        # A frozen model has no field setter, so the validator writes past it.
+        object.__setattr__(self, "display_name", clean_guest_name(self.display_name))
         return self
 
 
-class MeetingGuestOut(_CamelModel):
+class MeetingGuestOut(FrozenCamelModel, frozen=True):
     """A guest of a public meeting, as the meeting lead sees it.
 
     ``displayName`` is ``None`` after the pseudonymization; the client then shows
@@ -691,14 +680,14 @@ class MeetingGuestOut(_CamelModel):
     admitted_at: _datetime | None = Field(default=None, alias="admittedAt")
 
 
-class QrMatrixOut(_CamelModel):
+class QrMatrixOut(FrozenCamelModel, frozen=True):
     """A QR code as a module matrix without the quiet zone (rows of ``0``/``1``)."""
 
     size: int
     rows: list[str]
 
 
-class JoinLinkOut(_CamelModel):
+class JoinLinkOut(FrozenCamelModel, frozen=True):
     """The join link of a public meeting: code, absolute URL and its QR code."""
 
     join_code: str = Field(alias="joinCode")
@@ -706,13 +695,13 @@ class JoinLinkOut(_CamelModel):
     qr: QrMatrixOut
 
 
-class JoinTargetOut(_CamelModel):
+class JoinTargetOut(FrozenCamelModel, frozen=True):
     """``GET /meetings/join/{code}`` — the meeting of a join code, for a member."""
 
     meeting_id: UUID = Field(alias="meetingId")
 
 
-class MeetingDefaultsOut(_CamelModel):
+class MeetingDefaultsOut(FrozenCamelModel, frozen=True):
     """``GET /gremien/{id}/meeting-defaults`` — what a new meeting of the gremium allows."""
 
     #: Public participation only without a quorum.

@@ -74,7 +74,7 @@ export class AdminOAuthGrantsComponent {
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
 
-  readonly grants = signal<OAuthGrantAdmin[]>([]);
+  readonly grants = signal<readonly OAuthGrantAdmin[]>([]);
   readonly total = signal(0);
   readonly offset = signal(0);
   readonly loading = signal(true);

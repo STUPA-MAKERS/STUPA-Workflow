@@ -31,18 +31,18 @@ export function provideDetailPrefetch(): Provider {
 /** What a list reads ahead for the rows it shows. */
 export interface DetailPrefetch<T> {
   /** The rows the list shows, in order. */
-  items: () => readonly T[];
+  readonly items: () => readonly T[];
   /** The key of a row: one read ahead per key while it is fresh. */
-  key: (item: T) => string;
+  readonly key: (item: T) => string;
   /**
    * The GETs the detail of a row makes when it opens, as the same service calls. Each one
    * has to use `detailContext()`, else its answer is not kept and the click reads again.
    * An empty list reads nothing for that row. It runs in the injection context of the
    * list, so it can `inject()` the services it calls.
    */
-  reads: (item: T) => readonly Observable<unknown>[];
+  readonly reads: (item: T) => readonly Observable<unknown>[];
   /** Read nothing while this is false (a permission, a phone layout …). */
-  when?: () => boolean;
+  readonly when?: () => boolean;
 }
 
 /**

@@ -66,8 +66,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const auth = inject(AuthService);
   const csrfToken = UNSAFE_METHODS.has(req.method) ? readCookie(CSRF_COOKIE) : null;
 
-  const setHeaders: Record<string, string> = {};
-  if (csrfToken) setHeaders[CSRF_HEADER] = csrfToken;
+  const setHeaders: Record<string, string> = csrfToken ? { [CSRF_HEADER]: csrfToken } : {};
 
   const authed = req.clone({ withCredentials: true, setHeaders });
 

@@ -5,7 +5,9 @@ kind: style
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
-implementation: null
+implementation:
+  - frontend/eslint.config.js
+  - frontend/vendor/ui-kit/eslint.config.js
 scope:
   - frontend/
   - frontend/vendor/ui-kit

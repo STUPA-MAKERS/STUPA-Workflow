@@ -41,15 +41,15 @@ function alloc(
 }
 
 interface Spec {
-  id: string;
-  key: string;
-  name: string;
-  color?: string;
+  readonly id: string;
+  readonly key: string;
+  readonly name: string;
+  readonly color?: string;
   /** Own deciding gremium (`decisionGremiumId`); the children inherit it. */
-  decision?: string;
+  readonly decision?: string;
   /** allocated, bound, expended, income, requested in the current year. */
-  cur: [number, number, number, number?, number?];
-  children?: Spec[];
+  readonly cur: readonly [number, number, number, number?, number?];
+  readonly children?: readonly Spec[];
 }
 
 const SPEC: Spec = {
@@ -140,21 +140,20 @@ function build(spec: Spec, parent: BudgetTreeNode | null): BudgetTreeNode {
     ],
     children: [],
   };
-  node.children = (spec.children ?? []).map((c) => build(c, node));
-  return node;
+  return { ...node, children: (spec.children ?? []).map((c) => build(c, node)) };
 }
 
-export const MOCK_BUDGET_TREE: BudgetTreeNode[] = [build(SPEC, null)];
+export const MOCK_BUDGET_TREE: readonly BudgetTreeNode[] = [build(SPEC, null)];
 
 /** The fiscal years. The closed year 2024 is the one the admin cost-centre page marks "inaktiv". */
-const MOCK_FISCAL_YEARS: FiscalYear[] = [
+const MOCK_FISCAL_YEARS: readonly FiscalYear[] = [
   { id: FY_CURRENT, budgetId: ROOT, year: 2026, display: '2026', startDate: '2026-01-01', endDate: '2026-12-31', active: true },
   { id: FY_PREVIOUS, budgetId: ROOT, year: 2025, display: '2025', startDate: '2025-01-01', endDate: '2025-12-31', active: true },
   { id: 'f1000000-0000-0000-0000-000000000003', budgetId: ROOT, year: 2024, display: '2024', startDate: '2024-01-01', endDate: '2024-12-31', active: false },
 ];
 
 /** GET /budgets/{id}/fiscal-years: the years of the top budget above the node. */
-export function mockFiscalYears(_budgetId: string): FiscalYear[] {
+export function mockFiscalYears(_budgetId: string): readonly FiscalYear[] {
   return MOCK_FISCAL_YEARS;
 }
 
@@ -162,7 +161,7 @@ const STATE_REVIEW = { label: { de: 'In Prüfung', en: 'In review' }, color: '#d
 const STATE_AGENDA = { label: { de: 'Auf Tagesordnung', en: 'On the agenda' }, color: '#2f7fc1' };
 const STATE_APPROVED = { label: { de: 'Bewilligt', en: 'Approved' }, color: '#3f9a5c' };
 
-const MOCK_BUDGET_APPS: BudgetApplication[] = [
+const MOCK_BUDGET_APPS: readonly BudgetApplication[] = [
   ['c1000000-0000-0000-0000-000000000001', 'Lötstation für die Projektwerkstatt', '21', '1800.00', STATE_AGENDA, '2026-05-12T09:00:00Z'],
   ['c1000000-0000-0000-0000-000000000002', 'Exkursion zum Logistikzentrum', '22', '2000.00', STATE_REVIEW, '2026-05-20T10:30:00Z'],
   ['c1000000-0000-0000-0000-000000000003', 'Siebdruckrahmen für die Werkstatt', '24', '1200.00', STATE_APPROVED, '2026-04-02T14:00:00Z'],
@@ -186,23 +185,19 @@ const MOCK_BUDGET_APPS: BudgetApplication[] = [
   };
 });
 
-function findNode(nodes: BudgetTreeNode[], id: string): BudgetTreeNode | null {
-  for (const n of nodes) {
-    if (n.id === id) return n;
-    const hit = findNode(n.children, id);
-    if (hit) return hit;
-  }
-  return null;
+function findNode(nodes: readonly BudgetTreeNode[], id: string): BudgetTreeNode | null {
+  return nodes.reduce<BudgetTreeNode | null>(
+    (hit, n) => hit ?? (n.id === id ? n : findNode(n.children, id)),
+    null,
+  );
 }
 
-function subtreeIds(node: BudgetTreeNode): Set<string> {
-  const out = new Set<string>([node.id]);
-  for (const c of node.children) for (const id of subtreeIds(c)) out.add(id);
-  return out;
+function subtreeIds(node: BudgetTreeNode): ReadonlySet<string> {
+  return new Set([node.id, ...node.children.flatMap((c) => [...subtreeIds(c)])]);
 }
 
 /** GET /budgets/{id}/applications: the applications of the node and its subtree. */
-export function mockBudgetApplications(budgetId: string, fiscalYearId: string | null): BudgetApplication[] {
+export function mockBudgetApplications(budgetId: string, fiscalYearId: string | null): readonly BudgetApplication[] {
   const node = findNode(MOCK_BUDGET_TREE, budgetId);
   if (!node) return [];
   const ids = subtreeIds(node);

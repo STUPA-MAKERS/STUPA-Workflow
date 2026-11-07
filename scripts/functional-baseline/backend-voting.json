@@ -1,0 +1,5 @@
+{
+  "backend/app/modules/voting/election.py": 3,
+  "backend/app/modules/voting/poll.py": 4,
+  "backend/app/modules/voting/service.py": 22
+}

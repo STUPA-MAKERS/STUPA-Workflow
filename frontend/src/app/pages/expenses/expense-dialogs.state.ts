@@ -117,38 +117,34 @@ export class ExpenseDialogsState {
   readonly confirmDelete = signal<Expense | null>(null);
 
   /** The invoices to link. One invoice can back many bookings. */
-  readonly invoices = signal<Invoice[]>([]);
+  readonly invoices = signal<readonly Invoice[]>([]);
   readonly newInvoiceId = signal('');
   readonly editInvoiceId = signal('');
   /** Open invoices, newest issue date first. A booking keeps its invoice open (part
    *  bookings), and "Als bezahlt markieren" closes it, so paid invoices drop out of the
    *  create dropdown. */
-  private readonly openInvoices = computed<Invoice[]>(() =>
+  private readonly openInvoices = computed<readonly Invoice[]>(() =>
     this.invoices()
       .filter((i) => i.status === 'open')
       .sort((a, b) => (b.issueDate ?? '').localeCompare(a.issueDate ?? '')),
   );
   /** Open invoices. A preselected paid one ("Buchung anlegen" on a paid invoice) stays
    *  selectable, like the linked invoice of an edit. */
-  readonly invoiceOptions = computed<SelectOption[]>(() => {
-    const opts = this.openInvoices().map((i) => ({ value: i.id, label: this.invoiceLabel(i) }));
-    const picked = this.newInvoiceId();
-    if (picked && !opts.some((o) => o.value === picked)) {
-      const inv = this.invoices().find((i) => i.id === picked);
-      if (inv) opts.unshift({ value: inv.id, label: this.invoiceLabel(inv) });
-    }
-    return opts;
-  });
+  readonly invoiceOptions = computed<SelectOption[]>(() =>
+    this.openInvoiceOptionsWith(this.newInvoiceId()),
+  );
   /** Edit keeps the currently linked (possibly paid) invoice selectable. */
-  readonly editInvoiceOptions = computed<SelectOption[]>(() => {
+  readonly editInvoiceOptions = computed<SelectOption[]>(() =>
+    this.openInvoiceOptionsWith(this.editInvoiceId()),
+  );
+
+  /** The open invoices as options, with the invoice `id` on top when they lack it. */
+  private openInvoiceOptionsWith(id: string): SelectOption[] {
     const opts = this.openInvoices().map((i) => ({ value: i.id, label: this.invoiceLabel(i) }));
-    const linkedId = this.editInvoiceId();
-    if (linkedId && !opts.some((o) => o.value === linkedId)) {
-      const inv = this.invoices().find((i) => i.id === linkedId);
-      if (inv) opts.unshift({ value: inv.id, label: this.invoiceLabel(inv) });
-    }
-    return opts;
-  });
+    const missing = id && !opts.some((o) => o.value === id);
+    const inv = missing ? this.invoices().find((i) => i.id === id) : undefined;
+    return inv ? [{ value: inv.id, label: this.invoiceLabel(inv) }, ...opts] : opts;
+  }
 
   readonly transferOpen = signal(false);
   readonly tFromId = signal('');
@@ -238,7 +234,7 @@ export class ExpenseDialogsState {
   }
 
   /** `rows` plus the cached invoices of the two invoice fields that `rows` does not hold. */
-  private keepPicked(rows: Invoice[]): Invoice[] {
+  private keepPicked(rows: readonly Invoice[]): readonly Invoice[] {
     const picked = new Set([this.newInvoiceId(), this.editInvoiceId()].filter((id) => !!id));
     const kept = this.invoices().filter((i) => picked.has(i.id) && !rows.some((r) => r.id === i.id));
     return kept.length ? [...rows, ...kept] : rows;

@@ -252,7 +252,6 @@ def webhook_row(**kw: Any) -> Any:
         "id": uuid.uuid4(),
         "name": "hook",
         "url": "https://x.example/hook",
-        "events": ["status_changed"],
         "active": True,
     }
     base.update(kw)
@@ -275,7 +274,7 @@ def test_mappers_roundtrip() -> None:
     assert a.granted_by == "bootstrap"
 
     w = _webhook_out(webhook_row())
-    assert w.events == ["status_changed"]
+    assert w.active is True
 
     m = _mapping_out(mapping_row())
     assert m.oidc_group == "grp"
@@ -1289,13 +1288,10 @@ async def test_create_webhook_ok() -> None:
     """The server generates the secret with 32 bytes."""
     s, sess = svc([*audit_results()])
     out = await s.create_webhook(
-        WebhookCreate(
-            name="hook", url="https://x.example/h", events=["status_changed"]
-        ),
+        WebhookCreate(name="hook", url="https://x.example/h"),
         "admin",
     )
     assert out.name == "hook"
-    assert out.events == ["status_changed"]
     wh = sess.added[0]
     assert isinstance(wh.secret, bytes)
     assert len(wh.secret) == 32
@@ -1309,14 +1305,12 @@ async def test_update_webhook_all_fields() -> None:
         WebhookUpdate(
             name="neu",
             url="https://y.example/h",
-            events=["vote_opened"],
             active=False,
         ),
         "admin",
     )
     assert row.name == "neu"
     assert row.url == "https://y.example/h"
-    assert row.events == ["vote_opened"]
     assert row.active is False
     assert out.active is False
 

@@ -13,23 +13,23 @@ import {
 
 /** A column of the sheet; `count` is the number of cards when the board is known. */
 export interface MoveColumn {
-  id: Uuid;
-  name: string;
-  count?: number | null;
+  readonly id: Uuid;
+  readonly name: string;
+  readonly count?: number | null;
 }
 
 /** A long press on a tile asks for its sheet: the card, its board and the columns in order. */
 export interface TileMenuRequest {
-  card: TodoCardTile;
-  boardId: Uuid;
-  boardKind: TodoBoardKind;
-  columns: readonly TodoColumn[];
+  readonly card: TodoCardTile;
+  readonly boardId: Uuid;
+  readonly boardKind: TodoBoardKind;
+  readonly columns: readonly TodoColumn[];
 }
 
 /** The choice of the sheet: the column and the end of it. */
 export interface MoveChoice {
-  columnId: Uuid;
-  position: 'top' | 'bottom';
+  readonly columnId: Uuid;
+  readonly position: 'top' | 'bottom';
 }
 
 /**

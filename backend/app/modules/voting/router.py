@@ -61,7 +61,7 @@ _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 
 
 def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
-    return {code: _PROBLEM for code in codes}
+    return dict.fromkeys(codes, _PROBLEM)
 
 
 def get_voting_service(
@@ -202,13 +202,15 @@ async def open_vote(
 
     The livevote import is local, because the livevote modules import this module.
     """
-    await service.assert_can_run_vote(vote_id, principal)
-    eligible: int | None = None
-    meeting_id = await service.meeting_id_of(vote_id)
-    if meeting_id is not None:
-        from app.modules.livevote.vote_open import check_draft_open
+    from app.modules.livevote.vote_open import check_draft_open
 
-        eligible = await check_draft_open(service.session, meeting_id, vote_id, principal)
+    await service.assert_can_run_vote(vote_id, principal)
+    meeting_id = await service.meeting_id_of(vote_id)
+    eligible = (
+        await check_draft_open(service.session, meeting_id, vote_id, principal)
+        if meeting_id is not None
+        else None
+    )
     vote = await service.open(
         vote_id, now=datetime.now(UTC), actor=principal.sub, eligible_count=eligible
     )

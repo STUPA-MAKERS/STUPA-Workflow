@@ -37,6 +37,7 @@ import {
   liveOpenedVote,
 } from './meetings-display.util';
 import { problemCode, problemDetail } from '@core/api/problem';
+import { withEntry } from '@shared/util/immutable';
 
 /** The shortest time between two live drafts of the protokollant. */
 const DRAFT_INTERVAL_MS = 300;
@@ -74,7 +75,7 @@ export class MeetingSessionService implements OnDestroy {
 
   readonly attendance = signal<Attendance[]>([]);
   /** Live viewers of the meeting page (WS `viewers`). */
-  readonly viewers = signal<string[]>([]);
+  readonly viewers = signal<readonly string[]>([]);
   readonly savingAttendance = signal(false);
   /**
    * The member whose "present" the server refused with 409 `delegation_active`. The
@@ -113,7 +114,7 @@ export class MeetingSessionService implements OnDestroy {
   private draftTimer: ReturnType<typeof setTimeout> | null = null;
   private draftPending: { itemId: Uuid; body: string } | null = null;
   /** The highest draft sequence number seen per agenda item (viewer side). */
-  private readonly draftSeen = new Map<Uuid, number>();
+  private draftSeen: ReadonlyMap<Uuid, number> = new Map();
 
   /** The admin manages the meetings of every Gremium. Everybody else manages per
    *  Gremium through `session.manage`, which the server reports as `canManage`. */
@@ -710,8 +711,15 @@ export class MeetingSessionService implements OnDestroy {
       type: 'body_draft',
       agendaItemId: draft.itemId,
       body: draft.body,
-      seq: this.draftSeq++,
+      seq: this.takeDraftSeq(),
     });
+  }
+
+  /** The sequence number of the next draft frame. Only a frame that goes out takes one. */
+  private takeDraftSeq(): number {
+    const seq = this.draftSeq;
+    this.draftSeq = seq + 1;
+    return seq;
   }
 
   /** Drop the waiting draft, for example when the channel goes away. */
@@ -732,7 +740,7 @@ export class MeetingSessionService implements OnDestroy {
     if (m.isProtokollant || this.canEditProtocol()) return;
     const last = this.draftSeen.get(msg.agendaItemId);
     if (last !== undefined && msg.seq < last) return;
-    this.draftSeen.set(msg.agendaItemId, msg.seq);
+    this.draftSeen = withEntry(this.draftSeen, msg.agendaItemId, msg.seq);
     this.agendaSvc.applyDraft(msg.agendaItemId, msg.body);
   }
 
@@ -740,7 +748,7 @@ export class MeetingSessionService implements OnDestroy {
   private connectLive(meetingId: Uuid): void {
     this.viewers.set([]);
     this.clearDraft();
-    this.draftSeen.clear();
+    this.draftSeen = new Map();
     if (this.useMock) return;
     this.channel?.close();
     this.channel = this.ws.connectMeeting(meetingId);
@@ -767,7 +775,7 @@ export class MeetingSessionService implements OnDestroy {
           activeApplicationId: msg.activeApplicationId,
           currentAgendaItemId,
         });
-        this.draftSeen.clear();
+        this.draftSeen = new Map();
         this.agendaSvc.load(m.id, currentAgendaItemId);
         if (currentAgendaItemId && currentAgendaItemId !== m.currentAgendaItemId && !m.isProtokollant) {
           this.agendaSvc.selectTop(m.id, currentAgendaItemId);
@@ -786,7 +794,7 @@ export class MeetingSessionService implements OnDestroy {
         break;
       }
       case 'vote_opened': {
-        this.voteEvents++;
+        this.voteEvents += 1;
         const known = m.votes.find((v) => v.id === msg.voteId);
         if (known) {
           this.patchVote(msg.voteId, {
@@ -805,7 +813,7 @@ export class MeetingSessionService implements OnDestroy {
         break;
       }
       case 'vote_tally':
-        this.voteEvents++;
+        this.voteEvents += 1;
         this.patchVote(msg.voteId, {
           counts: msg.counts,
           leading: msg.leading,
@@ -831,7 +839,7 @@ export class MeetingSessionService implements OnDestroy {
         });
         break;
       case 'vote_closed':
-        this.voteEvents++;
+        this.voteEvents += 1;
         this.patchVote(msg.voteId, {
           status: 'closed',
           result: msg.result,
@@ -843,11 +851,11 @@ export class MeetingSessionService implements OnDestroy {
         });
         break;
       case 'vote_lot_drawn':
-        this.voteEvents++;
+        this.voteEvents += 1;
         this.patchVote(msg.voteId, { result: msg.result, electionResult: msg.electionResult });
         break;
       case 'vote_cancelled':
-        this.voteEvents++;
+        this.voteEvents += 1;
         this.patchVote(msg.voteId, {
           status: 'cancelled',
           closedAt: closedAtOf(m, msg.voteId),
@@ -884,14 +892,12 @@ export class MeetingSessionService implements OnDestroy {
       next: (read) => {
         const current = this.meeting();
         if (current?.id !== read.id) return;
-        let updated = read;
-        if (this.voteEvents !== events) {
-          if (attempt < 2) {
-            this.reloadAfterState(meetingId, attempt + 1);
-            return;
-          }
-          updated = { ...read, votes: current.votes };
+        const stale = this.voteEvents !== events;
+        if (stale && attempt < 2) {
+          this.reloadAfterState(meetingId, attempt + 1);
+          return;
         }
+        const updated = stale ? { ...read, votes: current.votes } : read;
         this.meeting.set(updated);
         if (updated.protocolId && !this.protocol() && (this.canWrite() || this.canViewAll())) {
           this.refreshProtocol();

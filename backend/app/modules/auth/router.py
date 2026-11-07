@@ -10,6 +10,7 @@ HttpOnly+Secure+SameSite=Lax cookie.
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 from uuid import UUID
@@ -23,7 +24,7 @@ from app.deps import DbSession, Principal, SettingsDep, require_principal
 from app.modules.admin.models import Gremium
 from app.modules.auth import oidc, service, sessions
 from app.modules.auth.login_settings import load_login_settings, session_days
-from app.modules.auth.models import SESSION_CLIENT_WEB
+from app.modules.auth.models import SESSION_CLIENT_WEB, AuthSession
 from app.modules.auth.oidc import OidcError, OidcUnavailableError
 from app.modules.auth.schemas import (
     GremiumRef,
@@ -66,7 +67,7 @@ _TX_MAX_AGE = 600
 
 def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
     """Document problem+json for the given error status codes."""
-    return {code: _PROBLEM for code in codes}
+    return dict.fromkeys(codes, _PROBLEM)
 
 
 @router.get(
@@ -122,6 +123,18 @@ async def login(
     return response
 
 
+def _callback_destination(
+    settings: Settings, *, return_to: str | None, oauth_in_flight: bool
+) -> str:
+    """Return the page after the login: the OAuth code-mint step, `return_to` or home."""
+    base = settings.public_base_url.rstrip("/")
+    return (
+        base + "/api/oauth/finish"
+        if oauth_in_flight
+        else (base + return_to if return_to else settings.public_base_url)
+    )
+
+
 @router.get(
     "/callback",
     status_code=status.HTTP_307_TEMPORARY_REDIRECT,
@@ -173,17 +186,17 @@ async def callback(
         if exc.code != "account_merged":
             raise
         await db.rollback()
-        dest = settings.public_base_url.rstrip("/") + "/?loginError=account_merged"
-        refused = RedirectResponse(dest, status_code=status.HTTP_303_SEE_OTHER)
+        merged = settings.public_base_url.rstrip("/") + "/?loginError=account_merged"
+        refused = RedirectResponse(merged, status_code=status.HTTP_303_SEE_OTHER)
         refused.delete_cookie(settings.oidc_tx_cookie_name, path="/")
         return refused
     await db.commit()
 
-    dest = settings.public_base_url
-    if tx.get("return_to"):
-        dest = settings.public_base_url.rstrip("/") + tx["return_to"]
-    if request.cookies.get(settings.oauth_tx_cookie_name):
-        dest = settings.public_base_url.rstrip("/") + "/api/oauth/finish"
+    dest = _callback_destination(
+        settings,
+        return_to=tx.get("return_to"),
+        oauth_in_flight=bool(request.cookies.get(settings.oauth_tx_cookie_name)),
+    )
     days = session_days(await load_login_settings(db), tx["client"])
     response = RedirectResponse(dest, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
     response.set_cookie(
@@ -194,6 +207,21 @@ async def callback(
     )
     response.delete_cookie(settings.oidc_tx_cookie_name, path="/")
     return response
+
+
+async def _idp_logout_url(settings: Settings, ended: AuthSession | None) -> str | None:
+    """Return the RP-initiated logout URL of the IdP for an ended session, if there is one.
+
+    A failed discovery gives `None`, because the local logout must not fail on an IdP
+    outage.
+    """
+    if not settings.oidc_enabled or ended is None:
+        return None
+    try:
+        return await oidc.end_session_url(settings, id_token=ended.id_token)
+    except OidcError:
+        logger.warning("oidc discovery failed at logout, no IdP logout URL")
+        return None
 
 
 @router.post("/logout")
@@ -212,20 +240,18 @@ async def logout(
         sessions end in every case, because a logout that fails on an IdP outage would
         leave the session open.
     """
-    logout_url: str | None = None
     cookie = request.cookies.get(settings.session_cookie_name)
-    if cookie:
-        ended = await sessions.delete_principal_session(
+    ended = (
+        await sessions.delete_principal_session(
             db,
             secret=settings.session_secret,
             cookie_value=cookie,
             max_age=sessions.SESSION_COOKIE_MAX_AGE,
         )
-        if settings.oidc_enabled and ended is not None:
-            try:
-                logout_url = await oidc.end_session_url(settings, id_token=ended.id_token)
-            except OidcError:
-                logger.warning("oidc discovery failed at logout, no IdP logout URL")
+        if cookie
+        else None
+    )
+    logout_url = await _idp_logout_url(settings, ended)
     ap_cookie = request.cookies.get(settings.applicant_cookie_name)
     if ap_cookie:
         await sessions.delete_applicant_session(
@@ -289,12 +315,14 @@ async def me(
         sub=principal.sub,
         email=principal.email,
         display_name=principal.display_name,
-        roles=sorted(principal.roles),
-        permissions=sorted(principal.permissions),
-        groups=sorted(principal.groups),
-        gremien=await _gremien_for(db, principal.sub),
-        session_manage_gremien=await _session_manage_gremien(db, principal),
-        gremium_permissions=await _gremium_permissions(db, principal),
+        roles=tuple(sorted(principal.roles)),
+        permissions=tuple(sorted(principal.permissions)),
+        groups=tuple(sorted(principal.groups)),
+        gremien=tuple(await _gremien_for(db, principal.sub)),
+        session_manage_gremien=tuple(await _session_manage_gremien(db, principal)),
+        gremium_permissions={
+            gid: tuple(keys) for gid, keys in (await _gremium_permissions(db, principal)).items()
+        },
         has_scoped_budget_view=await _has_scoped_budget_view(db, principal.sub),
         in_substitute_pool=await _in_substitute_pool(db, principal.sub),
         has_reported_tickets=await _has_reported_tickets(db, principal.sub),
@@ -362,13 +390,18 @@ async def _gremium_permissions(
     """
     from app.modules.admin.gremium_roles import GREMIUM_PERMISSIONS, active_gremium_roles
 
-    out: dict[UUID, list[str]] = {}
-    for gid, role in await active_gremium_roles(db, principal.sub):
-        held = set(role.permissions or [])
-        out[gid] = [
-            p for p in GREMIUM_PERMISSIONS if p in held and principal.scope_allows(p)
-        ]
-    return out
+    roles = await active_gremium_roles(db, principal.sub)
+    return {
+        gid: _scoped_keys(principal, GREMIUM_PERMISSIONS, frozenset(role.permissions or []))
+        for gid, role in roles
+    }
+
+
+def _scoped_keys(
+    principal: Principal, keys: Iterable[str], held: frozenset[str]
+) -> list[str]:
+    """Return the `keys` in their order that the role holds and the scope cap lets through."""
+    return [p for p in keys if p in held and principal.scope_allows(p)]
 
 
 async def _gremien_for(db: DbSession, sub: str) -> list[GremiumRef]:

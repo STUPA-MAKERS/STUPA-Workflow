@@ -1,0 +1,8 @@
+{
+  "backend/app/modules/auth/login_settings.py": 5,
+  "backend/app/modules/auth/mcp_router.py": 1,
+  "backend/app/modules/auth/oauth.py": 1,
+  "backend/app/modules/auth/oidc.py": 2,
+  "backend/app/modules/auth/service.py": 4,
+  "backend/app/modules/auth/session_renewal.py": 4
+}

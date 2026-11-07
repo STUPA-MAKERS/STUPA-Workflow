@@ -6,16 +6,16 @@ import { skipLoading } from '@stupa-makers/ui-kit';
 
 /** An extra UI language as the admin page lists it (P admin.translations). */
 export interface AdminUiLanguage {
-  code: string;
-  name: string;
-  active: boolean;
-  updatedAt?: string | null;
+  readonly code: string;
+  readonly name: string;
+  readonly active: boolean;
+  readonly updatedAt?: string | null;
 }
 
 /** The overrides of one locale: key → text. A key without an override is absent. */
 export interface LocaleTexts {
-  locale: string;
-  overrides: Record<string, string>;
+  readonly locale: string;
+  readonly overrides: Record<string, string>;
 }
 
 /**

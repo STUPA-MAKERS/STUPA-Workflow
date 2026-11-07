@@ -9,19 +9,19 @@ import type { Uuid } from '@core/api/models';
 
 /** Available, bound and requested amount of a node in a fiscal year. Money is a string. */
 export interface BudgetAllocationView {
-  fiscalYearId: Uuid;
-  allocated: string;
+  readonly fiscalYearId: Uuid;
+  readonly allocated: string;
   /** Accepted applications, reduced proportionally by committed expenses. */
-  bound: string;
+  readonly bound: string;
   /** Actual expenses. */
-  expended: string;
+  readonly expended: string;
   /** Income increases the available budget. */
-  income: string;
+  readonly income: string;
   /** Total consumption (bound + expended). Kept for backward compatibility. */
-  committed: string;
+  readonly committed: string;
   /** Requested amount of in-flight applications that are neither accepted nor denied. */
-  requested: string;
-  available: string;
+  readonly requested: string;
+  readonly available: string;
 }
 
 /** Booking kind of an actual movement. */
@@ -30,49 +30,49 @@ export type PaymentMethod = 'ueberweisung' | 'bar' | 'lastschrift' | 'karte' | '
 
 /** Booked expense or income. Money is a string (Decimal). */
 export interface Expense {
-  id: Uuid;
-  budgetId: Uuid;
-  pathKey: string | null;
-  fiscalYearId: Uuid;
-  kind: ExpenseKind;
-  amount: string;
-  currency: string;
-  description: string;
-  applicationId: Uuid | null;
-  applicationTitle: string | null;
-  transferId: Uuid | null;
+  readonly id: Uuid;
+  readonly budgetId: Uuid;
+  readonly pathKey: string | null;
+  readonly fiscalYearId: Uuid;
+  readonly kind: ExpenseKind;
+  readonly amount: string;
+  readonly currency: string;
+  readonly description: string;
+  readonly applicationId: Uuid | null;
+  readonly applicationTitle: string | null;
+  readonly transferId: Uuid | null;
   /** The raw principal `sub` (audit). The UI shows `actorName`, never the UUID. */
-  actor: string | null;
+  readonly actor: string | null;
   /** The display name of `actor`, resolved by the server. */
-  actorName: string | null;
+  readonly actorName: string | null;
   /** Extra metadata from here on, all optional. Dates are ISO dates (YYYY-MM-DD). */
-  invoiceDate: string | null;
-  paymentDate: string | null;
-  correspondent: string | null;
-  note: string | null;
-  referenceNumber: string | null;
-  paymentMethod: PaymentMethod | null;
-  category: string | null;
+  readonly invoiceDate: string | null;
+  readonly paymentDate: string | null;
+  readonly correspondent: string | null;
+  readonly note: string | null;
+  readonly referenceNumber: string | null;
+  readonly paymentMethod: PaymentMethod | null;
+  readonly category: string | null;
   /** The linked invoice. One invoice can back many bookings. */
-  invoiceId: Uuid | null;
-  invoiceNumber: string | null;
+  readonly invoiceId: Uuid | null;
+  readonly invoiceNumber: string | null;
   /** Set when this booking is a sub-booking. */
-  parentExpenseId: Uuid | null;
+  readonly parentExpenseId: Uuid | null;
   /**
    * The number of sub-bookings. A booking with sub-bookings expands, and its `amount` is the
    * sum of the children and read-only.
    */
-  childCount: number;
-  createdAt: string;
+  readonly childCount: number;
+  readonly createdAt: string;
 }
 
 /** Transfer from cost center to cost center inside the same fiscal year. */
 export interface TransferCreate {
-  fromBudgetId: Uuid;
-  toBudgetId: Uuid;
-  fiscalYearId: Uuid;
-  amount: string;
-  description: string;
+  readonly fromBudgetId: Uuid;
+  readonly toBudgetId: Uuid;
+  readonly fiscalYearId: Uuid;
+  readonly amount: string;
+  readonly description: string;
 }
 
 /**
@@ -84,47 +84,47 @@ export interface TransferCreate {
  * `actor`, it is the raw principal id.
  */
 export interface BudgetTransfer {
-  transferId: Uuid;
-  expenseId: Uuid;
-  incomeId: Uuid;
-  fromBudgetId: Uuid;
-  fromPathKey: string | null;
-  toBudgetId: Uuid;
-  toPathKey: string | null;
-  fiscalYearId: Uuid;
-  amount: string;
-  currency: string;
-  description: string;
-  note: string | null;
-  invoiceDate: string | null;
-  paymentDate: string | null;
-  actor: string | null;
-  actorName: string | null;
-  createdAt: string;
+  readonly transferId: Uuid;
+  readonly expenseId: Uuid;
+  readonly incomeId: Uuid;
+  readonly fromBudgetId: Uuid;
+  readonly fromPathKey: string | null;
+  readonly toBudgetId: Uuid;
+  readonly toPathKey: string | null;
+  readonly fiscalYearId: Uuid;
+  readonly amount: string;
+  readonly currency: string;
+  readonly description: string;
+  readonly note: string | null;
+  readonly invoiceDate: string | null;
+  readonly paymentDate: string | null;
+  readonly actor: string | null;
+  readonly actorName: string | null;
+  readonly createdAt: string;
 }
 
 /** Offset page of transfers. */
 export interface TransferPage {
-  items: BudgetTransfer[];
-  total: number;
-  limit: number;
-  offset: number;
+  readonly items: readonly BudgetTransfer[];
+  readonly total: number;
+  readonly limit: number;
+  readonly offset: number;
 }
 
 /** Query of `GET /budget-transfers`. `budget` matches either cost centre. */
 export interface TransferQuery {
-  id?: Uuid;
-  budget?: Uuid;
-  fiscalYear?: Uuid;
-  q?: string;
-  amountMin?: number | string;
-  amountMax?: number | string;
-  createdFrom?: string;
-  createdTo?: string;
-  sort?: 'createdAt' | 'amount' | 'invoiceDate' | 'paymentDate';
-  order?: 'asc' | 'desc';
-  limit?: number;
-  offset?: number;
+  readonly id?: Uuid;
+  readonly budget?: Uuid;
+  readonly fiscalYear?: Uuid;
+  readonly q?: string;
+  readonly amountMin?: number | string;
+  readonly amountMax?: number | string;
+  readonly createdFrom?: string;
+  readonly createdTo?: string;
+  readonly sort?: 'createdAt' | 'amount' | 'invoiceDate' | 'paymentDate';
+  readonly order?: 'asc' | 'desc';
+  readonly limit?: number;
+  readonly offset?: number;
 }
 
 /**
@@ -134,175 +134,175 @@ export interface TransferQuery {
  * this body never carries them. The fiscal year is not patchable at all.
  */
 export interface TransferUpdate {
-  amount?: string;
-  description?: string;
-  note?: string | null;
-  invoiceDate?: string | null;
-  paymentDate?: string | null;
+  readonly amount?: string;
+  readonly description?: string;
+  readonly note?: string | null;
+  readonly invoiceDate?: string | null;
+  readonly paymentDate?: string | null;
 }
 
 /** Offset page of booked expenses/income. */
 export interface ExpensePage {
-  items: Expense[];
-  total: number;
-  limit: number;
-  offset: number;
+  readonly items: readonly Expense[];
+  readonly total: number;
+  readonly limit: number;
+  readonly offset: number;
 }
 
 /** Extra metadata of a booking, used on create and on update. */
 export interface ExpenseMetadata {
-  invoiceDate?: string | null;
-  paymentDate?: string | null;
-  correspondent?: string | null;
-  note?: string | null;
-  referenceNumber?: string | null;
-  paymentMethod?: PaymentMethod | null;
-  category?: string | null;
+  readonly invoiceDate?: string | null;
+  readonly paymentDate?: string | null;
+  readonly correspondent?: string | null;
+  readonly note?: string | null;
+  readonly referenceNumber?: string | null;
+  readonly paymentMethod?: PaymentMethod | null;
+  readonly category?: string | null;
   /** Linked invoice. ``null`` removes the link. */
-  invoiceId?: Uuid | null;
+  readonly invoiceId?: Uuid | null;
 }
 
 /** Create a booking: standalone (``budgetId``) or bound to an application. */
 export interface ExpenseCreate extends ExpenseMetadata {
-  amount: string;
-  description: string;
-  kind?: ExpenseKind;
-  budgetId?: Uuid | null;
-  fiscalYearId?: Uuid | null;
-  applicationId?: Uuid | null;
+  readonly amount: string;
+  readonly description: string;
+  readonly kind?: ExpenseKind;
+  readonly budgetId?: Uuid | null;
+  readonly fiscalYearId?: Uuid | null;
+  readonly applicationId?: Uuid | null;
 }
 
 /** Update a booking: amount, description, cost center and extra metadata. */
 export interface ExpenseUpdate extends ExpenseMetadata {
-  amount?: string;
-  description?: string;
+  readonly amount?: string;
+  readonly description?: string;
   /** Rebook to another cost center. The fiscal year stays fixed. */
-  budgetId?: Uuid;
+  readonly budgetId?: Uuid;
 }
 
 /** Manually create a sub-booking. It carries only its own fields. The parent gives the rest. */
 export interface SubBookingBody extends ExpenseMetadata {
-  amount: string;
-  description: string;
+  readonly amount: string;
+  readonly description: string;
 }
 
 export type InvoiceStatus = 'open' | 'paid';
 
 /** Invoice as a standalone document. Money is a string (Decimal). */
 export interface Invoice {
-  id: Uuid;
-  number: string | null;
-  issueDate: string | null;
-  dueDate: string | null;
-  supplier: string | null;
-  netAmount: string | null;
-  taxAmount: string | null;
-  grossAmount: string;
-  currency: string;
-  note: string | null;
-  status: InvoiceStatus;
-  fileName: string | null;
-  hasFile: boolean;
-  actor: string | null;
-  createdAt: string;
+  readonly id: Uuid;
+  readonly number: string | null;
+  readonly issueDate: string | null;
+  readonly dueDate: string | null;
+  readonly supplier: string | null;
+  readonly netAmount: string | null;
+  readonly taxAmount: string | null;
+  readonly grossAmount: string;
+  readonly currency: string;
+  readonly note: string | null;
+  readonly status: InvoiceStatus;
+  readonly fileName: string | null;
+  readonly hasFile: boolean;
+  readonly actor: string | null;
+  readonly createdAt: string;
   /**
    * The bookings that reference this invoice, in booking order. The server sends
    * only the bookings on cost centres the reader may see. An older backend sends no
    * field at all: the list then hides its bookings column instead of asking for the
    * bookings of each invoice one by one.
    */
-  linkedBookings?: InvoiceBooking[];
+  readonly linkedBookings?: readonly InvoiceBooking[];
 }
 
 /** One booking on an invoice, as the invoice list shows it. */
 export interface InvoiceBooking {
-  id: Uuid;
-  budgetId: Uuid;
-  pathKey: string;
-  budgetName: string;
-  fiscalYearId: Uuid;
-  kind: ExpenseKind;
-  amount: string;
-  description: string;
-  paymentDate: string | null;
+  readonly id: Uuid;
+  readonly budgetId: Uuid;
+  readonly pathKey: string;
+  readonly budgetName: string;
+  readonly fiscalYearId: Uuid;
+  readonly kind: ExpenseKind;
+  readonly amount: string;
+  readonly description: string;
+  readonly paymentDate: string | null;
   /** Set when the booking is a sub-booking of another booking. */
-  parentExpenseId: Uuid | null;
-  createdAt: string;
+  readonly parentExpenseId: Uuid | null;
+  readonly createdAt: string;
 }
 
 /** Create an invoice. ``grossAmount`` is required and the rest is optional. On
  *  import the parse supplies ``fileToken``, ``fileName`` and ``fileMime``. */
 export interface InvoiceCreate {
-  number?: string | null;
-  issueDate?: string | null;
-  dueDate?: string | null;
-  supplier?: string | null;
-  netAmount?: string | null;
-  taxAmount?: string | null;
-  grossAmount: string;
-  note?: string | null;
-  status?: InvoiceStatus;
-  fileToken?: string | null;
-  fileName?: string | null;
-  fileMime?: string | null;
+  readonly number?: string | null;
+  readonly issueDate?: string | null;
+  readonly dueDate?: string | null;
+  readonly supplier?: string | null;
+  readonly netAmount?: string | null;
+  readonly taxAmount?: string | null;
+  readonly grossAmount: string;
+  readonly note?: string | null;
+  readonly status?: InvoiceStatus;
+  readonly fileToken?: string | null;
+  readonly fileName?: string | null;
+  readonly fileMime?: string | null;
 }
 
 /** Update an invoice. It applies only the set fields and does no file handling. */
 export interface InvoiceUpdate {
-  number?: string | null;
-  issueDate?: string | null;
-  dueDate?: string | null;
-  supplier?: string | null;
-  netAmount?: string | null;
-  taxAmount?: string | null;
-  grossAmount?: string;
-  note?: string | null;
-  status?: InvoiceStatus;
+  readonly number?: string | null;
+  readonly issueDate?: string | null;
+  readonly dueDate?: string | null;
+  readonly supplier?: string | null;
+  readonly netAmount?: string | null;
+  readonly taxAmount?: string | null;
+  readonly grossAmount?: string;
+  readonly note?: string | null;
+  readonly status?: InvoiceStatus;
 }
 
 /** Result of ``POST /invoices/parse``: parsed fields + file handle. */
 export interface InvoiceParseResult {
-  number: string | null;
-  issueDate: string | null;
-  dueDate: string | null;
-  supplier: string | null;
-  netAmount: string | null;
-  taxAmount: string | null;
-  grossAmount: string;
-  currency: string;
-  fileToken: string;
-  fileName: string;
-  fileMime: string;
+  readonly number: string | null;
+  readonly issueDate: string | null;
+  readonly dueDate: string | null;
+  readonly supplier: string | null;
+  readonly netAmount: string | null;
+  readonly taxAmount: string | null;
+  readonly grossAmount: string;
+  readonly currency: string;
+  readonly fileToken: string;
+  readonly fileName: string;
+  readonly fileMime: string;
   /** Possible duplicate: an invoice with the same number already exists. */
-  duplicate: boolean;
+  readonly duplicate: boolean;
 }
 
 /** Handle to a stored document PDF: ``POST /invoices/file``. */
 export interface InvoiceFileResult {
-  fileToken: string;
-  fileName: string;
-  fileMime: string;
+  readonly fileToken: string;
+  readonly fileName: string;
+  readonly fileMime: string;
 }
 
 /** Filter and paging of the invoice list. The server does the fuzzy match and the filter. */
 export interface InvoiceQuery {
   /** The exact invoice, for a deep link such as a global-search hit. */
-  id?: string;
-  q?: string;
-  status?: InvoiceStatus;
+  readonly id?: string;
+  readonly q?: string;
+  readonly status?: InvoiceStatus;
   /**
    * With (`true`) or without (`false`) a booking the reader can see. With `status: 'open'`
    * this gives the list segments "Verbucht" and "Eingang".
    */
-  booked?: boolean;
-  grossMin?: number;
-  grossMax?: number;
-  issueFrom?: string;
-  issueTo?: string;
-  dueFrom?: string;
-  dueTo?: string;
-  limit?: number;
-  offset?: number;
+  readonly booked?: boolean;
+  readonly grossMin?: number;
+  readonly grossMax?: number;
+  readonly issueFrom?: string;
+  readonly issueTo?: string;
+  readonly dueFrom?: string;
+  readonly dueTo?: string;
+  readonly limit?: number;
+  readonly offset?: number;
 }
 
 /**
@@ -310,166 +310,166 @@ export interface InvoiceQuery {
  * all, "Eingang" (open, no booking), "Verbucht" (open, with a booking) and "Bezahlt".
  */
 export interface InvoiceSegmentCounts {
-  all: number;
-  inbox: number;
-  booked: number;
-  paid: number;
+  readonly all: number;
+  readonly inbox: number;
+  readonly booked: number;
+  readonly paid: number;
 }
 
 /** Offset page of invoices. */
 export interface InvoicePage {
-  items: Invoice[];
-  total: number;
-  limit: number;
-  offset: number;
+  readonly items: readonly Invoice[];
+  readonly total: number;
+  readonly limit: number;
+  readonly offset: number;
   /** The segment counts. An older backend sends none. */
-  counts?: InvoiceSegmentCounts;
+  readonly counts?: InvoiceSegmentCounts;
 }
 
 /** Filter/paging of the bookings list. */
 export interface ExpenseQuery {
   /** Exact booking (deep link). */
-  id?: Uuid;
-  budget?: Uuid;
-  fiscalYear?: Uuid;
-  kind?: ExpenseKind;
-  applicationId?: Uuid;
-  q?: string;
-  amountMin?: number;
-  amountMax?: number;
-  createdFrom?: string;
-  createdTo?: string;
-  sort?: 'createdAt' | 'amount' | 'invoiceDate' | 'paymentDate';
-  order?: 'asc' | 'desc';
-  limit?: number;
-  offset?: number;
+  readonly id?: Uuid;
+  readonly budget?: Uuid;
+  readonly fiscalYear?: Uuid;
+  readonly kind?: ExpenseKind;
+  readonly applicationId?: Uuid;
+  readonly q?: string;
+  readonly amountMin?: number;
+  readonly amountMax?: number;
+  readonly createdFrom?: string;
+  readonly createdTo?: string;
+  readonly sort?: 'createdAt' | 'amount' | 'invoiceDate' | 'paymentDate';
+  readonly order?: 'asc' | 'desc';
+  readonly limit?: number;
+  readonly offset?: number;
 }
 
 /** Tree node (cost center) with the sums per fiscal year and the recursive children. */
 export interface BudgetTreeNode {
-  id: Uuid;
-  parentId: Uuid | null;
-  gremiumId: Uuid | null;
-  key: string;
-  pathKey: string;
-  name: string;
-  currency: string;
-  active: boolean;
+  readonly id: Uuid;
+  readonly parentId: Uuid | null;
+  readonly gremiumId: Uuid | null;
+  readonly key: string;
+  readonly pathKey: string;
+  readonly name: string;
+  readonly currency: string;
+  readonly active: boolean;
   /** Display color for the pie and the tree. `null` means automatic. */
-  color: string | null;
+  readonly color: string | null;
   /** Top-level only: flow-state keys that count as accepted/denied. */
-  acceptedStateKeys: string[];
-  deniedStateKeys: string[];
+  readonly acceptedStateKeys: readonly string[];
+  readonly deniedStateKeys: readonly string[];
   /** Hide in the budget tab. This is display only and the rollups do not change. */
-  hiddenInBudget: boolean;
+  readonly hiddenInBudget: boolean;
   /** Visibility gremium: its members see this subtree in the budget tab as a root.
    *  They need no global budget.* permissions. */
-  viewGremiumId: Uuid | null;
+  readonly viewGremiumId: Uuid | null;
   /** The gremium that decides on spending from this node (its OWN value). */
-  decisionGremiumId?: Uuid | null;
+  readonly decisionGremiumId?: Uuid | null;
   /** The own value, else the value of the nearest ancestor, else `null` (read only). */
-  effectiveDecisionGremiumId?: Uuid | null;
+  readonly effectiveDecisionGremiumId?: Uuid | null;
   /** The node that supplies the effective value: this node, an ancestor, or `null`. */
-  decisionGremiumSourceId?: Uuid | null;
+  readonly decisionGremiumSourceId?: Uuid | null;
   /** Fiscal-year cutoff: the day and month of the period start. Only the top level
    *  uses it. */
-  fiscalStartMonth: number;
-  fiscalStartDay: number;
-  byFiscalYear: BudgetAllocationView[];
-  children: BudgetTreeNode[];
+  readonly fiscalStartMonth: number;
+  readonly fiscalStartDay: number;
+  readonly byFiscalYear: readonly BudgetAllocationView[];
+  readonly children: readonly BudgetTreeNode[];
 }
 
 export interface BudgetNode {
-  id: Uuid;
-  parentId: Uuid | null;
-  gremiumId: Uuid | null;
-  key: string;
-  pathKey: string;
-  name: string;
-  currency: string;
-  active: boolean;
-  color?: string | null;
-  acceptedStateKeys?: string[];
-  deniedStateKeys?: string[];
-  hiddenInBudget?: boolean;
-  decisionGremiumId?: Uuid | null;
-  effectiveDecisionGremiumId?: Uuid | null;
-  decisionGremiumSourceId?: Uuid | null;
-  fiscalStartMonth?: number;
-  fiscalStartDay?: number;
+  readonly id: Uuid;
+  readonly parentId: Uuid | null;
+  readonly gremiumId: Uuid | null;
+  readonly key: string;
+  readonly pathKey: string;
+  readonly name: string;
+  readonly currency: string;
+  readonly active: boolean;
+  readonly color?: string | null;
+  readonly acceptedStateKeys?: readonly string[];
+  readonly deniedStateKeys?: readonly string[];
+  readonly hiddenInBudget?: boolean;
+  readonly decisionGremiumId?: Uuid | null;
+  readonly effectiveDecisionGremiumId?: Uuid | null;
+  readonly decisionGremiumSourceId?: Uuid | null;
+  readonly fiscalStartMonth?: number;
+  readonly fiscalStartDay?: number;
 }
 
 /** The problem code of a money mutation on a closed fiscal year (409). */
 export const FISCAL_YEAR_CLOSED = 'fiscal_year_closed';
 
 export interface FiscalYear {
-  id: Uuid;
-  budgetId: Uuid;
+  readonly id: Uuid;
+  readonly budgetId: Uuid;
   /** Start year. A fiscal year is unique by year and takes no free text. */
-  year: number;
+  readonly year: number;
   /** Display: ``YYYY`` (cutoff 01.01.) or ``YYYY/YY`` (otherwise). */
-  display: string;
-  startDate: string;
-  endDate: string;
-  active: boolean;
+  readonly display: string;
+  readonly startDate: string;
+  readonly endDate: string;
+  readonly active: boolean;
   /** Set while the year is closed ("abgeschlossen"): its money data is frozen, and
    *  every booking, transfer, limit or assignment on it answers 409. */
-  closedAt?: string | null;
+  readonly closedAt?: string | null;
 }
 
 export interface BudgetNodeCreate {
-  key: string;
-  name: string;
-  parentId?: Uuid | null;
-  gremiumId?: Uuid | null;
-  decisionGremiumId?: Uuid | null;
-  currency?: string;
-  color?: string | null;
-  fiscalStartMonth?: number;
-  fiscalStartDay?: number;
+  readonly key: string;
+  readonly name: string;
+  readonly parentId?: Uuid | null;
+  readonly gremiumId?: Uuid | null;
+  readonly decisionGremiumId?: Uuid | null;
+  readonly currency?: string;
+  readonly color?: string | null;
+  readonly fiscalStartMonth?: number;
+  readonly fiscalStartDay?: number;
 }
 
 /** Partial update of a node. All fields are optional and ``color:""`` clears the color. */
 export interface BudgetNodeUpdate {
-  key?: string;
-  name?: string;
-  active?: boolean;
-  color?: string | null;
-  acceptedStateKeys?: string[];
-  deniedStateKeys?: string[];
-  hiddenInBudget?: boolean;
+  readonly key?: string;
+  readonly name?: string;
+  readonly active?: boolean;
+  readonly color?: string | null;
+  readonly acceptedStateKeys?: readonly string[];
+  readonly deniedStateKeys?: readonly string[];
+  readonly hiddenInBudget?: boolean;
   /** Visibility gremium. `null` clears the assignment. */
-  viewGremiumId?: Uuid | null;
+  readonly viewGremiumId?: Uuid | null;
   /** Deciding gremium of the node. `null` clears it; the node then inherits. */
-  decisionGremiumId?: Uuid | null;
-  fiscalStartMonth?: number;
-  fiscalStartDay?: number;
+  readonly decisionGremiumId?: Uuid | null;
+  readonly fiscalStartMonth?: number;
+  readonly fiscalStartDay?: number;
 }
 
 export interface FiscalYearCreate {
-  year: number;
+  readonly year: number;
 }
 
 /** Partial update of a fiscal year. Only the year and the active flag are editable. */
 export interface FiscalYearUpdate {
-  year?: number;
-  active?: boolean;
+  readonly year?: number;
+  readonly active?: boolean;
 }
 
 /** An application inside a cost center and its subtree. Used for budget statistics. */
 export interface BudgetApplication {
-  applicationId: Uuid;
-  title: string | null;
-  budgetId: Uuid | null;
-  pathKey: string | null;
-  fiscalYearId: Uuid | null;
-  amount: string | null;
-  currency: string | null;
-  stateId: Uuid | null;
+  readonly applicationId: Uuid;
+  readonly title: string | null;
+  readonly budgetId: Uuid | null;
+  readonly pathKey: string | null;
+  readonly fiscalYearId: Uuid | null;
+  readonly amount: string | null;
+  readonly currency: string | null;
+  readonly stateId: Uuid | null;
   /** Current flow state (i18n label map and color) for the status column. */
-  stateLabel?: Record<string, string> | null;
-  stateColor?: string | null;
-  createdAt: string;
+  readonly stateLabel?: Record<string, string> | null;
+  readonly stateColor?: string | null;
+  readonly createdAt: string;
 }
 
 /**
@@ -479,6 +479,18 @@ export interface BudgetApplication {
  */
 /** The tree changes only when a cost centre is edited, and that invalidates it. */
 const TREE_TTL_MS = 5 * 60_000;
+
+/** Whether a query value is set: `undefined`, `null` and the empty string are not. */
+const isSet = (value: unknown): boolean => value !== undefined && value !== null && value !== '';
+
+/** The set values of a list query as string params, in the order of the query's keys. */
+function queryParams(query: object): Readonly<Record<string, string>> {
+  return Object.fromEntries(
+    Object.entries(query)
+      .filter(([, value]) => isSet(value))
+      .map(([key, value]) => [key, String(value)]),
+  );
+}
 
 @Injectable({ providedIn: 'root' })
 export class BudgetTreeApi {
@@ -566,12 +578,7 @@ export class BudgetTreeApi {
 
   /** Booked expenses and income, filtered and offset-paginated. */
   listExpenses(query: ExpenseQuery = {}): Observable<ExpensePage> {
-    const params: Record<string, string> = {};
-    for (const [key, value] of Object.entries(query)) {
-      if (value !== undefined && value !== null && value !== '') {
-        params[key] = String(value);
-      }
-    }
+    const params = queryParams(query);
     return this.http.get<ExpensePage>(`${this.base}/expenses`, {
       params,
       context: listContext(query.offset),
@@ -612,12 +619,7 @@ export class BudgetTreeApi {
 
   /** Transfers as their own paged list. Mirrors {@link listExpenses}. */
   listTransfers(query: TransferQuery = {}): Observable<TransferPage> {
-    const params: Record<string, string> = {};
-    for (const [key, value] of Object.entries(query)) {
-      if (value !== undefined && value !== null && value !== '') {
-        params[key] = String(value);
-      }
-    }
+    const params = queryParams(query);
     return this.http.get<TransferPage>(`${this.base}/budget-transfers`, {
       params,
       context: skipLoading(),
@@ -638,12 +640,7 @@ export class BudgetTreeApi {
   /** Invoices, fuzzy-searched, filtered and offset-paginated. Mirrors
    *  {@link listExpenses}. */
   listInvoicesPaged(query: InvoiceQuery = {}): Observable<InvoicePage> {
-    const params: Record<string, string> = {};
-    for (const [key, value] of Object.entries(query)) {
-      if (value !== undefined && value !== null && value !== '') {
-        params[key] = String(value);
-      }
-    }
+    const params = queryParams(query);
     return this.http.get<InvoicePage>(`${this.base}/invoices`, {
       params,
       context: listContext(query.offset),
@@ -652,7 +649,7 @@ export class BudgetTreeApi {
 
   /** Full invoice list, newest invoice date first. The booking link dropdown needs
    *  all invoices. */
-  listInvoices(): Observable<Invoice[]> {
+  listInvoices(): Observable<readonly Invoice[]> {
     return this.listInvoicesPaged({ limit: 200 }).pipe(map((page) => page.items));
   }
   /** Single invoice by ID for the detail dialog. The linked invoice can sit outside
@@ -703,15 +700,12 @@ export class BudgetTreeApi {
       amountMax?: string;
       createdFrom?: string;
       createdTo?: string;
-      ids?: string[];
+      ids?: readonly string[];
     } = {},
   ): Observable<Blob> {
-    let params = new HttpParams();
-    for (const [k, v] of Object.entries(opts)) {
-      if (k === 'ids' || v === undefined || v === null || v === '') continue;
-      params = params.set(k, String(v));
-    }
-    for (const id of opts.ids ?? []) params = params.append('ids', id);
+    const scalars = Object.entries(opts).filter(([k, v]) => k !== 'ids' && isSet(v));
+    const withScalars = scalars.reduce((p, [k, v]) => p.set(k, String(v)), new HttpParams());
+    const params = (opts.ids ?? []).reduce((p, id) => p.append('ids', id), withScalars);
     return this.http.get(`${this.base}/expenses/export.xlsx`, { params, responseType: 'blob' });
   }
 
@@ -719,10 +713,11 @@ export class BudgetTreeApi {
   exportXlsx(
     opts: { node?: string; fiscalYear?: string; gremium?: string } = {},
   ): Observable<Blob> {
-    const params: Record<string, string> = {};
-    if (opts.node) params['node'] = opts.node;
-    if (opts.fiscalYear) params['fiscalYear'] = opts.fiscalYear;
-    if (opts.gremium) params['gremium'] = opts.gremium;
+    const params: Readonly<Record<string, string>> = {
+      ...(opts.node ? { node: opts.node } : {}),
+      ...(opts.fiscalYear ? { fiscalYear: opts.fiscalYear } : {}),
+      ...(opts.gremium ? { gremium: opts.gremium } : {}),
+    };
     return this.http.get(`${this.base}/budget/export.xlsx`, { params, responseType: 'blob' });
   }
 
@@ -751,14 +746,11 @@ import { simplifyPathKey } from '@shared/budget-path';
 export { simplifyPathKey };
 
 /** Tree (recursive) -> flat option list (pre-order, "pathKey - name", simplified). */
-export function flattenBudgetOptions(nodes: BudgetTreeNode[]): { value: Uuid; label: string }[] {
-  const out: { value: Uuid; label: string }[] = [];
-  const walk = (ns: BudgetTreeNode[]): void => {
-    for (const n of ns) {
-      out.push({ value: n.id, label: `${simplifyPathKey(n.pathKey)} – ${n.name}` });
-      if (n.children?.length) walk(n.children);
-    }
-  };
-  walk(nodes);
-  return out;
+export function flattenBudgetOptions(
+  nodes: readonly BudgetTreeNode[],
+): readonly { readonly value: Uuid; readonly label: string }[] {
+  return nodes.flatMap((n) => [
+    { value: n.id, label: `${simplifyPathKey(n.pathKey)} – ${n.name}` },
+    ...(n.children?.length ? flattenBudgetOptions(n.children) : []),
+  ]);
 }

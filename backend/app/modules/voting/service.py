@@ -25,6 +25,7 @@ The livevote imports are local, because the livevote modules import this module.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import cast
 from uuid import UUID
@@ -176,6 +177,95 @@ def _refuse_open(rows: Sequence[Vote], *, owner: str) -> None:
         )
 
 
+def _kind_of(config: VoteConfig | ElectionConfig | PollConfig) -> VoteKind:
+    """Return the vote kind that a create payload config gives."""
+    match config:
+        case ElectionConfig():
+            return "election"
+        case PollConfig():
+            return "poll"
+        case _:
+            return "motion"
+
+
+def _vote_config(config: VoteConfig | ElectionConfig | PollConfig) -> VoteConfig:
+    """Return the motion view of a config: an election and a poll give their projection."""
+    match config:
+        case ElectionConfig() | PollConfig():
+            return config.as_vote_config()
+        case _:
+            return config
+
+
+def _with_stored_result(tally_out: TallyOut, vote: Vote) -> TallyOut:
+    """Add the stored result of a closed vote and its failed reason to the tally."""
+    stored = cast("tally_mod.VoteResult", vote.result)
+    return (
+        tally_out.model_copy(
+            update={
+                "result": stored,
+                "failed_reason": tally_mod.failed_reason(stored, tally_out.quorum_met),
+            }
+        )
+        if vote.status == "closed" and vote.result is not None
+        else tally_out
+    )
+
+
+def _orphaned(vote: Vote, left_state_id: UUID | None, *, left_is_vote: bool) -> bool:
+    """Tell whether a state change orphans an open or draft vote of the application.
+
+    An open vote is always orphaned. A draft is orphaned only when it belongs to the
+    left state: its ``opens_state_id`` is that state, or it has none and the left state
+    is a vote state. ``left_state_id`` is None when the application left no state (or
+    came back into the same one), so every draft stays.
+    """
+    return vote.status != "draft" or _draft_orphaned(
+        vote.opens_state_id, left_state_id, left_is_vote=left_is_vote
+    )
+
+
+def _draft_orphaned(
+    opens_state_id: UUID | None, left_state_id: UUID | None, *, left_is_vote: bool
+) -> bool:
+    """Tell whether a draft belongs to the left state (see ``_orphaned``)."""
+    match (left_state_id, opens_state_id):
+        case (None, _):
+            return False
+        case (_, None):
+            return left_is_vote
+        case _:
+            return opens_state_id == left_state_id
+
+
+def _check_closable(vote: Vote, *, quorum_met: bool, now: datetime | None) -> None:
+    """Refuse the close of a vote with the quorum missed while its window runs.
+
+    Only the cron close passes ``now``, so only it closes a vote whose window expired
+    with the quorum missed (terminal QUORUM-MISSED).
+
+    Raises:
+        ConflictError: The quorum is missed and the window has not expired (409).
+    """
+    window_expired = now is not None and vote.closes_at is not None and now >= vote.closes_at
+    if not quorum_met and not window_expired:
+        raise ConflictError(
+            "quorum not met — the vote cannot be closed; collect more ballots "
+            "or cancel the vote.",
+            code="quorum_not_met",
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class _Counted:
+    """The counts of a vote for its tally card: per option, turnout, quorum and leader."""
+
+    counts: dict[str, int]
+    voted: int
+    quorum_met: bool
+    leading: str | None
+
+
 class VotingService:
     """Vote service on one ``AsyncSession`` with an optional flow dispatcher."""
 
@@ -198,9 +288,12 @@ class VotingService:
         Raises:
             NotFoundError: No vote has this id.
         """
-        stmt = select(Vote).where(Vote.id == vote_id)
-        if for_update:
-            stmt = stmt.with_for_update().execution_options(populate_existing=True)
+        base = select(Vote).where(Vote.id == vote_id)
+        stmt = (
+            base.with_for_update().execution_options(populate_existing=True)
+            if for_update
+            else base
+        )
         vote = (await self.session.execute(stmt)).scalar_one_or_none()
         if vote is None:
             raise NotFoundError(f"vote {vote_id} not found")
@@ -456,9 +549,8 @@ class VotingService:
             **self._audit_refs(vote),
             "agendaItemId": str(vote.agenda_item_id) if vote.agenda_item_id else None,
             "status": vote.status,
+            **({"reason": reason} if reason is not None else {}),
         }
-        if reason is not None:
-            data["reason"] = reason
         await election_mod.release_runoff_link(self.session, vote)
         await audit_record(
             self.session,
@@ -477,14 +569,13 @@ class VotingService:
         The ``voted_marker`` rows count too. A vote splits the identity from the
         choice, so the marker is the only trace that somebody voted.
         """
-        total = 0
-        for model in (SecretBallot, VotedMarker):
-            total += (
-                await self.session.scalar(
-                    select(func.count()).select_from(model).where(model.vote_id == vote_id)
-                )
-            ) or 0
-        return total
+        counts = [
+            await self.session.scalar(
+                select(func.count()).select_from(model).where(model.vote_id == vote_id)
+            )
+            for model in (SecretBallot, VotedMarker)
+        ]
+        return sum(n or 0 for n in counts)
 
     async def delete_standalone(self, vote_id: UUID, *, actor: str) -> None:
         """Delete a standalone application-bound vote that is a draft or cancelled.
@@ -530,9 +621,8 @@ class VotingService:
         (`email_confirmed_at IS NULL`). Such an application rests in the flow and stays
         invisible, as on the flow routes.
         """
-        stmt = select(Application).where(Application.id == application_id)
-        if confirmed_only:
-            stmt = stmt.where(Application.email_confirmed_at.is_not(None))
+        base = select(Application).where(Application.id == application_id)
+        stmt = base.where(Application.email_confirmed_at.is_not(None)) if confirmed_only else base
         app = (await self.session.execute(stmt)).scalar_one_or_none()
         if app is None:
             raise NotFoundError(f"application {application_id} not found")
@@ -649,38 +739,65 @@ class VotingService:
         The present count is queried only for a running vote with a meeting, because a
         vote without a meeting has no attendance.
         """
-        voted = sum(counts.values())
-        outcome = tally_mod.result(config, counts, eligible)
-        quorum_met, lead = outcome.quorum_met, outcome.leading
-        if election_mod.is_election(vote):
-            ev = await self._election_outcome(vote, eligible)
-            counts, voted, quorum_met, lead = ev.display_counts(), ev.ballots, ev.quorum_met, None
-        elif poll_mod.is_poll(vote):
-            pv = await self._poll_outcome(vote)
-            counts, voted, quorum_met, lead = pv.display_counts(), pv.ballots, True, None
-        members: int | None = None
-        guests: int | None = None
-        present = 0
+        counted = await self._counted(vote, config, counts, eligible)
+        members, guests, present = await self._attendance(vote, config)
         revealed = vote.status == "closed"
-        if revealed:
-            members = getattr(vote, "present_members", None)
-            guests = getattr(vote, "present_guests", None)
-        elif vote.meeting_id is not None:
-            members = await self._present_count(vote)
-            guests = await self._guest_attendance(vote, config)
-            present = members + guests if config.guests_vote else members
         return TallyOut(
-            counts=counts if revealed else {},
+            counts=counted.counts if revealed else {},
             eligible=eligible,
-            voted=voted,
+            voted=counted.voted,
             present=present,
             revealed=revealed,
-            quorumMet=quorum_met,
-            leading=lead if revealed else None,
+            quorumMet=counted.quorum_met,
+            leading=counted.leading if revealed else None,
             result=None,
             presentMembers=members,
             presentGuests=guests,
         )
+
+    async def _counted(
+        self, vote: Vote, config: VoteConfig, counts: dict[str, int], eligible: int
+    ) -> _Counted:
+        """Count a vote by its kind: an election and a poll tally their stored ballots.
+
+        An election counts ballots, not votes, and has no leader. A poll only counts: it
+        has no quorum and no leader.
+        """
+        match getattr(vote, "kind", "motion"):
+            case election_mod.ELECTION:
+                ev = await self._election_outcome(vote, eligible)
+                return _Counted(ev.display_counts(), ev.ballots, ev.quorum_met, None)
+            case poll_mod.POLL:
+                pv = await self._poll_outcome(vote)
+                return _Counted(pv.display_counts(), pv.ballots, True, None)
+            case _:
+                outcome = tally_mod.result(config, counts, eligible)
+                return _Counted(
+                    counts, sum(counts.values()), outcome.quorum_met, outcome.leading
+                )
+
+    async def _attendance(
+        self, vote: Vote, config: VoteConfig
+    ) -> tuple[int | None, int | None, int]:
+        """Return the present members, the present guests and the present count.
+
+        A closed vote gives the values fixed at the close and a present count of 0. A
+        running vote with a meeting queries them, and a vote with guests counts the
+        guests as present. A vote without a meeting has no attendance.
+        """
+        match (vote.status == "closed", vote.meeting_id is not None):
+            case (True, _):
+                return (
+                    getattr(vote, "present_members", None),
+                    getattr(vote, "present_guests", None),
+                    0,
+                )
+            case (False, True):
+                members = await self._present_count(vote)
+                guests = await self._guest_attendance(vote, config)
+                return members, guests, members + guests if config.guests_vote else members
+            case _:
+                return None, None, 0
 
     def _to_out(self, vote: Vote, config: VoteConfig, tally_out: TallyOut) -> VoteOut:
         return VoteOut(
@@ -944,13 +1061,8 @@ class VotingService:
         The id is preset only when given, because an explicit None would bypass the
         server default.
         """
-        election = payload.config if isinstance(payload.config, ElectionConfig) else None
+        kind = _kind_of(payload.config)
         poll = payload.config if isinstance(payload.config, PollConfig) else None
-        kind: VoteKind = "motion"
-        if election is not None:
-            kind = "election"
-        elif poll is not None:
-            kind = "poll"
         preset = {"id": vote_id} if vote_id is not None else {}
         vote = Vote(
             **preset,
@@ -966,7 +1078,7 @@ class VotingService:
             question=payload.question,
             config=(
                 payload.config.model_dump(by_alias=True)
-                if election is None and poll is None
+                if kind == "motion"
                 else payload.config.model_dump(mode="json", by_alias=True)
             ),
             eligible_count=payload.eligible_count,
@@ -988,14 +1100,8 @@ class VotingService:
                 data=poll_mod.audit_data(vote, poll),
             )
         await self.session.commit()
-        config: VoteConfig
-        if election is not None:
-            config = election.as_vote_config()
-        elif poll is not None:
-            config = poll.as_vote_config()
-        else:
-            config = cast(VoteConfig, payload.config)
-        empty = {opt: 0 for opt in config.options}
+        config = _vote_config(payload.config)
+        empty = dict.fromkeys(config.options, 0)
         return self._to_out(
             vote, config, await self._tally_out(vote, config, empty, vote.eligible_count or 0)
         )
@@ -1038,11 +1144,7 @@ class VotingService:
                 await self._get_application(vote.application_id), payload.proposal
             )
         config = payload.config
-        kind: VoteKind = "motion"
-        if isinstance(config, ElectionConfig):
-            kind = "election"
-        elif isinstance(config, PollConfig):
-            kind = "poll"
+        kind = _kind_of(config)
         vote.kind = kind
         vote.question = payload.question
         vote.config = (
@@ -1108,7 +1210,7 @@ class VotingService:
             await self._lock_live_meeting(meeting_id)
         vote = await self._get_vote(vote_id, for_update=True)
         if vote.status != "draft":
-            raise ConflictError(f"vote is {vote.status}, cannot open.", code="conflict")
+            raise ConflictError(f"vote is {vote.status}, cannot open.", code="vote_not_draft")
         if await self.vote_gremium_mismatch(vote):
             raise vote_gremium_mismatch_error()
         await poll_mod.PollService(self).check_open(vote, now)
@@ -1117,9 +1219,11 @@ class VotingService:
             vote.eligible_count = eligible_count
         vote.opens_at = now
         vote.status = "open"
-        data: dict[str, object] = {**self._audit_refs(vote), "guestsVote": config.guests_vote}
-        if poll_mod.is_poll(vote):
-            data["kind"] = poll_mod.POLL
+        data: dict[str, object] = {
+            **self._audit_refs(vote),
+            "guestsVote": config.guests_vote,
+            **({"kind": poll_mod.POLL} if poll_mod.is_poll(vote) else {}),
+        }
         await audit_record(
             self.session,
             actor=actor,
@@ -1130,7 +1234,7 @@ class VotingService:
         )
         await self.session.flush()
         await self.session.commit()
-        empty = {opt: 0 for opt in config.options}
+        empty = dict.fromkeys(config.options, 0)
         return self._to_out(
             vote, config, await self._tally_out(vote, config, empty, vote.eligible_count or 0)
         )
@@ -1178,28 +1282,19 @@ class VotingService:
         """
         vote = await self._get_vote(vote_id, for_update=True)
         if vote.status != "open":
-            raise ConflictError("vote is not open.", code="conflict")
+            raise ConflictError("vote is not open.", code="vote_not_open")
         if vote.closes_at is not None and now >= vote.closes_at:
-            raise ConflictError("voting window has closed.", code="conflict")
+            raise ConflictError("voting window has closed.", code="vote_window_closed")
         if principal.scope_permissions is not None:
             raise ForbiddenError("Only a human session can cast a ballot.")
         blocked, delegator_sub = await voting_delegation_check(
             self.session, principal.sub, vote.meeting_id, vote.eligible_group, now
         )
-        if as_delegation:
-            if delegator_sub is None:
-                delegator_sub = await claim_pool_seat(
-                    self.session, principal.sub, vote.meeting_id, vote.eligible_group
-                )
-            if delegator_sub is None:
-                raise ForbiddenError("No delegated voting right for this ballot.")
-            voter_sub = delegator_sub
-        else:
-            if blocked:
-                raise ForbiddenError("Voting right has been delegated to another member.")
-            if not self._may_cast(principal, vote.eligible_group):
-                raise ForbiddenError("Not eligible to vote in this ballot.")
-            voter_sub = principal.sub
+        voter_sub = (
+            await self._represented_voter(principal, vote, delegator_sub)
+            if as_delegation
+            else self._own_voter(principal, vote, blocked=blocked)
+        )
         config = self._config(vote)
         stored = self._stored_choice(vote, config, choice)
         if as_delegation:
@@ -1219,6 +1314,41 @@ class VotingService:
                 vote.meeting_id, principal.sub
             )
         return await self._cast_secret(vote.id, voter_sub, stored)
+
+    async def _represented_voter(
+        self, principal: Principal, vote: Vote, delegator_sub: str | None
+    ) -> str:
+        """Return the ``sub`` that a represented ballot runs under.
+
+        Without a voting delegation, a pool substitute claims a free seat
+        (``claim_pool_seat``).
+
+        Raises:
+            ForbiddenError: 403 - neither a delegation nor a free seat.
+        """
+        represented = (
+            delegator_sub
+            if delegator_sub is not None
+            else await claim_pool_seat(
+                self.session, principal.sub, vote.meeting_id, vote.eligible_group
+            )
+        )
+        if represented is None:
+            raise ForbiddenError("No delegated voting right for this ballot.")
+        return represented
+
+    def _own_voter(self, principal: Principal, vote: Vote, *, blocked: bool) -> str:
+        """Return the ``sub`` of an own ballot after the roster check.
+
+        Raises:
+            ForbiddenError: 403 - the right is delegated away, or the principal is not
+                on the roster of the vote.
+        """
+        if blocked:
+            raise ForbiddenError("Voting right has been delegated to another member.")
+        if not self._may_cast(principal, vote.eligible_group):
+            raise ForbiddenError("Not eligible to vote in this ballot.")
+        return principal.sub
 
     @staticmethod
     def _stored_choice(vote: Vote, config: VoteConfig, choice: Choice) -> str:
@@ -1272,9 +1402,9 @@ class VotingService:
         """
         vote = await self._get_vote(vote_id, for_update=True)
         if vote.status != "open":
-            raise ConflictError("vote is not open.", code="conflict")
+            raise ConflictError("vote is not open.", code="vote_not_open")
         if vote.closes_at is not None and now >= vote.closes_at:
-            raise ConflictError("voting window has closed.", code="conflict")
+            raise ConflictError("voting window has closed.", code="vote_window_closed")
         config = self._config(vote)
         if not config.guests_vote:
             raise ForbiddenError(
@@ -1354,14 +1484,19 @@ class VotingService:
             and not (await self.my_ballot(vote, principal.sub)).cast
         ):
             return True
-        if delegator_sub is None:
-            seat = await pool_seat_for(
-                self.session, principal.sub, vote.meeting_id, vote.eligible_group
-            )
-            if seat is None:
-                return False
-            delegator_sub = seat.sub
-        return not (await self.my_ballot(vote, delegator_sub)).cast
+        represented = (
+            delegator_sub
+            if delegator_sub is not None
+            else await self._free_seat_sub(principal, vote)
+        )
+        return represented is not None and not (await self.my_ballot(vote, represented)).cast
+
+    async def _free_seat_sub(self, principal: Principal, vote: Vote) -> str | None:
+        """Return the ``sub`` of the pool seat that the principal could claim, or None."""
+        seat = await pool_seat_for(
+            self.session, principal.sub, vote.meeting_id, vote.eligible_group
+        )
+        return seat.sub if seat is not None else None
 
     async def _cast_secret(self, vote_id: UUID, voter_sub: str, choice: str) -> BallotAccepted:
         """Insert the secret ballot. A second cast of the same voter gives 409.
@@ -1681,15 +1816,7 @@ class VotingService:
         config = self._config(vote)
         counts = await self._aggregate(vote, config)
         tally_out = await self._tally_out(vote, config, counts, vote.eligible_count or 0)
-        if vote.status == "closed" and vote.result is not None:
-            stored_result = cast("tally_mod.VoteResult", vote.result)
-            tally_out = tally_out.model_copy(
-                update={
-                    "result": stored_result,
-                    "failed_reason": tally_mod.failed_reason(stored_result, tally_out.quorum_met),
-                }
-            )
-        return self._to_out(vote, config, tally_out)
+        return self._to_out(vote, config, _with_stored_result(tally_out, vote))
 
     async def cancel(
         self, vote_id: UUID, *, now: datetime | None = None, actor: str | None = None
@@ -1706,7 +1833,7 @@ class VotingService:
         """
         vote = await self._get_vote(vote_id, for_update=True)
         if vote.status != "open":
-            raise ConflictError(f"vote is {vote.status}, cannot cancel.", code="conflict")
+            raise ConflictError(f"vote is {vote.status}, cannot cancel.", code="vote_not_open")
         await self._mark_cancelled(
             vote, now=now or datetime.now(UTC), actor=actor, reason="manual"
         )
@@ -1786,21 +1913,20 @@ class VotingService:
             .scalars()
             .all()
         )
-        left_is_vote: bool | None = None
-        cancelled: list[Vote] = []
-        for vote in rows:
-            if vote.status == "draft":
-                if left_state_id is None or left_state_id == entered_state_id:
-                    continue
-                if vote.opens_state_id is None:
-                    if left_is_vote is None:
-                        left_is_vote = await self._is_vote_state(left_state_id)
-                    if not left_is_vote:
-                        continue
-                elif vote.opens_state_id != left_state_id:
-                    continue
+        state_left = left_state_id is not None and left_state_id != entered_state_id
+        unbound_draft = any(v.status == "draft" and v.opens_state_id is None for v in rows)
+        left_is_vote = (
+            await self._is_vote_state(left_state_id)
+            if left_state_id is not None and state_left and unbound_draft
+            else False
+        )
+        cancelled = [
+            vote
+            for vote in rows
+            if _orphaned(vote, left_state_id if state_left else None, left_is_vote=left_is_vote)
+        ]
+        for vote in cancelled:
             await self._mark_cancelled(vote, now=now, actor=actor, reason="state_left")
-            cancelled.append(vote)
         await self.session.flush()
         return cancelled
 
@@ -1902,40 +2028,21 @@ class VotingService:
         """
         vote = await self._get_vote(vote_id, for_update=True)
         if vote.status != "open":
-            raise ConflictError(f"vote is {vote.status}, cannot close.", code="conflict")
+            raise ConflictError(f"vote is {vote.status}, cannot close.", code="vote_not_open")
         if election_mod.is_election(vote):
             return await self._close_election(vote, principal, now=now)
         if poll_mod.is_poll(vote):
             return await self._close_poll(vote, principal, now=now)
         config = self._config(vote)
         counts = await self._aggregate(vote, config)
-        eligible = vote.eligible_count or 0
-        outcome = tally_mod.result(config, counts, eligible)
-
-        window_expired = (
-            now is not None and vote.closes_at is not None and now >= vote.closes_at
-        )
-
-        if not outcome.quorum_met and not window_expired:
-            raise ConflictError(
-                "quorum not met — the vote cannot be closed; collect more ballots "
-                "or cancel the vote.",
-                code="conflict",
-            )
+        outcome = tally_mod.result(config, counts, vote.eligible_count or 0)
+        _check_closable(vote, quorum_met=outcome.quorum_met, now=now)
 
         result_value: tally_mod.VoteResult = (
             outcome.result if outcome.quorum_met else "rejected"
         )
         closed_at = now or datetime.now(UTC)
-
-        if vote.meeting_id is not None:
-            members = await self._present_count(vote)
-            guests = await self._guest_attendance(vote, config)
-            vote.present_members = members
-            vote.present_guests = guests
-            if config.guests_vote:
-                eligible = members + guests
-                vote.eligible_count = eligible
+        eligible = await self._fix_attendance(vote, config)
 
         vote.status = "closed"
         vote.result = result_value
@@ -1956,10 +2063,8 @@ class VotingService:
 
         branch_name = "pass" if result_value == "passed" else "fail"
         flow = FlowService(self.session, self.dispatcher)
-        staged: StagedFire | None = None
-        decision: ApplicationDecision | None = None
-        if vote.application_id is not None:
-            staged, decision = await self._stage_branch(
+        staged, decision = (
+            await self._stage_branch(
                 flow,
                 vote,
                 vote.application_id,
@@ -1968,16 +2073,18 @@ class VotingService:
                 note=f"vote:{result_value}",
                 decide=result_value == "passed",
             )
+            if vote.application_id is not None
+            else (None, None)
+        )
         if staged is not None:
             vote.result_branch_transition_id = staged.transition.id
             if decision is not None:
                 decision.status_event_id = staged.status_event_id
         await self.session.commit()
 
-        new_state_id: UUID | None = None
-        if staged is not None:
-            fired = await flow.after_commit(staged)
-            new_state_id = fired.new_state_id
+        new_state_id = (
+            (await flow.after_commit(staged)).new_state_id if staged is not None else None
+        )
 
         tally_out = TallyOut(
             counts=counts,
@@ -2001,6 +2108,22 @@ class VotingService:
             branchFired=staged is not None,
         )
 
+    async def _fix_attendance(self, vote: Vote, config: VoteConfig) -> int:
+        """Store the attendance of a closing meeting vote and return its eligible count.
+
+        A vote with guests counts the present members plus the admitted guests as
+        eligible, because a guest admitted while the vote ran voted too. A vote without
+        a meeting keeps its count.
+        """
+        if vote.meeting_id is not None:
+            members = await self._present_count(vote)
+            guests = await self._guest_attendance(vote, config)
+            vote.present_members = members
+            vote.present_guests = guests
+            if config.guests_vote:
+                vote.eligible_count = members + guests
+        return vote.eligible_count or 0
+
     async def _record_proposal(
         self, vote: Vote, application_id: UUID, principal: Principal
     ) -> ApplicationDecision | None:
@@ -2015,12 +2138,16 @@ class VotingService:
             return None
         application = await self._get_application(application_id)
         approved = proposal.approved_amount
-        if approved is not None and (application.amount is None or approved > application.amount):
-            proposal = proposal.model_copy(update={"approved_amount": None})
+        binding = (
+            proposal.model_copy(update={"approved_amount": None})
+            if approved is not None
+            and (application.amount is None or approved > application.amount)
+            else proposal
+        )
         return await record_decision(
             self.session,
             application,
-            proposal,
+            binding,
             actor=principal.sub,
             decided_by=None,
             old_approved=application.approved_amount,
@@ -2043,26 +2170,10 @@ class VotingService:
             ConflictError: The quorum is missed and the window has not expired.
         """
         config = self._config(vote)
-        eligible = vote.eligible_count or 0
-        outcome = await self._election_outcome(vote, eligible)
-        window_expired = (
-            now is not None and vote.closes_at is not None and now >= vote.closes_at
-        )
-        if not outcome.quorum_met and not window_expired:
-            raise ConflictError(
-                "quorum not met — the vote cannot be closed; collect more ballots "
-                "or cancel the vote.",
-                code="conflict",
-            )
+        outcome = await self._election_outcome(vote, vote.eligible_count or 0)
+        _check_closable(vote, quorum_met=outcome.quorum_met, now=now)
         closed_at = now or datetime.now(UTC)
-        if vote.meeting_id is not None:
-            members = await self._present_count(vote)
-            guests = await self._guest_attendance(vote, config)
-            vote.present_members = members
-            vote.present_guests = guests
-            if config.guests_vote:
-                eligible = members + guests
-                vote.eligible_count = eligible
+        eligible = await self._fix_attendance(vote, config)
         result = election_mod.result_of(outcome)
         vote.status = "closed"
         vote.result = outcome.result
@@ -2116,16 +2227,8 @@ class VotingService:
         """
         config = self._config(vote)
         outcome = await self._poll_outcome(vote)
-        eligible = vote.eligible_count or 0
         closed_at = now or datetime.now(UTC)
-        if vote.meeting_id is not None:
-            members = await self._present_count(vote)
-            guests = await self._guest_attendance(vote, config)
-            vote.present_members = members
-            vote.present_guests = guests
-            if config.guests_vote:
-                eligible = members + guests
-                vote.eligible_count = eligible
+        eligible = await self._fix_attendance(vote, config)
         result = poll_mod.result_of(outcome)
         vote.status = "closed"
         vote.result = None
@@ -2194,32 +2297,55 @@ class VotingService:
         A current state without the branch (a misconfigured flow, or a vote outside its
         vote state) gives the reason ``no_branch``.
         """
-        reason: str | None = None
-        decision: ApplicationDecision | None = None
-        if await self.vote_gremium_mismatch(vote):
-            reason = VOTE_GREMIUM_MISMATCH
-        else:
-            if decide:
-                decision = await self._record_proposal(vote, application_id, principal)
-            try:
-                async with self.session.begin_nested():
-                    staged = await flow.stage_branch(
-                        application_id, branch_name, principal, note=note, vote_id=vote.id
-                    )
-                    return staged, decision
-            except ConflictError as exc:
-                reason = exc.code
-            except NotFoundError:
-                reason = "no_branch"
-        await audit_record(
-            self.session,
-            actor=principal.sub,
-            action=AuditAction.VOTE_BRANCH_BLOCKED,
-            target_type="vote",
-            target_id=str(vote.id),
-            data={**self._audit_refs(vote), "branch": branch_name, "reason": reason},
+        mismatch = await self.vote_gremium_mismatch(vote)
+        decision = (
+            await self._record_proposal(vote, application_id, principal)
+            if decide and not mismatch
+            else None
         )
-        return None, decision
+        staged, reason = (
+            (None, VOTE_GREMIUM_MISMATCH)
+            if mismatch
+            else await self._try_stage(
+                flow, application_id, branch_name, principal, note=note, vote_id=vote.id
+            )
+        )
+        if staged is None:
+            await audit_record(
+                self.session,
+                actor=principal.sub,
+                action=AuditAction.VOTE_BRANCH_BLOCKED,
+                target_type="vote",
+                target_id=str(vote.id),
+                data={**self._audit_refs(vote), "branch": branch_name, "reason": reason},
+            )
+        return staged, decision
+
+    async def _try_stage(
+        self,
+        flow: FlowService,
+        application_id: UUID,
+        branch_name: str,
+        principal: Principal,
+        *,
+        note: str,
+        vote_id: UUID,
+    ) -> tuple[StagedFire | None, str | None]:
+        """Stage the branch in a SAVEPOINT and return it, or no fire and the reason.
+
+        A refused fire gives the code of its conflict (a guard, a lost race), and a
+        current state without the branch gives ``no_branch``.
+        """
+        try:
+            async with self.session.begin_nested():
+                staged = await flow.stage_branch(
+                    application_id, branch_name, principal, note=note, vote_id=vote_id
+                )
+                return staged, None
+        except ConflictError as exc:
+            return None, exc.code
+        except NotFoundError:
+            return None, "no_branch"
 
     async def vote_gremium_mismatch(self, vote: Vote) -> bool:
         """Tell whether the Gremium of ``vote`` does not decide its application now.

@@ -24,13 +24,15 @@ The excuse text (``meeting_attendance.note``) is never read.
 from __future__ import annotations
 
 import base64
-from collections.abc import Iterable, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from datetime import date as _date
 from datetime import time as _time
 from decimal import Decimal
-from typing import Any
+from itertools import groupby
+from operator import itemgetter
+from typing import Any, assert_never
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
@@ -192,13 +194,210 @@ def _role_rank(key: str) -> int:
     return _ROLE_ORDER.get(key, 2)
 
 
+def _nested[I, V](triples: Iterable[tuple[UUID, I, V]]) -> dict[UUID, dict[I, V]]:
+    """Group ``(outer, inner, value)`` triples into ``{outer: {inner: value}}``.
+
+    The sort is stable, so a later triple with the same keys wins, as in a loop.
+    """
+    ordered = sorted(triples, key=itemgetter(0))
+    return {
+        outer: {inner: value for _, inner, value in group}
+        for outer, group in groupby(ordered, key=itemgetter(0))
+    }
+
+
+def _next_rank(m: Meeting) -> tuple[int, _date, _time, str]:
+    """Order the next meetings: live first, then dated planned ones, then undated ones."""
+    return (
+        0 if m.status == "live" else 1 if m.date is not None else 2,
+        m.date or _date.max,
+        m.start_time or _time(0, 0),
+        str(m.id),
+    )
+
+
+def _member_order(row: GremiumMemberOut) -> tuple[int, str]:
+    """Order the member list: by role, then by name or e-mail."""
+    return _role_rank(row.role_key), (row.display_name or row.email or "").casefold()
+
+
+def _attendance_order(row: AttendanceRowOut) -> tuple[str, str]:
+    """Order the attendance matrix: by name, then by principal id."""
+    return (row.display_name or "").casefold(), str(row.principal_id)
+
+
+def _member_state(recorded: str | None, *, delegated: bool) -> AttendanceState:
+    """Return the state of a member in one closed meeting.
+
+    A vote transfer wins over a record; a meeting without a usable record is absent.
+    """
+    match (delegated, recorded):
+        case (True, _):
+            return "delegated"
+        case (False, "present"):
+            return "present"
+        case (False, "excused"):
+            return "excused"
+        case _:
+            return "absent"
+
+
+def _kind_filter(kind: DecisionKind | None) -> tuple[ColumnElement[bool], ...]:
+    """Return the conditions of the ``kind`` filter of the decision list."""
+    match kind:
+        case None:
+            return ()
+        case "election":
+            return (Vote.kind == "election",)
+        case "application":
+            return (Vote.kind != "election", Vote.application_id.is_not(None))
+        case "motion":
+            return (Vote.kind != "election", Vote.application_id.is_(None))
+        case _:
+            assert_never(kind)
+
+
+def _result_filter(result: DecisionResultFilter | None) -> tuple[ColumnElement[bool], ...]:
+    """Return the conditions of the ``result`` filter of the decision list."""
+    match result:
+        case None:
+            return ()
+        case "passed":
+            return (Vote.result.in_(("passed", "elected")),)
+        case "rejected":
+            return (Vote.result.in_(("rejected", "tie")),)
+        case _:
+            assert_never(result)
+
+
 @dataclass(frozen=True, slots=True)
 class _Term:
     """One membership row of a gremium."""
 
     principal_id: UUID
     role_key: str
-    role_name: dict[str, str]
+    role_name: Mapping[str, str]
+
+
+@dataclass(frozen=True, slots=True)
+class _Tally:
+    """The part of a decision row that depends on the kind of the vote."""
+
+    kind: DecisionKind
+    counts: DecisionCountsOut | None
+    elected: list[str]
+    ballots: int
+    secret: bool
+    rule: str | None
+
+
+def _election_tally(vote: Vote) -> _Tally:
+    """Return the elected names and the ballots of an election, from its stored result."""
+    config = election_config(vote)
+    stored = ElectionResultOut.model_validate(vote.election_result or {"counts": {}})
+    names = {c.id: c.name for c in config.candidates}
+    return _Tally(
+        kind="election",
+        counts=None,
+        elected=[names.get(cid, cid) for cid in stored.elected],
+        ballots=stored.ballots,
+        secret=config.secret,
+        rule=None,
+    )
+
+
+def _motion_tally(vote: Vote, per: Mapping[str, int]) -> _Tally:
+    """Return the sums of a motion or an application vote."""
+    config = VoteConfig.from_stored(vote.config)
+    return _Tally(
+        kind="application" if vote.application_id else "motion",
+        counts=DecisionCountsOut(
+            yes=per.get("yes", 0), no=per.get("no", 0), abstain=per.get("abstain", 0)
+        ),
+        elected=[],
+        ballots=sum(per.values()),
+        secret=config.secret,
+        rule=config.majority_rule,
+    )
+
+
+def _overview_row(
+    g: Gremium,
+    role: tuple[str, Mapping[str, str]] | None,
+    nxt: NextMeetingOut | None,
+    member_count: int,
+    *,
+    has_logo: bool,
+) -> GremiumOverviewOut:
+    """Build one row of the list of gremien."""
+    return GremiumOverviewOut(
+        id=g.id,
+        name=g.name,
+        slug=g.slug,
+        is_member=role is not None,
+        role_key=role[0] if role else None,
+        role_name=role[1] if role else None,
+        member_count=member_count,
+        next_meeting=nxt,
+        live=nxt is not None and nxt.status == "live",
+        quorum_percent=g.quorum_percent,
+        protocols_public=bool(g.protocols_public),
+        allow_vote_delegation=bool(g.allow_vote_delegation),
+        logo_url=logo_url(g.id) if has_logo else None,
+    )
+
+
+def _meeting_row(
+    m: Meeting,
+    recorded: Mapping[UUID, str],
+    members: frozenset[UUID],
+    agenda_items: int,
+    protocol_status: str | None,
+) -> GremiumMeetingOut:
+    """Build one meeting row: the roster is the members plus every recorded principal."""
+    return GremiumMeetingOut(
+        id=m.id,
+        title=m.title,
+        date=m.date,
+        start_time=m.start_time,
+        end_time=m.end_time,
+        status=m.status,  # type: ignore[arg-type]
+        agenda_item_count=agenda_items,
+        present_count=sum(1 for st in recorded.values() if st == "present"),
+        member_count=len(members | recorded.keys()),
+        protocol_status=protocol_status,  # type: ignore[arg-type]
+    )
+
+
+def _attendance_row(
+    pid: UUID,
+    own_terms: Sequence[_Term],
+    person: tuple[str | None, str | None],
+    months: Sequence[Month],
+    cells: Mapping[str, tuple[int, int, int]],
+    viewer_sub: str,
+) -> AttendanceRowOut:
+    """Build one person of the attendance matrix, with a cell for each month."""
+    display, sub = person
+    role = own_terms[0] if own_terms else None
+    return AttendanceRowOut(
+        principal_id=pid,
+        display_name=display,
+        role_key=role.role_key if role else None,
+        role_name=role.role_name if role else None,
+        is_self=sub is not None and sub == viewer_sub,
+        cells=tuple(_attendance_cell(month_key(m), cells, member=bool(own_terms)) for m in months),
+    )
+
+
+def _attendance_cell(
+    key: str, cells: Mapping[str, tuple[int, int, int]], *, member: bool
+) -> AttendanceCellOut:
+    """Build the cell of one month; a month without a number counts zero."""
+    present, excused, delegated = cells.get(key, (0, 0, 0))
+    return AttendanceCellOut(
+        month=key, member=member, present=present, excused=excused, delegated=delegated
+    )
 
 
 class GremienService:
@@ -221,42 +420,30 @@ class GremienService:
         """
         now = datetime.now(UTC)
         own = await self._own_roles(principal)
-        stmt = select(Gremium).order_by(Gremium.name, Gremium.id)
-        if not views_all(principal):
-            if not own or not principal.scope_allows(GREMIUM_VIEW_ALL):
-                return []
-            stmt = stmt.where(Gremium.id.in_(list(own)))
-        gremien = list((await self.session.scalars(stmt)).all())
+        sees_all = views_all(principal)
+        if not sees_all and (not own or not principal.scope_allows(GREMIUM_VIEW_ALL)):
+            return []
+        by_name = select(Gremium).order_by(Gremium.name, Gremium.id)
+        stmt = by_name if sees_all else by_name.where(Gremium.id.in_(list(own)))
+        gremien = tuple((await self.session.scalars(stmt)).all())
         if not gremien:
             return []
         ids = [g.id for g in gremien]
         counts = await self._member_counts(ids)
         upcoming = await self._next_meetings(ids, self._today(now))
         logos = await self._square_logos(ids)
-        out: list[GremiumOverviewOut] = []
-        for g in gremien:
-            role = own.get(g.id)
-            nxt = upcoming.get(g.id)
-            out.append(
-                GremiumOverviewOut(
-                    id=g.id,
-                    name=g.name,
-                    slug=g.slug,
-                    is_member=role is not None,
-                    role_key=role[0] if role else None,
-                    role_name=role[1] if role else None,
-                    member_count=counts.get(g.id, 0),
-                    next_meeting=nxt,
-                    live=nxt is not None and nxt.status == "live",
-                    quorum_percent=g.quorum_percent,
-                    protocols_public=bool(g.protocols_public),
-                    allow_vote_delegation=bool(g.allow_vote_delegation),
-                    logo_url=logo_url(g.id) if g.id in logos else None,
-                )
+        return [
+            _overview_row(
+                g,
+                own.get(g.id),
+                upcoming.get(g.id),
+                counts.get(g.id, 0),
+                has_logo=g.id in logos,
             )
-        return out
+            for g in gremien
+        ]
 
-    async def _own_roles(self, principal: Principal) -> dict[UUID, tuple[str, dict[str, str]]]:
+    async def _own_roles(self, principal: Principal) -> dict[UUID, tuple[str, Mapping[str, str]]]:
         """Return the active roles of ``principal``: gremium → (role key, role names)."""
         rows = await self.session.execute(
             select(GremiumMembership.gremium_id, GremiumRole.key, GremiumRole.name_i18n)
@@ -303,20 +490,7 @@ class GremienService:
                 ),
             )
         )
-
-        def rank(m: Meeting) -> tuple[int, _date, _time, str]:
-            return (
-                0 if m.status == "live" else 1 if m.date is not None else 2,
-                m.date or _date.max,
-                m.start_time or _time(0, 0),
-                str(m.id),
-            )
-
-        best: dict[UUID, Meeting] = {}
-        for m in rows.all():
-            held = best.get(m.gremium_id)
-            if held is None or rank(m) < rank(held):
-                best[m.gremium_id] = m
+        best = {m.gremium_id: m for m in sorted(rows.all(), key=_next_rank, reverse=True)}
         return {
             gid: NextMeetingOut(
                 id=m.id,
@@ -328,7 +502,7 @@ class GremienService:
             for gid, m in best.items()
         }
 
-    async def _square_logos(self, ids: list[UUID]) -> set[UUID]:
+    async def _square_logos(self, ids: list[UUID]) -> frozenset[UUID]:
         """Return the gremien whose CD variant has a stored raster square logo.
 
         The rule matches the one of the logo route (``_square_ref``).
@@ -344,7 +518,7 @@ class GremienService:
             )
             .distinct()
         )
-        return set(rows.all())
+        return frozenset(rows.all())
 
     async def members(
         self, gremium_id: UUID, principal: Principal, *, former: bool
@@ -368,25 +542,20 @@ class GremienService:
             .outerjoin(PrincipalRow, PrincipalRow.id == GremiumMembership.principal_id)
             .where(GremiumMembership.gremium_id == gremium_id)
         )
-        out: list[GremiumMemberOut] = []
-        for m, key, names, display, email, active, sub in rows.all():
-            if bool(active) == former:
-                continue
-            out.append(
-                GremiumMemberOut(
-                    principal_id=m.principal_id,
-                    display_name=display,
-                    email=email,
-                    role_id=m.gremium_role_id,
-                    role_key=key,
-                    role_name=dict(names or {}),
-                    is_self=sub is not None and sub == principal.sub,
-                )
+        found = [
+            GremiumMemberOut(
+                principal_id=m.principal_id,
+                display_name=display,
+                email=email,
+                role_id=m.gremium_role_id,
+                role_key=key,
+                role_name=dict(names or {}),
+                is_self=sub is not None and sub == principal.sub,
             )
-        out.sort(
-            key=lambda r: (_role_rank(r.role_key), (r.display_name or r.email or "").casefold())
-        )
-        return out
+            for m, key, names, display, email, active, sub in rows.all()
+            if bool(active) != former
+        ]
+        return sorted(found, key=_member_order)
 
     async def meetings(self, gremium_id: UUID) -> list[GremiumMeetingOut]:
         """Return the meetings of a gremium, the newest first.
@@ -396,7 +565,7 @@ class GremienService:
         ``livevote.roster``); ``presentCount`` counts the ``present``
         records. Five queries for any number of meetings.
         """
-        meetings = list(
+        meetings = tuple(
             (
                 await self.session.scalars(
                     select(Meeting)
@@ -421,7 +590,7 @@ class GremienService:
         found = await self.session.execute(
             select(Protocol.meeting_id, Protocol.status).where(Protocol.meeting_id.in_(ids))
         )
-        protocols: dict[UUID, str] = {mid: st for mid, st in found.all()}
+        protocols: dict[UUID, str] = dict(found.all())
         records = await self.session.execute(
             select(
                 MeetingAttendance.meeting_id,
@@ -429,10 +598,8 @@ class GremienService:
                 MeetingAttendance.status,
             ).where(MeetingAttendance.meeting_id.in_(ids))
         )
-        recorded: dict[UUID, dict[UUID, str]] = {}
-        for mid, pid, status in records.all():
-            recorded.setdefault(mid, {})[pid] = status
-        members = set(
+        recorded = _nested((mid, pid, status) for mid, pid, status in records.all())
+        members = frozenset(
             (
                 await self.session.scalars(
                     select(GremiumMembership.principal_id).where(
@@ -441,25 +608,12 @@ class GremienService:
                 )
             ).all()
         )
-        out: list[GremiumMeetingOut] = []
-        for m in meetings:
-            rows = recorded.get(m.id, {})
-            roster = members | set(rows)
-            out.append(
-                GremiumMeetingOut(
-                    id=m.id,
-                    title=m.title,
-                    date=m.date,
-                    start_time=m.start_time,
-                    end_time=m.end_time,
-                    status=m.status,  # type: ignore[arg-type]
-                    agenda_item_count=items.get(m.id, 0),
-                    present_count=sum(1 for st in rows.values() if st == "present"),
-                    member_count=len(roster),
-                    protocol_status=protocols.get(m.id),  # type: ignore[arg-type]
-                )
+        return [
+            _meeting_row(
+                m, recorded.get(m.id, {}), members, items.get(m.id, 0), protocols.get(m.id)
             )
-        return out
+            for m in meetings
+        ]
 
     def _closed_in(self, gremium_id: UUID, first: _date, end: _date) -> ColumnElement[bool]:
         """Return the closed meetings of a gremium with a date in ``[first, end)``."""
@@ -498,44 +652,26 @@ class GremienService:
         held: dict[str, int] = {str(k): int(n) for k, n in held_rows.all()}
 
         counts = await self.session.execute(self._attendance_counts(gremium_id, in_range))
-        cells: dict[UUID, dict[str, tuple[int, int, int]]] = {}
-        for row in counts.all():
-            pid, month, present, excused, delegated = tuple(row)
-            cells.setdefault(pid, {})[str(month)] = (int(present), int(excused), int(delegated))
+        cells = _nested(
+            (pid, str(month), (int(present), int(excused), int(delegated)))
+            for pid, month, present, excused, delegated in counts.all()
+        )
 
         terms = await self._terms(gremium_id)
         principal_ids = {t.principal_id for t in terms} | set(cells)
         people = await self._people(principal_ids)
 
-        rows: list[AttendanceRowOut] = []
-        for pid in principal_ids:
-            own_terms = [t for t in terms if t.principal_id == pid]
-            display, sub = people.get(pid, (None, None))
-            row_cells: list[AttendanceCellOut] = []
-            for month in months:
-                key = month_key(month)
-                present, excused, delegated = cells.get(pid, {}).get(key, (0, 0, 0))
-                row_cells.append(
-                    AttendanceCellOut(
-                        month=key,
-                        member=bool(own_terms),
-                        present=present,
-                        excused=excused,
-                        delegated=delegated,
-                    )
-                )
-            role = own_terms[0] if own_terms else None
-            rows.append(
-                AttendanceRowOut(
-                    principal_id=pid,
-                    display_name=display,
-                    role_key=role.role_key if role else None,
-                    role_name=role.role_name if role else None,
-                    is_self=sub is not None and sub == principal.sub,
-                    cells=row_cells,
-                )
+        rows = [
+            _attendance_row(
+                pid,
+                [t for t in terms if t.principal_id == pid],
+                people.get(pid, (None, None)),
+                months,
+                cells.get(pid, {}),
+                principal.sub,
             )
-        rows.sort(key=lambda r: ((r.display_name or "").casefold(), str(r.principal_id)))
+            for pid in principal_ids
+        ]
         return AttendanceOut(
             from_month=month_key(months[0]),
             to_month=month_key(months[-1]),
@@ -543,7 +679,7 @@ class GremienService:
                 AttendanceMonthOut(month=month_key(m), meetings=held.get(month_key(m), 0))
                 for m in months
             ],
-            rows=rows,
+            rows=sorted(rows, key=_attendance_order),
         )
 
     def _attendance_counts(
@@ -663,52 +799,55 @@ class GremienService:
             )
             .order_by(Meeting.date, Meeting.start_time.nulls_first(), Meeting.id)
         )
-        meetings = list(found.all())
-        records: dict[UUID, str] = {}
-        delegates: dict[UUID, str | None] = {}
-        if meetings:
-            ids = [mid for mid, *_ in meetings]
-            rec = await self.session.execute(
-                select(MeetingAttendance.meeting_id, MeetingAttendance.status).where(
-                    MeetingAttendance.principal_id == principal_id,
-                    MeetingAttendance.meeting_id.in_(ids),
-                )
-            )
-            records = {mid: st for mid, st in rec.all()}
-            dele = await self.session.execute(
-                select(MeetingDelegation.meeting_id, PrincipalRow.display_name)
-                .join(PrincipalRow, PrincipalRow.id == MeetingDelegation.delegate_principal_id)
-                .where(
-                    MeetingDelegation.delegator_principal_id == principal_id,
-                    MeetingDelegation.meeting_id.in_(ids),
-                    MeetingDelegation.delegate_voting.is_(True),
-                )
-            )
-            delegates = {mid: name for mid, name in dele.all()}
-        rows: list[MemberMeetingOut] = []
-        for mid, title, day, start in meetings:
-            state: AttendanceState
-            if mid in delegates:
-                state = "delegated"
-            else:
-                recorded = records.get(mid)
-                state = recorded if recorded in ("present", "excused") else "absent"
-            rows.append(
+        meetings = tuple(found.all())
+        records, delegates = await self._member_states(
+            principal_id, [mid for mid, *_ in meetings]
+        )
+        return MemberAttendanceOut(
+            principal_id=principal_id,
+            display_name=person.display_name,
+            month=month_key(first_month),
+            meetings=[
                 MemberMeetingOut(
                     meeting_id=mid,
                     title=title,
                     date=day,
                     start_time=start,
-                    status=state,
+                    status=_member_state(records.get(mid), delegated=mid in delegates),
                     delegate_name=delegates.get(mid),
                 )
-            )
-        return MemberAttendanceOut(
-            principal_id=principal_id,
-            display_name=person.display_name,
-            month=month_key(first_month),
-            meetings=rows,
+                for mid, title, day, start in meetings
+            ],
         )
+
+    async def _member_states(
+        self, principal_id: UUID, ids: Sequence[UUID]
+    ) -> tuple[dict[UUID, str], dict[UUID, str | None]]:
+        """Return the records and the vote transfers of one member in some meetings.
+
+        The first map gives the attendance status per meeting, the second the name of
+        the delegate per meeting with a vote transfer. No meeting means no query.
+        """
+        if not ids:
+            return {}, {}
+        rec = await self.session.execute(
+            select(MeetingAttendance.meeting_id, MeetingAttendance.status).where(
+                MeetingAttendance.principal_id == principal_id,
+                MeetingAttendance.meeting_id.in_(ids),
+            )
+        )
+        records: dict[UUID, str] = dict(rec.all())
+        dele = await self.session.execute(
+            select(MeetingDelegation.meeting_id, PrincipalRow.display_name)
+            .join(PrincipalRow, PrincipalRow.id == MeetingDelegation.delegate_principal_id)
+            .where(
+                MeetingDelegation.delegator_principal_id == principal_id,
+                MeetingDelegation.meeting_id.in_(ids),
+                MeetingDelegation.delegate_voting.is_(True),
+            )
+        )
+        delegates: dict[UUID, str | None] = dict(dele.all())
+        return records, delegates
 
     async def _related(self, gremium_id: UUID, principal_id: UUID) -> bool:
         """Tell if a principal has a membership, a record or a vote transfer in a gremium."""
@@ -753,31 +892,25 @@ class GremienService:
         """
         offset = decode_cursor(cursor)
         gremium_of = func.coalesce(sql_cast(Meeting.gremium_id, Text), Vote.eligible_group)
-        where: list[ColumnElement[bool]] = [
+        scope = await read_scope(self.session, principal)
+        since_filter: tuple[ColumnElement[bool], ...] = (
+            ()
+            if since is None
+            else (
+                Vote.closed_at
+                >= datetime.combine(since, _time(0, 0), tzinfo=self.tz).astimezone(UTC),
+            )
+        )
+        where = (
             Vote.status == "closed",
             Vote.kind != "poll",
             gremium_of == str(gremium_id),
-            await read_scope(self.session, principal),
+            scope,
             self._search(q),
-        ]
-        if kind == "election":
-            where.append(Vote.kind == "election")
-        elif kind is not None:
-            where.append(Vote.kind != "election")
-            where.append(
-                Vote.application_id.is_not(None)
-                if kind == "application"
-                else Vote.application_id.is_(None)
-            )
-        if result == "passed":
-            where.append(Vote.result.in_(("passed", "elected")))
-        elif result == "rejected":
-            where.append(Vote.result.in_(("rejected", "tie")))
-        if since is not None:
-            where.append(
-                Vote.closed_at
-                >= datetime.combine(since, _time(0, 0), tzinfo=self.tz).astimezone(UTC)
-            )
+            *_kind_filter(kind),
+            *_result_filter(result),
+            *since_filter,
+        )
         when = func.coalesce(Vote.closed_at, Vote.created_at)
         found = await self.session.execute(
             select(Vote, Meeting.title, Meeting.date)
@@ -787,11 +920,13 @@ class GremienService:
             .limit(DECISION_PAGE + 1)
             .offset(offset)
         )
-        rows = list(found.all())
-        more = len(rows) > DECISION_PAGE
-        rows = rows[:DECISION_PAGE]
+        fetched = tuple(found.all())
+        more = len(fetched) > DECISION_PAGE
+        rows = fetched[:DECISION_PAGE]
         votes: list[Vote] = [r[0] for r in rows]
-        apps = await self._applications({v.application_id for v in votes if v.application_id})
+        apps = await self._applications(
+            frozenset(v.application_id for v in votes if v.application_id)
+        )
         sums = await self._sums([v for v in votes if not is_election(v)])
         items = [self._decision(v, title, day, apps, sums) for v, title, day in rows]
         return DecisionPageOut(
@@ -811,7 +946,9 @@ class GremienService:
             func.coalesce(Meeting.title, "").ilike(like, escape="\\"),
         )
 
-    async def _applications(self, ids: set[UUID]) -> dict[UUID, tuple[str | None, Decimal | None]]:
+    async def _applications(
+        self, ids: Collection[UUID]
+    ) -> dict[UUID, tuple[str | None, Decimal | None]]:
         """Return the title and the requested amount of each application."""
         if not ids:
             return {}
@@ -827,64 +964,45 @@ class GremienService:
 
         One ``GROUP BY``; no row ever leaves the database with a voter.
         """
-        out: dict[UUID, dict[str, int]] = {}
         if not votes:
-            return out
+            return {}
         rows = await self.session.execute(
             select(SecretBallot.vote_id, SecretBallot.choice, func.count())
             .where(SecretBallot.vote_id.in_([v.id for v in votes]))
             .group_by(SecretBallot.vote_id, SecretBallot.choice)
         )
-        for vid, choice, n in rows.all():
-            out.setdefault(vid, {})[str(choice)] = int(n)
-        return out
+        return _nested((vid, str(choice), int(n)) for vid, choice, n in rows.all())
 
     @staticmethod
     def _decision(
         vote: Vote,
         meeting_title: str | None,
         meeting_date: _date | None,
-        apps: dict[UUID, tuple[str | None, Decimal | None]],
-        sums: dict[UUID, dict[str, int]],
+        apps: Mapping[UUID, tuple[str | None, Decimal | None]],
+        sums: Mapping[UUID, Mapping[str, int]],
     ) -> DecisionOut:
         """Build one decision row."""
         title, amount = (
             apps.get(vote.application_id, (None, None)) if vote.application_id else (None, None)
         )
-        counts: DecisionCountsOut | None = None
-        elected: list[str] = []
-        if is_election(vote):
-            config = election_config(vote)
-            stored = ElectionResultOut.model_validate(vote.election_result or {"counts": {}})
-            names = {c.id: c.name for c in config.candidates}
-            elected = [names.get(cid, cid) for cid in stored.elected]
-            ballots = stored.ballots
-            secret = config.secret
-            rule: str | None = None
-            kind: DecisionKind = "election"
-        else:
-            config_m = VoteConfig.from_stored(vote.config)
-            per = sums.get(vote.id, {})
-            counts = DecisionCountsOut(
-                yes=per.get("yes", 0), no=per.get("no", 0), abstain=per.get("abstain", 0)
-            )
-            ballots = sum(per.values())
-            secret = config_m.secret
-            rule = config_m.majority_rule
-            kind = "application" if vote.application_id else "motion"
+        tally = (
+            _election_tally(vote)
+            if is_election(vote)
+            else _motion_tally(vote, sums.get(vote.id, {}))
+        )
         return DecisionOut(
             id=vote.id,
             question=vote.question,
-            kind=kind,
+            kind=tally.kind,
             application_id=vote.application_id,
             application_title=title,
             amount=amount,
-            secret=secret,
-            majority_rule=rule,
-            counts=counts,
-            ballots=ballots,
+            secret=tally.secret,
+            majority_rule=tally.rule,
+            counts=tally.counts,
+            ballots=tally.ballots,
             result=vote.result,
-            elected=elected,
+            elected=tally.elected,
             meeting_id=vote.meeting_id,
             meeting_title=meeting_title,
             meeting_date=meeting_date,

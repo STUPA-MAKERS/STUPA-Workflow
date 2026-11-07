@@ -1,0 +1,12 @@
+{
+  "backend/app/modules/livevote/agenda_service.py": 4,
+  "backend/app/modules/livevote/attendance_service.py": 2,
+  "backend/app/modules/livevote/broker.py": 1,
+  "backend/app/modules/livevote/connection.py": 15,
+  "backend/app/modules/livevote/guest_connection.py": 11,
+  "backend/app/modules/livevote/guests.py": 27,
+  "backend/app/modules/livevote/open_window.py": 5,
+  "backend/app/modules/livevote/service/handover.py": 4,
+  "backend/app/modules/livevote/service/lifecycle.py": 8,
+  "backend/app/modules/livevote/service/service_base.py": 1
+}

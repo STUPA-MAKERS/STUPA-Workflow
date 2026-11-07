@@ -85,11 +85,11 @@ async def tickets_note(
             /tickets/assignees`); they get a mail. Another id gives 422
             `mention_not_member`. Write a mention as "@Display Name" in `body`.
     """
-    payload: dict[str, object] = {"body": body}
-    if public:
-        payload["visibility"] = "public"
-    if mentions:
-        payload["mentions"] = mentions
+    payload: dict[str, object] = {
+        "body": body,
+        **({"visibility": "public"} if public else {}),
+        **({"mentions": mentions} if mentions else {}),
+    }
     return await post_message(f"/tickets/{ticket_id}/notes", payload, file_paths)
 
 

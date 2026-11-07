@@ -212,6 +212,15 @@ export class AuthService {
   }
 }
 
+/** An app URL resolved against a placeholder origin, or `null` when it does not parse. */
+function parseAppUrl(url: string): URL | null {
+  try {
+    return new URL(url, 'http://app.invalid');
+  } catch {
+    return null;
+  }
+}
+
 /**
  * The part of an app URL that the login may carry to the server and back.
  *
@@ -221,12 +230,8 @@ export class AuthService {
  * start page and paths under `/api` give `null`: the login then goes home, as before.
  */
 export function loginReturnTo(url: string): string | null {
-  let parsed: URL;
-  try {
-    parsed = new URL(url, 'http://app.invalid');
-  } catch {
-    return null;
-  }
+  const parsed = parseAppUrl(url);
+  if (!parsed) return null;
   if (parsed.origin !== 'http://app.invalid') return null;
   const path = parsed.pathname;
   if (path === '/api' || path.startsWith('/api/')) return null;

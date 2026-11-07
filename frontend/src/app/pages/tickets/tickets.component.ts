@@ -64,20 +64,32 @@ export const TICKET_PAGE = 100;
 
 /** One row as the template shows it. */
 export interface TicketRow {
-  item: TicketListItem;
-  icon: IconName;
-  kindLabel: string;
+  readonly item: TicketListItem;
+  readonly icon: IconName;
+  readonly kindLabel: string;
   /** The sub line after the number, which the row sets in mono. */
-  sub: string;
-  assignee: PersonRef | null;
+  readonly sub: string;
+  readonly assignee: PersonRef | null;
 }
 
 /** One group of the list: a state, or "Erledigt oder abgelehnt". */
 export interface TicketGroup {
-  key: string;
-  label: string;
-  count: number;
-  rows: TicketRow[];
+  readonly key: string;
+  readonly label: string;
+  readonly count: number;
+  readonly rows: readonly TicketRow[];
+}
+
+/** The states the list shows as groups for a state chip, in their order. */
+function statusOrder(status: TicketStatusFilter): readonly TicketStatus[] {
+  switch (status) {
+    case 'open':
+      return ['new', 'in_progress'];
+    case 'all':
+      return ['new', 'in_progress', 'done', 'rejected'];
+    default:
+      return [status];
+  }
 }
 
 /**
@@ -159,14 +171,14 @@ export class TicketsComponent {
       (this.assigneeFilter() ? 1 : 0),
   );
 
-  readonly items = signal<TicketListItem[]>([]);
+  readonly items = signal<readonly TicketListItem[]>([]);
   readonly total = signal(0);
   readonly loading = signal(true);
   readonly error = signal(false);
   readonly loadingMore = signal(false);
   /** The closed tickets of the default view: their number, and the rows once shown. */
   readonly closedTotal = signal(0);
-  readonly closedItems = signal<TicketListItem[] | null>(null);
+  readonly closedItems = signal<readonly TicketListItem[] | null>(null);
   readonly closedLoading = signal(false);
   private seq = 0;
 
@@ -222,28 +234,30 @@ export class TicketsComponent {
   });
 
   /** The groups of the list, in the order of the states. */
-  readonly groups = computed<TicketGroup[]>(() => {
+  readonly groups = computed<readonly TicketGroup[]>(() => {
     const rows = this.items().map((i) => this.toRow(i));
-    const byStatus = (s: TicketStatus): TicketRow[] => rows.filter((r) => r.item.status === s);
     const status = this.statusFilter();
-    const groups: TicketGroup[] = [];
-    const order: TicketStatus[] =
-      status === 'open' ? ['new', 'in_progress'] : status === 'all' ? ['new', 'in_progress', 'done', 'rejected'] : [status];
-    for (const s of order) {
-      const list = byStatus(s);
-      if (list.length) {
-        groups.push({ key: s, label: this.i18n.translate(STATUS_LABEL[s]), count: list.length, rows: list });
-      }
-    }
-    if (status === 'open' && this.closedTotal() > 0) {
-      groups.push({
-        key: 'closed',
-        label: this.i18n.translate('tickets.list.closedGroup'),
-        count: this.closedTotal(),
-        rows: (this.closedItems() ?? []).map((i) => this.toRow(i)),
-      });
-    }
-    return groups;
+    const stateGroups = statusOrder(status)
+      .map((s) => ({ s, list: rows.filter((r) => r.item.status === s) }))
+      .filter(({ list }) => list.length > 0)
+      .map(({ s, list }) => ({
+        key: s,
+        label: this.i18n.translate(STATUS_LABEL[s]),
+        count: list.length,
+        rows: list,
+      }));
+    const closedGroup: readonly TicketGroup[] =
+      status === 'open' && this.closedTotal() > 0
+        ? [
+            {
+              key: 'closed',
+              label: this.i18n.translate('tickets.list.closedGroup'),
+              count: this.closedTotal(),
+              rows: (this.closedItems() ?? []).map((i) => this.toRow(i)),
+            },
+          ]
+        : [];
+    return [...stateGroups, ...closedGroup];
   });
 
   readonly hasRows = computed(() => this.items().length > 0 || this.closedTotal() > 0);

@@ -55,7 +55,7 @@ _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 
 
 def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
-    return {code: _PROBLEM for code in codes}
+    return dict.fromkeys(codes, _PROBLEM)
 
 
 def _mail_queue(request: Request) -> MailQueue | None:

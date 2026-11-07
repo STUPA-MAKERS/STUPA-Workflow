@@ -97,10 +97,14 @@ def _agenda_action(actions: object) -> dict[str, Any] | None:
     """Return the first `addToNextSession` action, or `None`."""
     if not isinstance(actions, list):
         return None
-    for action in actions:
-        if isinstance(action, dict) and action.get("type") == "addToNextSession":
-            return cast("dict[str, Any]", action)
-    return None
+    return next(
+        (
+            cast("dict[str, Any]", action)
+            for action in cast("list[object]", actions)
+            if isinstance(action, dict) and action.get("type") == "addToNextSession"
+        ),
+        None,
+    )
 
 
 def agenda_gremium_id(actions: object) -> UUID | None:
@@ -271,9 +275,11 @@ class FlowService:
         """
         if not gremium_from_budget(target):
             return []
-        if app.budget_id is None:
-            return [Application.budget_id.is_(None)]
-        return [Application.budget_id == app.budget_id]
+        return [
+            Application.budget_id.is_(None)
+            if app.budget_id is None
+            else Application.budget_id == app.budget_id
+        ]
 
     async def _enterable(self, target: State | None, budget_id: UUID | None) -> bool:
         """Tell whether an application with cost center `budget_id` may enter `target`.
@@ -294,22 +300,22 @@ class FlowService:
         (fail closed, the fire would give 409 `no_vote_gremium`). A transition into an
         accepted state of the top budget carries `allowsDecision`.
         """
-        out: list[TransitionOut] = []
         accepted = await accepted_state_keys(self.session, app.budget_id)
-        for t in transitions:
-            target = await self.session.get(State, t.to_state_id)
-            if not await self._enterable(target, app.budget_id):
-                continue
-            out.append(
-                _transition_out(
-                    t,
-                    await self._agenda_gremium(t, target, app.budget_id),
-                    allows_decision=bool(accepted)
-                    and target is not None
-                    and target.key in accepted,
-                )
-            )
-        return out
+        outs = [await self._firable_out(app, t, accepted) for t in transitions]
+        return [o for o in outs if o is not None]
+
+    async def _firable_out(
+        self, app: Application, transition: Transition, accepted: frozenset[str]
+    ) -> TransitionOut | None:
+        """Map one transition to its API shape, or `None` when its target refuses the app."""
+        target = await self.session.get(State, transition.to_state_id)
+        if not await self._enterable(target, app.budget_id):
+            return None
+        return _transition_out(
+            transition,
+            await self._agenda_gremium(transition, target, app.budget_id),
+            allows_decision=bool(accepted) and target is not None and target.key in accepted,
+        )
 
     async def _outgoing(self, app: Application) -> list[Transition]:
         return list(
@@ -545,10 +551,8 @@ class FlowService:
         current state has no such branch exit.
         """
         app = await self._load_app(application_id)
-        for t in await self._outgoing(app):
-            if t.branch == branch:
-                return t
-        return None
+        outgoing = await self._outgoing(app)
+        return next((t for t in outgoing if t.branch == branch), None)
 
     async def fire_branch(
         self,
@@ -770,22 +774,21 @@ class FlowService:
         if transition.from_state_id != app.current_state_id:
             raise ConflictError(
                 "Transition is not available from the current state.",
-                code="conflict",
+                code="transition_not_available",
             )
         if manual and transition.branch is not None:
             raise ConflictError(
                 "Branch transitions are fired by the vote outcome, not manually.",
-                code="conflict",
+                code="branch_transition_manual",
             )
         if manual and transition.automatic:
             raise ConflictError(
                 "Automatic transitions are fired by the system, not manually.",
-                code="conflict",
+                code="automatic_transition_manual",
             )
 
-        old_approved: Decimal | None = None
+        old_approved: Decimal | None = app.approved_amount if decision is not None else None
         if decision is not None:
-            old_approved = app.approved_amount
             target_state = await self._load_state(transition.to_state_id)
             await check_decision_target(
                 self.session, app, target_state.key if target_state is not None else None
@@ -823,7 +826,7 @@ class FlowService:
                 await self.session.rollback()
             raise ConflictError(
                 "Concurrent transition detected; application state changed.",
-                code="conflict",
+                code="concurrent_state_change",
             )
 
         event = StatusEvent(
@@ -839,14 +842,16 @@ class FlowService:
         await self.session.flush()
         status_event_id = event.id
 
-        cancelled: tuple[UUID, ...] = ()
-        if transition.branch is None:
-            cancelled = await self._cancel_votes(
+        cancelled: tuple[UUID, ...] = (
+            await self._cancel_votes(
                 app.id,
                 actor=principal.sub,
                 left_state_id=from_state_id,
                 entered_state_id=to_state_id,
             )
+            if transition.branch is None
+            else ()
+        )
 
         await AuditService(self.session).record(
             actor=principal.sub,
@@ -897,20 +902,24 @@ class FlowService:
         await self._publish_cancelled(staged.cancelled_vote_ids)
         transition = staged.transition
         app_id = staged.application.id
-        dispatched = build_dispatched_actions(
+        configured = build_dispatched_actions(
             transition.actions,
             application_id=app_id,
             transition_id=transition.id,
             status_event_id=staged.status_event_id,
         )
-        if staged.agenda_added:
-            dispatched = [a for a in dispatched if a.type != "addToNextSession"]
-        dispatched += build_implicit_notifications(
+        kept = (
+            [a for a in configured if a.type != "addToNextSession"]
+            if staged.agenda_added
+            else configured
+        )
+        implicit = build_implicit_notifications(
             transition.actions,
             application_id=app_id,
             transition_id=transition.id,
             status_event_id=staged.status_event_id,
         )
+        dispatched = [*kept, *implicit]
         await self.dispatcher.dispatch(dispatched)
 
         return TransitionResult(
@@ -1072,12 +1081,13 @@ class FlowService:
             left_state_id=to_state_id,
             entered_state_id=from_state_id,
         )
-        if decision_swap is not None:
-            swap = await redo_decision_swap(self.session, app, decision_swap, actor=actor)
-        else:
-            swap = await revert_decision_for_event(
+        swap = (
+            await redo_decision_swap(self.session, app, decision_swap, actor=actor)
+            if decision_swap is not None
+            else await revert_decision_for_event(
                 self.session, app, reverted_status_event_id, actor=actor
             )
+        )
         swap_data: dict[str, Any] = (
             {}
             if swap is None
@@ -1185,7 +1195,7 @@ class FlowService:
         from_state_id = app.current_state_id
         if from_state_id is None:
             raise ConflictError(
-                "Application has no current state to change.", code="conflict"
+                "Application has no current state to change.", code="no_current_state"
             )
         target = await self._load_state(target_state_id)
         if target is None or target.flow_version_id != app.flow_version_id:
@@ -1194,7 +1204,7 @@ class FlowService:
             )
         if target_state_id == from_state_id:
             raise ConflictError(
-                "Application is already in the target state.", code="conflict"
+                "Application is already in the target state.", code="already_in_state"
             )
         vote_gremium = await self._entry_snapshot(app, from_state_id, target)
         result = cast(
@@ -1212,7 +1222,7 @@ class FlowService:
         if result.rowcount != 1:
             await self.session.rollback()
             raise ConflictError(
-                "Concurrent status change detected; try again.", code="conflict"
+                "Concurrent status change detected; try again.", code="concurrent_state_change"
             )
         event = StatusEvent(
             application_id=app.id,

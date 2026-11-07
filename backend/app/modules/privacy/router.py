@@ -71,7 +71,7 @@ ConfigPrincipal = Annotated[Principal, Depends(require_principal("privacy.manage
 
 
 def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
-    return {code: _PROBLEM for code in codes}
+    return dict.fromkeys(codes, _PROBLEM)
 
 
 def get_erasure_service(session: DbSession) -> ErasureRequestService:

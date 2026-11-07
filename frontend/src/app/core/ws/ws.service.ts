@@ -6,7 +6,7 @@ import type { ClientMessage, MeetingStateMsg, ServerMessage, TodoServerMessage, 
 /** An open live-vote connection. */
 export interface MeetingChannel {
   /** Stream of JSON messages from the server to the client. */
-  messages$: Observable<ServerMessage>;
+  readonly messages$: Observable<ServerMessage>;
   /** Send a client to server frame, that is `cast`, `subscribe` or `body_draft`. */
   send(msg: ClientMessage): void;
   close(): void;
@@ -15,7 +15,7 @@ export interface MeetingChannel {
 /** The open channel of the to-do boards. */
 export interface TodoChannel {
   /** The frames of the server; the last one is `closed` with the close code, then it completes. */
-  messages$: Observable<TodoServerMessage>;
+  readonly messages$: Observable<TodoServerMessage>;
   send(msg: TodoSubscribeMsg): void;
   close(): void;
 }
@@ -100,13 +100,12 @@ export class WsService {
 
     ws.addEventListener('open', flush);
     ws.addEventListener('message', (ev: MessageEvent<string>) => {
-      let msg: ServerMessage;
-      try {
-        msg = JSON.parse(ev.data) as ServerMessage;
-      } catch {
+      const frame = parseFrame(ev.data);
+      if (!frame) {
         subject.next({ type: 'error', code: 'malformed_message' });
         return;
       }
+      const { msg } = frame;
       subject.next(msg);
       if (msg.type === 'meeting_state') this.meetingStates.next(msg);
     });
@@ -131,5 +130,14 @@ export class WsService {
   private url(path: string): string {
     const proto = this.location.protocol === 'https:' ? 'wss' : 'ws';
     return `${proto}://${this.location.host}${path}`;
+  }
+}
+
+/** A frame of the meeting channel, or `null` when it is not JSON. */
+function parseFrame(data: string): { readonly msg: ServerMessage } | null {
+  try {
+    return { msg: JSON.parse(data) as ServerMessage };
+  } catch {
+    return null;
   }
 }

@@ -145,12 +145,12 @@ async def ensure_bootstrap_admins(db: AsyncSession, settings: Settings) -> int:
             PrincipalRow.sub.in_(subjects), PrincipalRow.merged_into.is_(None)
         )
     )
-    granted = 0
-    for row in res.scalars().all():
-        if not await _has_admin_assignment(db, row.id, role_id):
-            db.add(_new_assignment(row.id, role_id))
-            granted += 1
-    if granted:
+    ungranted = [
+        row for row in res.scalars().all() if not await _has_admin_assignment(db, row.id, role_id)
+    ]
+    for row in ungranted:
+        db.add(_new_assignment(row.id, role_id))
+    if ungranted:
         await db.flush()
-        logger.info("bootstrap admin sweep granted %d assignment(s)", granted)
-    return granted
+        logger.info("bootstrap admin sweep granted %d assignment(s)", len(ungranted))
+    return len(ungranted)

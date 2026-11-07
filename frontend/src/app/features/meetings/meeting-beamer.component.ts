@@ -28,64 +28,64 @@ import {
 
 /** The vote that the beamer shows, as the page assembles it from the server data. */
 export interface BeamerVote {
-  question: string;
-  options: readonly string[];
-  status: 'open' | 'closed';
-  majorityRule: MajorityRule;
-  secret: boolean;
-  quorum: Quorum | null;
-  quorumMet: boolean;
+  readonly question: string;
+  readonly options: readonly string[];
+  readonly status: 'open' | 'closed';
+  readonly majorityRule: MajorityRule;
+  readonly secret: boolean;
+  readonly quorum: Quorum | null;
+  readonly quorumMet: boolean;
   /** The ballots cast so far. */
-  voted: number;
+  readonly voted: number;
   /** The present members: the base of the turnout. */
-  present: number;
+  readonly present: number;
   /** The counts per option. `null` while the server hides them. */
-  counts: Readonly<Record<string, number>> | null;
-  result: VoteResult | null;
-  failedReason: 'quorum' | 'majority' | null;
+  readonly counts: Readonly<Record<string, number>> | null;
+  readonly result: VoteResult | null;
+  readonly failedReason: 'quorum' | 'majority' | null;
   /** Admitted guests vote too: no quorum, the majority of the cast votes. */
-  guestsVote?: boolean;
+  readonly guestsVote?: boolean;
   /** The present members and the admitted guests, for "19 Mitglieder + 7 Gäste anwesend". */
-  presentMembers?: number | null;
-  presentGuests?: number | null;
+  readonly presentMembers?: number | null;
+  readonly presentGuests?: number | null;
   /** A personnel election: the candidates, the stored result and the round. */
-  election?: ElectionConfig | null;
-  electionResult?: ElectionResult | null;
-  round?: number;
+  readonly election?: ElectionConfig | null;
+  readonly electionResult?: ElectionResult | null;
+  readonly round?: number;
   /** A poll: the mode, the options and the stored counts. */
-  poll?: PollConfig | null;
-  pollResult?: PollResult | null;
+  readonly poll?: PollConfig | null;
+  readonly pollResult?: PollResult | null;
 }
 
 /** The join code of a public meeting on the screen: never a name, only the code. */
 export interface BeamerJoin {
-  code: string;
-  url: string;
-  qr: QrMatrix;
+  readonly code: string;
+  readonly url: string;
+  readonly qr: QrMatrix;
 }
 
 /** The people in the room: present members and admitted guests. */
 export interface BeamerPresence {
-  members: number;
-  guests: number;
+  readonly members: number;
+  readonly guests: number;
 }
 
 /** The texts of the screen for one vote. */
 interface BeamerText {
   /** Show the counts as bars. */
-  bars: boolean;
+  readonly bars: boolean;
   /** "14 von 19 Anwesenden haben abgestimmt", the label of the bar. */
-  turnout: string;
-  hiddenKey: TranslationKey;
+  readonly turnout: string;
+  readonly hiddenKey: TranslationKey;
   /** "Einfache Mehrheit · offene Abstimmung · Quorum 12". */
-  rules: string;
+  readonly rules: string;
   /** "Quorum 12 · noch nicht erreicht" while an open vote misses its quorum. */
-  quorumWarning: string | null;
-  passed: boolean;
+  readonly quorumWarning: string | null;
+  readonly passed: boolean;
   /** "Einfache Mehrheit · Quorum erreicht · 20 Stimmen". */
-  outcome: string;
+  readonly outcome: string;
   /** A vote with guests: "19 Mitglieder + 7 Gäste anwesend", else `null`. */
-  composition: string | null;
+  readonly composition: string | null;
 }
 
 /**
@@ -173,9 +173,11 @@ export class MeetingBeamerComponent {
     );
 
     const missedQuorum = v.failedReason === 'quorum';
-    const outcome = [passed || missedQuorum ? majority : t('beamer.majorityMissed', { rule: majority })];
-    if (q) outcome.push(t(missedQuorum ? 'beamer.quorumMissed' : 'beamer.quorumMet'));
-    outcome.push(v.voted === 1 ? t('beamer.ballotsOne') : t('beamer.ballots', { n: v.voted }));
+    const outcome = [
+      passed || missedQuorum ? majority : t('beamer.majorityMissed', { rule: majority }),
+      ...(q ? [t(missedQuorum ? 'beamer.quorumMissed' : 'beamer.quorumMet')] : []),
+      v.voted === 1 ? t('beamer.ballotsOne') : t('beamer.ballots', { n: v.voted }),
+    ];
     const composition = guests ? guestComposition(v.presentMembers, v.presentGuests, t) : null;
 
     return {

@@ -67,7 +67,7 @@ export function batchPings(ms = PING_COALESCE_MS): OperatorFunction<TodoPing, To
 export class TodoLiveService {
   private readonly ws = inject(WsService);
   /** The board ids of every live subscriber, oldest first. */
-  private readonly subscribers: (readonly string[])[] = [];
+  private subscribers: readonly (readonly string[])[] = [];
   private readonly pings = new Subject<TodoPing>();
   private channel: TodoChannel | null = null;
   private timer: ReturnType<typeof setTimeout> | null = null;
@@ -87,24 +87,22 @@ export class TodoLiveService {
     return new Observable<TodoPing>((sub) => {
       const ids = new Set(boardIds);
       const entry: readonly string[] = [...ids];
-      this.subscribers.push(entry);
+      this.subscribers = [...this.subscribers, entry];
       this.queueSync();
       const inner = this.pings.subscribe((p) => {
         if (ids.has(p.boardId)) sub.next(p);
       });
       return () => {
         inner.unsubscribe();
-        this.subscribers.splice(this.subscribers.indexOf(entry), 1);
+        this.subscribers = this.subscribers.filter((s) => s !== entry);
         this.queueSync();
       };
     });
   }
 
   /** Every subscribed board once, the boards of the newest subscriber first. */
-  private boardIds(): string[] {
-    const ids = new Set<string>();
-    for (let i = this.subscribers.length - 1; i >= 0; i--) for (const id of this.subscribers[i]) ids.add(id);
-    return [...ids];
+  private boardIds(): readonly string[] {
+    return [...new Set([...this.subscribers].reverse().flat())];
   }
 
   /** One `subscribe` for all changes of the same task (a page swaps its boards at once). */

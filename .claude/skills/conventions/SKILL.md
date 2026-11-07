@@ -39,11 +39,61 @@ The non-negotiables. Source of truth: this skill, `.github/pull_request_template
 - **No `eval`** — flow/form guards run through a whitelist dispatch table (`app/shared/guards.py`,
   `app/shared/jsonlogic.py`), never `eval`.
 
+## Functional style
+
+The rules are the specs in `specs/style/shared/functional/` (000081-000089, 000437),
+`specs/style/backend/functional/000090` and `specs/style/frontend/functional/` (000091, 000438).
+Read them before you change code. In short:
+
+- **Body shape:** guard raises, then locals bound once, then one `return` of an expression or one
+  `match`/`switch` with a `return` per case. Readability limits the single expression: split
+  anything deeper than three levels or longer than 8 lines into named locals or a helper.
+- **No rebinding, no mutation:** no second assignment, no `+=`, no `.append`/`.add`/`x[k] = v`
+  (Python), only `const`, no `.push`/`.splice`/in-place `.sort()` (TS). Build the value whole:
+  comprehension, generator into `tuple()`/`dict()`/`sum()`, spread, `dataclasses.replace`,
+  `model_copy(update=...)`, `toSorted()`.
+- **Loops:** a loop that builds a value is a comprehension or `map`/`filter`/`flatMap`/`reduce`,
+  never `forEach`. A loop that only causes effects (send mails) stays a `for` statement.
+- **Branches:** a branch on one value with two or more outcomes is an exhaustive `match`
+  (`assert_never`) or `switch` (`assertNever` from `shared/util/immutable.ts`). A binary choice is a
+  conditional expression, nested at most one level. basedpyright `reportMatchNotExhaustive` is on.
+- **Frozen data:** `@dataclass(frozen=True, slots=True)`; every Pydantic model is frozen through
+  `FrozenModel`/`FrozenCamelModel`/`FrozenStrictCamelModel` in `app/shared/schemas.py`, and each
+  subclass repeats `frozen=True` (basedpyright demands it). Fields are `tuple`, `frozenset`,
+  `Mapping`. TS: `readonly` fields, `readonly T[]`, `ReadonlySet`, `ReadonlyMap`, `as const`.
+- **Effects at the edge:** DB, Redis, S3, mail, audit and WebSocket calls stay in services,
+  routers and Angular services; the decision is a pure function next to them. Never
+  `asyncio.gather` over one `AsyncSession`; use `[await f(x) for x in xs]`.
+- **Signals:** `computed()` is a pure expression; `.update(fn)` gets a pure `fn`
+  (`(s) => toggled(s, key)`), never copy-then-mutate.
+- **Exceptions (000089):** ORM rows and migrations, tests, `try`/`with`/`raise`, Pydantic
+  validators and framework wiring, signals in event handlers, ngx-formly configs and Reactive
+  Forms, DOM APIs and RxJS subscriptions.
+- **Reference examples:** `_majority` in `backend/app/modules/voting/tally.py` (match per case) and
+  `linkSub` in `frontend/src/app/features/todos/todos.util.ts` (switch that returns, after its refactor).
+
+**Enforcement.** ruff selects `C4`, `PERF401`, `PERF402`, `SIM108`, `RET`, `PLW2901`, `FURB`
+(tests and migrations excepted). ESLint runs `eslint-plugin-functional` and `prefer-const`,
+`no-param-reassign`, `switch-exhaustiveness-check` as warnings on `src/**` (no specs).
+`scripts/check_functional.py` counts the violations per file against
+`scripts/functional-baseline/<area>.json` (one file per backend module and frontend folder); CI
+(`functional` job, and the ratchet step of `fe-unit`) fails when a count differs. A readonly
+type change needs `npm run build` too: only the Angular template type check finds a template that
+writes into a readonly field or passes a readonly array to a mutable input; `npm run typecheck`
+does not. After you lower a count, run:
+
+```sh
+python3 scripts/check_functional.py --write                     # backend, mcp, typst
+(cd frontend && npx eslint . -f json -o eslint-report.json) && \
+  python3 scripts/check_functional.py --eslint frontend/eslint-report.json --write
+```
+
 ## FE/BE contract
 
 - **Identical field/header/cookie names** FE↔BE, **camelCase** in JSON. No FE-invented fields, no silent
   `snake_case`↔`camelCase` drift — both sides compile, then they fail silently at runtime.
-- camelCase base model: `app/shared/config_schemas.py` (alias, `extra=forbid`).
+- camelCase base model: `FrozenCamelModel` in `app/shared/schemas.py` (frozen, `populate_by_name`);
+  `FrozenStrictCamelModel` adds `extra=forbid`.
 
 ## Frontend Definition of Done
 

@@ -16,6 +16,7 @@ or allocations gives 409. A money mutation on a closed fiscal year gives 409
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from decimal import Decimal
 from typing import Annotated, Any, Literal
 from uuid import UUID
@@ -84,7 +85,7 @@ _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 
 
 def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
-    return {code: _PROBLEM for code in codes}
+    return dict.fromkeys(codes, _PROBLEM)
 
 
 def get_budget_tree_service(
@@ -167,14 +168,12 @@ async def list_budget_tree(
     return await service.get_tree(gremium_id=gremium_id, visible_gremium_ids=member)
 
 
-def _find_subtree(roots: list[BudgetTreeNodeOut], node_id: UUID) -> BudgetTreeNodeOut | None:
-    for node in roots:
-        if node.id == node_id:
-            return node
-        found = _find_subtree(node.children, node_id)
-        if found is not None:
-            return found
-    return None
+def _find_subtree(
+    roots: Sequence[BudgetTreeNodeOut], node_id: UUID
+) -> BudgetTreeNodeOut | None:
+    """Return the node with `node_id` from the forest, depth first, or None."""
+    hits = (node if node.id == node_id else _find_subtree(node.children, node_id) for node in roots)
+    return next((hit for hit in hits if hit is not None), None)
 
 
 @router.get(
@@ -196,10 +195,9 @@ async def export_budget_xlsx(
     """
     from app.shared.xlsx import XLSX_MEDIA_TYPE, build_budget_workbook
 
-    roots = await service.get_tree(gremium_id=gremium_id)
-    if node_id is not None:
-        sub = _find_subtree(roots, node_id)
-        roots = [sub] if sub is not None else []
+    tree = await service.get_tree(gremium_id=gremium_id)
+    sub = _find_subtree(tree, node_id) if node_id is not None else None
+    roots = tree if node_id is None else ([sub] if sub is not None else [])
     labels = await service.fiscal_year_label_map()
     data = build_budget_workbook(roots, fiscal_year_labels=labels, fiscal_year_id=fiscal_year_id)
     await audit_record(
@@ -471,10 +469,8 @@ async def export_expenses_xlsx(
         limit=10_000,
         offset=0,
     )
-    items = page.items
-    if ids:
-        wanted = set(ids)
-        items = [e for e in items if e.id in wanted]
+    wanted = frozenset(ids or ())
+    items = [e for e in page.items if e.id in wanted] if ids else page.items
     data = build_expenses_workbook(items)
     await audit_record(
         service.session,

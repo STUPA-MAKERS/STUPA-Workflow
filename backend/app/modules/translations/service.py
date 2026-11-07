@@ -15,6 +15,7 @@ log cannot revert it. The entry names the keys and counts, never the texts.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import UTC, datetime
 
 from sqlalchemy import delete, select
@@ -53,9 +54,8 @@ class TranslationService:
 
     async def languages(self, *, active_only: bool) -> list[UiLanguage]:
         """Return the extra languages by code, or only the active ones."""
-        stmt = select(UiLanguage).order_by(UiLanguage.code)
-        if active_only:
-            stmt = stmt.where(UiLanguage.active.is_(True))
+        ordered = select(UiLanguage).order_by(UiLanguage.code)
+        stmt = ordered.where(UiLanguage.active.is_(True)) if active_only else ordered
         return list((await self.session.scalars(stmt)).all())
 
     async def create_language(
@@ -98,13 +98,20 @@ class TranslationService:
             NotFoundError: No extra language has this code.
         """
         row = await self._language(code)
-        data: dict[str, object] = {}
-        if name is not None and name != row.name:
-            data["name"] = {"from": row.name, "to": name}
-            row.name = name
-        if active is not None and active != row.active:
-            data["active"] = {"from": row.active, "to": active}
-            row.active = active
+        new_name = name if name is not None and name != row.name else None
+        new_active = active if active is not None and active != row.active else None
+        data: dict[str, object] = {
+            **({"name": {"from": row.name, "to": new_name}} if new_name is not None else {}),
+            **(
+                {"active": {"from": row.active, "to": new_active}}
+                if new_active is not None
+                else {}
+            ),
+        }
+        if new_name is not None:
+            row.name = new_name
+        if new_active is not None:
+            row.active = new_active
         if data:
             row.updated_at = datetime.now(UTC)
             row.updated_by = actor
@@ -178,20 +185,15 @@ class TranslationService:
                 code="locale_required",
                 errors=[{"field": "locale", "msg": "required"}],
             )
-        own: dict[str, str] = {}
-        if locale is not None:
-            own = await self.admin_overrides(locale)
-        rows: list[tuple[str, BuiltinText, str | None]] = []
-        for key, text in builtin_texts().items():
-            if prefix is not None and not key.startswith(prefix):
-                continue
-            if untranslated and key in own:
-                continue
-            rows.append((key, text, own.get(key)))
-        return rows
+        own = await self.admin_overrides(locale) if locale is not None else {}
+        return [
+            (key, text, own.get(key))
+            for key, text in builtin_texts().items()
+            if (prefix is None or key.startswith(prefix)) and not (untranslated and key in own)
+        ]
 
     async def save(
-        self, locale: str, changes: dict[str, str | None], *, actor: str
+        self, locale: str, changes: Mapping[str, str | None], *, actor: str
     ) -> dict[str, str]:
         """Apply the changes of one save and commit. Return the overrides after it.
 
@@ -284,9 +286,11 @@ class TranslationService:
         """
         active = await self.languages(active_only=True)
         codes = {row.code for row in active}
-        locale = DEFAULT_LOCALE
-        if requested is not None and (requested in BUILTIN_LOCALES or requested in codes):
-            locale = requested
+        locale = (
+            requested
+            if requested is not None and (requested in BUILTIN_LOCALES or requested in codes)
+            else DEFAULT_LOCALE
+        )
         overrides = {code: await self.overrides(code) for code in fallback_chain(locale)}
         return locale, active, overrides
 

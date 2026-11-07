@@ -32,30 +32,69 @@ import {
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { type StatusView, webhookDeliveryStatus } from '@shared/status-kind.util';
+import { withEntry } from '@shared/util/immutable';
 import { AdminApiService } from '../admin-api.service';
 import {
-  EVENT_NAMES,
-  type EventName,
   type WebhookConfig,
   type WebhookDeliveryState,
   type WebhookDeliveryStatus,
 } from '../admin.models';
 
 function emptyHook(): WebhookConfig {
-  return { id: '', name: '', url: '', events: [], active: true };
+  return { id: '', name: '', url: '', active: true };
+}
+
+/** The client check of a target URL: http or https with something after the scheme. */
+const HTTP_URL = /^https?:\/\/.+/i;
+
+/** The delivery state of a webhook that has never sent anything. */
+function neverDelivered(webhookId: string): WebhookDeliveryStatus {
+  return {
+    webhookId,
+    lastState: 'never',
+    reasonClass: 'no_deliveries',
+    responseCode: null,
+    attempts: 0,
+    lastAt: null,
+  };
+}
+
+/** Returns `list` with `saved` appended (`idx` null) or in place of the entry at `idx`. */
+function withSaved(
+  list: readonly WebhookConfig[],
+  idx: number | null,
+  saved: WebhookConfig,
+): readonly WebhookConfig[] {
+  return idx === null ? [...list, saved] : list.map((h, i) => (i === idx ? saved : h));
+}
+
+/** Returns `list` with the active flag of webhook `id` set to `active`. */
+function withActive(
+  list: readonly WebhookConfig[],
+  id: string,
+  active: boolean,
+): readonly WebhookConfig[] {
+  return list.map((h) => (h.id === id ? { ...h, active } : h));
+}
+
+/** Returns a new set that holds `id` when `on` is true and lacks it otherwise. */
+function withMember(set: ReadonlySet<string>, id: string, on: boolean): ReadonlySet<string> {
+  const rest = [...set].filter((x) => x !== id);
+  return new Set(on ? [...rest, id] : rest);
 }
 
 /**
  * Webhook config UI at `/admin/webhooks`. One expand row per webhook: the name with the
  * state of its newest delivery as status text (Zugestellt, Fehlgeschlagen, Läuft, Noch nie),
  * the whole target URL as the sub line, the "Aktiv" switch (it saves at once) and the ⋮
- * menu with delete. A press on the row opens the edit. The chevron opens the body: the real
- * event keys as tags and "Zustellstatus" (state, HTTP code, attempts, last attempt, failure
+ * menu with delete. A press on the row opens the edit. The chevron opens the body:
+ * "Zustellstatus" (state, HTTP code, attempts, last attempt, failure
  * class and the dead-letter note). An inactive webhook carries "Inaktiv" beside its name.
  * Without P(`webhook.manage`) a press on the row opens the body, because there is no edit.
  *
  * Create and edit run in a dialog. The client validation asks for a valid http or https
- * URL. The event selection stays optional. Delete runs through a confirm dialog. Every
+ * URL. A webhook has no event list: it sends only through the `webhook` action of a flow
+ * transition (§F/integrations/webhooks/000402). Delete runs through a confirm dialog. Every
  * change needs P(`webhook.manage`), which the backend enforces.
  */
 @Component({
@@ -97,8 +136,7 @@ export class WebhooksComponent {
    */
   protected readonly loading = signal(true);
 
-  protected readonly allEvents = EVENT_NAMES;
-  protected readonly hooks = signal<WebhookConfig[]>([]);
+  protected readonly hooks = signal<readonly WebhookConfig[]>([]);
   protected readonly draft = signal<WebhookConfig | null>(null);
   protected readonly editingIndex = signal<number | null>(null);
   /** The webhook whose delete the user confirms now. */
@@ -123,12 +161,9 @@ export class WebhooksComponent {
   /** The delivery status loads one time, as soon as the permission is known. */
   private statusRequested = false;
 
-  protected readonly errors = computed(() => {
+  protected readonly errors = computed<readonly string[]>(() => {
     const d = this.draft();
-    if (!d) return [] as string[];
-    const errs: string[] = [];
-    if (!/^https?:\/\/.+/i.test(d.url)) errs.push('admin.webhook.badUrl');
-    return errs;
+    return d && !HTTP_URL.test(d.url) ? ['admin.webhook.badUrl'] : [];
   });
 
   /**
@@ -186,7 +221,7 @@ export class WebhooksComponent {
 
   protected openEdit(i: number): void {
     this.editingIndex.set(i);
-    this.draft.set({ ...this.hooks()[i], events: [...this.hooks()[i].events] });
+    this.draft.set({ ...this.hooks()[i] });
   }
 
   protected close(): void {
@@ -198,36 +233,15 @@ export class WebhooksComponent {
     this.draft.update((d) => (d ? { ...d, [key]: value } : d));
   }
 
-  protected toggleEvent(ev: EventName): void {
-    this.draft.update((d) => {
-      if (!d) return d;
-      const events = d.events.includes(ev)
-        ? d.events.filter((e) => e !== ev)
-        : [...d.events, ev];
-      return { ...d, events };
-    });
-  }
-
   protected save(): void {
     const d = this.draft();
     if (!d || this.errors().length > 0) return;
     const idx = this.editingIndex();
     this.api.saveWebhook(d).subscribe({
       next: (saved) => {
-        this.hooks.update((list) =>
-          idx === null ? [...list, saved] : list.map((h, i) => (i === idx ? saved : h)),
-        );
+        this.hooks.update((list) => withSaved(list, idx, saved));
         if (idx === null && !this.delivery().has(saved.id)) {
-          this.delivery.update((m) =>
-            new Map(m).set(saved.id, {
-              webhookId: saved.id,
-              lastState: 'never',
-              reasonClass: 'no_deliveries',
-              responseCode: null,
-              attempts: 0,
-              lastAt: null,
-            }),
-          );
+          this.delivery.update((m) => withEntry(m, saved.id, neverDelivered(saved.id)));
         }
         this.toast.success(this.i18n.translate('admin.common.saved'));
         this.close();
@@ -247,12 +261,7 @@ export class WebhooksComponent {
   }
 
   private setToggling(id: string, on: boolean): void {
-    this.toggling.update((cur) => {
-      const next = new Set(cur);
-      if (on) next.add(id);
-      else next.delete(id);
-      return next;
-    });
+    this.toggling.update((cur) => withMember(cur, id, on));
   }
 
   /**
@@ -264,15 +273,15 @@ export class WebhooksComponent {
     if (this.isToggling(hook.id)) return;
     const before = hook.active;
     this.setToggling(hook.id, true);
-    this.hooks.update((list) => list.map((h) => (h.id === hook.id ? { ...h, active } : h)));
-    this.api.saveWebhook({ ...hook, events: [...hook.events], active }).subscribe({
+    this.hooks.update((list) => withActive(list, hook.id, active));
+    this.api.saveWebhook({ ...hook, active }).subscribe({
       next: (saved) => {
         this.setToggling(hook.id, false);
         this.hooks.update((list) => list.map((h) => (h.id === saved.id ? saved : h)));
       },
       error: () => {
         this.setToggling(hook.id, false);
-        this.hooks.update((list) => list.map((h) => (h.id === hook.id ? { ...h, active: before } : h)));
+        this.hooks.update((list) => withActive(list, hook.id, before));
         this.toast.error(this.i18n.translate('admin.common.saveFailed'));
       },
     });
@@ -288,11 +297,7 @@ export class WebhooksComponent {
     this.api.deleteWebhook(hook.id).subscribe({
       next: () => {
         this.hooks.update((list) => list.filter((h) => h.id !== hook.id));
-        this.delivery.update((m) => {
-          const next = new Map(m);
-          next.delete(hook.id);
-          return next;
-        });
+        this.delivery.update((m) => new Map([...m].filter(([id]) => id !== hook.id)));
         this.confirmDelete.set(null);
         this.toast.success(this.i18n.translate('admin.webhook.deleted'));
       },

@@ -447,11 +447,11 @@ export class MeetingsComponent {
     return voteResultVariant(result);
   }
 
-  countEntries(vote: MeetingVote): { key: string; value: number }[] {
+  countEntries(vote: MeetingVote): readonly { readonly key: string; readonly value: number }[] {
     return countEntries(vote);
   }
 
-  voteOptionsFor(vote: MeetingVote): string[] {
+  voteOptionsFor(vote: MeetingVote): readonly string[] {
     return voteOptionsFor(vote);
   }
 }

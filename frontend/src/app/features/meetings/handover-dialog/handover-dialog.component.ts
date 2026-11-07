@@ -25,10 +25,10 @@ import { personLabel } from '@shared/person-label.util';
 
 /** One choice of the handover time. */
 interface ModeOption {
-  mode: HandoverMode;
-  label: string;
-  sub: string;
-  disabled: boolean;
+  readonly mode: HandoverMode;
+  readonly label: string;
+  readonly sub: string;
+  readonly disabled: boolean;
 }
 
 /**

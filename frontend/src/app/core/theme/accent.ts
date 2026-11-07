@@ -136,13 +136,11 @@ function inGamut(rgb: Rgb): boolean {
 /** OKLCH → hex. Reduces the chroma until the colour fits sRGB. */
 function oklchToHex([L, C, H]: Oklch): string {
   if (inGamut(oklchToRgb([L, C, H]))) return rgbToHex(oklchToRgb([L, C, H]));
-  let lo = 0;
-  let hi = C;
-  for (let i = 0; i < 20; i++) {
+  const halve = ([lo, hi]: readonly [number, number]): readonly [number, number] => {
     const mid = (lo + hi) / 2;
-    if (inGamut(oklchToRgb([L, mid, H]))) lo = mid;
-    else hi = mid;
-  }
+    return inGamut(oklchToRgb([L, mid, H])) ? [mid, hi] : [lo, mid];
+  };
+  const [lo] = Array.from({ length: 20 }).reduce<readonly [number, number]>(halve, [0, C]);
   return rgbToHex(oklchToRgb([L, lo, H]));
 }
 
@@ -168,11 +166,12 @@ export function contrast(a: string, b: string): number {
 export function ensureContrast(hex: string, surfaces: readonly string[], dark: boolean): string {
   const [L0, C, H] = rgbToOklch(hexToRgb(hex));
   const step = dark ? 0.01 : -0.01;
-  let out = hex;
-  for (let i = 1; i <= 100 && !surfaces.every((s) => contrast(out, s) >= AA); i++) {
-    out = oklchToHex([Math.min(1, Math.max(0, L0 + i * step)), C, H]);
-  }
-  return out;
+  const passes = (c: string): boolean => surfaces.every((s) => contrast(c, s) >= AA);
+  const search = (i: number, out: string): string =>
+    i > 100 || passes(out)
+      ? out
+      : search(i + 1, oklchToHex([Math.min(1, Math.max(0, L0 + i * step)), C, H]));
+  return search(1, hex);
 }
 
 /** The hue difference in degrees, in -180..180. */
@@ -203,26 +202,40 @@ export function accentPalette(accent: string): Record<string, string> {
     const [Lt, Ct, Ht] = rgbToOklch(hexToRgb(value));
     return oklchToHex([Lt, Ct * ratio, (Ht + turn + 360) % 360]);
   };
-  const out: Record<string, string> = {};
-  for (const p of PRIMITIVES) out[p.name] = derive(p.value);
-
-  for (const theme of ['light', 'dark'] as const) {
-    const dark = theme === 'dark';
-    const sel = out[`--c-${theme}-sel`];
-    const pc = out[`--c-${theme}-pc`];
-    const surfaces = [...SURFACES[theme], sel];
-    for (const step of ['pt', 'pt-hover', 'pt-active']) {
-      const name = `--c-${theme}-${step}`;
-      out[name] = ensureContrast(out[name], surfaces, dark);
-    }
-    out[`--c-${theme}-onpc`] = ensureContrast(out[`--c-${theme}-onpc`], [pc], dark);
-    out[`--c-${theme}-onsel`] = ensureContrast(out[`--c-${theme}-onsel`], [sel], dark);
-  }
-
-  out['--c-accent'] = hex;
+  const derived: Readonly<Record<string, string>> = Object.fromEntries(
+    PRIMITIVES.map((p) => [p.name, derive(p.value)]),
+  );
+  const fixes = (['light', 'dark'] as const).flatMap((theme) => contrastFixes(derived, theme));
   const tint = derive(ON_ACCENT);
-  out['--c-on-accent'] = contrast(tint, hex) >= contrast('#ffffff', hex) ? tint : '#ffffff';
-  return out;
+  return {
+    ...derived,
+    ...Object.fromEntries(fixes),
+    '--c-accent': hex,
+    '--c-on-accent': contrast(tint, hex) >= contrast('#ffffff', hex) ? tint : '#ffffff',
+  };
+}
+
+/**
+ * The text and pill colours of one theme, moved to AA contrast on the surfaces they sit on.
+ * The selection and the pill container of the theme stay as derived.
+ */
+function contrastFixes(
+  derived: Readonly<Record<string, string>>,
+  theme: 'light' | 'dark',
+): readonly (readonly [string, string])[] {
+  const dark = theme === 'dark';
+  const sel = derived[`--c-${theme}-sel`];
+  const pc = derived[`--c-${theme}-pc`];
+  const surfaces = [...SURFACES[theme], sel];
+  const fix = (name: string, on: readonly string[]): readonly [string, string] => [
+    name,
+    ensureContrast(derived[name], on, dark),
+  ];
+  return [
+    ...['pt', 'pt-hover', 'pt-active'].map((step) => fix(`--c-${theme}-${step}`, surfaces)),
+    fix(`--c-${theme}-onpc`, [pc]),
+    fix(`--c-${theme}-onsel`, [sel]),
+  ];
 }
 
 /**

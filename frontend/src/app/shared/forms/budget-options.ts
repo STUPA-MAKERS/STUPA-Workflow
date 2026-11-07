@@ -13,41 +13,42 @@ const LABEL = /^(.*) \(([^()]*)\)$/;
  * another shape is the name, and the key is the path key then. A parent without an option
  * makes its child a root. The nodes carry no figures, so the picker shows no free amounts.
  */
-export function budgetOptionTree(options: readonly FieldOption[], lang: Lang): BudgetTreeNode[] {
-  const byId = new Map<string, BudgetTreeNode>();
-  for (const o of options) {
-    const label = resolveI18n(o.label, lang);
-    const parts = LABEL.exec(label);
-    const key = o.key ?? '';
-    byId.set(o.value, {
-      id: o.value,
-      parentId: o.parentId ?? null,
-      gremiumId: null,
-      key,
-      pathKey: parts ? parts[2] : key,
-      name: parts ? parts[1] : label,
-      currency: 'EUR',
-      active: true,
-      color: o.color ?? null,
-      acceptedStateKeys: [],
-      deniedStateKeys: [],
-      hiddenInBudget: false,
-      viewGremiumId: null,
-      fiscalStartMonth: 1,
-      fiscalStartDay: 1,
-      byFiscalYear: [],
-      children: [],
-    });
-  }
-  const roots: BudgetTreeNode[] = [];
-  for (const n of byId.values()) {
-    const parent = n.parentId ? byId.get(n.parentId) : undefined;
-    if (parent) {
-      parent.children.push(n);
-    } else {
-      n.parentId = null;
-      roots.push(n);
-    }
-  }
-  return roots;
+export function budgetOptionTree(
+  options: readonly FieldOption[],
+  lang: Lang,
+): readonly BudgetTreeNode[] {
+  const byId = new Map(options.map((o) => [o.value, optionNode(o, lang)] as const));
+  const nodes = [...byId.values()];
+  const isRoot = (n: BudgetTreeNode): boolean => !(n.parentId && byId.has(n.parentId));
+  const withChildren = (n: BudgetTreeNode): BudgetTreeNode => ({
+    ...n,
+    children: nodes.filter((c) => !isRoot(c) && c.parentId === n.id).map(withChildren),
+  });
+  return nodes.filter(isRoot).map((n) => withChildren({ ...n, parentId: null }));
+}
+
+/** One option as a tree node without children. */
+function optionNode(o: FieldOption, lang: Lang): BudgetTreeNode {
+  const label = resolveI18n(o.label, lang);
+  const parts = LABEL.exec(label);
+  const key = o.key ?? '';
+  return {
+    id: o.value,
+    parentId: o.parentId ?? null,
+    gremiumId: null,
+    key,
+    pathKey: parts ? parts[2] : key,
+    name: parts ? parts[1] : label,
+    currency: 'EUR',
+    active: true,
+    color: o.color ?? null,
+    acceptedStateKeys: [],
+    deniedStateKeys: [],
+    hiddenInBudget: false,
+    viewGremiumId: null,
+    fiscalStartMonth: 1,
+    fiscalStartDay: 1,
+    byFiscalYear: [],
+    children: [],
+  };
 }

@@ -19,9 +19,22 @@ from app.modules.config_revision.service import (
     ConfigRevisionService,
 )
 from app.modules.flow.models import FlowVersion, State, Transition
-from app.shared.config_schemas import FlowGraph, FlowValidationError, validate_flow_graph
+from app.shared.config_schemas import (
+    FlowGraph,
+    FlowValidationError,
+    StateDef,
+    validate_flow_graph,
+)
 from app.shared.errors import ValidationProblem
 from app.shared.guards import budget_ids_of_action
+
+
+def _parse_uuid(ref: str) -> UUID | None:
+    """Return the UUID that ``ref`` spells, or ``None`` when it is no UUID."""
+    try:
+        return UUID(ref)
+    except ValueError:
+        return None
 
 
 class FlowOps(ConfigServiceBase):
@@ -127,15 +140,14 @@ class FlowOps(ConfigServiceBase):
             ) from exc
         await self._check_budget_refs(payload.graph)
 
-        app_keys: dict[UUID, str] = {}
-        for app_id, key in (
+        app_rows = (
             await self.session.execute(
                 select(Application.id, State.key).join(
                     State, State.id == Application.current_state_id
                 )
             )
-        ).all():
-            app_keys[app_id] = key
+        ).all()
+        app_keys: dict[UUID, str] = dict(app_rows)
 
         max_version = await self.session.scalar(
             select(FlowVersion.version).order_by(FlowVersion.version.desc()).limit(1)
@@ -151,27 +163,14 @@ class FlowOps(ConfigServiceBase):
         self.session.add(version)
         await self.session.flush()
 
-        id_by_key: dict[str, UUID] = {}
-        state_by_key: dict[str, State] = {}
-        initial_id: UUID | None = None
-        for state in payload.graph.states:
-            row = State(
-                flow_version_id=version.id,
-                key=state.key,
-                label_i18n=state.label,
-                color=state.color,
-                edit_allowed=state.edit_allowed,
-                is_initial=state.is_initial,
-                is_terminal=state.is_terminal,
-                kind=state.kind,
-                config=state.config,
-            )
-            self.session.add(row)
-            await self.session.flush()
-            id_by_key[state.key] = row.id
-            state_by_key[state.key] = row
-            if state.is_initial:
-                initial_id = row.id
+        added = [
+            (state, await self._add_state(version.id, state)) for state in payload.graph.states
+        ]
+        id_by_key = {state.key: row.id for state, row in added}
+        state_by_key = {state.key: row for state, row in added}
+        initial_id = next(
+            (row.id for state, row in reversed(added) if state.is_initial), None
+        )
 
         for order, trans in enumerate(payload.graph.transitions):
             self.session.add(
@@ -226,6 +225,23 @@ class FlowOps(ConfigServiceBase):
             active=True,
         )
 
+    async def _add_state(self, version_id: UUID, state: StateDef) -> State:
+        """Insert the row of one state of the new version and flush it, for its id."""
+        row = State(
+            flow_version_id=version_id,
+            key=state.key,
+            label_i18n=state.label,
+            color=state.color,
+            edit_allowed=state.edit_allowed,
+            is_initial=state.is_initial,
+            is_terminal=state.is_terminal,
+            kind=state.kind,
+            config=state.config,
+        )
+        self.session.add(row)
+        await self.session.flush()
+        return row
+
     async def _check_budget_refs(self, graph: FlowGraph) -> None:
         """Refuse a graph whose cost-center actions name an unknown cost center.
 
@@ -243,19 +259,14 @@ class FlowOps(ConfigServiceBase):
         }
         if not refs:
             return
-        ids: set[UUID] = set()
-        bad: set[str] = set()
-        for ref in refs:
-            try:
-                ids.add(UUID(ref))
-            except ValueError:
-                bad.add(ref)
+        parsed = {ref: _parse_uuid(ref) for ref in refs}
+        ids = {i for i in parsed.values() if i is not None}
         found = (
             set((await self.session.scalars(select(Budget.id).where(Budget.id.in_(ids)))).all())
             if ids
             else set()
         )
-        bad |= {str(i) for i in ids - found}
+        bad = {ref for ref, i in parsed.items() if i is None} | {str(i) for i in ids - found}
         if bad:
             raise ValidationProblem(
                 "Invalid flow graph.",
@@ -286,9 +297,12 @@ class FlowOps(ConfigServiceBase):
         from app.modules.flow.vote_gremium import gremium_from_budget, resolve_vote_gremium
 
         vote_states = [s for s in states if s.kind == "vote"]
-        clear = update(Application).where(Application.vote_gremium_id.is_not(None))
-        if vote_states:
-            clear = clear.where(Application.current_state_id.not_in([s.id for s in vote_states]))
+        set_ones = update(Application).where(Application.vote_gremium_id.is_not(None))
+        clear = (
+            set_ones.where(Application.current_state_id.not_in([s.id for s in vote_states]))
+            if vote_states
+            else set_ones
+        )
         await self.session.execute(
             clear.values(vote_gremium_id=None, updated_at=Application.updated_at)
         )

@@ -12,13 +12,13 @@ export function stateDisplayLabel(s: StateDef): string {
 /** Lookup context for guard labels. The code reads the values at call time, so signal
  *  consumers stay reactive. */
 export interface GuardLabelContext {
-  translate: (key: TranslationKey) => string;
-  roleOptions: SelectOption[];
-  gremiumOptions: SelectOption[];
-  budgetNameById: ReadonlyMap<string, string>;
+  readonly translate: (key: TranslationKey) => string;
+  readonly roleOptions: readonly SelectOption[];
+  readonly gremiumOptions: readonly SelectOption[];
+  readonly budgetNameById: ReadonlyMap<string, string>;
 }
 
-function optionLabel(options: SelectOption[], value: string): string {
+function optionLabel(options: readonly SelectOption[], value: string): string {
   return options.find((o) => o.value === value)?.label ?? value;
 }
 

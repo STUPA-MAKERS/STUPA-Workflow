@@ -1,0 +1,9 @@
+{
+  "frontend/src/app/features/todos/card-detail/todo-card-detail.component.ts": 4,
+  "frontend/src/app/features/todos/due-chip/todo-due-chip.component.ts": 1,
+  "frontend/src/app/features/todos/link-picker/todo-link-picker.component.ts": 4,
+  "frontend/src/app/features/todos/linked-list/todo-linked-list.component.ts": 1,
+  "frontend/src/app/features/todos/new-dialog/todo-new-dialog.component.ts": 1,
+  "frontend/src/app/features/todos/todo-cache.service.ts": 3,
+  "frontend/src/app/features/todos/transfer-dialog/todo-transfer-dialog.component.ts": 3
+}

@@ -11,18 +11,18 @@
 
 /** One offer of a position. */
 export interface PositionOffer {
-  label: string;
-  value: number | null;
-  preferred: boolean;
+  readonly label: string;
+  readonly value: number | null;
+  readonly preferred: boolean;
 }
 
 /** One cost position with its offers. */
 export interface CostPosition {
-  label: string;
-  offers: PositionOffer[];
+  readonly label: string;
+  readonly offers: readonly PositionOffer[];
   /** The position has no comparison offers; `noOffersReason` says why. */
-  noOffers: boolean;
-  noOffersReason: string;
+  readonly noOffers: boolean;
+  readonly noOffersReason: string;
 }
 
 function toNumber(raw: unknown): number | null {
@@ -35,7 +35,7 @@ function toNumber(raw: unknown): number | null {
  * Read a stored `positions` answer into typed positions. Anything that is no list gives
  * no positions; a broken entry keeps what it has, so an old answer still shows.
  */
-export function normalizePositions(raw: unknown): CostPosition[] {
+export function normalizePositions(raw: unknown): readonly CostPosition[] {
   if (!Array.isArray(raw)) return [];
   return raw
     .filter((p): p is Record<string, unknown> => typeof p === 'object' && p !== null)

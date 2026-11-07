@@ -269,12 +269,12 @@
                   <app-i18n-input
                     [placeholder]="'admin.forms.questionPlaceholder' | t"
                     [value]="field.label"
-                    (valueChange)="field.label = $event; touch()"
+                    (valueChange)="setQuestion(pos, { label: $event })"
                   />
                   <app-i18n-input
                     [label]="'admin.forms.help' | t"
                     [value]="field.help ?? {}"
-                    (valueChange)="field.help = $event; touch()"
+                    (valueChange)="setQuestion(pos, { help: $event })"
                   />
                 </div>
 
@@ -284,7 +284,7 @@
                     @for (opt of field.options ?? []; track $index; let oi = $index) {
                       <div class="fe__opt">
                         <app-input class="fe__mono" [label]="'admin.form.optionValue' | t" [(ngModel)]="opt.value" (ngModelChange)="touch()" />
-                        <app-i18n-input [short]="true" [value]="opt.label" (valueChange)="opt.label = $event; touch()" />
+                        <app-i18n-input [short]="true" [value]="opt.label" (valueChange)="setOptionLabel(pos, oi, $event)" />
                         <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" [title]="'admin.common.remove' | t" (click)="removeOption(pos, oi)"><app-icon name="trash" /></app-button>
                       </div>
                     }
@@ -351,7 +351,7 @@
                         [label]="'admin.form.promoteTarget' | t"
                         [options]="promoteTargetOptions"
                         [ngModel]="field.promoteTarget"
-                        (ngModelChange)="field.promoteTarget = $event; touch()"
+                        (ngModelChange)="setQuestion(pos, { promoteTarget: $event })"
                       />
                     }
 

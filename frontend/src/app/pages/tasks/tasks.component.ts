@@ -68,21 +68,21 @@ const DUE_TEXT: Record<TasksDue, TranslationKey> = {
 
 /** One To-Do as the template shows it. */
 interface TodoRow {
-  item: TodoMineItem;
-  due: string | null;
-  tone: DueTone;
+  readonly item: TodoMineItem;
+  readonly due: string | null;
+  readonly tone: DueTone;
 }
 
 /** One row as the template shows it. */
 interface TaskRow {
-  item: ApplicationListItem;
-  createdAt: string;
-  title: string;
-  typeLabel: string;
-  stateLabel: string | null;
-  stateKind: StatusKind;
-  amount: string | null;
-  since: IsoDateTime;
+  readonly item: ApplicationListItem;
+  readonly createdAt: string;
+  readonly title: string;
+  readonly typeLabel: string;
+  readonly stateLabel: string | null;
+  readonly stateKind: StatusKind;
+  readonly amount: string | null;
+  readonly since: IsoDateTime;
 }
 
 /**
@@ -170,7 +170,7 @@ export class TasksComponent {
   readonly detailOpen = computed(() => this.selectedId() !== null || this.selectedTodo() !== null);
 
   /** The open cards assigned to me; a failed request leaves the group out. */
-  readonly todos = signal<TodoMineItem[]>([]);
+  readonly todos = signal<readonly TodoMineItem[]>([]);
   private todoSeq = 0;
   readonly show = signal<TasksShow>('all');
   readonly due = signal<TasksDue>('');

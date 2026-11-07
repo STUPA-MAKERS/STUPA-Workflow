@@ -27,7 +27,7 @@ def _hook(
     *, url: str = "https://hook.test/h", active: bool = True, secret: bytes | None = b"k"
 ) -> Webhook:
     hook = Webhook(
-        name="h", url=url, events=["status_changed"], active=active, secret=secret
+        name="h", url=url, active=active, secret=secret
     )
     hook.id = uuid.uuid4()
     return hook

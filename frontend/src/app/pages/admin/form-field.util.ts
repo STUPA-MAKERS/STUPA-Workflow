@@ -78,43 +78,37 @@ export function validateJsonLogic(expr: unknown): boolean {
 }
 
 export interface FieldValidationResult {
-  valid: boolean;
-  errors: string[];
+  readonly valid: boolean;
+  readonly errors: readonly string[];
 }
 
 export function validateFormField(field: FormFieldDef): FieldValidationResult {
-  const errors: string[] = [];
-
-  if (!KEY_PATTERN.test(field.key)) {
-    errors.push(`invalid field key: ${JSON.stringify(field.key)}`);
-  }
-  if (!FIELD_TYPES.includes(field.type)) {
-    errors.push(`unknown field type: ${JSON.stringify(field.type)}`);
-  }
-  if (!field.label || !field.label['de']?.trim()) {
-    errors.push('label (de) is required');
-  }
-  if ((field.type === 'select' || field.type === 'multiselect') && !field.options?.length) {
-    errors.push(`options are required for type '${field.type}'`);
-  }
-  if (field.type === 'computed' && !field.compute) {
-    errors.push("compute is required for type 'computed'");
-  }
-  if (field.isPromoted && !field.promoteTarget) {
-    errors.push('promoteTarget is required when isPromoted is true');
-  }
-  if (field.visibleIf && !validateJsonLogic(field.visibleIf)) {
-    errors.push('visibleIf is not a valid JsonLogic expression');
-  }
-  if (field.compute && !validateJsonLogic(field.compute)) {
-    errors.push('compute is not a valid JsonLogic expression');
-  }
-
+  const isChoice = field.type === 'select' || field.type === 'multiselect';
+  const checks: readonly (readonly [boolean, string])[] = [
+    [!KEY_PATTERN.test(field.key), `invalid field key: ${JSON.stringify(field.key)}`],
+    [!FIELD_TYPES.includes(field.type), `unknown field type: ${JSON.stringify(field.type)}`],
+    [!field.label || !field.label['de']?.trim(), 'label (de) is required'],
+    [isChoice && !field.options?.length, `options are required for type '${field.type}'`],
+    [field.type === 'computed' && !field.compute, "compute is required for type 'computed'"],
+    [
+      !!field.isPromoted && !field.promoteTarget,
+      'promoteTarget is required when isPromoted is true',
+    ],
+    [
+      !!field.visibleIf && !validateJsonLogic(field.visibleIf),
+      'visibleIf is not a valid JsonLogic expression',
+    ],
+    [
+      !!field.compute && !validateJsonLogic(field.compute),
+      'compute is not a valid JsonLogic expression',
+    ],
+  ];
+  const errors = checks.filter(([failed]) => failed).map(([, message]) => message);
   return { valid: errors.length === 0, errors };
 }
 
 /** Find duplicate field keys across the whole form (UI hint). */
-export function duplicateKeys(fields: FormFieldDef[]): string[] {
+export function duplicateKeys(fields: readonly FormFieldDef[]): readonly string[] {
   const keys = fields.map((f) => f.key).filter(Boolean);
   return [...new Set(keys.filter((k) => keys.indexOf(k) !== keys.lastIndexOf(k)))].sort();
 }
@@ -125,7 +119,7 @@ export function duplicateKeys(fields: FormFieldDef[]): string[] {
  * `positions` field, because the funding is checked against the cost total.
  */
 export function fundingProblem(
-  fields: FormFieldDef[],
+  fields: readonly FormFieldDef[],
 ): 'admin.form.fundingTwice' | 'admin.form.fundingNoPositions' | null {
   const funding = fields.filter((f) => f.type === 'funding').length;
   if (funding > 1) return 'admin.form.fundingTwice';
@@ -142,35 +136,41 @@ export function fundingProblem(
  * `positions` or `funding` field promotes into `amount` automatically, without a flag.
  */
 export function normalizeFormField(field: FormFieldDef): FormFieldDef {
-  const out: FormFieldDef = { key: field.key, type: field.type, label: field.label };
-  if (field.help && Object.keys(field.help).length > 0) out.help = field.help;
-  if (field.required) out.required = true;
-  if (field.validation && Object.values(field.validation).some((v) => v != null && v !== '')) {
-    out.validation = field.validation;
-  }
-  if (field.options && field.options.length > 0) out.options = field.options;
-  if (field.visibleIf) out.visibleIf = field.visibleIf;
-  if (field.compute) out.compute = field.compute;
-  if (field.isPII) out.isPII = true;
-  if (field.isPromoted && (field.type === 'number' || field.type === 'currency')) {
-    out.isPromoted = true;
-    if (field.promoteTarget) out.promoteTarget = field.promoteTarget;
-  }
-  return out;
+  const hasValidation =
+    !!field.validation && Object.values(field.validation).some((v) => v != null && v !== '');
+  const promoted = !!field.isPromoted && (field.type === 'number' || field.type === 'currency');
+  return {
+    key: field.key,
+    type: field.type,
+    label: field.label,
+    ...(field.help && Object.keys(field.help).length > 0 ? { help: field.help } : {}),
+    ...(field.required ? { required: true } : {}),
+    ...(hasValidation ? { validation: field.validation } : {}),
+    ...(field.options && field.options.length > 0 ? { options: field.options } : {}),
+    ...(field.visibleIf ? { visibleIf: field.visibleIf } : {}),
+    ...(field.compute ? { compute: field.compute } : {}),
+    ...(field.isPII ? { isPII: true } : {}),
+    ...(promoted ? { isPromoted: true } : {}),
+    ...(promoted && field.promoteTarget ? { promoteTarget: field.promoteTarget } : {}),
+  };
 }
 
 export function blankField(type: FieldType = 'text', key = ''): FormFieldDef {
-  const field: FormFieldDef = { key, type, label: { de: '', en: '' } };
-  if (type === 'select' || type === 'multiselect') {
-    field.options = [{ value: '', label: { de: '', en: '' } }];
-  }
-  if (type === 'computed') {
-    field.compute = { var: '' };
-  }
-  return field;
+  return {
+    key,
+    type,
+    label: { de: '', en: '' },
+    ...(type === 'select' || type === 'multiselect'
+      ? { options: [{ value: '', label: { de: '', en: '' } }] }
+      : {}),
+    ...(type === 'computed' ? { compute: { var: '' } } : {}),
+  };
 }
 
-export function blankOption(): { value: string; label: { de: string; en: string } } {
+export function blankOption(): {
+  readonly value: string;
+  readonly label: { readonly de: string; readonly en: string };
+} {
   return { value: '', label: { de: '', en: '' } };
 }
 
@@ -182,8 +182,8 @@ export function blankOption(): { value: string; label: { de: string; en: string 
  */
 export interface QuestionGroup {
   /** The title per language. */
-  title: I18nMap;
-  fields: FormFieldDef[];
+  readonly title: I18nMap;
+  readonly fields: readonly FormFieldDef[];
 }
 
 /**
@@ -194,23 +194,21 @@ export interface QuestionGroup {
  * `validation._split_sections` in the backend, so the editor and the effective form use
  * the same step split.
  */
-export function groupsFromFields(fields: FormFieldDef[]): QuestionGroup[] {
-  const groups: QuestionGroup[] = [];
-  let current: QuestionGroup = { title: { de: '', en: '' }, fields: [] };
-  let opened = false;
-  for (const f of fields) {
-    if (f.type === 'section') {
-      if (opened || current.fields.length > 0) {
-        groups.push(current);
-      }
-      current = { title: { de: '', en: '', ...f.label }, fields: [] };
-      opened = true;
-      continue;
-    }
-    current.fields.push(f);
-  }
-  groups.push(current);
-  return groups;
+export function groupsFromFields(fields: readonly FormFieldDef[]): readonly QuestionGroup[] {
+  const markers = fields.flatMap((f, i) => (f.type === 'section' ? [i] : []));
+  const implicit: QuestionGroup = {
+    title: { de: '', en: '' },
+    fields: fields.slice(0, markers[0] ?? fields.length),
+  };
+  const sections = markers.map(
+    (m, j): QuestionGroup => ({
+      title: { de: '', en: '', ...fields[m].label },
+      fields: fields.slice(m + 1, markers[j + 1] ?? fields.length),
+    }),
+  );
+  return markers.length === 0
+    ? [implicit]
+    : [...(implicit.fields.length > 0 ? [implicit] : []), ...sections];
 }
 
 /**
@@ -222,29 +220,21 @@ export function groupsFromFields(fields: FormFieldDef[]): QuestionGroup[] {
  * exactly. Every further group gets a marker, and so does a first group **with** a title.
  * An empty group with a title only serializes to its marker alone.
  */
-export function groupsToFields(groups: QuestionGroup[]): FormFieldDef[] {
-  const out: FormFieldDef[] = [];
-  let n = 0;
-  groups.forEach((g, gi) => {
-    const hasTitle = Object.values(g.title).some(Boolean);
-    const needsMarker = gi > 0 || hasTitle;
-    if (needsMarker) {
-      n += 1;
-      out.push({
-        key: `section_${n}`,
-        type: 'section',
-        label: { ...g.title },
-      });
-    }
-    out.push(...g.fields);
-  });
-  return out;
+export function groupsToFields(groups: readonly QuestionGroup[]): readonly FormFieldDef[] {
+  const needsMarker = groups.map((g, gi) => gi > 0 || Object.values(g.title).some(Boolean));
+  const markerNumber = (gi: number): number => needsMarker.slice(0, gi + 1).filter(Boolean).length;
+  return groups.flatMap((g, gi): readonly FormFieldDef[] => [
+    ...(needsMarker[gi]
+      ? [{ key: `section_${markerNumber(gi)}`, type: 'section' as const, label: { ...g.title } }]
+      : []),
+    ...g.fields,
+  ]);
 }
 
 /** The place of a question: the index of its group and its index in the group. */
 export interface QuestionPos {
-  gi: number;
-  qi: number;
+  readonly gi: number;
+  readonly qi: number;
 }
 
 /**
@@ -261,13 +251,17 @@ export function moveQuestionTo(
   groups: readonly QuestionGroup[],
   from: QuestionPos,
   to: QuestionPos,
-): { groups: QuestionGroup[]; pos: QuestionPos } | null {
+): { readonly groups: QuestionGroup[]; readonly pos: QuestionPos } | null {
   const source = groups[from.gi];
   if (!source || from.qi < 0 || from.qi >= source.fields.length || !groups[to.gi]) return null;
-  const next = groups.map((g) => ({ ...g, fields: [...g.fields] }));
-  const [moved] = next[from.gi].fields.splice(from.qi, 1);
-  const target = next[to.gi].fields;
-  const qi = Math.max(0, Math.min(to.qi, target.length));
-  target.splice(qi, 0, moved);
+  const moved = source.fields[from.qi];
+  const without = groups.map((g, gi) => ({
+    ...g,
+    fields: gi === from.gi ? g.fields.filter((_, i) => i !== from.qi) : [...g.fields],
+  }));
+  const qi = Math.max(0, Math.min(to.qi, without[to.gi].fields.length));
+  const next = without.map((g, gi) =>
+    gi === to.gi ? { ...g, fields: [...g.fields.slice(0, qi), moved, ...g.fields.slice(qi)] } : g,
+  );
   return { groups: next, pos: { gi: to.gi, qi } };
 }

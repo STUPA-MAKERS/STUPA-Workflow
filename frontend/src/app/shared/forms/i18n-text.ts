@@ -9,11 +9,8 @@ import { fallbackChain } from '@core/i18n/i18n.service';
  */
 export function resolveI18n(map: I18nMap | null | undefined, lang: Lang): string {
   if (!map) return '';
-  for (const code of fallbackChain(lang)) {
-    if (code in map) return map[code] ?? '';
-  }
-  const first = Object.values(map)[0];
-  return first ?? '';
+  const code = fallbackChain(lang).find((c) => c in map);
+  return code === undefined ? (Object.values(map)[0] ?? '') : (map[code] ?? '');
 }
 
 /**
@@ -23,11 +20,11 @@ export function resolveI18n(map: I18nMap | null | undefined, lang: Lang): string
  * with only an `en` label reads as its key in German, and an empty label counts as missing.
  */
 export function i18nLabel(map: I18nMap | null | undefined, lang: Lang, fallback: string): string {
-  for (const code of fallbackChain(lang)) {
-    const text = map?.[code];
-    if (text) return text;
-  }
-  return fallback;
+  return (
+    fallbackChain(lang)
+      .map((code) => map?.[code])
+      .find((text) => !!text) ?? fallback
+  );
 }
 
 /** The label of the field of one language: `Bezeichnung (DE)`, `Bezeichnung (PT-BR)`. */
@@ -41,9 +38,10 @@ export function langFieldLabel(label: string, lang: Lang): string {
  * an empty text. DE and EN keep an empty entry, as the editors always wrote them.
  */
 export function setI18n(map: I18nMap | null | undefined, lang: Lang, text: string): I18nMap {
-  const next: I18nMap = { ...map, [lang]: text };
-  if (text === '' && lang !== 'de' && lang !== 'en') delete next[lang];
-  return next;
+  const drop = text === '' && lang !== 'de' && lang !== 'en';
+  return drop
+    ? Object.fromEntries(Object.entries(map ?? {}).filter(([code]) => code !== lang))
+    : { ...map, [lang]: text };
 }
 
 /** The two maps have the same text in every language. A missing entry equals an empty one. */
@@ -54,9 +52,9 @@ export function sameI18n(a: I18nMap | null | undefined, b: I18nMap | null | unde
 
 /** The map with each text trimmed and without the empty ones. */
 export function trimI18n(map: I18nMap | null | undefined): I18nMap {
-  const out: I18nMap = {};
-  for (const [code, text] of Object.entries(map ?? {})) {
-    if (text.trim()) out[code] = text.trim();
-  }
-  return out;
+  return Object.fromEntries(
+    Object.entries(map ?? {})
+      .filter(([, text]) => text.trim())
+      .map(([code, text]) => [code, text.trim()]),
+  );
 }

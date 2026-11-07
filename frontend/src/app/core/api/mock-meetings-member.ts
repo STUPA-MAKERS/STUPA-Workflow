@@ -102,25 +102,25 @@ function liveMeeting(live: MeetingOutWire): MeetingOutWire {
 }
 
 /** The members of the mock gremium (without the demo user) and the substitutes. */
-const MEMBERS: DelegationRecipient[] = [
+const MEMBERS: readonly DelegationRecipient[] = [
   { principalId: 'p-2', displayName: 'Max Mustermann', viaPool: false, isMember: true },
   { principalId: 'p-3', displayName: 'Erika Beispiel', viaPool: false, isMember: true },
   { principalId: 'p-4', displayName: 'Uli Übernahme', viaPool: false, isMember: true },
   { principalId: 'p-5', displayName: 'Rolf Redner', viaPool: false, isMember: true },
   { principalId: 'p-8', displayName: 'Fritz Fehlend', viaPool: false, isMember: true },
 ];
-const SUBSTITUTES: DelegationRecipient[] = [
+const SUBSTITUTES: readonly DelegationRecipient[] = [
   { principalId: 'p-7', displayName: 'Sven Stellvertreter', viaPool: true, isMember: false },
   { principalId: 'p-10', displayName: 'Emma Vogel', viaPool: true, isMember: false },
 ];
 /** The personal pool entries of the missing members of the live meeting. */
-const PERSONAL: Record<string, DelegationRecipient[]> = {
+const PERSONAL: Record<string, readonly DelegationRecipient[]> = {
   'p-8': [{ principalId: 'p-11', displayName: 'Paula Persönlich', viaPool: true, isMember: false }],
   'p-9': [{ principalId: 'p-12', displayName: 'Karl Kern', viaPool: true, isMember: false }],
 };
 
 /** The pool of one member for the lead entry: the personal and the gremium-wide entries. */
-function poolOf(delegatorId: string): DelegationRecipient[] {
+function poolOf(delegatorId: string): readonly DelegationRecipient[] {
   return [...(PERSONAL[delegatorId] ?? []), ...SUBSTITUTES].sort((a, b) =>
     (a.displayName ?? '').localeCompare(b.displayName ?? ''),
   );
@@ -135,26 +135,26 @@ function context(
   const planned = meetingId === MEMBER_PLANNED_ID;
   const started = !planned && meetingId !== 'd0000000-0000-0000-0000-000000000002';
   const mine = delegations.filter((d) => d.meetingId === meetingId);
-  const incoming = mine.filter((d) => d.delegateId === 'me' || d.delegateId === DEMO_SUB);
-  if (meetingId === LIVE_MEETING_ID || meetingId === MEMBER_LIVE_ID) {
-    incoming.push({
-      id: 'f0000000-0000-0000-0000-000000000010',
-      meetingId,
-      meetingTitle: live.title,
-      meetingDate: live.date ?? null,
-      gremiumId: 'g0000000-0000-0000-0000-000000000001',
-      gremiumName: 'Studierendenparlament',
-      delegatorId: 'p-3',
-      delegatorName: 'Erika Beispiel',
-      delegateId: DEMO_SUB,
-      delegateName: 'Demo Mitglied',
-      delegateVoting: true,
-      viaPool: false,
-      createdAt: at(-2, 9, 0),
-      revocable: false,
-      direction: 'incoming',
-    });
-  }
+  const received = mine.filter((d) => d.delegateId === 'me' || d.delegateId === DEMO_SUB);
+  const proxy: Delegation = {
+    id: 'f0000000-0000-0000-0000-000000000010',
+    meetingId,
+    meetingTitle: live.title,
+    meetingDate: live.date ?? null,
+    gremiumId: 'g0000000-0000-0000-0000-000000000001',
+    gremiumName: 'Studierendenparlament',
+    delegatorId: 'p-3',
+    delegatorName: 'Erika Beispiel',
+    delegateId: DEMO_SUB,
+    delegateName: 'Demo Mitglied',
+    delegateVoting: true,
+    viaPool: false,
+    createdAt: at(-2, 9, 0),
+    revocable: false,
+    direction: 'incoming',
+  };
+  const isLive = meetingId === LIVE_MEETING_ID || meetingId === MEMBER_LIVE_ID;
+  const incoming = isLive ? [...received, proxy] : received;
   return {
     meetingId,
     gremiumId: planned ? 'g0000000-0000-0000-0000-000000000002' : 'g0000000-0000-0000-0000-000000000001',
@@ -198,7 +198,7 @@ export function memberMeetingGet(
 export function memberDelegationCreate(
   body: unknown,
   seq: number,
-  roster: readonly { principalId: string; displayName: string | null }[],
+  roster: readonly { readonly principalId: string; readonly displayName: string | null }[],
 ): Delegation {
   const {
     meetingId = '',

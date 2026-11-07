@@ -7,7 +7,7 @@ also holds the pure module-level field and data helpers.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping, Set
 from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
@@ -73,9 +73,7 @@ def _field_from_row(row: FormField) -> FormFieldDef:
 
 def _title_of(data: dict[str, Any] | None) -> str | None:
     """Read the application title from the `title` system field, for the list views."""
-    if not data:
-        return None
-    value = data.get("title")
+    value = (data or {}).get("title")
     return value.strip() if isinstance(value, str) and value.strip() else None
 
 
@@ -122,7 +120,6 @@ APPLICANT_ACTOR = "applicant"
 #: Actor value of an automatic action. The plain value is ``system``; a source adds a
 #: suffix, for example ``system:deadlines``.
 SYSTEM_ACTOR = "system"
-_SYSTEM_PREFIX = SYSTEM_ACTOR + ":"
 #: The key of the plain ``system`` actor in `ActorOut.key`.
 SYSTEM_AUTO_KEY = "auto"
 
@@ -132,11 +129,8 @@ def system_actor_key(value: str) -> str | None:
 
     ``system`` gives ``auto``. ``system:deadlines`` gives ``deadlines``.
     """
-    if value == SYSTEM_ACTOR:
-        return SYSTEM_AUTO_KEY
-    if value.startswith(_SYSTEM_PREFIX):
-        return value[len(_SYSTEM_PREFIX) :] or SYSTEM_AUTO_KEY
-    return None
+    head, _sep, key = value.partition(":")
+    return (key or SYSTEM_AUTO_KEY) if head == SYSTEM_ACTOR else None
 
 
 async def gremium_actor_name(session: AsyncSession, gremium_id: UUID | None) -> str | None:
@@ -174,7 +168,7 @@ async def pii_keys_for_type(session: AsyncSession, type_id: UUID) -> set[str]:
     return set(rows)
 
 
-def _without_keys(data: dict[str, Any] | None, keys: set[str]) -> dict[str, Any]:
+def _without_keys(data: Mapping[str, Any] | None, keys: Set[str]) -> dict[str, Any]:
     """Return a copy of ``data`` without ``keys``."""
     return {k: v for k, v in (data or {}).items() if k not in keys}
 
@@ -190,7 +184,7 @@ def _whitelist(fields: list[FormFieldDef], data: dict[str, Any]) -> dict[str, An
     return {k: v for k, v in data.items() if k in known}
 
 
-def _scrub_diff(diff: dict[str, Any], pii_keys: set[str]) -> dict[str, Any]:
+def _scrub_diff(diff: Mapping[str, Any], pii_keys: Set[str]) -> dict[str, Any]:
     """Drop the PII field keys from a stored `DataDiff`.
 
     The function covers the added, removed and changed buckets. A diff value carries
@@ -325,7 +319,7 @@ class ApplicationsServiceBase:
         rows = (
             await self.session.execute(select(sq.c.app_id, sq.c.since).where(sq.c.app_id.in_(ids)))
         ).all()
-        return {app_id: since for app_id, since in rows}
+        return dict(rows)
 
     async def _gremium_actor(self, app: Application) -> str | None:
         """Return the name of the Gremium of the application.
@@ -335,7 +329,9 @@ class ApplicationsServiceBase:
         """
         return await gremium_actor_name(self.session, app.gremium_id)
 
-    async def _applicant_actors(self, app: Application, *, magic_link_view: bool) -> set[str]:
+    async def _applicant_actors(
+        self, app: Application, *, magic_link_view: bool
+    ) -> frozenset[str]:
         """Return the actor values that name the applicant of one application.
 
         The applicant view keeps these actors and shows the Gremium for all others.
@@ -348,7 +344,7 @@ class ApplicationsServiceBase:
         person, and the creator is a member like any other. The comparison ignores
         case, as the create route does.
         """
-        own = {APPLICANT_ACTOR}
+        own = frozenset({APPLICANT_ACTOR})
         if app.created_by is None:
             return own
         if not magic_link_view:
@@ -361,13 +357,12 @@ class ApplicationsServiceBase:
         applicant_email = await self.session.scalar(
             select(Applicant.email).where(Applicant.application_id == app.id)
         )
-        if (
+        same_person = bool(
             creator_email
             and applicant_email
             and creator_email.casefold() == applicant_email.casefold()
-        ):
-            own.add(app.created_by)
-        return own
+        )
+        return own | {app.created_by} if same_person else own
 
     async def _to_out(
         self,
@@ -395,19 +390,24 @@ class ApplicationsServiceBase:
         since = (await self._state_since_map([app.id])).get(app.id, app.created_at)
         hidden = await self._pii_keys_for_type(app.type_id) if strip_pii_fields else set()
         data = _without_keys(app.data, hidden) if hidden else app.data
-        applicant_out: ApplicantOut | None = None
-        if include_pii:
-            applicant = (
+        applicant = (
+            (
                 await self.session.execute(
                     select(Applicant).where(Applicant.application_id == app.id)
                 )
             ).scalar_one_or_none()
-            if applicant is not None:
-                applicant_out = ApplicantOut(
-                    email=applicant.email,
-                    name=applicant.name,
-                    anonymized=applicant.anonymized_at is not None,
-                )
+            if include_pii
+            else None
+        )
+        applicant_out = (
+            ApplicantOut(
+                email=applicant.email,
+                name=applicant.name,
+                anonymized=applicant.anonymized_at is not None,
+            )
+            if applicant is not None
+            else None
+        )
         return ApplicationOut(
             id=app.id,
             typeId=app.type_id,
@@ -429,7 +429,7 @@ class ApplicationsServiceBase:
             isOwner=is_owner,
             archivedAt=app.archived_at,
             stateSince=since,
-            hiddenKeys=sorted(hidden),
+            hiddenKeys=tuple(sorted(hidden)),
             capture=await self._capture_out(
                 app, applicant_view=applicant_view, magic_link_view=magic_link_view
             ),
@@ -491,11 +491,8 @@ class ApplicationsServiceBase:
         """
         from app.modules.auth.identity import refs_by_sub
 
-        out: dict[str, tuple[str, UUID]] = {}
-        for sub, ref in (await refs_by_sub(self.session, subs)).items():
-            if ref.name:
-                out[sub] = (ref.name, ref.id)
-        return out
+        refs = await refs_by_sub(self.session, subs)
+        return {sub: (ref.name, ref.id) for sub, ref in refs.items() if ref.name}
 
     async def _resolve_actors(
         self,
@@ -516,11 +513,11 @@ class ApplicationsServiceBase:
         if not wanted:
             return {}
         own = await self._applicant_actors(app, magic_link_view=magic_link_view)
-        gremium: ActorOut | None = None
-        if applicant_view and any(v not in own for v in wanted):
-            gremium = ActorOut(
-                kind="gremium", displayName=await self._gremium_actor(app)
-            )
+        gremium = (
+            ActorOut(kind="gremium", displayName=await self._gremium_actor(app))
+            if applicant_view and any(v not in own for v in wanted)
+            else None
+        )
         subs = {
             v
             for v in wanted
@@ -529,17 +526,27 @@ class ApplicationsServiceBase:
             and not (gremium is not None and v not in own)
         }
         refs = await self._author_refs(subs)
-        out: dict[str, ActorOut] = {}
-        for v in wanted:
-            if gremium is not None and v not in own:
-                out[v] = gremium
-            elif v == APPLICANT_ACTOR:
-                out[v] = ActorOut(kind="applicant")
-            elif (key := system_actor_key(v)) is not None:
-                out[v] = ActorOut(kind="system", key=key)
-            elif v in refs:
-                name, pid = refs[v]
-                out[v] = ActorOut(kind="principal", displayName=name, principalId=pid)
-            else:
-                out[v] = ActorOut(kind="deleted")
-        return out
+        return {
+            v: _actor_out(v, gremium if v not in own else None, refs.get(v)) for v in wanted
+        }
+
+
+def _actor_out(
+    value: str, gremium: ActorOut | None, ref: tuple[str, UUID] | None
+) -> ActorOut:
+    """Resolve one stored actor value.
+
+    ``gremium`` is the Gremium actor that replaces a member in the applicant view, else
+    None. ``ref`` is the name and the principal id of the account of the value, if any.
+    """
+    match (gremium, value == APPLICANT_ACTOR, system_actor_key(value), ref):
+        case (ActorOut() as shown, _, _, _):
+            return shown
+        case (None, True, _, _):
+            return ActorOut(kind="applicant")
+        case (None, False, str() as key, _):
+            return ActorOut(kind="system", key=key)
+        case (None, False, None, (name, pid)):
+            return ActorOut(kind="principal", displayName=name, principalId=pid)
+        case _:
+            return ActorOut(kind="deleted")

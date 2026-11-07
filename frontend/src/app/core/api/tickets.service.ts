@@ -16,6 +16,7 @@ import type { IsoDateTime, MessageAttachment, MessageFiles, PersonRef, ScanState
 import { messageFiles } from '@core/api/mappers';
 import { skipLoading } from '@stupa-makers/ui-kit';
 import { detailContext } from '@core/cache/cache.interceptor';
+import { httpParams } from './http-params';
 
 export type TicketKind = 'bug' | 'question' | 'idea';
 export type TicketStatus = 'new' | 'in_progress' | 'done' | 'rejected';
@@ -25,63 +26,63 @@ export const TICKET_KINDS: readonly TicketKind[] = ['bug', 'question', 'idea'];
 
 /** What the dialog sends along: every field optional, capped by the server. */
 export interface TicketContext {
-  url?: string;
-  route?: string;
-  appVersion?: string;
-  userAgent?: string;
-  viewport?: string;
-  language?: string;
-  colorScheme?: 'light' | 'dark';
+  readonly url?: string;
+  readonly route?: string;
+  readonly appVersion?: string;
+  readonly userAgent?: string;
+  readonly viewport?: string;
+  readonly language?: string;
+  readonly colorScheme?: 'light' | 'dark';
 }
 
 export interface TicketCreate {
-  kind: TicketKind;
-  title: string;
-  body: string;
+  readonly kind: TicketKind;
+  readonly title: string;
+  readonly body: string;
   /** Required without a session; the server ignores it with one. */
-  email?: string | null;
-  context: TicketContext;
-  attachmentIds?: Uuid[];
-  draftToken?: string | null;
+  readonly email?: string | null;
+  readonly context: TicketContext;
+  readonly attachmentIds?: readonly Uuid[];
+  readonly draftToken?: string | null;
   /** Required without a session. */
-  altcha?: string | null;
+  readonly altcha?: string | null;
 }
 
 /** The only answer to the reporter: the number, for example "T-0042". */
 export interface TicketCreated {
-  number: string;
+  readonly number: string;
 }
 
 export interface TicketReporter {
-  principalId: Uuid | null;
-  displayName: string | null;
+  readonly principalId: Uuid | null;
+  readonly displayName: string | null;
   /** The account e-mail or the given e-mail; null after the anonymization. */
-  email: string | null;
-  anonymized: boolean;
+  readonly email: string | null;
+  readonly anonymized: boolean;
 }
 
 export interface TicketListItem {
-  id: Uuid;
-  number: string;
-  kind: TicketKind;
-  title: string;
-  status: TicketStatus;
-  reporter: TicketReporter;
-  assignee: PersonRef | null;
-  createdAt: IsoDateTime;
-  updatedAt: IsoDateTime;
+  readonly id: Uuid;
+  readonly number: string;
+  readonly kind: TicketKind;
+  readonly title: string;
+  readonly status: TicketStatus;
+  readonly reporter: TicketReporter;
+  readonly assignee: PersonRef | null;
+  readonly createdAt: IsoDateTime;
+  readonly updatedAt: IsoDateTime;
 }
 
 /** A file of the report. Only a `clean` file downloads, streamed through the API. */
 export interface TicketAttachment {
-  id: Uuid;
-  filename: string;
-  mime: string;
-  size: number;
+  readonly id: Uuid;
+  readonly filename: string;
+  readonly mime: string;
+  readonly size: number;
   /** The scan ended; it does not say whether it found anything. */
-  scanned: boolean;
+  readonly scanned: boolean;
   /** The three-state scan of the server, as on a message file. */
-  scanState?: ScanState;
+  readonly scanState?: ScanState;
 }
 
 export type TicketEventKind = 'created' | 'status' | 'assignee' | 'kind' | 'todo_done';
@@ -89,62 +90,66 @@ export type TicketEventKind = 'created' | 'status' | 'assignee' | 'kind' | 'todo
 /** The payloads of the event kinds, all optional so one type reads every kind. */
 export interface TicketEventPayload {
   /** created */
-  confirmationSent?: boolean;
+  readonly confirmationSent?: boolean;
   /** status, assignee, kind */
-  from?: TicketStatus | TicketKind | PersonRef | null;
-  to?: TicketStatus | TicketKind | PersonRef | null;
+  readonly from?: TicketStatus | TicketKind | PersonRef | null;
+  readonly to?: TicketStatus | TicketKind | PersonRef | null;
   /** status: the number of the ticket this one duplicates. */
-  duplicateOf?: string;
+  readonly duplicateOf?: string;
   /** todo_done */
-  cardId?: Uuid;
-  cardTitle?: string | null;
-  boardId?: Uuid;
+  readonly cardId?: Uuid;
+  readonly cardTitle?: string | null;
+  readonly boardId?: Uuid;
 }
 
 export interface TicketEvent {
-  id: Uuid;
-  kind: TicketEventKind;
+  readonly id: Uuid;
+  readonly kind: TicketEventKind;
   /** null: the system. */
-  actor: PersonRef | null;
-  at: IsoDateTime;
-  payload: TicketEventPayload;
+  readonly actor: PersonRef | null;
+  readonly at: IsoDateTime;
+  readonly payload: TicketEventPayload;
 }
 
 /** `internal`: the holders of `ticket.manage` only; `public`: the reporter account too. */
 export type TicketNoteVisibility = 'internal' | 'public';
 
 export interface TicketNote {
-  id: Uuid;
-  author: PersonRef;
-  body: string;
-  at: IsoDateTime;
-  editedAt: IsoDateTime | null;
-  isOwn: boolean;
+  readonly id: Uuid;
+  readonly author: PersonRef;
+  readonly body: string;
+  readonly at: IsoDateTime;
+  readonly editedAt: IsoDateTime | null;
+  readonly isOwn: boolean;
   /** The files of the note, oldest first. */
-  attachments: MessageAttachment[];
+  readonly attachments: readonly MessageAttachment[];
   /** Absent on an older server: internal. */
-  visibility?: TicketNoteVisibility;
+  readonly visibility?: TicketNoteVisibility;
   /** The reporter wrote it. */
-  fromReporter?: boolean;
+  readonly fromReporter?: boolean;
   /** The people the note mentions; empty for the reporter. */
-  mentions?: PersonRef[];
+  readonly mentions?: readonly PersonRef[];
 }
 
 export interface TicketDetail extends TicketListItem {
-  body: string;
-  context: TicketContext;
-  attachments: TicketAttachment[];
-  notes: TicketNote[];
-  events: TicketEvent[];
-  duplicateOf: { id: Uuid; number: string } | null;
+  readonly body: string;
+  readonly context: TicketContext;
+  readonly attachments: readonly TicketAttachment[];
+  readonly notes: readonly TicketNote[];
+  readonly events: readonly TicketEvent[];
+  readonly duplicateOf: { readonly id: Uuid; readonly number: string } | null;
   /** The application or meeting of `context.route`, when the viewer may read it. */
-  contextTarget: { kind: 'application' | 'meeting'; id: Uuid; title: string } | null;
+  readonly contextTarget: {
+    readonly kind: 'application' | 'meeting';
+    readonly id: Uuid;
+    readonly title: string;
+  } | null;
   /** Linked cards that are open and readable. */
-  openTodoCount: number;
-  closedAt: IsoDateTime | null;
-  anonymizedAt: IsoDateTime | null;
+  readonly openTodoCount: number;
+  readonly closedAt: IsoDateTime | null;
+  readonly anonymizedAt: IsoDateTime | null;
   /** The reporter is blocked; false for an anonymized ticket. */
-  senderBlocked: boolean;
+  readonly senderBlocked: boolean;
 }
 
 /**
@@ -152,91 +157,96 @@ export interface TicketDetail extends TicketListItem {
  * but nothing is stored and no mail goes out.
  */
 export interface TicketBlockedSender {
-  id: Uuid;
-  kind: 'principal' | 'email';
+  readonly id: Uuid;
+  readonly kind: 'principal' | 'email';
   /** kind `principal`. */
-  person: PersonRef | null;
+  readonly person: PersonRef | null;
   /** kind `email`: the stored address; kind `principal`: the account e-mail. */
-  email: string | null;
+  readonly email: string | null;
   /** null: a deleted person. */
-  blockedBy: PersonRef | null;
-  blockedAt: IsoDateTime;
+  readonly blockedBy: PersonRef | null;
+  readonly blockedAt: IsoDateTime;
   /** null after the ticket is gone. */
-  sourceTicket: { id: Uuid; number: string } | null;
+  readonly sourceTicket: { readonly id: Uuid; readonly number: string } | null;
   /** Reports held back since the block. */
-  hitCount: number;
-  lastHitAt: IsoDateTime | null;
+  readonly hitCount: number;
+  readonly lastHitAt: IsoDateTime | null;
 }
 
 /** A ticket in the list of its reporter: no reporter, no assignee. */
 export interface MyTicketItem {
-  id: Uuid;
-  number: string;
-  kind: TicketKind;
-  title: string;
-  status: TicketStatus;
-  createdAt: IsoDateTime;
-  updatedAt: IsoDateTime;
+  readonly id: Uuid;
+  readonly number: string;
+  readonly kind: TicketKind;
+  readonly title: string;
+  readonly status: TicketStatus;
+  readonly createdAt: IsoDateTime;
+  readonly updatedAt: IsoDateTime;
 }
 
 /** The own ticket of a reporter: the report, the public notes and the status changes. */
 export interface MyTicketDetail extends MyTicketItem {
-  body: string;
-  attachments: TicketAttachment[];
-  notes: TicketNote[];
+  readonly body: string;
+  readonly attachments: readonly TicketAttachment[];
+  readonly notes: readonly TicketNote[];
   /** Status changes only, without an actor. */
-  events: { id: Uuid; kind: 'status'; at: IsoDateTime; payload: TicketEventPayload }[];
-  closedAt: IsoDateTime | null;
+  readonly events: readonly {
+    readonly id: Uuid;
+    readonly kind: 'status';
+    readonly at: IsoDateTime;
+    readonly payload: TicketEventPayload;
+  }[];
+  readonly closedAt: IsoDateTime | null;
   /** False while a block holds back the reporter. */
-  canReply: boolean;
+  readonly canReply: boolean;
 }
 
 export interface MyTicketPage {
-  items: MyTicketItem[];
-  total: number;
-  limit: number;
-  offset: number;
+  readonly items: readonly MyTicketItem[];
+  readonly total: number;
+  readonly limit: number;
+  readonly offset: number;
 }
 
 export interface TicketPatch {
-  status?: TicketStatus;
+  readonly status?: TicketStatus;
   /** Explicit null unassigns. */
-  assigneeId?: Uuid | null;
-  kind?: TicketKind;
+  readonly assigneeId?: Uuid | null;
+  readonly kind?: TicketKind;
   /** Only with status `rejected`. */
-  duplicateOfId?: Uuid;
+  readonly duplicateOfId?: Uuid;
   /** Only with status `done` or `rejected`. */
-  completeTodos?: boolean;
+  readonly completeTodos?: boolean;
 }
 
 export interface TicketCounts {
-  new: number;
-  inProgress: number;
-  done: number;
-  rejected: number;
+  readonly new: number;
+  readonly inProgress: number;
+  readonly done: number;
+  readonly rejected: number;
 }
 
 /** A quiet read; `detail` also keeps it in the HTTP cache. */
-function readContext(opts: { detail?: boolean }): HttpContext {
+function readContext(opts: { readonly detail?: boolean }): HttpContext {
   return opts.detail ? detailContext() : skipLoading();
 }
 
 /** The filters of `GET /tickets`. */
 export interface TicketQuery {
-  status?: readonly TicketStatus[];
-  kind?: readonly TicketKind[];
+  readonly status?: readonly TicketStatus[];
+  readonly kind?: readonly TicketKind[];
   /** A principal id, `me` or `none`. */
-  assignee?: string | null;
-  q?: string | null;
-  limit?: number;
-  offset?: number;
+  readonly assignee?: string | null;
+  readonly q?: string | null;
+  readonly limit?: number;
+  readonly offset?: number;
 }
 
 export interface TicketPage {
-  items: TicketListItem[];
-  total: number;
-  limit: number;
-  offset: number;
+  readonly items: readonly TicketListItem[];
+  readonly total: number;
+  readonly limit: number;
+  readonly offset: number;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -359,13 +369,12 @@ export class TicketsApiService {
 
 /** The query params of a ticket list. */
 function queryParams(query: TicketQuery): HttpParams {
-  let params = new HttpParams();
-  for (const s of query.status ?? []) params = params.append('status', s);
-  for (const k of query.kind ?? []) params = params.append('kind', k);
-  if (query.assignee) params = params.set('assignee', query.assignee);
-  const q = query.q?.trim();
-  if (q) params = params.set('q', q);
-  if (query.limit !== undefined) params = params.set('limit', query.limit);
-  if (query.offset !== undefined) params = params.set('offset', query.offset);
-  return params;
+  return httpParams({
+    status: query.status ?? [],
+    kind: query.kind ?? [],
+    assignee: query.assignee || undefined,
+    q: query.q?.trim() || undefined,
+    limit: query.limit,
+    offset: query.offset,
+  });
 }

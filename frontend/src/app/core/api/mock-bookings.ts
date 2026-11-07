@@ -25,21 +25,18 @@ const FY = 'f1000000-0000-0000-0000-000000000001';
 const cc = (suffix: string): string => `b1000000-0000-0000-0000-0000000000${suffix}`;
 
 interface NodeInfo {
-  pathKey: string;
-  name: string;
+  readonly pathKey: string;
+  readonly name: string;
 }
 
 /** The path and the name of every cost centre of the demo tree, by id. */
-function nodeIndex(): Map<string, NodeInfo> {
-  const out = new Map<string, NodeInfo>();
-  const walk = (nodes: typeof MOCK_BUDGET_TREE): void => {
-    for (const n of nodes) {
-      out.set(n.id, { pathKey: n.pathKey, name: n.name });
-      walk(n.children);
-    }
-  };
-  walk(MOCK_BUDGET_TREE);
-  return out;
+function nodeIndex(): ReadonlyMap<string, NodeInfo> {
+  const entries = (nodes: typeof MOCK_BUDGET_TREE): readonly (readonly [string, NodeInfo])[] =>
+    nodes.flatMap((n) => [
+      [n.id, { pathKey: n.pathKey, name: n.name }] as const,
+      ...entries(n.children),
+    ]);
+  return new Map(entries(MOCK_BUDGET_TREE));
 }
 
 const NODES = nodeIndex();
@@ -50,17 +47,13 @@ function node(id: string): NodeInfo {
 }
 
 /** The ids of a cost centre and all cost centres below it. */
-function subtree(id: string): Set<string> {
-  const ids = new Set<string>();
-  const add = (nodes: typeof MOCK_BUDGET_TREE, inside: boolean): void => {
-    for (const n of nodes) {
+function subtree(id: string): ReadonlySet<string> {
+  const collect = (nodes: typeof MOCK_BUDGET_TREE, inside: boolean): readonly string[] =>
+    nodes.flatMap((n) => {
       const hit = inside || n.id === id;
-      if (hit) ids.add(n.id);
-      add(n.children, hit);
-    }
-  };
-  add(MOCK_BUDGET_TREE, false);
-  return ids;
+      return [...(hit ? [n.id] : []), ...collect(n.children, hit)];
+    });
+  return new Set(collect(MOCK_BUDGET_TREE, false));
 }
 
 const INV = {
@@ -102,7 +95,7 @@ function expense(row: Row): Expense {
 
 const PARENT = 'e1000000-0000-0000-0000-000000000002';
 
-const EXPENSES: Expense[] = [
+const EXPENSES: readonly Expense[] = [
   expense({
     id: 'e1000000-0000-0000-0000-000000000001',
     description: 'Werkzeugsatz für die Projektwerkstatt',
@@ -210,7 +203,7 @@ const EXPENSES: Expense[] = [
   }),
 ];
 
-const SUB_BOOKINGS: Expense[] = [
+const SUB_BOOKINGS: readonly Expense[] = [
   expense({
     id: 'e1000000-0000-0000-0000-000000000021',
     description: 'Rahmen 60 × 90 cm',
@@ -229,7 +222,7 @@ const SUB_BOOKINGS: Expense[] = [
   }),
 ];
 
-const TRANSFERS: BudgetTransfer[] = [
+const TRANSFERS: readonly BudgetTransfer[] = [
   {
     transferId: 't1000000-0000-0000-0000-000000000001',
     expenseId: 'e1000000-0000-0000-0000-000000000031',
@@ -289,7 +282,7 @@ function invoice(row: InvoiceRow): Invoice {
   };
 }
 
-const INVOICES: Invoice[] = [
+const INVOICES: readonly Invoice[] = [
   invoice({
     id: INV.copy,
     number: 'K-2026-311',
@@ -354,7 +347,7 @@ const INVOICES: Invoice[] = [
   }),
 ];
 
-function page<T>(rows: T[], params: URLSearchParams): { items: T[]; total: number; limit: number; offset: number } {
+function page<T>(rows: readonly T[], params: URLSearchParams) {
   const limit = Number(params.get('limit') ?? 20);
   const offset = Number(params.get('offset') ?? 0);
   return { items: rows.slice(offset, offset + limit), total: rows.length, limit, offset };
@@ -382,7 +375,7 @@ export function mockExpenses(params: URLSearchParams): ExpensePage {
 }
 
 /** GET /budget-expenses/{id}/sub-bookings. */
-export function mockSubBookings(parentId: string): Expense[] {
+export function mockSubBookings(parentId: string): readonly Expense[] {
   return SUB_BOOKINGS.filter((e) => e.parentExpenseId === parentId);
 }
 

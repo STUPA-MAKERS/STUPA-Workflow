@@ -141,7 +141,7 @@ export class MeetingPageComponent {
   readonly saveState = input.required<SaveState>();
   readonly attendance = input.required<Attendance[]>();
   readonly savingAttendance = input.required<boolean>();
-  readonly viewers = input.required<string[]>();
+  readonly viewers = input.required<readonly string[]>();
   readonly casting = input.required<Uuid | null>();
   readonly deletingVote = input.required<Uuid | null>();
   readonly finalizing = input.required<boolean>();
@@ -269,19 +269,21 @@ export class MeetingPageComponent {
   protected readonly subLine = computed(() => {
     const m = this.meeting();
     const locale = this.i18n.formatLocale();
-    const parts: string[] = [];
-    if (m.gremiumName) parts.push(m.gremiumName);
-    if (m.date) parts.push(this.dateText(m.date));
     const started = clock(m.startedAt, locale);
-    if (m.status === 'live' && started) {
-      parts.push(this.i18n.translate('meetings.page.since', { time: started }));
-    } else if (m.status === 'closed' && started) {
-      const closed = clock(m.closedAt, locale);
-      parts.push(closed ? `${started}–${closed}` : started);
-    } else if (m.startTime) {
-      parts.push(m.startTime.slice(0, 5));
-    }
-    return parts.join(' · ');
+    const closed = clock(m.closedAt, locale);
+    const time =
+      m.status === 'live' && started
+        ? [this.i18n.translate('meetings.page.since', { time: started })]
+        : m.status === 'closed' && started
+          ? [closed ? `${started}–${closed}` : started]
+          : m.startTime
+            ? [m.startTime.slice(0, 5)]
+            : [];
+    return [
+      ...(m.gremiumName ? [m.gremiumName] : []),
+      ...(m.date ? [this.dateText(m.date)] : []),
+      ...time,
+    ].join(' · ');
   });
 
   /** Presence is shown to the people who run the meeting, while it is live. */
@@ -325,64 +327,70 @@ export class MeetingPageComponent {
    *
    * The beamer route and its stream need session.manage in the gremium.
    */
-  protected readonly menu = computed<RowMenuSection[]>(() => {
+  protected readonly menu = computed<readonly RowMenuSection[]>(() => {
     const m = this.meeting();
     const t = (key: Parameters<I18nService['translate']>[0]): string => this.i18n.translate(key);
-    const main: RowMenuItem[] = [];
-    if (this.mainAction() === 'open') {
-      main.push({
+    const when = (on: boolean, item: RowMenuItem): readonly RowMenuItem[] => (on ? [item] : []);
+    // A phone dock holds the attendance and the votes as icon buttons; it is hidden only while a
+    // planned meeting has no item open (no agenda yet).
+    const noDock = this.phone() && m.status === 'planned' && !this.top();
+    const keeper =
+      (m.status === 'planned' && m.canManage) ||
+      (m.status === 'live' && (m.canManage || m.isProtokollant));
+    const main: readonly RowMenuItem[] = [
+      ...when(this.mainAction() === 'open', {
         id: 'open',
         label: t('meetings.control.open'),
         icon: 'play',
         disabledReason: m.protokollantId
           ? this.opensAtText() || null
           : t('meetings.control.needProtokollant'),
-      });
-    }
-    // Below the wide layout the agenda is a sheet, and the menu opens it.
-    if (!this.wide()) main.push({ id: 'agenda', label: t('meetings.agenda.title'), icon: 'list' });
-    if (m.canManage) main.push({ id: 'settings', label: t('meetings.settings.title'), icon: 'edit' });
-    // A phone dock holds the attendance and the votes as icon buttons; it is hidden only while a
-    // planned meeting has no item open (no agenda yet).
-    const noDock = this.phone() && m.status === 'planned' && !this.top();
-    if (!this.phone() || noDock) {
-      main.push({ id: 'attendance', label: t('meetings.page.recordAttendance'), icon: 'users' });
-    }
-    if (noDock && this.showVotes()) {
-      main.push({ id: 'votes', label: t('meetings.vote.count'), icon: 'vote' });
-    }
-    const keeper =
-      (m.status === 'planned' && m.canManage) ||
-      (m.status === 'live' && (m.canManage || m.isProtokollant));
-    if (this.phone() && keeper) {
-      main.push({
+      }),
+      // Below the wide layout the agenda is a sheet, and the menu opens it.
+      ...when(!this.wide(), { id: 'agenda', label: t('meetings.agenda.title'), icon: 'list' }),
+      ...when(m.canManage, { id: 'settings', label: t('meetings.settings.title'), icon: 'edit' }),
+      ...when(!this.phone() || noDock, {
+        id: 'attendance',
+        label: t('meetings.page.recordAttendance'),
+        icon: 'users',
+      }),
+      ...when(noDock && this.showVotes(), {
+        id: 'votes',
+        label: t('meetings.vote.count'),
+        icon: 'vote',
+      }),
+      ...when(this.phone() && keeper, {
         id: 'keeper',
         label: t(m.status === 'live' ? 'meetings.handover.title' : 'meetings.dock.pickProtokollant'),
         icon: m.status === 'live' ? 'swap' : 'clipcheck',
-      });
-    }
-    if (!this.wide() && m.status !== 'closed' && m.canManage) {
-      main.push({ id: 'beamer', label: t('meetings.beamer.enter'), icon: 'monitor' });
-    }
-    if (this.phone() && m.publicJoin && m.status !== 'closed' && m.canManage) {
-      main.push({ id: 'qr', label: t('guests.qr.title'), icon: 'grid' });
-    }
-    const sections: RowMenuSection[] = [{ items: main }];
-    const danger: RowMenuItem[] = [];
-    if (this.phone() && this.mainAction() === 'close') {
-      danger.push({
+      }),
+      ...when(!this.wide() && m.status !== 'closed' && m.canManage, {
+        id: 'beamer',
+        label: t('meetings.beamer.enter'),
+        icon: 'monitor',
+      }),
+      ...when(this.phone() && m.publicJoin && m.status !== 'closed' && m.canManage, {
+        id: 'qr',
+        label: t('guests.qr.title'),
+        icon: 'grid',
+      }),
+    ];
+    const danger: readonly RowMenuItem[] = [
+      ...when(this.phone() && this.mainAction() === 'close', {
         id: 'close',
         label: t('meetings.control.closeSession'),
         icon: 'square',
         danger: true,
         disabledReason: this.anyOpenVote() ? t('meetings.page.closeBlocked') : null,
-      });
-    }
-    if (m.canDelete) {
-      danger.push({ id: 'delete', label: t('meetings.delete.title'), icon: 'trash', danger: true });
-    }
-    sections.push({ items: danger });
-    return sections;
+      }),
+      ...when(m.canDelete, {
+        id: 'delete',
+        label: t('meetings.delete.title'),
+        icon: 'trash',
+        danger: true,
+      }),
+    ];
+    return [{ items: main }, { items: danger }];
   });
 
   /** The votes of the open item: the open one first, then the newest first. */

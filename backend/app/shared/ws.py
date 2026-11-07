@@ -31,18 +31,16 @@ WS_FORBIDDEN = 4403
 WS_NOT_FOUND = 4404
 
 
-def _allowed_origins(settings: Settings) -> set[str]:
+def _allowed_origins(settings: Settings) -> frozenset[str]:
     """Return the allowed WebSocket origins.
 
     The set holds the public base URL and the configured CORS origins. Every
     entry is normalized to `scheme://host[:port]` without a path and without a
     trailing slash. This matches the `Origin` header of a browser.
     """
-    origins = {o.rstrip("/") for o in settings.cors_allow_origins if o}
+    configured = frozenset(o.rstrip("/") for o in settings.cors_allow_origins if o)
     base = (settings.public_base_url or "").rstrip("/")
-    if base:
-        origins.add(base)
-    return origins
+    return configured | {base} if base else configured
 
 
 def origin_allowed(origin: str | None, settings: Settings) -> bool:

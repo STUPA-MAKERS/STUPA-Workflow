@@ -13,14 +13,15 @@ import type {
 
 /** Build the query of the list and the semester routes. Empty filters stay out. */
 export function protocolParams(query: PublicProtocolQuery): HttpParams {
-  let params = new HttpParams();
-  for (const id of query.gremium ?? []) params = params.append('gremium', id);
-  if (query.semester) params = params.set('semester', query.semester);
   const q = query.q?.trim();
-  if (q) params = params.set('q', q.slice(0, 100));
-  if (query.limit !== undefined) params = params.set('limit', String(query.limit));
-  if (query.offset) params = params.set('offset', String(query.offset));
-  return params;
+  const entries: readonly (readonly [string, string])[] = [
+    ...(query.gremium ?? []).map((id) => ['gremium', id] as const),
+    ...(query.semester ? [['semester', query.semester] as const] : []),
+    ...(q ? [['q', q.slice(0, 100)] as const] : []),
+    ...(query.limit !== undefined ? [['limit', String(query.limit)] as const] : []),
+    ...(query.offset ? [['offset', String(query.offset)] as const] : []),
+  ];
+  return entries.reduce((params, [key, value]) => params.append(key, value), new HttpParams());
 }
 
 /**

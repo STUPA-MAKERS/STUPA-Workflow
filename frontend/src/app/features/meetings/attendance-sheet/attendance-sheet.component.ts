@@ -50,9 +50,9 @@ import { personLabel } from '@shared/person-label.util';
 
 /** One attendance change. `note` is the reason of an excuse; omitted keeps the stored one. */
 export interface AttendanceChange {
-  member: Attendance;
-  status: AttendanceStatus;
-  note?: string | null;
+  readonly member: Attendance;
+  readonly status: AttendanceStatus;
+  readonly note?: string | null;
 }
 
 /** A choice of the attendance control. `open` resets the record (lead only). */
@@ -60,29 +60,29 @@ type Choice = AttendanceStatus | 'open';
 
 /** One option of the control of a row. */
 interface ChoiceOption {
-  value: Choice;
-  label: TranslationKey;
+  readonly value: Choice;
+  readonly label: TranslationKey;
   /** Why the option is not possible now, or `null`. */
-  blocked: TranslationKey | null;
+  readonly blocked: TranslationKey | null;
 }
 
 /** A row of the sheet: the record, its sub line and its control. */
 interface Row {
-  a: Attendance;
-  name: string;
-  sub: string;
+  readonly a: Attendance;
+  readonly name: string;
+  readonly sub: string;
   /** The options of the control, or `null` for a read-only row. */
-  options: ChoiceOption[] | null;
+  readonly options: readonly ChoiceOption[] | null;
   /** The chosen option. */
-  value: Choice;
+  readonly value: Choice;
   /** The read-only status text. */
-  readOnly: { kind: StatusKind; key: TranslationKey };
-  menu: RowMenuSection[];
+  readonly readOnly: { readonly kind: StatusKind; readonly key: TranslationKey };
+  readonly menu: readonly RowMenuSection[];
   /** The server refused "present" for this member; the delegation is in the way. */
-  conflict: Delegation | 'unknown' | null;
+  readonly conflict: Delegation | 'unknown' | null;
 }
 
-const LEAD_CHOICES: readonly { value: Choice; label: TranslationKey }[] = [
+const LEAD_CHOICES: readonly { readonly value: Choice; readonly label: TranslationKey }[] = [
   { value: 'present', label: 'meetings.attendance.present' },
   { value: 'excused', label: 'meetings.attendance.excused' },
   { value: 'absent', label: 'meetings.attendance.absent' },
@@ -90,7 +90,7 @@ const LEAD_CHOICES: readonly { value: Choice; label: TranslationKey }[] = [
 ];
 
 /** A member reports the own record as present or absent ("Abwesend" means excused). */
-const SELF_CHOICES: readonly { value: Choice; label: TranslationKey }[] = [
+const SELF_CHOICES: readonly { readonly value: Choice; readonly label: TranslationKey }[] = [
   { value: 'present', label: 'meetings.attendance.selfPresent' },
   { value: 'excused', label: 'meetings.attendance.selfExcused' },
 ];
@@ -167,7 +167,7 @@ export class AttendanceSheetComponent {
   readonly attendance = input.required<Attendance[]>();
   readonly saving = input(false);
   /** Names of the people who have the meeting open (WS presence). */
-  readonly viewers = input<string[]>([]);
+  readonly viewers = input<readonly string[]>([]);
   /** The member whose "present" the server refused with 409 `delegation_active`. */
   readonly conflictId = input<Uuid | null>(null);
 
@@ -297,24 +297,26 @@ export class AttendanceSheetComponent {
     t: (key: TranslationKey, params?: Record<string, string | number>) => string,
   ): Row {
     const delegation = this.delegationOf(a.principalId);
-    const sub: string[] = [];
-    if (a.note) sub.push(t('meetings.attendanceSheet.reason', { note: a.note }));
-    if (delegation) {
-      sub.push(t('meetings.attendanceSheet.representedBy', { name: delegation.delegateName ?? '—' }));
-      if (delegation.delegateVoting) sub.push(t('meetings.attendanceSheet.withVote'));
-    }
-    if (a.source === 'lead') sub.push(t('meetings.attendance.bySession'));
-    if (a.principalId === this.meeting().protokollantId) sub.push(t('meetings.keeper.keeps'));
+    const sub = [
+      ...(a.note ? [t('meetings.attendanceSheet.reason', { note: a.note })] : []),
+      ...(delegation
+        ? [t('meetings.attendanceSheet.representedBy', { name: delegation.delegateName ?? '—' })]
+        : []),
+      ...(delegation?.delegateVoting ? [t('meetings.attendanceSheet.withVote')] : []),
+      ...(a.source === 'lead' ? [t('meetings.attendance.bySession')] : []),
+      ...(a.principalId === this.meeting().protokollantId ? [t('meetings.keeper.keeps')] : []),
+    ];
 
     const blocked: TranslationKey | null = delegation ? 'meetings.attendanceSheet.revokeFirst' : null;
-    let options: ChoiceOption[] | null = null;
-    if (!this.locked()) {
-      if (this.lead()) {
-        options = LEAD_CHOICES.map((c) => ({ ...c, blocked: c.value === 'present' ? blocked : null }));
-      } else if (a.isSelf && a.source !== 'lead') {
-        options = SELF_CHOICES.map((c) => ({ ...c, blocked: c.value === 'present' ? blocked : null }));
-      }
-    }
+    const choices = this.locked()
+      ? null
+      : this.lead()
+        ? LEAD_CHOICES
+        : a.isSelf && a.source !== 'lead'
+          ? SELF_CHOICES
+          : null;
+    const options: readonly ChoiceOption[] | null =
+      choices?.map((c) => ({ ...c, blocked: c.value === 'present' ? blocked : null })) ?? null;
 
     const conflict =
       this.conflictId() === a.principalId && a.status !== 'present' ? (delegation ?? 'unknown') : null;
@@ -369,24 +371,23 @@ export class AttendanceSheetComponent {
     );
   }
 
-  private menuOf(a: Attendance): RowMenuSection[] {
-    const items: RowMenuItem[] = [];
-    if (this.substitutable(a)) {
-      items.push({
-        id: 'substitute',
-        label: this.i18n.translate('meetings.leadSubstitute.action'),
-        icon: 'repeat',
-      });
-    }
-    if (this.noteEditable(a)) {
-      items.push({
-        id: 'note',
-        label: this.i18n.translate(
-          a.note ? 'meetings.attendanceSheet.editReason' : 'meetings.attendanceSheet.addReason',
-        ),
-        icon: 'edit',
-      });
-    }
+  private menuOf(a: Attendance): readonly RowMenuSection[] {
+    const substitute: RowMenuItem = {
+      id: 'substitute',
+      label: this.i18n.translate('meetings.leadSubstitute.action'),
+      icon: 'repeat',
+    };
+    const note: RowMenuItem = {
+      id: 'note',
+      label: this.i18n.translate(
+        a.note ? 'meetings.attendanceSheet.editReason' : 'meetings.attendanceSheet.addReason',
+      ),
+      icon: 'edit',
+    };
+    const items = [
+      ...(this.substitutable(a) ? [substitute] : []),
+      ...(this.noteEditable(a) ? [note] : []),
+    ];
     return items.length ? [{ items }] : [];
   }
 
@@ -411,14 +412,14 @@ export class AttendanceSheetComponent {
       : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 0;
     if (!dir) return;
     event.preventDefault();
-    for (let i = 1; i <= options.length; i++) {
-      const next = (index + dir * i + options.length) % options.length;
-      if (options[next].blocked) continue;
-      const group = (event.currentTarget as HTMLElement).parentElement;
-      this.focused.set({ id: row.a.principalId, value: options[next].value });
-      group?.querySelectorAll<HTMLButtonElement>('[role="radio"]')[next]?.focus();
-      return;
-    }
+    const steps = Array.from({ length: options.length }, (_, i) => i + 1);
+    const next = steps
+      .map((i) => (index + dir * i + options.length) % options.length)
+      .find((k) => !options[k].blocked);
+    if (next === undefined) return;
+    const group = (event.currentTarget as HTMLElement).parentElement;
+    this.focused.set({ id: row.a.principalId, value: options[next].value });
+    group?.querySelectorAll<HTMLButtonElement>('[role="radio"]')[next]?.focus();
   }
 
   /**

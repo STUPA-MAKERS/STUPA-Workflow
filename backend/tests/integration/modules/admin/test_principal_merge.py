@@ -89,6 +89,7 @@ from app.modules.todos.models import (
     TodoColumn,
     TodoComment,
     TodoEvent,
+    TodoEventSeries,
     TodoLink,
 )
 from app.modules.translations.models import UiLanguage, UiTranslation
@@ -457,6 +458,7 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
                 ),
                 TodoEvent(card_id=card.id, actor_id=old.id, kind="created"),
                 TodoLink(card_id=card.id, ticket_id=ticket.id, created_by=old.id),
+                TodoEventSeries(name=f"Reihe {tag}", created_by=old.id),
             ]
         )
 
@@ -603,7 +605,7 @@ async def test_merge_rewrites_every_area(maker: async_sessionmaker[AsyncSession]
     assert after["memberships"]["removed"] == 1
     assert after["calendar"]["removed"] == 1
     assert after["tickets"] == {"rewritten": 6, "combined": 0, "removed": 0}
-    assert after["todos"] == {"rewritten": 7, "combined": 0, "removed": 0}
+    assert after["todos"] == {"rewritten": 8, "combined": 0, "removed": 0}
 
     async with maker() as session:
         for column in SUB_REFS:

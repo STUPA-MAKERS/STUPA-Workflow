@@ -47,7 +47,7 @@ _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 
 
 def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
-    return {code: _PROBLEM for code in codes}
+    return dict.fromkeys(codes, _PROBLEM)
 
 
 def get_translation_service(session: DbSession) -> TranslationService:
@@ -74,7 +74,7 @@ async def get_i18n_bundle(
     response.headers["Cache-Control"] = "no-cache"
     return I18nBundleOut(
         locale=resolved,
-        languages=[PublicLanguageOut(code=row.code, name=row.name) for row in languages],
+        languages=tuple(PublicLanguageOut(code=row.code, name=row.name) for row in languages),
         overrides=overrides,
     )
 
@@ -156,7 +156,9 @@ async def get_builtin_texts(
     rows = await service.builtin(prefix=prefix, locale=locale, untranslated=untranslated)
     return BuiltinTextsOut(
         locale=locale,
-        texts=[BuiltinTextOut(key=key, de=text.de, en=text.en, own=own) for key, text, own in rows],
+        texts=tuple(
+            BuiltinTextOut(key=key, de=text.de, en=text.en, own=own) for key, text, own in rows
+        ),
     )
 
 

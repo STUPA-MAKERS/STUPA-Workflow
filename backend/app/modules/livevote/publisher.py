@@ -49,23 +49,23 @@ class NullPublisher:
 
     async def vote_opened(self, vote: VoteOut) -> None:
         """Drop the event."""
-        return None
+        return
 
     async def vote_tally(self, vote: VoteOut) -> None:
         """Drop the event."""
-        return None
+        return
 
     async def vote_closed(self, vote: VoteClosed) -> None:
         """Drop the event."""
-        return None
+        return
 
     async def vote_cancelled(self, vote: VoteOut) -> None:
         """Drop the event."""
-        return None
+        return
 
     async def vote_lot_drawn(self, vote: VoteOut) -> None:
         """Drop the event."""
-        return None
+        return
 
 
 def get_meeting_publisher(request: Request) -> MeetingPublisher:

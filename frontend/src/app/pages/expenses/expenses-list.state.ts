@@ -26,8 +26,8 @@ export class ExpensesListState {
   private readonly PAGE = 20;
   private nextOffset = 0;
 
-  readonly budgetTree = signal<BudgetTreeNode[]>([]);
-  readonly items = signal<Expense[]>([]);
+  readonly budgetTree = signal<readonly BudgetTreeNode[]>([]);
+  readonly items = signal<readonly Expense[]>([]);
   readonly total = signal(0);
   readonly loading = signal(true);
   readonly loadingMore = signal(false);
@@ -58,7 +58,7 @@ export class ExpensesListState {
         .length,
   );
 
-  readonly costCentreOptions = computed<SelectOption[]>(() =>
+  readonly costCentreOptions = computed<readonly SelectOption[]>(() =>
     flattenBudgetOptions(this.budgetTree()),
   );
 

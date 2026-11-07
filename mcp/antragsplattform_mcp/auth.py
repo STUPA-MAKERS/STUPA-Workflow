@@ -19,6 +19,8 @@ import threading
 import time
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from queue import SimpleQueue
+from typing import Any
 from urllib.parse import parse_qs, urlencode, urlparse
 
 import httpx
@@ -92,44 +94,65 @@ def _pkce_pair() -> tuple[str, str]:
     return verifier, challenge
 
 
+def _discovery_attempt(url: str, base_url: str) -> dict | str:
+    """Fetch the OAuth metadata at one URL.
+
+    Returns:
+        The checked metadata, or the text of the failure when the URL gives none.
+
+    Raises:
+        AuthError: The metadata lacks an endpoint or names an unsafe one.
+    """
+    try:
+        resp = httpx.get(url, timeout=15)
+    except httpx.HTTPError as exc:
+        return str(exc)
+    if resp.status_code != 200:
+        return f"{resp.status_code} at {url}"
+    try:
+        meta = resp.json()
+    except ValueError:
+        return f"non-JSON response at {url}"
+    # The metadata endpoints must be https (or loopback) and same-origin with
+    # base_url before a browser redirect or a token POST uses them.
+    for label in ("authorization_endpoint", "token_endpoint"):
+        value = meta.get(label)
+        if not isinstance(value, str) or not value:
+            raise AuthError(f"OAuth discovery missing {label}")
+        _require_secure_endpoint(label, value, base_url)
+    return meta
+
+
 def _discover(base_url: str) -> dict:
     # Reject a cleartext URL before any network call. Discovery returns the authorization
     # endpoint and the token endpoint. Both carry the OAuth code and the tokens.
     _require_secure_base(base_url)
     # Standard discovery sits at the root. Some deployments route only /api through the
     # edge proxy, so fall back to the metadata mirrored under /api.
-    candidates = [
-        f"{base_url}/.well-known/oauth-authorization-server",
-        f"{base_url}/api/.well-known/oauth-authorization-server",
-    ]
-    last = ""
-    for url in candidates:
-        try:
-            resp = httpx.get(url, timeout=15)
-        except httpx.HTTPError as exc:
-            last = str(exc)
-            continue
-        if resp.status_code == 200:
-            try:
-                meta = resp.json()
-            except ValueError:
-                last = f"non-JSON response at {url}"
-                continue
-            # The metadata endpoints must be https (or loopback) and same-origin with
-            # base_url before a browser redirect or a token POST uses them.
-            for label in ("authorization_endpoint", "token_endpoint"):
-                value = meta.get(label)
-                if not isinstance(value, str) or not value:
-                    raise AuthError(f"OAuth discovery missing {label}")
-                _require_secure_endpoint(label, value, base_url)
-            return meta
-        last = f"{resp.status_code} at {url}"
-    raise AuthError(f"OAuth discovery failed: {last}")
+    root = _discovery_attempt(f"{base_url}/.well-known/oauth-authorization-server", base_url)
+    found = (
+        root
+        if isinstance(root, dict)
+        else _discovery_attempt(f"{base_url}/api/.well-known/oauth-authorization-server", base_url)
+    )
+    if not isinstance(found, dict):
+        raise AuthError(f"OAuth discovery failed: {found}")
+    return found
 
 
-def _capture_code(redirect_path: str) -> tuple[HTTPServer, dict]:
-    """Start a loopback server on a random port and return it with a result holder."""
-    holder: dict = {}
+class _CallbackServer(HTTPServer):
+    """The loopback server of the callback. `timeout` bounds the wait for the one request."""
+
+    timeout = _CALLBACK_TIMEOUT
+
+
+def _capture_code(redirect_path: str) -> tuple[HTTPServer, SimpleQueue[dict]]:
+    """Start a loopback server on a random port and return it with the queue of its result.
+
+    The handler runs in the thread of the server, so it hands the callback parameters over
+    through a queue.
+    """
+    results: SimpleQueue[dict] = SimpleQueue()
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:
@@ -139,9 +162,7 @@ def _capture_code(redirect_path: str) -> tuple[HTTPServer, dict]:
                 self.end_headers()
                 return
             q = parse_qs(parsed.query)
-            holder["code"] = (q.get("code") or [None])[0]
-            holder["state"] = (q.get("state") or [None])[0]
-            holder["error"] = (q.get("error") or [None])[0]
+            results.put({key: (q.get(key) or [None])[0] for key in ("code", "state", "error")})
             self.send_response(200)
             self.send_header("Content-Type", "text/html")
             self.end_headers()
@@ -151,8 +172,7 @@ def _capture_code(redirect_path: str) -> tuple[HTTPServer, dict]:
             # Keep the stdlib request log quiet.
             return
 
-    server = HTTPServer(("127.0.0.1", 0), Handler)
-    return server, holder
+    return _CallbackServer(("127.0.0.1", 0), Handler), results
 
 
 def browser_login(config: Config) -> dict:
@@ -161,7 +181,7 @@ def browser_login(config: Config) -> dict:
     verifier, challenge = _pkce_pair()
     state = secrets.token_urlsafe(16)
 
-    server, holder = _capture_code("/callback")
+    server, results = _capture_code("/callback")
     port = server.server_address[1]
     redirect_uri = f"http://127.0.0.1:{port}/callback"
 
@@ -177,8 +197,8 @@ def browser_login(config: Config) -> dict:
         }
     )
 
-    # Serve exactly one request in a background thread. The timeout bounds the wait.
-    server.timeout = _CALLBACK_TIMEOUT
+    # Serve exactly one request in a background thread. The timeout of the server bounds
+    # the wait.
     thread = threading.Thread(target=server.handle_request, daemon=True)
     thread.start()
     opened = webbrowser.open(auth_url)
@@ -186,6 +206,7 @@ def browser_login(config: Config) -> dict:
         print(f"Open this URL to log in:\n{auth_url}", flush=True)
     thread.join(timeout=_CALLBACK_TIMEOUT + 5)
     server.server_close()
+    holder: dict = {} if results.empty() else results.get_nowait()
 
     if holder.get("error"):
         raise AuthError(f"authorization failed: {holder['error']}")
@@ -211,16 +232,22 @@ def browser_login(config: Config) -> dict:
 def _exchange(token_endpoint: str, data: dict) -> dict:
     resp = httpx.post(token_endpoint, data=data, timeout=15)
     if resp.status_code != 200:
-        detail = resp.text
-        with contextlib.suppress(Exception):
-            detail = resp.json().get("error_description") or resp.json().get("error")
-        raise AuthError(f"token endpoint error ({resp.status_code}): {detail}")
+        raise AuthError(f"token endpoint error ({resp.status_code}): {_token_error(resp)}")
     tokens = resp.json()
     expires_in = tokens.get("expires_in")
     # An absent or null expires_in means the token does not expire. Only a revocation
     # ends it.
-    tokens["expires_at"] = None if expires_in is None else time.time() + int(expires_in) - 60
-    return tokens
+    return {
+        **tokens,
+        "expires_at": None if expires_in is None else time.time() + int(expires_in) - 60,
+    }
+
+
+def _token_error(resp: httpx.Response) -> Any:
+    """Return the OAuth error text of a failed token response, or its raw text."""
+    with contextlib.suppress(Exception):
+        return resp.json().get("error_description") or resp.json().get("error")
+    return resp.text
 
 
 def _refresh(config: Config, refresh_token: str) -> dict:

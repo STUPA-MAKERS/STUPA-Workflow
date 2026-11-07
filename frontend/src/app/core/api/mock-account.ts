@@ -10,12 +10,12 @@ import type { ConsentRequest, McpSetup, NotificationPreference, OAuthGrant } fro
 
 /** The answer of a mock route: the status and the body. */
 export interface MockAccountReply {
-  status: number;
-  body: unknown;
+  readonly status: number;
+  readonly body: unknown;
 }
 
 /** The kinds of the server catalogue (`NOTIFICATION_KINDS`), in its order. */
-let prefs: NotificationPreference[] = [
+let prefs: readonly NotificationPreference[] = [
   { kind: 'status_update', enabled: true },
   { kind: 'comment', enabled: true },
   { kind: 'task', enabled: true },
@@ -32,7 +32,7 @@ function at(days: number, hours = 0): string {
 }
 
 /** The demo grants, newest first (the server order). */
-function initialGrants(): OAuthGrant[] {
+function initialGrants(): readonly OAuthGrant[] {
   return [
     {
       id: 'c1000000-0000-0000-0000-000000000001',
@@ -61,7 +61,7 @@ function initialGrants(): OAuthGrant[] {
   ];
 }
 
-let grants: OAuthGrant[] = initialGrants();
+let grants: readonly OAuthGrant[] = initialGrants();
 
 const SETUP: McpSetup = {
   mcpServers: { antragsplattform: { command: 'antragsplattform-mcp' } },

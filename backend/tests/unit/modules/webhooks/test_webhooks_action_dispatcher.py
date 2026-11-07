@@ -38,7 +38,7 @@ def _action(action_type: str, **params: Any) -> DispatchedAction:
 
 def _hook() -> Webhook:
     h = Webhook(
-        name="h", url="https://h.test/h", events=["status_changed"],
+        name="h", url="https://h.test/h",
         active=True, secret=b"k",
     )
     h.id = uuid.uuid4()

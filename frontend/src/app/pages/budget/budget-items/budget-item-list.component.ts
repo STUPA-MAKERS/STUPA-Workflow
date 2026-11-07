@@ -18,21 +18,21 @@ import { type BudgetItem, budgetItemKey } from './budget-items';
 
 /** One row of the list, ready for the template. */
 interface ItemRow {
-  key: string;
-  icon: IconName;
+  readonly key: string;
+  readonly icon: IconName;
   /** The name of the type, for a screen reader. */
-  typeLabel: string;
-  title: string;
-  link: readonly unknown[];
-  queryParams: Params | null;
-  statusLabel: string | null;
-  statusKind: StatusKind;
-  pathKey: string | null;
-  costCentre: string | null;
+  readonly typeLabel: string;
+  readonly title: string;
+  readonly link: readonly unknown[];
+  readonly queryParams: Params | null;
+  readonly statusLabel: string | null;
+  readonly statusKind: StatusKind;
+  readonly pathKey: string | null;
+  readonly costCentre: string | null;
   /** The date of a booking; `''` for an application. */
-  date: string;
-  amount: string;
-  income: boolean;
+  readonly date: string;
+  readonly amount: string;
+  readonly income: boolean;
 }
 
 /**

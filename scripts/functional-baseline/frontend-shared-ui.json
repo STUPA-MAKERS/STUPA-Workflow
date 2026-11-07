@@ -1,0 +1,13 @@
+{
+  "frontend/src/app/shared/ui/avatar/avatar.service.ts": 1,
+  "frontend/src/app/shared/ui/chat/chat-mentions.ts": 2,
+  "frontend/src/app/shared/ui/chat/chat-outbox.ts": 1,
+  "frontend/src/app/shared/ui/chat/chat.component.ts": 7,
+  "frontend/src/app/shared/ui/chat/chat.models.ts": 4,
+  "frontend/src/app/shared/ui/chat/chat.util.ts": 4,
+  "frontend/src/app/shared/ui/expand-row/expand-row.component.ts": 1,
+  "frontend/src/app/shared/ui/history/history.component.ts": 1,
+  "frontend/src/app/shared/ui/pane-form/pane-form-head.component.ts": 1,
+  "frontend/src/app/shared/ui/pull-refresh/pull-refresh-ring.component.ts": 6,
+  "frontend/src/app/shared/ui/pull-refresh/pull-refresh.directive.ts": 5
+}

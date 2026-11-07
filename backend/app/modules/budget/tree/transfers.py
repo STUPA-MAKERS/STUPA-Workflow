@@ -11,15 +11,14 @@ import uuid
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, func, or_, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import aliased
 
 from app.modules.audit.actions import AuditAction
 from app.modules.budget import tree_rules
 from app.modules.budget.tree.expenses import ExpenseOps
-from app.modules.budget.tree.service_base import _json_safe
+from app.modules.budget.tree.service_base import _applied, _json_safe, _subtree_ids
 from app.modules.budget.tree_models import Budget, BudgetExpense
-from app.modules.budget.tree_rules import _SEP
 from app.modules.budget.tree_schemas import (
     TransferCreate,
     TransferOut,
@@ -130,7 +129,7 @@ class TransferOps(ExpenseOps):
                 select(Budget.id, Budget.path_key).where(Budget.id.in_(budget_ids))
             )
         ).all()
-        return {bid: path for bid, path in rows}
+        return dict(rows)
 
     @staticmethod
     def _row_out(
@@ -185,44 +184,42 @@ class TransferOps(ExpenseOps):
         The subtree filter matches through the transfer id, because either leg may sit
         in the subtree.
         """
-        filters: list[ColumnElement[bool]] = [
-            BudgetExpense.transfer_id.is_not(None),
-            BudgetExpense.kind == "expense",
-        ]
-        if transfer_id is not None:
-            filters.append(BudgetExpense.transfer_id == transfer_id)
-        if budget_id is not None:
-            node = await self._get_node(budget_id)
-            subtree = select(Budget.id).where(
-                or_(
-                    Budget.path_key == node.path_key,
-                    Budget.path_key.like(node.path_key + _SEP + "%"),
-                )
-            )
-            leg = aliased(BudgetExpense)
-            filters.append(
-                BudgetExpense.transfer_id.in_(
-                    select(leg.transfer_id).where(leg.budget_id.in_(subtree))
-                )
-            )
-        if fiscal_year_id is not None:
-            filters.append(BudgetExpense.fiscal_year_id == fiscal_year_id)
-        rank_expr = None
-        if q and q.strip():
-            where, rank_expr = trigram_rank(
+        node = await self._get_node(budget_id) if budget_id is not None else None
+        leg = aliased(BudgetExpense)
+        search = (
+            trigram_rank(
                 q,
                 [BudgetExpense.description, BudgetExpense.note],
                 dialect=dialect_of(self.session),
             )
-            filters.append(where)
-        if amount_min is not None:
-            filters.append(BudgetExpense.amount >= amount_min)
-        if amount_max is not None:
-            filters.append(BudgetExpense.amount <= amount_max)
-        if created_from:
-            filters.append(func.date(BudgetExpense.created_at) >= created_from)
-        if created_to:
-            filters.append(func.date(BudgetExpense.created_at) <= created_to)
+            if q and q.strip()
+            else None
+        )
+        rank_expr = search[1] if search is not None else None
+        filters = (
+            BudgetExpense.transfer_id.is_not(None),
+            BudgetExpense.kind == "expense",
+            *_applied(
+                BudgetExpense.transfer_id == transfer_id if transfer_id is not None else None,
+                (
+                    BudgetExpense.transfer_id.in_(
+                        select(leg.transfer_id).where(leg.budget_id.in_(_subtree_ids(node)))
+                    )
+                    if node is not None
+                    else None
+                ),
+                (
+                    BudgetExpense.fiscal_year_id == fiscal_year_id
+                    if fiscal_year_id is not None
+                    else None
+                ),
+                search[0] if search is not None else None,
+                BudgetExpense.amount >= amount_min if amount_min is not None else None,
+                BudgetExpense.amount <= amount_max if amount_max is not None else None,
+                func.date(BudgetExpense.created_at) >= created_from if created_from else None,
+                func.date(BudgetExpense.created_at) <= created_to if created_to else None,
+            ),
+        )
 
         sort_map = {
             "amount": BudgetExpense.amount,

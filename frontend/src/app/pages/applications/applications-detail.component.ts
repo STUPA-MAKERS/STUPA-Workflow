@@ -102,6 +102,7 @@ import { RailStatusService } from '../../layout/rail-status.service';
 import { provideFormly } from '@shared/formly/formly.providers';
 import { AmountComponent } from '@shared/ui/amount/amount.component';
 import { formatMoney } from '@shared/format-money';
+import { withoutKey } from '@shared/util/immutable';
 
 /** Field types whose old and new value do not fit on one line of the history. The
  *  history opens them as blocks below the change ("Werte anzeigen"). */
@@ -241,7 +242,7 @@ export class ApplicationsDetailComponent {
   /** The status changes of the application, oldest first. */
   readonly timeline = signal<TimelineEntry[]>([]);
   /** The sections of the pinned form. Empty until it loaded, and on an error. */
-  readonly sections = signal<FormSection[]>([]);
+  readonly sections = signal<readonly FormSection[]>([]);
   /** The form is on its way; the answers wait for it, so no raw keys flash. */
   readonly formLoading = signal(true);
   /** The type of the application has a budget: drives `visibleIf: has_budget`. */
@@ -380,8 +381,7 @@ export class ApplicationsDetailComponent {
   private topLevelIdOf(budgetId: string): string | null {
     const contains = (n: BudgetTreeNode): boolean =>
       n.id === budgetId || (n.children?.some(contains) ?? false);
-    for (const root of this.budgetTree()) if (contains(root)) return root.id;
-    return null;
+    return this.budgetTree().find(contains)?.id ?? null;
   }
   /** Load the fiscal years of the selected cost centre's top budget (dropdown + badge). */
   private loadFiscalYears(budgetId: string | null): void {
@@ -545,21 +545,17 @@ export class ApplicationsDetailComponent {
    */
   private positionsBlock(value: unknown): string {
     const t = this.i18n;
-    const lines: string[] = [];
-    for (const p of normalizePositions(value)) {
+    const lines = normalizePositions(value).flatMap((p) => {
       const name = p.label.trim() || t.translate('forms.positions.untitled');
-      lines.push(`${name} · ${this.money(positionValue(p))}`);
-      if (p.noOffers) {
-        const reason = p.noOffersReason.trim();
-        const short = t.translate('forms.positions.noOffersShort');
-        lines.push(`   ${reason ? `${short}: ${reason}` : short}`);
-      }
-      for (const o of p.offers) {
-        const parts = [o.label.trim() || '—', this.money(o.value)];
-        if (o.preferred) parts.push(t.translate('forms.positions.preferred'));
-        lines.push(`   – ${parts.join(' · ')}`);
-      }
-    }
+      const reason = p.noOffersReason.trim();
+      const short = t.translate('forms.positions.noOffersShort');
+      const noOffers = p.noOffers ? [`   ${reason ? `${short}: ${reason}` : short}`] : [];
+      const offers = p.offers.map((o) => {
+        const preferred = o.preferred ? [t.translate('forms.positions.preferred')] : [];
+        return `   – ${[o.label.trim() || '—', this.money(o.value), ...preferred].join(' · ')}`;
+      });
+      return [`${name} · ${this.money(positionValue(p))}`, ...noOffers, ...offers];
+    });
     return lines.join('\n');
   }
 
@@ -600,15 +596,15 @@ export class ApplicationsDetailComponent {
     return [
       ...version.diff.changed.map((c) => {
         const more = detail(c.key, { old: c.old, new: c.new });
-        let old = this.fmt(c.old, c.key);
-        let neu = this.fmt(c.new, c.key);
-        if (more && old === neu) old = neu = null;
+        const old = this.fmt(c.old, c.key);
+        const neu = this.fmt(c.new, c.key);
+        const same = more !== null && old === neu;
         return {
           kind: 'warn' as const,
           tag: t('applications.history.diff.changed'),
           label: this.fieldLabel(c.key),
-          old,
-          new: neu,
+          old: same ? null : old,
+          new: same ? null : neu,
           detail: more,
         };
       }),
@@ -651,29 +647,30 @@ export class ApplicationsDetailComponent {
     const events = [...this.timeline()].sort((a, b) => a.at.localeCompare(b.at));
     const versions = this.versions();
     const capture = this.app()?.capture ?? null;
-    const entries: HistoryEntry[] = events.map((e, i) => {
-      const lines: string[] = [];
-      if (i === 0 && versions.some((v) => v.version === 1)) {
-        lines.push(t('applications.history.version', { version: 1 }));
-      }
-      if (i === 0 && capture) {
-        lines.push(t('applications.history.captured'));
-        if (capture.intake) lines.push(t('applications.history.intake', { intake: capture.intake }));
-      }
-      if (e.transitionLabel) {
-        lines.push(t('applications.history.transition', { label: e.transitionLabel }));
-      }
-      if (e.note && !e.note.startsWith('vote:')) lines.push(e.note);
-      if (e.decision) {
-        const line = decisionHistoryLine(
-          e.decision,
-          this.i18n.formatLocale(),
-          this.app()?.currency ?? 'EUR',
-          t,
-        );
-        if (line) lines.push(line);
-      }
-      if (e.voteDeleted) lines.push(t('applications.history.voteDeleted'));
+    const firstVersion = versions.some((v) => v.version === 1);
+    const statusEntries: HistoryEntry[] = events.map((e, i) => {
+      const first = i === 0;
+      const intake = capture?.intake
+        ? [t('applications.history.intake', { intake: capture.intake })]
+        : [];
+      const decision = e.decision
+        ? decisionHistoryLine(
+            e.decision,
+            this.i18n.formatLocale(),
+            this.app()?.currency ?? 'EUR',
+            t,
+          )
+        : null;
+      const lines = [
+        ...(first && firstVersion ? [t('applications.history.version', { version: 1 })] : []),
+        ...(first && capture ? [t('applications.history.captured'), ...intake] : []),
+        ...(e.transitionLabel
+          ? [t('applications.history.transition', { label: e.transitionLabel })]
+          : []),
+        ...(e.note && !e.note.startsWith('vote:') ? [e.note] : []),
+        ...(decision ? [decision] : []),
+        ...(e.voteDeleted ? [t('applications.history.voteDeleted')] : []),
+      ];
       return {
         at: e.at,
         icon: i === 0 ? 'send' : 'flow',
@@ -686,24 +683,25 @@ export class ApplicationsDetailComponent {
           : null,
       };
     });
-    for (const v of versions) {
-      if (v.version === 1 && events.length) continue;
-      const changes = v.version === 1 ? [] : this.versionChanges(v);
-      entries.push({
-        at: v.at,
-        icon: 'edit',
-        title: t('applications.history.version', { version: v.version }),
-        actor: this.actor(v.changedByInfo, v.changedBy),
-        body:
-          v.version === 1
-            ? t('applications.history.initial')
-            : changes.length
-              ? null
-              : t('applications.history.diff.none'),
-        changes,
+    const versionEntries: HistoryEntry[] = versions
+      .filter((v) => !(v.version === 1 && events.length))
+      .map((v) => {
+        const changes = v.version === 1 ? [] : this.versionChanges(v);
+        return {
+          at: v.at,
+          icon: 'edit',
+          title: t('applications.history.version', { version: v.version }),
+          actor: this.actor(v.changedByInfo, v.changedBy),
+          body:
+            v.version === 1
+              ? t('applications.history.initial')
+              : changes.length
+                ? null
+                : t('applications.history.diff.none'),
+          changes,
+        };
       });
-    }
-    return entries;
+    return [...statusEntries, ...versionEntries];
   });
 
   private id: Uuid = '';
@@ -750,31 +748,46 @@ export class ApplicationsDetailComponent {
     const app = this.app();
     if (!app) return [];
     const t = (key: TranslationKey) => this.i18n.translate(key);
-    const quick: RowMenuItem[] = [];
-    if (this.phone()) {
-      if (this.canEditData()) quick.push({ id: 'edit', label: t('applications.detail.edit'), icon: 'edit' });
-      if (this.canArchive()) {
-        quick.push({
-          id: 'archive',
-          label: t(app.archivedAt ? 'applications.row.unarchive' : 'applications.row.archive'),
-          icon: 'archive',
-        });
-      }
-    }
-    const more: RowMenuItem[] = [];
-    if (this.canForceStatus()) {
-      more.push({ id: 'force', label: t('applications.detail.forceStatus'), icon: 'flow' });
-    }
-    if (this.versions().length > 1) {
-      more.push({ id: 'versions', label: t('applications.detail.compareVersions'), icon: 'history' });
-    }
-    const danger: RowMenuItem[] = [];
-    if (this.canDelete()) {
-      danger.push({ id: 'delete', label: t('applications.detail.delete'), icon: 'trash', danger: true });
-    }
-    if (this.canRequestErasure()) {
-      danger.push({ id: 'erase', label: t('applications.detail.eraseRequest'), icon: 'user', danger: true });
-    }
+    const when = (shown: boolean, item: RowMenuItem): RowMenuItem[] => (shown ? [item] : []);
+    const phone = this.phone();
+    const quick = [
+      ...when(phone && this.canEditData(), {
+        id: 'edit',
+        label: t('applications.detail.edit'),
+        icon: 'edit',
+      }),
+      ...when(phone && this.canArchive(), {
+        id: 'archive',
+        label: t(app.archivedAt ? 'applications.row.unarchive' : 'applications.row.archive'),
+        icon: 'archive',
+      }),
+    ];
+    const more = [
+      ...when(this.canForceStatus(), {
+        id: 'force',
+        label: t('applications.detail.forceStatus'),
+        icon: 'flow',
+      }),
+      ...when(this.versions().length > 1, {
+        id: 'versions',
+        label: t('applications.detail.compareVersions'),
+        icon: 'history',
+      }),
+    ];
+    const danger = [
+      ...when(this.canDelete(), {
+        id: 'delete',
+        label: t('applications.detail.delete'),
+        icon: 'trash',
+        danger: true,
+      }),
+      ...when(this.canRequestErasure(), {
+        id: 'erase',
+        label: t('applications.detail.eraseRequest'),
+        icon: 'user',
+        danger: true,
+      }),
+    ];
     return [{ items: quick }, { items: more }, { items: danger }].filter((sec) => sec.items.length);
   });
 
@@ -903,7 +916,8 @@ export class ApplicationsDetailComponent {
    */
   private loadApplication(id: Uuid): void {
     this.id = id;
-    const seq = ++this.loadSeq;
+    this.loadSeq = this.loadSeq + 1;
+    const seq = this.loadSeq;
     this.commentsLoaded = false;
     this.mentionsFor = null;
     this.mentionables.set([]);
@@ -1305,8 +1319,7 @@ export class ApplicationsDetailComponent {
 
   /** Without `application.manage` the composer has no toggle, so the comment is public. */
   protected sendComment(req: ChatSend): void {
-    const comment: ChatSend = { ...req };
-    if (!this.canManage()) delete comment.visibility;
+    const comment: ChatSend = this.canManage() ? { ...req } : withoutKey(req, 'visibility');
     this.outbox.send(comment);
   }
 

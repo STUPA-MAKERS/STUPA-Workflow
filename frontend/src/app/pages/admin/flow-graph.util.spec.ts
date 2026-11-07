@@ -118,9 +118,11 @@ describe('validateFlowGraph', () => {
     const v = validateFlowGraph(g);
     expect(v.valid).toBe(false);
     expect(keys(v)).toContain('admin.flow.err.voteNoAutomatic');
-    g.transitions = g.transitions.filter((t) => !t.automatic);
-    g.transitions.push({ from: 'voting', to: 'failed' });
-    expect(validateFlowGraph(g).valid).toBe(true);
+    const fixed = {
+      ...g,
+      transitions: [...g.transitions.filter((t) => !t.automatic), { from: 'voting', to: 'failed' }],
+    };
+    expect(validateFlowGraph(fixed).valid).toBe(true);
   });
 
   it('rejects guards/actions outside the whitelist', () => {
@@ -523,10 +525,12 @@ describe('validateFlowGraph — vote state with the gremium from the cost center
   });
 
   it('rejects gremiumSource "budget" on the initial state', () => {
-    const graph = voteGraph({ gremiumSource: 'budget' });
-    graph.states[0].isInitial = false;
-    graph.states[1].isInitial = true;
-    graph.transitions.push({ from: 'vote', to: 'draft' });
+    const base = voteGraph({ gremiumSource: 'budget' });
+    const graph = {
+      ...base,
+      states: base.states.map((s, i) => (i < 2 ? { ...s, isInitial: i === 1 } : s)),
+      transitions: [...base.transitions, { from: 'vote', to: 'draft' }],
+    };
     expect(keys(validateFlowGraph(graph))).toEqual(['admin.flow.err.voteGremiumInitial']);
   });
 
@@ -546,8 +550,11 @@ describe('validateFlowGraph — vote state with the gremium from the cost center
   it('allows the voteGremium recipient only into a vote state', () => {
     const notify = { type: 'notify' as const, recipients: [{ kind: 'voteGremium' as const }] };
     expect(validateFlowGraph(voteGraph({ gremiumSource: 'budget' }, [notify])).valid).toBe(true);
-    const graph = voteGraph({ gremiumSource: 'budget' });
-    graph.transitions[1].actions = [notify];
+    const base = voteGraph({ gremiumSource: 'budget' });
+    const graph = {
+      ...base,
+      transitions: base.transitions.map((t, i) => (i === 1 ? { ...t, actions: [notify] } : t)),
+    };
     expect(validateFlowGraph(graph).errors).toEqual([
       { key: 'admin.flow.err.voteGremiumRecipientNeedsVote', params: { from: 'vote', to: 'ok' } },
     ]);
