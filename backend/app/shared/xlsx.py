@@ -8,15 +8,18 @@ knows no database. It turns rows into bytes.
 from __future__ import annotations
 
 import json
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence, Set
 from datetime import datetime
 from decimal import Decimal
+from functools import reduce
 from io import BytesIO
+from itertools import count
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:  # pragma: no cover - types only
     from uuid import UUID
 
+    from openpyxl import Workbook
     from openpyxl.worksheet.worksheet import Worksheet
 
     from app.modules.applications.schemas import ApplicationListItem
@@ -54,12 +57,24 @@ def _append(worksheet: Worksheet, row: Sequence[object]) -> None:
     worksheet.append([_safe(cell) for cell in row])
 
 
+def _cell_width(cell: object) -> int:
+    return len(str(cell)) if cell is not None else 0
+
+
+def _column_widths(
+    headers: Sequence[str], rows: Sequence[Sequence[object]]
+) -> tuple[int, ...]:
+    """Return the length of the longest cell of each column, the header included."""
+    return tuple(
+        max((len(str(header)), *(_cell_width(row[i]) for row in rows)))
+        for i, header in enumerate(headers)
+    )
+
+
 def _autosize(worksheet: Worksheet, headers: Sequence[str]) -> None:
     """Fit each column width roughly to its longest cell."""
-    widths = [len(str(h)) for h in headers]
-    for row in worksheet.iter_rows(min_row=2, values_only=True):
-        for i, cell in enumerate(row):
-            widths[i] = max(widths[i], len(str(cell)) if cell is not None else 0)
+    rows = tuple(worksheet.iter_rows(min_row=2, values_only=True))
+    widths = _column_widths(headers, rows)
     from openpyxl.utils import get_column_letter
 
     for i, width in enumerate(widths, start=1):
@@ -73,6 +88,20 @@ def _header_row(worksheet: Worksheet, headers: Sequence[str]) -> None:
     for cell in worksheet[1]:
         cell.font = Font(bold=True)
     worksheet.freeze_panes = "A2"
+
+
+def _first_sheet(worksheet: Worksheet | None, title: str) -> Worksheet:
+    """Give the default sheet of a new workbook its title."""
+    assert worksheet is not None
+    worksheet.title = title
+    return worksheet
+
+
+def _workbook_bytes(workbook: Workbook) -> bytes:
+    """Serialize a workbook to `.xlsx` bytes."""
+    buf = BytesIO()
+    workbook.save(buf)
+    return buf.getvalue()
 
 
 def _iter_nodes(
@@ -113,15 +142,15 @@ def build_budget_workbook(
         "Verfügbar",
         "Währung",
     ]
-    nodes = list(_iter_nodes(roots))
-
-    fy_order: list[Any] = []
-    for _depth, node in nodes:
-        for alloc in node.by_fiscal_year:
-            if fiscal_year_id is not None and alloc.fiscal_year_id != fiscal_year_id:
-                continue
-            if alloc.fiscal_year_id not in fy_order:
-                fy_order.append(alloc.fiscal_year_id)
+    nodes = tuple(_iter_nodes(roots))
+    fy_order: tuple[Any, ...] = tuple(
+        dict.fromkeys(
+            alloc.fiscal_year_id
+            for _depth, node in nodes
+            for alloc in node.by_fiscal_year
+            if fiscal_year_id is None or alloc.fiscal_year_id == fiscal_year_id
+        )
+    )
 
     wb = Workbook()
     default_ws = wb.active
@@ -129,60 +158,77 @@ def build_budget_workbook(
         wb.remove(default_ws)
 
     if not fy_order:
-        ws = wb.create_sheet(title="Budget")
-        _header_row(ws, headers)
-        _autosize(ws, headers)
-        buf = BytesIO()
-        wb.save(buf)
-        return buf.getvalue()
+        empty = wb.create_sheet(title="Budget")
+        _header_row(empty, headers)
+        _autosize(empty, headers)
+        return _workbook_bytes(wb)
 
-    used_titles: set[str] = set()
-    for fy in fy_order:
-        label = fiscal_year_labels.get(fy, "HHJ")
-        ws = wb.create_sheet(title=_sheet_title(label, used_titles))
+    titles = _sheet_titles(tuple(fiscal_year_labels.get(fy, "HHJ") for fy in fy_order))
+    for fy, title in zip(fy_order, titles, strict=True):
+        ws = wb.create_sheet(title=title)
         _header_row(ws, headers)
         for depth, node in nodes:
-            indented = ("    " * depth) + node.name
-            alloc = next(
-                (a for a in node.by_fiscal_year if a.fiscal_year_id == fy), None
-            )
-            if alloc is None:
-                _append(ws, [indented, node.path_key, None, None, None, None, node.currency])
-            else:
-                _append(
-                    ws,
-                    [
-                        indented,
-                        node.path_key,
-                        _num(alloc.allocated),
-                        _num(alloc.committed),
-                        _num(alloc.requested),
-                        _num(alloc.available),
-                        node.currency,
-                    ]
-                )
+            _append(ws, _budget_row(depth, node, fy))
         _autosize(ws, headers)
 
-    buf = BytesIO()
-    wb.save(buf)
-    return buf.getvalue()
+    return _workbook_bytes(wb)
 
 
-def _sheet_title(label: str, used: set[str]) -> str:
-    r"""Build a unique sheet name that Excel accepts.
+def _budget_row(depth: int, node: BudgetTreeNodeOut, fy: object) -> list[object]:
+    """Return the row of one cost center in the sheet of fiscal year ``fy``.
+
+    A cost center without an allocation in that year gets empty amount cells.
+    """
+    indented = ("    " * depth) + node.name
+    alloc = next((a for a in node.by_fiscal_year if a.fiscal_year_id == fy), None)
+    amounts = (
+        [None, None, None, None]
+        if alloc is None
+        else [
+            _num(alloc.allocated),
+            _num(alloc.committed),
+            _num(alloc.requested),
+            _num(alloc.available),
+        ]
+    )
+    return [indented, node.path_key, *amounts, node.currency]
+
+
+def _unique_title(label: str, used: Set[str]) -> str:
+    r"""Build a sheet name that Excel accepts and that ``used`` does not hold yet.
 
     The name holds 31 characters at most and none of the characters `[]:*?/\`.
     """
-    safe = "".join("_" if c in '[]:*?/\\' else c for c in label).strip() or "HHJ"
-    safe = safe[:31]
-    base = safe
-    n = 2
-    while safe in used:
-        suffix = f" ({n})"
-        safe = base[: 31 - len(suffix)] + suffix
-        n += 1
-    used.add(safe)
-    return safe
+    safe = ("".join("_" if c in '[]:*?/\\' else c for c in label).strip() or "HHJ")[:31]
+    suffixed = (_suffixed(safe, n) for n in count(2))
+    return safe if safe not in used else next(t for t in suffixed if t not in used)
+
+
+def _suffixed(base: str, n: int) -> str:
+    """Return ``base`` with the suffix `` (n)``, cut so the name keeps 31 characters."""
+    suffix = f" ({n})"
+    return base[: 31 - len(suffix)] + suffix
+
+
+def _sheet_titles(labels: Sequence[str]) -> tuple[str, ...]:
+    """Return one unique sheet name per label, in order."""
+    start: tuple[str, ...] = ()
+    return reduce(_add_title, labels, start)
+
+
+def _add_title(titles: tuple[str, ...], label: str) -> tuple[str, ...]:
+    """Return ``titles`` with a unique sheet name for ``label`` at the end."""
+    return (*titles, _unique_title(label, frozenset(titles)))
+
+
+def _sheet_title(label: str, used: set[str]) -> str:
+    r"""Build a unique sheet name that Excel accepts and record it in ``used``.
+
+    The name holds 31 characters at most and none of the characters `[]:*?/\`.
+    """
+    title = _unique_title(label, used)
+    used.add(title)
+    return title
 
 
 def build_applications_workbook(
@@ -207,22 +253,16 @@ def build_applications_workbook(
         "Status seit",
     ]
     wb = Workbook()
-    ws = wb.active
-    assert ws is not None
-    ws.title = "Anträge"
+    ws = _first_sheet(wb.active, "Anträge")
     _header_row(ws, headers)
 
     for item in items:
-        state_label = ""
-        if item.state is not None:
-            label = item.state.label or {}
-            state_label = label.get(locale) or label.get("de") or label.get("en") or ""
         _append(
             ws,
             [
                 item.title or "",
                 type_names.get(item.type_id, ""),
-                state_label,
+                _state_label(item, locale),
                 gremium_names.get(item.gremium_id, "") if item.gremium_id else "",
                 _num(item.amount),
                 item.currency or "",
@@ -233,9 +273,13 @@ def build_applications_workbook(
         )
 
     _autosize(ws, headers)
-    buf = BytesIO()
-    wb.save(buf)
-    return buf.getvalue()
+    return _workbook_bytes(wb)
+
+
+def _state_label(item: ApplicationListItem, locale: str) -> str:
+    """Return the state label of an application in ``locale``, else German, else English."""
+    label = (item.state.label or {}) if item.state is not None else {}
+    return label.get(locale) or label.get("de") or label.get("en") or ""
 
 
 def build_expenses_workbook(items: Iterable[Any], locale: str = "de") -> bytes:
@@ -254,9 +298,7 @@ def build_expenses_workbook(items: Iterable[Any], locale: str = "de") -> bytes:
         "Datum", "Art", "Beschreibung", "Kostenstelle", "Antrag", "Betrag", "Währung",
     ]
     wb = Workbook()
-    ws = wb.active
-    assert ws is not None
-    ws.title = "Buchungen"
+    ws = _first_sheet(wb.active, "Buchungen")
     _header_row(ws, headers)
     for e in items:
         _append(
@@ -272,9 +314,7 @@ def build_expenses_workbook(items: Iterable[Any], locale: str = "de") -> bytes:
             ],
         )
     _autosize(ws, headers)
-    buf = BytesIO()
-    wb.save(buf)
-    return buf.getvalue()
+    return _workbook_bytes(wb)
 
 
 def build_auskunft_workbook(
@@ -293,9 +333,7 @@ def build_auskunft_workbook(
     from openpyxl import Workbook
 
     wb = Workbook()
-    ws_account = wb.active
-    assert ws_account is not None
-    ws_account.title = "Konto"
+    ws_account = _first_sheet(wb.active, "Konto")
     acc_headers = ["Feld", "Wert"]
     _header_row(ws_account, acc_headers)
     _append(ws_account, ["E-Mail (Anfrage)", email])
@@ -341,10 +379,7 @@ def build_auskunft_workbook(
             ],
         )
     _autosize(ws_versions, v_headers)
-
-    buf = BytesIO()
-    wb.save(buf)
-    return buf.getvalue()
+    return _workbook_bytes(wb)
 
 
 def _fmt_dt(value: datetime | None) -> str:
