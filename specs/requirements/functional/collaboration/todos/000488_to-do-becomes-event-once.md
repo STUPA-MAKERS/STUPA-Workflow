@@ -2,10 +2,10 @@
 id: "000488"
 title: A to-do becomes an Event only once
 kind: functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-06
-implementation: null
+updated: 2026-11-07
+replaced_by: F/collaboration/todos/000534
 scope:
   - backend/app/modules/todos
   - frontend/src/app/features/todos

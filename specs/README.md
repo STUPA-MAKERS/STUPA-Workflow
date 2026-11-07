@@ -189,8 +189,17 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/todos/000485](requirements/functional/collaboration/todos/000485_events-findable.md) | Archived Events stay findable | approved |
 | [F/collaboration/todos/000486](requirements/functional/collaboration/todos/000486_event-calendar.md) | An Event with a start is in the calendar | approved |
 | [F/collaboration/todos/000487](requirements/functional/collaboration/todos/000487_card-grants-read.md) | A card gives read access to its links | approved |
-| [F/collaboration/todos/000488](requirements/functional/collaboration/todos/000488_to-do-becomes-event-once.md) | A to-do becomes an Event only once | approved |
+| [F/collaboration/todos/000488](requirements/functional/collaboration/todos/000488_to-do-becomes-event-once.md) | A to-do becomes an Event only once | replaced |
 | [F/collaboration/todos/000489](requirements/functional/collaboration/todos/000489_links-are-called-linked.md) | The cards of an element are under Verknüpft | approved |
+| [F/collaboration/todos/000533](requirements/functional/collaboration/todos/000533_procurement-card.md) | A Beschaffung is a card with procurement data | draft |
+| [F/collaboration/todos/000534](requirements/functional/collaboration/todos/000534_card-type-once.md) | The type of a card is chosen once | draft |
+| [F/collaboration/todos/000535](requirements/functional/collaboration/todos/000535_procurement-phase.md) | A Beschaffung shows its phase from its links | draft |
+| [F/collaboration/todos/000536](requirements/functional/collaboration/todos/000536_procurement-totals.md) | A Beschaffung shows the estimate against the costs | draft |
+| [F/collaboration/todos/000537](requirements/functional/collaboration/todos/000537_one-procurement-per-element.md) | An Antrag, an invoice or a Buchung belongs to at most one Beschaffung | draft |
+| [F/collaboration/todos/000538](requirements/functional/collaboration/todos/000538_procurement-picker.md) | A Buchung and an invoice can name their Beschaffung | draft |
+| [F/collaboration/todos/000539](requirements/functional/collaboration/todos/000539_procurement-findable.md) | Archived Beschaffungen stay findable | draft |
+| [F/collaboration/todos/000540](requirements/functional/collaboration/todos/000540_card-repeat.md) | A to-do can repeat | draft |
+| [F/collaboration/todos/000541](requirements/functional/collaboration/todos/000541_repeat-next-card.md) | Done on a repeating to-do creates the next one | draft |
 | [F/finance/budget/000138](requirements/functional/finance/budget/000138_cost-centre-picker.md) | The cost centre pickers are fixed | approved |
 | [F/finance/budget/000139](requirements/functional/finance/budget/000139_close-fiscal-year.md) | A fiscal year closes and reopens | approved |
 | [F/finance/budget/000140](requirements/functional/finance/budget/000140_default-fiscal-year.md) | The default fiscal year holds today | approved |
